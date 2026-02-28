@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.taro/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Go
+server/bin/
+server/tmp/
+server/data/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.db
+
+# Test
+coverage/
+.nyc_output/
+
+# Misc
+*.tgz
+.cache/
