@@ -1,0 +1,91 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.4/schema.json",
+  "vcs": {
+    "enabled": false
+  },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/build",
+      "!**/.taro",
+      "!**/coverage",
+      "!**/*.min.js",
+      "!**/pnpm-lock.yaml"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedVariables": "warn",
+        "useExhaustiveDependencies": "warn"
+      },
+      "suspicious": {
+        "noExplicitAny": "warn",
+        "noArrayIndexKey": "off"
+      },
+      "style": {
+        "useImportType": "warn",
+        "noNonNullAssertion": "warn"
+      },
+      "a11y": {
+        "noStaticElementInteractions": "off",
+        "useKeyWithClickEvents": "off",
+        "useValidAnchor": "off"
+      }
+    }
+  },
+  "css": {
+    "linter": {
+      "enabled": true
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.css", "**/*.scss"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noUnknownAtRules": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/mini-app/src/**"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "recommended": false
+          }
+        }
+      }
+    }
+  ],
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always"
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "name": "valley-mas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "创作者口令空间 - 图片分享平台",
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:mini": "turbo dev --filter=@valley/mini-app -- --type weapp",
+    "dev:h5": "turbo dev --filter=@valley/mini-app -- --type h5",
+    "dev:admin": "turbo dev --filter=@valley/admin",
+    "build": "turbo build",
+    "build:mini": "turbo build --filter=@valley/mini-app -- --type weapp",
+    "build:h5": "turbo build --filter=@valley/mini-app -- --type h5",
+    "build:admin": "turbo build --filter=@valley/admin",
+    "init-repo": "turbo build -F '!./apps/*'  && pnpm install --frozen-lockfile",
+    "lint": "turbo lint",
+    "format": "turbo format",
+    "check": "turbo check",
+    "clean": "turbo clean"
+  },
+  "keywords": [
+    "taro",
+    "react",
+    "monorepo",
+    "turborepo",
+    "miniprogram"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0"
+  }
+}
