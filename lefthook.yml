@@ -1,0 +1,65 @@
+# Lefthook - Git Hooks 配置
+# 文档: https://github.com/evilmartians/lefthook/blob/master/docs/configuration.md
+
+# 🎨 Pre-commit：提交前检查（只检查暂存文件，速度快）
+pre-commit:
+  parallel: true  # 并行执行，提速！
+  
+  commands:
+    # 1️⃣ Biome 检查（Lint + Format）
+    biome-check:
+      glob: "*.{js,ts,jsx,tsx,json}"
+      run: pnpm biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true  # 自动 stage 修复后的文件
+      fail_text: |
+        ❌ Biome 检查失败！
+        提示：大部分问题已自动修复，请重新 git add
+        手动修复：pnpm biome check --write {staged_files}
+    
+    # 2️⃣ 格式化检查
+    format:
+      glob: "*.{js,ts,jsx,tsx,json,md}"
+      run: pnpm biome format --write {staged_files}
+      stage_fixed: true
+      fail_text: |
+        ❌ 格式化失败！
+        手动修复：pnpm format
+
+# 📝 Commit-msg：提交信息检查（Conventional Commits）
+commit-msg:
+  commands:
+    # 使用 Node.js 脚本进行跨平台检查
+    message-format:
+      run: node scripts/check-commit-msg.js {1}
+      fail_text: |
+        ❌ Commit message 格式不符合 Conventional Commits 规范
+        💡 修改后重新提交即可
+
+# 🚀 Pre-push：推送前检查（可选，较慢）
+# 如果觉得太慢，可以注释掉
+pre-push:
+  parallel: false  # 串行执行，确保构建成功
+  
+  commands:
+    # 构建检查（确保代码可以正常构建）
+    build-check:
+      run: pnpm turbo build --filter="[origin/master...HEAD]"
+      fail_text: |
+        ❌ 构建失败！请修复后再推送
+        手动测试：pnpm turbo build
+
+# ⚙️ 全局配置
+colors: true      # 彩色输出
+no_tty: false     # 允许交互式输入
+min_version: 1.0.0
+
+# 输出控制
+output:
+  - summary       # 显示摘要
+  - success       # 显示成功信息
+  - failure       # 显示失败信息
+
+# 如果想要更安静的输出，使用这个：
+# skip_output:
+#   - meta
+#   - success
