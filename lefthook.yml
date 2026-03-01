@@ -16,9 +16,9 @@ pre-commit:
         提示：大部分问题已自动修复，请重新 git add
         手动修复：pnpm biome check --write {staged_files}
     
-    # 2️⃣ 格式化检查
+    # 2️⃣ 格式化检查（排除 Markdown 文件）
     format:
-      glob: "*.{js,ts,jsx,tsx,json,md}"
+      glob: "*.{js,ts,jsx,tsx,json}"
       run: pnpm biome format --write {staged_files}
       stage_fixed: true
       fail_text: |
