@@ -4,7 +4,7 @@
  * 遵循 Conventional Commits 规范
  */
 
-const fs = require('fs');
+const fs = require('node:fs');
 
 // 获取 commit message 文件路径
 const msgPath = process.argv[2];
