@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/bwmarrin/snowflake"
 )
@@ -9,6 +11,7 @@ import (
 var (
 	node     *snowflake.Node
 	nodeOnce sync.Once
+	rng      = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
 // InitSnowflake 初始化 Snowflake 节点
@@ -48,4 +51,15 @@ func ParseID(id int64) snowflake.ID {
 func GetTimestamp(id int64) int64 {
 	sfID := snowflake.ID(id)
 	return sfID.Time()
+}
+
+// GenerateRandomString 生成指定长度的随机字符串
+// length: 字符串长度
+func GenerateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rng.Intn(len(charset))]
+	}
+	return string(b)
 }

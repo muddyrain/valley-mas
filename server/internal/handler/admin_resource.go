@@ -1,6 +1,10 @@
 package handler
 
 import (
+	"valley-server/internal/database"
+	"valley-server/internal/model"
+	"valley-server/internal/utils"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,10 +23,27 @@ import (
 // @Failure      403  {object}  map[string]interface{}  "无权限"
 // @Router       /admin/resources [get]
 func ListResources(c *gin.Context) {
-	// TODO: 实现资源列表查询
+	page := GetIntQuery(c, "page", 1)
+	pageSize := GetIntQuery(c, "pageSize", 20)
+	resourceType := c.Query("type")
+
+	offset := (page - 1) * pageSize
+
+	db := database.GetDB()
+	var resources []model.Resource
+	var total int64
+
+	query := db.Model(&model.Resource{})
+	if resourceType != "" {
+		query = query.Where("type = ?", resourceType)
+	}
+
+	query.Count(&total)
+	query.Preload("User").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&resources)
+
 	Success(c, gin.H{
-		"list":  []gin.H{},
-		"total": 0,
+		"list":  resources,
+		"total": total,
 	})
 }
 
@@ -40,8 +61,81 @@ func ListResources(c *gin.Context) {
 // @Failure      403  {object}  map[string]interface{}  "无权限"
 // @Router       /admin/resources/upload [post]
 func UploadResource(c *gin.Context) {
-	// TODO: 实现资源上传
-	Success(c, gin.H{"id": "1", "url": ""})
+	resourceType := c.PostForm("type")
+	if resourceType != "avatar" && resourceType != "wallpaper" {
+		Error(c, 400, "资源类型必须是 avatar 或 wallpaper")
+		return
+	}
+
+	// 获取上传的文件
+	file, err := c.FormFile("file")
+	if err != nil {
+		Error(c, 400, "请上传文件")
+		return
+	}
+
+	// 验证文件类型
+	allowedTypes := []string{".jpg", ".jpeg", ".png", ".webp"}
+	if !utils.ValidateFileType(file.Filename, allowedTypes) {
+		Error(c, 400, "只支持 JPG、PNG、WEBP 格式的图片")
+		return
+	}
+
+	// 验证文件大小（头像最大 2MB，壁纸最大 5MB）
+	maxSize := int64(2)
+	if resourceType == "wallpaper" {
+		maxSize = 5
+	}
+	if !utils.ValidateFileSize(file.Size, maxSize) {
+		Error(c, 400, "文件过大")
+		return
+	}
+
+	// 获取 TOS 上传器
+	uploader := utils.GetTOSUploader()
+	if uploader == nil {
+		Error(c, 500, "文件上传服务未配置")
+		return
+	}
+
+	// 上传到 TOS
+	folder := "avatars"
+	if resourceType == "wallpaper" {
+		folder = "wallpapers"
+	}
+	url, err := uploader.UploadFile(folder, file)
+	if err != nil {
+		Error(c, 500, "文件上传失败: "+err.Error())
+		return
+	}
+
+	// 获取当前登录用户 ID
+	userID, exists := c.Get("userId")
+	if !exists {
+		Error(c, 401, "未授权")
+		return
+	}
+
+	// 保存到数据库
+	resource := model.Resource{
+		ID:          model.Int64String(utils.GenerateID()),
+		Type:        resourceType,
+		URL:         url,
+		Title:       file.Filename,
+		Size:        file.Size,
+		CreatorID:   model.Int64String(userID.(int64)),
+		Description: "",
+	}
+
+	db := database.GetDB()
+	if err := db.Create(&resource).Error; err != nil {
+		// 如果数据库保存失败，删除已上传的文件
+		_ = uploader.DeleteFile(uploader.ExtractKeyFromURL(url))
+		Error(c, 500, "保存资源信息失败")
+		return
+	}
+
+	Success(c, resource)
 }
 
 // DeleteResource 删除资源
@@ -57,6 +151,29 @@ func UploadResource(c *gin.Context) {
 // @Failure      403  {object}  map[string]interface{}  "无权限"
 // @Router       /admin/resources/{id} [delete]
 func DeleteResource(c *gin.Context) {
-	// TODO: 实现删除资源
+	id := c.Param("id")
+
+	db := database.GetDB()
+	var resource model.Resource
+
+	// 查找资源
+	if err := db.First(&resource, "id = ?", id).Error; err != nil {
+		Error(c, 404, "资源不存在")
+		return
+	}
+
+	// 从 TOS 删除文件
+	uploader := utils.GetTOSUploader()
+	if uploader != nil {
+		key := uploader.ExtractKeyFromURL(resource.URL)
+		_ = uploader.DeleteFile(key)
+	}
+
+	// 从数据库软删除
+	if err := db.Delete(&resource).Error; err != nil {
+		Error(c, 500, "删除失败")
+		return
+	}
+
 	Success(c, nil)
 }

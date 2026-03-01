@@ -8,6 +8,8 @@ import (
 	"valley-server/internal/utils"
 
 	_ "valley-server/docs" // Swagger 文档
+
+	"github.com/joho/godotenv"
 )
 
 // @title           Valley MAS API
@@ -30,6 +32,11 @@ import (
 // @description JWT 认证，格式：Bearer {token}
 
 func main() {
+	// 加载 .env 文件（开发环境）
+	if err := godotenv.Load(); err != nil {
+		log.Println("⚠️  No .env file found, using system environment variables")
+	}
+
 	// 加载配置
 	cfg := config.Load()
 
@@ -38,6 +45,17 @@ func main() {
 		log.Fatalf("Failed to init Snowflake: %v", err)
 	}
 	log.Println("✅ Snowflake ID generator initialized (Node ID: 1)")
+
+	// 初始化火山引擎 TOS（对象存储）
+	if cfg.TOS.AccessKey != "" && cfg.TOS.SecretKey != "" {
+		if err := utils.InitTOS(&cfg.TOS); err != nil {
+			log.Printf("⚠️  TOS initialization failed: %v", err)
+		} else {
+			log.Println("✅ TOS (Volcano Engine Object Storage) initialized")
+		}
+	} else {
+		log.Println("⚠️  TOS credentials not configured, file upload disabled")
+	}
 
 	// 初始化数据库
 	if err := database.Init(cfg); err != nil {

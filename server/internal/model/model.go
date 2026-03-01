@@ -146,8 +146,8 @@ func (c *Creator) BeforeCreate(tx *gorm.DB) error {
 // Resource 资源模型
 type Resource struct {
 	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
-	CreatorID     Int64String    `gorm:"index" json:"creatorId"`
-	Type          string         `gorm:"size:20" json:"type"` // avatar, wallpaper
+	CreatorID     Int64String    `gorm:"index" json:"creatorId"`                   // 可以是 Creator ID 或 User ID（管理员上传）
+	Type          string         `gorm:"size:20" json:"type"`                      // avatar, wallpaper
 	Title         string         `gorm:"size:100" json:"title"`
 	Description   string         `gorm:"size:255" json:"description"`
 	URL           string         `gorm:"size:500" json:"url"`
@@ -160,8 +160,9 @@ type Resource struct {
 	UpdatedAt     time.Time      `json:"updatedAt"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 
-	// 关联
+	// 关联（可能是创作者或管理员用户）
 	Creator *Creator `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
+	User    *User    `gorm:"foreignKey:CreatorID" json:"user,omitempty"` // 管理员上传时使用
 }
 
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
