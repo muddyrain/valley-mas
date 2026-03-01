@@ -40,7 +40,7 @@ TOS_REGION=cn-beijing
 4. 设置为：**公共读** (Public Read)
 5. 或配置 Bucket Policy 允许公开访问
 
-示例 Bucket Policy（公共读）:
+示例 Bucket Policy（公共读）: 
 ```json
 {
   "Statement": [

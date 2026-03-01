@@ -24,7 +24,7 @@ http.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // 响应拦截器
@@ -78,13 +78,14 @@ http.interceptors.response.use(
       } else {
         msg = '网络请求失败，请稍后重试';
       }
-    } if (responseData?.message) {
+    }
+    if (responseData?.message) {
       msg = responseData.message;
     }
     // 显示错误提示
     message.error(msg);
     return Promise.reject(error);
-  }
+  },
 );
 
 export default http;

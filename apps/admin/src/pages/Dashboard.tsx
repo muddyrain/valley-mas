@@ -1,11 +1,11 @@
-import { Row, Col, Card, Statistic } from 'antd'
-import { UserOutlined, CrownOutlined, PictureOutlined, DownloadOutlined } from '@ant-design/icons'
+import { CrownOutlined, DownloadOutlined, PictureOutlined, UserOutlined } from '@ant-design/icons';
+import { Card, Col, Row, Statistic } from 'antd';
 
 export default function Dashboard() {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">数据概览</h2>
-      
+
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>
           <Card>
@@ -46,5 +46,5 @@ export default function Dashboard() {
         </Col>
       </Row>
     </div>
-  )
+  );
 }
