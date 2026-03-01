@@ -1,9 +1,9 @@
 # Lefthook - Git Hooks 配置
 # 文档: https://github.com/evilmartians/lefthook/blob/master/docs/configuration.md
 
-# 🎨 Pre-commit：提交前检查（只检查暂存文件，速度快）
+# 🎨 Pre-commit：提交前检查（先 lint/format，再 build）
 pre-commit:
-  parallel: true  # 并行执行，提速！
+  parallel: false  # 串行执行，确保顺序
   
   commands:
     # 1️⃣ Biome 检查（Lint + Format）
@@ -24,6 +24,13 @@ pre-commit:
       fail_text: |
         ❌ 格式化失败！
         手动修复：pnpm format
+    
+    # 3️⃣ 构建检查（最后执行，确保修复后的代码可以正常构建）
+    build-check:
+      run: pnpm turbo build
+      fail_text: |
+        ❌ 构建失败！请修复后再提交
+        手动测试：pnpm turbo build
 
 # 📝 Commit-msg：提交信息检查（Conventional Commits）
 commit-msg:
@@ -35,18 +42,11 @@ commit-msg:
         ❌ Commit message 格式不符合 Conventional Commits 规范
         💡 修改后重新提交即可
 
-# 🚀 Pre-push：推送前检查（可选，较慢）
-# 如果觉得太慢，可以注释掉
-pre-push:
-  parallel: false  # 串行执行，确保构建成功
-  
-  commands:
-    # 构建检查（确保代码可以正常构建）
-    build-check:
-      run: pnpm turbo build --filter="[origin/master...HEAD]"
-      fail_text: |
-        ❌ 构建失败！请修复后再推送
-        手动测试：pnpm turbo build
+# 🚀 Pre-push：推送前检查（已禁用，构建检查已移到 pre-commit）
+# 如果需要在推送前执行其他检查，可以在这里添加
+# pre-push:
+#   commands:
+#     其他检查...
 
 # ⚙️ 全局配置
 colors: true      # 彩色输出
