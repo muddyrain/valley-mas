@@ -1,26 +1,42 @@
-import { Table, Card, Input, Button, Space, Tag, Modal, Form, Switch } from 'antd'
-import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
-import type { ColumnsType } from 'antd/es/table'
-import { useState } from 'react'
+import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { Button, Card, Form, Input, Modal, Space, Switch, Table, Tag } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { useState } from 'react';
 
 interface CreatorRecord {
-  id: string
-  name: string
-  code: string
-  resourceCount: number
-  downloadCount: number
-  isActive: boolean
-  createdAt: string
+  id: string;
+  name: string;
+  code: string;
+  resourceCount: number;
+  downloadCount: number;
+  isActive: boolean;
+  createdAt: string;
 }
 
 const mockData: CreatorRecord[] = [
-  { id: '1', name: '设计师小王', code: 'ABC123', resourceCount: 25, downloadCount: 580, isActive: true, createdAt: '2026-01-15' },
-  { id: '2', name: '摄影师老李', code: 'XYZ789', resourceCount: 42, downloadCount: 1200, isActive: true, createdAt: '2026-01-20' },
-]
+  {
+    id: '1',
+    name: '设计师小王',
+    code: 'ABC123',
+    resourceCount: 25,
+    downloadCount: 580,
+    isActive: true,
+    createdAt: '2026-01-15',
+  },
+  {
+    id: '2',
+    name: '摄影师老李',
+    code: 'XYZ789',
+    resourceCount: 42,
+    downloadCount: 1200,
+    isActive: true,
+    createdAt: '2026-01-20',
+  },
+];
 
 export default function Creators() {
-  const [modalOpen, setModalOpen] = useState(false)
-  const [form] = Form.useForm()
+  const [modalOpen, setModalOpen] = useState(false);
+  const [form] = Form.useForm();
 
   const columns: ColumnsType<CreatorRecord> = [
     { title: 'ID', dataIndex: 'id', width: 80 },
@@ -28,7 +44,11 @@ export default function Creators() {
     { title: '口令', dataIndex: 'code', render: (code) => <Tag color="blue">{code}</Tag> },
     { title: '资源数', dataIndex: 'resourceCount' },
     { title: '下载量', dataIndex: 'downloadCount' },
-    { title: '状态', dataIndex: 'isActive', render: (v) => <Tag color={v ? 'success' : 'default'}>{v ? '启用' : '禁用'}</Tag> },
+    {
+      title: '状态',
+      dataIndex: 'isActive',
+      render: (v) => <Tag color={v ? 'success' : 'default'}>{v ? '启用' : '禁用'}</Tag>,
+    },
     { title: '创建时间', dataIndex: 'createdAt' },
     {
       title: '操作',
@@ -40,7 +60,7 @@ export default function Creators() {
         </Space>
       ),
     },
-  ]
+  ];
 
   return (
     <div>
@@ -49,17 +69,26 @@ export default function Creators() {
         <div className="mb-4 flex justify-between">
           <Space>
             <Input placeholder="搜索创作者/口令" prefix={<SearchOutlined />} className="w-64" />
-            <Button icon={<SearchOutlined />} type="primary">搜索</Button>
+            <Button icon={<SearchOutlined />} type="primary">
+              搜索
+            </Button>
           </Space>
           <Space>
             <Button icon={<ReloadOutlined />}>刷新</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>添加创作者</Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+              添加创作者
+            </Button>
           </Space>
         </div>
         <Table columns={columns} dataSource={mockData} rowKey="id" />
       </Card>
 
-      <Modal title="添加创作者" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => form.submit()}>
+      <Modal
+        title="添加创作者"
+        open={modalOpen}
+        onCancel={() => setModalOpen(false)}
+        onOk={() => form.submit()}
+      >
         <Form form={form} layout="vertical">
           <Form.Item label="创作者名称" name="name" rules={[{ required: true }]}>
             <Input placeholder="请输入创作者名称" />
@@ -76,5 +105,5 @@ export default function Creators() {
         </Form>
       </Modal>
     </div>
-  )
+  );
 }
