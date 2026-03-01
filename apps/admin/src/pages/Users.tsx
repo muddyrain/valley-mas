@@ -15,7 +15,7 @@ import {
   Tag,
 } from 'antd';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { User } from '../api/user';
 import {
   reqCreateUser,
@@ -37,39 +37,39 @@ export default function Users() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState('新增用户');
   const [form] = Form.useForm();
-  const [editId, setEditId] = useState<number | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [currentPlatform, setCurrentPlatform] = useState('wechat');
 
-  const fetchUsers = useCallback(
-    async (page = pagination.current, pageSize = pagination.pageSize, kw = keyword) => {
-      setLoading(true);
-      try {
-        const res = await reqGetUserList({
-          page,
-          pageSize,
-          keyword: kw,
-          platform: platformFilter || undefined,
-          role: roleFilter || undefined,
-        });
-        setData(res.list || []);
-        setTotal(res.total || 0);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [pagination.current, pagination.pageSize, keyword, platformFilter, roleFilter],
-  );
+  // 获取用户列表
+  const fetchUsers = async (page = 1, pageSize = 10, kw = '') => {
+    setLoading(true);
+    try {
+      const res = await reqGetUserList({
+        page,
+        pageSize,
+        keyword: kw,
+        platform: platformFilter || undefined,
+        role: roleFilter || undefined,
+      });
+      setData(res.list || []);
+      setTotal(res.total || 0);
+      setPagination({ current: page, pageSize });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // 初始加载和筛选条件变化时触发
+  // 筛选条件变化时，重置到第一页
   useEffect(() => {
-    setPagination({ current: 1, pageSize: 10 });
+    fetchUsers(1, pagination.pageSize, keyword);
   }, [platformFilter, roleFilter]);
 
+  // 初始加载
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    fetchUsers(1, 10, '');
+  }, []);
 
   const handleTableChange = (pag: TablePaginationConfig) => {
     const current = pag.current || 1;
@@ -83,7 +83,7 @@ export default function Users() {
     fetchUsers(1, pagination.pageSize, keyword);
   };
 
-  const toggleStatus = async (id: number, checked: boolean) => {
+  const toggleStatus = async (id: string, checked: boolean) => {
     try {
       await reqUpdateUserStatus(id, checked);
       message.success('状态更新成功');
@@ -94,7 +94,7 @@ export default function Users() {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     try {
       await reqDeleteUser(id);
       message.success('删除成功');

@@ -1,21 +1,87 @@
 package model
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"fmt"
+	"strconv"
 	"time"
 	"valley-server/internal/utils"
 
 	"gorm.io/gorm"
 )
 
+// Int64String 用于将 int64 序列化为字符串，避免 JavaScript 精度丢失
+type Int64String int64
+
+// MarshalJSON 将 int64 序列化为 JSON 字符串
+func (i Int64String) MarshalJSON() ([]byte, error) {
+	return json.Marshal(strconv.FormatInt(int64(i), 10))
+}
+
+// UnmarshalJSON 从 JSON 字符串或数字反序列化为 int64
+func (i *Int64String) UnmarshalJSON(data []byte) error {
+	// 尝试解析为字符串
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		val, err := strconv.ParseInt(str, 10, 64)
+		if err != nil {
+			return err
+		}
+		*i = Int64String(val)
+		return nil
+	}
+
+	// 尝试解析为数字
+	var num int64
+	if err := json.Unmarshal(data, &num); err != nil {
+		return err
+	}
+	*i = Int64String(num)
+	return nil
+}
+
+// Value 实现 driver.Valuer 接口，用于 GORM
+func (i Int64String) Value() (driver.Value, error) {
+	return int64(i), nil
+}
+
+// Scan 实现 sql.Scanner 接口，用于 GORM
+func (i *Int64String) Scan(value interface{}) error {
+	if value == nil {
+		*i = 0
+		return nil
+	}
+	switch v := value.(type) {
+	case int64:
+		*i = Int64String(v)
+	case []byte:
+		val, err := strconv.ParseInt(string(v), 10, 64)
+		if err != nil {
+			return err
+		}
+		*i = Int64String(val)
+	case string:
+		val, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return err
+		}
+		*i = Int64String(val)
+	default:
+		return fmt.Errorf("cannot scan type %T into Int64String", value)
+	}
+	return nil
+}
+
 // User 用户模型 - 支持多平台（微信、抖音等）
-// 使用 Snowflake ID（int64），和抖音、字节跳动保持一致
+// 使用 Snowflake ID（int64），序列化为字符串避免 JavaScript 精度丢失
 type User struct {
-	ID       int64  `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID
-	Nickname string `gorm:"size:50" json:"nickname"`
-	Avatar   string `gorm:"size:255" json:"avatar"`
-	Platform string `gorm:"size:50;default:'wechat'" json:"platform"` // wechat, douyin, mini_app 等
-	OpenID   string `gorm:"size:100;index" json:"openid"`             // 平台唯一标识
-	UnionID  string `gorm:"size:100;index" json:"unionid"`            // 同一主体下的唯一标识
+	ID       Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
+	Nickname string      `gorm:"size:50" json:"nickname"`
+	Avatar   string      `gorm:"size:255" json:"avatar"`
+	Platform string      `gorm:"size:50;default:'wechat'" json:"platform"` // wechat, douyin, mini_app 等
+	OpenID   string      `gorm:"size:100;index" json:"openid"`             // 平台唯一标识
+	UnionID  string      `gorm:"size:100;index" json:"unionid"`            // 同一主体下的唯一标识
 
 	// 抖音平台特有字段
 	DouyinOpenID   string `gorm:"size:100;index" json:"douyinOpenid,omitempty"`  // 抖音用户唯一标识
@@ -47,15 +113,15 @@ type User struct {
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
 func (u *User) BeforeCreate(tx *gorm.DB) error {
 	if u.ID == 0 {
-		u.ID = utils.GenerateID()
+		u.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }
 
 // Creator 创作者模型
 type Creator struct {
-	ID          int64          `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID
-	UserID      int64          `gorm:"index" json:"userId"`
+	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
+	UserID      Int64String    `gorm:"index" json:"userId"`
 	Name        string         `gorm:"size:50" json:"name"`
 	Description string         `gorm:"size:255" json:"description"`
 	Avatar      string         `gorm:"size:255" json:"avatar"`
@@ -72,15 +138,15 @@ type Creator struct {
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
 func (c *Creator) BeforeCreate(tx *gorm.DB) error {
 	if c.ID == 0 {
-		c.ID = utils.GenerateID()
+		c.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }
 
 // Resource 资源模型
 type Resource struct {
-	ID            int64          `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID
-	CreatorID     int64          `gorm:"index" json:"creatorId"`
+	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
+	CreatorID     Int64String    `gorm:"index" json:"creatorId"`
 	Type          string         `gorm:"size:20" json:"type"` // avatar, wallpaper
 	Title         string         `gorm:"size:100" json:"title"`
 	Description   string         `gorm:"size:255" json:"description"`
@@ -101,18 +167,18 @@ type Resource struct {
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
 func (r *Resource) BeforeCreate(tx *gorm.DB) error {
 	if r.ID == 0 {
-		r.ID = utils.GenerateID()
+		r.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }
 
 // DownloadRecord 下载记录模型
 type DownloadRecord struct {
-	ID           int64     `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID
-	UserID       int64     `gorm:"index" json:"userId"`
-	ResourceID   int64     `gorm:"index" json:"resourceId"`
-	CreatorID    int64     `gorm:"index" json:"creatorId"`
-	DownloadedAt time.Time `json:"downloadedAt"`
+	ID           Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
+	UserID       Int64String `gorm:"index" json:"userId"`
+	ResourceID   Int64String `gorm:"index" json:"resourceId"`
+	CreatorID    Int64String `gorm:"index" json:"creatorId"`
+	DownloadedAt time.Time   `json:"downloadedAt"`
 
 	// 关联
 	User     *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
@@ -123,17 +189,17 @@ type DownloadRecord struct {
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
 func (d *DownloadRecord) BeforeCreate(tx *gorm.DB) error {
 	if d.ID == 0 {
-		d.ID = utils.GenerateID()
+		d.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }
 
 // UploadRecord 上传记录模型
 type UploadRecord struct {
-	ID         int64     `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID
-	CreatorID  int64     `gorm:"index" json:"creatorId"`
-	ResourceID int64     `gorm:"index" json:"resourceId"`
-	UploadedAt time.Time `json:"uploadedAt"`
+	ID         Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
+	CreatorID  Int64String `gorm:"index" json:"creatorId"`
+	ResourceID Int64String `gorm:"index" json:"resourceId"`
+	UploadedAt time.Time   `json:"uploadedAt"`
 
 	// 关联
 	Creator  *Creator  `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
@@ -143,7 +209,7 @@ type UploadRecord struct {
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
 func (u *UploadRecord) BeforeCreate(tx *gorm.DB) error {
 	if u.ID == 0 {
-		u.ID = utils.GenerateID()
+		u.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }

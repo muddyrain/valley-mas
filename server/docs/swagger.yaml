@@ -1,0 +1,856 @@
+basePath: /api/v1
+definitions:
+  handler.RegisterCreatorRequest:
+    properties:
+      avatar:
+        example: https://example.com/avatar.jpg
+        type: string
+      description:
+        example: 分享精美头像和壁纸
+        maxLength: 255
+        type: string
+      name:
+        example: 设计师小王
+        maxLength: 50
+        minLength: 2
+        type: string
+      spaceBanner:
+        example: https://example.com/banner.jpg
+        type: string
+      spaceDescription:
+        example: 这里有最新的设计作品
+        type: string
+      spaceTitle:
+        example: 小王的创意空间
+        maxLength: 100
+        type: string
+    required:
+    - name
+    type: object
+  handler.VerifyCodeRequest:
+    properties:
+      code:
+        example: y2722
+        type: string
+    required:
+    - code
+    type: object
+  handler.VerifyCodeResponse:
+    properties:
+      creator:
+        additionalProperties: true
+        type: object
+      valid:
+        example: true
+        type: boolean
+    type: object
+  model.User:
+    properties:
+      avatar:
+        type: string
+      createdAt:
+        type: string
+      douyinAvatar:
+        description: 抖音头像
+        type: string
+      douyinCity:
+        description: 抖音用户城市
+        type: string
+      douyinCountry:
+        description: 抖音用户国家
+        type: string
+      douyinGender:
+        description: '抖音性别: 0-未知 1-男 2-女'
+        type: integer
+      douyinNickname:
+        description: 抖音昵称
+        type: string
+      douyinOpenid:
+        description: 抖音平台特有字段
+        type: string
+      douyinProvince:
+        description: 抖音用户省份
+        type: string
+      douyinUnionid:
+        description: 抖音开放平台账号唯一标识
+        type: string
+      email:
+        description: 邮箱（可选）
+        type: string
+      id:
+        description: Snowflake ID (序列化为字符串)
+        type: integer
+      isActive:
+        type: boolean
+      nickname:
+        type: string
+      openid:
+        description: 平台唯一标识
+        type: string
+      phone:
+        description: 手机号（可选）
+        type: string
+      platform:
+        description: wechat, douyin, mini_app 等
+        type: string
+      role:
+        description: user, admin, creator
+        type: string
+      unionid:
+        description: 同一主体下的唯一标识
+        type: string
+      updatedAt:
+        type: string
+      username:
+        description: 管理后台登录字段
+        type: string
+      wechatOpenid:
+        description: 微信平台特有字段（可选）
+        type: string
+      wechatUnionid:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@valley-mas.com
+    name: API Support
+  description: |-
+    Valley MAS 创作者内容平台 API 文档
+    支持创作者注册、口令管理、资源上传下载等功能
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: Valley MAS API
+  version: "1.0"
+paths:
+  /admin/creators:
+    get:
+      consumes:
+      - application/json
+      description: 管理员查看所有创作者列表
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 创作者列表
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 获取创作者列表
+      tags:
+      - 管理后台 - 创作者管理
+    post:
+      consumes:
+      - application/json
+      description: 管理员为用户创建创作者身份
+      parameters:
+      - description: 创作者信息
+        in: body
+        name: creator
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 创建成功
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 创建创作者（管理员）
+      tags:
+      - 管理后台 - 创作者管理
+  /admin/creators/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 管理员删除创作者
+      parameters:
+      - description: 创作者ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 删除创作者
+      tags:
+      - 管理后台 - 创作者管理
+    put:
+      consumes:
+      - application/json
+      description: 管理员更新创作者信息
+      parameters:
+      - description: 创作者ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 创作者信息
+        in: body
+        name: creator
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 更新创作者信息
+      tags:
+      - 管理后台 - 创作者管理
+  /admin/records/downloads:
+    get:
+      consumes:
+      - application/json
+      description: 管理员查看所有下载记录
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 下载记录列表
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 获取下载记录
+      tags:
+      - 管理后台 - 记录管理
+  /admin/records/uploads:
+    get:
+      consumes:
+      - application/json
+      description: 管理员查看所有上传记录
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 上传记录列表
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 获取上传记录
+      tags:
+      - 管理后台 - 记录管理
+  /admin/resources:
+    get:
+      consumes:
+      - application/json
+      description: 管理员查看所有资源列表
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      - description: 资源类型
+        enum:
+        - avatar
+        - wallpaper
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 资源列表
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 获取资源列表
+      tags:
+      - 管理后台 - 资源管理
+  /admin/resources/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 管理员删除资源
+      parameters:
+      - description: 资源ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 删除资源
+      tags:
+      - 管理后台 - 资源管理
+  /admin/resources/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 管理员上传头像或壁纸资源
+      parameters:
+      - description: 资源文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: 资源类型
+        enum:
+        - avatar
+        - wallpaper
+        in: formData
+        name: type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 上传成功
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 上传资源
+      tags:
+      - 管理后台 - 资源管理
+  /admin/stats:
+    get:
+      consumes:
+      - application/json
+      description: 返回用户数、创作者数、资源数、下载数等统计信息
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 统计数据
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 获取系统统计数据
+      tags:
+      - 管理后台
+  /admin/users:
+    get:
+      consumes:
+      - application/json
+      description: 支持分页、关键词搜索、平台筛选、角色筛选
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      - description: 关键词搜索（昵称/OpenID）
+        in: query
+        name: keyword
+        type: string
+      - description: 平台筛选
+        enum:
+        - wechat
+        - douyin
+        - all
+        in: query
+        name: platform
+        type: string
+      - description: 角色筛选
+        enum:
+        - user
+        - creator
+        - admin
+        in: query
+        name: role
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 用户列表
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 获取用户列表
+      tags:
+      - 管理后台 - 用户管理
+    post:
+      consumes:
+      - application/json
+      description: 管理员创建新用户
+      parameters:
+      - description: 用户信息
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 创建成功
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 参数错误
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 创建用户
+      tags:
+      - 管理后台 - 用户管理
+  /admin/users/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 管理员删除用户（软删除）
+      parameters:
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: 删除失败
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 删除用户
+      tags:
+      - 管理后台 - 用户管理
+    get:
+      consumes:
+      - application/json
+      description: 根据用户ID获取详细信息
+      parameters:
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 用户详情
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: 用户不存在
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 获取用户详情
+      tags:
+      - 管理后台 - 用户管理
+    put:
+      consumes:
+      - application/json
+      description: 管理员更新用户信息
+      parameters:
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 用户信息
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 参数错误
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: 用户不存在
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 更新用户信息
+      tags:
+      - 管理后台 - 用户管理
+  /admin/users/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: 启用或禁用用户
+      parameters:
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 状态
+        in: body
+        name: status
+        required: true
+        schema:
+          properties:
+            isActive:
+              type: boolean
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 参数错误
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: 无权限
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: 用户不存在
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 更新用户状态
+      tags:
+      - 管理后台 - 用户管理
+  /code/verify:
+    post:
+      consumes:
+      - application/json
+      description: 输入5位口令（如：y2722）验证并获取创作者空间信息
+      parameters:
+      - description: 口令
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.VerifyCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 验证成功
+          schema:
+            $ref: '#/definitions/handler.VerifyCodeResponse'
+        "400":
+          description: 口令格式错误
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: 口令不存在或已关闭
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 验证创作者口令
+      tags:
+      - 公开接口
+  /creator/register:
+    post:
+      consumes:
+      - application/json
+      description: 普通用户注册成为创作者，系统自动生成5位口令（如：y2722）
+      parameters:
+      - description: 创作者信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RegisterCreatorRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 注册成功
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 参数错误或已注册
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: 服务器错误
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 注册成为创作者
+      tags:
+      - 创作者
+securityDefinitions:
+  Bearer:
+    description: JWT 认证，格式：Bearer {token}
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

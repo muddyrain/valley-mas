@@ -3,6 +3,9 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
+  # 构建前先运行 swag init 生成文档
+  pre_cmd = ["swag init --exclude tmp,data"]
+  
   # Windows 下必须输出 .exe
   cmd = "go build -o ./tmp/main.exe ."
 

@@ -6,6 +6,8 @@ import (
 	"valley-server/internal/middleware"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func Setup(cfg *config.Config) *gin.Engine {
@@ -13,6 +15,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 	// 中间件
 	r.Use(middleware.Cors())
+
+	// Swagger 文档路由
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// 健康检查
 	r.GET("/health", func(c *gin.Context) {
@@ -47,6 +52,12 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 			// 资源相关
 			auth.POST("/resource/download", handler.RecordDownload)
+
+			// 创作者相关
+			auth.POST("/creator/register", handler.RegisterCreator)              // 新增：注册成为创作者
+			auth.GET("/creator/my-space", handler.GetMyCreatorSpace)             // 新增：获取我的创作者空间
+			auth.PUT("/creator/code/toggle", handler.ToggleCreatorCode)          // 新增：开关口令
+			auth.POST("/creator/code/regenerate", handler.RegenerateCreatorCode) // 新增：重新生成口令
 		}
 
 		// 管理后台接口
