@@ -4,7 +4,8 @@ tmp_dir = "tmp"
 
 [build]
   # 构建前先运行 swag init 生成文档
-  pre_cmd = ["swag init --exclude tmp,data"]
+  # Windows 下 pre_cmd 不支持，改用手动执行或移除
+  # pre_cmd = ["swag init --exclude tmp,data"]
   
   # Windows 下必须输出 .exe
   cmd = "go build -o ./tmp/main.exe ."
@@ -15,7 +16,7 @@ tmp_dir = "tmp"
   # 监听参数
   delay = 500
   include_ext = ["go", "tpl", "tmpl", "html", "css", "js", "json", "yaml", "yml"]
-  exclude_dir = ["assets", "tmp", "vendor", ".git", "data"]
+  exclude_dir = ["assets", "tmp", "vendor", ".git", "data", "docs"]  # 排除 docs 避免 swag 生成文件触发重载
 
 [color]
   main = "yellow"

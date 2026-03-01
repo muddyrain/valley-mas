@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,4 +29,17 @@ func Error(c *gin.Context, code int, message string) {
 		Code:    code,
 		Message: message,
 	})
+}
+
+// GetIntQuery 获取 query 参数（int 类型）
+func GetIntQuery(c *gin.Context, key string, defaultValue int) int {
+	valueStr := c.Query(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		return defaultValue
+	}
+	return value
 }

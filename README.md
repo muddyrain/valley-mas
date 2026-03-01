@@ -183,8 +183,13 @@ cd server && go build -o bin/server main.go
 #### 开发基础设施
 - ✅ Air 热重载配置
 - ✅ Git Hooks（Lefthook）
-- ✅ Biome 代码规范
+- ✅ **Biome 代码规范**（✨ **不使用 ESLint/Prettier**）
+- ✅ **统一 API 请求规范**（✨ **禁止组件直接调用 request**）
 - ✅ 文档管理系统
+
+> **⚠️ 代码质量工具说明**：本项目使用 **Biome** 进行代码格式化和 Lint，不使用 ESLint 和 Prettier。详见：[代码质量工具说明](docs/CODE_QUALITY_TOOLS.md)
+>
+> **⚠️ API 请求规范说明**：所有 API 请求必须在 `src/api/` 目录集中管理，组件中禁止直接使用 `request` 或 `axios`。详见：[API 请求规范](docs/API_REQUEST_GUIDE.md)
 
 ---
 
