@@ -1,4 +1,7 @@
+import path from 'node:path'
+import tailwindcss from '@tailwindcss/postcss'
 import { defineConfig, type UserConfigExport } from '@tarojs/cli'
+import { UnifiedViteWeappTailwindcssPlugin } from 'weapp-tailwindcss/vite'
 
 import devConfig from './dev'
 import prodConfig from './prod'
@@ -29,13 +32,39 @@ export default defineConfig<'vite'>(async (merge, { command, mode }) => {
       }
     },
     framework: 'react',
-    compiler: 'vite',
+    compiler: {
+      type: 'vite',
+      vitePlugins: [
+        {
+          name: 'postcss-config-loader-plugin',
+          config(config) {
+            // 加载 tailwindcss
+            if (typeof config.css?.postcss === 'object') {
+              config.css?.postcss.plugins?.unshift(tailwindcss())
+            }
+          },
+        },
+        UnifiedViteWeappTailwindcssPlugin({
+          rem2rpx: true,
+          cssEntries: [
+            // 你 @import "tailwindcss"; 那个文件绝对路径
+            path.resolve(__dirname, '../src/app.css'),
+          ],
+        }),
+      ]
+    },
     mini: {
       postcss: {
         pxtransform: {
           enable: true,
           config: {
 
+          }
+        },
+        url: {
+          enable: true,
+          config: {
+            limit: 1024 // 设定转换尺寸上限
           }
         },
         cssModules: {
@@ -50,7 +79,6 @@ export default defineConfig<'vite'>(async (merge, { command, mode }) => {
     h5: {
       publicPath: '/',
       staticDirectory: 'static',
-
       miniCssExtractPluginOption: {
         ignoreOrder: true,
         filename: 'css/[name].[hash].css',

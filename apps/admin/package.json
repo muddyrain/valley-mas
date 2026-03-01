@@ -13,11 +13,11 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@ant-design/icons": "^5.5.0",
+    "@ant-design/icons": "^6.1.0",
     "@ant-design/pro-components": "^2.8.0",
     "@tanstack/react-query": "^5.62.0",
     "@valley/shared": "workspace:*",
-    "antd": "^5.22.0",
+    "antd": "^6.3.1",
     "axios": "^1.7.0",
     "dayjs": "^1.11.13",
     "react": "^19.0.0",
