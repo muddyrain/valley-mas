@@ -1,28 +1,90 @@
 package handler
 
 import (
+	"errors"
+	"net/http"
+	"valley-server/internal/database"
+	"valley-server/internal/model"
+	"valley-server/internal/utils"
+
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-// VerifyCode 验证口令
+// VerifyCodeRequest 验证口令请求
+type VerifyCodeRequest struct {
+	Code string `json:"code" binding:"required" example:"y2722"`
+}
+
+// VerifyCodeResponse 验证口令响应
+type VerifyCodeResponse struct {
+	Valid   bool                   `json:"valid" example:"true"`
+	Creator map[string]interface{} `json:"creator"`
+}
+
+// VerifyCode 验证口令（公开接口）
+// @Summary      验证创作者口令
+// @Description  输入5位口令（如：y2722）验证并获取创作者空间信息
+// @Tags         公开接口
+// @Accept       json
+// @Produce      json
+// @Param        request  body      VerifyCodeRequest  true  "口令"
+// @Success      200  {object}  VerifyCodeResponse  "验证成功"
+// @Failure      400  {object}  map[string]interface{}  "口令格式错误"
+// @Failure      404  {object}  map[string]interface{}  "口令不存在或已关闭"
+// @Router       /code/verify [post]
 func VerifyCode(c *gin.Context) {
-	var req struct {
-		Code string `json:"code" binding:"required"`
-	}
+	db := database.DB
+
+	// 1. 解析请求参数
+	var req VerifyCodeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		Error(c, 400, "参数错误")
+		Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
 
-	// TODO: 查询数据库验证口令
-	// creator, err := service.VerifyCode(req.Code)
+	// 2. 标准化口令（转小写，去空格）
+	normalizedCode := utils.NormalizeCode(req.Code)
 
+	// 3. 验证口令格式
+	if !utils.ValidateCodeFormat(normalizedCode) {
+		Error(c, http.StatusBadRequest, "口令格式错误，应为5位小写字母或数字（如：y2722）")
+		return
+	}
+
+	// 4. 查询创作者（只查询已激活的）
+	var creator model.Creator
+	err := db.Where("code = ? AND is_active = ?", normalizedCode, true).
+		Preload("User"). // 预加载用户信息
+		First(&creator).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(c, http.StatusNotFound, "口令不存在或已关闭")
+			return
+		}
+		Error(c, http.StatusInternalServerError, "查询失败")
+		return
+	}
+
+	// 5. 统计资源数量
+	var resourceCount int64
+	db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
+
+	// 6. 记录访问（可选：记录IP和时间用于统计）
+	// TODO: 如需记录访问日志，可以在这里添加
+
+	// 7. 返回创作者空间信息
 	Success(c, gin.H{
 		"valid": true,
 		"creator": gin.H{
-			"id":          "1",
-			"name":        "设计师小王",
-			"description": "分享精美头像和壁纸",
+			"id":            creator.ID,
+			"name":          creator.Name,
+			"description":   creator.Description,
+			"avatar":        creator.Avatar,
+			"code":          creator.Code,
+			"resourceCount": resourceCount,
+			"createdAt":     creator.CreatedAt,
 		},
 	})
 }

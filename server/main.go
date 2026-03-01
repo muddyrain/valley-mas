@@ -6,7 +6,28 @@ import (
 	"valley-server/internal/database"
 	"valley-server/internal/router"
 	"valley-server/internal/utils"
+
+	_ "valley-server/docs" // Swagger 文档
 )
+
+// @title           Valley MAS API
+// @version         1.0
+// @description     Valley MAS 创作者内容平台 API 文档
+// @description     支持创作者注册、口令管理、资源上传下载等功能
+
+// @contact.name   API Support
+// @contact.email  support@valley-mas.com
+
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+
+// @host      localhost:8080
+// @BasePath  /api/v1
+
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @description JWT 认证，格式：Bearer {token}
 
 func main() {
 	// 加载配置

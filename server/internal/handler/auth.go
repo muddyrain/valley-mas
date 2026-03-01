@@ -52,7 +52,7 @@ func Login(cfg *config.Config) gin.HandlerFunc {
 		}
 
 		// 生成 token
-		token, err := utils.GenerateToken(user.ID, user.Username, user.Role, cfg.JWT.Secret, cfg.JWT.Expire)
+		token, err := utils.GenerateToken(int64(user.ID), user.Username, user.Role, cfg.JWT.Secret, cfg.JWT.Expire)
 		if err != nil {
 			Error(c, http.StatusInternalServerError, "生成token失败")
 			return

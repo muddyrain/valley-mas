@@ -1,10 +1,16 @@
-import type { DouyinGender, PaginationParams, PaginationResponse, Platform, UserRole } from '../types/api';
+import type {
+  DouyinGender,
+  PaginationParams,
+  PaginationResponse,
+  Platform,
+  UserRole,
+} from '../types/api';
 import http from '../utils/request';
 
 // 用户接口定义 - 支持多平台
-// ID 使用 Snowflake 算法生成（int64），和抖音、字节跳动保持一致
+// ID 使用 Snowflake 算法生成（int64），后端序列化为字符串避免 JavaScript 精度丢失
 export interface User {
-  id: number; // Snowflake ID (int64)
+  id: string; // Snowflake ID (后端 int64，序列化为字符串)
   nickname: string;
   avatar: string;
   platform: Platform; // 平台类型
@@ -52,21 +58,21 @@ export const reqCreateUser = (data: Partial<User>) => {
 };
 
 // 获取用户详情
-export const reqGetUserDetail = (id: number) => {
+export const reqGetUserDetail = (id: string) => {
   return http.get<unknown, User>(`/admin/users/${id}`);
 };
 
 // 更新用户
-export const reqUpdateUser = (id: number, data: Partial<User>) => {
+export const reqUpdateUser = (id: string, data: Partial<User>) => {
   return http.put<unknown, User>(`/admin/users/${id}`, data);
 };
 
 // 更新用户状态
-export const reqUpdateUserStatus = (id: number, isActive: boolean) => {
+export const reqUpdateUserStatus = (id: string, isActive: boolean) => {
   return http.put<unknown, null>(`/admin/users/${id}/status`, { isActive });
 };
 
 // 删除用户
-export const reqDeleteUser = (id: number) => {
+export const reqDeleteUser = (id: string) => {
   return http.delete<unknown, null>(`/admin/users/${id}`);
 };
