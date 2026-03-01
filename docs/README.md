@@ -1,4 +1,23 @@
-# 📚 Valley 项目文档管理规范
+# 📚 Valley MAS 项目文档
+
+> **文档已重新组织！** 请查看 [📑 文档索引](./INDEX.md) 获取完整文档列表。
+
+---
+
+## 🎯 快速导航
+
+### 新手必读
+- [**快速开始指南**](./getting-started.md) - 5 分钟搭建开发环境
+
+### 开发规范（⭐ 重要）
+- [**开发规范速查**](./quick-reference/standards.md) - Biome + API 请求规范
+- [**API 请求规范**](./API_REQUEST_GUIDE.md) - 前端 API 封装标准
+- [**代码质量工具**](./CODE_QUALITY_TOOLS.md) - Biome 完整指南
+
+### 完整文档
+📑 查看 [文档索引 (INDEX.md)](./INDEX.md) 获取所有文档列表
+
+---
 
 ## 📁 文档目录结构
 
