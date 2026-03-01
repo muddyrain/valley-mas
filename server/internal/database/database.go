@@ -110,3 +110,8 @@ func Close() error {
 	}
 	return nil
 }
+
+// GetDB 获取数据库实例
+func GetDB() *gorm.DB {
+	return DB
+}

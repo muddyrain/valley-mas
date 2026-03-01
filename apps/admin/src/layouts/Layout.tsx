@@ -1,16 +1,17 @@
-import { useState } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Layout as AntLayout, Menu, Avatar, Dropdown, theme } from 'antd';
 import {
-  DashboardOutlined,
-  UserOutlined,
   CrownOutlined,
-  PictureOutlined,
+  DashboardOutlined,
   FileTextOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  PictureOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
+import { Layout as AntLayout, Avatar, Dropdown, Menu, message, theme } from 'antd';
+import { useEffect, useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import http from '../utils/request';
 
 const { Header, Sider, Content } = AntLayout;
 
@@ -24,9 +25,44 @@ const menuItems = [
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [userInfo, setUserInfo] = useState<{
+    nickname?: string;
+    username?: string;
+    avatar?: string;
+  }>({});
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = theme.useToken();
+
+  useEffect(() => {
+    // 从 localStorage 获取用户信息
+    const storedUserInfo = localStorage.getItem('userInfo');
+    if (storedUserInfo) {
+      try {
+        setUserInfo(JSON.parse(storedUserInfo));
+      } catch (error) {
+        console.error('解析用户信息失败:', error);
+      }
+    }
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      // 调用后端登出接口，清除服务器端的 Cookie
+      await http.post('/logout');
+
+      // 清除本地存储的用户信息
+      localStorage.removeItem('userInfo');
+
+      message.success('已退出登录');
+      navigate('/login');
+    } catch (error) {
+      console.error('退出登录失败:', error);
+      // 即使接口调用失败，也清除本地数据并跳转
+      localStorage.removeItem('userInfo');
+      navigate('/login');
+    }
+  };
 
   const userMenu = {
     items: [
@@ -34,7 +70,7 @@ export default function Layout() {
         key: 'logout',
         icon: <LogoutOutlined />,
         label: '退出登录',
-        onClick: () => navigate('/login'),
+        onClick: handleLogout,
       },
     ],
   };
@@ -63,8 +99,8 @@ export default function Layout() {
           </div>
           <Dropdown menu={userMenu} placement="bottomRight">
             <div className="flex items-center cursor-pointer">
-              <Avatar icon={<UserOutlined />} />
-              <span className="ml-2">管理员</span>
+              <Avatar src={userInfo.avatar} icon={<UserOutlined />} />
+              <span className="ml-2">{userInfo.nickname || userInfo.username || '管理员'}</span>
             </div>
           </Dropdown>
         </Header>

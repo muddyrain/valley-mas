@@ -1,0 +1,20 @@
+# air 热重载配置（https://github.com/air-verse/air）
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  # Windows 下必须输出 .exe
+  cmd = "go build -o ./tmp/main.exe ."
+
+  # 你的版本提示 bin 已弃用，改用 entrypoint
+  entrypoint = "tmp/main.exe"
+
+  # 监听参数
+  delay = 500
+  include_ext = ["go", "tpl", "tmpl", "html", "css", "js", "json", "yaml", "yml"]
+  exclude_dir = ["assets", "tmp", "vendor", ".git", "data"]
+
+[color]
+  main = "yellow"
+  watcher = "cyan"
+  build = "green"

@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
     "target": "es2017",
-    "module": "commonjs",
+    "module": "nodenext",
     "removeComments": false,
     "preserveConstEnums": true,
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "experimentalDecorators": true,
     "noImplicitAny": false,
     "allowSyntheticDefaultImports": true,
@@ -22,9 +22,15 @@
     ],
     "paths": {
       // TS5090 leading './'
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
-  "include": ["./src", "./types", "./config"],
+  "include": [
+    "./src",
+    "./types",
+    "./config"
+  ],
   "compileOnSave": false
 }
