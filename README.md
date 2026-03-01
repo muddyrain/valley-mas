@@ -53,11 +53,15 @@
 - ✅ Snowflake ID 系统（和抖音保持一致）
 
 ### 📚 完整文档
-- [快速启动](GET_STARTED.md) - 3分钟快速开始
-- [快速参考](REFERENCE_CARD.md) - 常用命令速查
-- [认证系统](docs/AUTH_SYSTEM.md) - 登录认证详解
-- [优化指南](docs/OPTIMIZATION_GUIDE.md) - 优化说明
-- [Bug 修复](docs/BUG_FIX_INIT.md) - 初始化问题修复
+
+📑 **查看 [文档中心](docs/INDEX.md) 获取所有文档** 
+
+快速导航：
+- [快速开始指南](docs/getting-started.md) - 5 分钟搭建开发环境
+- [开发规范速查](docs/quick-reference/standards.md) - Biome + API 请求规范 ⭐
+- [API 请求规范](docs/API_REQUEST_GUIDE.md) - 前端 API 封装标准
+- [代码质量工具](docs/CODE_QUALITY_TOOLS.md) - Biome 完整指南
+- [火山引擎 TOS 集成](docs/TOS_INTEGRATION.md) - 对象存储配置
 
 ---
 
