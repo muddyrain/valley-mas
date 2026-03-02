@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"time"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 	"valley-server/internal/utils"
@@ -31,6 +32,16 @@ func InitData(c *gin.Context) {
 	if force && count > 0 {
 		clearedCount = count
 
+		// 🔄 备份真实资源（TOS 上传的资源）
+		var realResources []model.Resource
+		database.DB.Where("url NOT LIKE ?", "%placeholder%").Find(&realResources)
+
+		backupResourceCount := len(realResources)
+		if backupResourceCount > 0 {
+			// 记录备份信息
+			c.Header("X-Backup-Resources", string(rune(backupResourceCount)))
+		}
+
 		// 使用事务确保数据完全清空
 		tx := database.DB.Begin()
 		defer func() {
@@ -53,6 +64,7 @@ func InitData(c *gin.Context) {
 			return
 		}
 
+		// ⚠️ 清空所有资源（包括真实资源，稍后会恢复）
 		if err := tx.Unscoped().Where("1 = 1").Delete(&model.Resource{}).Error; err != nil {
 			tx.Rollback()
 			Error(c, 500, "清空资源失败："+err.Error())
@@ -71,12 +83,13 @@ func InitData(c *gin.Context) {
 			return
 		}
 
-		// 重置自增序列（SQLite 特有）
-		if err := tx.Exec("DELETE FROM sqlite_sequence WHERE name IN ('users', 'creators', 'resources', 'download_records', 'upload_records')").Error; err != nil {
+		if err := tx.Unscoped().Where("1 = 1").Delete(&model.CodeAccessLog{}).Error; err != nil {
 			tx.Rollback()
-			Error(c, 500, "重置序列失败："+err.Error())
+			Error(c, 500, "清空访问日志失败："+err.Error())
 			return
 		}
+
+		// 注意：我们使用 Snowflake ID，不需要重置 SQLite 的自增序列
 
 		// 提交事务
 		if err := tx.Commit().Error; err != nil {
@@ -90,6 +103,10 @@ func InitData(c *gin.Context) {
 			Error(c, 500, "清空数据失败，仍有残留数据")
 			return
 		}
+
+		// 🔄 将备份的真实资源保存到临时变量，稍后恢复
+		// 使用闭包将 realResources 传递到后续逻辑
+		c.Set("backupResources", realResources)
 	}
 
 	// 再次确认清空（双重保险）
@@ -171,10 +188,147 @@ func InitData(c *gin.Context) {
 		return
 	}
 
+	// 为创作者用户创建创作者记录
+	creatorUser := users[3] // creator 用户
+	creator := model.Creator{
+		UserID:      creatorUser.ID,
+		Name:        "测试创作者",
+		Avatar:      "https://via.placeholder.com/150",
+		Code:        "y2722",
+		Description: "这是一个测试创作者空间",
+		IsActive:    true,
+	}
+	if err := database.DB.Create(&creator).Error; err != nil {
+		Error(c, 500, "创建创作者失败："+err.Error())
+		return
+	}
+
+	// 🔄 恢复备份的真实资源
+	var resources []model.Resource
+	var restoredCount int
+
+	backupResourcesVal, hasBackup := c.Get("backupResources")
+	if hasBackup {
+		backupResources := backupResourcesVal.([]model.Resource)
+
+		// 恢复真实资源并重新关联到新创建的创作者
+		for i := range backupResources {
+			// 保持原有的 ID 和其他信息
+			backupResources[i].CreatorID = creator.ID
+			// 重置时间戳（让 GORM 自动设置）
+			backupResources[i].CreatedAt = time.Time{}
+			backupResources[i].UpdatedAt = time.Time{}
+		}
+
+		if err := database.DB.Create(&backupResources).Error; err != nil {
+			Error(c, 500, "恢复真实资源失败："+err.Error())
+			return
+		}
+
+		resources = backupResources
+		restoredCount = len(backupResources)
+	}
+
+	// 如果没有备份的真实资源，创建一些示例数据用于展示
+	if restoredCount == 0 {
+		resources = []model.Resource{
+			{
+				CreatorID:     creator.ID,
+				Title:         "示例头像 001",
+				Type:          "avatar",
+				URL:           "https://via.placeholder.com/300/FF6B6B/FFFFFF?text=Avatar+1",
+				ThumbnailURL:  "https://via.placeholder.com/150/FF6B6B/FFFFFF?text=Avatar+1",
+				Description:   "这是示例数据，请上传真实资源",
+				Size:          102400,
+				Width:         300,
+				Height:        300,
+				DownloadCount: 0,
+			},
+			{
+				CreatorID:     creator.ID,
+				Title:         "示例壁纸 001",
+				Type:          "wallpaper",
+				URL:           "https://via.placeholder.com/1080x1920/1A1A2E/FFFFFF?text=Wallpaper",
+				ThumbnailURL:  "https://via.placeholder.com/300x500/1A1A2E/FFFFFF?text=Wallpaper",
+				Description:   "这是示例数据，请上传真实资源",
+				Size:          2097152,
+				Width:         1080,
+				Height:        1920,
+				DownloadCount: 0,
+			},
+		}
+
+		if err := database.DB.Create(&resources).Error; err != nil {
+			Error(c, 500, "创建示例资源失败："+err.Error())
+			return
+		}
+	}
+
+	// 创建下载记录（模拟最近 7 天的下载）
+	now := time.Now()
+	downloadRecords := []model.DownloadRecord{}
+
+	// 为每个资源创建随机的下载记录
+	for i := 0; i < 7; i++ {
+		date := now.AddDate(0, 0, -i)
+		// 每天随机 5-15 条下载记录
+		dailyDownloads := 5 + i*2
+
+		for j := 0; j < dailyDownloads; j++ {
+			resourceIndex := j % len(resources)
+			userIndex := j % len(users)
+
+			record := model.DownloadRecord{
+				UserID:     users[userIndex].ID,
+				ResourceID: resources[resourceIndex].ID,
+				CreatorID:  creator.ID,
+				IP:         "127.0.0.1",
+				UserAgent:  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+			}
+			// 设置创建时间为指定日期
+			record.CreatedAt = date.Add(time.Hour * time.Duration(j))
+			downloadRecords = append(downloadRecords, record)
+		}
+	}
+
+	if err := database.DB.Create(&downloadRecords).Error; err != nil {
+		Error(c, 500, "创建下载记录失败："+err.Error())
+		return
+	}
+
+	// 创建访问记录（模拟最近 7 天的访问）
+	accessLogs := []model.CodeAccessLog{}
+	for i := 0; i < 7; i++ {
+		date := now.AddDate(0, 0, -i)
+		// 每天随机 3-10 条访问记录
+		dailyAccess := 3 + i
+
+		for j := 0; j < dailyAccess; j++ {
+			log := model.CodeAccessLog{
+				CreatorID: creator.ID,
+				Code:      creator.Code,
+				IP:        "127.0.0.1",
+				UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+			}
+			log.CreatedAt = date.Add(time.Hour * time.Duration(j*2))
+			accessLogs = append(accessLogs, log)
+		}
+	}
+
+	if err := database.DB.Create(&accessLogs).Error; err != nil {
+		Error(c, 500, "创建访问记录失败："+err.Error())
+		return
+	}
+
 	Success(c, gin.H{
-		"message":      "初始化成功",
-		"createdUsers": len(users),
-		"clearedUsers": clearedCount,
-		"users":        users,
+		"message":           "初始化成功",
+		"createdUsers":      len(users),
+		"createdCreators":   1,
+		"restoredResources": restoredCount,  // 🔄 恢复的真实资源数量
+		"createdResources":  len(resources), // 总资源数量（恢复的 + 新建的）
+		"createdDownloads":  len(downloadRecords),
+		"createdAccessLogs": len(accessLogs),
+		"clearedUsers":      clearedCount,
+		"users":             users,
 	})
 }

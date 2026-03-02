@@ -96,6 +96,7 @@ func autoMigrate() error {
 		&model.Resource{},
 		&model.DownloadRecord{},
 		&model.UploadRecord{},
+		&model.CodeAccessLog{},
 	)
 }
 

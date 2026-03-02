@@ -1,9 +1,16 @@
-import { DeleteOutlined, ReloadOutlined, SearchOutlined, UploadOutlined } from '@ant-design/icons';
+import {
+  DeleteOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  UploadOutlined,
+  UserSwitchOutlined,
+} from '@ant-design/icons';
 import { formatFileSize } from '@valley/shared';
 import type { UploadFile, UploadProps } from 'antd';
 import {
   Button,
   Card,
+  Form,
   Image,
   Input,
   Modal,
@@ -22,8 +29,10 @@ import {
   type ResourceType,
   reqDeleteResource,
   reqGetResourceList,
+  reqUpdateResourceCreator,
   reqUploadResource,
 } from '../api/resource';
+import { reqGetUserList } from '../api/user';
 
 export default function Resources() {
   const [loading, setLoading] = useState(false);
@@ -37,6 +46,13 @@ export default function Resources() {
   const [uploadType, setUploadType] = useState<ResourceType>('avatar');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
+
+  // 配置上传者相关状态
+  const [creatorModalOpen, setCreatorModalOpen] = useState(false);
+  const [currentResource, setCurrentResource] = useState<Resource | null>(null);
+  const [creatorForm] = Form.useForm();
+  const [users, setUsers] = useState<Array<{ id: string; nickname: string }>>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   // 获取资源列表
   const fetchResources = useCallback(async () => {
@@ -112,8 +128,14 @@ export default function Resources() {
       return;
     }
 
+    const file = fileList[0].originFileObj;
+    if (!file) {
+      message.error('文件无效');
+      return;
+    }
+
     const formData = new FormData();
-    formData.append('file', fileList[0] as unknown as Blob);
+    formData.append('file', file); // 后端期望的字段名是 'file'
     formData.append('type', uploadType);
 
     setUploading(true);
@@ -128,6 +150,40 @@ export default function Resources() {
       message.error(err.response?.data?.message || '上传失败');
     } finally {
       setUploading(false);
+    }
+  };
+
+  // 打开配置上传者 Modal
+  const openCreatorModal = async (resource: Resource) => {
+    setCurrentResource(resource);
+    creatorForm.setFieldsValue({ creatorId: resource.user?.id });
+    setCreatorModalOpen(true);
+
+    // 加载用户列表
+    setLoadingUsers(true);
+    try {
+      const response = await reqGetUserList({ page: 1, pageSize: 100 });
+      setUsers(response.list || []);
+    } catch {
+      message.error('加载用户列表失败');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  // 更新上传者
+  const handleUpdateCreator = async () => {
+    if (!currentResource) return;
+
+    try {
+      const values = await creatorForm.validateFields();
+      await reqUpdateResourceCreator(currentResource.id, values.creatorId);
+      message.success('上传者更新成功');
+      setCreatorModalOpen(false);
+      fetchResources();
+    } catch (error) {
+      message.error('更新失败');
+      console.error(error);
     }
   };
 
@@ -192,10 +248,18 @@ export default function Resources() {
     {
       title: '操作',
       key: 'action',
-      width: 120,
+      width: 180,
       fixed: 'right',
       render: (_, record) => (
         <Space>
+          <Button
+            type="link"
+            size="small"
+            icon={<UserSwitchOutlined />}
+            onClick={() => openCreatorModal(record)}
+          >
+            配置上传者
+          </Button>
           <Button
             type="link"
             size="small"
@@ -306,6 +370,38 @@ export default function Resources() {
             {uploadType === 'avatar' ? '头像最大 2MB' : '壁纸最大 5MB'}
           </p>
         </Upload.Dragger>
+      </Modal>
+
+      {/* 配置上传者 Modal */}
+      <Modal
+        title="配置上传者"
+        open={creatorModalOpen}
+        onOk={handleUpdateCreator}
+        onCancel={() => setCreatorModalOpen(false)}
+        okText="确定"
+        cancelText="取消"
+      >
+        <Form form={creatorForm} layout="vertical">
+          <Form.Item
+            name="creatorId"
+            label="选择上传者"
+            rules={[{ required: true, message: '请选择上传者' }]}
+          >
+            <Select
+              placeholder="请选择用户"
+              loading={loadingUsers}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              allowClear
+              options={users.map((u) => ({ value: u.id, label: u.nickname }))}
+            />
+          </Form.Item>
+          {currentResource && (
+            <div className="text-gray-500 text-sm">当前资源: {currentResource.title}</div>
+          )}
+        </Form>
       </Modal>
     </div>
   );

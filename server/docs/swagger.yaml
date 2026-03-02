@@ -497,7 +497,7 @@ paths:
       - Bearer: []
       summary: 获取系统统计数据
       tags:
-      - 管理后台
+      - 管理后台 - 数据统计
   /admin/users:
     get:
       consumes:
@@ -847,6 +847,94 @@ paths:
       summary: 注册成为创作者
       tags:
       - 创作者
+  /public/resource/{id}/download:
+    post:
+      consumes:
+      - application/json
+      description: 用户下载资源，记录下载行为
+      parameters:
+      - description: 资源ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 下载链接
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: 资源不存在
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 下载资源
+      tags:
+      - 用户端 - 公开接口
+  /public/space/{code}:
+    get:
+      consumes:
+      - application/json
+      description: 通过口令获取创作者空间信息，包含资源列表
+      parameters:
+      - description: 创作者口令
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 创作者空间信息
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: 创作者不存在
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 获取创作者空间
+      tags:
+      - 用户端 - 公开接口
+  /user/downloads:
+    get:
+      consumes:
+      - application/json
+      description: 用户查看自己的下载历史
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 下载记录
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: 未登录
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 获取我的下载记录
+      tags:
+      - 用户端 - 我的
 securityDefinitions:
   Bearer:
     description: JWT 认证，格式：Bearer {token}
