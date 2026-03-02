@@ -62,3 +62,8 @@ export const reqUploadResource = (formData: FormData) => {
 export const reqDeleteResource = (id: string) => {
   return http.delete<unknown, null>(`/admin/resources/${id}`);
 };
+
+// 更新资源上传者
+export const reqUpdateResourceCreator = (id: string, creatorId: string) => {
+  return http.put<unknown, Resource>(`/admin/resources/${id}/creator`, { creatorId });
+};

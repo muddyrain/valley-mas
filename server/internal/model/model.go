@@ -175,11 +175,14 @@ func (r *Resource) BeforeCreate(tx *gorm.DB) error {
 
 // DownloadRecord 下载记录模型
 type DownloadRecord struct {
-	ID           Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
-	UserID       Int64String `gorm:"index" json:"userId"`
-	ResourceID   Int64String `gorm:"index" json:"resourceId"`
-	CreatorID    Int64String `gorm:"index" json:"creatorId"`
-	DownloadedAt time.Time   `json:"downloadedAt"`
+	ID         Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
+	UserID     Int64String    `gorm:"index" json:"userId"`
+	ResourceID Int64String    `gorm:"index" json:"resourceId"`
+	CreatorID  Int64String    `gorm:"index" json:"creatorId"`
+	IP         string         `gorm:"size:50" json:"ip"`
+	UserAgent  string         `gorm:"size:500" json:"userAgent"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// 关联
 	User     *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
@@ -191,6 +194,28 @@ type DownloadRecord struct {
 func (d *DownloadRecord) BeforeCreate(tx *gorm.DB) error {
 	if d.ID == 0 {
 		d.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+// CodeAccessLog 口令访问日志模型
+type CodeAccessLog struct {
+	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
+	CreatorID Int64String    `gorm:"index" json:"creatorId"`
+	Code      string         `gorm:"size:20;index" json:"code"`
+	IP        string         `gorm:"size:50" json:"ip"`
+	UserAgent string         `gorm:"size:500" json:"userAgent"`
+	CreatedAt time.Time      `json:"createdAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+
+	// 关联
+	Creator *Creator `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
+}
+
+// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
+func (c *CodeAccessLog) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == 0 {
+		c.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }

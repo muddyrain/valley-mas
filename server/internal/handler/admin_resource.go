@@ -177,3 +177,65 @@ func DeleteResource(c *gin.Context) {
 
 	Success(c, nil)
 }
+
+// UpdateResourceCreator 更新资源的上传者
+// @Summary      更新资源上传者
+// @Description  管理员修改资源的上传者（CreatorID）
+// @Tags         管理后台 - 资源管理
+// @Accept       json
+// @Produce      json
+// @Security     Bearer
+// @Param        id          path    string  true   "资源ID"
+// @Param        creatorId   body    string  true   "新的上传者ID（用户ID）"
+// @Success      200  {object}  map[string]interface{}  "更新成功"
+// @Failure      400  {object}  map[string]interface{}  "参数错误"
+// @Failure      401  {object}  map[string]interface{}  "未登录"
+// @Failure      403  {object}  map[string]interface{}  "无权限"
+// @Failure      404  {object}  map[string]interface{}  "资源不存在"
+// @Router       /admin/resources/{id}/creator [put]
+func UpdateResourceCreator(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		CreatorID string `json:"creatorId" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Error(c, 400, "参数错误："+err.Error())
+		return
+	}
+
+	db := database.GetDB()
+	var resource model.Resource
+
+	// 查找资源
+	if err := db.First(&resource, "id = ?", id).Error; err != nil {
+		Error(c, 404, "资源不存在")
+		return
+	}
+
+	// 验证新的上传者是否存在
+	var user model.User
+	if err := db.First(&user, "id = ?", req.CreatorID).Error; err != nil {
+		Error(c, 404, "指定的用户不存在")
+		return
+	}
+
+	// 更新上传者（使用 Scan 方法转换字符串）
+	var creatorID model.Int64String
+	if err := creatorID.Scan(req.CreatorID); err != nil {
+		Error(c, 400, "用户ID格式错误："+err.Error())
+		return
+	}
+	resource.CreatorID = creatorID
+
+	if err := db.Save(&resource).Error; err != nil {
+		Error(c, 500, "更新失败："+err.Error())
+		return
+	}
+
+	// 重新加载资源并预加载用户信息
+	db.Preload("User").First(&resource, "id = ?", id)
+
+	Success(c, resource)
+}
