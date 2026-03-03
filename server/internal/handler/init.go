@@ -194,12 +194,24 @@ func InitData(c *gin.Context) {
 		UserID:      creatorUser.ID,
 		Name:        "测试创作者",
 		Avatar:      "https://via.placeholder.com/150",
-		Code:        "y2722",
 		Description: "这是一个测试创作者空间",
 		IsActive:    true,
 	}
 	if err := database.DB.Create(&creator).Error; err != nil {
 		Error(c, 500, "创建创作者失败："+err.Error())
+		return
+	}
+
+	// 创建默认空间
+	space := model.CreatorSpace{
+		CreatorID:   creator.ID,
+		Title:       "测试创作者的默认空间",
+		Code:        "y2722",
+		Description: "这是一个测试空间",
+		IsActive:    true,
+	}
+	if err := database.DB.Create(&space).Error; err != nil {
+		Error(c, 500, "创建空间失败："+err.Error())
 		return
 	}
 
@@ -305,8 +317,8 @@ func InitData(c *gin.Context) {
 
 		for j := 0; j < dailyAccess; j++ {
 			log := model.CodeAccessLog{
-				CreatorID: creator.ID,
-				Code:      creator.Code,
+				SpaceID:   space.ID,
+				Code:      space.Code,
 				IP:        "127.0.0.1",
 				UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
 			}

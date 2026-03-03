@@ -93,6 +93,7 @@ func autoMigrate() error {
 	return DB.AutoMigrate(
 		&model.User{},
 		&model.Creator{},
+		&model.CreatorSpace{}, // 新增：创作者空间表
 		&model.Resource{},
 		&model.DownloadRecord{},
 		&model.UploadRecord{},

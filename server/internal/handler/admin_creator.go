@@ -1,27 +1,111 @@
 package handler
 
 import (
+	"strconv"
+	"strings"
+
+	"valley-server/internal/database"
+	"valley-server/internal/model"
+
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-// ListCreators 创作者列表
+// CreatorWithStats 带统计数据的创作者
+type CreatorWithStats struct {
+	model.Creator
+	SpaceCount    int `json:"spaceCount"`    // 空间数量
+	ResourceCount int `json:"resourceCount"` // 资源数量
+	DownloadCount int `json:"downloadCount"` // 下载量
+}
+
+// ListCreators 获取创作者列表（管理员）
 // @Summary      获取创作者列表
-// @Description  管理员查看所有创作者列表
+// @Description  管理员查看所有创作者，支持搜索和筛选
 // @Tags         管理后台 - 创作者管理
 // @Accept       json
 // @Produce      json
 // @Security     Bearer
-// @Param        page      query  int  false  "页码"  default(1)
-// @Param        pageSize  query  int  false  "每页数量"  default(20)
+// @Param        page      query  int     false  "页码"        default(1)
+// @Param        pageSize  query  int     false  "每页数量"     default(20)
+// @Param        keyword   query  string  false  "搜索关键词"
+// @Param        isActive  query  string  false  "状态筛选"
 // @Success      200  {object}  map[string]interface{}  "创作者列表"
 // @Failure      401  {object}  map[string]interface{}  "未登录"
 // @Failure      403  {object}  map[string]interface{}  "无权限"
 // @Router       /admin/creators [get]
 func ListCreators(c *gin.Context) {
-	// TODO: 实现创作者列表查询
+	db := database.DB
+
+	// 解析分页参数
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	// 解析搜索和筛选参数
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	isActiveStr := c.Query("isActive")
+
+	// 构建查询
+	query := db.Model(&model.Creator{})
+
+	// 关键词搜索（仅搜索名称）
+	if keyword != "" {
+		query = query.Where("name LIKE ?", "%"+keyword+"%")
+	}
+
+	// 状态筛选
+	if isActiveStr != "" {
+		isActive := isActiveStr == "true"
+		query = query.Where("is_active = ?", isActive)
+	}
+
+	// 查询总数
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		Error(c, 500, "查询创作者总数失败")
+		return
+	}
+
+	// 查询列表
+	var creators []model.Creator
+	if err := query.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&creators).Error; err != nil {
+		Error(c, 500, "查询创作者列表失败")
+		return
+	}
+
+	// 为每个创作者添加统计数据
+	creatorsWithStats := make([]CreatorWithStats, len(creators))
+	for i, creator := range creators {
+		creatorsWithStats[i] = CreatorWithStats{
+			Creator: creator,
+		}
+
+		// 统计空间数量
+		var spaceCount int64
+		db.Model(&model.CreatorSpace{}).Where("creator_id = ?", creator.ID).Count(&spaceCount)
+		creatorsWithStats[i].SpaceCount = int(spaceCount)
+
+		// 统计资源数量
+		var resourceCount int64
+		db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
+		creatorsWithStats[i].ResourceCount = int(resourceCount)
+
+		// 统计下载量
+		var downloadCount int64
+		db.Model(&model.DownloadRecord{}).Where("creator_id = ?", creator.ID).Count(&downloadCount)
+		creatorsWithStats[i].DownloadCount = int(downloadCount)
+	}
+
 	Success(c, gin.H{
-		"list":  []gin.H{},
-		"total": 0,
+		"list":  creatorsWithStats,
+		"total": total,
 	})
 }
 
@@ -38,8 +122,130 @@ func ListCreators(c *gin.Context) {
 // @Failure      403  {object}  map[string]interface{}  "无权限"
 // @Router       /admin/creators [post]
 func CreateCreator(c *gin.Context) {
-	// TODO: 实现创建创作者
-	Success(c, gin.H{"id": "1"})
+	db := database.DB
+
+	// 请求参数结构
+	type CreateCreatorRequest struct {
+		UserID      string `json:"userId" binding:"required"`
+		Name        string `json:"name" binding:"required"`
+		Description string `json:"description"`
+		Avatar      string `json:"avatar"`
+		IsActive    *bool  `json:"isActive"`
+	}
+
+	var req CreateCreatorRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Error(c, 400, "参数错误: "+err.Error())
+		return
+	}
+
+	// 验证用户是否存在
+	var userID model.Int64String
+	if err := userID.Scan(req.UserID); err != nil {
+		Error(c, 400, "用户ID格式错误")
+		return
+	}
+
+	var user model.User
+	if err := db.First(&user, "id = ?", userID).Error; err != nil {
+		Error(c, 404, "用户不存在")
+		return
+	}
+
+	// 检查该用户是否已经是创作者
+	var existingCreator model.Creator
+	if err := db.Where("user_id = ?", userID).First(&existingCreator).Error; err == nil {
+		Error(c, 400, "该用户已经是创作者")
+		return
+	}
+
+	// 设置默认状态
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
+	// 创建创作者
+	creator := model.Creator{
+		UserID:      userID,
+		Name:        req.Name,
+		Description: req.Description,
+		Avatar:      req.Avatar,
+		IsActive:    isActive,
+	}
+
+	if err := db.Create(&creator).Error; err != nil {
+		Error(c, 500, "创建创作者失败")
+		return
+	}
+
+	// 返回创建的创作者（带统计数据）
+	result := CreatorWithStats{
+		Creator:       creator,
+		SpaceCount:    0,
+		ResourceCount: 0,
+		DownloadCount: 0,
+	}
+
+	Success(c, result)
+}
+
+// GetCreatorDetail 获取创作者详情
+// @Summary      获取创作者详情
+// @Description  管理员查看创作者详细信息
+// @Tags         管理后台 - 创作者管理
+// @Accept       json
+// @Produce      json
+// @Security     Bearer
+// @Param        id  path  string  true  "创作者ID"
+// @Success      200  {object}  map[string]interface{}  "创作者详情"
+// @Failure      401  {object}  map[string]interface{}  "未登录"
+// @Failure      403  {object}  map[string]interface{}  "无权限"
+// @Failure      404  {object}  map[string]interface{}  "创作者不存在"
+// @Router       /admin/creators/{id} [get]
+func GetCreatorDetail(c *gin.Context) {
+	db := database.DB
+
+	// 获取创作者ID
+	creatorIDStr := c.Param("id")
+	var creatorID model.Int64String
+	if err := creatorID.Scan(creatorIDStr); err != nil {
+		Error(c, 400, "创作者ID格式错误")
+		return
+	}
+
+	// 查询创作者
+	var creator model.Creator
+	if err := db.Preload("User").First(&creator, "id = ?", creatorID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			Error(c, 404, "创作者不存在")
+		} else {
+			Error(c, 500, "查询创作者失败")
+		}
+		return
+	}
+
+	// 统计空间数量
+	var spaceCount int64
+	db.Model(&model.CreatorSpace{}).Where("creator_id = ?", creator.ID).Count(&spaceCount)
+
+	// 统计资源数量
+	var resourceCount int64
+	db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
+
+	// 统计下载量
+	var downloadCount int64
+	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", creator.ID).Count(&downloadCount)
+
+	// 返回详情
+	result := CreatorWithStats{
+		Creator:       creator,
+		SpaceCount:    int(spaceCount),
+		ResourceCount: int(resourceCount),
+		DownloadCount: int(downloadCount),
+	}
+
+	Success(c, result)
 }
 
 // UpdateCreator 更新创作者
@@ -54,15 +260,95 @@ func CreateCreator(c *gin.Context) {
 // @Success      200  {object}  map[string]interface{}  "更新成功"
 // @Failure      401  {object}  map[string]interface{}  "未登录"
 // @Failure      403  {object}  map[string]interface{}  "无权限"
+// @Failure      404  {object}  map[string]interface{}  "创作者不存在"
 // @Router       /admin/creators/{id} [put]
 func UpdateCreator(c *gin.Context) {
-	// TODO: 实现更新创作者
-	Success(c, nil)
+	db := database.DB
+
+	// 获取创作者ID
+	creatorIDStr := c.Param("id")
+	var creatorID model.Int64String
+	if err := creatorID.Scan(creatorIDStr); err != nil {
+		Error(c, 400, "创作者ID格式错误")
+		return
+	}
+
+	// 请求参数结构
+	type UpdateCreatorRequest struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Avatar      string `json:"avatar"`
+		IsActive    *bool  `json:"isActive"`
+	}
+
+	var req UpdateCreatorRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Error(c, 400, "参数错误: "+err.Error())
+		return
+	}
+
+	// 查询创作者
+	var creator model.Creator
+	if err := db.First(&creator, "id = ?", creatorID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			Error(c, 404, "创作者不存在")
+		} else {
+			Error(c, 500, "查询创作者失败")
+		}
+		return
+	}
+
+	// 构建更新数据
+	updates := make(map[string]interface{})
+
+	if req.Name != "" {
+		updates["name"] = req.Name
+	}
+	if req.Description != "" {
+		updates["description"] = req.Description
+	}
+	if req.Avatar != "" {
+		updates["avatar"] = req.Avatar
+	}
+	if req.IsActive != nil {
+		updates["is_active"] = *req.IsActive
+	}
+
+	// 更新创作者
+	if err := db.Model(&creator).Updates(updates).Error; err != nil {
+		Error(c, 500, "更新创作者失败")
+		return
+	}
+
+	// 重新查询以获取最新数据
+	db.First(&creator, "id = ?", creatorID)
+
+	// 统计空间数量
+	var spaceCount int64
+	db.Model(&model.CreatorSpace{}).Where("creator_id = ?", creator.ID).Count(&spaceCount)
+
+	// 统计资源数量
+	var resourceCount int64
+	db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
+
+	// 统计下载量
+	var downloadCount int64
+	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", creator.ID).Count(&downloadCount)
+
+	// 返回更新后的创作者
+	result := CreatorWithStats{
+		Creator:       creator,
+		SpaceCount:    int(spaceCount),
+		ResourceCount: int(resourceCount),
+		DownloadCount: int(downloadCount),
+	}
+
+	Success(c, result)
 }
 
 // DeleteCreator 删除创作者
 // @Summary      删除创作者
-// @Description  管理员删除创作者
+// @Description  管理员删除创作者（软删除）
 // @Tags         管理后台 - 创作者管理
 // @Accept       json
 // @Produce      json
@@ -71,8 +357,102 @@ func UpdateCreator(c *gin.Context) {
 // @Success      200  {object}  map[string]interface{}  "删除成功"
 // @Failure      401  {object}  map[string]interface{}  "未登录"
 // @Failure      403  {object}  map[string]interface{}  "无权限"
+// @Failure      404  {object}  map[string]interface{}  "创作者不存在"
 // @Router       /admin/creators/{id} [delete]
 func DeleteCreator(c *gin.Context) {
-	// TODO: 实现删除创作者
-	Success(c, nil)
+	db := database.DB
+
+	// 获取创作者ID
+	creatorIDStr := c.Param("id")
+	var creatorID model.Int64String
+	if err := creatorID.Scan(creatorIDStr); err != nil {
+		Error(c, 400, "创作者ID格式错误")
+		return
+	}
+
+	// 查询创作者
+	var creator model.Creator
+	if err := db.First(&creator, "id = ?", creatorID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			Error(c, 404, "创作者不存在")
+		} else {
+			Error(c, 500, "查询创作者失败")
+		}
+		return
+	}
+
+	// 软删除创作者
+	if err := db.Delete(&creator).Error; err != nil {
+		Error(c, 500, "删除创作者失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"message": "删除成功",
+	})
+}
+
+// ToggleCreatorStatus 切换创作者状态
+// @Summary      切换创作者状态
+// @Description  管理员启用或禁用创作者
+// @Tags         管理后台 - 创作者管理
+// @Accept       json
+// @Produce      json
+// @Security     Bearer
+// @Param        id  path  string  true  "创作者ID"
+// @Success      200  {object}  map[string]interface{}  "切换成功"
+// @Failure      401  {object}  map[string]interface{}  "未登录"
+// @Failure      403  {object}  map[string]interface{}  "无权限"
+// @Failure      404  {object}  map[string]interface{}  "创作者不存在"
+// @Router       /admin/creators/{id}/toggle-status [post]
+func ToggleCreatorStatus(c *gin.Context) {
+	db := database.DB
+
+	// 获取创作者ID
+	creatorIDStr := c.Param("id")
+	var creatorID model.Int64String
+	if err := creatorID.Scan(creatorIDStr); err != nil {
+		Error(c, 400, "创作者ID格式错误")
+		return
+	}
+
+	// 查询创作者
+	var creator model.Creator
+	if err := db.First(&creator, "id = ?", creatorID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			Error(c, 404, "创作者不存在")
+		} else {
+			Error(c, 500, "查询创作者失败")
+		}
+		return
+	}
+
+	// 切换状态
+	creator.IsActive = !creator.IsActive
+	if err := db.Save(&creator).Error; err != nil {
+		Error(c, 500, "更新状态失败")
+		return
+	}
+
+	// 统计空间数量
+	var spaceCount int64
+	db.Model(&model.CreatorSpace{}).Where("creator_id = ?", creator.ID).Count(&spaceCount)
+
+	// 统计资源数量
+	var resourceCount int64
+	db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
+
+	// 统计下载量
+	var downloadCount int64
+	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", creator.ID).Count(&downloadCount)
+
+	// 返回更新后的创作者
+	result := CreatorWithStats{
+		Creator:       creator,
+		SpaceCount:    int(spaceCount),
+		ResourceCount: int(resourceCount),
+		DownloadCount: int(downloadCount),
+	}
+
+	Success(c, result)
 }

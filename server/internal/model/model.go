@@ -125,20 +125,48 @@ type Creator struct {
 	Name        string         `gorm:"size:50" json:"name"`
 	Description string         `gorm:"size:255" json:"description"`
 	Avatar      string         `gorm:"size:255" json:"avatar"`
-	Code        string         `gorm:"size:20;uniqueIndex" json:"code"`
 	IsActive    bool           `gorm:"default:true" json:"isActive"`
 	CreatedAt   time.Time      `json:"createdAt"`
 	UpdatedAt   time.Time      `json:"updatedAt"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// 关联
-	Resources []Resource `gorm:"foreignKey:CreatorID" json:"resources,omitempty"`
+	Spaces    []CreatorSpace `gorm:"foreignKey:CreatorID" json:"spaces,omitempty"`    // 创作者的空间列表
+	Resources []Resource     `gorm:"foreignKey:CreatorID" json:"resources,omitempty"` // 创作者上传的所有资源
 }
 
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
 func (c *Creator) BeforeCreate(tx *gorm.DB) error {
 	if c.ID == 0 {
 		c.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+// CreatorSpace 创作者空间模型（一个创作者可以有多个空间，每个空间有独立口令）
+type CreatorSpace struct {
+	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
+	CreatorID   Int64String    `gorm:"index" json:"creatorId"`
+	Title       string         `gorm:"size:100" json:"title"`           // 空间标题
+	Description string         `gorm:"size:500" json:"description"`     // 空间描述
+	Banner      string         `gorm:"size:500" json:"banner"`          // 空间横幅图
+	Code        string         `gorm:"size:20;uniqueIndex" json:"code"` // 口令（唯一）
+	IsActive    bool           `gorm:"default:true" json:"isActive"`    // 是否启用
+	ViewCount   int            `gorm:"default:0" json:"viewCount"`      // 浏览次数
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+
+	// 关联
+	Creator   *Creator        `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
+	Resources []Resource      `gorm:"many2many:space_resources;" json:"resources,omitempty"` // 空间关联的资源
+	Logs      []CodeAccessLog `gorm:"foreignKey:SpaceID" json:"logs,omitempty"`              // 访问日志
+}
+
+// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
+func (s *CreatorSpace) BeforeCreate(tx *gorm.DB) error {
+	if s.ID == 0 {
+		s.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }
@@ -201,7 +229,7 @@ func (d *DownloadRecord) BeforeCreate(tx *gorm.DB) error {
 // CodeAccessLog 口令访问日志模型
 type CodeAccessLog struct {
 	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
-	CreatorID Int64String    `gorm:"index" json:"creatorId"`
+	SpaceID   Int64String    `gorm:"index" json:"spaceId"`                     // 关联到空间
 	Code      string         `gorm:"size:20;index" json:"code"`
 	IP        string         `gorm:"size:50" json:"ip"`
 	UserAgent string         `gorm:"size:500" json:"userAgent"`
@@ -209,7 +237,7 @@ type CodeAccessLog struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// 关联
-	Creator *Creator `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
+	Space *CreatorSpace `gorm:"foreignKey:SpaceID" json:"space,omitempty"`
 }
 
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID

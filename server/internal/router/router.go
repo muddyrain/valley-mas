@@ -89,11 +89,20 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 			// 创作者管理
 			admin.GET("/creators", handler.ListCreators)
+			admin.GET("/creators/:id", handler.GetCreatorDetail)
 			admin.POST("/creators", handler.CreateCreator)
 			admin.PUT("/creators/:id", handler.UpdateCreator)
+			admin.POST("/creators/:id/toggle-status", handler.ToggleCreatorStatus)
 			admin.DELETE("/creators/:id", handler.DeleteCreator)
 
-			// 资源管理
+			// 创作者空间管理（一个创作者可以有多个空间）
+			admin.GET("/creators/:id/spaces", handler.ListCreatorSpaces)
+			admin.GET("/creators/:id/spaces/:spaceId", handler.GetCreatorSpaceDetail)
+			admin.POST("/creators/:id/spaces", handler.CreateCreatorSpace)
+			admin.PUT("/creators/:id/spaces/:spaceId", handler.UpdateCreatorSpace)
+			admin.DELETE("/creators/:id/spaces/:spaceId", handler.DeleteCreatorSpace)
+			admin.POST("/creators/:id/spaces/:spaceId/resources", handler.AddResourcesToSpace)
+			admin.DELETE("/creators/:id/spaces/:spaceId/resources", handler.RemoveResourcesFromSpace) // 资源管理
 			admin.GET("/resources", handler.ListResources)
 			admin.POST("/resources/upload", handler.UploadResource)
 			admin.PUT("/resources/:id/creator", handler.UpdateResourceCreator) // 新增：更新资源上传者
