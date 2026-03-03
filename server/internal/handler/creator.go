@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
-	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -33,7 +32,7 @@ type RegisterCreatorResponse struct {
 
 // RegisterCreator 创作者注册
 // @Summary      注册成为创作者
-// @Description  普通用户注册成为创作者，系统自动生成5位口令（如：y2722）
+// @Description  普通用户注册成为创作者，自动创建一个默认空间
 // @Tags         创作者
 // @Accept       json
 // @Produce      json
@@ -74,31 +73,20 @@ func RegisterCreator(c *gin.Context) {
 		return
 	}
 
-	// 4. 生成唯一口令（最多尝试10次）
-	code, err := generateUniqueCode(db)
-	if err != nil {
-		Error(c, http.StatusInternalServerError, "生成口令失败: "+err.Error())
-		return
-	}
-
-	// 5. 获取用户信息（用于设置默认头像等）
+	// 4. 获取用户信息（用于设置默认头像等）
 	var user model.User
 	if err := db.First(&user, userID).Error; err != nil {
 		Error(c, http.StatusNotFound, "用户不存在")
 		return
 	}
 
-	// 6. 创建创作者记录
+	// 5. 创建创作者记录
 	creator := model.Creator{
 		UserID:      model.Int64String(userID.(int64)),
 		Name:        req.Name,
 		Description: req.Description,
 		Avatar:      req.Avatar,
-		Code:        code,
 		IsActive:    true, // 默认启用
-		// SpaceTitle:       req.SpaceTitle,       // 等数据库字段添加后启用
-		// SpaceBanner:      req.SpaceBanner,      // 等数据库字段添加后启用
-		// SpaceDescription: req.SpaceDescription, // 等数据库字段添加后启用
 	}
 
 	// 如果没有传头像，使用用户头像
@@ -106,15 +94,40 @@ func RegisterCreator(c *gin.Context) {
 		creator.Avatar = user.Avatar
 	}
 
-	// 如果没有传空间标题，使用创作者名称
-	// if creator.SpaceTitle == "" {
-	// 	creator.SpaceTitle = creator.Name
-	// }
+	// 6. 生成空间口令
+	code, err := generateSpaceCode(db)
+	if err != nil {
+		Error(c, http.StatusInternalServerError, "生成口令失败: "+err.Error())
+		return
+	}
 
-	// 7. 使用事务保存
+	// 7. 创建默认空间
+	spaceTitle := req.SpaceTitle
+	if spaceTitle == "" {
+		spaceTitle = req.Name + "的创意空间"
+	}
+
+	space := model.CreatorSpace{
+		CreatorID:   creator.ID,
+		Title:       spaceTitle,
+		Code:        code,
+		Banner:      req.SpaceBanner,
+		Description: req.SpaceDescription,
+		IsActive:    true,
+	}
+
+	// 8. 使用事务保存
 	err = db.Transaction(func(tx *gorm.DB) error {
 		// 保存创作者
 		if err := tx.Create(&creator).Error; err != nil {
+			return err
+		}
+
+		// 更新空间的 CreatorID
+		space.CreatorID = creator.ID
+
+		// 保存默认空间
+		if err := tx.Create(&space).Error; err != nil {
 			return err
 		}
 
@@ -131,71 +144,23 @@ func RegisterCreator(c *gin.Context) {
 		return
 	}
 
-	// 8. 返回创作者信息
+	// 9. 返回创作者信息
 	Success(c, gin.H{
 		"id":          creator.ID,
 		"userId":      creator.UserID,
 		"name":        creator.Name,
-		"code":        creator.Code,
 		"avatar":      creator.Avatar,
 		"description": creator.Description,
 		"isActive":    creator.IsActive,
 		"createdAt":   creator.CreatedAt,
-		"message":     "🎉 恭喜！您已成为创作者",
-		"tip":         "您的专属口令是：" + creator.Code + "（4位，永久有效）",
+		"space": gin.H{
+			"id":    space.ID,
+			"title": space.Title,
+			"code":  space.Code,
+		},
+		"message": "🎉 恭喜！您已成为创作者",
+		"tip":     "您的专属空间口令是：" + space.Code + "（4位，永久有效）",
 	})
-}
-
-// generateUniqueCode 生成唯一口令
-// 确保口令在数据库中不存在（全局唯一）
-func generateUniqueCode(db *gorm.DB) (string, error) {
-	maxAttempts := 10 // 最多尝试10次
-
-	for i := 0; i < maxAttempts; i++ {
-		// 生成随机口令
-		code := utils.GenerateCode()
-
-		// 检查口令是否已存在（包括已删除的记录）
-		var count int64
-		err := db.Model(&model.Creator{}).
-			Unscoped(). // 包括软删除的记录
-			Where("code = ?", code).
-			Count(&count).Error
-
-		if err != nil {
-			return "", err
-		}
-
-		// 如果口令不存在，返回
-		if count == 0 {
-			return code, nil
-		}
-
-		// 如果存在，记录日志并继续尝试
-		// log.Printf("口令冲突：%s 已存在，尝试生成新口令（第%d次）", code, i+1)
-	}
-
-	// 10次都冲突的概率极低
-	// 即使有10万个创作者，概率也接近0
-	// 但为了保险，使用6位口令作为回退
-	code := utils.GenerateCode() + utils.GenerateCode()[:1]
-
-	// 再次检查6位口令是否存在
-	var count int64
-	err := db.Model(&model.Creator{}).
-		Unscoped().
-		Where("code = ?", code).
-		Count(&count).Error
-
-	if err != nil {
-		return "", err
-	}
-
-	if count > 0 {
-		return "", errors.New("生成口令失败，请重试")
-	}
-
-	return code, nil // 6位口令，组合数 29^6 = 594,823,321（约5.9亿）
 }
 
 // GetMyCreatorSpace 获取我的创作者空间信息
@@ -222,125 +187,38 @@ func GetMyCreatorSpace(c *gin.Context) {
 		return
 	}
 
-	// 3. 统计资源数量
+	// 3. 查询所有空间
+	var spaces []model.CreatorSpace
+	db.Where("creator_id = ?", creator.ID).Find(&spaces)
+
+	// 4. 统计资源数量
 	var resourceCount int64
 	db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
 
-	// 4. 返回创作者空间信息
+	// 5. 返回创作者空间信息
 	Success(c, gin.H{
 		"id":            creator.ID,
 		"userId":        creator.UserID,
 		"name":          creator.Name,
-		"code":          creator.Code,
 		"avatar":        creator.Avatar,
 		"description":   creator.Description,
 		"isActive":      creator.IsActive,
+		"spaces":        spaces,
+		"spaceCount":    len(spaces),
 		"resourceCount": resourceCount,
-		// "viewCount":     creator.ViewCount,     // 等字段添加后启用
-		// "downloadCount": creator.DownloadCount, // 等字段添加后启用
-		// "revenue":       creator.Revenue,       // 等字段添加后启用
-		"createdAt": creator.CreatedAt,
-		"updatedAt": creator.UpdatedAt,
+		"createdAt":     creator.CreatedAt,
+		"updatedAt":     creator.UpdatedAt,
 	})
 }
 
-// ToggleCreatorCode 开启/关闭创作者口令
+// ToggleCreatorCode 开启/关闭创作者口令（已废弃，改为空间级别控制）
 // PUT /api/v1/creator/code/toggle
 func ToggleCreatorCode(c *gin.Context) {
-	db := database.DB
-
-	// 1. 获取当前用户ID
-	userID, exists := c.Get("userID")
-	if !exists {
-		Error(c, http.StatusUnauthorized, "未登录")
-		return
-	}
-
-	// 2. 解析请求
-	var req struct {
-		IsActive bool `json:"isActive"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		Error(c, http.StatusBadRequest, "参数错误")
-		return
-	}
-
-	// 3. 查询创作者
-	var creator model.Creator
-	err := db.Where("user_id = ?", userID).First(&creator).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			Error(c, http.StatusNotFound, "您还不是创作者")
-			return
-		}
-		Error(c, http.StatusInternalServerError, "查询失败")
-		return
-	}
-
-	// 4. 更新状态
-	if err := db.Model(&creator).Update("is_active", req.IsActive).Error; err != nil {
-		Error(c, http.StatusInternalServerError, "更新失败")
-		return
-	}
-
-	// 5. 返回结果
-	message := "口令已开启"
-	if !req.IsActive {
-		message = "口令已关闭"
-	}
-
-	Success(c, gin.H{
-		"isActive":  req.IsActive,
-		"message":   message,
-		"code":      creator.Code,
-		"updatedAt": creator.UpdatedAt,
-	})
+	Error(c, http.StatusBadRequest, "该功能已废弃，请使用空间管理功能")
 }
 
-// RegenerateCreatorCode 重新生成创作者口令
+// RegenerateCreatorCode 重新生成创作者口令（已废弃，改为空间级别控制）
 // POST /api/v1/creator/code/regenerate
 func RegenerateCreatorCode(c *gin.Context) {
-	db := database.DB
-
-	// 1. 获取当前用户ID
-	userID, exists := c.Get("userID")
-	if !exists {
-		Error(c, http.StatusUnauthorized, "未登录")
-		return
-	}
-
-	// 2. 查询创作者
-	var creator model.Creator
-	err := db.Where("user_id = ?", userID).First(&creator).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			Error(c, http.StatusNotFound, "您还不是创作者")
-			return
-		}
-		Error(c, http.StatusInternalServerError, "查询失败")
-		return
-	}
-
-	// 3. 生成新口令
-	oldCode := creator.Code
-	newCode, err := generateUniqueCode(db)
-	if err != nil {
-		Error(c, http.StatusInternalServerError, "生成口令失败")
-		return
-	}
-
-	// 4. 更新口令
-	if err := db.Model(&creator).Update("code", newCode).Error; err != nil {
-		Error(c, http.StatusInternalServerError, "更新失败")
-		return
-	}
-
-	// 5. 返回结果
-	Success(c, gin.H{
-		"oldCode":     oldCode,
-		"newCode":     newCode,
-		"message":     "口令已重新生成",
-		"tip":         "旧口令已失效，请使用新口令：" + newCode,
-		"generatedAt": creator.UpdatedAt,
-	})
+	Error(c, http.StatusBadRequest, "该功能已废弃，请使用空间管理功能")
 }

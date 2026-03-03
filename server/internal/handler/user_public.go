@@ -14,32 +14,29 @@ import (
 // @Tags         用户端 - 公开接口
 // @Accept       json
 // @Produce      json
-// @Param        code  path  string  true  "创作者口令"
-// @Success      200  {object}  map[string]interface{}  "创作者空间信息"
-// @Failure      404  {object}  map[string]interface{}  "创作者不存在"
+// @Param        code  path  string  true  "空间口令"
+// @Success      200  {object}  map[string]interface{}  "空间信息"
+// @Failure      404  {object}  map[string]interface{}  "空间不存在"
 // @Router       /public/space/{code} [get]
 func GetCreatorSpace(c *gin.Context) {
 	code := c.Param("code")
 
 	db := database.GetDB()
 
-	// 查找创作者
-	var creator model.Creator
-	if err := db.Where("code = ? AND is_active = ?", code, true).First(&creator).Error; err != nil {
-		Error(c, 404, "创作者不存在或未激活")
+	// 查找空间
+	var space model.CreatorSpace
+	if err := db.Where("code = ? AND is_active = ?", code, true).
+		Preload("Creator").
+		Preload("Resources").
+		First(&space).Error; err != nil {
+		Error(c, 404, "空间不存在或未激活")
 		return
 	}
-
-	// 获取创作者的资源列表
-	var resources []model.Resource
-	db.Where("creator_id = ?", creator.ID).
-		Order("created_at DESC").
-		Find(&resources)
 
 	// 记录访问日志
 	accessLog := model.CodeAccessLog{
 		ID:        model.Int64String(utils.GenerateID()),
-		CreatorID: creator.ID,
+		SpaceID:   space.ID,
 		Code:      code,
 		IP:        c.ClientIP(),
 		UserAgent: c.GetHeader("User-Agent"),
@@ -49,18 +46,24 @@ func GetCreatorSpace(c *gin.Context) {
 	// 统计数据
 	var totalViews int64
 	var totalDownloads int64
-	db.Model(&model.CodeAccessLog{}).Where("creator_id = ?", creator.ID).Count(&totalViews)
-	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", creator.ID).Count(&totalDownloads)
+	db.Model(&model.CodeAccessLog{}).Where("space_id = ?", space.ID).Count(&totalViews)
+	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", space.CreatorID).Count(&totalDownloads)
 
 	Success(c, gin.H{
-		"creator": gin.H{
-			"id":          creator.ID,
-			"name":        creator.Name,
-			"avatar":      creator.Avatar,
-			"description": creator.Description,
-			"code":        creator.Code,
+		"space": gin.H{
+			"id":          space.ID,
+			"title":       space.Title,
+			"description": space.Description,
+			"banner":      space.Banner,
+			"code":        space.Code,
 		},
-		"resources": resources,
+		"creator": gin.H{
+			"id":          space.Creator.ID,
+			"name":        space.Creator.Name,
+			"avatar":      space.Creator.Avatar,
+			"description": space.Creator.Description,
+		},
+		"resources": space.Resources,
 		"stats": gin.H{
 			"totalViews":     totalViews,
 			"totalDownloads": totalDownloads,

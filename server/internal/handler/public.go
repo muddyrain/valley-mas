@@ -48,15 +48,16 @@ func VerifyCode(c *gin.Context) {
 
 	// 3. 验证口令格式
 	if !utils.ValidateCodeFormat(normalizedCode) {
-		Error(c, http.StatusBadRequest, "口令格式错误，应为5位小写字母或数字（如：y2722）")
+		Error(c, http.StatusBadRequest, "口令格式错误，应为4位小写字母或数字")
 		return
 	}
 
-	// 4. 查询创作者（只查询已激活的）
-	var creator model.Creator
+	// 4. 查询空间（只查询已激活的）
+	var space model.CreatorSpace
 	err := db.Where("code = ? AND is_active = ?", normalizedCode, true).
-		Preload("User"). // 预加载用户信息
-		First(&creator).Error
+		Preload("Creator").      // 预加载创作者信息
+		Preload("Creator.User"). // 预加载用户信息
+		First(&space).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -69,22 +70,27 @@ func VerifyCode(c *gin.Context) {
 
 	// 5. 统计资源数量
 	var resourceCount int64
-	db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
+	db.Model(&space.Resources).Count(&resourceCount)
 
 	// 6. 记录访问（可选：记录IP和时间用于统计）
 	// TODO: 如需记录访问日志，可以在这里添加
 
-	// 7. 返回创作者空间信息
+	// 7. 返回空间信息
 	Success(c, gin.H{
 		"valid": true,
-		"creator": gin.H{
-			"id":            creator.ID,
-			"name":          creator.Name,
-			"description":   creator.Description,
-			"avatar":        creator.Avatar,
-			"code":          creator.Code,
+		"space": gin.H{
+			"id":            space.ID,
+			"title":         space.Title,
+			"description":   space.Description,
+			"banner":        space.Banner,
+			"code":          space.Code,
 			"resourceCount": resourceCount,
-			"createdAt":     creator.CreatedAt,
+			"creator": gin.H{
+				"id":     space.Creator.ID,
+				"name":   space.Creator.Name,
+				"avatar": space.Creator.Avatar,
+			},
+			"createdAt": space.CreatedAt,
 		},
 	})
 }
