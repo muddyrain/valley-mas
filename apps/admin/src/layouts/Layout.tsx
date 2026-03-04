@@ -15,12 +15,20 @@ import http from '../utils/request';
 
 const { Header, Sider, Content } = AntLayout;
 
-const menuItems = [
+// 管理员菜单（完整权限）
+const adminMenuItems = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' },
   { key: '/users', icon: <UserOutlined />, label: '用户管理' },
   { key: '/creators', icon: <CrownOutlined />, label: '创作者管理' },
   { key: '/resources', icon: <PictureOutlined />, label: '资源管理' },
   { key: '/records', icon: <FileTextOutlined />, label: '记录管理' },
+];
+
+// 创作者菜单（受限权限）
+const creatorMenuItems = [
+  { key: '/creator-dashboard', icon: <DashboardOutlined />, label: '数据概览' },
+  { key: '/resources', icon: <PictureOutlined />, label: '我的资源' },
+  { key: '/creators', icon: <CrownOutlined />, label: '我的空间' },
 ];
 
 export default function Layout() {
@@ -29,6 +37,7 @@ export default function Layout() {
     nickname?: string;
     username?: string;
     avatar?: string;
+    role?: string;
   }>({});
   const navigate = useNavigate();
   const location = useLocation();
@@ -45,6 +54,9 @@ export default function Layout() {
       }
     }
   }, []);
+
+  // 根据角色选择菜单
+  const menuItems = userInfo.role === 'admin' ? adminMenuItems : creatorMenuItems;
 
   const handleLogout = async () => {
     try {
@@ -100,7 +112,12 @@ export default function Layout() {
           <Dropdown menu={userMenu} placement="bottomRight">
             <div className="flex items-center cursor-pointer">
               <Avatar src={userInfo.avatar} icon={<UserOutlined />} />
-              <span className="ml-2">{userInfo.nickname || userInfo.username || '管理员'}</span>
+              <span className="ml-2">
+                {userInfo.nickname || userInfo.username || '用户'}
+                {userInfo.role === 'creator' && (
+                  <span className="ml-2 text-xs text-blue-500">[创作者]</span>
+                )}
+              </span>
             </div>
           </Dropdown>
         </Header>

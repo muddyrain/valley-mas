@@ -9,16 +9,16 @@ import (
 
 // Claims JWT 声明
 type Claims struct {
-	UserID   int64  `json:"userId"`
+	UserID   string `json:"userId"` // 使用字符串避免JavaScript精度丢失
 	Username string `json:"username"`
 	Role     string `json:"role"`
 	jwt.RegisteredClaims
 }
 
 // GenerateToken 生成 JWT token
-func GenerateToken(userID int64, username, role, secret string, expireHours int64) (string, error) {
+func GenerateToken(userID string, username, role, secret string, expireHours int64) (string, error) {
 	claims := Claims{
-		UserID:   userID,
+		UserID:   userID, // 直接使用字符串
 		Username: username,
 		Role:     role,
 		RegisteredClaims: jwt.RegisteredClaims{

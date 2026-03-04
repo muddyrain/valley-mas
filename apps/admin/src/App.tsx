@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { reqGetCurrentUser } from './api/auth';
 import Layout from './layouts/Layout';
+import CreatorDashboard from './pages/CreatorDashboard';
 import CreatorSpaces from './pages/CreatorSpaces';
 import Creators from './pages/Creators';
 import Dashboard from './pages/Dashboard';
@@ -93,6 +94,7 @@ function App() {
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="creator-dashboard" element={<CreatorDashboard />} />
           <Route path="users" element={<Users />} />
           <Route path="creators" element={<Creators />} />
           <Route path="creators/:creatorId/spaces" element={<CreatorSpaces />} />

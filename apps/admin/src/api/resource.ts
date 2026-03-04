@@ -30,6 +30,7 @@ export interface Resource {
 export interface ResourceListParams extends PaginationParams {
   keyword?: string; // 搜索关键词
   type?: ResourceType; // 按类型筛选
+  creatorId?: string; // 按创作者筛选
 }
 
 // 资源列表响应

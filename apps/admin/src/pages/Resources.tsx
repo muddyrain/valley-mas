@@ -24,6 +24,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useEffect, useState } from 'react';
 import { UserCardInfo } from '@/components/UserCardInfo';
+import { type Creator, reqGetCreatorList } from '../api/creator';
 import {
   type Resource,
   type ResourceType,
@@ -42,6 +43,8 @@ export default function Resources() {
   const [pageSize, setPageSize] = useState(20);
   const [typeFilter, setTypeFilter] = useState<ResourceType | ''>('');
   const [keyword, setKeyword] = useState('');
+  const [creatorIdFilter, setCreatorIdFilter] = useState<string>(''); // 创作者筛选
+  const [creators, setCreators] = useState<Creator[]>([]); // 创作者列表
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadType, setUploadType] = useState<ResourceType>('avatar');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
@@ -54,16 +57,43 @@ export default function Resources() {
   const [users, setUsers] = useState<Array<{ id: string; nickname: string }>>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
+  // 获取当前用户信息
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+  const isCreator = userInfo.role === 'creator';
+
+  // 加载创作者列表（用于筛选 - 仅管理员使用）
+  useEffect(() => {
+    // 只有管理员需要加载创作者列表
+    if (isCreator) return;
+
+    const fetchCreators = async () => {
+      try {
+        const response = await reqGetCreatorList({ page: 1, pageSize: 1000 });
+        const creatorList = response.list || [];
+        setCreators(creatorList);
+      } catch (error) {
+        console.error('加载创作者列表失败', error);
+      }
+    };
+    fetchCreators();
+  }, [isCreator]);
+
   // 获取资源列表
   const fetchResources = useCallback(async () => {
     setLoading(true);
     try {
-      const params: { page: number; pageSize: number; type?: ResourceType; keyword?: string } = {
+      const params: {
+        page: number;
+        pageSize: number;
+        type?: ResourceType;
+        keyword?: string;
+      } = {
         page,
         pageSize,
       };
       if (typeFilter) params.type = typeFilter;
       if (keyword) params.keyword = keyword;
+      // 移除 creatorId 参数，后端自动根据登录用户过滤
 
       const response = await reqGetResourceList(params);
       setData(response.list || []);
@@ -74,7 +104,7 @@ export default function Resources() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, typeFilter, keyword]);
+  }, [page, pageSize, typeFilter, keyword]); // 移除 creatorIdFilter 依赖
 
   // 删除资源
   const handleDelete = async (id: string) => {
@@ -252,14 +282,16 @@ export default function Resources() {
       fixed: 'right',
       render: (_, record) => (
         <Space>
-          <Button
-            type="link"
-            size="small"
-            icon={<UserSwitchOutlined />}
-            onClick={() => openCreatorModal(record)}
-          >
-            配置上传者
-          </Button>
+          {!isCreator && (
+            <Button
+              type="link"
+              size="small"
+              icon={<UserSwitchOutlined />}
+              onClick={() => openCreatorModal(record)}
+            >
+              配置上传者
+            </Button>
+          )}
           <Button
             type="link"
             size="small"
@@ -276,7 +308,7 @@ export default function Resources() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">资源管理</h2>
+      <h2 className="text-2xl font-bold mb-6">{isCreator ? '我的资源' : '资源管理'}</h2>
       <Card>
         <div className="mb-4 flex justify-between">
           <Space>
@@ -299,6 +331,23 @@ export default function Resources() {
                 { label: '壁纸', value: 'wallpaper' },
               ]}
             />
+            {!isCreator && (
+              <Select
+                placeholder="创作者"
+                className="w-40"
+                allowClear
+                showSearch
+                value={creatorIdFilter || undefined}
+                onChange={(value) => setCreatorIdFilter(value || '')}
+                options={creators.map((c) => ({
+                  label: c.name,
+                  value: c.id,
+                }))}
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+              />
+            )}
             <Button icon={<SearchOutlined />} type="primary" onClick={fetchResources}>
               搜索
             </Button>

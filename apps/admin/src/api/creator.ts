@@ -16,6 +16,38 @@ export interface Creator {
   spaceCount?: number;
   resourceCount?: number;
   downloadCount?: number;
+
+  // 用户信息（后端关联查询）
+  username?: string;
+  userNickname?: string;
+}
+
+// 创作者数据概览
+export interface CreatorStats {
+  totalResources: number;
+  totalSpaces: number;
+  totalDownloads: number;
+  totalViews: number;
+  todayDownloads: number;
+  todayViews: number;
+  last7DaysDownloads: number;
+  last7DaysViews: number;
+  downloadTrend: Array<{ date: string; count: number }>;
+  viewTrend: Array<{ date: string; count: number }>;
+  topResources: Array<{
+    id: string;
+    title: string;
+    type: string;
+    downloadCount: number;
+    url: string;
+    thumbnailUrl: string;
+  }>;
+  creatorInfo: {
+    id: string;
+    name: string;
+    avatar: string;
+    description: string;
+  };
 }
 
 export interface CreatorListParams extends PaginationParams {
@@ -24,6 +56,11 @@ export interface CreatorListParams extends PaginationParams {
 }
 
 export type CreatorListResponse = PaginationResponse<Creator>;
+
+// 获取创作者数据概览
+export const reqGetCreatorStats = () => {
+  return http.get<unknown, CreatorStats>('/admin/creator/stats');
+};
 
 // 获取创作者列表
 export const reqGetCreatorList = (params: CreatorListParams) => {
@@ -74,6 +111,9 @@ export interface CreatorSpace {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+
+  // 关联数据
+  resources?: Array<{ id: string; title: string; type: string; url: string }>;
 
   // 统计数据
   resourceCount?: number;

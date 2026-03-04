@@ -5,18 +5,22 @@ import (
 	"strings"
 
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
 // CreatorWithStats 带统计数据的创作者
 type CreatorWithStats struct {
 	model.Creator
-	SpaceCount    int `json:"spaceCount"`    // 空间数量
-	ResourceCount int `json:"resourceCount"` // 资源数量
-	DownloadCount int `json:"downloadCount"` // 下载量
+	SpaceCount    int    `json:"spaceCount"`    // 空间数量
+	ResourceCount int    `json:"resourceCount"` // 资源数量
+	DownloadCount int    `json:"downloadCount"` // 下载量
+	Username      string `json:"username"`      // 用户名
+	UserNickname  string `json:"userNickname"`  // 用户昵称
 }
 
 // ListCreators 获取创作者列表（管理员）
@@ -52,8 +56,17 @@ func ListCreators(c *gin.Context) {
 	keyword := strings.TrimSpace(c.Query("keyword"))
 	isActiveStr := c.Query("isActive")
 
+	// 获取当前用户信息
+	userRole, _ := c.Get("userRole")
+	userId, _ := c.Get("userId")
+
 	// 构建查询
 	query := db.Model(&model.Creator{})
+
+	// 🔒 如果是创作者，只能查看自己的信息
+	if userRole == "creator" {
+		query = query.Where("user_id = ?", userId)
+	}
 
 	// 关键词搜索（仅搜索名称）
 	if keyword != "" {
@@ -85,6 +98,13 @@ func ListCreators(c *gin.Context) {
 	for i, creator := range creators {
 		creatorsWithStats[i] = CreatorWithStats{
 			Creator: creator,
+		}
+
+		// 查询用户信息
+		var user model.User
+		if err := db.Where("id = ?", creator.UserID).First(&user).Error; err == nil {
+			creatorsWithStats[i].Username = user.Username
+			creatorsWithStats[i].UserNickname = user.Nickname
 		}
 
 		// 统计空间数量
@@ -208,22 +228,50 @@ func GetCreatorDetail(c *gin.Context) {
 
 	// 获取创作者ID
 	creatorIDStr := c.Param("id")
+	logger.Info(c, "Fetching creator detail", logrus.Fields{
+		"creator_id": creatorIDStr,
+	})
+
 	var creatorID model.Int64String
 	if err := creatorID.Scan(creatorIDStr); err != nil {
-		Error(c, 400, "创作者ID格式错误")
+		ErrorWithDetail(c, 400, "创作者ID格式错误", err, logrus.Fields{
+			"input": creatorIDStr,
+		})
 		return
 	}
 
 	// 查询创作者
 	var creator model.Creator
-	if err := db.Preload("User").First(&creator, "id = ?", creatorID).Error; err != nil {
+	if err := db.First(&creator, "id = ?", creatorID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
+			logger.Warn(c, "Creator not found", logrus.Fields{
+				"creator_id": creatorID,
+			})
 			Error(c, 404, "创作者不存在")
 		} else {
-			Error(c, 500, "查询创作者失败")
+			ErrorWithDetail(c, 500, "查询创作者失败", err, logrus.Fields{
+				"creator_id": creatorID,
+			})
 		}
 		return
 	}
+
+	// 🔒 如果是创作者角色，只能查看自己的详情
+	userRole, _ := c.Get("userRole")
+	userId, _ := c.Get("userId")
+	if userRole == "creator" && creator.UserID != userId {
+		logger.Warn(c, "Creator attempted to access other creator's detail", logrus.Fields{
+			"request_user_id": userId,
+			"creator_user_id": creator.UserID,
+		})
+		Error(c, 403, "无权访问其他创作者的信息")
+		return
+	}
+
+	logger.Debug(c, "Creator found", logrus.Fields{
+		"creator_id": creator.ID,
+		"user_id":    creator.UserID,
+	})
 
 	// 统计空间数量
 	var spaceCount int64
@@ -236,6 +284,13 @@ func GetCreatorDetail(c *gin.Context) {
 	// 统计下载量
 	var downloadCount int64
 	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", creator.ID).Count(&downloadCount)
+
+	logger.Info(c, "Creator detail retrieved successfully", logrus.Fields{
+		"creator_id":     creator.ID,
+		"space_count":    spaceCount,
+		"resource_count": resourceCount,
+		"download_count": downloadCount,
+	})
 
 	// 返回详情
 	result := CreatorWithStats{

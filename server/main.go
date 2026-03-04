@@ -4,6 +4,7 @@ import (
 	"log"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/router"
 	"valley-server/internal/utils"
 
@@ -40,26 +41,30 @@ func main() {
 	// 加载配置
 	cfg := config.Load()
 
+	// 初始化日志系统
+	logger.InitLogger()
+	logger.Log.Info("🚀 Valley MAS Server Starting...")
+
 	// 初始化 Snowflake ID 生成器（节点ID可配置，默认为1）
 	if err := utils.InitSnowflake(1); err != nil {
-		log.Fatalf("Failed to init Snowflake: %v", err)
+		logger.Log.Fatalf("Failed to init Snowflake: %v", err)
 	}
-	log.Println("✅ Snowflake ID generator initialized (Node ID: 1)")
+	logger.Log.Info("✅ Snowflake ID generator initialized (Node ID: 1)")
 
 	// 初始化火山引擎 TOS（对象存储）
 	if cfg.TOS.AccessKey != "" && cfg.TOS.SecretKey != "" {
 		if err := utils.InitTOS(&cfg.TOS); err != nil {
-			log.Printf("⚠️  TOS initialization failed: %v", err)
+			logger.Log.Warnf("⚠️  TOS initialization failed: %v", err)
 		} else {
-			log.Println("✅ TOS (Volcano Engine Object Storage) initialized")
+			logger.Log.Info("✅ TOS (Volcano Engine Object Storage) initialized")
 		}
 	} else {
-		log.Println("⚠️  TOS credentials not configured, file upload disabled")
+		logger.Log.Warn("⚠️  TOS credentials not configured, file upload disabled")
 	}
 
 	// 初始化数据库
 	if err := database.Init(cfg); err != nil {
-		log.Fatalf("Failed to init database: %v", err)
+		logger.Log.Fatalf("Failed to init database: %v", err)
 	}
 	defer database.Close()
 
@@ -67,8 +72,8 @@ func main() {
 	r := router.Setup(cfg)
 
 	// 启动服务
-	log.Printf("🚀 Server starting on port %s (env: %s)", cfg.Port, cfg.Env)
+	logger.Log.Infof("🚀 Server starting on port %s (env: %s)", cfg.Port, cfg.Env)
 	if err := r.Run(":" + cfg.Port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		logger.Log.Fatalf("Failed to start server: %v", err)
 	}
 }

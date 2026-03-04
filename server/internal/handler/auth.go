@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
@@ -51,8 +52,8 @@ func Login(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		// 生成 token
-		token, err := utils.GenerateToken(int64(user.ID), user.Username, user.Role, cfg.JWT.Secret, cfg.JWT.Expire)
+		// 生成 token (将ID转换为字符串以避免JavaScript精度丢失)
+		token, err := utils.GenerateToken(strconv.FormatInt(int64(user.ID), 10), user.Username, user.Role, cfg.JWT.Secret, cfg.JWT.Expire)
 		if err != nil {
 			Error(c, http.StatusInternalServerError, "生成token失败")
 			return

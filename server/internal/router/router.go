@@ -3,6 +3,7 @@ package router
 import (
 	"valley-server/internal/config"
 	"valley-server/internal/handler"
+	"valley-server/internal/logger"
 	"valley-server/internal/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -14,6 +15,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	r := gin.Default()
 
 	// 中间件
+	r.Use(logger.RequestLogger()) // 请求日志中间件（自动生成 Request ID）
 	r.Use(middleware.Cors())
 
 	// Swagger 文档路由
@@ -73,44 +75,61 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 		// 管理后台接口
 		admin := api.Group("/admin")
-		admin.Use(middleware.Auth(cfg), middleware.AdminOnly()) // 启用认证和管理员权限
+		admin.Use(middleware.Auth(cfg)) // 启用认证
 		{
-			// 统计
-			admin.GET("/stats", handler.GetStats)
-			admin.GET("/trends", handler.GetTrends) // 新增：趋势数据
+			// ========== 管理员专属接口 ==========
+			adminOnly := admin.Group("")
+			adminOnly.Use(middleware.AdminOnly())
+			{
+				// 用户管理（仅管理员）
+				adminOnly.GET("/users", handler.ListUsers)
+				adminOnly.POST("/users", handler.CreateUser)
+				adminOnly.GET("/users/:id", handler.GetUserDetail)
+				adminOnly.PUT("/users/:id", handler.UpdateUser)
+				adminOnly.PUT("/users/:id/status", handler.UpdateUserStatus)
+				adminOnly.DELETE("/users/:id", handler.DeleteUser)
 
-			// 用户管理（CRUD）
-			admin.GET("/users", handler.ListUsers)
-			admin.POST("/users", handler.CreateUser)       // 新增：创建用户
-			admin.GET("/users/:id", handler.GetUserDetail) // 新增：用户详情
-			admin.PUT("/users/:id", handler.UpdateUser)    // 新增：更新用户
-			admin.PUT("/users/:id/status", handler.UpdateUserStatus)
-			admin.DELETE("/users/:id", handler.DeleteUser) // 新增：删除用户
+				// 创作者管理 - 仅管理员可以执行的操作
+				adminOnly.POST("/creators", handler.CreateCreator)
+				adminOnly.PUT("/creators/:id", handler.UpdateCreator)
+				adminOnly.POST("/creators/:id/toggle-status", handler.ToggleCreatorStatus)
+				adminOnly.DELETE("/creators/:id", handler.DeleteCreator)
 
-			// 创作者管理
-			admin.GET("/creators", handler.ListCreators)
-			admin.GET("/creators/:id", handler.GetCreatorDetail)
-			admin.POST("/creators", handler.CreateCreator)
-			admin.PUT("/creators/:id", handler.UpdateCreator)
-			admin.POST("/creators/:id/toggle-status", handler.ToggleCreatorStatus)
-			admin.DELETE("/creators/:id", handler.DeleteCreator)
+				// 全局统计（仅管理员）
+				adminOnly.GET("/stats", handler.GetStats)
+				adminOnly.GET("/trends", handler.GetTrends)
 
-			// 创作者空间管理（一个创作者可以有多个空间）
-			admin.GET("/creators/:id/spaces", handler.ListCreatorSpaces)
-			admin.GET("/creators/:id/spaces/:spaceId", handler.GetCreatorSpaceDetail)
-			admin.POST("/creators/:id/spaces", handler.CreateCreatorSpace)
-			admin.PUT("/creators/:id/spaces/:spaceId", handler.UpdateCreatorSpace)
-			admin.DELETE("/creators/:id/spaces/:spaceId", handler.DeleteCreatorSpace)
-			admin.POST("/creators/:id/spaces/:spaceId/resources", handler.AddResourcesToSpace)
-			admin.DELETE("/creators/:id/spaces/:spaceId/resources", handler.RemoveResourcesFromSpace) // 资源管理
-			admin.GET("/resources", handler.ListResources)
-			admin.POST("/resources/upload", handler.UploadResource)
-			admin.PUT("/resources/:id/creator", handler.UpdateResourceCreator) // 新增：更新资源上传者
-			admin.DELETE("/resources/:id", handler.DeleteResource)
+				// 全局记录管理（仅管理员）
+				adminOnly.GET("/records/downloads", handler.ListDownloadRecords)
+				adminOnly.GET("/records/uploads", handler.ListUploadRecords)
+			}
 
-			// 记录管理
-			admin.GET("/records/downloads", handler.ListDownloadRecords)
-			admin.GET("/records/uploads", handler.ListUploadRecords)
+			// ========== 创作者和管理员共享接口 ==========
+			content := admin.Group("")
+			content.Use(middleware.CreatorOrAdmin())
+			{
+				// 创作者数据概览（创作者专用）
+				content.GET("/creator/stats", handler.GetCreatorStats)
+
+				// 创作者列表和详情（创作者可以查看自己的信息，管理员可以查看所有）
+				content.GET("/creators", handler.ListCreators)
+				content.GET("/creators/:id", handler.GetCreatorDetail)
+
+				// 创作者空间管理（创作者只能管理自己的空间）
+				content.GET("/creators/:id/spaces", handler.ListCreatorSpaces)
+				content.GET("/creators/:id/spaces/:spaceId", handler.GetCreatorSpaceDetail)
+				content.POST("/creators/:id/spaces", handler.CreateCreatorSpace)
+				content.PUT("/creators/:id/spaces/:spaceId", handler.UpdateCreatorSpace)
+				content.DELETE("/creators/:id/spaces/:spaceId", handler.DeleteCreatorSpace)
+				content.POST("/creators/:id/spaces/:spaceId/resources", handler.AddResourcesToSpace)
+				content.DELETE("/creators/:id/spaces/:spaceId/resources", handler.RemoveResourcesFromSpace)
+
+				// 资源管理（创作者只能管理自己的资源）
+				content.GET("/resources", handler.ListResources)
+				content.POST("/resources/upload", handler.UploadResource)
+				content.PUT("/resources/:id/creator", handler.UpdateResourceCreator)
+				content.DELETE("/resources/:id", handler.DeleteResource)
+			}
 		}
 	}
 

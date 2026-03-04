@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"valley-server/internal/config"
 	"valley-server/internal/utils"
@@ -61,10 +62,18 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
+		// 将字符串ID转换回int64
+		userID, err := strconv.ParseInt(claims.UserID, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "无效的用户ID"})
+			c.Abort()
+			return
+		}
+
 		// 将用户信息存入上下文
-		c.Set("userId", claims.UserID)
-		c.Set("username", claims.Username)
-		c.Set("role", claims.Role)
+		c.Set("userId", userID)            // int64 类型（从字符串转换）
+		c.Set("username", claims.Username) // string 类型
+		c.Set("userRole", claims.Role)     // string 类型
 
 		c.Next()
 	}
@@ -73,9 +82,35 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 // AdminOnly 管理员权限中间件
 func AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		role, exists := c.Get("role")
+		role, exists := c.Get("userRole")
 		if !exists || role != "admin" {
 			c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "无权限访问"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// CreatorOrAdmin 创作者或管理员权限中间件
+func CreatorOrAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("userRole")
+		if !exists || (role != "admin" && role != "creator") {
+			c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "需要创作者或管理员权限"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// CreatorOnly 创作者权限中间件
+func CreatorOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("userRole")
+		if !exists || role != "creator" {
+			c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "需要创作者权限"})
 			c.Abort()
 			return
 		}

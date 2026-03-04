@@ -17,10 +17,21 @@ export default function Login() {
       // 只需保存用户信息到 localStorage
       localStorage.setItem('userInfo', JSON.stringify(res.userInfo));
 
+      // 检查角色权限
+      const role = res.userInfo.role;
+      if (role !== 'admin' && role !== 'creator') {
+        message.error('您没有权限访问管理后台');
+        return;
+      }
+
       message.success('登录成功');
 
-      // 跳转到首页
-      navigate('/');
+      // 根据角色跳转到不同页面
+      if (role === 'creator') {
+        navigate('/creator-dashboard');
+      } else {
+        navigate('/');
+      }
     } catch (error: unknown) {
       // 错误提示已在 request.ts 中统一处理
       // 这里只需要打印日志用于调试
@@ -35,7 +46,7 @@ export default function Login() {
       <Card className="w-96 shadow-lg">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-blue-600">Valley</h1>
-          <p className="text-gray-500 mt-2">管理后台</p>
+          <p className="text-gray-500 mt-2">创作者·管理后台</p>
         </div>
         <Form onFinish={onFinish} size="large">
           <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>

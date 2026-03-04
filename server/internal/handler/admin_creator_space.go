@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -23,7 +24,7 @@ type SpaceWithStats struct {
 func generateSpaceCode(db *gorm.DB) (string, error) {
 	maxAttempts := 10
 	for i := 0; i < maxAttempts; i++ {
-		code := utils.GenerateRandomString(4)
+		code := utils.GenerateRandomCode(6)
 
 		// 检查口令是否已存在
 		var count int64
@@ -36,8 +37,8 @@ func generateSpaceCode(db *gorm.DB) (string, error) {
 		}
 	}
 
-	// 如果 10 次都重复，则生成 6 位口令
-	return utils.GenerateRandomString(6), nil
+	// 如果 10 次都重复（极小概率），返回错误
+	return "", fmt.Errorf("无法生成唯一口令")
 }
 
 // ListCreatorSpaces 获取创作者的空间列表
@@ -73,6 +74,14 @@ func ListCreatorSpaces(c *gin.Context) {
 		} else {
 			Error(c, 500, "查询创作者失败")
 		}
+		return
+	}
+
+	// 🔒 如果是创作者角色，只能查看自己的空间
+	userRole, _ := c.Get("userRole")
+	userId, _ := c.Get("userId")
+	if userRole == "creator" && creator.UserID != userId {
+		Error(c, 403, "无权访问其他创作者的空间")
 		return
 	}
 
@@ -161,6 +170,14 @@ func CreateCreatorSpace(c *gin.Context) {
 		} else {
 			Error(c, 500, "查询创作者失败")
 		}
+		return
+	}
+
+	// 🔒 如果是创作者角色，只能为自己创建空间
+	userRole, _ := c.Get("userRole")
+	userId, _ := c.Get("userId")
+	if userRole == "creator" && creator.UserID != userId {
+		Error(c, 403, "无权为其他创作者创建空间")
 		return
 	}
 
@@ -346,6 +363,22 @@ func UpdateCreatorSpace(c *gin.Context) {
 		return
 	}
 
+	// 🔒 如果是创作者角色，只能更新自己的空间
+	userRole, _ := c.Get("userRole")
+	userId, _ := c.Get("userId")
+	if userRole == "creator" {
+		// 查询空间所属的创作者
+		var creator model.Creator
+		if err := db.First(&creator, "id = ?", space.CreatorID).Error; err != nil {
+			Error(c, 500, "查询创作者失败")
+			return
+		}
+		if creator.UserID != userId {
+			Error(c, 403, "无权更新其他创作者的空间")
+			return
+		}
+	}
+
 	// 请求参数
 	type UpdateSpaceRequest struct {
 		Title       string `json:"title"`
@@ -452,6 +485,22 @@ func DeleteCreatorSpace(c *gin.Context) {
 		return
 	}
 
+	// 🔒 如果是创作者角色，只能删除自己的空间
+	userRole, _ := c.Get("userRole")
+	userId, _ := c.Get("userId")
+	if userRole == "creator" {
+		// 查询空间所属的创作者
+		var creator model.Creator
+		if err := db.First(&creator, "id = ?", space.CreatorID).Error; err != nil {
+			Error(c, 500, "查询创作者失败")
+			return
+		}
+		if creator.UserID != userId {
+			Error(c, 403, "无权删除其他创作者的空间")
+			return
+		}
+	}
+
 	// 软删除（关联的资源不会被删除，只是解除关联）
 	if err := db.Delete(&space).Error; err != nil {
 		Error(c, 500, "删除空间失败")
@@ -500,6 +549,22 @@ func AddResourcesToSpace(c *gin.Context) {
 			Error(c, 500, "查询空间失败")
 		}
 		return
+	}
+
+	// 🔒 如果是创作者角色，只能为自己的空间添加资源
+	userRole, _ := c.Get("userRole")
+	userId, _ := c.Get("userId")
+	if userRole == "creator" {
+		// 查询空间所属的创作者
+		var creator model.Creator
+		if err := db.First(&creator, "id = ?", space.CreatorID).Error; err != nil {
+			Error(c, 500, "查询创作者失败")
+			return
+		}
+		if creator.UserID != userId {
+			Error(c, 403, "无权为其他创作者的空间添加资源")
+			return
+		}
 	}
 
 	// 请求参数
@@ -579,6 +644,22 @@ func RemoveResourcesFromSpace(c *gin.Context) {
 			Error(c, 500, "查询空间失败")
 		}
 		return
+	}
+
+	// 🔒 如果是创作者角色，只能移除自己空间的资源
+	userRole, _ := c.Get("userRole")
+	userId, _ := c.Get("userId")
+	if userRole == "creator" {
+		// 查询空间所属的创作者
+		var creator model.Creator
+		if err := db.First(&creator, "id = ?", space.CreatorID).Error; err != nil {
+			Error(c, 500, "查询创作者失败")
+			return
+		}
+		if creator.UserID != userId {
+			Error(c, 403, "无权移除其他创作者空间的资源")
+			return
+		}
 	}
 
 	// 请求参数
