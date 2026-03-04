@@ -63,3 +63,13 @@ func GenerateRandomString(length int) string {
 	}
 	return string(b)
 }
+
+// GenerateRandomCode 生成大写字母+数字的随机口令（无符号）
+func GenerateRandomCode(length int) string {
+	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rng.Intn(len(charset))]
+	}
+	return string(b)
+}

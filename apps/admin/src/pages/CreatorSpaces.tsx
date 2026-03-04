@@ -1,4 +1,10 @@
-import { CopyOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import {
+  AppstoreOutlined,
+  CopyOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+} from '@ant-design/icons';
 import {
   Button,
   Card,
@@ -13,18 +19,23 @@ import {
   Table,
   Tag,
   Tooltip,
+  Transfer,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { CreatorSpace } from '../api/creator';
 import {
+  reqAddResourcesToSpace,
   reqCreateSpace,
   reqDeleteSpace,
   reqGetCreatorDetail,
+  reqGetSpaceDetail,
   reqGetSpaceList,
+  reqRemoveResourcesFromSpace,
   reqUpdateSpace,
 } from '../api/creator';
+import { type Resource, reqGetResourceList } from '../api/resource';
 
 export default function CreatorSpaces() {
   const { creatorId } = useParams<{ creatorId: string }>();
@@ -43,6 +54,12 @@ export default function CreatorSpaces() {
   const [modalType, setModalType] = useState<'create' | 'edit'>('create');
   const [currentSpace, setCurrentSpace] = useState<CreatorSpace | null>(null);
   const [form] = Form.useForm();
+
+  // 资源管理相关状态
+  const [resourceModalOpen, setResourceModalOpen] = useState(false);
+  const [resourceLoading, setResourceLoading] = useState(false);
+  const [allResources, setAllResources] = useState<Resource[]>([]);
+  const [selectedResourceIds, setSelectedResourceIds] = useState<string[]>([]);
 
   // 加载创作者信息
   useEffect(() => {
@@ -150,6 +167,79 @@ export default function CreatorSpaces() {
     message.success('口令已复制到剪贴板');
   };
 
+  // 打开资源管理弹窗
+  const handleManageResources = async (space: CreatorSpace) => {
+    if (!creatorId) return;
+
+    setCurrentSpace(space);
+    setResourceLoading(true);
+    setResourceModalOpen(true);
+
+    try {
+      // 并发加载：空间详情（含已关联资源）+ 该创作者的所有资源
+      const [spaceDetail, resourceList] = await Promise.all([
+        reqGetSpaceDetail(creatorId, space.id),
+        reqGetResourceList({
+          page: 1,
+          pageSize: 1000,
+          creatorId: creatorId, // 只加载该创作者的资源
+        }),
+      ]);
+
+      // 过滤并设置资源（只显示该创作者的资源）
+      const creatorResources = (resourceList.list || []).filter((r) => r.creatorId === creatorId);
+      setAllResources(creatorResources);
+
+      // 设置已选中的资源ID
+      const selectedIds = (spaceDetail.resources || []).map((r) => r.id);
+      setSelectedResourceIds(selectedIds);
+    } catch {
+      message.error('加载资源列表失败');
+      setResourceModalOpen(false);
+    } finally {
+      setResourceLoading(false);
+    }
+  };
+
+  // 保存资源关联
+  const handleSaveResources = async () => {
+    if (!creatorId || !currentSpace) return;
+
+    setResourceLoading(true);
+    try {
+      // 获取当前空间的资源
+      const spaceDetail = await reqGetSpaceDetail(creatorId, currentSpace.id);
+      const currentResourceIds = (spaceDetail.resources || []).map((r) => r.id);
+
+      // 计算要添加和移除的资源
+      const toAdd = selectedResourceIds.filter((id) => !currentResourceIds.includes(id));
+      const toRemove = currentResourceIds.filter((id) => !selectedResourceIds.includes(id));
+
+      // 执行添加和移除操作
+      const promises = [];
+      if (toAdd.length > 0) {
+        promises.push(reqAddResourcesToSpace(creatorId, currentSpace.id, toAdd));
+      }
+      if (toRemove.length > 0) {
+        promises.push(reqRemoveResourcesFromSpace(creatorId, currentSpace.id, toRemove));
+      }
+
+      if (promises.length > 0) {
+        await Promise.all(promises);
+        message.success('保存成功');
+      } else {
+        message.info('没有变更');
+      }
+
+      setResourceModalOpen(false);
+      fetchList(); // 刷新列表
+    } catch {
+      message.error('保存失败');
+    } finally {
+      setResourceLoading(false);
+    }
+  };
+
   const columns: ColumnsType<CreatorSpace> = [
     {
       title: '空间名称',
@@ -209,10 +299,18 @@ export default function CreatorSpaces() {
     {
       title: '操作',
       key: 'action',
-      width: 180,
+      width: 250,
       fixed: 'right',
       render: (_, record) => (
         <Space size="small">
+          <Button
+            type="link"
+            size="small"
+            icon={<AppstoreOutlined />}
+            onClick={() => handleManageResources(record)}
+          >
+            管理资源
+          </Button>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>
             编辑
           </Button>
@@ -316,11 +414,15 @@ export default function CreatorSpaces() {
           </Form.Item>
 
           <Form.Item
-            label="口令（选填，留空自动生成4位口令）"
+            label="口令（选填，留空自动生成6位口令）"
             name="code"
-            rules={[{ pattern: /^[a-z0-9]{4}$/, message: '口令必须是4位小写字母或数字' }]}
+            rules={[{ pattern: /^[A-Z0-9]{6}$/, message: '口令必须是6位大写字母或数字' }]}
           >
-            <Input placeholder="例如：abc1" maxLength={4} />
+            <Input
+              placeholder="例如：ABC123 或 ABCDEF 或 123456"
+              maxLength={6}
+              style={{ textTransform: 'uppercase' }}
+            />
           </Form.Item>
 
           <Form.Item label="描述" name="description">
@@ -335,6 +437,52 @@ export default function CreatorSpaces() {
             <Switch checkedChildren="启用" unCheckedChildren="禁用" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 资源管理弹窗 */}
+      <Modal
+        title={`管理空间资源 - ${currentSpace?.title || ''}`}
+        open={resourceModalOpen}
+        onOk={handleSaveResources}
+        onCancel={() => setResourceModalOpen(false)}
+        width={800}
+        confirmLoading={resourceLoading}
+      >
+        <div className="mt-4">
+          <p className="mb-4 text-gray-600">选择要关联到此空间的资源（仅显示该创作者上传的资源）</p>
+          <Transfer
+            dataSource={allResources.map((r) => ({
+              key: r.id,
+              title: r.title,
+              description: `类型: ${r.type === 'avatar' ? '头像' : '壁纸'} | 大小: ${(r.size / 1024 / 1024).toFixed(2)}MB`,
+            }))}
+            targetKeys={selectedResourceIds}
+            onChange={(targetKeys) => setSelectedResourceIds(targetKeys as string[])}
+            render={(item) => (
+              <div>
+                <div>{item.title}</div>
+                <div className="text-xs text-gray-400">{item.description}</div>
+              </div>
+            )}
+            listStyle={{
+              width: 350,
+              height: 400,
+            }}
+            showSearch
+            filterOption={(inputValue, item) =>
+              item.title?.toLowerCase().includes(inputValue.toLowerCase())
+            }
+            locale={{
+              itemUnit: '项',
+              itemsUnit: '项',
+              searchPlaceholder: '搜索资源',
+              notFoundContent: '列表为空',
+            }}
+          />
+          <div className="mt-4 text-sm text-gray-500">
+            已选择 {selectedResourceIds.length} 个资源
+          </div>
+        </div>
       </Modal>
     </div>
   );

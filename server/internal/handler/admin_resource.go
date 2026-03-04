@@ -29,11 +29,22 @@ func ListResources(c *gin.Context) {
 
 	offset := (page - 1) * pageSize
 
+	// 获取当前用户信息
+	userRole, _ := c.Get("userRole")
+	userId, _ := c.Get("userId")
+
 	db := database.GetDB()
 	var resources []model.Resource
 	var total int64
 
 	query := db.Model(&model.Resource{})
+
+	// 🔒 如果是创作者，只能查看自己上传的资源
+	// 注意：Resource.CreatorID 存储的是 User ID，不是 Creator ID
+	if userRole == "creator" {
+		query = query.Where("creator_id = ?", userId)
+	}
+
 	if resourceType != "" {
 		query = query.Where("type = ?", resourceType)
 	}

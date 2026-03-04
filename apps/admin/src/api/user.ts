@@ -16,6 +16,7 @@ export interface User {
   platform: Platform; // 平台类型
   openid: string;
   unionid: string;
+  username: string;
 
   // 抖音平台特有字段
   douyinOpenid?: string;

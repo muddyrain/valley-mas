@@ -48,6 +48,10 @@ export default function Creators() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'create' | 'edit'>('create');
   const [currentCreator, setCurrentCreator] = useState<Creator | null>(null);
+
+  // 获取当前用户信息
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+  const isCreator = userInfo.role === 'creator';
   const [form] = Form.useForm();
 
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -66,14 +70,21 @@ export default function Creators() {
         keyword: keyword || undefined,
         isActive: statusFilter,
       });
-      setDataSource(response.list || []);
-      setTotal(response.total || 0);
+
+      // 如果是创作者角色,只显示自己的数据
+      let list = response.list || [];
+      if (isCreator && userInfo.id) {
+        list = list.filter((creator) => creator.userId === userInfo.id);
+      }
+
+      setDataSource(list);
+      setTotal(isCreator ? list.length : response.total || 0);
     } catch {
       message.error('加载创作者列表失败');
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, keyword, statusFilter]);
+  }, [page, pageSize, keyword, statusFilter, isCreator, userInfo.id]);
 
   // 加载用户列表（用于创建创作者时选择用户）
   const fetchUsers = async () => {
@@ -181,6 +192,27 @@ export default function Creators() {
       ellipsis: true,
     },
     {
+      title: '用户ID',
+      dataIndex: 'userId',
+      width: 150,
+      ellipsis: true,
+    },
+    {
+      title: '用户名',
+      dataIndex: 'username',
+      width: 120,
+      render: (username, record) => (
+        <div className="w-full flex flex-col">
+          <Tooltip title={record.userNickname}>
+            <div className="font-medium truncate">{record.userNickname}</div>
+          </Tooltip>
+          <Tooltip title={username}>
+            <div className="text-xs text-gray-400 truncate">{username?.slice(0, 20)}</div>
+          </Tooltip>
+        </div>
+      ),
+    },
+    {
       title: '创作者',
       dataIndex: 'name',
       width: 150,
@@ -213,14 +245,17 @@ export default function Creators() {
       title: '状态',
       dataIndex: 'isActive',
       width: 100,
-      render: (isActive, record) => (
-        <Switch
-          checked={isActive}
-          onChange={() => handleToggleStatus(record)}
-          checkedChildren="启用"
-          unCheckedChildren="禁用"
-        />
-      ),
+      render: (isActive, record) =>
+        isCreator ? (
+          <Tag color={isActive ? 'green' : 'red'}>{isActive ? '启用' : '禁用'}</Tag>
+        ) : (
+          <Switch
+            checked={isActive}
+            onChange={() => handleToggleStatus(record)}
+            checkedChildren="启用"
+            unCheckedChildren="禁用"
+          />
+        ),
     },
     {
       title: '创建时间',
@@ -235,14 +270,16 @@ export default function Creators() {
       fixed: 'right',
       render: (_, record) => (
         <Space size="small">
-          <Tooltip title="查看详情">
-            <Button
-              type="link"
-              size="small"
-              icon={<EyeOutlined />}
-              onClick={() => handleViewDetail(record.id)}
-            />
-          </Tooltip>
+          {!isCreator && (
+            <Tooltip title="查看详情">
+              <Button
+                type="link"
+                size="small"
+                icon={<EyeOutlined />}
+                onClick={() => handleViewDetail(record.id)}
+              />
+            </Tooltip>
+          )}
           <Tooltip title="管理空间">
             <Button
               type="link"
@@ -253,18 +290,22 @@ export default function Creators() {
               空间
             </Button>
           </Tooltip>
-          <Button type="link" size="small" onClick={() => handleEdit(record)}>
-            编辑
-          </Button>
-          <Popconfirm
-            title="确定要删除该创作者吗？"
-            description="此操作不可恢复"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Button type="link" danger size="small">
-              删除
-            </Button>
-          </Popconfirm>
+          {!isCreator && (
+            <>
+              <Button type="link" size="small" onClick={() => handleEdit(record)}>
+                编辑
+              </Button>
+              <Popconfirm
+                title="确定要删除该创作者吗？"
+                description="此操作不可恢复"
+                onConfirm={() => handleDelete(record.id)}
+              >
+                <Button type="link" danger size="small">
+                  删除
+                </Button>
+              </Popconfirm>
+            </>
+          )}
         </Space>
       ),
     },
@@ -272,41 +313,47 @@ export default function Creators() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">创作者管理</h2>
+      <h2 className="text-2xl font-bold mb-6">{isCreator ? '我的空间管理' : '创作者管理'}</h2>
       <Card>
         <div className="mb-4 flex justify-between">
           <Space>
-            <Input
-              placeholder="搜索创作者"
-              prefix={<SearchOutlined />}
-              className="w-64"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              onPressEnter={handleSearch}
-            />
-            <Select
-              placeholder="状态筛选"
-              className="w-32"
-              allowClear
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={[
-                { label: '全部', value: undefined },
-                { label: '启用', value: true },
-                { label: '禁用', value: false },
-              ]}
-            />
-            <Button icon={<SearchOutlined />} type="primary" onClick={handleSearch}>
-              搜索
-            </Button>
+            {!isCreator && (
+              <>
+                <Input
+                  placeholder="搜索创作者"
+                  prefix={<SearchOutlined />}
+                  className="w-64"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  onPressEnter={handleSearch}
+                />
+                <Select
+                  placeholder="状态筛选"
+                  className="w-32"
+                  allowClear
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  options={[
+                    { label: '全部', value: undefined },
+                    { label: '启用', value: true },
+                    { label: '禁用', value: false },
+                  ]}
+                />
+                <Button icon={<SearchOutlined />} type="primary" onClick={handleSearch}>
+                  搜索
+                </Button>
+              </>
+            )}
           </Space>
           <Space>
             <Button icon={<ReloadOutlined />} onClick={fetchList}>
               刷新
             </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              添加创作者
-            </Button>
+            {!isCreator && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                添加创作者
+              </Button>
+            )}
           </Space>
         </div>
         <Table
@@ -314,7 +361,7 @@ export default function Creators() {
           dataSource={dataSource}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1500 }}
+          scroll={{ x: 1700 }}
           pagination={{
             current: page,
             pageSize,

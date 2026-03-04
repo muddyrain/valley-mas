@@ -13,6 +13,7 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
 } from 'antd';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
 import { useEffect, useState } from 'react';
@@ -165,18 +166,27 @@ export default function Users() {
     {
       title: '用户信息',
       key: 'userInfo',
-      width: 200,
+      width: 150,
       render: (_, record) => (
-        <Space>
-          <Avatar src={record.avatar} size={40}>
+        <div className="w-full flex items-center">
+          <Avatar src={record.avatar} size={40} className="flex-shrink-0">
             {record.nickname?.charAt(0)}
           </Avatar>
-          <div>
-            <div className="font-medium">{record.nickname}</div>
-            <div className="text-xs text-gray-400">{record.openid?.slice(0, 10)}...</div>
+          <div className="flex-1 overflow-hidden ml-2">
+            <Tooltip title={record.nickname}>
+              <div className="font-medium truncate">{record.nickname}</div>
+            </Tooltip>
+            <Tooltip title={record.username}>
+              <div className="text-xs text-gray-400 truncate">{record.username?.slice(0, 20)}</div>
+            </Tooltip>
           </div>
-        </Space>
+        </div>
       ),
+    },
+    {
+      title: 'openid',
+      dataIndex: 'openid',
+      width: 150,
     },
     {
       title: '平台',
