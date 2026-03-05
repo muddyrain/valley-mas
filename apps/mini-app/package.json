@@ -46,9 +46,11 @@
   "author": "",
   "dependencies": {
     "@babel/runtime": "^7.24.4",
+    "@nutui/nutui-react-taro": "2.7.15-beta.1",
     "@tarojs/components": "4.1.11",
     "@tarojs/helper": "4.1.11",
     "@tarojs/plugin-framework-react": "4.1.11",
+    "@tarojs/plugin-html": "4.1.11",
     "@tarojs/plugin-platform-alipay": "4.1.11",
     "@tarojs/plugin-platform-h5": "4.1.11",
     "@tarojs/plugin-platform-harmony-hybrid": "4.1.11",
@@ -61,9 +63,9 @@
     "@tarojs/runtime": "4.1.11",
     "@tarojs/shared": "4.1.11",
     "@tarojs/taro": "4.1.11",
+    "@weapp-tailwindcss/merge": "^2.1.6",
     "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "@weapp-tailwindcss/merge": "^2.1.6"
+    "react-dom": "^18.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.24.4",
@@ -71,8 +73,8 @@
     "@babel/preset-react": "^7.24.1",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
-    "@tailwindcss/vite": "^4.2.1",
     "@tailwindcss/postcss": "^4.2.1",
+    "@tailwindcss/vite": "^4.2.1",
     "@tarojs/cli": "4.1.11",
     "@tarojs/plugin-generator": "4.1.11",
     "@tarojs/vite-runner": "4.1.11",
@@ -80,6 +82,7 @@
     "@types/react": "^18.0.0",
     "@vitejs/plugin-react": "^4.3.0",
     "autoprefixer": "^10.4.20",
+    "babel-plugin-import": "^1.13.8",
     "babel-preset-taro": "4.1.11",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.2",
