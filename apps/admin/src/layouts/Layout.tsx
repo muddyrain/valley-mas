@@ -1,7 +1,9 @@
 import {
+  AuditOutlined,
   CrownOutlined,
   DashboardOutlined,
   FileTextOutlined,
+  FormOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -20,6 +22,11 @@ const adminMenuItems = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' },
   { key: '/users', icon: <UserOutlined />, label: '用户管理' },
   { key: '/creators', icon: <CrownOutlined />, label: '创作者管理' },
+  {
+    key: '/creator-applications',
+    icon: <AuditOutlined />,
+    label: '创作者申请审核',
+  },
   { key: '/resources', icon: <PictureOutlined />, label: '资源管理' },
   { key: '/records', icon: <FileTextOutlined />, label: '记录管理' },
 ];
@@ -30,6 +37,9 @@ const creatorMenuItems = [
   { key: '/resources', icon: <PictureOutlined />, label: '我的资源' },
   { key: '/creators', icon: <CrownOutlined />, label: '我的空间' },
 ];
+
+// 普通用户菜单
+const userMenuItems = [{ key: '/apply-creator', icon: <FormOutlined />, label: '申请成为创作者' }];
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -56,7 +66,12 @@ export default function Layout() {
   }, []);
 
   // 根据角色选择菜单
-  const menuItems = userInfo.role === 'admin' ? adminMenuItems : creatorMenuItems;
+  const menuItems =
+    userInfo.role === 'admin'
+      ? adminMenuItems
+      : userInfo.role === 'creator'
+        ? creatorMenuItems
+        : userMenuItems;
 
   const handleLogout = async () => {
     try {

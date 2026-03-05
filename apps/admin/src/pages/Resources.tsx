@@ -186,7 +186,7 @@ export default function Resources() {
   // 打开配置上传者 Modal
   const openCreatorModal = async (resource: Resource) => {
     setCurrentResource(resource);
-    creatorForm.setFieldsValue({ creatorId: resource.user?.id });
+    creatorForm.setFieldsValue({ uploaderId: resource.user?.id });
     setCreatorModalOpen(true);
 
     // 加载用户列表
@@ -207,7 +207,7 @@ export default function Resources() {
 
     try {
       const values = await creatorForm.validateFields();
-      await reqUpdateResourceCreator(currentResource.id, values.creatorId);
+      await reqUpdateResourceCreator(currentResource.id, values.uploaderId);
       message.success('上传者更新成功');
       setCreatorModalOpen(false);
       fetchResources();
@@ -432,7 +432,7 @@ export default function Resources() {
       >
         <Form form={creatorForm} layout="vertical">
           <Form.Item
-            name="creatorId"
+            name="uploaderId"
             label="选择上传者"
             rules={[{ required: true, message: '请选择上传者' }]}
           >

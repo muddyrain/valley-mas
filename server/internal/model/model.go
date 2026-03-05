@@ -173,9 +173,9 @@ func (s *CreatorSpace) BeforeCreate(tx *gorm.DB) error {
 
 // Resource 资源模型
 type Resource struct {
-	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
-	CreatorID     Int64String    `gorm:"index" json:"creatorId"`                   // 可以是 Creator ID 或 User ID（管理员上传）
-	Type          string         `gorm:"size:20" json:"type"`                      // avatar, wallpaper
+	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`  // Snowflake ID (序列化为字符串)
+	CreatorID     Int64String    `gorm:"column:creator_id;index" json:"uploaderId"` // 数据库字段名：creator_id，API 返回：uploaderId（上传者的用户 ID）
+	Type          string         `gorm:"size:20" json:"type"`                       // avatar, wallpaper
 	Title         string         `gorm:"size:100" json:"title"`
 	Description   string         `gorm:"size:255" json:"description"`
 	URL           string         `gorm:"size:500" json:"url"`
@@ -188,9 +188,8 @@ type Resource struct {
 	UpdatedAt     time.Time      `json:"updatedAt"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 
-	// 关联（可能是创作者或管理员用户）
-	Creator *Creator `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
-	User    *User    `gorm:"foreignKey:CreatorID" json:"user,omitempty"` // 管理员上传时使用
+	// 关联：上传者用户信息
+	User *User `gorm:"foreignKey:CreatorID" json:"user,omitempty"` // 上传者用户信息
 }
 
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
@@ -264,6 +263,37 @@ type UploadRecord struct {
 func (u *UploadRecord) BeforeCreate(tx *gorm.DB) error {
 	if u.ID == 0 {
 		u.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+// CreatorApplication 创作者申请模型
+type CreatorApplication struct {
+	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`      // Snowflake ID (序列化为字符串)
+	UserID      Int64String    `gorm:"index" json:"userId"`                           // 申请用户ID
+	Name        string         `gorm:"size:50" json:"name"`                           // 创作者名称
+	Description string         `gorm:"size:500" json:"description"`                   // 创作者描述
+	Avatar      string         `gorm:"size:255" json:"avatar"`                        // 创作者头像
+	Reason      string         `gorm:"size:500" json:"reason"`                        // 申请理由
+	Phone       string         `gorm:"size:20" json:"phone"`                          // 联系电话
+	Email       string         `gorm:"size:100" json:"email"`                         // 联系邮箱
+	Status      string         `gorm:"size:20;default:'pending';index" json:"status"` // pending/approved/rejected
+	ReviewerID  *Int64String   `gorm:"index" json:"reviewerId,omitempty"`             // 审核人ID
+	ReviewNote  string         `gorm:"size:500" json:"reviewNote"`                    // 审核备注
+	ReviewedAt  *time.Time     `json:"reviewedAt,omitempty"`                          // 审核时间
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+
+	// 关联
+	User     *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Reviewer *User `gorm:"foreignKey:ReviewerID" json:"reviewer,omitempty"`
+}
+
+// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
+func (c *CreatorApplication) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == 0 {
+		c.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }

@@ -57,6 +57,7 @@ func generateSpaceCode(db *gorm.DB) (string, error) {
 // @Router       /admin/creators/{creatorId}/spaces [get]
 func ListCreatorSpaces(c *gin.Context) {
 	db := database.DB
+	// 获取URL参数：创作者ID (Creator.ID，不是User.ID)
 	creatorIDStr := c.Param("id")
 
 	// 转换创作者ID
@@ -77,10 +78,8 @@ func ListCreatorSpaces(c *gin.Context) {
 		return
 	}
 
-	// 🔒 如果是创作者角色，只能查看自己的空间
-	userRole, _ := c.Get("userRole")
-	userId, _ := c.Get("userId")
-	if userRole == "creator" && creator.UserID != userId {
+	// 🔒 权限检查：创作者只能查看自己的空间，管理员可以查看所有
+	if !CheckCreatorPermission(c, &creator) {
 		Error(c, 403, "无权访问其他创作者的空间")
 		return
 	}
@@ -153,6 +152,7 @@ func ListCreatorSpaces(c *gin.Context) {
 // @Router       /admin/creators/{creatorId}/spaces [post]
 func CreateCreatorSpace(c *gin.Context) {
 	db := database.DB
+	// 获取URL参数：创作者ID (Creator.ID)
 	creatorIDStr := c.Param("id")
 
 	// 转换创作者ID
@@ -173,10 +173,8 @@ func CreateCreatorSpace(c *gin.Context) {
 		return
 	}
 
-	// 🔒 如果是创作者角色，只能为自己创建空间
-	userRole, _ := c.Get("userRole")
-	userId, _ := c.Get("userId")
-	if userRole == "creator" && creator.UserID != userId {
+	// 🔒 权限检查：创作者只能为自己创建空间，管理员可以为任何人创建
+	if !CheckCreatorPermission(c, &creator) {
 		Error(c, 403, "无权为其他创作者创建空间")
 		return
 	}
@@ -242,6 +240,8 @@ func CreateCreatorSpace(c *gin.Context) {
 
 	// 关联资源
 	if len(req.ResourceIDs) > 0 {
+		// 注意：Resource.CreatorID 字段存储的是上传者的用户 ID（User.ID），不是创作者 ID
+		// 所以这里需要使用 creator.UserID 来查询该创作者上传的资源
 		var resources []model.Resource
 		for _, idStr := range req.ResourceIDs {
 			var resourceID model.Int64String
@@ -250,7 +250,8 @@ func CreateCreatorSpace(c *gin.Context) {
 			}
 
 			var resource model.Resource
-			if err := db.First(&resource, "id = ? AND creator_id = ?", resourceID, creatorID).Error; err == nil {
+			// 使用 creator.UserID 查询该创作者上传的资源
+			if err := db.First(&resource, "id = ? AND creator_id = ?", resourceID, creator.UserID).Error; err == nil {
 				resources = append(resources, resource)
 			}
 		}
@@ -363,17 +364,15 @@ func UpdateCreatorSpace(c *gin.Context) {
 		return
 	}
 
-	// 🔒 如果是创作者角色，只能更新自己的空间
-	userRole, _ := c.Get("userRole")
-	userId, _ := c.Get("userId")
-	if userRole == "creator" {
+	// 🔒 权限检查：创作者只能更新自己的空间
+	if GetCurrentUserRole(c) == "creator" {
 		// 查询空间所属的创作者
 		var creator model.Creator
 		if err := db.First(&creator, "id = ?", space.CreatorID).Error; err != nil {
 			Error(c, 500, "查询创作者失败")
 			return
 		}
-		if creator.UserID != userId {
+		if !IsCreatorOwner(&creator, GetCurrentUserID(c)) {
 			Error(c, 403, "无权更新其他创作者的空间")
 			return
 		}
@@ -485,17 +484,15 @@ func DeleteCreatorSpace(c *gin.Context) {
 		return
 	}
 
-	// 🔒 如果是创作者角色，只能删除自己的空间
-	userRole, _ := c.Get("userRole")
-	userId, _ := c.Get("userId")
-	if userRole == "creator" {
+	// 🔒 权限检查：创作者只能删除自己的空间
+	if GetCurrentUserRole(c) == "creator" {
 		// 查询空间所属的创作者
 		var creator model.Creator
 		if err := db.First(&creator, "id = ?", space.CreatorID).Error; err != nil {
 			Error(c, 500, "查询创作者失败")
 			return
 		}
-		if creator.UserID != userId {
+		if !IsCreatorOwner(&creator, GetCurrentUserID(c)) {
 			Error(c, 403, "无权删除其他创作者的空间")
 			return
 		}
@@ -551,18 +548,22 @@ func AddResourcesToSpace(c *gin.Context) {
 		return
 	}
 
-	// 🔒 如果是创作者角色，只能为自己的空间添加资源
-	userRole, _ := c.Get("userRole")
-	userId, _ := c.Get("userId")
-	if userRole == "creator" {
+	// 🔒 权限检查：创作者只能为自己的空间添加资源
+	var creator model.Creator
+	if GetCurrentUserRole(c) == "creator" {
 		// 查询空间所属的创作者
-		var creator model.Creator
 		if err := db.First(&creator, "id = ?", space.CreatorID).Error; err != nil {
 			Error(c, 500, "查询创作者失败")
 			return
 		}
-		if creator.UserID != userId {
+		if !IsCreatorOwner(&creator, GetCurrentUserID(c)) {
 			Error(c, 403, "无权为其他创作者的空间添加资源")
+			return
+		}
+	} else {
+		// 管理员也需要加载创作者信息，用于后续查询资源
+		if err := db.First(&creator, "id = ?", creatorID).Error; err != nil {
+			Error(c, 500, "查询创作者失败")
 			return
 		}
 	}
@@ -579,6 +580,8 @@ func AddResourcesToSpace(c *gin.Context) {
 	}
 
 	// 查询资源
+	// 注意：Resource.CreatorID 字段存储的是上传者的用户 ID（User.ID），不是创作者 ID（Creator.ID）
+	// 所以这里需要使用 creator.UserID 来查询该创作者上传的资源
 	var resources []model.Resource
 	for _, idStr := range req.ResourceIDs {
 		var resourceID model.Int64String
@@ -587,8 +590,8 @@ func AddResourcesToSpace(c *gin.Context) {
 		}
 
 		var resource model.Resource
-		// 只能添加该创作者自己的资源
-		if err := db.First(&resource, "id = ? AND creator_id = ?", resourceID, creatorID).Error; err == nil {
+		// 使用 creator.UserID 查询该创作者上传的资源
+		if err := db.First(&resource, "id = ? AND creator_id = ?", resourceID, creator.UserID).Error; err == nil {
 			resources = append(resources, resource)
 		}
 	}
@@ -646,17 +649,15 @@ func RemoveResourcesFromSpace(c *gin.Context) {
 		return
 	}
 
-	// 🔒 如果是创作者角色，只能移除自己空间的资源
-	userRole, _ := c.Get("userRole")
-	userId, _ := c.Get("userId")
-	if userRole == "creator" {
+	// 🔒 权限检查：创作者只能移除自己空间的资源
+	if GetCurrentUserRole(c) == "creator" {
 		// 查询空间所属的创作者
 		var creator model.Creator
 		if err := db.First(&creator, "id = ?", space.CreatorID).Error; err != nil {
 			Error(c, 500, "查询创作者失败")
 			return
 		}
-		if creator.UserID != userId {
+		if !IsCreatorOwner(&creator, GetCurrentUserID(c)) {
 			Error(c, 403, "无权移除其他创作者空间的资源")
 			return
 		}

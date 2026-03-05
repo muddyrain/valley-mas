@@ -39,8 +39,8 @@ func ListResources(c *gin.Context) {
 
 	query := db.Model(&model.Resource{})
 
-	// 🔒 如果是创作者，只能查看自己上传的资源
-	// 注意：Resource.CreatorID 存储的是 User ID，不是 Creator ID
+	// 🔒 如果是创作者角色，只能查看自己上传的资源
+	// Resource.CreatorID 字段存储的是上传者的用户 ID（User.ID）
 	if userRole == "creator" {
 		query = query.Where("creator_id = ?", userId)
 	}
@@ -120,7 +120,7 @@ func UploadResource(c *gin.Context) {
 		return
 	}
 
-	// 获取当前登录用户 ID
+	// 获取当前登录用户 ID（作为资源的上传者）
 	userID, exists := c.Get("userId")
 	if !exists {
 		Error(c, 401, "未授权")
@@ -134,7 +134,7 @@ func UploadResource(c *gin.Context) {
 		URL:         url,
 		Title:       file.Filename,
 		Size:        file.Size,
-		CreatorID:   model.Int64String(userID.(int64)),
+		CreatorID:   model.Int64String(userID.(int64)), // CreatorID 实际存储上传者的用户 ID
 		Description: "",
 	}
 
@@ -191,13 +191,13 @@ func DeleteResource(c *gin.Context) {
 
 // UpdateResourceCreator 更新资源的上传者
 // @Summary      更新资源上传者
-// @Description  管理员修改资源的上传者（CreatorID）
+// @Description  管理员修改资源的上传者（将资源分配给特定用户）
 // @Tags         管理后台 - 资源管理
 // @Accept       json
 // @Produce      json
 // @Security     Bearer
 // @Param        id          path    string  true   "资源ID"
-// @Param        creatorId   body    string  true   "新的上传者ID（用户ID）"
+// @Param        uploaderId  body    string  true   "新的上传者ID（用户 User.ID）"
 // @Success      200  {object}  map[string]interface{}  "更新成功"
 // @Failure      400  {object}  map[string]interface{}  "参数错误"
 // @Failure      401  {object}  map[string]interface{}  "未登录"
@@ -208,7 +208,7 @@ func UpdateResourceCreator(c *gin.Context) {
 	id := c.Param("id")
 
 	var req struct {
-		CreatorID string `json:"creatorId" binding:"required"`
+		UploaderID string `json:"uploaderId" binding:"required"` // API 使用 uploaderId
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -227,18 +227,18 @@ func UpdateResourceCreator(c *gin.Context) {
 
 	// 验证新的上传者是否存在
 	var user model.User
-	if err := db.First(&user, "id = ?", req.CreatorID).Error; err != nil {
+	if err := db.First(&user, "id = ?", req.UploaderID).Error; err != nil {
 		Error(c, 404, "指定的用户不存在")
 		return
 	}
 
 	// 更新上传者（使用 Scan 方法转换字符串）
-	var creatorID model.Int64String
-	if err := creatorID.Scan(req.CreatorID); err != nil {
+	var uploaderID model.Int64String
+	if err := uploaderID.Scan(req.UploaderID); err != nil {
 		Error(c, 400, "用户ID格式错误："+err.Error())
 		return
 	}
-	resource.CreatorID = creatorID
+	resource.CreatorID = uploaderID // 数据库字段名仍为 CreatorID
 
 	if err := db.Save(&resource).Error; err != nil {
 		Error(c, 500, "更新失败："+err.Error())

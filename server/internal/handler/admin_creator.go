@@ -112,9 +112,9 @@ func ListCreators(c *gin.Context) {
 		db.Model(&model.CreatorSpace{}).Where("creator_id = ?", creator.ID).Count(&spaceCount)
 		creatorsWithStats[i].SpaceCount = int(spaceCount)
 
-		// 统计资源数量
+		// 统计资源数量（Resource.CreatorID 存储的是 User.ID，不是 Creator.ID）
 		var resourceCount int64
-		db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
+		db.Model(&model.Resource{}).Where("creator_id = ?", creator.UserID).Count(&resourceCount)
 		creatorsWithStats[i].ResourceCount = int(resourceCount)
 
 		// 统计下载量
@@ -259,7 +259,7 @@ func GetCreatorDetail(c *gin.Context) {
 	// 🔒 如果是创作者角色，只能查看自己的详情
 	userRole, _ := c.Get("userRole")
 	userId, _ := c.Get("userId")
-	if userRole == "creator" && creator.UserID != userId {
+	if userRole == "creator" && int64(creator.UserID) != userId.(int64) {
 		logger.Warn(c, "Creator attempted to access other creator's detail", logrus.Fields{
 			"request_user_id": userId,
 			"creator_user_id": creator.UserID,
@@ -277,9 +277,9 @@ func GetCreatorDetail(c *gin.Context) {
 	var spaceCount int64
 	db.Model(&model.CreatorSpace{}).Where("creator_id = ?", creator.ID).Count(&spaceCount)
 
-	// 统计资源数量
+	// 统计资源数量（Resource.CreatorID 存储的是 User.ID，不是 Creator.ID）
 	var resourceCount int64
-	db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
+	db.Model(&model.Resource{}).Where("creator_id = ?", creator.UserID).Count(&resourceCount)
 
 	// 统计下载量
 	var downloadCount int64
