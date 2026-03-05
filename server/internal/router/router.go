@@ -71,6 +71,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.GET("/creator/my-space", handler.GetMyCreatorSpace)
 			auth.PUT("/creator/code/toggle", handler.ToggleCreatorCode)
 			auth.POST("/creator/code/regenerate", handler.RegenerateCreatorCode)
+
+			// 创作者申请相关（新增）
+			auth.POST("/creator/application", handler.SubmitCreatorApplication)
+			auth.GET("/creator/application/my", handler.GetMyApplication)
 		}
 
 		// 管理后台接口
@@ -94,6 +98,11 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.PUT("/creators/:id", handler.UpdateCreator)
 				adminOnly.POST("/creators/:id/toggle-status", handler.ToggleCreatorStatus)
 				adminOnly.DELETE("/creators/:id", handler.DeleteCreator)
+
+				// 创作者申请审核管理（新增）
+				adminOnly.GET("/creator-applications", handler.ListCreatorApplications)
+				adminOnly.GET("/creator-applications/:id", handler.GetCreatorApplicationDetail)
+				adminOnly.POST("/creator-applications/:id/review", handler.ReviewCreatorApplication)
 
 				// 全局统计（仅管理员）
 				adminOnly.GET("/stats", handler.GetStats)

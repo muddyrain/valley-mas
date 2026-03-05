@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"strconv"
 	"time"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
@@ -86,7 +87,7 @@ func GetCreatorStats(c *gin.Context) {
 	// 初始化统计数据
 	stats := CreatorStats{
 		CreatorInfo: CreatorInfo{
-			ID:          string(creator.ID),
+			ID:          strconv.FormatInt(int64(creator.ID), 10),
 			Name:        creator.Name,
 			Avatar:      creator.Avatar,
 			Description: creator.Description,
@@ -197,7 +198,7 @@ func GetCreatorStats(c *gin.Context) {
 	stats.TopResources = make([]TopResource, len(resources))
 	for i, r := range resources {
 		stats.TopResources[i] = TopResource{
-			ID:            string(r.ID),
+			ID:            strconv.FormatInt(int64(r.ID), 10),
 			Title:         r.Title,
 			Type:          r.Type,
 			DownloadCount: r.DownloadCount,

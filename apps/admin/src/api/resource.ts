@@ -22,15 +22,15 @@ export interface Resource {
   size: number; // 文件大小（字节）
   downloadCount: number; // 下载次数
   createdAt: string;
-  creatorId?: string; // 创建者 ID（可选）
-  user?: ResourceUser; // 上传者信息（管理员）
+  uploaderId?: string; // 上传者的用户 ID（User.ID）
+  user?: ResourceUser; // 上传者用户信息
 }
 
 // 资源列表查询参数
 export interface ResourceListParams extends PaginationParams {
   keyword?: string; // 搜索关键词
   type?: ResourceType; // 按类型筛选
-  creatorId?: string; // 按创作者筛选
+  uploaderId?: string; // 按上传者筛选（用户 ID）
 }
 
 // 资源列表响应
@@ -65,6 +65,6 @@ export const reqDeleteResource = (id: string) => {
 };
 
 // 更新资源上传者
-export const reqUpdateResourceCreator = (id: string, creatorId: string) => {
-  return http.put<unknown, Resource>(`/admin/resources/${id}/creator`, { creatorId });
+export const reqUpdateResourceCreator = (id: string, uploaderId: string) => {
+  return http.put<unknown, Resource>(`/admin/resources/${id}/creator`, { uploaderId });
 };

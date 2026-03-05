@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   Form,
+  Image,
   Input,
   Modal,
   message,
@@ -176,19 +177,18 @@ export default function CreatorSpaces() {
     setResourceModalOpen(true);
 
     try {
-      // 并发加载：空间详情（含已关联资源）+ 该创作者的所有资源
+      // 并发加载：空间详情（含已关联资源）+ 所有资源
       const [spaceDetail, resourceList] = await Promise.all([
         reqGetSpaceDetail(creatorId, space.id),
         reqGetResourceList({
           page: 1,
           pageSize: 1000,
-          creatorId: creatorId, // 只加载该创作者的资源
+          // 不传 uploaderId，让后端根据当前登录用户角色自动筛选
         }),
       ]);
 
-      // 过滤并设置资源（只显示该创作者的资源）
-      const creatorResources = (resourceList.list || []).filter((r) => r.creatorId === creatorId);
-      setAllResources(creatorResources);
+      // 设置所有可用资源
+      setAllResources(resourceList.list || []);
 
       // 设置已选中的资源ID
       const selectedIds = (spaceDetail.resources || []).map((r) => r.id);
@@ -454,14 +454,18 @@ export default function CreatorSpaces() {
             dataSource={allResources.map((r) => ({
               key: r.id,
               title: r.title,
+              url: r.url,
               description: `类型: ${r.type === 'avatar' ? '头像' : '壁纸'} | 大小: ${(r.size / 1024 / 1024).toFixed(2)}MB`,
             }))}
             targetKeys={selectedResourceIds}
             onChange={(targetKeys) => setSelectedResourceIds(targetKeys as string[])}
             render={(item) => (
-              <div>
-                <div>{item.title}</div>
-                <div className="text-xs text-gray-400">{item.description}</div>
+              <div className="flex items-center">
+                <Image src={item.url} alt={item.title} width={50} height={50} />
+                <div className="ml-2">
+                  <div>{item.title}</div>
+                  <div className="text-xs text-gray-400">{item.description}</div>
+                </div>
               </div>
             )}
             listStyle={{

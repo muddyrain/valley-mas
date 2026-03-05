@@ -3,6 +3,8 @@ import { useEffect, useRef } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { reqGetCurrentUser } from './api/auth';
 import Layout from './layouts/Layout';
+import ApplyCreator from './pages/ApplyCreator';
+import CreatorApplications from './pages/CreatorApplications';
 import CreatorDashboard from './pages/CreatorDashboard';
 import CreatorSpaces from './pages/CreatorSpaces';
 import Creators from './pages/Creators';
@@ -98,6 +100,8 @@ function App() {
           <Route path="users" element={<Users />} />
           <Route path="creators" element={<Creators />} />
           <Route path="creators/:creatorId/spaces" element={<CreatorSpaces />} />
+          <Route path="creator-applications" element={<CreatorApplications />} />
+          <Route path="apply-creator" element={<ApplyCreator />} />
           <Route path="resources" element={<Resources />} />
           <Route path="records" element={<Records />} />
         </Route>

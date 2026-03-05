@@ -223,10 +223,11 @@ func InitData(c *gin.Context) {
 	if hasBackup {
 		backupResources := backupResourcesVal.([]model.Resource)
 
-		// 恢复真实资源并重新关联到新创建的创作者
+		// 恢复真实资源并重新关联到新创建的创作者用户
+		// 注意：Resource.CreatorID 字段存储的是上传者的用户 ID（User.ID），不是创作者 ID
 		for i := range backupResources {
 			// 保持原有的 ID 和其他信息
-			backupResources[i].CreatorID = creator.ID
+			backupResources[i].CreatorID = creatorUser.ID // 使用 User.ID，不是 Creator.ID
 			// 重置时间戳（让 GORM 自动设置）
 			backupResources[i].CreatedAt = time.Time{}
 			backupResources[i].UpdatedAt = time.Time{}
@@ -242,10 +243,11 @@ func InitData(c *gin.Context) {
 	}
 
 	// 如果没有备份的真实资源，创建一些示例数据用于展示
+	// 注意：Resource.CreatorID 字段存储的是上传者的用户 ID（User.ID），不是创作者 ID
 	if restoredCount == 0 {
 		resources = []model.Resource{
 			{
-				CreatorID:     creator.ID,
+				CreatorID:     creatorUser.ID, // 使用 User.ID
 				Title:         "示例头像 001",
 				Type:          "avatar",
 				URL:           "https://via.placeholder.com/300/FF6B6B/FFFFFF?text=Avatar+1",
@@ -257,7 +259,7 @@ func InitData(c *gin.Context) {
 				DownloadCount: 0,
 			},
 			{
-				CreatorID:     creator.ID,
+				CreatorID:     creatorUser.ID, // 使用 User.ID
 				Title:         "示例壁纸 001",
 				Type:          "wallpaper",
 				URL:           "https://via.placeholder.com/1080x1920/1A1A2E/FFFFFF?text=Wallpaper",

@@ -17,20 +17,17 @@ export default function Login() {
       // 只需保存用户信息到 localStorage
       localStorage.setItem('userInfo', JSON.stringify(res.userInfo));
 
-      // 检查角色权限
-      const role = res.userInfo.role;
-      if (role !== 'admin' && role !== 'creator') {
-        message.error('您没有权限访问管理后台');
-        return;
-      }
-
       message.success('登录成功');
 
       // 根据角色跳转到不同页面
+      const role = res.userInfo.role;
       if (role === 'creator') {
         navigate('/creator-dashboard');
+      } else if (role === 'admin') {
+        navigate('/dashboard');
       } else {
-        navigate('/');
+        // 普通用户跳转到申请页面
+        navigate('/apply-creator');
       }
     } catch (error: unknown) {
       // 错误提示已在 request.ts 中统一处理
@@ -63,8 +60,9 @@ export default function Login() {
         </Form>
 
         <div className="mt-4 text-center text-gray-500 text-sm">
-          <p>默认账号：admin</p>
-          <p>默认密码：admin123</p>
+          <p>管理员账号：admin/admin123</p>
+          <p>创作者账号：creator/creator123</p>
+          <p>普通用户：admin1/admin123</p>
         </div>
       </Card>
     </div>

@@ -186,36 +186,37 @@ export default function Creators() {
 
   const columns: ColumnsType<Creator> = [
     {
-      title: 'ID',
-      dataIndex: 'id',
-      width: 150,
-      ellipsis: true,
-    },
-    {
-      title: '用户ID',
-      dataIndex: 'userId',
-      width: 150,
-      ellipsis: true,
-    },
-    {
-      title: '用户名',
-      dataIndex: 'username',
-      width: 120,
-      render: (username, record) => (
+      title: '创作者信息',
+      dataIndex: 'name',
+      width: 200,
+      render: (name, record) => (
         <div className="w-full flex flex-col">
-          <Tooltip title={record.userNickname}>
-            <div className="font-medium truncate">{record.userNickname}</div>
+          <Tooltip title={`创作者名称: ${name}`}>
+            <div className="font-medium truncate">{name}</div>
           </Tooltip>
-          <Tooltip title={username}>
-            <div className="text-xs text-gray-400 truncate">{username?.slice(0, 20)}</div>
+          <Tooltip title={`创作者ID: ${record.id}`}>
+            <div className="text-xs text-blue-500 truncate">ID: {record.id}</div>
           </Tooltip>
         </div>
       ),
     },
     {
-      title: '创作者',
-      dataIndex: 'name',
-      width: 150,
+      title: '关联账号',
+      dataIndex: 'username',
+      width: 200,
+      render: (username, record) => (
+        <div className="w-full flex flex-col">
+          <Tooltip title={`用户昵称: ${record.userNickname}`}>
+            <div className="font-medium truncate">{record.userNickname}</div>
+          </Tooltip>
+          <Tooltip title={`账号: ${username}`}>
+            <div className="text-xs text-gray-400 truncate">{username?.slice(0, 20)}</div>
+          </Tooltip>
+          <Tooltip title={`用户ID: ${record.userId}`}>
+            <div className="text-xs text-green-600 truncate">User ID: {record.userId}</div>
+          </Tooltip>
+        </div>
+      ),
     },
     {
       title: '描述',
@@ -451,8 +452,12 @@ export default function Creators() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <div className="text-gray-500 text-sm mb-1">ID</div>
-                <div className="font-medium">{detailData.id}</div>
+                <div className="text-gray-500 text-sm mb-1">创作者 ID</div>
+                <div className="font-medium text-blue-600">{detailData.id}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 text-sm mb-1">关联用户 ID</div>
+                <div className="font-medium text-green-600">{detailData.userId}</div>
               </div>
               <div>
                 <div className="text-gray-500 text-sm mb-1">创作者名称</div>
@@ -477,10 +482,6 @@ export default function Creators() {
               <div>
                 <div className="text-gray-500 text-sm mb-1">下载量</div>
                 <div className="font-medium">{detailData.downloadCount || 0}</div>
-              </div>
-              <div>
-                <div className="text-gray-500 text-sm mb-1">用户 ID</div>
-                <div className="text-gray-600 text-sm">{detailData.userId}</div>
               </div>
             </div>
 

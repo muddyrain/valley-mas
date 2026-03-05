@@ -5,6 +5,7 @@ import {
   FileImageOutlined,
   FolderOutlined,
 } from '@ant-design/icons';
+import { DefaultMiniAvatar } from '@valley/shared';
 import { Card, Col, Image, Row, Statistic, Table, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { type CreatorStats, reqGetCreatorStats } from '../api/creator';
@@ -118,18 +119,15 @@ export default function CreatorDashboard() {
       {/* 创作者信息 */}
       <Card style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <img
+          <Image
+            className="rounded-full"
+            width={80}
+            height={80}
             src={stats.creatorInfo.avatar}
             alt={stats.creatorInfo.name}
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: 40,
-              objectFit: 'cover',
-              marginRight: 20,
-            }}
+            fallback={DefaultMiniAvatar}
           />
-          <div>
+          <div className="ml-5">
             <Title level={3} style={{ margin: 0 }}>
               {stats.creatorInfo.name}
             </Title>
