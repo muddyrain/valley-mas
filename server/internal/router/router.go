@@ -40,6 +40,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 		{
 			public.GET("/space/:code", handler.GetCreatorSpace)             // 新增：获取创作者空间
 			public.POST("/resource/:id/download", handler.DownloadResource) // 新增：下载资源
+			public.GET("/hot-creators", handler.GetHotCreators)          // 新增：获取热门创作者
 		}
 
 		// 旧的公开接口（保留兼容）

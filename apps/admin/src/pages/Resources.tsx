@@ -259,6 +259,23 @@ export default function Resources() {
       },
     },
     {
+      title: '存储目录',
+      dataIndex: 'storageKey',
+      width: 280,
+      ellipsis: true,
+      render: (key) => {
+        if (!key) return <span className="text-gray-400">-</span>;
+        // 提取目录路径（不含文件名）
+        const lastSlash = key.lastIndexOf('/');
+        const directory = lastSlash > 0 ? key.substring(0, lastSlash) : key;
+        return (
+          <span className="text-xs text-gray-600 font-mono" title={key}>
+            {directory}
+          </span>
+        );
+      },
+    },
+    {
       title: '大小',
       dataIndex: 'size',
       width: 100,

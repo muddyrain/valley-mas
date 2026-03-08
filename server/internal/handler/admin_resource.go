@@ -3,6 +3,7 @@ package handler
 import (
 	"valley-server/internal/database"
 	"valley-server/internal/model"
+	"valley-server/internal/service"
 	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
@@ -60,7 +61,7 @@ func ListResources(c *gin.Context) {
 
 // UploadResource 上传资源
 // @Summary      上传资源
-// @Description  管理员上传头像或壁纸资源
+// @Description  管理员上传头像或壁纸资源（按用户目录分类存储）
 // @Tags         管理后台 - 资源管理
 // @Accept       multipart/form-data
 // @Produce      json
@@ -85,41 +86,6 @@ func UploadResource(c *gin.Context) {
 		return
 	}
 
-	// 验证文件类型
-	allowedTypes := []string{".jpg", ".jpeg", ".png", ".webp"}
-	if !utils.ValidateFileType(file.Filename, allowedTypes) {
-		Error(c, 400, "只支持 JPG、PNG、WEBP 格式的图片")
-		return
-	}
-
-	// 验证文件大小（头像最大 2MB，壁纸最大 5MB）
-	maxSize := int64(2)
-	if resourceType == "wallpaper" {
-		maxSize = 5
-	}
-	if !utils.ValidateFileSize(file.Size, maxSize) {
-		Error(c, 400, "文件过大")
-		return
-	}
-
-	// 获取 TOS 上传器
-	uploader := utils.GetTOSUploader()
-	if uploader == nil {
-		Error(c, 500, "文件上传服务未配置")
-		return
-	}
-
-	// 上传到 TOS
-	folder := "avatars"
-	if resourceType == "wallpaper" {
-		folder = "wallpapers"
-	}
-	url, err := uploader.UploadFile(folder, file)
-	if err != nil {
-		Error(c, 500, "文件上传失败: "+err.Error())
-		return
-	}
-
 	// 获取当前登录用户 ID（作为资源的上传者）
 	userID, exists := c.Get("userId")
 	if !exists {
@@ -127,11 +93,27 @@ func UploadResource(c *gin.Context) {
 		return
 	}
 
+	// 创建上传服务
+	uploadService := service.NewUploadService()
+
+	// 获取上传配置
+	uploadType := service.UploadType(resourceType)
+	config := service.GetDefaultConfig(uploadType)
+	config.UserID = userID.(int64) // 设置用户ID，用于生成用户专属目录
+
+	// 上传文件
+	result, err := uploadService.Upload(file, config)
+	if err != nil {
+		Error(c, 400, err.Error())
+		return
+	}
+
 	// 保存到数据库
 	resource := model.Resource{
 		ID:          model.Int64String(utils.GenerateID()),
 		Type:        resourceType,
-		URL:         url,
+		URL:         result.URL,
+		StorageKey:  result.Key, // 保存对象存储键名
 		Title:       file.Filename,
 		Size:        file.Size,
 		CreatorID:   model.Int64String(userID.(int64)), // CreatorID 实际存储上传者的用户 ID
@@ -141,12 +123,15 @@ func UploadResource(c *gin.Context) {
 	db := database.GetDB()
 	if err := db.Create(&resource).Error; err != nil {
 		// 如果数据库保存失败，删除已上传的文件
-		_ = uploader.DeleteFile(uploader.ExtractKeyFromURL(url))
+		_ = uploadService.DeleteByKey(result.Key)
 		Error(c, 500, "保存资源信息失败")
 		return
 	}
 
-	Success(c, resource)
+	Success(c, gin.H{
+		"resource":    resource,
+		"storagePath": result.Key, // 返回存储路径，便于调试
+	})
 }
 
 // DeleteResource 删除资源
@@ -173,11 +158,20 @@ func DeleteResource(c *gin.Context) {
 		return
 	}
 
-	// 从 TOS 删除文件
-	uploader := utils.GetTOSUploader()
-	if uploader != nil {
-		key := uploader.ExtractKeyFromURL(resource.URL)
-		_ = uploader.DeleteFile(key)
+	// 使用上传服务删除文件
+	uploadService := service.NewUploadService()
+
+	// 优先使用 StorageKey，如果没有则从 URL 提取（兼容旧数据）
+	if resource.StorageKey != "" {
+		if err := uploadService.DeleteByKey(resource.StorageKey); err != nil {
+			// 即使删除文件失败，也继续删除数据库记录（打印日志）
+			println("警告: 删除文件失败:", err.Error())
+		}
+	} else {
+		// 兼容旧数据：从 URL 提取 Key
+		if err := uploadService.Delete(resource.URL); err != nil {
+			println("警告: 删除文件失败:", err.Error())
+		}
 	}
 
 	// 从数据库软删除

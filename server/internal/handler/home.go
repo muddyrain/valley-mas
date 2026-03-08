@@ -2,7 +2,10 @@ package handler
 
 import (
 	"fmt"
+	"strconv"
 	"time"
+	"valley-server/internal/database"
+	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
 )
@@ -102,4 +105,131 @@ func HomePage(c *gin.Context) {
 </html>`, now)
 
 	c.Data(200, "text/html; charset=utf-8", []byte(html))
+}
+
+// HotCreatorResponse 热门创作者响应项
+type HotCreatorResponse struct {
+	ID             string `json:"id" example:"1234567890"`
+	Name           string `json:"name" example:"设计师小王"`
+	Avatar         string `json:"avatar" example:"https://example.com/avatar.jpg"`
+	ResourceCount  int    `json:"resourceCount" example:"156"`
+	DownloadCount  int64  `json:"downloadCount" example:"8920"`
+	Description    string `json:"description" example:"分享精美头像和壁纸"`
+	CreatedAt      string `json:"createdAt" example:"2026-03-01T12:00:00Z"`
+}
+
+// GetHotCreators 获取热门创作者
+// @Summary      获取热门创作者列表
+// @Description  获取热门创作者列表，按资源数量和下载量排序
+// @Tags         公开接口
+// @Accept       json
+// @Produce      json
+// @Param        page     query     int    false  "页码"    default(1)
+// @Param        pageSize  query     int    false  "每页数量"  default(10)
+// @Success      200  {object}  map[string]interface{}  "获取成功"
+// @Failure      400  {object}  map[string]interface{}  "参数错误"
+// @Failure      500  {object}  map[string]interface{}  "服务器错误"
+// @Router       /public/hot-creators [get]
+func GetHotCreators(c *gin.Context) {
+	db := database.DB
+
+	// 获取分页参数
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	
+	// 限制每页最大数量
+	if pageSize > 50 {
+		pageSize = 50
+	}
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if page <= 0 {
+		page = 1
+	}
+
+	offset := (page - 1) * pageSize
+
+	var creators []model.Creator
+	var total int64
+
+	// 查询热门创作者（按资源数量和下载量排序）
+	// 使用子查询计算每个创作者的资源数量和总下载量
+	err := db.Table("creators").
+		Select(`creators.id, creators.name, creators.avatar, creators.description, creators.created_at,
+			COALESCE(resource_stats.resource_count, 0) as resource_count,
+			COALESCE(resource_stats.download_count, 0) as download_count`).
+		Joins(`LEFT JOIN (
+			SELECT 
+				creator_id, 
+				COUNT(*) as resource_count,
+				SUM(download_count) as download_count
+			FROM resources 
+			WHERE deleted_at IS NULL
+			GROUP BY creator_id
+		) as resource_stats ON creators.id = resource_stats.creator_id`).
+		Where("creators.is_active = ? AND creators.deleted_at IS NULL", true).
+		Order("resource_count DESC, download_count DESC").
+		Limit(pageSize).
+		Offset(offset).
+		Scan(&creators).Error
+
+	if err != nil {
+		c.JSON(500, gin.H{
+			"code":    500,
+			"message": "查询热门创作者失败",
+			"data":    nil,
+		})
+		return
+	}
+
+	// 获取总数
+	db.Model(&model.Creator{}).
+		Where("is_active = ? AND deleted_at IS NULL", true).
+		Count(&total)
+
+	// 转换为响应格式
+	var response []HotCreatorResponse
+	for _, creator := range creators {
+		response = append(response, HotCreatorResponse{
+			ID:            string(creator.ID),
+			Name:          creator.Name,
+			Avatar:        creator.Avatar,
+			Description:   creator.Description,
+			ResourceCount:  0, // 将在下面设置
+			DownloadCount:  0, // 将在下面设置
+			CreatedAt:     creator.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+
+	// 再次查询每个创作者的统计数据（因为上面的扫描可能无法正确获取）
+	for i, creator := range creators {
+		var resourceCount int64
+		var downloadCount int64
+
+		// 查询资源数量
+		db.Model(&model.Resource{}).
+			Where("creator_id = ? AND deleted_at IS NULL", creator.ID).
+			Count(&resourceCount)
+
+		// 查询总下载量
+		db.Model(&model.Resource{}).
+			Where("creator_id = ? AND deleted_at IS NULL", creator.ID).
+			Select("COALESCE(SUM(download_count), 0)").
+			Scan(&downloadCount)
+
+		response[i].ResourceCount = int(resourceCount)
+		response[i].DownloadCount = downloadCount
+	}
+
+	c.JSON(200, gin.H{
+		"code":    0,
+		"message": "获取成功",
+		"data": gin.H{
+			"list":     response,
+			"total":    total,
+			"page":     page,
+			"pageSize": pageSize,
+		},
+	})
 }

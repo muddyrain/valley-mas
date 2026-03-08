@@ -19,6 +19,7 @@ export interface Resource {
   title: string;
   type: ResourceType;
   url: string; // TOS 公开访问 URL
+  storageKey?: string; // 对象存储键名（如：wallpaper/users/123/202603/xxx.jpg）
   size: number; // 文件大小（字节）
   downloadCount: number; // 下载次数
   createdAt: string;

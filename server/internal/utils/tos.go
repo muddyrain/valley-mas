@@ -56,6 +56,22 @@ func (u *TOSUploader) UploadFile(folder string, file *multipart.FileHeader) (str
 		return "", fmt.Errorf("TOS uploader not initialized")
 	}
 
+	// 生成唯一文件名
+	ext := filepath.Ext(file.Filename)
+	fileName := fmt.Sprintf("%s/%d_%s%s", folder, time.Now().UnixNano(), GenerateRandomString(8), ext)
+
+	return u.UploadFileWithPath(fileName, file)
+}
+
+// UploadFileWithPath 使用自定义路径上传文件到 TOS
+// customPath: 完整的存储路径，如 "avatars/users/123/202603/123456.png"
+// file: 上传的文件
+// 返回: 文件URL和错误信息
+func (u *TOSUploader) UploadFileWithPath(customPath string, file *multipart.FileHeader) (string, error) {
+	if u == nil || u.client == nil {
+		return "", fmt.Errorf("TOS uploader not initialized")
+	}
+
 	// 打开文件
 	src, err := file.Open()
 	if err != nil {
@@ -69,16 +85,12 @@ func (u *TOSUploader) UploadFile(folder string, file *multipart.FileHeader) (str
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 
-	// 生成唯一文件名
-	ext := filepath.Ext(file.Filename)
-	fileName := fmt.Sprintf("%s/%d_%s%s", folder, time.Now().UnixNano(), GenerateRandomString(8), ext)
-
 	// 上传到 TOS
 	ctx := context.Background()
 	input := &tos.PutObjectV2Input{
 		PutObjectBasicInput: tos.PutObjectBasicInput{
 			Bucket: u.bucket,
-			Key:    fileName,
+			Key:    customPath,
 		},
 		Content: bytes.NewReader(fileBytes),
 	}
@@ -89,8 +101,7 @@ func (u *TOSUploader) UploadFile(folder string, file *multipart.FileHeader) (str
 	}
 
 	// 生成公开访问 URL
-	// 格式: https://{bucket}.{endpoint}/{key}
-	url := u.GetPublicURL(fileName)
+	url := u.GetPublicURL(customPath)
 
 	return url, nil
 }
