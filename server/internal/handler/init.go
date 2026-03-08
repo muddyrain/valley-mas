@@ -251,6 +251,7 @@ func InitData(c *gin.Context) {
 				Title:         "示例头像 001",
 				Type:          "avatar",
 				URL:           "https://via.placeholder.com/300/FF6B6B/FFFFFF?text=Avatar+1",
+				StorageKey:    "avatar/202603/example_avatar_001.jpg", // 示例存储路径
 				ThumbnailURL:  "https://via.placeholder.com/150/FF6B6B/FFFFFF?text=Avatar+1",
 				Description:   "这是示例数据，请上传真实资源",
 				Size:          102400,
@@ -263,6 +264,7 @@ func InitData(c *gin.Context) {
 				Title:         "示例壁纸 001",
 				Type:          "wallpaper",
 				URL:           "https://via.placeholder.com/1080x1920/1A1A2E/FFFFFF?text=Wallpaper",
+				StorageKey:    "wallpaper/users/1/202603/example_wallpaper_001.jpg", // 示例存储路径（按用户分类）
 				ThumbnailURL:  "https://via.placeholder.com/300x500/1A1A2E/FFFFFF?text=Wallpaper",
 				Description:   "这是示例数据，请上传真实资源",
 				Size:          2097152,

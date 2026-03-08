@@ -178,7 +178,8 @@ type Resource struct {
 	Type          string         `gorm:"size:20" json:"type"`                       // avatar, wallpaper
 	Title         string         `gorm:"size:100" json:"title"`
 	Description   string         `gorm:"size:255" json:"description"`
-	URL           string         `gorm:"size:500" json:"url"`
+	URL           string         `gorm:"size:500" json:"url"`        // 访问 URL（可能是 CDN 域名）
+	StorageKey    string         `gorm:"size:500" json:"storageKey"` // 对象存储键名（如：wallpaper/users/123/202603/xxx.jpg）
 	ThumbnailURL  string         `gorm:"size:500" json:"thumbnailUrl"`
 	Width         int            `json:"width"`
 	Height        int            `json:"height"`
