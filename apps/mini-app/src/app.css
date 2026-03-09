@@ -1,5 +1,41 @@
 @import "tailwindcss";
+@import "tailwindcss/utilities";
+@import "tailwindcss/theme";
 
-html {
+@layer base {
+  /* 针对所有 text 类型的 input 移除默认 padding */
+  input[type="text"] {
+    padding-block: 0;
+    padding-inline: 0;
+  }
+}
+
+:root {
+  /* 基础字号重写 */
+  --text-xs: 0.55rem;
+  --text-xs--line-height: 1.5; /* 建议直接写倍数，更清晰 */
+
+  --text-sm: 0.63rem;
+  --text-sm--line-height: 1.5;
+
+  --text-base: 0.72rem;
+  --text-base--line-height: 1.5;
+
+  --text-lg: 0.81rem;
+  --text-lg--line-height: 1.75;
+
+  --text-xl: 0.9rem;
+  --text-xl--line-height: 1.75;
+
+  --text-2xl: 1.1rem;
+  --text-2xl--line-height: 2;
+
+  --text-3xl: 1.3rem;
+  --text-3xl--line-height: 2;
+
+  --text-4xl: 1.5rem;
+  --text-4xl--line-height: 2;
+
+  /* 颜色重写 */
   --color-primary: #8b5cf6;
 }

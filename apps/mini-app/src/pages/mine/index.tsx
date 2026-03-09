@@ -100,7 +100,7 @@ export default function Mine() {
             {userInfo.avatar ? (
               <Avatar size="large" src={userInfo.avatar} />
             ) : (
-              <View className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex flex-col items-center justify-center border-2 border-white/30">
+              <View className="w-16 h-16 rounded-full bg-white/20 flex flex-col items-center justify-center border-2 border-white/30">
                 <Text className="text-white text-xs font-bold">神图</Text>
                 <Text className="text-white/80 text-[10px]">壁纸</Text>
               </View>

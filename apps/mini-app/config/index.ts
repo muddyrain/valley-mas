@@ -11,19 +11,15 @@ export default defineConfig<'vite'>(async (merge) => {
   const baseConfig: UserConfigExport<'vite'> = {
     projectName: 'valley-mini-app',
     date: '2026-2-28',
-    designWidth(input: any) {
-      // 配置 NutUI 375 尺寸
-      if ((input?.file?.toString() ?? '')?.replace(/\\+/g, '/').indexOf('@nutui') > -1) {
-        return 375;
-      }
+    designWidth() {
       // 全局使用 Taro 默认的 750 尺寸
       return 750;
     },
     deviceRatio: {
       640: 2.34 / 2,
       750: 1,
-      375: 2,
       828: 1.81 / 2,
+      375: 2 / 1,
     },
     alias: {
       '@': path.resolve(__dirname, '../src'),
