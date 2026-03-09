@@ -1,5 +1,4 @@
-import { Avatar, Button } from '@nutui/nutui-react-taro';
-import { Image, Input, ScrollView, Text, View } from '@tarojs/components';
+import { Button, Image, Input, ScrollView, Text, View } from '@tarojs/components';
 import Taro, { useLoad, useReady } from '@tarojs/taro';
 import { useEffect, useMemo, useState } from 'react';
 import { creatorApi } from '@/api';
@@ -109,7 +108,7 @@ export default function Home() {
     setTimeout(() => {
       Taro.hideLoading();
       Taro.navigateTo({
-        url: `/pages/creator/space?code=${searchCode}`,
+        url: `/pages/creator-profile/index?code=${searchCode}`,
       });
     }, 1000);
   };
@@ -181,6 +180,7 @@ export default function Home() {
 
   useEffect(() => {
     creatorApi.getHotCreators().then((res) => {
+      console.log(res.list);
       setHotCreators(res.list || []);
     });
   }, []);
@@ -207,33 +207,35 @@ export default function Home() {
 
       {/* 搜索框区域 */}
       <View className="px-4 pb-4">
-        <View className="flex items-center bg-white rounded-full px-4 py-2 shadow-lg">
-          <Text className="text-gray-400 text-base mr-2">🔍</Text>
-          <Input
-            className="flex-1 text-sm text-gray-700 placeholder-gray-400 bg-transparent outline-none"
-            placeholder="请输入创作者口令"
-            value={searchCode}
-            onInput={(e) => {
-              setSearchCode(e.detail.value);
-            }}
-            onConfirm={handleSearch}
-          />
-          <Button
-            type="primary"
-            size="small"
-            className="rounded-full px-6"
-            style={{ background: 'var(--color-primary)' }}
-            onClick={handleSearch}
-          >
-            搜索
-          </Button>
+        <View className="bg-white rounded-2xl px-4 py-3 shadow-lg border-indigo-300 border-4">
+          <div className="flex items-center">
+            <Text className="text-gray-400 text-xl mr-2">🔍</Text>
+            <Input
+              placeholder="请输入创作者口令"
+              className="appearance-none flex-1 text-lg"
+              value={searchCode}
+              onInput={(e) => {
+                setSearchCode(e.detail.value);
+              }}
+              onConfirm={handleSearch}
+            />
+            <View>
+              <Button
+                type="primary"
+                className="rounded-full px-3 py-1 text-sm"
+                style={{ background: 'var(--color-primary)' }}
+                onClick={handleSearch}
+              >
+                搜索
+              </Button>
+            </View>
+          </div>
         </View>
       </View>
 
       {/* 推荐创作者 */}
       <View>
         {renderDivider('推荐创作者')}
-
         <ScrollView className="whitespace-nowrap px-4" scrollX showScrollbar={false}>
           <View className="flex pb-2">
             {hotCreators.map((creator) => (
@@ -242,7 +244,16 @@ export default function Home() {
                 className="inline-flex flex-col items-center mr-5 last:mr-0"
                 onClick={() => viewCreator(creator)}
               >
-                <Avatar size="large" src={creator.avatar} className="border-2 border-white/50" />
+                {creator.avatar ? (
+                  <Image
+                    src={creator.avatar}
+                    className="w-12 h-12 rounded-full border-2 border-solid border-white/50"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs">
+                    {creator.name?.[0] || '?'}
+                  </div>
+                )}
                 <Text className="text-xs text-white/90 mt-2 truncate max-w-16 text-center">
                   {creator.name}
                 </Text>
