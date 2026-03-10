@@ -1,5 +1,6 @@
 import {
   AppstoreOutlined,
+  CopyOutlined,
   EyeOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -128,6 +129,7 @@ export default function Creators() {
       name: record.name,
       description: record.description,
       avatar: record.avatar,
+      code: record.code,
       isActive: record.isActive,
     });
     setModalOpen(true);
@@ -173,6 +175,12 @@ export default function Creators() {
     }
   };
 
+  // 复制口令
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    message.success('口令已复制到剪贴板');
+  };
+
   // 查看详情
   const handleViewDetail = async (id: string) => {
     try {
@@ -216,6 +224,24 @@ export default function Creators() {
             <div className="text-xs text-green-600 truncate">User ID: {record.userId}</div>
           </Tooltip>
         </div>
+      ),
+    },
+    {
+      title: '口令',
+      dataIndex: 'code',
+      width: 150,
+      render: (code) => (
+        <Space>
+          <Tag color="blue">{code}</Tag>
+          <Tooltip title="复制口令">
+            <Button
+              type="link"
+              size="small"
+              icon={<CopyOutlined />}
+              onClick={() => handleCopyCode(code)}
+            />
+          </Tooltip>
+        </Space>
       ),
     },
     {
@@ -462,6 +488,18 @@ export default function Creators() {
               <div>
                 <div className="text-gray-500 text-sm mb-1">创作者名称</div>
                 <div className="font-medium">{detailData.name}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 text-sm mb-1">口令</div>
+                <div className="flex items-center">
+                  <Tag color="blue">{detailData.code}</Tag>
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<CopyOutlined />}
+                    onClick={() => handleCopyCode(detailData.code)}
+                  />
+                </div>
               </div>
               <div>
                 <div className="text-gray-500 text-sm mb-1">状态</div>

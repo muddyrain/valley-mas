@@ -125,14 +125,14 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.GET("/creators", handler.ListCreators)
 				content.GET("/creators/:id", handler.GetCreatorDetail)
 
-				// 创作者空间管理（创作者只能管理自己的空间）
+				// 创作者空间管理（创作者只能管理自己的空间，一个创作者只有一个空间）
 				content.GET("/creators/:id/spaces", handler.ListCreatorSpaces)
-				content.GET("/creators/:id/spaces/:spaceId", handler.GetCreatorSpaceDetail)
+				content.GET("/creators/:id/spaces/detail", handler.GetCreatorSpaceDetail)
 				content.POST("/creators/:id/spaces", handler.CreateCreatorSpace)
-				content.PUT("/creators/:id/spaces/:spaceId", handler.UpdateCreatorSpace)
-				content.DELETE("/creators/:id/spaces/:spaceId", handler.DeleteCreatorSpace)
-				content.POST("/creators/:id/spaces/:spaceId/resources", handler.AddResourcesToSpace)
-				content.DELETE("/creators/:id/spaces/:spaceId/resources", handler.RemoveResourcesFromSpace)
+				content.PUT("/creators/:id/spaces", handler.UpdateCreatorSpace)
+				content.DELETE("/creators/:id/spaces", handler.DeleteCreatorSpace)
+				content.POST("/creators/:id/spaces/resources", handler.AddResourcesToSpace)
+				content.DELETE("/creators/:id/spaces/resources", handler.RemoveResourcesFromSpace)
 
 				// 资源管理（创作者只能管理自己的资源）
 				content.GET("/resources", handler.ListResources)
