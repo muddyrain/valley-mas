@@ -119,10 +119,10 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 }
 
 // Creator 创作者模型
+// 注意：创作者的名称使用关联用户的 nickname，不单独存储
 type Creator struct {
 	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
 	UserID      Int64String    `gorm:"index" json:"userId"`
-	Name        string         `gorm:"size:50" json:"name"`
 	Description string         `gorm:"size:255" json:"description"`
 	Avatar      string         `gorm:"size:255" json:"avatar"`
 	Code        string         `gorm:"size:20;uniqueIndex" json:"code"` // 创作者唯一口令
@@ -132,6 +132,7 @@ type Creator struct {
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// 关联
+	User      *User           `gorm:"foreignKey:UserID" json:"user,omitempty"`         // 关联的用户（用于获取昵称等信息）
 	Space     *CreatorSpace   `gorm:"foreignKey:CreatorID" json:"space,omitempty"`     // 创作者的空间（一个创作者只有一个空间）
 	Resources []Resource      `gorm:"foreignKey:CreatorID" json:"resources,omitempty"` // 创作者上传的所有资源
 	Logs      []CodeAccessLog `gorm:"foreignKey:CreatorID" json:"logs,omitempty"`      // 访问日志
@@ -146,14 +147,14 @@ func (c *Creator) BeforeCreate(tx *gorm.DB) error {
 }
 
 // CreatorSpace 创作者空间模型（一个创作者只有一个空间）
+// 空间名称使用创作者名称，口令使用创作者口令，不需要单独的 title 字段
 type CreatorSpace struct {
 	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
 	CreatorID   Int64String    `gorm:"uniqueIndex" json:"creatorId"`             // 一个创作者只有一个空间，唯一索引
-	Title       string         `gorm:"size:100" json:"title"`                     // 空间标题
-	Description string         `gorm:"size:500" json:"description"`               // 空间描述
-	Banner      string         `gorm:"size:500" json:"banner"`                    // 空间横幅图
-	IsActive    bool           `gorm:"default:true" json:"isActive"`              // 是否启用
-	ViewCount   int            `gorm:"default:0" json:"viewCount"`                // 浏览次数
+	Description string         `gorm:"size:500" json:"description"`              // 空间描述
+	Banner      string         `gorm:"size:500" json:"banner"`                   // 空间横幅图
+	IsActive    bool           `gorm:"default:true" json:"isActive"`             // 是否启用
+	ViewCount   int            `gorm:"default:0" json:"viewCount"`               // 浏览次数
 	CreatedAt   time.Time      `json:"createdAt"`
 	UpdatedAt   time.Time      `json:"updatedAt"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
@@ -244,26 +245,6 @@ type CodeAccessLog struct {
 func (c *CodeAccessLog) BeforeCreate(tx *gorm.DB) error {
 	if c.ID == 0 {
 		c.ID = Int64String(utils.GenerateID())
-	}
-	return nil
-}
-
-// UploadRecord 上传记录模型
-type UploadRecord struct {
-	ID         Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
-	CreatorID  Int64String `gorm:"index" json:"creatorId"`
-	ResourceID Int64String `gorm:"index" json:"resourceId"`
-	UploadedAt time.Time   `json:"uploadedAt"`
-
-	// 关联
-	Creator  *Creator  `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
-	Resource *Resource `gorm:"foreignKey:ResourceID" json:"resource,omitempty"`
-}
-
-// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
-func (u *UploadRecord) BeforeCreate(tx *gorm.DB) error {
-	if u.ID == 0 {
-		u.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }

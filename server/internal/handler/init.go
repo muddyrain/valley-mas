@@ -52,11 +52,6 @@ func InitData(c *gin.Context) {
 
 		// 按照外键依赖顺序删除：先删除依赖表，再删除主表
 		// 使用 Unscoped 彻底删除数据（包括软删除的记录）
-		if err := tx.Unscoped().Where("1 = 1").Delete(&model.UploadRecord{}).Error; err != nil {
-			tx.Rollback()
-			Error(c, 500, "清空上传记录失败："+err.Error())
-			return
-		}
 
 		if err := tx.Unscoped().Where("1 = 1").Delete(&model.DownloadRecord{}).Error; err != nil {
 			tx.Rollback()
@@ -191,10 +186,10 @@ func InitData(c *gin.Context) {
 	// 为创作者用户创建创作者记录
 	creatorUser := users[3] // creator 用户
 	creatorCode := "test12"
-	
+
+	// 注意：创作者名称使用关联用户的昵称，不单独存储
 	creator := model.Creator{
 		UserID:      creatorUser.ID,
-		Name:        "测试创作者",
 		Avatar:      "https://via.placeholder.com/150",
 		Description: "这是一个测试创作者空间",
 		Code:        creatorCode,
@@ -208,7 +203,6 @@ func InitData(c *gin.Context) {
 	// 创建默认空间
 	space := model.CreatorSpace{
 		CreatorID:   creator.ID,
-		Title:       "测试创作者的默认空间",
 		Description: "这是一个测试空间",
 		IsActive:    true,
 	}

@@ -109,13 +109,13 @@ func HomePage(c *gin.Context) {
 
 // HotCreatorResponse 热门创作者响应项
 type HotCreatorResponse struct {
-	ID             string `json:"id" example:"1234567890"`
-	Name           string `json:"name" example:"设计师小王"`
-	Avatar         string `json:"avatar" example:"https://example.com/avatar.jpg"`
-	ResourceCount  int    `json:"resourceCount" example:"156"`
-	DownloadCount  int64  `json:"downloadCount" example:"8920"`
-	Description    string `json:"description" example:"分享精美头像和壁纸"`
-	CreatedAt      string `json:"createdAt" example:"2026-03-01T12:00:00Z"`
+	ID            string `json:"id" example:"1234567890"`
+	Name          string `json:"name" example:"设计师小王"`
+	Avatar        string `json:"avatar" example:"https://example.com/avatar.jpg"`
+	ResourceCount int    `json:"resourceCount" example:"156"`
+	DownloadCount int64  `json:"downloadCount" example:"8920"`
+	Description   string `json:"description" example:"分享精美头像和壁纸"`
+	CreatedAt     string `json:"createdAt" example:"2026-03-01T12:00:00Z"`
 }
 
 // GetHotCreators 获取热门创作者
@@ -136,7 +136,7 @@ func GetHotCreators(c *gin.Context) {
 	// 获取分页参数
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
-	
+
 	// 限制每页最大数量
 	if pageSize > 50 {
 		pageSize = 50
@@ -156,7 +156,7 @@ func GetHotCreators(c *gin.Context) {
 	// 查询热门创作者（按资源数量和下载量排序）
 	// 使用子查询计算每个创作者的资源数量和总下载量
 	err := db.Table("creators").
-		Select(`creators.id, creators.name, creators.avatar, creators.description, creators.created_at,
+		Select(`creators.id, creators.user_id, creators.avatar, creators.description, creators.created_at,
 			COALESCE(resource_stats.resource_count, 0) as resource_count,
 			COALESCE(resource_stats.download_count, 0) as download_count`).
 		Joins(`LEFT JOIN (
@@ -191,13 +191,20 @@ func GetHotCreators(c *gin.Context) {
 	// 转换为响应格式
 	var response []HotCreatorResponse
 	for _, creator := range creators {
+		// 获取用户信息以获取昵称
+		var user model.User
+		var name string
+		if err := db.Where("id = ?", creator.UserID).First(&user).Error; err == nil {
+			name = user.Nickname
+		}
+
 		response = append(response, HotCreatorResponse{
-			ID:            string(creator.ID),
-			Name:          creator.Name,
+			ID:            fmt.Sprintf("%d", creator.ID),
+			Name:          name,
 			Avatar:        creator.Avatar,
 			Description:   creator.Description,
-			ResourceCount:  0, // 将在下面设置
-			DownloadCount:  0, // 将在下面设置
+			ResourceCount: 0, // 将在下面设置
+			DownloadCount: 0, // 将在下面设置
 			CreatedAt:     creator.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		})
 	}

@@ -126,7 +126,6 @@ export default function Creators() {
     setCurrentCreator(record);
     form.setFieldsValue({
       userId: record.userId,
-      name: record.name,
       description: record.description,
       avatar: record.avatar,
       code: record.code,
@@ -195,15 +194,12 @@ export default function Creators() {
   const columns: ColumnsType<Creator> = [
     {
       title: '创作者信息',
-      dataIndex: 'name',
+      dataIndex: 'id',
       width: 200,
-      render: (name, record) => (
+      render: (id) => (
         <div className="w-full flex flex-col">
-          <Tooltip title={`创作者名称: ${name}`}>
-            <div className="font-medium truncate">{name}</div>
-          </Tooltip>
-          <Tooltip title={`创作者ID: ${record.id}`}>
-            <div className="text-xs text-blue-500 truncate">ID: {record.id}</div>
+          <Tooltip title={`创作者ID: ${id}`}>
+            <div className="text-xs text-blue-500 truncate">ID: {id}</div>
           </Tooltip>
         </div>
       ),
@@ -215,13 +211,13 @@ export default function Creators() {
       render: (username, record) => (
         <div className="w-full flex flex-col">
           <Tooltip title={`用户昵称: ${record.userNickname}`}>
-            <div className="font-medium truncate">{record.userNickname}</div>
+            <div className="font-medium truncate">用户昵称: {record.userNickname}</div>
           </Tooltip>
           <Tooltip title={`账号: ${username}`}>
-            <div className="text-xs text-gray-400 truncate">{username?.slice(0, 20)}</div>
+            <div className="text-xs text-gray-400 truncate">账号: {username?.slice(0, 20)}</div>
           </Tooltip>
           <Tooltip title={`用户ID: ${record.userId}`}>
-            <div className="text-xs text-green-600 truncate">User ID: {record.userId}</div>
+            <div className="text-xs text-green-600 truncate">用户ID: {record.userId}</div>
           </Tooltip>
         </div>
       ),
@@ -249,12 +245,7 @@ export default function Creators() {
       dataIndex: 'description',
       width: 200,
       ellipsis: true,
-    },
-    {
-      title: '空间数',
-      dataIndex: 'spaceCount',
-      width: 100,
-      render: (count) => count || 0,
+      render: (text) => <Tooltip title={text}>{text || '-'}</Tooltip>,
     },
     {
       title: '资源数',
@@ -435,27 +426,12 @@ export default function Creators() {
               />
             </Form.Item>
           )}
-
-          <Form.Item
-            label="创作者名称"
-            name="name"
-            rules={[{ required: true, message: '请输入创作者名称' }]}
-          >
-            <Input placeholder="请输入创作者名称" maxLength={50} />
-          </Form.Item>
-
           <Form.Item label="描述" name="description">
             <Input.TextArea placeholder="请输入描述" rows={3} maxLength={255} />
           </Form.Item>
-
           <Form.Item label="头像 URL" name="avatar">
             <Input placeholder="请输入头像 URL（可选）" />
           </Form.Item>
-
-          <Form.Item label="口令" name="code" extra="留空则自动生成 4 位字母数字组合">
-            <Input placeholder="请输入口令（可选）" maxLength={20} />
-          </Form.Item>
-
           <Form.Item label="是否启用" name="isActive" valuePropName="checked" initialValue={true}>
             <Switch checkedChildren="启用" unCheckedChildren="禁用" />
           </Form.Item>
@@ -487,7 +463,7 @@ export default function Creators() {
               </div>
               <div>
                 <div className="text-gray-500 text-sm mb-1">创作者名称</div>
-                <div className="font-medium">{detailData.name}</div>
+                <div className="font-medium">{detailData.userNickname}</div>
               </div>
               <div>
                 <div className="text-gray-500 text-sm mb-1">口令</div>
@@ -508,10 +484,6 @@ export default function Creators() {
                     {detailData.isActive ? '启用' : '禁用'}
                   </Tag>
                 </div>
-              </div>
-              <div>
-                <div className="text-gray-500 text-sm mb-1">空间数量</div>
-                <div className="font-medium">{detailData.spaceCount || 0}</div>
               </div>
               <div>
                 <div className="text-gray-500 text-sm mb-1">资源数量</div>

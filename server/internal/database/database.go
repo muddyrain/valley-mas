@@ -96,8 +96,8 @@ func autoMigrate() error {
 		&model.CreatorSpace{}, // 新增：创作者空间表
 		&model.Resource{},
 		&model.DownloadRecord{},
-		&model.UploadRecord{},
 		&model.CodeAccessLog{},
+		&model.CreatorApplication{}, // 创作者申请表
 	)
 }
 

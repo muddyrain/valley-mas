@@ -79,16 +79,21 @@ func GetCreatorStats(c *gin.Context) {
 
 	// 查找该用户对应的创作者记录
 	var creator model.Creator
-	if err := db.Where("user_id = ?", userId).First(&creator).Error; err != nil {
+	if err := db.Where("user_id = ?", userId).Preload("User").First(&creator).Error; err != nil {
 		Error(c, 404, "未找到创作者信息")
 		return
+	}
+
+	creatorName := ""
+	if creator.User != nil {
+		creatorName = creator.User.Nickname
 	}
 
 	// 初始化统计数据
 	stats := CreatorStats{
 		CreatorInfo: CreatorInfo{
 			ID:          strconv.FormatInt(int64(creator.ID), 10),
-			Name:        creator.Name,
+			Name:        creatorName,
 			Avatar:      creator.Avatar,
 			Description: creator.Description,
 		},

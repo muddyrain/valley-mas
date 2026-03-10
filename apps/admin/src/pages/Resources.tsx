@@ -239,6 +239,7 @@ export default function Resources() {
     {
       title: '标题',
       dataIndex: 'title',
+      width: 300,
       render: (title) => title || '未命名资源',
     },
     {

@@ -356,10 +356,9 @@ func ReviewCreatorApplication(c *gin.Context) {
 				return err
 			}
 
-			// 创建创作者
+			// 创建创作者（名称使用用户昵称，不单独存储）
 			creator := model.Creator{
 				UserID:      application.UserID,
-				Name:        application.Name,
 				Description: application.Description,
 				Avatar:      application.Avatar,
 				Code:        code,
@@ -373,7 +372,6 @@ func ReviewCreatorApplication(c *gin.Context) {
 			// 创建默认空间
 			space := model.CreatorSpace{
 				CreatorID:   creator.ID,
-				Title:       application.Name + "的创意空间",
 				Description: application.Description,
 				IsActive:    true,
 			}
