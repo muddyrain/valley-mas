@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,11 +10,31 @@ import (
 	"valley-server/internal/database"
 	"valley-server/internal/logger"
 	"valley-server/internal/model"
+	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
+
+// generateCreatorCode 生成唯一的创作者口令
+func generateCreatorCodeForApplication(db *gorm.DB) (string, error) {
+	maxAttempts := 10
+	for i := 0; i < maxAttempts; i++ {
+		code := utils.GenerateRandomCode(6)
+
+		var count int64
+		if err := db.Model(&model.Creator{}).Where("code = ?", code).Count(&count).Error; err != nil {
+			return "", err
+		}
+
+		if count == 0 {
+			return code, nil
+		}
+	}
+
+	return "", fmt.Errorf("无法生成唯一口令")
+}
 
 // SubmitCreatorApplication 提交创作者申请
 // @Summary      提交创作者申请
@@ -329,12 +350,19 @@ func ReviewCreatorApplication(c *gin.Context) {
 				return err
 			}
 
+			// 生成创作者口令
+			code, err := generateCreatorCodeForApplication(tx)
+			if err != nil {
+				return err
+			}
+
 			// 创建创作者
 			creator := model.Creator{
 				UserID:      application.UserID,
 				Name:        application.Name,
 				Description: application.Description,
 				Avatar:      application.Avatar,
+				Code:        code,
 				IsActive:    true,
 			}
 
@@ -342,17 +370,10 @@ func ReviewCreatorApplication(c *gin.Context) {
 				return err
 			}
 
-			// 生成空间口令
-			code, err := generateSpaceCode(tx)
-			if err != nil {
-				return err
-			}
-
 			// 创建默认空间
 			space := model.CreatorSpace{
 				CreatorID:   creator.ID,
 				Title:       application.Name + "的创意空间",
-				Code:        code,
 				Description: application.Description,
 				IsActive:    true,
 			}

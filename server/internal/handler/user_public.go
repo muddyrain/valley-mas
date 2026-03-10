@@ -10,11 +10,11 @@ import (
 
 // GetCreatorSpace 获取创作者空间信息（公开接口，用户端）
 // @Summary      获取创作者空间
-// @Description  通过口令获取创作者空间信息，包含资源列表
+// @Description  通过创作者口令获取创作者空间信息，包含资源列表
 // @Tags         用户端 - 公开接口
 // @Accept       json
 // @Produce      json
-// @Param        code  path  string  true  "空间口令"
+// @Param        code  path  string  true  "创作者口令"
 // @Success      200  {object}  map[string]interface{}  "空间信息"
 // @Failure      404  {object}  map[string]interface{}  "空间不存在"
 // @Router       /public/space/{code} [get]
@@ -23,20 +23,20 @@ func GetCreatorSpace(c *gin.Context) {
 
 	db := database.GetDB()
 
-	// 查找空间
-	var space model.CreatorSpace
+	// 查找创作者
+	var creator model.Creator
 	if err := db.Where("code = ? AND is_active = ?", code, true).
-		Preload("Creator").
-		Preload("Resources").
-		First(&space).Error; err != nil {
-		Error(c, 404, "空间不存在或未激活")
+		Preload("Space").
+		Preload("Space.Resources").
+		First(&creator).Error; err != nil {
+		Error(c, 404, "创作者不存在或未激活")
 		return
 	}
 
 	// 记录访问日志
 	accessLog := model.CodeAccessLog{
 		ID:        model.Int64String(utils.GenerateID()),
-		SpaceID:   space.ID,
+		CreatorID: creator.ID,
 		Code:      code,
 		IP:        c.ClientIP(),
 		UserAgent: c.GetHeader("User-Agent"),
@@ -46,29 +46,34 @@ func GetCreatorSpace(c *gin.Context) {
 	// 统计数据
 	var totalViews int64
 	var totalDownloads int64
-	db.Model(&model.CodeAccessLog{}).Where("space_id = ?", space.ID).Count(&totalViews)
-	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", space.CreatorID).Count(&totalDownloads)
+	db.Model(&model.CodeAccessLog{}).Where("creator_id = ?", creator.ID).Count(&totalViews)
+	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", creator.ID).Count(&totalDownloads)
 
-	Success(c, gin.H{
-		"space": gin.H{
-			"id":          space.ID,
-			"title":       space.Title,
-			"description": space.Description,
-			"banner":      space.Banner,
-			"code":        space.Code,
-		},
+	response := gin.H{
 		"creator": gin.H{
-			"id":          space.Creator.ID,
-			"name":        space.Creator.Name,
-			"avatar":      space.Creator.Avatar,
-			"description": space.Creator.Description,
+			"id":          creator.ID,
+			"name":        creator.Name,
+			"avatar":      creator.Avatar,
+			"description": creator.Description,
+			"code":        creator.Code,
 		},
-		"resources": space.Resources,
 		"stats": gin.H{
 			"totalViews":     totalViews,
 			"totalDownloads": totalDownloads,
 		},
-	})
+	}
+
+	if creator.Space != nil {
+		response["space"] = gin.H{
+			"id":          creator.Space.ID,
+			"title":       creator.Space.Title,
+			"description": creator.Space.Description,
+			"banner":      creator.Space.Banner,
+		}
+		response["resources"] = creator.Space.Resources
+	}
+
+	Success(c, response)
 }
 
 // DownloadResource 下载资源（公开接口，暂时不需要广告令牌）

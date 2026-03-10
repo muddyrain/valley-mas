@@ -8,6 +8,7 @@ export interface Creator {
   name: string;
   description: string;
   avatar: string;
+  code: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -20,6 +21,9 @@ export interface Creator {
   // 用户信息（后端关联查询）
   username?: string;
   userNickname?: string;
+
+  // 关联的空间
+  space?: CreatorSpace;
 }
 
 // 创作者数据概览
@@ -105,7 +109,6 @@ export interface CreatorSpace {
   id: string;
   creatorId: string;
   title: string;
-  code: string;
   description: string;
   banner: string;
   isActive: boolean;
@@ -133,18 +136,17 @@ export const reqGetSpaceList = (creatorId: string, params?: SpaceListParams) => 
 };
 
 // 获取空间详情
-export const reqGetSpaceDetail = (creatorId: string, spaceId: string) => {
-  return http.get<unknown, CreatorSpace>(`/admin/creators/${creatorId}/spaces/${spaceId}`);
+export const reqGetSpaceDetail = (creatorId: string) => {
+  return http.get<unknown, CreatorSpace>(`/admin/creators/${creatorId}/spaces/detail`);
 };
 
-// 创建空间
+// 创建/更新空间（一个创作者只有一个空间）
 export const reqCreateSpace = (
   creatorId: string,
   data: {
     title: string;
     description?: string;
     banner?: string;
-    code?: string;
     isActive?: boolean;
   },
 ) => {
@@ -152,33 +154,25 @@ export const reqCreateSpace = (
 };
 
 // 更新空间
-export const reqUpdateSpace = (creatorId: string, spaceId: string, data: Partial<CreatorSpace>) => {
-  return http.put<unknown, CreatorSpace>(`/admin/creators/${creatorId}/spaces/${spaceId}`, data);
+export const reqUpdateSpace = (creatorId: string, data: Partial<CreatorSpace>) => {
+  return http.put<unknown, CreatorSpace>(`/admin/creators/${creatorId}/spaces`, data);
 };
 
 // 删除空间
-export const reqDeleteSpace = (creatorId: string, spaceId: string) => {
-  return http.delete<unknown, void>(`/admin/creators/${creatorId}/spaces/${spaceId}`);
+export const reqDeleteSpace = (creatorId: string) => {
+  return http.delete<unknown, void>(`/admin/creators/${creatorId}/spaces`);
 };
 
 // 为空间添加资源
-export const reqAddResourcesToSpace = (
-  creatorId: string,
-  spaceId: string,
-  resourceIds: string[],
-) => {
-  return http.post<unknown, void>(`/admin/creators/${creatorId}/spaces/${spaceId}/resources`, {
+export const reqAddResourcesToSpace = (creatorId: string, resourceIds: string[]) => {
+  return http.post<unknown, void>(`/admin/creators/${creatorId}/spaces/resources`, {
     resourceIds,
   });
 };
 
 // 从空间移除资源
-export const reqRemoveResourcesFromSpace = (
-  creatorId: string,
-  spaceId: string,
-  resourceIds: string[],
-) => {
-  return http.delete<unknown, void>(`/admin/creators/${creatorId}/spaces/${spaceId}/resources`, {
+export const reqRemoveResourcesFromSpace = (creatorId: string, resourceIds: string[]) => {
+  return http.delete<unknown, void>(`/admin/creators/${creatorId}/spaces/resources`, {
     data: { resourceIds },
   });
 };

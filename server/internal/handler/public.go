@@ -24,7 +24,7 @@ type VerifyCodeResponse struct {
 
 // VerifyCode 验证口令（公开接口）
 // @Summary      验证创作者口令
-// @Description  输入5位口令（如：y2722）验证并获取创作者空间信息
+// @Description  输入口令验证并获取创作者空间信息
 // @Tags         公开接口
 // @Accept       json
 // @Produce      json
@@ -48,16 +48,16 @@ func VerifyCode(c *gin.Context) {
 
 	// 3. 验证口令格式
 	if !utils.ValidateCodeFormat(normalizedCode) {
-		Error(c, http.StatusBadRequest, "口令格式错误，应为4位小写字母或数字")
+		Error(c, http.StatusBadRequest, "口令格式错误")
 		return
 	}
 
-	// 4. 查询空间（只查询已激活的）
-	var space model.CreatorSpace
+	// 4. 查询创作者（只查询已激活的），预加载空间信息
+	var creator model.Creator
 	err := db.Where("code = ? AND is_active = ?", normalizedCode, true).
-		Preload("Creator").      // 预加载创作者信息
-		Preload("Creator.User"). // 预加载用户信息
-		First(&space).Error
+		Preload("Space").      // 预加载空间信息
+		Preload("Space.Resources"). // 预加载空间资源
+		First(&creator).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -69,30 +69,46 @@ func VerifyCode(c *gin.Context) {
 	}
 
 	// 5. 统计资源数量
-	var resourceCount int64
-	db.Model(&space.Resources).Count(&resourceCount)
+	resourceCount := 0
+	if creator.Space != nil {
+		resourceCount = len(creator.Space.Resources)
+	}
 
-	// 6. 记录访问（可选：记录IP和时间用于统计）
-	// TODO: 如需记录访问日志，可以在这里添加
+	// 6. 记录访问
+	ip := c.ClientIP()
+	userAgent := c.GetHeader("User-Agent")
+	accessLog := model.CodeAccessLog{
+		CreatorID: creator.ID,
+		Code:      normalizedCode,
+		IP:        ip,
+		UserAgent: userAgent,
+	}
+	db.Create(&accessLog)
 
-	// 7. 返回空间信息
-	Success(c, gin.H{
+	// 7. 返回创作者和空间信息
+	response := gin.H{
 		"valid": true,
-		"space": gin.H{
-			"id":            space.ID,
-			"title":         space.Title,
-			"description":   space.Description,
-			"banner":        space.Banner,
-			"code":          space.Code,
-			"resourceCount": resourceCount,
-			"creator": gin.H{
-				"id":     space.Creator.ID,
-				"name":   space.Creator.Name,
-				"avatar": space.Creator.Avatar,
-			},
-			"createdAt": space.CreatedAt,
+		"creator": gin.H{
+			"id":          creator.ID,
+			"name":        creator.Name,
+			"avatar":      creator.Avatar,
+			"description": creator.Description,
+			"code":        creator.Code,
 		},
-	})
+	}
+
+	if creator.Space != nil {
+		response["space"] = gin.H{
+			"id":            creator.Space.ID,
+			"title":         creator.Space.Title,
+			"description":   creator.Space.Description,
+			"banner":        creator.Space.Banner,
+			"resourceCount": resourceCount,
+			"createdAt":     creator.Space.CreatedAt,
+		}
+	}
+
+	Success(c, response)
 }
 
 // GetCreatorResources 获取创作者资源列表

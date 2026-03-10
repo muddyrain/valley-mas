@@ -2,9 +2,11 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
+	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -28,6 +30,26 @@ type RegisterCreatorResponse struct {
 	Description string `json:"description" example:"分享精美头像和壁纸"`
 	IsActive    bool   `json:"isActive" example:"true"`
 	CreatedAt   string `json:"createdAt" example:"2026-03-01T12:00:00Z"`
+}
+
+// generateCreatorCode 生成唯一的创作者口令
+func generateCreatorCode(db *gorm.DB) (string, error) {
+	maxAttempts := 10
+	for i := 0; i < maxAttempts; i++ {
+		code := utils.GenerateRandomCode(6)
+
+		// 检查口令是否已存在
+		var count int64
+		if err := db.Model(&model.Creator{}).Where("code = ?", code).Count(&count).Error; err != nil {
+			return "", err
+		}
+
+		if count == 0 {
+			return code, nil
+		}
+	}
+
+	return "", fmt.Errorf("无法生成唯一口令")
 }
 
 // RegisterCreator 创作者注册
@@ -80,25 +102,26 @@ func RegisterCreator(c *gin.Context) {
 		return
 	}
 
-	// 5. 创建创作者记录
+	// 5. 生成创作者口令
+	code, err := generateCreatorCode(db)
+	if err != nil {
+		Error(c, http.StatusInternalServerError, "生成口令失败: "+err.Error())
+		return
+	}
+
+	// 6. 创建创作者记录
 	creator := model.Creator{
 		UserID:      model.Int64String(userID.(int64)),
 		Name:        req.Name,
 		Description: req.Description,
 		Avatar:      req.Avatar,
+		Code:        code,
 		IsActive:    true, // 默认启用
 	}
 
 	// 如果没有传头像，使用用户头像
 	if creator.Avatar == "" {
 		creator.Avatar = user.Avatar
-	}
-
-	// 6. 生成空间口令
-	code, err := generateSpaceCode(db)
-	if err != nil {
-		Error(c, http.StatusInternalServerError, "生成口令失败: "+err.Error())
-		return
 	}
 
 	// 7. 创建默认空间
@@ -110,7 +133,6 @@ func RegisterCreator(c *gin.Context) {
 	space := model.CreatorSpace{
 		CreatorID:   creator.ID,
 		Title:       spaceTitle,
-		Code:        code,
 		Banner:      req.SpaceBanner,
 		Description: req.SpaceDescription,
 		IsActive:    true,
@@ -151,15 +173,15 @@ func RegisterCreator(c *gin.Context) {
 		"name":        creator.Name,
 		"avatar":      creator.Avatar,
 		"description": creator.Description,
+		"code":        creator.Code,
 		"isActive":    creator.IsActive,
 		"createdAt":   creator.CreatedAt,
 		"space": gin.H{
 			"id":    space.ID,
 			"title": space.Title,
-			"code":  space.Code,
 		},
 		"message": "🎉 恭喜！您已成为创作者",
-		"tip":     "您的专属空间口令是：" + space.Code + "（4位，永久有效）",
+		"tip":     "您的专属口令是：" + creator.Code + "（永久有效）",
 	})
 }
 
@@ -175,9 +197,9 @@ func GetMyCreatorSpace(c *gin.Context) {
 		return
 	}
 
-	// 2. 查询创作者信息
+	// 2. 查询创作者信息，预加载空间
 	var creator model.Creator
-	err := db.Where("user_id = ?", userID).First(&creator).Error
+	err := db.Where("user_id = ?", userID).Preload("Space").First(&creator).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			Error(c, http.StatusNotFound, "您还不是创作者，请先注册")
@@ -187,24 +209,20 @@ func GetMyCreatorSpace(c *gin.Context) {
 		return
 	}
 
-	// 3. 查询所有空间
-	var spaces []model.CreatorSpace
-	db.Where("creator_id = ?", creator.ID).Find(&spaces)
-
-	// 4. 统计资源数量
+	// 3. 统计资源数量
 	var resourceCount int64
 	db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
 
-	// 5. 返回创作者空间信息
+	// 4. 返回创作者空间信息
 	Success(c, gin.H{
 		"id":            creator.ID,
 		"userId":        creator.UserID,
 		"name":          creator.Name,
 		"avatar":        creator.Avatar,
 		"description":   creator.Description,
+		"code":          creator.Code,
 		"isActive":      creator.IsActive,
-		"spaces":        spaces,
-		"spaceCount":    len(spaces),
+		"space":         creator.Space,
 		"resourceCount": resourceCount,
 		"createdAt":     creator.CreatedAt,
 		"updatedAt":     creator.UpdatedAt,
