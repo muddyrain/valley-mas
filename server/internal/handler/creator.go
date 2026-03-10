@@ -110,9 +110,9 @@ func RegisterCreator(c *gin.Context) {
 	}
 
 	// 6. 创建创作者记录
+	// 注意：创作者名称使用用户的昵称,不单独存储
 	creator := model.Creator{
 		UserID:      model.Int64String(userID.(int64)),
-		Name:        req.Name,
 		Description: req.Description,
 		Avatar:      req.Avatar,
 		Code:        code,
@@ -124,15 +124,9 @@ func RegisterCreator(c *gin.Context) {
 		creator.Avatar = user.Avatar
 	}
 
-	// 7. 创建默认空间
-	spaceTitle := req.SpaceTitle
-	if spaceTitle == "" {
-		spaceTitle = req.Name + "的创意空间"
-	}
-
+	// 7. 创建默认空间（空间使用创作者描述，不需要单独的 title）
 	space := model.CreatorSpace{
 		CreatorID:   creator.ID,
-		Title:       spaceTitle,
 		Banner:      req.SpaceBanner,
 		Description: req.SpaceDescription,
 		IsActive:    true,
@@ -170,15 +164,14 @@ func RegisterCreator(c *gin.Context) {
 	Success(c, gin.H{
 		"id":          creator.ID,
 		"userId":      creator.UserID,
-		"name":        creator.Name,
+		"name":        user.Nickname, // 使用用户昵称
 		"avatar":      creator.Avatar,
 		"description": creator.Description,
 		"code":        creator.Code,
 		"isActive":    creator.IsActive,
 		"createdAt":   creator.CreatedAt,
 		"space": gin.H{
-			"id":    space.ID,
-			"title": space.Title,
+			"id": space.ID,
 		},
 		"message": "🎉 恭喜！您已成为创作者",
 		"tip":     "您的专属口令是：" + creator.Code + "（永久有效）",
@@ -197,9 +190,12 @@ func GetMyCreatorSpace(c *gin.Context) {
 		return
 	}
 
-	// 2. 查询创作者信息，预加载空间
+	// 2. 查询创作者信息，预加载空间和用户信息
 	var creator model.Creator
-	err := db.Where("user_id = ?", userID).Preload("Space").First(&creator).Error
+	err := db.Where("user_id = ?", userID).
+		Preload("User"). // 预加载用户信息
+		Preload("Space").
+		First(&creator).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			Error(c, http.StatusNotFound, "您还不是创作者，请先注册")
@@ -213,11 +209,16 @@ func GetMyCreatorSpace(c *gin.Context) {
 	var resourceCount int64
 	db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
 
+	creatorName := ""
+	if creator.User != nil {
+		creatorName = creator.User.Nickname
+	}
+
 	// 4. 返回创作者空间信息
 	Success(c, gin.H{
 		"id":            creator.ID,
 		"userId":        creator.UserID,
-		"name":          creator.Name,
+		"name":          creatorName,
 		"avatar":        creator.Avatar,
 		"description":   creator.Description,
 		"code":          creator.Code,

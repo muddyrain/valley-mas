@@ -14,13 +14,12 @@ export interface Creator {
   updatedAt: string;
 
   // 统计数据（后端计算）
-  spaceCount?: number;
   resourceCount?: number;
   downloadCount?: number;
 
   // 用户信息（后端关联查询）
-  username?: string;
-  userNickname?: string;
+  username: string;
+  userNickname: string;
 
   // 关联的空间
   space?: CreatorSpace;
@@ -105,10 +104,11 @@ export const reqToggleCreatorStatus = (id: string) => {
 // ==================== 空间管理 ====================
 
 // 空间接口定义
+// 注意：空间没有独立的 title 字段，空间名称使用创作者名称
 export interface CreatorSpace {
   id: string;
   creatorId: string;
-  title: string;
+  // title 字段已移除，空间名称使用创作者名称，口令使用创作者 code
   description: string;
   banner: string;
   isActive: boolean;
@@ -144,7 +144,6 @@ export const reqGetSpaceDetail = (creatorId: string) => {
 export const reqCreateSpace = (
   creatorId: string,
   data: {
-    title: string;
     description?: string;
     banner?: string;
     isActive?: boolean;

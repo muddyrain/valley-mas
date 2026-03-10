@@ -38,14 +38,14 @@ export default function CreatorSpaces() {
     setLoading(true);
     try {
       const [creator] = await Promise.all([reqGetCreatorDetail(creatorId)]);
-      setCreatorName(creator.name);
+      setCreatorName(creator.userNickname);
       setCreatorCode(creator.code);
 
       try {
         const spaceData = await reqGetSpaceDetail(creatorId);
         setSpace(spaceData);
         form.setFieldsValue({
-          title: spaceData.title,
+          // title 已移除，空间名称使用创作者名称
           description: spaceData.description,
           banner: spaceData.banner,
           isActive: spaceData.isActive,
@@ -64,6 +64,7 @@ export default function CreatorSpaces() {
   // 初始加载
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [creatorId]);
 
   // 提交表单
@@ -176,7 +177,7 @@ export default function CreatorSpaces() {
 
       <Card>
         <div className="mb-4 flex justify-between items-center">
-          <h3 className="text-lg font-semibold">{space ? '编辑空间' : '创建空间'}</h3>
+          <h3 className="text-lg font-semibold">{space ? `${creatorName} 的空间` : '创建空间'}</h3>
           <Space>
             <Button icon={<ReloadOutlined />} onClick={fetchData}>
               刷新
@@ -190,13 +191,7 @@ export default function CreatorSpaces() {
         </div>
 
         <Form form={form} layout="vertical" className="mt-4">
-          <Form.Item
-            label="空间名称"
-            name="title"
-            rules={[{ required: true, message: '请输入空间名称' }]}
-          >
-            <Input placeholder="例如：精选头像合集" />
-          </Form.Item>
+          {/* title 字段已移除，空间名称使用创作者名称 */}
 
           <Form.Item label="描述" name="description">
             <Input.TextArea rows={3} placeholder="空间描述" />
@@ -216,15 +211,20 @@ export default function CreatorSpaces() {
                 {space ? '更新' : '创建'}
               </Button>
               {space && (
-                <Button danger onClick={handleDelete}>
-                  删除
+                <Button
+                  danger
+                  onClick={handleDelete}
+                  disabled
+                  title="空间与创作者绑定，不可单独删除"
+                >
+                  删除（已禁用）
                 </Button>
               )}
             </Space>
           </Form.Item>
         </Form>
 
-        {space && space.banner && (
+        {space?.banner && (
           <div className="mt-6">
             <h4 className="text-md font-semibold mb-2">横幅预览</h4>
             <Image src={space.banner} alt="横幅" style={{ maxWidth: '100%', maxHeight: '300px' }} />
@@ -234,7 +234,7 @@ export default function CreatorSpaces() {
 
       {/* 资源管理弹窗 */}
       <Modal
-        title={`管理空间资源 - ${space?.title || ''}`}
+        title={`管理空间资源 - ${creatorName}`}
         open={resourceModalOpen}
         onOk={handleSaveResources}
         onCancel={() => setResourceModalOpen(false)}
@@ -254,7 +254,15 @@ export default function CreatorSpaces() {
             onChange={(targetKeys) => setSelectedResourceIds(targetKeys as string[])}
             render={(item) => (
               <div className="flex items-center">
-                <Image src={item.url} alt={item.title} width={50} height={50} />
+                <div className="w-12 h-12">
+                  <Image
+                    className="object-contain"
+                    src={item.url}
+                    alt={item.title}
+                    width={48}
+                    height={48}
+                  />
+                </div>
                 <div className="ml-2">
                   <div>{item.title}</div>
                   <div className="text-xs text-gray-400">{item.description}</div>

@@ -7,6 +7,7 @@ import (
 	"valley-server/internal/database"
 	"valley-server/internal/logger"
 	"valley-server/internal/model"
+	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -16,7 +17,6 @@ import (
 // CreatorWithStats 带统计数据的创作者
 type CreatorWithStats struct {
 	model.Creator
-	SpaceCount    int    `json:"spaceCount"`    // 空间数量
 	ResourceCount int    `json:"resourceCount"` // 资源数量
 	DownloadCount int    `json:"downloadCount"` // 下载量
 	Username      string `json:"username"`      // 用户名
@@ -107,11 +107,6 @@ func ListCreators(c *gin.Context) {
 			creatorsWithStats[i].UserNickname = user.Nickname
 		}
 
-		// 统计空间数量
-		var spaceCount int64
-		db.Model(&model.CreatorSpace{}).Where("creator_id = ?", creator.ID).Count(&spaceCount)
-		creatorsWithStats[i].SpaceCount = int(spaceCount)
-
 		// 统计资源数量（Resource.CreatorID 存储的是 User.ID，不是 Creator.ID）
 		var resourceCount int64
 		db.Model(&model.Resource{}).Where("creator_id = ?", creator.UserID).Count(&resourceCount)
@@ -147,7 +142,6 @@ func CreateCreator(c *gin.Context) {
 	// 请求参数结构
 	type CreateCreatorRequest struct {
 		UserID      string `json:"userId" binding:"required"`
-		Name        string `json:"name" binding:"required"`
 		Description string `json:"description"`
 		Avatar      string `json:"avatar"`
 		IsActive    *bool  `json:"isActive"`
@@ -185,24 +179,65 @@ func CreateCreator(c *gin.Context) {
 		isActive = *req.IsActive
 	}
 
-	// 创建创作者
-	creator := model.Creator{
-		UserID:      userID,
-		Name:        req.Name,
-		Description: req.Description,
-		Avatar:      req.Avatar,
-		IsActive:    isActive,
+	// 生成唯一的创作者口令（最多尝试10次）
+	var code string
+	for i := range 10 {
+		code = utils.GenerateCode()
+
+		// 检查口令是否已存在
+		var existingCreatorByCode model.Creator
+		if err := db.Where("code = ?", code).First(&existingCreatorByCode).Error; err == gorm.ErrRecordNotFound {
+			// 口令不存在，可以使用
+			break
+		}
+
+		// 如果是最后一次尝试仍然重复，返回错误
+		if i == 9 {
+			Error(c, 500, "生成唯一口令失败，请重试")
+			return
+		}
 	}
 
-	if err := db.Create(&creator).Error; err != nil {
-		Error(c, 500, "创建创作者失败")
+	// 使用事务创建创作者和默认空间
+	var creator model.Creator
+	err := db.Transaction(func(tx *gorm.DB) error {
+		// 创建创作者（名称使用用户昵称,不单独存储）
+		creator = model.Creator{
+			UserID:      userID,
+			Description: req.Description,
+			Avatar:      req.Avatar,
+			IsActive:    isActive,
+			Code:        code,
+		}
+
+		if err := tx.Create(&creator).Error; err != nil {
+			return err
+		}
+
+		// 自动创建默认空间（空间使用创作者名称和口令，不需要单独的标题）
+		space := model.CreatorSpace{
+			CreatorID:   creator.ID,
+			Description: req.Description,
+			Banner:      req.Avatar, // 使用创作者头像作为默认横幅
+			IsActive:    true,
+			ViewCount:   0,
+		}
+
+		if err := tx.Create(&space).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		Error(c, 500, "创建创作者失败: "+err.Error())
 		return
 	}
 
 	// 返回创建的创作者（带统计数据）
 	result := CreatorWithStats{
 		Creator:       creator,
-		SpaceCount:    0,
 		ResourceCount: 0,
 		DownloadCount: 0,
 	}
@@ -273,9 +308,11 @@ func GetCreatorDetail(c *gin.Context) {
 		"user_id":    creator.UserID,
 	})
 
-	// 统计空间数量
-	var spaceCount int64
-	db.Model(&model.CreatorSpace{}).Where("creator_id = ?", creator.ID).Count(&spaceCount)
+	// 查询用户信息
+	var user model.User
+	if err := db.Where("id = ?", creator.UserID).First(&user).Error; err == nil {
+		// 成功查到用户
+	}
 
 	// 统计资源数量（Resource.CreatorID 存储的是 User.ID，不是 Creator.ID）
 	var resourceCount int64
@@ -287,7 +324,6 @@ func GetCreatorDetail(c *gin.Context) {
 
 	logger.Info(c, "Creator detail retrieved successfully", logrus.Fields{
 		"creator_id":     creator.ID,
-		"space_count":    spaceCount,
 		"resource_count": resourceCount,
 		"download_count": downloadCount,
 	})
@@ -295,9 +331,10 @@ func GetCreatorDetail(c *gin.Context) {
 	// 返回详情
 	result := CreatorWithStats{
 		Creator:       creator,
-		SpaceCount:    int(spaceCount),
 		ResourceCount: int(resourceCount),
 		DownloadCount: int(downloadCount),
+		Username:      user.Username,
+		UserNickname:  user.Nickname,
 	}
 
 	Success(c, result)
@@ -329,8 +366,8 @@ func UpdateCreator(c *gin.Context) {
 	}
 
 	// 请求参数结构
+	// 注意：创作者名称使用用户昵称，不能单独修改
 	type UpdateCreatorRequest struct {
-		Name        string `json:"name"`
 		Description string `json:"description"`
 		Avatar      string `json:"avatar"`
 		IsActive    *bool  `json:"isActive"`
@@ -356,9 +393,6 @@ func UpdateCreator(c *gin.Context) {
 	// 构建更新数据
 	updates := make(map[string]interface{})
 
-	if req.Name != "" {
-		updates["name"] = req.Name
-	}
 	if req.Description != "" {
 		updates["description"] = req.Description
 	}
@@ -378,10 +412,6 @@ func UpdateCreator(c *gin.Context) {
 	// 重新查询以获取最新数据
 	db.First(&creator, "id = ?", creatorID)
 
-	// 统计空间数量
-	var spaceCount int64
-	db.Model(&model.CreatorSpace{}).Where("creator_id = ?", creator.ID).Count(&spaceCount)
-
 	// 统计资源数量
 	var resourceCount int64
 	db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
@@ -393,7 +423,6 @@ func UpdateCreator(c *gin.Context) {
 	// 返回更新后的创作者
 	result := CreatorWithStats{
 		Creator:       creator,
-		SpaceCount:    int(spaceCount),
 		ResourceCount: int(resourceCount),
 		DownloadCount: int(downloadCount),
 	}
@@ -489,10 +518,6 @@ func ToggleCreatorStatus(c *gin.Context) {
 		return
 	}
 
-	// 统计空间数量
-	var spaceCount int64
-	db.Model(&model.CreatorSpace{}).Where("creator_id = ?", creator.ID).Count(&spaceCount)
-
 	// 统计资源数量
 	var resourceCount int64
 	db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
@@ -504,7 +529,6 @@ func ToggleCreatorStatus(c *gin.Context) {
 	// 返回更新后的创作者
 	result := CreatorWithStats{
 		Creator:       creator,
-		SpaceCount:    int(spaceCount),
 		ResourceCount: int(resourceCount),
 		DownloadCount: int(downloadCount),
 	}

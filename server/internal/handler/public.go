@@ -55,7 +55,8 @@ func VerifyCode(c *gin.Context) {
 	// 4. 查询创作者（只查询已激活的），预加载空间信息
 	var creator model.Creator
 	err := db.Where("code = ? AND is_active = ?", normalizedCode, true).
-		Preload("Space").      // 预加载空间信息
+		Preload("User").            // 预加载用户信息（用于获取昵称）
+		Preload("Space").           // 预加载空间信息
 		Preload("Space.Resources"). // 预加载空间资源
 		First(&creator).Error
 
@@ -86,11 +87,16 @@ func VerifyCode(c *gin.Context) {
 	db.Create(&accessLog)
 
 	// 7. 返回创作者和空间信息
+	creatorName := ""
+	if creator.User != nil {
+		creatorName = creator.User.Nickname
+	}
+
 	response := gin.H{
 		"valid": true,
 		"creator": gin.H{
 			"id":          creator.ID,
-			"name":        creator.Name,
+			"name":        creatorName,
 			"avatar":      creator.Avatar,
 			"description": creator.Description,
 			"code":        creator.Code,
@@ -100,7 +106,6 @@ func VerifyCode(c *gin.Context) {
 	if creator.Space != nil {
 		response["space"] = gin.H{
 			"id":            creator.Space.ID,
-			"title":         creator.Space.Title,
 			"description":   creator.Space.Description,
 			"banner":        creator.Space.Banner,
 			"resourceCount": resourceCount,

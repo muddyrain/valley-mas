@@ -15,8 +15,6 @@ type SpaceWithStats struct {
 	DownloadCount int `json:"downloadCount"` // 下载次数
 }
 
-
-
 // ListCreatorSpaces 获取创作者的空间（一个创作者只有一个空间）
 // @Summary      获取创作者的空间
 // @Description  查看指定创作者的空间
@@ -84,15 +82,15 @@ func ListCreatorSpaces(c *gin.Context) {
 }
 
 // CreateCreatorSpace 创建或更新创作者空间（一个创作者只有一个空间）
-// @Summary      创建或更新创作者空间
-// @Description  为创作者创建或更新空间
+// @Summary      更新创作者空间信息
+// @Description  更新创作者空间的描述、横幅等信息（空间标题使用创作者名称）
 // @Tags         管理后台 - 创作者空间管理
 // @Accept       json
 // @Produce      json
 // @Security     Bearer
 // @Param        creatorId  path  string  true  "创作者ID"
 // @Param        space      body  object  true  "空间信息"
-// @Success      200  {object}  map[string]interface{}  "创建成功"
+// @Success      200  {object}  map[string]interface{}  "更新成功"
 // @Failure      401  {object}  map[string]interface{}  "未登录"
 // @Failure      403  {object}  map[string]interface{}  "无权限"
 // @Router       /admin/creators/{creatorId}/spaces [post]
@@ -122,7 +120,7 @@ func CreateCreatorSpace(c *gin.Context) {
 	}
 
 	type CreateSpaceRequest struct {
-		Title       string   `json:"title" binding:"required"`
+		// Title 字段已移除，空间标题使用创作者名称
 		Description string   `json:"description"`
 		Banner      string   `json:"banner"`
 		IsActive    *bool    `json:"isActive"`
@@ -146,8 +144,7 @@ func CreateCreatorSpace(c *gin.Context) {
 
 	var space model.CreatorSpace
 	if err == nil {
-		// 更新现有空间
-		existingSpace.Title = req.Title
+		// 更新现有空间（不更新标题，标题永远使用创作者名称）
 		existingSpace.Description = req.Description
 		existingSpace.Banner = req.Banner
 		existingSpace.IsActive = isActive
@@ -157,10 +154,9 @@ func CreateCreatorSpace(c *gin.Context) {
 			return
 		}
 	} else {
-		// 创建新空间
+		// 创建新空间（不需要标题，使用创作者名称作为标识）
 		space = model.CreatorSpace{
 			CreatorID:   creatorID,
-			Title:       req.Title,
 			Description: req.Description,
 			Banner:      req.Banner,
 			IsActive:    isActive,
@@ -274,7 +270,7 @@ func GetCreatorSpaceDetail(c *gin.Context) {
 
 // UpdateCreatorSpace 更新空间信息
 // @Summary      更新空间信息
-// @Description  更新空间的标题、描述等信息
+// @Description  更新空间的描述、横幅等信息（标题使用创作者名称，不可单独修改）
 // @Tags         管理后台 - 创作者空间管理
 // @Accept       json
 // @Produce      json
@@ -321,7 +317,7 @@ func UpdateCreatorSpace(c *gin.Context) {
 	}
 
 	type UpdateSpaceRequest struct {
-		Title       string `json:"title"`
+		// Title 字段已移除，空间标题永远使用创作者名称
 		Description string `json:"description"`
 		Banner      string `json:"banner"`
 		IsActive    *bool  `json:"isActive"`
@@ -334,9 +330,7 @@ func UpdateCreatorSpace(c *gin.Context) {
 	}
 
 	updates := make(map[string]interface{})
-	if req.Title != "" {
-		updates["title"] = req.Title
-	}
+	// 不再更新标题，标题永远使用创作者名称
 	if req.Description != "" {
 		updates["description"] = req.Description
 	}
@@ -371,9 +365,9 @@ func UpdateCreatorSpace(c *gin.Context) {
 	Success(c, result)
 }
 
-// DeleteCreatorSpace 删除空间
-// @Summary      删除空间
-// @Description  删除创作者空间（软删除）
+// DeleteCreatorSpace 删除空间（已禁用 - 空间与创作者绑定，不可单独删除）
+// @Summary      删除空间（已禁用）
+// @Description  空间与创作者是一对一绑定关系，不可单独删除
 // @Tags         管理后台 - 创作者空间管理
 // @Accept       json
 // @Produce      json
@@ -384,46 +378,9 @@ func UpdateCreatorSpace(c *gin.Context) {
 // @Failure      403  {object}  map[string]interface{}  "无权限"
 // @Router       /admin/creators/{creatorId}/spaces [delete]
 func DeleteCreatorSpace(c *gin.Context) {
-	db := database.DB
-	creatorIDStr := c.Param("id")
-
-	var creatorID model.Int64String
-	if err := creatorID.Scan(creatorIDStr); err != nil {
-		Error(c, 400, "创作者ID格式错误")
-		return
-	}
-
-	var creator model.Creator
-	if err := db.First(&creator, "id = ?", creatorID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			Error(c, 404, "创作者不存在")
-		} else {
-			Error(c, 500, "查询创作者失败")
-		}
-		return
-	}
-
-	if !CheckCreatorPermission(c, &creator) {
-		Error(c, 403, "无权删除其他创作者的空间")
-		return
-	}
-
-	var space model.CreatorSpace
-	if err := db.Where("creator_id = ?", creatorID).First(&space).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			Error(c, 404, "空间不存在")
-		} else {
-			Error(c, 500, "查询空间失败")
-		}
-		return
-	}
-
-	if err := db.Delete(&space).Error; err != nil {
-		Error(c, 500, "删除空间失败")
-		return
-	}
-
-	Success(c, gin.H{"message": "删除成功"})
+	// 空间与创作者是一对一绑定关系，不可单独删除
+	// 如需删除空间，请删除对应的创作者
+	Error(c, 400, "空间与创作者绑定，不可单独删除。如需删除，请删除对应的创作者。")
 }
 
 // AddResourcesToSpace 为空间添加资源
@@ -491,7 +448,8 @@ func AddResourcesToSpace(c *gin.Context) {
 			continue
 		}
 		var resource model.Resource
-		if err := db.First(&resource, "id = ? AND creator_id = ?", resourceID, creator.UserID).Error; err == nil {
+		// 管理员可以添加任何资源到空间,不限制为创作者自己上传的资源
+		if err := db.First(&resource, "id = ?", resourceID).Error; err == nil {
 			resources = append(resources, resource)
 		}
 	}

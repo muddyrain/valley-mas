@@ -40,7 +40,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 		{
 			public.GET("/space/:code", handler.GetCreatorSpace)             // 新增：获取创作者空间
 			public.POST("/resource/:id/download", handler.DownloadResource) // 新增：下载资源
-			public.GET("/hot-creators", handler.GetHotCreators)          // 新增：获取热门创作者
+			public.GET("/hot-creators", handler.GetHotCreators)             // 新增：获取热门创作者
 		}
 
 		// 旧的公开接口（保留兼容）
@@ -110,11 +110,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.GET("/trends", handler.GetTrends)
 
 				// 全局记录管理（仅管理员）
+				// 注意：资源上传信息可以直接在资源管理页面查看，不需要单独的上传记录
 				adminOnly.GET("/records/downloads", handler.ListDownloadRecords)
-				adminOnly.GET("/records/uploads", handler.ListUploadRecords)
-			}
-
-			// ========== 创作者和管理员共享接口 ==========
+			} // ========== 创作者和管理员共享接口 ==========
 			content := admin.Group("")
 			content.Use(middleware.CreatorOrAdmin())
 			{

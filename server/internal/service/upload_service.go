@@ -24,7 +24,6 @@ type UploadConfig struct {
 	UserID       int64      // 用户ID
 	MaxSize      int64      // 最大文件大小(MB)
 	AllowedExts  []string   // 允许的文件扩展名
-	UseUserPath  bool       // 是否使用用户目录
 	CustomFolder string     // 自定义文件夹（可选）
 }
 
@@ -56,30 +55,26 @@ func GetDefaultConfig(uploadType UploadType) UploadConfig {
 			Type:        UploadTypeAvatar,
 			MaxSize:     2, // 2MB
 			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
-			UseUserPath: false, // 头像不按用户分类
 		},
 		UploadTypeWallpaper: {
 			Type:        UploadTypeWallpaper,
 			MaxSize:     5, // 5MB
 			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
-			UseUserPath: true, // 壁纸按用户分类
 		},
 		UploadTypeCover: {
 			Type:        UploadTypeCover,
 			MaxSize:     3, // 3MB
 			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
-			UseUserPath: false,
 		},
 	}
 
 	config, exists := configs[uploadType]
 	if !exists {
-		// 默认配置
+		// 默认配置 - 统一按日期分类
 		return UploadConfig{
 			Type:        uploadType,
 			MaxSize:     5,
 			AllowedExts: []string{".jpg", ".jpeg", ".png"},
-			UseUserPath: false,
 		}
 	}
 
@@ -87,35 +82,36 @@ func GetDefaultConfig(uploadType UploadType) UploadConfig {
 }
 
 // GenerateStoragePath 生成存储路径
-// 标准路径格式：
-// - 按用户分类：{type}/users/{userId}/YYYYMM/{filename}
-// - 不分类：{type}/YYYYMM/{filename}
-// - 自定义：{customFolder}/{filename}
+// 标准路径格式（用户优先 + 日期分类）：
+// - 标准路径：users/{userId}/{type}/{YYYYMMDD}/{filename}
+// - 匿名用户：anonymous/{type}/{YYYYMMDD}/{filename}
+// - 自定义路径：{customFolder}/{filename}
 func (s *UploadService) GenerateStoragePath(config UploadConfig, fileName string) string {
 	ext := strings.ToLower(filepath.Ext(fileName))
 	timestamp := time.Now().UnixNano()
 	newFileName := fmt.Sprintf("%d%s", timestamp, ext)
 
-	// 如果有自定义文件夹
+	// 自定义文件夹（优先级最高）
 	if config.CustomFolder != "" {
 		return fmt.Sprintf("%s/%s", config.CustomFolder, newFileName)
 	}
 
-	// 日期文件夹（按年月分类，便于管理）
-	dateFolder := time.Now().Format("200601") // YYYYMM
+	// 日期文件夹（统一按年月日分类）
+	dateFolder := time.Now().Format("20060102") // YYYYMMDD
 
-	// 按用户分类
-	if config.UseUserPath && config.UserID > 0 {
-		return fmt.Sprintf("%s/users/%d/%s/%s",
+	// 必须有用户ID才能上传
+	if config.UserID <= 0 {
+		// 匿名用户（理论上不会出现，因为上传需要登录）
+		return fmt.Sprintf("anonymous/%s/%s/%s",
 			config.Type,
-			config.UserID,
 			dateFolder,
 			newFileName,
 		)
 	}
 
-	// 不按用户分类
-	return fmt.Sprintf("%s/%s/%s",
+	// 标准路径：users/{userId}/{type}/{YYYYMMDD}/{filename}
+	return fmt.Sprintf("users/%d/%s/%s/%s",
+		config.UserID,
 		config.Type,
 		dateFolder,
 		newFileName,

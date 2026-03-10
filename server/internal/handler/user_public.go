@@ -2,10 +2,12 @@ package handler
 
 import (
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 // GetCreatorSpace 获取创作者空间信息（公开接口，用户端）
@@ -26,6 +28,7 @@ func GetCreatorSpace(c *gin.Context) {
 	// 查找创作者
 	var creator model.Creator
 	if err := db.Where("code = ? AND is_active = ?", code, true).
+		Preload("User"). // 预加载用户信息
 		Preload("Space").
 		Preload("Space.Resources").
 		First(&creator).Error; err != nil {
@@ -49,10 +52,15 @@ func GetCreatorSpace(c *gin.Context) {
 	db.Model(&model.CodeAccessLog{}).Where("creator_id = ?", creator.ID).Count(&totalViews)
 	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", creator.ID).Count(&totalDownloads)
 
+	creatorName := ""
+	if creator.User != nil {
+		creatorName = creator.User.Nickname
+	}
+
 	response := gin.H{
 		"creator": gin.H{
 			"id":          creator.ID,
-			"name":        creator.Name,
+			"name":        creatorName,
 			"avatar":      creator.Avatar,
 			"description": creator.Description,
 			"code":        creator.Code,
@@ -66,7 +74,6 @@ func GetCreatorSpace(c *gin.Context) {
 	if creator.Space != nil {
 		response["space"] = gin.H{
 			"id":          creator.Space.ID,
-			"title":       creator.Space.Title,
 			"description": creator.Space.Description,
 			"banner":      creator.Space.Banner,
 		}
@@ -78,7 +85,7 @@ func GetCreatorSpace(c *gin.Context) {
 
 // DownloadResource 下载资源（公开接口，暂时不需要广告令牌）
 // @Summary      下载资源
-// @Description  用户下载资源，记录下载行为
+// @Description  用户下载资源，记录下载行为，增加创作者下载量统计
 // @Tags         用户端 - 公开接口
 // @Accept       json
 // @Produce      json
@@ -93,24 +100,61 @@ func DownloadResource(c *gin.Context) {
 
 	// 查找资源
 	var resource model.Resource
-	if err := db.Preload("Creator").First(&resource, "id = ?", resourceID).Error; err != nil {
+	if err := db.First(&resource, "id = ?", resourceID).Error; err != nil {
 		Error(c, 404, "资源不存在")
 		return
+	}
+
+	// 根据资源的 CreatorID (User.ID) 查找对应的 Creator
+	var creator model.Creator
+	if err := db.Where("user_id = ?", resource.CreatorID).First(&creator).Error; err != nil {
+		ErrorWithDetail(c, 500, "查询创作者信息失败", err, logrus.Fields{
+			"resource_id":     resourceID,
+			"creator_user_id": resource.CreatorID,
+		})
+		return
+	}
+
+	// 获取当前用户ID（如果已登录）
+	var userID model.Int64String
+	if uid, exists := c.Get("userId"); exists {
+		if id, ok := uid.(int64); ok {
+			userID = model.Int64String(id)
+		}
 	}
 
 	// 记录下载行为
 	downloadRecord := model.DownloadRecord{
 		ID:         model.Int64String(utils.GenerateID()),
-		UserID:     model.Int64String(0), // 暂时没有用户系统，后续接入
+		UserID:     userID, // 如果未登录则为 0
 		ResourceID: resource.ID,
-		CreatorID:  resource.CreatorID,
+		CreatorID:  creator.ID, // 使用 Creator.ID 而不是 User.ID
 		IP:         c.ClientIP(),
 		UserAgent:  c.GetHeader("User-Agent"),
 	}
-	db.Create(&downloadRecord)
 
-	// 增加下载次数
+	if err := db.Create(&downloadRecord).Error; err != nil {
+		ErrorWithDetail(c, 500, "创建下载记录失败", err, logrus.Fields{
+			"resource_id": resourceID,
+			"user_id":     userID,
+			"creator_id":  creator.ID,
+		})
+		// 记录失败不影响下载，继续返回下载链接
+		logger.Warn(c, "Failed to create download record, but continue download", logrus.Fields{
+			"resource_id": resourceID,
+			"error":       err.Error(),
+		})
+	}
+
+	// 增加资源下载次数
 	db.Model(&resource).Update("download_count", resource.DownloadCount+1)
+
+	logger.Info(c, "Resource downloaded", logrus.Fields{
+		"resource_id":    resourceID,
+		"user_id":        userID,
+		"creator_id":     creator.ID,
+		"download_count": resource.DownloadCount + 1,
+	})
 
 	// 返回下载链接（直接返回 TOS URL）
 	Success(c, gin.H{
