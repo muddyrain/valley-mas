@@ -41,7 +41,7 @@ export default defineAppConfig({
   window: {
     backgroundTextStyle: 'light',
     navigationBarBackgroundColor: '#7B61FF',
-    navigationBarTitleText: '神图壁纸',
+    navigationBarTitleText: '山谷神图',
     navigationBarTextStyle: 'white',
   },
 });

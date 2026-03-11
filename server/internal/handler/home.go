@@ -240,3 +240,114 @@ func GetHotCreators(c *gin.Context) {
 		},
 	})
 }
+
+// HotResourceResponse 热门资源响应
+type HotResourceResponse struct {
+	ID            string `json:"id"`
+	Title         string `json:"title"`
+	Type          string `json:"type"`
+	URL           string `json:"url"`
+	ThumbnailURL  string `json:"thumbnailUrl"`
+	Size          int64  `json:"size"`
+	DownloadCount int64  `json:"downloadCount"`
+	CreatorID     string `json:"creatorId"`
+	CreatorName   string `json:"creatorName"`
+	CreatorAvatar string `json:"creatorAvatar"`
+	CreatedAt     string `json:"createdAt"`
+}
+
+// GetHotResources 获取热门资源
+// @Summary 获取热门资源
+// @Description 获取热门资源列表，按下载量排序
+// @Tags 公共接口
+// @Accept json
+// @Produce json
+// @Param page query int false "页码" default(1)
+// @Param pageSize query int false "每页数量" default(10)
+// @Success 200 {object} Response{data=object{list=[]HotResourceResponse,total=int64,page=int,pageSize=int}}
+// @Router /api/v1/public/hot-resources [get]
+func GetHotResources(c *gin.Context) {
+	db := database.GetDB()
+
+	// 解析分页参数
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 10
+	}
+	if pageSize > 50 {
+		pageSize = 50
+	}
+
+	offset := (page - 1) * pageSize
+
+	// 查询总数（只统计有下载量的资源）
+	var total int64
+	db.Model(&model.Resource{}).
+		Where("deleted_at IS NULL AND download_count > 0").
+		Count(&total)
+
+	// 查询热门资源，按下载量排序
+	var resources []model.Resource
+	err := db.Where("deleted_at IS NULL AND download_count > 0").
+		Order("download_count DESC, created_at DESC").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&resources).Error
+
+	if err != nil {
+		c.JSON(500, gin.H{
+			"code":    500,
+			"message": "查询失败: " + err.Error(),
+		})
+		return
+	}
+
+	// 构建响应数据
+	response := make([]HotResourceResponse, 0, len(resources))
+	for _, resource := range resources {
+		// 获取创作者信息
+		var creator model.Creator
+		var creatorName string
+		var creatorAvatar string
+
+		if err := db.Where("id = ? AND deleted_at IS NULL", resource.CreatorID).
+			First(&creator).Error; err == nil {
+			// 获取创作者的用户信息
+			var user model.User
+			if err := db.Where("id = ? AND deleted_at IS NULL", creator.UserID).
+				First(&user).Error; err == nil {
+				creatorName = user.Nickname
+			}
+			creatorAvatar = creator.Avatar
+		}
+
+		response = append(response, HotResourceResponse{
+			ID:            fmt.Sprintf("%d", resource.ID),
+			Title:         resource.Title,
+			Type:          resource.Type,
+			URL:           resource.URL,
+			ThumbnailURL:  resource.ThumbnailURL,
+			Size:          resource.Size,
+			DownloadCount: int64(resource.DownloadCount),
+			CreatorID:     fmt.Sprintf("%d", resource.CreatorID),
+			CreatorName:   creatorName,
+			CreatorAvatar: creatorAvatar,
+			CreatedAt:     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+
+	c.JSON(200, gin.H{
+		"code":    0,
+		"message": "获取成功",
+		"data": gin.H{
+			"list":     response,
+			"total":    total,
+			"page":     page,
+			"pageSize": pageSize,
+		},
+	})
+}

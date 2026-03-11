@@ -210,3 +210,95 @@ func GetMyDownloads(c *gin.Context) {
 		"total": total,
 	})
 }
+
+// GetCreatorResourcesList 获取创作者的资源列表（公开接口）
+// @Summary      获取创作者资源列表
+// @Description  通过创作者ID获取该创作者的所有资源
+// @Tags         用户端 - 公开接口
+// @Accept       json
+// @Produce      json
+// @Param        id        path   string  true   "创作者ID"
+// @Param        page      query  int     false  "页码"      default(1)
+// @Param        pageSize  query  int     false  "每页数量"  default(20)
+// @Param        type      query  string  false  "资源类型(avatar/wallpaper)"
+// @Success      200  {object}  map[string]interface{}  "资源列表"
+// @Failure      404  {object}  map[string]interface{}  "创作者不存在"
+// @Router       /public/creators/{id}/resources [get]
+func GetCreatorResourcesList(c *gin.Context) {
+	creatorID := c.Param("id")
+	page := GetIntQuery(c, "page", 1)
+	pageSize := GetIntQuery(c, "pageSize", 20)
+	resourceType := c.Query("type")
+
+	if pageSize > 50 {
+		pageSize = 50
+	}
+	offset := (page - 1) * pageSize
+
+	db := database.GetDB()
+
+	// 验证创作者是否存在
+	var creator model.Creator
+	if err := db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", creatorID, true).
+		First(&creator).Error; err != nil {
+		Error(c, 404, "创作者不存在或未激活")
+		return
+	}
+
+	// 查询资源
+	query := db.Model(&model.Resource{}).
+		Where("creator_id = ? AND deleted_at IS NULL", creator.UserID)
+
+	// 按类型筛选
+	if resourceType != "" {
+		query = query.Where("type = ?", resourceType)
+	}
+
+	// 统计总数
+	var total int64
+	query.Count(&total)
+
+	// 查询资源列表
+	var resources []model.Resource
+	err := query.Order("created_at DESC").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&resources).Error
+
+	if err != nil {
+		Error(c, 500, "查询失败: "+err.Error())
+		return
+	}
+
+	// 获取创作者名称
+	var creatorName string
+	var user model.User
+	if err := db.Where("id = ?", creator.UserID).First(&user).Error; err == nil {
+		creatorName = user.Nickname
+	}
+
+	// 构建响应
+	resourceList := make([]gin.H, 0, len(resources))
+	for _, resource := range resources {
+		resourceList = append(resourceList, gin.H{
+			"id":            resource.ID,
+			"title":         resource.Title,
+			"type":          resource.Type,
+			"url":           resource.URL,
+			"thumbnailUrl":  resource.ThumbnailURL,
+			"size":          resource.Size,
+			"downloadCount": resource.DownloadCount,
+			"creatorId":     creator.ID,
+			"creatorName":   creatorName,
+			"creatorAvatar": creator.Avatar,
+			"createdAt":     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+
+	Success(c, gin.H{
+		"list":     resourceList,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+	})
+}
