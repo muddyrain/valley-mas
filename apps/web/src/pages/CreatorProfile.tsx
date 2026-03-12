@@ -1,19 +1,22 @@
 import {
   ArrowLeft,
-  Folder,
+  Award,
+  Download,
+  Eye,
+  Heart,
   Image as ImageIcon,
   Search,
   Share2,
+  Sparkles,
   UserCheck,
   UserPlus,
+  Users,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  type Album,
   type Creator,
   followCreator,
-  getCreatorAlbums,
   getCreatorByCode,
   getCreatorWorks,
   type Resource,
@@ -27,14 +30,18 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const categories = ['全部', '壁纸', '头像', '表情包', '背景图'];
+// 分类映射:中文名 -> 后端类型
+const categories = [
+  { label: '全部', value: '' },
+  { label: '壁纸', value: 'wallpaper' },
+  { label: '头像', value: 'avatar' },
+];
 
 export default function CreatorProfile() {
   const { code } = useParams<{ code: string }>();
   const [creator, setCreator] = useState<Creator | null>(null);
   const [works, setWorks] = useState<Resource[]>([]);
-  const [albums, setAlbums] = useState<Album[]>([]);
-  const [activeCategory, setActiveCategory] = useState('全部');
+  const [activeCategory, setActiveCategory] = useState(''); // 存储实际的type值
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -49,13 +56,12 @@ export default function CreatorProfile() {
         const creatorData = await getCreatorByCode(code);
         setCreator(creatorData);
 
-        const [worksData, albumsData] = await Promise.all([
-          getCreatorWorks(creatorData.id),
-          getCreatorAlbums(creatorData.id),
-        ]);
-
+        // 只加载作品,暂时不加载专辑(后端未实现)
+        const worksData = await getCreatorWorks(creatorData.id);
         setWorks(worksData.list);
-        setAlbums(albumsData.list);
+        // 暂时注释掉专辑加载
+        // const albumsData = await getCreatorAlbums(creatorData.id);
+        // setAlbums(albumsData.list);
       } catch (error) {
         console.error('加载创作者数据失败:', error);
       } finally {
@@ -86,26 +92,48 @@ export default function CreatorProfile() {
     if (!creator) return;
 
     try {
-      const params: { keyword?: string; category?: string } = {};
+      const params: { keyword?: string; type?: string } = {};
       if (searchKeyword) params.keyword = searchKeyword;
-      if (activeCategory !== '全部') params.category = activeCategory;
+      // 只有当activeCategory不为空时才传type参数
+      if (activeCategory) params.type = activeCategory;
 
       if (activeTab === 'works') {
         const data = await getCreatorWorks(creator.id, params);
         setWorks(data.list);
-      } else {
-        const data = await getCreatorAlbums(creator.id, { keyword: searchKeyword });
-        setAlbums(data.list);
       }
+      // 暂时注释掉专辑搜索(后端未实现)
+      // else {
+      //   const data = await getCreatorAlbums(creator.id, { keyword: searchKeyword });
+      //   setAlbums(data.list);
+      // }
     } catch (error) {
       console.error('搜索失败:', error);
     }
   };
 
+  // 切换分类的处理函数
+  const handleCategoryChange = (categoryValue: string) => {
+    setActiveCategory(categoryValue);
+    // 立即触发搜索
+    setTimeout(async () => {
+      if (!creator) return;
+      try {
+        const params: { keyword?: string; type?: string } = {};
+        if (searchKeyword) params.keyword = searchKeyword;
+        if (categoryValue) params.type = categoryValue;
+
+        const data = await getCreatorWorks(creator.id, params);
+        setWorks(data.list);
+      } catch (error) {
+        console.error('筛选失败:', error);
+      }
+    }, 0);
+  };
+
   if (loading) {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-gray-50">
-        <div className="bg-gradient-to-r from-purple-600 to-purple-800">
+        <div className="bg-linear-to-r from-purple-600 to-purple-800">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="flex items-center gap-6">
               <Skeleton className="h-24 w-24 rounded-full" />
@@ -140,172 +168,273 @@ export default function CreatorProfile() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gray-50">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-800 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-            <Avatar className="h-20 w-20 md:h-24 md:w-24 border-4 border-white/30 shadow-xl">
-              <AvatarImage src={creator.avatar} />
-              <AvatarFallback className="bg-white/20 text-2xl md:text-3xl font-bold">
-                {creator.name[0]}
-              </AvatarFallback>
-            </Avatar>
+    <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-50 via-purple-50/30 to-indigo-50/30">
+      {/* Hero Banner with Glassmorphism */}
+      <div className="relative overflow-hidden">
+        {/* Animated Background */}
+        <div className="absolute inset-0 bg-linear-to-br from-purple-600 via-indigo-600 to-purple-800">
+          <div className="absolute inset-0 opacity-20">
+            <div className="absolute top-0 -left-4 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob" />
+            <div className="absolute top-0 -right-4 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000" />
+            <div className="absolute -bottom-8 left-20 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000" />
+          </div>
+        </div>
 
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl md:text-3xl font-bold">{creator.name}</h1>
-              <p className="text-purple-100 mt-2 text-sm md:text-base line-clamp-2">
-                {creator.description || '暂无简介'}
-              </p>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+          {/* Back Button */}
+          <Button
+            variant="ghost"
+            onClick={() => window.history.back()}
+            className="mb-6 text-white/90 hover:text-white hover:bg-white/10 backdrop-blur-sm"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            返回
+          </Button>
 
-              <div className="flex items-center gap-6 mt-4 text-sm md:text-base">
-                <div className="text-center">
-                  <span className="font-bold text-xl md:text-2xl">{creator.resourceCount}</span>
-                  <span className="text-purple-200 ml-1">作品</span>
-                </div>
-                <div className="text-center">
-                  <span className="font-bold text-xl md:text-2xl">{albums.length}</span>
-                  <span className="text-purple-200 ml-1">专辑</span>
-                </div>
-                <div className="text-center">
-                  <span className="font-bold text-xl md:text-2xl">{creator.followerCount}</span>
-                  <span className="text-purple-200 ml-1">粉丝</span>
-                </div>
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
+            {/* Avatar with Glow Effect */}
+            <div className="relative group">
+              <div className="absolute -inset-2 bg-linear-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full opacity-75 blur-xl group-hover:opacity-100 transition duration-500" />
+              <Avatar className="relative h-32 w-32 md:h-40 md:w-40 border-4 border-white/30 shadow-2xl ring-4 ring-purple-500/30">
+                <AvatarImage src={creator.avatar} className="object-cover" />
+                <AvatarFallback className="bg-linear-to-br from-purple-400 to-indigo-600 text-white text-4xl md:text-5xl font-bold">
+                  {creator.name[0]}
+                </AvatarFallback>
+              </Avatar>
+              {/* Badge */}
+              <div className="absolute -bottom-2 -right-2 bg-linear-to-r from-amber-400 to-orange-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
+                <Award className="h-3 w-3" />
+                认证创作者
               </div>
             </div>
 
-            <div className="flex gap-3 w-full md:w-auto">
-              <Button
-                onClick={handleFollow}
-                variant={isFollowing ? 'outline' : 'secondary'}
-                className={`flex-1 md:flex-none ${
-                  isFollowing
-                    ? 'border-white text-white hover:bg-white/10'
-                    : 'bg-white text-purple-600 hover:bg-gray-100'
-                }`}
-              >
-                {isFollowing ? (
-                  <>
-                    <UserCheck className="h-4 w-4 mr-2" /> 已关注
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="h-4 w-4 mr-2" /> 关注
-                  </>
-                )}
-              </Button>
-              <Button variant="outline" className="border-white text-white hover:bg-white/10 px-3">
-                <Share2 className="h-4 w-4" />
-              </Button>
+            <div className="flex-1 min-w-0 text-white">
+              <div className="flex items-center gap-3 mb-3">
+                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold drop-shadow-lg">
+                  {creator.name}
+                </h1>
+                <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30 px-3 py-1">
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  活跃
+                </Badge>
+              </div>
+
+              <p className="text-purple-100 text-base md:text-lg mb-6 max-w-2xl leading-relaxed drop-shadow">
+                {creator.description || '这是一个优秀的内容创作者,分享精美的设计作品'}
+              </p>
+
+              {/* Stats Cards */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 hover:bg-white/20 transition-all hover:scale-105">
+                  <div className="flex items-center gap-2 text-purple-200 mb-2">
+                    <ImageIcon className="h-4 w-4" />
+                    <span className="text-xs font-medium">作品</span>
+                  </div>
+                  <div className="text-2xl md:text-3xl font-bold">{creator.resourceCount}</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 hover:bg-white/20 transition-all hover:scale-105">
+                  <div className="flex items-center gap-2 text-purple-200 mb-2">
+                    <Download className="h-4 w-4" />
+                    <span className="text-xs font-medium">下载</span>
+                  </div>
+                  <div className="text-2xl md:text-3xl font-bold">{creator.downloadCount}</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 hover:bg-white/20 transition-all hover:scale-105">
+                  <div className="flex items-center gap-2 text-purple-200 mb-2">
+                    <Users className="h-4 w-4" />
+                    <span className="text-xs font-medium">粉丝</span>
+                  </div>
+                  <div className="text-2xl md:text-3xl font-bold">{creator.followerCount || 0}</div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  onClick={handleFollow}
+                  size="lg"
+                  variant={isFollowing ? 'ghost' : 'default'}
+                  className={`${
+                    isFollowing
+                      ? 'bg-white/20 hover:bg-white/30 text-white border-2 border-white/50 backdrop-blur-sm'
+                      : 'bg-white text-purple-600 hover:bg-gray-100 shadow-xl hover:shadow-2xl hover:scale-105'
+                  } font-semibold px-8 transition-all`}
+                >
+                  {isFollowing ? (
+                    <>
+                      <UserCheck className="h-5 w-5 mr-2" />
+                      已关注
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="h-5 w-5 mr-2" />
+                      关注创作者
+                    </>
+                  )}
+                </Button>
+                <Button
+                  size="lg"
+                  variant="ghost"
+                  className="border-2 border-white/50 text-white hover:bg-white/20 backdrop-blur-sm font-semibold px-6 bg-transparent"
+                >
+                  <Share2 className="h-5 w-5 mr-2" />
+                  分享
+                </Button>
+                <Button
+                  size="lg"
+                  variant="ghost"
+                  className="border-2 border-white/50 text-white hover:bg-white/20 backdrop-blur-sm font-semibold px-6 bg-transparent"
+                >
+                  <Heart className="h-5 w-5 mr-2" />
+                  喜欢
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6 bg-white border">
-            <TabsTrigger
-              value="works"
-              className="gap-2 data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700"
-            >
-              <ImageIcon className="h-4 w-4" />
-              作品
-            </TabsTrigger>
-            <TabsTrigger
-              value="albums"
-              className="gap-2 data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700"
-            >
-              <Folder className="h-4 w-4" />
-              专辑
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Search and Filter */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
-              {categories.map((category) => (
-                <Badge
-                  key={category}
-                  variant={activeCategory === category ? 'default' : 'outline'}
-                  className={`cursor-pointer whitespace-nowrap px-3 py-1.5 ${
-                    activeCategory === category
-                      ? 'bg-purple-600 hover:bg-purple-700'
-                      : 'hover:bg-gray-100'
-                  }`}
-                  onClick={() => {
-                    setActiveCategory(category);
-                    handleSearch();
-                  }}
-                >
-                  {category}
+      {/* Content Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Tabs with Modern Design */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className={'gap-4'}>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-2">
+            <TabsList className="bg-transparent border-0 gap-6">
+              <TabsTrigger
+                value="works"
+                className="data-[state=active]:bg-linear-to-r data-[state=active]:from-purple-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white rounded-xl px-6 py-3 font-semibold transition-all data-[state=active]:shadow-lg hover:bg-gray-50"
+              >
+                <ImageIcon className="h-5 w-5 mr-2" />
+                作品集
+                <Badge className="ml-2 bg-purple-100 text-purple-600 data-[state=active]:bg-white/20 data-[state=active]:text-white">
+                  {works.length}
                 </Badge>
-              ))}
-            </div>
-            <div className="flex gap-2 sm:ml-auto">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="搜索..."
-                  value={searchKeyword}
-                  onChange={(e) => setSearchKeyword(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="pl-9 w-full sm:w-48"
-                />
-              </div>
-              <Button onClick={handleSearch} variant="outline">
-                搜索
-              </Button>
-            </div>
+              </TabsTrigger>
+            </TabsList>
           </div>
 
-          <TabsContent value="works" className="mt-0">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {works.map((work) => (
-                <Card
-                  key={work.id}
-                  className="group overflow-hidden cursor-pointer transition-all hover:shadow-lg"
-                >
-                  <div className="aspect-[3/4] overflow-hidden bg-gray-100">
-                    <img
-                      src={work.thumbnailUrl || work.url}
-                      alt={work.title}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
+          <div className="flex flex-col flex-1">
+            {/* Search and Filter Section - Redesigned */}
+            <div className="mb-4 flex items-center justify-between bg-white rounded-2xl shadow-sm border border-gray-100 p-6 gap-8 w-full">
+              {/* Category Filter */}
+              <div className="flex flex-col w-1/2">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-6 bg-linear-to-b from-purple-600 to-indigo-600 rounded-full" />
+                    <h3 className="text-lg font-bold text-gray-900">分类筛选</h3>
                   </div>
-                  <CardContent className="p-3">
-                    <h3 className="font-medium text-gray-900 truncate">{work.title}</h3>
-                    <p className="text-sm text-gray-500 mt-1">{work.downloadCount} 次下载</p>
-                  </CardContent>
-                </Card>
-              ))}
+                  <span className="text-sm text-gray-500">{works.length} 个作品</span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {categories.map((category) => (
+                    <button
+                      type="button"
+                      key={category.value}
+                      onClick={() => handleCategoryChange(category.value)}
+                      className={`relative cursor-pointer px-6 py-3 rounded-xl font-medium text-sm transition-all duration-300 ${
+                        activeCategory === category.value
+                          ? 'bg-linear-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/30 scale-105'
+                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:scale-105'
+                      }`}
+                    >
+                      {activeCategory === category.value && (
+                        <div className="absolute inset-0 bg-linear-to-r from-purple-400 to-indigo-400 rounded-xl blur-lg opacity-50 -z-10" />
+                      )}
+                      <span className="relative z-10">{category.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Search Box */}
+              <div className="flex flex-col w-1/2">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1 h-6 bg-linear-to-b from-purple-600 to-indigo-600 rounded-full" />
+                  <h3 className="text-lg font-bold text-gray-900">搜索作品</h3>
+                </div>
+                <div className="relative">
+                  <div className="absolute left-5 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                    <Search className="h-5 w-5 text-purple-500" />
+                  </div>
+                  <Input
+                    type="text"
+                    placeholder="输入关键词搜索作品..."
+                    value={searchKeyword}
+                    onChange={(e) => setSearchKeyword(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    className="pl-14 pr-32 h-14 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-base transition-all"
+                  />
+                  <Button
+                    onClick={handleSearch}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-6 h-10 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all"
+                  >
+                    搜索
+                  </Button>
+                </div>
+              </div>
             </div>
-          </TabsContent>
 
-          <TabsContent value="albums" className="mt-0">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {albums.map((album) => (
-                <Card
-                  key={album.id}
-                  className="group overflow-hidden cursor-pointer transition-all hover:shadow-lg"
-                >
-                  <div className="aspect-square overflow-hidden bg-gray-100">
-                    <img
-                      src={album.coverUrl}
-                      alt={album.name}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
+            {/* Works Grid */}
+            <TabsContent value="works" className="mt-0">
+              {works.length === 0 ? (
+                <div className="text-center py-20">
+                  <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-purple-100 mb-6">
+                    <ImageIcon className="h-12 w-12 text-purple-600" />
                   </div>
-                  <CardContent className="p-3">
-                    <h3 className="font-medium text-gray-900 truncate">{album.name}</h3>
-                    <p className="text-sm text-gray-500 mt-1">{album.resourceCount} 个作品</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">暂无作品</h3>
+                  <p className="text-gray-500">该创作者还没有上传任何作品</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {works.map((work) => (
+                    <Card
+                      key={work.id}
+                      className="group overflow-hidden cursor-pointer transition-all hover:shadow-2xl hover:-translate-y-2 border-2 border-transparent hover:border-purple-200 bg-white rounded-2xl"
+                    >
+                      <div className="aspect-3/4 overflow-hidden bg-linear-to-br from-purple-100 to-indigo-100 relative">
+                        <img
+                          src={work.thumbnailUrl || work.url}
+                          alt={work.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        />
+                        {/* Hover Overlay */}
+                        <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                          <div className="absolute bottom-0 left-0 right-0 p-4 text-white transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                            <div className="flex items-center gap-3 text-xs">
+                              <span className="flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2 py-1 rounded-full">
+                                <Eye className="h-3 w-3" />
+                                预览
+                              </span>
+                              <span className="flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2 py-1 rounded-full">
+                                <Download className="h-3 w-3" />
+                                {work.downloadCount}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <CardContent className="p-4">
+                        <h3 className="font-semibold text-gray-900 truncate mb-2 group-hover:text-purple-600 transition-colors">
+                          {work.title}
+                        </h3>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500 flex items-center gap-1">
+                            <Download className="h-3.5 w-3.5 text-purple-500" />
+                            {work.downloadCount}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="text-xs border-purple-200 text-purple-600"
+                          >
+                            {work.type || '壁纸'}
+                          </Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </div>
         </Tabs>
       </div>
     </div>

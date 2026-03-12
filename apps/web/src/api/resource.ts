@@ -79,3 +79,44 @@ export const favoriteResource = (id: string) => {
 export const unfavoriteResource = (id: string) => {
   return http.delete<void>(`/user/resources/${id}/favorite`);
 };
+
+// ========== 创作者资源管理接口 ==========
+
+export interface MyResource {
+  id: string;
+  title: string;
+  type: string;
+  url: string;
+  thumbnailUrl: string;
+  size: number;
+  downloadCount: number;
+  createdAt: string;
+  storageKey: string;
+}
+
+interface MyResourcesResponse {
+  list: MyResource[];
+  total: number;
+}
+
+// 获取我上传的资源列表（需要创作者/管理员权限）
+export const getMyResources = (
+  params: { page?: number; pageSize?: number; type?: string } = {},
+) => {
+  const { page = 1, pageSize = 20, type } = params;
+  let url = `/admin/resources?page=${page}&pageSize=${pageSize}`;
+  if (type) url += `&type=${type}`;
+  return http.get<unknown, MyResourcesResponse>(url);
+};
+
+// 上传资源（需要创作者/管理员权限）
+export const uploadResource = (formData: FormData) => {
+  return http.post<unknown, { resource: MyResource }>('/admin/resources/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
+// 删除资源（需要创作者/管理员权限）
+export const deleteResource = (id: string) => {
+  return http.delete<void>(`/admin/resources/${id}`);
+};

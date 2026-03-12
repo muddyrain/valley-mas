@@ -54,8 +54,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 		user := api.Group("/user")
 		user.Use(middleware.Auth(cfg))
 		{
-			user.GET("/downloads", handler.GetMyDownloads) // 新增：获取我的下载记录
-			user.GET("/info", handler.GetUserInfo)
+			user.GET("/downloads", handler.GetMyDownloads) // 获取我的下载记录
+			user.GET("/info", handler.GetUserInfo)         // 获取个人信息
+			user.PUT("/profile", handler.UpdateMyProfile)  // 更新个人信息
+			user.PUT("/password", handler.ChangePassword)  // 修改密码
 		}
 
 		// 需要认证的接口

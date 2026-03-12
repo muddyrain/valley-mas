@@ -5,6 +5,8 @@ import Creator from './pages/Creator';
 import CreatorProfile from './pages/CreatorProfile';
 import Home from './pages/Home';
 import Login from './pages/Login';
+import MySpace from './pages/MySpace';
+import Profile from './pages/Profile';
 
 function App() {
   return (
@@ -12,8 +14,10 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
-          <Route path="creator" element={<Creator />} />
+          <Route path="creators" element={<Creator />} />
           <Route path="creator/:code" element={<CreatorProfile />} />
+          <Route path="my-space" element={<MySpace />} />
+          <Route path="profile" element={<Profile />} />
         </Route>
         <Route path="/login" element={<Login />} />
       </Routes>

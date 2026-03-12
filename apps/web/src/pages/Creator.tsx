@@ -1,13 +1,11 @@
-import { ChevronRight, Download, Image, Sparkles, Users } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { type Creator, getHotCreators } from '@/api/creator';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import CreatorCard from '@/components/CreatorCard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function CreatorPage() {
-  const navigate = useNavigate();
   const [creators, setCreators] = useState<Creator[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,7 +31,7 @@ export default function CreatorPage() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600">
+            <div className="p-2 rounded-xl bg-linear-to-br from-purple-500 to-indigo-600">
               <Sparkles className="h-6 w-6 text-white" />
             </div>
             <div>
@@ -65,47 +63,7 @@ export default function CreatorPage() {
                 </Card>
               ))
             : creators.map((creator) => (
-                <Card
-                  key={creator.id}
-                  className="group cursor-pointer transition-all hover:shadow-lg hover:border-purple-200"
-                  onClick={() => navigate(`/creator/${creator.id}`)}
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <Avatar className="h-16 w-16 border-2 border-purple-100">
-                        <AvatarImage src={creator.avatar} />
-                        <AvatarFallback className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white text-xl font-bold">
-                          {creator.name[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-bold text-lg text-gray-900 truncate">
-                            {creator.name}
-                          </h3>
-                        </div>
-                        <p className="text-sm text-gray-500 truncate mb-3">
-                          {creator.description || '暂无简介'}
-                        </p>
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <span className="flex items-center gap-1.5">
-                            <Image className="h-4 w-4 text-purple-500" />
-                            {creator.resourceCount}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <Download className="h-4 w-4 text-blue-500" />
-                            {creator.downloadCount}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <Users className="h-4 w-4 text-pink-500" />
-                            {creator.followerCount}
-                          </span>
-                        </div>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-purple-500 transition-colors" />
-                    </div>
-                  </CardContent>
-                </Card>
+                <CreatorCard key={creator.id} creator={creator} variant="detail" />
               ))}
         </div>
       </div>
