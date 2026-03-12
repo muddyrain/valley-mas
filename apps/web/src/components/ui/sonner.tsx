@@ -1,3 +1,4 @@
+import { CircleCheck, Info, ShieldAlert, TriangleAlert } from 'lucide-react';
 import { Toaster as Sonner } from 'sonner';
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
@@ -7,7 +8,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme="light"
       className="toaster group"
-      position="top-right"
+      position="top-center"
+      icons={{
+        success: <CircleCheck className="h-5 w-5 font-bold text-green-400" />,
+        error: <ShieldAlert className="h-5 w-5 font-bold text-red-400" />,
+        warning: <TriangleAlert className="h-5 w-5 font-bold text-yellow-400" />,
+        info: <Info className="h-5 w-5 font-bold text-blue-400" />,
+      }}
       toastOptions={{
         classNames: {
           toast:

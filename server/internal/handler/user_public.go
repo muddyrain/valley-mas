@@ -49,8 +49,10 @@ func GetCreatorSpace(c *gin.Context) {
 	// 统计数据
 	var totalViews int64
 	var totalDownloads int64
+	var resourceCount int64
 	db.Model(&model.CodeAccessLog{}).Where("creator_id = ?", creator.ID).Count(&totalViews)
 	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", creator.ID).Count(&totalDownloads)
+	db.Model(&model.Resource{}).Where("creator_id = ? AND deleted_at IS NULL", creator.UserID).Count(&resourceCount)
 
 	creatorName := ""
 	if creator.User != nil {
@@ -68,6 +70,7 @@ func GetCreatorSpace(c *gin.Context) {
 		"stats": gin.H{
 			"totalViews":     totalViews,
 			"totalDownloads": totalDownloads,
+			"resourceCount":  resourceCount,
 		},
 	}
 

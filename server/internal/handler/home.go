@@ -110,6 +110,7 @@ func HomePage(c *gin.Context) {
 // HotCreatorResponse 热门创作者响应项
 type HotCreatorResponse struct {
 	ID            string `json:"id" example:"1234567890"`
+	Code          string `json:"code" example:"ABCD1234"`
 	Name          string `json:"name" example:"设计师小王"`
 	Avatar        string `json:"avatar" example:"https://example.com/avatar.jpg"`
 	ResourceCount int    `json:"resourceCount" example:"156"`
@@ -154,9 +155,9 @@ func GetHotCreators(c *gin.Context) {
 	var total int64
 
 	// 查询热门创作者（按资源数量和下载量排序）
-	// 使用子查询计算每个创作者的资源数量和总下载量
+	// 注意：resources.creator_id 存储的是 User.ID，需要通过 creators.user_id 关联
 	err := db.Table("creators").
-		Select(`creators.id, creators.user_id, creators.avatar, creators.description, creators.created_at,
+		Select(`creators.id, creators.user_id, creators.code, creators.avatar, creators.description, creators.created_at,
 			COALESCE(resource_stats.resource_count, 0) as resource_count,
 			COALESCE(resource_stats.download_count, 0) as download_count`).
 		Joins(`LEFT JOIN (
@@ -167,7 +168,7 @@ func GetHotCreators(c *gin.Context) {
 			FROM resources 
 			WHERE deleted_at IS NULL
 			GROUP BY creator_id
-		) as resource_stats ON creators.id = resource_stats.creator_id`).
+		) as resource_stats ON creators.user_id = resource_stats.creator_id`).
 		Where("creators.is_active = ? AND creators.deleted_at IS NULL", true).
 		Order("resource_count DESC, download_count DESC").
 		Limit(pageSize).
@@ -200,6 +201,7 @@ func GetHotCreators(c *gin.Context) {
 
 		response = append(response, HotCreatorResponse{
 			ID:            fmt.Sprintf("%d", creator.ID),
+			Code:          creator.Code,
 			Name:          name,
 			Avatar:        creator.Avatar,
 			Description:   creator.Description,
@@ -209,19 +211,18 @@ func GetHotCreators(c *gin.Context) {
 		})
 	}
 
-	// 再次查询每个创作者的统计数据（因为上面的扫描可能无法正确获取）
+	// 查询每个创作者的统计数据
+	// 注意：resources.creator_id 存储的是 User.ID，使用 creator.UserID 关联
 	for i, creator := range creators {
 		var resourceCount int64
 		var downloadCount int64
 
-		// 查询资源数量
 		db.Model(&model.Resource{}).
-			Where("creator_id = ? AND deleted_at IS NULL", creator.ID).
+			Where("creator_id = ? AND deleted_at IS NULL", creator.UserID).
 			Count(&resourceCount)
 
-		// 查询总下载量
 		db.Model(&model.Resource{}).
-			Where("creator_id = ? AND deleted_at IS NULL", creator.ID).
+			Where("creator_id = ? AND deleted_at IS NULL", creator.UserID).
 			Select("COALESCE(SUM(download_count), 0)").
 			Scan(&downloadCount)
 

@@ -3,6 +3,7 @@ import http from '@/utils/request';
 // 创作者类型
 export interface Creator {
   id: string;
+  code: string; // 创作者口令
   name: string;
   avatar: string;
   description: string;
@@ -10,6 +11,29 @@ export interface Creator {
   downloadCount: number;
   followerCount: number;
   createdAt: string;
+}
+
+// 创作者空间响应类型
+interface CreatorSpaceResponse {
+  creator: {
+    id: string;
+    code: string;
+    name: string;
+    avatar: string;
+    description: string;
+    createdAt?: string;
+  };
+  stats: {
+    totalViews: number;
+    totalDownloads: number;
+    resourceCount: number;
+  };
+  space?: {
+    id: string;
+    description: string;
+    banner: string;
+  };
+  resources?: Resource[];
 }
 
 // 资源类型
@@ -50,8 +74,23 @@ export const getHotCreators = (page = 1, pageSize = 10) => {
 };
 
 // 获取创作者详情
-export const getCreatorByCode = (code: string) => {
-  return http.get<unknown, Creator>(`/public/creator/${code}`);
+export const getCreatorByCode = async (code: string): Promise<Creator> => {
+  const response = await http.get<unknown, CreatorSpaceResponse>(`/public/space/${code}`);
+  // 适配后端返回的数据结构
+  if (response.creator) {
+    return {
+      id: response.creator.id,
+      code: response.creator.code,
+      name: response.creator.name,
+      avatar: response.creator.avatar,
+      description: response.creator.description,
+      resourceCount: response.stats?.resourceCount || 0,
+      downloadCount: response.stats?.totalDownloads || 0,
+      followerCount: 0, // 后端暂未提供
+      createdAt: response.creator.createdAt || '',
+    };
+  }
+  throw new Error('创作者数据格式错误');
 };
 
 // 获取创作者作品
@@ -60,13 +99,13 @@ export const getCreatorWorks = (
   params: {
     page?: number;
     pageSize?: number;
-    category?: string;
+    type?: string; // 资源类型: avatar/wallpaper
     keyword?: string;
   } = {},
 ) => {
-  const { page = 1, pageSize = 20, category, keyword } = params;
-  let url = `/public/creator/${creatorId}/works?page=${page}&pageSize=${pageSize}`;
-  if (category) url += `&category=${category}`;
+  const { page = 1, pageSize = 20, type, keyword } = params;
+  let url = `/public/creators/${creatorId}/resources?page=${page}&pageSize=${pageSize}`;
+  if (type) url += `&type=${type}`;
   if (keyword) url += `&keyword=${keyword}`;
 
   return http.get<unknown, ListResponse<Resource>>(url);

@@ -36,3 +36,30 @@ export const logout = async () => {
 export const getCurrentUser = () => {
   return http.get<unknown, User>('/user/current');
 };
+
+// 获取个人详细信息（含统计数据）
+export interface UserProfile extends User {
+  email: string;
+  phone: string;
+  createdAt: string;
+  downloadCount: number;
+}
+
+export const getMyProfile = () => {
+  return http.get<unknown, UserProfile>('/user/info');
+};
+
+// 更新个人信息
+export const updateMyProfile = (data: {
+  nickname?: string;
+  avatar?: string;
+  email?: string;
+  phone?: string;
+}) => {
+  return http.put<unknown, User>('/user/profile', data);
+};
+
+// 修改密码
+export const changePassword = (data: { oldPassword: string; newPassword: string }) => {
+  return http.put<void>('/user/password', data);
+};
