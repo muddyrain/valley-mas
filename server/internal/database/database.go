@@ -98,6 +98,8 @@ func autoMigrate() error {
 		&model.DownloadRecord{},
 		&model.CodeAccessLog{},
 		&model.CreatorApplication{}, // 创作者申请表
+		&model.UserFavorite{},       // 用户收藏资源表
+		&model.UserFollow{},         // 用户关注创作者表
 	)
 }
 

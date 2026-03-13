@@ -155,20 +155,19 @@ func GetHotCreators(c *gin.Context) {
 	var total int64
 
 	// 查询热门创作者（按资源数量和下载量排序）
-	// 注意：resources.creator_id 存储的是 User.ID，需要通过 creators.user_id 关联
 	err := db.Table("creators").
-		Select(`creators.id, creators.user_id, creators.code, creators.avatar, creators.description, creators.created_at,
+		Select(`creators.id, creators.user_id, creators.code, creators.description, creators.created_at,
 			COALESCE(resource_stats.resource_count, 0) as resource_count,
 			COALESCE(resource_stats.download_count, 0) as download_count`).
 		Joins(`LEFT JOIN (
 			SELECT 
-				creator_id, 
+				user_id, 
 				COUNT(*) as resource_count,
 				SUM(download_count) as download_count
 			FROM resources 
 			WHERE deleted_at IS NULL
-			GROUP BY creator_id
-		) as resource_stats ON creators.user_id = resource_stats.creator_id`).
+			GROUP BY user_id
+		) as resource_stats ON creators.user_id = resource_stats.user_id`).
 		Where("creators.is_active = ? AND creators.deleted_at IS NULL", true).
 		Order("resource_count DESC, download_count DESC").
 		Limit(pageSize).
@@ -192,37 +191,37 @@ func GetHotCreators(c *gin.Context) {
 	// 转换为响应格式
 	var response []HotCreatorResponse
 	for _, creator := range creators {
-		// 获取用户信息以获取昵称
+		// 获取用户信息以获取昵称和头像
 		var user model.User
-		var name string
+		var name, avatar string
 		if err := db.Where("id = ?", creator.UserID).First(&user).Error; err == nil {
 			name = user.Nickname
+			avatar = user.Avatar
 		}
 
 		response = append(response, HotCreatorResponse{
 			ID:            fmt.Sprintf("%d", creator.ID),
 			Code:          creator.Code,
 			Name:          name,
-			Avatar:        creator.Avatar,
+			Avatar:        avatar,
 			Description:   creator.Description,
-			ResourceCount: 0, // 将在下面设置
-			DownloadCount: 0, // 将在下面设置
+			ResourceCount: 0,
+			DownloadCount: 0,
 			CreatedAt:     creator.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		})
 	}
 
 	// 查询每个创作者的统计数据
-	// 注意：resources.creator_id 存储的是 User.ID，使用 creator.UserID 关联
 	for i, creator := range creators {
 		var resourceCount int64
 		var downloadCount int64
 
 		db.Model(&model.Resource{}).
-			Where("creator_id = ? AND deleted_at IS NULL", creator.UserID).
+			Where("user_id = ? AND deleted_at IS NULL", creator.UserID).
 			Count(&resourceCount)
 
 		db.Model(&model.Resource{}).
-			Where("creator_id = ? AND deleted_at IS NULL", creator.UserID).
+			Where("user_id = ? AND deleted_at IS NULL", creator.UserID).
 			Select("COALESCE(SUM(download_count), 0)").
 			Scan(&downloadCount)
 
@@ -251,10 +250,11 @@ type HotResourceResponse struct {
 	ThumbnailURL  string `json:"thumbnailUrl"`
 	Size          int64  `json:"size"`
 	DownloadCount int64  `json:"downloadCount"`
-	CreatorID     string `json:"creatorId"`
+	UserId        string `json:"userId"`
 	CreatorName   string `json:"creatorName"`
 	CreatorAvatar string `json:"creatorAvatar"`
 	CreatedAt     string `json:"createdAt"`
+	IsFavorited   bool   `json:"isFavorited"`
 }
 
 // GetHotResources 获取热门资源
@@ -308,36 +308,40 @@ func GetHotResources(c *gin.Context) {
 	}
 
 	// 构建响应数据
+	// 如果当前请求携带了有效 token（OptionalAuth 已解析），则查询收藏状态
+	favoritedSet := map[string]bool{}
+	if uid, exists := c.Get("userId"); exists {
+		userID := uid.(int64)
+		var favs []model.UserFavorite
+		db.Where("user_id = ? AND deleted_at IS NULL", userID).Find(&favs)
+		for _, f := range favs {
+			favoritedSet[strconv.FormatInt(int64(f.ResourceID), 10)] = true
+		}
+	}
+
 	response := make([]HotResourceResponse, 0, len(resources))
 	for _, resource := range resources {
-		// 获取创作者信息
-		var creator model.Creator
-		var creatorName string
-		var creatorAvatar string
-
-		if err := db.Where("id = ? AND deleted_at IS NULL", resource.CreatorID).
-			First(&creator).Error; err == nil {
-			// 获取创作者的用户信息
-			var user model.User
-			if err := db.Where("id = ? AND deleted_at IS NULL", creator.UserID).
-				First(&user).Error; err == nil {
-				creatorName = user.Nickname
-			}
-			creatorAvatar = creator.Avatar
+		// 直接用 resource.UserID 查用户昵称和头像
+		var user model.User
+		if err := db.Where("id = ? AND deleted_at IS NULL", resource.UserID).
+			First(&user).Error; err != nil {
+			user = model.User{}
 		}
 
+		rid := strconv.FormatInt(int64(resource.ID), 10)
 		response = append(response, HotResourceResponse{
-			ID:            fmt.Sprintf("%d", resource.ID),
+			ID:            rid,
 			Title:         resource.Title,
 			Type:          resource.Type,
 			URL:           resource.URL,
 			ThumbnailURL:  resource.ThumbnailURL,
 			Size:          resource.Size,
 			DownloadCount: int64(resource.DownloadCount),
-			CreatorID:     fmt.Sprintf("%d", resource.CreatorID),
-			CreatorName:   creatorName,
-			CreatorAvatar: creatorAvatar,
+			UserId:        fmt.Sprintf("%d", resource.UserID),
+			CreatorName:   user.Nickname,
+			CreatorAvatar: user.Avatar,
 			CreatedAt:     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			IsFavorited:   favoritedSet[rid],
 		})
 	}
 

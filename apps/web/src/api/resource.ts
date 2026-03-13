@@ -11,11 +11,13 @@ export interface Resource {
   downloadCount: number;
   viewCount: number;
   likeCount: number;
-  creatorId: string;
+  userId: string;
   creatorName: string;
   creatorAvatar: string;
   tags: string[];
   createdAt: string;
+  /** 当前用户是否已收藏（仅登录用户时服务端返回 true/false，未登录为 false） */
+  isFavorited?: boolean;
 }
 
 // 列表响应类型
@@ -70,14 +72,45 @@ export const downloadResource = (id: string) => {
   return http.post<unknown, { downloadUrl: string }>(`/user/resources/${id}/download`);
 };
 
-// 收藏资源
+// 收藏资源（喜欢）
 export const favoriteResource = (id: string) => {
-  return http.post<void>(`/user/resources/${id}/favorite`);
+  return http.post<unknown, { favorited: boolean }>(`/user/resources/${id}/favorite`);
 };
 
 // 取消收藏
 export const unfavoriteResource = (id: string) => {
-  return http.delete<void>(`/user/resources/${id}/favorite`);
+  return http.delete<unknown, { favorited: boolean }>(`/user/resources/${id}/favorite`);
+};
+
+// 查询资源收藏状态
+export const getResourceFavoriteStatus = (id: string) => {
+  return http.get<unknown, { favorited: boolean }>(`/user/resources/${id}/favorite/status`);
+};
+
+// 批量查询资源收藏状态，返回 { resourceId: boolean } 的 map
+export const batchGetFavoriteStatus = (ids: string[]) => {
+  return http.post<unknown, { favorited: Record<string, boolean> }>(
+    '/user/resources/favorite/batch-status',
+    { ids },
+  );
+};
+
+// 获取我的收藏列表
+export const getMyFavorites = (params: { page?: number; pageSize?: number } = {}) => {
+  const { page = 1, pageSize = 20 } = params;
+  return http.get<
+    unknown,
+    {
+      list: Array<{
+        id: string;
+        userId: string;
+        resourceId: string;
+        createdAt: string;
+        resource?: Resource;
+      }>;
+      total: number;
+    }
+  >(`/user/favorites?page=${page}&pageSize=${pageSize}`);
 };
 
 // ========== 创作者资源管理接口 ==========

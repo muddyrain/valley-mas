@@ -119,12 +119,11 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 }
 
 // Creator 创作者模型
-// 注意：创作者的名称使用关联用户的 nickname，不单独存储
+// 注意：创作者的名称和头像使用关联用户的 nickname/avatar，不单独存储
 type Creator struct {
 	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"` // Snowflake ID (序列化为字符串)
-	UserID      Int64String    `gorm:"index" json:"userId"`
+	UserID      Int64String    `gorm:"uniqueIndex" json:"userId"`                // 一个用户只能是一个创作者
 	Description string         `gorm:"size:255" json:"description"`
-	Avatar      string         `gorm:"size:255" json:"avatar"`
 	Code        string         `gorm:"size:20;uniqueIndex" json:"code"` // 创作者唯一口令
 	IsActive    bool           `gorm:"default:true" json:"isActive"`
 	CreatedAt   time.Time      `json:"createdAt"`
@@ -132,10 +131,10 @@ type Creator struct {
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// 关联
-	User      *User           `gorm:"foreignKey:UserID" json:"user,omitempty"`         // 关联的用户（用于获取昵称等信息）
-	Space     *CreatorSpace   `gorm:"foreignKey:CreatorID" json:"space,omitempty"`     // 创作者的空间（一个创作者只有一个空间）
-	Resources []Resource      `gorm:"foreignKey:CreatorID" json:"resources,omitempty"` // 创作者上传的所有资源
-	Logs      []CodeAccessLog `gorm:"foreignKey:CreatorID" json:"logs,omitempty"`      // 访问日志
+	User      *User           `gorm:"foreignKey:UserID" json:"user,omitempty"`      // 关联的用户（用于获取昵称、头像等信息）
+	Space     *CreatorSpace   `gorm:"foreignKey:CreatorID" json:"space,omitempty"`  // 创作者的空间
+	Resources []Resource      `gorm:"foreignKey:UserID" json:"resources,omitempty"` // 创作者上传的所有资源
+	Logs      []CodeAccessLog `gorm:"foreignKey:CreatorID" json:"logs,omitempty"`   // 访问日志
 }
 
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
@@ -174,13 +173,13 @@ func (s *CreatorSpace) BeforeCreate(tx *gorm.DB) error {
 
 // Resource 资源模型
 type Resource struct {
-	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`  // Snowflake ID (序列化为字符串)
-	CreatorID     Int64String    `gorm:"column:creator_id;index" json:"uploaderId"` // 数据库字段名：creator_id，API 返回：uploaderId（上传者的用户 ID）
-	Type          string         `gorm:"size:20" json:"type"`                       // avatar, wallpaper
+	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID        Int64String    `gorm:"column:user_id;index" json:"userId"` // 上传者的 User.ID
+	Type          string         `gorm:"size:20" json:"type"`                // avatar, wallpaper
 	Title         string         `gorm:"size:100" json:"title"`
 	Description   string         `gorm:"size:255" json:"description"`
-	URL           string         `gorm:"size:500" json:"url"`        // 访问 URL（可能是 CDN 域名）
-	StorageKey    string         `gorm:"size:500" json:"storageKey"` // 对象存储键名（如：wallpaper/users/123/202603/xxx.jpg）
+	URL           string         `gorm:"size:500" json:"url"`
+	StorageKey    string         `gorm:"size:500" json:"storageKey"`
 	ThumbnailURL  string         `gorm:"size:500" json:"thumbnailUrl"`
 	Width         int            `json:"width"`
 	Height        int            `json:"height"`
@@ -190,8 +189,8 @@ type Resource struct {
 	UpdatedAt     time.Time      `json:"updatedAt"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 
-	// 关联：上传者用户信息
-	User *User `gorm:"foreignKey:CreatorID" json:"user,omitempty"` // 上传者用户信息
+	// 关联
+	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"` // 上传者用户信息
 }
 
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
@@ -276,6 +275,48 @@ type CreatorApplication struct {
 func (c *CreatorApplication) BeforeCreate(tx *gorm.DB) error {
 	if c.ID == 0 {
 		c.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+// UserFavorite 用户收藏资源（喜欢资源）
+type UserFavorite struct {
+	ID         Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID     Int64String    `gorm:"index;uniqueIndex:uidx_user_resource" json:"userId"`
+	ResourceID Int64String    `gorm:"index;uniqueIndex:uidx_user_resource" json:"resourceId"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+
+	// 关联
+	User     *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Resource *Resource `gorm:"foreignKey:ResourceID" json:"resource,omitempty"`
+}
+
+// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
+func (f *UserFavorite) BeforeCreate(tx *gorm.DB) error {
+	if f.ID == 0 {
+		f.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+// UserFollow 用户关注创作者
+type UserFollow struct {
+	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID    Int64String    `gorm:"index;uniqueIndex:uidx_user_creator" json:"userId"`
+	CreatorID Int64String    `gorm:"index;uniqueIndex:uidx_user_creator" json:"creatorId"`
+	CreatedAt time.Time      `json:"createdAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+
+	// 关联
+	User    *User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Creator *Creator `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
+}
+
+// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
+func (f *UserFollow) BeforeCreate(tx *gorm.DB) error {
+	if f.ID == 0 {
+		f.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }

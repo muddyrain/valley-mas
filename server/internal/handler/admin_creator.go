@@ -143,7 +143,6 @@ func CreateCreator(c *gin.Context) {
 	type CreateCreatorRequest struct {
 		UserID      string `json:"userId" binding:"required"`
 		Description string `json:"description"`
-		Avatar      string `json:"avatar"`
 		IsActive    *bool  `json:"isActive"`
 	}
 
@@ -205,7 +204,6 @@ func CreateCreator(c *gin.Context) {
 		creator = model.Creator{
 			UserID:      userID,
 			Description: req.Description,
-			Avatar:      req.Avatar,
 			IsActive:    isActive,
 			Code:        code,
 		}
@@ -214,11 +212,10 @@ func CreateCreator(c *gin.Context) {
 			return err
 		}
 
-		// 自动创建默认空间（空间使用创作者名称和口令，不需要单独的标题）
+		// 自动创建默认空间
 		space := model.CreatorSpace{
 			CreatorID:   creator.ID,
 			Description: req.Description,
-			Banner:      req.Avatar, // 使用创作者头像作为默认横幅
 			IsActive:    true,
 			ViewCount:   0,
 		}
@@ -369,7 +366,6 @@ func UpdateCreator(c *gin.Context) {
 	// 注意：创作者名称使用用户昵称，不能单独修改
 	type UpdateCreatorRequest struct {
 		Description string `json:"description"`
-		Avatar      string `json:"avatar"`
 		IsActive    *bool  `json:"isActive"`
 	}
 
@@ -395,9 +391,6 @@ func UpdateCreator(c *gin.Context) {
 
 	if req.Description != "" {
 		updates["description"] = req.Description
-	}
-	if req.Avatar != "" {
-		updates["avatar"] = req.Avatar
 	}
 	if req.IsActive != nil {
 		updates["is_active"] = *req.IsActive

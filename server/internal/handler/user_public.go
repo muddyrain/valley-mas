@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"strconv"
 	"valley-server/internal/database"
 	"valley-server/internal/logger"
 	"valley-server/internal/model"
@@ -52,18 +53,20 @@ func GetCreatorSpace(c *gin.Context) {
 	var resourceCount int64
 	db.Model(&model.CodeAccessLog{}).Where("creator_id = ?", creator.ID).Count(&totalViews)
 	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", creator.ID).Count(&totalDownloads)
-	db.Model(&model.Resource{}).Where("creator_id = ? AND deleted_at IS NULL", creator.UserID).Count(&resourceCount)
+	db.Model(&model.Resource{}).Where("user_id = ? AND deleted_at IS NULL", creator.UserID).Count(&resourceCount)
 
 	creatorName := ""
+	creatorAvatar := ""
 	if creator.User != nil {
 		creatorName = creator.User.Nickname
+		creatorAvatar = creator.User.Avatar
 	}
 
 	response := gin.H{
 		"creator": gin.H{
 			"id":          creator.ID,
 			"name":        creatorName,
-			"avatar":      creator.Avatar,
+			"avatar":      creatorAvatar,
 			"description": creator.Description,
 			"code":        creator.Code,
 		},
@@ -108,12 +111,12 @@ func DownloadResource(c *gin.Context) {
 		return
 	}
 
-	// 根据资源的 CreatorID (User.ID) 查找对应的 Creator
+	// 根据资源的 UserID 查找对应的 Creator
 	var creator model.Creator
-	if err := db.Where("user_id = ?", resource.CreatorID).First(&creator).Error; err != nil {
+	if err := db.Where("user_id = ?", resource.UserID).First(&creator).Error; err != nil {
 		ErrorWithDetail(c, 500, "查询创作者信息失败", err, logrus.Fields{
-			"resource_id":     resourceID,
-			"creator_user_id": resource.CreatorID,
+			"resource_id": resourceID,
+			"user_id":     resource.UserID,
 		})
 		return
 	}
@@ -273,16 +276,29 @@ func GetCreatorResourcesList(c *gin.Context) {
 		return
 	}
 
-	// 获取创作者名称
-	var creatorName string
+	// 获取创作者名称和头像（统一从 User 读取）
+	var creatorName, creatorAvatar string
 	var user model.User
 	if err := db.Where("id = ?", creator.UserID).First(&user).Error; err == nil {
 		creatorName = user.Nickname
+		creatorAvatar = user.Avatar
+	}
+
+	// 如果当前请求携带了有效 token（OptionalAuth 已解析），则查询收藏状态
+	favoritedSet := map[string]bool{}
+	if uid, exists := c.Get("userId"); exists {
+		userID := uid.(int64)
+		var favs []model.UserFavorite
+		db.Where("user_id = ? AND deleted_at IS NULL", userID).Find(&favs)
+		for _, f := range favs {
+			favoritedSet[strconv.FormatInt(int64(f.ResourceID), 10)] = true
+		}
 	}
 
 	// 构建响应
 	resourceList := make([]gin.H, 0, len(resources))
 	for _, resource := range resources {
+		rid := strconv.FormatInt(int64(resource.ID), 10)
 		resourceList = append(resourceList, gin.H{
 			"id":            resource.ID,
 			"title":         resource.Title,
@@ -291,10 +307,11 @@ func GetCreatorResourcesList(c *gin.Context) {
 			"thumbnailUrl":  resource.ThumbnailURL,
 			"size":          resource.Size,
 			"downloadCount": resource.DownloadCount,
-			"creatorId":     creator.ID,
+			"userId":        resource.UserID,
 			"creatorName":   creatorName,
-			"creatorAvatar": creator.Avatar,
+			"creatorAvatar": creatorAvatar,
 			"createdAt":     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			"isFavorited":   favoritedSet[rid],
 		})
 	}
 

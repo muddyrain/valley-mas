@@ -38,11 +38,13 @@ func Setup(cfg *config.Config) *gin.Engine {
 		// 公开接口（无需认证）- 用户端
 		public := api.Group("/public")
 		{
-			public.GET("/space/:code", handler.GetCreatorSpace)                    // 新增：获取创作者空间
-			public.POST("/resource/:id/download", handler.DownloadResource)        // 新增：下载资源
-			public.GET("/hot-creators", handler.GetHotCreators)                    // 新增：获取热门创作者
-			public.GET("/hot-resources", handler.GetHotResources)                  // 新增：获取热门资源
-			public.GET("/creators/:id/resources", handler.GetCreatorResourcesList) // 新增：获取创作者资源列表
+			public.GET("/space/:code", handler.GetCreatorSpace)             // 新增：获取创作者空间
+			public.POST("/resource/:id/download", handler.DownloadResource) // 新增：下载资源
+			public.GET("/hot-creators", handler.GetHotCreators)             // 新增：获取热门创作者
+
+			// 以下接口挂可选认证，登录用户响应中会带 isFavorited 字段
+			public.GET("/hot-resources", middleware.OptionalAuth(cfg), handler.GetHotResources)                  // 新增：获取热门资源
+			public.GET("/creators/:id/resources", middleware.OptionalAuth(cfg), handler.GetCreatorResourcesList) // 新增：获取创作者资源列表
 		}
 
 		// 旧的公开接口（保留兼容）
@@ -58,6 +60,19 @@ func Setup(cfg *config.Config) *gin.Engine {
 			user.GET("/info", handler.GetUserInfo)         // 获取个人信息
 			user.PUT("/profile", handler.UpdateMyProfile)  // 更新个人信息
 			user.PUT("/password", handler.ChangePassword)  // 修改密码
+
+			// 资源收藏（喜欢）
+			user.POST("/resources/favorite/batch-status", handler.BatchGetFavoriteStatus) // 批量查询收藏状态（静态路由须在动态路由前）
+			user.POST("/resources/:id/favorite", handler.FavoriteResource)                // 收藏资源
+			user.DELETE("/resources/:id/favorite", handler.UnfavoriteResource)            // 取消收藏
+			user.GET("/resources/:id/favorite/status", handler.GetResourceFavoriteStatus) // 查询收藏状态
+			user.GET("/favorites", handler.GetMyFavorites)                                // 我的收藏列表
+
+			// 关注创作者
+			user.POST("/creators/:id/follow", handler.FollowCreator)                // 关注创作者
+			user.DELETE("/creators/:id/follow", handler.UnfollowCreator)            // 取消关注
+			user.GET("/creators/:id/follow/status", handler.GetCreatorFollowStatus) // 查询关注状态
+			user.GET("/follows", handler.GetMyFollows)                              // 我关注的创作者列表
 		}
 
 		// 需要认证的接口
