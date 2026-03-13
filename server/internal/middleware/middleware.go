@@ -79,6 +79,33 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
+// OptionalAuth 可选认证中间件 - token 有效则写入 userId，无 token 或无效 token 则跳过（不 Abort）
+func OptionalAuth(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var token string
+
+		token, err := c.Cookie("token")
+		if err != nil || token == "" {
+			authHeader := c.GetHeader("Authorization")
+			if authHeader != "" {
+				token = strings.TrimPrefix(authHeader, "Bearer ")
+			}
+		}
+
+		if token != "" {
+			if claims, err := utils.ParseToken(token, cfg.JWT.Secret); err == nil {
+				if userID, err := strconv.ParseInt(claims.UserID, 10, 64); err == nil {
+					c.Set("userId", userID)
+					c.Set("username", claims.Username)
+					c.Set("userRole", claims.Role)
+				}
+			}
+		}
+
+		c.Next()
+	}
+}
+
 // AdminOnly 管理员权限中间件
 func AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {

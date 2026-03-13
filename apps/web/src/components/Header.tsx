@@ -1,4 +1,4 @@
-import { Home, LogOut, Sparkles, User, Users } from 'lucide-react';
+import { Heart, Home, LogOut, Sparkles, User, Users } from 'lucide-react';
 import { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -113,6 +113,13 @@ export default function Header() {
                 >
                   <User className="h-4 w-4 text-purple-600" />
                   <span className="font-medium">个人中心</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate('/favorites')}
+                  className="gap-3 py-2.5 rounded-lg hover:bg-purple-50 cursor-pointer transition-colors"
+                >
+                  <Heart className="h-4 w-4 text-pink-500" />
+                  <span className="font-medium">我的收藏</span>
                 </DropdownMenuItem>
                 {user?.role === 'creator' && (
                   <DropdownMenuItem

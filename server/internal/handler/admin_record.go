@@ -108,10 +108,9 @@ func ListDownloadRecords(c *gin.Context) {
 	}
 
 	type CreatorInfo struct {
-		ID     string    `json:"id"`
-		Avatar string    `json:"avatar"`
-		Code   string    `json:"code"`
-		User   *UserInfo `json:"user,omitempty"`
+		ID   string    `json:"id"`
+		Code string    `json:"code"`
+		User *UserInfo `json:"user,omitempty"`
 	}
 
 	type DownloadRecordResponse struct {
@@ -162,9 +161,8 @@ func ListDownloadRecords(c *gin.Context) {
 		// 创作者信息
 		if record.Creator != nil {
 			list[i].Creator = &CreatorInfo{
-				ID:     string(record.Creator.ID),
-				Avatar: record.Creator.Avatar,
-				Code:   record.Creator.Code,
+				ID:   string(record.Creator.ID),
+				Code: record.Creator.Code,
 			}
 			if record.Creator.User != nil {
 				list[i].Creator.User = &UserInfo{

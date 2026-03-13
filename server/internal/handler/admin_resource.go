@@ -41,9 +41,8 @@ func ListResources(c *gin.Context) {
 	query := db.Model(&model.Resource{})
 
 	// 🔒 如果是创作者角色，只能查看自己上传的资源
-	// Resource.CreatorID 字段存储的是上传者的用户 ID（User.ID）
 	if userRole == "creator" {
-		query = query.Where("creator_id = ?", userId)
+		query = query.Where("user_id = ?", userId)
 	}
 
 	if resourceType != "" {
@@ -116,7 +115,7 @@ func UploadResource(c *gin.Context) {
 		StorageKey:  result.Key, // 保存对象存储键名
 		Title:       file.Filename,
 		Size:        file.Size,
-		CreatorID:   model.Int64String(userID.(int64)), // CreatorID 实际存储上传者的用户 ID
+		UserID:      model.Int64String(userID.(int64)),
 		Description: "",
 	}
 
@@ -232,7 +231,7 @@ func UpdateResourceCreator(c *gin.Context) {
 		Error(c, 400, "用户ID格式错误："+err.Error())
 		return
 	}
-	resource.CreatorID = uploaderID // 数据库字段名仍为 CreatorID
+	resource.UserID = uploaderID
 
 	if err := db.Save(&resource).Error; err != nil {
 		Error(c, 500, "更新失败："+err.Error())

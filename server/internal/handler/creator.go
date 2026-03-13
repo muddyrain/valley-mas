@@ -110,18 +110,11 @@ func RegisterCreator(c *gin.Context) {
 	}
 
 	// 6. 创建创作者记录
-	// 注意：创作者名称使用用户的昵称,不单独存储
 	creator := model.Creator{
 		UserID:      model.Int64String(userID.(int64)),
 		Description: req.Description,
-		Avatar:      req.Avatar,
 		Code:        code,
-		IsActive:    true, // 默认启用
-	}
-
-	// 如果没有传头像，使用用户头像
-	if creator.Avatar == "" {
-		creator.Avatar = user.Avatar
+		IsActive:    true,
 	}
 
 	// 7. 创建默认空间（空间使用创作者描述，不需要单独的 title）
@@ -164,8 +157,8 @@ func RegisterCreator(c *gin.Context) {
 	Success(c, gin.H{
 		"id":          creator.ID,
 		"userId":      creator.UserID,
-		"name":        user.Nickname, // 使用用户昵称
-		"avatar":      creator.Avatar,
+		"name":        user.Nickname,
+		"avatar":      user.Avatar,
 		"description": creator.Description,
 		"code":        creator.Code,
 		"isActive":    creator.IsActive,
@@ -207,11 +200,13 @@ func GetMyCreatorSpace(c *gin.Context) {
 
 	// 3. 统计资源数量
 	var resourceCount int64
-	db.Model(&model.Resource{}).Where("creator_id = ?", creator.ID).Count(&resourceCount)
+	db.Model(&model.Resource{}).Where("user_id = ?", creator.UserID).Count(&resourceCount)
 
 	creatorName := ""
+	creatorAvatar := ""
 	if creator.User != nil {
 		creatorName = creator.User.Nickname
+		creatorAvatar = creator.User.Avatar
 	}
 
 	// 4. 返回创作者空间信息
@@ -219,7 +214,7 @@ func GetMyCreatorSpace(c *gin.Context) {
 		"id":            creator.ID,
 		"userId":        creator.UserID,
 		"name":          creatorName,
-		"avatar":        creator.Avatar,
+		"avatar":        creatorAvatar,
 		"description":   creator.Description,
 		"code":          creator.Code,
 		"isActive":      creator.IsActive,

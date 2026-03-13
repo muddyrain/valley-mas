@@ -97,7 +97,7 @@ func VerifyCode(c *gin.Context) {
 		"creator": gin.H{
 			"id":          creator.ID,
 			"name":        creatorName,
-			"avatar":      creator.Avatar,
+			"avatar":      creator.User.Avatar,
 			"description": creator.Description,
 			"code":        creator.Code,
 		},

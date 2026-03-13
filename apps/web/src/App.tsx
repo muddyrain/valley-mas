@@ -3,6 +3,7 @@ import { Toaster } from '@/components/ui/sonner';
 import Layout from './layouts/Layout';
 import Creator from './pages/Creator';
 import CreatorProfile from './pages/CreatorProfile';
+import Favorites from './pages/Favorites';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import MySpace from './pages/MySpace';
@@ -18,6 +19,7 @@ function App() {
           <Route path="creator/:code" element={<CreatorProfile />} />
           <Route path="my-space" element={<MySpace />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="favorites" element={<Favorites />} />
         </Route>
         <Route path="/login" element={<Login />} />
       </Routes>

@@ -1,8 +1,14 @@
 import { Download, Heart, Search, Sparkles, TrendingUp, Users, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { type Creator, getHotCreators } from '@/api/creator';
-import { getHotResources, type Resource } from '@/api/resource';
+import {
+  favoriteResource,
+  getHotResources,
+  type Resource,
+  unfavoriteResource,
+} from '@/api/resource';
 import CreatorCard from '@/components/CreatorCard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -16,6 +22,8 @@ export default function Home() {
   const [creators, setCreators] = useState<Creator[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
+  // 收藏状态：key = resourceId, value = boolean
+  const [favoritedMap, setFavoritedMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const loadData = async () => {
@@ -28,6 +36,13 @@ export default function Home() {
 
         setCreators(creatorsData.list);
         setResources(resourcesData.list);
+
+        // 直接从列表响应中读取 isFavorited 字段（服务端对登录用户返回收藏状态）
+        const map: Record<string, boolean> = {};
+        resourcesData.list.forEach((r) => {
+          map[r.id] = r.isFavorited ?? false;
+        });
+        setFavoritedMap(map);
       } catch (error) {
         console.error('加载数据失败:', error);
       } finally {
@@ -41,6 +56,24 @@ export default function Home() {
   const handleSearchCode = () => {
     if (!code.trim()) return;
     navigate(`/creator/${code}`);
+  };
+
+  const handleFavorite = async (e: React.MouseEvent, resource: Resource) => {
+    e.stopPropagation();
+    const isFav = favoritedMap[resource.id] ?? false;
+    try {
+      if (isFav) {
+        await unfavoriteResource(resource.id);
+        setFavoritedMap((prev) => ({ ...prev, [resource.id]: false }));
+        toast.success('已取消收藏');
+      } else {
+        await favoriteResource(resource.id);
+        setFavoritedMap((prev) => ({ ...prev, [resource.id]: true }));
+        toast.success('收藏成功');
+      }
+    } catch {
+      toast.error('请先登录后再收藏');
+    }
   };
 
   return (
@@ -222,13 +255,16 @@ export default function Home() {
                             </span>
                             <Button
                               size="xs"
-                              className="bg-white/20 backdrop-blur-sm hover:bg-white/30 border-0 h-7"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // Handle like/favorite
-                              }}
+                              className={`backdrop-blur-sm border-0 h-7 transition-colors ${
+                                favoritedMap[resource.id]
+                                  ? 'bg-pink-500/80 hover:bg-pink-600/80 text-white'
+                                  : 'bg-white/20 hover:bg-white/30'
+                              }`}
+                              onClick={(e) => handleFavorite(e, resource)}
                             >
-                              <Heart className="w-3.5 h-3.5" />
+                              <Heart
+                                className={`w-3.5 h-3.5 ${favoritedMap[resource.id] ? 'fill-white' : ''}`}
+                              />
                             </Button>
                           </div>
                         </div>

@@ -14,14 +14,17 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   type Creator,
   followCreator,
   getCreatorByCode,
+  getCreatorFollowStatus,
   getCreatorWorks,
   type Resource,
   unfollowCreator,
 } from '@/api/creator';
+import { favoriteResource, unfavoriteResource } from '@/api/resource';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,11 +44,16 @@ export default function CreatorProfile() {
   const { code } = useParams<{ code: string }>();
   const [creator, setCreator] = useState<Creator | null>(null);
   const [works, setWorks] = useState<Resource[]>([]);
-  const [activeCategory, setActiveCategory] = useState(''); // 存储实际的type值
+  const [activeCategory, setActiveCategory] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isSelf, setIsSelf] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [followLoading, setFollowLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('works');
+  // 作品收藏状态：key = resourceId, value = boolean
+  const [favoritedMap, setFavoritedMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!code) return;
@@ -55,13 +63,28 @@ export default function CreatorProfile() {
         setLoading(true);
         const creatorData = await getCreatorByCode(code);
         setCreator(creatorData);
+        setFollowerCount(creatorData.followerCount || 0);
 
-        // 只加载作品,暂时不加载专辑(后端未实现)
-        const worksData = await getCreatorWorks(creatorData.id);
+        // 并行加载作品和关注状态
+        const [worksData] = await Promise.all([
+          getCreatorWorks(creatorData.id),
+          // 查询关注状态（接口失败不影响主流程）
+          getCreatorFollowStatus(creatorData.id)
+            .then((res) => {
+              setIsFollowing(res.following);
+              setFollowerCount(res.followerCount);
+              setIsSelf(res.isSelf);
+            })
+            .catch(() => {}),
+        ]);
         setWorks(worksData.list);
-        // 暂时注释掉专辑加载
-        // const albumsData = await getCreatorAlbums(creatorData.id);
-        // setAlbums(albumsData.list);
+
+        // 直接从列表响应中读取 isFavorited 字段（服务端对登录用户返回收藏状态）
+        const map: Record<string, boolean> = {};
+        worksData.list.forEach((w) => {
+          map[w.id] = w.isFavorited ?? false;
+        });
+        setFavoritedMap(map);
       } catch (error) {
         console.error('加载创作者数据失败:', error);
       } finally {
@@ -73,18 +96,41 @@ export default function CreatorProfile() {
   }, [code]);
 
   const handleFollow = async () => {
-    if (!creator) return;
+    if (!creator || followLoading) return;
 
     try {
+      setFollowLoading(true);
       if (isFollowing) {
-        await unfollowCreator(creator.id);
-        setIsFollowing(false);
+        const res = await unfollowCreator(creator.id);
+        setIsFollowing(res.following);
+        setFollowerCount((n) => Math.max(0, n - 1));
       } else {
-        await followCreator(creator.id);
-        setIsFollowing(true);
+        const res = await followCreator(creator.id);
+        setIsFollowing(res.following);
+        setFollowerCount((n) => n + 1);
       }
     } catch (error) {
       console.error('关注操作失败:', error);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
+  const handleFavorite = async (e: React.MouseEvent, work: Resource) => {
+    e.stopPropagation();
+    const isFav = favoritedMap[work.id] ?? false;
+    try {
+      if (isFav) {
+        await unfavoriteResource(work.id);
+        setFavoritedMap((prev) => ({ ...prev, [work.id]: false }));
+        toast.success('已取消收藏');
+      } else {
+        await favoriteResource(work.id);
+        setFavoritedMap((prev) => ({ ...prev, [work.id]: true }));
+        toast.success('收藏成功');
+      }
+    } catch {
+      toast.error('请先登录后再收藏');
     }
   };
 
@@ -244,34 +290,38 @@ export default function CreatorProfile() {
                     <Users className="h-4 w-4" />
                     <span className="text-xs font-medium">粉丝</span>
                   </div>
-                  <div className="text-2xl md:text-3xl font-bold">{creator.followerCount || 0}</div>
+                  <div className="text-2xl md:text-3xl font-bold">{followerCount}</div>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-3">
-                <Button
-                  onClick={handleFollow}
-                  size="lg"
-                  variant={isFollowing ? 'ghost' : 'default'}
-                  className={`${
-                    isFollowing
-                      ? 'bg-white/20 hover:bg-white/30 text-white border-2 border-white/50 backdrop-blur-sm'
-                      : 'bg-white text-purple-600 hover:bg-gray-100 shadow-xl hover:shadow-2xl hover:scale-105'
-                  } font-semibold px-8 transition-all`}
-                >
-                  {isFollowing ? (
-                    <>
-                      <UserCheck className="h-5 w-5 mr-2" />
-                      已关注
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="h-5 w-5 mr-2" />
-                      关注创作者
-                    </>
-                  )}
-                </Button>
+                {/* 自己不显示关注按钮 */}
+                {!isSelf && (
+                  <Button
+                    onClick={handleFollow}
+                    disabled={followLoading}
+                    size="lg"
+                    variant={isFollowing ? 'ghost' : 'default'}
+                    className={`${
+                      isFollowing
+                        ? 'bg-white/20 hover:bg-white/30 text-white border-2 border-white/50 backdrop-blur-sm'
+                        : 'bg-white text-purple-600 hover:bg-gray-100 shadow-xl hover:shadow-2xl hover:scale-105'
+                    } font-semibold px-8 transition-all`}
+                  >
+                    {isFollowing ? (
+                      <>
+                        <UserCheck className="h-5 w-5 mr-2" />
+                        已关注
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="h-5 w-5 mr-2" />
+                        关注创作者
+                      </>
+                    )}
+                  </Button>
+                )}
                 <Button
                   size="lg"
                   variant="ghost"
@@ -279,14 +329,6 @@ export default function CreatorProfile() {
                 >
                   <Share2 className="h-5 w-5 mr-2" />
                   分享
-                </Button>
-                <Button
-                  size="lg"
-                  variant="ghost"
-                  className="border-2 border-white/50 text-white hover:bg-white/20 backdrop-blur-sm font-semibold px-6 bg-transparent"
-                >
-                  <Heart className="h-5 w-5 mr-2" />
-                  喜欢
                 </Button>
               </div>
             </div>
@@ -408,6 +450,19 @@ export default function CreatorProfile() {
                                 <Download className="h-3 w-3" />
                                 {work.downloadCount}
                               </span>
+                              <button
+                                type="button"
+                                onClick={(e) => handleFavorite(e, work)}
+                                className={`flex items-center gap-1 px-2 py-1 rounded-full backdrop-blur-sm transition-colors ${
+                                  favoritedMap[work.id]
+                                    ? 'bg-pink-500/80 text-white'
+                                    : 'bg-white/20 hover:bg-white/30 text-white'
+                                }`}
+                              >
+                                <Heart
+                                  className={`h-3 w-3 ${favoritedMap[work.id] ? 'fill-white' : ''}`}
+                                />
+                              </button>
                             </div>
                           </div>
                         </div>

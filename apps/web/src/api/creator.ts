@@ -44,9 +44,11 @@ export interface Resource {
   thumbnailUrl: string;
   type: string;
   downloadCount: number;
-  creatorId: string;
+  userId: string;
   creatorName: string;
   isTop: boolean;
+  /** 当前用户是否已收藏（仅登录用户时服务端返回 true/false，未登录为 false） */
+  isFavorited?: boolean;
 }
 
 // 专辑类型
@@ -129,10 +131,25 @@ export const getCreatorAlbums = (
 
 // 关注创作者
 export const followCreator = (creatorId: string) => {
-  return http.post<void>(`/user/creators/${creatorId}/follow`);
+  return http.post<unknown, { following: boolean }>(`/user/creators/${creatorId}/follow`);
 };
 
 // 取消关注
 export const unfollowCreator = (creatorId: string) => {
-  return http.delete<void>(`/user/creators/${creatorId}/follow`);
+  return http.delete<unknown, { following: boolean }>(`/user/creators/${creatorId}/follow`);
+};
+
+// 查询关注状态
+export const getCreatorFollowStatus = (creatorId: string) => {
+  return http.get<unknown, { following: boolean; followerCount: number; isSelf: boolean }>(
+    `/user/creators/${creatorId}/follow/status`,
+  );
+};
+
+// 获取我关注的创作者列表
+export const getMyFollows = (params: { page?: number; pageSize?: number } = {}) => {
+  const { page = 1, pageSize = 20 } = params;
+  return http.get<unknown, { list: unknown[]; total: number }>(
+    `/user/follows?page=${page}&pageSize=${pageSize}`,
+  );
 };

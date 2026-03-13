@@ -85,8 +85,10 @@ func GetCreatorStats(c *gin.Context) {
 	}
 
 	creatorName := ""
+	creatorAvatar := ""
 	if creator.User != nil {
 		creatorName = creator.User.Nickname
+		creatorAvatar = creator.User.Avatar
 	}
 
 	// 初始化统计数据
@@ -94,15 +96,15 @@ func GetCreatorStats(c *gin.Context) {
 		CreatorInfo: CreatorInfo{
 			ID:          strconv.FormatInt(int64(creator.ID), 10),
 			Name:        creatorName,
-			Avatar:      creator.Avatar,
+			Avatar:      creatorAvatar,
 			Description: creator.Description,
 		},
 	}
 
 	// 1. 基础统计
-	// 总资源数（Resource.CreatorID 存储的是 User ID）
+	// 总资源数（Resource.user_id = 上传者 User.ID）
 	var totalResources int64
-	db.Model(&model.Resource{}).Where("creator_id = ?", userId).Count(&totalResources)
+	db.Model(&model.Resource{}).Where("user_id = ?", userId).Count(&totalResources)
 	stats.TotalResources = int(totalResources)
 
 	// 总空间数
@@ -195,7 +197,7 @@ func GetCreatorStats(c *gin.Context) {
 
 	// 5. 热门资源 Top 5
 	var resources []model.Resource
-	db.Where("creator_id = ?", userId).
+	db.Where("user_id = ?", userId).
 		Order("download_count DESC").
 		Limit(5).
 		Find(&resources)

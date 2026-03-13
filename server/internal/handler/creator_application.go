@@ -360,7 +360,6 @@ func ReviewCreatorApplication(c *gin.Context) {
 			creator := model.Creator{
 				UserID:      application.UserID,
 				Description: application.Description,
-				Avatar:      application.Avatar,
 				Code:        code,
 				IsActive:    true,
 			}
