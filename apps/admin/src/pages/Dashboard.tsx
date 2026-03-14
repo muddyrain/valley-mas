@@ -112,19 +112,19 @@ export default function Dashboard() {
       dataIndex: 'creator',
       render: (creator) => (
         <div className="flex items-center gap-2">
-          {creator?.avatar ? (
+          {creator?.user?.avatar ? (
             <img
-              src={creator.avatar}
-              alt={creator.name}
+              src={creator.user.avatar}
+              alt={creator.user.nickname}
               className="w-10 h-10 object-cover rounded-full"
             />
           ) : (
             <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center">
-              {creator?.name?.[0] || '?'}
+              {creator?.user?.nickname?.[0] || '?'}
             </div>
           )}
           <div>
-            <div className="font-medium">{creator?.name || '未知'}</div>
+            <div className="font-medium">{creator?.user?.nickname || '未知'}</div>
             <Tag className="text-xs">{creator?.code}</Tag>
           </div>
         </div>

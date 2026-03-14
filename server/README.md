@@ -48,3 +48,15 @@ go run .\main.go
 5) 我已经为你添加了 `.air.toml`（位于本目录），推荐直接使用 `air` 运行以获得自动重启体验。
 
 如果你愿意，我可以接着为你添加一个 PowerShell 启动脚本（例如 `dev.ps1`），方便一键启动。
+
+
+## ssh 连接 google-cloud
+
+```powershell
+gcloud compute ssh "instance-20251220-041132" --zone "us-west1-b" --project "alert-synapse-481804-j8"
+```
+## 部署发布至google-cloud
+
+```powershell
+gcloud compute scp ./valley-server-linux instance-20251220-041132:/opt/go-project/ --zone "us-west1-b" --project "alert-synapse-481804-j8"
+```

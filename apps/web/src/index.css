@@ -50,7 +50,7 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-purple-300 rounded-full hover:bg-purple-400;
+    @apply bg-gray-300 rounded-full hover:bg-gray-400;
   }
 
   /* 自定义动画 */

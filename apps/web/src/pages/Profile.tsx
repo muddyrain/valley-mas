@@ -14,13 +14,8 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import {
-  changePassword,
-  getMyProfile,
-  type UserProfile,
-  updateMyProfile,
-  uploadAvatar,
-} from '@/api/auth';
+import { changePassword, updateMyProfile, uploadAvatar } from '@/api/auth';
+import ApplyCreatorBanner from '@/components/ApplyCreatorBanner';
 import PageBanner from '@/components/PageBanner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -39,10 +34,15 @@ const ROLE_MAP: Record<string, { label: string; color: string }> = {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, setAuth, token } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  // 从 store 获取 profile 及相关 actions
+  const profile = useAuthStore((s) => s.profile);
+  const profileLoading = useAuthStore((s) => s.profileLoading);
+  const fetchProfile = useAuthStore((s) => s.fetchProfile);
+  const setStoreProfile = useAuthStore((s) => s.setProfile);
 
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const loading = profileLoading && !profile;
 
   // 头像上传
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -60,28 +60,25 @@ export default function Profile() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
-    const load = async () => {
-      try {
-        setLoading(true);
-        const data = await getMyProfile();
-        setProfile(data);
-        setInfoForm({
-          nickname: data.nickname || '',
-          email: data.email || '',
-          phone: data.phone || '',
-        });
-      } catch {
-        toast.error('加载个人信息失败');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [isAuthenticated, navigate]);
+    // 强制刷新 profile（每次进入 Profile 页都拉最新数据）
+    fetchProfile(true);
+  }, [hasHydrated, isAuthenticated, navigate, fetchProfile]);
+
+  // profile 加载后同步到表单
+  useEffect(() => {
+    if (profile) {
+      setInfoForm({
+        nickname: profile.nickname || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+      });
+    }
+  }, [profile]);
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -99,10 +96,9 @@ export default function Profile() {
       const formData = new FormData();
       formData.append('file', file);
       const { avatarUrl } = await uploadAvatar(formData);
-      // 同步更新本地状态和全局 store
-      setProfile((prev) => (prev ? { ...prev, avatar: avatarUrl } : prev));
-      if (token && user) {
-        setAuth({ ...user, avatar: avatarUrl }, token);
+      // 同步更新 store（setProfile 会自动同步 user + cookie）
+      if (profile) {
+        setStoreProfile({ ...profile, avatar: avatarUrl });
       }
       toast.success('头像已更新');
     } catch {
@@ -126,11 +122,10 @@ export default function Profile() {
         email: infoForm.email,
         phone: infoForm.phone,
       });
-      // 同步更新 store 里的用户信息
-      if (token && user) {
-        setAuth({ ...user, ...updated }, token);
+      // 同步更新 store（setProfile 会自动同步 user + cookie）
+      if (profile) {
+        setStoreProfile({ ...profile, ...updated });
       }
-      setProfile((prev) => (prev ? { ...prev, ...updated } : prev));
       toast.success('个人信息已更新');
     } catch {
       // 错误已在 request.ts 中通过 toast 显示
@@ -167,6 +162,8 @@ export default function Profile() {
     }
   };
 
+  // 水合未完成时不渲染（避免闪跳到 /login）
+  if (!hasHydrated) return null;
   if (!isAuthenticated) return null;
 
   const roleInfo = ROLE_MAP[profile?.role || user?.role || 'user'];
@@ -496,6 +493,9 @@ export default function Profile() {
             </CardContent>
           </Card>
         )}
+
+        {/* ===== 申请创作者入口（仅普通用户显示，逻辑封装在组件内） ===== */}
+        {!loading && <ApplyCreatorBanner />}
       </div>
     </div>
   );

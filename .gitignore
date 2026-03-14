@@ -38,6 +38,7 @@ server/data/
 *.so
 *.dylib
 *.db
+valley-server-linux
 
 # Test
 coverage/

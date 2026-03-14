@@ -51,6 +51,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 		// 旧的公开接口（保留兼容）
 		api.POST("/login", handler.Login(cfg))
+		api.POST("/register", handler.Register(cfg))
 		api.POST("/code/verify", handler.VerifyCode)
 		api.GET("/creator/:code/resources", handler.GetCreatorResources)
 

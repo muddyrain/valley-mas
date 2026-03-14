@@ -20,6 +20,7 @@ export interface Creator {
   // 用户信息（后端关联查询）
   username: string;
   userNickname: string;
+  userAvatar: string;
 
   // 关联的空间
   space?: CreatorSpace;

@@ -54,14 +54,14 @@ export default function Records() {
     },
     {
       title: '用户',
-      dataIndex: 'user',
+      dataIndex: 'creator',
       width: 150,
-      render: (user) => (
+      render: (creator) => (
         <Space>
-          <Avatar src={user?.avatar} size="small">
-            {user?.nickname?.[0]}
+          <Avatar src={creator?.user?.avatar} size="small">
+            {creator?.user?.nickname?.[0]}
           </Avatar>
-          <span>{user?.nickname || '未知用户'}</span>
+          <span>{creator?.user?.nickname || '未知用户'}</span>
         </Space>
       ),
     },
@@ -96,7 +96,7 @@ export default function Records() {
       width: 150,
       render: (creator) => (
         <Space>
-          <Avatar src={creator?.avatar} size="small">
+          <Avatar src={creator?.user?.avatar} size="small">
             {creator?.user?.nickname?.[0]}
           </Avatar>
           <span>{creator?.user?.nickname || '未知'}</span>

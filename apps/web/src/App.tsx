@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import Layout from './layouts/Layout';
+import ApplyCreator from './pages/ApplyCreator';
 import Creator from './pages/Creator';
 import CreatorProfile from './pages/CreatorProfile';
 import Favorites from './pages/Favorites';
@@ -8,6 +9,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import MySpace from './pages/MySpace';
 import Profile from './pages/Profile';
+import Register from './pages/Register';
 import ResourceDetail from './pages/ResourceDetail';
 import Resources from './pages/Resources';
 
@@ -24,8 +26,10 @@ function App() {
           <Route path="my-space" element={<MySpace />} />
           <Route path="profile" element={<Profile />} />
           <Route path="favorites" element={<Favorites />} />
+          <Route path="apply-creator" element={<ApplyCreator />} />
         </Route>
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
       </Routes>
       <Toaster />
     </>
