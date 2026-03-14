@@ -1,7 +1,7 @@
 import {
-  Download,
   Image as ImageIcon,
   Loader2,
+  Pencil,
   Plus,
   Sparkles,
   Trash2,
@@ -11,13 +11,21 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { deleteResource, getMyResources, type MyResource, uploadResource } from '@/api/resource';
+import {
+  deleteResource,
+  getMyResources,
+  type MyResource,
+  updateResource,
+  uploadResource,
+} from '@/api/resource';
+import EmptyState from '@/components/EmptyState';
+import PageBanner from '@/components/PageBanner';
+import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
+import TypeFilterBar from '@/components/TypeFilterBar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const RESOURCE_TYPES = [
@@ -46,6 +54,8 @@ export default function MySpace() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadType, setUploadType] = useState<'wallpaper' | 'avatar'>('wallpaper');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadDesc, setUploadDesc] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,6 +63,13 @@ export default function MySpace() {
   // 删除确认状态
   const [deleteTarget, setDeleteTarget] = useState<MyResource | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // 编辑弹窗状态
+  const [editTarget, setEditTarget] = useState<MyResource | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editType, setEditType] = useState('');
+  const [editing, setEditing] = useState(false);
 
   // 权限检查
   useEffect(() => {
@@ -102,6 +119,8 @@ export default function MySpace() {
     }
     setUploadFile(file);
     setPreviewUrl(URL.createObjectURL(file));
+    // 自动填入文件名（去掉扩展名）作为标题
+    setUploadTitle(file.name.replace(/\.[^/.]+$/, ''));
   };
 
   // 拖拽上传
@@ -119,6 +138,8 @@ export default function MySpace() {
     }
     setUploadFile(file);
     setPreviewUrl(URL.createObjectURL(file));
+    // 自动填入文件名（去掉扩展名）作为标题
+    setUploadTitle(file.name.replace(/\.[^/.]+$/, ''));
   };
 
   // 提交上传
@@ -132,6 +153,8 @@ export default function MySpace() {
       const formData = new FormData();
       formData.append('file', uploadFile);
       formData.append('type', uploadType);
+      formData.append('title', uploadTitle.trim());
+      formData.append('description', uploadDesc.trim());
       await uploadResource(formData);
       toast.success('上传成功');
       setUploadOpen(false);
@@ -149,6 +172,8 @@ export default function MySpace() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setUploadType('wallpaper');
+    setUploadTitle('');
+    setUploadDesc('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -168,6 +193,41 @@ export default function MySpace() {
     }
   };
 
+  // 打开编辑弹窗，回填当前值
+  const handleOpenEdit = (resource: MyResource) => {
+    setEditTarget(resource);
+    setEditTitle(resource.title);
+    setEditDesc(resource.description ?? '');
+    setEditType(resource.type);
+  };
+
+  // 提交编辑
+  const handleEditSubmit = async () => {
+    if (!editTarget) return;
+    try {
+      setEditing(true);
+      await updateResource(editTarget.id, {
+        title: editTitle.trim() || undefined,
+        description: editDesc.trim() || undefined,
+        type: editType || undefined,
+      });
+      toast.success('修改成功');
+      // 本地同步更新，避免重新请求
+      setResources((prev) =>
+        prev.map((r) =>
+          r.id === editTarget.id
+            ? { ...r, title: editTitle.trim() || r.title, type: editType || r.type }
+            : r,
+        ),
+      );
+      setEditTarget(null);
+    } catch {
+      // 错误已在 request.ts 中通过 toast 显示
+    } finally {
+      setEditing(false);
+    }
+  };
+
   if (!isAuthenticated || user?.role !== 'creator') {
     return null;
   }
@@ -175,159 +235,95 @@ export default function MySpace() {
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-50 via-purple-50/30 to-indigo-50/30">
       {/* 头部 Banner */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-linear-to-br from-purple-600 via-indigo-600 to-purple-800">
-          <div className="absolute inset-0 opacity-20">
-            <div className="absolute top-0 -left-4 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob" />
-            <div className="absolute top-0 -right-4 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000" />
+      <PageBanner>
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+          {/* 头像 */}
+          <div className="relative">
+            <div className="absolute -inset-2 bg-linear-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full opacity-75 blur-xl" />
+            <Avatar className="relative h-24 w-24 border-4 border-white/30 shadow-2xl ring-4 ring-purple-500/30">
+              <AvatarImage src={user?.avatar} className="object-cover" />
+              <AvatarFallback className="bg-linear-to-br from-purple-400 to-indigo-600 text-white text-3xl font-bold">
+                {(user?.nickname?.[0] || user?.username?.[0] || 'U').toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
           </div>
-        </div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-            {/* 头像 */}
-            <div className="relative">
-              <div className="absolute -inset-2 bg-linear-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full opacity-75 blur-xl" />
-              <Avatar className="relative h-24 w-24 border-4 border-white/30 shadow-2xl ring-4 ring-purple-500/30">
-                <AvatarImage src={user?.avatar} className="object-cover" />
-                <AvatarFallback className="bg-linear-to-br from-purple-400 to-indigo-600 text-white text-3xl font-bold">
-                  {(user?.nickname?.[0] || user?.username?.[0] || 'U').toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            </div>
 
-            {/* 信息 */}
-            <div className="flex-1 text-white">
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-2xl md:text-3xl font-bold drop-shadow-lg">
-                  {user?.nickname || user?.username}
-                </h1>
-                <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30 px-3 py-1">
-                  <Sparkles className="h-3 w-3 mr-1" />
-                  我的创作空间
-                </Badge>
-              </div>
-              <p className="text-purple-100 text-sm mb-5">
-                在这里管理你上传的所有资源，上传新作品或删除旧内容。
-              </p>
-              {/* 统计 */}
-              <div className="flex gap-4">
-                <div className="bg-white/10 backdrop-blur-md rounded-xl px-5 py-3 border border-white/20">
-                  <div className="flex items-center gap-2 text-purple-200 mb-1">
-                    <ImageIcon className="h-3.5 w-3.5" />
-                    <span className="text-xs font-medium">作品总数</span>
-                  </div>
-                  <div className="text-2xl font-bold">{total}</div>
+          {/* 信息 */}
+          <div className="flex-1 text-white">
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-2xl md:text-3xl font-bold drop-shadow-lg">
+                {user?.nickname || user?.username}
+              </h1>
+              <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30 px-3 py-1">
+                <Sparkles className="h-3 w-3 mr-1" />
+                我的创作空间
+              </Badge>
+            </div>
+            <p className="text-purple-100 text-sm mb-5">
+              在这里管理你上传的所有资源，上传新作品或删除旧内容。
+            </p>
+            {/* 统计 */}
+            <div className="flex gap-4">
+              <div className="bg-white/10 backdrop-blur-md rounded-xl px-5 py-3 border border-white/20">
+                <div className="flex items-center gap-2 text-purple-200 mb-1">
+                  <ImageIcon className="h-3.5 w-3.5" />
+                  <span className="text-xs font-medium">作品总数</span>
                 </div>
+                <div className="text-2xl font-bold">{total}</div>
               </div>
             </div>
-
-            {/* 上传按钮 */}
-            <Button
-              onClick={() => setUploadOpen(true)}
-              size="lg"
-              className="bg-white text-purple-600 hover:bg-gray-100 shadow-xl hover:shadow-2xl hover:scale-105 font-semibold px-8 transition-all"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              上传新资源
-            </Button>
           </div>
+
+          {/* 上传按钮 */}
+          <Button
+            onClick={() => setUploadOpen(true)}
+            size="lg"
+            className="bg-white text-purple-600 hover:bg-gray-100 shadow-xl hover:shadow-2xl hover:scale-105 font-semibold px-8 transition-all"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            上传新资源
+          </Button>
         </div>
-      </div>
+      </PageBanner>
 
       {/* 内容区 */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 分类筛选 */}
-        <div className="flex items-center gap-3 mb-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <span className="text-sm text-gray-500 font-medium mr-2">筛选：</span>
-          {RESOURCE_TYPES.map((t) => (
-            <button
-              type="button"
-              key={t.value}
-              onClick={() => setActiveType(t.value)}
-              className={`px-5 py-2 rounded-xl font-medium text-sm transition-all duration-200 ${
-                activeType === t.value
-                  ? 'bg-linear-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/30 scale-105'
-                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-          <span className="ml-auto text-sm text-gray-400">共 {total} 个资源</span>
-        </div>
+        <TypeFilterBar
+          options={RESOURCE_TYPES}
+          value={activeType}
+          onChange={setActiveType}
+          prefix="筛选："
+          extra={<span className="text-sm text-gray-400">共 {total} 个资源</span>}
+          className="mb-6"
+        />
 
         {/* 资源列表 */}
         {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
             {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="rounded-2xl overflow-hidden bg-white shadow-sm">
-                <Skeleton className="aspect-3/4 w-full" />
-                <div className="p-3 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
-              </div>
+              <ResourceCardSkeleton key={i} />
             ))}
           </div>
         ) : resources.length === 0 ? (
-          <div className="text-center py-24">
-            <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-purple-100 mb-6">
-              <ImageIcon className="h-12 w-12 text-purple-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">还没有上传任何资源</h3>
-            <p className="text-gray-500 mb-8">点击上方按钮，上传你的第一个作品吧！</p>
-            <Button
-              onClick={() => setUploadOpen(true)}
-              className="bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-8 font-semibold shadow-lg"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              立即上传
-            </Button>
-          </div>
+          <EmptyState
+            icon={ImageIcon}
+            title="还没有上传任何资源"
+            description="点击上方按钮，上传你的第一个作品吧！"
+            actionLabel="立即上传"
+            onAction={() => setUploadOpen(true)}
+          />
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
-            {resources.map((resource) => (
-              <Card
+            {resources.map((resource, i) => (
+              <ResourceCard
                 key={resource.id}
-                className="group overflow-hidden cursor-pointer transition-all hover:shadow-2xl hover:-translate-y-1 border-2 border-transparent hover:border-purple-200 bg-white rounded-2xl"
-              >
-                <div className="aspect-3/4 overflow-hidden bg-linear-to-br from-purple-50 to-indigo-50 relative">
-                  <img
-                    src={resource.thumbnailUrl || resource.url}
-                    alt={resource.title}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                  {/* 悬浮操作层 */}
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(resource)}
-                      className="p-2.5 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-lg transition-all hover:scale-110"
-                      title="删除"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {/* 类型标签 */}
-                  <div className="absolute top-2 left-2">
-                    <Badge className="bg-black/50 backdrop-blur-sm text-white border-0 text-xs px-2 py-0.5">
-                      {resource.type === 'wallpaper' ? '壁纸' : '头像'}
-                    </Badge>
-                  </div>
-                </div>
-                <CardContent className="p-3">
-                  <h3 className="font-medium text-gray-900 truncate text-sm mb-1.5 group-hover:text-purple-600 transition-colors">
-                    {resource.title}
-                  </h3>
-                  <div className="flex items-center justify-between text-xs text-gray-400">
-                    <span className="flex items-center gap-1">
-                      <Download className="h-3 w-3 text-purple-400" />
-                      {resource.downloadCount}
-                    </span>
-                    <span>{formatSize(resource.size)}</span>
-                  </div>
-                </CardContent>
-              </Card>
+                resource={resource}
+                onDelete={setDeleteTarget}
+                onEdit={handleOpenEdit}
+                showSize
+                animationDelay={i * 30}
+              />
             ))}
           </div>
         )}
@@ -427,6 +423,36 @@ export default function MySpace() {
               />
             </div>
 
+            {/* 标题 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                资源标题 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={uploadTitle}
+                onChange={(e) => setUploadTitle(e.target.value)}
+                placeholder="给这个资源起个名字，如「蓝色星空壁纸」"
+                maxLength={100}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 transition"
+              />
+            </div>
+
+            {/* 描述（可选） */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                描述 <span className="text-gray-400 font-normal">（可选）</span>
+              </label>
+              <textarea
+                value={uploadDesc}
+                onChange={(e) => setUploadDesc(e.target.value)}
+                placeholder="简单描述一下这个资源…"
+                maxLength={255}
+                rows={2}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 transition resize-none"
+              />
+            </div>
+
             {/* 操作按钮 */}
             <div className="flex gap-3 pt-1">
               <Button
@@ -519,6 +545,98 @@ export default function MySpace() {
                 </>
               )}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== 编辑弹窗 ===== */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+              <Pencil className="h-5 w-5 text-blue-600" />
+              编辑资源信息
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2">
+            {/* 标题 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">资源标题</label>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="给这个资源起个名字"
+                maxLength={100}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+              />
+            </div>
+
+            {/* 描述 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                描述 <span className="text-gray-400 font-normal">（可选）</span>
+              </label>
+              <textarea
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                placeholder="简单描述一下这个资源…"
+                maxLength={255}
+                rows={2}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition resize-none"
+              />
+            </div>
+
+            {/* 类型 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">资源类型</label>
+              <div className="flex gap-3">
+                {(['wallpaper', 'avatar'] as const).map((type) => (
+                  <button
+                    type="button"
+                    key={type}
+                    onClick={() => setEditType(type)}
+                    className={`flex-1 py-2.5 rounded-xl font-medium text-sm border-2 transition-all ${
+                      editType === type
+                        ? 'border-blue-600 bg-blue-50 text-blue-600'
+                        : 'border-gray-200 text-gray-500 hover:border-blue-300'
+                    }`}
+                  >
+                    {type === 'wallpaper' ? '🖼️ 壁纸' : '🙂 头像'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 操作按钮 */}
+            <div className="flex gap-3 pt-1">
+              <Button
+                variant="outline"
+                onClick={() => setEditTarget(null)}
+                className="flex-1"
+                disabled={editing}
+              >
+                取消
+              </Button>
+              <Button
+                onClick={handleEditSubmit}
+                disabled={editing}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md"
+              >
+                {editing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    保存中...
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    保存修改
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

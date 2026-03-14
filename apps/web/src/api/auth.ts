@@ -63,3 +63,10 @@ export const updateMyProfile = (data: {
 export const changePassword = (data: { oldPassword: string; newPassword: string }) => {
   return http.put<void>('/user/password', data);
 };
+
+// 上传头像，返回新头像 URL
+export const uploadAvatar = (formData: FormData) => {
+  return http.post<unknown, { avatarUrl: string }>('/user/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};

@@ -3,6 +3,7 @@ package handler
 import (
 	"valley-server/internal/database"
 	"valley-server/internal/model"
+	"valley-server/internal/service"
 	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
@@ -158,4 +159,65 @@ func RecordDownload(c *gin.Context) {
 	// TODO: 记录下载
 
 	Success(c, nil)
+}
+
+// UploadAvatar 上传用户头像
+// @Summary      上传头像
+// @Description  上传并更新当前用户头像
+// @Tags         用户
+// @Accept       multipart/form-data
+// @Produce      json
+// @Security     Bearer
+// @Param        file  formData  file  true  "头像图片"
+// @Success      200  {object}  map[string]interface{}  "上传成功，返回头像 URL"
+// @Failure      400  {object}  map[string]interface{}  "参数错误"
+// @Failure      401  {object}  map[string]interface{}  "未登录"
+// @Router       /user/avatar [post]
+func UploadAvatar(c *gin.Context) {
+	userID, exists := c.Get("userId")
+	if !exists {
+		Error(c, 401, "未登录")
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		Error(c, 400, "请上传文件")
+		return
+	}
+
+	// 限制大小 5MB
+	if file.Size > 5*1024*1024 {
+		Error(c, 400, "头像文件不能超过 5MB")
+		return
+	}
+
+	uploadService := service.NewUploadService()
+	config := service.GetDefaultConfig(service.UploadTypeAvatar)
+	config.UserID = userID.(int64)
+
+	result, err := uploadService.Upload(file, config)
+	if err != nil {
+		Error(c, 400, err.Error())
+		return
+	}
+
+	// 更新用户头像字段
+	db := database.GetDB()
+	var user model.User
+	if err := db.First(&user, userID).Error; err != nil {
+		_ = uploadService.DeleteByKey(result.Key)
+		Error(c, 404, "用户不存在")
+		return
+	}
+
+	if err := db.Model(&user).Update("avatar", result.URL).Error; err != nil {
+		_ = uploadService.DeleteByKey(result.Key)
+		Error(c, 500, "更新头像失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"avatarUrl": result.URL,
+	})
 }

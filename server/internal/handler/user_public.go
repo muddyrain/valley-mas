@@ -235,6 +235,7 @@ func GetCreatorResourcesList(c *gin.Context) {
 	page := GetIntQuery(c, "page", 1)
 	pageSize := GetIntQuery(c, "pageSize", 20)
 	resourceType := c.Query("type")
+	keyword := c.Query("keyword")
 
 	if pageSize > 50 {
 		pageSize = 50
@@ -251,13 +252,19 @@ func GetCreatorResourcesList(c *gin.Context) {
 		return
 	}
 
-	// 查询资源
+	// 查询资源（resources 表用 user_id 关联上传者，不是 creator_id）
 	query := db.Model(&model.Resource{}).
-		Where("creator_id = ? AND deleted_at IS NULL", creator.UserID)
+		Where("user_id = ? AND deleted_at IS NULL", creator.UserID)
 
 	// 按类型筛选
 	if resourceType != "" {
 		query = query.Where("type = ?", resourceType)
+	}
+
+	// 关键词搜索（匹配标题或描述）
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		query = query.Where("title LIKE ? OR description LIKE ?", like, like)
 	}
 
 	// 统计总数
@@ -306,7 +313,11 @@ func GetCreatorResourcesList(c *gin.Context) {
 			"url":           resource.URL,
 			"thumbnailUrl":  resource.ThumbnailURL,
 			"size":          resource.Size,
+			"width":         resource.Width,
+			"height":        resource.Height,
+			"extension":     resource.Extension,
 			"downloadCount": resource.DownloadCount,
+			"favoriteCount": resource.FavoriteCount,
 			"userId":        resource.UserID,
 			"creatorName":   creatorName,
 			"creatorAvatar": creatorAvatar,

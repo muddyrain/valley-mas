@@ -2,6 +2,9 @@ package service
 
 import (
 	"fmt"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"mime/multipart"
 	"path/filepath"
 	"strings"
@@ -34,6 +37,8 @@ type UploadResult struct {
 	FileName string `json:"fileName"` // 原始文件名
 	Size     int64  `json:"size"`     // 文件大小
 	Ext      string `json:"ext"`      // 文件扩展名
+	Width    int    `json:"width"`    // 图片宽度（px）
+	Height   int    `json:"height"`   // 图片高度（px）
 }
 
 // UploadService 上传服务
@@ -144,6 +149,19 @@ func (s *UploadService) Upload(file *multipart.FileHeader, config UploadConfig) 
 		return nil, err
 	}
 
+	// 尝试读取图片尺寸（仅对 jpg/png 有效）
+	width, height := 0, 0
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if ext == ".jpg" || ext == ".jpeg" || ext == ".png" {
+		if f, err := file.Open(); err == nil {
+			if cfg, _, err := image.DecodeConfig(f); err == nil {
+				width = cfg.Width
+				height = cfg.Height
+			}
+			f.Close()
+		}
+	}
+
 	// 生成存储路径
 	storagePath := s.GenerateStoragePath(config, file.Filename)
 
@@ -159,6 +177,8 @@ func (s *UploadService) Upload(file *multipart.FileHeader, config UploadConfig) 
 		FileName: file.Filename,
 		Size:     file.Size,
 		Ext:      filepath.Ext(file.Filename),
+		Width:    width,
+		Height:   height,
 	}, nil
 }
 
