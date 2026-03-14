@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 	"valley-server/internal/service"
@@ -215,6 +216,17 @@ func UploadAvatar(c *gin.Context) {
 		_ = uploadService.DeleteByKey(result.Key)
 		Error(c, 500, "更新头像失败")
 		return
+	}
+
+	// 记录头像历史
+	history := model.UserAvatarHistory{
+		UserID:     model.Int64String(userID.(int64)),
+		AvatarURL:  result.URL,
+		StorageKey: result.Key,
+	}
+	if err := db.Create(&history).Error; err != nil {
+		// 历史记录写入失败不影响主流程，仅打印日志
+		log.Printf("[WARN] 写入头像历史记录失败: userId=%v, err=%v", userID, err)
 	}
 
 	Success(c, gin.H{

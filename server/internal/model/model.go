@@ -327,3 +327,23 @@ func (f *UserFollow) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+// UserAvatarHistory 用户头像历史记录
+type UserAvatarHistory struct {
+	ID         Int64String `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID     Int64String `gorm:"index" json:"userId"`
+	AvatarURL  string      `gorm:"size:500" json:"avatarUrl"` // 头像 URL
+	StorageKey string      `gorm:"size:500" json:"-"`         // 对象存储键名（用于删除）
+	CreatedAt  time.Time   `json:"createdAt"`
+
+	// 关联
+	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
+}
+
+// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
+func (h *UserAvatarHistory) BeforeCreate(tx *gorm.DB) error {
+	if h.ID == 0 {
+		h.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}

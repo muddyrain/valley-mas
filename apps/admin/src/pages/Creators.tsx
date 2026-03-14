@@ -7,6 +7,7 @@ import {
   SearchOutlined,
 } from '@ant-design/icons';
 import {
+  Avatar,
   Button,
   Card,
   Form,
@@ -207,18 +208,23 @@ export default function Creators() {
     {
       title: '关联账号',
       dataIndex: 'username',
-      width: 200,
+      width: 250,
       render: (username, record) => (
-        <div className="w-full flex flex-col">
-          <Tooltip title={`用户昵称: ${record.userNickname}`}>
-            <div className="font-medium truncate">用户昵称: {record.userNickname}</div>
-          </Tooltip>
-          <Tooltip title={`账号: ${username}`}>
-            <div className="text-xs text-gray-400 truncate">账号: {username?.slice(0, 20)}</div>
-          </Tooltip>
-          <Tooltip title={`用户ID: ${record.userId}`}>
-            <div className="text-xs text-green-600 truncate">用户ID: {record.userId}</div>
-          </Tooltip>
+        <div className="flex items-center">
+          <Avatar src={record?.userAvatar} size="large" className="flex-shrink-0">
+            {record?.userAvatar}
+          </Avatar>
+          <div className="w-full flex flex-col ml-2">
+            <Tooltip title={`用户昵称: ${record.userNickname}`}>
+              <div className="font-medium truncate">用户昵称: {record.userNickname}</div>
+            </Tooltip>
+            <Tooltip title={`账号: ${username}`}>
+              <div className="text-xs text-gray-400 truncate">账号: {username?.slice(0, 20)}</div>
+            </Tooltip>
+            <Tooltip title={`用户ID: ${record.userId}`}>
+              <div className="text-xs text-green-600 truncate">用户ID: {record.userId}</div>
+            </Tooltip>
+          </div>
         </div>
       ),
     },

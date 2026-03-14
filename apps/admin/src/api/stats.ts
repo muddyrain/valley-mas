@@ -27,9 +27,13 @@ export interface StatsData {
     resourceCount: number;
     creator: {
       id: string;
-      name: string;
-      avatar: string;
       code: string;
+      description: string;
+      user?: {
+        id: string;
+        nickname: string;
+        avatar: string;
+      };
     };
   }>;
 }

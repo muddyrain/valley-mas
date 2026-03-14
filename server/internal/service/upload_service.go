@@ -114,7 +114,16 @@ func (s *UploadService) GenerateStoragePath(config UploadConfig, fileName string
 		)
 	}
 
-	// 标准路径：users/{userId}/{type}/{YYYYMMDD}/{filename}
+	// 头像单独按类型组织：avatars/{userId}/{YYYYMMDD}/{filename}
+	if config.Type == UploadTypeAvatar {
+		return fmt.Sprintf("avatars/%d/%s/%s",
+			config.UserID,
+			dateFolder,
+			newFileName,
+		)
+	}
+
+	// 其他资源标准路径：users/{userId}/{type}/{YYYYMMDD}/{filename}
 	return fmt.Sprintf("users/%d/%s/%s/%s",
 		config.UserID,
 		config.Type,

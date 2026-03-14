@@ -134,3 +134,83 @@ func Logout() gin.HandlerFunc {
 		})
 	}
 }
+
+// Register 用户注册
+// @Summary      用户注册
+// @Description  通过用户名、密码、昵称注册新账号，默认角色为 user
+// @Tags         认证
+// @Accept       json
+// @Produce      json
+// @Param        body  body  object  true  "注册信息"
+// @Success      200   {object}  LoginResponse
+// @Failure      400   {object}  map[string]interface{}  "参数错误 / 用户名已存在"
+// @Router       /register [post]
+func Register(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Username string `json:"username" binding:"required,min=3,max=20"`
+			Password string `json:"password" binding:"required,min=6"`
+			Nickname string `json:"nickname"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			Error(c, http.StatusBadRequest, "参数错误："+err.Error())
+			return
+		}
+
+		db := database.GetDB()
+
+		// 检查用户名是否已存在
+		var count int64
+		db.Model(&model.User{}).Where("username = ?", req.Username).Count(&count)
+		if count > 0 {
+			Error(c, http.StatusBadRequest, "用户名已被占用")
+			return
+		}
+
+		nickname := req.Nickname
+		if nickname == "" {
+			nickname = req.Username
+		}
+
+		user := model.User{
+			Username: req.Username,
+			Password: utils.HashPassword(req.Password),
+			Nickname: nickname,
+			Role:     "user",
+			IsActive: true,
+			Platform: "web",
+		}
+
+		if err := db.Create(&user).Error; err != nil {
+			Error(c, http.StatusInternalServerError, "注册失败，请稍后重试")
+			return
+		}
+
+		// 注册成功后自动登录，返回 token
+		token, err := utils.GenerateToken(
+			strconv.FormatInt(int64(user.ID), 10),
+			user.Username,
+			user.Role,
+			cfg.JWT.Secret,
+			cfg.JWT.Expire,
+		)
+		if err != nil {
+			Error(c, http.StatusInternalServerError, "生成token失败")
+			return
+		}
+
+		c.SetCookie("token", token, int(cfg.JWT.Expire*3600), "/", "", false, true)
+
+		Success(c, gin.H{
+			"userInfo": gin.H{
+				"id":       user.ID,
+				"username": user.Username,
+				"nickname": user.Nickname,
+				"avatar":   user.Avatar,
+				"role":     user.Role,
+				"email":    user.Email,
+				"phone":    user.Phone,
+			},
+		})
+	}
+}

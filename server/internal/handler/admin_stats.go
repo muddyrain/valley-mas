@@ -57,22 +57,35 @@ func GetStats(c *gin.Context) {
 	db.Order("download_count DESC").Limit(5).Find(&topResources)
 
 	// 获取最活跃的创作者（资源最多）
+	// Resource.user_id = Creator.user_id，通过 JOIN creators 表关联
 	type CreatorStats struct {
 		CreatorID     model.Int64String `json:"creatorId"`
 		ResourceCount int64             `json:"resourceCount"`
 		Creator       *model.Creator    `json:"creator"`
 	}
-	var topCreators []CreatorStats
+	var topCreatorIDs []struct {
+		CreatorID     model.Int64String
+		ResourceCount int64
+	}
 	db.Model(&model.Resource{}).
-		Select("creator_id, COUNT(*) as resource_count").
-		Group("creator_id").
+		Select("creators.id as creator_id, COUNT(resources.id) as resource_count").
+		Joins("JOIN creators ON creators.user_id = resources.user_id AND creators.deleted_at IS NULL").
+		Group("creators.id").
 		Order("resource_count DESC").
 		Limit(5).
-		Scan(&topCreators)
+		Scan(&topCreatorIDs)
 
-	// 加载创作者信息
-	for i := range topCreators {
-		db.First(&topCreators[i].Creator, "id = ?", topCreators[i].CreatorID)
+	topCreators := make([]CreatorStats, 0, len(topCreatorIDs))
+	for _, row := range topCreatorIDs {
+		var creator model.Creator
+		if err := db.Preload("User").First(&creator, "id = ?", row.CreatorID).Error; err != nil {
+			continue
+		}
+		topCreators = append(topCreators, CreatorStats{
+			CreatorID:     row.CreatorID,
+			ResourceCount: row.ResourceCount,
+			Creator:       &creator,
+		})
 	}
 
 	Success(c, gin.H{

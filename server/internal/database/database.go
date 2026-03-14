@@ -9,6 +9,7 @@ import (
 	"valley-server/internal/model"
 
 	"github.com/glebarez/sqlite"
+	mysqlDriver "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -73,19 +74,17 @@ func initSQLite(cfg *config.Config) (gorm.Dialector, error) {
 	return sqlite.Open(dbPath), nil
 }
 
-// initMySQL 初始化 MySQL（暂未使用，如需启用请安装 gorm.io/driver/mysql）
+// initMySQL 初始化 MySQL
 func initMySQL(cfg *config.Config) (gorm.Dialector, error) {
-	// dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-	// 	cfg.Database.User,
-	// 	cfg.Database.Password,
-	// 	cfg.Database.Host,
-	// 	cfg.Database.Port,
-	// 	cfg.Database.DBName,
-	// )
-	// log.Printf("🔗 Connecting to MySQL: %s:%s/%s", cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName)
-	// return mysql.Open(dsn), nil
-
-	return nil, fmt.Errorf("MySQL support is currently disabled. Using SQLite instead.")
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		cfg.Database.User,
+		cfg.Database.Password,
+		cfg.Database.Host,
+		cfg.Database.Port,
+		cfg.Database.DBName,
+	)
+	log.Printf("🔗 Connecting to MySQL: %s:%s/%s", cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName)
+	return mysqlDriver.Open(dsn), nil
 }
 
 // autoMigrate 自动迁移表结构
@@ -100,6 +99,7 @@ func autoMigrate() error {
 		&model.CreatorApplication{}, // 创作者申请表
 		&model.UserFavorite{},       // 用户收藏资源表
 		&model.UserFollow{},         // 用户关注创作者表
+		&model.UserAvatarHistory{},  // 用户头像历史记录表
 	)
 }
 

@@ -21,6 +21,7 @@ type CreatorWithStats struct {
 	DownloadCount int    `json:"downloadCount"` // 下载量
 	Username      string `json:"username"`      // 用户名
 	UserNickname  string `json:"userNickname"`  // 用户昵称
+	UserAvatar    string `json:"userAvatar"`    // 用户头像
 }
 
 // ListCreators 获取创作者列表（管理员）
@@ -105,6 +106,7 @@ func ListCreators(c *gin.Context) {
 		if err := db.Where("id = ?", creator.UserID).First(&user).Error; err == nil {
 			creatorsWithStats[i].Username = user.Username
 			creatorsWithStats[i].UserNickname = user.Nickname
+			creatorsWithStats[i].UserAvatar = user.Avatar
 		}
 
 		// 统计资源数量（Resource.CreatorID 存储的是 User.ID，不是 Creator.ID）

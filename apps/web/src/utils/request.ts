@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
-import Cookies from 'js-cookie';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 // 定义接口返回的标准结构
 export interface ApiResponse<T = unknown> {
@@ -19,8 +19,8 @@ const http: AxiosInstance = axios.create({
 // 请求拦截器
 http.interceptors.request.use(
   (config) => {
-    // 从 Cookie 中获取 token 并设置到请求头
-    const token = Cookies.get('valley_token');
+    // 直接从 Zustand store 的 getState() 取 token，避免手动解析 Cookie
+    const token = useAuthStore.getState().token;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -57,9 +57,8 @@ http.interceptors.response.use(
       errorMessage = responseData.message;
     } else if (status === 401) {
       errorMessage = '认证失败，请重新登录';
-      // Token 已过期或无效，清除认证信息
-      Cookies.remove('valley_token');
-      Cookies.remove('valley_user');
+      // 调用 store logout，清除所有认证状态和 Cookie
+      useAuthStore.getState().logout();
 
       // 避免在登录页重复跳转
       if (window.location.pathname !== '/login') {
