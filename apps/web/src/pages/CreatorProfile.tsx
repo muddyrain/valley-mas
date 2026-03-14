@@ -2,8 +2,6 @@ import {
   ArrowLeft,
   Award,
   Download,
-  Eye,
-  Heart,
   Image as ImageIcon,
   Search,
   Share2,
@@ -25,10 +23,11 @@ import {
   unfollowCreator,
 } from '@/api/creator';
 import { favoriteResource, unfavoriteResource } from '@/api/resource';
+import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
+import TypeFilterBar from '@/components/TypeFilterBar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -50,6 +49,7 @@ export default function CreatorProfile() {
   const [isSelf, setIsSelf] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [worksLoading, setWorksLoading] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('works');
   // 作品收藏状态：key = resourceId, value = boolean
@@ -138,42 +138,49 @@ export default function CreatorProfile() {
     if (!creator) return;
 
     try {
+      setWorksLoading(true);
       const params: { keyword?: string; type?: string } = {};
       if (searchKeyword) params.keyword = searchKeyword;
-      // 只有当activeCategory不为空时才传type参数
       if (activeCategory) params.type = activeCategory;
 
       if (activeTab === 'works') {
         const data = await getCreatorWorks(creator.id, params);
         setWorks(data.list);
+        const map: Record<string, boolean> = {};
+        data.list.forEach((w) => {
+          map[w.id] = w.isFavorited ?? false;
+        });
+        setFavoritedMap(map);
       }
-      // 暂时注释掉专辑搜索(后端未实现)
-      // else {
-      //   const data = await getCreatorAlbums(creator.id, { keyword: searchKeyword });
-      //   setAlbums(data.list);
-      // }
     } catch (error) {
       console.error('搜索失败:', error);
+    } finally {
+      setWorksLoading(false);
     }
   };
 
   // 切换分类的处理函数
-  const handleCategoryChange = (categoryValue: string) => {
+  const handleCategoryChange = async (categoryValue: string) => {
+    if (!creator) return;
     setActiveCategory(categoryValue);
-    // 立即触发搜索
-    setTimeout(async () => {
-      if (!creator) return;
-      try {
-        const params: { keyword?: string; type?: string } = {};
-        if (searchKeyword) params.keyword = searchKeyword;
-        if (categoryValue) params.type = categoryValue;
+    try {
+      setWorksLoading(true);
+      const params: { keyword?: string; type?: string } = {};
+      if (searchKeyword) params.keyword = searchKeyword;
+      if (categoryValue) params.type = categoryValue;
 
-        const data = await getCreatorWorks(creator.id, params);
-        setWorks(data.list);
-      } catch (error) {
-        console.error('筛选失败:', error);
-      }
-    }, 0);
+      const data = await getCreatorWorks(creator.id, params);
+      setWorks(data.list);
+      const map: Record<string, boolean> = {};
+      data.list.forEach((w) => {
+        map[w.id] = w.isFavorited ?? false;
+      });
+      setFavoritedMap(map);
+    } catch (error) {
+      console.error('筛选失败:', error);
+    } finally {
+      setWorksLoading(false);
+    }
   };
 
   if (loading) {
@@ -368,23 +375,12 @@ export default function CreatorProfile() {
                   <span className="text-sm text-gray-500">{works.length} 个作品</span>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  {categories.map((category) => (
-                    <button
-                      type="button"
-                      key={category.value}
-                      onClick={() => handleCategoryChange(category.value)}
-                      className={`relative cursor-pointer px-6 py-3 rounded-xl font-medium text-sm transition-all duration-300 ${
-                        activeCategory === category.value
-                          ? 'bg-linear-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/30 scale-105'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:scale-105'
-                      }`}
-                    >
-                      {activeCategory === category.value && (
-                        <div className="absolute inset-0 bg-linear-to-r from-purple-400 to-indigo-400 rounded-xl blur-lg opacity-50 -z-10" />
-                      )}
-                      <span className="relative z-10">{category.label}</span>
-                    </button>
-                  ))}
+                  <TypeFilterBar
+                    options={categories}
+                    value={activeCategory}
+                    onChange={handleCategoryChange}
+                    className="bg-transparent! shadow-none! border-none! p-0!"
+                  />
                 </div>
               </div>
               {/* Search Box */}
@@ -417,7 +413,13 @@ export default function CreatorProfile() {
 
             {/* Works Grid */}
             <TabsContent value="works" className="mt-0">
-              {works.length === 0 ? (
+              {worksLoading ? (
+                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <ResourceCardSkeleton key={i} contentPadding="p-4" />
+                  ))}
+                </div>
+              ) : works.length === 0 ? (
                 <div className="text-center py-20">
                   <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-purple-100 mb-6">
                     <ImageIcon className="h-12 w-12 text-purple-600" />
@@ -428,63 +430,13 @@ export default function CreatorProfile() {
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {works.map((work) => (
-                    <Card
+                    <ResourceCard
                       key={work.id}
-                      className="group overflow-hidden cursor-pointer transition-all hover:shadow-2xl hover:-translate-y-2 border-2 border-transparent hover:border-purple-200 bg-white rounded-2xl"
-                    >
-                      <div className="aspect-3/4 overflow-hidden bg-linear-to-br from-purple-100 to-indigo-100 relative">
-                        <img
-                          src={work.thumbnailUrl || work.url}
-                          alt={work.title}
-                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                        />
-                        {/* Hover Overlay */}
-                        <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <div className="absolute bottom-0 left-0 right-0 p-4 text-white transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                            <div className="flex items-center gap-3 text-xs">
-                              <span className="flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2 py-1 rounded-full">
-                                <Eye className="h-3 w-3" />
-                                预览
-                              </span>
-                              <span className="flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2 py-1 rounded-full">
-                                <Download className="h-3 w-3" />
-                                {work.downloadCount}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={(e) => handleFavorite(e, work)}
-                                className={`flex items-center gap-1 px-2 py-1 rounded-full backdrop-blur-sm transition-colors ${
-                                  favoritedMap[work.id]
-                                    ? 'bg-pink-500/80 text-white'
-                                    : 'bg-white/20 hover:bg-white/30 text-white'
-                                }`}
-                              >
-                                <Heart
-                                  className={`h-3 w-3 ${favoritedMap[work.id] ? 'fill-white' : ''}`}
-                                />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <CardContent className="p-4">
-                        <h3 className="font-semibold text-gray-900 truncate mb-2 group-hover:text-purple-600 transition-colors">
-                          {work.title}
-                        </h3>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-500 flex items-center gap-1">
-                            <Download className="h-3.5 w-3.5 text-purple-500" />
-                            {work.downloadCount}
-                          </span>
-                          <Badge
-                            variant="outline"
-                            className="text-xs border-purple-200 text-purple-600"
-                          >
-                            {work.type || '壁纸'}
-                          </Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
+                      resource={work}
+                      isFavorited={favoritedMap[work.id]}
+                      onFavorite={handleFavorite}
+                      contentPadding="p-4"
+                    />
                   ))}
                 </div>
               )}

@@ -43,8 +43,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 			public.GET("/hot-creators", handler.GetHotCreators)             // 新增：获取热门创作者
 
 			// 以下接口挂可选认证，登录用户响应中会带 isFavorited 字段
-			public.GET("/hot-resources", middleware.OptionalAuth(cfg), handler.GetHotResources)                  // 新增：获取热门资源
-			public.GET("/creators/:id/resources", middleware.OptionalAuth(cfg), handler.GetCreatorResourcesList) // 新增：获取创作者资源列表
+			public.GET("/hot-resources", middleware.OptionalAuth(cfg), handler.GetHotResources)                  // 热门资源
+			public.GET("/resources", middleware.OptionalAuth(cfg), handler.GetAllResources)                      // 资源广场（全量列表）
+			public.GET("/creators/:id/resources", middleware.OptionalAuth(cfg), handler.GetCreatorResourcesList) // 创作者资源列表
+			public.GET("/resources/:id", middleware.OptionalAuth(cfg), handler.GetResourceDetail)                // 资源详情
 		}
 
 		// 旧的公开接口（保留兼容）
@@ -60,6 +62,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			user.GET("/info", handler.GetUserInfo)         // 获取个人信息
 			user.PUT("/profile", handler.UpdateMyProfile)  // 更新个人信息
 			user.PUT("/password", handler.ChangePassword)  // 修改密码
+			user.POST("/avatar", handler.UploadAvatar)     // 上传头像
 
 			// 资源收藏（喜欢）
 			user.POST("/resources/favorite/batch-status", handler.BatchGetFavoriteStatus) // 批量查询收藏状态（静态路由须在动态路由前）
@@ -154,6 +157,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 				// 资源管理（创作者只能管理自己的资源）
 				content.GET("/resources", handler.ListResources)
 				content.POST("/resources/upload", handler.UploadResource)
+				content.PATCH("/resources/:id", handler.UpdateResource)
 				content.PUT("/resources/:id/creator", handler.UpdateResourceCreator)
 				content.DELETE("/resources/:id", handler.DeleteResource)
 			}

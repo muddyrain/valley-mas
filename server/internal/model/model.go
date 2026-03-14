@@ -41,6 +41,11 @@ func (i *Int64String) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// String 实现 fmt.Stringer 接口，返回十进制字符串
+func (i Int64String) String() string {
+	return strconv.FormatInt(int64(i), 10)
+}
+
 // Value 实现 driver.Valuer 接口，用于 GORM
 func (i Int64String) Value() (driver.Value, error) {
 	return int64(i), nil
@@ -184,7 +189,9 @@ type Resource struct {
 	Width         int            `json:"width"`
 	Height        int            `json:"height"`
 	Size          int64          `json:"size"`
+	Extension     string         `gorm:"size:20" json:"extension"` // 文件扩展名，如 jpg/png/gif
 	DownloadCount int            `gorm:"default:0" json:"downloadCount"`
+	FavoriteCount int            `gorm:"default:0" json:"favoriteCount"`
 	CreatedAt     time.Time      `json:"createdAt"`
 	UpdatedAt     time.Time      `json:"updatedAt"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`

@@ -8,6 +8,8 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import MySpace from './pages/MySpace';
 import Profile from './pages/Profile';
+import ResourceDetail from './pages/ResourceDetail';
+import Resources from './pages/Resources';
 
 function App() {
   return (
@@ -17,6 +19,8 @@ function App() {
           <Route index element={<Home />} />
           <Route path="creators" element={<Creator />} />
           <Route path="creator/:code" element={<CreatorProfile />} />
+          <Route path="resources" element={<Resources />} />
+          <Route path="resource/:id" element={<ResourceDetail />} />
           <Route path="my-space" element={<MySpace />} />
           <Route path="profile" element={<Profile />} />
           <Route path="favorites" element={<Favorites />} />

@@ -10,7 +10,7 @@ import {
   unfavoriteResource,
 } from '@/api/resource';
 import CreatorCard from '@/components/CreatorCard';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,36 +21,44 @@ export default function Home() {
   const [code, setCode] = useState('');
   const [creators, setCreators] = useState<Creator[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingCreators, setLoadingCreators] = useState(true);
+  const [loadingResources, setLoadingResources] = useState(true);
+  const [creatorsError, setCreatorsError] = useState(false);
+  const [resourcesError, setResourcesError] = useState(false);
   // 收藏状态：key = resourceId, value = boolean
   const [favoritedMap, setFavoritedMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const [creatorsData, resourcesData] = await Promise.all([
-          getHotCreators(1, 8),
-          getHotResources(1, 12),
-        ]);
+    // 独立加载创作者，互不影响
+    setLoadingCreators(true);
+    setCreatorsError(false);
+    getHotCreators(1, 8)
+      .then((data) => {
+        setCreators(data.list ?? []);
+      })
+      .catch((error) => {
+        console.error('加载创作者失败:', error);
+        setCreatorsError(true);
+      })
+      .finally(() => setLoadingCreators(false));
 
-        setCreators(creatorsData.list);
-        setResources(resourcesData.list);
-
-        // 直接从列表响应中读取 isFavorited 字段（服务端对登录用户返回收藏状态）
+    // 独立加载资源
+    setLoadingResources(true);
+    setResourcesError(false);
+    getHotResources(1, 12)
+      .then((data) => {
+        setResources(data.list ?? []);
         const map: Record<string, boolean> = {};
-        resourcesData.list.forEach((r) => {
+        (data.list ?? []).forEach((r) => {
           map[r.id] = r.isFavorited ?? false;
         });
         setFavoritedMap(map);
-      } catch (error) {
-        console.error('加载数据失败:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
+      })
+      .catch((error) => {
+        console.error('加载资源失败:', error);
+        setResourcesError(true);
+      })
+      .finally(() => setLoadingResources(false));
   }, []);
 
   const handleSearchCode = () => {
@@ -173,23 +181,35 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {loading
-              ? Array.from({ length: 4 }).map((_, i) => (
-                  <Card key={i} className="overflow-hidden">
-                    <CardContent className="p-5">
-                      <div className="flex items-center gap-3">
-                        <Skeleton className="h-14 w-14 rounded-full" />
-                        <div className="space-y-2 flex-1">
-                          <Skeleton className="h-4 w-24" />
-                          <Skeleton className="h-3 w-16" />
-                        </div>
+            {loadingCreators ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="overflow-hidden">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-14 w-14 rounded-full" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-3 w-16" />
                       </div>
-                    </CardContent>
-                  </Card>
-                ))
-              : creators.map((creator) => (
-                  <CreatorCard key={creator.id} creator={creator} variant="compact" />
-                ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : creatorsError ? (
+              <div className="col-span-full flex flex-col items-center justify-center py-16 text-gray-400">
+                <Users className="w-12 h-12 mb-3 opacity-30" />
+                <p className="text-sm">创作者数据加载失败，请稍后刷新重试</p>
+              </div>
+            ) : creators.length === 0 ? (
+              <div className="col-span-full flex flex-col items-center justify-center py-16 text-gray-400">
+                <Users className="w-12 h-12 mb-3 opacity-30" />
+                <p className="text-sm">暂无创作者数据</p>
+              </div>
+            ) : (
+              creators.map((creator) => (
+                <CreatorCard key={creator.id} creator={creator} variant="compact" />
+              ))
+            )}
           </div>
         </section>
 
@@ -214,78 +234,31 @@ export default function Home() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-            {loading
-              ? Array.from({ length: 12 }).map((_, i) => (
-                  <Card key={i} className="overflow-hidden group">
-                    <Skeleton className="aspect-3/4 w-full" />
-                    <CardContent className="p-3 space-y-2">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-3 w-2/3" />
-                    </CardContent>
-                  </Card>
-                ))
-              : resources.map((resource, index) => (
-                  <Card
-                    key={resource.id}
-                    className="group overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 border-gray-100 bg-white/80 backdrop-blur-sm"
-                    onClick={() => navigate(`/resource/${resource.id}`)}
-                    style={{ animationDelay: `${index * 50}ms` }}
-                  >
-                    <div className="relative aspect-3/4 overflow-hidden bg-linear-to-br from-gray-100 to-gray-200">
-                      <img
-                        src={resource.thumbnailUrl || resource.url}
-                        alt={resource.title}
-                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        loading="lazy"
-                      />
-                      {/* 资源类型标签 */}
-                      <div className="absolute top-3 right-3">
-                        <span className="px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-sm text-white text-xs font-medium shadow-lg">
-                          {resource.type === 'wallpaper' ? '🖼️ 壁纸' : '👤 头像'}
-                        </span>
-                      </div>
-                      {/* Hover 遮罩和信息 */}
-                      <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <div className="absolute bottom-0 left-0 right-0 p-4 text-white transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                          <div className="flex items-center justify-between text-xs mb-2">
-                            <span className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-2 py-1 rounded-lg">
-                              <Download className="w-3.5 h-3.5" />
-                              {resource.downloadCount}
-                            </span>
-                            <Button
-                              size="xs"
-                              className={`backdrop-blur-sm border-0 h-7 transition-colors ${
-                                favoritedMap[resource.id]
-                                  ? 'bg-pink-500/80 hover:bg-pink-600/80 text-white'
-                                  : 'bg-white/20 hover:bg-white/30'
-                              }`}
-                              onClick={(e) => handleFavorite(e, resource)}
-                            >
-                              <Heart
-                                className={`w-3.5 h-3.5 ${favoritedMap[resource.id] ? 'fill-white' : ''}`}
-                              />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <CardContent className="p-3">
-                      <h3 className="font-medium text-sm text-gray-900 truncate mb-2 group-hover:text-purple-600 transition-colors">
-                        {resource.title}
-                      </h3>
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <Avatar className="h-5 w-5 border border-gray-200">
-                          <AvatarImage src={resource.creatorAvatar} />
-                          <AvatarFallback className="text-[10px] bg-purple-100 text-purple-600">
-                            {resource.creatorName?.[0] || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="truncate">{resource.creatorName || '未知创作者'}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+          <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {loadingResources ? (
+              Array.from({ length: 12 }).map((_, i) => <ResourceCardSkeleton key={i} />)
+            ) : resourcesError ? (
+              <div className="col-span-full flex flex-col items-center justify-center py-16 text-gray-400">
+                <TrendingUp className="w-12 h-12 mb-3 opacity-30" />
+                <p className="text-sm">资源数据加载失败，请稍后刷新重试</p>
+              </div>
+            ) : resources.length === 0 ? (
+              <div className="col-span-full flex flex-col items-center justify-center py-16 text-gray-400">
+                <TrendingUp className="w-12 h-12 mb-3 opacity-30" />
+                <p className="text-sm">暂无资源数据</p>
+              </div>
+            ) : (
+              resources.map((resource, index) => (
+                <ResourceCard
+                  key={resource.id}
+                  resource={resource}
+                  isFavorited={favoritedMap[resource.id]}
+                  onFavorite={handleFavorite}
+                  showCreator
+                  animationDelay={index * 50}
+                />
+              ))
+            )}
           </div>
         </section>
       </div>

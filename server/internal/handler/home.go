@@ -241,7 +241,61 @@ func GetHotCreators(c *gin.Context) {
 	})
 }
 
-// HotResourceResponse 热门资源响应
+// GetResourceDetail 获取单个资源详情（公开接口）
+func GetResourceDetail(c *gin.Context) {
+	id := c.Param("id")
+	db := database.GetDB()
+
+	var resource model.Resource
+	if err := db.Where("id = ? AND deleted_at IS NULL", id).First(&resource).Error; err != nil {
+		Error(c, 404, "资源不存在")
+		return
+	}
+
+	// 查询上传者信息
+	var user model.User
+	if err := db.Where("id = ? AND deleted_at IS NULL", resource.UserID).First(&user).Error; err != nil {
+		user = model.User{}
+	}
+
+	// 查询创作者 code（用于跳转创作者主页）
+	var creator model.Creator
+	creatorCode := ""
+	if err := db.Where("user_id = ?", resource.UserID).First(&creator).Error; err == nil {
+		creatorCode = creator.Code
+	}
+
+	// 收藏状态（OptionalAuth 已解析 userId）
+	isFavorited := false
+	if uid, exists := c.Get("userId"); exists {
+		var fav model.UserFavorite
+		if err := db.Where("user_id = ? AND resource_id = ? AND deleted_at IS NULL", uid, resource.ID).
+			First(&fav).Error; err == nil {
+			isFavorited = true
+		}
+	}
+
+	Success(c, gin.H{
+		"id":            strconv.FormatInt(int64(resource.ID), 10),
+		"title":         resource.Title,
+		"description":   resource.Description,
+		"type":          resource.Type,
+		"url":           resource.URL,
+		"thumbnailUrl":  resource.ThumbnailURL,
+		"size":          resource.Size,
+		"width":         resource.Width,
+		"height":        resource.Height,
+		"downloadCount": resource.DownloadCount,
+		"favoriteCount": resource.FavoriteCount,
+		"extension":     resource.Extension,
+		"createdAt":     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		"userId":        fmt.Sprintf("%d", resource.UserID),
+		"creatorName":   user.Nickname,
+		"creatorAvatar": user.Avatar,
+		"creatorCode":   creatorCode,
+		"isFavorited":   isFavorited,
+	})
+} // HotResourceResponse 热门资源响应
 type HotResourceResponse struct {
 	ID            string `json:"id"`
 	Title         string `json:"title"`
@@ -249,7 +303,11 @@ type HotResourceResponse struct {
 	URL           string `json:"url"`
 	ThumbnailURL  string `json:"thumbnailUrl"`
 	Size          int64  `json:"size"`
+	Width         int    `json:"width"`
+	Height        int    `json:"height"`
+	Extension     string `json:"extension"`
 	DownloadCount int64  `json:"downloadCount"`
+	FavoriteCount int    `json:"favoriteCount"`
 	UserId        string `json:"userId"`
 	CreatorName   string `json:"creatorName"`
 	CreatorAvatar string `json:"creatorAvatar"`
@@ -336,7 +394,11 @@ func GetHotResources(c *gin.Context) {
 			URL:           resource.URL,
 			ThumbnailURL:  resource.ThumbnailURL,
 			Size:          resource.Size,
+			Width:         resource.Width,
+			Height:        resource.Height,
+			Extension:     resource.Extension,
 			DownloadCount: int64(resource.DownloadCount),
+			FavoriteCount: resource.FavoriteCount,
 			UserId:        fmt.Sprintf("%d", resource.UserID),
 			CreatorName:   user.Nickname,
 			CreatorAvatar: user.Avatar,
@@ -354,5 +416,87 @@ func GetHotResources(c *gin.Context) {
 			"page":     page,
 			"pageSize": pageSize,
 		},
+	})
+}
+
+// GetAllResources 资源广场 - 获取全量资源列表（支持分页、类型、关键词筛选）
+func GetAllResources(c *gin.Context) {
+	db := database.GetDB()
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
+	resourceType := c.Query("type")
+	keyword := c.Query("keyword")
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 50 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	query := db.Model(&model.Resource{}).Where("deleted_at IS NULL")
+	if resourceType != "" {
+		query = query.Where("type = ?", resourceType)
+	}
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		query = query.Where("title LIKE ? OR description LIKE ?", like, like)
+	}
+
+	var total int64
+	query.Count(&total)
+
+	var resources []model.Resource
+	if err := query.Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&resources).Error; err != nil {
+		Error(c, 500, "查询失败: "+err.Error())
+		return
+	}
+
+	// 收藏状态（OptionalAuth）
+	favoritedSet := map[string]bool{}
+	if uid, exists := c.Get("userId"); exists {
+		userID := uid.(int64)
+		var favs []model.UserFavorite
+		db.Where("user_id = ? AND deleted_at IS NULL", userID).Find(&favs)
+		for _, f := range favs {
+			favoritedSet[strconv.FormatInt(int64(f.ResourceID), 10)] = true
+		}
+	}
+
+	// 复用 HotResourceResponse 结构
+	response := make([]HotResourceResponse, 0, len(resources))
+	for _, resource := range resources {
+		var user model.User
+		if err := db.Where("id = ? AND deleted_at IS NULL", resource.UserID).First(&user).Error; err != nil {
+			user = model.User{}
+		}
+		rid := strconv.FormatInt(int64(resource.ID), 10)
+		response = append(response, HotResourceResponse{
+			ID:            rid,
+			Title:         resource.Title,
+			Type:          resource.Type,
+			URL:           resource.URL,
+			ThumbnailURL:  resource.ThumbnailURL,
+			Size:          resource.Size,
+			Width:         resource.Width,
+			Height:        resource.Height,
+			Extension:     resource.Extension,
+			DownloadCount: int64(resource.DownloadCount),
+			FavoriteCount: resource.FavoriteCount,
+			UserId:        fmt.Sprintf("%d", resource.UserID),
+			CreatorName:   user.Nickname,
+			CreatorAvatar: user.Avatar,
+			CreatedAt:     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			IsFavorited:   favoritedSet[rid],
+		})
+	}
+
+	Success(c, gin.H{
+		"list":     response,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
 	})
 }

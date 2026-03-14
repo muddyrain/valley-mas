@@ -129,10 +129,10 @@ func ListDownloadRecords(c *gin.Context) {
 	list := make([]DownloadRecordResponse, len(records))
 	for i, record := range records {
 		list[i] = DownloadRecordResponse{
-			ID:         string(record.ID),
-			UserID:     string(record.UserID),
-			ResourceID: string(record.ResourceID),
-			CreatorID:  string(record.CreatorID),
+			ID:         record.ID.String(),
+			UserID:     record.UserID.String(),
+			ResourceID: record.ResourceID.String(),
+			CreatorID:  record.CreatorID.String(),
 			IP:         record.IP,
 			UserAgent:  record.UserAgent,
 			CreatedAt:  record.CreatedAt.Format("2006-01-02 15:04:05"),
@@ -141,7 +141,7 @@ func ListDownloadRecords(c *gin.Context) {
 		// 用户信息
 		if record.User != nil {
 			list[i].User = &UserInfo{
-				ID:       string(record.User.ID),
+				ID:       record.User.ID.String(),
 				Nickname: record.User.Nickname,
 				Avatar:   record.User.Avatar,
 			}
@@ -150,7 +150,7 @@ func ListDownloadRecords(c *gin.Context) {
 		// 资源信息
 		if record.Resource != nil {
 			list[i].Resource = &ResourceInfo{
-				ID:           string(record.Resource.ID),
+				ID:           record.Resource.ID.String(),
 				Title:        record.Resource.Title,
 				Type:         record.Resource.Type,
 				URL:          record.Resource.URL,
@@ -161,12 +161,12 @@ func ListDownloadRecords(c *gin.Context) {
 		// 创作者信息
 		if record.Creator != nil {
 			list[i].Creator = &CreatorInfo{
-				ID:   string(record.Creator.ID),
+				ID:   record.Creator.ID.String(),
 				Code: record.Creator.Code,
 			}
 			if record.Creator.User != nil {
 				list[i].Creator.User = &UserInfo{
-					ID:       string(record.Creator.User.ID),
+					ID:       record.Creator.User.ID.String(),
 					Nickname: record.Creator.User.Nickname,
 					Avatar:   record.Creator.User.Avatar,
 				}

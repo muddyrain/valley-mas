@@ -45,6 +45,8 @@ func FavoriteResource(c *gin.Context) {
 				Error(c, 500, "收藏失败")
 				return
 			}
+			// 收藏数 +1
+			db.Model(&model.Resource{}).Where("id = ?", rid).UpdateColumn("favorite_count", gorm.Expr("favorite_count + 1"))
 		} else {
 			// 已收藏，直接返回成功
 			Success(c, gin.H{"favorited": true})
@@ -61,6 +63,8 @@ func FavoriteResource(c *gin.Context) {
 			Error(c, 500, "收藏失败")
 			return
 		}
+		// 收藏数 +1
+		db.Model(&model.Resource{}).Where("id = ?", rid).UpdateColumn("favorite_count", gorm.Expr("favorite_count + 1"))
 	} else {
 		Error(c, 500, "操作失败")
 		return
@@ -88,6 +92,11 @@ func UnfavoriteResource(c *gin.Context) {
 	if result.Error != nil {
 		Error(c, 500, "取消收藏失败")
 		return
+	}
+	// 若确实删除了记录，收藏数 -1（不低于 0）
+	if result.RowsAffected > 0 {
+		db.Model(&model.Resource{}).Where("id = ? AND favorite_count > 0", resourceID).
+			UpdateColumn("favorite_count", gorm.Expr("favorite_count - 1"))
 	}
 
 	Success(c, gin.H{"favorited": false})

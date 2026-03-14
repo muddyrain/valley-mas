@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strings"
+
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 	"valley-server/internal/service"
@@ -112,11 +114,18 @@ func UploadResource(c *gin.Context) {
 		ID:          model.Int64String(utils.GenerateID()),
 		Type:        resourceType,
 		URL:         result.URL,
-		StorageKey:  result.Key, // 保存对象存储键名
-		Title:       file.Filename,
+		StorageKey:  result.Key,
+		Title:       c.PostForm("title"),
+		Description: c.PostForm("description"),
 		Size:        file.Size,
+		Width:       result.Width,
+		Height:      result.Height,
+		Extension:   strings.TrimPrefix(result.Ext, "."), // 去掉前导点，如 ".jpg" → "jpg"
 		UserID:      model.Int64String(userID.(int64)),
-		Description: "",
+	}
+	// 标题为空时兜底使用去掉扩展名的文件名
+	if resource.Title == "" {
+		resource.Title = strings.TrimSuffix(file.Filename, result.Ext)
 	}
 
 	db := database.GetDB()
@@ -134,7 +143,6 @@ func UploadResource(c *gin.Context) {
 }
 
 // DeleteResource 删除资源
-// @Summary      删除资源
 // @Description  管理员删除资源
 // @Tags         管理后台 - 资源管理
 // @Accept       json
@@ -242,4 +250,84 @@ func UpdateResourceCreator(c *gin.Context) {
 	db.Preload("User").First(&resource, "id = ?", id)
 
 	Success(c, resource)
+}
+
+// UpdateResource 修改资源元数据（标题、描述、类型）
+// @Summary      修改资源
+// @Description  创作者或管理员修改资源的标题、描述、类型
+// @Tags         管理后台 - 资源管理
+// @Accept       json
+// @Produce      json
+// @Security     Bearer
+// @Param        id    path  string  true  "资源ID"
+// @Param        body  body  object  true  "修改内容"
+// @Success      200  {object}  map[string]interface{}  "修改成功"
+// @Failure      400  {object}  map[string]interface{}  "参数错误"
+// @Failure      401  {object}  map[string]interface{}  "未登录"
+// @Failure      403  {object}  map[string]interface{}  "无权限"
+// @Failure      404  {object}  map[string]interface{}  "资源不存在"
+// @Router       /admin/resources/{id} [patch]
+func UpdateResource(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Type        string `json:"type"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Error(c, 400, "参数错误："+err.Error())
+		return
+	}
+
+	db := database.GetDB()
+	var resource model.Resource
+	if err := db.First(&resource, "id = ?", id).Error; err != nil {
+		Error(c, 404, "资源不存在")
+		return
+	}
+
+	// 权限：创作者只能改自己的资源，管理员可以改所有
+	userRole, _ := c.Get("userRole")
+	userID, _ := c.Get("userId")
+	if userRole == "creator" && int64(resource.UserID) != userID.(int64) {
+		Error(c, 403, "无权限修改他人资源")
+		return
+	}
+
+	// 只更新允许修改的字段（空字符串不覆盖）
+	updates := map[string]interface{}{}
+	if req.Title != "" {
+		updates["title"] = req.Title
+	}
+	if req.Description != "" {
+		updates["description"] = req.Description
+	}
+	if req.Type != "" {
+		validTypes := map[string]bool{"wallpaper": true, "avatar": true, "emoji": true, "background": true, "dynamic": true}
+		if !validTypes[req.Type] {
+			Error(c, 400, "无效的资源类型")
+			return
+		}
+		updates["type"] = req.Type
+	}
+
+	if len(updates) == 0 {
+		Error(c, 400, "没有可更新的字段")
+		return
+	}
+
+	if err := db.Model(&resource).Updates(updates).Error; err != nil {
+		Error(c, 500, "更新失败："+err.Error())
+		return
+	}
+
+	// 返回最新数据
+	db.First(&resource, "id = ?", id)
+	Success(c, gin.H{
+		"id":          resource.ID,
+		"title":       resource.Title,
+		"description": resource.Description,
+		"type":        resource.Type,
+	})
 }

@@ -1,4 +1,5 @@
 import {
+  Camera,
   Download,
   Eye,
   EyeOff,
@@ -10,10 +11,17 @@ import {
   Shield,
   User,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { changePassword, getMyProfile, type UserProfile, updateMyProfile } from '@/api/auth';
+import {
+  changePassword,
+  getMyProfile,
+  type UserProfile,
+  updateMyProfile,
+  uploadAvatar,
+} from '@/api/auth';
+import PageBanner from '@/components/PageBanner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,6 +43,10 @@ export default function Profile() {
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // 头像上传
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   // 基本信息表单
   const [infoForm, setInfoForm] = useState({ nickname: '', email: '', phone: '' });
@@ -70,6 +82,37 @@ export default function Profile() {
     };
     load();
   }, [isAuthenticated, navigate]);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('仅支持图片文件');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('头像文件不能超过 5MB');
+      return;
+    }
+    try {
+      setAvatarUploading(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      const { avatarUrl } = await uploadAvatar(formData);
+      // 同步更新本地状态和全局 store
+      setProfile((prev) => (prev ? { ...prev, avatar: avatarUrl } : prev));
+      if (token && user) {
+        setAuth({ ...user, avatar: avatarUrl }, token);
+      }
+      toast.success('头像已更新');
+    } catch {
+      // 错误已在 request.ts 中通过 toast 显示
+    } finally {
+      setAvatarUploading(false);
+      // 重置 input，允许重复选同一文件
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
+  };
 
   const handleInfoSave = async () => {
     if (!infoForm.nickname.trim()) {
@@ -131,64 +174,79 @@ export default function Profile() {
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-50 via-purple-50/30 to-indigo-50/30">
       {/* 头部 Banner */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-linear-to-br from-purple-600 via-indigo-600 to-purple-800">
-          <div className="absolute inset-0 opacity-20">
-            <div className="absolute top-0 -left-4 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob" />
-            <div className="absolute -bottom-8 right-20 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000" />
-          </div>
-        </div>
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
-          <div className="flex items-center gap-6">
-            {/* 头像 */}
-            <div className="relative shrink-0">
-              <div className="absolute -inset-2 bg-linear-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full opacity-75 blur-xl" />
-              {loading ? (
-                <Skeleton className="relative h-24 w-24 rounded-full" />
-              ) : (
-                <Avatar className="relative h-24 w-24 border-4 border-white/30 shadow-2xl ring-4 ring-purple-500/30">
+      <PageBanner maxWidth="max-w-4xl">
+        <div className="flex items-center gap-6">
+          {/* 头像 */}
+          <div className="relative shrink-0">
+            <div className="absolute -inset-2 bg-linear-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full opacity-75 blur-xl" />
+            {loading ? (
+              <Skeleton className="relative h-24 w-24 rounded-full" />
+            ) : (
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                className="relative group focus:outline-none"
+                title="点击更换头像"
+                disabled={avatarUploading}
+              >
+                <Avatar className="h-24 w-24 border-4 border-white/30 shadow-2xl ring-4 ring-purple-500/30">
                   <AvatarImage src={profile?.avatar} className="object-cover" />
                   <AvatarFallback className="bg-linear-to-br from-purple-400 to-indigo-600 text-white text-3xl font-bold">
                     {(profile?.nickname?.[0] || profile?.username?.[0] || 'U').toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-              )}
-            </div>
-
-            {/* 信息 */}
-            <div className="text-white min-w-0">
-              {loading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-8 w-40 bg-white/20" />
-                  <Skeleton className="h-4 w-28 bg-white/20" />
+                {/* 悬浮遮罩 */}
+                <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  {avatarUploading ? (
+                    <Loader2 className="h-6 w-6 text-white animate-spin" />
+                  ) : (
+                    <Camera className="h-6 w-6 text-white" />
+                  )}
                 </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-3 mb-2 flex-wrap">
-                    <h1 className="text-2xl md:text-3xl font-bold drop-shadow-lg">
-                      {profile?.nickname || profile?.username}
-                    </h1>
-                    <Badge className={`${roleInfo.color} border-0 px-3 py-1 font-medium`}>
-                      {roleInfo.label}
-                    </Badge>
-                  </div>
-                  <p className="text-purple-200 text-sm mb-4">@{profile?.username}</p>
-                  {/* 统计 */}
-                  <div className="flex gap-4 flex-wrap">
-                    <div className="bg-white/10 backdrop-blur-md rounded-xl px-5 py-3 border border-white/20">
-                      <div className="flex items-center gap-2 text-purple-200 mb-1">
-                        <Download className="h-3.5 w-3.5" />
-                        <span className="text-xs font-medium">累计下载</span>
-                      </div>
-                      <div className="text-2xl font-bold">{profile?.downloadCount ?? 0}</div>
+              </button>
+            )}
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarChange}
+            />
+          </div>
+
+          {/* 信息 */}
+          <div className="text-white min-w-0">
+            {loading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-40 bg-white/20" />
+                <Skeleton className="h-4 w-28 bg-white/20" />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
+                  <h1 className="text-2xl md:text-3xl font-bold drop-shadow-lg">
+                    {profile?.nickname || profile?.username}
+                  </h1>
+                  <Badge className={`${roleInfo.color} border-0 px-3 py-1 font-medium`}>
+                    {roleInfo.label}
+                  </Badge>
+                </div>
+                <p className="text-purple-200 text-sm mb-4">@{profile?.username}</p>
+                {/* 统计 */}
+                <div className="flex gap-4 flex-wrap">
+                  <div className="bg-white/10 backdrop-blur-md rounded-xl px-5 py-3 border border-white/20">
+                    <div className="flex items-center gap-2 text-purple-200 mb-1">
+                      <Download className="h-3.5 w-3.5" />
+                      <span className="text-xs font-medium">累计下载</span>
                     </div>
+                    <div className="text-2xl font-bold">{profile?.downloadCount ?? 0}</div>
                   </div>
-                </>
-              )}
-            </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
-      </div>
+      </PageBanner>
 
       {/* 内容区 */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
