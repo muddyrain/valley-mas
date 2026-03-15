@@ -59,19 +59,21 @@ func Login(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		// 将 token 设置到 HttpOnly Cookie 中（更安全）
+		// 将 token 设置到 HttpOnly Cookie 中（兼容旧版本，逐步废弃）
+		// TODO: 后续完全切换为 header 认证后可移除此行
 		c.SetCookie(
-			"token",                  // name
-			token,                    // value
-			int(cfg.JWT.Expire*3600), // maxAge (秒) = 小时数 * 3600
-			"/",                      // path
-			"",                       // domain (空字符串表示当前域)
-			false,                    // secure (生产环境应设为 true，使用 HTTPS)
-			true,                     // httpOnly (防止 JavaScript 访问)
+			"token",
+			token,
+			int(cfg.JWT.Expire*3600),
+			"/",
+			"",
+			false,
+			true,
 		)
 
-		// 返回用户信息（不包含密码，不返回 token）
+		// 返回用户信息 + token（admin 端通过 header 携带 token，避免与 web Cookie 冲突）
 		Success(c, gin.H{
+			"token": token,
 			"userInfo": gin.H{
 				"id":       user.ID,
 				"username": user.Username,

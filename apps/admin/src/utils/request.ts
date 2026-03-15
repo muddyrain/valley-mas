@@ -18,8 +18,12 @@ const http: AxiosInstance = axios.create({
 // 请求拦截器
 http.interceptors.request.use(
   (config) => {
-    // Token 现在通过 Cookie 自动发送，无需手动设置
-    // 保留此拦截器以便后续扩展其他功能
+    // 从 localStorage 读取 admin token，通过 Authorization header 发送
+    // 避免与 web 端的 Cookie token 在同一 localhost 域下冲突
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => {
@@ -50,9 +54,8 @@ http.interceptors.response.use(
     // 优先使用后端返回的错误信息
     if (status === 401) {
       msg = '认证失败，请重新登录';
-      // Token 已过期或无效，跳转到登录页
-      // 不需要清除 Cookie，因为 Cookie 会由服务器清除或自动过期
-      localStorage.removeItem('userInfo'); // 清除本地用户信息
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('userInfo');
       // 避免在登录页重复跳转
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';

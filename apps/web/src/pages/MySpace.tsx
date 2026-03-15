@@ -501,7 +501,7 @@ export default function MySpace() {
             {deleteTarget && (
               <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 mb-4">
                 <img
-                  src={deleteTarget.thumbnailUrl || deleteTarget.url}
+                  src={deleteTarget.url}
                   alt={deleteTarget.title}
                   className="h-14 w-14 rounded-lg object-cover"
                 />

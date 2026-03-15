@@ -195,7 +195,7 @@ export default function ResourceDetail() {
             <div className="relative aspect-square rounded-2xl overflow-hidden bg-black shadow-2xl">
               {/* 模糊背景 */}
               <img
-                src={resource.thumbnailUrl || resource.url}
+                src={resource.url}
                 alt=""
                 aria-hidden
                 className="absolute inset-0 h-full w-full object-cover scale-110 blur-2xl opacity-50 pointer-events-none select-none"

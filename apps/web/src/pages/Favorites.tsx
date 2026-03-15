@@ -151,9 +151,9 @@ export default function Favorites() {
                   >
                     {/* 缩略图 */}
                     <div className="relative aspect-square bg-gray-100 overflow-hidden">
-                      {res?.thumbnailUrl ? (
+                      {res?.url ? (
                         <img
-                          src={res.thumbnailUrl}
+                          src={res.url}
                           alt={res.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />

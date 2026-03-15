@@ -100,11 +100,10 @@ func ListDownloadRecords(c *gin.Context) {
 	}
 
 	type ResourceInfo struct {
-		ID           string `json:"id"`
-		Title        string `json:"title"`
-		Type         string `json:"type"`
-		URL          string `json:"url"`
-		ThumbnailURL string `json:"thumbnailUrl"`
+		ID    string `json:"id"`
+		Title string `json:"title"`
+		Type  string `json:"type"`
+		URL   string `json:"url"`
 	}
 
 	type CreatorInfo struct {
@@ -150,11 +149,10 @@ func ListDownloadRecords(c *gin.Context) {
 		// 资源信息
 		if record.Resource != nil {
 			list[i].Resource = &ResourceInfo{
-				ID:           record.Resource.ID.String(),
-				Title:        record.Resource.Title,
-				Type:         record.Resource.Type,
-				URL:          record.Resource.URL,
-				ThumbnailURL: record.Resource.ThumbnailURL,
+				ID:    record.Resource.ID.String(),
+				Title: record.Resource.Title,
+				Type:  record.Resource.Type,
+				URL:   record.Resource.URL,
 			}
 		}
 

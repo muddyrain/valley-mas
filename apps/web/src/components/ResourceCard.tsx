@@ -10,7 +10,6 @@ export interface ResourceCardItem {
   id: string;
   title: string;
   url: string;
-  thumbnailUrl?: string;
   type: string;
   downloadCount: number;
   size?: number;
@@ -90,14 +89,14 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
       <div className={`relative ${getAspectClass(resource.type)} overflow-hidden bg-black`}>
         {/* 模糊背景层（放大裁剪原图填满空白区域） */}
         <img
-          src={resource.thumbnailUrl || resource.url}
+          src={resource.url}
           alt=""
           aria-hidden
           className="absolute inset-0 h-full w-full object-cover scale-110 blur-xl opacity-60 pointer-events-none select-none"
         />
         {/* 主图：完整显示，不裁剪 */}
         <img
-          src={resource.thumbnailUrl || resource.url}
+          src={resource.url}
           alt={resource.title}
           className="relative h-full w-full object-contain transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
