@@ -75,17 +75,14 @@ export default function Layout() {
 
   const handleLogout = async () => {
     try {
-      // 调用后端登出接口，清除服务器端的 Cookie
       await http.post('/logout');
-
-      // 清除本地存储的用户信息
+      localStorage.removeItem('admin_token');
       localStorage.removeItem('userInfo');
-
       message.success('已退出登录');
       navigate('/login');
     } catch (error) {
       console.error('退出登录失败:', error);
-      // 即使接口调用失败，也清除本地数据并跳转
+      localStorage.removeItem('admin_token');
       localStorage.removeItem('userInfo');
       navigate('/login');
     }

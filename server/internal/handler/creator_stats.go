@@ -49,7 +49,6 @@ type TopResource struct {
 	Type          string `json:"type"`
 	DownloadCount int    `json:"downloadCount"`
 	URL           string `json:"url"`
-	ThumbnailURL  string `json:"thumbnailUrl"`
 }
 
 // CreatorInfo 创作者信息
@@ -210,7 +209,6 @@ func GetCreatorStats(c *gin.Context) {
 			Type:          r.Type,
 			DownloadCount: r.DownloadCount,
 			URL:           r.URL,
-			ThumbnailURL:  r.ThumbnailURL,
 		}
 	}
 

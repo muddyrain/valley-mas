@@ -16,9 +16,10 @@ import (
 type UploadType string
 
 const (
-	UploadTypeAvatar    UploadType = "avatar"    // 用户头像
-	UploadTypeWallpaper UploadType = "wallpaper" // 壁纸资源
-	UploadTypeCover     UploadType = "cover"     // 封面图
+	UploadTypeUserAvatar UploadType = "user_avatar" // 用户个人头像（存 avatars/ 目录）
+	UploadTypeAvatar     UploadType = "avatar"      // 资源素材 - 头像类型（存 resources/ 目录）
+	UploadTypeWallpaper  UploadType = "wallpaper"   // 资源素材 - 壁纸类型（存 resources/ 目录）
+	UploadTypeCover      UploadType = "cover"       // 封面图（存 resources/ 目录）
 )
 
 // UploadConfig 上传配置
@@ -56,9 +57,14 @@ func NewUploadService() *UploadService {
 // GetDefaultConfig 获取默认配置
 func GetDefaultConfig(uploadType UploadType) UploadConfig {
 	configs := map[UploadType]UploadConfig{
+		UploadTypeUserAvatar: {
+			Type:        UploadTypeUserAvatar,
+			MaxSize:     2, // 2MB
+			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
+		},
 		UploadTypeAvatar: {
 			Type:        UploadTypeAvatar,
-			MaxSize:     2, // 2MB
+			MaxSize:     5, // 5MB
 			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
 		},
 		UploadTypeWallpaper: {
@@ -87,10 +93,12 @@ func GetDefaultConfig(uploadType UploadType) UploadConfig {
 }
 
 // GenerateStoragePath 生成存储路径
-// 标准路径格式（用户优先 + 日期分类）：
-// - 标准路径：users/{userId}/{type}/{YYYYMMDD}/{filename}
-// - 匿名用户：anonymous/{type}/{YYYYMMDD}/{filename}
+// 路径格式：
+// - 用户头像：avatars/{userId}/{YYYYMMDD}/{filename}
+// - 用户资源：resources/{userId}/{YYYYMMDD}/{filename}
+// - 匿名用户：anonymous/{YYYYMMDD}/{filename}
 // - 自定义路径：{customFolder}/{filename}
+// 注意：资源路径不包含 type 目录，避免修改资源类型后路径与存储不一致
 func (s *UploadService) GenerateStoragePath(config UploadConfig, fileName string) string {
 	ext := strings.ToLower(filepath.Ext(fileName))
 	timestamp := time.Now().UnixNano()
@@ -104,18 +112,13 @@ func (s *UploadService) GenerateStoragePath(config UploadConfig, fileName string
 	// 日期文件夹（统一按年月日分类）
 	dateFolder := time.Now().Format("20060102") // YYYYMMDD
 
-	// 必须有用户ID才能上传
+	// 匿名用户（理论上不会出现，因为上传需要登录）
 	if config.UserID <= 0 {
-		// 匿名用户（理论上不会出现，因为上传需要登录）
-		return fmt.Sprintf("anonymous/%s/%s/%s",
-			config.Type,
-			dateFolder,
-			newFileName,
-		)
+		return fmt.Sprintf("anonymous/%s/%s", dateFolder, newFileName)
 	}
 
-	// 头像单独按类型组织：avatars/{userId}/{YYYYMMDD}/{filename}
-	if config.Type == UploadTypeAvatar {
+	// 用户个人头像单独存储：avatars/{userId}/{YYYYMMDD}/{filename}
+	if config.Type == UploadTypeUserAvatar {
 		return fmt.Sprintf("avatars/%d/%s/%s",
 			config.UserID,
 			dateFolder,
@@ -123,10 +126,10 @@ func (s *UploadService) GenerateStoragePath(config UploadConfig, fileName string
 		)
 	}
 
-	// 其他资源标准路径：users/{userId}/{type}/{YYYYMMDD}/{filename}
-	return fmt.Sprintf("users/%d/%s/%s/%s",
+	// 所有资源素材（wallpaper/avatar 类型等）：resources/{userId}/{YYYYMMDD}/{filename}
+	// 不含 type 目录，避免后台修改类型后存储路径与实际类型不一致
+	return fmt.Sprintf("resources/%d/%s/%s",
 		config.UserID,
-		config.Type,
 		dateFolder,
 		newFileName,
 	)

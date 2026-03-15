@@ -13,8 +13,8 @@ export default function Login() {
     try {
       const res = await reqLogin(values);
 
-      // Token 已通过 HttpOnly Cookie 存储，无需手动保存
-      // 只需保存用户信息到 localStorage
+      // 保存 token 到 localStorage（使用独立 key，避免与 web 端 Cookie 冲突）
+      localStorage.setItem('admin_token', res.token);
       localStorage.setItem('userInfo', JSON.stringify(res.userInfo));
 
       message.success('登录成功');

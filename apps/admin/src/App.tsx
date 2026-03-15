@@ -16,10 +16,9 @@ import Users from './pages/Users';
 
 // 路由守卫：检查是否已登录
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  // Cookie 中的 token 无法通过 JavaScript 访问（HttpOnly）
-  // 所以通过检查 userInfo 来判断是否登录
-  const userInfo = localStorage.getItem('userInfo');
-  return userInfo ? children : <Navigate to="/login" replace />;
+  // 通过 admin_token 判断是否登录（避免与 web Cookie 冲突）
+  const token = localStorage.getItem('admin_token');
+  return token ? children : <Navigate to="/login" replace />;
 }
 
 // Token 验证组件
@@ -29,20 +28,18 @@ function TokenValidator() {
 
   // 验证 token 是否有效
   const validateToken = useRef(async () => {
-    // 如果正在验证，跳过
     if (isValidatingRef.current) return;
 
     // 检查是否已登录
-    const userInfo = localStorage.getItem('userInfo');
-    if (!userInfo) return;
+    const token = localStorage.getItem('admin_token');
+    if (!token) return;
 
     try {
       isValidatingRef.current = true;
       await reqGetCurrentUser();
-      // Token 有效，无需操作
     } catch (error: unknown) {
-      // Token 失效或过期
       console.error('Token 验证失败:', error);
+      localStorage.removeItem('admin_token');
       localStorage.removeItem('userInfo');
       message.warning('登录已过期，请重新登录');
       navigate('/login', { replace: true });

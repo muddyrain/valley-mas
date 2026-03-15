@@ -281,7 +281,6 @@ func GetResourceDetail(c *gin.Context) {
 		"description":   resource.Description,
 		"type":          resource.Type,
 		"url":           resource.URL,
-		"thumbnailUrl":  resource.ThumbnailURL,
 		"size":          resource.Size,
 		"width":         resource.Width,
 		"height":        resource.Height,
@@ -301,7 +300,6 @@ type HotResourceResponse struct {
 	Title         string `json:"title"`
 	Type          string `json:"type"`
 	URL           string `json:"url"`
-	ThumbnailURL  string `json:"thumbnailUrl"`
 	Size          int64  `json:"size"`
 	Width         int    `json:"width"`
 	Height        int    `json:"height"`
@@ -392,7 +390,6 @@ func GetHotResources(c *gin.Context) {
 			Title:         resource.Title,
 			Type:          resource.Type,
 			URL:           resource.URL,
-			ThumbnailURL:  resource.ThumbnailURL,
 			Size:          resource.Size,
 			Width:         resource.Width,
 			Height:        resource.Height,
@@ -478,7 +475,6 @@ func GetAllResources(c *gin.Context) {
 			Title:         resource.Title,
 			Type:          resource.Type,
 			URL:           resource.URL,
-			ThumbnailURL:  resource.ThumbnailURL,
 			Size:          resource.Size,
 			Width:         resource.Width,
 			Height:        resource.Height,

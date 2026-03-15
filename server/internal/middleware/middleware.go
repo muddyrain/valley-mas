@@ -38,14 +38,15 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var token string
 
-		// 优先从 Cookie 获取 token
-		token, err := c.Cookie("token")
-		if err != nil || token == "" {
-			// 如果 Cookie 中没有，尝试从 Authorization header 获取（兼容旧方式）
-			authHeader := c.GetHeader("Authorization")
-			if authHeader != "" {
-				token = strings.TrimPrefix(authHeader, "Bearer ")
-			}
+		// 优先从 Authorization header 获取（web 端使用，避免与 admin Cookie 冲突）
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" {
+			token = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+
+		// 其次从 Cookie 获取（admin 端使用 HttpOnly Cookie）
+		if token == "" {
+			token, _ = c.Cookie("token")
 		}
 
 		if token == "" {
@@ -84,12 +85,15 @@ func OptionalAuth(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var token string
 
-		token, err := c.Cookie("token")
-		if err != nil || token == "" {
-			authHeader := c.GetHeader("Authorization")
-			if authHeader != "" {
-				token = strings.TrimPrefix(authHeader, "Bearer ")
-			}
+		// 优先从 Authorization header 获取
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" {
+			token = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+
+		// 其次从 Cookie 获取
+		if token == "" {
+			token, _ = c.Cookie("token")
 		}
 
 		if token != "" {

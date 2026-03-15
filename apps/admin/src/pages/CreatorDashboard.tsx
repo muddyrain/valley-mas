@@ -72,12 +72,12 @@ export default function CreatorDashboard() {
   const columns = [
     {
       title: '预览',
-      dataIndex: 'thumbnailUrl',
-      key: 'thumbnailUrl',
+      dataIndex: 'url',
+      key: 'url',
       width: 80,
       render: (url: string, record: CreatorStats['topResources'][0]) => (
         <Image
-          src={url || record.url}
+          src={url}
           alt={record.title}
           width={60}
           height={60}

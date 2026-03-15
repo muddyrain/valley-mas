@@ -8,6 +8,7 @@ export interface LoginParams {
 
 // 登录响应
 export interface LoginResponse {
+  token: string;
   userInfo: {
     id: number;
     username: string;

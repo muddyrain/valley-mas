@@ -21,7 +21,6 @@ export interface DownloadRecord {
     title: string;
     type: string;
     url: string;
-    thumbnailUrl: string;
   };
   creator?: {
     id: string;

@@ -6,7 +6,6 @@ export interface Resource {
   title: string;
   description: string;
   url: string;
-  thumbnailUrl: string;
   type: 'wallpaper' | 'avatar' | 'emoji' | 'background' | 'dynamic';
   downloadCount: number;
   viewCount: number;
@@ -144,7 +143,6 @@ export interface MyResource {
   description?: string;
   type: string;
   url: string;
-  thumbnailUrl: string;
   size: number;
   downloadCount: number;
   createdAt: string;

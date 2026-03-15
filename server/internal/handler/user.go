@@ -194,7 +194,7 @@ func UploadAvatar(c *gin.Context) {
 	}
 
 	uploadService := service.NewUploadService()
-	config := service.GetDefaultConfig(service.UploadTypeAvatar)
+	config := service.GetDefaultConfig(service.UploadTypeUserAvatar)
 	config.UserID = userID.(int64)
 
 	result, err := uploadService.Upload(file, config)

@@ -41,7 +41,6 @@ export interface Resource {
   id: string;
   title: string;
   url: string;
-  thumbnailUrl: string;
   type: string;
   downloadCount: number;
   userId: string;

@@ -44,7 +44,6 @@ export interface CreatorStats {
     type: string;
     downloadCount: number;
     url: string;
-    thumbnailUrl: string;
   }>;
   creatorInfo: {
     id: string;

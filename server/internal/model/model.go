@@ -185,7 +185,6 @@ type Resource struct {
 	Description   string         `gorm:"size:255" json:"description"`
 	URL           string         `gorm:"size:500" json:"url"`
 	StorageKey    string         `gorm:"size:500" json:"storageKey"`
-	ThumbnailURL  string         `gorm:"size:500" json:"thumbnailUrl"`
 	Width         int            `json:"width"`
 	Height        int            `json:"height"`
 	Size          int64          `json:"size"`

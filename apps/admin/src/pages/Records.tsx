@@ -72,7 +72,7 @@ export default function Records() {
       render: (resource) => (
         <Space>
           <Image
-            src={resource?.thumbnailUrl || resource?.url}
+            src={resource?.url}
             alt={resource?.title}
             width={40}
             height={40}

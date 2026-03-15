@@ -311,7 +311,6 @@ func GetCreatorResourcesList(c *gin.Context) {
 			"title":         resource.Title,
 			"type":          resource.Type,
 			"url":           resource.URL,
-			"thumbnailUrl":  resource.ThumbnailURL,
 			"size":          resource.Size,
 			"width":         resource.Width,
 			"height":        resource.Height,
