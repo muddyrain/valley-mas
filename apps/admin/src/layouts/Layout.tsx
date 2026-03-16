@@ -1,5 +1,6 @@
 import {
   AuditOutlined,
+  BookOutlined,
   CrownOutlined,
   DashboardOutlined,
   FileTextOutlined,
@@ -29,6 +30,7 @@ const adminMenuItems = [
   },
   { key: '/resources', icon: <PictureOutlined />, label: '资源管理' },
   { key: '/records', icon: <FileTextOutlined />, label: '记录管理' },
+  { key: '/blog-posts', icon: <BookOutlined />, label: '博客管理' },
 ];
 
 // 创作者菜单（受限权限）

@@ -1,0 +1,49 @@
+{
+  "posts": [
+    {
+      "slug": "getting-started-with-react",
+      "title": "React 入门指南",
+      "date": "2024-03-15",
+      "tags": ["React", "前端", "JavaScript"],
+      "category": "技术",
+      "excerpt": "从零开始学习 React，掌握现代前端开发的核心概念和最佳实践。",
+      "cover": "https://picsum.photos/seed/react/800/400"
+    },
+    {
+      "slug": "typescript-best-practices",
+      "title": "TypeScript 最佳实践",
+      "date": "2024-03-10",
+      "tags": ["TypeScript", "前端", "JavaScript"],
+      "category": "技术",
+      "excerpt": "深入探讨 TypeScript 的高级特性和在实际项目中的最佳实践。",
+      "cover": "https://picsum.photos/seed/typescript/800/400"
+    },
+    {
+      "slug": "my-travel-to-japan",
+      "title": "日本旅行日记",
+      "date": "2024-02-28",
+      "tags": ["旅行", "日本", "生活"],
+      "category": "生活",
+      "excerpt": "记录在日本的美好时光，从东京到京都的精彩旅程。",
+      "cover": "https://picsum.photos/seed/japan/800/400"
+    },
+    {
+      "slug": "understanding-async-await",
+      "title": "深入理解 Async/Await",
+      "date": "2024-02-20",
+      "tags": ["JavaScript", "异步编程", "前端"],
+      "category": "技术",
+      "excerpt": "彻底搞懂 JavaScript 异步编程，从 Promise 到 Async/Await 的演进。",
+      "cover": "https://picsum.photos/seed/async/800/400"
+    },
+    {
+      "slug": "minimalist-lifestyle",
+      "title": "极简主义生活方式",
+      "date": "2024-02-15",
+      "tags": ["生活", "极简主义", "思考"],
+      "category": "生活",
+      "excerpt": "如何通过极简主义获得更自由、更专注的生活。",
+      "cover": "https://picsum.photos/seed/minimal/800/400"
+    }
+  ]
+}

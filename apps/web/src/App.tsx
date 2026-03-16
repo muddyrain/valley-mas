@@ -2,6 +2,8 @@ import { Route, Routes } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import Layout from './layouts/Layout';
 import ApplyCreator from './pages/ApplyCreator';
+import BlogList from './pages/blog/BlogList';
+import BlogPost from './pages/blog/BlogPost';
 import Creator from './pages/Creator';
 import CreatorProfile from './pages/CreatorProfile';
 import Favorites from './pages/Favorites';
@@ -27,6 +29,8 @@ function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="favorites" element={<Favorites />} />
           <Route path="apply-creator" element={<ApplyCreator />} />
+          <Route path="blog" element={<BlogList />} />
+          <Route path="blog/:slug" element={<BlogPost />} />
         </Route>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

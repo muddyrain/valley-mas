@@ -42,6 +42,12 @@ func Setup(cfg *config.Config) *gin.Engine {
 			public.POST("/resource/:id/download", handler.DownloadResource) // 新增：下载资源
 			public.GET("/hot-creators", handler.GetHotCreators)             // 新增：获取热门创作者
 
+			// 博客相关接口
+			public.GET("/blog/posts", handler.GetPosts)            // 获取文章列表
+			public.GET("/blog/posts/:slug", handler.GetPostDetail) // 获取文章详情
+			public.GET("/blog/categories", handler.GetCategories)  // 获取博客分类列表
+			public.GET("/blog/tags", handler.GetTags)              // 获取博客标签列表
+
 			// 以下接口挂可选认证，登录用户响应中会带 isFavorited 字段
 			public.GET("/hot-resources", middleware.OptionalAuth(cfg), handler.GetHotResources)                  // 热门资源
 			public.GET("/resources", middleware.OptionalAuth(cfg), handler.GetAllResources)                      // 资源广场（全量列表）
@@ -135,6 +141,13 @@ func Setup(cfg *config.Config) *gin.Engine {
 				// 全局记录管理（仅管理员）
 				// 注意：资源上传信息可以直接在资源管理页面查看，不需要单独的上传记录
 				adminOnly.GET("/records/downloads", handler.ListDownloadRecords)
+
+				// 博客管理接口
+				adminOnly.GET("/blog/posts", handler.AdminGetPosts)          // 获取文章列表（包含草稿）
+				adminOnly.GET("/blog/posts/:id", handler.AdminGetPostDetail) // 获取文章详情
+				adminOnly.POST("/blog/posts", handler.AdminCreatePost)       // 创建文章
+				adminOnly.PUT("/blog/posts/:id", handler.AdminUpdatePost)    // 更新文章
+				adminOnly.DELETE("/blog/posts/:id", handler.AdminDeletePost) // 删除文章
 			} // ========== 创作者和管理员共享接口 ==========
 			content := admin.Group("")
 			content.Use(middleware.CreatorOrAdmin())

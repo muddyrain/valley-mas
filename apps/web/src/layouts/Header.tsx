@@ -1,4 +1,4 @@
-import { Heart, Home, ImageIcon, LogOut, Sparkles, User, Users } from 'lucide-react';
+import { BookOpen, Heart, Home, ImageIcon, LogOut, Sparkles, User, Users } from 'lucide-react';
 import { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -86,13 +86,26 @@ export default function Header() {
               variant="ghost"
               className={`gap-2 transition-colors ${
                 location.pathname.startsWith('/resources') ||
-                location.pathname.startsWith('/resources')
+                location.pathname.startsWith('/resource')
                   ? 'bg-purple-100 text-purple-600'
                   : 'hover:bg-purple-50 hover:text-purple-600'
               }`}
             >
               <ImageIcon className="h-4 w-4" />
               <span className="hidden sm:inline">资源</span>
+            </Button>
+          </Link>
+          <Link to="/blog">
+            <Button
+              variant="ghost"
+              className={`gap-2 transition-colors ${
+                location.pathname.startsWith('/blog')
+                  ? 'bg-purple-100 text-purple-600'
+                  : 'hover:bg-purple-50 hover:text-purple-600'
+              }`}
+            >
+              <BookOpen className="h-4 w-4" />
+              <span className="hidden sm:inline">博客</span>
             </Button>
           </Link>
         </nav>
