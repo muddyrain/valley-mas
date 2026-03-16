@@ -44,6 +44,9 @@
         "useValidAnchor": "off",
         "noLabelWithoutControl": "off",
         "noSvgWithoutTitle": "off"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "warn"
       }
     }
   },

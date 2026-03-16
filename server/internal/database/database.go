@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"valley-server/internal/config"
 	"valley-server/internal/model"
+	"valley-server/internal/utils"
 
 	"github.com/glebarez/sqlite"
 	mysqlDriver "gorm.io/driver/mysql"
@@ -89,7 +90,7 @@ func initMySQL(cfg *config.Config) (gorm.Dialector, error) {
 
 // autoMigrate 自动迁移表结构
 func autoMigrate() error {
-	return DB.AutoMigrate(
+	if err := DB.AutoMigrate(
 		&model.User{},
 		&model.Creator{},
 		&model.CreatorSpace{}, // 新增：创作者空间表
@@ -100,7 +101,44 @@ func autoMigrate() error {
 		&model.UserFavorite{},       // 用户收藏资源表
 		&model.UserFollow{},         // 用户关注创作者表
 		&model.UserAvatarHistory{},  // 用户头像历史记录表
-	)
+		&model.Post{},               // 博客文章表
+		&model.PostCategory{},       // 博客分类表
+		&model.PostTag{},            // 博客标签表
+		&model.PostTagRelation{},    // 博客标签关联表
+	); err != nil {
+		return err
+	}
+
+	// 初始化默认博客分类
+	return initDefaultBlogData()
+}
+
+// initDefaultBlogData 初始化默认博客数据
+func initDefaultBlogData() error {
+	// 检查是否已有分类
+	var count int64
+	DB.Model(&model.PostCategory{}).Count(&count)
+	if count > 0 {
+		return nil // 已有数据，跳过
+	}
+
+	// 插入默认分类
+	defaultCategories := []model.PostCategory{
+		{Name: "技术", Slug: "tech", Description: "技术相关文章", SortOrder: 1},
+		{Name: "生活", Slug: "life", Description: "生活随笔", SortOrder: 2},
+		{Name: "教程", Slug: "tutorial", Description: "教程文档", SortOrder: 3},
+		{Name: "随笔", Slug: "notes", Description: "随手记录", SortOrder: 4},
+	}
+
+	for _, category := range defaultCategories {
+		category.ID = model.Int64String(utils.GenerateID())
+		if err := DB.Create(&category).Error; err != nil {
+			log.Printf("Failed to create default category %s: %v", category.Name, err)
+		}
+	}
+
+	log.Println("✅ Default blog categories initialized")
+	return nil
 }
 
 // Close 关闭数据库连接

@@ -4,6 +4,8 @@ import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-route
 import { reqGetCurrentUser } from './api/auth';
 import Layout from './layouts/Layout';
 import ApplyCreator from './pages/ApplyCreator';
+import BlogPostEdit from './pages/BlogPostEdit';
+import BlogPosts from './pages/BlogPosts';
 import CreatorApplications from './pages/CreatorApplications';
 import CreatorDashboard from './pages/CreatorDashboard';
 import CreatorSpaces from './pages/CreatorSpaces';
@@ -101,6 +103,9 @@ function App() {
           <Route path="apply-creator" element={<ApplyCreator />} />
           <Route path="resources" element={<Resources />} />
           <Route path="records" element={<Records />} />
+          <Route path="blog-posts" element={<BlogPosts />} />
+          <Route path="blog-posts/create" element={<BlogPostEdit />} />
+          <Route path="blog-posts/edit/:id" element={<BlogPostEdit />} />
         </Route>
       </Routes>
     </BrowserRouter>
