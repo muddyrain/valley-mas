@@ -1,4 +1,4 @@
-import {
+﻿import {
   DeleteOutlined,
   EditOutlined,
   EyeOutlined,
@@ -17,7 +17,8 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { useEffect, useState } from 'react';
+import type { ColumnsType } from 'antd/es/table';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Post } from '@/api/blog';
 import { deletePost, getAdminPosts } from '@/api/blog';
@@ -35,21 +36,19 @@ export default function BlogPosts() {
   const [keyword, setKeyword] = useState('');
 
   useEffect(() => {
-    loadPosts();
+    void loadPosts();
   }, [page, pageSize, status]);
 
   const loadPosts = async () => {
     setLoading(true);
     try {
-      const res: any = await getAdminPosts({
+      const data = await getAdminPosts({
         page,
         pageSize,
         status: status || undefined,
       });
-      if (res.code === 0) {
-        setPosts(res.data);
-        setTotal(res.total);
-      }
+      setPosts(data.list || []);
+      setTotal(data.total || 0);
     } catch (error) {
       console.error('Failed to load posts:', error);
       message.error('加载文章列表失败');
@@ -60,38 +59,44 @@ export default function BlogPosts() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res: any = await deletePost(id);
-      if (res.code === 0) {
-        message.success('删除成功');
-        loadPosts();
-      } else {
-        message.error(res.message || '删除失败');
-      }
+      await deletePost(id);
+      message.success('删除成功');
+      void loadPosts();
     } catch (error) {
       console.error('Failed to delete post:', error);
       message.error('删除失败');
     }
   };
 
-  const getStatusTag = (status: string) => {
+  const getStatusTag = (value: string) => {
     const statusMap: Record<string, { color: string; text: string }> = {
       published: { color: 'green', text: '已发布' },
       draft: { color: 'orange', text: '草稿' },
       archived: { color: 'default', text: '已归档' },
     };
-    const config = statusMap[status] || { color: 'default', text: status };
+    const config = statusMap[value] || { color: 'default', text: value || '-' };
     return <Tag color={config.color}>{config.text}</Tag>;
   };
 
-  const columns = [
+  const filteredPosts = useMemo(() => {
+    if (!keyword.trim()) return posts;
+    const lower = keyword.toLowerCase();
+    return posts.filter(
+      (post) =>
+        post.title.toLowerCase().includes(lower) ||
+        (post.excerpt || '').toLowerCase().includes(lower),
+    );
+  }, [keyword, posts]);
+
+  const columns: ColumnsType<Post> = [
     {
       title: '标题',
       dataIndex: 'title',
       key: 'title',
-      render: (text: string, record: Post) => (
+      render: (text, record) => (
         <div>
           <div className="font-medium">{text}</div>
-          <div className="text-gray-400 text-sm truncate max-w-md">{record.excerpt}</div>
+          <div className="max-w-md truncate text-sm text-gray-400">{record.excerpt || '-'}</div>
         </div>
       ),
     },
@@ -105,30 +110,30 @@ export default function BlogPosts() {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => getStatusTag(status),
+      render: (value: string) => getStatusTag(value),
     },
     {
       title: '浏览',
       dataIndex: 'viewCount',
       key: 'viewCount',
-      width: 80,
+      width: 90,
     },
     {
       title: '发布时间',
       dataIndex: 'publishedAt',
       key: 'publishedAt',
-      render: (date: string) => (date ? new Date(date).toLocaleString('zh-CN') : '-'),
+      render: (value?: string) => (value ? new Date(value).toLocaleString('zh-CN') : '-'),
     },
     {
       title: '操作',
       key: 'action',
-      width: 200,
-      render: (_: unknown, record: Post) => (
+      width: 220,
+      render: (_, record) => (
         <Space>
           <Button
             type="link"
             icon={<EyeOutlined />}
-            onClick={() => window.open(`/blog/${record.slug}`, '_blank')}
+            onClick={() => window.open(`/blog/${record.id}`, '_blank')}
           >
             预览
           </Button>
@@ -141,7 +146,7 @@ export default function BlogPosts() {
           </Button>
           <Popconfirm
             title="确认删除"
-            description={`确定要删除文章「${record.title}」吗？`}
+            description={`确定要删除文章《${record.title}》吗？`}
             onConfirm={() => handleDelete(record.id)}
             okText="删除"
             cancelText="取消"
@@ -156,18 +161,10 @@ export default function BlogPosts() {
     },
   ];
 
-  const filteredPosts = keyword
-    ? posts.filter(
-        (post) =>
-          post.title.toLowerCase().includes(keyword.toLowerCase()) ||
-          post.excerpt.toLowerCase().includes(keyword.toLowerCase()),
-      )
-    : posts;
-
   return (
     <div className="p-6">
       <Card>
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <Title level={4} className="!mb-0">
             文章管理
           </Title>
@@ -180,9 +177,9 @@ export default function BlogPosts() {
           </Button>
         </div>
 
-        <div className="flex gap-4 mb-6">
+        <div className="mb-6 flex gap-4">
           <Input
-            placeholder="搜索文章标题或摘要..."
+            placeholder="搜索标题或摘要"
             prefix={<SearchOutlined />}
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
@@ -192,15 +189,16 @@ export default function BlogPosts() {
           <Select
             placeholder="全部状态"
             value={status}
-            onChange={setStatus}
+            onChange={(v) => setStatus(v || '')}
             allowClear
-            className="w-32"
-          >
-            <Select.Option value="">全部状态</Select.Option>
-            <Select.Option value="published">已发布</Select.Option>
-            <Select.Option value="draft">草稿</Select.Option>
-            <Select.Option value="archived">已归档</Select.Option>
-          </Select>
+            className="w-36"
+            options={[
+              { value: '', label: '全部状态' },
+              { value: 'published', label: '已发布' },
+              { value: 'draft', label: '草稿' },
+              { value: 'archived', label: '已归档' },
+            ]}
+          />
         </div>
 
         <Table
@@ -213,10 +211,10 @@ export default function BlogPosts() {
             pageSize,
             total,
             showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 条`,
-            onChange: (page, pageSize) => {
-              setPage(page);
-              setPageSize(pageSize || 10);
+            showTotal: (count) => `共 ${count} 条`,
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPage);
+              setPageSize(nextPageSize || 10);
             },
           }}
         />

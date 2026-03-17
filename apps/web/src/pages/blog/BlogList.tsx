@@ -5,7 +5,6 @@ import type { Category, Post, Tag as TagType } from '@/api/blog';
 import { getCategories, getPosts, getTags } from '@/api/blog';
 import { PostCard, TagCloud } from '@/components/blog';
 import { Button } from '@/components/ui/button';
-import { formatDate } from '@/utils/blog';
 
 export default function BlogList() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -17,37 +16,30 @@ export default function BlogList() {
 
   const selectedTag = searchParams.get('tag') || '';
   const selectedCategory = searchParams.get('category') || '';
-  const currentPage = parseInt(searchParams.get('page') || '1');
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [selectedTag, selectedCategory, currentPage]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      // 并行加载数据
-      const [postsRes, categoriesRes, tagsRes] = await Promise.all([
+      const [postsData, categoriesData, tagsData] = await Promise.all([
         getPosts({
           page: currentPage,
           pageSize: 12,
-          category: selectedCategory,
-          tag: selectedTag,
+          category: selectedCategory || undefined,
+          tag: selectedTag || undefined,
         }),
         getCategories(),
         getTags(),
       ]);
 
-      if (postsRes.code === 0) {
-        setPosts(postsRes.data);
-        setTotal(postsRes.total);
-      }
-      if (categoriesRes.code === 0) {
-        setCategories(categoriesRes.data);
-      }
-      if (tagsRes.code === 0) {
-        setTags(tagsRes.data);
-      }
+      setPosts(postsData.list || []);
+      setTotal(postsData.total || 0);
+      setCategories(categoriesData || []);
+      setTags(tagsData || []);
     } catch (error) {
       console.error('Failed to load blog data:', error);
     } finally {
@@ -56,6 +48,7 @@ export default function BlogList() {
   };
 
   const handleTagClick = (tagSlug: string) => {
+    if (!tagSlug) return;
     const newParams = new URLSearchParams(searchParams);
     if (selectedTag === tagSlug) {
       newParams.delete('tag');
@@ -67,6 +60,7 @@ export default function BlogList() {
   };
 
   const handleCategoryClick = (categorySlug: string) => {
+    if (!categorySlug) return;
     const newParams = new URLSearchParams(searchParams);
     if (selectedCategory === categorySlug) {
       newParams.delete('category');
@@ -81,7 +75,6 @@ export default function BlogList() {
     setSearchParams(new URLSearchParams());
   };
 
-  // 转换标签格式
   const tagCloudData = useMemo(() => {
     return tags.map((tag) => ({
       name: tag.name,
@@ -89,10 +82,10 @@ export default function BlogList() {
     }));
   }, [tags]);
 
-  // 转换分类格式
   const categoryData = useMemo(() => {
     return categories.map((cat) => ({
       name: cat.name,
+      slug: cat.slug,
       count: cat.postCount,
     }));
   }, [categories]);
@@ -124,7 +117,7 @@ export default function BlogList() {
               我的博客
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              记录技术成长，分享生活感悟
+              记录创作和开发中的真实经验
             </p>
           </div>
         </div>
@@ -134,8 +127,8 @@ export default function BlogList() {
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1">
             {(selectedTag || selectedCategory) && (
-              <div className="mb-6 flex items-center gap-3">
-                <span className="text-sm text-muted-foreground">当前筛选:</span>
+              <div className="mb-6 flex items-center gap-3 flex-wrap">
+                <span className="text-sm text-muted-foreground">当前筛选</span>
                 {selectedCategory && (
                   <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">
                     <Folder className="w-3 h-3" />
@@ -150,7 +143,7 @@ export default function BlogList() {
                 )}
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
                   <X className="w-3 h-3" />
-                  清除筛选
+                  清空
                 </Button>
               </div>
             )}
@@ -166,10 +159,10 @@ export default function BlogList() {
                     <PostCard
                       key={post.id}
                       post={{
-                        slug: post.slug,
+                        id: post.id,
                         title: post.title,
                         excerpt: post.excerpt,
-                        date: formatDate(post.publishedAt || post.createdAt),
+                        date: post.publishedAt || post.createdAt,
                         category: post.category?.name || '未分类',
                         tags: post.tags?.map((t) => t.name) || [],
                         cover: post.cover,
@@ -178,7 +171,6 @@ export default function BlogList() {
                   ))}
                 </div>
 
-                {/* 分页 */}
                 {total > 12 && (
                   <div className="mt-8 flex justify-center gap-2">
                     <Button
@@ -225,14 +217,10 @@ export default function BlogList() {
                   {categoryData.map((category) => (
                     <button
                       type="button"
-                      key={category.name}
-                      onClick={() =>
-                        handleCategoryClick(
-                          categories.find((c) => c.name === category.name)?.slug || '',
-                        )
-                      }
+                      key={category.slug}
+                      onClick={() => handleCategoryClick(category.slug)}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                        selectedCategory === categories.find((c) => c.name === category.name)?.slug
+                        selectedCategory === category.slug
                           ? 'bg-primary text-primary-foreground'
                           : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                       }`}

@@ -43,10 +43,11 @@ func Setup(cfg *config.Config) *gin.Engine {
 			public.GET("/hot-creators", handler.GetHotCreators)             // 新增：获取热门创作者
 
 			// 博客相关接口
-			public.GET("/blog/posts", handler.GetPosts)            // 获取文章列表
-			public.GET("/blog/posts/:slug", handler.GetPostDetail) // 获取文章详情
-			public.GET("/blog/categories", handler.GetCategories)  // 获取博客分类列表
-			public.GET("/blog/tags", handler.GetTags)              // 获取博客标签列表
+			public.GET("/blog/posts", handler.GetPosts)                 // 获取文章列表
+			public.GET("/blog/posts/id/:id", handler.GetPostDetailByID) // 通过 ID 获取文章详情
+			public.GET("/blog/posts/:slug", handler.GetPostDetail)      // 获取文章详情
+			public.GET("/blog/categories", handler.GetCategories)       // 获取博客分类列表
+			public.GET("/blog/tags", handler.GetTags)                   // 获取博客标签列表
 
 			// 以下接口挂可选认证，登录用户响应中会带 isFavorited 字段
 			public.GET("/hot-resources", middleware.OptionalAuth(cfg), handler.GetHotResources)                  // 热门资源
