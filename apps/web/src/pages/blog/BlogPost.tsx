@@ -1,60 +1,57 @@
-import { ArrowLeft, Calendar, ChevronLeft, Clock } from 'lucide-react';
-import { useEffect, useState } from 'react';
+﻿import { ArrowLeft, Calendar, ChevronLeft, Clock } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { PostDetail } from '@/api/blog';
-import { getPostDetail } from '@/api/blog';
+import { getPostDetailById } from '@/api/blog';
 import { MarkdownContent, TableOfContents } from '@/components/blog';
 import { Button } from '@/components/ui/button';
-import type { TocItem } from '@/utils/blog';
-import { extractToc, formatDate, renderMarkdown } from '@/utils/blog';
+import { extractToc, formatDate, renderMarkdown, type TocItem } from '@/utils/blog';
 
 export default function BlogPost() {
-  const { slug } = useParams<{ slug: string }>();
+  const { id } = useParams<{ id: string }>();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [htmlContent, setHtmlContent] = useState('');
 
   useEffect(() => {
-    if (slug) {
-      loadPost(slug);
-    }
-  }, [slug]);
+    if (!id) return;
+    void loadPost(id);
+  }, [id]);
 
-  const loadPost = async (postSlug: string) => {
+  const loadPost = async (postId: string) => {
     setLoading(true);
     try {
-      const res = await getPostDetail(postSlug);
-      if (res.code === 0 && res.data) {
-        setPost(res.data);
-        // 如果后端已经渲染了 HTML，直接使用；否则前端渲染
-        const html = res.data.htmlContent || renderMarkdown(res.data.content);
-        setHtmlContent(html);
-        setToc(extractToc(res.data.content));
-      }
+      const data = await getPostDetailById(postId);
+      setPost(data);
+      setToc(extractToc(data.content || ''));
     } catch (error) {
       console.error('Failed to load post:', error);
+      setPost(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const processedContent = htmlContent.replace(/<h([1-6])>([^<]+)<\/h[1-6]>/g, (_, level, text) => {
-    const id = text
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '-');
-    return `<h${level} id="${id}">${text}</h${level}>`;
-  });
+  const processedContent = useMemo(() => {
+    if (!post) return '';
+    const html = renderMarkdown(post.content || post.htmlContent || '');
+    return html.replace(/<h([1-6])>([^<]+)<\/h[1-6]>/g, (_, level, text) => {
+      const headingId = text
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/\s+/g, '-');
+      return `<h${level} id="${headingId}">${text}</h${level}>`;
+    });
+  }, [post]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-muted rounded w-3/4" />
-            <div className="h-4 bg-muted rounded w-1/2" />
-            <div className="h-64 bg-muted rounded mt-8" />
+            <div className="h-8 w-3/4 rounded bg-muted" />
+            <div className="h-4 w-1/2 rounded bg-muted" />
+            <div className="mt-8 h-64 rounded bg-muted" />
           </div>
         </div>
       </div>
@@ -63,13 +60,13 @@ export default function BlogPost() {
 
   if (!post) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-4">文章未找到</h1>
-          <p className="text-muted-foreground mb-6">抱歉，您访问的文章不存在。</p>
+          <h1 className="mb-4 text-2xl font-bold text-foreground">文章未找到</h1>
+          <p className="mb-6 text-muted-foreground">你访问的文章不存在或已下线。</p>
           <Link to="/blog">
             <Button>
-              <ArrowLeft className="w-4 h-4 mr-2" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
               返回博客列表
             </Button>
           </Link>
@@ -79,65 +76,59 @@ export default function BlogPost() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* 顶部导航栏 */}
-      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+    <div className="min-h-screen bg-gradient-to-b from-muted/20 via-background to-background">
+      <div className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur">
+        <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 lg:px-8">
           <Link
             to="/blog"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
-            <ChevronLeft className="w-4 h-4 mr-1" />
-            返回博客
+            <ChevronLeft className="mr-1 h-4 w-4" />
+            返回博客列表
           </Link>
         </div>
       </div>
 
-      {/* 文章头部 */}
-      <header className="pt-12 pb-8">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          {/* 分类标签 */}
+      <header className="mx-auto max-w-6xl px-4 pb-8 pt-10 sm:px-6 lg:px-8">
+        <div className="rounded-2xl border border-border/60 bg-card/70 p-6 shadow-sm sm:p-10">
           {post.category && (
-            <div className="mb-6">
-              <Link
-                to={`/blog?category=${encodeURIComponent(post.category.slug)}`}
-                className="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-all"
-              >
-                {post.category.name}
-              </Link>
-            </div>
+            <Link
+              to={`/blog?category=${encodeURIComponent(post.category.slug)}`}
+              className="mb-5 inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+            >
+              {post.category.name}
+            </Link>
           )}
 
-          {/* 标题 */}
-          <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-6 leading-tight">
+          <h1 className="max-w-4xl text-3xl font-bold leading-tight text-foreground sm:text-5xl">
             {post.title}
           </h1>
 
-          {/* 元信息 */}
-          <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
+          <div className="mt-6 flex flex-wrap items-center gap-5 text-sm text-muted-foreground">
+            <div className="inline-flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
               <time>{formatDate(post.publishedAt || post.createdAt)}</time>
             </div>
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              <span>阅读约 {Math.ceil(post.content.length / 500)} 分钟</span>
+            <div className="inline-flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              <span>预计阅读 {Math.max(1, Math.ceil((post.content || '').length / 500))} 分钟</span>
             </div>
-            {post.viewCount > 0 && (
-              <div className="flex items-center gap-2">
-                <span>👁 {post.viewCount} 次浏览</span>
-              </div>
-            )}
+            {post.viewCount > 0 && <span>{post.viewCount} 次阅读</span>}
           </div>
 
-          {/* 标签 */}
+          {!!post.cover && (
+            <div className="mt-8 overflow-hidden rounded-xl border border-border/60">
+              <img src={post.cover} alt={post.title} className="h-52 w-full object-cover sm:h-72" />
+            </div>
+          )}
+
           {post.tags && post.tags.length > 0 && (
-            <div className="flex flex-wrap items-center justify-center gap-2 mt-6">
+            <div className="mt-6 flex flex-wrap items-center gap-2">
               {post.tags.map((tag) => (
                 <Link
                   key={tag.id}
                   to={`/blog?tag=${encodeURIComponent(tag.slug)}`}
-                  className="text-sm text-muted-foreground hover:text-primary transition-colors px-3 py-1 rounded-full hover:bg-muted"
+                  className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                 >
                   #{tag.name}
                 </Link>
@@ -147,32 +138,22 @@ export default function BlogPost() {
         </div>
       </header>
 
-      {/* 文章内容区域 */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-        <div className="flex flex-col lg:flex-row gap-12">
-          {/* 目录侧边栏 */}
+      <div className="mx-auto max-w-6xl px-4 pb-20 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-8 lg:flex-row">
           {toc.length > 0 && (
-            <aside className="hidden lg:block lg:w-64 lg:flex-shrink-0">
-              <div className="sticky top-24">
-                <div className="bg-card rounded-xl p-5 border border-border/50 shadow-sm">
-                  <TableOfContents toc={toc} />
-                </div>
+            <aside className="hidden w-64 shrink-0 lg:block">
+              <div className="sticky top-24 rounded-xl border border-border/60 bg-card p-5 shadow-sm">
+                <TableOfContents toc={toc} />
               </div>
             </aside>
           )}
 
-          {/* 正文内容 */}
-          <main className="flex-1 min-w-0 max-w-3xl lg:max-w-2xl mx-auto lg:mx-0">
+          <main className="min-w-0 flex-1 rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-10">
             <MarkdownContent content={processedContent} />
-
-            {/* 文章底部 */}
-            <div className="mt-16 pt-8 border-t border-border flex items-center justify-between">
+            <div className="mt-12 border-t border-border pt-6">
               <Link to="/blog">
-                <Button
-                  variant="ghost"
-                  className="gap-2 text-muted-foreground hover:text-foreground"
-                >
-                  <ArrowLeft className="w-4 h-4" />
+                <Button variant="ghost" className="gap-2">
+                  <ArrowLeft className="h-4 w-4" />
                   返回列表
                 </Button>
               </Link>

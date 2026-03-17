@@ -19,7 +19,7 @@ export function PostCard({ post }: PostCardProps) {
         'transition-all duration-300',
       )}
     >
-      <Link to={`/blog/${post.slug}`} className="block">
+      <Link to={`/blog/${post.id}`} className="block">
         {post.cover && (
           <div className="relative h-48 overflow-hidden">
             <img

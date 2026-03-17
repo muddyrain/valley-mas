@@ -1,5 +1,17 @@
 import request from '@/utils/request';
 
+export interface PostCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface PostTag {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface Post {
   id: string;
   title: string;
@@ -7,16 +19,9 @@ export interface Post {
   excerpt: string;
   cover?: string;
   categoryId: string;
-  category?: {
-    id: string;
-    name: string;
-    slug: string;
-  };
-  tags?: {
-    id: string;
-    name: string;
-    slug: string;
-  }[];
+  category?: PostCategory;
+  tags?: PostTag[];
+  status?: 'draft' | 'published' | 'archived';
   viewCount: number;
   likeCount: number;
   isTop: boolean;
@@ -58,83 +63,54 @@ export interface PostListParams {
   keyword?: string;
 }
 
-export interface PostListResponse {
-  code: number;
-  message: string;
-  data: Post[];
+export interface PostListData {
+  list: Post[];
   total: number;
   page: number;
   pageSize: number;
 }
 
-// 获取文章列表
-export function getPosts(params: PostListParams = {}): Promise<PostListResponse> {
-  return request.get('/public/blog/posts', { params });
-}
-
-// 获取文章详情
-export function getPostDetail(
-  slug: string,
-): Promise<{ code: number; message: string; data: PostDetail }> {
-  return request.get(`/public/blog/posts/${slug}`);
-}
-
-// 获取分类列表
-export function getCategories(): Promise<{
-  code: number;
-  message: string;
-  data: Category[];
-}> {
-  return request.get('/public/blog/categories');
-}
-
-// 获取标签列表
-export function getTags(): Promise<{
-  code: number;
-  message: string;
-  data: Tag[];
-}> {
-  return request.get('/public/blog/tags');
-}
-
-// ========== 管理员接口 ==========
-
 export interface CreatePostData {
   title: string;
-  slug: string;
+  slug?: string;
   content: string;
   excerpt?: string;
   cover?: string;
-  categoryId: number;
-  tagIds?: number[];
+  categoryId: string;
+  tagIds?: string[];
   status?: 'draft' | 'published' | 'archived';
   isTop?: boolean;
   publishNow?: boolean;
 }
 
-// 创建文章（管理员）
-export function createPost(
-  data: CreatePostData,
-): Promise<{ code: number; message: string; data: Post }> {
-  return request.post('/admin/posts', data);
+export function getPosts(params: PostListParams = {}) {
+  return request.get<unknown, PostListData>('/public/blog/posts', { params });
 }
 
-// 更新文章（管理员）
-export function updatePost(
-  id: string,
-  data: Partial<CreatePostData>,
-): Promise<{ code: number; message: string }> {
-  return request.put(`/admin/posts/${id}`, data);
+export function getPostDetailById(id: string) {
+  return request.get<unknown, PostDetail>(`/public/blog/posts/id/${id}`);
 }
 
-// 删除文章（管理员）
-export function deletePost(id: string): Promise<{ code: number; message: string }> {
-  return request.delete(`/admin/posts/${id}`);
+export function getCategories() {
+  return request.get<unknown, Category[]>('/public/blog/categories');
 }
 
-// 获取文章列表（管理员，包含草稿）
-export function getAdminPosts(
-  params: { page?: number; pageSize?: number; status?: string } = {},
-): Promise<PostListResponse> {
-  return request.get('/admin/posts', { params });
+export function getTags() {
+  return request.get<unknown, Tag[]>('/public/blog/tags');
+}
+
+export function createPost(data: CreatePostData) {
+  return request.post<unknown, Post>('/admin/blog/posts', data);
+}
+
+export function updatePost(id: string, data: Partial<CreatePostData>) {
+  return request.put<unknown, null>(`/admin/blog/posts/${id}`, data);
+}
+
+export function deletePost(id: string) {
+  return request.delete<unknown, null>(`/admin/blog/posts/${id}`);
+}
+
+export function getAdminPosts(params: { page?: number; pageSize?: number; status?: string } = {}) {
+  return request.get<unknown, PostListData>('/admin/blog/posts', { params });
 }

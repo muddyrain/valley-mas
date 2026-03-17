@@ -30,7 +30,7 @@ function App() {
           <Route path="favorites" element={<Favorites />} />
           <Route path="apply-creator" element={<ApplyCreator />} />
           <Route path="blog" element={<BlogList />} />
-          <Route path="blog/:slug" element={<BlogPost />} />
+          <Route path="blog/:id" element={<BlogPost />} />
         </Route>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

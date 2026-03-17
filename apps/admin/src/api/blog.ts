@@ -1,4 +1,16 @@
-import http from '@/utils/request';
+﻿import http from '@/utils/request';
+
+export interface PostCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface PostTag {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 export interface Post {
   id: string;
@@ -7,16 +19,8 @@ export interface Post {
   excerpt: string;
   cover?: string;
   categoryId: string;
-  category?: {
-    id: string;
-    name: string;
-    slug: string;
-  };
-  tags?: {
-    id: string;
-    name: string;
-    slug: string;
-  }[];
+  category?: PostCategory;
+  tags?: PostTag[];
   status: 'draft' | 'published' | 'archived';
   viewCount: number;
   likeCount: number;
@@ -60,50 +64,50 @@ export interface PostListParams {
   status?: string;
 }
 
-// 获取文章列表（管理员）
-export function getAdminPosts(params: PostListParams = {}) {
-  return http.get('/admin/posts', { params });
+export interface PostListData {
+  list: Post[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
-// 获取文章详情（管理员）
-export function getAdminPostDetail(id: string) {
-  return http.get(`/admin/posts/${id}`);
-}
-
-// 创建文章
 export interface CreatePostData {
   title: string;
-  slug: string;
+  slug?: string;
   content: string;
   excerpt?: string;
   cover?: string;
-  categoryId: number;
-  tagIds?: number[];
+  categoryId: string;
+  tagIds?: string[];
   status?: 'draft' | 'published' | 'archived';
   isTop?: boolean;
   publishNow?: boolean;
 }
 
+export function getAdminPosts(params: PostListParams = {}) {
+  return http.get<unknown, PostListData>('/admin/blog/posts', { params });
+}
+
+export function getAdminPostDetail(id: string) {
+  return http.get<unknown, PostDetail>(`/admin/blog/posts/${id}`);
+}
+
 export function createPost(data: CreatePostData) {
-  return http.post('/admin/posts', data);
+  return http.post<unknown, Post>('/admin/blog/posts', data);
 }
 
-// 更新文章
 export function updatePost(id: string, data: Partial<CreatePostData>) {
-  return http.put(`/admin/posts/${id}`, data);
+  return http.put<unknown, null>(`/admin/blog/posts/${id}`, data);
 }
 
-// 删除文章
 export function deletePost(id: string) {
-  return http.delete(`/admin/posts/${id}`);
+  return http.delete<unknown, null>(`/admin/blog/posts/${id}`);
 }
 
-// 获取分类列表
 export function getCategories() {
-  return http.get<unknown, Category[]>('/public/categories');
+  return http.get<unknown, Category[]>('/public/blog/categories');
 }
 
-// 获取标签列表
 export function getTags() {
-  return http.get<unknown, Tag[]>('/public/tags');
+  return http.get<unknown, Tag[]>('/public/blog/tags');
 }
