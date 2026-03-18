@@ -55,9 +55,16 @@ export default function Login() {
       <div className="hidden lg:flex lg:w-1/2 items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIvPjwvc3ZnPg==')] opacity-30"></div>
         <div className="relative text-center text-white px-12">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm mb-8">
-            <Sparkles className="w-10 h-10" />
-          </div>
+          <Link to="/blog">
+            <div
+              className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm mb-8 animate-bounce cursor-pointer hover:bg-purple-100/50 duration-300"
+              onClick={() => {
+                // 点击首页
+              }}
+            >
+              <Sparkles className="w-10 h-10" />
+            </div>
+          </Link>
           <h1 className="text-4xl font-bold mb-4">Valley</h1>
           <p className="text-xl text-purple-100 mb-8">
             发现精美壁纸，
