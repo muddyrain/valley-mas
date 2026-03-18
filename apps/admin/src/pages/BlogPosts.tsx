@@ -1,9 +1,10 @@
-﻿import {
+import {
   DeleteOutlined,
   EditOutlined,
   EyeOutlined,
   PlusOutlined,
   SearchOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import {
   Button,
@@ -105,6 +106,18 @@ export default function BlogPosts() {
       dataIndex: 'category',
       key: 'category',
       render: (category: Post['category']) => category?.name || '-',
+    },
+    {
+      title: '作者',
+      dataIndex: 'author',
+      key: 'author',
+      width: 160,
+      render: (author: Post['author']) => (
+        <span className="inline-flex items-center gap-1 text-gray-700">
+          <UserOutlined className="text-gray-400" />
+          {author?.nickname || '-'}
+        </span>
+      ),
     },
     {
       title: '状态',

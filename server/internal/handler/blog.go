@@ -22,6 +22,7 @@ type PostListResponse struct {
 	Category    *PostCategoryInfo `json:"category,omitempty"`
 	Tags        []PostTagInfo     `json:"tags,omitempty"`
 	Status      string            `json:"status,omitempty"`
+	Author      *AuthorInfo       `json:"author,omitempty"`
 	ViewCount   int               `json:"viewCount"`
 	LikeCount   int               `json:"likeCount"`
 	IsTop       bool              `json:"isTop"`
@@ -86,7 +87,10 @@ func GetPosts(c *gin.Context) {
 	query := database.DB.Model(&model.Post{}).
 		Where("status = ? AND deleted_at IS NULL", "published").
 		Preload("Category").
-		Preload("Tags")
+		Preload("Tags").
+		Preload("Author", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, nickname, avatar")
+		})
 
 	if categorySlug != "" {
 		var category model.PostCategory
@@ -410,7 +414,10 @@ func AdminGetPosts(c *gin.Context) {
 
 	query := database.DB.Model(&model.Post{}).
 		Preload("Category").
-		Preload("Tags")
+		Preload("Tags").
+		Preload("Author", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, nickname, avatar")
+		})
 
 	if status != "" {
 		query = query.Where("status = ?", status)
@@ -425,8 +432,13 @@ func AdminGetPosts(c *gin.Context) {
 		Offset(offset).
 		Find(&posts)
 
+	response := make([]PostListResponse, len(posts))
+	for i := range posts {
+		response[i] = convertToPostListResponse(&posts[i])
+	}
+
 	Success(c, gin.H{
-		"list":     posts,
+		"list":     response,
 		"total":    total,
 		"page":     page,
 		"pageSize": pageSize,
@@ -447,6 +459,14 @@ func convertToPostListResponse(post *model.Post) PostListResponse {
 		IsTop:       post.IsTop,
 		PublishedAt: post.PublishedAt,
 		CreatedAt:   post.CreatedAt,
+	}
+
+	if post.Author != nil {
+		resp.Author = &AuthorInfo{
+			ID:       post.Author.ID,
+			Nickname: post.Author.Nickname,
+			Avatar:   post.Author.Avatar,
+		}
 	}
 
 	if post.Category != nil {

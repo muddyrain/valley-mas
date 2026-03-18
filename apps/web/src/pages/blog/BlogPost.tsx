@@ -1,4 +1,4 @@
-﻿import { ArrowLeft, Calendar, ChevronLeft, Clock } from 'lucide-react';
+import { ArrowLeft, Calendar, ChevronLeft, Clock, User } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { PostDetail } from '@/api/blog';
@@ -105,6 +105,12 @@ export default function BlogPost() {
           </h1>
 
           <div className="mt-6 flex flex-wrap items-center gap-5 text-sm text-muted-foreground">
+            {post.author?.nickname && (
+              <div className="inline-flex items-center gap-2">
+                <User className="h-4 w-4" />
+                <span>{post.author.nickname}</span>
+              </div>
+            )}
             <div className="inline-flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               <time>{formatDate(post.publishedAt || post.createdAt)}</time>

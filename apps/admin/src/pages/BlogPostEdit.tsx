@@ -7,14 +7,15 @@ import {
   Card,
   Checkbox,
   Col,
+  Divider,
   Form,
   Input,
   message,
   Row,
   Select,
   Space,
-  Statistic,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -22,7 +23,7 @@ import { useBeforeUnload, useNavigate, useParams } from 'react-router-dom';
 import type { Category, CreatePostData, Tag as TagType } from '@/api/blog';
 import { createPost, getAdminPostDetail, getCategories, getTags, updatePost } from '@/api/blog';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 type EditorFormValues = {
@@ -33,6 +34,12 @@ type EditorFormValues = {
   status: 'draft' | 'published' | 'archived';
   isTop: boolean;
   tagIds?: string[];
+};
+
+type LocalUserInfo = {
+  id?: string | number;
+  username?: string;
+  nickname?: string;
 };
 
 type Snapshot = {
@@ -86,11 +93,23 @@ export default function BlogPostEdit() {
   const [content, setContent] = useState('');
   const [initialSnapshot, setInitialSnapshot] = useState<Snapshot>(makeSnapshot(defaultValues, ''));
   const bypassNavigationGuardRef = useRef(false);
+  const [currentUser, setCurrentUser] = useState<LocalUserInfo | null>(null);
 
   const watchedValues = Form.useWatch([], form);
 
   useEffect(() => {
     void loadCategoriesAndTags();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const userInfo = localStorage.getItem('userInfo');
+      if (!userInfo) return;
+      const parsed = JSON.parse(userInfo) as LocalUserInfo;
+      setCurrentUser(parsed);
+    } catch (error) {
+      console.error('Failed to parse user info:', error);
+    }
   }, []);
 
   useEffect(() => {
@@ -242,20 +261,33 @@ export default function BlogPostEdit() {
   };
 
   return (
-    <div className="p-6" data-color-mode="light">
-      <Card loading={loading}>
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <Space>
-            <Button icon={<ArrowLeftOutlined />} onClick={() => guardedNavigate('/blog-posts')}>
-              返回
-            </Button>
-            <Title level={4} className="!mb-0">
+    <div
+      className="bg-[radial-gradient(circle_at_top_right,rgba(24,144,255,0.08),transparent_35%),radial-gradient(circle_at_10%_10%,rgba(19,194,194,0.08),transparent_30%)] p-6"
+      data-color-mode="light"
+    >
+      <Card
+        loading={loading}
+        className="rounded-2xl border border-slate-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]"
+      >
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-[320px]">
+            <Space>
+              <Button icon={<ArrowLeftOutlined />} onClick={() => guardedNavigate('/blog-posts')}>
+                返回列表
+              </Button>
+              {isDirty && <Tag color="processing">未保存</Tag>}
+              {watchedValues?.isTop && <Tag color="gold">置顶</Tag>}
+            </Space>
+
+            <Title level={3} className="!mb-1 !mt-3">
               {isEdit ? '编辑文章' : '新建文章'}
             </Title>
-            {isDirty && <Tag color="processing">未保存</Tag>}
-          </Space>
+            <Text type="secondary">
+              专注写作主流程，非必要字段收纳到右侧“可选信息”，减少发布干扰。
+            </Text>
+          </div>
 
-          <Space>
+          <Space className="items-start">
             <Button
               icon={<SaveOutlined />}
               onClick={() => handleSubmit(false)}
@@ -271,46 +303,57 @@ export default function BlogPostEdit() {
               loading={saving}
               disabled={saving}
             >
-              发布文章
+              直接发布
             </Button>
           </Space>
         </div>
 
-        <Row gutter={16} className="mb-4">
-          <Col xs={24} md={8}>
-            <Card size="small">
-              <Statistic title="字符数" value={charCount} />
-            </Card>
-          </Col>
-          <Col xs={24} md={8}>
-            <Card size="small">
-              <Statistic title="预计阅读" value={readingMinutes} suffix="分钟" />
-            </Card>
-          </Col>
-          <Col xs={24} md={8}>
-            <Card size="small">
-              <Statistic title="已选标签" value={(watchedValues?.tagIds || []).length} />
-            </Card>
-          </Col>
-        </Row>
+        <div className="mb-6 flex items-center overflow-x-auto rounded-xl border border-slate-200 bg-sky-50 px-4 py-3">
+          <div className="flex min-w-[100px] flex-col">
+            <Text className="text-xs text-slate-500">字数</Text>
+            <Text className="text-lg font-semibold text-slate-900">{charCount}</Text>
+          </div>
+          <Divider type="vertical" className="mx-3 h-7" />
+          <div className="flex min-w-[100px] flex-col">
+            <Text className="text-xs text-slate-500">预计阅读</Text>
+            <Text className="text-lg font-semibold text-slate-900">{readingMinutes} 分钟</Text>
+          </div>
+          <Divider type="vertical" className="mx-3 h-7" />
+          <div className="flex min-w-[100px] flex-col">
+            <Text className="text-xs text-slate-500">标签</Text>
+            <Text className="text-lg font-semibold text-slate-900">
+              {(watchedValues?.tagIds || []).length}
+            </Text>
+          </div>
+        </div>
+
+        <Alert
+          className="mb-6"
+          type="info"
+          showIcon
+          message={`文章将自动绑定到当前用户：${
+            currentUser?.nickname || currentUser?.username || '当前登录用户'
+          }`}
+          description="博客按用户归属（authorId）管理，不使用创作者资源体系。"
+        />
 
         <Form form={form} layout="vertical" initialValues={defaultValues}>
-          <Row gutter={24}>
+          <Row gutter={24} align="top">
             <Col xs={24} lg={16}>
-              <Card size="small" className="!mb-4" title="内容编辑">
+              <Card className="rounded-xl border border-slate-200" title="正文内容">
                 <Form.Item
                   label="文章标题"
                   name="title"
                   rules={[{ required: true, message: '请输入标题' }]}
                 >
-                  <Input placeholder="输入文章标题" maxLength={120} showCount />
+                  <Input placeholder="输入文章标题（建议 10-40 字）" maxLength={120} showCount />
                 </Form.Item>
 
                 <Form.Item label="Markdown 内容" required>
                   <MDEditor
                     value={content}
                     onChange={(value) => setContent(value || '')}
-                    height={680}
+                    height={740}
                     preview="live"
                     visibleDragbar={false}
                     textareaProps={{
@@ -322,8 +365,8 @@ export default function BlogPostEdit() {
             </Col>
 
             <Col xs={24} lg={8}>
-              <Space direction="vertical" className="w-full" size={16}>
-                <Card size="small" title="发布设置">
+              <div className="grid gap-4 lg:sticky lg:top-4">
+                <Card className="rounded-xl border border-slate-200" title="发布设置">
                   <Form.Item
                     label="分类"
                     name="categoryId"
@@ -338,58 +381,60 @@ export default function BlogPostEdit() {
                     />
                   </Form.Item>
 
-                  <Form.Item
-                    label="状态"
-                    name="status"
-                    rules={[{ required: true, message: '请选择状态' }]}
-                  >
-                    <Select
-                      options={[
-                        { label: '草稿', value: 'draft' },
-                        { label: '已发布', value: 'published' },
-                        { label: '已归档', value: 'archived' },
-                      ]}
-                    />
-                  </Form.Item>
-
-                  <Form.Item name="isTop" valuePropName="checked" className="!mb-0">
+                  <Form.Item name="isTop" valuePropName="checked" className="!mb-2">
                     <Checkbox>置顶文章</Checkbox>
                   </Form.Item>
+
+                  <Form.Item name="status" hidden>
+                    <Input />
+                  </Form.Item>
+
+                  <Alert
+                    type="info"
+                    showIcon
+                    message="状态由按钮控制"
+                    description="点击“保存草稿”将保留草稿状态，点击“直接发布”会立即发布。"
+                  />
                 </Card>
 
-                <Card size="small" title="标签与摘要">
+                <Card className="rounded-xl border border-slate-200" title="可选信息">
                   <Form.Item label="标签" name="tagIds">
                     <Select
                       mode="multiple"
                       allowClear
                       maxTagCount="responsive"
-                      placeholder="选择标签"
+                      placeholder="选择标签（可选）"
                       options={tags.map((tag) => ({ label: tag.name, value: tag.id }))}
                     />
                   </Form.Item>
 
-                  <Form.Item label="摘要" name="excerpt" className="!mb-0">
+                  <Form.Item label="摘要" name="excerpt">
                     <TextArea
-                      placeholder="列表页展示的简短摘要"
+                      placeholder="列表页展示的简短摘要（可选）"
                       rows={4}
                       maxLength={240}
                       showCount
                     />
                   </Form.Item>
-                </Card>
 
-                <Card size="small" title="封面图">
-                  <Form.Item name="cover" className="!mb-2">
-                    <Input placeholder="输入图片 URL" />
+                  <Form.Item
+                    label={
+                      <Space size={6}>
+                        <span>封面图 URL</span>
+                        <Tooltip title="当前版本仅支持图片链接，暂不支持上传。">
+                          <Text type="secondary">说明</Text>
+                        </Tooltip>
+                      </Space>
+                    }
+                    name="cover"
+                    className="!mb-2"
+                  >
+                    <Input placeholder="https://example.com/cover.jpg" />
                   </Form.Item>
-                  <Alert
-                    type="info"
-                    showIcon
-                    message="v1 仅支持图片 URL"
-                    description="后续 v2 可升级为编辑器内直传。"
-                  />
+
+                  <Alert type="info" showIcon message="这些字段不会阻塞发布，可后续补充完善。" />
                 </Card>
-              </Space>
+              </div>
             </Col>
           </Row>
         </Form>
