@@ -96,7 +96,7 @@ export default function CreatorProfile() {
     };
 
     loadCreatorData();
-  }, [code]);
+  }, [code, user?.id]);
 
   const handleFollow = async () => {
     if (!creator || followLoading) return;
