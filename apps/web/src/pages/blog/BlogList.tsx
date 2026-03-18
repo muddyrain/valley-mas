@@ -166,6 +166,7 @@ export default function BlogList() {
                         category: post.category?.name || '未分类',
                         tags: post.tags?.map((t) => t.name) || [],
                         cover: post.cover,
+                        authorName: post.author?.nickname || '',
                       }}
                     />
                   ))}

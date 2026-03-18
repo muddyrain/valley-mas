@@ -6,6 +6,7 @@ export interface PostMeta {
   category: string;
   excerpt: string;
   cover?: string;
+  authorName?: string;
 }
 
 export interface Post extends PostMeta {

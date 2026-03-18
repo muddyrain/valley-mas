@@ -1,4 +1,4 @@
-import { Calendar, Tag } from 'lucide-react';
+import { Calendar, Tag, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import type { PostMeta } from '@/types/blog';
@@ -43,10 +43,18 @@ export function PostCard({ post }: PostCardProps) {
 
           <p className="text-muted-foreground text-sm mb-4 line-clamp-2">{post.excerpt}</p>
 
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5" />
-              <time>{formatDate(post.date)}</time>
+          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                <time>{formatDate(post.date)}</time>
+              </div>
+              {post.authorName && (
+                <div className="inline-flex min-w-0 items-center gap-1">
+                  <User className="h-3.5 w-3.5" />
+                  <span className="truncate">{post.authorName}</span>
+                </div>
+              )}
             </div>
 
             {post.tags.length > 0 && (

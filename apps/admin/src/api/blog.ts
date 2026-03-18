@@ -27,6 +27,11 @@ export interface Post {
   isTop: boolean;
   publishedAt?: string;
   createdAt: string;
+  author?: {
+    id: string;
+    nickname: string;
+    avatar: string;
+  };
 }
 
 export interface PostDetail extends Post {
