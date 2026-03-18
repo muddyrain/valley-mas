@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 // 分类映射:中文名 -> 后端类型
 const categories = [
@@ -54,7 +55,7 @@ export default function CreatorProfile() {
   const [activeTab, setActiveTab] = useState('works');
   // 作品收藏状态：key = resourceId, value = boolean
   const [favoritedMap, setFavoritedMap] = useState<Record<string, boolean>>({});
-
+  const user = useAuthStore((state) => state.user);
   useEffect(() => {
     if (!code) return;
 
@@ -69,13 +70,15 @@ export default function CreatorProfile() {
         const [worksData] = await Promise.all([
           getCreatorWorks(creatorData.id),
           // 查询关注状态（接口失败不影响主流程）
-          getCreatorFollowStatus(creatorData.id)
-            .then((res) => {
-              setIsFollowing(res.following);
-              setFollowerCount(res.followerCount);
-              setIsSelf(res.isSelf);
-            })
-            .catch(() => {}),
+          user?.id
+            ? getCreatorFollowStatus(creatorData.id)
+                .then((res) => {
+                  setIsFollowing(res.following);
+                  setFollowerCount(res.followerCount);
+                  setIsSelf(res.isSelf);
+                })
+                .catch(() => {})
+            : Promise.resolve(),
         ]);
         setWorks(worksData.list);
 
