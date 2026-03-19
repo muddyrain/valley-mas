@@ -1,7 +1,8 @@
-package config
+﻿package config
 
 import (
 	"os"
+	"strconv"
 )
 
 type Config struct {
@@ -10,6 +11,7 @@ type Config struct {
 	Database DatabaseConfig
 	TOS      TOSConfig
 	JWT      JWTConfig
+	TTS      TTSConfig
 }
 
 type DatabaseConfig struct {
@@ -19,7 +21,7 @@ type DatabaseConfig struct {
 	User     string
 	Password string
 	DBName   string
-	SQLite   string // SQLite 文件路径
+	SQLite   string // SQLite file path
 }
 
 type TOSConfig struct {
@@ -33,6 +35,14 @@ type TOSConfig struct {
 type JWTConfig struct {
 	Secret string
 	Expire int64 // hours
+}
+
+type TTSConfig struct {
+	BaseURL      string
+	APIKey       string
+	UpstreamPath string
+	OutputDir    string
+	TimeoutSec   int
 }
 
 func Load() *Config {
@@ -59,7 +69,14 @@ func Load() *Config {
 		},
 		JWT: JWTConfig{
 			Secret: getEnv("JWT_SECRET", "valley-secret-key"),
-			Expire: 24 * 7, // 7 days
+			Expire: 24 * 7,
+		},
+		TTS: TTSConfig{
+			BaseURL:      getEnv("TTS_BASE_URL", ""),
+			APIKey:       getEnv("TTS_API_KEY", ""),
+			UpstreamPath: getEnv("TTS_UPSTREAM_PATH", "/synthesize"),
+			OutputDir:    getEnv("TTS_OUTPUT_DIR", "./data/tts"),
+			TimeoutSec:   getEnvInt("TTS_TIMEOUT_SEC", 120),
 		},
 	}
 }
@@ -71,10 +88,21 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-// getDefaultDriver 根据环境返回默认数据库驱动
 func getDefaultDriver(env string) string {
 	if env == "production" {
 		return "mysql"
 	}
-	return "sqlite" // 开发环境默认用 SQLite
+	return "sqlite"
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	value := getEnv(key, "")
+	if value == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return defaultValue
+	}
+	return parsed
 }

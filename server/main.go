@@ -1,78 +1,54 @@
-package main
+﻿package main
 
 import (
 	"log"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
+	"valley-server/internal/handler"
 	"valley-server/internal/logger"
 	"valley-server/internal/router"
 	"valley-server/internal/utils"
 
-	_ "valley-server/docs" // Swagger 文档
+	_ "valley-server/docs"
 
 	"github.com/joho/godotenv"
 )
 
-// @title           Valley MAS API
-// @version         1.0
-// @description     Valley MAS 创作者内容平台 API 文档
-// @description     支持创作者注册、口令管理、资源上传下载等功能
-
-// @contact.name   API Support
-// @contact.email  support@valley-mas.com
-
-// @license.name  MIT
-// @license.url   https://opensource.org/licenses/MIT
-
-// @host      localhost:8080
-// @BasePath  /api/v1
-
-// @securityDefinitions.apikey Bearer
-// @in header
-// @name Authorization
-// @description JWT 认证，格式：Bearer {token}
-
 func main() {
-	// 加载 .env 文件（开发环境）
 	if err := godotenv.Load(); err != nil {
-		log.Println("⚠️  No .env file found, using system environment variables")
+		log.Println("No .env file found, using system environment variables")
 	}
 
-	// 加载配置
 	cfg := config.Load()
 
-	// 初始化日志系统
 	logger.InitLogger()
-	logger.Log.Info("🚀 Valley MAS Server Starting...")
+	logger.Log.Info("Valley MAS Server Starting...")
 
-	// 初始化 Snowflake ID 生成器（节点ID可配置，默认为1）
 	if err := utils.InitSnowflake(1); err != nil {
 		logger.Log.Fatalf("Failed to init Snowflake: %v", err)
 	}
-	logger.Log.Info("✅ Snowflake ID generator initialized (Node ID: 1)")
 
-	// 初始化火山引擎 TOS（对象存储）
 	if cfg.TOS.AccessKey != "" && cfg.TOS.SecretKey != "" {
 		if err := utils.InitTOS(&cfg.TOS); err != nil {
-			logger.Log.Warnf("⚠️  TOS initialization failed: %v", err)
-		} else {
-			logger.Log.Info("✅ TOS (Volcano Engine Object Storage) initialized")
+			logger.Log.Warnf("TOS initialization failed: %v", err)
 		}
 	} else {
-		logger.Log.Warn("⚠️  TOS credentials not configured, file upload disabled")
+		logger.Log.Warn("TOS credentials not configured, file upload disabled")
 	}
 
-	// 初始化数据库
 	if err := database.Init(cfg); err != nil {
 		logger.Log.Fatalf("Failed to init database: %v", err)
 	}
 	defer database.Close()
 
-	// 初始化路由
-	r := router.Setup(cfg)
+	handler.InitTTSConfig(cfg)
 
-	// 启动服务
-	logger.Log.Infof("🚀 Server starting on port %s (env: %s)", cfg.Port, cfg.Env)
+	r := router.Setup(cfg)
+	// Register TTS routes here to avoid touching existing router comments.
+	r.POST("/api/v1/public/tts/synthesize", handler.SynthesizeTTS)
+	r.GET("/api/v1/public/tts/audio/:filename", handler.GetTTSAudio)
+
+	logger.Log.Infof("Server starting on port %s (env: %s)", cfg.Port, cfg.Env)
 	if err := r.Run(":" + cfg.Port); err != nil {
 		logger.Log.Fatalf("Failed to start server: %v", err)
 	}
