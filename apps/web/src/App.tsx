@@ -14,6 +14,7 @@ import Profile from './pages/Profile';
 import Register from './pages/Register';
 import ResourceDetail from './pages/ResourceDetail';
 import Resources from './pages/Resources';
+import TTSStudio from './pages/TTSStudio';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
           <Route path="apply-creator" element={<ApplyCreator />} />
           <Route path="blog" element={<BlogList />} />
           <Route path="blog/:id" element={<BlogPost />} />
+          <Route path="tts" element={<TTSStudio />} />
         </Route>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
