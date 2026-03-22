@@ -1,5 +1,5 @@
 import { BookOpen, Folder, Tag, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Category, Post, Tag as TagType } from '@/api/blog';
 import { getCategories, getPosts, getTags } from '@/api/blog';
@@ -18,11 +18,7 @@ export default function BlogList() {
   const selectedCategory = searchParams.get('category') || '';
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
 
-  useEffect(() => {
-    void loadData();
-  }, [selectedTag, selectedCategory, currentPage]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [postsData, categoriesData, tagsData] = await Promise.all([
@@ -45,7 +41,11 @@ export default function BlogList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, selectedCategory, selectedTag]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const handleTagClick = (tagSlug: string) => {
     if (!tagSlug) return;

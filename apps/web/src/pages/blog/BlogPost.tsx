@@ -1,5 +1,5 @@
 import { ArrowLeft, Calendar, ChevronLeft, Clock, User } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { PostDetail } from '@/api/blog';
 import { getPostDetailById } from '@/api/blog';
@@ -13,12 +13,7 @@ export default function BlogPost() {
   const [toc, setToc] = useState<TocItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!id) return;
-    void loadPost(id);
-  }, [id]);
-
-  const loadPost = async (postId: string) => {
+  const loadPost = useCallback(async (postId: string) => {
     setLoading(true);
     try {
       const data = await getPostDetailById(postId);
@@ -30,7 +25,12 @@ export default function BlogPost() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    void loadPost(id);
+  }, [id, loadPost]);
 
   const processedContent = useMemo(() => {
     if (!post) return '';
