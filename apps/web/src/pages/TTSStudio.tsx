@@ -1,5 +1,5 @@
 ﻿import { Download, Loader2, Mic2, PlayCircle, Sparkles, Trash2, Volume2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { synthesizeTtsAsync, TTS_VOICE_PRESETS, type TtsProgressResult } from '@/api/tts';
 import { Button } from '@/components/ui/button';
@@ -8,10 +8,12 @@ import { Input } from '@/components/ui/input';
 
 const MAX_TEXT_LENGTH = 240;
 const MAX_SSE_TIME_MS = 10 * 60 * 1000;
-const HISTORY_KEY = 'tts_history_v1';
+const HISTORY_KEY = 'tts_history_v2';
 const MAX_HISTORY_ITEMS = 20;
+const DB_NAME = 'tts_history_audio_db';
+const DB_STORE = 'audio_blobs';
 
-type TtsHistoryItem = {
+type TtsHistoryMeta = {
   id: string;
   taskId: string;
   text: string;
@@ -19,7 +21,12 @@ type TtsHistoryItem = {
   voiceName: string;
   speed: number;
   audioUrl: string;
+  localAudioId?: string;
   createdAt: number;
+};
+
+type TtsHistoryItem = TtsHistoryMeta & {
+  playUrl: string;
 };
 
 function resolveSseUrl(taskId: string): string {
@@ -27,19 +34,21 @@ function resolveSseUrl(taskId: string): string {
   return `${base}/public/tts/progress/stream/${encodeURIComponent(taskId)}`;
 }
 
-function loadHistory(): TtsHistoryItem[] {
+function loadHistoryMeta(): TtsHistoryMeta[] {
   try {
     const raw = window.localStorage.getItem(HISTORY_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as TtsHistoryItem[];
+    const parsed = JSON.parse(raw) as TtsHistoryMeta[];
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item) => item && item.audioUrl && item.text).slice(0, MAX_HISTORY_ITEMS);
+    return parsed
+      .filter((item) => item && item.taskId && item.text && item.audioUrl)
+      .slice(0, MAX_HISTORY_ITEMS);
   } catch {
     return [];
   }
 }
 
-function saveHistory(items: TtsHistoryItem[]): void {
+function saveHistoryMeta(items: TtsHistoryMeta[]): void {
   try {
     window.localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, MAX_HISTORY_ITEMS)));
   } catch {
@@ -51,8 +60,80 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleString('zh-CN', { hour12: false });
 }
 
-const minSpeed = 0.7;
-const maxSpeed = 1.4;
+function openAudioDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) {
+        db.createObjectStore(DB_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function putAudioBlob(id: string, blob: Blob): Promise<void> {
+  const db = await openAudioDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).put(blob, id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
+async function getAudioBlob(id: string): Promise<Blob | null> {
+  const db = await openAudioDb();
+  const result = await new Promise<Blob | null>((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readonly');
+    const req = tx.objectStore(DB_STORE).get(id);
+    req.onsuccess = () => resolve((req.result as Blob | undefined) || null);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return result;
+}
+
+async function deleteAudioBlob(id: string): Promise<void> {
+  const db = await openAudioDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
+async function fetchAudioBlob(audioUrl: string): Promise<Blob> {
+  const resp = await fetch(audioUrl, { credentials: 'include' });
+  if (!resp.ok) {
+    throw new Error(`音频下载失败: ${resp.status}`);
+  }
+  return resp.blob();
+}
+
+async function hydrateHistory(meta: TtsHistoryMeta[]): Promise<TtsHistoryItem[]> {
+  const items: TtsHistoryItem[] = [];
+  for (const m of meta) {
+    let playUrl = m.audioUrl;
+    if (m.localAudioId) {
+      try {
+        const blob = await getAudioBlob(m.localAudioId);
+        if (blob) {
+          playUrl = URL.createObjectURL(blob);
+        }
+      } catch {
+        // fallback to remote url
+      }
+    }
+    items.push({ ...m, playUrl });
+  }
+  return items;
+}
 
 export default function TTSStudio() {
   const [text, setText] = useState('');
@@ -63,7 +144,8 @@ export default function TTSStudio() {
   const [lastTaskId, setLastTaskId] = useState('');
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState('等待开始');
-  const [history, setHistory] = useState<TtsHistoryItem[]>(() => loadHistory());
+  const [history, setHistory] = useState<TtsHistoryItem[]>([]);
+  const blobUrlRef = useRef<string[]>([]);
 
   const charCount = text.trim().length;
   const estimatedSec = useMemo(
@@ -75,26 +157,124 @@ export default function TTSStudio() {
     [voiceId],
   );
 
-  const appendHistory = (item: Omit<TtsHistoryItem, 'id' | 'createdAt'>) => {
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const meta = loadHistoryMeta();
+      const hydrated = await hydrateHistory(meta);
+      if (!alive) {
+        for (const item of hydrated) {
+          if (item.playUrl.startsWith('blob:')) URL.revokeObjectURL(item.playUrl);
+        }
+        return;
+      }
+      blobUrlRef.current = hydrated
+        .filter((x) => x.playUrl.startsWith('blob:'))
+        .map((x) => x.playUrl);
+      setHistory(hydrated);
+    })();
+
+    return () => {
+      alive = false;
+      for (const url of blobUrlRef.current) {
+        if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+      }
+      blobUrlRef.current = [];
+    };
+  }, []);
+
+  const appendHistory = async (params: {
+    taskId: string;
+    text: string;
+    voiceId: string;
+    voiceName: string;
+    speed: number;
+    audioUrl: string;
+  }) => {
+    const localAudioId = `${params.taskId}-${Date.now()}`;
+    const audioBlob = await fetchAudioBlob(params.audioUrl);
+    await putAudioBlob(localAudioId, audioBlob);
+    const playUrl = URL.createObjectURL(audioBlob);
+
     setHistory((prev) => {
-      const nextItem: TtsHistoryItem = {
-        id: `${item.taskId}-${Date.now()}`,
+      const nextMeta: TtsHistoryMeta = {
+        id: `${params.taskId}-${Date.now()}`,
+        taskId: params.taskId,
+        text: params.text,
+        voiceId: params.voiceId,
+        voiceName: params.voiceName,
+        speed: params.speed,
+        audioUrl: params.audioUrl,
+        localAudioId,
         createdAt: Date.now(),
-        ...item,
       };
-      const next = [nextItem, ...prev.filter((x) => x.taskId !== item.taskId)].slice(
+
+      const dedup = prev.filter((x) => x.taskId !== params.taskId);
+      const next: TtsHistoryItem[] = [{ ...nextMeta, playUrl }, ...dedup].slice(
         0,
         MAX_HISTORY_ITEMS,
       );
-      saveHistory(next);
+
+      // revoke dropped blob urls
+      for (const dropped of dedup.slice(MAX_HISTORY_ITEMS - 1)) {
+        if (dropped.playUrl.startsWith('blob:')) URL.revokeObjectURL(dropped.playUrl);
+      }
+
+      blobUrlRef.current = next.filter((x) => x.playUrl.startsWith('blob:')).map((x) => x.playUrl);
+      saveHistoryMeta(next.map(({ playUrl: _playUrl, ...rest }) => rest));
       return next;
     });
+
+    setAudioUrl(playUrl);
   };
 
-  const clearHistory = () => {
+  const clearHistory = async () => {
+    const meta = loadHistoryMeta();
+    await Promise.all(
+      meta
+        .filter((x) => !!x.localAudioId)
+        .map(async (x) => {
+          try {
+            await deleteAudioBlob(x.localAudioId!);
+          } catch {
+            // ignore
+          }
+        }),
+    );
+
+    for (const url of blobUrlRef.current) {
+      if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+    }
+    blobUrlRef.current = [];
+    saveHistoryMeta([]);
     setHistory([]);
-    saveHistory([]);
     toast.success('历史记录已清空');
+  };
+
+  const deleteHistoryItem = async (item: TtsHistoryItem) => {
+    if (item.localAudioId) {
+      try {
+        await deleteAudioBlob(item.localAudioId);
+      } catch {
+        // ignore
+      }
+    }
+
+    if (item.playUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(item.playUrl);
+    }
+
+    setHistory((prev) => {
+      const next = prev.filter((x) => x.id !== item.id);
+      blobUrlRef.current = next.filter((x) => x.playUrl.startsWith('blob:')).map((x) => x.playUrl);
+      saveHistoryMeta(next.map(({ playUrl: _playUrl, ...rest }) => rest));
+      return next;
+    });
+
+    if (audioUrl === item.playUrl) {
+      setAudioUrl('');
+    }
+    toast.success('已删除该历史条目');
   };
 
   const handleGenerate = async () => {
@@ -147,15 +327,12 @@ export default function TTSStudio() {
           }
         });
 
-        eventSource.addEventListener('done', (event) => {
+        eventSource.addEventListener('done', async (event) => {
           try {
             const status = JSON.parse((event as MessageEvent).data) as TtsProgressResult;
             applyProgress(status);
             if (status.status === 'completed' && status.audioUrl) {
-              setAudioUrl(status.audioUrl);
-              setProgress(100);
-              setProgressText('已完成');
-              appendHistory({
+              await appendHistory({
                 taskId: submit.taskId,
                 text: trimmed,
                 voiceId,
@@ -163,6 +340,8 @@ export default function TTSStudio() {
                 speed,
                 audioUrl: status.audioUrl,
               });
+              setProgress(100);
+              setProgressText('已完成');
               toast.success('语音已生成');
               closeAll();
               resolve();
@@ -243,9 +422,9 @@ export default function TTSStudio() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 mb-2">音色预设</label>
+                <label className="text-sm font-medium text-slate-700">音色预设</label>
                 <select
-                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none ring-sky-500 focus:ring-2 mt-2"
+                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none ring-sky-500 focus:ring-2"
                   value={voiceId}
                   onChange={(event) => setVoiceId(event.target.value)}
                 >
@@ -261,20 +440,12 @@ export default function TTSStudio() {
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">语速倍率</label>
                 <Input
-                  className="mt-2"
                   type="number"
-                  min={selectedVoice?.speedRange?.[0] || minSpeed}
-                  max={selectedVoice?.speedRange?.[1] || maxSpeed}
+                  min={selectedVoice?.speedRange?.[0] || 0.8}
+                  max={selectedVoice?.speedRange?.[1] || 1.2}
                   step={0.05}
                   value={speed}
                   onChange={(event) => setSpeed(Number(event.target.value))}
-                  onBlur={() => {
-                    if (speed < (selectedVoice?.speedRange?.[0] || minSpeed)) {
-                      setSpeed(selectedVoice?.speedRange?.[0] || minSpeed);
-                    } else if (speed > (selectedVoice?.speedRange?.[1] || maxSpeed)) {
-                      setSpeed(selectedVoice?.speedRange?.[1] || maxSpeed);
-                    }
-                  }}
                 />
                 <p className="text-xs text-slate-500">
                   推荐范围 {selectedVoice?.speedRange?.[0]} - {selectedVoice?.speedRange?.[1]}
@@ -346,11 +517,11 @@ export default function TTSStudio() {
         <Card className="mt-6">
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
-              <CardTitle className="text-lg">生成历史（可对比）</CardTitle>
+              <CardTitle className="text-lg">生成历史（本地持久化）</CardTitle>
               <Button
                 variant="outline"
                 className="gap-2"
-                onClick={clearHistory}
+                onClick={() => void clearHistory()}
                 disabled={!history.length}
               >
                 <Trash2 className="h-4 w-4" />
@@ -374,7 +545,7 @@ export default function TTSStudio() {
                       </span>
                     </div>
                     <p className="mb-3 line-clamp-3 text-sm text-slate-700">{item.text}</p>
-                    <audio className="w-full" controls src={item.audioUrl}>
+                    <audio className="w-full" controls src={item.playUrl}>
                       <track kind="captions" />
                     </audio>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -385,12 +556,20 @@ export default function TTSStudio() {
                       >
                         回填文本
                       </Button>
-                      <a href={item.audioUrl} download={`tts-${item.taskId}.wav`}>
+                      <a href={item.playUrl} download={`tts-${item.taskId}.wav`}>
                         <Button variant="outline" className="gap-2">
                           <Download className="h-4 w-4" />
                           下载
                         </Button>
                       </a>
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => void deleteHistoryItem(item)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        删除
+                      </Button>
                     </div>
                   </div>
                 ))}
