@@ -49,7 +49,10 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200/50 bg-white/80 shadow-sm backdrop-blur-xl">
+    <header
+      data-global-header
+      className="sticky top-0 z-50 w-full border-b border-gray-200/50 bg-white/80 shadow-sm backdrop-blur-xl"
+    >
       <div className="mx-auto flex h-16 max-w-7xl items-center px-4 md:px-8">
         <Link to="/" className="group mr-8 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-purple-600 to-indigo-600 shadow-md transition-transform group-hover:scale-110 group-hover:shadow-lg">

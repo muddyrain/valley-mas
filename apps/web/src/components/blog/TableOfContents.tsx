@@ -8,11 +8,72 @@ interface TableOfContentsProps {
   className?: string;
 }
 
+function getStickyTopOffset() {
+  const stickySelectors = ['[data-global-header]', '[data-blog-post-nav]'];
+
+  const stickyHeight = stickySelectors.reduce((total, selector) => {
+    const element = document.querySelector<HTMLElement>(selector);
+    if (!element) return total;
+
+    const rect = element.getBoundingClientRect();
+    const styles = window.getComputedStyle(element);
+    const isStickyElement = styles.position === 'sticky' || styles.position === 'fixed';
+    const isPinnedToTop = rect.top <= 1 && rect.bottom > 0;
+
+    return isStickyElement && isPinnedToTop ? total + rect.height : total;
+  }, 0);
+
+  return Math.round(stickyHeight + 16);
+}
+
 export function TableOfContents({ toc, className }: TableOfContentsProps) {
   const [activeId, setActiveId] = useState<string>('');
+  const [scrollOffset, setScrollOffset] = useState<number>(120);
   const headingElementsRef = useRef<Map<string, IntersectionObserverEntry>>(new Map());
 
   useEffect(() => {
+    const updateOffset = () => {
+      setScrollOffset(getStickyTopOffset());
+    };
+
+    updateOffset();
+    window.addEventListener('resize', updateOffset);
+
+    return () => {
+      window.removeEventListener('resize', updateOffset);
+    };
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--blog-scroll-offset', `${scrollOffset}px`);
+
+    return () => {
+      document.documentElement.style.removeProperty('--blog-scroll-offset');
+    };
+  }, [scrollOffset]);
+
+  useEffect(() => {
+    const highlightCurrentHeading = () => {
+      const allHeadings = toc
+        .map((item) => document.getElementById(item.id))
+        .filter((heading): heading is HTMLElement => Boolean(heading));
+
+      let currentActive = '';
+
+      for (const heading of allHeadings) {
+        const rect = heading.getBoundingClientRect();
+        if (rect.top <= scrollOffset + 8) {
+          currentActive = heading.id;
+        }
+      }
+
+      if (currentActive) {
+        setActiveId(currentActive);
+      } else if (allHeadings[0]) {
+        setActiveId(allHeadings[0].id);
+      }
+    };
+
     const callback = (entries: IntersectionObserverEntry[]) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
@@ -22,37 +83,19 @@ export function TableOfContents({ toc, className }: TableOfContentsProps) {
         }
       });
 
-      // 获取当前可见的 headings，按 DOM 顺序排序
-      const visibleHeadings = Array.from(headingElementsRef.current.values()).sort((a, b) => {
-        // 按在页面上的位置排序
-        return a.boundingClientRect.top - b.boundingClientRect.top;
-      });
+      const visibleHeadings = Array.from(headingElementsRef.current.values()).sort(
+        (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
+      );
 
-      // 高亮第一个可见的 heading
       if (visibleHeadings.length > 0) {
         setActiveId(visibleHeadings[0].target.id);
       } else {
-        // 如果没有可见的 heading，找到当前滚动位置之前的最后一个 heading
-        const allHeadings = toc.map((item) => document.getElementById(item.id)).filter(Boolean);
-        let currentActive = '';
-
-        for (const heading of allHeadings) {
-          if (heading) {
-            const rect = heading.getBoundingClientRect();
-            if (rect.top <= 150) {
-              currentActive = heading.id;
-            }
-          }
-        }
-
-        if (currentActive) {
-          setActiveId(currentActive);
-        }
+        highlightCurrentHeading();
       }
     };
 
     const observer = new IntersectionObserver(callback, {
-      rootMargin: '-80px 0px -60% 0px',
+      rootMargin: `-${scrollOffset}px 0px -60% 0px`,
       threshold: 0,
     });
 
@@ -63,23 +106,32 @@ export function TableOfContents({ toc, className }: TableOfContentsProps) {
       }
     });
 
-    return () => observer.disconnect();
-  }, [toc]);
+    highlightCurrentHeading();
+
+    const handleScroll = () => {
+      highlightCurrentHeading();
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [toc, scrollOffset]);
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
     e.preventDefault();
     const element = document.getElementById(id);
     if (element) {
-      const offset = 100;
       const elementPosition = element.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - offset;
+      const offsetPosition = elementPosition + window.pageYOffset - scrollOffset;
 
       window.scrollTo({
         top: offsetPosition,
         behavior: 'smooth',
       });
 
-      // 点击时立即设置高亮
       setActiveId(id);
     }
   };
