@@ -108,6 +108,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			// 创作者申请相关（新增）
 			auth.POST("/creator/application", handler.SubmitCreatorApplication)
 			auth.GET("/creator/application/my", handler.GetMyApplication)
+			auth.POST("/ai/chat", handler.ChatWithAI)
 		}
 
 		// 管理后台接口
@@ -177,6 +178,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.PATCH("/resources/:id", handler.UpdateResource)
 				content.PUT("/resources/:id/creator", handler.UpdateResourceCreator)
 				content.DELETE("/resources/:id", handler.DeleteResource)
+
 			}
 		}
 	}

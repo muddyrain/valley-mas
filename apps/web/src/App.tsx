@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import Layout from './layouts/Layout';
+import AIChat from './pages/AIChat';
 import ApplyCreator from './pages/ApplyCreator';
 import BlogList from './pages/blog/BlogList';
 import BlogPost from './pages/blog/BlogPost';
@@ -33,6 +34,7 @@ function App() {
           <Route path="blog" element={<BlogList />} />
           <Route path="blog/:id" element={<BlogPost />} />
           <Route path="tts" element={<TTSStudio />} />
+          <Route path="ai-chat" element={<AIChat />} />
         </Route>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

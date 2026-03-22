@@ -1,4 +1,4 @@
-import {
+﻿import {
   AuditOutlined,
   BookOutlined,
   CrownOutlined,
@@ -18,29 +18,22 @@ import http from '../utils/request';
 
 const { Header, Sider, Content } = AntLayout;
 
-// 管理员菜单（完整权限）
 const adminMenuItems = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' },
   { key: '/users', icon: <UserOutlined />, label: '用户管理' },
   { key: '/creators', icon: <CrownOutlined />, label: '创作者管理' },
-  {
-    key: '/creator-applications',
-    icon: <AuditOutlined />,
-    label: '创作者申请审核',
-  },
+  { key: '/creator-applications', icon: <AuditOutlined />, label: '创作者申请审核' },
   { key: '/resources', icon: <PictureOutlined />, label: '资源管理' },
   { key: '/records', icon: <FileTextOutlined />, label: '记录管理' },
   { key: '/blog-posts', icon: <BookOutlined />, label: '博客管理' },
 ];
 
-// 创作者菜单（受限权限）
 const creatorMenuItems = [
   { key: '/creator-dashboard', icon: <DashboardOutlined />, label: '数据概览' },
   { key: '/resources', icon: <PictureOutlined />, label: '我的资源' },
   { key: '/creators', icon: <CrownOutlined />, label: '我的空间' },
 ];
 
-// 普通用户菜单
 const userMenuItems = [{ key: '/apply-creator', icon: <FormOutlined />, label: '申请成为创作者' }];
 
 export default function Layout() {
@@ -51,12 +44,12 @@ export default function Layout() {
     avatar?: string;
     role?: string;
   }>({});
+
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = theme.useToken();
 
   useEffect(() => {
-    // 从 localStorage 获取用户信息
     const storedUserInfo = localStorage.getItem('userInfo');
     if (storedUserInfo) {
       try {
@@ -67,7 +60,6 @@ export default function Layout() {
     }
   }, []);
 
-  // 根据角色选择菜单
   const menuItems =
     userInfo.role === 'admin'
       ? adminMenuItems
@@ -123,6 +115,7 @@ export default function Layout() {
           <div className="cursor-pointer text-lg" onClick={() => setCollapsed(!collapsed)}>
             {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           </div>
+
           <Dropdown menu={userMenu} placement="bottomRight">
             <div className="flex items-center cursor-pointer">
               <Avatar src={userInfo.avatar} icon={<UserOutlined />} />
@@ -135,6 +128,7 @@ export default function Layout() {
             </div>
           </Dropdown>
         </Header>
+
         <Content
           className="m-4 p-6 overflow-auto"
           style={{

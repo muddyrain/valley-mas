@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
 	"valley-server/internal/handler"
@@ -15,7 +16,21 @@ import (
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
+	// 兼容不同启动目录：
+	// - 在 server 目录启动：读取 .env
+	// - 在项目根目录启动：读取 server/.env
+	envCandidates := []string{".env", "server/.env", "./server/.env", "../server/.env"}
+	loaded := false
+	for _, p := range envCandidates {
+		if _, err := os.Stat(p); err == nil {
+			if err := godotenv.Load(p); err == nil {
+				log.Printf("Loaded env file: %s", p)
+				loaded = true
+				break
+			}
+		}
+	}
+	if !loaded {
 		log.Println("No .env file found, using system environment variables")
 	}
 

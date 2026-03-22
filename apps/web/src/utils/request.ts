@@ -39,6 +39,12 @@ http.interceptors.response.use(
 
     // 假设非 0 均为错误情况，具体看后端约定
     if (code !== 0) {
+      if (code === 401) {
+        useAuthStore.getState().logout();
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }
       toast.error(msg || '请求失败');
       return Promise.reject(new Error(msg || 'Error'));
     }
