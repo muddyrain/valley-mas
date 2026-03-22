@@ -77,7 +77,10 @@ export default function BlogPost() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-muted/20 via-background to-background">
-      <div className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur">
+      <div
+        data-blog-post-nav
+        className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur"
+      >
         <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 lg:px-8">
           <Link
             to="/blog"

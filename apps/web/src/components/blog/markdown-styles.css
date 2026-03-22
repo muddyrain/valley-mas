@@ -19,7 +19,7 @@
   font-weight: 600;
   line-height: 1.4;
   color: hsl(var(--foreground));
-  scroll-margin-top: 100px;
+  scroll-margin-top: calc(var(--blog-scroll-offset, 120px) + 8px);
 }
 
 .markdown-body h1 {
