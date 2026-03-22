@@ -29,6 +29,8 @@ func ListResources(c *gin.Context) {
 	page := GetIntQuery(c, "page", 1)
 	pageSize := GetIntQuery(c, "pageSize", 20)
 	resourceType := c.Query("type")
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	uploaderID := strings.TrimSpace(c.Query("uploaderId"))
 
 	offset := (page - 1) * pageSize
 
@@ -45,10 +47,16 @@ func ListResources(c *gin.Context) {
 	// 🔒 如果是创作者角色，只能查看自己上传的资源
 	if userRole == "creator" {
 		query = query.Where("user_id = ?", userId)
+	} else if uploaderID != "" {
+		query = query.Where("user_id = ?", uploaderID)
 	}
 
 	if resourceType != "" {
 		query = query.Where("type = ?", resourceType)
+	}
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		query = query.Where("title LIKE ? OR description LIKE ?", like, like)
 	}
 
 	query.Count(&total)

@@ -13,6 +13,7 @@ import { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { logout } from '@/api/auth';
+import AiChatAssistant from '@/components/AiChatAssistant';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -134,6 +135,7 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-3">
+          {isAuthenticated && <AiChatAssistant />}
           {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger className="relative h-10 w-10 rounded-full outline-none transition-all hover:ring-2 hover:ring-purple-200">

@@ -87,13 +87,14 @@ export default function Resources() {
         pageSize: number;
         type?: ResourceType;
         keyword?: string;
+        uploaderId?: string;
       } = {
         page,
         pageSize,
       };
       if (typeFilter) params.type = typeFilter;
       if (keyword) params.keyword = keyword;
-      // 移除 creatorId 参数，后端自动根据登录用户过滤
+      if (!isCreator && creatorIdFilter) params.uploaderId = creatorIdFilter;
 
       const response = await reqGetResourceList(params);
       setData(response.list || []);
@@ -104,7 +105,7 @@ export default function Resources() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, typeFilter, keyword]); // 移除 creatorIdFilter 依赖
+  }, [page, pageSize, typeFilter, keyword, creatorIdFilter, isCreator]);
 
   // 删除资源
   const handleDelete = async (id: string) => {
@@ -359,7 +360,7 @@ export default function Resources() {
                 onChange={(value) => setCreatorIdFilter(value || '')}
                 options={creators.map((c) => ({
                   label: c.name,
-                  value: c.id,
+                  value: c.userId,
                 }))}
                 filterOption={(input, option) =>
                   (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
