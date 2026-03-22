@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"log"
@@ -44,9 +44,6 @@ func main() {
 	handler.InitTTSConfig(cfg)
 
 	r := router.Setup(cfg)
-	// Register TTS routes here to avoid touching existing router comments.
-	r.POST("/api/v1/public/tts/synthesize", handler.SynthesizeTTS)
-	r.GET("/api/v1/public/tts/audio/:filename", handler.GetTTSAudio)
 
 	logger.Log.Infof("Server starting on port %s (env: %s)", cfg.Port, cfg.Env)
 	if err := r.Run(":" + cfg.Port); err != nil {
