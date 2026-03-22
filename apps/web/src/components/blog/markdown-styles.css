@@ -86,7 +86,7 @@
 }
 
 .markdown-body ul li::before {
-  content: '';
+  content: "";
   position: absolute;
   left: -1.3em;
   top: 0.7em;
@@ -129,7 +129,7 @@
 
 /* 代码 */
 .markdown-body code {
-  font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
+  font-family: "JetBrains Mono", "Fira Code", Consolas, Monaco, monospace;
   font-size: 0.9em;
   padding: 0.2em 0.4em;
   background: hsl(var(--muted));

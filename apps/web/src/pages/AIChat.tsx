@@ -82,7 +82,7 @@ export default function AIChat() {
   useEffect(() => {
     if (!messageListRef.current) return;
     messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
-  }, [activeSession?.messages.length]);
+  });
 
   const updateCurrentSession = (updater: (session: ChatSession) => ChatSession) => {
     setSessions((prev) =>

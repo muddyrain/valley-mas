@@ -41,7 +41,7 @@ function loadHistoryMeta(): TtsHistoryMeta[] {
     const parsed = JSON.parse(raw) as TtsHistoryMeta[];
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .filter((item) => item && item.taskId && item.text && item.audioUrl)
+      .filter((item) => item?.taskId && item.text && item.audioUrl)
       .slice(0, MAX_HISTORY_ITEMS);
   } catch {
     return [];
@@ -234,8 +234,9 @@ export default function TTSStudio() {
       meta
         .filter((x) => !!x.localAudioId)
         .map(async (x) => {
+          if (!x.localAudioId) return;
           try {
-            await deleteAudioBlob(x.localAudioId!);
+            await deleteAudioBlob(x.localAudioId);
           } catch {
             // ignore
           }
