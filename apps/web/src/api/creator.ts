@@ -142,6 +142,7 @@ export const unfollowCreator = (creatorId: string) => {
 export const getCreatorFollowStatus = (creatorId: string) => {
   return http.get<unknown, { following: boolean; followerCount: number; isSelf: boolean }>(
     `/user/creators/${creatorId}/follow/status`,
+    { skipAuth: true } as any,
   );
 };
 
