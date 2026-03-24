@@ -11,7 +11,10 @@ export interface TtsSynthesizePayload {
   text: string;
   voiceId: string;
   speed: number;
+  emotion?: TtsEmotion;
 }
+
+export type TtsEmotion = 'neutral' | 'calm' | 'happy' | 'sad' | 'excited';
 
 export interface TtsSynthesizeResult {
   taskId: string;
@@ -44,8 +47,8 @@ export interface TtsProgressResult {
 }
 
 export const TTS_VOICE_PRESETS: TtsVoicePreset[] = [
-  { id: 'yier', name: '一二配音', style: '一二小白熊', speedRange: [0.7, 1.4] },
-  { id: 'bubu', name: '布布配音', style: '布布棕熊布', speedRange: [0.7, 1.4] },
+  { id: 'yier', name: '一二（白熊）', style: '软萌奶呼呼，清亮元气', speedRange: [0.7, 1.4] },
+  { id: 'bubu', name: '布布（棕熊）', style: '温暖厚实，治愈亲切', speedRange: [0.7, 1.4] },
 ];
 
 export async function synthesizeTts(payload: TtsSynthesizePayload): Promise<TtsSynthesizeResult> {

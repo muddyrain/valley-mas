@@ -1,7 +1,14 @@
 ﻿import { Download, Loader2, Mic2, PlayCircle, Sparkles, Trash2, Volume2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { synthesizeTtsAsync, TTS_VOICE_PRESETS, type TtsProgressResult } from '@/api/tts';
+import {
+  synthesizeTtsAsync,
+  TTS_VOICE_PRESETS,
+  type TtsEmotion,
+  type TtsProgressResult,
+} from '@/api/tts';
+import bubuAvatar from '@/assets/bubu.jpeg';
+import yierAvatar from '@/assets/yier.jpeg';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,6 +19,35 @@ const HISTORY_KEY = 'tts_history_v2';
 const MAX_HISTORY_ITEMS = 20;
 const DB_NAME = 'tts_history_audio_db';
 const DB_STORE = 'audio_blobs';
+const TTS_EMOTION_OPTIONS: Array<{ value: TtsEmotion; label: string; hint: string }> = [
+  { value: 'neutral', label: '自然', hint: '平稳自然，适合通用旁白' },
+  { value: 'calm', label: '平静', hint: '更柔和，适合治愈风格' },
+  { value: 'happy', label: '开心', hint: '更轻快，适合种草推荐' },
+  { value: 'sad', label: '低沉', hint: '更慢更柔，适合故事情节' },
+  { value: 'excited', label: '激昂', hint: '更有张力，适合宣传口播' },
+];
+const VOICE_THEME: Record<
+  string,
+  {
+    mascot: string;
+    intro: string;
+    bubble: string;
+    avatar: string;
+  }
+> = {
+  yier: {
+    mascot: '一二 · 白熊',
+    intro: '轻甜清亮，适合可爱口播、日常解说',
+    bubble: 'from-[#f4effa] via-[#fff7fb] to-white',
+    avatar: yierAvatar,
+  },
+  bubu: {
+    mascot: '布布 · 棕熊',
+    intro: '温暖厚实，适合故事叙述、陪伴感场景',
+    bubble: 'from-[#f4ecfb] via-[#fff7ef] to-white',
+    avatar: bubuAvatar,
+  },
+};
 
 type TtsHistoryMeta = {
   id: string;
@@ -20,6 +56,7 @@ type TtsHistoryMeta = {
   voiceId: string;
   voiceName: string;
   speed: number;
+  emotion: TtsEmotion;
   audioUrl: string;
   localAudioId?: string;
   createdAt: number;
@@ -38,10 +75,22 @@ function loadHistoryMeta(): TtsHistoryMeta[] {
   try {
     const raw = window.localStorage.getItem(HISTORY_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as TtsHistoryMeta[];
+    const parsed = JSON.parse(raw) as Array<Partial<TtsHistoryMeta>>;
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((item) => item?.taskId && item.text && item.audioUrl)
+      .map((item) => ({
+        id: String(item.id || `${item.taskId}-${Date.now()}`),
+        taskId: String(item.taskId),
+        text: String(item.text),
+        voiceId: String(item.voiceId || ''),
+        voiceName: String(item.voiceName || item.voiceId || ''),
+        speed: Number(item.speed || 1),
+        emotion: (item.emotion as TtsEmotion) || 'neutral',
+        audioUrl: String(item.audioUrl),
+        localAudioId: item.localAudioId ? String(item.localAudioId) : undefined,
+        createdAt: Number(item.createdAt || Date.now()),
+      }))
       .slice(0, MAX_HISTORY_ITEMS);
   } catch {
     return [];
@@ -139,6 +188,7 @@ export default function TTSStudio() {
   const [text, setText] = useState('');
   const [voiceId, setVoiceId] = useState(TTS_VOICE_PRESETS[0]?.id || '');
   const [speed, setSpeed] = useState(1);
+  const [emotion, setEmotion] = useState<TtsEmotion>('neutral');
   const [isGenerating, setIsGenerating] = useState(false);
   const [audioUrl, setAudioUrl] = useState('');
   const [lastTaskId, setLastTaskId] = useState('');
@@ -155,6 +205,14 @@ export default function TTSStudio() {
   const selectedVoice = useMemo(
     () => TTS_VOICE_PRESETS.find((voice) => voice.id === voiceId) || TTS_VOICE_PRESETS[0],
     [voiceId],
+  );
+  const activeTheme = useMemo(
+    () => VOICE_THEME[voiceId] || VOICE_THEME[TTS_VOICE_PRESETS[0]?.id || 'yier'],
+    [voiceId],
+  );
+  const selectedEmotion = useMemo(
+    () => TTS_EMOTION_OPTIONS.find((item) => item.value === emotion) || TTS_EMOTION_OPTIONS[0],
+    [emotion],
   );
 
   useEffect(() => {
@@ -189,6 +247,7 @@ export default function TTSStudio() {
     voiceId: string;
     voiceName: string;
     speed: number;
+    emotion: TtsEmotion;
     audioUrl: string;
   }) => {
     const localAudioId = `${params.taskId}-${Date.now()}`;
@@ -204,6 +263,7 @@ export default function TTSStudio() {
         voiceId: params.voiceId,
         voiceName: params.voiceName,
         speed: params.speed,
+        emotion: params.emotion,
         audioUrl: params.audioUrl,
         localAudioId,
         createdAt: Date.now(),
@@ -295,7 +355,7 @@ export default function TTSStudio() {
       setProgress(0);
       setProgressText('已提交任务');
 
-      const submit = await synthesizeTtsAsync({ text: trimmed, voiceId, speed });
+      const submit = await synthesizeTtsAsync({ text: trimmed, voiceId, speed, emotion });
       setLastTaskId(submit.taskId);
       setProgress(submit.progress ?? 0);
       setProgressText(submit.message || '排队中');
@@ -339,6 +399,7 @@ export default function TTSStudio() {
                 voiceId,
                 voiceName: selectedVoice?.name || voiceId,
                 speed,
+                emotion,
                 audioUrl: status.audioUrl,
               });
               setProgress(100);
@@ -379,15 +440,40 @@ export default function TTSStudio() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-linear-to-b from-sky-50 via-white to-white">
+    <div className="min-h-[calc(100vh-4rem)] bg-[radial-gradient(circle_at_top,#eee3f8_0%,#fdf7ff_28%,#fff9f2_62%,#ffffff_100%)]">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mb-8 rounded-2xl border border-sky-100 bg-white p-6 shadow-sm sm:p-8">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
+        <div className="mb-6 rounded-3xl border border-[#e7dff2] bg-white/95 p-6 shadow-[0_10px_30px_rgba(90,56,126,0.12)] backdrop-blur sm:p-8">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#ede2fb] px-3 py-1 text-xs font-medium text-[#5b3d78]">
             <Sparkles className="h-3.5 w-3.5" />
-            TTS v1
+            一二 & 布布 TTS Studio
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 sm:text-4xl">一二布布在线语音合成</h1>
-          <p className="mt-3 max-w-3xl text-slate-600">支持本地模型合成、实时进度和历史对比。</p>
+          <h1 className="text-3xl font-bold text-[#3a2330] sm:text-4xl">一二布布在线语音合成</h1>
+          <p className="mt-3 max-w-3xl text-[#6d5669]">
+            白熊一二偏清亮，棕熊布布偏温暖，支持实时进度和历史对比。
+          </p>
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {TTS_VOICE_PRESETS.map((voice) => {
+              const theme = VOICE_THEME[voice.id] || VOICE_THEME.yier;
+              const active = voice.id === voiceId;
+              return (
+                <button
+                  key={voice.id}
+                  type="button"
+                  className={`rounded-2xl border p-3 text-left transition ${
+                    active
+                      ? 'border-[#5b3d78] bg-white shadow-[0_8px_20px_rgba(91,61,120,0.16)]'
+                      : 'border-[#eadff4] bg-white/80 hover:border-[#cfbde7]'
+                  }`}
+                  onClick={() => setVoiceId(voice.id)}
+                >
+                  <div className={`rounded-xl bg-gradient-to-r ${theme.bubble} p-3`}>
+                    <p className="text-sm font-semibold text-[#4a2d44]">{theme.mascot}</p>
+                    <p className="mt-1 text-xs text-[#6d5669]">{theme.intro}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -422,6 +508,22 @@ export default function TTSStudio() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
+              <div
+                className={`rounded-2xl border border-[#eadff4] bg-gradient-to-br ${activeTheme.bubble} p-4`}
+              >
+                <div className="flex items-center gap-3">
+                  <img
+                    src={activeTheme.avatar}
+                    alt={activeTheme.mascot}
+                    className="h-14 w-14 rounded-full border-2 border-[#5b3d78]/30 object-cover"
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-[#4a2d44]">{activeTheme.mascot}</p>
+                    <p className="text-xs text-[#6d5669]">{selectedVoice?.style}</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">音色预设</label>
                 <select
@@ -451,6 +553,22 @@ export default function TTSStudio() {
                 <p className="text-xs text-slate-500">
                   推荐范围 {selectedVoice?.speedRange?.[0]} - {selectedVoice?.speedRange?.[1]}
                 </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">情绪语气</label>
+                <select
+                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none ring-sky-500 focus:ring-2"
+                  value={emotion}
+                  onChange={(event) => setEmotion(event.target.value as TtsEmotion)}
+                >
+                  {TTS_EMOTION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500">{selectedEmotion.hint}</p>
               </div>
 
               <Button className="w-full gap-2" onClick={handleGenerate} disabled={isGenerating}>
@@ -542,7 +660,9 @@ export default function TTSStudio() {
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
                       <span>{formatTime(item.createdAt)}</span>
                       <span>
-                        音色：{item.voiceName} | 语速：{item.speed} | 任务号：{item.taskId}
+                        音色：{item.voiceName} | 语速：{item.speed} | 情绪：
+                        {TTS_EMOTION_OPTIONS.find((x) => x.value === item.emotion)?.label || '自然'}{' '}
+                        | 任务号：{item.taskId}
                       </span>
                     </div>
                     <p className="mb-3 line-clamp-3 text-sm text-slate-700">{item.text}</p>

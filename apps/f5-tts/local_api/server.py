@@ -9,6 +9,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import soundfile as sf
 from cached_path import cached_path
 from fastapi import FastAPI, HTTPException
@@ -43,6 +44,12 @@ CROSS_FADE_SEC = float(os.environ.get("F5_TTS_CROSS_FADE_SEC", "0.20"))
 CHINESE_SPEED_MAX = float(os.environ.get("F5_TTS_CHINESE_SPEED_MAX", "1.12"))
 OUTPUT_KEEP_SEC = int(os.environ.get("F5_TTS_OUTPUT_KEEP_SEC", str(24 * 3600)))
 OUTPUT_MAX_FILES = int(os.environ.get("F5_TTS_OUTPUT_MAX_FILES", "200"))
+OUTPUT_CLEANUP_ENABLED = os.environ.get("F5_TTS_OUTPUT_CLEANUP", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 _RUNTIME_LOCK = threading.Lock()
 _REF_LOCK = threading.Lock()
@@ -61,6 +68,7 @@ class SynthesizeRequest(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
     voiceId: str = Field(min_length=1)
     speed: float = 1.0
+    emotion: str = "neutral"
 
 
 app = FastAPI(title="Local F5-TTS API", version="1.3.0")
@@ -77,6 +85,29 @@ def normalize_text(raw: str) -> str:
     if len(text) <= 3 and not text.endswith((".", "。", "!", "！", "?", "？")):
         text = text + "。"
     return text
+
+
+def apply_emotion_tuning(emotion_raw: str, speed: float) -> tuple[float, float, float, float]:
+    # Returns: speed, cfg_strength, sway_sampling_coef, cross_fade_sec
+    emotion = (emotion_raw or "neutral").strip().lower()
+    cfg_strength = 2.0
+    sway_sampling_coef = -1.0
+    cross_fade_sec = CROSS_FADE_SEC
+
+    if emotion == "calm":
+        speed *= 0.96
+        cross_fade_sec = max(cross_fade_sec, 0.22)
+    elif emotion == "happy":
+        speed *= 1.03
+        cross_fade_sec = max(cross_fade_sec, 0.22)
+    elif emotion == "sad":
+        speed *= 0.94
+        cross_fade_sec = max(cross_fade_sec, 0.26)
+    elif emotion == "excited":
+        speed *= 1.06
+        cross_fade_sec = max(cross_fade_sec, 0.20)
+
+    return speed, cfg_strength, sway_sampling_coef, cross_fade_sec
 
 
 def ensure_runtime_loaded() -> None:
@@ -133,6 +164,9 @@ def cleanup_old_tasks() -> None:
 
 
 def cleanup_output_files() -> None:
+    if not OUTPUT_CLEANUP_ENABLED:
+        return
+
     # Keep outputs bounded by both age and count to avoid unbounded disk growth.
     if OUTPUT_KEEP_SEC <= 0 and OUTPUT_MAX_FILES <= 0:
         return
@@ -204,6 +238,7 @@ def run_synthesize(payload: SynthesizeRequest, task_id: str, report=None) -> dic
     ensure_runtime_loaded()
 
     speed = max(0.7, min(1.4, float(payload.speed or 1.0)))
+    speed, cfg_strength, sway_sampling_coef, cross_fade_sec = apply_emotion_tuning(payload.emotion, speed)
     output_file = f"{task_id}.wav"
     output_path = OUTPUT_DIR / output_file
 
@@ -213,6 +248,7 @@ def run_synthesize(payload: SynthesizeRequest, task_id: str, report=None) -> dic
 
     if _HAS_CJK_RE.search(text):
         speed = min(speed, CHINESE_SPEED_MAX)
+    speed = max(0.7, min(1.4, speed))
 
     step(25, "preparing reference")
     ref_audio_ready, ref_text_ready = get_ready_reference(payload.voiceId, preset, ref_audio)
@@ -227,11 +263,17 @@ def run_synthesize(payload: SynthesizeRequest, task_id: str, report=None) -> dic
             _VOCODER,
             nfe_step=NFE_STEP,
             speed=speed,
-            cross_fade_duration=CROSS_FADE_SEC,
+            cfg_strength=cfg_strength,
+            sway_sampling_coef=sway_sampling_coef,
+            cross_fade_duration=cross_fade_sec,
             show_info=lambda *_args, **_kwargs: None,
         )
 
     step(92, "writing audio")
+    peak = float(np.max(np.abs(final_wave))) if len(final_wave) > 0 else 0.0
+    if peak > 0.98:
+        final_wave = final_wave * (0.92 / peak)
+    final_wave = np.clip(final_wave, -0.98, 0.98)
     sf.write(str(output_path), final_wave, final_sample_rate)
     if not output_path.exists():
         raise HTTPException(status_code=500, detail="audio file not generated")
