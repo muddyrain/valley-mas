@@ -16,6 +16,7 @@ set F5_TTS_EAGER_LOAD=1
 set F5_TTS_RETURN_BASE64=1
 set F5_TTS_CROSS_FADE_SEC=0.20
 set F5_TTS_CHINESE_SPEED_MAX=1.12
+set F5_TTS_OUTPUT_CLEANUP=0
 
 uvicorn local_api.server:app --host 127.0.0.1 --port 7860
 

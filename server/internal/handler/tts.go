@@ -63,6 +63,7 @@ type ttsSynthesizeRequest struct {
 	Text    string  `json:"text" binding:"required"`
 	VoiceID string  `json:"voiceId" binding:"required"`
 	Speed   float64 `json:"speed"`
+	Emotion string  `json:"emotion"`
 }
 
 type ttsSynthesizeResponse struct {
@@ -310,15 +311,27 @@ func parseAndValidateTTSRequest(c *gin.Context) (ttsSynthesizeRequest, bool) {
 	if req.Speed <= 0 {
 		req.Speed = 1
 	}
+	req.Emotion = strings.ToLower(strings.TrimSpace(req.Emotion))
+	switch req.Emotion {
+	case "", "neutral", "calm", "happy", "sad", "excited":
+		// ok
+	default:
+		Error(c, http.StatusBadRequest, "emotion must be one of: neutral, calm, happy, sad, excited")
+		return req, false
+	}
 	return req, true
 }
 
 func buildTTSPayload(req ttsSynthesizeRequest) map[string]interface{} {
-	return map[string]interface{}{
+	payload := map[string]interface{}{
 		"text":    req.Text,
 		"voiceId": req.VoiceID,
 		"speed":   req.Speed,
 	}
+	if req.Emotion != "" {
+		payload["emotion"] = req.Emotion
+	}
+	return payload
 }
 
 func persistUpstreamResultToLocal(result *upstreamTTSResult) (*ttsSynthesizeResponse, error) {
