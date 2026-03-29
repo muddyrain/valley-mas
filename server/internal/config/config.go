@@ -15,14 +15,15 @@ type Config struct {
 }
 
 type DatabaseConfig struct {
-	Driver    string // mysql, postgres
-	DSN       string
-	SlowLogMs int
-	Host      string
-	Port      string
-	User      string
-	Password  string
-	DBName    string
+	Driver      string // mysql, postgres
+	DSN         string
+	SlowLogMs   int
+	AutoMigrate bool
+	Host        string
+	Port        string
+	User        string
+	Password    string
+	DBName      string
 }
 
 type TOSConfig struct {
@@ -53,14 +54,15 @@ func Load() *Config {
 		Env:  env,
 		Port: getEnv("PORT", "8080"),
 		Database: DatabaseConfig{
-			Driver:    getEnv("DB_DRIVER", getDefaultDriver()),
-			DSN:       getEnv("DB_DSN", ""),
-			SlowLogMs: getEnvInt("DB_SLOW_LOG_MS", 100),
-			Host:      getEnv("DB_HOST", "localhost"),
-			Port:      getEnv("DB_PORT", "3306"),
-			User:      getEnv("DB_USER", "root"),
-			Password:  getEnv("DB_PASSWORD", ""),
-			DBName:    getEnv("DB_NAME", "valley"),
+			Driver:      getEnv("DB_DRIVER", getDefaultDriver()),
+			DSN:         getEnv("DB_DSN", ""),
+			SlowLogMs:   getEnvInt("DB_SLOW_LOG_MS", 100),
+			AutoMigrate: getEnvBool("DB_AUTO_MIGRATE", env != "production"),
+			Host:        getEnv("DB_HOST", "localhost"),
+			Port:        getEnv("DB_PORT", "3306"),
+			User:        getEnv("DB_USER", "root"),
+			Password:    getEnv("DB_PASSWORD", ""),
+			DBName:      getEnv("DB_NAME", "valley"),
 		},
 		TOS: TOSConfig{
 			AccessKey: getEnv("TOS_ACCESS_KEY", ""),
@@ -104,4 +106,19 @@ func getEnvInt(key string, defaultValue int) int {
 		return defaultValue
 	}
 	return parsed
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	value := getEnv(key, "")
+	if value == "" {
+		return defaultValue
+	}
+	switch value {
+	case "1", "true", "TRUE", "True", "yes", "YES", "on", "ON":
+		return true
+	case "0", "false", "FALSE", "False", "no", "NO", "off", "OFF":
+		return false
+	default:
+		return defaultValue
+	}
 }

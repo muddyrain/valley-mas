@@ -49,8 +49,12 @@ func Init(cfg *config.Config) error {
 		return fmt.Errorf("failed to connect database: %w", err)
 	}
 
-	if err := autoMigrate(); err != nil {
-		return fmt.Errorf("failed to migrate database: %w", err)
+	if cfg.Database.AutoMigrate {
+		if err := autoMigrate(); err != nil {
+			return fmt.Errorf("failed to migrate database: %w", err)
+		}
+	} else {
+		log.Printf("Auto migrate skipped (DB_AUTO_MIGRATE=false)")
 	}
 
 	log.Printf("Database connected successfully (driver: %s)", cfg.Database.Driver)
