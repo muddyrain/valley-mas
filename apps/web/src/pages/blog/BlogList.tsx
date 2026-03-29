@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Category, Post, Tag as TagType } from '@/api/blog';
 import { getCategories, getPosts, getTags } from '@/api/blog';
-import { PostCard, TagCloud } from '@/components/blog';
+import { ExternalPreviewPostCard, TagCloud } from '@/components/blog';
 import { Button } from '@/components/ui/button';
 
 export default function BlogList() {
@@ -154,21 +154,9 @@ export default function BlogList() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
                   {posts.map((post) => (
-                    <PostCard
-                      key={post.id}
-                      post={{
-                        id: post.id,
-                        title: post.title,
-                        excerpt: post.excerpt,
-                        date: post.publishedAt || post.createdAt,
-                        category: post.category?.name || '未分类',
-                        tags: post.tags?.map((t) => t.name) || [],
-                        cover: post.cover,
-                        authorName: post.author?.nickname || '',
-                      }}
-                    />
+                    <ExternalPreviewPostCard key={post.id} post={post} />
                   ))}
                 </div>
 

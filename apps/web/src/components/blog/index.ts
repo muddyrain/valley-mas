@@ -1,3 +1,4 @@
+export { ExternalPreviewPostCard } from './ExternalPreviewPostCard';
 export { MarkdownContent } from './MarkdownContent';
 export { PostCard } from './PostCard';
 export { TableOfContents } from './TableOfContents';

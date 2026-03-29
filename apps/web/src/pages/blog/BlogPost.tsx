@@ -1,4 +1,12 @@
-import { ArrowLeft, Calendar, ChevronLeft, Clock, User } from 'lucide-react';
+﻿import {
+  ArrowLeft,
+  Calendar,
+  ChevronLeft,
+  ChevronLeftCircle,
+  ChevronRightCircle,
+  Clock,
+  User,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { PostDetail } from '@/api/blog';
@@ -7,11 +15,36 @@ import { MarkdownContent, TableOfContents } from '@/components/blog';
 import { Button } from '@/components/ui/button';
 import { extractToc, formatDate, renderMarkdown, type TocItem } from '@/utils/blog';
 
+type ImageTextPayload = {
+  pages?: string[];
+  stickerEmoji?: string;
+  style?: {
+    templateKey?: string;
+    textClass?: string;
+    fontFamily?: string;
+    lineHeight?: string;
+  };
+};
+
+function extractMarkdownImageUrls(content: string) {
+  if (!content) return [];
+  const matcher = /!\[[^\]]*]\(([^)]+)\)/g;
+  const urls: string[] = [];
+  let match = matcher.exec(content);
+  while (match) {
+    const url = (match[1] || '').trim();
+    if (url) urls.push(url);
+    match = matcher.exec(content);
+  }
+  return urls;
+}
+
 export default function BlogPost() {
   const { id } = useParams<{ id: string }>();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [imagePageIndex, setImagePageIndex] = useState(0);
 
   const loadPost = useCallback(async (postId: string) => {
     setLoading(true);
@@ -19,6 +52,7 @@ export default function BlogPost() {
       const data = await getPostDetailById(postId);
       setPost(data);
       setToc(extractToc(data.content || ''));
+      setImagePageIndex(0);
     } catch (error) {
       console.error('Failed to load post:', error);
       setPost(null);
@@ -32,6 +66,36 @@ export default function BlogPost() {
     void loadPost(id);
   }, [id, loadPost]);
 
+  const imageTextData = useMemo<ImageTextPayload | null>(() => {
+    if (!post || post.postType !== 'image_text' || !post.templateData) return null;
+    try {
+      return JSON.parse(post.templateData) as ImageTextPayload;
+    } catch {
+      return null;
+    }
+  }, [post]);
+
+  const pages = imageTextData?.pages?.length ? imageTextData.pages : null;
+  const imageUrls = useMemo(() => {
+    if (!post || post.postType !== 'image_text') return [];
+    return extractMarkdownImageUrls(post.content || '');
+  }, [post]);
+  const pageCount = imageUrls.length > 0 ? imageUrls.length : pages?.length || 0;
+
+  useEffect(() => {
+    if (pageCount <= 1) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowLeft') {
+        setImagePageIndex((prev) => (prev - 1 + pageCount) % pageCount);
+      } else if (event.key === 'ArrowRight') {
+        setImagePageIndex((prev) => (prev + 1) % pageCount);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [pageCount]);
+
   const processedContent = useMemo(() => {
     if (!post) return '';
     const html = renderMarkdown(post.content || post.htmlContent || '');
@@ -43,6 +107,16 @@ export default function BlogPost() {
       return `<h${level} id="${headingId}">${text}</h${level}>`;
     });
   }, [post]);
+
+  const goPrevPage = () => {
+    if (pageCount <= 1) return;
+    setImagePageIndex((prev) => (prev - 1 + pageCount) % pageCount);
+  };
+
+  const goNextPage = () => {
+    if (pageCount <= 1) return;
+    setImagePageIndex((prev) => (prev + 1) % pageCount);
+  };
 
   if (loading) {
     return (
@@ -92,84 +166,173 @@ export default function BlogPost() {
         </div>
       </div>
 
-      <header className="mx-auto max-w-6xl px-4 pb-8 pt-10 sm:px-6 lg:px-8">
-        <div className="rounded-2xl border border-border/60 bg-card/70 p-6 shadow-sm sm:p-10">
-          {post.category && (
-            <Link
-              to={`/blog?category=${encodeURIComponent(post.category.slug)}`}
-              className="mb-5 inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
-            >
-              {post.category.name}
-            </Link>
-          )}
-
-          <h1 className="max-w-4xl text-3xl font-bold leading-tight text-foreground sm:text-5xl">
-            {post.title}
-          </h1>
-
-          <div className="mt-6 flex flex-wrap items-center gap-5 text-sm text-muted-foreground">
-            {post.author?.nickname && (
-              <div className="inline-flex items-center gap-2">
-                <User className="h-4 w-4" />
-                <span>{post.author.nickname}</span>
+      {post.postType === 'image_text' && pageCount > 0 ? (
+        <div className="mx-auto max-w-7xl px-4 pb-20 pt-8 sm:px-6 lg:px-8">
+          <main className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm lg:p-6">
+            <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+              <div className="inline-flex items-center gap-2 rounded-full bg-muted/70 px-3 py-1.5">
+                <div className="h-7 w-7 overflow-hidden rounded-full bg-slate-200">
+                  {post.author?.avatar ? (
+                    <img
+                      src={post.author.avatar}
+                      alt={post.author.nickname || 'author'}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : null}
+                </div>
+                <span className="font-medium text-foreground">
+                  {post.author?.nickname || '创作者'}
+                </span>
               </div>
-            )}
-            <div className="inline-flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              <time>{formatDate(post.publishedAt || post.createdAt)}</time>
+              {post.category && (
+                <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs text-primary">
+                  {post.category.name}
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground">
+                {formatDate(post.publishedAt || post.createdAt)}
+              </span>
+              {pageCount > 1 && (
+                <span className="text-xs text-muted-foreground">
+                  {imagePageIndex + 1}/{pageCount}
+                </span>
+              )}
             </div>
-            <div className="inline-flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              <span>预计阅读 {Math.max(1, Math.ceil((post.content || '').length / 500))} 分钟</span>
-            </div>
-            {post.viewCount > 0 && <span>{post.viewCount} 次阅读</span>}
-          </div>
+            <section className="rounded-2xl bg-[#f3f4f6] p-4 sm:p-6">
+              <div className="mx-auto flex max-w-[760px] items-center justify-center gap-4">
+                {pageCount > 1 && (
+                  <button
+                    type="button"
+                    onClick={goPrevPage}
+                    className="text-slate-400 transition hover:text-slate-700"
+                  >
+                    <ChevronLeftCircle className="h-9 w-9" />
+                  </button>
+                )}
 
-          {!!post.cover && (
-            <div className="mt-8 overflow-hidden rounded-xl border border-border/60">
-              <img src={post.cover} alt={post.title} className="h-52 w-full object-cover sm:h-72" />
-            </div>
-          )}
+                {imageUrls.length > 0 ? (
+                  <div className="relative h-[720px] w-[460px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-0">
+                    <img
+                      src={imageUrls[imagePageIndex]}
+                      alt={`图文第${imagePageIndex + 1}页`}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="relative h-[720px] w-[460px] overflow-hidden rounded-2xl border border-[#e1d7bc] bg-[#f8f5eb] p-6">
+                    <div className="absolute left-5 top-4 text-xs text-black/35">
+                      {new Date(post.createdAt).toLocaleDateString('zh-CN')}
+                    </div>
+                    {!!imageTextData?.stickerEmoji && (
+                      <div className="absolute right-7 top-7 text-4xl">
+                        {imageTextData.stickerEmoji}
+                      </div>
+                    )}
+                    <div
+                      className="mt-24 whitespace-pre-wrap text-[42px] font-semibold text-[#4e4537]"
+                      style={{
+                        fontFamily:
+                          imageTextData?.style?.fontFamily || '"STSong", "Songti SC", serif',
+                        lineHeight: imageTextData?.style?.lineHeight || '1.58',
+                      }}
+                    >
+                      {pages?.[imagePageIndex] || ''}
+                    </div>
+                  </div>
+                )}
 
-          {post.tags && post.tags.length > 0 && (
-            <div className="mt-6 flex flex-wrap items-center gap-2">
-              {post.tags.map((tag) => (
-                <Link
-                  key={tag.id}
-                  to={`/blog?tag=${encodeURIComponent(tag.slug)}`}
-                  className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                >
-                  #{tag.name}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-6xl px-4 pb-20 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-8 lg:flex-row">
-          {toc.length > 0 && (
-            <aside className="hidden w-64 shrink-0 lg:block">
-              <div className="sticky top-24 rounded-xl border border-border/60 bg-card p-5 shadow-sm">
-                <TableOfContents toc={toc} />
+                {pageCount > 1 && (
+                  <button
+                    type="button"
+                    onClick={goNextPage}
+                    className="text-slate-400 transition hover:text-slate-700"
+                  >
+                    <ChevronRightCircle className="h-9 w-9" />
+                  </button>
+                )}
               </div>
-            </aside>
-          )}
 
-          <main className="min-w-0 flex-1 rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-10">
-            <MarkdownContent content={processedContent} />
-            <div className="mt-12 border-t border-border pt-6">
-              <Link to="/blog">
-                <Button variant="ghost" className="gap-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  返回列表
-                </Button>
-              </Link>
-            </div>
+              {pageCount > 1 && (
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  {Array.from({ length: pageCount }).map((_, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => setImagePageIndex(index)}
+                      className={`h-2.5 rounded-full transition ${
+                        imagePageIndex === index ? 'w-7 bg-violet-500' : 'w-2.5 bg-slate-300'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
           </main>
         </div>
-      </div>
+      ) : (
+        <>
+          <header className="mx-auto max-w-6xl px-4 pb-8 pt-10 sm:px-6 lg:px-8">
+            <div className="rounded-2xl border border-border/60 bg-card/70 p-6 shadow-sm sm:p-10">
+              {post.category && (
+                <Link
+                  to={`/blog?category=${encodeURIComponent(post.category.slug)}`}
+                  className="mb-5 inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+                >
+                  {post.category.name}
+                </Link>
+              )}
+
+              <h1 className="max-w-4xl text-3xl font-bold leading-tight text-foreground sm:text-5xl">
+                {post.title}
+              </h1>
+
+              <div className="mt-6 flex flex-wrap items-center gap-5 text-sm text-muted-foreground">
+                {post.author?.nickname && (
+                  <div className="inline-flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    <span>{post.author.nickname}</span>
+                  </div>
+                )}
+                <div className="inline-flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <time>{formatDate(post.publishedAt || post.createdAt)}</time>
+                </div>
+                <div className="inline-flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  <span>
+                    预计阅读 {Math.max(1, Math.ceil((post.content || '').length / 500))} 分钟
+                  </span>
+                </div>
+                {post.viewCount > 0 && <span>{post.viewCount} 次阅读</span>}
+              </div>
+            </div>
+          </header>
+
+          <div className="mx-auto max-w-6xl px-4 pb-20 sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-8 lg:flex-row">
+              {toc.length > 0 && (
+                <aside className="hidden w-64 shrink-0 lg:block">
+                  <div className="sticky top-24 rounded-xl border border-border/60 bg-card p-5 shadow-sm">
+                    <TableOfContents toc={toc} />
+                  </div>
+                </aside>
+              )}
+
+              <main className="min-w-0 flex-1 rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-10">
+                <MarkdownContent content={processedContent} />
+                <div className="mt-12 border-t border-border pt-6">
+                  <Link to="/blog">
+                    <Button variant="ghost" className="gap-2">
+                      <ArrowLeft className="h-4 w-4" />
+                      返回列表
+                    </Button>
+                  </Link>
+                </div>
+              </main>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

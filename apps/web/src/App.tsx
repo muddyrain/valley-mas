@@ -9,6 +9,7 @@ import Creator from './pages/Creator';
 import CreatorProfile from './pages/CreatorProfile';
 import Favorites from './pages/Favorites';
 import Home from './pages/Home';
+import ImageTextCreate from './pages/ImageTextCreate';
 import Login from './pages/Login';
 import MySpace from './pages/MySpace';
 import Profile from './pages/Profile';
@@ -28,6 +29,7 @@ function App() {
           <Route path="resources" element={<Resources />} />
           <Route path="resource/:id" element={<ResourceDetail />} />
           <Route path="my-space" element={<MySpace />} />
+          <Route path="my-space/image-text" element={<ImageTextCreate />} />
           <Route path="profile" element={<Profile />} />
           <Route path="favorites" element={<Favorites />} />
           <Route path="apply-creator" element={<ApplyCreator />} />

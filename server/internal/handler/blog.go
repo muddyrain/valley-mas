@@ -1,8 +1,10 @@
-package handler
+﻿package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
@@ -12,22 +14,30 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	postTypeBlog      = "blog"
+	postTypeImageText = "image_text"
+)
+
 type PostListResponse struct {
-	ID          model.Int64String `json:"id"`
-	Title       string            `json:"title"`
-	Slug        string            `json:"slug"`
-	Excerpt     string            `json:"excerpt"`
-	Cover       string            `json:"cover"`
-	CategoryID  model.Int64String `json:"categoryId"`
-	Category    *PostCategoryInfo `json:"category,omitempty"`
-	Tags        []PostTagInfo     `json:"tags,omitempty"`
-	Status      string            `json:"status,omitempty"`
-	Author      *AuthorInfo       `json:"author,omitempty"`
-	ViewCount   int               `json:"viewCount"`
-	LikeCount   int               `json:"likeCount"`
-	IsTop       bool              `json:"isTop"`
-	PublishedAt *time.Time        `json:"publishedAt,omitempty"`
-	CreatedAt   time.Time         `json:"createdAt"`
+	ID           model.Int64String `json:"id"`
+	Title        string            `json:"title"`
+	Slug         string            `json:"slug"`
+	PostType     string            `json:"postType"`
+	TemplateKey  string            `json:"templateKey,omitempty"`
+	TemplateData string            `json:"templateData,omitempty"`
+	Excerpt      string            `json:"excerpt"`
+	Cover        string            `json:"cover"`
+	CategoryID   model.Int64String `json:"categoryId"`
+	Category     *PostCategoryInfo `json:"category,omitempty"`
+	Tags         []PostTagInfo     `json:"tags,omitempty"`
+	Status       string            `json:"status,omitempty"`
+	Author       *AuthorInfo       `json:"author,omitempty"`
+	ViewCount    int               `json:"viewCount"`
+	LikeCount    int               `json:"likeCount"`
+	IsTop        bool              `json:"isTop"`
+	PublishedAt  *time.Time        `json:"publishedAt,omitempty"`
+	CreatedAt    time.Time         `json:"createdAt"`
 }
 
 type PostCategoryInfo struct {
@@ -43,23 +53,26 @@ type PostTagInfo struct {
 }
 
 type PostDetailResponse struct {
-	ID          model.Int64String `json:"id"`
-	Title       string            `json:"title"`
-	Slug        string            `json:"slug"`
-	Content     string            `json:"content"`
-	HTMLContent string            `json:"htmlContent"`
-	Excerpt     string            `json:"excerpt"`
-	Cover       string            `json:"cover"`
-	CategoryID  model.Int64String `json:"categoryId"`
-	Status      string            `json:"status"`
-	Author      *AuthorInfo       `json:"author,omitempty"`
-	Category    *PostCategoryInfo `json:"category,omitempty"`
-	Tags        []PostTagInfo     `json:"tags,omitempty"`
-	ViewCount   int               `json:"viewCount"`
-	LikeCount   int               `json:"likeCount"`
-	IsTop       bool              `json:"isTop"`
-	PublishedAt *time.Time        `json:"publishedAt,omitempty"`
-	CreatedAt   time.Time         `json:"createdAt"`
+	ID           model.Int64String `json:"id"`
+	Title        string            `json:"title"`
+	Slug         string            `json:"slug"`
+	PostType     string            `json:"postType"`
+	TemplateKey  string            `json:"templateKey,omitempty"`
+	TemplateData string            `json:"templateData,omitempty"`
+	Content      string            `json:"content"`
+	HTMLContent  string            `json:"htmlContent"`
+	Excerpt      string            `json:"excerpt"`
+	Cover        string            `json:"cover"`
+	CategoryID   model.Int64String `json:"categoryId"`
+	Status       string            `json:"status"`
+	Author       *AuthorInfo       `json:"author,omitempty"`
+	Category     *PostCategoryInfo `json:"category,omitempty"`
+	Tags         []PostTagInfo     `json:"tags,omitempty"`
+	ViewCount    int               `json:"viewCount"`
+	LikeCount    int               `json:"likeCount"`
+	IsTop        bool              `json:"isTop"`
+	PublishedAt  *time.Time        `json:"publishedAt,omitempty"`
+	CreatedAt    time.Time         `json:"createdAt"`
 }
 
 type AuthorInfo struct {
@@ -74,6 +87,10 @@ func GetPosts(c *gin.Context) {
 	categorySlug := c.Query("category")
 	tagSlug := c.Query("tag")
 	keyword := c.Query("keyword")
+	postType := ""
+	if raw := strings.TrimSpace(c.Query("postType")); raw != "" {
+		postType = normalizePostType(raw)
+	}
 
 	if page < 1 {
 		page = 1
@@ -109,6 +126,9 @@ func GetPosts(c *gin.Context) {
 
 	if keyword != "" {
 		query = query.Where("title LIKE ? OR excerpt LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+	}
+	if postType != "" {
+		query = query.Where("post_type = ?", postType)
 	}
 
 	var total int64
@@ -210,6 +230,11 @@ func AdminGetPostDetail(c *gin.Context) {
 		return
 	}
 
+	if !canManagePost(c, post.AuthorID) {
+		Error(c, http.StatusForbidden, "no permission")
+		return
+	}
+
 	Success(c, convertToPostDetailResponse(&post))
 }
 
@@ -225,18 +250,27 @@ func AdminCreatePost(c *gin.Context) {
 		Error(c, http.StatusUnauthorized, "invalid user")
 		return
 	}
+	roleAny, _ := c.Get("userRole")
+	role, _ := roleAny.(string)
+	if role != "admin" && role != "creator" {
+		Error(c, http.StatusForbidden, "creator required")
+		return
+	}
 
 	var req struct {
-		Title      string              `json:"title" binding:"required"`
-		Slug       string              `json:"slug"`
-		Content    string              `json:"content" binding:"required"`
-		Excerpt    string              `json:"excerpt"`
-		Cover      string              `json:"cover"`
-		CategoryID model.Int64String   `json:"categoryId" binding:"required"`
-		TagIDs     []model.Int64String `json:"tagIds"`
-		Status     string              `json:"status"`
-		IsTop      bool                `json:"isTop"`
-		PublishNow bool                `json:"publishNow"`
+		Title        string              `json:"title" binding:"required"`
+		Slug         string              `json:"slug"`
+		PostType     string              `json:"postType"`
+		TemplateKey  string              `json:"templateKey"`
+		TemplateData string              `json:"templateData"`
+		Content      string              `json:"content"`
+		Excerpt      string              `json:"excerpt"`
+		Cover        string              `json:"cover"`
+		CategoryID   model.Int64String   `json:"categoryId" binding:"required"`
+		TagIDs       []model.Int64String `json:"tagIds"`
+		Status       string              `json:"status"`
+		IsTop        bool                `json:"isTop"`
+		PublishNow   bool                `json:"publishNow"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -251,6 +285,23 @@ func AdminCreatePost(c *gin.Context) {
 			return
 		}
 	}
+	if req.TemplateData != "" && !json.Valid([]byte(req.TemplateData)) {
+		Error(c, http.StatusBadRequest, "templateData must be valid json")
+		return
+	}
+
+	postType := normalizePostType(req.PostType)
+	if postType == "" {
+		postType = postTypeBlog
+	}
+	content := strings.TrimSpace(req.Content)
+	if postType == postTypeImageText && content == "" {
+		content = buildImageTextContent(req.TemplateKey, req.TemplateData)
+	}
+	if content == "" {
+		Error(c, http.StatusBadRequest, "content is required")
+		return
+	}
 
 	postID := model.Int64String(utils.GenerateID())
 	slug := req.Slug
@@ -259,17 +310,20 @@ func AdminCreatePost(c *gin.Context) {
 	}
 
 	post := model.Post{
-		ID:          postID,
-		Title:       req.Title,
-		Slug:        slug,
-		Content:     req.Content,
-		HTMLContent: renderMarkdown(req.Content),
-		Excerpt:     req.Excerpt,
-		Cover:       req.Cover,
-		AuthorID:    model.Int64String(userID),
-		CategoryID:  req.CategoryID,
-		Status:      req.Status,
-		IsTop:       req.IsTop,
+		ID:           postID,
+		Title:        req.Title,
+		Slug:         slug,
+		PostType:     postType,
+		TemplateKey:  strings.TrimSpace(req.TemplateKey),
+		TemplateData: strings.TrimSpace(req.TemplateData),
+		Content:      content,
+		HTMLContent:  renderMarkdown(content),
+		Excerpt:      req.Excerpt,
+		Cover:        req.Cover,
+		AuthorID:     model.Int64String(userID),
+		CategoryID:   req.CategoryID,
+		Status:       req.Status,
+		IsTop:        req.IsTop,
 	}
 
 	if post.Status == "" {
@@ -312,17 +366,24 @@ func AdminUpdatePost(c *gin.Context) {
 		Error(c, http.StatusNotFound, "post not found")
 		return
 	}
+	if !canManagePost(c, post.AuthorID) {
+		Error(c, http.StatusForbidden, "no permission")
+		return
+	}
 
 	var req struct {
-		Title      string              `json:"title"`
-		Slug       string              `json:"slug"`
-		Content    string              `json:"content"`
-		Excerpt    string              `json:"excerpt"`
-		Cover      string              `json:"cover"`
-		CategoryID model.Int64String   `json:"categoryId"`
-		TagIDs     []model.Int64String `json:"tagIds"`
-		Status     string              `json:"status"`
-		IsTop      bool                `json:"isTop"`
+		Title        string              `json:"title"`
+		Slug         string              `json:"slug"`
+		PostType     string              `json:"postType"`
+		TemplateKey  string              `json:"templateKey"`
+		TemplateData string              `json:"templateData"`
+		Content      string              `json:"content"`
+		Excerpt      string              `json:"excerpt"`
+		Cover        string              `json:"cover"`
+		CategoryID   model.Int64String   `json:"categoryId"`
+		TagIDs       []model.Int64String `json:"tagIds"`
+		Status       string              `json:"status"`
+		IsTop        bool                `json:"isTop"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -337,6 +398,10 @@ func AdminUpdatePost(c *gin.Context) {
 			return
 		}
 	}
+	if req.TemplateData != "" && !json.Valid([]byte(req.TemplateData)) {
+		Error(c, http.StatusBadRequest, "templateData must be valid json")
+		return
+	}
 
 	updates := make(map[string]interface{})
 	if req.Title != "" {
@@ -345,9 +410,38 @@ func AdminUpdatePost(c *gin.Context) {
 	if req.Slug != "" {
 		updates["slug"] = req.Slug
 	}
+	if normalizedType := normalizePostType(req.PostType); normalizedType != "" {
+		updates["post_type"] = normalizedType
+	}
+	if req.TemplateKey != "" {
+		updates["template_key"] = strings.TrimSpace(req.TemplateKey)
+	}
+	if req.TemplateData != "" {
+		updates["template_data"] = strings.TrimSpace(req.TemplateData)
+	}
 	if req.Content != "" {
 		updates["content"] = req.Content
 		updates["html_content"] = renderMarkdown(req.Content)
+	} else {
+		finalType := post.PostType
+		if req.PostType != "" {
+			finalType = normalizePostType(req.PostType)
+		}
+		if finalType == postTypeImageText {
+			templateKey := post.TemplateKey
+			if req.TemplateKey != "" {
+				templateKey = strings.TrimSpace(req.TemplateKey)
+			}
+			templateData := post.TemplateData
+			if req.TemplateData != "" {
+				templateData = strings.TrimSpace(req.TemplateData)
+			}
+			autoContent := buildImageTextContent(templateKey, templateData)
+			if autoContent != "" {
+				updates["content"] = autoContent
+				updates["html_content"] = renderMarkdown(autoContent)
+			}
+		}
 	}
 	if req.Excerpt != "" {
 		updates["excerpt"] = req.Excerpt
@@ -388,6 +482,10 @@ func AdminDeletePost(c *gin.Context) {
 		Error(c, http.StatusNotFound, "post not found")
 		return
 	}
+	if !canManagePost(c, post.AuthorID) {
+		Error(c, http.StatusForbidden, "no permission")
+		return
+	}
 
 	database.DB.Delete(&post)
 
@@ -402,12 +500,22 @@ func AdminGetPosts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
 	status := c.Query("status")
+	postType := ""
+	if raw := strings.TrimSpace(c.Query("postType")); raw != "" {
+		postType = normalizePostType(raw)
+	}
 
 	if page < 1 {
 		page = 1
 	}
 	if pageSize < 1 || pageSize > 50 {
 		pageSize = 10
+	}
+
+	userID, role, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "unauthorized")
+		return
 	}
 
 	offset := (page - 1) * pageSize
@@ -419,8 +527,14 @@ func AdminGetPosts(c *gin.Context) {
 			return db.Select("id, nickname, avatar")
 		})
 
+	if role == "creator" {
+		query = query.Where("author_id = ?", userID)
+	}
 	if status != "" {
 		query = query.Where("status = ?", status)
+	}
+	if postType != "" {
+		query = query.Where("post_type = ?", postType)
 	}
 
 	var total int64
@@ -447,18 +561,21 @@ func AdminGetPosts(c *gin.Context) {
 
 func convertToPostListResponse(post *model.Post) PostListResponse {
 	resp := PostListResponse{
-		ID:          post.ID,
-		Title:       post.Title,
-		Slug:        post.Slug,
-		Excerpt:     post.Excerpt,
-		Cover:       post.Cover,
-		CategoryID:  post.CategoryID,
-		Status:      post.Status,
-		ViewCount:   post.ViewCount,
-		LikeCount:   post.LikeCount,
-		IsTop:       post.IsTop,
-		PublishedAt: post.PublishedAt,
-		CreatedAt:   post.CreatedAt,
+		ID:           post.ID,
+		Title:        post.Title,
+		Slug:         post.Slug,
+		PostType:     normalizePostType(post.PostType),
+		TemplateKey:  post.TemplateKey,
+		TemplateData: post.TemplateData,
+		Excerpt:      post.Excerpt,
+		Cover:        post.Cover,
+		CategoryID:   post.CategoryID,
+		Status:       post.Status,
+		ViewCount:    post.ViewCount,
+		LikeCount:    post.LikeCount,
+		IsTop:        post.IsTop,
+		PublishedAt:  post.PublishedAt,
+		CreatedAt:    post.CreatedAt,
 	}
 
 	if post.Author != nil {
@@ -493,20 +610,23 @@ func convertToPostListResponse(post *model.Post) PostListResponse {
 
 func convertToPostDetailResponse(post *model.Post) PostDetailResponse {
 	resp := PostDetailResponse{
-		ID:          post.ID,
-		Title:       post.Title,
-		Slug:        post.Slug,
-		Content:     post.Content,
-		HTMLContent: post.HTMLContent,
-		Excerpt:     post.Excerpt,
-		Cover:       post.Cover,
-		CategoryID:  post.CategoryID,
-		Status:      post.Status,
-		ViewCount:   post.ViewCount,
-		LikeCount:   post.LikeCount,
-		IsTop:       post.IsTop,
-		PublishedAt: post.PublishedAt,
-		CreatedAt:   post.CreatedAt,
+		ID:           post.ID,
+		Title:        post.Title,
+		Slug:         post.Slug,
+		PostType:     normalizePostType(post.PostType),
+		TemplateKey:  post.TemplateKey,
+		TemplateData: post.TemplateData,
+		Content:      post.Content,
+		HTMLContent:  post.HTMLContent,
+		Excerpt:      post.Excerpt,
+		Cover:        post.Cover,
+		CategoryID:   post.CategoryID,
+		Status:       post.Status,
+		ViewCount:    post.ViewCount,
+		LikeCount:    post.LikeCount,
+		IsTop:        post.IsTop,
+		PublishedAt:  post.PublishedAt,
+		CreatedAt:    post.CreatedAt,
 	}
 
 	if post.Author != nil {
@@ -547,4 +667,108 @@ func increasePostViewCount(postID model.Int64String) {
 	database.DB.Model(&model.Post{}).
 		Where("id = ?", postID).
 		UpdateColumn("view_count", gorm.Expr("view_count + 1"))
+}
+
+func normalizePostType(value string) string {
+	v := strings.TrimSpace(strings.ToLower(value))
+	switch v {
+	case postTypeBlog:
+		return postTypeBlog
+	case postTypeImageText:
+		return postTypeImageText
+	default:
+		return ""
+	}
+}
+
+func currentUser(c *gin.Context) (int64, string, bool) {
+	userIDAny, exists := c.Get("userId")
+	if !exists {
+		return 0, "", false
+	}
+	userID, ok := userIDAny.(int64)
+	if !ok {
+		return 0, "", false
+	}
+	roleAny, _ := c.Get("userRole")
+	role, _ := roleAny.(string)
+	return userID, role, true
+}
+
+func canManagePost(c *gin.Context, authorID model.Int64String) bool {
+	userID, role, ok := currentUser(c)
+	if !ok {
+		return false
+	}
+	if role == "admin" {
+		return true
+	}
+	return int64(authorID) == userID
+}
+
+func buildImageTextContent(templateKey, templateData string) string {
+	templateKey = strings.TrimSpace(templateKey)
+	templateData = strings.TrimSpace(templateData)
+	if templateData == "" {
+		if templateKey == "" {
+			return ""
+		}
+		return "# 图文卡片\n\n模板：" + templateKey
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(templateData), &payload); err != nil {
+		if templateKey == "" {
+			return ""
+		}
+		return "# 图文卡片\n\n模板：" + templateKey
+	}
+
+	pick := func(keys ...string) string {
+		for _, key := range keys {
+			if value, ok := payload[key]; ok {
+				if text, ok := value.(string); ok {
+					trimmed := strings.TrimSpace(text)
+					if trimmed != "" {
+						return trimmed
+					}
+				}
+			}
+		}
+		return ""
+	}
+
+	title := pick("title", "headline", "mainText")
+	subtitle := pick("subtitle", "subTitle", "slogan")
+	body := pick("content", "body", "description", "text")
+	imageURL := pick("imageUrl", "image", "cover")
+
+	var b strings.Builder
+	if title != "" {
+		b.WriteString("# ")
+		b.WriteString(title)
+		b.WriteString("\n\n")
+	}
+	if subtitle != "" {
+		b.WriteString("> ")
+		b.WriteString(subtitle)
+		b.WriteString("\n\n")
+	}
+	if imageURL != "" {
+		b.WriteString("![图文配图](")
+		b.WriteString(imageURL)
+		b.WriteString(")\n\n")
+	}
+	if body != "" {
+		b.WriteString(body)
+		b.WriteString("\n")
+	}
+	if b.Len() == 0 {
+		if templateKey == "" {
+			return ""
+		}
+		return "# 图文卡片\n\n模板：" + templateKey
+	}
+
+	return strings.TrimSpace(b.String())
 }

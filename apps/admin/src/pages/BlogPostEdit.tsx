@@ -1,4 +1,4 @@
-﻿import { ArrowLeftOutlined, SaveOutlined, SendOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, SaveOutlined, SendOutlined } from '@ant-design/icons';
 import MDEditor from '@uiw/react-md-editor';
 import '@uiw/react-md-editor/markdown-editor.css';
 import {
@@ -20,7 +20,7 @@ import {
 } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBeforeUnload, useNavigate, useParams } from 'react-router-dom';
-import type { Category, CreatePostData, Tag as TagType } from '@/api/blog';
+import type { Category, CreatePostData, PostType, Tag as TagType } from '@/api/blog';
 import { createPost, getAdminPostDetail, getCategories, getTags, updatePost } from '@/api/blog';
 
 const { Title, Text } = Typography;
@@ -28,6 +28,9 @@ const { TextArea } = Input;
 
 type EditorFormValues = {
   title: string;
+  postType: PostType;
+  templateKey?: string;
+  templateData?: string;
   excerpt?: string;
   cover?: string;
   categoryId: string;
@@ -44,6 +47,9 @@ type LocalUserInfo = {
 
 type Snapshot = {
   title: string;
+  postType: PostType;
+  templateKey: string;
+  templateData: string;
   excerpt: string;
   cover: string;
   categoryId: string;
@@ -55,6 +61,9 @@ type Snapshot = {
 
 const defaultValues: EditorFormValues = {
   title: '',
+  postType: 'blog',
+  templateKey: '',
+  templateData: '',
   excerpt: '',
   cover: '',
   categoryId: '',
@@ -63,9 +72,33 @@ const defaultValues: EditorFormValues = {
   tagIds: [],
 };
 
+const IMAGE_TEXT_TEMPLATES = [
+  {
+    value: 'basic_quote',
+    label: '基础文案卡',
+    placeholder:
+      '{\n  "title": "今日金句",\n  "content": "保持热爱，奔赴山海",\n  "imageUrl": "https://..."\n}',
+  },
+  {
+    value: 'mood_poster',
+    label: '情绪海报',
+    placeholder:
+      '{\n  "title": "周末心情",\n  "subtitle": "慢一点也没关系",\n  "content": "把今天过成想要的样子",\n  "imageUrl": "https://..."\n}',
+  },
+  {
+    value: 'note_style',
+    label: '便签风',
+    placeholder:
+      '{\n  "title": "备忘",\n  "content": "1. 先完成核心功能\\n2. 再优化细节",\n  "imageUrl": "https://..."\n}',
+  },
+];
+
 function makeSnapshot(values: Partial<EditorFormValues>, content: string): Snapshot {
   return {
     title: values.title || '',
+    postType: values.postType || 'blog',
+    templateKey: values.templateKey || '',
+    templateData: values.templateData || '',
     excerpt: values.excerpt || '',
     cover: values.cover || '',
     categoryId: values.categoryId || '',
@@ -96,6 +129,7 @@ export default function BlogPostEdit() {
   const [currentUser, setCurrentUser] = useState<LocalUserInfo | null>(null);
 
   const watchedValues = Form.useWatch([], form);
+  const postType = watchedValues?.postType || 'blog';
 
   useEffect(() => {
     void loadCategoriesAndTags();
@@ -203,6 +237,9 @@ export default function BlogPostEdit() {
       const post = await getAdminPostDetail(postId);
       const values: EditorFormValues = {
         title: post.title,
+        postType: post.postType || 'blog',
+        templateKey: post.templateKey || '',
+        templateData: post.templateData || '',
         excerpt: post.excerpt || '',
         cover: post.cover || '',
         categoryId: post.categoryId,
@@ -223,19 +260,36 @@ export default function BlogPostEdit() {
     }
   };
 
+  const handleTemplatePreset = () => {
+    const key = form.getFieldValue('templateKey');
+    const target = IMAGE_TEXT_TEMPLATES.find((item) => item.value === key);
+    if (!target) return;
+    form.setFieldValue('templateData', target.placeholder);
+  };
+
   const handleSubmit = async (publishNow = false) => {
     try {
       const values = await form.validateFields();
-      if (!content.trim()) {
+
+      if (values.postType === 'blog' && !content.trim()) {
         message.error('请输入 Markdown 内容');
         return;
+      }
+
+      if (values.postType === 'image_text' && values.templateData?.trim()) {
+        try {
+          JSON.parse(values.templateData);
+        } catch {
+          message.error('图文模板数据必须是合法 JSON');
+          return;
+        }
       }
 
       setSaving(true);
 
       const payload: CreatePostData = {
         ...values,
-        content,
+        content: content || '',
         tagIds: values.tagIds || [],
         status: publishNow ? 'published' : values.status,
         publishNow,
@@ -277,14 +331,13 @@ export default function BlogPostEdit() {
               </Button>
               {isDirty && <Tag color="processing">未保存</Tag>}
               {watchedValues?.isTop && <Tag color="gold">置顶</Tag>}
+              {postType === 'image_text' && <Tag color="magenta">图文</Tag>}
             </Space>
 
             <Title level={3} className="!mb-1 !mt-3">
-              {isEdit ? '编辑文章' : '新建文章'}
+              {isEdit ? '编辑内容' : '新建内容'}
             </Title>
-            <Text type="secondary">
-              专注写作主流程，非必要字段收纳到右侧“可选信息”，减少发布干扰。
-            </Text>
+            <Text type="secondary">支持博客和图文两种创作方式。</Text>
           </div>
 
           <Space className="items-start">
@@ -331,10 +384,8 @@ export default function BlogPostEdit() {
           className="mb-6"
           type="info"
           showIcon
-          message={`文章将自动绑定到当前用户：${
-            currentUser?.nickname || currentUser?.username || '当前登录用户'
-          }`}
-          description="博客按用户归属（authorId）管理，不使用创作者资源体系。"
+          message={`当前作者：${currentUser?.nickname || currentUser?.username || '当前登录用户'}`}
+          description="仅创作者/管理员可进行创作，创作者默认只可管理自己的内容。"
         />
 
         <Form form={form} layout="vertical" initialValues={defaultValues}>
@@ -342,14 +393,57 @@ export default function BlogPostEdit() {
             <Col xs={24} lg={16}>
               <Card className="rounded-xl border border-slate-200" title="正文内容">
                 <Form.Item
-                  label="文章标题"
+                  label="标题"
                   name="title"
                   rules={[{ required: true, message: '请输入标题' }]}
                 >
-                  <Input placeholder="输入文章标题（建议 10-40 字）" maxLength={120} showCount />
+                  <Input placeholder="输入标题（建议 10-40 字）" maxLength={120} showCount />
                 </Form.Item>
 
-                <Form.Item label="Markdown 内容" required>
+                <Form.Item label="内容类型" name="postType" rules={[{ required: true }]}>
+                  <Select
+                    options={[
+                      { label: '博客（Markdown）', value: 'blog' },
+                      { label: '图文（模板）', value: 'image_text' },
+                    ]}
+                  />
+                </Form.Item>
+
+                {postType === 'image_text' && (
+                  <>
+                    <Form.Item
+                      label="图文模板"
+                      name="templateKey"
+                      rules={[{ required: true, message: '请选择图文模板' }]}
+                    >
+                      <Select
+                        placeholder="选择模板"
+                        options={IMAGE_TEXT_TEMPLATES.map((item) => ({
+                          label: item.label,
+                          value: item.value,
+                        }))}
+                        onChange={handleTemplatePreset}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="模板数据（JSON）"
+                      name="templateData"
+                      rules={[{ required: true, message: '请输入模板数据 JSON' }]}
+                    >
+                      <TextArea rows={10} placeholder={IMAGE_TEXT_TEMPLATES[0].placeholder} />
+                    </Form.Item>
+                  </>
+                )}
+
+                <Form.Item
+                  label={
+                    postType === 'blog'
+                      ? 'Markdown 内容'
+                      : '图文正文（可选，留空自动由模板数据生成）'
+                  }
+                  required={postType === 'blog'}
+                >
                   <MDEditor
                     value={content}
                     onChange={(value) => setContent(value || '')}
@@ -357,7 +451,10 @@ export default function BlogPostEdit() {
                     preview="live"
                     visibleDragbar={false}
                     textareaProps={{
-                      placeholder: '在这里编写 Markdown，支持代码块、链接和图片 URL。',
+                      placeholder:
+                        postType === 'blog'
+                          ? '在这里编写 Markdown，支持代码块、链接和图片 URL。'
+                          : '可选：覆盖模板自动生成的正文。',
                     }}
                   />
                 </Form.Item>
@@ -382,7 +479,7 @@ export default function BlogPostEdit() {
                   </Form.Item>
 
                   <Form.Item name="isTop" valuePropName="checked" className="!mb-2">
-                    <Checkbox>置顶文章</Checkbox>
+                    <Checkbox>置顶内容</Checkbox>
                   </Form.Item>
 
                   <Form.Item name="status" hidden>
@@ -393,7 +490,7 @@ export default function BlogPostEdit() {
                     type="info"
                     showIcon
                     message="状态由按钮控制"
-                    description="点击“保存草稿”将保留草稿状态，点击“直接发布”会立即发布。"
+                    description="点击“保存草稿”保留草稿，点击“直接发布”立即发布。"
                   />
                 </Card>
 
@@ -421,7 +518,7 @@ export default function BlogPostEdit() {
                     label={
                       <Space size={6}>
                         <span>封面图 URL</span>
-                        <Tooltip title="当前版本仅支持图片链接，暂不支持上传。">
+                        <Tooltip title="支持图片链接，图文模板也可在 templateData 里带 imageUrl。">
                           <Text type="secondary">说明</Text>
                         </Tooltip>
                       </Space>
@@ -432,7 +529,7 @@ export default function BlogPostEdit() {
                     <Input placeholder="https://example.com/cover.jpg" />
                   </Form.Item>
 
-                  <Alert type="info" showIcon message="这些字段不会阻塞发布，可后续补充完善。" />
+                  <Alert type="info" showIcon message="这些字段不会阻塞发布，可后续补充。" />
                 </Card>
               </div>
             </Col>

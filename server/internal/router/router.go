@@ -1,4 +1,4 @@
-package router
+﻿package router
 
 import (
 	"valley-server/internal/config"
@@ -35,7 +35,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	// API 路由
 	api := r.Group("/api/v1")
 	{
-		// 公开接口（无需认证）- 用户端
+		// 公开接口（无需认证）
 		public := api.Group("/public")
 		{
 			registerTTSRoutes(public)
@@ -47,11 +47,11 @@ func Setup(cfg *config.Config) *gin.Engine {
 			// 博客相关接口
 			public.GET("/blog/posts", handler.GetPosts)                 // 获取文章列表
 			public.GET("/blog/posts/id/:id", handler.GetPostDetailByID) // 通过 ID 获取文章详情
-			public.GET("/blog/posts/:slug", handler.GetPostDetail)      // 获取文章详情
+			public.GET("/blog/posts/:slug", handler.GetPostDetail)      // 通过 slug 获取文章详情
 			public.GET("/blog/categories", handler.GetCategories)       // 获取博客分类列表
 			public.GET("/blog/tags", handler.GetTags)                   // 获取博客标签列表
 
-			// 以下接口挂可选认证，登录用户响应中会带 isFavorited 字段
+			// 以下接口支持可选认证，登录用户响应中会带 isFavorited 字段
 			public.GET("/hot-resources", middleware.OptionalAuth(cfg), handler.GetHotResources)                  // 热门资源
 			public.GET("/resources", middleware.OptionalAuth(cfg), handler.GetAllResources)                      // 资源广场（全量列表）
 			public.GET("/creators/:id/resources", middleware.OptionalAuth(cfg), handler.GetCreatorResourcesList) // 创作者资源列表
@@ -64,7 +64,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 		api.POST("/code/verify", handler.VerifyCode)
 		api.GET("/creator/:code/resources", handler.GetCreatorResources)
 
-		// 需要认证的接口 - 用户端
+		// 需要认证的用户端接口
 		user := api.Group("/user")
 		user.Use(middleware.Auth(cfg))
 		{
@@ -75,7 +75,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			user.POST("/avatar", handler.UploadAvatar)     // 上传头像
 
 			// 资源收藏（喜欢）
-			user.POST("/resources/favorite/batch-status", handler.BatchGetFavoriteStatus) // 批量查询收藏状态（静态路由须在动态路由前）
+			user.POST("/resources/favorite/batch-status", handler.BatchGetFavoriteStatus) // 批量查询收藏状态（静态路由优先）
 			user.POST("/resources/:id/favorite", handler.FavoriteResource)                // 收藏资源
 			user.DELETE("/resources/:id/favorite", handler.UnfavoriteResource)            // 取消收藏
 			user.GET("/resources/:id/favorite/status", handler.GetResourceFavoriteStatus) // 查询收藏状态
@@ -88,7 +88,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			user.GET("/follows", handler.GetMyFollows)                              // 我关注的创作者列表
 		}
 
-		// 需要认证的接口
+		// 需要认证的通用接口
 		auth := api.Group("")
 		auth.Use(middleware.Auth(cfg))
 		{
@@ -105,7 +105,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.PUT("/creator/code/toggle", handler.ToggleCreatorCode)
 			auth.POST("/creator/code/regenerate", handler.RegenerateCreatorCode)
 
-			// 创作者申请相关（新增）
+			// 创作者申请相关
 			auth.POST("/creator/application", handler.SubmitCreatorApplication)
 			auth.GET("/creator/application/my", handler.GetMyApplication)
 			auth.POST("/ai/chat", handler.ChatWithAI)
@@ -115,7 +115,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 		admin := api.Group("/admin")
 		admin.Use(middleware.Auth(cfg)) // 启用认证
 		{
-			// ========== 管理员专属接口 ==========
+			// 管理员专属接口
 			adminOnly := admin.Group("")
 			adminOnly.Use(middleware.AdminOnly())
 			{
@@ -127,13 +127,13 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.PUT("/users/:id/status", handler.UpdateUserStatus)
 				adminOnly.DELETE("/users/:id", handler.DeleteUser)
 
-				// 创作者管理 - 仅管理员可以执行的操作
+				// 创作者管理（仅管理员可执行）
 				adminOnly.POST("/creators", handler.CreateCreator)
 				adminOnly.PUT("/creators/:id", handler.UpdateCreator)
 				adminOnly.POST("/creators/:id/toggle-status", handler.ToggleCreatorStatus)
 				adminOnly.DELETE("/creators/:id", handler.DeleteCreator)
 
-				// 创作者申请审核管理（新增）
+				// 创作者申请审核管理
 				adminOnly.GET("/creator-applications", handler.ListCreatorApplications)
 				adminOnly.GET("/creator-applications/:id", handler.GetCreatorApplicationDetail)
 				adminOnly.POST("/creator-applications/:id/review", handler.ReviewCreatorApplication)
@@ -143,27 +143,28 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.GET("/trends", handler.GetTrends)
 
 				// 全局记录管理（仅管理员）
-				// 注意：资源上传信息可以直接在资源管理页面查看，不需要单独的上传记录
 				adminOnly.GET("/records/downloads", handler.ListDownloadRecords)
+			}
 
-				// 博客管理接口
-				adminOnly.GET("/blog/posts", handler.AdminGetPosts)          // 获取文章列表（包含草稿）
-				adminOnly.GET("/blog/posts/:id", handler.AdminGetPostDetail) // 获取文章详情
-				adminOnly.POST("/blog/posts", handler.AdminCreatePost)       // 创建文章
-				adminOnly.PUT("/blog/posts/:id", handler.AdminUpdatePost)    // 更新文章
-				adminOnly.DELETE("/blog/posts/:id", handler.AdminDeletePost) // 删除文章
-			} // ========== 创作者和管理员共享接口 ==========
+			// 创作者和管理员共用接口
 			content := admin.Group("")
 			content.Use(middleware.CreatorOrAdmin())
 			{
 				// 创作者数据概览（创作者专用）
 				content.GET("/creator/stats", handler.GetCreatorStats)
 
-				// 创作者列表和详情（创作者可以查看自己的信息，管理员可以查看所有）
+				// 博客与图文管理
+				content.GET("/blog/posts", handler.AdminGetPosts)
+				content.GET("/blog/posts/:id", handler.AdminGetPostDetail)
+				content.POST("/blog/posts", handler.AdminCreatePost)
+				content.PUT("/blog/posts/:id", handler.AdminUpdatePost)
+				content.DELETE("/blog/posts/:id", handler.AdminDeletePost)
+
+				// 创作者列表和详情（创作者可查看自己，管理员可查看全部）
 				content.GET("/creators", handler.ListCreators)
 				content.GET("/creators/:id", handler.GetCreatorDetail)
 
-				// 创作者空间管理（创作者只能管理自己的空间，一个创作者只有一个空间）
+				// 创作者空间管理（创作者只能管理自己的空间）
 				content.GET("/creators/:id/spaces", handler.ListCreatorSpaces)
 				content.GET("/creators/:id/spaces/detail", handler.GetCreatorSpaceDetail)
 				content.POST("/creators/:id/spaces", handler.CreateCreatorSpace)
@@ -178,7 +179,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.PATCH("/resources/:id", handler.UpdateResource)
 				content.PUT("/resources/:id/creator", handler.UpdateResourceCreator)
 				content.DELETE("/resources/:id", handler.DeleteResource)
-
 			}
 		}
 	}
