@@ -1,4 +1,4 @@
-﻿import { Download, Loader2, Mic2, PlayCircle, Sparkles, Trash2, Volume2 } from 'lucide-react';
+import { Download, Loader2, Mic2, PlayCircle, Sparkles, Trash2, Volume2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {

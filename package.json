@@ -16,6 +16,7 @@
     "lint": "turbo lint",
     "format": "turbo format",
     "check": "turbo check",
+    "check:utf8": "powershell -ExecutionPolicy Bypass -File ./scripts/check-utf8.ps1",
     "clean": "turbo clean",
     "prepare": "lefthook install",
     "hooks:test": "lefthook run pre-commit"

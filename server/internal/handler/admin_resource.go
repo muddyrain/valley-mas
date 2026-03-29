@@ -9,7 +9,19 @@ import (
 	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
+
+func truncateRunes(s string, max int) string {
+	if max <= 0 || s == "" {
+		return ""
+	}
+	runes := []rune(strings.TrimSpace(s))
+	if len(runes) <= max {
+		return string(runes)
+	}
+	return string(runes[:max])
+}
 
 // ListResources 资源列表
 // @Summary      获取资源列表
@@ -118,29 +130,39 @@ func UploadResource(c *gin.Context) {
 	}
 
 	// 保存到数据库
+	title := strings.TrimSpace(c.PostForm("title"))
+	description := strings.TrimSpace(c.PostForm("description"))
+	if title == "" {
+		title = strings.TrimSuffix(file.Filename, result.Ext)
+	}
+
 	resource := model.Resource{
 		ID:          model.Int64String(utils.GenerateID()),
 		Type:        resourceType,
 		URL:         result.URL,
 		StorageKey:  result.Key,
-		Title:       c.PostForm("title"),
-		Description: c.PostForm("description"),
+		Title:       truncateRunes(title, 100),
+		Description: truncateRunes(description, 255),
 		Size:        file.Size,
 		Width:       result.Width,
 		Height:      result.Height,
-		Extension:   strings.TrimPrefix(result.Ext, "."), // 去掉前导点，如 ".jpg" → "jpg"
+		Extension:   truncateRunes(strings.TrimPrefix(result.Ext, "."), 20), // 去掉前导点，并限制长度
 		UserID:      model.Int64String(userID.(int64)),
-	}
-	// 标题为空时兜底使用去掉扩展名的文件名
-	if resource.Title == "" {
-		resource.Title = strings.TrimSuffix(file.Filename, result.Ext)
 	}
 
 	db := database.GetDB()
 	if err := db.Create(&resource).Error; err != nil {
 		// 如果数据库保存失败，删除已上传的文件
 		_ = uploadService.DeleteByKey(result.Key)
-		Error(c, 500, "保存资源信息失败")
+		ErrorWithDetail(c, 500, "保存资源信息失败", err, logrus.Fields{
+			"user_id":     userID.(int64),
+			"title":       resource.Title,
+			"description": resource.Description,
+			"extension":   resource.Extension,
+			"file_name":   file.Filename,
+			"file_size":   file.Size,
+			"storage_key": result.Key,
+		})
 		return
 	}
 

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { createRandomCnNickname } from '@/utils/randomNickname';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -21,6 +22,10 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const handleGenerateNickname = () => {
+    setFormData((prev) => ({ ...prev, nickname: createRandomCnNickname() }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,11 +52,11 @@ export default function Register() {
       const { token, userInfo } = await register({
         username: formData.username,
         password: formData.password,
-        nickname: formData.nickname || undefined,
+        nickname: formData.nickname.trim() || createRandomCnNickname(),
       });
 
       setAuth(userInfo, token);
-      toast.success('注册成功，欢迎加入 Valley！');
+      toast.success('注册成功，欢迎加入 Valley');
       navigate('/');
     } catch {
       // 错误已在 request.ts 中通过 toast 显示
@@ -62,7 +67,6 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-purple-600 via-purple-700 to-indigo-800 flex">
-      {/* Left Side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIvPjwvc3ZnPg==')] opacity-30" />
         <div className="relative text-center text-white px-12">
@@ -73,29 +77,27 @@ export default function Register() {
           <p className="text-xl text-purple-100 mb-8">
             加入我们，
             <br />
-            发现精美壁纸与优秀创作者
+            发现精美壁纸与优质创作者
           </p>
           <div className="flex justify-center gap-8 text-sm">
             <div className="text-center">
               <div className="text-2xl font-bold">10K+</div>
-              <div className="text-purple-200">精美壁纸</div>
+              <div className="text-purple-200">精品资源</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">500+</div>
-              <div className="text-purple-200">创作者</div>
+              <div className="text-purple-200">活跃创作者</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">100K+</div>
-              <div className="text-purple-200">用户</div>
+              <div className="text-purple-200">平台用户</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Right Side - Register Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
-          {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-white/20 backdrop-blur-sm mb-4">
               <Sparkles className="w-8 h-8 text-white" />
@@ -103,7 +105,6 @@ export default function Register() {
             <h1 className="text-2xl font-bold text-white">Valley</h1>
           </div>
 
-          {/* Register Card */}
           <div className="bg-white rounded-2xl shadow-2xl p-8">
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900">创建账号</h2>
@@ -111,7 +112,6 @@ export default function Register() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* 用户名 */}
               <div className="space-y-2">
                 <Label htmlFor="username" className="text-gray-700">
                   用户名 <span className="text-red-500">*</span>
@@ -130,18 +130,25 @@ export default function Register() {
                 </div>
               </div>
 
-              {/* 昵称（可选） */}
               <div className="space-y-2">
-                <Label htmlFor="nickname" className="text-gray-700">
-                  昵称{' '}
-                  <span className="text-gray-400 font-normal text-xs">（可选，默认同用户名）</span>
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="nickname" className="text-gray-700">
+                    昵称 <span className="text-gray-400 font-normal text-xs">（可选）</span>
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={handleGenerateNickname}
+                    className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+                  >
+                    随机生成
+                  </button>
+                </div>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <Input
                     id="nickname"
                     type="text"
-                    placeholder="显示给其他用户的名字"
+                    placeholder="不填也可以，注册时会自动生成随机昵称"
                     value={formData.nickname}
                     onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
                     className="pl-11 h-12 border-gray-200 focus:border-purple-500 focus:ring-purple-500"
@@ -150,7 +157,6 @@ export default function Register() {
                 </div>
               </div>
 
-              {/* 密码 */}
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-gray-700">
                   密码 <span className="text-red-500">*</span>
@@ -175,7 +181,6 @@ export default function Register() {
                 </div>
               </div>
 
-              {/* 确认密码 */}
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword" className="text-gray-700">
                   确认密码 <span className="text-red-500">*</span>

@@ -14,7 +14,7 @@ export interface RequestConfig {
 
 const http: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
-  timeout: 10000,
+  timeout: 30000,
   withCredentials: true,
 });
 
@@ -45,7 +45,6 @@ http.interceptors.request.use(
 http.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
     const { code, message: msg, data } = response.data;
-
     if (code !== 0) {
       if (code === 401) {
         useAuthStore.getState().logout();
@@ -64,39 +63,43 @@ http.interceptors.response.use(
 
     const status = error.response?.status;
     const responseData = error.response?.data;
-    let errorMessage = '请求失败，请稍后重试';
-
-    if (responseData?.message) {
-      errorMessage = responseData.message;
-    } else if (status === 401) {
-      errorMessage = '认证失败，请重新登录';
-      useAuthStore.getState().logout();
+    let msg = error.message;
+    // 优先使用后端返回的错误信息
+    if (status === 401) {
+      msg = '认证失败，请重新登录';
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('userInfo');
+      // 避免在登录页重复跳转
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
     } else if (status === 403) {
-      errorMessage = '您没有权限执行此操作';
+      msg = '您没有权限执行此操作';
     } else if (status === 404) {
-      errorMessage = '请求的资源不存在';
+      msg = '请求的资源不存在';
     } else if (status === 500) {
-      errorMessage = '服务器内部错误';
+      msg = '服务器内部错误';
     } else if (status === 502) {
-      errorMessage = '网关错误';
+      msg = '网关错误';
     } else if (status === 503) {
-      errorMessage = '服务暂时不可用';
-    } else if (status && status >= 500) {
-      errorMessage = '服务器错误';
+      msg = '服务暂时不可用';
+    } else if (status >= 500) {
+      msg = '服务器端发生错误';
     } else if (!status) {
+      // 网络错误或请求被取消
       if (error.code === 'ECONNABORTED') {
-        errorMessage = '请求超时，请检查网络连接';
+        msg = '请求超时，请检查网络连接';
       } else if (error.code === 'ERR_NETWORK') {
-        errorMessage = '网络连接失败，请检查网络';
+        msg = '网络连接失败，请检查网络';
       } else {
-        errorMessage = '网络请求失败，请稍后重试';
+        msg = '网络请求失败，请稍后重试';
       }
     }
-
-    toast.error(errorMessage);
+    if (responseData?.message) {
+      msg = responseData.message;
+    }
+    // 显示错误提示
+    toast.error(msg);
     return Promise.reject(error);
   },
 );

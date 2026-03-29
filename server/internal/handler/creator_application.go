@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -335,6 +336,30 @@ func ReviewCreatorApplication(c *gin.Context) {
 		application.ReviewedAt = &now
 
 		if err := tx.Save(&application).Error; err != nil {
+			return err
+		}
+
+		extraData := map[string]interface{}{
+			"applicationId": application.ID,
+			"status":        req.Status,
+		}
+		extraDataBytes, _ := json.Marshal(extraData)
+		notifyContent := "你的创作者申请已通过审核，已为你开通创作者权限。"
+		if req.Status == "rejected" {
+			notifyContent = "你的创作者申请未通过审核。"
+			if strings.TrimSpace(req.ReviewNote) != "" {
+				notifyContent += " 备注：" + strings.TrimSpace(req.ReviewNote)
+			}
+		}
+		notification := model.UserNotification{
+			UserID:    application.UserID,
+			Type:      "creator_application_review",
+			Title:     "创作者申请审核结果",
+			Content:   notifyContent,
+			IsRead:    false,
+			ExtraData: string(extraDataBytes),
+		}
+		if err := tx.Create(&notification).Error; err != nil {
 			return err
 		}
 

@@ -11,7 +11,7 @@ export interface ApiResponse<T = unknown> {
 // 创建 axios 实例
 const http: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
-  timeout: 10000,
+  timeout: 30000,
   withCredentials: true, // 允许携带 Cookie
 });
 
@@ -50,7 +50,6 @@ http.interceptors.response.use(
     const status = error.response?.status;
     const responseData = error.response?.data;
     let msg = error.message;
-    console.log(status);
     // 优先使用后端返回的错误信息
     if (status === 401) {
       msg = '认证失败，请重新登录';

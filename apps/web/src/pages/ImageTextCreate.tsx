@@ -1,4 +1,4 @@
-﻿import { ArrowLeft, Check, ChevronLeftCircle, ChevronRightCircle, Sparkles } from 'lucide-react';
+import { ArrowLeft, Check, ChevronLeftCircle, ChevronRightCircle, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';

@@ -55,13 +55,17 @@ export function ExternalPreviewPostCard({ post, className }: ExternalPreviewPost
     <Link
       to={`/blog/${post.id}`}
       className={cn(
-        'group block rounded-[22px] border border-slate-200 bg-white p-3 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(15,23,42,0.12)]',
+        'group block rounded-[24px] border border-slate-200/85 bg-linear-to-b from-white to-slate-50/60 p-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:border-violet-200 hover:shadow-[0_20px_42px_rgba(76,63,131,0.14)]',
         className,
       )}
     >
-      <div className="rounded-[18px] border border-slate-200 bg-[#f9f9f6] p-4">
-        <div className="relative mx-auto h-[360px] w-full max-w-[270px] overflow-hidden rounded-2xl border border-[#e4dfd3] bg-[#f7f5ef] p-6 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45)]">
+      <div className="relative overflow-hidden rounded-[20px] border border-slate-200/80 bg-[#f9f9f6] p-4">
+        <div className="pointer-events-none absolute -right-8 -top-8 h-20 w-20 rounded-full bg-violet-100/60 blur-2xl transition duration-500 group-hover:scale-110" />
+        <div className="pointer-events-none absolute -bottom-8 -left-8 h-20 w-20 rounded-full bg-sky-100/60 blur-2xl transition duration-500 group-hover:scale-110" />
+
+        <div className="relative mx-auto h-[360px] w-full max-w-[270px] overflow-hidden rounded-2xl border border-[#e4dfd3] bg-[#f7f5ef] p-6 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45),0_10px_30px_rgba(79,70,44,0.08)]">
           <div className="absolute left-5 top-4 text-[46px] leading-none text-[#e6e0d2]">“</div>
+          <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_85%_15%,rgba(167,139,250,0.18),transparent_42%)]" />
           <div
             className={cn(
               'relative z-10 mt-12 font-semibold tracking-tight text-[#3d3a38]',
@@ -78,15 +82,15 @@ export function ExternalPreviewPostCard({ post, className }: ExternalPreviewPost
       </div>
 
       <div className="mt-3 px-1">
-        <h3 className="line-clamp-1 text-lg font-semibold text-slate-900 group-hover:text-violet-700">
+        <h3 className="line-clamp-1 text-lg font-semibold text-slate-900 transition-colors group-hover:text-violet-700">
           {post.title}
         </h3>
         <div className="mt-2 flex items-center justify-between text-sm text-slate-500">
-          <div className="inline-flex min-w-0 items-center gap-1.5">
+          <div className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-slate-100/80 px-2.5 py-1">
             <User className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{post.author?.nickname || '创作者'}</span>
           </div>
-          <div className="inline-flex items-center gap-1">
+          <div className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-rose-500">
             <Heart className="h-3.5 w-3.5" />
             <span>{post.likeCount || 0}</span>
           </div>
