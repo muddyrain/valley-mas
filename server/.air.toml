@@ -8,7 +8,7 @@ tmp_dir = "tmp"
   # pre_cmd = ["swag init --exclude tmp,data"]
   
   # Windows 下必须输出 .exe
-  cmd = "go build -o ./tmp/main.exe ."
+  cmd = "go build -o ./tmp/main.exe ./cmd/local"
 
   # 你的版本提示 bin 已弃用，改用 entrypoint
   # entrypoint = "scripts/air-entry.cmd"

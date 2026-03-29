@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "api/index.go": {
+      "maxDuration": 30
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.go"
+    }
+  ]
+}

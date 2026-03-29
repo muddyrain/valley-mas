@@ -31,6 +31,17 @@ func InitLogger() {
 	// 设置日志级别
 	Log.SetLevel(logrus.InfoLevel)
 
+	// Vercel/Serverless 环境建议只输出 stdout，避免文件系统写入问题。
+	if os.Getenv("VERCEL") != "" || os.Getenv("DISABLE_FILE_LOG") == "1" {
+		if gin.Mode() == gin.DebugMode {
+			Log.SetOutput(os.Stdout)
+		} else {
+			Log.SetOutput(os.Stdout)
+		}
+		Log.Info("logger initialized in stdout-only mode")
+		return
+	}
+
 	// 创建日志目录
 	logDir := "logs"
 	if err := os.MkdirAll(logDir, 0755); err != nil {
