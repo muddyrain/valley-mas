@@ -536,6 +536,17 @@ export default function ImageTextCreate() {
         postType: 'image_text',
         templateKey: '',
         templateData: '',
+        imageTextData: {
+          templateKey,
+          partner,
+          stickerEmoji,
+          images: uploadedImageUrls,
+          pages: pages.map((text, index) => ({
+            text,
+            imageUrl: uploadedImageUrls[index],
+          })),
+          generatedAt: new Date().toISOString(),
+        },
         content: markdownImages,
         excerpt: pages[0]?.slice(0, 120) || title,
         cover: uploadedImageUrls[0],

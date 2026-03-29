@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"log"
 	"os"
 	"valley-server/internal/config"
@@ -23,7 +24,7 @@ func main() {
 	loaded := false
 	for _, p := range envCandidates {
 		if _, err := os.Stat(p); err == nil {
-			if err := godotenv.Load(p); err == nil {
+			if err := loadEnvFileCompat(p); err == nil {
 				log.Printf("Loaded env file: %s", p)
 				loaded = true
 				break
@@ -64,4 +65,23 @@ func main() {
 	if err := r.Run(":" + cfg.Port); err != nil {
 		logger.Log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+func loadEnvFileCompat(path string) error {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	content = bytes.TrimPrefix(content, []byte{0xEF, 0xBB, 0xBF})
+
+	values, err := godotenv.Unmarshal(string(content))
+	if err != nil {
+		return err
+	}
+	for key, value := range values {
+		if err := os.Setenv(key, value); err != nil {
+			return err
+		}
+	}
+	return nil
 }

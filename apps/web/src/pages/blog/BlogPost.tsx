@@ -16,7 +16,8 @@ import { Button } from '@/components/ui/button';
 import { extractToc, formatDate, renderMarkdown, type TocItem } from '@/utils/blog';
 
 type ImageTextPayload = {
-  pages?: string[];
+  images?: string[];
+  pages?: Array<string | { text?: string; imageUrl?: string }>;
   stickerEmoji?: string;
   style?: {
     templateKey?: string;
@@ -67,19 +68,30 @@ export default function BlogPost() {
   }, [id, loadPost]);
 
   const imageTextData = useMemo<ImageTextPayload | null>(() => {
-    if (!post || post.postType !== 'image_text' || !post.templateData) return null;
+    if (!post || post.postType !== 'image_text') return null;
+    const raw = post.imageTextData || post.templateData;
+    if (!raw) return null;
     try {
-      return JSON.parse(post.templateData) as ImageTextPayload;
+      return JSON.parse(raw) as ImageTextPayload;
     } catch {
       return null;
     }
   }, [post]);
 
-  const pages = imageTextData?.pages?.length ? imageTextData.pages : null;
+  const pages = useMemo(() => {
+    if (!imageTextData?.pages?.length) return null;
+    return imageTextData.pages
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        return item?.text || '';
+      })
+      .filter(Boolean);
+  }, [imageTextData]);
   const imageUrls = useMemo(() => {
     if (!post || post.postType !== 'image_text') return [];
+    if (imageTextData?.images?.length) return imageTextData.images;
     return extractMarkdownImageUrls(post.content || '');
-  }, [post]);
+  }, [post, imageTextData]);
   const pageCount = imageUrls.length > 0 ? imageUrls.length : pages?.length || 0;
 
   useEffect(() => {

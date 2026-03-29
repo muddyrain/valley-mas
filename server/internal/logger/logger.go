@@ -5,7 +5,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
+	"valley-server/internal/database"
+	"valley-server/internal/model"
+	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -115,6 +119,8 @@ func RequestLogger() gin.HandlerFunc {
 		// 如果有用户信息，添加到日志
 		if userID, exists := c.Get("userID"); exists {
 			fields["user_id"] = userID
+		} else if userID, exists := c.Get("userId"); exists {
+			fields["user_id"] = userID
 		}
 
 		Log.WithFields(fields).Info("请求开始")
@@ -136,14 +142,78 @@ func RequestLogger() gin.HandlerFunc {
 			"ip":      c.ClientIP(),
 		}
 
+		level := "info"
+		message := "请求完成"
+
 		// 根据状态码选择日志级别
 		if statusCode >= 500 {
-			Log.WithFields(responseFields).Error("请求完成（服务器错误）")
+			level = "error"
+			message = "请求完成（服务器错误）"
+			Log.WithFields(responseFields).Error(message)
 		} else if statusCode >= 400 {
-			Log.WithFields(responseFields).Warn("请求完成（客户端错误）")
+			level = "warn"
+			message = "请求完成（客户端错误）"
+			Log.WithFields(responseFields).Warn(message)
 		} else {
-			Log.WithFields(responseFields).Info("请求完成")
+			Log.WithFields(responseFields).Info(message)
 		}
+
+		saveOperationLog(c, logID, statusCode, latency, level, message)
+	}
+}
+
+func saveOperationLog(
+	c *gin.Context,
+	logID string,
+	statusCode int,
+	latency time.Duration,
+	level string,
+	message string,
+) {
+	db := database.GetDB()
+	if db == nil {
+		return
+	}
+
+	userID := ""
+	if uid, exists := c.Get("userId"); exists {
+		switch v := uid.(type) {
+		case int64:
+			userID = strconv.FormatInt(v, 10)
+		case model.Int64String:
+			userID = v.String()
+		case string:
+			userID = v
+		default:
+			userID = fmt.Sprintf("%v", v)
+		}
+	}
+
+	userRole := ""
+	if role, exists := c.Get("userRole"); exists {
+		if r, ok := role.(string); ok {
+			userRole = r
+		}
+	}
+
+	op := model.OperationLog{
+		ID:        model.Int64String(utils.GenerateID()),
+		LogID:     logID,
+		Method:    c.Request.Method,
+		Path:      c.Request.URL.Path,
+		Query:     c.Request.URL.RawQuery,
+		Status:    statusCode,
+		LatencyMs: latency.Milliseconds(),
+		IP:        c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+		UserID:    userID,
+		UserRole:  userRole,
+		Level:     level,
+		Message:   message,
+	}
+
+	if err := db.Create(&op).Error; err != nil {
+		Log.WithError(err).WithField("log_id", logID).Warn("写入操作日志表失败")
 	}
 }
 

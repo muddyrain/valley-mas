@@ -58,12 +58,6 @@ export default function Login() {
             </Button>
           </Form.Item>
         </Form>
-
-        <div className="mt-4 text-center text-gray-500 text-sm">
-          <p>管理员账号：admin/admin123</p>
-          <p>创作者账号：creator/creator123</p>
-          <p>普通用户：admin1/admin123</p>
-        </div>
       </Card>
     </div>
   );

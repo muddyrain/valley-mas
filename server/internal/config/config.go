@@ -1,4 +1,4 @@
-﻿package config
+package config
 
 import (
 	"os"
@@ -15,13 +15,14 @@ type Config struct {
 }
 
 type DatabaseConfig struct {
-	Driver   string // sqlite, mysql
-	Host     string
-	Port     string
-	User     string
-	Password string
-	DBName   string
-	SQLite   string // SQLite file path
+	Driver    string // mysql, postgres
+	DSN       string
+	SlowLogMs int
+	Host      string
+	Port      string
+	User      string
+	Password  string
+	DBName    string
 }
 
 type TOSConfig struct {
@@ -52,13 +53,14 @@ func Load() *Config {
 		Env:  env,
 		Port: getEnv("PORT", "8080"),
 		Database: DatabaseConfig{
-			Driver:   getEnv("DB_DRIVER", getDefaultDriver(env)),
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "3306"),
-			User:     getEnv("DB_USER", "root"),
-			Password: getEnv("DB_PASSWORD", ""),
-			DBName:   getEnv("DB_NAME", "valley"),
-			SQLite:   getEnv("DB_SQLITE_PATH", "./data/valley.db"),
+			Driver:    getEnv("DB_DRIVER", getDefaultDriver()),
+			DSN:       getEnv("DB_DSN", ""),
+			SlowLogMs: getEnvInt("DB_SLOW_LOG_MS", 100),
+			Host:      getEnv("DB_HOST", "localhost"),
+			Port:      getEnv("DB_PORT", "3306"),
+			User:      getEnv("DB_USER", "root"),
+			Password:  getEnv("DB_PASSWORD", ""),
+			DBName:    getEnv("DB_NAME", "valley"),
 		},
 		TOS: TOSConfig{
 			AccessKey: getEnv("TOS_ACCESS_KEY", ""),
@@ -88,11 +90,8 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-func getDefaultDriver(env string) string {
-	if env == "production" {
-		return "mysql"
-	}
-	return "sqlite"
+func getDefaultDriver() string {
+	return "postgres"
 }
 
 func getEnvInt(key string, defaultValue int) int {

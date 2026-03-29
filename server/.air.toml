@@ -11,7 +11,7 @@ tmp_dir = "tmp"
   cmd = "go build -o ./tmp/main.exe ."
 
   # 你的版本提示 bin 已弃用，改用 entrypoint
-  entrypoint = "scripts/air-entry.cmd"
+  # entrypoint = "scripts/air-entry.cmd"
 
   # 监听参数
   delay = 500
