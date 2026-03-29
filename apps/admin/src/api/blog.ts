@@ -2,6 +2,19 @@ import http from '@/utils/request';
 
 export type PostType = 'blog' | 'image_text';
 
+export interface ImageTextPage {
+  imageUrl?: string;
+  text?: string;
+}
+
+export interface ImageTextData {
+  templateKey?: string;
+  stickerEmoji?: string;
+  images?: string[];
+  pages?: ImageTextPage[];
+  generatedAt?: string;
+}
+
 export interface PostCategory {
   id: string;
   name: string;
@@ -21,6 +34,7 @@ export interface Post {
   postType: PostType;
   templateKey?: string;
   templateData?: string;
+  imageTextData?: string;
   excerpt: string;
   cover?: string;
   categoryId: string;
@@ -83,6 +97,7 @@ export interface CreatePostData {
   postType?: PostType;
   templateKey?: string;
   templateData?: string;
+  imageTextData?: ImageTextData;
   content: string;
   excerpt?: string;
   cover?: string;

@@ -14,7 +14,7 @@ export default function CreatorPage() {
       try {
         setLoading(true);
         const data = await getHotCreators(1, 20);
-        setCreators(data.list);
+        setCreators(data.list || []);
       } catch (error) {
         console.error('加载创作者失败:', error);
       } finally {

@@ -4,17 +4,21 @@ import type { Post } from '@/api/blog';
 import { cn } from '@/lib/utils';
 
 type ImageTextPayload = {
-  pages?: string[];
+  pages?: Array<string | { text?: string }>;
 };
 
 function parsePreviewText(post: Post) {
-  if (post.postType === 'image_text' && post.templateData) {
+  if (post.postType === 'image_text') {
+    const raw = post.imageTextData || post.templateData;
+    if (!raw) return (post.excerpt || post.title || '').trim();
     try {
-      const payload = JSON.parse(post.templateData) as ImageTextPayload;
-      const firstPage = payload.pages?.[0]?.trim();
+      const payload = JSON.parse(raw) as ImageTextPayload;
+      const firstPageRaw = payload.pages?.[0];
+      const firstPage =
+        typeof firstPageRaw === 'string' ? firstPageRaw.trim() : firstPageRaw?.text?.trim();
       if (firstPage) return firstPage;
     } catch {
-      // ignore invalid templateData
+      // ignore invalid payload
     }
   }
   return (post.excerpt || post.title || '').trim();
