@@ -4,7 +4,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { login } from '@/api/auth';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -148,22 +147,10 @@ export default function Login() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="remember"
-                    checked={formData.remember}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, remember: checked as boolean })
-                    }
-                  />
-                  <Label htmlFor="remember" className="text-sm text-gray-600 cursor-pointer">
-                    记住我
-                  </Label>
-                </div>
+              <div className="flex items-center">
                 <Link
                   to="/forgot-password"
-                  className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                  className="text-sm text-purple-600 hover:text-purple-700 font-medium ml-auto"
                 >
                   忘记密码？
                 </Link>

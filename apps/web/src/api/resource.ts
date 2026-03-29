@@ -159,21 +159,21 @@ export const getMyResources = (
   params: { page?: number; pageSize?: number; type?: string } = {},
 ) => {
   const { page = 1, pageSize = 20, type } = params;
-  let url = `/admin/resources?page=${page}&pageSize=${pageSize}`;
+  let url = `/creator/resources?page=${page}&pageSize=${pageSize}`;
   if (type) url += `&type=${type}`;
   return http.get<unknown, MyResourcesResponse>(url);
 };
 
 // 上传资源（需要创作者/管理员权限）
 export const uploadResource = (formData: FormData) => {
-  return http.post<unknown, { resource: MyResource }>('/admin/resources/upload', formData, {
+  return http.post<unknown, { resource: MyResource }>('/creator/resources/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 };
 
 // 删除资源（需要创作者/管理员权限）
 export const deleteResource = (id: string) => {
-  return http.delete<void>(`/admin/resources/${id}`);
+  return http.delete<void>(`/creator/resources/${id}`);
 };
 
 // 修改资源元数据（标题、描述、类型）
@@ -182,7 +182,7 @@ export const updateResource = (
   data: { title?: string; description?: string; type?: string },
 ) => {
   return http.patch<unknown, { id: string; title: string; description: string; type: string }>(
-    `/admin/resources/${id}`,
+    `/creator/resources/${id}`,
     data,
   );
 };

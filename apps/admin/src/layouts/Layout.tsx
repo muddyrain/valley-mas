@@ -1,4 +1,4 @@
-﻿import {
+import {
   AuditOutlined,
   BookOutlined,
   CrownOutlined,

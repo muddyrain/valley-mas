@@ -1,4 +1,4 @@
-﻿import { Bot, Plus, Send, Sparkles, Trash2, User } from 'lucide-react';
+import { Bot, Plus, Send, Sparkles, Trash2, User } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { reqAIChatStream } from '@/api/ai';

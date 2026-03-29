@@ -1,4 +1,4 @@
-﻿# 本地 F5-TTS 接入说明（Windows）
+# 本地 F5-TTS 接入说明（Windows）
 
 ## 目录
 - F5-TTS 主项目：`apps/f5-tts`

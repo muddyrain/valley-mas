@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { createRandomCnNickname } from '@/utils/randomNickname';
 
 const ROLE_MAP: Record<string, { label: string; color: string }> = {
   admin: { label: '管理员', color: 'bg-red-100 text-red-600' },
@@ -282,9 +283,20 @@ export default function Profile() {
 
                 {/* 昵称 */}
                 <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                    昵称 <span className="text-red-500">*</span>
-                  </Label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Label className="text-sm font-medium text-gray-700 block">
+                      昵称 <span className="text-red-500">*</span>
+                    </Label>
+                    <Button
+                      size={'sm'}
+                      variant={'link'}
+                      onClick={() => {
+                        setInfoForm((f) => ({ ...f, nickname: createRandomCnNickname() }));
+                      }}
+                    >
+                      换一个
+                    </Button>
+                  </div>
                   <Input
                     value={infoForm.nickname}
                     onChange={(e) => setInfoForm((f) => ({ ...f, nickname: e.target.value }))}

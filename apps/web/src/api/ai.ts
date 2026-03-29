@@ -1,4 +1,4 @@
-﻿import { useAuthStore } from '@/stores/useAuthStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import http from '@/utils/request';
 
 export interface AIChatMessage {

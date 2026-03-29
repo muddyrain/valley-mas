@@ -1,4 +1,4 @@
-﻿package router
+package router
 
 import (
 	"valley-server/internal/config"
@@ -68,24 +68,30 @@ func Setup(cfg *config.Config) *gin.Engine {
 		user := api.Group("/user")
 		user.Use(middleware.Auth(cfg))
 		{
-			user.GET("/downloads", handler.GetMyDownloads) // 获取我的下载记录
-			user.GET("/info", handler.GetUserInfo)         // 获取个人信息
-			user.PUT("/profile", handler.UpdateMyProfile)  // 更新个人信息
-			user.PUT("/password", handler.ChangePassword)  // 修改密码
-			user.POST("/avatar", handler.UploadAvatar)     // 上传头像
+			user.GET("/downloads", handler.GetMyDownloads)
+			user.GET("/info", handler.GetUserInfo)
+			user.PUT("/profile", handler.UpdateMyProfile)
+			user.PUT("/password", handler.ChangePassword)
+			user.POST("/avatar", handler.UploadAvatar)
 
-			// 资源收藏（喜欢）
-			user.POST("/resources/favorite/batch-status", handler.BatchGetFavoriteStatus) // 批量查询收藏状态（静态路由优先）
-			user.POST("/resources/:id/favorite", handler.FavoriteResource)                // 收藏资源
-			user.DELETE("/resources/:id/favorite", handler.UnfavoriteResource)            // 取消收藏
-			user.GET("/resources/:id/favorite/status", handler.GetResourceFavoriteStatus) // 查询收藏状态
-			user.GET("/favorites", handler.GetMyFavorites)                                // 我的收藏列表
+			// 收藏
+			user.POST("/resources/favorite/batch-status", handler.BatchGetFavoriteStatus)
+			user.POST("/resources/:id/favorite", handler.FavoriteResource)
+			user.DELETE("/resources/:id/favorite", handler.UnfavoriteResource)
+			user.GET("/resources/:id/favorite/status", handler.GetResourceFavoriteStatus)
+			user.GET("/favorites", handler.GetMyFavorites)
 
 			// 关注创作者
-			user.POST("/creators/:id/follow", handler.FollowCreator)                // 关注创作者
-			user.DELETE("/creators/:id/follow", handler.UnfollowCreator)            // 取消关注
-			user.GET("/creators/:id/follow/status", handler.GetCreatorFollowStatus) // 查询关注状态
-			user.GET("/follows", handler.GetMyFollows)                              // 我关注的创作者列表
+			user.POST("/creators/:id/follow", handler.FollowCreator)
+			user.DELETE("/creators/:id/follow", handler.UnfollowCreator)
+			user.GET("/creators/:id/follow/status", handler.GetCreatorFollowStatus)
+			user.GET("/follows", handler.GetMyFollows)
+
+			// 通知中心
+			user.GET("/notifications", handler.ListMyNotifications)
+			user.GET("/notifications/unread-count", handler.GetUnreadNotificationCount)
+			user.POST("/notifications/:id/read", handler.MarkNotificationRead)
+			user.POST("/notifications/read-all", handler.MarkAllNotificationsRead)
 		}
 
 		// 需要认证的通用接口
@@ -109,6 +115,17 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/creator/application", handler.SubmitCreatorApplication)
 			auth.GET("/creator/application/my", handler.GetMyApplication)
 			auth.POST("/ai/chat", handler.ChatWithAI)
+		}
+
+		// 创作者内容接口（语义化路径，供 web 端使用）
+		creator := api.Group("/creator")
+		creator.Use(middleware.Auth(cfg))
+		creator.Use(middleware.CreatorOrAdmin())
+		{
+			creator.GET("/resources", handler.ListResources)
+			creator.POST("/resources/upload", handler.UploadResource)
+			creator.PATCH("/resources/:id", handler.UpdateResource)
+			creator.DELETE("/resources/:id", handler.DeleteResource)
 		}
 
 		// 管理后台接口

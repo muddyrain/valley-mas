@@ -109,6 +109,7 @@ func autoMigrate() error {
 		&model.UserFavorite{},
 		&model.UserFollow{},
 		&model.UserAvatarHistory{},
+		&model.UserNotification{},
 		&model.Post{},
 		&model.PostCategory{},
 		&model.PostTag{},
@@ -118,7 +119,43 @@ func autoMigrate() error {
 		return err
 	}
 
+	if err := fixResourceForeignKeyConstraint(); err != nil {
+		return err
+	}
+
 	return initDefaultBlogData()
+}
+
+// fixResourceForeignKeyConstraint repairs historical wrong FK settings for
+// resources.user_id and aligns it to users.id (uploader user).
+func fixResourceForeignKeyConstraint() error {
+	if DB == nil {
+		return nil
+	}
+
+	dialect := DB.Dialector.Name()
+	switch dialect {
+	case "postgres":
+		if err := DB.Exec(`ALTER TABLE resources DROP CONSTRAINT IF EXISTS fk_creators_resources`).Error; err != nil {
+			return err
+		}
+		_ = DB.Exec(`ALTER TABLE resources DROP CONSTRAINT IF EXISTS fk_resources_user`).Error
+		return DB.Exec(`
+			ALTER TABLE resources
+			ADD CONSTRAINT fk_resources_user
+			FOREIGN KEY (user_id) REFERENCES users(id)
+		`).Error
+	case "mysql":
+		_ = DB.Exec("ALTER TABLE resources DROP FOREIGN KEY fk_creators_resources").Error
+		_ = DB.Exec("ALTER TABLE resources DROP FOREIGN KEY fk_resources_user").Error
+		return DB.Exec(`
+			ALTER TABLE resources
+			ADD CONSTRAINT fk_resources_user
+			FOREIGN KEY (user_id) REFERENCES users(id)
+		`).Error
+	default:
+		return nil
+	}
 }
 
 func initDefaultBlogData() error {

@@ -346,3 +346,26 @@ func (h *UserAvatarHistory) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+// UserNotification 用户通知
+type UserNotification struct {
+	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID    Int64String    `gorm:"index;not null" json:"userId"`
+	Type      string         `gorm:"size:40;index;not null" json:"type"` // creator_application_review
+	Title     string         `gorm:"size:120;not null" json:"title"`
+	Content   string         `gorm:"size:1000;not null" json:"content"`
+	IsRead    bool           `gorm:"index;default:false" json:"isRead"`
+	ReadAt    *time.Time     `json:"readAt,omitempty"`
+	ExtraData string         `gorm:"type:text" json:"extraData,omitempty"` // JSON string
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
+func (n *UserNotification) BeforeCreate(tx *gorm.DB) error {
+	if n.ID == 0 {
+		n.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}

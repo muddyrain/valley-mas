@@ -153,11 +153,11 @@ export default function CreatorApplications() {
     {
       title: '联系方式',
       key: 'contact',
-      width: 150,
+      width: 200,
       render: (_, record) => (
         <div>
-          {record.phone && <div>📱 {record.phone}</div>}
-          {record.email && <div>📧 {record.email}</div>}
+          {record.phone && <div className="text-nowrap">📱 {record.phone}</div>}
+          {record.email && <div className="text-nowrap">📧 {record.email}</div>}
           {!record.phone && !record.email && <span style={{ color: '#999' }}>未填写</span>}
         </div>
       ),
