@@ -1,4 +1,6 @@
-﻿import http from '@/utils/request';
+import http from '@/utils/request';
+
+export type PostType = 'blog' | 'image_text';
 
 export interface PostCategory {
   id: string;
@@ -16,6 +18,9 @@ export interface Post {
   id: string;
   title: string;
   slug: string;
+  postType: PostType;
+  templateKey?: string;
+  templateData?: string;
   excerpt: string;
   cover?: string;
   categoryId: string;
@@ -37,11 +42,6 @@ export interface Post {
 export interface PostDetail extends Post {
   content: string;
   htmlContent: string;
-  author?: {
-    id: string;
-    nickname: string;
-    avatar: string;
-  };
 }
 
 export interface Category {
@@ -67,6 +67,7 @@ export interface PostListParams {
   tag?: string;
   keyword?: string;
   status?: string;
+  postType?: PostType;
 }
 
 export interface PostListData {
@@ -79,6 +80,9 @@ export interface PostListData {
 export interface CreatePostData {
   title: string;
   slug?: string;
+  postType?: PostType;
+  templateKey?: string;
+  templateData?: string;
   content: string;
   excerpt?: string;
   cover?: string;

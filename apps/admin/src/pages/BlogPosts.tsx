@@ -21,10 +21,15 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Post } from '@/api/blog';
+import type { Post, PostType } from '@/api/blog';
 import { deletePost, getAdminPosts } from '@/api/blog';
 
 const { Title } = Typography;
+
+const postTypeMap: Record<PostType, { color: string; text: string }> = {
+  blog: { color: 'blue', text: '博客' },
+  image_text: { color: 'magenta', text: '图文' },
+};
 
 export default function BlogPosts() {
   const navigate = useNavigate();
@@ -34,11 +39,12 @@ export default function BlogPosts() {
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState<string>('');
+  const [postType, setPostType] = useState<PostType | ''>('');
   const [keyword, setKeyword] = useState('');
 
   useEffect(() => {
     void loadPosts();
-  }, [page, pageSize, status]);
+  }, [page, pageSize, status, postType]);
 
   const loadPosts = async () => {
     setLoading(true);
@@ -47,12 +53,13 @@ export default function BlogPosts() {
         page,
         pageSize,
         status: status || undefined,
+        postType: postType || undefined,
       });
       setPosts(data.list || []);
       setTotal(data.total || 0);
     } catch (error) {
       console.error('Failed to load posts:', error);
-      message.error('加载文章列表失败');
+      message.error('加载内容列表失败');
     } finally {
       setLoading(false);
     }
@@ -100,6 +107,16 @@ export default function BlogPosts() {
           <div className="max-w-md truncate text-sm text-gray-400">{record.excerpt || '-'}</div>
         </div>
       ),
+    },
+    {
+      title: '类型',
+      dataIndex: 'postType',
+      key: 'postType',
+      width: 90,
+      render: (value: PostType) => {
+        const config = postTypeMap[value] || postTypeMap.blog;
+        return <Tag color={config.color}>{config.text}</Tag>;
+      },
     },
     {
       title: '分类',
@@ -159,7 +176,7 @@ export default function BlogPosts() {
           </Button>
           <Popconfirm
             title="确认删除"
-            description={`确定要删除文章《${record.title}》吗？`}
+            description={`确定要删除《${record.title}》吗？`}
             onConfirm={() => handleDelete(record.id)}
             okText="删除"
             cancelText="取消"
@@ -179,14 +196,14 @@ export default function BlogPosts() {
       <Card>
         <div className="mb-6 flex items-center justify-between">
           <Title level={4} className="!mb-0">
-            文章管理
+            内容管理
           </Title>
           <Button
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => navigate('/blog-posts/create')}
           >
-            新建文章
+            新建内容
           </Button>
         </div>
 
@@ -198,6 +215,18 @@ export default function BlogPosts() {
             onChange={(e) => setKeyword(e.target.value)}
             className="max-w-md"
             allowClear
+          />
+          <Select
+            placeholder="全部类型"
+            value={postType}
+            onChange={(v) => setPostType((v || '') as PostType | '')}
+            allowClear
+            className="w-36"
+            options={[
+              { value: '', label: '全部类型' },
+              { value: 'blog', label: '博客' },
+              { value: 'image_text', label: '图文' },
+            ]}
           />
           <Select
             placeholder="全部状态"

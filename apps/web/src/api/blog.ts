@@ -1,5 +1,7 @@
 import request from '@/utils/request';
 
+export type PostType = 'blog' | 'image_text';
+
 export interface PostCategory {
   id: string;
   name: string;
@@ -16,6 +18,9 @@ export interface Post {
   id: string;
   title: string;
   slug: string;
+  postType: PostType;
+  templateKey?: string;
+  templateData?: string;
   excerpt: string;
   cover?: string;
   categoryId: string;
@@ -37,11 +42,6 @@ export interface Post {
 export interface PostDetail extends Post {
   content: string;
   htmlContent: string;
-  author?: {
-    id: string;
-    nickname: string;
-    avatar: string;
-  };
 }
 
 export interface Category {
@@ -66,6 +66,7 @@ export interface PostListParams {
   category?: string;
   tag?: string;
   keyword?: string;
+  postType?: PostType;
 }
 
 export interface PostListData {
@@ -78,6 +79,9 @@ export interface PostListData {
 export interface CreatePostData {
   title: string;
   slug?: string;
+  postType?: PostType;
+  templateKey?: string;
+  templateData?: string;
   content: string;
   excerpt?: string;
   cover?: string;
@@ -116,6 +120,8 @@ export function deletePost(id: string) {
   return request.delete<unknown, null>(`/admin/blog/posts/${id}`);
 }
 
-export function getAdminPosts(params: { page?: number; pageSize?: number; status?: string } = {}) {
+export function getAdminPosts(
+  params: { page?: number; pageSize?: number; status?: string; postType?: PostType } = {},
+) {
   return request.get<unknown, PostListData>('/admin/blog/posts', { params });
 }
