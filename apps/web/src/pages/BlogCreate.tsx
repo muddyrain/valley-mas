@@ -250,27 +250,51 @@ export default function BlogCreate() {
                   <div>
                     <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
                       <span>文章分组</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700"
+                          onClick={() => navigate('/my-space/blog-groups')}
+                        >
+                          管理分组
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-violet-600 hover:text-violet-700"
+                          onClick={() => setShowCreateGroup((v) => !v)}
+                        >
+                          <Plus className="h-3 w-3" />
+                          新建分组
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2">
                       <button
                         type="button"
-                        className="inline-flex items-center gap-1 text-violet-600 hover:text-violet-700"
-                        onClick={() => setShowCreateGroup((v) => !v)}
+                        onClick={() => setGroupId('')}
+                        className={`rounded-full px-3 py-1.5 text-sm transition ${
+                          !groupId
+                            ? 'bg-violet-600 text-white shadow-sm'
+                            : 'bg-white text-slate-600 hover:bg-slate-100'
+                        }`}
                       >
-                        <Plus className="h-3 w-3" />
-                        新建分组
+                        未分组
                       </button>
-                    </div>
-                    <select
-                      value={groupId}
-                      onChange={(e) => setGroupId(e.target.value)}
-                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-violet-200"
-                    >
-                      <option value="">未分组</option>
                       {groups.map((item) => (
-                        <option key={item.id} value={item.id}>
+                        <button
+                          type="button"
+                          key={item.id}
+                          onClick={() => setGroupId(item.id)}
+                          className={`rounded-full px-3 py-1.5 text-sm transition ${
+                            groupId === item.id
+                              ? 'bg-violet-600 text-white shadow-sm'
+                              : 'bg-white text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
                           {item.name}
-                        </option>
+                        </button>
                       ))}
-                    </select>
+                    </div>
 
                     {showCreateGroup && (
                       <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50/50 p-3">
