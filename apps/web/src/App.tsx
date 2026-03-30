@@ -4,6 +4,7 @@ import Layout from './layouts/Layout';
 import AIChat from './pages/AIChat';
 import ApplyCreator from './pages/ApplyCreator';
 import BlogCreate from './pages/BlogCreate';
+import BlogGroupManage from './pages/BlogGroupManage';
 import BlogList from './pages/blog/BlogList';
 import BlogPost from './pages/blog/BlogPost';
 import Creator from './pages/Creator';
@@ -32,6 +33,7 @@ function App() {
           <Route path="my-space" element={<MySpace />} />
           <Route path="my-space/image-text" element={<ImageTextCreate />} />
           <Route path="my-space/blog-create" element={<BlogCreate />} />
+          <Route path="my-space/blog-groups" element={<BlogGroupManage />} />
           <Route path="profile" element={<Profile />} />
           <Route path="favorites" element={<Favorites />} />
           <Route path="apply-creator" element={<ApplyCreator />} />

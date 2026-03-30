@@ -1,6 +1,8 @@
 import {
   Calendar,
+  ChevronDown,
   FileText,
+  FolderTree,
   Image as ImageIcon,
   Loader2,
   Pencil,
@@ -34,6 +36,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { formatDate } from '@/utils/blog';
 
@@ -416,6 +424,14 @@ export default function MySpace() {
                   <ImageIcon className="mr-1.5 h-4 w-4" />
                   新建图文
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/my-space/blog-groups')}
+                  className="rounded-xl"
+                >
+                  <FolderTree className="mr-1.5 h-4 w-4" />
+                  管理分组
+                </Button>
               </div>
             </div>
 
@@ -439,18 +455,24 @@ export default function MySpace() {
                 </button>
               ))}
 
-              <select
-                value={postGroupFilter}
-                onChange={(e) => setPostGroupFilter(e.target.value)}
-                className="ml-1 h-9 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-600"
-              >
-                <option value="">全部分组</option>
-                {myGroups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
+              <DropdownMenu>
+                <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-700 transition hover:border-violet-300 hover:text-violet-700">
+                  {postGroupFilter
+                    ? myGroups.find((g) => g.id === postGroupFilter)?.name || '分组'
+                    : '全部分组'}
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-48 rounded-xl">
+                  <DropdownMenuItem onClick={() => setPostGroupFilter('')}>
+                    全部分组
+                  </DropdownMenuItem>
+                  {myGroups.map((group) => (
+                    <DropdownMenuItem key={group.id} onClick={() => setPostGroupFilter(group.id)}>
+                      {group.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {loadingPosts ? (
