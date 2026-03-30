@@ -22,6 +22,17 @@ export interface PostCategory {
   slug: string;
 }
 
+export interface PostGroup {
+  id: string;
+  name: string;
+  slug?: string;
+  description?: string;
+  authorId: string;
+  parentId?: string;
+  sortOrder?: number;
+  postCount?: number;
+}
+
 export interface PostTag {
   id: string;
   name: string;
@@ -31,13 +42,15 @@ export interface PostTag {
 export interface Post {
   id: string;
   title: string;
-  slug: string;
+  slug?: string;
   postType: PostType;
   templateKey?: string;
   templateData?: string;
   imageTextData?: string;
   excerpt: string;
   cover?: string;
+  groupId: string;
+  group?: PostGroup;
   categoryId: string;
   category?: PostCategory;
   tags?: PostTag[];
@@ -68,6 +81,8 @@ export interface Category {
   postCount: number;
 }
 
+export type Group = PostGroup;
+
 export interface Tag {
   id: string;
   name: string;
@@ -78,6 +93,7 @@ export interface Tag {
 export interface PostListParams {
   page?: number;
   pageSize?: number;
+  groupId?: string;
   category?: string;
   tag?: string;
   keyword?: string;
@@ -93,7 +109,6 @@ export interface PostListData {
 
 export interface CreatePostData {
   title: string;
-  slug?: string;
   postType?: PostType;
   templateKey?: string;
   templateData?: string;
@@ -101,7 +116,8 @@ export interface CreatePostData {
   content: string;
   excerpt?: string;
   cover?: string;
-  categoryId: string;
+  groupId?: string;
+  categoryId?: string;
   tagIds?: string[];
   status?: 'draft' | 'published' | 'archived';
   isTop?: boolean;
@@ -118,6 +134,10 @@ export function getPostDetailById(id: string) {
 
 export function getCategories() {
   return request.get<unknown, Category[]>('/public/blog/categories');
+}
+
+export function getGroups(params: { authorId?: string } = {}) {
+  return request.get<unknown, Group[]>('/public/blog/groups', { params });
 }
 
 export function getTags() {
@@ -140,4 +160,35 @@ export function getAdminPosts(
   params: { page?: number; pageSize?: number; status?: string; postType?: PostType } = {},
 ) {
   return request.get<unknown, PostListData>('/admin/blog/posts', { params });
+}
+
+export function getAdminGroups() {
+  return request.get<unknown, Group[]>('/admin/blog/groups');
+}
+
+export function createGroup(data: {
+  name: string;
+  slug?: string;
+  description?: string;
+  parentId?: string;
+  sortOrder?: number;
+}) {
+  return request.post<unknown, Group>('/admin/blog/groups', data);
+}
+
+export function updateGroup(
+  id: string,
+  data: {
+    name?: string;
+    slug?: string;
+    description?: string;
+    parentId?: string;
+    sortOrder?: number;
+  },
+) {
+  return request.put<unknown, null>(`/admin/blog/groups/${id}`, data);
+}
+
+export function deleteGroup(id: string) {
+  return request.delete<unknown, null>(`/admin/blog/groups/${id}`);
 }

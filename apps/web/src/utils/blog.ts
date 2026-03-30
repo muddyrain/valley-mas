@@ -95,6 +95,23 @@ export function renderMarkdown(content: string): string {
   return marked.parse(content) as string;
 }
 
+export function createHeadingId(text: string): string {
+  return String(text)
+    .toLowerCase()
+    .replace(/[^\w\u4e00-\u9fa5\s-]/g, '')
+    .replace(/\s+/g, '-');
+}
+
+export function withHeadingAnchors(html: string): string {
+  return html.replace(/<h([1-6])>([^<]+)<\/h[1-6]>/g, (_, level, text) => {
+    return `<h${level} id="${createHeadingId(String(text))}">${String(text)}</h${level}>`;
+  });
+}
+
+export function renderMarkdownWithAnchors(content: string): string {
+  return withHeadingAnchors(renderMarkdown(content));
+}
+
 // 从 Markdown 内容提取目录
 export interface TocItem {
   level: number;

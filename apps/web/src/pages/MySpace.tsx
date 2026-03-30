@@ -1,4 +1,6 @@
 import {
+  Calendar,
+  FileText,
   Image as ImageIcon,
   Loader2,
   Pencil,
@@ -8,9 +10,15 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import {
+  type Group as BlogGroup,
+  type Post as BlogPost,
+  getAdminGroups,
+  getAdminPosts,
+} from '@/api/blog';
 import {
   deleteResource,
   getMyResources,
@@ -27,6 +35,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { formatDate } from '@/utils/blog';
 
 const RESOURCE_TYPES = [
   { label: '全部', value: '' },
@@ -49,6 +58,11 @@ export default function MySpace() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [activeType, setActiveType] = useState('');
+  const [myPosts, setMyPosts] = useState<BlogPost[]>([]);
+  const [myGroups, setMyGroups] = useState<BlogGroup[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [postTypeFilter, setPostTypeFilter] = useState<'all' | 'blog' | 'image_text'>('all');
+  const [postGroupFilter, setPostGroupFilter] = useState('');
 
   // 上传弹窗状态
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -104,6 +118,36 @@ export default function MySpace() {
       loadResources(activeType);
     }
   }, [isAuthenticated, user, activeType, loadResources]);
+
+  const loadMyPosts = useCallback(async () => {
+    try {
+      setLoadingPosts(true);
+      const [postsData, groupsData] = await Promise.all([
+        getAdminPosts({ page: 1, pageSize: 24 }),
+        getAdminGroups(),
+      ]);
+      setMyPosts(postsData.list || []);
+      setMyGroups(groupsData || []);
+    } catch {
+      toast.error('加载博客内容失败');
+    } finally {
+      setLoadingPosts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.role === 'creator') {
+      void loadMyPosts();
+    }
+  }, [isAuthenticated, user, loadMyPosts]);
+
+  const filteredPosts = useMemo(() => {
+    return myPosts.filter((post) => {
+      if (postTypeFilter !== 'all' && post.postType !== postTypeFilter) return false;
+      if (postGroupFilter && post.groupId !== postGroupFilter) return false;
+      return true;
+    });
+  }, [myPosts, postGroupFilter, postTypeFilter]);
 
   // 选择文件
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -274,15 +318,33 @@ export default function MySpace() {
             </div>
           </div>
 
-          {/* 上传按钮 */}
-          <Button
-            onClick={() => setUploadOpen(true)}
-            size="lg"
-            className="bg-white text-purple-600 hover:bg-gray-100 shadow-xl hover:shadow-2xl hover:scale-105 font-semibold px-8 transition-all"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            上传新资源
-          </Button>
+          {/* 快捷创作按钮 */}
+          <div className="flex flex-col gap-2 md:items-end">
+            <Button
+              onClick={() => navigate('/my-space/blog-create')}
+              size="lg"
+              variant="outline"
+              className="w-full border-white/35 bg-white/90 text-purple-700 hover:bg-white"
+            >
+              写博客
+            </Button>
+            <Button
+              onClick={() => navigate('/my-space/image-text')}
+              size="lg"
+              variant="outline"
+              className="w-full border-white/35 bg-white/90 text-purple-700 hover:bg-white"
+            >
+              图文创作
+            </Button>
+            <Button
+              onClick={() => setUploadOpen(true)}
+              size="lg"
+              className="w-full bg-white text-purple-600 hover:bg-gray-100 shadow-xl hover:shadow-2xl font-semibold px-8 transition-all"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              上传新资源
+            </Button>
+          </div>
         </div>
       </PageBanner>
 
@@ -327,6 +389,123 @@ export default function MySpace() {
             ))}
           </div>
         )}
+
+        <section className="mt-12">
+          <div className="rounded-3xl border border-violet-200/70 bg-white/90 p-6 shadow-[0_14px_32px_rgba(88,76,155,0.1)]">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">我的博客与图文</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  当前账号的全部创作内容，支持按分组与类型查看
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/my-space/blog-create')}
+                  className="rounded-xl"
+                >
+                  <FileText className="mr-1.5 h-4 w-4" />
+                  新建博客
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/my-space/image-text')}
+                  className="rounded-xl"
+                >
+                  <ImageIcon className="mr-1.5 h-4 w-4" />
+                  新建图文
+                </Button>
+              </div>
+            </div>
+
+            <div className="mb-5 flex flex-wrap items-center gap-2">
+              {[
+                { label: '全部', value: 'all' },
+                { label: '博客', value: 'blog' },
+                { label: '图文', value: 'image_text' },
+              ].map((item) => (
+                <button
+                  type="button"
+                  key={item.value}
+                  onClick={() => setPostTypeFilter(item.value as 'all' | 'blog' | 'image_text')}
+                  className={`rounded-full px-3 py-1.5 text-sm transition ${
+                    postTypeFilter === item.value
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+
+              <select
+                value={postGroupFilter}
+                onChange={(e) => setPostGroupFilter(e.target.value)}
+                className="ml-1 h-9 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-600"
+              >
+                <option value="">全部分组</option>
+                {myGroups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {loadingPosts ? (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-44 animate-pulse rounded-2xl bg-slate-100" />
+                ))}
+              </div>
+            ) : filteredPosts.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+                <p className="text-slate-500">当前筛选下还没有内容，先去发布一篇吧。</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {filteredPosts.map((post) => (
+                  <Link
+                    key={post.id}
+                    to={`/blog/${post.id}`}
+                    className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-[0_16px_34px_rgba(91,78,167,0.15)]"
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs ${
+                          post.postType === 'image_text'
+                            ? 'bg-sky-100 text-sky-700'
+                            : 'bg-violet-100 text-violet-700'
+                        }`}
+                      >
+                        {post.postType === 'image_text' ? '图文创作' : '博客'}
+                      </span>
+                      <span className="text-xs text-slate-500">{post.status || 'draft'}</span>
+                    </div>
+                    <h3 className="line-clamp-2 text-lg font-semibold text-slate-900 group-hover:text-violet-700">
+                      {post.title}
+                    </h3>
+                    <p className="mt-2 line-clamp-3 min-h-[66px] text-sm leading-6 text-slate-600">
+                      {post.excerpt || '暂无摘要，点击查看详情内容。'}
+                    </p>
+                    <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                      <div className="inline-flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5" />
+                        {formatDate(post.publishedAt || post.createdAt)}
+                      </div>
+                      {post.group?.name && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+                          {post.group.name}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
       {/* ===== 上传弹窗 ===== */}

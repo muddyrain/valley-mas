@@ -44,7 +44,10 @@ func Init(cfg *config.Config) error {
 		},
 	)
 
-	DB, err = gorm.Open(dialector, &gorm.Config{Logger: gormLogger})
+	DB, err = gorm.Open(dialector, &gorm.Config{
+		Logger:                                   gormLogger,
+		DisableForeignKeyConstraintWhenMigrating: true,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to connect database: %w", err)
 	}
@@ -110,6 +113,7 @@ func autoMigrate() error {
 		&model.UserFollow{},
 		&model.UserAvatarHistory{},
 		&model.UserNotification{},
+		&model.PostGroup{},
 		&model.Post{},
 		&model.PostCategory{},
 		&model.PostTag{},
@@ -120,7 +124,8 @@ func autoMigrate() error {
 	}
 
 	if err := fixResourceForeignKeyConstraint(); err != nil {
-		return err
+		// Do not block startup because of historical dirty data.
+		log.Printf("warn: fix resource foreign key skipped: %v", err)
 	}
 
 	return initDefaultBlogData()
@@ -140,19 +145,25 @@ func fixResourceForeignKeyConstraint() error {
 			return err
 		}
 		_ = DB.Exec(`ALTER TABLE resources DROP CONSTRAINT IF EXISTS fk_resources_user`).Error
-		return DB.Exec(`
+		if err := DB.Exec(`
 			ALTER TABLE resources
 			ADD CONSTRAINT fk_resources_user
 			FOREIGN KEY (user_id) REFERENCES users(id)
-		`).Error
+		`).Error; err != nil {
+			return err
+		}
+		return nil
 	case "mysql":
 		_ = DB.Exec("ALTER TABLE resources DROP FOREIGN KEY fk_creators_resources").Error
 		_ = DB.Exec("ALTER TABLE resources DROP FOREIGN KEY fk_resources_user").Error
-		return DB.Exec(`
+		if err := DB.Exec(`
 			ALTER TABLE resources
 			ADD CONSTRAINT fk_resources_user
 			FOREIGN KEY (user_id) REFERENCES users(id)
-		`).Error
+		`).Error; err != nil {
+			return err
+		}
+		return nil
 	default:
 		return nil
 	}
