@@ -332,3 +332,100 @@ button {
 .hero-particle-c {
   animation-delay: 2.1s;
 }
+
+@keyframes poem-breathe {
+  0% {
+    opacity: 0.92;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+  50% {
+    opacity: 1;
+    text-shadow: 0 0 12px rgba(255, 255, 255, 0.22);
+  }
+  100% {
+    opacity: 0.92;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes poem-glow {
+  0%,
+  100% {
+    box-shadow: 0 10px 26px rgba(79, 70, 229, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  }
+  50% {
+    box-shadow: 0 12px 30px rgba(147, 51, 234, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  }
+}
+
+.poem-footer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 56px;
+  overflow: hidden;
+  border-radius: 9999px;
+  padding: 10px 18px;
+  color: #fff;
+  background: linear-gradient(90deg, rgba(71, 85, 255, 0.38), rgba(147, 51, 234, 0.38));
+  backdrop-filter: blur(10px);
+  animation: poem-glow 4.8s ease-in-out infinite;
+}
+
+.poem-footer::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, rgba(15, 23, 42, 0.16), rgba(15, 23, 42, 0.08));
+}
+
+.poem-footer > * {
+  position: relative;
+  z-index: 1;
+}
+
+.poem-text {
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.35s ease;
+  animation: poem-breathe 3.8s ease-in-out infinite;
+}
+
+.poem-source {
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+.poem-footer-floating {
+  width: min(860px, calc(100vw - 24px));
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  box-shadow: 0 20px 42px rgba(76, 57, 130, 0.28);
+}
+
+.poem-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.poem-refresh-btn:hover {
+  transform: rotate(-18deg) scale(1.06);
+  background: rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+}
