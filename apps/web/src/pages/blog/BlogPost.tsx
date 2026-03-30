@@ -13,7 +13,7 @@ import type { PostDetail } from '@/api/blog';
 import { getPostDetailById } from '@/api/blog';
 import { MarkdownContent, TableOfContents } from '@/components/blog';
 import { Button } from '@/components/ui/button';
-import { extractToc, formatDate, renderMarkdown, type TocItem } from '@/utils/blog';
+import { extractToc, formatDate, renderMarkdownWithAnchors, type TocItem } from '@/utils/blog';
 
 type ImageTextPayload = {
   images?: string[];
@@ -110,14 +110,7 @@ export default function BlogPost() {
 
   const processedContent = useMemo(() => {
     if (!post) return '';
-    const html = renderMarkdown(post.content || post.htmlContent || '');
-    return html.replace(/<h([1-6])>([^<]+)<\/h[1-6]>/g, (_, level, text) => {
-      const headingId = text
-        .toLowerCase()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/\s+/g, '-');
-      return `<h${level} id="${headingId}">${text}</h${level}>`;
-    });
+    return renderMarkdownWithAnchors(post.content || post.htmlContent || '');
   }, [post]);
 
   const goPrevPage = () => {
@@ -196,9 +189,9 @@ export default function BlogPost() {
                   {post.author?.nickname || '创作者'}
                 </span>
               </div>
-              {post.category && (
+              {post.group && (
                 <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs text-primary">
-                  {post.category.name}
+                  {post.group.name}
                 </span>
               )}
               <span className="text-xs text-muted-foreground">
@@ -285,12 +278,12 @@ export default function BlogPost() {
         <>
           <header className="mx-auto max-w-6xl px-4 pb-8 pt-10 sm:px-6 lg:px-8">
             <div className="rounded-2xl border border-border/60 bg-card/70 p-6 shadow-sm sm:p-10">
-              {post.category && (
+              {post.group && (
                 <Link
-                  to={`/blog?category=${encodeURIComponent(post.category.slug)}`}
+                  to={`/blog?groupId=${encodeURIComponent(post.group.id)}`}
                   className="mb-5 inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
                 >
-                  {post.category.name}
+                  {post.group.name}
                 </Link>
               )}
 

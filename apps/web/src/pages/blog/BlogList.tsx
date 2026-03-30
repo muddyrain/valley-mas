@@ -1,47 +1,47 @@
-import { BookOpen, Folder, Tag, X } from 'lucide-react';
+import { BookOpen, FolderTree, Tag, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import type { Category, Post, Tag as TagType } from '@/api/blog';
-import { getCategories, getPosts, getTags } from '@/api/blog';
-import { ExternalPreviewPostCard, TagCloud } from '@/components/blog';
+import type { Group, Post, Tag as TagType } from '@/api/blog';
+import { getGroups, getPosts, getTags } from '@/api/blog';
+import { BlogFeedCard, TagCloud } from '@/components/blog';
 import { Button } from '@/components/ui/button';
 
 export default function BlogList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState<Post[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [tags, setTags] = useState<TagType[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
 
   const selectedTag = searchParams.get('tag') || '';
-  const selectedCategory = searchParams.get('category') || '';
+  const selectedGroupId = searchParams.get('groupId') || '';
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [postsData, categoriesData, tagsData] = await Promise.all([
+      const [postsData, groupsData, tagsData] = await Promise.all([
         getPosts({
           page: currentPage,
           pageSize: 12,
-          category: selectedCategory || undefined,
+          groupId: selectedGroupId || undefined,
           tag: selectedTag || undefined,
         }),
-        getCategories(),
+        getGroups(),
         getTags(),
       ]);
 
       setPosts(postsData.list || []);
       setTotal(postsData.total || 0);
-      setCategories(categoriesData || []);
+      setGroups(groupsData || []);
       setTags(tagsData || []);
     } catch (error) {
       console.error('Failed to load blog data:', error);
     } finally {
       setLoading(false);
     }
-  }, [currentPage, selectedCategory, selectedTag]);
+  }, [currentPage, selectedGroupId, selectedTag]);
 
   useEffect(() => {
     void loadData();
@@ -59,13 +59,13 @@ export default function BlogList() {
     setSearchParams(newParams);
   };
 
-  const handleCategoryClick = (categorySlug: string) => {
-    if (!categorySlug) return;
+  const handleGroupClick = (targetGroupId: string) => {
+    if (!targetGroupId) return;
     const newParams = new URLSearchParams(searchParams);
-    if (selectedCategory === categorySlug) {
-      newParams.delete('category');
+    if (selectedGroupId === targetGroupId) {
+      newParams.delete('groupId');
     } else {
-      newParams.set('category', categorySlug);
+      newParams.set('groupId', targetGroupId);
     }
     newParams.set('page', '1');
     setSearchParams(newParams);
@@ -82,13 +82,13 @@ export default function BlogList() {
     }));
   }, [tags]);
 
-  const categoryData = useMemo(() => {
-    return categories.map((cat) => ({
-      name: cat.name,
-      slug: cat.slug,
-      count: cat.postCount,
+  const groupData = useMemo(() => {
+    return groups.map((item) => ({
+      name: item.name,
+      id: item.id,
+      count: item.postCount || 0,
     }));
-  }, [categories]);
+  }, [groups]);
 
   if (loading) {
     return (
@@ -114,10 +114,10 @@ export default function BlogList() {
           <div className="text-center">
             <h1 className="text-4xl font-bold text-foreground mb-4 flex items-center justify-center gap-3">
               <BookOpen className="w-10 h-10 text-primary" />
-              我的博客
+              博客与图文广场
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              记录创作和开发中的真实经验
+              记录创作、分享思考，也可以浏览图文灵感。
             </p>
           </div>
         </div>
@@ -126,13 +126,13 @@ export default function BlogList() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1">
-            {(selectedTag || selectedCategory) && (
+            {(selectedTag || selectedGroupId) && (
               <div className="mb-6 flex items-center gap-3 flex-wrap">
                 <span className="text-sm text-muted-foreground">当前筛选</span>
-                {selectedCategory && (
+                {selectedGroupId && (
                   <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">
-                    <Folder className="w-3 h-3" />
-                    {categories.find((c) => c.slug === selectedCategory)?.name || selectedCategory}
+                    <FolderTree className="w-3 h-3" />
+                    {groups.find((g) => g.id === selectedGroupId)?.name || selectedGroupId}
                   </span>
                 )}
                 {selectedTag && (
@@ -156,7 +156,7 @@ export default function BlogList() {
               <>
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
                   {posts.map((post) => (
-                    <ExternalPreviewPostCard key={post.id} post={post} />
+                    <BlogFeedCard key={post.id} post={post} />
                   ))}
                 </div>
 
@@ -196,26 +196,26 @@ export default function BlogList() {
           <aside className="w-full lg:w-80 space-y-6">
             <div className="bg-card rounded-xl p-6 border border-border/50">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Folder className="w-5 h-5 text-primary" />
-                分类
+                <FolderTree className="w-5 h-5 text-primary" />
+                分组
               </h3>
-              {categoryData.length === 0 ? (
-                <p className="text-sm text-muted-foreground">暂无分类</p>
+              {groupData.length === 0 ? (
+                <p className="text-sm text-muted-foreground">暂无分组</p>
               ) : (
                 <div className="space-y-2">
-                  {categoryData.map((category) => (
+                  {groupData.map((group) => (
                     <button
                       type="button"
-                      key={category.slug}
-                      onClick={() => handleCategoryClick(category.slug)}
+                      key={group.id}
+                      onClick={() => handleGroupClick(group.id)}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                        selectedCategory === category.slug
+                        selectedGroupId === group.id
                           ? 'bg-primary text-primary-foreground'
                           : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      <span>{category.name}</span>
-                      <span className="text-xs opacity-70">{category.count}</span>
+                      <span>{group.name}</span>
+                      <span className="text-xs opacity-70">{group.count}</span>
                     </button>
                   ))}
                 </div>

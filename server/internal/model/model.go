@@ -136,10 +136,10 @@ type Creator struct {
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// 关联
-	User      *User           `gorm:"foreignKey:UserID" json:"user,omitempty"`      // 关联的用户（用于获取昵称、头像等信息）
-	Space     *CreatorSpace   `gorm:"foreignKey:CreatorID" json:"space,omitempty"`  // 创作者的空间
-	Resources []Resource      `gorm:"foreignKey:UserID" json:"resources,omitempty"` // 创作者上传的所有资源
-	Logs      []CodeAccessLog `gorm:"foreignKey:CreatorID" json:"logs,omitempty"`   // 访问日志
+	User      *User           `gorm:"foreignKey:UserID" json:"user,omitempty"`                        // 关联的用户（用于获取昵称、头像等信息）
+	Space     *CreatorSpace   `gorm:"foreignKey:CreatorID" json:"space,omitempty"`                    // 创作者的空间
+	Resources []Resource      `gorm:"foreignKey:UserID;references:UserID" json:"resources,omitempty"` // 创作者上传的所有资源
+	Logs      []CodeAccessLog `gorm:"foreignKey:CreatorID" json:"logs,omitempty"`                     // 访问日志
 }
 
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID

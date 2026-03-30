@@ -20,7 +20,7 @@ import {
   type Resource,
   unfavoriteResource,
 } from '@/api/resource';
-import { ExternalPreviewPostCard } from '@/components/blog';
+import { BlogFeedCard } from '@/components/blog';
 import CreatorCard from '@/components/CreatorCard';
 
 import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
@@ -28,10 +28,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 export default function Home() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [code, setCode] = useState('');
+  const canCreateContent = user?.role === 'creator' || user?.role === 'admin';
 
   const [creators, setCreators] = useState<Creator[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
@@ -173,14 +176,16 @@ export default function Home() {
                 >
                   浏览博客图文
                 </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="h-12 rounded-xl border-emerald-300 bg-white/70 px-5 text-emerald-700 hover:bg-emerald-50"
-                  onClick={() => navigate('/my-space/image-text')}
-                >
-                  图文创作
-                </Button>
+                {canCreateContent && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="h-12 rounded-xl border-amber-300 bg-white/70 px-5 text-amber-700 hover:bg-amber-50"
+                    onClick={() => navigate('/my-space')}
+                  >
+                    进入我的创作空间
+                  </Button>
+                )}
               </div>
 
               <div className="mt-8 max-w-2xl">
@@ -452,7 +457,7 @@ export default function Home() {
                 </div>
               </div>
             ) : (
-              blogs.map((blog) => <ExternalPreviewPostCard key={blog.id} post={blog} />)
+              blogs.map((blog) => <BlogFeedCard key={blog.id} post={blog} />)
             )}
           </div>
         </section>

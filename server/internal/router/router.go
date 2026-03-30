@@ -48,6 +48,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			public.GET("/blog/posts", handler.GetPosts)                 // 获取文章列表
 			public.GET("/blog/posts/id/:id", handler.GetPostDetailByID) // 通过 ID 获取文章详情
 			public.GET("/blog/posts/:slug", handler.GetPostDetail)      // 通过 slug 获取文章详情
+			public.GET("/blog/groups", handler.GetGroups)               // 获取博客分组列表
 			public.GET("/blog/categories", handler.GetCategories)       // 获取博客分类列表
 			public.GET("/blog/tags", handler.GetTags)                   // 获取博客标签列表
 
@@ -176,6 +177,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.POST("/blog/posts", handler.AdminCreatePost)
 				content.PUT("/blog/posts/:id", handler.AdminUpdatePost)
 				content.DELETE("/blog/posts/:id", handler.AdminDeletePost)
+				content.GET("/blog/groups", handler.AdminListGroups)
+				content.POST("/blog/groups", handler.AdminCreateGroup)
+				content.PUT("/blog/groups/:id", handler.AdminUpdateGroup)
+				content.DELETE("/blog/groups/:id", handler.AdminDeleteGroup)
 
 				// 创作者列表和详情（创作者可查看自己，管理员可查看全部）
 				content.GET("/creators", handler.ListCreators)

@@ -2,7 +2,7 @@ import { ArrowLeft, Check, ChevronLeftCircle, ChevronRightCircle, Sparkles } fro
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { type Category, createPost, getCategories } from '@/api/blog';
+import { createPost, type Group, getAdminGroups } from '@/api/blog';
 import { uploadResource } from '@/api/resource';
 import bubuImage from '@/assets/bubu.jpeg';
 import yierImage from '@/assets/yier.jpeg';
@@ -408,8 +408,8 @@ export default function ImageTextCreate() {
   const [partner, setPartner] = useState<PartnerKey>('yier');
   const [stickerEmoji, setStickerEmoji] = useState<string>('✨');
   const [templateKey, setTemplateKey] = useState<TemplateKey>('paper');
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [categoryId, setCategoryId] = useState('');
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [groupId, setGroupId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [generatedPages, setGeneratedPages] = useState<string[]>([]);
   const [activePage, setActivePage] = useState(0);
@@ -420,13 +420,13 @@ export default function ImageTextCreate() {
       return;
     }
 
-    getCategories()
+    getAdminGroups()
       .then((list) => {
-        setCategories(list || []);
-        if (list?.[0]?.id) setCategoryId(list[0].id);
+        setGroups(list || []);
+        if (list?.[0]?.id) setGroupId(list[0].id);
       })
       .catch(() => {
-        toast.error('加载分类失败');
+        toast.error('加载分组失败');
       });
   }, [isAuthenticated, navigate]);
 
@@ -498,8 +498,8 @@ export default function ImageTextCreate() {
       toast.error('请输入文本内容');
       return;
     }
-    if (!categoryId) {
-      toast.error('发布前请选择分类');
+    if (!groupId && groups.length > 0) {
+      toast.error('发布前请选择分组');
       return;
     }
 
@@ -550,7 +550,7 @@ export default function ImageTextCreate() {
         content: markdownImages,
         excerpt: pages[0]?.slice(0, 120) || title,
         cover: uploadedImageUrls[0],
-        categoryId,
+        groupId: groupId || undefined,
         status: 'published',
         publishNow: true,
       });
@@ -582,13 +582,14 @@ export default function ImageTextCreate() {
           {stage === 'pick' ? (
             <div className="flex items-center gap-3">
               <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
+                value={groupId}
+                onChange={(e) => setGroupId(e.target.value)}
                 className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-200"
               >
-                {categories.map((item) => (
+                <option value="">发布分组：未分组</option>
+                {groups.map((item) => (
                   <option key={item.id} value={item.id}>
-                    发布分类：{item.name}
+                    发布分组：{item.name}
                   </option>
                 ))}
               </select>

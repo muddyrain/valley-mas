@@ -7,10 +7,12 @@ import (
 	"strings"
 	"time"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -29,6 +31,8 @@ type PostListResponse struct {
 	ImageTextData string            `json:"imageTextData,omitempty"`
 	Excerpt       string            `json:"excerpt"`
 	Cover         string            `json:"cover"`
+	GroupID       model.Int64String `json:"groupId"`
+	Group         *PostGroupInfo    `json:"group,omitempty"`
 	CategoryID    model.Int64String `json:"categoryId"`
 	Category      *PostCategoryInfo `json:"category,omitempty"`
 	Tags          []PostTagInfo     `json:"tags,omitempty"`
@@ -45,6 +49,15 @@ type PostCategoryInfo struct {
 	ID   model.Int64String `json:"id"`
 	Name string            `json:"name"`
 	Slug string            `json:"slug"`
+}
+
+type PostGroupInfo struct {
+	ID          model.Int64String  `json:"id"`
+	Name        string             `json:"name"`
+	Slug        string             `json:"slug"`
+	Description string             `json:"description,omitempty"`
+	AuthorID    model.Int64String  `json:"authorId"`
+	ParentID    *model.Int64String `json:"parentId,omitempty"`
 }
 
 type PostTagInfo struct {
@@ -65,9 +78,11 @@ type PostDetailResponse struct {
 	HTMLContent   string            `json:"htmlContent"`
 	Excerpt       string            `json:"excerpt"`
 	Cover         string            `json:"cover"`
+	GroupID       model.Int64String `json:"groupId"`
 	CategoryID    model.Int64String `json:"categoryId"`
 	Status        string            `json:"status"`
 	Author        *AuthorInfo       `json:"author,omitempty"`
+	Group         *PostGroupInfo    `json:"group,omitempty"`
 	Category      *PostCategoryInfo `json:"category,omitempty"`
 	Tags          []PostTagInfo     `json:"tags,omitempty"`
 	ViewCount     int               `json:"viewCount"`
@@ -86,6 +101,8 @@ type AuthorInfo struct {
 func GetPosts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	groupIDRaw := strings.TrimSpace(c.Query("groupId"))
+	groupSlug := strings.TrimSpace(c.Query("group"))
 	categorySlug := c.Query("category")
 	tagSlug := c.Query("tag")
 	keyword := c.Query("keyword")
@@ -105,11 +122,23 @@ func GetPosts(c *gin.Context) {
 
 	query := database.DB.Model(&model.Post{}).
 		Where("status = ? AND deleted_at IS NULL", "published").
+		Preload("Group").
 		Preload("Category").
 		Preload("Tags").
 		Preload("Author", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, nickname, avatar")
 		})
+
+	if groupIDRaw != "" {
+		if groupID, err := strconv.ParseInt(groupIDRaw, 10, 64); err == nil {
+			query = query.Where("group_id = ?", groupID)
+		}
+	} else if groupSlug != "" {
+		var group model.PostGroup
+		if err := database.DB.Where("slug = ?", groupSlug).First(&group).Error; err == nil {
+			query = query.Where("group_id = ?", group.ID)
+		}
+	}
 
 	if categorySlug != "" {
 		var category model.PostCategory
@@ -160,6 +189,7 @@ func GetPostDetail(c *gin.Context) {
 
 	var post model.Post
 	if err := database.DB.Where("slug = ? AND status = ? AND deleted_at IS NULL", slug, "published").
+		Preload("Group").
 		Preload("Category").
 		Preload("Tags").
 		Preload("Author", func(db *gorm.DB) *gorm.DB {
@@ -184,6 +214,7 @@ func GetPostDetailByID(c *gin.Context) {
 
 	var post model.Post
 	if err := database.DB.Where("id = ? AND status = ? AND deleted_at IS NULL", id, "published").
+		Preload("Group").
 		Preload("Category").
 		Preload("Tags").
 		Preload("Author", func(db *gorm.DB) *gorm.DB {
@@ -208,6 +239,20 @@ func GetCategories(c *gin.Context) {
 	Success(c, categories)
 }
 
+func GetGroups(c *gin.Context) {
+	authorIDRaw := strings.TrimSpace(c.Query("authorId"))
+	query := database.DB.Model(&model.PostGroup{}).Where("deleted_at IS NULL")
+	if authorIDRaw != "" {
+		if authorID, err := strconv.ParseInt(authorIDRaw, 10, 64); err == nil {
+			query = query.Where("author_id = ?", authorID)
+		}
+	}
+
+	var groups []model.PostGroup
+	query.Order("sort_order ASC, created_at DESC").Find(&groups)
+	Success(c, groups)
+}
+
 func GetTags(c *gin.Context) {
 	var tags []model.PostTag
 	database.DB.Where("deleted_at IS NULL").
@@ -217,11 +262,190 @@ func GetTags(c *gin.Context) {
 	Success(c, tags)
 }
 
+func AdminListGroups(c *gin.Context) {
+	userID, role, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	query := database.DB.Model(&model.PostGroup{}).Where("deleted_at IS NULL")
+	if role == "creator" {
+		query = query.Where("author_id = ?", userID)
+	}
+
+	var groups []model.PostGroup
+	query.Order("sort_order ASC, created_at DESC").Find(&groups)
+	Success(c, groups)
+}
+
+func AdminCreateGroup(c *gin.Context) {
+	userID, role, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if role != "admin" && role != "creator" {
+		Error(c, http.StatusForbidden, "creator required")
+		return
+	}
+
+	var req struct {
+		Name        string             `json:"name" binding:"required"`
+		Description string             `json:"description"`
+		ParentID    *model.Int64String `json:"parentId"`
+		SortOrder   int                `json:"sortOrder"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Error(c, http.StatusBadRequest, "invalid request: "+err.Error())
+		return
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		Error(c, http.StatusBadRequest, "name is required")
+		return
+	}
+	if req.ParentID != nil {
+		var parent model.PostGroup
+		if err := database.DB.First(&parent, *req.ParentID).Error; err != nil {
+			Error(c, http.StatusBadRequest, "parent group not found")
+			return
+		}
+		if role == "creator" && int64(parent.AuthorID) != userID {
+			Error(c, http.StatusForbidden, "parent group no permission")
+			return
+		}
+	}
+
+	slug := strconv.FormatInt(utils.GenerateID(), 10)
+
+	group := model.PostGroup{
+		ID:          model.Int64String(utils.GenerateID()),
+		Name:        name,
+		Slug:        slug,
+		Description: strings.TrimSpace(req.Description),
+		AuthorID:    model.Int64String(userID),
+		ParentID:    req.ParentID,
+		SortOrder:   req.SortOrder,
+	}
+	if err := database.DB.Create(&group).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "create group failed")
+		return
+	}
+	Success(c, group)
+}
+
+func AdminUpdateGroup(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		Error(c, http.StatusBadRequest, "invalid group id")
+		return
+	}
+	userID, role, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var group model.PostGroup
+	if err := database.DB.First(&group, id).Error; err != nil {
+		Error(c, http.StatusNotFound, "group not found")
+		return
+	}
+	if role != "admin" && int64(group.AuthorID) != userID {
+		Error(c, http.StatusForbidden, "no permission")
+		return
+	}
+
+	var req struct {
+		Name        string             `json:"name"`
+		Description string             `json:"description"`
+		ParentID    *model.Int64String `json:"parentId"`
+		SortOrder   *int               `json:"sortOrder"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Error(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	updates := map[string]any{}
+	if name := strings.TrimSpace(req.Name); name != "" {
+		updates["name"] = name
+	}
+	if req.Description != "" {
+		updates["description"] = strings.TrimSpace(req.Description)
+	}
+	if req.ParentID != nil {
+		if int64(*req.ParentID) == id {
+			Error(c, http.StatusBadRequest, "parentId can not be itself")
+			return
+		}
+		var parent model.PostGroup
+		if err := database.DB.First(&parent, *req.ParentID).Error; err != nil {
+			Error(c, http.StatusBadRequest, "parent group not found")
+			return
+		}
+		if role != "admin" && int64(parent.AuthorID) != userID {
+			Error(c, http.StatusForbidden, "parent group no permission")
+			return
+		}
+		updates["parent_id"] = int64(*req.ParentID)
+	}
+	if req.SortOrder != nil {
+		updates["sort_order"] = *req.SortOrder
+	}
+
+	if len(updates) > 0 {
+		if err := database.DB.Model(&group).Updates(updates).Error; err != nil {
+			Error(c, http.StatusInternalServerError, "update group failed")
+			return
+		}
+	}
+	Success(c, nil)
+}
+
+func AdminDeleteGroup(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		Error(c, http.StatusBadRequest, "invalid group id")
+		return
+	}
+	userID, role, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var group model.PostGroup
+	if err := database.DB.First(&group, id).Error; err != nil {
+		Error(c, http.StatusNotFound, "group not found")
+		return
+	}
+	if role != "admin" && int64(group.AuthorID) != userID {
+		Error(c, http.StatusForbidden, "no permission")
+		return
+	}
+
+	if err := database.DB.Model(&model.Post{}).
+		Where("group_id = ?", id).
+		Update("group_id", 0).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "unlink posts failed")
+		return
+	}
+	if err := database.DB.Delete(&group).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "delete group failed")
+		return
+	}
+	Success(c, nil)
+}
+
 func AdminGetPostDetail(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 
 	var post model.Post
 	if err := database.DB.
+		Preload("Group").
 		Preload("Category").
 		Preload("Tags").
 		Preload("Author", func(db *gorm.DB) *gorm.DB {
@@ -261,7 +485,6 @@ func AdminCreatePost(c *gin.Context) {
 
 	var req struct {
 		Title         string              `json:"title" binding:"required"`
-		Slug          string              `json:"slug"`
 		PostType      string              `json:"postType"`
 		TemplateKey   string              `json:"templateKey"`
 		TemplateData  string              `json:"templateData"`
@@ -269,7 +492,8 @@ func AdminCreatePost(c *gin.Context) {
 		Content       string              `json:"content"`
 		Excerpt       string              `json:"excerpt"`
 		Cover         string              `json:"cover"`
-		CategoryID    model.Int64String   `json:"categoryId" binding:"required"`
+		GroupID       model.Int64String   `json:"groupId"`
+		CategoryID    model.Int64String   `json:"categoryId"`
 		TagIDs        []model.Int64String `json:"tagIds"`
 		Status        string              `json:"status"`
 		IsTop         bool                `json:"isTop"`
@@ -281,18 +505,12 @@ func AdminCreatePost(c *gin.Context) {
 		return
 	}
 
-	if req.Slug != "" {
-		var existingPost model.Post
-		if err := database.DB.Where("slug = ?", req.Slug).First(&existingPost).Error; err == nil {
-			Error(c, http.StatusBadRequest, "duplicate slug")
-			return
-		}
-	}
 	imageTextData := normalizeImageTextData(strings.TrimSpace(string(req.ImageTextData)), req.TemplateData)
 	if imageTextData != "" && !json.Valid([]byte(imageTextData)) {
 		Error(c, http.StatusBadRequest, "imageTextData must be valid json")
 		return
 	}
+	imageTextData = normalizeJSONColumnValue(imageTextData)
 
 	postType := normalizePostType(req.PostType)
 	if postType == "" {
@@ -307,11 +525,20 @@ func AdminCreatePost(c *gin.Context) {
 		return
 	}
 
-	postID := model.Int64String(utils.GenerateID())
-	slug := req.Slug
-	if slug == "" {
-		slug = postID.String()
+	categoryID := req.CategoryID
+	if categoryID == 0 {
+		fallback, err := getOrCreateFallbackCategoryID()
+		if err != nil {
+			ErrorWithDetail(c, http.StatusInternalServerError, "create failed", err, logrus.Fields{
+				"stage": "resolve_fallback_category",
+			})
+			return
+		}
+		categoryID = fallback
 	}
+
+	postID := model.Int64String(utils.GenerateID())
+	slug := postID.String()
 
 	post := model.Post{
 		ID:            postID,
@@ -326,9 +553,22 @@ func AdminCreatePost(c *gin.Context) {
 		Excerpt:       req.Excerpt,
 		Cover:         req.Cover,
 		AuthorID:      model.Int64String(userID),
-		CategoryID:    req.CategoryID,
+		GroupID:       req.GroupID,
+		CategoryID:    categoryID,
 		Status:        req.Status,
 		IsTop:         req.IsTop,
+	}
+
+	if req.GroupID != 0 {
+		var group model.PostGroup
+		if err := database.DB.First(&group, req.GroupID).Error; err != nil {
+			Error(c, http.StatusBadRequest, "group not found")
+			return
+		}
+		if role != "admin" && int64(group.AuthorID) != userID {
+			Error(c, http.StatusForbidden, "group no permission")
+			return
+		}
 	}
 
 	if post.Status == "" {
@@ -341,6 +581,13 @@ func AdminCreatePost(c *gin.Context) {
 	}
 
 	if err := database.DB.Create(&post).Error; err != nil {
+		logger.Error(c, "Create post failed", err, logrus.Fields{
+			"title":       post.Title,
+			"slug":        post.Slug,
+			"author_id":   post.AuthorID,
+			"group_id":    post.GroupID,
+			"category_id": post.CategoryID,
+		})
 		Error(c, http.StatusInternalServerError, "create failed")
 		return
 	}
@@ -356,9 +603,11 @@ func AdminCreatePost(c *gin.Context) {
 			UpdateColumn("post_count", gorm.Expr("post_count + 1"))
 	}
 
-	database.DB.Model(&model.PostCategory{}).
-		Where("id = ?", int64(req.CategoryID)).
-		UpdateColumn("post_count", gorm.Expr("post_count + 1"))
+	if req.GroupID != 0 {
+		database.DB.Model(&model.PostGroup{}).
+			Where("id = ?", int64(req.GroupID)).
+			UpdateColumn("post_count", gorm.Expr("post_count + 1"))
+	}
 
 	Success(c, post)
 }
@@ -378,7 +627,6 @@ func AdminUpdatePost(c *gin.Context) {
 
 	var req struct {
 		Title         string              `json:"title"`
-		Slug          string              `json:"slug"`
 		PostType      string              `json:"postType"`
 		TemplateKey   string              `json:"templateKey"`
 		TemplateData  string              `json:"templateData"`
@@ -386,6 +634,7 @@ func AdminUpdatePost(c *gin.Context) {
 		Content       string              `json:"content"`
 		Excerpt       string              `json:"excerpt"`
 		Cover         string              `json:"cover"`
+		GroupID       *model.Int64String  `json:"groupId"`
 		CategoryID    model.Int64String   `json:"categoryId"`
 		TagIDs        []model.Int64String `json:"tagIds"`
 		Status        string              `json:"status"`
@@ -397,13 +646,6 @@ func AdminUpdatePost(c *gin.Context) {
 		return
 	}
 
-	if req.Slug != "" && req.Slug != post.Slug {
-		var existingPost model.Post
-		if err := database.DB.Where("slug = ? AND id != ?", req.Slug, id).First(&existingPost).Error; err == nil {
-			Error(c, http.StatusBadRequest, "duplicate slug")
-			return
-		}
-	}
 	hasImageTextData := len(req.ImageTextData) > 0
 	imageTextData := normalizeImageTextData(strings.TrimSpace(string(req.ImageTextData)), req.TemplateData)
 	if (hasImageTextData || strings.TrimSpace(req.TemplateData) != "") && imageTextData != "" && !json.Valid([]byte(imageTextData)) {
@@ -415,9 +657,6 @@ func AdminUpdatePost(c *gin.Context) {
 	if req.Title != "" {
 		updates["title"] = req.Title
 	}
-	if req.Slug != "" {
-		updates["slug"] = req.Slug
-	}
 	if normalizedType := normalizePostType(req.PostType); normalizedType != "" {
 		updates["post_type"] = normalizedType
 	}
@@ -428,7 +667,7 @@ func AdminUpdatePost(c *gin.Context) {
 		updates["template_data"] = strings.TrimSpace(req.TemplateData)
 	}
 	if hasImageTextData || strings.TrimSpace(req.TemplateData) != "" {
-		updates["image_text_data"] = imageTextData
+		updates["image_text_data"] = normalizeJSONColumnValue(imageTextData)
 		updates["template_data"] = imageTextData
 	}
 	if req.Content != "" {
@@ -466,6 +705,27 @@ func AdminUpdatePost(c *gin.Context) {
 	if req.Cover != "" {
 		updates["cover"] = req.Cover
 	}
+	if req.GroupID != nil {
+		if *req.GroupID == 0 {
+			updates["group_id"] = 0
+		} else {
+			var group model.PostGroup
+			if err := database.DB.First(&group, *req.GroupID).Error; err != nil {
+				Error(c, http.StatusBadRequest, "group not found")
+				return
+			}
+			userID, role, ok := currentUser(c)
+			if !ok {
+				Error(c, http.StatusUnauthorized, "unauthorized")
+				return
+			}
+			if role != "admin" && int64(group.AuthorID) != userID {
+				Error(c, http.StatusForbidden, "group no permission")
+				return
+			}
+			updates["group_id"] = int64(*req.GroupID)
+		}
+	}
 	if req.CategoryID != 0 {
 		updates["category_id"] = int64(req.CategoryID)
 	}
@@ -478,7 +738,24 @@ func AdminUpdatePost(c *gin.Context) {
 	}
 	updates["is_top"] = req.IsTop
 
+	oldGroupID := post.GroupID
+	newGroupID := oldGroupID
+	if req.GroupID != nil {
+		newGroupID = *req.GroupID
+	}
 	database.DB.Model(&post).Updates(updates)
+	if req.GroupID != nil && oldGroupID != newGroupID {
+		if oldGroupID != 0 {
+			database.DB.Model(&model.PostGroup{}).
+				Where("id = ?", oldGroupID).
+				UpdateColumn("post_count", gorm.Expr("GREATEST(post_count - 1, 0)"))
+		}
+		if newGroupID != 0 {
+			database.DB.Model(&model.PostGroup{}).
+				Where("id = ?", int64(newGroupID)).
+				UpdateColumn("post_count", gorm.Expr("post_count + 1"))
+		}
+	}
 
 	if req.TagIDs != nil {
 		database.DB.Where("post_id = ?", post.ID).Delete(&model.PostTagRelation{})
@@ -506,9 +783,11 @@ func AdminDeletePost(c *gin.Context) {
 
 	database.DB.Delete(&post)
 
-	database.DB.Model(&model.PostCategory{}).
-		Where("id = ?", post.CategoryID).
-		UpdateColumn("post_count", gorm.Expr("post_count - 1"))
+	if post.GroupID != 0 {
+		database.DB.Model(&model.PostGroup{}).
+			Where("id = ?", post.GroupID).
+			UpdateColumn("post_count", gorm.Expr("GREATEST(post_count - 1, 0)"))
+	}
 
 	Success(c, nil)
 }
@@ -538,6 +817,7 @@ func AdminGetPosts(c *gin.Context) {
 	offset := (page - 1) * pageSize
 
 	query := database.DB.Model(&model.Post{}).
+		Preload("Group").
 		Preload("Category").
 		Preload("Tags").
 		Preload("Author", func(db *gorm.DB) *gorm.DB {
@@ -587,6 +867,7 @@ func convertToPostListResponse(post *model.Post) PostListResponse {
 		ImageTextData: normalizeImageTextData(post.ImageTextData, post.TemplateData),
 		Excerpt:       post.Excerpt,
 		Cover:         post.Cover,
+		GroupID:       post.GroupID,
 		CategoryID:    post.CategoryID,
 		Status:        post.Status,
 		ViewCount:     post.ViewCount,
@@ -601,6 +882,17 @@ func convertToPostListResponse(post *model.Post) PostListResponse {
 			ID:       post.Author.ID,
 			Nickname: post.Author.Nickname,
 			Avatar:   post.Author.Avatar,
+		}
+	}
+
+	if post.Group != nil {
+		resp.Group = &PostGroupInfo{
+			ID:          post.Group.ID,
+			Name:        post.Group.Name,
+			Slug:        post.Group.Slug,
+			Description: post.Group.Description,
+			AuthorID:    post.Group.AuthorID,
+			ParentID:    post.Group.ParentID,
 		}
 	}
 
@@ -639,6 +931,7 @@ func convertToPostDetailResponse(post *model.Post) PostDetailResponse {
 		HTMLContent:   post.HTMLContent,
 		Excerpt:       post.Excerpt,
 		Cover:         post.Cover,
+		GroupID:       post.GroupID,
 		CategoryID:    post.CategoryID,
 		Status:        post.Status,
 		ViewCount:     post.ViewCount,
@@ -653,6 +946,17 @@ func convertToPostDetailResponse(post *model.Post) PostDetailResponse {
 			ID:       post.Author.ID,
 			Nickname: post.Author.Nickname,
 			Avatar:   post.Author.Avatar,
+		}
+	}
+
+	if post.Group != nil {
+		resp.Group = &PostGroupInfo{
+			ID:          post.Group.ID,
+			Name:        post.Group.Name,
+			Slug:        post.Group.Slug,
+			Description: post.Group.Description,
+			AuthorID:    post.Group.AuthorID,
+			ParentID:    post.Group.ParentID,
 		}
 	}
 
@@ -725,6 +1029,32 @@ func canManagePost(c *gin.Context, authorID model.Int64String) bool {
 	return int64(authorID) == userID
 }
 
+func getOrCreateFallbackCategoryID() (model.Int64String, error) {
+	var category model.PostCategory
+	if err := database.DB.
+		Where("deleted_at IS NULL").
+		Order("sort_order ASC, created_at ASC").
+		First(&category).Error; err == nil {
+		return category.ID, nil
+	}
+
+	if err := database.DB.Where("slug = ?", "default").First(&category).Error; err == nil {
+		return category.ID, nil
+	}
+
+	category = model.PostCategory{
+		ID:          model.Int64String(utils.GenerateID()),
+		Name:        "默认分类",
+		Slug:        "default",
+		Description: "系统默认分类",
+		SortOrder:   999,
+	}
+	if err := database.DB.Create(&category).Error; err != nil {
+		return 0, err
+	}
+	return category.ID, nil
+}
+
 func normalizeImageTextData(imageTextData, legacyTemplateData string) string {
 	data := strings.TrimSpace(imageTextData)
 	if data != "" {
@@ -735,6 +1065,17 @@ func normalizeImageTextData(imageTextData, legacyTemplateData string) string {
 		return legacy
 	}
 	return ""
+}
+
+func normalizeJSONColumnValue(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "{}"
+	}
+	if json.Valid([]byte(trimmed)) {
+		return trimmed
+	}
+	return "{}"
 }
 
 func buildImageTextContent(templateKey, templateData string) string {
