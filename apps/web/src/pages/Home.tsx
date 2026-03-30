@@ -22,6 +22,7 @@ import {
 } from '@/api/resource';
 import { ExternalPreviewPostCard } from '@/components/blog';
 import CreatorCard from '@/components/CreatorCard';
+
 import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,6 +32,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function Home() {
   const navigate = useNavigate();
   const [code, setCode] = useState('');
+
   const [creators, setCreators] = useState<Creator[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
@@ -111,10 +113,10 @@ export default function Home() {
       } else {
         await favoriteResource(resource.id);
         setFavoritedMap((prev) => ({ ...prev, [resource.id]: true }));
-        toast.success('鏀惰棌鎴愬姛');
+        toast.success('收藏成功');
       }
     } catch {
-      toast.error('璇峰厛鐧诲綍鍚庡啀鏀惰棌');
+      toast.error('请先登录后再收藏');
     }
   };
 
