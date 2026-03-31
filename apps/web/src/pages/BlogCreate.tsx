@@ -1,16 +1,54 @@
-import { ArrowLeft, Eye, PenSquare, Plus, Save, Send, Sparkles } from 'lucide-react';
+import {
+  ArrowLeft,
+  Clock3,
+  Eye,
+  ImagePlus,
+  Loader2,
+  PenSquare,
+  Plus,
+  Save,
+  Send,
+  Sparkles,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { createGroup, createPost, type Group, getAdminGroups } from '@/api/blog';
+import {
+  createGroup,
+  createPost,
+  type Group,
+  getAdminGroups,
+  getAdminPostDetail,
+  updatePost,
+} from '@/api/blog';
+import { uploadResource } from '@/api/resource';
 import { MarkdownPreview } from '@/components/blog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/useAuthStore';
 
+type LocalDraft = {
+  title: string;
+  excerpt: string;
+  cover: string;
+  content: string;
+  groupId: string;
+  updatedAt: string;
+};
+
+const LOCAL_CREATE_DRAFT_KEY = 'valley-blog-create-draft-v2';
+
+function formatTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 export default function BlogCreate() {
   const navigate = useNavigate();
+  const { id: editingId } = useParams<{ id?: string }>();
   const { user, isAuthenticated } = useAuthStore();
+  const isEditMode = Boolean(editingId);
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupId, setGroupId] = useState('');
@@ -23,7 +61,11 @@ export default function BlogCreate() {
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
   const [previewMode, setPreviewMode] = useState<'editor' | 'split' | 'preview'>('split');
+  const [loadingPost, setLoadingPost] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState('');
+  const [draftRecovered, setDraftRecovered] = useState(false);
 
   const loadGroups = async () => {
     try {
@@ -34,6 +76,28 @@ export default function BlogCreate() {
       }
     } catch {
       toast.error('加载分组失败');
+    }
+  };
+
+  const loadPost = async (postId: string) => {
+    try {
+      setLoadingPost(true);
+      const detail = await getAdminPostDetail(postId);
+      if (detail.postType !== 'blog') {
+        toast.error('当前仅支持编辑博客类型内容');
+        navigate('/my-space');
+        return;
+      }
+      setTitle(detail.title || '');
+      setExcerpt(detail.excerpt || '');
+      setCover(detail.cover || '');
+      setContent(detail.content || '');
+      setGroupId(detail.groupId || '');
+    } catch {
+      toast.error('加载博客内容失败');
+      navigate('/my-space');
+    } finally {
+      setLoadingPost(false);
     }
   };
 
@@ -49,10 +113,76 @@ export default function BlogCreate() {
     }
 
     void loadGroups();
+    if (editingId) {
+      void loadPost(editingId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, navigate, user?.role]);
+  }, [isAuthenticated, navigate, user?.role, editingId]);
 
-  const handleSubmit = async (status: 'draft' | 'published') => {
+  useEffect(() => {
+    if (isEditMode) return;
+    try {
+      const raw = localStorage.getItem(LOCAL_CREATE_DRAFT_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as LocalDraft;
+      if (!draft) return;
+      if (!draft.title && !draft.content && !draft.excerpt && !draft.cover) return;
+      setTitle(draft.title || '');
+      setExcerpt(draft.excerpt || '');
+      setCover(draft.cover || '');
+      setContent(draft.content || '');
+      setGroupId(draft.groupId || '');
+      setLastAutoSavedAt(draft.updatedAt || '');
+      setDraftRecovered(true);
+    } catch {
+      // ignore local parse error
+    }
+  }, [isEditMode]);
+
+  useEffect(() => {
+    if (isEditMode || loadingPost) return;
+    const timer = setTimeout(() => {
+      const draft: LocalDraft = {
+        title,
+        excerpt,
+        cover,
+        content,
+        groupId,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const hasData = [title, excerpt, cover, content, groupId].some((item) => item.trim());
+      if (!hasData) {
+        localStorage.removeItem(LOCAL_CREATE_DRAFT_KEY);
+        setLastAutoSavedAt('');
+        return;
+      }
+      localStorage.setItem(LOCAL_CREATE_DRAFT_KEY, JSON.stringify(draft));
+      setLastAutoSavedAt(draft.updatedAt);
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [isEditMode, loadingPost, title, excerpt, cover, content, groupId]);
+
+  useEffect(() => {
+    const handleKeydown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void handleSubmit('draft', {
+          stayOnPage: isEditMode,
+          fromShortcut: true,
+        });
+      }
+    };
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, content, excerpt, cover, groupId, isEditMode, editingId]);
+
+  const handleSubmit = async (
+    status: 'draft' | 'published',
+    options?: { stayOnPage?: boolean; fromShortcut?: boolean },
+  ) => {
     const trimmedTitle = title.trim();
     const trimmedContent = content.trim();
     if (!trimmedTitle) {
@@ -66,22 +196,76 @@ export default function BlogCreate() {
 
     try {
       setSubmitting(true);
-      await createPost({
-        title: trimmedTitle,
-        postType: 'blog',
-        content: trimmedContent,
-        excerpt: excerpt.trim() || trimmedContent.slice(0, 120),
-        cover: cover.trim() || undefined,
-        groupId: groupId || undefined,
-        status,
-        publishNow: status === 'published',
-      });
-      toast.success(status === 'published' ? '博客发布成功' : '草稿保存成功');
-      navigate('/blog');
+      if (isEditMode && editingId) {
+        await updatePost(editingId, {
+          title: trimmedTitle,
+          postType: 'blog',
+          content: trimmedContent,
+          excerpt: excerpt.trim() || trimmedContent.slice(0, 120),
+          cover: cover.trim() || '',
+          groupId: groupId || '0',
+          status,
+        });
+        if (status === 'published') {
+          toast.success('博客更新并发布成功');
+        } else if (options?.fromShortcut) {
+          toast.success('草稿已快捷保存（未离开当前页面）');
+        } else {
+          toast.success('博客更新成功');
+        }
+      } else {
+        await createPost({
+          title: trimmedTitle,
+          postType: 'blog',
+          content: trimmedContent,
+          excerpt: excerpt.trim() || trimmedContent.slice(0, 120),
+          cover: cover.trim() || undefined,
+          groupId: groupId || undefined,
+          status,
+          publishNow: status === 'published',
+        });
+        toast.success(status === 'published' ? '博客发布成功' : '草稿保存成功');
+        if (status !== 'published') {
+          localStorage.removeItem(LOCAL_CREATE_DRAFT_KEY);
+        }
+      }
+      if (!options?.stayOnPage) {
+        navigate('/blog');
+      }
     } catch {
-      toast.error(status === 'published' ? '发布失败，请稍后重试' : '保存失败，请稍后重试');
+      toast.error(status === 'published' ? '提交失败，请稍后重试' : '保存失败，请稍后重试');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleUploadCover = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('封面仅支持图片');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('封面大小不能超过 10MB');
+      return;
+    }
+
+    try {
+      setCoverUploading(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'wallpaper');
+      formData.append('title', `博客封面-${Date.now()}`);
+      formData.append('description', '博客封面图');
+      const result = await uploadResource(formData);
+      setCover(result.resource.url);
+      toast.success('封面上传成功');
+    } catch {
+      toast.error('封面上传失败，请重试');
+    } finally {
+      setCoverUploading(false);
+      event.target.value = '';
     }
   };
 
@@ -111,23 +295,68 @@ export default function BlogCreate() {
   };
 
   const wordCount = useMemo(() => content.replace(/\s+/g, '').length, [content]);
+  const readMinutes = useMemo(() => Math.max(1, Math.ceil(wordCount / 500)), [wordCount]);
   const previewMarkdown = useMemo(() => {
     return `# ${title.trim() || '未命名标题'}\n\n${content.trim() || '开始输入正文内容吧。'}`;
   }, [title, content]);
+  const isEditBootLoading = isEditMode && loadingPost && !title && !content;
+
+  if (isEditBootLoading) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] bg-[linear-gradient(145deg,#f4f3ff_0%,#edf6ff_48%,#f8fbff_100%)] px-4 py-6 md:px-8">
+        <div className="mx-auto max-w-[1400px]">
+          <div className="mb-5 flex items-center gap-3 rounded-2xl border border-violet-200/70 bg-white/80 px-4 py-3 shadow-sm backdrop-blur">
+            <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
+            <span className="text-sm text-slate-600">正在加载博客内容...</span>
+          </div>
+
+          <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+            <section className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5">
+              <div className="mb-4 h-5 w-20 animate-pulse rounded bg-slate-100" />
+              <div className="mb-3 h-12 animate-pulse rounded-xl bg-slate-100" />
+              <div className="h-[620px] animate-pulse rounded-xl bg-slate-100" />
+            </section>
+
+            <section className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5">
+                <div className="mb-3 h-5 w-24 animate-pulse rounded bg-slate-100" />
+                <div className="space-y-3">
+                  <div className="h-10 animate-pulse rounded-xl bg-slate-100" />
+                  <div className="h-10 animate-pulse rounded-xl bg-slate-100" />
+                  <div className="h-20 animate-pulse rounded-xl bg-slate-100" />
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5">
+                <div className="mb-3 h-5 w-24 animate-pulse rounded bg-slate-100" />
+                <div className="h-[380px] animate-pulse rounded-xl bg-slate-100" />
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[linear-gradient(145deg,#f7f6ff_0%,#f2f7ff_45%,#f9fafb_100%)] px-4 py-6 md:px-8">
+    <div className="min-h-[calc(100vh-4rem)] bg-[linear-gradient(145deg,#f4f3ff_0%,#edf6ff_48%,#f8fbff_100%)] px-4 py-6 md:px-8">
       <div className="mx-auto max-w-[1400px]">
-        <div className="mb-5 flex items-center justify-between gap-3">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-200/70 bg-white/75 px-4 py-3 shadow-sm backdrop-blur">
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="rounded-xl">
               <ArrowLeft className="mr-1 h-4 w-4" />
               返回
             </Button>
-            <h1 className="text-xl font-semibold text-slate-900">博客创作</h1>
-            <span className="rounded-full bg-violet-100 px-3 py-1 text-xs text-violet-700">
-              现代编辑模式
+            <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">
+              {isEditMode ? '编辑博客' : '博客创作'}
+            </h1>
+            <span className="rounded-full bg-violet-100 px-3 py-1 text-xs text-violet-700 shadow-sm">
+              Markdown Pro
             </span>
+            {!isEditMode && draftRecovered && (
+              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700">
+                已恢复本地草稿
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <div className="hidden items-center rounded-lg border border-slate-200 bg-white p-1 md:inline-flex">
@@ -167,10 +396,18 @@ export default function BlogCreate() {
                 预览
               </button>
             </div>
+            <span className="hidden items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs text-slate-500 md:inline-flex">
+              <Clock3 className="h-3.5 w-3.5" />
+              Ctrl/Cmd + S 草稿保存
+            </span>
             <Button
               variant="outline"
               disabled={submitting}
-              onClick={() => void handleSubmit('draft')}
+              onClick={() =>
+                void handleSubmit('draft', {
+                  stayOnPage: isEditMode,
+                })
+              }
               className="rounded-xl"
             >
               <Save className="mr-2 h-4 w-4" />
@@ -182,7 +419,7 @@ export default function BlogCreate() {
               className="rounded-xl"
             >
               <Send className="mr-2 h-4 w-4" />
-              发布博客
+              {isEditMode ? '更新并发布' : '发布博客'}
             </Button>
           </div>
         </div>
@@ -193,32 +430,44 @@ export default function BlogCreate() {
           }
         >
           {previewMode !== 'preview' && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
-              <div className="mb-4 flex items-center justify-between">
+            <section className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm text-slate-500">写作区</div>
-                <div className="text-xs text-slate-400">字数：{wordCount}</div>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <span>字数：{wordCount}</span>
+                  <span>预计阅读：{readMinutes} 分钟</span>
+                  {lastAutoSavedAt && (
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">
+                      自动保存 {formatTime(lastAutoSavedAt)}
+                    </span>
+                  )}
+                </div>
               </div>
 
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="输入标题，抓住重点"
-                maxLength={200}
-                className="mb-3 h-12 rounded-xl border-slate-300 text-base"
-              />
+              {loadingPost ? (
+                <div className="mb-3 h-12 animate-pulse rounded-xl bg-slate-100" />
+              ) : (
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="输入标题，抓住读者注意力"
+                  maxLength={200}
+                  className="mb-3 h-12 rounded-xl border-slate-300 text-base"
+                />
+              )}
 
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="在这里直接写 Markdown 原文（不做工具栏干预）。"
+                placeholder="在这里直接写 Markdown 原文。支持标题、列表、代码块、引用等标准语法。"
                 className="min-h-[620px] w-full rounded-xl border border-slate-300 bg-[#fcfcff] p-4 font-mono text-[15px] leading-8 outline-none focus:ring-2 focus:ring-violet-200"
               />
             </section>
           )}
 
           {(previewMode === 'split' || previewMode === 'preview') && (
-            <section className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+            <section className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+              <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5">
                 <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-800">
                   <Sparkles className="h-4 w-4 text-violet-500" />
                   发布设置
@@ -238,13 +487,31 @@ export default function BlogCreate() {
 
                   <div>
                     <div className="mb-1 text-xs text-slate-500">封面 URL（可选）</div>
-                    <Input
-                      value={cover}
-                      onChange={(e) => setCover(e.target.value)}
-                      placeholder="https://..."
-                      maxLength={500}
-                      className="rounded-xl"
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        value={cover}
+                        onChange={(e) => setCover(e.target.value)}
+                        placeholder="https://..."
+                        maxLength={500}
+                        className="rounded-xl"
+                      />
+                      <label className="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl border border-violet-300 bg-violet-50 px-2.5 text-sm text-violet-700 whitespace-nowrap hover:bg-violet-100">
+                        <ImagePlus className="mr-1 h-4 w-4" />
+                        {coverUploading ? '上传中' : '上传'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={coverUploading}
+                          onChange={handleUploadCover}
+                        />
+                      </label>
+                    </div>
+                    {!!cover && (
+                      <div className="mt-2 overflow-hidden rounded-xl border border-slate-200">
+                        <img src={cover} alt="博客封面预览" className="h-32 w-full object-cover" />
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -335,7 +602,7 @@ export default function BlogCreate() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+              <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5">
                 <div className="mb-2 text-sm font-medium text-slate-800">实时预览</div>
                 <div
                   className={`overflow-auto rounded-xl border border-slate-200 bg-[#fdfdff] p-4 ${

@@ -1,6 +1,7 @@
 import {
   Calendar,
   ChevronDown,
+  ExternalLink,
   FileText,
   FolderTree,
   Image as ImageIcon,
@@ -13,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   type Group as BlogGroup,
@@ -56,6 +57,25 @@ function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function getPostStatusMeta(status?: string) {
+  if (status === 'published') {
+    return {
+      label: '已发布',
+      className: 'bg-emerald-100 text-emerald-700',
+    };
+  }
+  if (status === 'archived') {
+    return {
+      label: '已归档',
+      className: 'bg-slate-200 text-slate-700',
+    };
+  }
+  return {
+    label: '草稿',
+    className: 'bg-amber-100 text-amber-700',
+  };
 }
 
 export default function MySpace() {
@@ -488,22 +508,32 @@ export default function MySpace() {
             ) : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {filteredPosts.map((post) => (
-                  <Link
+                  <div
                     key={post.id}
-                    to={`/blog/${post.id}`}
                     className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-[0_16px_34px_rgba(91,78,167,0.15)]"
                   >
                     <div className="mb-3 flex items-center justify-between">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs ${
-                          post.postType === 'image_text'
-                            ? 'bg-sky-100 text-sky-700'
-                            : 'bg-violet-100 text-violet-700'
-                        }`}
-                      >
-                        {post.postType === 'image_text' ? '图文创作' : '博客'}
-                      </span>
-                      <span className="text-xs text-slate-500">{post.status || 'draft'}</span>
+                      {(() => {
+                        const statusMeta = getPostStatusMeta(post.status);
+                        return (
+                          <>
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs ${
+                                post.postType === 'image_text'
+                                  ? 'bg-sky-100 text-sky-700'
+                                  : 'bg-violet-100 text-violet-700'
+                              }`}
+                            >
+                              {post.postType === 'image_text' ? '图文创作' : '博客'}
+                            </span>
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}
+                            >
+                              {statusMeta.label}
+                            </span>
+                          </>
+                        );
+                      })()}
                     </div>
                     <h3 className="line-clamp-2 text-lg font-semibold text-slate-900 group-hover:text-violet-700">
                       {post.title}
@@ -522,7 +552,28 @@ export default function MySpace() {
                         </span>
                       )}
                     </div>
-                  </Link>
+                    <div className="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 rounded-lg"
+                        onClick={() => navigate(`/blog/${post.id}`)}
+                      >
+                        <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                        查看
+                      </Button>
+                      {post.postType === 'blog' && (
+                        <Button
+                          size="sm"
+                          className="h-8 rounded-lg"
+                          onClick={() => navigate(`/my-space/blog-edit/${post.id}`)}
+                        >
+                          <Pencil className="mr-1 h-3.5 w-3.5" />
+                          编辑博客
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

@@ -13,7 +13,9 @@ import type { PostDetail } from '@/api/blog';
 import { getPostDetailById } from '@/api/blog';
 import { MarkdownContent, TableOfContents } from '@/components/blog';
 import { Button } from '@/components/ui/button';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { extractToc, formatDate, renderMarkdownWithAnchors, type TocItem } from '@/utils/blog';
+import { DefaultBlogCover } from './components/DefaultBlogCover';
 
 type ImageTextPayload = {
   images?: string[];
@@ -42,6 +44,7 @@ function extractMarkdownImageUrls(content: string) {
 
 export default function BlogPost() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuthStore();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,6 +115,10 @@ export default function BlogPost() {
     if (!post) return '';
     return renderMarkdownWithAnchors(post.content || post.htmlContent || '');
   }, [post]);
+  const canEditBlog = useMemo(() => {
+    if (!post || post.postType !== 'blog') return false;
+    return Boolean(user?.id && post.author?.id && user.id === post.author.id);
+  }, [post, user?.id]);
 
   const goPrevPage = () => {
     if (pageCount <= 1) return;
@@ -287,9 +294,30 @@ export default function BlogPost() {
                 </Link>
               )}
 
-              <h1 className="max-w-4xl text-3xl font-bold leading-tight text-foreground sm:text-5xl">
-                {post.title}
-              </h1>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <h1 className="max-w-4xl text-3xl font-bold leading-tight text-foreground sm:text-5xl">
+                  {post.title}
+                </h1>
+                {canEditBlog && (
+                  <Link to={`/my-space/blog-edit/${post.id}`}>
+                    <Button variant="outline" className="rounded-xl">
+                      编辑文章
+                    </Button>
+                  </Link>
+                )}
+              </div>
+
+              <div className="mt-6 overflow-hidden rounded-2xl border border-border/60">
+                {post.cover ? (
+                  <img
+                    src={post.cover}
+                    alt={post.title}
+                    className="h-72 w-full object-cover sm:h-80"
+                  />
+                ) : (
+                  <DefaultBlogCover className="h-72 sm:h-80" />
+                )}
+              </div>
 
               <div className="mt-6 flex flex-wrap items-center gap-5 text-sm text-muted-foreground">
                 {post.author?.nickname && (

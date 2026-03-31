@@ -132,6 +132,10 @@ export function getPostDetailById(id: string) {
   return request.get<unknown, PostDetail>(`/public/blog/posts/id/${id}`);
 }
 
+export function getAdminPostDetail(id: string) {
+  return request.get<unknown, PostDetail>(`/admin/blog/posts/${id}`);
+}
+
 export function getCategories() {
   return request.get<unknown, Category[]>('/public/blog/categories');
 }
