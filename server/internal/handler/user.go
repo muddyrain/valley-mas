@@ -2,6 +2,7 @@ package handler
 
 import (
 	"log"
+	"strconv"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 	"valley-server/internal/service"
@@ -39,6 +40,78 @@ func GetUserInfo(c *gin.Context) {
 		"phone":         user.Phone,
 		"createdAt":     user.CreatedAt,
 		"downloadCount": downloadCount,
+	})
+}
+
+// ListAvatarHistory 获取当前用户头像历史
+func ListAvatarHistory(c *gin.Context) {
+	userID, exists := c.Get("userId")
+	if !exists {
+		Error(c, 401, "未登录")
+		return
+	}
+
+	pageSize := 12
+	if s := c.Query("pageSize"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			if v > 50 {
+				v = 50
+			}
+			pageSize = v
+		}
+	}
+
+	db := database.GetDB()
+	var list []model.UserAvatarHistory
+	if err := db.
+		Where("user_id = ?", userID).
+		Order("created_at DESC").
+		Limit(pageSize).
+		Find(&list).Error; err != nil {
+		Error(c, 500, "获取头像历史失败")
+		return
+	}
+
+	Success(c, list)
+}
+
+// UseAvatarHistory 使用历史头像
+func UseAvatarHistory(c *gin.Context) {
+	userID, exists := c.Get("userId")
+	if !exists {
+		Error(c, 401, "未登录")
+		return
+	}
+
+	idStr := c.Param("id")
+	historyID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		Error(c, 400, "头像历史ID无效")
+		return
+	}
+
+	db := database.GetDB()
+	var history model.UserAvatarHistory
+	if err := db.
+		Where("id = ? AND user_id = ?", historyID, userID).
+		First(&history).Error; err != nil {
+		Error(c, 404, "头像历史不存在")
+		return
+	}
+
+	var user model.User
+	if err := db.First(&user, userID).Error; err != nil {
+		Error(c, 404, "用户不存在")
+		return
+	}
+
+	if err := db.Model(&user).Update("avatar", history.AvatarURL).Error; err != nil {
+		Error(c, 500, "切换历史头像失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"avatarUrl": history.AvatarURL,
 	})
 }
 

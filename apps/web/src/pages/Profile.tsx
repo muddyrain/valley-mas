@@ -11,12 +11,20 @@ import {
   Shield,
   User,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { changePassword, updateMyProfile, uploadAvatar } from '@/api/auth';
+import {
+  type AvatarHistoryItem,
+  changePassword,
+  getAvatarHistory,
+  getUseAvatarHistory,
+  updateMyProfile,
+  uploadAvatar,
+} from '@/api/auth';
 import ApplyCreatorBanner from '@/components/ApplyCreatorBanner';
 import PageBanner from '@/components/PageBanner';
+import AvatarBeadEditorDialog from '@/components/profile/AvatarBeadEditorDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,8 +54,10 @@ export default function Profile() {
   const loading = profileLoading && !profile;
 
   // 头像上传
-  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
+  const [avatarHistory, setAvatarHistory] = useState<AvatarHistoryItem[]>([]);
+  const [avatarHistoryLoading, setAvatarHistoryLoading] = useState(false);
 
   // 基本信息表单
   const [infoForm, setInfoForm] = useState({ nickname: '', email: '', phone: '' });
@@ -81,35 +91,41 @@ export default function Profile() {
     }
   }, [profile]);
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('仅支持图片文件');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('头像文件不能超过 5MB');
-      return;
-    }
+  const handleAvatarSaveFromEditor = async (blob: Blob) => {
     try {
       setAvatarUploading(true);
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', new File([blob], `avatar-${Date.now()}.png`, { type: 'image/png' }));
       const { avatarUrl } = await uploadAvatar(formData);
-      // 同步更新 store（setProfile 会自动同步 user + cookie）
       if (profile) {
         setStoreProfile({ ...profile, avatar: avatarUrl });
       }
       toast.success('头像已更新');
-    } catch {
-      // 错误已在 request.ts 中通过 toast 显示
     } finally {
       setAvatarUploading(false);
-      // 重置 input，允许重复选同一文件
-      if (avatarInputRef.current) avatarInputRef.current.value = '';
     }
   };
+
+  const handleUseHistoryAvatar = async (historyID: string) => {
+    try {
+      setAvatarUploading(true);
+      const { avatarUrl } = await getUseAvatarHistory(historyID);
+      if (profile) {
+        setStoreProfile({ ...profile, avatar: avatarUrl });
+      }
+      toast.success('已切换历史头像');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!avatarEditorOpen) return;
+    setAvatarHistoryLoading(true);
+    getAvatarHistory(16)
+      .then((list) => setAvatarHistory(list))
+      .finally(() => setAvatarHistoryLoading(false));
+  }, [avatarEditorOpen]);
 
   const handleInfoSave = async () => {
     if (!infoForm.nickname.trim()) {
@@ -182,7 +198,7 @@ export default function Profile() {
             ) : (
               <button
                 type="button"
-                onClick={() => avatarInputRef.current?.click()}
+                onClick={() => setAvatarEditorOpen(true)}
                 className="relative group focus:outline-none"
                 title="点击更换头像"
                 disabled={avatarUploading}
@@ -203,13 +219,6 @@ export default function Profile() {
                 </div>
               </button>
             )}
-            <input
-              ref={avatarInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarChange}
-            />
           </div>
 
           {/* 信息 */}
@@ -509,6 +518,21 @@ export default function Profile() {
         {/* ===== 申请创作者入口（仅普通用户显示，逻辑封装在组件内） ===== */}
         {!loading && <ApplyCreatorBanner />}
       </div>
+
+      <AvatarBeadEditorDialog
+        open={avatarEditorOpen}
+        currentAvatarUrl={profile?.avatar}
+        avatarHistory={avatarHistory}
+        avatarHistoryLoading={avatarHistoryLoading}
+        onOpenChange={(open) => {
+          setAvatarEditorOpen(open);
+        }}
+        onCancel={() => {
+          setAvatarEditorOpen(false);
+        }}
+        onSave={handleAvatarSaveFromEditor}
+        onApplyHistory={handleUseHistoryAvatar}
+      />
     </div>
   );
 }
