@@ -33,6 +33,7 @@ function App() {
           <Route path="my-space" element={<MySpace />} />
           <Route path="my-space/image-text" element={<ImageTextCreate />} />
           <Route path="my-space/blog-create" element={<BlogCreate />} />
+          <Route path="my-space/blog-edit/:id" element={<BlogCreate />} />
           <Route path="my-space/blog-groups" element={<BlogGroupManage />} />
           <Route path="profile" element={<Profile />} />
           <Route path="favorites" element={<Favorites />} />

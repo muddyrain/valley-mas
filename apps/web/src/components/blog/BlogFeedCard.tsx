@@ -1,6 +1,7 @@
 import { Calendar, FileText, Image as ImageIcon, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Post } from '@/api/blog';
+import { DefaultBlogCover } from '@/pages/blog/components/DefaultBlogCover';
 import { formatDate } from '@/utils/blog';
 
 type ImageTextPayload = {
@@ -45,9 +46,15 @@ export function BlogFeedCard({ post }: BlogFeedCardProps) {
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-slate-400">
-            {isImageText ? <ImageIcon className="h-12 w-12" /> : <FileText className="h-12 w-12" />}
-          </div>
+          <DefaultBlogCover compact>
+            <div className="relative flex h-full w-full items-center justify-center text-slate-500">
+              {isImageText ? (
+                <ImageIcon className="h-12 w-12" />
+              ) : (
+                <FileText className="h-12 w-12" />
+              )}
+            </div>
+          </DefaultBlogCover>
         )}
         <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/45 px-2.5 py-1 text-xs text-white backdrop-blur">
           {isImageText ? (

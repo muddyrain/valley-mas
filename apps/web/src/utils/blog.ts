@@ -96,20 +96,53 @@ export function renderMarkdown(content: string): string {
 }
 
 export function createHeadingId(text: string): string {
-  return String(text)
+  const normalized = String(text)
     .toLowerCase()
     .replace(/[^\w\u4e00-\u9fa5\s-]/g, '')
-    .replace(/\s+/g, '-');
+    .replace(/\s+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalized || 'heading';
 }
 
-export function withHeadingAnchors(html: string): string {
-  return html.replace(/<h([1-6])>([^<]+)<\/h[1-6]>/g, (_, level, text) => {
-    return `<h${level} id="${createHeadingId(String(text))}">${String(text)}</h${level}>`;
+function getHeadingToc(content: string): TocItem[] {
+  const tokens = marked.lexer(content || '');
+  const slugCounter = new Map<string, number>();
+  const result: TocItem[] = [];
+
+  for (const token of tokens) {
+    if (token.type !== 'heading') continue;
+    const headingToken = token as { depth?: number; text?: string };
+    const level = headingToken.depth ?? 1;
+    const text = String(headingToken.text || '').trim();
+    if (!text) continue;
+
+    const base = createHeadingId(text);
+    const count = (slugCounter.get(base) || 0) + 1;
+    slugCounter.set(base, count);
+    const uniqueId = count === 1 ? base : `${base}-${count}`;
+
+    result.push({ level, text, id: uniqueId });
+  }
+
+  return result;
+}
+
+export function withHeadingAnchors(html: string, toc: TocItem[]): string {
+  let index = 0;
+  return html.replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/g, (_, level, attrs, inner) => {
+    const current = toc[index];
+    const fallbackId = `heading-${index + 1}`;
+    const id = current?.id || fallbackId;
+    index += 1;
+
+    const cleanAttrs = String(attrs || '').replace(/\sid="[^"]*"/g, '');
+    return `<h${level}${cleanAttrs} id="${id}">${String(inner)}</h${level}>`;
   });
 }
 
 export function renderMarkdownWithAnchors(content: string): string {
-  return withHeadingAnchors(renderMarkdown(content));
+  const toc = getHeadingToc(content);
+  return withHeadingAnchors(renderMarkdown(content), toc);
 }
 
 // 从 Markdown 内容提取目录
@@ -120,23 +153,7 @@ export interface TocItem {
 }
 
 export function extractToc(content: string): TocItem[] {
-  const toc: TocItem[] = [];
-  const lines = content.split('\n');
-
-  for (const line of lines) {
-    const match = line.match(/^(#{1,6})\s+(.+)$/);
-    if (match) {
-      const level = match[1].length;
-      const text = match[2].trim();
-      const id = text
-        .toLowerCase()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/\s+/g, '-');
-      toc.push({ level, text, id });
-    }
-  }
-
-  return toc;
+  return getHeadingToc(content);
 }
 
 // 格式化日期
