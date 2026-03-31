@@ -74,6 +74,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 			user.PUT("/profile", handler.UpdateMyProfile)
 			user.PUT("/password", handler.ChangePassword)
 			user.POST("/avatar", handler.UploadAvatar)
+			user.GET("/avatar/history", handler.ListAvatarHistory)
+			user.POST("/avatar/history/:id/use", handler.UseAvatarHistory)
 
 			// 收藏
 			user.POST("/resources/favorite/batch-status", handler.BatchGetFavoriteStatus)
@@ -174,6 +176,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 				// 博客与图文管理
 				content.GET("/blog/posts", handler.AdminGetPosts)
 				content.GET("/blog/posts/:id", handler.AdminGetPostDetail)
+				content.POST("/blog/cover/upload", handler.AdminUploadBlogCover)
 				content.POST("/blog/posts", handler.AdminCreatePost)
 				content.PUT("/blog/posts/:id", handler.AdminUpdatePost)
 				content.DELETE("/blog/posts/:id", handler.AdminDeletePost)

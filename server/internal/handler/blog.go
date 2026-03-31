@@ -9,6 +9,7 @@ import (
 	"valley-server/internal/database"
 	"valley-server/internal/logger"
 	"valley-server/internal/model"
+	"valley-server/internal/service"
 	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
@@ -22,27 +23,28 @@ const (
 )
 
 type PostListResponse struct {
-	ID            model.Int64String `json:"id"`
-	Title         string            `json:"title"`
-	Slug          string            `json:"slug"`
-	PostType      string            `json:"postType"`
-	TemplateKey   string            `json:"templateKey,omitempty"`
-	TemplateData  string            `json:"templateData,omitempty"`
-	ImageTextData string            `json:"imageTextData,omitempty"`
-	Excerpt       string            `json:"excerpt"`
-	Cover         string            `json:"cover"`
-	GroupID       model.Int64String `json:"groupId"`
-	Group         *PostGroupInfo    `json:"group,omitempty"`
-	CategoryID    model.Int64String `json:"categoryId"`
-	Category      *PostCategoryInfo `json:"category,omitempty"`
-	Tags          []PostTagInfo     `json:"tags,omitempty"`
-	Status        string            `json:"status,omitempty"`
-	Author        *AuthorInfo       `json:"author,omitempty"`
-	ViewCount     int               `json:"viewCount"`
-	LikeCount     int               `json:"likeCount"`
-	IsTop         bool              `json:"isTop"`
-	PublishedAt   *time.Time        `json:"publishedAt,omitempty"`
-	CreatedAt     time.Time         `json:"createdAt"`
+	ID              model.Int64String `json:"id"`
+	Title           string            `json:"title"`
+	Slug            string            `json:"slug"`
+	PostType        string            `json:"postType"`
+	TemplateKey     string            `json:"templateKey,omitempty"`
+	TemplateData    string            `json:"templateData,omitempty"`
+	ImageTextData   string            `json:"imageTextData,omitempty"`
+	Excerpt         string            `json:"excerpt"`
+	Cover           string            `json:"cover"`
+	CoverStorageKey string            `json:"coverStorageKey,omitempty"`
+	GroupID         model.Int64String `json:"groupId"`
+	Group           *PostGroupInfo    `json:"group,omitempty"`
+	CategoryID      model.Int64String `json:"categoryId"`
+	Category        *PostCategoryInfo `json:"category,omitempty"`
+	Tags            []PostTagInfo     `json:"tags,omitempty"`
+	Status          string            `json:"status,omitempty"`
+	Author          *AuthorInfo       `json:"author,omitempty"`
+	ViewCount       int               `json:"viewCount"`
+	LikeCount       int               `json:"likeCount"`
+	IsTop           bool              `json:"isTop"`
+	PublishedAt     *time.Time        `json:"publishedAt,omitempty"`
+	CreatedAt       time.Time         `json:"createdAt"`
 }
 
 type PostCategoryInfo struct {
@@ -67,29 +69,30 @@ type PostTagInfo struct {
 }
 
 type PostDetailResponse struct {
-	ID            model.Int64String `json:"id"`
-	Title         string            `json:"title"`
-	Slug          string            `json:"slug"`
-	PostType      string            `json:"postType"`
-	TemplateKey   string            `json:"templateKey,omitempty"`
-	TemplateData  string            `json:"templateData,omitempty"`
-	ImageTextData string            `json:"imageTextData,omitempty"`
-	Content       string            `json:"content"`
-	HTMLContent   string            `json:"htmlContent"`
-	Excerpt       string            `json:"excerpt"`
-	Cover         string            `json:"cover"`
-	GroupID       model.Int64String `json:"groupId"`
-	CategoryID    model.Int64String `json:"categoryId"`
-	Status        string            `json:"status"`
-	Author        *AuthorInfo       `json:"author,omitempty"`
-	Group         *PostGroupInfo    `json:"group,omitempty"`
-	Category      *PostCategoryInfo `json:"category,omitempty"`
-	Tags          []PostTagInfo     `json:"tags,omitempty"`
-	ViewCount     int               `json:"viewCount"`
-	LikeCount     int               `json:"likeCount"`
-	IsTop         bool              `json:"isTop"`
-	PublishedAt   *time.Time        `json:"publishedAt,omitempty"`
-	CreatedAt     time.Time         `json:"createdAt"`
+	ID              model.Int64String `json:"id"`
+	Title           string            `json:"title"`
+	Slug            string            `json:"slug"`
+	PostType        string            `json:"postType"`
+	TemplateKey     string            `json:"templateKey,omitempty"`
+	TemplateData    string            `json:"templateData,omitempty"`
+	ImageTextData   string            `json:"imageTextData,omitempty"`
+	Content         string            `json:"content"`
+	HTMLContent     string            `json:"htmlContent"`
+	Excerpt         string            `json:"excerpt"`
+	Cover           string            `json:"cover"`
+	CoverStorageKey string            `json:"coverStorageKey,omitempty"`
+	GroupID         model.Int64String `json:"groupId"`
+	CategoryID      model.Int64String `json:"categoryId"`
+	Status          string            `json:"status"`
+	Author          *AuthorInfo       `json:"author,omitempty"`
+	Group           *PostGroupInfo    `json:"group,omitempty"`
+	Category        *PostCategoryInfo `json:"category,omitempty"`
+	Tags            []PostTagInfo     `json:"tags,omitempty"`
+	ViewCount       int               `json:"viewCount"`
+	LikeCount       int               `json:"likeCount"`
+	IsTop           bool              `json:"isTop"`
+	PublishedAt     *time.Time        `json:"publishedAt,omitempty"`
+	CreatedAt       time.Time         `json:"createdAt"`
 }
 
 type AuthorInfo struct {
@@ -484,20 +487,21 @@ func AdminCreatePost(c *gin.Context) {
 	}
 
 	var req struct {
-		Title         string              `json:"title" binding:"required"`
-		PostType      string              `json:"postType"`
-		TemplateKey   string              `json:"templateKey"`
-		TemplateData  string              `json:"templateData"`
-		ImageTextData json.RawMessage     `json:"imageTextData"`
-		Content       string              `json:"content"`
-		Excerpt       string              `json:"excerpt"`
-		Cover         string              `json:"cover"`
-		GroupID       model.Int64String   `json:"groupId"`
-		CategoryID    model.Int64String   `json:"categoryId"`
-		TagIDs        []model.Int64String `json:"tagIds"`
-		Status        string              `json:"status"`
-		IsTop         bool                `json:"isTop"`
-		PublishNow    bool                `json:"publishNow"`
+		Title           string              `json:"title" binding:"required"`
+		PostType        string              `json:"postType"`
+		TemplateKey     string              `json:"templateKey"`
+		TemplateData    string              `json:"templateData"`
+		ImageTextData   json.RawMessage     `json:"imageTextData"`
+		Content         string              `json:"content"`
+		Excerpt         string              `json:"excerpt"`
+		Cover           string              `json:"cover"`
+		CoverStorageKey string              `json:"coverStorageKey"`
+		GroupID         model.Int64String   `json:"groupId"`
+		CategoryID      model.Int64String   `json:"categoryId"`
+		TagIDs          []model.Int64String `json:"tagIds"`
+		Status          string              `json:"status"`
+		IsTop           bool                `json:"isTop"`
+		PublishNow      bool                `json:"publishNow"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -541,22 +545,23 @@ func AdminCreatePost(c *gin.Context) {
 	slug := postID.String()
 
 	post := model.Post{
-		ID:            postID,
-		Title:         req.Title,
-		Slug:          slug,
-		PostType:      postType,
-		TemplateKey:   strings.TrimSpace(req.TemplateKey),
-		TemplateData:  imageTextData,
-		ImageTextData: imageTextData,
-		Content:       content,
-		HTMLContent:   renderMarkdown(content),
-		Excerpt:       req.Excerpt,
-		Cover:         req.Cover,
-		AuthorID:      model.Int64String(userID),
-		GroupID:       req.GroupID,
-		CategoryID:    categoryID,
-		Status:        req.Status,
-		IsTop:         req.IsTop,
+		ID:              postID,
+		Title:           req.Title,
+		Slug:            slug,
+		PostType:        postType,
+		TemplateKey:     strings.TrimSpace(req.TemplateKey),
+		TemplateData:    imageTextData,
+		ImageTextData:   imageTextData,
+		Content:         content,
+		HTMLContent:     renderMarkdown(content),
+		Excerpt:         req.Excerpt,
+		Cover:           req.Cover,
+		CoverStorageKey: strings.TrimSpace(req.CoverStorageKey),
+		AuthorID:        model.Int64String(userID),
+		GroupID:         req.GroupID,
+		CategoryID:      categoryID,
+		Status:          req.Status,
+		IsTop:           req.IsTop,
 	}
 
 	if req.GroupID != 0 {
@@ -581,6 +586,9 @@ func AdminCreatePost(c *gin.Context) {
 	}
 
 	if err := database.DB.Create(&post).Error; err != nil {
+		if key := strings.TrimSpace(req.CoverStorageKey); key != "" {
+			_ = service.NewUploadService().DeleteByKey(key)
+		}
 		logger.Error(c, "Create post failed", err, logrus.Fields{
 			"title":       post.Title,
 			"slug":        post.Slug,
@@ -626,19 +634,20 @@ func AdminUpdatePost(c *gin.Context) {
 	}
 
 	var req struct {
-		Title         string              `json:"title"`
-		PostType      string              `json:"postType"`
-		TemplateKey   string              `json:"templateKey"`
-		TemplateData  string              `json:"templateData"`
-		ImageTextData json.RawMessage     `json:"imageTextData"`
-		Content       string              `json:"content"`
-		Excerpt       string              `json:"excerpt"`
-		Cover         string              `json:"cover"`
-		GroupID       *model.Int64String  `json:"groupId"`
-		CategoryID    model.Int64String   `json:"categoryId"`
-		TagIDs        []model.Int64String `json:"tagIds"`
-		Status        string              `json:"status"`
-		IsTop         bool                `json:"isTop"`
+		Title           string              `json:"title"`
+		PostType        string              `json:"postType"`
+		TemplateKey     string              `json:"templateKey"`
+		TemplateData    string              `json:"templateData"`
+		ImageTextData   json.RawMessage     `json:"imageTextData"`
+		Content         string              `json:"content"`
+		Excerpt         string              `json:"excerpt"`
+		Cover           string              `json:"cover"`
+		CoverStorageKey string              `json:"coverStorageKey"`
+		GroupID         *model.Int64String  `json:"groupId"`
+		CategoryID      model.Int64String   `json:"categoryId"`
+		TagIDs          []model.Int64String `json:"tagIds"`
+		Status          string              `json:"status"`
+		IsTop           bool                `json:"isTop"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -702,8 +711,15 @@ func AdminUpdatePost(c *gin.Context) {
 	if req.Excerpt != "" {
 		updates["excerpt"] = req.Excerpt
 	}
-	if req.Cover != "" {
-		updates["cover"] = req.Cover
+	newCoverURL := strings.TrimSpace(req.Cover)
+	newCoverKey := strings.TrimSpace(req.CoverStorageKey)
+	coverChanged := false
+	if newCoverURL != "" && newCoverURL != strings.TrimSpace(post.Cover) {
+		updates["cover"] = newCoverURL
+		updates["cover_storage_key"] = newCoverKey
+		coverChanged = true
+	} else if req.CoverStorageKey != "" && strings.TrimSpace(post.CoverStorageKey) != newCoverKey {
+		updates["cover_storage_key"] = newCoverKey
 	}
 	if req.GroupID != nil {
 		if *req.GroupID == 0 {
@@ -744,6 +760,9 @@ func AdminUpdatePost(c *gin.Context) {
 		newGroupID = *req.GroupID
 	}
 	database.DB.Model(&post).Updates(updates)
+	if coverChanged {
+		deletePostCoverAsync(strings.TrimSpace(post.CoverStorageKey), strings.TrimSpace(post.Cover))
+	}
 	if req.GroupID != nil && oldGroupID != newGroupID {
 		if oldGroupID != 0 {
 			database.DB.Model(&model.PostGroup{}).
@@ -781,7 +800,10 @@ func AdminDeletePost(c *gin.Context) {
 		return
 	}
 
+	coverKey := strings.TrimSpace(post.CoverStorageKey)
+	coverURL := strings.TrimSpace(post.Cover)
 	database.DB.Delete(&post)
+	deletePostCoverAsync(coverKey, coverURL)
 
 	if post.GroupID != 0 {
 		database.DB.Model(&model.PostGroup{}).
@@ -858,23 +880,24 @@ func AdminGetPosts(c *gin.Context) {
 
 func convertToPostListResponse(post *model.Post) PostListResponse {
 	resp := PostListResponse{
-		ID:            post.ID,
-		Title:         post.Title,
-		Slug:          post.Slug,
-		PostType:      normalizePostType(post.PostType),
-		TemplateKey:   post.TemplateKey,
-		TemplateData:  post.TemplateData,
-		ImageTextData: normalizeImageTextData(post.ImageTextData, post.TemplateData),
-		Excerpt:       post.Excerpt,
-		Cover:         post.Cover,
-		GroupID:       post.GroupID,
-		CategoryID:    post.CategoryID,
-		Status:        post.Status,
-		ViewCount:     post.ViewCount,
-		LikeCount:     post.LikeCount,
-		IsTop:         post.IsTop,
-		PublishedAt:   post.PublishedAt,
-		CreatedAt:     post.CreatedAt,
+		ID:              post.ID,
+		Title:           post.Title,
+		Slug:            post.Slug,
+		PostType:        normalizePostType(post.PostType),
+		TemplateKey:     post.TemplateKey,
+		TemplateData:    post.TemplateData,
+		ImageTextData:   normalizeImageTextData(post.ImageTextData, post.TemplateData),
+		Excerpt:         post.Excerpt,
+		Cover:           post.Cover,
+		CoverStorageKey: post.CoverStorageKey,
+		GroupID:         post.GroupID,
+		CategoryID:      post.CategoryID,
+		Status:          post.Status,
+		ViewCount:       post.ViewCount,
+		LikeCount:       post.LikeCount,
+		IsTop:           post.IsTop,
+		PublishedAt:     post.PublishedAt,
+		CreatedAt:       post.CreatedAt,
 	}
 
 	if post.Author != nil {
@@ -920,25 +943,26 @@ func convertToPostListResponse(post *model.Post) PostListResponse {
 
 func convertToPostDetailResponse(post *model.Post) PostDetailResponse {
 	resp := PostDetailResponse{
-		ID:            post.ID,
-		Title:         post.Title,
-		Slug:          post.Slug,
-		PostType:      normalizePostType(post.PostType),
-		TemplateKey:   post.TemplateKey,
-		TemplateData:  post.TemplateData,
-		ImageTextData: normalizeImageTextData(post.ImageTextData, post.TemplateData),
-		Content:       post.Content,
-		HTMLContent:   post.HTMLContent,
-		Excerpt:       post.Excerpt,
-		Cover:         post.Cover,
-		GroupID:       post.GroupID,
-		CategoryID:    post.CategoryID,
-		Status:        post.Status,
-		ViewCount:     post.ViewCount,
-		LikeCount:     post.LikeCount,
-		IsTop:         post.IsTop,
-		PublishedAt:   post.PublishedAt,
-		CreatedAt:     post.CreatedAt,
+		ID:              post.ID,
+		Title:           post.Title,
+		Slug:            post.Slug,
+		PostType:        normalizePostType(post.PostType),
+		TemplateKey:     post.TemplateKey,
+		TemplateData:    post.TemplateData,
+		ImageTextData:   normalizeImageTextData(post.ImageTextData, post.TemplateData),
+		Content:         post.Content,
+		HTMLContent:     post.HTMLContent,
+		Excerpt:         post.Excerpt,
+		Cover:           post.Cover,
+		CoverStorageKey: post.CoverStorageKey,
+		GroupID:         post.GroupID,
+		CategoryID:      post.CategoryID,
+		Status:          post.Status,
+		ViewCount:       post.ViewCount,
+		LikeCount:       post.LikeCount,
+		IsTop:           post.IsTop,
+		PublishedAt:     post.PublishedAt,
+		CreatedAt:       post.CreatedAt,
 	}
 
 	if post.Author != nil {
@@ -1186,4 +1210,23 @@ func buildImageTextContent(templateKey, templateData string) string {
 	}
 
 	return strings.TrimSpace(b.String())
+}
+
+func deletePostCoverAsync(storageKey, coverURL string) {
+	if storageKey == "" && coverURL == "" {
+		return
+	}
+
+	go func() {
+		uploader := service.NewUploadService()
+		if storageKey != "" {
+			if err := uploader.DeleteByKey(storageKey); err != nil {
+				logger.Log.WithField("storage_key", storageKey).WithError(err).Warn("delete blog cover by key failed")
+			}
+			return
+		}
+		if err := uploader.Delete(coverURL); err != nil {
+			logger.Log.WithField("cover_url", coverURL).WithError(err).Warn("delete blog cover by url failed")
+		}
+	}()
 }

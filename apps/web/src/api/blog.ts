@@ -49,6 +49,7 @@ export interface Post {
   imageTextData?: string;
   excerpt: string;
   cover?: string;
+  coverStorageKey?: string;
   groupId: string;
   group?: PostGroup;
   categoryId: string;
@@ -116,6 +117,7 @@ export interface CreatePostData {
   content: string;
   excerpt?: string;
   cover?: string;
+  coverStorageKey?: string;
   groupId?: string;
   categoryId?: string;
   tagIds?: string[];
@@ -150,6 +152,22 @@ export function getTags() {
 
 export function createPost(data: CreatePostData) {
   return request.post<unknown, Post>('/admin/blog/posts', data);
+}
+
+export function uploadBlogCover(formData: FormData) {
+  return request.post<
+    unknown,
+    {
+      url: string;
+      storageKey: string;
+      fileName: string;
+      size: number;
+      width: number;
+      height: number;
+    }
+  >('/admin/blog/cover/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
 }
 
 export function updatePost(id: string, data: Partial<CreatePostData>) {

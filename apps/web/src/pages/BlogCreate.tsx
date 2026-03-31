@@ -20,8 +20,8 @@ import {
   getAdminGroups,
   getAdminPostDetail,
   updatePost,
+  uploadBlogCover,
 } from '@/api/blog';
-import { uploadResource } from '@/api/resource';
 import { MarkdownPreview } from '@/components/blog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,7 @@ type LocalDraft = {
   title: string;
   excerpt: string;
   cover: string;
+  coverStorageKey: string;
   content: string;
   groupId: string;
   updatedAt: string;
@@ -55,6 +56,7 @@ export default function BlogCreate() {
   const [title, setTitle] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [cover, setCover] = useState('');
+  const [coverStorageKey, setCoverStorageKey] = useState('');
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -91,6 +93,7 @@ export default function BlogCreate() {
       setTitle(detail.title || '');
       setExcerpt(detail.excerpt || '');
       setCover(detail.cover || '');
+      setCoverStorageKey(detail.coverStorageKey || '');
       setContent(detail.content || '');
       setGroupId(detail.groupId || '');
     } catch {
@@ -130,6 +133,7 @@ export default function BlogCreate() {
       setTitle(draft.title || '');
       setExcerpt(draft.excerpt || '');
       setCover(draft.cover || '');
+      setCoverStorageKey(draft.coverStorageKey || '');
       setContent(draft.content || '');
       setGroupId(draft.groupId || '');
       setLastAutoSavedAt(draft.updatedAt || '');
@@ -146,12 +150,15 @@ export default function BlogCreate() {
         title,
         excerpt,
         cover,
+        coverStorageKey,
         content,
         groupId,
         updatedAt: new Date().toISOString(),
       };
 
-      const hasData = [title, excerpt, cover, content, groupId].some((item) => item.trim());
+      const hasData = [title, excerpt, cover, coverStorageKey, content, groupId].some((item) =>
+        item.trim(),
+      );
       if (!hasData) {
         localStorage.removeItem(LOCAL_CREATE_DRAFT_KEY);
         setLastAutoSavedAt('');
@@ -162,7 +169,7 @@ export default function BlogCreate() {
     }, 700);
 
     return () => clearTimeout(timer);
-  }, [isEditMode, loadingPost, title, excerpt, cover, content, groupId]);
+  }, [isEditMode, loadingPost, title, excerpt, cover, coverStorageKey, content, groupId]);
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {
@@ -177,7 +184,7 @@ export default function BlogCreate() {
     window.addEventListener('keydown', handleKeydown);
     return () => window.removeEventListener('keydown', handleKeydown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content, excerpt, cover, groupId, isEditMode, editingId]);
+  }, [title, content, excerpt, cover, coverStorageKey, groupId, isEditMode, editingId]);
 
   const handleSubmit = async (
     status: 'draft' | 'published',
@@ -203,6 +210,7 @@ export default function BlogCreate() {
           content: trimmedContent,
           excerpt: excerpt.trim() || trimmedContent.slice(0, 120),
           cover: cover.trim() || '',
+          coverStorageKey: coverStorageKey.trim() || '',
           groupId: groupId || '0',
           status,
         });
@@ -220,6 +228,7 @@ export default function BlogCreate() {
           content: trimmedContent,
           excerpt: excerpt.trim() || trimmedContent.slice(0, 120),
           cover: cover.trim() || undefined,
+          coverStorageKey: coverStorageKey.trim() || undefined,
           groupId: groupId || undefined,
           status,
           publishNow: status === 'published',
@@ -255,11 +264,9 @@ export default function BlogCreate() {
       setCoverUploading(true);
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('type', 'wallpaper');
-      formData.append('title', `博客封面-${Date.now()}`);
-      formData.append('description', '博客封面图');
-      const result = await uploadResource(formData);
-      setCover(result.resource.url);
+      const result = await uploadBlogCover(formData);
+      setCover(result.url);
+      setCoverStorageKey(result.storageKey);
       toast.success('封面上传成功');
     } catch {
       toast.error('封面上传失败，请重试');
@@ -490,7 +497,10 @@ export default function BlogCreate() {
                     <div className="flex gap-2">
                       <Input
                         value={cover}
-                        onChange={(e) => setCover(e.target.value)}
+                        onChange={(e) => {
+                          setCover(e.target.value);
+                          setCoverStorageKey('');
+                        }}
                         placeholder="https://..."
                         maxLength={500}
                         className="rounded-xl"

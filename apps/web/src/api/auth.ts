@@ -45,6 +45,12 @@ export interface UserProfile extends User {
   downloadCount: number;
 }
 
+export interface AvatarHistoryItem {
+  id: string;
+  avatarUrl: string;
+  createdAt: string;
+}
+
 export const getMyProfile = () => {
   return http.get<unknown, UserProfile>('/user/info');
 };
@@ -69,4 +75,12 @@ export const uploadAvatar = (formData: FormData) => {
   return http.post<unknown, { avatarUrl: string }>('/user/avatar', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+};
+
+export const getAvatarHistory = (pageSize = 12) => {
+  return http.get<unknown, AvatarHistoryItem[]>(`/user/avatar/history?pageSize=${pageSize}`);
+};
+
+export const getUseAvatarHistory = (id: string) => {
+  return http.post<unknown, { avatarUrl: string }>(`/user/avatar/history/${id}/use`);
 };

@@ -19,6 +19,7 @@ import {
   type Resource,
   unfavoriteResource,
 } from '@/api/resource';
+import ImagePreviewDialog from '@/components/ImagePreviewDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -56,6 +57,7 @@ export default function ResourceDetail() {
   const [favorited, setFavorited] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   // 图片是否已加载完成（用于模糊渐入）
   const [imgLoaded, setImgLoaded] = useState(false);
 
@@ -192,7 +194,10 @@ export default function ResourceDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* ── 左：图片预览 ───────────────────────────────── */}
           <div className="lg:col-span-3">
-            <div className="relative aspect-square rounded-2xl overflow-hidden bg-black shadow-2xl">
+            <div
+              className="relative aspect-square rounded-2xl overflow-hidden bg-black shadow-2xl cursor-zoom-in"
+              onClick={() => setPreviewOpen(true)}
+            >
               {/* 模糊背景 */}
               <img
                 src={resource.url}
@@ -375,6 +380,12 @@ export default function ResourceDetail() {
           </div>
         </div>
       </div>
+      <ImagePreviewDialog
+        open={previewOpen}
+        src={resource.url}
+        title={resource.title || '资源预览'}
+        onOpenChange={setPreviewOpen}
+      />
     </div>
   );
 }
