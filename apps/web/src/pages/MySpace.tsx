@@ -26,6 +26,7 @@ import {
   deleteResource,
   getMyResources,
   type MyResource,
+  type ResourceVisibility,
   updateResource,
   uploadResource,
 } from '@/api/resource';
@@ -50,6 +51,12 @@ const RESOURCE_TYPES = [
   { label: '全部', value: '' },
   { label: '壁纸', value: 'wallpaper' },
   { label: '头像', value: 'avatar' },
+];
+
+const VISIBILITY_OPTIONS: Array<{ label: string; value: ResourceVisibility }> = [
+  { label: '私密', value: 'private' },
+  { label: '共享', value: 'shared' },
+  { label: '公开', value: 'public' },
 ];
 
 // 文件大小格式化
@@ -95,6 +102,7 @@ export default function MySpace() {
   // 上传弹窗状态
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadType, setUploadType] = useState<'wallpaper' | 'avatar'>('wallpaper');
+  const [uploadVisibility, setUploadVisibility] = useState<ResourceVisibility>('private');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadDesc, setUploadDesc] = useState('');
@@ -111,6 +119,7 @@ export default function MySpace() {
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editType, setEditType] = useState('');
+  const [editVisibility, setEditVisibility] = useState<ResourceVisibility>('private');
   const [editing, setEditing] = useState(false);
 
   // 权限检查
@@ -225,6 +234,7 @@ export default function MySpace() {
       const formData = new FormData();
       formData.append('file', uploadFile);
       formData.append('type', uploadType);
+      formData.append('visibility', uploadVisibility);
       formData.append('title', uploadTitle.trim());
       formData.append('description', uploadDesc.trim());
       await uploadResource(formData);
@@ -244,6 +254,7 @@ export default function MySpace() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setUploadType('wallpaper');
+    setUploadVisibility('private');
     setUploadTitle('');
     setUploadDesc('');
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -271,6 +282,7 @@ export default function MySpace() {
     setEditTitle(resource.title);
     setEditDesc(resource.description ?? '');
     setEditType(resource.type);
+    setEditVisibility(resource.visibility || 'private');
   };
 
   // 提交编辑
@@ -282,13 +294,20 @@ export default function MySpace() {
         title: editTitle.trim() || undefined,
         description: editDesc.trim() || undefined,
         type: editType || undefined,
+        visibility: editVisibility,
       });
       toast.success('修改成功');
       // 本地同步更新，避免重新请求
       setResources((prev) =>
         prev.map((r) =>
           r.id === editTarget.id
-            ? { ...r, title: editTitle.trim() || r.title, type: editType || r.type }
+            ? {
+                ...r,
+                title: editTitle.trim() || r.title,
+                description: editDesc.trim() || r.description,
+                type: editType || r.type,
+                visibility: editVisibility,
+              }
             : r,
         ),
       );
@@ -619,6 +638,26 @@ export default function MySpace() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">可见范围</label>
+              <div className="flex gap-3">
+                {VISIBILITY_OPTIONS.map((option) => (
+                  <button
+                    type="button"
+                    key={option.value}
+                    onClick={() => setUploadVisibility(option.value)}
+                    className={`flex-1 py-2.5 rounded-xl font-medium text-sm border-2 transition-all ${
+                      uploadVisibility === option.value
+                        ? 'border-purple-600 bg-purple-50 text-purple-600'
+                        : 'border-gray-200 text-gray-500 hover:border-purple-300'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* 文件拖拽区 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">选择图片</label>
@@ -856,6 +895,26 @@ export default function MySpace() {
                     }`}
                   >
                     {type === 'wallpaper' ? '🖼️ 壁纸' : '🙂 头像'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">可见范围</label>
+              <div className="flex gap-3">
+                {VISIBILITY_OPTIONS.map((option) => (
+                  <button
+                    type="button"
+                    key={option.value}
+                    onClick={() => setEditVisibility(option.value)}
+                    className={`flex-1 py-2.5 rounded-xl font-medium text-sm border-2 transition-all ${
+                      editVisibility === option.value
+                        ? 'border-blue-600 bg-blue-50 text-blue-600'
+                        : 'border-gray-200 text-gray-500 hover:border-blue-300'
+                    }`}
+                  >
+                    {option.label}
                   </button>
                 ))}
               </div>

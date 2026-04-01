@@ -31,7 +31,7 @@ func GetCreatorSpace(c *gin.Context) {
 	if err := db.Where("code = ? AND is_active = ?", code, true).
 		Preload("User"). // 预加载用户信息
 		Preload("Space").
-		Preload("Space.Resources").
+		Preload("Space.Resources", "(visibility = ? OR visibility IS NULL OR visibility = '') AND deleted_at IS NULL", "public").
 		First(&creator).Error; err != nil {
 		Error(c, 404, "创作者不存在或未激活")
 		return
@@ -53,7 +53,10 @@ func GetCreatorSpace(c *gin.Context) {
 	var resourceCount int64
 	db.Model(&model.CodeAccessLog{}).Where("creator_id = ?", creator.ID).Count(&totalViews)
 	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", creator.ID).Count(&totalDownloads)
-	db.Model(&model.Resource{}).Where("user_id = ? AND deleted_at IS NULL", creator.UserID).Count(&resourceCount)
+	db.Model(&model.Resource{}).
+		Where("user_id = ? AND deleted_at IS NULL", creator.UserID).
+		Where("(visibility = ? OR visibility IS NULL OR visibility = '')", "public").
+		Count(&resourceCount)
 
 	creatorName := ""
 	creatorAvatar := ""
@@ -106,7 +109,9 @@ func DownloadResource(c *gin.Context) {
 
 	// 查找资源
 	var resource model.Resource
-	if err := db.First(&resource, "id = ?", resourceID).Error; err != nil {
+	if err := db.Where("id = ?", resourceID).
+		Where("(visibility = ? OR visibility IS NULL OR visibility = '')", "public").
+		First(&resource).Error; err != nil {
 		Error(c, 404, "资源不存在")
 		return
 	}
@@ -254,7 +259,8 @@ func GetCreatorResourcesList(c *gin.Context) {
 
 	// 查询资源（resources 表用 user_id 关联上传者，不是 creator_id）
 	query := db.Model(&model.Resource{}).
-		Where("user_id = ? AND deleted_at IS NULL", creator.UserID)
+		Where("user_id = ? AND deleted_at IS NULL", creator.UserID).
+		Where("(visibility = ? OR visibility IS NULL OR visibility = '')", "public")
 
 	// 按类型筛选
 	if resourceType != "" {

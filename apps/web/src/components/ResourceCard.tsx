@@ -67,7 +67,8 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
   const favored = isFavorited ?? resource.isFavorited ?? false;
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const handleCardClick = () => {
+  const handleCardClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (onClick) {
       onClick(resource);
     } else {

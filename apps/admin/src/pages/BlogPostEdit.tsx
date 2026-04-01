@@ -20,7 +20,7 @@ import {
 } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBeforeUnload, useNavigate, useParams } from 'react-router-dom';
-import type { Category, CreatePostData, PostType, Tag as TagType } from '@/api/blog';
+import type { Category, CreatePostData, PostType, Tag as TagType, Visibility } from '@/api/blog';
 import { createPost, getAdminPostDetail, getCategories, getTags, updatePost } from '@/api/blog';
 
 const { Title, Text } = Typography;
@@ -29,6 +29,7 @@ const { TextArea } = Input;
 type EditorFormValues = {
   title: string;
   postType: PostType;
+  visibility: Visibility;
   templateKey?: string;
   templateData?: string;
   excerpt?: string;
@@ -48,6 +49,7 @@ type LocalUserInfo = {
 type Snapshot = {
   title: string;
   postType: PostType;
+  visibility: Visibility;
   templateKey: string;
   templateData: string;
   excerpt: string;
@@ -62,6 +64,7 @@ type Snapshot = {
 const defaultValues: EditorFormValues = {
   title: '',
   postType: 'blog',
+  visibility: 'private',
   templateKey: '',
   templateData: '',
   excerpt: '',
@@ -97,6 +100,7 @@ function makeSnapshot(values: Partial<EditorFormValues>, content: string): Snaps
   return {
     title: values.title || '',
     postType: values.postType || 'blog',
+    visibility: values.visibility || 'private',
     templateKey: values.templateKey || '',
     templateData: values.templateData || '',
     excerpt: values.excerpt || '',
@@ -238,6 +242,7 @@ export default function BlogPostEdit() {
       const values: EditorFormValues = {
         title: post.title,
         postType: post.postType || 'blog',
+        visibility: post.visibility || 'private',
         templateKey: post.templateKey || '',
         templateData: post.templateData || '',
         excerpt: post.excerpt || '',
@@ -480,6 +485,16 @@ export default function BlogPostEdit() {
 
                   <Form.Item name="isTop" valuePropName="checked" className="!mb-2">
                     <Checkbox>置顶内容</Checkbox>
+                  </Form.Item>
+
+                  <Form.Item label="可见范围" name="visibility">
+                    <Select
+                      options={[
+                        { label: '私密', value: 'private' },
+                        { label: '共享', value: 'shared' },
+                        { label: '公开', value: 'public' },
+                      ]}
+                    />
                   </Form.Item>
 
                   <Form.Item name="status" hidden>

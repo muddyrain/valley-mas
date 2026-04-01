@@ -55,9 +55,9 @@ func VerifyCode(c *gin.Context) {
 	// 4. 查询创作者（只查询已激活的），预加载空间信息
 	var creator model.Creator
 	err := db.Where("code = ? AND is_active = ?", normalizedCode, true).
-		Preload("User").            // 预加载用户信息（用于获取昵称）
-		Preload("Space").           // 预加载空间信息
-		Preload("Space.Resources"). // 预加载空间资源
+		Preload("User").                                                                                                          // 预加载用户信息（用于获取昵称）
+		Preload("Space").                                                                                                         // 预加载空间信息
+		Preload("Space.Resources", "(visibility = ? OR visibility IS NULL OR visibility = '') AND deleted_at IS NULL", "public"). // 预加载空间资源
 		First(&creator).Error
 
 	if err != nil {

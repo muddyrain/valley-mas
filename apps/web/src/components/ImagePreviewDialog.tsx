@@ -95,7 +95,12 @@ export default function ImagePreviewDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[96vw] max-w-[96vw] sm:w-[92vw] sm:max-w-[92vw] h-[92vh] max-h-[92vh] p-0 border-none bg-black/45 backdrop-blur-sm shadow-none">
-        <div className="relative h-full w-full overflow-hidden rounded-xl bg-black/40">
+        <div
+          className="relative h-full w-full overflow-hidden rounded-xl bg-black/40"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
           <div className="pointer-events-none absolute left-4 top-4 z-10 max-w-[70vw] rounded-lg bg-black/40 px-3 py-1.5 text-sm text-white/95 backdrop-blur">
             <span className="block truncate">{displayTitle}</span>
           </div>
