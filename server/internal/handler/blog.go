@@ -754,6 +754,8 @@ func AdminUpdatePost(c *gin.Context) {
 	}
 	updates["is_top"] = req.IsTop
 
+	oldCoverStorageKey := strings.TrimSpace(post.CoverStorageKey)
+	oldCoverURL := strings.TrimSpace(post.Cover)
 	oldGroupID := post.GroupID
 	newGroupID := oldGroupID
 	if req.GroupID != nil {
@@ -761,7 +763,7 @@ func AdminUpdatePost(c *gin.Context) {
 	}
 	database.DB.Model(&post).Updates(updates)
 	if coverChanged {
-		deletePostCoverAsync(strings.TrimSpace(post.CoverStorageKey), strings.TrimSpace(post.Cover))
+		deletePostCoverAsync(oldCoverStorageKey, oldCoverURL)
 	}
 	if req.GroupID != nil && oldGroupID != newGroupID {
 		if oldGroupID != 0 {
