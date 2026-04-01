@@ -10,7 +10,7 @@ import {
   Send,
   Sparkles,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -37,12 +37,21 @@ type LocalDraft = {
   updatedAt: string;
 };
 
-const LOCAL_CREATE_DRAFT_KEY = 'valley-blog-create-draft-v2';
+type CoverImageMeta = {
+  width: number;
+  height: number;
+};
+
+const LOCAL_CREATE_DRAFT_KEY = 'valley-blog-create-draft-v3';
 
 function formatTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--';
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 export default function BlogCreate() {
@@ -57,6 +66,13 @@ export default function BlogCreate() {
   const [excerpt, setExcerpt] = useState('');
   const [cover, setCover] = useState('');
   const [coverStorageKey, setCoverStorageKey] = useState('');
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverObjectUrl, setCoverObjectUrl] = useState('');
+  const [coverImageMeta, setCoverImageMeta] = useState<CoverImageMeta | null>(null);
+  const [coverZoom, setCoverZoom] = useState(1);
+  const [coverOffsetX, setCoverOffsetX] = useState(0);
+  const [coverOffsetY, setCoverOffsetY] = useState(0);
+  const [coverDragging, setCoverDragging] = useState(false);
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -68,6 +84,9 @@ export default function BlogCreate() {
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState('');
   const [draftRecovered, setDraftRecovered] = useState(false);
+
+  const coverViewportRef = useRef<HTMLDivElement | null>(null);
+  const dragStartRef = useRef<{ x: number; y: number; baseX: number; baseY: number } | null>(null);
 
   const loadGroups = async () => {
     try {
@@ -139,7 +158,7 @@ export default function BlogCreate() {
       setLastAutoSavedAt(draft.updatedAt || '');
       setDraftRecovered(true);
     } catch {
-      // ignore local parse error
+      // ignore
     }
   }, [isEditMode]);
 
@@ -172,19 +191,126 @@ export default function BlogCreate() {
   }, [isEditMode, loadingPost, title, excerpt, cover, coverStorageKey, content, groupId]);
 
   useEffect(() => {
-    const handleKeydown = (event: KeyboardEvent) => {
+    const onKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        void handleSubmit('draft', {
-          stayOnPage: isEditMode,
-          fromShortcut: true,
-        });
+        void handleSubmit('draft', { stayOnPage: isEditMode, fromShortcut: true });
       }
     };
-    window.addEventListener('keydown', handleKeydown);
-    return () => window.removeEventListener('keydown', handleKeydown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content, excerpt, cover, coverStorageKey, groupId, isEditMode, editingId]);
+  }, [title, content, excerpt, cover, coverStorageKey, groupId, isEditMode, editingId, coverFile]);
+
+  useEffect(() => {
+    return () => {
+      if (coverObjectUrl) {
+        URL.revokeObjectURL(coverObjectUrl);
+      }
+    };
+  }, [coverObjectUrl]);
+
+  const resetLocalCoverEditing = () => {
+    if (coverObjectUrl) {
+      URL.revokeObjectURL(coverObjectUrl);
+    }
+    setCoverFile(null);
+    setCoverObjectUrl('');
+    setCoverImageMeta(null);
+    setCoverZoom(1);
+    setCoverOffsetX(0);
+    setCoverOffsetY(0);
+    setCoverDragging(false);
+  };
+
+  const getCoverDragLimit = (zoom = coverZoom) => {
+    const viewport = coverViewportRef.current;
+    if (!viewport || !coverImageMeta) return { maxX: 0, maxY: 0 };
+    const boxW = viewport.clientWidth;
+    const boxH = viewport.clientHeight;
+    const baseScale = Math.max(boxW / coverImageMeta.width, boxH / coverImageMeta.height);
+    const renderedW = coverImageMeta.width * baseScale * zoom;
+    const renderedH = coverImageMeta.height * baseScale * zoom;
+    return {
+      maxX: Math.max(0, (renderedW - boxW) / 2),
+      maxY: Math.max(0, (renderedH - boxH) / 2),
+    };
+  };
+
+  const applyClampedCoverOffset = (x: number, y: number, zoom = coverZoom) => {
+    const limit = getCoverDragLimit(zoom);
+    setCoverOffsetX(clamp(x, -limit.maxX, limit.maxX));
+    setCoverOffsetY(clamp(y, -limit.maxY, limit.maxY));
+  };
+
+  const renderCoverToBlob = async (): Promise<Blob | null> => {
+    if (!coverFile || !coverImageMeta) return null;
+    const viewport = coverViewportRef.current;
+    if (!viewport) return null;
+
+    const boxW = viewport.clientWidth;
+    const boxH = viewport.clientHeight;
+    if (!boxW || !boxH) return null;
+
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('cover image load failed'));
+      img.src = coverObjectUrl;
+    });
+
+    const baseScale = Math.max(boxW / coverImageMeta.width, boxH / coverImageMeta.height);
+    const renderScale = baseScale * coverZoom;
+    const renderW = coverImageMeta.width * renderScale;
+    const renderH = coverImageMeta.height * renderScale;
+    const drawX = (boxW - renderW) / 2 + coverOffsetX;
+    const drawY = (boxH - renderH) / 2 + coverOffsetY;
+
+    const sourceX = clamp((0 - drawX) / renderScale, 0, coverImageMeta.width);
+    const sourceY = clamp((0 - drawY) / renderScale, 0, coverImageMeta.height);
+    const sourceW = clamp(boxW / renderScale, 1, coverImageMeta.width - sourceX);
+    const sourceH = clamp(boxH / renderScale, 1, coverImageMeta.height - sourceY);
+
+    const outputW = 1200;
+    const outputH = 480;
+    const canvas = document.createElement('canvas');
+    canvas.width = outputW;
+    canvas.height = outputH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(image, sourceX, sourceY, sourceW, sourceH, 0, 0, outputW, outputH);
+    return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+  };
+
+  const uploadCoverIfNeeded = async () => {
+    if (!coverFile || !coverObjectUrl) {
+      return {
+        cover: cover.trim(),
+        coverStorageKey: coverStorageKey.trim(),
+      };
+    }
+    setCoverUploading(true);
+    try {
+      const blob = await renderCoverToBlob();
+      if (!blob) throw new Error('cover process failed');
+      const formData = new FormData();
+      const uploadName = coverFile.name.replace(/\.[^.]+$/, '') || 'blog-cover';
+      const uploadFile = new File([blob], `${uploadName}.jpg`, { type: 'image/jpeg' });
+      formData.append('file', uploadFile);
+      const result = await uploadBlogCover(formData);
+      setCover(result.url);
+      setCoverStorageKey(result.storageKey);
+      resetLocalCoverEditing();
+      return {
+        cover: result.url,
+        coverStorageKey: result.storageKey,
+      };
+    } finally {
+      setCoverUploading(false);
+    }
+  };
 
   const handleSubmit = async (
     status: 'draft' | 'published',
@@ -203,14 +329,15 @@ export default function BlogCreate() {
 
     try {
       setSubmitting(true);
+      const resolvedCover = await uploadCoverIfNeeded();
       if (isEditMode && editingId) {
         await updatePost(editingId, {
           title: trimmedTitle,
           postType: 'blog',
           content: trimmedContent,
           excerpt: excerpt.trim() || trimmedContent.slice(0, 120),
-          cover: cover.trim() || '',
-          coverStorageKey: coverStorageKey.trim() || '',
+          cover: resolvedCover.cover || '',
+          coverStorageKey: resolvedCover.coverStorageKey || '',
           groupId: groupId || '0',
           status,
         });
@@ -227,8 +354,8 @@ export default function BlogCreate() {
           postType: 'blog',
           content: trimmedContent,
           excerpt: excerpt.trim() || trimmedContent.slice(0, 120),
-          cover: cover.trim() || undefined,
-          coverStorageKey: coverStorageKey.trim() || undefined,
+          cover: resolvedCover.cover || undefined,
+          coverStorageKey: resolvedCover.coverStorageKey || undefined,
           groupId: groupId || undefined,
           status,
           publishNow: status === 'published',
@@ -238,6 +365,7 @@ export default function BlogCreate() {
           localStorage.removeItem(LOCAL_CREATE_DRAFT_KEY);
         }
       }
+
       if (!options?.stayOnPage) {
         navigate('/blog');
       }
@@ -248,7 +376,7 @@ export default function BlogCreate() {
     }
   };
 
-  const handleUploadCover = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelectLocalCover = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
@@ -259,21 +387,58 @@ export default function BlogCreate() {
       toast.error('封面大小不能超过 10MB');
       return;
     }
-
     try {
-      setCoverUploading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      const result = await uploadBlogCover(formData);
-      setCover(result.url);
-      setCoverStorageKey(result.storageKey);
-      toast.success('封面上传成功');
+      const objectUrl = URL.createObjectURL(file);
+      const meta = await new Promise<CoverImageMeta>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        img.onerror = () => reject(new Error('read cover failed'));
+        img.src = objectUrl;
+      });
+      if (coverObjectUrl) {
+        URL.revokeObjectURL(coverObjectUrl);
+      }
+      setCoverFile(file);
+      setCoverObjectUrl(objectUrl);
+      setCoverImageMeta(meta);
+      setCoverZoom(1);
+      setCoverOffsetX(0);
+      setCoverOffsetY(0);
+      setCoverStorageKey('');
     } catch {
-      toast.error('封面上传失败，请重试');
+      toast.error('封面读取失败，请重试');
     } finally {
-      setCoverUploading(false);
       event.target.value = '';
     }
+  };
+
+  const handleCoverPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!coverObjectUrl) return;
+    dragStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      baseX: coverOffsetX,
+      baseY: coverOffsetY,
+    };
+    setCoverDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleCoverPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!coverDragging || !dragStartRef.current) return;
+    const deltaX = event.clientX - dragStartRef.current.x;
+    const deltaY = event.clientY - dragStartRef.current.y;
+    applyClampedCoverOffset(
+      dragStartRef.current.baseX + deltaX,
+      dragStartRef.current.baseY + deltaY,
+    );
+  };
+
+  const handleCoverPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!coverDragging) return;
+    setCoverDragging(false);
+    dragStartRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
   const handleCreateGroup = async () => {
@@ -315,29 +480,6 @@ export default function BlogCreate() {
           <div className="mb-5 flex items-center gap-3 rounded-2xl border border-violet-200/70 bg-white/80 px-4 py-3 shadow-sm backdrop-blur">
             <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
             <span className="text-sm text-slate-600">正在加载博客内容...</span>
-          </div>
-
-          <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-            <section className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5">
-              <div className="mb-4 h-5 w-20 animate-pulse rounded bg-slate-100" />
-              <div className="mb-3 h-12 animate-pulse rounded-xl bg-slate-100" />
-              <div className="h-[620px] animate-pulse rounded-xl bg-slate-100" />
-            </section>
-
-            <section className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5">
-                <div className="mb-3 h-5 w-24 animate-pulse rounded bg-slate-100" />
-                <div className="space-y-3">
-                  <div className="h-10 animate-pulse rounded-xl bg-slate-100" />
-                  <div className="h-10 animate-pulse rounded-xl bg-slate-100" />
-                  <div className="h-20 animate-pulse rounded-xl bg-slate-100" />
-                </div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5">
-                <div className="mb-3 h-5 w-24 animate-pulse rounded bg-slate-100" />
-                <div className="h-[380px] animate-pulse rounded-xl bg-slate-100" />
-              </div>
-            </section>
           </div>
         </div>
       </div>
@@ -409,19 +551,15 @@ export default function BlogCreate() {
             </span>
             <Button
               variant="outline"
-              disabled={submitting}
-              onClick={() =>
-                void handleSubmit('draft', {
-                  stayOnPage: isEditMode,
-                })
-              }
+              disabled={submitting || coverUploading}
+              onClick={() => void handleSubmit('draft', { stayOnPage: isEditMode })}
               className="rounded-xl"
             >
               <Save className="mr-2 h-4 w-4" />
               保存草稿
             </Button>
             <Button
-              disabled={submitting}
+              disabled={submitting || coverUploading}
               onClick={() => void handleSubmit('published')}
               className="rounded-xl"
             >
@@ -466,7 +604,7 @@ export default function BlogCreate() {
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="在这里直接写 Markdown 原文。支持标题、列表、代码块、引用等标准语法。"
+                placeholder="在这里直接写 Markdown 原文，支持标题、列表、代码块、引用等标准语法。"
                 className="min-h-[620px] w-full rounded-xl border border-slate-300 bg-[#fcfcff] p-4 font-mono text-[15px] leading-8 outline-none focus:ring-2 focus:ring-violet-200"
               />
             </section>
@@ -498,6 +636,7 @@ export default function BlogCreate() {
                       <Input
                         value={cover}
                         onChange={(e) => {
+                          if (coverFile || coverObjectUrl) resetLocalCoverEditing();
                           setCover(e.target.value);
                           setCoverStorageKey('');
                         }}
@@ -507,19 +646,74 @@ export default function BlogCreate() {
                       />
                       <label className="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl border border-violet-300 bg-violet-50 px-2.5 text-sm text-violet-700 whitespace-nowrap hover:bg-violet-100">
                         <ImagePlus className="mr-1 h-4 w-4" />
-                        {coverUploading ? '上传中' : '上传'}
+                        {coverUploading ? '上传中' : coverObjectUrl ? '重新选图' : '选择图片'}
                         <input
                           type="file"
                           accept="image/*"
                           className="hidden"
                           disabled={coverUploading}
-                          onChange={handleUploadCover}
+                          onChange={handleSelectLocalCover}
                         />
                       </label>
                     </div>
-                    {!!cover && (
-                      <div className="mt-2 overflow-hidden rounded-xl border border-slate-200">
-                        <img src={cover} alt="博客封面预览" className="h-32 w-full object-cover" />
+                    {(!!cover || !!coverObjectUrl) && (
+                      <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                        <div
+                          ref={coverViewportRef}
+                          className="relative h-36 w-full touch-none overflow-hidden bg-slate-100 md:h-44"
+                          onPointerDown={handleCoverPointerDown}
+                          onPointerMove={handleCoverPointerMove}
+                          onPointerUp={handleCoverPointerUp}
+                          onPointerCancel={handleCoverPointerUp}
+                          style={{
+                            cursor: coverObjectUrl
+                              ? coverDragging
+                                ? 'grabbing'
+                                : 'grab'
+                              : 'default',
+                          }}
+                        >
+                          <img
+                            src={coverObjectUrl || cover}
+                            alt="博客封面预览"
+                            className="pointer-events-none absolute inset-0 h-full w-full object-cover select-none"
+                            draggable={false}
+                            style={{
+                              transform: `translate(${coverOffsetX}px, ${coverOffsetY}px) scale(${coverZoom})`,
+                              transformOrigin: 'center center',
+                              transition: coverDragging ? 'none' : 'transform 120ms ease-out',
+                            }}
+                          />
+                          {coverObjectUrl && (
+                            <div className="pointer-events-none absolute right-2 bottom-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] text-white">
+                              可拖动裁剪
+                            </div>
+                          )}
+                        </div>
+                        {coverObjectUrl && (
+                          <div className="border-t border-slate-200 px-3 py-2">
+                            <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
+                              <span>缩放裁剪</span>
+                              <span>{coverZoom.toFixed(2)}x</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={1}
+                              max={3}
+                              step={0.01}
+                              value={coverZoom}
+                              onChange={(e) => {
+                                const nextZoom = Number(e.target.value);
+                                setCoverZoom(nextZoom);
+                                applyClampedCoverOffset(coverOffsetX, coverOffsetY, nextZoom);
+                              }}
+                              className="w-full accent-violet-600"
+                            />
+                            <div className="mt-1 text-[11px] text-slate-400">
+                              提示：封面仅本地预览，点击保存草稿/发布时才会上传到 TOS。
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

@@ -1,4 +1,4 @@
-package handler
+﻿package handler
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// AdminUploadBlogCover 上传博客封面（仅上传文件，不写资源表）
+// AdminUploadBlogCover 上传博客封面（仅上传文件，不写 resources 表）
 func AdminUploadBlogCover(c *gin.Context) {
 	userID, role, ok := currentUser(c)
 	if !ok {

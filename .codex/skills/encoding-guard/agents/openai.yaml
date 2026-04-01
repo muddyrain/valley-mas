@@ -1,0 +1,4 @@
+interface:
+  display_name: "编码防乱码"
+  short_description: "检测并拦截代码文本乱码"
+  default_prompt: "在代码编辑前后执行编码检查，发现疑似乱码时给出修复建议并要求修复后再结束任务。"

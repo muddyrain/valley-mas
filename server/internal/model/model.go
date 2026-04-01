@@ -347,6 +347,29 @@ func (h *UserAvatarHistory) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+// BlogCoverUpload 博客封面上传追踪（用于临时文件回收）
+type BlogCoverUpload struct {
+	ID         Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID     Int64String    `gorm:"index;not null" json:"userId"`
+	StorageKey string         `gorm:"size:500;uniqueIndex;not null" json:"storageKey"`
+	URL        string         `gorm:"size:500;not null" json:"url"`
+	Status     string         `gorm:"size:20;index;not null;default:'tmp'" json:"status"` // tmp/active/deleted
+	PostID     *Int64String   `gorm:"index" json:"postId,omitempty"`
+	ExpiresAt  *time.Time     `gorm:"index" json:"expiresAt,omitempty"`
+	UsedAt     *time.Time     `json:"usedAt,omitempty"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	UpdatedAt  time.Time      `json:"updatedAt"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+	User       *User          `gorm:"foreignKey:UserID" json:"user,omitempty"`
+}
+
+func (b *BlogCoverUpload) BeforeCreate(tx *gorm.DB) error {
+	if b.ID == 0 {
+		b.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
 // UserNotification 用户通知
 type UserNotification struct {
 	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
