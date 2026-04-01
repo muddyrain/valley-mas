@@ -28,12 +28,26 @@ import { type Creator, reqGetCreatorList } from '../api/creator';
 import {
   type Resource,
   type ResourceType,
+  type ResourceVisibility,
   reqDeleteResource,
   reqGetResourceList,
+  reqUpdateResource,
   reqUpdateResourceCreator,
   reqUploadResource,
 } from '../api/resource';
 import { reqGetUserList } from '../api/user';
+
+const visibilityOptions = [
+  { label: '私密', value: 'private' },
+  { label: '共享', value: 'shared' },
+  { label: '公开', value: 'public' },
+] satisfies Array<{ label: string; value: ResourceVisibility }>;
+
+const visibilityColorMap: Record<ResourceVisibility, string> = {
+  private: 'default',
+  shared: 'cyan',
+  public: 'green',
+};
 
 export default function Resources() {
   const [loading, setLoading] = useState(false);
@@ -43,42 +57,36 @@ export default function Resources() {
   const [pageSize, setPageSize] = useState(20);
   const [typeFilter, setTypeFilter] = useState<ResourceType | ''>('');
   const [keyword, setKeyword] = useState('');
-  const [creatorIdFilter, setCreatorIdFilter] = useState<string>(''); // 创作者筛选
-  const [creators, setCreators] = useState<Creator[]>([]); // 创作者列表
+  const [creatorIdFilter, setCreatorIdFilter] = useState('');
+  const [creators, setCreators] = useState<Creator[]>([]);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadType, setUploadType] = useState<ResourceType>('avatar');
+  const [uploadVisibility, setUploadVisibility] = useState<ResourceVisibility>('private');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
-
-  // 配置上传者相关状态
   const [creatorModalOpen, setCreatorModalOpen] = useState(false);
   const [currentResource, setCurrentResource] = useState<Resource | null>(null);
   const [creatorForm] = Form.useForm();
   const [users, setUsers] = useState<Array<{ id: string; nickname: string }>>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-
-  // 获取当前用户信息
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
   const isCreator = userInfo.role === 'creator';
 
-  // 加载创作者列表（用于筛选 - 仅管理员使用）
   useEffect(() => {
-    // 只有管理员需要加载创作者列表
     if (isCreator) return;
 
     const fetchCreators = async () => {
       try {
         const response = await reqGetCreatorList({ page: 1, pageSize: 1000 });
-        const creatorList = response.list || [];
-        setCreators(creatorList);
+        setCreators(response.list || []);
       } catch (error) {
-        console.error('加载创作者列表失败', error);
+        console.error('Failed to load creators:', error);
       }
     };
-    fetchCreators();
+
+    void fetchCreators();
   }, [isCreator]);
 
-  // 获取资源列表
   const fetchResources = useCallback(async () => {
     setLoading(true);
     try {
@@ -88,10 +96,8 @@ export default function Resources() {
         type?: ResourceType;
         keyword?: string;
         uploaderId?: string;
-      } = {
-        page,
-        pageSize,
-      };
+      } = { page, pageSize };
+
       if (typeFilter) params.type = typeFilter;
       if (keyword) params.keyword = keyword;
       if (!isCreator && creatorIdFilter) params.uploaderId = creatorIdFilter;
@@ -100,14 +106,17 @@ export default function Resources() {
       setData(response.list || []);
       setTotal(response.total || 0);
     } catch (error) {
+      console.error('Failed to load resources:', error);
       message.error('获取资源列表失败');
-      console.error(error);
     } finally {
       setLoading(false);
     }
   }, [page, pageSize, typeFilter, keyword, creatorIdFilter, isCreator]);
 
-  // 删除资源
+  useEffect(() => {
+    void fetchResources();
+  }, [fetchResources]);
+
   const handleDelete = async (id: string) => {
     Modal.confirm({
       title: '确认删除',
@@ -119,40 +128,38 @@ export default function Resources() {
         try {
           await reqDeleteResource(id);
           message.success('删除成功');
-          fetchResources();
+          void fetchResources();
         } catch (error) {
+          console.error('Failed to delete resource:', error);
           message.error('删除失败');
-          console.error(error);
         }
       },
     });
   };
 
-  // 上传配置
   const uploadProps: UploadProps = {
     fileList,
     onChange: ({ fileList }) => setFileList(fileList),
     beforeUpload: (file) => {
       const isImage = file.type.startsWith('image/');
       if (!isImage) {
-        message.error('只能上传图片文件！');
+        message.error('只能上传图片文件');
         return false;
       }
 
       const maxSize = uploadType === 'avatar' ? 2 : 5;
       const isLt = file.size / 1024 / 1024 < maxSize;
       if (!isLt) {
-        message.error(`文件大小不能超过 ${maxSize}MB！`);
+        message.error(`文件大小不能超过 ${maxSize}MB`);
         return false;
       }
 
       setFileList([file]);
-      return false; // 阻止自动上传
+      return false;
     },
     onRemove: () => setFileList([]),
   };
 
-  // 执行上传
   const handleUpload = async () => {
     if (fileList.length === 0) {
       message.error('请选择文件');
@@ -166,8 +173,9 @@ export default function Resources() {
     }
 
     const formData = new FormData();
-    formData.append('file', file); // 后端期望的字段名是 'file'
+    formData.append('file', file);
     formData.append('type', uploadType);
+    formData.append('visibility', uploadVisibility);
 
     setUploading(true);
     try {
@@ -175,7 +183,8 @@ export default function Resources() {
       message.success('上传成功');
       setUploadModalOpen(false);
       setFileList([]);
-      fetchResources();
+      setUploadVisibility('private');
+      void fetchResources();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       message.error(err.response?.data?.message || '上传失败');
@@ -184,13 +193,11 @@ export default function Resources() {
     }
   };
 
-  // 打开配置上传者 Modal
   const openCreatorModal = async (resource: Resource) => {
     setCurrentResource(resource);
     creatorForm.setFieldsValue({ uploaderId: resource.user?.id });
     setCreatorModalOpen(true);
 
-    // 加载用户列表
     setLoadingUsers(true);
     try {
       const response = await reqGetUserList({ page: 1, pageSize: 100 });
@@ -202,7 +209,6 @@ export default function Resources() {
     }
   };
 
-  // 更新上传者
   const handleUpdateCreator = async () => {
     if (!currentResource) return;
 
@@ -211,16 +217,25 @@ export default function Resources() {
       await reqUpdateResourceCreator(currentResource.id, values.uploaderId);
       message.success('上传者更新成功');
       setCreatorModalOpen(false);
-      fetchResources();
+      void fetchResources();
     } catch (error) {
+      console.error('Failed to update creator:', error);
       message.error('更新失败');
-      console.error(error);
     }
   };
 
-  useEffect(() => {
-    void fetchResources();
-  }, [fetchResources]);
+  const handleVisibilityChange = async (resource: Resource, visibility: ResourceVisibility) => {
+    try {
+      await reqUpdateResource(resource.id, { visibility });
+      message.success('可见范围已更新');
+      setData((prev) =>
+        prev.map((item) => (item.id === resource.id ? { ...item, visibility } : item)),
+      );
+    } catch (error) {
+      console.error('Failed to update resource visibility:', error);
+      message.error('更新可见范围失败');
+    }
+  };
 
   const columns: ColumnsType<Resource> = [
     {
@@ -240,21 +255,37 @@ export default function Resources() {
     {
       title: '标题',
       dataIndex: 'title',
-      width: 300,
+      width: 240,
       render: (title) => title || '未命名资源',
     },
     {
       title: '类型',
       dataIndex: 'type',
       width: 100,
-      render: (t) => (
-        <Tag color={t === 'avatar' ? 'blue' : 'purple'}>{t === 'avatar' ? '头像' : '壁纸'}</Tag>
+      render: (value: ResourceType) => (
+        <Tag color={value === 'avatar' ? 'blue' : 'purple'}>
+          {value === 'avatar' ? '头像' : '壁纸'}
+        </Tag>
+      ),
+    },
+    {
+      title: '可见范围',
+      dataIndex: 'visibility',
+      width: 140,
+      render: (value: ResourceVisibility, record) => (
+        <Select
+          size="small"
+          value={value || 'private'}
+          options={visibilityOptions}
+          onChange={(nextValue) => handleVisibilityChange(record, nextValue)}
+          popupMatchSelectWidth={false}
+        />
       ),
     },
     {
       title: '上传者',
       dataIndex: 'user',
-      width: 150,
+      width: 160,
       render: (user) => {
         if (!user) return <span className="text-gray-400">未知</span>;
         return <UserCardInfo user={user} />;
@@ -265,13 +296,12 @@ export default function Resources() {
       dataIndex: 'storageKey',
       width: 280,
       ellipsis: true,
-      render: (key) => {
+      render: (key?: string) => {
         if (!key) return <span className="text-gray-400">-</span>;
-        // 提取目录路径（不含文件名）
         const lastSlash = key.lastIndexOf('/');
         const directory = lastSlash > 0 ? key.substring(0, lastSlash) : key;
         return (
-          <span className="text-xs text-gray-600 font-mono" title={key}>
+          <span className="font-mono text-xs text-gray-600" title={key}>
             {directory}
           </span>
         );
@@ -281,12 +311,13 @@ export default function Resources() {
       title: '大小',
       dataIndex: 'size',
       width: 100,
-      render: (s) => formatFileSize(s),
+      render: (size) => formatFileSize(size),
     },
     {
       title: '下载量',
       dataIndex: 'downloadCount',
       width: 100,
+      render: (count) => count ?? 0,
     },
     {
       title: '上传时间',
@@ -301,6 +332,12 @@ export default function Resources() {
       fixed: 'right',
       render: (_, record) => (
         <Space>
+          <Tag color={visibilityColorMap[record.visibility || 'private']}>
+            {
+              visibilityOptions.find((item) => item.value === (record.visibility || 'private'))
+                ?.label
+            }
+          </Tag>
           {!isCreator && (
             <Button
               type="link"
@@ -308,7 +345,7 @@ export default function Resources() {
               icon={<UserSwitchOutlined />}
               onClick={() => openCreatorModal(record)}
             >
-              配置上传者
+              设置上传者
             </Button>
           )}
           <Button
@@ -327,7 +364,7 @@ export default function Resources() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">{isCreator ? '我的资源' : '资源管理'}</h2>
+      <h2 className="mb-6 text-2xl font-bold">{isCreator ? '我的资源' : '资源管理'}</h2>
       <Card>
         <div className="mb-4 flex justify-between">
           <Space>
@@ -337,7 +374,7 @@ export default function Resources() {
               className="w-48"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              onPressEnter={fetchResources}
+              onPressEnter={() => void fetchResources()}
             />
             <Select
               placeholder="类型"
@@ -363,16 +400,18 @@ export default function Resources() {
                   value: c.userId,
                 }))}
                 filterOption={(input, option) =>
-                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  String(option?.label ?? '')
+                    .toLowerCase()
+                    .includes(input.toLowerCase())
                 }
               />
             )}
-            <Button icon={<SearchOutlined />} type="primary" onClick={fetchResources}>
+            <Button icon={<SearchOutlined />} type="primary" onClick={() => void fetchResources()}>
               搜索
             </Button>
           </Space>
           <Space>
-            <Button icon={<ReloadOutlined />} onClick={fetchResources}>
+            <Button icon={<ReloadOutlined />} onClick={() => void fetchResources()}>
               刷新
             </Button>
             <Button
@@ -384,6 +423,7 @@ export default function Resources() {
             </Button>
           </Space>
         </div>
+
         <Table
           columns={columns}
           dataSource={data}
@@ -395,22 +435,22 @@ export default function Resources() {
             total,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 条`,
-            onChange: (page, pageSize) => {
-              setPage(page);
-              setPageSize(pageSize);
+            showTotal: (count) => `共 ${count} 条`,
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPage);
+              setPageSize(nextPageSize);
             },
           }}
         />
       </Card>
 
-      {/* 上传模态框 */}
       <Modal
         title="上传资源"
         open={uploadModalOpen}
         onCancel={() => {
           setUploadModalOpen(false);
           setFileList([]);
+          setUploadVisibility('private');
         }}
         onOk={handleUpload}
         confirmLoading={uploading}
@@ -419,30 +459,38 @@ export default function Resources() {
         width={600}
       >
         <div className="mb-4">
-          <div className="block mb-2">资源类型：</div>
+          <div className="mb-2 block">资源类型</div>
           <Select
             className="w-full"
             value={uploadType}
             onChange={setUploadType}
             options={[
-              { label: '头像 (最大 2MB)', value: 'avatar' },
-              { label: '壁纸 (最大 5MB)', value: 'wallpaper' },
+              { label: '头像（最大 2MB）', value: 'avatar' },
+              { label: '壁纸（最大 5MB）', value: 'wallpaper' },
             ]}
           />
         </div>
+        <div className="mb-4">
+          <div className="mb-2 block">可见范围</div>
+          <Select
+            className="w-full"
+            value={uploadVisibility}
+            onChange={setUploadVisibility}
+            options={visibilityOptions}
+          />
+        </div>
         <Upload.Dragger {...uploadProps} accept="image/jpeg,image/jpg,image/png,image/webp">
-          <p className="text-4xl mb-4">📁</p>
-          <p className="text-base mb-2">点击或拖拽图片到此处上传</p>
-          <p className="text-gray-400 text-sm">支持 JPG、PNG、WEBP 格式</p>
-          <p className="text-gray-400 text-sm mt-2">
+          <p className="mb-4 text-4xl">上传</p>
+          <p className="mb-2 text-base">点击或拖拽图片到此处上传</p>
+          <p className="text-sm text-gray-400">支持 JPG、PNG、WEBP 格式</p>
+          <p className="mt-2 text-sm text-gray-400">
             {uploadType === 'avatar' ? '头像最大 2MB' : '壁纸最大 5MB'}
           </p>
         </Upload.Dragger>
       </Modal>
 
-      {/* 配置上传者 Modal */}
       <Modal
-        title="配置上传者"
+        title="设置上传者"
         open={creatorModalOpen}
         onOk={handleUpdateCreator}
         onCancel={() => setCreatorModalOpen(false)}
@@ -460,14 +508,16 @@ export default function Resources() {
               loading={loadingUsers}
               showSearch
               filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                String(option?.label ?? '')
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
               }
               allowClear
               options={users.map((u) => ({ value: u.id, label: u.nickname }))}
             />
           </Form.Item>
           {currentResource && (
-            <div className="text-gray-500 text-sm">当前资源: {currentResource.title}</div>
+            <div className="text-sm text-gray-500">当前资源：{currentResource.title}</div>
           )}
         </Form>
       </Modal>

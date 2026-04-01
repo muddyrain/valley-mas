@@ -1,5 +1,7 @@
 import http from '@/utils/request';
 
+export type ResourceVisibility = 'private' | 'shared' | 'public';
+
 // 资源类型
 export interface Resource {
   id: string;
@@ -7,6 +9,7 @@ export interface Resource {
   description: string;
   url: string;
   type: 'wallpaper' | 'avatar' | 'emoji' | 'background' | 'dynamic';
+  visibility?: ResourceVisibility;
   downloadCount: number;
   viewCount: number;
   likeCount: number;
@@ -142,6 +145,7 @@ export interface MyResource {
   title: string;
   description?: string;
   type: string;
+  visibility?: ResourceVisibility;
   url: string;
   size: number;
   downloadCount: number;
@@ -179,10 +183,16 @@ export const deleteResource = (id: string) => {
 // 修改资源元数据（标题、描述、类型）
 export const updateResource = (
   id: string,
-  data: { title?: string; description?: string; type?: string },
+  data: { title?: string; description?: string; type?: string; visibility?: ResourceVisibility },
 ) => {
-  return http.patch<unknown, { id: string; title: string; description: string; type: string }>(
-    `/creator/resources/${id}`,
-    data,
-  );
+  return http.patch<
+    unknown,
+    {
+      id: string;
+      title: string;
+      description: string;
+      type: string;
+      visibility?: ResourceVisibility;
+    }
+  >(`/creator/resources/${id}`, data);
 };

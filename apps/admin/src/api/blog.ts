@@ -1,6 +1,7 @@
 import http from '@/utils/request';
 
 export type PostType = 'blog' | 'image_text';
+export type Visibility = 'private' | 'shared' | 'public';
 
 export interface ImageTextPage {
   imageUrl?: string;
@@ -32,6 +33,7 @@ export interface Post {
   title: string;
   slug: string;
   postType: PostType;
+  visibility: Visibility;
   templateKey?: string;
   templateData?: string;
   imageTextData?: string;
@@ -95,6 +97,7 @@ export interface CreatePostData {
   title: string;
   slug?: string;
   postType?: PostType;
+  visibility?: Visibility;
   templateKey?: string;
   templateData?: string;
   imageTextData?: ImageTextData;

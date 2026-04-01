@@ -181,6 +181,7 @@ type Resource struct {
 	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID        Int64String    `gorm:"column:user_id;index" json:"userId"` // 上传者的 User.ID
 	Type          string         `gorm:"size:20" json:"type"`                // avatar, wallpaper
+	Visibility    string         `gorm:"size:20;default:'private';index" json:"visibility"`
 	Title         string         `gorm:"size:100" json:"title"`
 	Description   string         `gorm:"size:255" json:"description"`
 	URL           string         `gorm:"size:500" json:"url"`

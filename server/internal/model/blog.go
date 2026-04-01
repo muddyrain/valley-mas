@@ -14,6 +14,7 @@ type Post struct {
 	Title           string         `gorm:"size:200;not null" json:"title"`
 	Slug            string         `gorm:"size:200;uniqueIndex;not null" json:"slug"`
 	PostType        string         `gorm:"size:20;default:'blog';index" json:"postType"`
+	Visibility      string         `gorm:"size:20;default:'private';index" json:"visibility"`
 	TemplateKey     string         `gorm:"size:64" json:"templateKey,omitempty"`
 	TemplateData    string         `gorm:"type:text" json:"templateData,omitempty"`
 	ImageTextData   string         `gorm:"type:json" json:"imageTextData,omitempty"`

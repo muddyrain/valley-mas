@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const publicVisibilityWhere = "(visibility = 'public' OR visibility IS NULL OR visibility = '')"
+
 // HomePage 服务入口页（浏览器访问友好）
 func HomePage(c *gin.Context) {
 	now := time.Now().Format("2006-01-02 15:04:05")
@@ -252,6 +254,31 @@ func GetResourceDetail(c *gin.Context) {
 		return
 	}
 
+	visibility := resource.Visibility
+	if visibility == "" {
+		visibility = "public"
+	}
+
+	canView := visibility == "public"
+	if !canView {
+		if userIDAny, exists := c.Get("userId"); exists {
+			if userID, ok := userIDAny.(int64); ok && int64(resource.UserID) == userID {
+				canView = true
+			}
+		}
+	}
+	if !canView {
+		if roleAny, exists := c.Get("userRole"); exists {
+			if role, ok := roleAny.(string); ok && role == "admin" {
+				canView = true
+			}
+		}
+	}
+	if !canView {
+		Error(c, 404, "?????")
+		return
+	}
+
 	// 查询上传者信息
 	var user model.User
 	if err := db.Where("id = ? AND deleted_at IS NULL", resource.UserID).First(&user).Error; err != nil {
@@ -280,6 +307,7 @@ func GetResourceDetail(c *gin.Context) {
 		"title":         resource.Title,
 		"description":   resource.Description,
 		"type":          resource.Type,
+		"visibility":    visibility,
 		"url":           resource.URL,
 		"size":          resource.Size,
 		"width":         resource.Width,
@@ -345,11 +373,13 @@ func GetHotResources(c *gin.Context) {
 	var total int64
 	db.Model(&model.Resource{}).
 		Where("deleted_at IS NULL AND download_count > 0").
+		Where(publicVisibilityWhere).
 		Count(&total)
 
 	// 查询热门资源，按下载量排序
 	var resources []model.Resource
 	err := db.Where("deleted_at IS NULL AND download_count > 0").
+		Where(publicVisibilityWhere).
 		Order("download_count DESC, created_at DESC").
 		Limit(pageSize).
 		Offset(offset).
@@ -433,7 +463,7 @@ func GetAllResources(c *gin.Context) {
 	}
 	offset := (page - 1) * pageSize
 
-	query := db.Model(&model.Resource{}).Where("deleted_at IS NULL")
+	query := db.Model(&model.Resource{}).Where("deleted_at IS NULL").Where(publicVisibilityWhere)
 	if resourceType != "" {
 		query = query.Where("type = ?", resourceType)
 	}

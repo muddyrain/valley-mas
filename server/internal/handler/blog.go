@@ -20,6 +20,9 @@ import (
 const (
 	postTypeBlog      = "blog"
 	postTypeImageText = "image_text"
+	visibilityPrivate = "private"
+	visibilityShared  = "shared"
+	visibilityPublic  = "public"
 )
 
 type PostListResponse struct {
@@ -27,6 +30,7 @@ type PostListResponse struct {
 	Title           string            `json:"title"`
 	Slug            string            `json:"slug"`
 	PostType        string            `json:"postType"`
+	Visibility      string            `json:"visibility"`
 	TemplateKey     string            `json:"templateKey,omitempty"`
 	TemplateData    string            `json:"templateData,omitempty"`
 	ImageTextData   string            `json:"imageTextData,omitempty"`
@@ -73,6 +77,7 @@ type PostDetailResponse struct {
 	Title           string            `json:"title"`
 	Slug            string            `json:"slug"`
 	PostType        string            `json:"postType"`
+	Visibility      string            `json:"visibility"`
 	TemplateKey     string            `json:"templateKey,omitempty"`
 	TemplateData    string            `json:"templateData,omitempty"`
 	ImageTextData   string            `json:"imageTextData,omitempty"`
@@ -124,7 +129,7 @@ func GetPosts(c *gin.Context) {
 	offset := (page - 1) * pageSize
 
 	query := database.DB.Model(&model.Post{}).
-		Where("status = ? AND deleted_at IS NULL", "published").
+		Where("status = ? AND visibility = ? AND deleted_at IS NULL", "published", visibilityPublic).
 		Preload("Group").
 		Preload("Category").
 		Preload("Tags").
@@ -191,7 +196,7 @@ func GetPostDetail(c *gin.Context) {
 	slug := c.Param("slug")
 
 	var post model.Post
-	if err := database.DB.Where("slug = ? AND status = ? AND deleted_at IS NULL", slug, "published").
+	if err := database.DB.Where("slug = ? AND status = ? AND visibility = ? AND deleted_at IS NULL", slug, "published", visibilityPublic).
 		Preload("Group").
 		Preload("Category").
 		Preload("Tags").
@@ -216,7 +221,7 @@ func GetPostDetailByID(c *gin.Context) {
 	}
 
 	var post model.Post
-	if err := database.DB.Where("id = ? AND status = ? AND deleted_at IS NULL", id, "published").
+	if err := database.DB.Where("id = ? AND status = ? AND visibility = ? AND deleted_at IS NULL", id, "published", visibilityPublic).
 		Preload("Group").
 		Preload("Category").
 		Preload("Tags").
@@ -489,6 +494,7 @@ func AdminCreatePost(c *gin.Context) {
 	var req struct {
 		Title           string              `json:"title" binding:"required"`
 		PostType        string              `json:"postType"`
+		Visibility      string              `json:"visibility"`
 		TemplateKey     string              `json:"templateKey"`
 		TemplateData    string              `json:"templateData"`
 		ImageTextData   json.RawMessage     `json:"imageTextData"`
@@ -549,6 +555,7 @@ func AdminCreatePost(c *gin.Context) {
 		Title:           req.Title,
 		Slug:            slug,
 		PostType:        postType,
+		Visibility:      normalizeVisibility(req.Visibility),
 		TemplateKey:     strings.TrimSpace(req.TemplateKey),
 		TemplateData:    imageTextData,
 		ImageTextData:   imageTextData,
@@ -578,6 +585,9 @@ func AdminCreatePost(c *gin.Context) {
 
 	if post.Status == "" {
 		post.Status = "draft"
+	}
+	if post.Visibility == "" {
+		post.Visibility = visibilityPrivate
 	}
 
 	if req.PublishNow && post.Status == "published" {
@@ -636,6 +646,7 @@ func AdminUpdatePost(c *gin.Context) {
 	var req struct {
 		Title           string              `json:"title"`
 		PostType        string              `json:"postType"`
+		Visibility      string              `json:"visibility"`
 		TemplateKey     string              `json:"templateKey"`
 		TemplateData    string              `json:"templateData"`
 		ImageTextData   json.RawMessage     `json:"imageTextData"`
@@ -668,6 +679,9 @@ func AdminUpdatePost(c *gin.Context) {
 	}
 	if normalizedType := normalizePostType(req.PostType); normalizedType != "" {
 		updates["post_type"] = normalizedType
+	}
+	if normalizedVisibility := normalizeVisibility(req.Visibility); normalizedVisibility != "" {
+		updates["visibility"] = normalizedVisibility
 	}
 	if req.TemplateKey != "" {
 		updates["template_key"] = strings.TrimSpace(req.TemplateKey)
@@ -886,6 +900,7 @@ func convertToPostListResponse(post *model.Post) PostListResponse {
 		Title:           post.Title,
 		Slug:            post.Slug,
 		PostType:        normalizePostType(post.PostType),
+		Visibility:      normalizeVisibility(post.Visibility),
 		TemplateKey:     post.TemplateKey,
 		TemplateData:    post.TemplateData,
 		ImageTextData:   normalizeImageTextData(post.ImageTextData, post.TemplateData),
@@ -949,6 +964,7 @@ func convertToPostDetailResponse(post *model.Post) PostDetailResponse {
 		Title:           post.Title,
 		Slug:            post.Slug,
 		PostType:        normalizePostType(post.PostType),
+		Visibility:      normalizeVisibility(post.Visibility),
 		TemplateKey:     post.TemplateKey,
 		TemplateData:    post.TemplateData,
 		ImageTextData:   normalizeImageTextData(post.ImageTextData, post.TemplateData),
@@ -1025,6 +1041,20 @@ func normalizePostType(value string) string {
 		return postTypeBlog
 	case postTypeImageText:
 		return postTypeImageText
+	default:
+		return ""
+	}
+}
+
+func normalizeVisibility(value string) string {
+	v := strings.TrimSpace(strings.ToLower(value))
+	switch v {
+	case visibilityPrivate:
+		return visibilityPrivate
+	case visibilityShared:
+		return visibilityShared
+	case visibilityPublic:
+		return visibilityPublic
 	default:
 		return ""
 	}

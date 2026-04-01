@@ -86,6 +86,16 @@ export default function BlogPosts() {
     return <Tag color={config.color}>{config.text}</Tag>;
   };
 
+  const getVisibilityTag = (value: string) => {
+    const visibilityMap: Record<string, { color: string; text: string }> = {
+      private: { color: 'default', text: '私密' },
+      shared: { color: 'cyan', text: '共享' },
+      public: { color: 'green', text: '公开' },
+    };
+    const config = visibilityMap[value] || { color: 'default', text: value || '-' };
+    return <Tag color={config.color}>{config.text}</Tag>;
+  };
+
   const filteredPosts = useMemo(() => {
     if (!keyword.trim()) return posts;
     const lower = keyword.toLowerCase();
@@ -141,6 +151,13 @@ export default function BlogPosts() {
       dataIndex: 'status',
       key: 'status',
       render: (value: string) => getStatusTag(value),
+    },
+    {
+      title: '可见范围',
+      dataIndex: 'visibility',
+      key: 'visibility',
+      width: 100,
+      render: (value: string) => getVisibilityTag(value),
     },
     {
       title: '浏览',

@@ -21,6 +21,7 @@ import {
   getAdminPostDetail,
   updatePost,
   uploadBlogCover,
+  type Visibility,
 } from '@/api/blog';
 import { MarkdownPreview } from '@/components/blog';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,7 @@ type LocalDraft = {
   coverStorageKey: string;
   content: string;
   groupId: string;
+  visibility: Visibility;
   updatedAt: string;
 };
 
@@ -62,6 +64,7 @@ export default function BlogCreate() {
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupId, setGroupId] = useState('');
+  const [visibility, setVisibility] = useState<Visibility>('private');
   const [title, setTitle] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [cover, setCover] = useState('');
@@ -115,6 +118,7 @@ export default function BlogCreate() {
       setCoverStorageKey(detail.coverStorageKey || '');
       setContent(detail.content || '');
       setGroupId(detail.groupId || '');
+      setVisibility(detail.visibility || 'private');
     } catch {
       toast.error('加载博客内容失败');
       navigate('/my-space');
@@ -155,6 +159,7 @@ export default function BlogCreate() {
       setCoverStorageKey(draft.coverStorageKey || '');
       setContent(draft.content || '');
       setGroupId(draft.groupId || '');
+      setVisibility(draft.visibility || 'private');
       setLastAutoSavedAt(draft.updatedAt || '');
       setDraftRecovered(true);
     } catch {
@@ -172,11 +177,12 @@ export default function BlogCreate() {
         coverStorageKey,
         content,
         groupId,
+        visibility,
         updatedAt: new Date().toISOString(),
       };
 
-      const hasData = [title, excerpt, cover, coverStorageKey, content, groupId].some((item) =>
-        item.trim(),
+      const hasData = [title, excerpt, cover, coverStorageKey, content, groupId, visibility].some(
+        (item) => item.trim(),
       );
       if (!hasData) {
         localStorage.removeItem(LOCAL_CREATE_DRAFT_KEY);
@@ -188,7 +194,17 @@ export default function BlogCreate() {
     }, 700);
 
     return () => clearTimeout(timer);
-  }, [isEditMode, loadingPost, title, excerpt, cover, coverStorageKey, content, groupId]);
+  }, [
+    isEditMode,
+    loadingPost,
+    title,
+    excerpt,
+    cover,
+    coverStorageKey,
+    content,
+    groupId,
+    visibility,
+  ]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -200,7 +216,18 @@ export default function BlogCreate() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content, excerpt, cover, coverStorageKey, groupId, isEditMode, editingId, coverFile]);
+  }, [
+    title,
+    content,
+    excerpt,
+    cover,
+    coverStorageKey,
+    groupId,
+    visibility,
+    isEditMode,
+    editingId,
+    coverFile,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -339,6 +366,7 @@ export default function BlogCreate() {
           cover: resolvedCover.cover || '',
           coverStorageKey: resolvedCover.coverStorageKey || '',
           groupId: groupId || '0',
+          visibility,
           status,
         });
         if (status === 'published') {
@@ -357,6 +385,7 @@ export default function BlogCreate() {
           cover: resolvedCover.cover || undefined,
           coverStorageKey: resolvedCover.coverStorageKey || undefined,
           groupId: groupId || undefined,
+          visibility,
           status,
           publishNow: status === 'published',
         });
@@ -575,7 +604,7 @@ export default function BlogCreate() {
           }
         >
           {previewMode !== 'preview' && (
-            <section className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5">
+            <section className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5 min-w-125">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm text-slate-500">写作区</div>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
@@ -716,6 +745,30 @@ export default function BlogCreate() {
                         )}
                       </div>
                     )}
+                  </div>
+
+                  <div>
+                    <div className="mb-1 text-xs text-slate-500">可见范围</div>
+                    <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2">
+                      {[
+                        { label: '私密', value: 'private' as const },
+                        { label: '共享', value: 'shared' as const },
+                        { label: '公开', value: 'public' as const },
+                      ].map((item) => (
+                        <button
+                          type="button"
+                          key={item.value}
+                          onClick={() => setVisibility(item.value)}
+                          className={`rounded-full px-3 py-1.5 text-sm transition ${
+                            visibility === item.value
+                              ? 'bg-violet-600 text-white shadow-sm'
+                              : 'bg-white text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div>

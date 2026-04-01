@@ -23,6 +23,17 @@ func truncateRunes(s string, max int) string {
 	return string(runes[:max])
 }
 
+func normalizeResourceVisibility(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "public":
+		return "public"
+	case "shared":
+		return "shared"
+	default:
+		return "private"
+	}
+}
+
 // ListResources 资源列表
 // @Summary      获取资源列表
 // @Description  管理员查看所有资源列表
@@ -139,6 +150,7 @@ func UploadResource(c *gin.Context) {
 	resource := model.Resource{
 		ID:          model.Int64String(utils.GenerateID()),
 		Type:        resourceType,
+		Visibility:  normalizeResourceVisibility(c.PostForm("visibility")),
 		URL:         result.URL,
 		StorageKey:  result.Key,
 		Title:       truncateRunes(title, 100),
@@ -304,6 +316,7 @@ func UpdateResource(c *gin.Context) {
 		Title       string `json:"title"`
 		Description string `json:"description"`
 		Type        string `json:"type"`
+		Visibility  string `json:"visibility"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Error(c, 400, "参数错误："+err.Error())
@@ -340,6 +353,9 @@ func UpdateResource(c *gin.Context) {
 			return
 		}
 		updates["type"] = req.Type
+	}
+	if req.Visibility != "" {
+		updates["visibility"] = normalizeResourceVisibility(req.Visibility)
 	}
 
 	if len(updates) == 0 {
