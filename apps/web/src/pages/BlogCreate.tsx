@@ -24,6 +24,7 @@ import {
   type Visibility,
 } from '@/api/blog';
 import { MarkdownPreview } from '@/components/blog';
+import { CoverCropDialog } from '@/components/blog/CoverCropDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -75,7 +76,6 @@ export default function BlogCreate() {
   const [coverZoom, setCoverZoom] = useState(1);
   const [coverOffsetX, setCoverOffsetX] = useState(0);
   const [coverOffsetY, setCoverOffsetY] = useState(0);
-  const [coverDragging, setCoverDragging] = useState(false);
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -87,9 +87,11 @@ export default function BlogCreate() {
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState('');
   const [draftRecovered, setDraftRecovered] = useState(false);
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [pendingCropFile, setPendingCropFile] = useState<File | null>(null);
+  const [pendingCropUrl, setPendingCropUrl] = useState('');
 
   const coverViewportRef = useRef<HTMLDivElement | null>(null);
-  const dragStartRef = useRef<{ x: number; y: number; baseX: number; baseY: number } | null>(null);
 
   const loadGroups = async () => {
     try {
@@ -247,27 +249,6 @@ export default function BlogCreate() {
     setCoverZoom(1);
     setCoverOffsetX(0);
     setCoverOffsetY(0);
-    setCoverDragging(false);
-  };
-
-  const getCoverDragLimit = (zoom = coverZoom) => {
-    const viewport = coverViewportRef.current;
-    if (!viewport || !coverImageMeta) return { maxX: 0, maxY: 0 };
-    const boxW = viewport.clientWidth;
-    const boxH = viewport.clientHeight;
-    const baseScale = Math.max(boxW / coverImageMeta.width, boxH / coverImageMeta.height);
-    const renderedW = coverImageMeta.width * baseScale * zoom;
-    const renderedH = coverImageMeta.height * baseScale * zoom;
-    return {
-      maxX: Math.max(0, (renderedW - boxW) / 2),
-      maxY: Math.max(0, (renderedH - boxH) / 2),
-    };
-  };
-
-  const applyClampedCoverOffset = (x: number, y: number, zoom = coverZoom) => {
-    const limit = getCoverDragLimit(zoom);
-    setCoverOffsetX(clamp(x, -limit.maxX, limit.maxX));
-    setCoverOffsetY(clamp(y, -limit.maxY, limit.maxY));
   };
 
   const renderCoverToBlob = async (): Promise<Blob | null> => {
@@ -418,22 +399,11 @@ export default function BlogCreate() {
     }
     try {
       const objectUrl = URL.createObjectURL(file);
-      const meta = await new Promise<CoverImageMeta>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-        img.onerror = () => reject(new Error('read cover failed'));
-        img.src = objectUrl;
-      });
-      if (coverObjectUrl) {
-        URL.revokeObjectURL(coverObjectUrl);
-      }
-      setCoverFile(file);
-      setCoverObjectUrl(objectUrl);
-      setCoverImageMeta(meta);
-      setCoverZoom(1);
-      setCoverOffsetX(0);
-      setCoverOffsetY(0);
-      setCoverStorageKey('');
+      // 先弹出裁剪框，让用户自由选择裁剪范围
+      if (pendingCropUrl) URL.revokeObjectURL(pendingCropUrl);
+      setPendingCropFile(file);
+      setPendingCropUrl(objectUrl);
+      setCropDialogOpen(true);
     } catch {
       toast.error('封面读取失败，请重试');
     } finally {
@@ -441,33 +411,30 @@ export default function BlogCreate() {
     }
   };
 
-  const handleCoverPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!coverObjectUrl) return;
-    dragStartRef.current = {
-      x: event.clientX,
-      y: event.clientY,
-      baseX: coverOffsetX,
-      baseY: coverOffsetY,
-    };
-    setCoverDragging(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handleCoverPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!coverDragging || !dragStartRef.current) return;
-    const deltaX = event.clientX - dragStartRef.current.x;
-    const deltaY = event.clientY - dragStartRef.current.y;
-    applyClampedCoverOffset(
-      dragStartRef.current.baseX + deltaX,
-      dragStartRef.current.baseY + deltaY,
-    );
-  };
-
-  const handleCoverPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!coverDragging) return;
-    setCoverDragging(false);
-    dragStartRef.current = null;
-    event.currentTarget.releasePointerCapture(event.pointerId);
+  const handleCropConfirm = async (croppedFile: File) => {
+    try {
+      const objectUrl = URL.createObjectURL(croppedFile);
+      const meta = await new Promise<CoverImageMeta>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        img.onerror = () => reject(new Error('read cover failed'));
+        img.src = objectUrl;
+      });
+      if (coverObjectUrl) URL.revokeObjectURL(coverObjectUrl);
+      setCoverFile(croppedFile);
+      setCoverObjectUrl(objectUrl);
+      setCoverImageMeta(meta);
+      setCoverZoom(1);
+      setCoverOffsetX(0);
+      setCoverOffsetY(0);
+      setCoverStorageKey('');
+      // 清理 pending 状态
+      if (pendingCropUrl) URL.revokeObjectURL(pendingCropUrl);
+      setPendingCropFile(null);
+      setPendingCropUrl('');
+    } catch {
+      toast.error('封面处理失败，请重试');
+    }
   };
 
   const handleCreateGroup = async () => {
@@ -517,7 +484,7 @@ export default function BlogCreate() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[linear-gradient(145deg,#f4f3ff_0%,#edf6ff_48%,#f8fbff_100%)] px-4 py-6 md:px-8">
-      <div className="mx-auto max-w-[1400px]">
+      <div className="mx-auto max-w-350">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-200/70 bg-white/75 px-4 py-3 shadow-sm backdrop-blur">
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="rounded-xl">
@@ -604,7 +571,7 @@ export default function BlogCreate() {
           }
         >
           {previewMode !== 'preview' && (
-            <section className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5 min-w-125">
+            <section className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5 w-full">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm text-slate-500">写作区</div>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
@@ -689,60 +656,24 @@ export default function BlogCreate() {
                       <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                         <div
                           ref={coverViewportRef}
-                          className="relative h-36 w-full touch-none overflow-hidden bg-slate-100 md:h-44"
-                          onPointerDown={handleCoverPointerDown}
-                          onPointerMove={handleCoverPointerMove}
-                          onPointerUp={handleCoverPointerUp}
-                          onPointerCancel={handleCoverPointerUp}
-                          style={{
-                            cursor: coverObjectUrl
-                              ? coverDragging
-                                ? 'grabbing'
-                                : 'grab'
-                              : 'default',
-                          }}
+                          className="relative aspect-[5/2] w-full overflow-hidden"
                         >
                           <img
                             src={coverObjectUrl || cover}
                             alt="博客封面预览"
-                            className="pointer-events-none absolute inset-0 h-full w-full object-cover select-none"
+                            className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
                             draggable={false}
-                            style={{
-                              transform: `translate(${coverOffsetX}px, ${coverOffsetY}px) scale(${coverZoom})`,
-                              transformOrigin: 'center center',
-                              transition: coverDragging ? 'none' : 'transform 120ms ease-out',
-                            }}
                           />
-                          {coverObjectUrl && (
-                            <div className="pointer-events-none absolute right-2 bottom-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] text-white">
-                              可拖动裁剪
-                            </div>
-                          )}
                         </div>
-                        {coverObjectUrl && (
-                          <div className="border-t border-slate-200 px-3 py-2">
-                            <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
-                              <span>缩放裁剪</span>
-                              <span>{coverZoom.toFixed(2)}x</span>
-                            </div>
-                            <input
-                              type="range"
-                              min={1}
-                              max={3}
-                              step={0.01}
-                              value={coverZoom}
-                              onChange={(e) => {
-                                const nextZoom = Number(e.target.value);
-                                setCoverZoom(nextZoom);
-                                applyClampedCoverOffset(coverOffsetX, coverOffsetY, nextZoom);
-                              }}
-                              className="w-full accent-violet-600"
-                            />
-                            <div className="mt-1 text-[11px] text-slate-400">
-                              提示：封面仅本地预览，点击保存草稿/发布时才会上传到 TOS。
-                            </div>
-                          </div>
-                        )}
+                        {/* 可见范围标签 */}
+                        <div className="px-3 py-1 text-xs text-slate-500">
+                          当前可见范围：
+                          {visibility === 'public'
+                            ? '公开'
+                            : visibility === 'shared'
+                              ? '共享'
+                              : '私密'}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -873,6 +804,24 @@ export default function BlogCreate() {
           )}
         </div>
       </div>
+
+      {/* 封面裁剪弹框 */}
+      {pendingCropUrl && pendingCropFile && (
+        <CoverCropDialog
+          open={cropDialogOpen}
+          imageUrl={pendingCropUrl}
+          fileName={pendingCropFile.name}
+          onOpenChange={(open) => {
+            if (!open) {
+              setCropDialogOpen(false);
+              if (pendingCropUrl) URL.revokeObjectURL(pendingCropUrl);
+              setPendingCropFile(null);
+              setPendingCropUrl('');
+            }
+          }}
+          onConfirm={(file) => void handleCropConfirm(file)}
+        />
+      )}
     </div>
   );
 }

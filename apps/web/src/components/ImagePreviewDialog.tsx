@@ -1,4 +1,4 @@
-﻿import { RotateCcw, RotateCw, ZoomIn, ZoomOut } from 'lucide-react';
+﻿import { Maximize2, RotateCcw, RotateCw, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
@@ -94,30 +94,57 @@ export default function ImagePreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[96vw] max-w-[96vw] sm:w-[92vw] sm:max-w-[92vw] h-[92vh] max-h-[92vh] p-0 border-none bg-black/45 backdrop-blur-sm shadow-none">
+      <DialogContent className="w-[96vw] max-w-[96vw] sm:w-[90vw] sm:max-w-[90vw] h-[92vh] max-h-[92vh] p-0 border-none bg-transparent shadow-none overflow-hidden [&>button]:hidden">
+        {/* 毛玻璃背景遮罩 */}
         <div
-          className="relative h-full w-full overflow-hidden rounded-xl bg-black/40"
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-        >
-          <div className="pointer-events-none absolute left-4 top-4 z-10 max-w-[70vw] rounded-lg bg-black/40 px-3 py-1.5 text-sm text-white/95 backdrop-blur">
-            <span className="block truncate">{displayTitle}</span>
+          className="absolute inset-0 bg-black/80 backdrop-blur-xl"
+          onClick={() => onOpenChange(false)}
+        />
+
+        {/* 主容器 */}
+        <div className="relative flex h-full w-full flex-col">
+          {/* 顶部标题栏 */}
+          <div className="relative z-10 flex items-center justify-between px-5 py-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/10">
+                <Maximize2 className="h-3.5 w-3.5 text-white/80" />
+              </div>
+              <span className="truncate text-sm font-medium text-white/90 max-w-[60vw]">
+                {displayTitle}
+              </span>
+            </div>
+            {/* 关闭按钮 */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenChange(false);
+              }}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition-all hover:bg-white/30 hover:scale-110 active:scale-95"
+              title="关闭"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
 
-          <div className="flex h-full w-full items-center justify-center p-8">
+          {/* 图片区域 */}
+          <div
+            className="relative flex flex-1 items-center justify-center overflow-hidden px-6 pb-4"
+            onClick={() => onOpenChange(false)}
+          >
             {canPreview ? (
               <img
                 src={src}
                 alt={displayTitle}
-                className="select-none rounded-sm shadow-[0_16px_64px_rgba(0,0,0,0.45)] cursor-grab active:cursor-grabbing"
+                className="select-none rounded-xl shadow-[0_32px_80px_rgba(0,0,0,0.7)] cursor-grab active:cursor-grabbing"
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
                 onPointerCancel={handlePointerUp}
+                onClick={(e) => e.stopPropagation()}
                 style={{
-                  maxWidth: '82vw',
-                  maxHeight: '76vh',
+                  maxWidth: '84vw',
+                  maxHeight: '72vh',
                   width: 'auto',
                   height: 'auto',
                   transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale}) rotate(${rotate}deg)`,
@@ -127,60 +154,84 @@ export default function ImagePreviewDialog({
                 }}
               />
             ) : (
-              <div className="text-sm text-white/80">暂无可预览图片</div>
+              <div className="text-sm text-white/60">暂无可预览图片</div>
             )}
           </div>
 
-          <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
-            <div className="flex items-center gap-1.5 rounded-full border border-white/15 bg-black/55 px-2 py-1.5 backdrop-blur-md">
+          {/* 底部工具栏 */}
+          <div className="relative z-10 flex justify-center pb-5">
+            <div className="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/10 p-1.5 backdrop-blur-xl shadow-lg">
+              {/* 缩小 */}
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setScale((v) => clamp(v - SCALE_STEP, MIN_SCALE, MAX_SCALE));
                 }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/90 hover:bg-white/15"
+                className="group flex h-9 w-9 items-center justify-center rounded-xl text-white/70 transition-all hover:bg-white/20 hover:text-white"
                 title="缩小"
               >
                 <ZoomOut className="h-4 w-4" />
               </button>
+
+              {/* 缩放比例 */}
+              <div className="min-w-[3.2rem] text-center text-xs font-medium text-white/60 tabular-nums select-none">
+                {Math.round(scale * 100)}%
+              </div>
+
+              {/* 放大 */}
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setScale((v) => clamp(v + SCALE_STEP, MIN_SCALE, MAX_SCALE));
                 }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/90 hover:bg-white/15"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-white/70 transition-all hover:bg-white/20 hover:text-white"
                 title="放大"
               >
                 <ZoomIn className="h-4 w-4" />
               </button>
+
+              {/* 分隔线 */}
+              <div className="mx-1 h-5 w-px bg-white/15" />
+
+              {/* 向左旋转 */}
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setRotate((v) => v - 90);
                 }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/90 hover:bg-white/15"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-white/70 transition-all hover:bg-white/20 hover:text-white"
                 title="向左旋转"
               >
                 <RotateCcw className="h-4 w-4" />
               </button>
+
+              {/* 向右旋转 */}
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setRotate((v) => v + 90);
                 }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/90 hover:bg-white/15"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-white/70 transition-all hover:bg-white/20 hover:text-white"
                 title="向右旋转"
               >
                 <RotateCw className="h-4 w-4" />
               </button>
+
+              {/* 分隔线 */}
+              <div className="mx-1 h-5 w-px bg-white/15" />
+
+              {/* 复位 */}
               <button
                 type="button"
-                onClick={reset}
-                className="rounded-full px-3 py-1.5 text-xs font-medium text-white/90 hover:bg-white/15"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  reset();
+                }}
+                className="flex h-9 items-center justify-center rounded-xl px-3 text-xs font-medium text-white/70 transition-all hover:bg-white/20 hover:text-white"
                 title="复位"
               >
                 复位

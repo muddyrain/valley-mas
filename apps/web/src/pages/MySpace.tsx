@@ -534,8 +534,25 @@ export default function MySpace() {
                     <div className="mb-3 flex items-center justify-between">
                       {(() => {
                         const statusMeta = getPostStatusMeta(post.status);
+                        // tag 样式
+                        const visMap: Record<
+                          'public' | 'shared' | 'private',
+                          { label: string; className: string }
+                        > = {
+                          public: { label: '公开', className: 'bg-green-100 text-green-700' },
+                          shared: { label: '共享', className: 'bg-blue-100 text-blue-700' },
+                          private: { label: '私密', className: 'bg-slate-200 text-slate-600' },
+                        };
+                        const vis =
+                          visMap[post.visibility as 'public' | 'shared' | 'private'] ||
+                          visMap.private;
                         return (
                           <>
+                            <span
+                              className={`mr-2 rounded-full px-2.5 py-1 text-xs font-medium ${vis.className}`}
+                            >
+                              {vis.label}
+                            </span>
                             <span
                               className={`rounded-full px-2.5 py-1 text-xs ${
                                 post.postType === 'image_text'
@@ -546,7 +563,7 @@ export default function MySpace() {
                               {post.postType === 'image_text' ? '图文创作' : '博客'}
                             </span>
                             <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}
+                              className={`ml-auto rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}
                             >
                               {statusMeta.label}
                             </span>
@@ -557,6 +574,7 @@ export default function MySpace() {
                     <h3 className="line-clamp-2 text-lg font-semibold text-slate-900 group-hover:text-violet-700">
                       {post.title}
                     </h3>
+
                     <p className="mt-2 line-clamp-3 min-h-[66px] text-sm leading-6 text-slate-600">
                       {post.excerpt || '暂无摘要，点击查看详情内容。'}
                     </p>
