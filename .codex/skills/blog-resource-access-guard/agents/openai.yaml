@@ -1,0 +1,4 @@
+interface:
+  display_name: "博客资源访问护栏"
+  short_description: "保护博客与资源的可见范围、自访问和回跳行为"
+  default_prompt: "当任务涉及博客或资源详情访问、private/shared 可见范围、public/admin 兜底逻辑或返回路径时，使用博客资源访问护栏。"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "技能使用透明化"
+  short_description: "要求 AI 主动说明本次用了哪些 skills 以及原因"
+  default_prompt: "当本次任务触发了 skills 时，主动告诉用户用了哪些 skills，并用一句话说明原因。"
