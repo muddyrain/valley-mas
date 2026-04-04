@@ -9,13 +9,15 @@ import {
   Share2,
   User,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   downloadResource,
   favoriteResource,
+  getMyResources,
   getResourceDetail,
+  type MyResource,
   type Resource,
   unfavoriteResource,
 } from '@/api/resource';
@@ -47,10 +49,36 @@ function formatDate(iso?: string): string {
   });
 }
 
+function mapMyResourceToDetail(
+  resource: MyResource,
+  currentUser?: { id?: string; nickname?: string; username?: string; avatar?: string },
+): Resource {
+  return {
+    id: resource.id,
+    title: resource.title,
+    description: resource.description || '',
+    url: resource.url,
+    type: resource.type as Resource['type'],
+    visibility: resource.visibility,
+    downloadCount: resource.downloadCount,
+    viewCount: 0,
+    likeCount: 0,
+    favoriteCount: 0,
+    userId: currentUser?.id || '',
+    creatorName: currentUser?.nickname || currentUser?.username || '我',
+    creatorAvatar: currentUser?.avatar || '',
+    tags: [],
+    createdAt: resource.createdAt,
+    size: resource.size,
+    isFavorited: false,
+  };
+}
+
 export default function ResourceDetail() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
 
   const [resource, setResource] = useState<Resource | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,21 +86,52 @@ export default function ResourceDetail() {
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  // 图片是否已加载完成（用于模糊渐入）
   const [imgLoaded, setImgLoaded] = useState(false);
+
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo || '/resources';
+  const returnLabel =
+    (location.state as { returnLabel?: string } | null)?.returnLabel || '返回资源列表';
+
+  const handleReturn = useCallback(() => {
+    if (window.history.state?.idx > 0) {
+      navigate(-1);
+      return;
+    }
+    navigate(returnTo);
+  }, [navigate, returnTo]);
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
-    setImgLoaded(false);
-    getResourceDetail(id)
-      .then((data) => {
+
+    const load = async () => {
+      setLoading(true);
+      setImgLoaded(false);
+      try {
+        let data: Resource;
+        try {
+          data = await getResourceDetail(id, { suppressErrorToast: true });
+        } catch (error) {
+          if (user?.role !== 'creator') throw error;
+          const mine = await getMyResources(
+            { page: 1, pageSize: 1000 },
+            { suppressErrorToast: true },
+          );
+          const matched = mine.list.find((item) => item.id === id);
+          if (!matched) throw error;
+          data = mapMyResourceToDetail(matched, user || undefined);
+        }
         setResource(data);
         setFavorited(data.isFavorited ?? false);
-      })
-      .catch(() => toast.error('加载资源失败'))
-      .finally(() => setLoading(false));
-  }, [id]);
+      } catch (error) {
+        console.error('Failed to load resource:', error);
+        setResource(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void load();
+  }, [id, user]);
 
   const handleFavorite = async () => {
     if (!isAuthenticated) {
@@ -81,7 +140,7 @@ export default function ResourceDetail() {
       return;
     }
     if (!resource) return;
-    // 乐观更新：先同步 UI，失败时回滚
+
     const prevFavorited = favorited;
     const delta = favorited ? -1 : 1;
     setFavorited(!favorited);
@@ -99,7 +158,6 @@ export default function ResourceDetail() {
         toast.success('已收藏');
       }
     } catch {
-      // 请求失败，回滚 UI
       setFavorited(prevFavorited);
       setResource((prev) =>
         prev ? { ...prev, favoriteCount: Math.max(0, (prev.favoriteCount ?? 0) - delta) } : prev,
@@ -119,11 +177,8 @@ export default function ResourceDetail() {
     try {
       setDownloading(true);
       const { downloadUrl } = await downloadResource(resource.id);
-      // 新 tab 打开下载链接
       window.open(downloadUrl, '_blank', 'noopener');
       setResource((prev) => (prev ? { ...prev, downloadCount: prev.downloadCount + 1 } : prev));
-    } catch {
-      // request.ts 已处理
     } finally {
       setDownloading(false);
     }
@@ -135,19 +190,16 @@ export default function ResourceDetail() {
     });
   };
 
-  // ── 骨架屏 ──────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-50 via-purple-50/30 to-indigo-50/30">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Skeleton className="h-8 w-24 mb-6" />
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-            {/* 图片骨架 */}
+        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+          <Skeleton className="mb-6 h-8 w-24" />
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
             <div className="lg:col-span-3">
-              <Skeleton className="w-full aspect-square rounded-2xl" />
+              <Skeleton className="aspect-square w-full rounded-2xl" />
             </div>
-            {/* 信息骨架 */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="space-y-4 lg:col-span-2">
               <Skeleton className="h-8 w-3/4" />
               <Skeleton className="h-5 w-1/2" />
               <Skeleton className="h-4 w-full" />
@@ -166,12 +218,14 @@ export default function ResourceDetail() {
 
   if (!resource) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
         <div className="text-center">
-          <FileImage className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-500">资源不存在或已被删除</h2>
-          <Button variant="outline" onClick={() => navigate('/')} className="mt-4">
-            返回首页
+          <FileImage className="mx-auto mb-4 h-16 w-16 text-gray-300" />
+          <h2 className="text-xl font-semibold text-gray-500">
+            资源不存在，或当前账号没有权限访问
+          </h2>
+          <Button variant="outline" onClick={handleReturn} className="mt-4">
+            {returnLabel}
           </Button>
         </div>
       </div>
@@ -180,92 +234,82 @@ export default function ResourceDetail() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-50 via-purple-50/30 to-indigo-50/30">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 返回按钮 */}
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         <button
           type="button"
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-purple-600 transition-colors mb-6 group"
+          onClick={handleReturn}
+          className="group mb-6 flex items-center gap-2 text-sm text-gray-500 transition-colors hover:text-purple-600"
         >
-          <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
-          返回
+          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+          {returnLabel}
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          {/* ── 左：图片预览 ───────────────────────────────── */}
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
           <div className="lg:col-span-3">
             <div
-              className="relative aspect-square rounded-2xl overflow-hidden bg-black shadow-2xl cursor-zoom-in"
+              className="relative aspect-square cursor-zoom-in overflow-hidden rounded-2xl bg-black shadow-2xl"
               onClick={() => setPreviewOpen(true)}
             >
-              {/* 模糊背景 */}
               <img
                 src={resource.url}
                 alt=""
                 aria-hidden
-                className="absolute inset-0 h-full w-full object-cover scale-110 blur-2xl opacity-50 pointer-events-none select-none"
+                className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover scale-110 blur-2xl opacity-50"
               />
-              {/* 主图 */}
               <img
                 src={resource.url}
                 alt={resource.title}
                 className={`relative h-full w-full object-contain transition-opacity duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
                 onLoad={() => setImgLoaded(true)}
               />
-              {/* 加载中占位 */}
               {!imgLoaded && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 text-white/60 animate-spin" />
+                  <Loader2 className="h-8 w-8 animate-spin text-white/60" />
                 </div>
               )}
-              {/* 类型标签 */}
-              <div className="absolute top-3 left-3">
-                <Badge className="bg-black/60 backdrop-blur-sm text-white border-0 text-xs px-2.5 py-1">
+              <div className="absolute left-3 top-3">
+                <Badge className="border-0 bg-black/60 px-2.5 py-1 text-xs text-white backdrop-blur-sm">
                   {TYPE_LABEL[resource.type] ?? resource.type}
                 </Badge>
               </div>
             </div>
           </div>
 
-          {/* ── 右：信息面板 ───────────────────────────────── */}
-          <div className="lg:col-span-2 flex flex-col gap-5">
-            {/* 标题 */}
+          <div className="flex flex-col gap-5 lg:col-span-2">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 leading-tight mb-2">
+              <h1 className="mb-2 text-2xl font-bold leading-tight text-gray-900">
                 {resource.title}
               </h1>
               {resource.description && (
-                <p className="text-gray-500 text-sm leading-relaxed">{resource.description}</p>
+                <p className="text-sm leading-relaxed text-gray-500">{resource.description}</p>
               )}
             </div>
 
-            {/* 创作者信息 */}
             <button
               type="button"
               onClick={() =>
                 resource.creatorCode ? navigate(`/creator/${resource.creatorCode}`) : undefined
               }
-              className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 shadow-sm hover:border-purple-200 hover:shadow-md transition-all text-left w-full"
+              className="flex w-full items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 text-left shadow-sm transition-all hover:border-purple-200 hover:shadow-md"
             >
               <Avatar className="h-10 w-10 border-2 border-purple-100">
                 <AvatarImage src={resource.creatorAvatar} className="object-cover" />
-                <AvatarFallback className="bg-linear-to-br from-purple-400 to-indigo-600 text-white text-sm font-bold">
+                <AvatarFallback className="bg-linear-to-br from-purple-400 to-indigo-600 text-sm font-bold text-white">
                   {resource.creatorName?.[0]?.toUpperCase() || 'C'}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-400 mb-0.5">创作者</p>
-                <p className="text-sm font-semibold text-gray-800 truncate">
+              <div className="min-w-0 flex-1">
+                <p className="mb-0.5 text-xs text-gray-400">创作者</p>
+                <p className="truncate text-sm font-semibold text-gray-800">
                   {resource.creatorName || '未知创作者'}
                 </p>
               </div>
-              <User className="h-4 w-4 text-purple-400 shrink-0" />
+              <User className="h-4 w-4 shrink-0 text-purple-400" />
             </button>
 
-            {/* 统计信息 */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
-                <div className="p-1.5 rounded-lg bg-purple-50">
+              <div className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+                <div className="rounded-lg bg-purple-50 p-1.5">
                   <Download className="h-4 w-4 text-purple-500" />
                 </div>
                 <div>
@@ -273,8 +317,8 @@ export default function ResourceDetail() {
                   <p className="text-base font-bold text-gray-800">{resource.downloadCount}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
-                <div className="p-1.5 rounded-lg bg-pink-50">
+              <div className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+                <div className="rounded-lg bg-pink-50 p-1.5">
                   <Heart className="h-4 w-4 text-pink-500" />
                 </div>
                 <div>
@@ -282,8 +326,8 @@ export default function ResourceDetail() {
                   <p className="text-base font-bold text-gray-800">{resource.favoriteCount ?? 0}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
-                <div className="p-1.5 rounded-lg bg-blue-50">
+              <div className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+                <div className="rounded-lg bg-blue-50 p-1.5">
                   <FileImage className="h-4 w-4 text-blue-500" />
                 </div>
                 <div>
@@ -292,8 +336,8 @@ export default function ResourceDetail() {
                 </div>
               </div>
               {resource.width && resource.height ? (
-                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
-                  <div className="p-1.5 rounded-lg bg-indigo-50">
+                <div className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+                  <div className="rounded-lg bg-indigo-50 p-1.5">
                     <MonitorSmartphone className="h-4 w-4 text-indigo-500" />
                   </div>
                   <div>
@@ -305,13 +349,13 @@ export default function ResourceDetail() {
                 </div>
               ) : null}
               {resource.extension ? (
-                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
-                  <div className="p-1.5 rounded-lg bg-emerald-50">
+                <div className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+                  <div className="rounded-lg bg-emerald-50 p-1.5">
                     <FileImage className="h-4 w-4 text-emerald-500" />
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">文件格式</p>
-                    <p className="text-base font-bold text-gray-800 uppercase">
+                    <p className="text-base font-bold uppercase text-gray-800">
                       {resource.extension}
                     </p>
                   </div>
@@ -319,34 +363,30 @@ export default function ResourceDetail() {
               ) : null}
             </div>
 
-            {/* 上传时间 */}
-            <div className="flex items-center gap-2 text-sm text-gray-400 px-1">
+            <div className="flex items-center gap-2 px-1 text-sm text-gray-400">
               <Calendar className="h-4 w-4 shrink-0" />
               <span>上传于 {formatDate(resource.createdAt)}</span>
             </div>
 
-            {/* 操作按钮 */}
-            <div className="flex gap-3 mt-auto pt-2">
-              {/* 下载 */}
+            <div className="mt-auto flex gap-3 pt-2">
               <Button
                 onClick={handleDownload}
                 disabled={downloading}
-                className="flex-1 bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold h-11 rounded-xl shadow-md shadow-purple-500/20 hover:shadow-lg transition-all"
+                className="h-11 flex-1 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 font-semibold text-white shadow-md shadow-purple-500/20 transition-all hover:from-purple-700 hover:to-indigo-700 hover:shadow-lg"
               >
                 {downloading ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    下载中…
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    下载中...
                   </>
                 ) : (
                   <>
-                    <Download className="h-4 w-4 mr-2" />
+                    <Download className="mr-2 h-4 w-4" />
                     下载资源
                   </>
                 )}
               </Button>
 
-              {/* 收藏 */}
               <Button
                 variant="outline"
                 size="icon"
@@ -366,12 +406,11 @@ export default function ResourceDetail() {
                 )}
               </Button>
 
-              {/* 分享 */}
               <Button
                 variant="outline"
                 size="icon"
                 onClick={handleShare}
-                className="h-11 w-11 rounded-xl border-2 border-gray-200 hover:border-purple-300 hover:text-purple-500 transition-all"
+                className="h-11 w-11 rounded-xl border-2 border-gray-200 transition-all hover:border-purple-300 hover:text-purple-500"
                 title="复制链接"
               >
                 <Share2 className="h-4 w-4" />
@@ -380,6 +419,7 @@ export default function ResourceDetail() {
           </div>
         </div>
       </div>
+
       <ImagePreviewDialog
         open={previewOpen}
         src={resource.url}

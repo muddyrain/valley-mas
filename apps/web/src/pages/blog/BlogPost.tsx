@@ -8,9 +8,9 @@ import {
   User,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { PostDetail } from '@/api/blog';
-import { getPostDetailById } from '@/api/blog';
+import { getAdminPostDetail, getPostDetailById } from '@/api/blog';
 import { MarkdownContent, TableOfContents } from '@/components/blog';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -44,26 +44,49 @@ function extractMarkdownImageUrls(content: string) {
 
 export default function BlogPost() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [imagePageIndex, setImagePageIndex] = useState(0);
 
-  const loadPost = useCallback(async (postId: string) => {
-    setLoading(true);
-    try {
-      const data = await getPostDetailById(postId);
-      setPost(data);
-      setToc(extractToc(data.content || ''));
-      setImagePageIndex(0);
-    } catch (error) {
-      console.error('Failed to load post:', error);
-      setPost(null);
-    } finally {
-      setLoading(false);
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo || '/blog';
+  const returnLabel =
+    (location.state as { returnLabel?: string } | null)?.returnLabel || '返回博客列表';
+
+  const handleReturn = useCallback(() => {
+    if (window.history.state?.idx > 0) {
+      navigate(-1);
+      return;
     }
-  }, []);
+    navigate(returnTo);
+  }, [navigate, returnTo]);
+
+  const loadPost = useCallback(
+    async (postId: string) => {
+      setLoading(true);
+      try {
+        let data: PostDetail;
+        try {
+          data = await getPostDetailById(postId, { suppressErrorToast: true });
+        } catch (error) {
+          if (user?.role !== 'creator') throw error;
+          data = await getAdminPostDetail(postId, { suppressErrorToast: true });
+        }
+        setPost(data);
+        setToc(extractToc(data.content || ''));
+        setImagePageIndex(0);
+      } catch (error) {
+        console.error('Failed to load post:', error);
+        setPost(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user?.role],
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -90,11 +113,13 @@ export default function BlogPost() {
       })
       .filter(Boolean);
   }, [imageTextData]);
+
   const imageUrls = useMemo(() => {
     if (!post || post.postType !== 'image_text') return [];
     if (imageTextData?.images?.length) return imageTextData.images;
     return extractMarkdownImageUrls(post.content || '');
   }, [post, imageTextData]);
+
   const pageCount = imageUrls.length > 0 ? imageUrls.length : pages?.length || 0;
 
   useEffect(() => {
@@ -115,6 +140,7 @@ export default function BlogPost() {
     if (!post) return '';
     return renderMarkdownWithAnchors(post.content || post.htmlContent || '');
   }, [post]);
+
   const canEditBlog = useMemo(() => {
     if (!post || post.postType !== 'blog') return false;
     return Boolean(user?.id && post.author?.id && user.id === post.author.id);
@@ -149,13 +175,11 @@ export default function BlogPost() {
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
           <h1 className="mb-4 text-2xl font-bold text-foreground">文章未找到</h1>
-          <p className="mb-6 text-muted-foreground">你访问的文章不存在或已下线。</p>
-          <Link to="/blog">
-            <Button>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              返回博客列表
-            </Button>
-          </Link>
+          <p className="mb-6 text-muted-foreground">你访问的文章不存在，或当前账号没有权限访问。</p>
+          <Button onClick={handleReturn}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            {returnLabel}
+          </Button>
         </div>
       </div>
     );
@@ -168,13 +192,14 @@ export default function BlogPost() {
         className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur"
       >
         <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 lg:px-8">
-          <Link
-            to="/blog"
+          <button
+            type="button"
+            onClick={handleReturn}
             className="inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ChevronLeft className="mr-1 h-4 w-4" />
-            返回博客列表
-          </Link>
+            {returnLabel}
+          </button>
         </div>
       </div>
 
@@ -226,7 +251,7 @@ export default function BlogPost() {
                   <div className="relative h-[720px] w-[460px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-0">
                     <img
                       src={imageUrls[imagePageIndex]}
-                      alt={`图文第${imagePageIndex + 1}页`}
+                      alt={`图文第 ${imagePageIndex + 1} 页`}
                       className="h-full w-full object-contain"
                     />
                   </div>
@@ -354,12 +379,10 @@ export default function BlogPost() {
               <main className="min-w-0 flex-1 rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-10">
                 <MarkdownContent content={processedContent} />
                 <div className="mt-12 border-t border-border pt-6">
-                  <Link to="/blog">
-                    <Button variant="ghost" className="gap-2">
-                      <ArrowLeft className="h-4 w-4" />
-                      返回列表
-                    </Button>
-                  </Link>
+                  <Button variant="ghost" className="gap-2" onClick={handleReturn}>
+                    <ArrowLeft className="h-4 w-4" />
+                    {returnLabel}
+                  </Button>
                 </div>
               </main>
             </div>

@@ -20,6 +20,7 @@ const (
 	UploadTypeAvatar     UploadType = "avatar"      // 资源素材 - 头像类型（存 resources/ 目录）
 	UploadTypeWallpaper  UploadType = "wallpaper"   // 资源素材 - 壁纸类型（存 resources/ 目录）
 	UploadTypeCover      UploadType = "cover"       // 封面图（存 resources/ 目录）
+	UploadTypeImageText  UploadType = "image_text"  // 图文生成图（存 image-text/ 目录）
 )
 
 // UploadConfig 上传配置
@@ -75,6 +76,11 @@ func GetDefaultConfig(uploadType UploadType) UploadConfig {
 		UploadTypeCover: {
 			Type:        UploadTypeCover,
 			MaxSize:     3, // 3MB
+			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
+		},
+		UploadTypeImageText: {
+			Type:        UploadTypeImageText,
+			MaxSize:     8, // 8MB
 			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
 		},
 	}

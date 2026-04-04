@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf16"
 	"valley-server/internal/database"
 	"valley-server/internal/logger"
 	"valley-server/internal/model"
@@ -196,7 +199,7 @@ func GetPostDetail(c *gin.Context) {
 	slug := c.Param("slug")
 
 	var post model.Post
-	if err := database.DB.Where("slug = ? AND status = ? AND visibility = ? AND deleted_at IS NULL", slug, "published", visibilityPublic).
+	if err := database.DB.Where("slug = ? AND status = ? AND deleted_at IS NULL", slug, "published").
 		Preload("Group").
 		Preload("Category").
 		Preload("Tags").
@@ -204,6 +207,10 @@ func GetPostDetail(c *gin.Context) {
 			return db.Select("id, nickname, avatar")
 		}).
 		First(&post).Error; err != nil {
+		Error(c, http.StatusNotFound, "post not found")
+		return
+	}
+	if post.Visibility != visibilityPublic && !canManagePost(c, post.AuthorID) {
 		Error(c, http.StatusNotFound, "post not found")
 		return
 	}
@@ -221,7 +228,7 @@ func GetPostDetailByID(c *gin.Context) {
 	}
 
 	var post model.Post
-	if err := database.DB.Where("id = ? AND status = ? AND visibility = ? AND deleted_at IS NULL", id, "published", visibilityPublic).
+	if err := database.DB.Where("id = ? AND status = ? AND deleted_at IS NULL", id, "published").
 		Preload("Group").
 		Preload("Category").
 		Preload("Tags").
@@ -229,6 +236,10 @@ func GetPostDetailByID(c *gin.Context) {
 			return db.Select("id, nickname, avatar")
 		}).
 		First(&post).Error; err != nil {
+		Error(c, http.StatusNotFound, "post not found")
+		return
+	}
+	if post.Visibility != visibilityPublic && !canManagePost(c, post.AuthorID) {
 		Error(c, http.StatusNotFound, "post not found")
 		return
 	}
@@ -672,6 +683,7 @@ func AdminUpdatePost(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "imageTextData must be valid json")
 		return
 	}
+	imageTextData = normalizeJSONColumnValue(imageTextData)
 
 	updates := make(map[string]interface{})
 	if req.Title != "" {
@@ -687,10 +699,10 @@ func AdminUpdatePost(c *gin.Context) {
 		updates["template_key"] = strings.TrimSpace(req.TemplateKey)
 	}
 	if req.TemplateData != "" {
-		updates["template_data"] = strings.TrimSpace(req.TemplateData)
+		updates["template_data"] = normalizeJSONColumnValue(strings.TrimSpace(req.TemplateData))
 	}
 	if hasImageTextData || strings.TrimSpace(req.TemplateData) != "" {
-		updates["image_text_data"] = normalizeJSONColumnValue(imageTextData)
+		updates["image_text_data"] = imageTextData
 		updates["template_data"] = imageTextData
 	}
 	if req.Content != "" {
@@ -770,6 +782,7 @@ func AdminUpdatePost(c *gin.Context) {
 
 	oldCoverStorageKey := strings.TrimSpace(post.CoverStorageKey)
 	oldCoverURL := strings.TrimSpace(post.Cover)
+	oldImageTextKeys := extractImageTextStorageKeys(normalizeImageTextData(post.ImageTextData, post.TemplateData))
 	oldGroupID := post.GroupID
 	newGroupID := oldGroupID
 	if req.GroupID != nil {
@@ -778,6 +791,10 @@ func AdminUpdatePost(c *gin.Context) {
 	database.DB.Model(&post).Updates(updates)
 	if coverChanged {
 		deletePostCoverAsync(oldCoverStorageKey, oldCoverURL)
+	}
+	if hasImageTextData || strings.TrimSpace(req.TemplateData) != "" {
+		newImageTextKeys := extractImageTextStorageKeys(imageTextData)
+		deleteObsoleteImageTextAssets(oldImageTextKeys, newImageTextKeys)
 	}
 	if req.GroupID != nil && oldGroupID != newGroupID {
 		if oldGroupID != 0 {
@@ -818,8 +835,10 @@ func AdminDeletePost(c *gin.Context) {
 
 	coverKey := strings.TrimSpace(post.CoverStorageKey)
 	coverURL := strings.TrimSpace(post.Cover)
+	imageTextKeys := extractImageTextStorageKeys(normalizeImageTextData(post.ImageTextData, post.TemplateData))
 	database.DB.Delete(&post)
 	deletePostCoverAsync(coverKey, coverURL)
+	deleteImageTextAssetsAsync(imageTextKeys)
 
 	if post.GroupID != 0 {
 		database.DB.Model(&model.PostGroup{}).
@@ -1128,10 +1147,149 @@ func normalizeJSONColumnValue(value string) string {
 	if trimmed == "" {
 		return "{}"
 	}
-	if json.Valid([]byte(trimmed)) {
-		return trimmed
+	if !json.Valid([]byte(trimmed)) {
+		return "{}"
 	}
-	return "{}"
+	var payload any
+	if err := json.Unmarshal([]byte(trimmed), &payload); err != nil {
+		return "{}"
+	}
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(payload); err != nil {
+		return "{}"
+	}
+	return encodeJSONStringASCII(strings.TrimSpace(buf.String()))
+}
+
+func encodeJSONStringASCII(value string) string {
+	var b strings.Builder
+	for _, r := range value {
+		switch {
+		case r < 0x80:
+			b.WriteRune(r)
+		case r <= 0xFFFF:
+			b.WriteString(fmt.Sprintf("\\u%04x", r))
+		default:
+			r1, r2 := utf16.EncodeRune(r)
+			b.WriteString(fmt.Sprintf("\\u%04x\\u%04x", r1, r2))
+		}
+	}
+	return b.String()
+}
+
+func AdminUploadImageTextAsset(c *gin.Context) {
+	userID, role, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if role != "admin" && role != "creator" {
+		Error(c, http.StatusForbidden, "creator required")
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		Error(c, http.StatusBadRequest, "file is required")
+		return
+	}
+
+	uploadService := service.NewUploadService()
+	config := service.GetDefaultConfig(service.UploadTypeImageText)
+	config.UserID = userID
+	config.CustomFolder = buildImageTextAssetFolder(userID)
+
+	result, err := uploadService.Upload(file, config)
+	if err != nil {
+		Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	Success(c, gin.H{
+		"url":      result.URL,
+		"key":      result.Key,
+		"fileName": result.FileName,
+		"size":     result.Size,
+		"width":    result.Width,
+		"height":   result.Height,
+	})
+}
+
+func buildImageTextAssetFolder(userID int64) string {
+	return "image-text/" + strconv.FormatInt(userID, 10) + "/" + time.Now().Format("20060102")
+}
+
+func extractImageTextStorageKeys(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var payload struct {
+		Images []string `json:"images"`
+		Pages  []struct {
+			ImageKey string `json:"imageKey"`
+		} `json:"pages"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return nil
+	}
+
+	keys := make([]string, 0, len(payload.Images)+len(payload.Pages))
+	seen := map[string]struct{}{}
+	for _, item := range payload.Pages {
+		key := strings.TrimSpace(item.ImageKey)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func deleteObsoleteImageTextAssets(oldKeys, newKeys []string) {
+	if len(oldKeys) == 0 {
+		return
+	}
+	keep := map[string]struct{}{}
+	for _, key := range newKeys {
+		if key = strings.TrimSpace(key); key != "" {
+			keep[key] = struct{}{}
+		}
+	}
+	var obsolete []string
+	for _, key := range oldKeys {
+		if key = strings.TrimSpace(key); key == "" {
+			continue
+		}
+		if _, ok := keep[key]; ok {
+			continue
+		}
+		obsolete = append(obsolete, key)
+	}
+	deleteImageTextAssetsAsync(obsolete)
+}
+
+func deleteImageTextAssetsAsync(keys []string) {
+	if len(keys) == 0 {
+		return
+	}
+	go func() {
+		uploader := service.NewUploadService()
+		for _, key := range keys {
+			key = strings.TrimSpace(key)
+			if key == "" {
+				continue
+			}
+			if err := uploader.DeleteByKey(key); err != nil {
+				logger.Log.WithField("storage_key", key).WithError(err).Warn("delete image-text asset failed")
+			}
+		}
+	}()
 }
 
 func buildImageTextContent(templateKey, templateData string) string {

@@ -1,11 +1,22 @@
-import request from '@/utils/request';
+import request, { type RequestConfig } from '@/utils/request';
 
 export type PostType = 'blog' | 'image_text';
 export type Visibility = 'private' | 'shared' | 'public';
 
 export interface ImageTextPage {
   imageUrl?: string;
+  imageKey?: string;
   text?: string;
+  highlightText?: string;
+  highlightStart?: number;
+  highlightEnd?: number;
+  fontSize?: number;
+  highlightFontSize?: number;
+  textStyles?: Array<{
+    start?: number;
+    end?: number;
+    fontSize?: number;
+  }>;
 }
 
 export interface ImageTextData {
@@ -133,12 +144,12 @@ export function getPosts(params: PostListParams = {}) {
   return request.get<unknown, PostListData>('/public/blog/posts', { params });
 }
 
-export function getPostDetailById(id: string) {
-  return request.get<unknown, PostDetail>(`/public/blog/posts/id/${id}`);
+export function getPostDetailById(id: string, config?: RequestConfig) {
+  return request.get<unknown, PostDetail>(`/public/blog/posts/id/${id}`, config);
 }
 
-export function getAdminPostDetail(id: string) {
-  return request.get<unknown, PostDetail>(`/admin/blog/posts/${id}`);
+export function getAdminPostDetail(id: string, config?: RequestConfig) {
+  return request.get<unknown, PostDetail>(`/admin/blog/posts/${id}`, config);
 }
 
 export function getCategories() {
@@ -155,6 +166,22 @@ export function getTags() {
 
 export function createPost(data: CreatePostData) {
   return request.post<unknown, Post>('/admin/blog/posts', data);
+}
+
+export function uploadImageTextAsset(formData: FormData) {
+  return request.post<
+    unknown,
+    {
+      url: string;
+      key: string;
+      fileName: string;
+      size: number;
+      width: number;
+      height: number;
+    }
+  >('/admin/blog/image-text/assets/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
 }
 
 export function uploadBlogCover(formData: FormData) {

@@ -1,5 +1,7 @@
 export { BlogFeedCard } from './BlogFeedCard';
+export { BlogPostCard } from './BlogPostCard';
 export { ExternalPreviewPostCard } from './ExternalPreviewPostCard';
+export { ImageTextPostCard } from './ImageTextPostCard';
 export { MarkdownContent } from './MarkdownContent';
 export { MarkdownPreview } from './MarkdownPreview';
 export { PostCard } from './PostCard';

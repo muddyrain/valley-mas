@@ -1,4 +1,4 @@
-import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
+import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from 'axios';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/useAuthStore';
 
@@ -8,8 +8,9 @@ export interface ApiResponse<T = unknown> {
   data: T;
 }
 
-export interface RequestConfig {
+export interface RequestConfig extends AxiosRequestConfig {
   skipAuth?: boolean;
+  suppressErrorToast?: boolean;
 }
 
 const http: AxiosInstance = axios.create({
@@ -37,7 +38,10 @@ http.interceptors.request.use(
     return requestConfig;
   },
   (error) => {
-    toast.error('请求失败，请稍后重试');
+    const requestConfig = error.config as RequestConfig | undefined;
+    if (!requestConfig?.suppressErrorToast) {
+      toast.error('请求失败，请稍后重试');
+    }
     return Promise.reject(error);
   },
 );
@@ -60,16 +64,16 @@ http.interceptors.response.use(
   },
   (error) => {
     console.error('API Error:', error);
+    const requestConfig = error.config as RequestConfig | undefined;
 
     const status = error.response?.status;
     const responseData = error.response?.data;
     let msg = error.message;
-    // 优先使用后端返回的错误信息
+
     if (status === 401) {
       msg = '认证失败，请重新登录';
       localStorage.removeItem('admin_token');
       localStorage.removeItem('userInfo');
-      // 避免在登录页重复跳转
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
@@ -84,9 +88,8 @@ http.interceptors.response.use(
     } else if (status === 503) {
       msg = '服务暂时不可用';
     } else if (status >= 500) {
-      msg = '服务器端发生错误';
+      msg = '服务端发生错误';
     } else if (!status) {
-      // 网络错误或请求被取消
       if (error.code === 'ECONNABORTED') {
         msg = '请求超时，请检查网络连接';
       } else if (error.code === 'ERR_NETWORK') {
@@ -95,11 +98,14 @@ http.interceptors.response.use(
         msg = '网络请求失败，请稍后重试';
       }
     }
+
     if (responseData?.message) {
       msg = responseData.message;
     }
-    // 显示错误提示
-    toast.error(msg);
+
+    if (!requestConfig?.suppressErrorToast) {
+      toast.error(msg);
+    }
     return Promise.reject(error);
   },
 );
