@@ -1,0 +1,4 @@
+interface:
+  display_name: "技能机会侦察"
+  short_description: "开发过程中主动判断哪些稳定模式值得沉淀成 skill"
+  default_prompt: "当开发中反复出现稳定规则、固定流程或重复判断时，使用技能机会侦察，主动评估是否值得新增 skill。"

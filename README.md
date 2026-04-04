@@ -1,22 +1,27 @@
 # Valley MAS
 
-面向创作者内容分发与管理的平台，包含 Go 服务端、Web 端、Admin 端和本地 F5-TTS 能力。
+一个以个人内容展示与日常工具为主的网站项目，当前包含博客、图文、资源、AI Chat、TTS 等能力。
 
-## 当前重点功能
+项目采用：
 
-- 统一账号与权限（admin / creator / user）
-- 创作者空间与资源管理
-- 公开资源访问与下载链路
-- 本地 TTS（F5-TTS）
-  - 同步合成：`POST /api/v1/public/tts/synthesize`
-  - 异步提交：`POST /api/v1/public/tts/synthesize-async`
-  - 进度查询：`GET /api/v1/public/tts/progress/:taskId`
-  - SSE 进度流：`GET /api/v1/public/tts/progress/stream/:taskId`
-  - 音频访问：`GET /api/v1/public/tts/audio/:filename`
-- TTS Web 页面已支持
-  - 实时进度条（SSE）
-  - 生成历史列表
-  - 历史音频本地持久化（IndexedDB）
+- `apps/web`：前台 Web 站点
+- `apps/admin`：后台管理端
+- `server`：Go 服务端
+- `apps/f5-tts`：本地 F5-TTS 能力
+
+当前线上发布方式是：
+
+- `Vercel` 部署
+- 包含 `Go server`
+
+## 当前主要功能
+
+- 个人网站首页展示
+- 博客与图文内容发布
+- 资源上传、展示与下载
+- 创作空间管理
+- AI Chat 页面
+- TTS 页面与本地 F5-TTS 联动
 
 ## 目录结构
 
@@ -34,11 +39,7 @@ valley-mas/
 └─ QUICK_START.md
 ```
 
-## 快速开始
-
-详细步骤见 [QUICK_START.md](./QUICK_START.md)。
-
-最短路径：
+## 本地开发
 
 1. 安装依赖
 
@@ -46,7 +47,7 @@ valley-mas/
 pnpm install
 ```
 
-2. 启动服务端
+2. 启动 Go 服务端
 
 ```bash
 cd server
@@ -64,29 +65,22 @@ pnpm dev
 
 ```bash
 cd apps/f5-tts
-scripts\start_local_api.cmd
+scripts\\start_local_api.cmd
 ```
 
-## TTS 说明
-
-- Go 已改为路由模块化注册（不在 `main.go` 里直接堆路由）
-- 音频访问采用 Go 代理流式转发优先，减少重复落盘
-- Python 侧输出目录支持自动清理，避免磁盘无限增长
-- `apps/f5-tts/outputs/` 已加入忽略，不应提交到 git
-
-## 开发校验
+## 常用校验
 
 ```bash
+# web
+node node_modules/typescript/bin/tsc -p apps/web/tsconfig.json --noEmit
+
 # server
 cd server
-go build .
-
-# web
-after cd apps/web
-node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
+go build ./cmd/server
 ```
 
 ## 文档
 
+- [QUICK_START.md](./QUICK_START.md)
 - [docs/INDEX.md](./docs/INDEX.md)
 - [apps/f5-tts/LOCAL_API_CN.md](./apps/f5-tts/LOCAL_API_CN.md)

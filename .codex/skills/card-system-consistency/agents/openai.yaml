@@ -1,0 +1,4 @@
+interface:
+  display_name: "卡片系统一致性"
+  short_description: "统一卡片结构，但保留不同内容类型的真实差异"
+  default_prompt: "当任务涉及博客、图文、资源卡片或共享卡片组件时，使用卡片系统一致性。"

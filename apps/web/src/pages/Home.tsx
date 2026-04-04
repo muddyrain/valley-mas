@@ -134,20 +134,20 @@ export default function Home() {
             <div>
               <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-violet-700 backdrop-blur">
                 <Sparkles className="h-3.5 w-3.5 text-violet-500" />
-                创作资源与内容一站式
+                我的内容、资源与日常记录
               </div>
 
               <h1 className="max-w-2xl text-4xl font-semibold leading-tight tracking-tight text-slate-900 md:text-6xl">
-                智能创作协作平台
+                Valley 是我的个人网站
                 <br />
-                让复杂流程
+                用来整理内容、
                 <span className="ml-3 bg-linear-to-r from-violet-600 to-sky-500 bg-clip-text font-serif italic text-transparent">
-                  更简单更优雅
+                  分享作品与记录想法
                 </span>
               </h1>
 
               <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 md:text-lg">
-                输入创作者口令快速进入空间，发现热门资源，也能直接阅读最新博客与图文内容。
+                这里集中放了我的博客、图文、资源和一些正在持续完善的小工具。你可以直接浏览内容，也可以通过口令进入对应空间看看更多整理过的资料。
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -166,7 +166,7 @@ export default function Home() {
                   onClick={handleSecondaryHeroAction}
                 >
                   <Play className="mr-2 h-4 w-4" />
-                  查看热门创作者
+                  看看最近内容
                 </Button>
                 <Button
                   variant="outline"
@@ -204,9 +204,9 @@ export default function Home() {
 
               <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {[
-                  { label: '精品资源', value: '10K+', icon: Heart },
-                  { label: '活跃创作者', value: '500+', icon: Users },
-                  { label: '总下载量', value: '100K+', icon: Download },
+                  { label: '博客与图文', value: '持续更新', icon: Heart },
+                  { label: '内容栏目', value: '多主题', icon: Users },
+                  { label: '资源与工具', value: '持续整理', icon: Download },
                 ].map((stat) => (
                   <div
                     key={stat.label}
@@ -236,14 +236,16 @@ export default function Home() {
               <div className="hero-card hero-card-top absolute left-4 top-8 rounded-xl border border-violet-200 bg-white/75 px-4 py-3 backdrop-blur">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                   <ShieldCheck className="h-4 w-4 text-violet-600" />
-                  创作者可信平台
+                  个人内容站点
                 </div>
-                <p className="mt-1 text-xs text-slate-600">上传稳定、分发高性能、权限可控。</p>
+                <p className="mt-1 text-xs text-slate-600">
+                  记录想法、整理资源，也保留了一些可继续扩展的能力。
+                </p>
               </div>
 
               <div className="hero-card hero-card-bottom absolute bottom-8 right-0 rounded-xl border border-violet-200 bg-white/75 px-4 py-3 backdrop-blur">
-                <p className="text-xs text-slate-600">实时运营数据</p>
-                <p className="text-lg font-semibold text-slate-900">互动提升 +278%</p>
+                <p className="text-xs text-slate-600">当前站点重点</p>
+                <p className="text-lg font-semibold text-slate-900">内容整理与持续更新</p>
               </div>
             </div>
           </div>

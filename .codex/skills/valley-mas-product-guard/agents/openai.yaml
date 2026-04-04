@@ -1,0 +1,4 @@
+interface:
+  display_name: "产品行为护栏"
+  short_description: "在开发过程中保护创作者链路与产品体验一致性"
+  default_prompt: "当改动涉及创作空间、博客、资源、图文、可见范围、返回路径或其他用户体验链路时，使用产品行为护栏。"
