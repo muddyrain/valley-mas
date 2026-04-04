@@ -23,6 +23,18 @@ type(scope): summary
 type: summary
 ```
 
+## 当前默认偏好
+
+- `type` 和 `scope` 保持 Conventional Commits 常见写法
+- `summary` 默认优先使用中文
+- 中文 summary 要短、准、直接，不要写成长句
+
+例如：
+
+- `feat(image-text): 支持局部文字字号设置`
+- `fix(blog): 修复作者访问私密博客 404`
+- `docs: 更新站点为个人网站定位`
+
 ## 常用类型
 
 - `feat`: 新功能
@@ -38,12 +50,12 @@ type: summary
 
 ## 编写规则
 
-1. `summary` 用英文短句，简洁直接。
+1. `summary` 默认使用中文短句。
 2. 总结改动结果，不要写成过程描述。
 3. 优先写“做了什么”，不要写“我改了什么”。
 4. 如果改动明显属于某个模块，补上 `scope`，例如：
-   - `feat(image-text): support per-selection font sizing`
-   - `fix(blog): allow authors to open private posts`
+   - `feat(image-text): 支持选区样式编辑`
+   - `fix(resource): 修复详情页返回上下文`
 5. 如果一次改动横跨多个模块，但没有单一核心模块，可以省略 `scope`。
 
 ## 选择类型的建议
@@ -60,7 +72,7 @@ type: summary
 - `update code`
 - `modify something`
 - `fix bug`
-- 纯中文长句
+- 没有主语义的超长中文句子
 - 混合多个不相关动作但没有主次
 
 ## 推荐输出方式
@@ -69,6 +81,6 @@ type: summary
 
 例如：
 
-- `feat(image-text): support selection-based text styling`
-- `fix(resource): preserve creator return context on detail pages`
-- `docs: reposition site description as a personal website`
+- `feat(image-text): 支持选区文字样式编辑`
+- `fix(resource): 保留创作者详情返回上下文`
+- `docs: 更新站点为个人网站定位`
