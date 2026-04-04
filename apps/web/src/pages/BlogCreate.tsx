@@ -28,6 +28,7 @@ import { CoverCropDialog } from '@/components/blog/CoverCropDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { createPlainTextExcerpt } from '@/utils/blog';
 
 type LocalDraft = {
   title: string;
@@ -55,6 +56,12 @@ function formatTime(value: string) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function createAutoExcerpt(excerpt: string, content: string) {
+  const trimmedExcerpt = excerpt.trim();
+  if (trimmedExcerpt) return trimmedExcerpt;
+  return createPlainTextExcerpt(content.trim(), 180);
 }
 
 export default function BlogCreate() {
@@ -343,7 +350,7 @@ export default function BlogCreate() {
           title: trimmedTitle,
           postType: 'blog',
           content: trimmedContent,
-          excerpt: excerpt.trim() || trimmedContent.slice(0, 120),
+          excerpt: createAutoExcerpt(excerpt, trimmedContent),
           cover: resolvedCover.cover || '',
           coverStorageKey: resolvedCover.coverStorageKey || '',
           groupId: groupId || '0',
@@ -362,7 +369,7 @@ export default function BlogCreate() {
           title: trimmedTitle,
           postType: 'blog',
           content: trimmedContent,
-          excerpt: excerpt.trim() || trimmedContent.slice(0, 120),
+          excerpt: createAutoExcerpt(excerpt, trimmedContent),
           cover: resolvedCover.cover || undefined,
           coverStorageKey: resolvedCover.coverStorageKey || undefined,
           groupId: groupId || undefined,

@@ -48,9 +48,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 			public.GET("/blog/posts", middleware.OptionalAuth(cfg), handler.GetPosts)                 // 获取文章列表
 			public.GET("/blog/posts/id/:id", middleware.OptionalAuth(cfg), handler.GetPostDetailByID) // 通过 ID 获取文章详情
 			public.GET("/blog/posts/:slug", middleware.OptionalAuth(cfg), handler.GetPostDetail)      // 通过 slug 获取文章详情
-			public.GET("/blog/groups", handler.GetGroups)                                             // 获取博客分组列表
-			public.GET("/blog/categories", handler.GetCategories)                                     // 获取博客分类列表
-			public.GET("/blog/tags", handler.GetTags)                                                 // 获取博客标签列表
+			public.GET("/blog/posts/id/:id/comments", middleware.OptionalAuth(cfg), handler.GetPostComments)
+			public.GET("/blog/groups", handler.GetGroups)         // 获取博客分组列表
+			public.GET("/blog/categories", handler.GetCategories) // 获取博客分类列表
+			public.GET("/blog/tags", handler.GetTags)             // 获取博客标签列表
 
 			// 以下接口支持可选认证，登录用户响应中会带 isFavorited 字段
 			public.GET("/hot-resources", middleware.OptionalAuth(cfg), handler.GetHotResources)                  // 热门资源
@@ -118,6 +119,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 			auth.POST("/creator/application", handler.SubmitCreatorApplication)
 			auth.GET("/creator/application/my", handler.GetMyApplication)
 			auth.POST("/ai/chat", handler.ChatWithAI)
+			auth.POST("/blog/posts/:id/comments", handler.CreatePostComment)
+			auth.DELETE("/blog/comments/:commentId", handler.DeletePostComment)
 		}
 
 		// 创作者内容接口（语义化路径，供 web 端使用）

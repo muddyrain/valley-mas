@@ -5,6 +5,7 @@ export { ImageTextPostCard } from './ImageTextPostCard';
 export { MarkdownContent } from './MarkdownContent';
 export { MarkdownPreview } from './MarkdownPreview';
 export { PostCard } from './PostCard';
+export { PostComments } from './PostComments';
 export { TableOfContents } from './TableOfContents';
 export { TagCloud } from './TagCloud';
 export { ThemeToggle } from './ThemeToggle';

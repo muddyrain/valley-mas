@@ -109,6 +109,22 @@ type AuthorInfo struct {
 	Avatar   string            `json:"avatar"`
 }
 
+type PostCommentAuthorInfo struct {
+	ID       model.Int64String `json:"id"`
+	Nickname string            `json:"nickname"`
+	Avatar   string            `json:"avatar"`
+}
+
+type PostCommentResponse struct {
+	ID        model.Int64String      `json:"id"`
+	PostID    model.Int64String      `json:"postId"`
+	UserID    model.Int64String      `json:"userId"`
+	Content   string                 `json:"content"`
+	CreatedAt time.Time              `json:"createdAt"`
+	UpdatedAt time.Time              `json:"updatedAt"`
+	Author    *PostCommentAuthorInfo `json:"author,omitempty"`
+}
+
 func GetPosts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
@@ -247,6 +263,126 @@ func GetPostDetailByID(c *gin.Context) {
 	go increasePostViewCount(post.ID)
 
 	Success(c, convertToPostDetailResponse(&post))
+}
+
+func GetPostComments(c *gin.Context) {
+	postID, post, ok := loadReadablePostByID(c)
+	if !ok {
+		return
+	}
+
+	var comments []model.PostComment
+	if err := database.DB.
+		Where("post_id = ? AND deleted_at IS NULL", postID).
+		Preload("User", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, nickname, avatar")
+		}).
+		Order("created_at ASC").
+		Find(&comments).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "failed to load comments")
+		return
+	}
+
+	response := make([]PostCommentResponse, len(comments))
+	for i := range comments {
+		response[i] = convertToPostCommentResponse(&comments[i])
+	}
+
+	Success(c, gin.H{
+		"list":     response,
+		"total":    len(response),
+		"postType": normalizePostType(post.PostType),
+	})
+}
+
+func CreatePostComment(c *gin.Context) {
+	userID, _, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	postID, _, readable := loadReadablePostByID(c)
+	if !readable {
+		return
+	}
+
+	var req struct {
+		Content string `json:"content" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Error(c, http.StatusBadRequest, "invalid request: "+err.Error())
+		return
+	}
+
+	content := strings.TrimSpace(req.Content)
+	if content == "" {
+		Error(c, http.StatusBadRequest, "comment content required")
+		return
+	}
+	if len([]rune(content)) > 500 {
+		Error(c, http.StatusBadRequest, "comment too long")
+		return
+	}
+
+	comment := model.PostComment{
+		PostID:  postID,
+		UserID:  model.Int64String(userID),
+		Content: content,
+	}
+	if err := database.DB.Create(&comment).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "failed to create comment")
+		return
+	}
+	if err := database.DB.
+		Preload("User", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, nickname, avatar")
+		}).
+		First(&comment, "id = ?", comment.ID).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "failed to load comment")
+		return
+	}
+
+	Success(c, convertToPostCommentResponse(&comment))
+}
+
+func DeletePostComment(c *gin.Context) {
+	commentID, err := strconv.ParseInt(c.Param("commentId"), 10, 64)
+	if err != nil {
+		Error(c, http.StatusBadRequest, "invalid comment id")
+		return
+	}
+
+	userID, role, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var comment model.PostComment
+	if err := database.DB.First(&comment, "id = ? AND deleted_at IS NULL", commentID).Error; err != nil {
+		Error(c, http.StatusNotFound, "comment not found")
+		return
+	}
+
+	var post model.Post
+	if err := database.DB.Select("id, author_id").First(&post, "id = ? AND deleted_at IS NULL", comment.PostID).Error; err != nil {
+		Error(c, http.StatusNotFound, "post not found")
+		return
+	}
+
+	canDelete := role == "admin" || int64(comment.UserID) == userID || int64(post.AuthorID) == userID
+	if !canDelete {
+		Error(c, http.StatusForbidden, "forbidden")
+		return
+	}
+
+	if err := database.DB.Delete(&comment).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "failed to delete comment")
+		return
+	}
+
+	Success(c, gin.H{"deleted": true})
 }
 
 func GetCategories(c *gin.Context) {
@@ -1043,6 +1179,27 @@ func convertToPostDetailResponse(post *model.Post) PostDetailResponse {
 	return resp
 }
 
+func convertToPostCommentResponse(comment *model.PostComment) PostCommentResponse {
+	resp := PostCommentResponse{
+		ID:        comment.ID,
+		PostID:    comment.PostID,
+		UserID:    comment.UserID,
+		Content:   comment.Content,
+		CreatedAt: comment.CreatedAt,
+		UpdatedAt: comment.UpdatedAt,
+	}
+
+	if comment.User != nil {
+		resp.Author = &PostCommentAuthorInfo{
+			ID:       comment.User.ID,
+			Nickname: comment.User.Nickname,
+			Avatar:   comment.User.Avatar,
+		}
+	}
+
+	return resp
+}
+
 func renderMarkdown(content string) string {
 	return content
 }
@@ -1102,6 +1259,32 @@ func canManagePost(c *gin.Context, authorID model.Int64String) bool {
 		return true
 	}
 	return int64(authorID) == userID
+}
+
+func loadReadablePostByID(c *gin.Context) (model.Int64String, *model.Post, bool) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		Error(c, http.StatusBadRequest, "invalid post id")
+		return 0, nil, false
+	}
+
+	var post model.Post
+	if err := database.DB.
+		Where("id = ? AND status = ? AND deleted_at IS NULL", id, "published").
+		Preload("Author", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, nickname, avatar")
+		}).
+		First(&post).Error; err != nil {
+		Error(c, http.StatusNotFound, "post not found")
+		return 0, nil, false
+	}
+
+	if post.Visibility != visibilityPublic && !canManagePost(c, post.AuthorID) {
+		Error(c, http.StatusNotFound, "post not found")
+		return 0, nil, false
+	}
+
+	return model.Int64String(id), &post, true
 }
 
 func getOrCreateFallbackCategoryID() (model.Int64String, error) {
