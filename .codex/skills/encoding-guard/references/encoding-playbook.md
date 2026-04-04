@@ -1,28 +1,31 @@
-# 编码防乱码手册
+# Encoding Playbook
 
-## 目标
+## Goal
 
-保证用户可见文本可读，避免编辑过程中出现意外乱码（mojibake）。
+Keep user-visible text readable throughout code edits, especially in multilingual files.
 
-## 常见故障模式
+## Failure Modes Covered
 
-UTF-8 文本被按 GBK/GB18030（或其他代码页）误解码，生成“看似中文但语义错误”的字符串。
+1. Mojibake
+   UTF-8 text is decoded as GBK/GB18030 or another legacy encoding.
+2. Silent text loss
+   User-visible Chinese text is replaced with `?`, often during terminal or script-based rewrites.
 
-## 保护原则
+## Safe Editing Practices
 
-1. 源码默认使用 UTF-8。
-2. 避免全局另存或批量重编码操作。
-3. 多语言文件优先做局部改动，不做整文件重写。
-4. 编辑前后都运行 `scripts/check_mojibake.py`。
+1. Default to UTF-8.
+2. Prefer targeted line edits over full-file rewrites.
+3. Avoid copy/paste paths that pass through a lossy terminal encoding layer.
+4. Run `scripts/check_mojibake.py` before and after editing.
 
-## 修复流程
+## Recovery Workflow
 
-1. 根据扫描输出定位可疑行。
-2. 用上下文（同模块、i18n、测试）确认原始语义。
-3. 若脚本给出的恢复候选正确，只替换损坏字符串。
-4. 重新扫描，确认结果干净。
+1. Inspect the reported line and nearby UI copy.
+2. Compare with `git diff` or the previous file revision.
+3. Restore the intended text exactly.
+4. Re-run the checker until it is clean.
 
-## 说明
+## Notes
 
-- 检测是启发式结果，不是绝对证明。
-- 若仓库确实有意包含特殊字符（少见），修改前请人工复核。
+- Heuristics are intentionally conservative.
+- Repeated `?` inside quoted strings or JSX text should be treated as suspicious unless proven intentional.

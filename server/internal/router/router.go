@@ -45,12 +45,12 @@ func Setup(cfg *config.Config) *gin.Engine {
 			public.GET("/hot-creators", handler.GetHotCreators)             // 新增：获取热门创作者
 
 			// 博客相关接口
-			public.GET("/blog/posts", handler.GetPosts)                 // 获取文章列表
-			public.GET("/blog/posts/id/:id", handler.GetPostDetailByID) // 通过 ID 获取文章详情
-			public.GET("/blog/posts/:slug", handler.GetPostDetail)      // 通过 slug 获取文章详情
-			public.GET("/blog/groups", handler.GetGroups)               // 获取博客分组列表
-			public.GET("/blog/categories", handler.GetCategories)       // 获取博客分类列表
-			public.GET("/blog/tags", handler.GetTags)                   // 获取博客标签列表
+			public.GET("/blog/posts", middleware.OptionalAuth(cfg), handler.GetPosts)                 // 获取文章列表
+			public.GET("/blog/posts/id/:id", middleware.OptionalAuth(cfg), handler.GetPostDetailByID) // 通过 ID 获取文章详情
+			public.GET("/blog/posts/:slug", middleware.OptionalAuth(cfg), handler.GetPostDetail)      // 通过 slug 获取文章详情
+			public.GET("/blog/groups", handler.GetGroups)                                             // 获取博客分组列表
+			public.GET("/blog/categories", handler.GetCategories)                                     // 获取博客分类列表
+			public.GET("/blog/tags", handler.GetTags)                                                 // 获取博客标签列表
 
 			// 以下接口支持可选认证，登录用户响应中会带 isFavorited 字段
 			public.GET("/hot-resources", middleware.OptionalAuth(cfg), handler.GetHotResources)                  // 热门资源
@@ -177,6 +177,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.GET("/blog/posts", handler.AdminGetPosts)
 				content.GET("/blog/posts/:id", handler.AdminGetPostDetail)
 				content.POST("/blog/cover/upload", handler.AdminUploadBlogCover)
+				content.POST("/blog/image-text/assets/upload", handler.AdminUploadImageTextAsset)
 				content.POST("/blog/posts", handler.AdminCreatePost)
 				content.PUT("/blog/posts/:id", handler.AdminUpdatePost)
 				content.DELETE("/blog/posts/:id", handler.AdminDeletePost)

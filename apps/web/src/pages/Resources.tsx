@@ -214,6 +214,8 @@ export default function Resources() {
                   isFavorited={favoritedMap[resource.id]}
                   onFavorite={handleFavorite}
                   showCreator
+                  showDate
+                  showEngagement
                   animationDelay={index * 30}
                 />
               ))}

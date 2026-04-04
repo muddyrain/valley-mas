@@ -1,4 +1,4 @@
-import http from '@/utils/request';
+import http, { type RequestConfig } from '@/utils/request';
 
 export type ResourceVisibility = 'private' | 'shared' | 'public';
 
@@ -70,8 +70,8 @@ export const getCreatorResources = (
 };
 
 // 获取资源详情
-export const getResourceDetail = (id: string) => {
-  return http.get<unknown, Resource>(`/public/resources/${id}`);
+export const getResourceDetail = (id: string, config?: RequestConfig) => {
+  return http.get<unknown, Resource>(`/public/resources/${id}`, config);
 };
 
 // 搜索资源
@@ -161,11 +161,12 @@ interface MyResourcesResponse {
 // 获取我上传的资源列表（需要创作者/管理员权限）
 export const getMyResources = (
   params: { page?: number; pageSize?: number; type?: string } = {},
+  config?: RequestConfig,
 ) => {
   const { page = 1, pageSize = 20, type } = params;
   let url = `/creator/resources?page=${page}&pageSize=${pageSize}`;
   if (type) url += `&type=${type}`;
-  return http.get<unknown, MyResourcesResponse>(url);
+  return http.get<unknown, MyResourcesResponse>(url, config);
 };
 
 // 上传资源（需要创作者/管理员权限）

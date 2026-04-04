@@ -1,5 +1,4 @@
 import {
-  Calendar,
   ChevronDown,
   ExternalLink,
   FileText,
@@ -19,6 +18,7 @@ import { toast } from 'sonner';
 import {
   type Group as BlogGroup,
   type Post as BlogPost,
+  deletePost,
   getAdminGroups,
   getAdminPosts,
 } from '@/api/blog';
@@ -30,6 +30,7 @@ import {
   updateResource,
   uploadResource,
 } from '@/api/resource';
+import { BlogPostCard, ImageTextPostCard } from '@/components/blog';
 import EmptyState from '@/components/EmptyState';
 import PageBanner from '@/components/PageBanner';
 import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
@@ -45,7 +46,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { formatDate } from '@/utils/blog';
 
 const RESOURCE_TYPES = [
   { label: '全部', value: '' },
@@ -66,25 +66,6 @@ function formatSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function getPostStatusMeta(status?: string) {
-  if (status === 'published') {
-    return {
-      label: '已发布',
-      className: 'bg-emerald-100 text-emerald-700',
-    };
-  }
-  if (status === 'archived') {
-    return {
-      label: '已归档',
-      className: 'bg-slate-200 text-slate-700',
-    };
-  }
-  return {
-    label: '草稿',
-    className: 'bg-amber-100 text-amber-700',
-  };
-}
-
 export default function MySpace() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuthStore();
@@ -96,7 +77,6 @@ export default function MySpace() {
   const [myPosts, setMyPosts] = useState<BlogPost[]>([]);
   const [myGroups, setMyGroups] = useState<BlogGroup[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
-  const [postTypeFilter, setPostTypeFilter] = useState<'all' | 'blog' | 'image_text'>('all');
   const [postGroupFilter, setPostGroupFilter] = useState('');
 
   // 上传弹窗状态
@@ -113,6 +93,8 @@ export default function MySpace() {
   // 删除确认状态
   const [deleteTarget, setDeleteTarget] = useState<MyResource | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deletePostTarget, setDeletePostTarget] = useState<BlogPost | null>(null);
+  const [deletingPost, setDeletingPost] = useState(false);
 
   // 编辑弹窗状态
   const [editTarget, setEditTarget] = useState<MyResource | null>(null);
@@ -180,11 +162,20 @@ export default function MySpace() {
 
   const filteredPosts = useMemo(() => {
     return myPosts.filter((post) => {
-      if (postTypeFilter !== 'all' && post.postType !== postTypeFilter) return false;
       if (postGroupFilter && post.groupId !== postGroupFilter) return false;
       return true;
     });
-  }, [myPosts, postGroupFilter, postTypeFilter]);
+  }, [myPosts, postGroupFilter]);
+
+  const filteredBlogPosts = useMemo(
+    () => filteredPosts.filter((post) => post.postType === 'blog'),
+    [filteredPosts],
+  );
+
+  const filteredImageTextPosts = useMemo(
+    () => filteredPosts.filter((post) => post.postType === 'image_text'),
+    [filteredPosts],
+  );
 
   // 选择文件
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -319,6 +310,67 @@ export default function MySpace() {
     }
   };
 
+  const handleDeletePost = async () => {
+    if (!deletePostTarget) return;
+    try {
+      setDeletingPost(true);
+      await deletePost(deletePostTarget.id);
+      toast.success('删除成功');
+      setDeletePostTarget(null);
+      await loadMyPosts();
+    } catch {
+      // 错误已在 request.ts 中通过 toast 显示
+    } finally {
+      setDeletingPost(false);
+    }
+  };
+
+  const renderPostFooter = (post: BlogPost) => (
+    <div className="flex items-center justify-end gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-8 rounded-lg"
+        onClick={() =>
+          navigate(`/blog/${post.id}`, {
+            state: { returnTo: '/my-space', returnLabel: '返回创作空间' },
+          })
+        }
+      >
+        <ExternalLink className="mr-1 h-3.5 w-3.5" />
+        查看
+      </Button>
+      {post.postType === 'blog' ? (
+        <Button
+          size="sm"
+          className="h-8 rounded-lg"
+          onClick={() => navigate(`/my-space/blog-edit/${post.id}`)}
+        >
+          <Pencil className="mr-1 h-3.5 w-3.5" />
+          编辑博客
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          className="h-8 rounded-lg"
+          onClick={() => navigate(`/my-space/image-text-edit/${post.id}`)}
+        >
+          <Pencil className="mr-1 h-3.5 w-3.5" />
+          编辑图文
+        </Button>
+      )}
+      <Button
+        size="sm"
+        variant="destructive"
+        className="h-8 rounded-lg"
+        onClick={() => setDeletePostTarget(post)}
+      >
+        <Trash2 className="mr-1 h-3.5 w-3.5" />
+        删除
+      </Button>
+    </div>
+  );
+
   if (!isAuthenticated || user?.role !== 'creator') {
     return null;
   }
@@ -431,6 +483,8 @@ export default function MySpace() {
                 onDelete={setDeleteTarget}
                 onEdit={handleOpenEdit}
                 showSize
+                showDate
+                showVisibilityTag
                 animationDelay={i * 30}
               />
             ))}
@@ -475,25 +529,6 @@ export default function MySpace() {
             </div>
 
             <div className="mb-5 flex flex-wrap items-center gap-2">
-              {[
-                { label: '全部', value: 'all' },
-                { label: '博客', value: 'blog' },
-                { label: '图文', value: 'image_text' },
-              ].map((item) => (
-                <button
-                  type="button"
-                  key={item.value}
-                  onClick={() => setPostTypeFilter(item.value as 'all' | 'blog' | 'image_text')}
-                  className={`rounded-full px-3 py-1.5 text-sm transition ${
-                    postTypeFilter === item.value
-                      ? 'bg-violet-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-
               <DropdownMenu>
                 <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-700 transition hover:border-violet-300 hover:text-violet-700">
                   {postGroupFilter
@@ -512,6 +547,13 @@ export default function MySpace() {
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              <span className="rounded-full bg-violet-50 px-3 py-1.5 text-sm text-violet-700">
+                博客 {filteredBlogPosts.length}
+              </span>
+              <span className="rounded-full bg-orange-50 px-3 py-1.5 text-sm text-orange-700">
+                图文 {filteredImageTextPosts.length}
+              </span>
             </div>
 
             {loadingPosts ? (
@@ -525,93 +567,66 @@ export default function MySpace() {
                 <p className="text-slate-500">当前筛选下还没有内容，先去发布一篇吧。</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {filteredPosts.map((post) => (
-                  <div
-                    key={post.id}
-                    className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-[0_16px_34px_rgba(91,78,167,0.15)]"
-                  >
-                    <div className="mb-3 flex items-center justify-between">
-                      {(() => {
-                        const statusMeta = getPostStatusMeta(post.status);
-                        // tag 样式
-                        const visMap: Record<
-                          'public' | 'shared' | 'private',
-                          { label: string; className: string }
-                        > = {
-                          public: { label: '公开', className: 'bg-green-100 text-green-700' },
-                          shared: { label: '共享', className: 'bg-blue-100 text-blue-700' },
-                          private: { label: '私密', className: 'bg-slate-200 text-slate-600' },
-                        };
-                        const vis =
-                          visMap[post.visibility as 'public' | 'shared' | 'private'] ||
-                          visMap.private;
-                        return (
-                          <>
-                            <span
-                              className={`mr-2 rounded-full px-2.5 py-1 text-xs font-medium ${vis.className}`}
-                            >
-                              {vis.label}
-                            </span>
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-xs ${
-                                post.postType === 'image_text'
-                                  ? 'bg-sky-100 text-sky-700'
-                                  : 'bg-violet-100 text-violet-700'
-                              }`}
-                            >
-                              {post.postType === 'image_text' ? '图文创作' : '博客'}
-                            </span>
-                            <span
-                              className={`ml-auto rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}
-                            >
-                              {statusMeta.label}
-                            </span>
-                          </>
-                        );
-                      })()}
+              <div className="space-y-8">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">博客列表</h3>
+                      <p className="text-sm text-slate-500">只展示文章内容，方便继续编辑和管理。</p>
                     </div>
-                    <h3 className="line-clamp-2 text-lg font-semibold text-slate-900 group-hover:text-violet-700">
-                      {post.title}
-                    </h3>
-
-                    <p className="mt-2 line-clamp-3 min-h-[66px] text-sm leading-6 text-slate-600">
-                      {post.excerpt || '暂无摘要，点击查看详情内容。'}
-                    </p>
-                    <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                      <div className="inline-flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5" />
-                        {formatDate(post.publishedAt || post.createdAt)}
-                      </div>
-                      {post.group?.name && (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
-                          {post.group.name}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 rounded-lg"
-                        onClick={() => navigate(`/blog/${post.id}`)}
-                      >
-                        <ExternalLink className="mr-1 h-3.5 w-3.5" />
-                        查看
-                      </Button>
-                      {post.postType === 'blog' && (
-                        <Button
-                          size="sm"
-                          className="h-8 rounded-lg"
-                          onClick={() => navigate(`/my-space/blog-edit/${post.id}`)}
-                        >
-                          <Pencil className="mr-1 h-3.5 w-3.5" />
-                          编辑博客
-                        </Button>
-                      )}
-                    </div>
+                    <span className="rounded-full bg-violet-50 px-3 py-1 text-sm text-violet-700">
+                      {filteredBlogPosts.length} 篇
+                    </span>
                   </div>
-                ))}
+
+                  {filteredBlogPosts.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+                      当前筛选下还没有博客内容。
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {filteredBlogPosts.map((post) => (
+                        <BlogPostCard
+                          key={post.id}
+                          post={post}
+                          mode="creator"
+                          footer={renderPostFooter(post)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">图文展示列</h3>
+                      <p className="text-sm text-slate-500">
+                        单独突出图文页数、封面和贴纸信息，不再复用博客卡片。
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-orange-50 px-3 py-1 text-sm text-orange-700">
+                      {filteredImageTextPosts.length} 组
+                    </span>
+                  </div>
+
+                  {filteredImageTextPosts.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-orange-200 bg-orange-50/60 p-6 text-sm text-orange-700">
+                      当前筛选下还没有图文内容。
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                      {filteredImageTextPosts.map((post) => (
+                        <ImageTextPostCard
+                          key={post.id}
+                          post={post}
+                          mode="creator"
+                          footer={renderPostFooter(post)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -851,6 +866,61 @@ export default function MySpace() {
                 <>
                   <Trash2 className="h-4 w-4 mr-2" />
                   确认删除
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== 内容删除弹窗 ===== */}
+      <Dialog
+        open={!!deletePostTarget}
+        onOpenChange={(open) => !open && !deletingPost && setDeletePostTarget(null)}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" />
+              {'确认删除内容'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-3">
+            {deletePostTarget && (
+              <div className="mb-4 rounded-xl bg-gray-50 p-3">
+                <p className="line-clamp-2 text-sm font-medium text-gray-900">
+                  {deletePostTarget.title}
+                </p>
+                <p className="mt-1 text-xs text-gray-400">
+                  {deletePostTarget.postType === 'image_text' ? '图文创作' : '博客'}
+                </p>
+              </div>
+            )}
+            <p className="text-sm text-gray-600">{'删除后将无法恢复，确认继续？'}</p>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setDeletePostTarget(null)}
+              className="flex-1"
+              disabled={deletingPost}
+            >
+              {'取消'}
+            </Button>
+            <Button
+              onClick={() => void handleDeletePost()}
+              disabled={deletingPost}
+              className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold"
+            >
+              {deletingPost ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {'删除中...'}
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {'确认删除'}
                 </>
               )}
             </Button>

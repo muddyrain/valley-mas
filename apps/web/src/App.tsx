@@ -32,6 +32,7 @@ function App() {
           <Route path="resource/:id" element={<ResourceDetail />} />
           <Route path="my-space" element={<MySpace />} />
           <Route path="my-space/image-text" element={<ImageTextCreate />} />
+          <Route path="my-space/image-text-edit/:id" element={<ImageTextCreate />} />
           <Route path="my-space/blog-create" element={<BlogCreate />} />
           <Route path="my-space/blog-edit/:id" element={<BlogCreate />} />
           <Route path="my-space/blog-groups" element={<BlogGroupManage />} />
