@@ -145,6 +145,37 @@ export function renderMarkdownWithAnchors(content: string): string {
   return withHeadingAnchors(renderMarkdown(content), toc);
 }
 
+export function markdownToPlainText(content: string): string {
+  if (!content) return '';
+
+  return String(content)
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[[^\]]*]\(([^)]+)\)/g, ' ')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
+    .replace(/^>\s?/gm, '')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^[-*+]\s+/gm, '')
+    .replace(/^\d+\.\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{2,}/g, '\n')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+export function createPlainTextExcerpt(content: string, maxLength = 180): string {
+  const plainText = markdownToPlainText(content);
+  if (!plainText) return '';
+  if (plainText.length <= maxLength) return plainText;
+  return `${plainText.slice(0, maxLength).trimEnd()}...`;
+}
+
 // 从 Markdown 内容提取目录
 export interface TocItem {
   level: number;

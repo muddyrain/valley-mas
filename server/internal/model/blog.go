@@ -116,3 +116,23 @@ type PostTagRelation struct {
 func (PostTagRelation) TableName() string {
 	return "post_tag_relations"
 }
+
+type PostComment struct {
+	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	PostID    Int64String    `gorm:"index;not null" json:"postId"`
+	UserID    Int64String    `gorm:"index;not null" json:"userId"`
+	Content   string         `gorm:"size:2000;not null" json:"content"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+
+	Post *Post `gorm:"foreignKey:PostID" json:"post,omitempty"`
+	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
+}
+
+func (c *PostComment) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == 0 {
+		c.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}

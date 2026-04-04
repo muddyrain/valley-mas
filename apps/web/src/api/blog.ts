@@ -86,6 +86,26 @@ export interface PostDetail extends Post {
   htmlContent: string;
 }
 
+export interface PostComment {
+  id: string;
+  postId: string;
+  userId: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  author?: {
+    id: string;
+    nickname: string;
+    avatar: string;
+  };
+}
+
+export interface PostCommentListData {
+  list: PostComment[];
+  total: number;
+  postType: PostType;
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -148,8 +168,20 @@ export function getPostDetailById(id: string, config?: RequestConfig) {
   return request.get<unknown, PostDetail>(`/public/blog/posts/id/${id}`, config);
 }
 
+export function getPostComments(id: string, config?: RequestConfig) {
+  return request.get<unknown, PostCommentListData>(`/public/blog/posts/id/${id}/comments`, config);
+}
+
 export function getAdminPostDetail(id: string, config?: RequestConfig) {
   return request.get<unknown, PostDetail>(`/admin/blog/posts/${id}`, config);
+}
+
+export function createPostComment(id: string, data: { content: string }) {
+  return request.post<unknown, PostComment>(`/blog/posts/${id}/comments`, data);
+}
+
+export function deletePostComment(commentId: string) {
+  return request.delete<unknown, { deleted: boolean }>(`/blog/comments/${commentId}`);
 }
 
 export function getCategories() {

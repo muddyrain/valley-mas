@@ -118,6 +118,7 @@ func autoMigrate() error {
 		&model.PostCategory{},
 		&model.PostTag{},
 		&model.PostTagRelation{},
+		&model.PostComment{},
 		&model.OperationLog{},
 	); err != nil {
 		return err

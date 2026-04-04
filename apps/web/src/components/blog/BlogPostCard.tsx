@@ -13,22 +13,22 @@ import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import type { Post } from '@/api/blog';
 import { DefaultBlogCover } from '@/pages/blog/components/DefaultBlogCover';
-import { formatDate } from '@/utils/blog';
+import { createPlainTextExcerpt, formatDate } from '@/utils/blog';
 
 type ImageTextPayload = {
   pages?: Array<string | { text?: string }>;
 };
 
 function getPostPreviewText(post: Post) {
-  if (post.excerpt?.trim()) return post.excerpt.trim();
+  if (post.excerpt?.trim()) return createPlainTextExcerpt(post.excerpt.trim(), 110);
   if (post.postType === 'image_text') {
     const raw = post.imageTextData || post.templateData;
     if (!raw) return '';
     try {
       const payload = JSON.parse(raw) as ImageTextPayload;
       const first = payload.pages?.[0];
-      if (typeof first === 'string') return first.trim();
-      return first?.text?.trim() || '';
+      if (typeof first === 'string') return createPlainTextExcerpt(first.trim(), 110);
+      return createPlainTextExcerpt(first?.text?.trim() || '', 110);
     } catch {
       return '';
     }
