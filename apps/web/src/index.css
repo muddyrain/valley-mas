@@ -80,54 +80,6 @@
   }
 
   /* 自定义动画 */
-  @keyframes float {
-    0%,
-    100% {
-      transform: translateY(0px);
-    }
-    50% {
-      transform: translateY(-10px);
-    }
-  }
-
-  @keyframes shimmer {
-    0% {
-      background-position: -1000px 0;
-    }
-    100% {
-      background-position: 1000px 0;
-    }
-  }
-
-  @keyframes gradient-shift {
-    0%,
-    100% {
-      background-position: 0% 50%;
-    }
-    50% {
-      background-position: 100% 50%;
-    }
-  }
-
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
-  }
-
-  .animate-shimmer {
-    animation: shimmer 2s infinite linear;
-    background: linear-gradient(
-      to right,
-      transparent 0%,
-      rgba(255, 255, 255, 0.6) 50%,
-      transparent 100%
-    );
-    background-size: 1000px 100%;
-  }
-
-  .animate-gradient {
-    background-size: 200% 200%;
-    animation: gradient-shift 8s ease infinite;
-  }
 }
 
 /* ════════════════════════════════════════════════
@@ -514,128 +466,7 @@ button {
   cursor: pointer;
 }
 
-/* Home hero animation */
-@keyframes hero-orb-drift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.9;
-  }
-  50% {
-    transform: translate3d(-14px, 12px, 0) scale(1.05);
-    opacity: 1;
-  }
-}
-
-@keyframes hero-ring-float {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) rotate(0deg);
-  }
-  50% {
-    transform: translate3d(-8px, 10px, 0) rotate(-2deg);
-  }
-}
-
-@keyframes hero-crystal-pulse {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) rotate(0deg);
-    filter: saturate(1);
-  }
-  50% {
-    transform: translate3d(8px, -10px, 0) rotate(2deg);
-    filter: saturate(1.15);
-  }
-}
-
-@keyframes hero-card-float {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(0, -8px, 0);
-  }
-}
-
-@keyframes hero-particle-rise {
-  0% {
-    transform: translate3d(0, 0, 0) scale(0.9);
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    transform: translate3d(-10px, -26px, 0) scale(1.2);
-    opacity: 0;
-  }
-}
-
-.hero-orb-main {
-  animation: hero-orb-drift 6.8s ease-in-out infinite;
-}
-
-.hero-orb-secondary {
-  animation: hero-orb-drift 8.6s ease-in-out infinite reverse;
-}
-
-.hero-ring {
-  animation: hero-ring-float 8s ease-in-out infinite;
-}
-
-.hero-sheet {
-  animation: hero-ring-float 9s ease-in-out infinite reverse;
-}
-
-.hero-crystal {
-  animation: hero-crystal-pulse 5.8s ease-in-out infinite;
-}
-
-.hero-card {
-  box-shadow: 0 12px 30px rgba(91, 63, 139, 0.12);
-}
-
-.hero-card-top {
-  animation: hero-card-float 6s ease-in-out infinite;
-}
-
-.hero-card-bottom {
-  animation: hero-card-float 6s ease-in-out infinite;
-  animation-delay: 1.6s;
-}
-
-.hero-particle {
-  pointer-events: none;
-  animation: hero-particle-rise 3.6s ease-in-out infinite;
-}
-
-.hero-particle-b {
-  animation-delay: 1.2s;
-}
-
-.hero-particle-c {
-  animation-delay: 2.1s;
-}
-
-@keyframes poem-breathe {
-  0% {
-    opacity: 0.92;
-    transform: translateY(0);
-    filter: blur(0);
-  }
-  50% {
-    opacity: 1;
-    text-shadow: 0 0 12px rgba(255, 255, 255, 0.22);
-  }
-  100% {
-    opacity: 0.92;
-    transform: translateY(0);
-    filter: blur(0);
-  }
-}
-
+/* MotivationalFooter 专用动画 keyframes */
 @keyframes poem-glow {
   0%,
   100% {
@@ -650,79 +481,13 @@ button {
   }
 }
 
-.poem-footer {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  min-height: 56px;
-  overflow: hidden;
-  border-radius: 9999px;
-  padding: 10px 18px;
-  color: #fff;
-  background: linear-gradient(
-    90deg,
-    rgba(var(--theme-primary-rgb), 0.55),
-    rgba(var(--theme-primary-rgb), 0.35)
-  );
-  backdrop-filter: blur(10px);
-  animation: poem-glow 4.8s ease-in-out infinite;
-}
-
-.poem-footer::before {
-  content: "";
-  position: absolute;
-  inset: 1px;
-  border-radius: 9999px;
-  background: linear-gradient(90deg, rgba(15, 23, 42, 0.16), rgba(15, 23, 42, 0.08));
-}
-
-.poem-footer > * {
-  position: relative;
-  z-index: 1;
-}
-
-.poem-text {
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: color 0.35s ease;
-  animation: poem-breathe 3.8s ease-in-out infinite;
-}
-
-.poem-source {
-  margin-top: 2px;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 12px;
-  letter-spacing: 0.03em;
-}
-
-.poem-footer-floating {
-  width: min(860px, calc(100vw - 24px));
-  border: 1px solid rgba(255, 255, 255, 0.32);
-  box-shadow: 0 20px 42px rgba(var(--theme-primary-rgb), 0.28);
-}
-
-.poem-refresh-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  transition:
-    transform 0.2s ease,
-    background 0.2s ease,
-    color 0.2s ease;
-}
-
-.poem-refresh-btn:hover {
-  transform: rotate(-18deg) scale(1.06);
-  background: rgba(255, 255, 255, 0.24);
-  color: #ffffff;
+@keyframes poem-breathe {
+  0%,
+  100% {
+    opacity: 0.92;
+  }
+  50% {
+    opacity: 1;
+    text-shadow: 0 0 12px rgba(255, 255, 255, 0.22);
+  }
 }
