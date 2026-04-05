@@ -211,7 +211,9 @@ export default function Header() {
             <Button
               variant="ghost"
               className={`gap-2 transition-colors ${
-                location.pathname === '/' ? 'theme-nav-active' : 'theme-nav-hover'
+                location.pathname === '/'
+                  ? 'bg-theme-soft text-theme-primary-hover'
+                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
               }`}
             >
               <Home className="h-4 w-4" />
@@ -225,8 +227,8 @@ export default function Header() {
               className={`gap-2 transition-colors ${
                 location.pathname.startsWith('/creators') ||
                 location.pathname.startsWith('/creator')
-                  ? 'theme-nav-active'
-                  : 'theme-nav-hover'
+                  ? 'bg-theme-soft text-theme-primary-hover'
+                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
               }`}
             >
               <Users className="h-4 w-4" />
@@ -240,8 +242,8 @@ export default function Header() {
               className={`gap-2 transition-colors ${
                 location.pathname.startsWith('/resources') ||
                 location.pathname.startsWith('/resource')
-                  ? 'theme-nav-active'
-                  : 'theme-nav-hover'
+                  ? 'bg-theme-soft text-theme-primary-hover'
+                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
               }`}
             >
               <ImageIcon className="h-4 w-4" />
@@ -253,7 +255,9 @@ export default function Header() {
             <Button
               variant="ghost"
               className={`gap-2 transition-colors ${
-                location.pathname.startsWith('/blog') ? 'theme-nav-active' : 'theme-nav-hover'
+                location.pathname.startsWith('/blog')
+                  ? 'bg-theme-soft text-theme-primary-hover'
+                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
               }`}
             >
               <BookOpen className="h-4 w-4" />
@@ -265,7 +269,9 @@ export default function Header() {
             <Button
               variant="ghost"
               className={`gap-2 transition-colors ${
-                location.pathname.startsWith('/tts') ? 'theme-nav-active' : 'theme-nav-hover'
+                location.pathname.startsWith('/tts')
+                  ? 'bg-theme-soft text-theme-primary-hover'
+                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
               }`}
             >
               <AudioLines className="h-4 w-4" />
@@ -337,7 +343,7 @@ export default function Header() {
 
           {isAuthenticated && (
             <DropdownMenu onOpenChange={(open) => open && loadNotifications()}>
-              <DropdownMenuTrigger className="theme-icon-btn relative flex h-10 w-10 items-center justify-center rounded-full transition-colors">
+              <DropdownMenuTrigger className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-theme-soft hover:text-theme-primary">
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-rose-500 px-1.5 text-center text-[10px] font-semibold leading-4 text-white">
@@ -354,7 +360,7 @@ export default function Header() {
                   <button
                     type="button"
                     onClick={handleMarkAllRead}
-                    className="text-theme-primary inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs theme-menu-hover"
+                    className="text-theme-primary inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-theme-soft"
                   >
                     <CheckCheck className="h-3.5 w-3.5" />
                     全部已读
@@ -399,7 +405,7 @@ export default function Header() {
                                       已读
                                     </span>
                                   ) : (
-                                    <span className="theme-unread-badge rounded-full px-2 py-0.5 text-[10px] text-white">
+                                    <span className="rounded-full bg-theme-primary px-2 py-0.5 text-[10px] text-white">
                                       未读
                                     </span>
                                   )}
@@ -437,7 +443,7 @@ export default function Header() {
                 className="w-64 border-theme-border bg-white/95 p-2 shadow-xl backdrop-blur-xl"
                 align="end"
               >
-                <div className="theme-user-card-bg mb-2 rounded-lg px-3 py-3">
+                <div className="bg-theme-soft mb-2 rounded-lg px-3 py-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-gray-900">
@@ -460,14 +466,14 @@ export default function Header() {
                 <DropdownMenuSeparator className="bg-theme-border" />
                 <DropdownMenuItem
                   onClick={() => navigate('/profile')}
-                  className="theme-menu-hover cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+                  className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
                 >
                   <User className="text-theme-primary h-4 w-4" />
                   <span className="font-medium">个人中心</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => navigate('/favorites')}
-                  className="theme-menu-hover cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+                  className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
                 >
                   <Heart className="h-4 w-4 text-pink-500" />
                   <span className="font-medium">我的收藏</span>
@@ -475,7 +481,7 @@ export default function Header() {
                 {user?.role === 'creator' && (
                   <DropdownMenuItem
                     onClick={() => navigate('/my-space')}
-                    className="theme-menu-hover cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+                    className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
                   >
                     <Sparkles className="text-theme-primary h-4 w-4" />
                     <span className="font-medium">我的创作空间</span>
