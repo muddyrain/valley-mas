@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChevronDown,
   ExternalLink,
   FileText,
@@ -594,7 +594,7 @@ export default function MySpace() {
 
             <div className="mb-5 flex flex-wrap items-center gap-2">
               <DropdownMenu>
-                <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-700 transition hover:border-(--theme-shell-border) hover:text-(--theme-primary)">
+                <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-700 transition hover:border-theme-shell-border hover:text-theme-primary">
                   {blogGroupFilter
                     ? blogGroups.find((g) => g.id === blogGroupFilter)?.name || '博客分组'
                     : '全部博客分组'}
@@ -612,10 +612,10 @@ export default function MySpace() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <span className="rounded-full bg-(--theme-primary-soft) px-3 py-1.5 text-sm text-(--theme-primary)">
+              <span className="rounded-full bg-theme-soft px-3 py-1.5 text-sm text-theme-primary">
                 博客 {filteredBlogPosts.length}
               </span>
-              <span className="rounded-full bg-(--theme-primary-soft) px-3 py-1.5 text-sm text-(--theme-primary-hover)">
+              <span className="rounded-full bg-theme-soft px-3 py-1.5 text-sm text-theme-primary-hover">
                 图文 {filteredImageTextPosts.length}
               </span>
             </div>
@@ -623,10 +623,7 @@ export default function MySpace() {
             {loadingPosts ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-44 animate-pulse rounded-2xl bg-(--theme-primary-soft)"
-                  />
+                  <div key={i} className="h-44 animate-pulse rounded-2xl bg-theme-soft" />
                 ))}
               </div>
             ) : filteredBlogPosts.length === 0 && filteredImageTextPosts.length === 0 ? (
@@ -641,7 +638,7 @@ export default function MySpace() {
                       <h3 className="text-lg font-semibold text-slate-900">博客列表</h3>
                       <p className="text-sm text-slate-500">只展示文章内容，方便继续编辑和管理。</p>
                     </div>
-                    <span className="rounded-full bg-(--theme-primary-soft) px-3 py-1 text-sm text-(--theme-primary)">
+                    <span className="rounded-full bg-theme-soft px-3 py-1 text-sm text-theme-primary">
                       {filteredBlogPosts.length} 篇
                     </span>
                   </div>
@@ -674,7 +671,7 @@ export default function MySpace() {
                     </div>
                     <div className="flex items-center gap-2">
                       <DropdownMenu>
-                        <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-700 transition hover:border-(--theme-shell-border) hover:text-(--theme-primary)">
+                        <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-700 transition hover:border-theme-shell-border hover:text-theme-primary">
                           {imageTextGroupFilter
                             ? imageTextGroups.find((g) => g.id === imageTextGroupFilter)?.name ||
                               '图文分组'
@@ -695,14 +692,14 @@ export default function MySpace() {
                           ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <span className="rounded-full bg-(--theme-primary-soft) px-3 py-1 text-sm text-(--theme-primary-hover)">
+                      <span className="rounded-full bg-theme-soft px-3 py-1 text-sm text-theme-primary-hover">
                         {filteredImageTextPosts.length} 组
                       </span>
                     </div>
                   </div>
 
                   {filteredImageTextPosts.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-(--theme-shell-border) bg-(--theme-primary-soft) p-6 text-sm text-(--theme-primary-hover)">
+                    <div className="rounded-2xl border border-dashed border-theme-shell-border bg-theme-soft p-6 text-sm text-theme-primary-hover">
                       当前筛选下还没有图文内容。
                     </div>
                   ) : (
@@ -752,8 +749,8 @@ export default function MySpace() {
                     onClick={() => setUploadType(type)}
                     className={`flex-1 py-2.5 rounded-xl font-medium text-sm border-2 transition-all ${
                       uploadType === type
-                        ? 'border-(--theme-primary) bg-(--theme-primary-soft) text-(--theme-primary)'
-                        : 'border-gray-200 text-gray-500 hover:border-(--theme-shell-border)'
+                        ? 'border-theme-primary bg-theme-soft text-theme-primary'
+                        : 'border-gray-200 text-gray-500 hover:border-theme-shell-border'
                     }`}
                   >
                     {type === 'wallpaper' ? '🖼️ 壁纸' : '🙂 头像'}
@@ -772,8 +769,8 @@ export default function MySpace() {
                     onClick={() => setUploadVisibility(option.value)}
                     className={`flex-1 py-2.5 rounded-xl font-medium text-sm border-2 transition-all ${
                       uploadVisibility === option.value
-                        ? 'border-(--theme-primary) bg-(--theme-primary-soft) text-(--theme-primary)'
-                        : 'border-gray-200 text-gray-500 hover:border-(--theme-shell-border)'
+                        ? 'border-theme-primary bg-theme-soft text-theme-primary'
+                        : 'border-gray-200 text-gray-500 hover:border-theme-shell-border'
                     }`}
                   >
                     {option.label}
@@ -788,8 +785,8 @@ export default function MySpace() {
               <div
                 className={`relative border-2 border-dashed rounded-2xl transition-all cursor-pointer ${
                   previewUrl
-                    ? 'border-(--theme-primary) bg-(--theme-primary-soft)/50'
-                    : 'border-gray-300 hover:border-(--theme-primary) hover:bg-(--theme-primary-soft)/30'
+                    ? 'border-theme-primary bg-theme-soft/50'
+                    : 'border-gray-300 hover:border-theme-primary hover:bg-theme-soft/30'
                 }`}
                 onDrop={handleDrop}
                 onDragOver={(e) => e.preventDefault()}
@@ -849,7 +846,7 @@ export default function MySpace() {
                 onChange={(e) => setUploadTitle(e.target.value)}
                 placeholder="给这个资源起个名字，如「蓝色星空壁纸」"
                 maxLength={100}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-(--theme-primary)/40 transition"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-primary/40 transition"
               />
             </div>
 
@@ -864,7 +861,7 @@ export default function MySpace() {
                 placeholder="简单描述一下这个资源…"
                 maxLength={255}
                 rows={2}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-(--theme-primary)/40 transition resize-none"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-primary/40 transition resize-none"
               />
             </div>
 
@@ -1039,7 +1036,7 @@ export default function MySpace() {
                 onChange={(e) => setEditTitle(e.target.value)}
                 placeholder="给这个资源起个名字"
                 maxLength={100}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-(--theme-primary)/40 transition"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-primary/40 transition"
               />
             </div>
 
@@ -1054,7 +1051,7 @@ export default function MySpace() {
                 placeholder="简单描述一下这个资源…"
                 maxLength={255}
                 rows={2}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-(--theme-primary)/40 transition resize-none"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-primary/40 transition resize-none"
               />
             </div>
 
@@ -1069,8 +1066,8 @@ export default function MySpace() {
                     onClick={() => setEditType(type)}
                     className={`flex-1 py-2.5 rounded-xl font-medium text-sm border-2 transition-all ${
                       editType === type
-                        ? 'border-(--theme-primary) bg-(--theme-primary-soft) text-(--theme-primary)'
-                        : 'border-gray-200 text-gray-500 hover:border-(--theme-shell-border)'
+                        ? 'border-theme-primary bg-theme-soft text-theme-primary'
+                        : 'border-gray-200 text-gray-500 hover:border-theme-shell-border'
                     }`}
                   >
                     {type === 'wallpaper' ? '🖼️ 壁纸' : '🙂 头像'}
@@ -1089,8 +1086,8 @@ export default function MySpace() {
                     onClick={() => setEditVisibility(option.value)}
                     className={`flex-1 py-2.5 rounded-xl font-medium text-sm border-2 transition-all ${
                       editVisibility === option.value
-                        ? 'border-(--theme-primary) bg-(--theme-primary-soft) text-(--theme-primary)'
-                        : 'border-gray-200 text-gray-500 hover:border-(--theme-shell-border)'
+                        ? 'border-theme-primary bg-theme-soft text-theme-primary'
+                        : 'border-gray-200 text-gray-500 hover:border-theme-shell-border'
                     }`}
                   >
                     {option.label}

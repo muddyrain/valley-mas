@@ -1,4 +1,4 @@
-import {
+﻿import {
   AudioLines,
   BadgeCheck,
   Bell,
@@ -278,11 +278,11 @@ export default function Header() {
           {isAuthenticated && <AiChatAssistant />}
 
           <DropdownMenu>
-            <DropdownMenuTrigger className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-[var(--theme-primary-soft)] hover:text-[var(--theme-primary)]">
+            <DropdownMenuTrigger className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-theme-soft hover:text-theme-primary">
               <Palette className="h-5 w-5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-72 border-[var(--theme-border)] bg-white/95 p-2 shadow-xl backdrop-blur-xl"
+              className="w-72 border-theme-border bg-white/95 p-2 shadow-xl backdrop-blur-xl"
               align="end"
             >
               <div className="px-2 py-1.5">
@@ -291,7 +291,7 @@ export default function Header() {
                   选择你更喜欢的页面色调，切换后会保留到下次打开。
                 </p>
               </div>
-              <DropdownMenuSeparator className="bg-[var(--theme-border)]" />
+              <DropdownMenuSeparator className="bg-theme-border" />
               <div className="grid gap-1 p-1">
                 {THEME_OPTIONS.map((option) => {
                   const active = option.value === currentTheme;
@@ -302,8 +302,8 @@ export default function Header() {
                       onClick={() => handleThemeChange(option.value)}
                       className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${
                         active
-                          ? 'border-[var(--theme-primary-soft-strong)] bg-[var(--theme-primary-soft)] shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.12)]'
-                          : 'border-transparent hover:border-[var(--theme-border)] hover:bg-[var(--theme-primary-soft)]'
+                          ? 'border-theme-soft-strong bg-theme-soft shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.12)]'
+                          : 'border-transparent hover:border-theme-border hover:bg-theme-soft'
                       }`}
                     >
                       <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-2 shadow-sm">
@@ -324,7 +324,7 @@ export default function Header() {
                         </span>
                       </span>
                       {active ? (
-                        <span className="rounded-full bg-[var(--theme-primary)] px-2.5 py-1 text-[11px] text-white">
+                        <span className="rounded-full bg-theme-primary px-2.5 py-1 text-[11px] text-white">
                           当前
                         </span>
                       ) : null}
@@ -346,7 +346,7 @@ export default function Header() {
                 )}
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                className="w-86 border-(--theme-border) bg-white/95 p-2 shadow-xl backdrop-blur-xl"
+                className="w-86 border-theme-border bg-white/95 p-2 shadow-xl backdrop-blur-xl"
                 align="end"
               >
                 <div className="mb-1 flex items-center justify-between px-2 py-1">
@@ -360,7 +360,7 @@ export default function Header() {
                     全部已读
                   </button>
                 </div>
-                <DropdownMenuSeparator className="bg-(--theme-border)" />
+                <DropdownMenuSeparator className="bg-theme-border" />
 
                 <div className="max-h-88 overflow-auto">
                   {notifyLoading ? (
@@ -375,7 +375,7 @@ export default function Header() {
                         className={`cursor-pointer rounded-xl border px-3 py-3 ${
                           item.isRead
                             ? 'border-slate-200 bg-slate-50/65'
-                            : 'border-(--theme-shell-border) bg-(--theme-primary-soft)/70 shadow-[0_6px_16px_rgba(var(--theme-primary-rgb),0.12)]'
+                            : 'border-theme-shell-border bg-theme-soft/70 shadow-[0_6px_16px_rgba(var(--theme-primary-rgb),0.12)]'
                         }`}
                       >
                         {(() => {
@@ -424,7 +424,7 @@ export default function Header() {
 
           {isAuthenticated ? (
             <DropdownMenu>
-              <DropdownMenuTrigger className="relative h-10 w-10 rounded-full outline-none transition-all hover:ring-2 hover:ring-(--theme-primary-soft-strong)">
+              <DropdownMenuTrigger className="relative h-10 w-10 rounded-full outline-none transition-all hover:ring-2 hover:ring-theme-soft-strong">
                 <Avatar className="theme-avatar-border h-10 w-10 border-2 shadow-sm">
                   <AvatarImage src={user?.avatar} alt={user?.nickname || user?.username} />
                   <AvatarFallback className="theme-avatar-fallback font-semibold text-white">
@@ -434,7 +434,7 @@ export default function Header() {
                 <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500" />
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                className="w-64 border-(--theme-border) bg-white/95 p-2 shadow-xl backdrop-blur-xl"
+                className="w-64 border-theme-border bg-white/95 p-2 shadow-xl backdrop-blur-xl"
                 align="end"
               >
                 <div className="theme-user-card-bg mb-2 rounded-lg px-3 py-3">
@@ -457,7 +457,7 @@ export default function Header() {
                     </button>
                   </div>
                 </div>
-                <DropdownMenuSeparator className="bg-(--theme-border)" />
+                <DropdownMenuSeparator className="bg-theme-border" />
                 <DropdownMenuItem
                   onClick={() => navigate('/profile')}
                   className="theme-menu-hover cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
@@ -481,7 +481,7 @@ export default function Header() {
                     <span className="font-medium">我的创作空间</span>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator className="bg-(--theme-border)" />
+                <DropdownMenuSeparator className="bg-theme-border" />
                 <DropdownMenuItem
                   onClick={handleLogout}
                   className="cursor-pointer gap-3 rounded-lg py-2.5 text-red-600 transition-colors hover:bg-red-50"

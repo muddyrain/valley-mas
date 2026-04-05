@@ -1,4 +1,4 @@
-import {
+﻿import {
   Calendar,
   Eye,
   FileText,
@@ -38,7 +38,7 @@ function getPostPreviewText(post: Post) {
 
 function getPostStatusMeta(status?: string) {
   if (status === 'published') {
-    return { label: '已发布', className: 'bg-(--theme-primary-soft) text-(--theme-primary)' };
+    return { label: '已发布', className: 'bg-theme-soft text-theme-primary' };
   }
   if (status === 'archived') {
     return { label: '已归档', className: 'bg-slate-200 text-slate-700' };
@@ -52,7 +52,7 @@ function getVisibilityMeta(visibility?: Post['visibility']): {
   icon: LucideIcon;
 } {
   if (visibility === 'public') {
-    return { label: '公开', className: 'bg-(--theme-primary) text-white', icon: Eye };
+    return { label: '公开', className: 'bg-theme-primary text-white', icon: Eye };
   }
   if (visibility === 'shared') {
     return {
@@ -84,14 +84,14 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
 
   return (
     <article
-      className={`group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_28px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--theme-primary-soft-strong)] hover:shadow-[0_16px_38px_rgba(var(--theme-primary-rgb),0.16)] ${className}`}
+      className={`group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_28px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:border-theme-soft-strong hover:shadow-[0_16px_38px_rgba(var(--theme-primary-rgb),0.16)] ${className}`}
     >
       <Link
         to={`/blog/${post.id}`}
         state={{ returnTo, returnLabel, source: mode === 'creator' ? 'my-space' : 'blog-list' }}
         className="block"
       >
-        <div className="relative h-44 overflow-hidden border-b border-slate-100 bg-[linear-gradient(135deg,var(--theme-primary-soft)_0%,var(--theme-surface-alt)_62%,white_100%)]">
+        <div className="relative h-44 overflow-hidden border-b border-slate-100 bg-theme-soft">
           {post.cover ? (
             <img
               src={post.cover}
@@ -133,7 +133,7 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
         </div>
 
         <div className="space-y-3 p-4">
-          <h3 className="line-clamp-2 text-lg font-semibold text-slate-900 transition-colors group-hover:text-[var(--theme-primary)]">
+          <h3 className="line-clamp-2 text-lg font-semibold text-slate-900 transition-colors group-hover:text-theme-primary">
             {post.title}
           </h3>
 
@@ -162,7 +162,7 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
               </span>
             </div>
 
-            <span className="rounded-full bg-[var(--theme-primary-soft)] px-2 py-0.5 text-[var(--theme-primary)]">
+            <span className="rounded-full bg-theme-soft px-2 py-0.5 text-theme-primary">
               {mode === 'creator' ? typeLabel : post.group?.name || '\u672a\u5206\u7ec4'}
             </span>
           </div>

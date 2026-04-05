@@ -1,4 +1,4 @@
-interface FilterOption {
+﻿interface FilterOption {
   label: string;
   value: string;
 }
@@ -28,7 +28,7 @@ export default function TypeFilterBar({
 }: TypeFilterBarProps) {
   return (
     <div
-      className={`flex items-center gap-3 bg-white rounded-2xl shadow-sm border border-(--theme-shell-border) p-4 ${className}`}
+      className={`flex items-center gap-3 bg-white rounded-2xl shadow-sm border border-theme-shell-border p-4 ${className}`}
     >
       {prefix && <span className="text-sm text-gray-500 font-medium mr-1">{prefix}</span>}
       {options.map((opt) => (
@@ -38,8 +38,8 @@ export default function TypeFilterBar({
           onClick={() => onChange(opt.value)}
           className={`px-5 py-2 rounded-xl font-medium text-sm transition-all duration-200 ${
             value === opt.value
-              ? 'bg-(--theme-primary) text-white shadow-md shadow-(--theme-primary)/30 scale-105'
-              : 'bg-(--theme-primary-soft) text-(--theme-primary-hover) hover:bg-(--theme-primary-soft-strong) hover:scale-105'
+              ? 'bg-theme-primary text-white shadow-md shadow-theme-primary/30 scale-105'
+              : 'bg-theme-soft text-theme-primary-hover hover:bg-theme-soft-strong hover:scale-105'
           }`}
         >
           {opt.label}

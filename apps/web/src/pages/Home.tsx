@@ -1,4 +1,4 @@
-import {
+﻿import {
   ArrowRight,
   BookOpen,
   Download,
@@ -336,7 +336,7 @@ export default function Home() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="theme-accent-border rounded-full border bg-[var(--theme-surface-alt)] px-6 text-slate-700 shadow-sm hover:bg-white"
+                    className="theme-accent-border rounded-full border bg-theme-surface-alt px-6 text-slate-700 shadow-sm hover:bg-white"
                     onClick={() => navigate('/my-space')}
                   >
                     进入创作空间
@@ -376,7 +376,7 @@ export default function Home() {
                   </div>
                   <Button
                     size="lg"
-                    className="h-12 rounded-full bg-[var(--theme-primary)] px-6 text-white hover:bg-[var(--theme-primary-hover)]"
+                    className="h-12 rounded-full bg-theme-primary px-6 text-white hover:bg-theme-primary-hover"
                     onClick={handleSearchCreator}
                   >
                     查看创作者
@@ -408,7 +408,7 @@ export default function Home() {
                     本站概览
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-[1.12fr_0.88fr]">
-                    <div className="rounded-[26px] border border-(--theme-shell-border) bg-[linear-gradient(145deg,rgba(255,255,255,0.98),color-mix(in_srgb,var(--theme-primary-soft)_60%,white))] p-5 shadow-[0_14px_36px_rgba(var(--theme-primary-rgb),0.12)]">
+                    <div className="rounded-[26px] border border-theme-shell-border bg-[linear-gradient(145deg,rgba(255,255,255,0.98),color-mix(in_srgb,var(--theme-primary-soft)_60%,white))] p-5 shadow-[0_14px_36px_rgba(var(--theme-primary-rgb),0.12)]">
                       <div className="theme-icon-accent text-xs tracking-[0.18em] uppercase">
                         Overview
                       </div>
@@ -434,7 +434,7 @@ export default function Home() {
                 </div>
 
                 <div className="grid gap-3">
-                  <div className="rounded-[24px] border border-(--theme-shell-border) bg-[linear-gradient(135deg,rgba(255,255,255,0.92),color-mix(in_srgb,var(--theme-primary-soft)_50%,white))] px-4 py-4 shadow-[0_16px_36px_rgba(148,163,184,0.08)]">
+                  <div className="rounded-[24px] border border-theme-shell-border bg-[linear-gradient(135deg,rgba(255,255,255,0.92),color-mix(in_srgb,var(--theme-primary-soft)_50%,white))] px-4 py-4 shadow-[0_16px_36px_rgba(148,163,184,0.08)]">
                     <div className="theme-icon-accent text-xs tracking-[0.18em] uppercase">
                       Content Flow
                     </div>
@@ -479,7 +479,7 @@ export default function Home() {
                     className="w-full space-y-4 text-left"
                     onClick={() => navigate(`/blog/${featuredPost.id}`)}
                   >
-                    <div className="relative h-60 overflow-hidden rounded-[28px] border border-(--theme-shell-border) bg-(--theme-primary-soft)">
+                    <div className="relative h-60 overflow-hidden rounded-[28px] border border-theme-shell-border bg-theme-soft">
                       {featuredPost.cover ? (
                         <img
                           src={featuredPost.cover}
@@ -500,7 +500,7 @@ export default function Home() {
                         </h3>
                       </div>
                     </div>
-                    <div className="rounded-[24px] border border-(--theme-shell-border) bg-(--theme-primary-soft) p-4">
+                    <div className="rounded-[24px] border border-theme-shell-border bg-theme-soft p-4">
                       <p className="text-sm leading-7 text-slate-600">
                         {featuredPostExcerpt || '这次更新已经放到内容区里了，点进去就能继续看。'}
                       </p>
@@ -512,12 +512,12 @@ export default function Home() {
                     </div>
                   </button>
                 ) : (
-                  <div className="rounded-[24px] bg-(--theme-primary-soft) p-6 text-sm text-slate-500">
+                  <div className="rounded-[24px] bg-theme-soft p-6 text-sm text-slate-500">
                     暂时还没有新的内容更新。
                   </div>
                 )}
               </div>
-              <div className="rounded-[34px] border border-(--theme-shell-border) bg-[linear-gradient(180deg,rgba(247,251,255,0.95),rgba(255,255,255,0.86))] p-5 shadow-[0_20px_56px_rgba(var(--theme-primary-rgb),0.10)]">
+              <div className="rounded-[34px] border border-theme-shell-border bg-[linear-gradient(180deg,rgba(247,251,255,0.95),rgba(255,255,255,0.86))] p-5 shadow-[0_20px_56px_rgba(var(--theme-primary-rgb),0.10)]">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-600">
                     <Images className="h-3.5 w-3.5 theme-icon-accent" />
@@ -560,7 +560,7 @@ export default function Home() {
             action={
               <Button
                 variant="outline"
-                className="rounded-full border-(--theme-shell-border) bg-white/80 px-5 text-slate-700 hover:bg-white"
+                className="rounded-full border-theme-shell-border bg-white/80 px-5 text-slate-700 hover:bg-white"
                 onClick={() => navigate('/creators')}
               >
                 去看创作者页
@@ -596,7 +596,7 @@ export default function Home() {
                 action={
                   <Button
                     variant="outline"
-                    className="rounded-full border-(--theme-shell-border) bg-white/80 px-5"
+                    className="rounded-full border-theme-shell-border bg-white/80 px-5"
                     onClick={() => navigate('/blog')}
                   >
                     先去看内容
@@ -615,7 +615,7 @@ export default function Home() {
             action={
               <Button
                 variant="outline"
-                className="rounded-full border-(--theme-shell-border) bg-white/85 px-5 text-(--theme-primary) hover:bg-white"
+                className="rounded-full border-theme-shell-border bg-white/85 px-5 text-theme-primary hover:bg-white"
                 onClick={() => navigate('/resources')}
               >
                 进入资源页
@@ -651,7 +651,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={() => navigate(`/resource/${featuredWallpaper.id}`)}
-                      className="group block w-full overflow-hidden rounded-[32px] border border-(--theme-shell-border) bg-white text-left shadow-[0_20px_56px_rgba(var(--theme-primary-rgb),0.12)] transition hover:-translate-y-1 hover:shadow-[0_26px_64px_rgba(var(--theme-primary-rgb),0.18)]"
+                      className="group block w-full overflow-hidden rounded-[32px] border border-theme-shell-border bg-white text-left shadow-[0_20px_56px_rgba(var(--theme-primary-rgb),0.12)] transition hover:-translate-y-1 hover:shadow-[0_26px_64px_rgba(var(--theme-primary-rgb),0.18)]"
                     >
                       <div className="relative h-[336px] overflow-hidden bg-slate-100">
                         <img
@@ -660,7 +660,7 @@ export default function Home() {
                           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
                         />
                         <div className="absolute inset-0 bg-linear-to-t from-black/72 via-black/20 to-transparent" />
-                        <div className="absolute left-5 top-5 inline-flex items-center rounded-full bg-white/88 px-3 py-1 text-xs font-medium text-(--theme-primary) backdrop-blur">
+                        <div className="absolute left-5 top-5 inline-flex items-center rounded-full bg-white/88 px-3 py-1 text-xs font-medium text-theme-primary backdrop-blur">
                           热门壁纸
                         </div>
                         <div className="absolute right-5 top-5">
@@ -691,7 +691,7 @@ export default function Home() {
                           key={resource.id}
                           type="button"
                           onClick={() => navigate(`/resource/${resource.id}`)}
-                          className="group overflow-hidden rounded-[26px] border border-(--theme-shell-border) bg-white text-left shadow-[0_16px_40px_rgba(148,163,184,0.1)] transition hover:-translate-y-1 hover:shadow-[0_20px_52px_rgba(var(--theme-primary-rgb),0.14)]"
+                          className="group overflow-hidden rounded-[26px] border border-theme-shell-border bg-white text-left shadow-[0_16px_40px_rgba(148,163,184,0.1)] transition hover:-translate-y-1 hover:shadow-[0_20px_52px_rgba(var(--theme-primary-rgb),0.14)]"
                         >
                           <div className="relative h-44 overflow-hidden bg-slate-100">
                             <img
@@ -717,7 +717,7 @@ export default function Home() {
                     </div>
                   ) : null}
                 </div>
-                <div className="rounded-[32px] border border-(--theme-shell-border) bg-white/84 p-5 shadow-[0_18px_50px_rgba(148,163,184,0.1)]">
+                <div className="rounded-[32px] border border-theme-shell-border bg-white/84 p-5 shadow-[0_18px_50px_rgba(148,163,184,0.1)]">
                   <div className="mb-5 flex items-center justify-between">
                     <div>
                       <div className="text-lg font-semibold text-slate-900">头像收藏</div>
@@ -734,7 +734,7 @@ export default function Home() {
                           key={resource.id}
                           type="button"
                           onClick={() => navigate(`/resource/${resource.id}`)}
-                          className="group overflow-hidden rounded-[24px] border border-(--theme-shell-border) bg-(--theme-primary-soft)/30 text-left transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(148,163,184,0.12)]"
+                          className="group overflow-hidden rounded-[24px] border border-theme-shell-border bg-theme-soft/30 text-left transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(148,163,184,0.12)]"
                         >
                           <div className="relative px-4 pb-3 pt-4">
                             <div className="absolute right-3 top-3">
@@ -743,7 +743,7 @@ export default function Home() {
                                 onClick={(event) => handleFavoriteResource(event, resource)}
                               />
                             </div>
-                            <div className="mx-auto h-24 w-24 overflow-hidden rounded-[22px] border border-(--theme-shell-border) bg-white shadow-[0_8px_24px_rgba(148,163,184,0.1)]">
+                            <div className="mx-auto h-24 w-24 overflow-hidden rounded-[22px] border border-theme-shell-border bg-white shadow-[0_8px_24px_rgba(148,163,184,0.1)]">
                               <img
                                 src={resource.url}
                                 alt={resource.title}
@@ -763,7 +763,7 @@ export default function Home() {
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-[24px] bg-(--theme-primary-soft) px-4 py-10 text-center text-sm text-slate-500">
+                    <div className="rounded-[24px] bg-theme-soft px-4 py-10 text-center text-sm text-slate-500">
                       当前资源里还没有头像内容。
                     </div>
                   )}
@@ -776,7 +776,7 @@ export default function Home() {
                 action={
                   <Button
                     variant="outline"
-                    className="rounded-full border-(--theme-shell-border) bg-white/85 px-5"
+                    className="rounded-full border-theme-shell-border bg-white/85 px-5"
                     onClick={() => navigate('/resources')}
                   >
                     去看资源页
@@ -795,7 +795,7 @@ export default function Home() {
             action={
               <Button
                 variant="outline"
-                className="rounded-full border-(--theme-shell-border) bg-white/80 px-5 text-slate-700 hover:bg-white"
+                className="rounded-full border-theme-shell-border bg-white/80 px-5 text-slate-700 hover:bg-white"
                 onClick={() => navigate('/blog')}
               >
                 去看内容页
@@ -835,7 +835,7 @@ export default function Home() {
                   isCreator ? (
                     <Button
                       variant="outline"
-                      className="rounded-full border-(--theme-shell-border) bg-white/80 px-5"
+                      className="rounded-full border-theme-shell-border bg-white/80 px-5"
                       onClick={() => navigate('/my-space')}
                     >
                       去创作空间看看
@@ -893,7 +893,7 @@ export default function Home() {
                   onClick={() => navigate('/resources')}
                   className="rounded-[28px] border border-white/80 bg-white/84 px-5 py-6 text-left shadow-[0_14px_36px_rgba(148,163,184,0.08)] transition hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(148,163,184,0.12)]"
                 >
-                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-(--theme-primary-soft) text-(--theme-primary)">
+                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-theme-soft text-theme-primary">
                     <Images className="h-5 w-5" />
                   </div>
                   <div className="text-lg font-medium text-slate-900">资源页</div>
@@ -904,7 +904,7 @@ export default function Home() {
                   onClick={() => navigate('/creators')}
                   className="rounded-[28px] border border-white/80 bg-white/84 px-5 py-6 text-left shadow-[0_14px_36px_rgba(148,163,184,0.08)] transition hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(148,163,184,0.12)]"
                 >
-                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-(--theme-primary-soft) theme-icon-accent">
+                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-theme-soft theme-icon-accent">
                     <SquareChartGantt className="h-5 w-5" />
                   </div>
                   <div className="text-lg font-medium text-slate-900">创作者页</div>
