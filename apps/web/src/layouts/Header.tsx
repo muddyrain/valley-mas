@@ -9,6 +9,7 @@ import {
   Home,
   ImageIcon,
   LogOut,
+  Palette,
   RefreshCw,
   Sparkles,
   User,
@@ -37,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { THEME_OPTIONS, useThemeStore } from '@/stores/useThemeStore';
 
 const formatNotifyTime = (value: string) => {
   const date = new Date(value);
@@ -63,8 +65,8 @@ const getNotificationVisual = (type: string, content: string) => {
 
   return {
     icon: BellRing,
-    iconClass: 'text-violet-600',
-    iconBgClass: 'bg-violet-100',
+    iconClass: 'text-amber-700',
+    iconBgClass: 'bg-amber-100',
   };
 };
 
@@ -79,6 +81,8 @@ export default function Header() {
     fetchProfile,
     profileLoading,
   } = useAuthStore();
+  const currentTheme = useThemeStore((state) => state.theme);
+  const setTheme = useThemeStore((state) => state.setTheme);
 
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -182,19 +186,24 @@ export default function Header() {
     }
   };
 
+  const handleThemeChange = (theme: (typeof THEME_OPTIONS)[number]['value']) => {
+    if (theme === currentTheme) return;
+    setTheme(theme);
+    const option = THEME_OPTIONS.find((item) => item.value === theme);
+    toast.success(`已切换为${option?.label || '新主题'}`);
+  };
+
   return (
     <header
       data-global-header
-      className="sticky top-0 z-50 w-full border-b border-gray-200/50 bg-white/80 shadow-sm backdrop-blur-xl"
+      className="theme-header sticky top-0 z-50 w-full border-b bg-white/82 backdrop-blur-xl"
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center px-4 md:px-8">
         <Link to="/" className="group mr-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-purple-600 to-indigo-600 shadow-md transition-transform group-hover:scale-110 group-hover:shadow-lg">
+          <div className="theme-logo-icon flex h-10 w-10 items-center justify-center rounded-xl transition-transform group-hover:scale-110">
             <span className="text-lg font-bold text-white">V</span>
           </div>
-          <span className="hidden bg-linear-to-r from-purple-600 to-indigo-600 bg-clip-text text-2xl font-bold text-transparent sm:block">
-            Valley
-          </span>
+          <span className="theme-logo-text hidden text-2xl font-bold sm:block">Valley</span>
         </Link>
 
         <nav className="flex flex-1 items-center gap-1">
@@ -202,9 +211,7 @@ export default function Header() {
             <Button
               variant="ghost"
               className={`gap-2 transition-colors ${
-                location.pathname === '/'
-                  ? 'bg-purple-100 text-purple-600'
-                  : 'hover:bg-purple-50 hover:text-purple-600'
+                location.pathname === '/' ? 'theme-nav-active' : 'theme-nav-hover'
               }`}
             >
               <Home className="h-4 w-4" />
@@ -218,8 +225,8 @@ export default function Header() {
               className={`gap-2 transition-colors ${
                 location.pathname.startsWith('/creators') ||
                 location.pathname.startsWith('/creator')
-                  ? 'bg-purple-100 text-purple-600'
-                  : 'hover:bg-purple-50 hover:text-purple-600'
+                  ? 'theme-nav-active'
+                  : 'theme-nav-hover'
               }`}
             >
               <Users className="h-4 w-4" />
@@ -233,8 +240,8 @@ export default function Header() {
               className={`gap-2 transition-colors ${
                 location.pathname.startsWith('/resources') ||
                 location.pathname.startsWith('/resource')
-                  ? 'bg-purple-100 text-purple-600'
-                  : 'hover:bg-purple-50 hover:text-purple-600'
+                  ? 'theme-nav-active'
+                  : 'theme-nav-hover'
               }`}
             >
               <ImageIcon className="h-4 w-4" />
@@ -246,9 +253,7 @@ export default function Header() {
             <Button
               variant="ghost"
               className={`gap-2 transition-colors ${
-                location.pathname.startsWith('/blog')
-                  ? 'bg-purple-100 text-purple-600'
-                  : 'hover:bg-purple-50 hover:text-purple-600'
+                location.pathname.startsWith('/blog') ? 'theme-nav-active' : 'theme-nav-hover'
               }`}
             >
               <BookOpen className="h-4 w-4" />
@@ -260,9 +265,7 @@ export default function Header() {
             <Button
               variant="ghost"
               className={`gap-2 transition-colors ${
-                location.pathname.startsWith('/tts')
-                  ? 'bg-purple-100 text-purple-600'
-                  : 'hover:bg-purple-50 hover:text-purple-600'
+                location.pathname.startsWith('/tts') ? 'theme-nav-active' : 'theme-nav-hover'
               }`}
             >
               <AudioLines className="h-4 w-4" />
@@ -274,9 +277,67 @@ export default function Header() {
         <div className="flex items-center gap-3">
           {isAuthenticated && <AiChatAssistant />}
 
+          <DropdownMenu>
+            <DropdownMenuTrigger className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-[var(--theme-primary-soft)] hover:text-[var(--theme-primary)]">
+              <Palette className="h-5 w-5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              className="w-72 border-[var(--theme-border)] bg-white/95 p-2 shadow-xl backdrop-blur-xl"
+              align="end"
+            >
+              <div className="px-2 py-1.5">
+                <p className="text-sm font-semibold text-slate-900">主题切换</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  选择你更喜欢的页面色调，切换后会保留到下次打开。
+                </p>
+              </div>
+              <DropdownMenuSeparator className="bg-[var(--theme-border)]" />
+              <div className="grid gap-1 p-1">
+                {THEME_OPTIONS.map((option) => {
+                  const active = option.value === currentTheme;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleThemeChange(option.value)}
+                      className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${
+                        active
+                          ? 'border-[var(--theme-primary-soft-strong)] bg-[var(--theme-primary-soft)] shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.12)]'
+                          : 'border-transparent hover:border-[var(--theme-border)] hover:bg-[var(--theme-primary-soft)]'
+                      }`}
+                    >
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-2 shadow-sm">
+                        {option.preview.map((color) => (
+                          <span
+                            key={color}
+                            className="h-3 w-3 rounded-full border border-white/80 shadow-sm"
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium text-slate-900">
+                          {option.label}
+                        </span>
+                        <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                          {option.description}
+                        </span>
+                      </span>
+                      {active ? (
+                        <span className="rounded-full bg-[var(--theme-primary)] px-2.5 py-1 text-[11px] text-white">
+                          当前
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {isAuthenticated && (
             <DropdownMenu onOpenChange={(open) => open && loadNotifications()}>
-              <DropdownMenuTrigger className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-purple-50 hover:text-purple-600">
+              <DropdownMenuTrigger className="theme-icon-btn relative flex h-10 w-10 items-center justify-center rounded-full transition-colors">
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-rose-500 px-1.5 text-center text-[10px] font-semibold leading-4 text-white">
@@ -285,7 +346,7 @@ export default function Header() {
                 )}
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                className="w-86 border-gray-200 bg-white/95 p-2 shadow-xl backdrop-blur-xl"
+                className="w-86 border-(--theme-border) bg-white/95 p-2 shadow-xl backdrop-blur-xl"
                 align="end"
               >
                 <div className="mb-1 flex items-center justify-between px-2 py-1">
@@ -293,13 +354,13 @@ export default function Header() {
                   <button
                     type="button"
                     onClick={handleMarkAllRead}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-purple-600 hover:bg-purple-50"
+                    className="theme-icon-accent inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs theme-menu-hover"
                   >
                     <CheckCheck className="h-3.5 w-3.5" />
                     全部已读
                   </button>
                 </div>
-                <DropdownMenuSeparator className="bg-gray-200" />
+                <DropdownMenuSeparator className="bg-(--theme-border)" />
 
                 <div className="max-h-88 overflow-auto">
                   {notifyLoading ? (
@@ -314,7 +375,7 @@ export default function Header() {
                         className={`cursor-pointer rounded-xl border px-3 py-3 ${
                           item.isRead
                             ? 'border-slate-200 bg-slate-50/65'
-                            : 'border-violet-200 bg-violet-50/70 shadow-[0_6px_16px_rgba(124,58,237,0.12)]'
+                            : 'border-(--theme-shell-border) bg-(--theme-primary-soft)/70 shadow-[0_6px_16px_rgba(var(--theme-primary-rgb),0.12)]'
                         }`}
                       >
                         {(() => {
@@ -338,7 +399,7 @@ export default function Header() {
                                       已读
                                     </span>
                                   ) : (
-                                    <span className="rounded-full bg-violet-500 px-2 py-0.5 text-[10px] text-white">
+                                    <span className="theme-unread-badge rounded-full px-2 py-0.5 text-[10px] text-white">
                                       未读
                                     </span>
                                   )}
@@ -363,20 +424,20 @@ export default function Header() {
 
           {isAuthenticated ? (
             <DropdownMenu>
-              <DropdownMenuTrigger className="relative h-10 w-10 rounded-full outline-none transition-all hover:ring-2 hover:ring-purple-200">
-                <Avatar className="h-10 w-10 border-2 border-purple-100 shadow-sm">
+              <DropdownMenuTrigger className="relative h-10 w-10 rounded-full outline-none transition-all hover:ring-2 hover:ring-(--theme-primary-soft-strong)">
+                <Avatar className="theme-avatar-border h-10 w-10 border-2 shadow-sm">
                   <AvatarImage src={user?.avatar} alt={user?.nickname || user?.username} />
-                  <AvatarFallback className="bg-linear-to-br from-purple-400 to-indigo-500 font-semibold text-white">
+                  <AvatarFallback className="theme-avatar-fallback font-semibold text-white">
                     {(user?.nickname?.[0] || user?.username?.[0] || 'U').toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500" />
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                className="w-64 border-gray-200 bg-white/95 p-2 shadow-xl backdrop-blur-xl"
+                className="w-64 border-(--theme-border) bg-white/95 p-2 shadow-xl backdrop-blur-xl"
                 align="end"
               >
-                <div className="mb-2 rounded-lg bg-linear-to-br from-purple-50 to-indigo-50 px-3 py-3">
+                <div className="theme-user-card-bg mb-2 rounded-lg px-3 py-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-gray-900">
@@ -387,7 +448,7 @@ export default function Header() {
                     <button
                       type="button"
                       onClick={handleRefreshUser}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-full text-purple-600 transition hover:bg-white/70 hover:text-purple-700"
+                      className="theme-icon-accent inline-flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-white/70"
                       title="刷新用户状态"
                     >
                       <RefreshCw
@@ -396,17 +457,17 @@ export default function Header() {
                     </button>
                   </div>
                 </div>
-                <DropdownMenuSeparator className="bg-gray-200" />
+                <DropdownMenuSeparator className="bg-(--theme-border)" />
                 <DropdownMenuItem
                   onClick={() => navigate('/profile')}
-                  className="cursor-pointer gap-3 rounded-lg py-2.5 transition-colors hover:bg-purple-50"
+                  className="theme-menu-hover cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
                 >
-                  <User className="h-4 w-4 text-purple-600" />
+                  <User className="theme-icon-accent h-4 w-4" />
                   <span className="font-medium">个人中心</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => navigate('/favorites')}
-                  className="cursor-pointer gap-3 rounded-lg py-2.5 transition-colors hover:bg-purple-50"
+                  className="theme-menu-hover cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
                 >
                   <Heart className="h-4 w-4 text-pink-500" />
                   <span className="font-medium">我的收藏</span>
@@ -414,13 +475,13 @@ export default function Header() {
                 {user?.role === 'creator' && (
                   <DropdownMenuItem
                     onClick={() => navigate('/my-space')}
-                    className="cursor-pointer gap-3 rounded-lg py-2.5 transition-colors hover:bg-purple-50"
+                    className="theme-menu-hover cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
                   >
-                    <Sparkles className="h-4 w-4 text-purple-600" />
+                    <Sparkles className="theme-icon-accent h-4 w-4" />
                     <span className="font-medium">我的创作空间</span>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator className="bg-gray-200" />
+                <DropdownMenuSeparator className="bg-(--theme-border)" />
                 <DropdownMenuItem
                   onClick={handleLogout}
                   className="cursor-pointer gap-3 rounded-lg py-2.5 text-red-600 transition-colors hover:bg-red-50"
@@ -432,7 +493,7 @@ export default function Header() {
             </DropdownMenu>
           ) : (
             <Link to="/login">
-              <Button className="rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 px-6 font-medium text-white shadow-md transition-all hover:scale-105 hover:from-purple-700 hover:to-indigo-700 hover:shadow-lg">
+              <Button className="theme-btn-primary rounded-xl px-6 font-medium transition-all">
                 登录 / 注册
               </Button>
             </Link>

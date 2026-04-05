@@ -51,7 +51,7 @@ const TYPE_LABEL: Record<string, string> = {
 const VISIBILITY_META = {
   public: {
     label: '公开可访问',
-    className: 'bg-emerald-500/85 text-white',
+    className: 'bg-(--theme-primary) text-white',
     icon: Globe,
   },
   shared: {
@@ -116,7 +116,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
 
   return (
     <Card
-      className="group overflow-hidden rounded-2xl border-2 border-transparent bg-white cursor-pointer transition-all duration-300 hover:-translate-y-1.5 hover:border-purple-200 hover:shadow-2xl"
+      className="group cursor-pointer overflow-hidden rounded-2xl border-2 border-transparent bg-white transition-all duration-300 hover:-translate-y-1.5 hover:border-[var(--theme-primary-soft-strong)] hover:shadow-[0_20px_44px_rgba(var(--theme-primary-rgb),0.16)]"
       onClick={handleCardClick}
       style={animationDelay !== undefined ? { animationDelay: `${animationDelay}ms` } : undefined}
     >
@@ -193,7 +193,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
                       e.stopPropagation();
                       onEdit(resource);
                     }}
-                    className="rounded-full bg-blue-500/80 p-1.5 text-white shadow transition-all hover:scale-110 hover:bg-blue-600"
+                    className="rounded-full bg-(--theme-primary)/80 p-1.5 text-white shadow transition-all hover:scale-110 hover:bg-(--theme-primary)"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
@@ -217,7 +217,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
       </div>
 
       <CardContent className={contentPadding}>
-        <h3 className="mb-1.5 truncate text-sm font-medium text-gray-900 transition-colors group-hover:text-purple-600">
+        <h3 className="mb-1.5 truncate text-sm font-medium text-gray-900 transition-colors group-hover:text-[var(--theme-primary)]">
           {resource.title}
         </h3>
 
@@ -225,7 +225,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
           <div className="mb-1.5 flex items-center gap-1.5 text-xs text-gray-500">
             <Avatar className="h-4 w-4 shrink-0 border border-gray-200">
               <AvatarImage src={resource.creatorAvatar} />
-              <AvatarFallback className="bg-purple-100 text-[9px] text-purple-600">
+              <AvatarFallback className="bg-[var(--theme-primary-soft)] text-[9px] text-[var(--theme-primary)]">
                 {resource.creatorName?.[0] || 'U'}
               </AvatarFallback>
             </Avatar>
@@ -235,7 +235,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
 
         <div className="flex items-center justify-between text-xs text-gray-400">
           <span className="flex items-center gap-1">
-            <Download className="h-3 w-3 text-purple-400" />
+            <Download className="h-3 w-3 text-[var(--theme-primary)]" />
             {resource.downloadCount}
           </span>
           {showSize && resource.size ? (
@@ -243,7 +243,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
           ) : (
             <Badge
               variant="outline"
-              className="px-1.5 py-0 text-[10px] text-purple-600 border-purple-200"
+              className="border-[var(--theme-primary-soft-strong)] bg-[var(--theme-primary-soft)] px-1.5 py-0 text-[10px] text-[var(--theme-primary)]"
             >
               {resource.type === 'wallpaper' ? '壁纸' : '头像'}
             </Badge>

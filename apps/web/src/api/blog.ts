@@ -2,6 +2,7 @@ import request, { type RequestConfig } from '@/utils/request';
 
 export type PostType = 'blog' | 'image_text';
 export type Visibility = 'private' | 'shared' | 'public';
+export type GroupType = PostType;
 
 export interface ImageTextPage {
   imageUrl?: string;
@@ -38,6 +39,7 @@ export interface PostGroup {
   id: string;
   name: string;
   slug?: string;
+  groupType?: GroupType;
   description?: string;
   authorId: string;
   parentId?: string;
@@ -188,7 +190,7 @@ export function getCategories() {
   return request.get<unknown, Category[]>('/public/blog/categories');
 }
 
-export function getGroups(params: { authorId?: string } = {}) {
+export function getGroups(params: { authorId?: string; groupType?: GroupType } = {}) {
   return request.get<unknown, Group[]>('/public/blog/groups', { params });
 }
 
@@ -246,12 +248,13 @@ export function getAdminPosts(
   return request.get<unknown, PostListData>('/admin/blog/posts', { params });
 }
 
-export function getAdminGroups() {
-  return request.get<unknown, Group[]>('/admin/blog/groups');
+export function getAdminGroups(params: { groupType?: GroupType } = {}) {
+  return request.get<unknown, Group[]>('/admin/blog/groups', { params });
 }
 
 export function createGroup(data: {
   name: string;
+  groupType?: GroupType;
   slug?: string;
   description?: string;
   parentId?: string;
@@ -264,6 +267,7 @@ export function updateGroup(
   id: string,
   data: {
     name?: string;
+    groupType?: GroupType;
     slug?: string;
     description?: string;
     parentId?: string;

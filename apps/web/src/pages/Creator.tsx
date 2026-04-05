@@ -1,126 +1,216 @@
-import { Sparkles, Users } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Download, Sparkles, Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { type Creator, getHotCreators } from '@/api/creator';
+import { toast } from 'sonner';
+import { type Creator as CreatorType, getHotCreators } from '@/api/creator';
 import CreatorCard from '@/components/CreatorCard';
+import EmptyState from '@/components/EmptyState';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export default function CreatorPage() {
+const PAGE_SIZE = 20;
+
+function SectionTitle({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="theme-accent-border inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] theme-accent-text uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
+        {eyebrow}
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-[36px] font-semibold tracking-[-0.04em] text-slate-950 md:text-[42px]">
+          {title}
+        </h2>
+        <p className="max-w-2xl text-[15px] leading-8 text-slate-500 md:text-base">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+export default function Creator() {
   const navigate = useNavigate();
-  const [creators, setCreators] = useState<Creator[]>([]);
+  const [creators, setCreators] = useState<CreatorType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    const loadCreators = async () => {
-      try {
-        setLoading(true);
-        setLoadError(false);
-        const data = await getHotCreators(1, 20);
-        setCreators(data.list || []);
-      } catch (error) {
-        console.error('加载创作者失败', error);
-        setLoadError(true);
-      } finally {
-        setLoading(false);
-      }
-    };
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
 
-    loadCreators();
+    getHotCreators(1, PAGE_SIZE)
+      .then((data) => {
+        if (cancelled) return;
+        setCreators(data.list ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError(true);
+        toast.error('加载创作者失败');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  const totalResources = useMemo(
+    () => creators.reduce((sum, creator) => sum + (creator.resourceCount || 0), 0),
+    [creators],
+  );
+
+  const totalDownloads = useMemo(
+    () => creators.reduce((sum, creator) => sum + (creator.downloadCount || 0), 0),
+    [creators],
+  );
+
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gray-50">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <div className="mb-2 flex items-center gap-3">
-            <div className="rounded-xl bg-linear-to-br from-purple-500 to-indigo-600 p-2">
-              <Sparkles className="h-6 w-6 text-white" />
+    <div className="min-h-screen bg-transparent text-slate-900">
+      <div className="mx-auto max-w-7xl px-6 pb-20 pt-8 md:px-8 lg:px-10">
+        <section className="theme-hero-shell relative overflow-hidden rounded-[40px] border px-6 py-8 md:px-10 md:py-10">
+          <div className="theme-hero-glow absolute inset-0" />
+          <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
+            <div className="space-y-6">
+              <SectionTitle
+                eyebrow="CREATORS"
+                title="创作者广场"
+                description="这里展示最近活跃的创作者，以及他们正在持续整理的资源和内容，方便继续浏览、进入空间或找到喜欢的风格。"
+              />
+
+              <div className="flex flex-wrap gap-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
+                  <Users className="theme-accent-text h-4 w-4" />
+                  {loading ? '...' : creators.length} 位创作者
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
+                  <Sparkles className="h-4 w-4 text-sky-500" />
+                  {loading ? '...' : totalResources} 项内容
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
+                  <Download className="h-4 w-4 text-emerald-500" />
+                  {loading ? '...' : totalDownloads} 次下载
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">创作者广场</h1>
-              <p className="text-gray-500">发现优质创作者与他们的最新内容</p>
+
+            <div className="rounded-[32px] border border-white/80 bg-white/82 p-5 shadow-[0_20px_48px_rgba(148,163,184,0.08)] backdrop-blur">
+              <div className="theme-chip mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
+                <Users className="h-3.5 w-3.5" />
+                创作者入口
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-[22px] border border-white/80 bg-[#fcfaf6] p-4">
+                  <div className="text-base font-semibold text-slate-900">发现喜欢的创作者</div>
+                  <p className="mt-2 text-sm leading-7 text-slate-500">
+                    从这里进入创作者空间，继续看 TA 的资源、分组和最近更新。
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/resources')}
+                    className="rounded-[22px] border border-white/80 bg-[#f8fbff] px-4 py-4 text-left shadow-[0_12px_28px_rgba(148,163,184,0.06)] transition hover:bg-white"
+                  >
+                    <div className="text-sm font-medium text-slate-900">去看资源页</div>
+                    <div className="mt-1 text-sm leading-6 text-slate-500">
+                      继续浏览最新整理的资源内容。
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/apply-creator')}
+                    className="theme-tag rounded-[22px] border border-white/80 px-4 py-4 text-left shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.08)] transition hover:bg-white"
+                  >
+                    <div className="text-sm font-medium text-slate-900">申请成为创作者</div>
+                    <div className="mt-1 text-sm leading-6 text-slate-500">
+                      整理自己的资源与内容，展示新的创作空间。
+                    </div>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {loading ? (
-            Array.from({ length: 6 }).map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <Skeleton className="h-16 w-16 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-5 w-24" />
-                      <Skeleton className="h-4 w-32" />
-                      <div className="flex gap-3 pt-1">
-                        <Skeleton className="h-3 w-12" />
-                        <Skeleton className="h-3 w-12" />
-                        <Skeleton className="h-3 w-12" />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : loadError ? (
-            <div className="col-span-full">
-              <div className="relative overflow-hidden rounded-3xl border border-violet-200/70 bg-linear-to-br from-white via-violet-50/45 to-sky-50/50 p-10 text-center shadow-[0_14px_38px_rgba(103,80,164,0.12)]">
-                <div className="pointer-events-none absolute -left-10 -top-10 h-32 w-32 rounded-full bg-violet-200/35 blur-2xl" />
-                <div className="pointer-events-none absolute -right-12 -bottom-12 h-36 w-36 rounded-full bg-sky-200/40 blur-2xl" />
-                <div className="relative mx-auto mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white/85 shadow-lg ring-1 ring-violet-200">
-                  <Users className="h-8 w-8 text-violet-600" />
+        <section className="mt-24">
+          <div className="theme-panel-shell rounded-[36px] border p-5 md:p-6">
+            {loading ? (
+              <>
+                <div className="mb-6 flex items-center justify-between gap-4">
+                  <div className="h-8 w-40 rounded-full bg-white/75" />
+                  <div className="h-10 w-28 rounded-full bg-white/75" />
                 </div>
-                <h3 className="relative text-xl font-semibold text-slate-900">
-                  创作者列表加载失败
-                </h3>
-                <p className="relative mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
-                  网络或服务暂时不可用，请稍后刷新重试。
-                </p>
+                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <Skeleton key={index} className="h-[198px] rounded-[30px]" />
+                  ))}
+                </div>
+              </>
+            ) : error ? (
+              <div className="rounded-[32px] bg-white/66 p-4">
+                <EmptyState
+                  icon={Users}
+                  title="创作者暂时没有加载出来"
+                  description="稍后再试一次，或者先去其他内容页继续浏览。"
+                  actionLabel="重新加载"
+                  onAction={() => window.location.reload()}
+                />
               </div>
-            </div>
-          ) : creators.length === 0 ? (
-            <div className="col-span-full">
-              <div className="relative overflow-hidden rounded-3xl border border-violet-200/70 bg-linear-to-br from-white via-violet-50/45 to-sky-50/50 p-10 text-center shadow-[0_14px_38px_rgba(103,80,164,0.12)]">
-                <div className="pointer-events-none absolute -left-10 -top-10 h-32 w-32 rounded-full bg-violet-200/35 blur-2xl" />
-                <div className="pointer-events-none absolute -right-12 -bottom-12 h-36 w-36 rounded-full bg-sky-200/40 blur-2xl" />
-                <div className="pointer-events-none absolute inset-0 opacity-[0.14] bg-[linear-gradient(rgba(139,92,246,0.2)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.2)_1px,transparent_1px)] bg-size-[24px_24px]" />
-
-                <div className="relative mx-auto mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white/85 shadow-lg ring-1 ring-violet-200">
-                  <Users className="h-8 w-8 text-violet-600" />
+            ) : creators.length === 0 ? (
+              <div className="rounded-[32px] bg-white/66 p-4">
+                <EmptyState
+                  icon={Users}
+                  title="还没有展示中的创作者"
+                  description="新的创作者加入后，会先出现在这里。"
+                  actionLabel="去申请创作者"
+                  onAction={() => navigate('/apply-creator')}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="mb-6 flex items-center justify-between gap-4">
+                  <div className="text-sm text-slate-500">当前展示最近活跃的创作者内容入口。</div>
+                  <div className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
+                    共 {creators.length} 位
+                  </div>
                 </div>
-                <h3 className="relative text-xl font-semibold text-slate-900">
-                  暂时还没有创作者入驻
-                </h3>
-                <p className="relative mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
-                  你可以先浏览图文与资源内容，或直接申请成为创作者。
-                </p>
-                <div className="relative mt-6 flex flex-wrap justify-center gap-3">
-                  <Button
-                    onClick={() => navigate('/apply-creator')}
-                    className="rounded-xl bg-violet-600 px-5 text-white hover:bg-violet-700"
-                  >
-                    申请成为创作者
-                  </Button>
+
+                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {creators.map((creator) => (
+                    <div
+                      key={creator.id}
+                      className="rounded-[30px] bg-white/68 p-2 shadow-[0_14px_40px_rgba(148,163,184,0.08)]"
+                    >
+                      <CreatorCard creator={creator} />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-10 flex justify-center">
                   <Button
                     variant="outline"
-                    onClick={() => navigate('/blog')}
-                    className="rounded-xl border-violet-300 text-violet-700 hover:bg-violet-50"
+                    onClick={() => navigate('/apply-creator')}
+                    className="theme-accent-border rounded-full border bg-white/82 px-8 text-slate-700"
                   >
-                    去看图文博客
+                    成为下一位创作者
                   </Button>
                 </div>
-              </div>
-            </div>
-          ) : (
-            creators.map((creator) => (
-              <CreatorCard key={creator.id} creator={creator} variant="detail" />
-            ))
-          )}
-        </div>
+              </>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -6,11 +6,6 @@ import type { Creator } from '@/api/creator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 
-/**
- * variant:
- *  - "compact"  首页热门创作者，小卡片（头像 + 名字 + 作品数 + code）
- *  - "detail"   创作者广场，大卡片（头像 + 名字 + 简介 + 三项统计 + 箭头）
- */
 export interface CreatorCardProps {
   creator: Creator;
   variant?: 'compact' | 'detail';
@@ -34,41 +29,38 @@ export default function CreatorCard({ creator, variant = 'detail' }: CreatorCard
   if (variant === 'compact') {
     return (
       <Card
-        className="group overflow-hidden cursor-pointer transition-all hover:shadow-xl hover:-translate-y-1 border-gray-100 bg-white/80 backdrop-blur-sm"
+        className="group cursor-pointer overflow-hidden border-gray-100 bg-white/80 backdrop-blur-sm transition-all hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(var(--theme-primary-rgb),0.14)]"
         onClick={handleClick}
       >
         <CardContent className="p-5">
           <div className="flex items-center gap-4">
-            {/* 头像 */}
             <div className="relative shrink-0">
-              <Avatar className="h-14 w-14 border-2 border-purple-100 shadow-md transition-transform group-hover:scale-110">
+              <Avatar className="h-14 w-14 border-2 border-[var(--theme-primary-soft-strong)] shadow-md transition-transform group-hover:scale-110">
                 <AvatarImage src={creator.avatar} />
-                <AvatarFallback className="bg-linear-to-br from-purple-400 to-indigo-500 text-white font-bold text-lg">
+                <AvatarFallback className="bg-linear-to-br from-[var(--theme-primary)] to-[var(--theme-primary-deep)] text-lg font-bold text-white">
                   {creator.name[0]}
                 </AvatarFallback>
               </Avatar>
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white" />
+              <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white bg-green-500" />
             </div>
 
-            {/* 信息 */}
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-gray-900 truncate group-hover:text-purple-600 transition-colors">
+              <h3 className="truncate font-semibold text-gray-900 transition-colors group-hover:text-[var(--theme-primary)]">
                 {creator.name}
               </h3>
-              <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5 mb-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
+              <p className="mb-1.5 mt-0.5 flex items-center gap-1 text-xs text-gray-400">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--theme-primary)]" />
                 {creator.resourceCount} 作品
               </p>
-              {/* 口令 */}
-              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 border border-purple-100">
-                <span className="text-[10px] text-purple-400 font-medium">口令</span>
-                <span className="text-xs font-bold text-purple-600 tracking-wider">
+              <div className="inline-flex items-center gap-1 rounded-md border border-[var(--theme-primary-soft-strong)] bg-[var(--theme-primary-soft)] px-2 py-0.5">
+                <span className="text-[10px] font-medium text-[var(--theme-primary)]">口令</span>
+                <span className="text-xs font-bold tracking-wider text-[var(--theme-primary)]">
                   {creator.code}
                 </span>
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="ml-0.5 text-purple-400 hover:text-purple-600 transition-colors"
+                  className="ml-0.5 text-[var(--theme-primary)] transition-colors hover:text-[var(--theme-primary-deep)]"
                   title="复制口令"
                 >
                   {copied ? (
@@ -85,39 +77,35 @@ export default function CreatorCard({ creator, variant = 'detail' }: CreatorCard
     );
   }
 
-  // variant === 'detail'
   return (
     <Card
-      className="group cursor-pointer transition-all hover:shadow-lg hover:border-purple-200"
+      className="group cursor-pointer transition-all hover:border-[var(--theme-primary-soft-strong)] hover:shadow-[0_18px_42px_rgba(var(--theme-primary-rgb),0.14)]"
       onClick={handleClick}
     >
       <CardContent className="p-6">
         <div className="flex items-center gap-4">
-          {/* 头像 */}
-          <Avatar className="h-16 w-16 border-2 border-purple-100 shrink-0">
+          <Avatar className="h-16 w-16 shrink-0 border-2 border-[var(--theme-primary-soft-strong)]">
             <AvatarImage src={creator.avatar} />
-            <AvatarFallback className="bg-linear-to-br from-purple-500 to-indigo-600 text-white text-xl font-bold">
+            <AvatarFallback className="bg-linear-to-br from-[var(--theme-primary)] to-[var(--theme-primary-deep)] text-xl font-bold text-white">
               {creator.name[0]}
             </AvatarFallback>
           </Avatar>
 
-          {/* 信息 */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="font-bold text-lg text-gray-900 truncate group-hover:text-purple-600 transition-colors">
+          <div className="min-w-0 flex-1">
+            <div className="mb-0.5 flex items-center gap-2">
+              <h3 className="truncate text-lg font-bold text-gray-900 transition-colors group-hover:text-[var(--theme-primary)]">
                 {creator.name}
               </h3>
             </div>
-            {/* 口令 */}
-            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 border border-purple-100 mb-2">
-              <span className="text-[10px] text-purple-400 font-medium">口令</span>
-              <span className="text-xs font-bold text-purple-600 tracking-wider">
+            <div className="mb-2 inline-flex items-center gap-1 rounded-md border border-[var(--theme-primary-soft-strong)] bg-[var(--theme-primary-soft)] px-2 py-0.5">
+              <span className="text-[10px] font-medium text-[var(--theme-primary)]">口令</span>
+              <span className="text-xs font-bold tracking-wider text-[var(--theme-primary)]">
                 {creator.code}
               </span>
               <button
                 type="button"
                 onClick={handleCopy}
-                className="ml-0.5 text-purple-400 hover:text-purple-600 transition-colors"
+                className="ml-0.5 text-[var(--theme-primary)] transition-colors hover:text-[var(--theme-primary-deep)]"
                 title="复制口令"
               >
                 {copied ? (
@@ -127,17 +115,16 @@ export default function CreatorCard({ creator, variant = 'detail' }: CreatorCard
                 )}
               </button>
             </div>
-            <p className="text-sm text-gray-500 truncate mb-3">
+            <p className="mb-3 truncate text-sm text-gray-500">
               {creator.description || '暂无简介'}
             </p>
-            {/* 三项统计 */}
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <span className="flex items-center gap-1.5">
-                <Image className="h-4 w-4 text-purple-500" />
+                <Image className="h-4 w-4 text-[var(--theme-primary)]" />
                 {creator.resourceCount}
               </span>
               <span className="flex items-center gap-1.5">
-                <Download className="h-4 w-4 text-blue-500" />
+                <Download className="h-4 w-4 text-sky-500" />
                 {creator.downloadCount}
               </span>
               <span className="flex items-center gap-1.5">
@@ -147,7 +134,7 @@ export default function CreatorCard({ creator, variant = 'detail' }: CreatorCard
             </div>
           </div>
 
-          <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-purple-500 transition-colors shrink-0" />
+          <ChevronRight className="h-5 w-5 shrink-0 text-gray-300 transition-colors group-hover:text-[var(--theme-primary)]" />
         </div>
       </CardContent>
     </Card>

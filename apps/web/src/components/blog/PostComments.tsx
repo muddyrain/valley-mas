@@ -60,7 +60,7 @@ export function PostComments({
 
   return (
     <section
-      className={`rounded-[28px] border border-[#f0dcc2] bg-white/92 shadow-[0_22px_60px_rgba(236,206,162,0.2)] ${compact ? 'p-5' : 'p-6 sm:p-7'}`}
+      className={`theme-panel-shell rounded-[28px] border bg-white/92 ${compact ? 'p-5' : 'p-6 sm:p-7'}`}
     >
       <div className="flex items-center justify-between gap-3">
         <div>

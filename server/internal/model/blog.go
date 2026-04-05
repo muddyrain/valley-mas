@@ -71,6 +71,7 @@ type PostGroup struct {
 	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	Name        string         `gorm:"size:80;not null" json:"name"`
 	Slug        string         `gorm:"size:100;not null;uniqueIndex" json:"slug"`
+	GroupType   string         `gorm:"size:20;default:'blog';index" json:"groupType"`
 	Description string         `gorm:"size:255" json:"description"`
 	AuthorID    Int64String    `gorm:"index;not null" json:"authorId"`
 	ParentID    *Int64String   `gorm:"index" json:"parentId,omitempty"`

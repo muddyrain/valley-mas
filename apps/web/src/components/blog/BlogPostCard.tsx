@@ -38,12 +38,12 @@ function getPostPreviewText(post: Post) {
 
 function getPostStatusMeta(status?: string) {
   if (status === 'published') {
-    return { label: '\u5df2\u53d1\u5e03', className: 'bg-emerald-100 text-emerald-700' };
+    return { label: '已发布', className: 'bg-(--theme-primary-soft) text-(--theme-primary)' };
   }
   if (status === 'archived') {
-    return { label: '\u5df2\u5f52\u6863', className: 'bg-slate-200 text-slate-700' };
+    return { label: '已归档', className: 'bg-slate-200 text-slate-700' };
   }
-  return { label: '\u8349\u7a3f', className: 'bg-amber-100 text-amber-700' };
+  return { label: '草稿', className: 'bg-amber-100 text-amber-700' };
 }
 
 function getVisibilityMeta(visibility?: Post['visibility']): {
@@ -52,16 +52,16 @@ function getVisibilityMeta(visibility?: Post['visibility']): {
   icon: LucideIcon;
 } {
   if (visibility === 'public') {
-    return { label: '\u516c\u5f00', className: 'bg-emerald-500/85 text-white', icon: Eye };
+    return { label: '公开', className: 'bg-(--theme-primary) text-white', icon: Eye };
   }
   if (visibility === 'shared') {
     return {
-      label: '\u53e3\u4ee4\u8bbf\u95ee',
+      label: '口令访问',
       className: 'bg-sky-500/85 text-white',
       icon: Users,
     };
   }
-  return { label: '\u79c1\u5bc6', className: 'bg-slate-900/75 text-white', icon: Lock };
+  return { label: '私密', className: 'bg-slate-900/75 text-white', icon: Lock };
 }
 
 interface BlogPostCardProps {
@@ -84,14 +84,14 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
 
   return (
     <article
-      className={`group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_28px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:border-violet-300 hover:shadow-[0_16px_38px_rgba(79,70,229,0.16)] ${className}`}
+      className={`group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_28px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--theme-primary-soft-strong)] hover:shadow-[0_16px_38px_rgba(var(--theme-primary-rgb),0.16)] ${className}`}
     >
       <Link
         to={`/blog/${post.id}`}
         state={{ returnTo, returnLabel, source: mode === 'creator' ? 'my-space' : 'blog-list' }}
         className="block"
       >
-        <div className="relative h-44 overflow-hidden border-b border-slate-100 bg-linear-to-br from-violet-100/70 via-sky-100/60 to-white">
+        <div className="relative h-44 overflow-hidden border-b border-slate-100 bg-[linear-gradient(135deg,var(--theme-primary-soft)_0%,var(--theme-surface-alt)_62%,white_100%)]">
           {post.cover ? (
             <img
               src={post.cover}
@@ -133,7 +133,7 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
         </div>
 
         <div className="space-y-3 p-4">
-          <h3 className="line-clamp-2 text-lg font-semibold text-slate-900 transition-colors group-hover:text-violet-700">
+          <h3 className="line-clamp-2 text-lg font-semibold text-slate-900 transition-colors group-hover:text-[var(--theme-primary)]">
             {post.title}
           </h3>
 
@@ -162,7 +162,7 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
               </span>
             </div>
 
-            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-violet-600">
+            <span className="rounded-full bg-[var(--theme-primary-soft)] px-2 py-0.5 text-[var(--theme-primary)]">
               {mode === 'creator' ? typeLabel : post.group?.name || '\u672a\u5206\u7ec4'}
             </span>
           </div>
