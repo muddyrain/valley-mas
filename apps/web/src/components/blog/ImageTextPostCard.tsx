@@ -37,7 +37,7 @@ function getVisibilityMeta(visibility?: Post['visibility']): {
   icon: LucideIcon;
 } {
   if (visibility === 'public') {
-    return { label: '公开可见', className: 'bg-emerald-500/90 text-white', icon: Eye };
+    return { label: '公开可见', className: 'bg-(--theme-primary) text-white', icon: Eye };
   }
   if (visibility === 'shared') {
     return { label: '口令访问', className: 'bg-sky-500/90 text-white', icon: Users };
@@ -47,7 +47,7 @@ function getVisibilityMeta(visibility?: Post['visibility']): {
 
 function getStatusMeta(status?: string) {
   if (status === 'published')
-    return { label: '已发布', className: 'bg-emerald-100 text-emerald-700' };
+    return { label: '已发布', className: 'bg-(--theme-primary-soft) text-(--theme-primary)' };
   if (status === 'archived') return { label: '已归档', className: 'bg-slate-200 text-slate-700' };
   return { label: '草稿', className: 'bg-amber-100 text-amber-700' };
 }
@@ -79,7 +79,7 @@ function PreviewSheet({
 }) {
   if (imageUrl) {
     return (
-      <div className="relative flex h-[220px] items-center justify-center overflow-hidden rounded-[28px] border border-[#efd8bf] bg-[linear-gradient(180deg,#fffaf3_0%,#f7eedf_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+      <div className="relative flex h-[220px] items-center justify-center overflow-hidden rounded-[28px] border border-(--theme-primary-soft-strong) bg-[linear-gradient(180deg,var(--theme-primary-soft)_0%,white_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
         <img
           src={imageUrl}
           alt="图文预览"
@@ -95,7 +95,7 @@ function PreviewSheet({
   }
 
   return (
-    <div className="relative h-[220px] rounded-[28px] border border-[#efd8bf] bg-[linear-gradient(180deg,#fff9ef_0%,#f8eedf_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+    <div className="relative h-[220px] rounded-[28px] border border-(--theme-primary-soft-strong) bg-[linear-gradient(180deg,var(--theme-primary-soft)_0%,white_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
       <div className="absolute left-4 top-4 text-[10px] text-slate-400">图文预览</div>
       {stickerEmoji ? <div className="absolute right-4 top-4 text-xl">{stickerEmoji}</div> : null}
       <div className="mt-7 h-[150px] overflow-hidden whitespace-pre-wrap text-[15px] font-semibold leading-7 text-[#45372c]">
@@ -134,18 +134,18 @@ export function ImageTextPostCard({
 
   return (
     <article
-      className={`group overflow-hidden rounded-[30px] border border-orange-200/70 bg-[linear-gradient(180deg,#fffaf3_0%,#fff4ec_100%)] shadow-[0_18px_46px_rgba(194,117,56,0.12)] transition-all duration-300 hover:-translate-y-1 hover:border-orange-300 hover:shadow-[0_22px_56px_rgba(194,117,56,0.18)] ${className}`}
+      className={`group overflow-hidden rounded-[30px] border border-(--theme-primary-soft-strong) bg-[linear-gradient(180deg,color-mix(in_srgb,var(--theme-primary-soft)_60%,white)_0%,color-mix(in_srgb,var(--theme-primary-soft)_90%,white)_100%)] shadow-[0_18px_46px_rgba(var(--theme-primary-rgb),0.12)] transition-all duration-300 hover:-translate-y-1 hover:border-(--theme-primary) hover:shadow-[0_22px_56px_rgba(var(--theme-primary-rgb),0.18)] ${className}`}
     >
       <Link
         to={`/blog/${post.id}`}
         state={{ returnTo, returnLabel, source: mode === 'creator' ? 'my-space' : 'blog-list' }}
         className="block"
       >
-        <div className="relative overflow-hidden border-b border-orange-100/80 px-5 pb-5 pt-4">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.2),transparent_42%),radial-gradient(circle_at_bottom_left,rgba(251,146,60,0.16),transparent_40%)]" />
+        <div className="relative overflow-hidden border-b border-[var(--theme-primary-soft-strong)] px-5 pb-5 pt-4">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(var(--theme-primary-rgb),0.18),transparent_42%),radial-gradient(circle_at_bottom_left,rgba(var(--theme-primary-rgb),0.1),transparent_40%)]" />
           <div className="relative mb-4 flex items-start justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-orange-700 backdrop-blur">
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-[var(--theme-primary)] backdrop-blur">
                 <Images className="h-3.5 w-3.5" />
                 图文创作
               </span>
@@ -177,11 +177,11 @@ export function ImageTextPostCard({
 
           <div className="relative grid gap-4 lg:grid-cols-[1.08fr_0.82fr]">
             <div className="flex min-h-[220px] flex-col rounded-[26px] border border-white/75 bg-white/78 p-5 backdrop-blur">
-              <div className="mb-3 inline-flex w-fit items-center gap-1 rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-medium text-orange-700">
+              <div className="mb-3 inline-flex w-fit items-center gap-1 rounded-full bg-[var(--theme-primary-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--theme-primary)]">
                 <Sparkles className="h-3.5 w-3.5" />
                 {pages.length || 1} 页图文
               </div>
-              <h3 className="line-clamp-2 text-[24px] font-semibold leading-9 text-slate-900 transition-colors group-hover:text-orange-700">
+              <h3 className="line-clamp-2 text-[24px] font-semibold leading-9 text-slate-900 transition-colors group-hover:text-[var(--theme-primary)]">
                 {post.title}
               </h3>
               <p className="mt-4 line-clamp-5 whitespace-pre-wrap text-sm leading-7 text-slate-600">
@@ -220,7 +220,7 @@ export function ImageTextPostCard({
               </span>
             </div>
 
-            <span className="rounded-full bg-orange-50 px-2.5 py-1 text-orange-600">
+            <span className="rounded-full bg-[var(--theme-primary-soft)] px-2.5 py-1 text-[var(--theme-primary)]">
               {mode === 'creator' ? '图文卡片' : post.group?.name || '灵感图文'}
             </span>
           </div>
@@ -245,7 +245,9 @@ export function ImageTextPostCard({
         </div>
       </Link>
 
-      {footer ? <div className="border-t border-orange-100/80 p-4 pt-3">{footer}</div> : null}
+      {footer ? (
+        <div className="border-t border-[var(--theme-primary-soft-strong)] p-4 pt-3">{footer}</div>
+      ) : null}
     </article>
   );
 }

@@ -1,10 +1,57 @@
-import { BookOpen, FolderTree, Tag, X } from 'lucide-react';
+import { BookOpen, FolderTree, Sparkles, Tag, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Group, Post, Tag as TagType } from '@/api/blog';
 import { getGroups, getPosts, getTags } from '@/api/blog';
 import { BlogFeedCard, TagCloud } from '@/components/blog';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+
+function SectionTitle({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="theme-accent-border inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] theme-accent-text uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
+        {eyebrow}
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-[34px] font-semibold tracking-[-0.04em] text-slate-950 md:text-[40px]">
+          {title}
+        </h2>
+        <p className="max-w-2xl text-[15px] leading-8 text-slate-500 md:text-base">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function FilterPanel({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[28px] border border-white/80 bg-white/82 p-5 shadow-[0_18px_42px_rgba(148,163,184,0.08)] backdrop-blur">
+      <div className="mb-4 flex items-center gap-2 text-slate-900">
+        <span className="theme-chip inline-flex h-9 w-9 items-center justify-center rounded-full">
+          {icon}
+        </span>
+        <span className="text-lg font-semibold">{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export default function BlogList() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -75,172 +122,198 @@ export default function BlogList() {
     setSearchParams(new URLSearchParams());
   };
 
-  const tagCloudData = useMemo(() => {
-    return tags.map((tag) => ({
-      name: tag.name,
-      count: tag.postCount,
-    }));
-  }, [tags]);
+  const tagCloudData = useMemo(
+    () =>
+      tags.map((tag) => ({
+        name: tag.name,
+        count: tag.postCount,
+      })),
+    [tags],
+  );
 
-  const groupData = useMemo(() => {
-    return groups.map((item) => ({
-      name: item.name,
-      id: item.id,
-      count: item.postCount || 0,
-    }));
-  }, [groups]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="animate-pulse space-y-8">
-            <div className="h-8 bg-muted rounded w-1/4" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-80 bg-muted rounded-xl" />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const groupData = useMemo(
+    () =>
+      groups.map((item) => ({
+        name: item.name,
+        id: item.id,
+        count: item.postCount || 0,
+      })),
+    [groups],
+  );
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="bg-gradient-to-b from-primary/5 to-background border-b border-border/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold text-foreground mb-4 flex items-center justify-center gap-3">
-              <BookOpen className="w-10 h-10 text-primary" />
-              博客与图文广场
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              记录创作、分享思考，也可以浏览图文灵感。
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex flex-col lg:flex-row gap-8">
-          <div className="flex-1">
-            {(selectedTag || selectedGroupId) && (
-              <div className="mb-6 flex items-center gap-3 flex-wrap">
-                <span className="text-sm text-muted-foreground">当前筛选</span>
-                {selectedGroupId && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">
-                    <FolderTree className="w-3 h-3" />
-                    {groups.find((g) => g.id === selectedGroupId)?.name || selectedGroupId}
-                  </span>
-                )}
-                {selectedTag && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">
-                    <Tag className="w-3 h-3" />
-                    {tags.find((t) => t.slug === selectedTag)?.name || selectedTag}
-                  </span>
-                )}
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
-                  <X className="w-3 h-3" />
-                  清空
-                </Button>
-              </div>
-            )}
-
-            {posts.length === 0 ? (
-              <div className="text-center py-20">
-                <p className="text-muted-foreground">暂无文章</p>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                  {posts.map((post) => (
-                    <BlogFeedCard key={post.id} post={post} />
-                  ))}
+    <div className="min-h-screen bg-transparent text-slate-900">
+      <div className="mx-auto max-w-7xl px-6 pb-20 pt-8 md:px-8 lg:px-10">
+        <section className="theme-hero-shell relative overflow-hidden rounded-[40px] border px-6 py-8 md:px-10 md:py-10">
+          <div className="theme-hero-glow absolute inset-0" />
+          <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
+            <div className="space-y-6">
+              <SectionTitle
+                eyebrow="UPDATES"
+                title="博客与图文"
+                description="最近发布的博客、图文和内容分组都会先汇在这里，方便继续浏览和筛选。"
+              />
+              <div className="flex flex-wrap gap-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
+                  <BookOpen className="theme-accent-text h-4 w-4" />
+                  {total} 篇内容
                 </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
+                  <FolderTree className="h-4 w-4 theme-icon-accent" />
+                  {groups.length} 个分组
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
+                  <Tag className="h-4 w-4 theme-icon-accent" />
+                  {tags.length} 个标签
+                </div>
+              </div>
 
-                {total > 12 && (
-                  <div className="mt-8 flex justify-center gap-2">
+              {(selectedTag || selectedGroupId) && (
+                <div className="rounded-[28px] border border-white/80 bg-white/82 p-4 shadow-[0_16px_40px_rgba(148,163,184,0.08)]">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm text-slate-500">当前筛选</span>
+                    {selectedGroupId ? (
+                      <span className="theme-tag inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm">
+                        <FolderTree className="h-3.5 w-3.5" />
+                        {groups.find((g) => g.id === selectedGroupId)?.name || selectedGroupId}
+                      </span>
+                    ) : null}
+                    {selectedTag ? (
+                      <span className="theme-tag inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm">
+                        <Tag className="h-3.5 w-3.5" />
+                        {tags.find((t) => t.slug === selectedTag)?.name || selectedTag}
+                      </span>
+                    ) : null}
                     <Button
-                      variant="outline"
-                      disabled={currentPage <= 1}
-                      onClick={() => {
-                        const newParams = new URLSearchParams(searchParams);
-                        newParams.set('page', String(currentPage - 1));
-                        setSearchParams(newParams);
-                      }}
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearFilters}
+                      className="rounded-full px-3 text-slate-500 hover:bg-white hover:text-slate-900"
                     >
-                      上一页
-                    </Button>
-                    <span className="flex items-center px-4 text-sm text-muted-foreground">
-                      第 {currentPage} 页
-                    </span>
-                    <Button
-                      variant="outline"
-                      disabled={posts.length < 12}
-                      onClick={() => {
-                        const newParams = new URLSearchParams(searchParams);
-                        newParams.set('page', String(currentPage + 1));
-                        setSearchParams(newParams);
-                      }}
-                    >
-                      下一页
+                      <X className="mr-1 h-3.5 w-3.5" />
+                      清空筛选
                     </Button>
                   </div>
-                )}
-              </>
-            )}
-          </div>
-
-          <aside className="w-full lg:w-80 space-y-6">
-            <div className="bg-card rounded-xl p-6 border border-border/50">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <FolderTree className="w-5 h-5 text-primary" />
-                分组
-              </h3>
-              {groupData.length === 0 ? (
-                <p className="text-sm text-muted-foreground">暂无分组</p>
-              ) : (
-                <div className="space-y-2">
-                  {groupData.map((group) => (
-                    <button
-                      type="button"
-                      key={group.id}
-                      onClick={() => handleGroupClick(group.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                        selectedGroupId === group.id
-                          ? 'bg-primary text-primary-foreground'
-                          : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <span>{group.name}</span>
-                      <span className="text-xs opacity-70">{group.count}</span>
-                    </button>
-                  ))}
                 </div>
               )}
             </div>
 
-            <div className="bg-card rounded-xl p-6 border border-border/50">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Tag className="w-5 h-5 text-primary" />
-                标签云
-              </h3>
-              {tagCloudData.length === 0 ? (
-                <p className="text-sm text-muted-foreground">暂无标签</p>
-              ) : (
-                <TagCloud
-                  tags={tagCloudData}
-                  selectedTag={selectedTag}
-                  onTagClick={(name) =>
-                    handleTagClick(tags.find((t) => t.name === name)?.slug || '')
-                  }
-                />
-              )}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
+              <FilterPanel title="内容分组" icon={<FolderTree className="h-4 w-4" />}>
+                {groupData.length === 0 ? (
+                  <p className="text-sm leading-7 text-slate-500">还没有可用的内容分组。</p>
+                ) : (
+                  <div className="grid gap-2">
+                    {groupData.slice(0, 6).map((group) => (
+                      <button
+                        type="button"
+                        key={group.id}
+                        onClick={() => handleGroupClick(group.id)}
+                        className={`flex items-center justify-between rounded-[18px] px-3 py-3 text-left text-sm transition ${
+                          selectedGroupId === group.id
+                            ? 'bg-slate-950 text-white shadow-[0_12px_28px_rgba(15,23,42,0.18)]'
+                            : 'bg-[#fbfaf8] text-slate-600 hover:bg-white hover:text-slate-950'
+                        }`}
+                      >
+                        <span className="font-medium">{group.name}</span>
+                        <span className="text-xs opacity-70">{group.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </FilterPanel>
+
+              <FilterPanel title="标签浏览" icon={<Sparkles className="h-4 w-4" />}>
+                {tagCloudData.length === 0 ? (
+                  <p className="text-sm leading-7 text-slate-500">还没有可用的标签。</p>
+                ) : (
+                  <TagCloud
+                    tags={tagCloudData}
+                    selectedTag={selectedTag}
+                    onTagClick={(name) =>
+                      handleTagClick(tags.find((t) => t.name === name)?.slug || '')
+                    }
+                  />
+                )}
+              </FilterPanel>
             </div>
-          </aside>
-        </div>
+          </div>
+        </section>
+
+        <section className="mt-24">
+          {loading ? (
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Skeleton key={index} className="h-[420px] rounded-[30px]" />
+              ))}
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="rounded-[36px] border border-dashed border-[#e6d7c7] bg-white/68 px-8 py-16 text-center shadow-[0_20px_56px_rgba(148,163,184,0.08)]">
+              <div className="mx-auto max-w-xl space-y-3">
+                <h3 className="text-2xl font-semibold text-slate-900">还没有可展示的内容</h3>
+                <p className="text-sm leading-8 text-slate-500">
+                  新的博客或图文发布后，会先出现在这里。
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="mb-6 flex items-center justify-between gap-4">
+                <div className="text-sm text-slate-500">
+                  第 {currentPage} 页，正在展示最近更新的内容。
+                </div>
+                {total > 12 ? (
+                  <div className="theme-eyebrow rounded-full border bg-white/82 px-4 py-2 text-sm shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)]">
+                    共 {total} 篇内容
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {posts.map((post) => (
+                  <div
+                    key={post.id}
+                    className="rounded-[30px] bg-white/68 p-2 shadow-[0_14px_40px_rgba(148,163,184,0.08)]"
+                  >
+                    <BlogFeedCard post={post} />
+                  </div>
+                ))}
+              </div>
+
+              {total > 12 ? (
+                <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+                  <Button
+                    variant="outline"
+                    className="theme-accent-border rounded-full border bg-white/82 px-5"
+                    disabled={currentPage <= 1}
+                    onClick={() => {
+                      const newParams = new URLSearchParams(searchParams);
+                      newParams.set('page', String(currentPage - 1));
+                      setSearchParams(newParams);
+                    }}
+                  >
+                    上一页
+                  </Button>
+                  <span className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-500 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
+                    第 {currentPage} 页
+                  </span>
+                  <Button
+                    variant="outline"
+                    className="theme-accent-border rounded-full border bg-white/82 px-5"
+                    disabled={posts.length < 12}
+                    onClick={() => {
+                      const newParams = new URLSearchParams(searchParams);
+                      newParams.set('page', String(currentPage + 1));
+                      setSearchParams(newParams);
+                    }}
+                  >
+                    下一页
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </section>
       </div>
     </div>
   );

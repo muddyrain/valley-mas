@@ -233,12 +233,18 @@ export default function ResourceDetail() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-50 via-purple-50/30 to-indigo-50/30">
+    <div
+      className="min-h-[calc(100vh-4rem)]"
+      style={{
+        background:
+          'linear-gradient(135deg, var(--theme-page-start), var(--theme-primary-soft) 50%, var(--theme-page-cool))',
+      }}
+    >
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={handleReturn}
-          className="group mb-6 flex items-center gap-2 text-sm text-gray-500 transition-colors hover:text-purple-600"
+          className="group mb-6 flex items-center gap-2 text-sm text-gray-500 transition-colors hover:text-(--theme-primary)"
         >
           <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
           {returnLabel}
@@ -290,11 +296,11 @@ export default function ResourceDetail() {
               onClick={() =>
                 resource.creatorCode ? navigate(`/creator/${resource.creatorCode}`) : undefined
               }
-              className="flex w-full items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 text-left shadow-sm transition-all hover:border-purple-200 hover:shadow-md"
+              className="flex w-full items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 text-left shadow-sm transition-all hover:border-(--theme-shell-border) hover:shadow-md"
             >
-              <Avatar className="h-10 w-10 border-2 border-purple-100">
+              <Avatar className="h-10 w-10 border-2 border-(--theme-primary-soft-strong)">
                 <AvatarImage src={resource.creatorAvatar} className="object-cover" />
-                <AvatarFallback className="bg-linear-to-br from-purple-400 to-indigo-600 text-sm font-bold text-white">
+                <AvatarFallback className="theme-avatar-fallback text-sm font-bold text-white">
                   {resource.creatorName?.[0]?.toUpperCase() || 'C'}
                 </AvatarFallback>
               </Avatar>
@@ -304,13 +310,13 @@ export default function ResourceDetail() {
                   {resource.creatorName || '未知创作者'}
                 </p>
               </div>
-              <User className="h-4 w-4 shrink-0 text-purple-400" />
+              <User className="h-4 w-4 shrink-0 theme-icon-accent" />
             </button>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
-                <div className="rounded-lg bg-purple-50 p-1.5">
-                  <Download className="h-4 w-4 text-purple-500" />
+                <div className="rounded-lg bg-(--theme-primary-soft) p-1.5">
+                  <Download className="h-4 w-4 text-(--theme-primary)" />
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">下载次数</p>
@@ -327,8 +333,8 @@ export default function ResourceDetail() {
                 </div>
               </div>
               <div className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
-                <div className="rounded-lg bg-blue-50 p-1.5">
-                  <FileImage className="h-4 w-4 text-blue-500" />
+                <div className="rounded-lg bg-(--theme-primary-soft) p-1.5">
+                  <FileImage className="h-4 w-4 text-(--theme-primary)" />
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">文件大小</p>
@@ -337,8 +343,8 @@ export default function ResourceDetail() {
               </div>
               {resource.width && resource.height ? (
                 <div className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
-                  <div className="rounded-lg bg-indigo-50 p-1.5">
-                    <MonitorSmartphone className="h-4 w-4 text-indigo-500" />
+                  <div className="rounded-lg bg-(--theme-primary-soft) p-1.5">
+                    <MonitorSmartphone className="h-4 w-4 text-(--theme-primary)" />
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">分辨率</p>
@@ -372,7 +378,7 @@ export default function ResourceDetail() {
               <Button
                 onClick={handleDownload}
                 disabled={downloading}
-                className="h-11 flex-1 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 font-semibold text-white shadow-md shadow-purple-500/20 transition-all hover:from-purple-700 hover:to-indigo-700 hover:shadow-lg"
+                className="theme-btn-primary h-11 flex-1 rounded-xl font-semibold text-white shadow-md transition-all hover:shadow-lg"
               >
                 {downloading ? (
                   <>
@@ -410,7 +416,7 @@ export default function ResourceDetail() {
                 variant="outline"
                 size="icon"
                 onClick={handleShare}
-                className="h-11 w-11 rounded-xl border-2 border-gray-200 transition-all hover:border-purple-300 hover:text-purple-500"
+                className="h-11 w-11 rounded-xl border-2 border-gray-200 transition-all hover:border-(--theme-shell-border) hover:text-(--theme-primary)"
                 title="复制链接"
               >
                 <Share2 className="h-4 w-4" />

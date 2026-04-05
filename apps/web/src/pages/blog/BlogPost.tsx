@@ -227,7 +227,7 @@ export default function BlogPost() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#fbf8f2]">
+      <div className="min-h-screen" style={{ background: 'var(--theme-page-start)' }}>
         <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_360px]">
             <div className="h-[72vh] animate-pulse rounded-[36px] bg-white/80" />
@@ -243,16 +243,16 @@ export default function BlogPost() {
 
   if (!post) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#fbf8f2] px-4">
-        <div className="max-w-md rounded-[28px] border border-[#f0dcc2] bg-white px-6 py-10 text-center shadow-[0_24px_80px_rgba(236,206,162,0.2)]">
+      <div
+        className="flex min-h-screen items-center justify-center px-4"
+        style={{ background: 'var(--theme-page-start)' }}
+      >
+        <div className="theme-panel-shell max-w-md rounded-[28px] border bg-white px-6 py-10 text-center">
           <h1 className="text-2xl font-semibold text-slate-900">内容暂时无法访问</h1>
           <p className="mt-3 text-sm leading-7 text-slate-500">
             这篇内容可能已被删除，或当前账号没有访问权限。
           </p>
-          <Button
-            onClick={handleReturn}
-            className="mt-6 rounded-full bg-[#ff7a18] px-5 text-white hover:bg-[#f26d0a]"
-          >
+          <Button onClick={handleReturn} className="theme-btn-primary mt-6 rounded-full px-5">
             <ArrowLeft className="mr-2 h-4 w-4" />
             {returnLabel}
           </Button>
@@ -263,13 +263,18 @@ export default function BlogPost() {
 
   if (post.postType === 'image_text') {
     return (
-      <div className="min-h-screen bg-[linear-gradient(180deg,#fbf8f2_0%,#fffdfa_55%,#ffffff_100%)]">
-        <div className="sticky top-0 z-40 border-b border-[#f1e3cf] bg-[#fffdf8]/88 backdrop-blur">
+      <div
+        className="min-h-screen"
+        style={{
+          background: `linear-gradient(180deg, var(--theme-page-start) 0%, var(--theme-page-mid) 52%, #ffffff 100%)`,
+        }}
+      >
+        <div className="theme-header sticky top-0 z-40 border-b bg-white/88 backdrop-blur">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
             <button
               type="button"
               onClick={handleReturn}
-              className="inline-flex items-center gap-2 rounded-full border border-[#ead8bc] bg-white px-4 py-2 text-sm text-slate-600 transition hover:text-slate-900"
+              className="theme-accent-border inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm text-slate-600 transition hover:text-slate-900"
             >
               <ArrowLeft className="h-4 w-4" />
               {returnLabel}
@@ -286,9 +291,39 @@ export default function BlogPost() {
           </div>
         </div>
 
-        <div className="mx-auto max-w-7xl px-4 pb-20 pt-8 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 pb-24 pt-8 sm:px-6 lg:px-8">
+          <section className="theme-hero-shell relative mb-8 overflow-hidden rounded-[34px] border px-6 py-6 sm:px-8">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_18%,rgba(251,191,36,0.12),transparent_26%),radial-gradient(circle_at_86%_18%,rgba(96,165,250,0.14),transparent_24%)]" />
+            <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="space-y-4">
+                <div className="theme-eyebrow inline-flex items-center gap-2 rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.28em] uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
+                  图文详情
+                </div>
+                <div className="space-y-2">
+                  <h1 className="text-[34px] font-semibold tracking-[-0.04em] text-slate-950 md:text-[42px]">
+                    {post.title}
+                  </h1>
+                  {excerpt ? (
+                    <p className="max-w-3xl text-[15px] leading-8 text-slate-500 md:text-base">
+                      {excerpt}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <span className="rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+                  {visibilityLabelMap[post.visibility || 'public'] || '公开可见'}
+                </span>
+                <span className="rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+                  共 {pageCount || 1} 页
+                </span>
+              </div>
+            </div>
+          </section>
+
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_380px]">
-            <section className="rounded-[36px] border border-[#f0dcc2] bg-[#efe6d2] p-4 shadow-[0_32px_100px_rgba(236,206,162,0.28)] sm:p-5">
+            <section className="theme-section-shell rounded-[36px] border p-4 sm:p-5">
               <div className="rounded-[30px] bg-white/72 p-3 sm:p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs text-slate-500">
@@ -387,8 +422,8 @@ export default function BlogPost() {
             </section>
 
             <aside className="space-y-6">
-              <section className="rounded-[30px] border border-[#f0dcc2] bg-white/92 p-6 shadow-[0_24px_80px_rgba(236,206,162,0.18)]">
-                <div className="inline-flex items-center gap-2 rounded-full bg-[#fff3e4] px-3 py-1 text-xs font-medium text-[#f06b14]">
+              <section className="theme-panel-shell rounded-[30px] border p-6">
+                <div className="theme-tag inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium">
                   图文创作
                 </div>
                 <h1 className="mt-4 text-[30px] font-semibold leading-tight text-slate-900">
@@ -403,17 +438,14 @@ export default function BlogPost() {
                 {post.tags?.length ? (
                   <div className="mt-5 flex flex-wrap gap-2">
                     {post.tags.map((tag) => (
-                      <span
-                        key={tag.id}
-                        className="rounded-full bg-[#f6f2ea] px-3 py-1.5 text-sm text-[#5b6990]"
-                      >
+                      <span key={tag.id} className="theme-tag rounded-full px-3 py-1.5 text-sm">
                         #{tag.name}
                       </span>
                     ))}
                   </div>
                 ) : null}
 
-                <div className="mt-6 grid gap-3 rounded-[22px] bg-[#faf6ee] p-4 text-sm text-slate-500">
+                <div className="theme-accent-border mt-6 grid gap-3 rounded-[22px] border bg-white/60 p-4 text-sm text-slate-500">
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4" />
                     <span>{post.author?.nickname || '未署名创作者'}</span>
@@ -454,13 +486,18 @@ export default function BlogPost() {
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#fbf8f2_0%,#fffdfa_48%,#ffffff_100%)]">
-      <div className="sticky top-0 z-40 border-b border-[#f1e3cf] bg-[#fffdf8]/88 backdrop-blur">
+    <div
+      className="min-h-screen"
+      style={{
+        background: `linear-gradient(180deg, var(--theme-page-start) 0%, var(--theme-page-mid) 48%, #ffffff 100%)`,
+      }}
+    >
+      <div className="theme-header sticky top-0 z-40 border-b bg-white/88 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
           <button
             type="button"
             onClick={handleReturn}
-            className="inline-flex items-center gap-2 rounded-full border border-[#ead8bc] bg-white px-4 py-2 text-sm text-slate-600 transition hover:text-slate-900"
+            className="theme-accent-border inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm text-slate-600 transition hover:text-slate-900"
           >
             <ArrowLeft className="h-4 w-4" />
             {returnLabel}
@@ -470,7 +507,7 @@ export default function BlogPost() {
             <Link to={`/my-space/blog-edit/${post.id}`}>
               <Button
                 variant="outline"
-                className="rounded-full border-[#f2d8b4] bg-white px-5 text-slate-700 hover:bg-[#fff7ef]"
+                className="theme-accent-border theme-menu-hover rounded-full border bg-white px-5 text-slate-700"
               >
                 <PencilLine className="mr-2 h-4 w-4" />
                 编辑博客
@@ -480,24 +517,24 @@ export default function BlogPost() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 pb-20 pt-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 pb-24 pt-8 sm:px-6 lg:px-8">
         <header className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
-          <section className="rounded-[36px] border border-[#f0dcc2] bg-white/92 p-6 shadow-[0_28px_80px_rgba(236,206,162,0.18)] sm:p-8">
+          <section className="theme-panel-shell rounded-[36px] border bg-white/92 p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
               {post.group && (
                 <Link
                   to={`/blog?groupId=${encodeURIComponent(post.group.id)}`}
-                  className="rounded-full bg-[#fff3e4] px-3 py-1 text-xs font-medium text-[#f06b14]"
+                  className="theme-tag rounded-full px-3 py-1 text-xs font-medium"
                 >
                   {post.group.name}
                 </Link>
               )}
-              <span className="rounded-full bg-[#f5f0e8] px-3 py-1 text-xs text-slate-500">
+              <span className="theme-tag rounded-full px-3 py-1 text-xs">
                 {visibilityLabelMap[post.visibility || 'public'] || '公开可见'}
               </span>
             </div>
 
-            <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-tight text-slate-950 sm:text-5xl">
+            <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-tight tracking-[-0.04em] text-slate-950 sm:text-5xl">
               {post.title}
             </h1>
 
@@ -532,7 +569,7 @@ export default function BlogPost() {
               </div>
             </div>
 
-            <div className="mt-8 overflow-hidden rounded-[28px] border border-[#efe2cb] bg-[#f9f4eb]">
+            <div className="theme-panel-shell mt-8 overflow-hidden rounded-[28px] border">
               {post.cover ? (
                 <img
                   src={post.cover}
@@ -546,7 +583,7 @@ export default function BlogPost() {
           </section>
 
           <aside className="space-y-6">
-            <section className="rounded-[30px] border border-[#f0dcc2] bg-white/92 p-6 shadow-[0_24px_80px_rgba(236,206,162,0.18)]">
+            <section className="theme-hero-shell overflow-hidden rounded-[30px] border p-6">
               <div className="text-sm font-medium text-slate-900">这篇文章讲什么</div>
               <p className="mt-3 text-sm leading-7 text-slate-600">
                 {excerpt || '这篇文章还没有补充摘要，可以直接从正文开始阅读。'}
@@ -555,10 +592,7 @@ export default function BlogPost() {
               {post.tags?.length ? (
                 <div className="mt-5 flex flex-wrap gap-2">
                   {post.tags.map((tag) => (
-                    <span
-                      key={tag.id}
-                      className="rounded-full bg-[#f6f2ea] px-3 py-1.5 text-sm text-[#5b6990]"
-                    >
+                    <span key={tag.id} className="theme-tag rounded-full px-3 py-1.5 text-sm">
                       #{tag.name}
                     </span>
                   ))}
@@ -567,7 +601,7 @@ export default function BlogPost() {
             </section>
 
             {toc.length > 0 && (
-              <section className="rounded-[30px] border border-[#f0dcc2] bg-white/92 p-6 shadow-[0_24px_80px_rgba(236,206,162,0.18)]">
+              <section className="theme-panel-shell rounded-[30px] border p-6">
                 <div className="text-sm font-medium text-slate-900">目录导读</div>
                 <div className="mt-4">
                   <TableOfContents toc={toc} />
@@ -578,9 +612,9 @@ export default function BlogPost() {
         </header>
 
         <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <main className="rounded-[36px] border border-[#f0dcc2] bg-white/95 p-6 shadow-[0_28px_80px_rgba(236,206,162,0.18)] sm:p-10">
+          <main className="theme-panel-shell rounded-[36px] border bg-white/95 p-6 sm:p-10">
             <MarkdownContent content={processedContent} />
-            <div className="mt-12 border-t border-[#f2e5d1] pt-6">
+            <div className="theme-accent-border mt-12 border-t pt-6">
               <Button
                 variant="ghost"
                 className="rounded-full px-0 text-slate-500 hover:bg-transparent hover:text-slate-900"

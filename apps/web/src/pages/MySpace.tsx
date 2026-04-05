@@ -32,11 +32,9 @@ import {
 } from '@/api/resource';
 import { BlogPostCard, ImageTextPostCard } from '@/components/blog';
 import EmptyState from '@/components/EmptyState';
-import PageBanner from '@/components/PageBanner';
 import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
 import TypeFilterBar from '@/components/TypeFilterBar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -66,6 +64,30 @@ function formatSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function SectionTitle({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="theme-eyebrow inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
+        {eyebrow}
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-[34px] font-semibold tracking-[-0.04em] text-slate-950 md:text-[40px]">
+          {title}
+        </h2>
+        <p className="max-w-2xl text-[15px] leading-8 text-slate-500 md:text-base">{description}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function MySpace() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuthStore();
@@ -75,9 +97,11 @@ export default function MySpace() {
   const [loading, setLoading] = useState(true);
   const [activeType, setActiveType] = useState('');
   const [myPosts, setMyPosts] = useState<BlogPost[]>([]);
-  const [myGroups, setMyGroups] = useState<BlogGroup[]>([]);
+  const [blogGroups, setBlogGroups] = useState<BlogGroup[]>([]);
+  const [imageTextGroups, setImageTextGroups] = useState<BlogGroup[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
-  const [postGroupFilter, setPostGroupFilter] = useState('');
+  const [blogGroupFilter, setBlogGroupFilter] = useState('');
+  const [imageTextGroupFilter, setImageTextGroupFilter] = useState('');
 
   // 上传弹窗状态
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -141,12 +165,14 @@ export default function MySpace() {
   const loadMyPosts = useCallback(async () => {
     try {
       setLoadingPosts(true);
-      const [postsData, groupsData] = await Promise.all([
+      const [postsData, blogGroupsData, imageTextGroupsData] = await Promise.all([
         getAdminPosts({ page: 1, pageSize: 24 }),
-        getAdminGroups(),
+        getAdminGroups({ groupType: 'blog' }),
+        getAdminGroups({ groupType: 'image_text' }),
       ]);
       setMyPosts(postsData.list || []);
-      setMyGroups(groupsData || []);
+      setBlogGroups(blogGroupsData || []);
+      setImageTextGroups(imageTextGroupsData || []);
     } catch {
       toast.error('加载博客内容失败');
     } finally {
@@ -160,21 +186,24 @@ export default function MySpace() {
     }
   }, [isAuthenticated, user, loadMyPosts]);
 
-  const filteredPosts = useMemo(() => {
-    return myPosts.filter((post) => {
-      if (postGroupFilter && post.groupId !== postGroupFilter) return false;
-      return true;
-    });
-  }, [myPosts, postGroupFilter]);
-
   const filteredBlogPosts = useMemo(
-    () => filteredPosts.filter((post) => post.postType === 'blog'),
-    [filteredPosts],
+    () =>
+      myPosts.filter((post) => {
+        if (post.postType !== 'blog') return false;
+        if (blogGroupFilter && post.groupId !== blogGroupFilter) return false;
+        return true;
+      }),
+    [blogGroupFilter, myPosts],
   );
 
   const filteredImageTextPosts = useMemo(
-    () => filteredPosts.filter((post) => post.postType === 'image_text'),
-    [filteredPosts],
+    () =>
+      myPosts.filter((post) => {
+        if (post.postType !== 'image_text') return false;
+        if (imageTextGroupFilter && post.groupId !== imageTextGroupFilter) return false;
+        return true;
+      }),
+    [imageTextGroupFilter, myPosts],
   );
 
   // 选择文件
@@ -376,129 +405,156 @@ export default function MySpace() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-50 via-purple-50/30 to-indigo-50/30">
-      {/* 头部 Banner */}
-      <PageBanner>
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-          {/* 头像 */}
-          <div className="relative">
-            <div className="absolute -inset-2 bg-linear-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full opacity-75 blur-xl" />
-            <Avatar className="relative h-24 w-24 border-4 border-white/30 shadow-2xl ring-4 ring-purple-500/30">
-              <AvatarImage src={user?.avatar} className="object-cover" />
-              <AvatarFallback className="bg-linear-to-br from-purple-400 to-indigo-600 text-white text-3xl font-bold">
-                {(user?.nickname?.[0] || user?.username?.[0] || 'U').toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-          </div>
+    <div className="min-h-screen bg-transparent text-slate-900">
+      <div className="mx-auto max-w-7xl px-6 pb-20 pt-8 md:px-8 lg:px-10">
+        <section className="theme-hero-shell relative overflow-hidden rounded-[40px] border px-6 py-8 md:px-10 md:py-10">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(251,191,36,0.16),transparent_24%),radial-gradient(circle_at_88%_20%,rgba(96,165,250,0.18),transparent_22%),radial-gradient(circle_at_80%_72%,rgba(251,191,36,0.1),transparent_28%)]" />
+          <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
+            <div className="space-y-6">
+              <SectionTitle
+                eyebrow="CREATOR"
+                title="创作者空间"
+                description="这里承接你的资源、博客和图文内容，方便继续整理、编辑、发布和回看每一条创作记录。"
+              />
 
-          {/* 信息 */}
-          <div className="flex-1 text-white">
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl md:text-3xl font-bold drop-shadow-lg">
-                {user?.nickname || user?.username}
-              </h1>
-              <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30 px-3 py-1">
-                <Sparkles className="h-3 w-3 mr-1" />
-                我的创作空间
-              </Badge>
-            </div>
-            <p className="text-purple-100 text-sm mb-5">
-              在这里管理你上传的所有资源，上传新作品或删除旧内容。
-            </p>
-            {/* 统计 */}
-            <div className="flex gap-4">
-              <div className="bg-white/10 backdrop-blur-md rounded-xl px-5 py-3 border border-white/20">
-                <div className="flex items-center gap-2 text-purple-200 mb-1">
-                  <ImageIcon className="h-3.5 w-3.5" />
-                  <span className="text-xs font-medium">作品总数</span>
+              <div className="flex flex-wrap gap-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
+                  <ImageIcon className="theme-icon-accent h-4 w-4" />共 {total} 项资源
                 </div>
-                <div className="text-2xl font-bold">{total}</div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
+                  <FileText className="h-4 w-4 text-emerald-500" />
+                  {filteredBlogPosts.length} 篇博客
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
+                  <Sparkles className="h-4 w-4 theme-icon-accent" />
+                  {filteredImageTextPosts.length} 组图文
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-white/80 bg-white/82 p-4 shadow-[0_16px_40px_rgba(148,163,184,0.08)] backdrop-blur">
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-18 w-18 border-4 border-white shadow-[0_10px_24px_rgba(148,163,184,0.12)]">
+                    <AvatarImage src={user?.avatar} className="object-cover" />
+                    <AvatarFallback className="bg-[linear-gradient(135deg,#f59e0b,#7c3aed)] text-xl font-bold text-white">
+                      {(user?.nickname?.[0] || user?.username?.[0] || 'U').toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-lg font-semibold text-slate-900">
+                      {user?.nickname || user?.username}
+                    </div>
+                    <div className="mt-1 text-sm leading-7 text-slate-500">
+                      继续在这里处理上传后的资源、博客编辑和图文创作，所有内容都会保留自己的管理入口。
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* 快捷创作按钮 */}
-          <div className="flex flex-col gap-2 md:items-end">
-            <Button
-              onClick={() => navigate('/my-space/blog-create')}
-              size="lg"
-              variant="outline"
-              className="w-full border-white/35 bg-white/90 text-purple-700 hover:bg-white"
-            >
-              写博客
-            </Button>
-            <Button
-              onClick={() => navigate('/my-space/image-text')}
-              size="lg"
-              variant="outline"
-              className="w-full border-white/35 bg-white/90 text-purple-700 hover:bg-white"
-            >
-              图文创作
-            </Button>
-            <Button
-              onClick={() => setUploadOpen(true)}
-              size="lg"
-              className="w-full bg-white text-purple-600 hover:bg-gray-100 shadow-xl hover:shadow-2xl font-semibold px-8 transition-all"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              上传新资源
-            </Button>
-          </div>
-        </div>
-      </PageBanner>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
+              <button
+                type="button"
+                onClick={() => navigate('/my-space/blog-create')}
+                className="rounded-[28px] border border-white/80 bg-white/82 p-5 text-left shadow-[0_18px_42px_rgba(148,163,184,0.08)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_24px_52px_rgba(148,163,184,0.12)]"
+              >
+                <div className="theme-tag mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
+                  <FileText className="h-3.5 w-3.5" />
+                  博客入口
+                </div>
+                <div className="text-lg font-semibold text-slate-900">新建博客</div>
+                <div className="mt-2 text-sm leading-7 text-slate-500">
+                  继续整理文章内容、摘要与封面。
+                </div>
+              </button>
 
-      {/* 内容区 */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 分类筛选 */}
-        <TypeFilterBar
-          options={RESOURCE_TYPES}
-          value={activeType}
-          onChange={setActiveType}
-          prefix="筛选："
-          extra={<span className="text-sm text-gray-400">共 {total} 个资源</span>}
-          className="mb-6"
-        />
+              <button
+                type="button"
+                onClick={() => navigate('/my-space/image-text')}
+                className="rounded-[28px] border border-white/80 bg-white/82 p-5 text-left shadow-[0_18px_42px_rgba(148,163,184,0.08)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_24px_52px_rgba(148,163,184,0.12)]"
+              >
+                <div className="theme-tag mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  图文入口
+                </div>
+                <div className="text-lg font-semibold text-slate-900">新建图文</div>
+                <div className="mt-2 text-sm leading-7 text-slate-500">
+                  继续编辑分页、模板和图文成片。
+                </div>
+              </button>
 
-        {/* 资源列表 */}
-        {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <ResourceCardSkeleton key={i} />
-            ))}
+              <button
+                type="button"
+                onClick={() => setUploadOpen(true)}
+                className="rounded-[28px] border border-white/80 bg-white/82 p-5 text-left shadow-[0_18px_42px_rgba(148,163,184,0.08)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_24px_52px_rgba(148,163,184,0.12)]"
+              >
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#eefcf5] px-3 py-1 text-xs text-emerald-700">
+                  <Plus className="h-3.5 w-3.5" />
+                  资源入口
+                </div>
+                <div className="text-lg font-semibold text-slate-900">上传资源</div>
+                <div className="mt-2 text-sm leading-7 text-slate-500">
+                  把新壁纸、头像或图像素材加入资源库。
+                </div>
+              </button>
+            </div>
           </div>
-        ) : resources.length === 0 ? (
-          <EmptyState
-            icon={ImageIcon}
-            title="还没有上传任何资源"
-            description="点击上方按钮，上传你的第一个作品吧！"
-            actionLabel="立即上传"
-            onAction={() => setUploadOpen(true)}
-          />
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
-            {resources.map((resource, i) => (
-              <ResourceCard
-                key={resource.id}
-                resource={resource}
-                onDelete={setDeleteTarget}
-                onEdit={handleOpenEdit}
-                showSize
-                showDate
-                showVisibilityTag
-                animationDelay={i * 30}
-              />
-            ))}
-          </div>
-        )}
+        </section>
 
-        <section className="mt-12">
-          <div className="rounded-3xl border border-violet-200/70 bg-white/90 p-6 shadow-[0_14px_32px_rgba(88,76,155,0.1)]">
+        <section className="mt-24">
+          <div className="rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
+            <TypeFilterBar
+              options={RESOURCE_TYPES}
+              value={activeType}
+              onChange={setActiveType}
+              prefix="资源类型："
+              extra={<span className="text-sm text-slate-400">共 {total} 个资源</span>}
+              className="mb-6"
+            />
+
+            {loading ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <ResourceCardSkeleton key={i} />
+                ))}
+              </div>
+            ) : resources.length === 0 ? (
+              <div className="rounded-[32px] bg-white/66 p-4">
+                <EmptyState
+                  icon={ImageIcon}
+                  title="还没有上传任何资源"
+                  description="点击上方资源入口，把第一张壁纸或头像先放进来。"
+                  actionLabel="立即上传"
+                  onAction={() => setUploadOpen(true)}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {resources.map((resource, i) => (
+                  <ResourceCard
+                    key={resource.id}
+                    resource={resource}
+                    onDelete={setDeleteTarget}
+                    onEdit={handleOpenEdit}
+                    showSize
+                    showDate
+                    showVisibilityTag
+                    animationDelay={i * 30}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="mt-24">
+          <div className="rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">我的博客与图文</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  当前账号的全部创作内容，支持按分组与类型查看
-                </p>
+                <SectionTitle
+                  eyebrow="CONTENT"
+                  title="博客与图文"
+                  description="这里承接当前账号的创作内容。博客和图文保留各自的分组筛选，但继续共存在同一页方便统一管理。"
+                />
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -519,39 +575,47 @@ export default function MySpace() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => navigate('/my-space/blog-groups')}
+                  onClick={() => navigate('/my-space/blog-groups?type=blog')}
                   className="rounded-xl"
                 >
                   <FolderTree className="mr-1.5 h-4 w-4" />
-                  管理分组
+                  管理博客分组
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/my-space/blog-groups?type=image_text')}
+                  className="rounded-xl"
+                >
+                  <FolderTree className="mr-1.5 h-4 w-4" />
+                  图文分组
                 </Button>
               </div>
             </div>
 
             <div className="mb-5 flex flex-wrap items-center gap-2">
               <DropdownMenu>
-                <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-700 transition hover:border-violet-300 hover:text-violet-700">
-                  {postGroupFilter
-                    ? myGroups.find((g) => g.id === postGroupFilter)?.name || '分组'
-                    : '全部分组'}
+                <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-700 transition hover:border-(--theme-shell-border) hover:text-(--theme-primary)">
+                  {blogGroupFilter
+                    ? blogGroups.find((g) => g.id === blogGroupFilter)?.name || '博客分组'
+                    : '全部博客分组'}
                   <ChevronDown className="h-3.5 w-3.5" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-48 rounded-xl">
-                  <DropdownMenuItem onClick={() => setPostGroupFilter('')}>
-                    全部分组
+                  <DropdownMenuItem onClick={() => setBlogGroupFilter('')}>
+                    全部博客分组
                   </DropdownMenuItem>
-                  {myGroups.map((group) => (
-                    <DropdownMenuItem key={group.id} onClick={() => setPostGroupFilter(group.id)}>
+                  {blogGroups.map((group) => (
+                    <DropdownMenuItem key={group.id} onClick={() => setBlogGroupFilter(group.id)}>
                       {group.name}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <span className="rounded-full bg-violet-50 px-3 py-1.5 text-sm text-violet-700">
+              <span className="rounded-full bg-(--theme-primary-soft) px-3 py-1.5 text-sm text-(--theme-primary)">
                 博客 {filteredBlogPosts.length}
               </span>
-              <span className="rounded-full bg-orange-50 px-3 py-1.5 text-sm text-orange-700">
+              <span className="rounded-full bg-(--theme-primary-soft) px-3 py-1.5 text-sm text-(--theme-primary-hover)">
                 图文 {filteredImageTextPosts.length}
               </span>
             </div>
@@ -559,10 +623,13 @@ export default function MySpace() {
             {loadingPosts ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-44 animate-pulse rounded-2xl bg-slate-100" />
+                  <div
+                    key={i}
+                    className="h-44 animate-pulse rounded-2xl bg-(--theme-primary-soft)"
+                  />
                 ))}
               </div>
-            ) : filteredPosts.length === 0 ? (
+            ) : filteredBlogPosts.length === 0 && filteredImageTextPosts.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
                 <p className="text-slate-500">当前筛选下还没有内容，先去发布一篇吧。</p>
               </div>
@@ -574,7 +641,7 @@ export default function MySpace() {
                       <h3 className="text-lg font-semibold text-slate-900">博客列表</h3>
                       <p className="text-sm text-slate-500">只展示文章内容，方便继续编辑和管理。</p>
                     </div>
-                    <span className="rounded-full bg-violet-50 px-3 py-1 text-sm text-violet-700">
+                    <span className="rounded-full bg-(--theme-primary-soft) px-3 py-1 text-sm text-(--theme-primary)">
                       {filteredBlogPosts.length} 篇
                     </span>
                   </div>
@@ -605,13 +672,37 @@ export default function MySpace() {
                         单独突出图文页数、封面和贴纸信息，不再复用博客卡片。
                       </p>
                     </div>
-                    <span className="rounded-full bg-orange-50 px-3 py-1 text-sm text-orange-700">
-                      {filteredImageTextPosts.length} 组
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-700 transition hover:border-(--theme-shell-border) hover:text-(--theme-primary)">
+                          {imageTextGroupFilter
+                            ? imageTextGroups.find((g) => g.id === imageTextGroupFilter)?.name ||
+                              '图文分组'
+                            : '全部图文分组'}
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-48 rounded-xl">
+                          <DropdownMenuItem onClick={() => setImageTextGroupFilter('')}>
+                            全部图文分组
+                          </DropdownMenuItem>
+                          {imageTextGroups.map((group) => (
+                            <DropdownMenuItem
+                              key={group.id}
+                              onClick={() => setImageTextGroupFilter(group.id)}
+                            >
+                              {group.name}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <span className="rounded-full bg-(--theme-primary-soft) px-3 py-1 text-sm text-(--theme-primary-hover)">
+                        {filteredImageTextPosts.length} 组
+                      </span>
+                    </div>
                   </div>
 
                   {filteredImageTextPosts.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-orange-200 bg-orange-50/60 p-6 text-sm text-orange-700">
+                    <div className="rounded-2xl border border-dashed border-(--theme-shell-border) bg-(--theme-primary-soft) p-6 text-sm text-(--theme-primary-hover)">
                       当前筛选下还没有图文内容。
                     </div>
                   ) : (
@@ -644,7 +735,7 @@ export default function MySpace() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <Upload className="h-5 w-5 text-purple-600" />
+              <Upload className="h-5 w-5 theme-icon-accent" />
               上传新资源
             </DialogTitle>
           </DialogHeader>
@@ -661,8 +752,8 @@ export default function MySpace() {
                     onClick={() => setUploadType(type)}
                     className={`flex-1 py-2.5 rounded-xl font-medium text-sm border-2 transition-all ${
                       uploadType === type
-                        ? 'border-purple-600 bg-purple-50 text-purple-600'
-                        : 'border-gray-200 text-gray-500 hover:border-purple-300'
+                        ? 'border-(--theme-primary) bg-(--theme-primary-soft) text-(--theme-primary)'
+                        : 'border-gray-200 text-gray-500 hover:border-(--theme-shell-border)'
                     }`}
                   >
                     {type === 'wallpaper' ? '🖼️ 壁纸' : '🙂 头像'}
@@ -681,8 +772,8 @@ export default function MySpace() {
                     onClick={() => setUploadVisibility(option.value)}
                     className={`flex-1 py-2.5 rounded-xl font-medium text-sm border-2 transition-all ${
                       uploadVisibility === option.value
-                        ? 'border-purple-600 bg-purple-50 text-purple-600'
-                        : 'border-gray-200 text-gray-500 hover:border-purple-300'
+                        ? 'border-(--theme-primary) bg-(--theme-primary-soft) text-(--theme-primary)'
+                        : 'border-gray-200 text-gray-500 hover:border-(--theme-shell-border)'
                     }`}
                   >
                     {option.label}
@@ -697,8 +788,8 @@ export default function MySpace() {
               <div
                 className={`relative border-2 border-dashed rounded-2xl transition-all cursor-pointer ${
                   previewUrl
-                    ? 'border-purple-400 bg-purple-50/50'
-                    : 'border-gray-300 hover:border-purple-400 hover:bg-purple-50/30'
+                    ? 'border-(--theme-primary) bg-(--theme-primary-soft)/50'
+                    : 'border-gray-300 hover:border-(--theme-primary) hover:bg-(--theme-primary-soft)/30'
                 }`}
                 onDrop={handleDrop}
                 onDragOver={(e) => e.preventDefault()}
@@ -732,7 +823,7 @@ export default function MySpace() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                    <ImageIcon className="h-12 w-12 mb-3 text-purple-300" />
+                    <ImageIcon className="h-12 w-12 mb-3 theme-icon-accent opacity-40" />
                     <p className="text-sm font-medium text-gray-600 mb-1">点击或拖拽图片至此处</p>
                     <p className="text-xs">支持 JPG、PNG、WebP，最大 10MB</p>
                   </div>
@@ -758,7 +849,7 @@ export default function MySpace() {
                 onChange={(e) => setUploadTitle(e.target.value)}
                 placeholder="给这个资源起个名字，如「蓝色星空壁纸」"
                 maxLength={100}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 transition"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-(--theme-primary)/40 transition"
               />
             </div>
 
@@ -773,7 +864,7 @@ export default function MySpace() {
                 placeholder="简单描述一下这个资源…"
                 maxLength={255}
                 rows={2}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 transition resize-none"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-(--theme-primary)/40 transition resize-none"
               />
             </div>
 
@@ -793,7 +884,7 @@ export default function MySpace() {
               <Button
                 onClick={handleUpload}
                 disabled={!uploadFile || uploading}
-                className="flex-1 bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold shadow-md"
+                className="theme-btn-primary flex-1 font-semibold shadow-md"
               >
                 {uploading ? (
                   <>
@@ -933,7 +1024,7 @@ export default function MySpace() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <Pencil className="h-5 w-5 text-blue-600" />
+              <Pencil className="h-5 w-5 theme-icon-accent" />
               编辑资源信息
             </DialogTitle>
           </DialogHeader>
@@ -948,7 +1039,7 @@ export default function MySpace() {
                 onChange={(e) => setEditTitle(e.target.value)}
                 placeholder="给这个资源起个名字"
                 maxLength={100}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-(--theme-primary)/40 transition"
               />
             </div>
 
@@ -963,7 +1054,7 @@ export default function MySpace() {
                 placeholder="简单描述一下这个资源…"
                 maxLength={255}
                 rows={2}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition resize-none"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-(--theme-primary)/40 transition resize-none"
               />
             </div>
 
@@ -978,8 +1069,8 @@ export default function MySpace() {
                     onClick={() => setEditType(type)}
                     className={`flex-1 py-2.5 rounded-xl font-medium text-sm border-2 transition-all ${
                       editType === type
-                        ? 'border-blue-600 bg-blue-50 text-blue-600'
-                        : 'border-gray-200 text-gray-500 hover:border-blue-300'
+                        ? 'border-(--theme-primary) bg-(--theme-primary-soft) text-(--theme-primary)'
+                        : 'border-gray-200 text-gray-500 hover:border-(--theme-shell-border)'
                     }`}
                   >
                     {type === 'wallpaper' ? '🖼️ 壁纸' : '🙂 头像'}
@@ -998,8 +1089,8 @@ export default function MySpace() {
                     onClick={() => setEditVisibility(option.value)}
                     className={`flex-1 py-2.5 rounded-xl font-medium text-sm border-2 transition-all ${
                       editVisibility === option.value
-                        ? 'border-blue-600 bg-blue-50 text-blue-600'
-                        : 'border-gray-200 text-gray-500 hover:border-blue-300'
+                        ? 'border-(--theme-primary) bg-(--theme-primary-soft) text-(--theme-primary)'
+                        : 'border-gray-200 text-gray-500 hover:border-(--theme-shell-border)'
                     }`}
                   >
                     {option.label}
@@ -1021,7 +1112,7 @@ export default function MySpace() {
               <Button
                 onClick={handleEditSubmit}
                 disabled={editing}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md"
+                className="theme-btn-primary flex-1 font-semibold shadow-md"
               >
                 {editing ? (
                   <>

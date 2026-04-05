@@ -1,16 +1,57 @@
 import { Edit3, FolderTree, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { createGroup, deleteGroup, type Group, getAdminGroups, updateGroup } from '@/api/blog';
+import {
+  createGroup,
+  deleteGroup,
+  type Group,
+  type GroupType,
+  getAdminGroups,
+  updateGroup,
+} from '@/api/blog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/useAuthStore';
 
+const GROUP_TYPE_META: Record<
+  GroupType,
+  {
+    title: string;
+    description: string;
+    empty: string;
+    createTitle: string;
+    manageLabel: string;
+  }
+> = {
+  blog: {
+    title: '博客分组管理',
+    description: '整理博客的栏目与内容归类，让创作空间和列表页更清晰。',
+    empty: '还没有博客分组，先创建一个吧。',
+    createTitle: '新建博客分组',
+    manageLabel: '博客',
+  },
+  image_text: {
+    title: '图文分组管理',
+    description: '整理图文创作的主题分组，避免和博客栏目混在一起。',
+    empty: '还没有图文分组，先创建一个吧。',
+    createTitle: '新建图文分组',
+    manageLabel: '图文',
+  },
+};
+
+function resolveGroupType(raw: string | null): GroupType {
+  return raw === 'image_text' ? 'image_text' : 'blog';
+}
+
 export default function BlogGroupManage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, isAuthenticated } = useAuthStore();
+  const groupType = resolveGroupType(searchParams.get('type'));
+  const meta = useMemo(() => GROUP_TYPE_META[groupType], [groupType]);
+
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -30,7 +71,7 @@ export default function BlogGroupManage() {
   const loadGroups = async () => {
     try {
       setLoading(true);
-      const data = await getAdminGroups();
+      const data = await getAdminGroups({ groupType });
       setGroups(data || []);
     } catch {
       toast.error('加载分组失败');
@@ -45,12 +86,12 @@ export default function BlogGroupManage() {
       return;
     }
     if (user?.role !== 'creator' && user?.role !== 'admin') {
-      toast.error('仅创作者可管理博客分组');
+      toast.error('仅创作者可管理分组');
       navigate('/');
       return;
     }
     void loadGroups();
-  }, [isAuthenticated, navigate, user?.role]);
+  }, [groupType, isAuthenticated, navigate, user?.role]);
 
   const handleCreate = async () => {
     const name = createName.trim();
@@ -60,7 +101,11 @@ export default function BlogGroupManage() {
     }
     try {
       setCreating(true);
-      await createGroup({ name, description: createDesc.trim() || undefined });
+      await createGroup({
+        name,
+        groupType,
+        description: createDesc.trim() || undefined,
+      });
       toast.success('分组创建成功');
       setCreateOpen(false);
       setCreateName('');
@@ -116,8 +161,32 @@ export default function BlogGroupManage() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900">博客分组管理</h1>
-            <p className="mt-1 text-sm text-slate-500">创建、编辑、删除你的博客分组</p>
+            <div className="mb-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSearchParams({ type: 'blog' })}
+                className={`rounded-full px-3 py-1 text-xs transition ${
+                  groupType === 'blog'
+                    ? 'bg-violet-600 text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                博客分组
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchParams({ type: 'image_text' })}
+                className={`rounded-full px-3 py-1 text-xs transition ${
+                  groupType === 'image_text'
+                    ? 'bg-orange-500 text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                图文分组
+              </button>
+            </div>
+            <h1 className="text-2xl font-semibold text-slate-900">{meta.title}</h1>
+            <p className="mt-1 text-sm text-slate-500">{meta.description}</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => navigate('/my-space')} className="rounded-xl">
@@ -139,7 +208,7 @@ export default function BlogGroupManage() {
         ) : groups.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-14 text-center">
             <FolderTree className="mx-auto h-10 w-10 text-slate-300" />
-            <p className="mt-3 text-slate-500">还没有分组，先创建第一个分组吧</p>
+            <p className="mt-3 text-slate-500">{meta.empty}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -150,15 +219,20 @@ export default function BlogGroupManage() {
               >
                 <div className="mb-3 flex items-start justify-between gap-2">
                   <div>
+                    <div className="mb-2">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                        {meta.manageLabel}
+                      </span>
+                    </div>
                     <h3 className="text-lg font-semibold text-slate-900">{group.name}</h3>
-                    <p className="mt-1 text-xs text-slate-500">文章数：{group.postCount || 0}</p>
+                    <p className="mt-1 text-xs text-slate-500">内容数：{group.postCount || 0}</p>
                   </div>
                   <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
                     ID {group.id}
                   </span>
                 </div>
                 <p className="line-clamp-2 min-h-[40px] text-sm text-slate-600">
-                  {group.description || '暂无分组描述'}
+                  {group.description || '暂未填写分组说明'}
                 </p>
                 <div className="mt-4 flex items-center gap-2">
                   <Button
@@ -193,7 +267,7 @@ export default function BlogGroupManage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>新建博客分组</DialogTitle>
+            <DialogTitle>{meta.createTitle}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <Input
@@ -204,7 +278,7 @@ export default function BlogGroupManage() {
             <Input
               value={createDesc}
               onChange={(e) => setCreateDesc(e.target.value)}
-              placeholder="分组描述（可选）"
+              placeholder="分组说明（可选）"
             />
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>
@@ -232,7 +306,7 @@ export default function BlogGroupManage() {
             <Input
               value={editDesc}
               onChange={(e) => setEditDesc(e.target.value)}
-              placeholder="分组描述（可选）"
+              placeholder="分组说明（可选）"
             />
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setEditTarget(null)} disabled={updating}>
@@ -252,7 +326,7 @@ export default function BlogGroupManage() {
             <DialogTitle>删除分组</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-slate-600">
-            确认删除「{deleteTarget?.name}」？分组下文章会自动取消分组，不会删除文章本身。
+            确认删除“{deleteTarget?.name}”？该分组下的内容会取消分组，不会删除内容本身。
           </p>
           <div className="mt-3 flex justify-end gap-2">
             <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>

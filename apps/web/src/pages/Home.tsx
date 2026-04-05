@@ -42,7 +42,7 @@ function SectionHeading({
   return (
     <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
       <div className="space-y-3">
-        <div className="inline-flex items-center rounded-full border border-[#e8d4bd] bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] text-[#b67638] uppercase shadow-[0_10px_24px_rgba(225,188,145,0.08)] backdrop-blur">
+        <div className="theme-eyebrow inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
           {eyebrow}
         </div>
         <div className="space-y-2">
@@ -74,7 +74,7 @@ function HeroStat({ label, value, accent }: { label: string; value: string; acce
 function HeroRibbon({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="inline-flex items-center gap-3 rounded-full border border-white/80 bg-white/78 px-4 py-2 shadow-[0_14px_36px_rgba(148,163,184,0.1)] backdrop-blur">
-      <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#fff6eb] text-[#b87731]">
+      <div className="theme-ribbon-icon inline-flex h-8 w-8 items-center justify-center rounded-full">
         {icon}
       </div>
       <div className="leading-tight">
@@ -282,24 +282,34 @@ export default function Home() {
   };
 
   return (
-    <div className="bg-[linear-gradient(180deg,#fffaf5_0%,#fffefc_22%,#f7fbff_54%,#fffaf6_100%)] text-slate-900">
+    <div className="bg-transparent text-slate-900">
       <div className="mx-auto max-w-7xl px-6 pb-20 pt-8 md:px-8 lg:px-10">
-        <section className="relative overflow-hidden rounded-[40px] border border-[#eedcc8] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),rgba(255,248,240,0.9)_40%,rgba(243,248,255,0.95)_100%)] px-6 py-7 shadow-[0_24px_80px_rgba(225,188,145,0.2)] md:px-10 md:py-10">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(251,191,36,0.18),transparent_26%),radial-gradient(circle_at_85%_20%,rgba(96,165,250,0.2),transparent_24%),radial-gradient(circle_at_72%_80%,rgba(251,191,36,0.12),transparent_26%)]" />
-          <div className="absolute -left-10 top-24 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(255,214,148,0.24),transparent_72%)] blur-2xl" />
-          <div className="absolute right-10 top-14 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(147,197,253,0.22),transparent_74%)] blur-2xl" />
+        <section className="theme-hero-shell relative overflow-hidden rounded-[40px] border px-6 py-7 md:px-10 md:py-10">
+          <div className="theme-hero-glow absolute inset-0" />
+          <div
+            className="absolute -left-10 top-24 h-56 w-56 rounded-full blur-2xl"
+            style={{
+              background:
+                'radial-gradient(circle, rgba(var(--theme-tertiary-rgb),0.24), transparent 72%)',
+            }}
+          />
+          <div
+            className="absolute right-10 top-14 h-48 w-48 rounded-full blur-2xl"
+            style={{
+              background:
+                'radial-gradient(circle, rgba(var(--theme-secondary-rgb),0.22), transparent 74%)',
+            }}
+          />
           <div className="relative grid gap-8 lg:grid-cols-[1.16fr_0.84fr] lg:items-start">
             <div className="space-y-8">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-1.5 text-xs tracking-[0.22em] text-[#b6793f] uppercase shadow-sm backdrop-blur">
+              <div className="theme-accent-border inline-flex items-center gap-2 rounded-full border bg-white/82 px-4 py-1.5 text-xs tracking-[0.22em] theme-accent-text uppercase shadow-sm backdrop-blur">
                 <Sparkles className="h-3.5 w-3.5" />
                 Valley Project
               </div>
               <div className="max-w-3xl space-y-5">
                 <h1 className="max-w-[760px] text-[48px] font-black leading-[0.95] tracking-[-0.06em] text-slate-950 md:text-[78px]">
                   <span className="block">记录正在发生的，</span>
-                  <span className="mt-2 block bg-linear-to-r from-[#b87731] via-[#d19644] to-[#8f5c22] bg-clip-text pl-1 text-transparent md:pl-2">
-                    也收藏值得留下的。
-                  </span>
+                  <span className="text-gradient mt-2 block pl-1 md:pl-2">也收藏值得留下的。</span>
                 </h1>
                 <p className="max-w-2xl text-base leading-8 text-slate-600 md:text-lg">
                   Valley 持续整理博客、图文、资源和创作过程，也把一些正在成形的内容慢慢收拢进来。
@@ -317,7 +327,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="rounded-full border-[#ddc4aa] bg-white/76 px-6 text-slate-700 shadow-sm hover:bg-white"
+                  className="theme-accent-border rounded-full border bg-white/76 px-6 text-slate-700 shadow-sm hover:bg-white"
                   onClick={() => navigate('/resources')}
                 >
                   去看资源页
@@ -326,7 +336,7 @@ export default function Home() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="rounded-full border-[#cfd9eb] bg-[#f7fbff] px-6 text-slate-700 shadow-sm hover:bg-white"
+                    className="theme-accent-border rounded-full border bg-[var(--theme-surface-alt)] px-6 text-slate-700 shadow-sm hover:bg-white"
                     onClick={() => navigate('/my-space')}
                   >
                     进入创作空间
@@ -366,7 +376,7 @@ export default function Home() {
                   </div>
                   <Button
                     size="lg"
-                    className="h-12 rounded-full bg-[#b87731] px-6 text-white hover:bg-[#a56827]"
+                    className="h-12 rounded-full bg-[var(--theme-primary)] px-6 text-white hover:bg-[var(--theme-primary-hover)]"
                     onClick={handleSearchCreator}
                   >
                     查看创作者
@@ -394,12 +404,12 @@ export default function Home() {
               <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
                 <div className="overflow-hidden rounded-[30px] border border-white/75 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(247,251,255,0.82))] p-5 shadow-[0_18px_44px_rgba(148,163,184,0.1)] backdrop-blur">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-500">
-                    <Sparkles className="h-3.5 w-3.5 text-[#b87731]" />
+                    <Sparkles className="theme-icon-accent h-3.5 w-3.5" />
                     本站概览
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-[1.12fr_0.88fr]">
-                    <div className="rounded-[26px] border border-white/80 bg-[linear-gradient(145deg,rgba(255,255,255,0.98),rgba(255,246,235,0.92))] p-5 shadow-[0_14px_36px_rgba(225,188,145,0.12)]">
-                      <div className="text-xs tracking-[0.18em] text-[#b87731] uppercase">
+                    <div className="rounded-[26px] border border-(--theme-shell-border) bg-[linear-gradient(145deg,rgba(255,255,255,0.98),color-mix(in_srgb,var(--theme-primary-soft)_60%,white))] p-5 shadow-[0_14px_36px_rgba(var(--theme-primary-rgb),0.12)]">
+                      <div className="theme-icon-accent text-xs tracking-[0.18em] uppercase">
                         Overview
                       </div>
                       <div className="mt-3 text-lg font-medium leading-8 text-slate-900">
@@ -408,13 +418,13 @@ export default function Home() {
                     </div>
                     <div className="grid gap-3">
                       <div className="rounded-[22px] border border-white/80 bg-white/86 p-4">
-                        <div className="text-xs text-slate-400">最新标题</div>
+                        <div className="theme-icon-accent text-xs tracking-[0.12em]">最新标题</div>
                         <div className="mt-2 line-clamp-2 text-base font-medium leading-7 text-slate-900">
                           {featuredPost ? featuredPost.title : '下一篇内容正在路上'}
                         </div>
                       </div>
                       <div className="rounded-[22px] border border-white/80 bg-white/86 p-4">
-                        <div className="text-xs text-slate-400">当前资源</div>
+                        <div className="theme-icon-accent text-xs tracking-[0.12em]">当前资源</div>
                         <div className="mt-2 line-clamp-2 text-base font-medium leading-7 text-slate-900">
                           {featuredWallpaper ? featuredWallpaper.title : '新的资源整理中'}
                         </div>
@@ -424,8 +434,8 @@ export default function Home() {
                 </div>
 
                 <div className="grid gap-3">
-                  <div className="rounded-[24px] border border-white/75 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(255,247,238,0.88))] px-4 py-4 shadow-[0_16px_36px_rgba(148,163,184,0.08)]">
-                    <div className="text-xs tracking-[0.18em] text-[#b87731] uppercase">
+                  <div className="rounded-[24px] border border-(--theme-shell-border) bg-[linear-gradient(135deg,rgba(255,255,255,0.92),color-mix(in_srgb,var(--theme-primary-soft)_50%,white))] px-4 py-4 shadow-[0_16px_36px_rgba(148,163,184,0.08)]">
+                    <div className="theme-icon-accent text-xs tracking-[0.18em] uppercase">
                       Content Flow
                     </div>
                     <div className="mt-2 text-lg font-medium leading-8 text-slate-900">
@@ -434,13 +444,13 @@ export default function Home() {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="rounded-[22px] border border-white/75 bg-white/82 px-4 py-4">
-                      <div className="text-xs text-slate-400">浏览入口</div>
+                      <div className="theme-icon-accent text-xs tracking-[0.12em]">浏览入口</div>
                       <div className="mt-2 text-sm font-medium text-slate-900">
                         博客、图文、资源
                       </div>
                     </div>
                     <div className="rounded-[22px] border border-white/75 bg-white/82 px-4 py-4">
-                      <div className="text-xs text-slate-400">创作节奏</div>
+                      <div className="theme-icon-accent text-xs tracking-[0.12em]">创作节奏</div>
                       <div className="mt-2 text-sm font-medium text-slate-900">内容持续补充中</div>
                     </div>
                   </div>
@@ -451,7 +461,7 @@ export default function Home() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
               <div className="rounded-[34px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,248,241,0.84))] p-5 shadow-[0_20px_60px_rgba(148,163,184,0.14)] backdrop-blur">
                 <div className="mb-4 flex items-center justify-between">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-[#fff5e9] px-3 py-1 text-xs text-[#b87731]">
+                  <div className="theme-tag inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
                     <BookOpen className="h-3.5 w-3.5" />
                     最新内容入口
                   </div>
@@ -469,7 +479,7 @@ export default function Home() {
                     className="w-full space-y-4 text-left"
                     onClick={() => navigate(`/blog/${featuredPost.id}`)}
                   >
-                    <div className="relative h-60 overflow-hidden rounded-[28px] border border-[#ecd7c1] bg-[#f8f2e8]">
+                    <div className="relative h-60 overflow-hidden rounded-[28px] border border-(--theme-shell-border) bg-(--theme-primary-soft)">
                       {featuredPost.cover ? (
                         <img
                           src={featuredPost.cover}
@@ -478,7 +488,7 @@ export default function Home() {
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.92),rgba(250,240,228,0.9))]">
-                          <SquareChartGantt className="h-12 w-12 text-[#caa67a]" />
+                          <SquareChartGantt className="h-12 w-12 theme-icon-accent opacity-50" />
                         </div>
                       )}
                       <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/58 via-black/18 to-transparent p-5 text-white">
@@ -490,7 +500,7 @@ export default function Home() {
                         </h3>
                       </div>
                     </div>
-                    <div className="rounded-[24px] border border-[#f1e8db] bg-[#fcfaf6] p-4">
+                    <div className="rounded-[24px] border border-(--theme-shell-border) bg-(--theme-primary-soft) p-4">
                       <p className="text-sm leading-7 text-slate-600">
                         {featuredPostExcerpt || '这次更新已经放到内容区里了，点进去就能继续看。'}
                       </p>
@@ -502,28 +512,28 @@ export default function Home() {
                     </div>
                   </button>
                 ) : (
-                  <div className="rounded-[24px] bg-[#fcfaf6] p-6 text-sm text-slate-500">
+                  <div className="rounded-[24px] bg-(--theme-primary-soft) p-6 text-sm text-slate-500">
                     暂时还没有新的内容更新。
                   </div>
                 )}
               </div>
-              <div className="rounded-[34px] border border-[#dfe9f5] bg-[linear-gradient(180deg,rgba(247,251,255,0.95),rgba(255,255,255,0.86))] p-5 shadow-[0_20px_56px_rgba(96,165,250,0.12)]">
+              <div className="rounded-[34px] border border-(--theme-shell-border) bg-[linear-gradient(180deg,rgba(247,251,255,0.95),rgba(255,255,255,0.86))] p-5 shadow-[0_20px_56px_rgba(var(--theme-primary-rgb),0.10)]">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-600">
-                    <Images className="h-3.5 w-3.5 text-sky-500" />
+                    <Images className="h-3.5 w-3.5 theme-icon-accent" />
                     近期常用入口
                   </div>
                   <div className="text-xs text-slate-400">快捷访问</div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                   <QuickEntryCard
-                    icon={<Images className="h-4 w-4 text-sky-500" />}
+                    icon={<Images className="h-4 w-4 theme-icon-accent" />}
                     title="资源整理"
                     description="资源浏览与收藏入口。"
                     onClick={() => navigate('/resources')}
                   />
                   <QuickEntryCard
-                    icon={<BookOpen className="h-4 w-4 text-[#b87731]" />}
+                    icon={<BookOpen className="h-4 w-4 theme-icon-accent" />}
                     title="博客与图文"
                     description="最近更新的内容都在这里。"
                     onClick={() => navigate('/blog')}
@@ -550,20 +560,20 @@ export default function Home() {
             action={
               <Button
                 variant="outline"
-                className="rounded-full border-[#d8c4aa] bg-white/80 px-5 text-slate-700 hover:bg-white"
+                className="rounded-full border-(--theme-shell-border) bg-white/80 px-5 text-slate-700 hover:bg-white"
                 onClick={() => navigate('/creators')}
               >
                 去看创作者页
               </Button>
             }
           />
-          <div className="rounded-[36px] border border-[#ecdcc8] bg-[linear-gradient(180deg,rgba(255,250,244,0.88),rgba(255,255,255,0.9))] p-5 shadow-[0_22px_56px_rgba(225,188,145,0.1)] md:p-6">
+          <div className="theme-section-shell rounded-[36px] border p-5 md:p-6">
             <div className="mb-5 flex items-center justify-between rounded-[28px] border border-white/85 bg-white/72 px-4 py-4">
               <div>
                 <div className="text-lg font-semibold text-slate-900">最近活跃</div>
                 <div className="mt-1 text-sm text-slate-500">这里会先展示最近有更新的创作者。</div>
               </div>
-              <div className="rounded-full bg-[#fff4e6] px-4 py-2 text-sm text-[#b87731]">
+              <div className="theme-pill rounded-full px-4 py-2 text-sm">
                 {creators.length} 位创作者
               </div>
             </div>
@@ -586,7 +596,7 @@ export default function Home() {
                 action={
                   <Button
                     variant="outline"
-                    className="rounded-full border-[#d8c4aa] bg-white/80 px-5"
+                    className="rounded-full border-(--theme-shell-border) bg-white/80 px-5"
                     onClick={() => navigate('/blog')}
                   >
                     先去看内容
@@ -605,20 +615,20 @@ export default function Home() {
             action={
               <Button
                 variant="outline"
-                className="rounded-full border-[#bfd5ee] bg-white/85 px-5 text-[#3f6f9e] hover:bg-white"
+                className="rounded-full border-(--theme-shell-border) bg-white/85 px-5 text-(--theme-primary) hover:bg-white"
                 onClick={() => navigate('/resources')}
               >
                 进入资源页
               </Button>
             }
           />
-          <div className="rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
+          <div className="theme-section-shell rounded-[36px] border p-5 md:p-6">
             <div className="mb-5 flex flex-col gap-3 rounded-[28px] border border-white/85 bg-white/72 px-4 py-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <div className="text-lg font-semibold text-slate-900">本期资源</div>
                 <div className="mt-1 text-sm text-slate-500">最近整理出的图像内容。</div>
               </div>
-              <div className="rounded-full bg-[#edf5ff] px-4 py-2 text-sm text-[#5b87b3]">
+              <div className="theme-pill rounded-full px-4 py-2 text-sm">
                 {resources.length} 项内容
               </div>
             </div>
@@ -641,7 +651,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={() => navigate(`/resource/${featuredWallpaper.id}`)}
-                      className="group block w-full overflow-hidden rounded-[32px] border border-[#d5e6f5] bg-white text-left shadow-[0_20px_56px_rgba(96,165,250,0.12)] transition hover:-translate-y-1 hover:shadow-[0_26px_64px_rgba(96,165,250,0.18)]"
+                      className="group block w-full overflow-hidden rounded-[32px] border border-(--theme-shell-border) bg-white text-left shadow-[0_20px_56px_rgba(var(--theme-primary-rgb),0.12)] transition hover:-translate-y-1 hover:shadow-[0_26px_64px_rgba(var(--theme-primary-rgb),0.18)]"
                     >
                       <div className="relative h-[336px] overflow-hidden bg-slate-100">
                         <img
@@ -650,7 +660,7 @@ export default function Home() {
                           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
                         />
                         <div className="absolute inset-0 bg-linear-to-t from-black/72 via-black/20 to-transparent" />
-                        <div className="absolute left-5 top-5 inline-flex items-center rounded-full bg-white/88 px-3 py-1 text-xs font-medium text-[#4a78a7] backdrop-blur">
+                        <div className="absolute left-5 top-5 inline-flex items-center rounded-full bg-white/88 px-3 py-1 text-xs font-medium text-(--theme-primary) backdrop-blur">
                           热门壁纸
                         </div>
                         <div className="absolute right-5 top-5">
@@ -681,7 +691,7 @@ export default function Home() {
                           key={resource.id}
                           type="button"
                           onClick={() => navigate(`/resource/${resource.id}`)}
-                          className="group overflow-hidden rounded-[26px] border border-[#d8e6f3] bg-white text-left shadow-[0_16px_40px_rgba(148,163,184,0.1)] transition hover:-translate-y-1 hover:shadow-[0_20px_52px_rgba(96,165,250,0.14)]"
+                          className="group overflow-hidden rounded-[26px] border border-(--theme-shell-border) bg-white text-left shadow-[0_16px_40px_rgba(148,163,184,0.1)] transition hover:-translate-y-1 hover:shadow-[0_20px_52px_rgba(var(--theme-primary-rgb),0.14)]"
                         >
                           <div className="relative h-44 overflow-hidden bg-slate-100">
                             <img
@@ -707,13 +717,13 @@ export default function Home() {
                     </div>
                   ) : null}
                 </div>
-                <div className="rounded-[32px] border border-[#d8e6f2] bg-white/84 p-5 shadow-[0_18px_50px_rgba(148,163,184,0.1)]">
+                <div className="rounded-[32px] border border-(--theme-shell-border) bg-white/84 p-5 shadow-[0_18px_50px_rgba(148,163,184,0.1)]">
                   <div className="mb-5 flex items-center justify-between">
                     <div>
                       <div className="text-lg font-semibold text-slate-900">头像收藏</div>
                       <div className="mt-1 text-sm text-slate-500">最近整理的头像内容。</div>
                     </div>
-                    <div className="rounded-full bg-[#f4f8fc] px-3 py-1 text-xs text-slate-500">
+                    <div className="theme-pill rounded-full px-3 py-1 text-xs">
                       {avatarShelf.length} 项
                     </div>
                   </div>
@@ -724,7 +734,7 @@ export default function Home() {
                           key={resource.id}
                           type="button"
                           onClick={() => navigate(`/resource/${resource.id}`)}
-                          className="group overflow-hidden rounded-[24px] border border-[#e4eef6] bg-[#fbfdff] text-left transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(148,163,184,0.12)]"
+                          className="group overflow-hidden rounded-[24px] border border-(--theme-shell-border) bg-(--theme-primary-soft)/30 text-left transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(148,163,184,0.12)]"
                         >
                           <div className="relative px-4 pb-3 pt-4">
                             <div className="absolute right-3 top-3">
@@ -733,7 +743,7 @@ export default function Home() {
                                 onClick={(event) => handleFavoriteResource(event, resource)}
                               />
                             </div>
-                            <div className="mx-auto h-24 w-24 overflow-hidden rounded-[22px] border border-[#e6edf5] bg-white shadow-[0_8px_24px_rgba(148,163,184,0.1)]">
+                            <div className="mx-auto h-24 w-24 overflow-hidden rounded-[22px] border border-(--theme-shell-border) bg-white shadow-[0_8px_24px_rgba(148,163,184,0.1)]">
                               <img
                                 src={resource.url}
                                 alt={resource.title}
@@ -753,7 +763,7 @@ export default function Home() {
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-[24px] bg-[#f8fbfe] px-4 py-10 text-center text-sm text-slate-500">
+                    <div className="rounded-[24px] bg-(--theme-primary-soft) px-4 py-10 text-center text-sm text-slate-500">
                       当前资源里还没有头像内容。
                     </div>
                   )}
@@ -766,7 +776,7 @@ export default function Home() {
                 action={
                   <Button
                     variant="outline"
-                    className="rounded-full border-[#bfd5ee] bg-white/85 px-5"
+                    className="rounded-full border-(--theme-shell-border) bg-white/85 px-5"
                     onClick={() => navigate('/resources')}
                   >
                     去看资源页
@@ -785,22 +795,20 @@ export default function Home() {
             action={
               <Button
                 variant="outline"
-                className="rounded-full border-[#e0ccba] bg-white/80 px-5 text-slate-700 hover:bg-white"
+                className="rounded-full border-(--theme-shell-border) bg-white/80 px-5 text-slate-700 hover:bg-white"
                 onClick={() => navigate('/blog')}
               >
                 去看内容页
               </Button>
             }
           />
-          <div className="rounded-[36px] border border-[#ecdcc8] bg-[linear-gradient(180deg,rgba(255,250,244,0.92),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(225,188,145,0.1)] md:p-6">
+          <div className="theme-section-shell rounded-[36px] border p-5 md:p-6">
             <div className="mb-5 flex items-center justify-between rounded-[28px] border border-white/85 bg-white/72 px-4 py-4">
               <div>
                 <div className="text-lg font-semibold text-slate-900">最近更新</div>
                 <div className="mt-1 text-sm text-slate-500">博客与图文的最新内容。</div>
               </div>
-              <div className="rounded-full bg-[#fff4e6] px-4 py-2 text-sm text-[#b87731]">
-                {posts.length} 条更新
-              </div>
+              <div className="theme-pill rounded-full px-4 py-2 text-sm">{posts.length} 条更新</div>
             </div>
             {loadingPosts ? (
               <div className="grid gap-5 xl:grid-cols-3">
@@ -813,7 +821,7 @@ export default function Home() {
                 {posts.slice(0, 3).map((post) => (
                   <div
                     key={post.id}
-                    className="rounded-[30px] bg-white/68 p-2 shadow-[0_14px_40px_rgba(225,188,145,0.08)]"
+                    className="rounded-[30px] bg-white/68 p-2 shadow-[0_14px_40px_rgba(var(--theme-primary-rgb),0.08)]"
                   >
                     <BlogFeedCard post={post} />
                   </div>
@@ -827,7 +835,7 @@ export default function Home() {
                   isCreator ? (
                     <Button
                       variant="outline"
-                      className="rounded-full border-[#e0ccba] bg-white/80 px-5"
+                      className="rounded-full border-(--theme-shell-border) bg-white/80 px-5"
                       onClick={() => navigate('/my-space')}
                     >
                       去创作空间看看
@@ -840,11 +848,11 @@ export default function Home() {
         </section>
 
         <section className="mt-24">
-          <div className="overflow-hidden rounded-[40px] border border-[#e8d8c6] bg-[linear-gradient(135deg,rgba(255,251,247,0.98),rgba(247,251,255,0.92))] p-8 shadow-[0_22px_58px_rgba(148,163,184,0.1)] md:p-10">
+          <div className="theme-section-shell overflow-hidden rounded-[40px] border p-8 md:p-10">
             <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
               <div className="space-y-5">
                 <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-500">
-                  <UserRound className="h-3.5 w-3.5 text-[#b87731]" />
+                  <UserRound className="theme-icon-accent h-3.5 w-3.5" />
                   继续逛逛
                 </div>
                 <h3 className="text-3xl font-semibold tracking-tight text-slate-950 md:text-[40px]">
@@ -874,7 +882,7 @@ export default function Home() {
                   onClick={() => navigate('/blog')}
                   className="rounded-[28px] border border-white/80 bg-white/84 px-5 py-6 text-left shadow-[0_14px_36px_rgba(148,163,184,0.08)] transition hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(148,163,184,0.12)]"
                 >
-                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#fff4e8] text-[#b87731]">
+                  <div className="theme-stat-icon mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full">
                     <BookOpen className="h-5 w-5" />
                   </div>
                   <div className="text-lg font-medium text-slate-900">内容页</div>
@@ -885,7 +893,7 @@ export default function Home() {
                   onClick={() => navigate('/resources')}
                   className="rounded-[28px] border border-white/80 bg-white/84 px-5 py-6 text-left shadow-[0_14px_36px_rgba(148,163,184,0.08)] transition hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(148,163,184,0.12)]"
                 >
-                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#eef6ff] text-sky-500">
+                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-(--theme-primary-soft) text-(--theme-primary)">
                     <Images className="h-5 w-5" />
                   </div>
                   <div className="text-lg font-medium text-slate-900">资源页</div>
@@ -896,7 +904,7 @@ export default function Home() {
                   onClick={() => navigate('/creators')}
                   className="rounded-[28px] border border-white/80 bg-white/84 px-5 py-6 text-left shadow-[0_14px_36px_rgba(148,163,184,0.08)] transition hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(148,163,184,0.12)]"
                 >
-                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#edf9f3] text-emerald-500">
+                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-(--theme-primary-soft) theme-icon-accent">
                     <SquareChartGantt className="h-5 w-5" />
                   </div>
                   <div className="text-lg font-medium text-slate-900">创作者页</div>

@@ -64,6 +64,7 @@ type PostGroupInfo struct {
 	ID          model.Int64String  `json:"id"`
 	Name        string             `json:"name"`
 	Slug        string             `json:"slug"`
+	GroupType   string             `json:"groupType"`
 	Description string             `json:"description,omitempty"`
 	AuthorID    model.Int64String  `json:"authorId"`
 	ParentID    *model.Int64String `json:"parentId,omitempty"`
@@ -396,11 +397,15 @@ func GetCategories(c *gin.Context) {
 
 func GetGroups(c *gin.Context) {
 	authorIDRaw := strings.TrimSpace(c.Query("authorId"))
+	groupType := normalizeGroupType(c.Query("groupType"))
 	query := database.DB.Model(&model.PostGroup{}).Where("deleted_at IS NULL")
 	if authorIDRaw != "" {
 		if authorID, err := strconv.ParseInt(authorIDRaw, 10, 64); err == nil {
 			query = query.Where("author_id = ?", authorID)
 		}
+	}
+	if groupType != "" {
+		query = query.Where("group_type = ?", groupType)
 	}
 
 	var groups []model.PostGroup
@@ -424,9 +429,13 @@ func AdminListGroups(c *gin.Context) {
 		return
 	}
 
+	groupType := normalizeGroupType(c.Query("groupType"))
 	query := database.DB.Model(&model.PostGroup{}).Where("deleted_at IS NULL")
 	if role == "creator" {
 		query = query.Where("author_id = ?", userID)
+	}
+	if groupType != "" {
+		query = query.Where("group_type = ?", groupType)
 	}
 
 	var groups []model.PostGroup
@@ -447,6 +456,7 @@ func AdminCreateGroup(c *gin.Context) {
 
 	var req struct {
 		Name        string             `json:"name" binding:"required"`
+		GroupType   string             `json:"groupType"`
 		Description string             `json:"description"`
 		ParentID    *model.Int64String `json:"parentId"`
 		SortOrder   int                `json:"sortOrder"`
@@ -461,6 +471,10 @@ func AdminCreateGroup(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "name is required")
 		return
 	}
+	groupType := normalizeGroupType(req.GroupType)
+	if groupType == "" {
+		groupType = postTypeBlog
+	}
 	if req.ParentID != nil {
 		var parent model.PostGroup
 		if err := database.DB.First(&parent, *req.ParentID).Error; err != nil {
@@ -471,6 +485,10 @@ func AdminCreateGroup(c *gin.Context) {
 			Error(c, http.StatusForbidden, "parent group no permission")
 			return
 		}
+		if normalizeGroupType(parent.GroupType) != groupType {
+			Error(c, http.StatusBadRequest, "parent group type mismatch")
+			return
+		}
 	}
 
 	slug := strconv.FormatInt(utils.GenerateID(), 10)
@@ -479,6 +497,7 @@ func AdminCreateGroup(c *gin.Context) {
 		ID:          model.Int64String(utils.GenerateID()),
 		Name:        name,
 		Slug:        slug,
+		GroupType:   groupType,
 		Description: strings.TrimSpace(req.Description),
 		AuthorID:    model.Int64String(userID),
 		ParentID:    req.ParentID,
@@ -545,6 +564,10 @@ func AdminUpdateGroup(c *gin.Context) {
 			Error(c, http.StatusForbidden, "parent group no permission")
 			return
 		}
+		if normalizeGroupType(parent.GroupType) != normalizeGroupType(group.GroupType) {
+			Error(c, http.StatusBadRequest, "parent group type mismatch")
+			return
+		}
 		updates["parent_id"] = int64(*req.ParentID)
 	}
 	if req.SortOrder != nil {
@@ -583,7 +606,7 @@ func AdminDeleteGroup(c *gin.Context) {
 	}
 
 	if err := database.DB.Model(&model.Post{}).
-		Where("group_id = ?", id).
+		Where("group_id = ? AND post_type = ?", id, normalizeGroupType(group.GroupType)).
 		Update("group_id", 0).Error; err != nil {
 		Error(c, http.StatusInternalServerError, "unlink posts failed")
 		return
@@ -719,13 +742,8 @@ func AdminCreatePost(c *gin.Context) {
 	}
 
 	if req.GroupID != 0 {
-		var group model.PostGroup
-		if err := database.DB.First(&group, req.GroupID).Error; err != nil {
+		if _, err := loadWritableGroupForPostType(c, req.GroupID, postType, userID, role); err != nil {
 			Error(c, http.StatusBadRequest, "group not found")
-			return
-		}
-		if role != "admin" && int64(group.AuthorID) != userID {
-			Error(c, http.StatusForbidden, "group no permission")
 			return
 		}
 	}
@@ -887,18 +905,12 @@ func AdminUpdatePost(c *gin.Context) {
 		if *req.GroupID == 0 {
 			updates["group_id"] = 0
 		} else {
-			var group model.PostGroup
-			if err := database.DB.First(&group, *req.GroupID).Error; err != nil {
+			finalType := post.PostType
+			if normalizedType := normalizePostType(req.PostType); normalizedType != "" {
+				finalType = normalizedType
+			}
+			if _, err := loadWritableGroupForPostType(c, *req.GroupID, finalType, currentUserIDForPost(c, post.AuthorID), currentUserRole(c)); err != nil {
 				Error(c, http.StatusBadRequest, "group not found")
-				return
-			}
-			userID, role, ok := currentUser(c)
-			if !ok {
-				Error(c, http.StatusUnauthorized, "unauthorized")
-				return
-			}
-			if role != "admin" && int64(group.AuthorID) != userID {
-				Error(c, http.StatusForbidden, "group no permission")
 				return
 			}
 			updates["group_id"] = int64(*req.GroupID)
@@ -1085,6 +1097,7 @@ func convertToPostListResponse(post *model.Post) PostListResponse {
 			ID:          post.Group.ID,
 			Name:        post.Group.Name,
 			Slug:        post.Group.Slug,
+			GroupType:   normalizeGroupType(post.Group.GroupType),
 			Description: post.Group.Description,
 			AuthorID:    post.Group.AuthorID,
 			ParentID:    post.Group.ParentID,
@@ -1151,6 +1164,7 @@ func convertToPostDetailResponse(post *model.Post) PostDetailResponse {
 			ID:          post.Group.ID,
 			Name:        post.Group.Name,
 			Slug:        post.Group.Slug,
+			GroupType:   normalizeGroupType(post.Group.GroupType),
 			Description: post.Group.Description,
 			AuthorID:    post.Group.AuthorID,
 			ParentID:    post.Group.ParentID,
@@ -1222,6 +1236,10 @@ func normalizePostType(value string) string {
 	}
 }
 
+func normalizeGroupType(value string) string {
+	return normalizePostType(value)
+}
+
 func normalizeVisibility(value string) string {
 	v := strings.TrimSpace(strings.ToLower(value))
 	switch v {
@@ -1248,6 +1266,39 @@ func currentUser(c *gin.Context) (int64, string, bool) {
 	roleAny, _ := c.Get("userRole")
 	role, _ := roleAny.(string)
 	return userID, role, true
+}
+
+func currentUserRole(c *gin.Context) string {
+	_, role, _ := currentUser(c)
+	return role
+}
+
+func currentUserIDForPost(c *gin.Context, fallbackAuthorID model.Int64String) int64 {
+	userID, _, ok := currentUser(c)
+	if ok {
+		return userID
+	}
+	return int64(fallbackAuthorID)
+}
+
+func loadWritableGroupForPostType(
+	c *gin.Context,
+	groupID model.Int64String,
+	postType string,
+	userID int64,
+	role string,
+) (*model.PostGroup, error) {
+	var group model.PostGroup
+	if err := database.DB.First(&group, groupID).Error; err != nil {
+		return nil, err
+	}
+	if role != "admin" && int64(group.AuthorID) != userID {
+		return nil, fmt.Errorf("group no permission")
+	}
+	if normalizeGroupType(group.GroupType) != normalizePostType(postType) {
+		return nil, fmt.Errorf("group type mismatch")
+	}
+	return &group, nil
 }
 
 func canManagePost(c *gin.Context, authorID model.Int64String) bool {

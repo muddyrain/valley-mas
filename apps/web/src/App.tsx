@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
+import { applyThemeToDocument, useThemeStore } from '@/stores/useThemeStore';
 import Layout from './layouts/Layout';
 import AIChat from './pages/AIChat';
 import ApplyCreator from './pages/ApplyCreator';
@@ -76,9 +77,20 @@ function RouteTitle() {
   return null;
 }
 
+function ThemeController() {
+  const theme = useThemeStore((state) => state.theme);
+
+  useEffect(() => {
+    applyThemeToDocument(theme);
+  }, [theme]);
+
+  return null;
+}
+
 function App() {
   return (
     <>
+      <ThemeController />
       <RouteTitle />
       <Routes>
         <Route path="/" element={<Layout />}>

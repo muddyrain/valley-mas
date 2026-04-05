@@ -830,7 +830,7 @@ export default function ImageTextCreate() {
       return;
     }
 
-    void getAdminGroups()
+    void getAdminGroups({ groupType: 'image_text' })
       .then((list) => {
         setGroups(list || []);
         if (!editingId && list?.[0]?.id) {

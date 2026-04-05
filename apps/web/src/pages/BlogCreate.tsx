@@ -102,7 +102,7 @@ export default function BlogCreate() {
 
   const loadGroups = async () => {
     try {
-      const list = await getAdminGroups();
+      const list = await getAdminGroups({ groupType: 'blog' });
       setGroups(list || []);
       if (!groupId && list?.[0]?.id) {
         setGroupId(list[0].id);
@@ -454,6 +454,7 @@ export default function BlogCreate() {
       setCreatingGroup(true);
       const created = await createGroup({
         name,
+        groupType: 'blog',
         description: newGroupDesc.trim() || undefined,
       });
       toast.success('分组创建成功');
@@ -716,7 +717,7 @@ export default function BlogCreate() {
                         <button
                           type="button"
                           className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700"
-                          onClick={() => navigate('/my-space/blog-groups')}
+                          onClick={() => navigate('/my-space/blog-groups?type=blog')}
                         >
                           管理分组
                         </button>
