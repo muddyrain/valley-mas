@@ -32,7 +32,7 @@ function SectionTitle({
 }) {
   return (
     <div className="space-y-3">
-      <div className="theme-accent-border inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] theme-accent-text uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
+      <div className="border-theme-soft-strong inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] text-theme-primary uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
         {eyebrow}
       </div>
       <div className="space-y-2">
@@ -161,22 +161,22 @@ export default function Resources() {
 
               <div className="flex flex-wrap gap-3">
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <ImageIcon className="theme-accent-text h-4 w-4" />共 {loading ? '...' : total}{' '}
+                  <ImageIcon className="text-theme-primary h-4 w-4" />共 {loading ? '...' : total}{' '}
                   项资源
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <Sparkles className="h-4 w-4 theme-icon-accent" />
+                  <Sparkles className="h-4 w-4 text-theme-primary" />
                   {wallpaperCount} 张壁纸
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <Sparkles className="h-4 w-4 theme-icon-accent" />
+                  <Sparkles className="h-4 w-4 text-theme-primary" />
                   {avatarCount} 个头像
                 </div>
               </div>
             </div>
 
             <div className="rounded-[32px] border border-white/80 bg-white/82 p-5 shadow-[0_20px_48px_rgba(148,163,184,0.08)] backdrop-blur">
-              <div className="theme-chip mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
+              <div className="bg-theme-soft text-theme-primary mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
                 <Search className="h-3.5 w-3.5" />
                 资源检索
               </div>
@@ -189,7 +189,7 @@ export default function Resources() {
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                     placeholder="搜索资源标题"
-                    className="h-11 rounded-full border-[#e6d6c5] bg-[#fffdf9] pl-9"
+                    className="h-11 rounded-full border-theme-border bg-theme-soft pl-9"
                   />
                 </div>
                 <Button
@@ -200,7 +200,7 @@ export default function Resources() {
                 </Button>
               </div>
 
-              <div className="mt-4 rounded-[22px] border border-white/80 bg-[#fcfaf6] p-4 text-sm leading-7 text-slate-500">
+              <div className="mt-4 rounded-[22px] border border-theme-shell-border bg-theme-soft p-4 text-sm leading-7 text-slate-500">
                 当前可以按类型筛选，也可以直接搜索资源标题。
               </div>
             </div>
@@ -224,7 +224,7 @@ export default function Resources() {
                         setKeyword('');
                         setInputValue('');
                       }}
-                      className="theme-accent-text ml-1.5 underline hover:opacity-80"
+                      className="text-theme-primary ml-1.5 underline hover:opacity-80"
                     >
                       清除
                     </button>
@@ -289,7 +289,7 @@ export default function Resources() {
                       variant="outline"
                       onClick={handleLoadMore}
                       disabled={loadingMore}
-                      className="theme-accent-border rounded-full border bg-white/82 px-8 text-slate-700"
+                      className="border-theme-soft-strong rounded-full border bg-white/82 px-8 text-slate-700"
                     >
                       {loadingMore ? (
                         <>
