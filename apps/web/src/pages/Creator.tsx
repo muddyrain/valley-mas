@@ -1,4 +1,4 @@
-import { Download, Sparkles, Users } from 'lucide-react';
+﻿import { Download, Sparkles, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -21,7 +21,7 @@ function SectionTitle({
 }) {
   return (
     <div className="space-y-3">
-      <div className="theme-accent-border inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] theme-accent-text uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
+      <div className="border-theme-soft-strong inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] text-theme-primary uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
         {eyebrow}
       </div>
       <div className="space-y-2">
@@ -89,7 +89,7 @@ export default function Creator() {
 
               <div className="flex flex-wrap gap-3">
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <Users className="theme-accent-text h-4 w-4" />
+                  <Users className="text-theme-primary h-4 w-4" />
                   {loading ? '...' : creators.length} 位创作者
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
@@ -104,7 +104,7 @@ export default function Creator() {
             </div>
 
             <div className="rounded-[32px] border border-white/80 bg-white/82 p-5 shadow-[0_20px_48px_rgba(148,163,184,0.08)] backdrop-blur">
-              <div className="theme-chip mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
+              <div className="bg-theme-soft text-theme-primary mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
                 <Users className="h-3.5 w-3.5" />
                 创作者入口
               </div>
@@ -131,7 +131,7 @@ export default function Creator() {
                   <button
                     type="button"
                     onClick={() => navigate('/apply-creator')}
-                    className="theme-tag rounded-[22px] border border-white/80 px-4 py-4 text-left shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.08)] transition hover:bg-white"
+                    className="bg-theme-soft text-theme-primary rounded-[22px] border border-white/80 px-4 py-4 text-left shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.08)] transition hover:bg-white"
                   >
                     <div className="text-sm font-medium text-slate-900">申请成为创作者</div>
                     <div className="mt-1 text-sm leading-6 text-slate-500">
@@ -202,7 +202,7 @@ export default function Creator() {
                   <Button
                     variant="outline"
                     onClick={() => navigate('/apply-creator')}
-                    className="theme-accent-border rounded-full border bg-white/82 px-8 text-slate-700"
+                    className="border-theme-soft-strong rounded-full border bg-white/82 px-8 text-slate-700"
                   >
                     成为下一位创作者
                   </Button>

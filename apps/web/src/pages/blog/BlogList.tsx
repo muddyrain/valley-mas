@@ -1,4 +1,4 @@
-import { BookOpen, FolderTree, Sparkles, Tag, X } from 'lucide-react';
+﻿import { BookOpen, FolderTree, Sparkles, Tag, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Group, Post, Tag as TagType } from '@/api/blog';
@@ -18,7 +18,7 @@ function SectionTitle({
 }) {
   return (
     <div className="space-y-3">
-      <div className="theme-accent-border inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] theme-accent-text uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
+      <div className="border-theme-soft-strong inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] text-theme-primary uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
         {eyebrow}
       </div>
       <div className="space-y-2">
@@ -43,7 +43,7 @@ function FilterPanel({
   return (
     <div className="rounded-[28px] border border-white/80 bg-white/82 p-5 shadow-[0_18px_42px_rgba(148,163,184,0.08)] backdrop-blur">
       <div className="mb-4 flex items-center gap-2 text-slate-900">
-        <span className="theme-chip inline-flex h-9 w-9 items-center justify-center rounded-full">
+        <span className="bg-theme-soft text-theme-primary inline-flex h-9 w-9 items-center justify-center rounded-full">
           {icon}
         </span>
         <span className="text-lg font-semibold">{title}</span>
@@ -155,15 +155,15 @@ export default function BlogList() {
               />
               <div className="flex flex-wrap gap-3">
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <BookOpen className="theme-accent-text h-4 w-4" />
+                  <BookOpen className="text-theme-primary h-4 w-4" />
                   {total} 篇内容
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <FolderTree className="h-4 w-4 theme-icon-accent" />
+                  <FolderTree className="h-4 w-4 text-theme-primary" />
                   {groups.length} 个分组
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <Tag className="h-4 w-4 theme-icon-accent" />
+                  <Tag className="h-4 w-4 text-theme-primary" />
                   {tags.length} 个标签
                 </div>
               </div>
@@ -173,13 +173,13 @@ export default function BlogList() {
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="text-sm text-slate-500">当前筛选</span>
                     {selectedGroupId ? (
-                      <span className="theme-tag inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm">
+                      <span className="bg-theme-soft text-theme-primary inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm">
                         <FolderTree className="h-3.5 w-3.5" />
                         {groups.find((g) => g.id === selectedGroupId)?.name || selectedGroupId}
                       </span>
                     ) : null}
                     {selectedTag ? (
-                      <span className="theme-tag inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm">
+                      <span className="bg-theme-soft text-theme-primary inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm">
                         <Tag className="h-3.5 w-3.5" />
                         {tags.find((t) => t.slug === selectedTag)?.name || selectedTag}
                       </span>
@@ -284,7 +284,7 @@ export default function BlogList() {
                 <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
                   <Button
                     variant="outline"
-                    className="theme-accent-border rounded-full border bg-white/82 px-5"
+                    className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
                     disabled={currentPage <= 1}
                     onClick={() => {
                       const newParams = new URLSearchParams(searchParams);
@@ -299,7 +299,7 @@ export default function BlogList() {
                   </span>
                   <Button
                     variant="outline"
-                    className="theme-accent-border rounded-full border bg-white/82 px-5"
+                    className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
                     disabled={posts.length < 12}
                     onClick={() => {
                       const newParams = new URLSearchParams(searchParams);

@@ -43,16 +43,24 @@ export function MotivationalFooter() {
   if (!motivation) return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4 pb-[max(env(safe-area-inset-bottom),0px)]">
-      <div className="poem-footer poem-footer-floating pointer-events-auto">
+      <div
+        className="pointer-events-auto flex min-h-14 w-[min(860px,calc(100vw-24px))] items-center gap-2.5 overflow-hidden rounded-full border border-white/30 px-4.5 py-2.5 text-white backdrop-blur-[10px] animate-[poem-glow_4.8s_ease-in-out_infinite]"
+        style={{
+          background: `linear-gradient(90deg, rgba(var(--theme-primary-rgb),0.55), rgba(var(--theme-primary-rgb),0.35))`,
+          boxShadow: `0 20px 42px rgba(var(--theme-primary-rgb),0.28)`,
+        }}
+      >
         <Quote className="mt-0.5 h-4 w-4 shrink-0 text-white/75" />
         <div className="min-w-0">
-          <p className="poem-text text-sm md:text-base">{motivation.content}</p>
-          <p className="poem-source">{motivation.source}</p>
+          <p className="overflow-hidden text-ellipsis whitespace-nowrap tracking-[0.04em] text-sm transition-colors duration-300 animate-[poem-breathe_3.8s_ease-in-out_infinite] md:text-base">
+            {motivation.content}
+          </p>
+          <p className="mt-0.5 text-xs tracking-[0.03em] text-white/80">{motivation.source}</p>
         </div>
         <button
           type="button"
           onClick={() => void loadMotivation()}
-          className="poem-refresh-btn ml-auto shrink-0"
+          className="ml-auto inline-flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-full border border-white/24 bg-white/14 text-white/90 transition-[transform,background,color] duration-200 hover:rotate-[-18deg] hover:scale-[1.06] hover:bg-white/24 hover:text-white"
           aria-label="刷新鼓励诗句"
           title="刷新鼓励诗句"
         >

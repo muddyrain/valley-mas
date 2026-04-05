@@ -1,4 +1,4 @@
-import {
+﻿import {
   ArrowLeft,
   CalendarDays,
   ChevronLeft,
@@ -274,7 +274,7 @@ export default function BlogPost() {
             <button
               type="button"
               onClick={handleReturn}
-              className="theme-accent-border inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm text-slate-600 transition hover:text-slate-900"
+              className="border-theme-soft-strong inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm text-slate-600 transition hover:text-slate-900"
             >
               <ArrowLeft className="h-4 w-4" />
               {returnLabel}
@@ -423,7 +423,7 @@ export default function BlogPost() {
 
             <aside className="space-y-6">
               <section className="theme-panel-shell rounded-[30px] border p-6">
-                <div className="theme-tag inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium">
+                <div className="bg-theme-soft text-theme-primary inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium">
                   图文创作
                 </div>
                 <h1 className="mt-4 text-[30px] font-semibold leading-tight text-slate-900">
@@ -438,14 +438,17 @@ export default function BlogPost() {
                 {post.tags?.length ? (
                   <div className="mt-5 flex flex-wrap gap-2">
                     {post.tags.map((tag) => (
-                      <span key={tag.id} className="theme-tag rounded-full px-3 py-1.5 text-sm">
+                      <span
+                        key={tag.id}
+                        className="bg-theme-soft text-theme-primary rounded-full px-3 py-1.5 text-sm"
+                      >
                         #{tag.name}
                       </span>
                     ))}
                   </div>
                 ) : null}
 
-                <div className="theme-accent-border mt-6 grid gap-3 rounded-[22px] border bg-white/60 p-4 text-sm text-slate-500">
+                <div className="border-theme-soft-strong mt-6 grid gap-3 rounded-[22px] border bg-white/60 p-4 text-sm text-slate-500">
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4" />
                     <span>{post.author?.nickname || '未署名创作者'}</span>
@@ -497,7 +500,7 @@ export default function BlogPost() {
           <button
             type="button"
             onClick={handleReturn}
-            className="theme-accent-border inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm text-slate-600 transition hover:text-slate-900"
+            className="border-theme-soft-strong inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm text-slate-600 transition hover:text-slate-900"
           >
             <ArrowLeft className="h-4 w-4" />
             {returnLabel}
@@ -507,7 +510,7 @@ export default function BlogPost() {
             <Link to={`/my-space/blog-edit/${post.id}`}>
               <Button
                 variant="outline"
-                className="theme-accent-border theme-menu-hover rounded-full border bg-white px-5 text-slate-700"
+                className="border-theme-soft-strong hover:bg-theme-soft rounded-full border bg-white px-5 text-slate-700"
               >
                 <PencilLine className="mr-2 h-4 w-4" />
                 编辑博客
@@ -524,12 +527,12 @@ export default function BlogPost() {
               {post.group && (
                 <Link
                   to={`/blog?groupId=${encodeURIComponent(post.group.id)}`}
-                  className="theme-tag rounded-full px-3 py-1 text-xs font-medium"
+                  className="bg-theme-soft text-theme-primary rounded-full px-3 py-1 text-xs font-medium"
                 >
                   {post.group.name}
                 </Link>
               )}
-              <span className="theme-tag rounded-full px-3 py-1 text-xs">
+              <span className="bg-theme-soft text-theme-primary rounded-full px-3 py-1 text-xs">
                 {visibilityLabelMap[post.visibility || 'public'] || '公开可见'}
               </span>
             </div>
@@ -592,7 +595,10 @@ export default function BlogPost() {
               {post.tags?.length ? (
                 <div className="mt-5 flex flex-wrap gap-2">
                   {post.tags.map((tag) => (
-                    <span key={tag.id} className="theme-tag rounded-full px-3 py-1.5 text-sm">
+                    <span
+                      key={tag.id}
+                      className="bg-theme-soft text-theme-primary rounded-full px-3 py-1.5 text-sm"
+                    >
                       #{tag.name}
                     </span>
                   ))}
@@ -614,7 +620,7 @@ export default function BlogPost() {
         <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
           <main className="theme-panel-shell rounded-[36px] border bg-white/95 p-6 sm:p-10">
             <MarkdownContent content={processedContent} />
-            <div className="theme-accent-border mt-12 border-t pt-6">
+            <div className="border-theme-soft-strong mt-12 border-t pt-6">
               <Button
                 variant="ghost"
                 className="rounded-full px-0 text-slate-500 hover:bg-transparent hover:text-slate-900"

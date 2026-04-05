@@ -419,14 +419,14 @@ export default function MySpace() {
 
               <div className="flex flex-wrap gap-3">
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <ImageIcon className="theme-icon-accent h-4 w-4" />共 {total} 项资源
+                  <ImageIcon className="text-theme-primary h-4 w-4" />共 {total} 项资源
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
                   <FileText className="h-4 w-4 text-emerald-500" />
                   {filteredBlogPosts.length} 篇博客
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <Sparkles className="h-4 w-4 theme-icon-accent" />
+                  <Sparkles className="h-4 w-4 text-theme-primary" />
                   {filteredImageTextPosts.length} 组图文
                 </div>
               </div>
@@ -457,7 +457,7 @@ export default function MySpace() {
                 onClick={() => navigate('/my-space/blog-create')}
                 className="rounded-[28px] border border-white/80 bg-white/82 p-5 text-left shadow-[0_18px_42px_rgba(148,163,184,0.08)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_24px_52px_rgba(148,163,184,0.12)]"
               >
-                <div className="theme-tag mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
+                <div className="bg-theme-soft text-theme-primary mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
                   <FileText className="h-3.5 w-3.5" />
                   博客入口
                 </div>
@@ -472,7 +472,7 @@ export default function MySpace() {
                 onClick={() => navigate('/my-space/image-text')}
                 className="rounded-[28px] border border-white/80 bg-white/82 p-5 text-left shadow-[0_18px_42px_rgba(148,163,184,0.08)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_24px_52px_rgba(148,163,184,0.12)]"
               >
-                <div className="theme-tag mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
+                <div className="bg-theme-soft text-theme-primary mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
                   <Sparkles className="h-3.5 w-3.5" />
                   图文入口
                 </div>
@@ -732,7 +732,7 @@ export default function MySpace() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <Upload className="h-5 w-5 theme-icon-accent" />
+              <Upload className="h-5 w-5 text-theme-primary" />
               上传新资源
             </DialogTitle>
           </DialogHeader>
@@ -820,7 +820,7 @@ export default function MySpace() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                    <ImageIcon className="h-12 w-12 mb-3 theme-icon-accent opacity-40" />
+                    <ImageIcon className="h-12 w-12 mb-3 text-theme-primary opacity-40" />
                     <p className="text-sm font-medium text-gray-600 mb-1">点击或拖拽图片至此处</p>
                     <p className="text-xs">支持 JPG、PNG、WebP，最大 10MB</p>
                   </div>
@@ -1021,7 +1021,7 @@ export default function MySpace() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <Pencil className="h-5 w-5 theme-icon-accent" />
+              <Pencil className="h-5 w-5 text-theme-primary" />
               编辑资源信息
             </DialogTitle>
           </DialogHeader>
