@@ -66,145 +66,207 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-purple-600 via-purple-700 to-indigo-800 flex">
-      <div className="hidden lg:flex lg:w-1/2 items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIvPjwvc3ZnPg==')] opacity-30" />
-        <div className="relative text-center text-white px-12">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm mb-8">
-            <Sparkles className="w-10 h-10" />
+    <div className="relative min-h-screen flex">
+      {/* ===== 左侧：深色品牌区 ===== */}
+      <div className="hidden lg:flex lg:w-[44%] flex-col justify-between relative overflow-hidden bg-slate-950 px-14 py-12">
+        {/* 主题色装饰光晕 */}
+        <div
+          className="absolute -right-24 -top-24 h-80 w-80 rounded-full opacity-30 blur-3xl pointer-events-none"
+          style={{ background: `rgba(var(--theme-primary-rgb),1)` }}
+        />
+        <div
+          className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full opacity-20 blur-3xl pointer-events-none"
+          style={{ background: `rgba(var(--theme-secondary-rgb),1)` }}
+        />
+        {/* 网格纹理 */}
+        <div
+          className="absolute inset-0 opacity-[0.04] pointer-events-none"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+            backgroundSize: '40px 40px',
+          }}
+        />
+
+        {/* 顶部 Logo */}
+        <Link to="/blog" className="relative flex items-center gap-3 w-fit group">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-white/10 transition-all group-hover:ring-white/25"
+            style={{ background: `rgba(var(--theme-primary-rgb),0.85)` }}
+          >
+            <Sparkles className="h-5 w-5 text-white" />
           </div>
-          <h1 className="text-4xl font-bold mb-4">Valley</h1>
-          <p className="text-xl text-purple-100 mb-8">
-            加入我们，
+          <span className="text-xl font-bold tracking-tight text-white">Valley</span>
+        </Link>
+
+        {/* 主文案 */}
+        <div className="relative space-y-7">
+          <div
+            className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
+            style={{
+              background: `rgba(var(--theme-primary-rgb),0.18)`,
+              color: `rgba(var(--theme-primary-rgb),1)`,
+              border: `1px solid rgba(var(--theme-primary-rgb),0.35)`,
+            }}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: `rgba(var(--theme-primary-rgb),1)` }}
+            />
+            免费注册，立即开始
+          </div>
+
+          <h1 className="text-[2.4rem] font-black leading-[1.2] tracking-tight text-white">
+            加入 Valley，
             <br />
-            发现精美壁纸与优质创作者
+            发现与收藏值得留下的。
+          </h1>
+
+          <p className="max-w-xs text-[0.95rem] leading-7 text-slate-400">
+            注册后可收藏资源、关注创作者，记录你正在发生的一切。
           </p>
-          <div className="flex justify-center gap-8 text-sm">
-            <div className="text-center">
-              <div className="text-2xl font-bold">10K+</div>
-              <div className="text-purple-200">精品资源</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">500+</div>
-              <div className="text-purple-200">活跃创作者</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">100K+</div>
-              <div className="text-purple-200">平台用户</div>
-            </div>
+
+          <div className="h-px w-12" style={{ background: `rgba(var(--theme-primary-rgb),0.5)` }} />
+
+          {/* 统计数字 */}
+          <div className="flex gap-8">
+            {[
+              { value: '10K+', label: '精美资源' },
+              { value: '500+', label: '创作者' },
+              { value: '100K+', label: '平台用户' },
+            ].map((item) => (
+              <div key={item.label}>
+                <div
+                  className="text-2xl font-black"
+                  style={{ color: `rgba(var(--theme-primary-rgb),1)` }}
+                >
+                  {item.value}
+                </div>
+                <div className="mt-1 text-xs text-slate-500">{item.label}</div>
+              </div>
+            ))}
           </div>
         </div>
+
+        {/* 底部版权 */}
+        <div className="relative text-xs text-slate-600">© 2025 Valley · 保留所有权利</div>
       </div>
 
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6">
+      {/* ===== 右侧：白色注册区 ===== */}
+      <div className="w-full lg:w-[56%] flex items-center justify-center bg-slate-50 p-6">
         <div className="w-full max-w-md">
+          {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-white/20 backdrop-blur-sm mb-4">
+            <div
+              className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4"
+              style={{ background: `rgba(var(--theme-primary-rgb),1)` }}
+            >
               <Sparkles className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-white">Valley</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Valley</h1>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-2xl p-8">
+          {/* Register Card */}
+          <div className="rounded-3xl bg-white p-8 shadow-[0_8px_40px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/80">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">创建账号</h2>
-              <p className="text-gray-500 mt-1">注册后即可收藏、下载资源</p>
+              <h2 className="text-2xl font-bold text-slate-900">创建账号</h2>
+              <p className="text-slate-500 mt-1.5 text-sm">注册后即可收藏、下载资源</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username" className="text-gray-700">
-                  用户名 <span className="text-red-500">*</span>
+              <div className="space-y-1.5">
+                <Label htmlFor="username" className="text-slate-700 text-sm font-medium">
+                  用户名 <span className="text-red-400">*</span>
                 </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     id="username"
                     type="text"
                     placeholder="3-20 个字符"
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    className="pl-11 h-12 border-gray-200 focus:border-purple-500 focus:ring-purple-500"
+                    className="pl-10 h-12 border-theme-border bg-theme-soft/60 focus-visible:ring-theme-primary/40 focus-visible:border-theme-primary"
                     maxLength={20}
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="nickname" className="text-gray-700">
-                    昵称 <span className="text-gray-400 font-normal text-xs">（可选）</span>
+                  <Label htmlFor="nickname" className="text-slate-700 text-sm font-medium">
+                    昵称 <span className="text-slate-400 font-normal text-xs">（可选）</span>
                   </Label>
                   <button
                     type="button"
                     onClick={handleGenerateNickname}
-                    className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+                    className="text-xs text-theme-primary hover:text-theme-primary-hover font-medium transition-colors"
                   >
                     随机生成
                   </button>
                 </div>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     id="nickname"
                     type="text"
-                    placeholder="不填也可以，注册时会自动生成随机昵称"
+                    placeholder="不填则自动生成随机昵称"
                     value={formData.nickname}
                     onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
-                    className="pl-11 h-12 border-gray-200 focus:border-purple-500 focus:ring-purple-500"
+                    className="pl-10 h-12 border-theme-border bg-theme-soft/60 focus-visible:ring-theme-primary/40 focus-visible:border-theme-primary"
                     maxLength={50}
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-gray-700">
-                  密码 <span className="text-red-500">*</span>
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-slate-700 text-sm font-medium">
+                  密码 <span className="text-red-400">*</span>
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="至少 6 个字符"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="pl-11 pr-11 h-12 border-gray-200 focus:border-purple-500 focus:ring-purple-500"
+                    className="pl-10 pr-11 h-12 border-theme-border bg-theme-soft/60 focus-visible:ring-theme-primary/40 focus-visible:border-theme-primary"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                   >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-gray-700">
-                  确认密码 <span className="text-red-500">*</span>
+              <div className="space-y-1.5">
+                <Label htmlFor="confirmPassword" className="text-slate-700 text-sm font-medium">
+                  确认密码 <span className="text-red-400">*</span>
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     id="confirmPassword"
                     type={showConfirm ? 'text' : 'password'}
                     placeholder="再次输入密码"
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    className={`pl-11 pr-11 h-12 border-gray-200 focus:border-purple-500 focus:ring-purple-500 ${
+                    className={`pl-10 pr-11 h-12 border-theme-border bg-theme-soft/60 focus-visible:ring-theme-primary/40 focus-visible:border-theme-primary ${
                       formData.confirmPassword && formData.password !== formData.confirmPassword
-                        ? 'border-red-400 focus:border-red-400 focus:ring-red-400'
+                        ? 'border-red-400 focus-visible:border-red-400 focus-visible:ring-red-400/40'
                         : ''
                     }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirm(!showConfirm)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                   >
-                    {showConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
                 {formData.confirmPassword && formData.password !== formData.confirmPassword && (
@@ -214,12 +276,12 @@ export default function Register() {
 
               <Button
                 type="submit"
-                className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-base font-semibold mt-2"
+                className="theme-btn-primary w-full h-12 rounded-xl text-base font-semibold mt-1"
                 disabled={loading}
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                       <circle
                         className="opacity-25"
                         cx="12"
@@ -240,21 +302,24 @@ export default function Register() {
                 ) : (
                   <span className="flex items-center gap-2">
                     立即注册
-                    <ArrowRight className="h-5 w-5" />
+                    <ArrowRight className="h-4 w-4" />
                   </span>
                 )}
               </Button>
             </form>
 
-            <div className="mt-6 pt-6 border-t border-gray-100 text-center">
-              <span className="text-gray-500">已有账号？</span>{' '}
-              <Link to="/login" className="text-purple-600 hover:text-purple-700 font-semibold">
+            <div className="mt-6 pt-5 border-t border-theme-shell-border text-center text-sm">
+              <span className="text-slate-500">已有账号？</span>{' '}
+              <Link
+                to="/login"
+                className="text-theme-primary hover:text-theme-primary-hover font-semibold transition-colors"
+              >
                 立即登录
               </Link>
             </div>
           </div>
 
-          <p className="text-center text-xs text-white/60 mt-6">
+          <p className="text-center text-xs text-slate-400 mt-6">
             注册即表示您同意我们的服务条款和隐私政策
           </p>
         </div>
