@@ -80,30 +80,62 @@ export default function Login() {
       />
 
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 items-center justify-center relative">
-        <div className="relative text-center text-white px-12 space-y-8">
-          <Link to="/blog">
-            <div className="mx-auto inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm mb-2 hover:bg-white/30 transition-colors duration-300 cursor-pointer">
-              <Sparkles className="w-10 h-10" />
+      <div className="hidden lg:flex lg:w-1/2 items-center justify-center relative p-12">
+        {/* 装饰性大圆 */}
+        <div
+          className="absolute left-1/2 top-1/2 h-130 w-130 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-20 blur-3xl pointer-events-none"
+          style={{ background: `rgba(var(--theme-tertiary-rgb),0.6)` }}
+        />
+
+        <div className="relative w-full max-w-sm space-y-6">
+          {/* Logo 卡片 */}
+          <Link to="/blog" className="block">
+            <div
+              className="flex items-center gap-4 rounded-2xl border border-white/30 px-5 py-4 backdrop-blur-md transition-all hover:border-white/50 hover:shadow-lg"
+              style={{ background: 'rgba(255,255,255,0.14)' }}
+            >
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                style={{ background: 'rgba(255,255,255,0.22)' }}
+              >
+                <Sparkles className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <div className="text-xl font-bold text-white">Valley</div>
+                <div className="text-xs text-white/70">持续更新 · 值得收藏</div>
+              </div>
             </div>
           </Link>
-          <div>
-            <h1 className="text-5xl font-bold mb-3">Valley</h1>
-            <p className="text-xl text-white/80 leading-relaxed">
+
+          {/* 主标语 */}
+          <div
+            className="rounded-2xl border border-white/25 px-6 py-6 backdrop-blur-md"
+            style={{ background: 'rgba(255,255,255,0.10)' }}
+          >
+            <h1 className="text-3xl font-bold leading-snug text-white">
               记录正在发生的，
               <br />
-              也收藏值得留下的。
+              <span className="opacity-80">也收藏值得留下的。</span>
+            </h1>
+            <p className="mt-3 text-sm leading-7 text-white/70">
+              Valley 整理博客、图文、资源与创作过程，把正在成形的内容慢慢收拢进来。
             </p>
           </div>
-          <div className="flex justify-center gap-10 text-sm">
+
+          {/* 统计数字 */}
+          <div className="grid grid-cols-3 gap-3">
             {[
               { value: '10K+', label: '精美资源' },
               { value: '500+', label: '创作者' },
               { value: '持续', label: '内容更新' },
             ].map((item) => (
-              <div key={item.label} className="text-center">
-                <div className="text-2xl font-bold">{item.value}</div>
-                <div className="mt-1 text-white/70 text-xs">{item.label}</div>
+              <div
+                key={item.label}
+                className="rounded-xl border border-white/20 px-3 py-3 text-center backdrop-blur-md"
+                style={{ background: 'rgba(255,255,255,0.10)' }}
+              >
+                <div className="text-xl font-bold text-white">{item.value}</div>
+                <div className="mt-0.5 text-[11px] text-white/65">{item.label}</div>
               </div>
             ))}
           </div>

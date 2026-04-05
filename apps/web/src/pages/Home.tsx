@@ -334,8 +334,7 @@ export default function Home() {
                 {isCreator ? (
                   <Button
                     size="lg"
-                    variant="outline"
-                    className="border-theme-soft-strong rounded-full border bg-theme-surface-alt px-6 text-slate-700 shadow-sm hover:bg-white"
+                    className="theme-btn-primary rounded-full px-6 text-white shadow-sm"
                     onClick={() => navigate('/my-space')}
                   >
                     进入创作空间
