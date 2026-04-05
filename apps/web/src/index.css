@@ -31,22 +31,22 @@
 
   /* ─── 主题色 Token → 映射到运行时 CSS 变量 ─── */
   /* 直接颜色 */
-  --color-theme-primary:        var(--theme-primary);
-  --color-theme-primary-hover:  var(--theme-primary-hover);
-  --color-theme-primary-deep:   var(--theme-primary-deep);
+  --color-theme-primary: var(--theme-primary);
+  --color-theme-primary-hover: var(--theme-primary-hover);
+  --color-theme-primary-deep: var(--theme-primary-deep);
   /* 柔和背景色 */
-  --color-theme-soft:           var(--theme-primary-soft);
-  --color-theme-soft-strong:    var(--theme-primary-soft-strong);
-  --color-theme-surface-alt:    var(--theme-surface-alt);
+  --color-theme-soft: var(--theme-primary-soft);
+  --color-theme-soft-strong: var(--theme-primary-soft-strong);
+  --color-theme-surface-alt: var(--theme-surface-alt);
   /* 边框色 */
-  --color-theme-shell-border:   var(--theme-shell-border);
-  --color-theme-border:         var(--theme-border);
-  --color-theme-panel-border:   var(--theme-panel-border);
+  --color-theme-shell-border: var(--theme-shell-border);
+  --color-theme-border: var(--theme-border);
+  --color-theme-panel-border: var(--theme-panel-border);
   /* 页面背景分段色 */
-  --color-theme-page-start:     var(--theme-page-start);
-  --color-theme-page-mid:       var(--theme-page-mid);
-  --color-theme-page-cool:      var(--theme-page-cool);
-  --color-theme-page-end:       var(--theme-page-end);
+  --color-theme-page-start: var(--theme-page-start);
+  --color-theme-page-mid: var(--theme-page-mid);
+  --color-theme-page-cool: var(--theme-page-cool);
+  --color-theme-page-end: var(--theme-page-end);
 }
 
 @layer base {
@@ -365,66 +365,7 @@
   --radius-3xl: calc(var(--radius) * 2.5);
 }
 
-/* 玻璃态效果 */
-.glass {
-  @apply backdrop-blur-xl bg-white/70 border border-white/20 shadow-xl;
-}
-
-.glass-dark {
-  @apply backdrop-blur-xl bg-gray-900/70 border border-white/10 shadow-2xl;
-}
-
-/* 渐变文字 */
-.text-gradient {
-  @apply bg-clip-text text-transparent;
-  background-image: linear-gradient(
-    90deg,
-    var(--theme-primary) 0%,
-    var(--theme-primary-hover) 48%,
-    var(--theme-primary-deep) 100%
-  );
-}
-
-/* ════ Hero shell ════ */
-.theme-hero-shell {
-  @apply border;
-  border-color: var(--theme-shell-border);
-  background: var(--theme-hero-background);
-  box-shadow: 0 24px 80px rgba(var(--theme-primary-rgb), 0.18);
-}
-
-/* Hero glow overlay */
-.theme-hero-glow {
-  background:
-    radial-gradient(circle at 12% 18%, rgba(var(--theme-tertiary-rgb), 0.18), transparent 24%),
-    radial-gradient(circle at 88% 20%, rgba(var(--theme-secondary-rgb), 0.16), transparent 22%),
-    radial-gradient(circle at 80% 72%, rgba(var(--theme-primary-rgb), 0.12), transparent 28%);
-}
-
-/* ════ Panel shell ════ */
-.theme-panel-shell {
-  @apply border;
-  border-color: var(--theme-panel-border);
-  background: var(--theme-panel-background);
-  box-shadow: 0 22px 56px rgba(var(--theme-primary-rgb), 0.1);
-}
-
-/* ════ 通用语义工具类（全部用 Tailwind token）════ */
-
-/* 柔和背景 + 主色文字 */
-.theme-chip {
-  @apply bg-theme-soft text-theme-primary;
-}
-
-/* 主色文字 */
-.theme-accent-text {
-  @apply text-theme-primary;
-}
-
-/* 柔和边框 */
-.theme-accent-border {
-  @apply border-theme-soft-strong;
-}
+/* ════ 通用语义工具类 ════ */
 
 /* ——— Header ——— */
 .theme-header {
@@ -452,44 +393,9 @@
   );
 }
 
-/* Nav 激活态 */
-.theme-nav-active {
-  @apply bg-theme-soft text-theme-primary-hover;
-}
-
-/* Nav hover */
-.theme-nav-hover:hover {
-  @apply bg-theme-soft text-theme-primary-hover;
-}
-
-/* 通用图标按钮 hover */
-.theme-icon-btn:hover {
-  @apply bg-theme-soft text-theme-primary;
-}
-
 /* Avatar fallback 渐变 */
 .theme-avatar-fallback {
   background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-deep));
-}
-
-/* Avatar 边框 */
-.theme-avatar-border {
-  @apply border-theme-soft-strong;
-}
-
-/* 未读徽标 */
-.theme-unread-badge {
-  @apply bg-theme-primary;
-}
-
-/* 用户卡片头部 */
-.theme-user-card-bg {
-  @apply bg-theme-soft;
-}
-
-/* 菜单 hover */
-.theme-menu-hover:hover {
-  @apply bg-theme-soft;
 }
 
 /* ——— 主操作按钮 ——— */
@@ -511,6 +417,30 @@
   box-shadow: 0 10px 24px rgba(var(--theme-primary-rgb), 0.08);
 }
 
+/* ——— Hero shell ——— */
+.theme-hero-shell {
+  @apply border;
+  border-color: var(--theme-shell-border);
+  background: var(--theme-hero-background);
+  box-shadow: 0 24px 80px rgba(var(--theme-primary-rgb), 0.18);
+}
+
+/* ——— Hero glow overlay ——— */
+.theme-hero-glow {
+  background:
+    radial-gradient(circle at 12% 18%, rgba(var(--theme-tertiary-rgb), 0.18), transparent 24%),
+    radial-gradient(circle at 88% 20%, rgba(var(--theme-secondary-rgb), 0.16), transparent 22%),
+    radial-gradient(circle at 80% 72%, rgba(var(--theme-primary-rgb), 0.12), transparent 28%);
+}
+
+/* ——— Panel shell ——— */
+.theme-panel-shell {
+  @apply border;
+  border-color: var(--theme-panel-border);
+  background: var(--theme-panel-background);
+  box-shadow: 0 22px 56px rgba(var(--theme-primary-rgb), 0.1);
+}
+
 /* ——— Section shell ——— */
 .theme-section-shell {
   @apply border;
@@ -521,28 +451,6 @@
     rgba(255, 255, 255, 0.88)
   );
   box-shadow: 0 22px 56px rgba(var(--theme-primary-rgb), 0.08);
-}
-
-/* ——— Pill / ribbon / tag（柔和背景 + 主色文字）——— */
-.theme-pill {
-  @apply bg-theme-soft text-theme-primary;
-}
-.theme-ribbon-icon {
-  @apply bg-theme-soft text-theme-primary;
-}
-.theme-tag {
-  @apply bg-theme-soft text-theme-primary;
-}
-
-/* ——— Icon accent ——— */
-.theme-icon-accent {
-  @apply text-theme-primary;
-}
-
-/* ——— Input border ——— */
-.theme-input-border {
-  @apply border-theme-border;
-  background-color: color-mix(in srgb, var(--theme-primary-soft) 30%, white);
 }
 
 /* ——— Card accent row ——— */
@@ -557,14 +465,21 @@
   box-shadow: 0 22px 56px rgba(var(--theme-primary-rgb), 0.08);
 }
 
-/* ——— Stat icon bg ——— */
-.theme-stat-icon {
-  @apply bg-theme-soft text-theme-primary;
+/* ——— 渐变文字 ——— */
+.text-gradient {
+  @apply bg-clip-text text-transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--theme-primary) 0%,
+    var(--theme-primary-hover) 48%,
+    var(--theme-primary-deep) 100%
+  );
 }
 
-/* 悬浮效果 */
-.hover-lift {
-  @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl;
+/* ——— Input border ——— */
+.theme-input-border {
+  @apply border-theme-border;
+  background-color: color-mix(in srgb, var(--theme-primary-soft) 30%, white);
 }
 
 /* 背景动画 - Blob效果 */
