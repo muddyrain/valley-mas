@@ -4,6 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+  /* ─── Tailwind 内置色板 ─── */
   --color-purple-50: #faf5ff;
   --color-purple-100: #f3e8ff;
   --color-purple-200: #e9d5ff;
@@ -27,6 +28,25 @@
   --color-indigo-800: #3730a3;
   --color-indigo-900: #312e81;
   --color-indigo-950: #1e1b4b;
+
+  /* ─── 主题色 Token → 映射到运行时 CSS 变量 ─── */
+  /* 直接颜色 */
+  --color-theme-primary:        var(--theme-primary);
+  --color-theme-primary-hover:  var(--theme-primary-hover);
+  --color-theme-primary-deep:   var(--theme-primary-deep);
+  /* 柔和背景色 */
+  --color-theme-soft:           var(--theme-primary-soft);
+  --color-theme-soft-strong:    var(--theme-primary-soft-strong);
+  --color-theme-surface-alt:    var(--theme-surface-alt);
+  /* 边框色 */
+  --color-theme-shell-border:   var(--theme-shell-border);
+  --color-theme-border:         var(--theme-border);
+  --color-theme-panel-border:   var(--theme-panel-border);
+  /* 页面背景分段色 */
+  --color-theme-page-start:     var(--theme-page-start);
+  --color-theme-page-mid:       var(--theme-page-mid);
+  --color-theme-page-cool:      var(--theme-page-cool);
+  --color-theme-page-end:       var(--theme-page-end);
 }
 
 @layer base {
@@ -35,8 +55,7 @@
   }
 
   body {
-    @apply text-gray-900 antialiased;
-    min-height: 100vh;
+    @apply text-gray-900 antialiased min-h-screen;
     background: linear-gradient(
       180deg,
       var(--theme-page-start) 0%,
@@ -111,7 +130,15 @@
   }
 }
 
+/* ════════════════════════════════════════════════
+   主题 CSS 变量（运行时，通过 data-theme 切换）
+   Tailwind token 在 @theme 中已映射到这些变量，
+   因此所有 bg-theme-* / text-theme-* 工具类会
+   随主题自动变色。
+   ════════════════════════════════════════════════ */
+
 :root {
+  /* —— 默认主题 = amber —— */
   --theme-page-start: #fffaf5;
   --theme-page-mid: #fffefc;
   --theme-page-cool: #f7fbff;
@@ -139,6 +166,8 @@
     rgba(255, 255, 255, 0.88)
   );
   --theme-panel-border: #d9e7f3;
+
+  /* —— shadcn/ui 语义 token（指向主题变量）—— */
   --background: #ffffff;
   --foreground: #0f172a;
   --card: #ffffff;
@@ -147,7 +176,7 @@
   --popover-foreground: #0f172a;
   --primary: var(--theme-primary);
   --primary-foreground: #ffffff;
-  --secondary: #f7f2ea;
+  --secondary: var(--theme-primary-soft);
   --secondary-foreground: #0f172a;
   --muted: var(--theme-primary-soft);
   --muted-foreground: #64748b;
@@ -303,6 +332,11 @@
   --ring: #a855f7;
 }
 
+/* ════════════════════════════════════════════════
+   @theme inline：将 shadcn/ui 语义 token 注入
+   Tailwind 颜色系统，使 bg-primary / text-muted 等
+   工具类生效。
+   ════════════════════════════════════════════════ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -342,23 +376,24 @@
 
 /* 渐变文字 */
 .text-gradient {
+  @apply bg-clip-text text-transparent;
   background-image: linear-gradient(
     90deg,
     var(--theme-primary) 0%,
     var(--theme-primary-hover) 48%,
     var(--theme-primary-deep) 100%
   );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
 }
 
+/* ════ Hero shell ════ */
 .theme-hero-shell {
+  @apply border;
   border-color: var(--theme-shell-border);
   background: var(--theme-hero-background);
   box-shadow: 0 24px 80px rgba(var(--theme-primary-rgb), 0.18);
 }
 
+/* Hero glow overlay */
 .theme-hero-glow {
   background:
     radial-gradient(circle at 12% 18%, rgba(var(--theme-tertiary-rgb), 0.18), transparent 24%),
@@ -366,23 +401,29 @@
     radial-gradient(circle at 80% 72%, rgba(var(--theme-primary-rgb), 0.12), transparent 28%);
 }
 
+/* ════ Panel shell ════ */
 .theme-panel-shell {
+  @apply border;
   border-color: var(--theme-panel-border);
   background: var(--theme-panel-background);
   box-shadow: 0 22px 56px rgba(var(--theme-primary-rgb), 0.1);
 }
 
+/* ════ 通用语义工具类（全部用 Tailwind token）════ */
+
+/* 柔和背景 + 主色文字 */
 .theme-chip {
-  background: var(--theme-primary-soft);
-  color: var(--theme-primary);
+  @apply bg-theme-soft text-theme-primary;
 }
 
+/* 主色文字 */
 .theme-accent-text {
-  color: var(--theme-primary);
+  @apply text-theme-primary;
 }
 
+/* 柔和边框 */
 .theme-accent-border {
-  border-color: var(--theme-primary-soft-strong);
+  @apply border-theme-soft-strong;
 }
 
 /* ——— Header ——— */
@@ -391,79 +432,72 @@
   box-shadow: 0 10px 30px rgba(var(--theme-primary-rgb), 0.08);
 }
 
-/* Logo icon gradient */
+/* Logo 图标渐变 */
 .theme-logo-icon {
   background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-deep));
   box-shadow: 0 12px 24px rgba(var(--theme-primary-rgb), 0.22);
 }
-
 .theme-logo-icon:hover {
   box-shadow: 0 16px 30px rgba(var(--theme-primary-rgb), 0.28);
 }
 
-/* Logo text gradient */
+/* Logo 文字渐变 */
 .theme-logo-text {
+  @apply bg-clip-text text-transparent;
   background-image: linear-gradient(
     90deg,
     var(--theme-primary) 0%,
     var(--theme-primary-hover) 50%,
     var(--theme-primary-deep) 100%
   );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
 }
 
-/* Nav item active state */
+/* Nav 激活态 */
 .theme-nav-active {
-  background-color: var(--theme-primary-soft);
-  color: var(--theme-primary-hover);
+  @apply bg-theme-soft text-theme-primary-hover;
 }
 
-/* Nav item hover state */
+/* Nav hover */
 .theme-nav-hover:hover {
-  background-color: var(--theme-primary-soft);
-  color: var(--theme-primary-hover);
+  @apply bg-theme-soft text-theme-primary-hover;
 }
 
-/* Generic icon button hover */
+/* 通用图标按钮 hover */
 .theme-icon-btn:hover {
-  background-color: var(--theme-primary-soft);
-  color: var(--theme-primary);
+  @apply bg-theme-soft text-theme-primary;
 }
 
-/* Avatar fallback */
+/* Avatar fallback 渐变 */
 .theme-avatar-fallback {
   background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-deep));
 }
 
-/* Avatar border */
+/* Avatar 边框 */
 .theme-avatar-border {
-  border-color: var(--theme-primary-soft-strong);
+  @apply border-theme-soft-strong;
 }
 
-/* Notification badge (unread) */
+/* 未读徽标 */
 .theme-unread-badge {
-  background-color: var(--theme-primary);
+  @apply bg-theme-primary;
 }
 
-/* User card header */
+/* 用户卡片头部 */
 .theme-user-card-bg {
-  background: linear-gradient(135deg, var(--theme-primary-soft), #f8fbff);
+  @apply bg-theme-soft;
 }
 
-/* Menu item hover */
+/* 菜单 hover */
 .theme-menu-hover:hover {
-  background-color: var(--theme-primary-soft);
+  @apply bg-theme-soft;
 }
 
-/* Primary action button */
+/* ——— 主操作按钮 ——— */
 .theme-btn-primary {
+  @apply text-white transition-all duration-200;
   background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-deep));
-  color: #ffffff;
   box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.22);
 }
-
 .theme-btn-primary:hover {
   background: linear-gradient(135deg, var(--theme-primary-hover), var(--theme-primary-deep));
   box-shadow: 0 16px 30px rgba(var(--theme-primary-rgb), 0.28);
@@ -472,13 +506,14 @@
 
 /* ——— Eyebrow badge ——— */
 .theme-eyebrow {
+  @apply border text-theme-primary;
   border-color: var(--theme-shell-border);
-  color: var(--theme-primary);
   box-shadow: 0 10px 24px rgba(var(--theme-primary-rgb), 0.08);
 }
 
-/* ——— Section shell (amber-toned panel) ——— */
+/* ——— Section shell ——— */
 .theme-section-shell {
+  @apply border;
   border-color: var(--theme-shell-border);
   background: linear-gradient(
     180deg,
@@ -488,37 +523,31 @@
   box-shadow: 0 22px 56px rgba(var(--theme-primary-rgb), 0.08);
 }
 
-/* ——— Ribbon / pill badge ——— */
+/* ——— Pill / ribbon / tag（柔和背景 + 主色文字）——— */
 .theme-pill {
-  background-color: var(--theme-primary-soft);
-  color: var(--theme-primary);
+  @apply bg-theme-soft text-theme-primary;
 }
-
-/* ——— Hero ribbon icon bg ——— */
 .theme-ribbon-icon {
-  background-color: var(--theme-primary-soft);
-  color: var(--theme-primary);
+  @apply bg-theme-soft text-theme-primary;
 }
-
-/* ——— Inline small tag ——— */
 .theme-tag {
-  background-color: var(--theme-primary-soft);
-  color: var(--theme-primary);
+  @apply bg-theme-soft text-theme-primary;
 }
 
-/* ——— Inline icon accent ——— */
+/* ——— Icon accent ——— */
 .theme-icon-accent {
-  color: var(--theme-primary);
+  @apply text-theme-primary;
 }
 
-/* ——— Input border themed ——— */
+/* ——— Input border ——— */
 .theme-input-border {
-  border-color: var(--theme-border);
+  @apply border-theme-border;
   background-color: color-mix(in srgb, var(--theme-primary-soft) 30%, white);
 }
 
-/* ——— Creator / blog card accent row ——— */
+/* ——— Card accent row ——— */
 .theme-card-accent-row {
+  @apply border;
   border-color: var(--theme-shell-border);
   background: linear-gradient(
     180deg,
@@ -530,8 +559,7 @@
 
 /* ——— Stat icon bg ——— */
 .theme-stat-icon {
-  background-color: var(--theme-primary-soft);
-  color: var(--theme-primary);
+  @apply bg-theme-soft text-theme-primary;
 }
 
 /* 悬浮效果 */
