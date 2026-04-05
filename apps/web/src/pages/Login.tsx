@@ -12,18 +12,19 @@ import { applyThemeToDocument, useThemeStore } from '@/stores/useThemeStore';
 export default function Login() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
-  const { theme, setTheme } = useThemeStore();
+  const setTheme = useThemeStore((state) => state.setTheme);
 
   // 首次进入（localStorage 无 valley_theme 记录）默认切换到 amber
+  // setTheme 是 zustand stable 引用，只需挂载时执行一次
   useEffect(() => {
-    const saved = localStorage.getItem('valley_theme');
+    const raw = localStorage.getItem('valley_theme');
+    const saved = raw ? (JSON.parse(raw) as { state?: { theme?: string } })?.state?.theme : null;
     if (!saved) {
       setTheme('amber');
     } else {
-      applyThemeToDocument(theme);
+      applyThemeToDocument(saved as Parameters<typeof applyThemeToDocument>[0]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setTheme]);
 
   const [formData, setFormData] = useState({
     username: '',
