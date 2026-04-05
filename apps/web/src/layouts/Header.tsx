@@ -354,7 +354,7 @@ export default function Header() {
                   <button
                     type="button"
                     onClick={handleMarkAllRead}
-                    className="theme-icon-accent inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs theme-menu-hover"
+                    className="text-theme-primary inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs theme-menu-hover"
                   >
                     <CheckCheck className="h-3.5 w-3.5" />
                     全部已读
@@ -425,7 +425,7 @@ export default function Header() {
           {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger className="relative h-10 w-10 rounded-full outline-none transition-all hover:ring-2 hover:ring-theme-soft-strong">
-                <Avatar className="theme-avatar-border h-10 w-10 border-2 shadow-sm">
+                <Avatar className="h-10 w-10 border-2 shadow-sm border-theme-primary/50">
                   <AvatarImage src={user?.avatar} alt={user?.nickname || user?.username} />
                   <AvatarFallback className="theme-avatar-fallback font-semibold text-white">
                     {(user?.nickname?.[0] || user?.username?.[0] || 'U').toUpperCase()}
@@ -448,7 +448,7 @@ export default function Header() {
                     <button
                       type="button"
                       onClick={handleRefreshUser}
-                      className="theme-icon-accent inline-flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-white/70"
+                      className="text-theme-primary inline-flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-white/70"
                       title="刷新用户状态"
                     >
                       <RefreshCw
@@ -462,7 +462,7 @@ export default function Header() {
                   onClick={() => navigate('/profile')}
                   className="theme-menu-hover cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
                 >
-                  <User className="theme-icon-accent h-4 w-4" />
+                  <User className="text-theme-primary h-4 w-4" />
                   <span className="font-medium">个人中心</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -477,7 +477,7 @@ export default function Header() {
                     onClick={() => navigate('/my-space')}
                     className="theme-menu-hover cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
                   >
-                    <Sparkles className="theme-icon-accent h-4 w-4" />
+                    <Sparkles className="text-theme-primary h-4 w-4" />
                     <span className="font-medium">我的创作空间</span>
                   </DropdownMenuItem>
                 )}

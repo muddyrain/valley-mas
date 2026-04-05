@@ -74,7 +74,7 @@ function HeroStat({ label, value, accent }: { label: string; value: string; acce
 function HeroRibbon({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="inline-flex items-center gap-3 rounded-full border border-white/80 bg-white/78 px-4 py-2 shadow-[0_14px_36px_rgba(148,163,184,0.1)] backdrop-blur">
-      <div className="theme-ribbon-icon inline-flex h-8 w-8 items-center justify-center rounded-full">
+      <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-theme-soft text-theme-primary">
         {icon}
       </div>
       <div className="leading-tight">
@@ -302,7 +302,7 @@ export default function Home() {
           />
           <div className="relative grid gap-8 lg:grid-cols-[1.16fr_0.84fr] lg:items-start">
             <div className="space-y-8">
-              <div className="theme-accent-border inline-flex items-center gap-2 rounded-full border bg-white/82 px-4 py-1.5 text-xs tracking-[0.22em] theme-accent-text uppercase shadow-sm backdrop-blur">
+              <div className="border-theme-soft-strong inline-flex items-center gap-2 rounded-full border bg-white/82 px-4 py-1.5 text-xs tracking-[0.22em] text-theme-primary uppercase shadow-sm backdrop-blur">
                 <Sparkles className="h-3.5 w-3.5" />
                 Valley Project
               </div>
@@ -327,8 +327,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="theme-accent-border rounded-full border bg-white/76 px-6 text-slate-700 shadow-sm hover:bg-white"
-                  onClick={() => navigate('/resources')}
+                  className="border-theme-soft-strong rounded-full border bg-white/76 px-6 text-slate-700 shadow-sm hover:bg-white"
                 >
                   去看资源页
                 </Button>
@@ -336,7 +335,7 @@ export default function Home() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="theme-accent-border rounded-full border bg-theme-surface-alt px-6 text-slate-700 shadow-sm hover:bg-white"
+                    className="border-theme-soft-strong rounded-full border bg-theme-surface-alt px-6 text-slate-700 shadow-sm hover:bg-white"
                     onClick={() => navigate('/my-space')}
                   >
                     进入创作空间
@@ -371,7 +370,7 @@ export default function Home() {
                         if (event.key === 'Enter') handleSearchCreator();
                       }}
                       placeholder="输入创作者口令"
-                      className="h-12 rounded-full border-[#e6d6c5] bg-[#fffdf9] pl-10 text-sm shadow-none"
+                      className="h-12 rounded-full border-theme-border bg-theme-soft pl-10 text-sm shadow-none"
                     />
                   </div>
                   <Button
@@ -404,12 +403,12 @@ export default function Home() {
               <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
                 <div className="overflow-hidden rounded-[30px] border border-white/75 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(247,251,255,0.82))] p-5 shadow-[0_18px_44px_rgba(148,163,184,0.1)] backdrop-blur">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-500">
-                    <Sparkles className="theme-icon-accent h-3.5 w-3.5" />
+                    <Sparkles className="text-theme-primary h-3.5 w-3.5" />
                     本站概览
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-[1.12fr_0.88fr]">
                     <div className="rounded-[26px] border border-theme-shell-border bg-[linear-gradient(145deg,rgba(255,255,255,0.98),color-mix(in_srgb,var(--theme-primary-soft)_60%,white))] p-5 shadow-[0_14px_36px_rgba(var(--theme-primary-rgb),0.12)]">
-                      <div className="theme-icon-accent text-xs tracking-[0.18em] uppercase">
+                      <div className="text-theme-primary text-xs tracking-[0.18em] uppercase">
                         Overview
                       </div>
                       <div className="mt-3 text-lg font-medium leading-8 text-slate-900">
@@ -418,13 +417,13 @@ export default function Home() {
                     </div>
                     <div className="grid gap-3">
                       <div className="rounded-[22px] border border-white/80 bg-white/86 p-4">
-                        <div className="theme-icon-accent text-xs tracking-[0.12em]">最新标题</div>
+                        <div className="text-theme-primary text-xs tracking-[0.12em]">最新标题</div>
                         <div className="mt-2 line-clamp-2 text-base font-medium leading-7 text-slate-900">
                           {featuredPost ? featuredPost.title : '下一篇内容正在路上'}
                         </div>
                       </div>
                       <div className="rounded-[22px] border border-white/80 bg-white/86 p-4">
-                        <div className="theme-icon-accent text-xs tracking-[0.12em]">当前资源</div>
+                        <div className="text-theme-primary text-xs tracking-[0.12em]">当前资源</div>
                         <div className="mt-2 line-clamp-2 text-base font-medium leading-7 text-slate-900">
                           {featuredWallpaper ? featuredWallpaper.title : '新的资源整理中'}
                         </div>
@@ -435,7 +434,7 @@ export default function Home() {
 
                 <div className="grid gap-3">
                   <div className="rounded-[24px] border border-theme-shell-border bg-[linear-gradient(135deg,rgba(255,255,255,0.92),color-mix(in_srgb,var(--theme-primary-soft)_50%,white))] px-4 py-4 shadow-[0_16px_36px_rgba(148,163,184,0.08)]">
-                    <div className="theme-icon-accent text-xs tracking-[0.18em] uppercase">
+                    <div className="text-theme-primary text-xs tracking-[0.18em] uppercase">
                       Content Flow
                     </div>
                     <div className="mt-2 text-lg font-medium leading-8 text-slate-900">
@@ -444,13 +443,13 @@ export default function Home() {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="rounded-[22px] border border-white/75 bg-white/82 px-4 py-4">
-                      <div className="theme-icon-accent text-xs tracking-[0.12em]">浏览入口</div>
+                      <div className="text-theme-primary text-xs tracking-[0.12em]">浏览入口</div>
                       <div className="mt-2 text-sm font-medium text-slate-900">
                         博客、图文、资源
                       </div>
                     </div>
                     <div className="rounded-[22px] border border-white/75 bg-white/82 px-4 py-4">
-                      <div className="theme-icon-accent text-xs tracking-[0.12em]">创作节奏</div>
+                      <div className="text-theme-primary text-xs tracking-[0.12em]">创作节奏</div>
                       <div className="mt-2 text-sm font-medium text-slate-900">内容持续补充中</div>
                     </div>
                   </div>
@@ -461,7 +460,7 @@ export default function Home() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
               <div className="rounded-[34px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,248,241,0.84))] p-5 shadow-[0_20px_60px_rgba(148,163,184,0.14)] backdrop-blur">
                 <div className="mb-4 flex items-center justify-between">
-                  <div className="theme-tag inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
+                  <div className="bg-theme-soft text-theme-primary inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
                     <BookOpen className="h-3.5 w-3.5" />
                     最新内容入口
                   </div>
@@ -488,7 +487,7 @@ export default function Home() {
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.92),rgba(250,240,228,0.9))]">
-                          <SquareChartGantt className="h-12 w-12 theme-icon-accent opacity-50" />
+                          <SquareChartGantt className="h-12 w-12 text-theme-primary opacity-50" />
                         </div>
                       )}
                       <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/58 via-black/18 to-transparent p-5 text-white">
@@ -520,20 +519,20 @@ export default function Home() {
               <div className="rounded-[34px] border border-theme-shell-border bg-[linear-gradient(180deg,rgba(247,251,255,0.95),rgba(255,255,255,0.86))] p-5 shadow-[0_20px_56px_rgba(var(--theme-primary-rgb),0.10)]">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-600">
-                    <Images className="h-3.5 w-3.5 theme-icon-accent" />
+                    <Images className="h-3.5 w-3.5 text-theme-primary" />
                     近期常用入口
                   </div>
                   <div className="text-xs text-slate-400">快捷访问</div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                   <QuickEntryCard
-                    icon={<Images className="h-4 w-4 theme-icon-accent" />}
+                    icon={<Images className="h-4 w-4 text-theme-primary" />}
                     title="资源整理"
                     description="资源浏览与收藏入口。"
                     onClick={() => navigate('/resources')}
                   />
                   <QuickEntryCard
-                    icon={<BookOpen className="h-4 w-4 theme-icon-accent" />}
+                    icon={<BookOpen className="h-4 w-4 text-theme-primary" />}
                     title="博客与图文"
                     description="最近更新的内容都在这里。"
                     onClick={() => navigate('/blog')}
@@ -573,7 +572,7 @@ export default function Home() {
                 <div className="text-lg font-semibold text-slate-900">最近活跃</div>
                 <div className="mt-1 text-sm text-slate-500">这里会先展示最近有更新的创作者。</div>
               </div>
-              <div className="theme-pill rounded-full px-4 py-2 text-sm">
+              <div className="bg-theme-soft text-theme-primary rounded-full px-4 py-2 text-sm">
                 {creators.length} 位创作者
               </div>
             </div>
@@ -628,7 +627,7 @@ export default function Home() {
                 <div className="text-lg font-semibold text-slate-900">本期资源</div>
                 <div className="mt-1 text-sm text-slate-500">最近整理出的图像内容。</div>
               </div>
-              <div className="theme-pill rounded-full px-4 py-2 text-sm">
+              <div className="bg-theme-soft text-theme-primary rounded-full px-4 py-2 text-sm">
                 {resources.length} 项内容
               </div>
             </div>
@@ -723,7 +722,7 @@ export default function Home() {
                       <div className="text-lg font-semibold text-slate-900">头像收藏</div>
                       <div className="mt-1 text-sm text-slate-500">最近整理的头像内容。</div>
                     </div>
-                    <div className="theme-pill rounded-full px-3 py-1 text-xs">
+                    <div className="bg-theme-soft text-theme-primary rounded-full px-3 py-1 text-xs">
                       {avatarShelf.length} 项
                     </div>
                   </div>
@@ -808,7 +807,9 @@ export default function Home() {
                 <div className="text-lg font-semibold text-slate-900">最近更新</div>
                 <div className="mt-1 text-sm text-slate-500">博客与图文的最新内容。</div>
               </div>
-              <div className="theme-pill rounded-full px-4 py-2 text-sm">{posts.length} 条更新</div>
+              <div className="bg-theme-soft text-theme-primary rounded-full px-4 py-2 text-sm">
+                {posts.length} 条更新
+              </div>
             </div>
             {loadingPosts ? (
               <div className="grid gap-5 xl:grid-cols-3">
@@ -852,7 +853,7 @@ export default function Home() {
             <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
               <div className="space-y-5">
                 <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-500">
-                  <UserRound className="theme-icon-accent h-3.5 w-3.5" />
+                  <UserRound className="text-theme-primary h-3.5 w-3.5" />
                   继续逛逛
                 </div>
                 <h3 className="text-3xl font-semibold tracking-tight text-slate-950 md:text-[40px]">
@@ -882,7 +883,7 @@ export default function Home() {
                   onClick={() => navigate('/blog')}
                   className="rounded-[28px] border border-white/80 bg-white/84 px-5 py-6 text-left shadow-[0_14px_36px_rgba(148,163,184,0.08)] transition hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(148,163,184,0.12)]"
                 >
-                  <div className="theme-stat-icon mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full">
+                  <div className="bg-theme-soft text-theme-primary mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full">
                     <BookOpen className="h-5 w-5" />
                   </div>
                   <div className="text-lg font-medium text-slate-900">内容页</div>
@@ -904,7 +905,7 @@ export default function Home() {
                   onClick={() => navigate('/creators')}
                   className="rounded-[28px] border border-white/80 bg-white/84 px-5 py-6 text-left shadow-[0_14px_36px_rgba(148,163,184,0.08)] transition hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(148,163,184,0.12)]"
                 >
-                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-theme-soft theme-icon-accent">
+                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-theme-soft text-theme-primary">
                     <SquareChartGantt className="h-5 w-5" />
                   </div>
                   <div className="text-lg font-medium text-slate-900">创作者页</div>
