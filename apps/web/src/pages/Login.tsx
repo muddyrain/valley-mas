@@ -58,103 +58,110 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden flex">
-      {/* 页面背景渐变（跟随主题） */}
-      <div
-        className="absolute inset-0 -z-10"
-        style={{
-          background: `linear-gradient(135deg,
-            rgba(var(--theme-primary-rgb),0.92) 0%,
-            rgba(var(--theme-primary-rgb),0.72) 45%,
-            rgba(var(--theme-primary-deep, var(--theme-primary-rgb)),0.85) 100%)`,
-        }}
-      />
-      {/* 背景光晕 */}
-      <div
-        className="absolute -left-32 -top-32 h-96 w-96 rounded-full blur-3xl opacity-40 pointer-events-none"
-        style={{ background: `rgba(var(--theme-secondary-rgb),0.5)` }}
-      />
-      <div
-        className="absolute -bottom-24 right-0 h-80 w-80 rounded-full blur-3xl opacity-30 pointer-events-none"
-        style={{ background: `rgba(var(--theme-tertiary-rgb),0.5)` }}
-      />
-
-      {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 items-center justify-center relative p-12">
-        {/* 装饰性大圆 */}
+    <div className="relative min-h-screen flex">
+      {/* ===== 左侧：深色品牌区（固定深色，主题色做点缀） ===== */}
+      <div className="hidden lg:flex lg:w-[44%] flex-col justify-between relative overflow-hidden bg-slate-950 px-14 py-12">
+        {/* 主题色装饰光晕（右上 + 左下） */}
         <div
-          className="absolute left-1/2 top-1/2 h-130 w-130 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-20 blur-3xl pointer-events-none"
-          style={{ background: `rgba(var(--theme-tertiary-rgb),0.6)` }}
+          className="absolute -right-24 -top-24 h-80 w-80 rounded-full opacity-30 blur-3xl pointer-events-none"
+          style={{ background: `rgba(var(--theme-primary-rgb),1)` }}
+        />
+        <div
+          className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full opacity-20 blur-3xl pointer-events-none"
+          style={{ background: `rgba(var(--theme-secondary-rgb),1)` }}
+        />
+        {/* 细网格纹理叠层 */}
+        <div
+          className="absolute inset-0 opacity-[0.04] pointer-events-none"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+            backgroundSize: '40px 40px',
+          }}
         />
 
-        <div className="relative w-full max-w-sm space-y-6">
-          {/* Logo 卡片 */}
-          <Link to="/blog" className="block">
-            <div
-              className="flex items-center gap-4 rounded-2xl border border-white/30 px-5 py-4 backdrop-blur-md transition-all hover:border-white/50 hover:shadow-lg"
-              style={{ background: 'rgba(255,255,255,0.14)' }}
-            >
-              <div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.22)' }}
-              >
-                <Sparkles className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <div className="text-xl font-bold text-white">Valley</div>
-                <div className="text-xs text-white/70">持续更新 · 值得收藏</div>
-              </div>
-            </div>
-          </Link>
-
-          {/* 主标语 */}
+        {/* 顶部 Logo */}
+        <Link to="/blog" className="relative flex items-center gap-3 w-fit group">
           <div
-            className="rounded-2xl border border-white/25 px-6 py-6 backdrop-blur-md"
-            style={{ background: 'rgba(255,255,255,0.10)' }}
+            className="flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-white/10 transition-all group-hover:ring-white/25"
+            style={{ background: `rgba(var(--theme-primary-rgb),0.85)` }}
           >
-            <h1 className="text-3xl font-bold leading-snug text-white">
-              记录正在发生的，
-              <br />
-              <span className="opacity-80">也收藏值得留下的。</span>
-            </h1>
-            <p className="mt-3 text-sm leading-7 text-white/70">
-              Valley 整理博客、图文、资源与创作过程，把正在成形的内容慢慢收拢进来。
-            </p>
+            <Sparkles className="h-5 w-5 text-white" />
+          </div>
+          <span className="text-xl font-bold tracking-tight text-white">Valley</span>
+        </Link>
+
+        {/* 主文案 */}
+        <div className="relative space-y-7">
+          {/* 小标签 */}
+          <div
+            className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
+            style={{
+              background: `rgba(var(--theme-primary-rgb),0.18)`,
+              color: `rgba(var(--theme-primary-rgb),1)`,
+              border: `1px solid rgba(var(--theme-primary-rgb),0.35)`,
+            }}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: `rgba(var(--theme-primary-rgb),1)` }}
+            />
+            正在持续更新
           </div>
 
+          <h1 className="text-[2.4rem] font-black leading-[1.2] tracking-tight text-white">
+            记录正在发生的，
+            <br />
+            也收藏值得留下的。
+          </h1>
+
+          <p className="max-w-xs text-[0.95rem] leading-7 text-slate-400">
+            Valley 整理博客、图文、资源与创作过程，把正在成形的内容慢慢收拢进来。
+          </p>
+
+          {/* 分割线 */}
+          <div className="h-px w-12" style={{ background: `rgba(var(--theme-primary-rgb),0.5)` }} />
+
           {/* 统计数字 */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="flex gap-8">
             {[
               { value: '10K+', label: '精美资源' },
               { value: '500+', label: '创作者' },
               { value: '持续', label: '内容更新' },
             ].map((item) => (
-              <div
-                key={item.label}
-                className="rounded-xl border border-white/20 px-3 py-3 text-center backdrop-blur-md"
-                style={{ background: 'rgba(255,255,255,0.10)' }}
-              >
-                <div className="text-xl font-bold text-white">{item.value}</div>
-                <div className="mt-0.5 text-[11px] text-white/65">{item.label}</div>
+              <div key={item.label}>
+                <div
+                  className="text-2xl font-black"
+                  style={{ color: `rgba(var(--theme-primary-rgb),1)` }}
+                >
+                  {item.value}
+                </div>
+                <div className="mt-1 text-xs text-slate-500">{item.label}</div>
               </div>
             ))}
           </div>
         </div>
+
+        {/* 底部版权 */}
+        <div className="relative text-xs text-slate-600">© 2025 Valley · 保留所有权利</div>
       </div>
 
-      {/* Right Side - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6">
+      {/* ===== 右侧：白色登录区 ===== */}
+      <div className="w-full lg:w-[56%] flex items-center justify-center bg-slate-50 p-6">
         <div className="w-full max-w-md">
-          {/* Mobile Logo */}
+          {/* Mobile Logo（仅移动端显示，右侧白底上用深色） */}
           <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-white/20 backdrop-blur-sm mb-4">
+            <div
+              className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4"
+              style={{ background: `rgba(var(--theme-primary-rgb),1)` }}
+            >
               <Sparkles className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-white">Valley</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Valley</h1>
           </div>
 
           {/* Login Card */}
-          <div className="theme-hero-shell rounded-3xl p-8 shadow-2xl">
+          <div className="rounded-3xl bg-white p-8 shadow-[0_8px_40px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/80">
             <div className="mb-7">
               <h2 className="text-2xl font-bold text-slate-900">欢迎回来</h2>
               <p className="text-slate-500 mt-1.5 text-sm">登录账号，继续探索</p>
@@ -256,7 +263,7 @@ export default function Login() {
             </div>
           </div>
 
-          <p className="text-center text-xs text-white/50 mt-6">
+          <p className="text-center text-xs text-slate-400 mt-6">
             登录即表示您同意我们的服务条款和隐私政策
           </p>
         </div>
