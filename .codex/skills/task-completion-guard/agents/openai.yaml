@@ -1,0 +1,4 @@
+interface:
+  display_name: "任务完成度护栏"
+  short_description: "执行任务时强制自检是否真的已实施并已完成。"
+  default_prompt: "使用 $task-completion-guard 检查这次任务是否真的已经开始执行、已经落地，并在最终说明里如实汇报完成状态。"
