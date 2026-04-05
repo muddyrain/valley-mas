@@ -40,17 +40,19 @@ function SectionHeading({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
       <div className="space-y-3">
-        <div className="inline-flex items-center rounded-full border border-[#e8d4bd] bg-white/80 px-4 py-1 text-xs tracking-[0.28em] text-[#b67638] uppercase backdrop-blur">
+        <div className="inline-flex items-center rounded-full border border-[#e8d4bd] bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] text-[#b67638] uppercase shadow-[0_10px_24px_rgba(225,188,145,0.08)] backdrop-blur">
           {eyebrow}
         </div>
         <div className="space-y-2">
-          <h2 className="text-4xl font-semibold tracking-tight text-slate-950 md:text-[42px]">
+          <h2 className="text-[38px] font-semibold tracking-[-0.04em] text-slate-950 md:text-[44px]">
             {title}
           </h2>
           {description ? (
-            <p className="max-w-3xl text-base leading-8 text-slate-600">{description}</p>
+            <p className="max-w-2xl text-[15px] leading-8 text-slate-500 md:text-base">
+              {description}
+            </p>
           ) : null}
         </div>
       </div>
@@ -61,11 +63,51 @@ function SectionHeading({
 
 function HeroStat({ label, value, accent }: { label: string; value: string; accent: string }) {
   return (
-    <div className="rounded-[26px] border border-white/70 bg-white/78 p-4 shadow-[0_18px_48px_rgba(148,163,184,0.12)] backdrop-blur">
+    <div className="rounded-[26px] border border-white/70 bg-white/80 p-4 shadow-[0_18px_48px_rgba(148,163,184,0.1)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_22px_54px_rgba(148,163,184,0.14)]">
       <div className={`mb-3 h-1.5 w-16 rounded-full ${accent}`} />
       <div className="text-2xl font-semibold text-slate-950">{value}</div>
       <div className="mt-1 text-sm text-slate-500">{label}</div>
     </div>
+  );
+}
+
+function HeroRibbon({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="inline-flex items-center gap-3 rounded-full border border-white/80 bg-white/78 px-4 py-2 shadow-[0_14px_36px_rgba(148,163,184,0.1)] backdrop-blur">
+      <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#fff6eb] text-[#b87731]">
+        {icon}
+      </div>
+      <div className="leading-tight">
+        <div className="text-[11px] tracking-[0.16em] text-slate-400 uppercase">{label}</div>
+        <div className="text-sm font-medium text-slate-900">{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function QuickEntryCard({
+  icon,
+  title,
+  description,
+  onClick,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-[24px] border border-white/80 bg-white/84 px-4 py-4 text-left shadow-[0_12px_28px_rgba(148,163,184,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(148,163,184,0.12)]"
+    >
+      <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f7fafc] text-slate-600 shadow-sm">
+        {icon}
+      </div>
+      <div className="text-sm font-medium text-slate-900">{title}</div>
+      <div className="mt-1 text-xs leading-6 text-slate-500">{description}</div>
+    </button>
   );
 }
 
@@ -201,10 +243,10 @@ export default function Home() {
   const wallpaperRail = featuredWallpaper
     ? wallpaperResources.filter((item) => item.id !== featuredWallpaper.id).slice(0, 3)
     : wallpaperResources.slice(0, 3);
-  const avatarShelf = avatarResources.slice(0, 6);
+  const avatarShelf = avatarResources.slice(0, 4);
   const featuredPost = posts[0];
   const featuredPostExcerpt = featuredPost
-    ? createPlainTextExcerpt(featuredPost.excerpt || featuredPost.title, 84)
+    ? createPlainTextExcerpt(featuredPost.excerpt || featuredPost.title, 96)
     : '';
 
   const handleFavoriteResource = async (event: React.MouseEvent, resource: Resource) => {
@@ -244,20 +286,23 @@ export default function Home() {
       <div className="mx-auto max-w-7xl px-6 pb-20 pt-8 md:px-8 lg:px-10">
         <section className="relative overflow-hidden rounded-[40px] border border-[#eedcc8] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),rgba(255,248,240,0.9)_40%,rgba(243,248,255,0.95)_100%)] px-6 py-7 shadow-[0_24px_80px_rgba(225,188,145,0.2)] md:px-10 md:py-10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(251,191,36,0.18),transparent_26%),radial-gradient(circle_at_85%_20%,rgba(96,165,250,0.2),transparent_24%),radial-gradient(circle_at_72%_80%,rgba(251,191,36,0.12),transparent_26%)]" />
-          <div className="relative grid gap-8 lg:grid-cols-[1.18fr_0.82fr] lg:items-start">
+          <div className="absolute -left-10 top-24 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(255,214,148,0.24),transparent_72%)] blur-2xl" />
+          <div className="absolute right-10 top-14 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(147,197,253,0.22),transparent_74%)] blur-2xl" />
+          <div className="relative grid gap-8 lg:grid-cols-[1.16fr_0.84fr] lg:items-start">
             <div className="space-y-8">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-1.5 text-xs tracking-[0.22em] text-[#b6793f] uppercase shadow-sm backdrop-blur">
                 <Sparkles className="h-3.5 w-3.5" />
                 Valley Project
               </div>
               <div className="max-w-3xl space-y-5">
-                <h1 className="text-5xl font-semibold leading-[1.08] tracking-tight text-slate-950 md:text-[72px] md:leading-[1.02]">
+                <h1 className="max-w-[760px] text-[48px] font-black leading-[0.95] tracking-[-0.06em] text-slate-950 md:text-[78px]">
                   <span className="block">记录正在发生的，</span>
-                  <span className="block text-[#b87731]">也收藏值得留下的。</span>
+                  <span className="mt-2 block bg-linear-to-r from-[#b87731] via-[#d19644] to-[#8f5c22] bg-clip-text pl-1 text-transparent md:pl-2">
+                    也收藏值得留下的。
+                  </span>
                 </h1>
                 <p className="max-w-2xl text-base leading-8 text-slate-600 md:text-lg">
-                  Valley
-                  是一个持续更新的内容项目，整理博客、图文、资源，也收纳一些还在慢慢打磨的实验功能。
+                  Valley 持续整理博客、图文、资源和创作过程，也把一些正在成形的内容慢慢收拢进来。
                 </p>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -287,6 +332,23 @@ export default function Home() {
                     进入创作空间
                   </Button>
                 ) : null}
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <HeroRibbon
+                  icon={<BookOpen className="h-4 w-4" />}
+                  label="内容"
+                  value={featuredPost ? featuredPost.title : '最新内容整理中'}
+                />
+                <HeroRibbon
+                  icon={<Images className="h-4 w-4" />}
+                  label="资源"
+                  value={featuredWallpaper ? featuredWallpaper.title : '资源持续补充中'}
+                />
+                <HeroRibbon
+                  icon={<UserRound className="h-4 w-4" />}
+                  label="创作者"
+                  value={loadingCreators ? '内容持续更新中' : `${creators.length}+ 位展示中`}
+                />
               </div>
               <div className="rounded-[28px] border border-white/80 bg-white/78 p-3 shadow-[0_16px_40px_rgba(148,163,184,0.12)] backdrop-blur">
                 <div className="flex flex-col gap-3 sm:flex-row">
@@ -329,37 +391,57 @@ export default function Home() {
                 />
               </div>
 
-              <div className="overflow-hidden rounded-[30px] border border-white/75 bg-[linear-gradient(135deg,rgba(255,255,255,0.88),rgba(247,251,255,0.78))] p-5 shadow-[0_18px_44px_rgba(148,163,184,0.1)] backdrop-blur">
-                <div className="flex items-center justify-between gap-3">
+              <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
+                <div className="overflow-hidden rounded-[30px] border border-white/75 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(247,251,255,0.82))] p-5 shadow-[0_18px_44px_rgba(148,163,184,0.1)] backdrop-blur">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-500">
                     <Sparkles className="h-3.5 w-3.5 text-[#b87731]" />
-                    此刻内容
+                    本站概览
                   </div>
-                  <div className="text-xs text-slate-400">轻量展示</div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-[1.12fr_0.88fr]">
+                    <div className="rounded-[26px] border border-white/80 bg-[linear-gradient(145deg,rgba(255,255,255,0.98),rgba(255,246,235,0.92))] p-5 shadow-[0_14px_36px_rgba(225,188,145,0.12)]">
+                      <div className="text-xs tracking-[0.18em] text-[#b87731] uppercase">
+                        Overview
+                      </div>
+                      <div className="mt-3 text-lg font-medium leading-8 text-slate-900">
+                        这里持续更新内容、资源和创作记录，也保留正在成形的阶段性整理。
+                      </div>
+                    </div>
+                    <div className="grid gap-3">
+                      <div className="rounded-[22px] border border-white/80 bg-white/86 p-4">
+                        <div className="text-xs text-slate-400">最新标题</div>
+                        <div className="mt-2 line-clamp-2 text-base font-medium leading-7 text-slate-900">
+                          {featuredPost ? featuredPost.title : '下一篇内容正在路上'}
+                        </div>
+                      </div>
+                      <div className="rounded-[22px] border border-white/80 bg-white/86 p-4">
+                        <div className="text-xs text-slate-400">当前资源</div>
+                        <div className="mt-2 line-clamp-2 text-base font-medium leading-7 text-slate-900">
+                          {featuredWallpaper ? featuredWallpaper.title : '新的资源整理中'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="mt-5 grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
-                  <div className="rounded-[24px] border border-white/80 bg-white/86 p-5">
+                <div className="grid gap-3">
+                  <div className="rounded-[24px] border border-white/75 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(255,247,238,0.88))] px-4 py-4 shadow-[0_16px_36px_rgba(148,163,184,0.08)]">
                     <div className="text-xs tracking-[0.18em] text-[#b87731] uppercase">
-                      Valley Notes
+                      Content Flow
                     </div>
-                    <p className="mt-3 text-lg font-medium leading-8 text-slate-900">
-                      内容、资源和灵感会继续慢慢整理，也会不断长出新的入口。
-                    </p>
+                    <div className="mt-2 text-lg font-medium leading-8 text-slate-900">
+                      更新、整理和归档会持续发生。
+                    </div>
                   </div>
-
-                  <div className="grid gap-3">
-                    <div className="rounded-[22px] border border-white/80 bg-white/84 px-4 py-4">
-                      <div className="text-xs text-slate-400">最新内容</div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-[22px] border border-white/75 bg-white/82 px-4 py-4">
+                      <div className="text-xs text-slate-400">浏览入口</div>
                       <div className="mt-2 text-sm font-medium text-slate-900">
-                        {featuredPost ? featuredPost.title : '等待下一次更新'}
+                        博客、图文、资源
                       </div>
                     </div>
-                    <div className="rounded-[22px] border border-white/80 bg-white/84 px-4 py-4">
-                      <div className="text-xs text-slate-400">当前资源</div>
-                      <div className="mt-2 text-sm font-medium text-slate-900">
-                        {featuredWallpaper ? featuredWallpaper.title : '等待新的资源整理'}
-                      </div>
+                    <div className="rounded-[22px] border border-white/75 bg-white/82 px-4 py-4">
+                      <div className="text-xs text-slate-400">创作节奏</div>
+                      <div className="mt-2 text-sm font-medium text-slate-900">内容持续补充中</div>
                     </div>
                   </div>
                 </div>
@@ -367,7 +449,7 @@ export default function Home() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
-              <div className="rounded-[34px] border border-white/80 bg-white/78 p-5 shadow-[0_20px_60px_rgba(148,163,184,0.14)] backdrop-blur">
+              <div className="rounded-[34px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(255,248,241,0.84))] p-5 shadow-[0_20px_60px_rgba(148,163,184,0.14)] backdrop-blur">
                 <div className="mb-4 flex items-center justify-between">
                   <div className="inline-flex items-center gap-2 rounded-full bg-[#fff5e9] px-3 py-1 text-xs text-[#b87731]">
                     <BookOpen className="h-3.5 w-3.5" />
@@ -387,7 +469,7 @@ export default function Home() {
                     className="w-full space-y-4 text-left"
                     onClick={() => navigate(`/blog/${featuredPost.id}`)}
                   >
-                    <div className="relative h-56 overflow-hidden rounded-[28px] border border-[#ecd7c1] bg-[#f8f2e8]">
+                    <div className="relative h-60 overflow-hidden rounded-[28px] border border-[#ecd7c1] bg-[#f8f2e8]">
                       {featuredPost.cover ? (
                         <img
                           src={featuredPost.cover}
@@ -408,10 +490,15 @@ export default function Home() {
                         </h3>
                       </div>
                     </div>
-                    <div className="rounded-[24px] bg-[#fcfaf6] p-4">
+                    <div className="rounded-[24px] border border-[#f1e8db] bg-[#fcfaf6] p-4">
                       <p className="text-sm leading-7 text-slate-600">
                         {featuredPostExcerpt || '这次更新已经放到内容区里了，点进去就能继续看。'}
                       </p>
+                      <div className="mt-3 inline-flex items-center gap-2 text-xs text-slate-400">
+                        <span>{featuredPost.postType === 'image_text' ? '图文创作' : '博客'}</span>
+                        <span>·</span>
+                        <span>最新内容</span>
+                      </div>
                     </div>
                   </button>
                 ) : (
@@ -421,42 +508,33 @@ export default function Home() {
                 )}
               </div>
               <div className="rounded-[34px] border border-[#dfe9f5] bg-[linear-gradient(180deg,rgba(247,251,255,0.95),rgba(255,255,255,0.86))] p-5 shadow-[0_20px_56px_rgba(96,165,250,0.12)]">
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-600">
-                  <Images className="h-3.5 w-3.5 text-sky-500" />
-                  近期常用入口
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-600">
+                    <Images className="h-3.5 w-3.5 text-sky-500" />
+                    近期常用入口
+                  </div>
+                  <div className="text-xs text-slate-400">快捷访问</div>
                 </div>
-                <div className="grid gap-3">
-                  <button
-                    type="button"
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                  <QuickEntryCard
+                    icon={<Images className="h-4 w-4 text-sky-500" />}
+                    title="资源整理"
+                    description="资源浏览与收藏入口。"
                     onClick={() => navigate('/resources')}
-                    className="rounded-[24px] border border-white/80 bg-white/84 px-4 py-4 text-left transition hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    <div className="text-sm font-medium text-slate-900">资源整理</div>
-                    <div className="mt-1 text-xs leading-6 text-slate-500">
-                      先看图片，再进入详情。
-                    </div>
-                  </button>
-                  <button
-                    type="button"
+                  />
+                  <QuickEntryCard
+                    icon={<BookOpen className="h-4 w-4 text-[#b87731]" />}
+                    title="博客与图文"
+                    description="最近更新的内容都在这里。"
                     onClick={() => navigate('/blog')}
-                    className="rounded-[24px] border border-white/80 bg-white/84 px-4 py-4 text-left transition hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    <div className="text-sm font-medium text-slate-900">博客与图文</div>
-                    <div className="mt-1 text-xs leading-6 text-slate-500">
-                      最近整理下来的内容都会放在这里。
-                    </div>
-                  </button>
+                  />
                   {isCreator ? (
-                    <button
-                      type="button"
+                    <QuickEntryCard
+                      icon={<SquareChartGantt className="h-4 w-4 text-emerald-500" />}
+                      title="创作空间"
+                      description="继续整理和管理自己的内容。"
                       onClick={() => navigate('/my-space')}
-                      className="rounded-[24px] border border-white/80 bg-white/84 px-4 py-4 text-left transition hover:-translate-y-0.5 hover:shadow-md"
-                    >
-                      <div className="text-sm font-medium text-slate-900">创作空间</div>
-                      <div className="mt-1 text-xs leading-6 text-slate-500">
-                        继续编辑、发布或管理自己的内容。
-                      </div>
-                    </button>
+                    />
                   ) : null}
                 </div>
               </div>
@@ -464,7 +542,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mt-20">
+        <section className="mt-24">
           <SectionHeading
             eyebrow="CREATORS"
             title="创作者空间"
@@ -479,40 +557,51 @@ export default function Home() {
               </Button>
             }
           />
-          {loadingCreators ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <Skeleton key={index} className="h-32 rounded-[28px]" />
-              ))}
+          <div className="rounded-[36px] border border-[#ecdcc8] bg-[linear-gradient(180deg,rgba(255,250,244,0.88),rgba(255,255,255,0.9))] p-5 shadow-[0_22px_56px_rgba(225,188,145,0.1)] md:p-6">
+            <div className="mb-5 flex items-center justify-between rounded-[28px] border border-white/85 bg-white/72 px-4 py-4">
+              <div>
+                <div className="text-lg font-semibold text-slate-900">最近活跃</div>
+                <div className="mt-1 text-sm text-slate-500">这里会先展示最近有更新的创作者。</div>
+              </div>
+              <div className="rounded-full bg-[#fff4e6] px-4 py-2 text-sm text-[#b87731]">
+                {creators.length} 位创作者
+              </div>
             </div>
-          ) : creators.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {creators.slice(0, 4).map((creator) => (
-                <CreatorCard key={creator.id} creator={creator} variant="compact" />
-              ))}
-            </div>
-          ) : (
-            <EmptyPanel
-              title="还没有展示中的创作者"
-              description="之后这里会放最近活跃的创作者入口。"
-              action={
-                <Button
-                  variant="outline"
-                  className="rounded-full border-[#d8c4aa] bg-white/80 px-5"
-                  onClick={() => navigate('/blog')}
-                >
-                  先去看内容
-                </Button>
-              }
-            />
-          )}
+            {loadingCreators ? (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <Skeleton key={index} className="h-32 rounded-[28px]" />
+                ))}
+              </div>
+            ) : creators.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {creators.slice(0, 4).map((creator) => (
+                  <CreatorCard key={creator.id} creator={creator} variant="compact" />
+                ))}
+              </div>
+            ) : (
+              <EmptyPanel
+                title="还没有展示中的创作者"
+                description="之后这里会放最近活跃的创作者入口。"
+                action={
+                  <Button
+                    variant="outline"
+                    className="rounded-full border-[#d8c4aa] bg-white/80 px-5"
+                    onClick={() => navigate('/blog')}
+                  >
+                    先去看内容
+                  </Button>
+                }
+              />
+            )}
+          </div>
         </section>
 
-        <section className="mt-20">
+        <section className="mt-24">
           <SectionHeading
             eyebrow="RESOURCES"
             title="资源精选"
-            description="首页先看更适合展示的资源图，想继续筛选、收藏或查看完整参数，再进入资源页。"
+            description="最近整理出来的资源会先出现在这里。"
             action={
               <Button
                 variant="outline"
@@ -523,32 +612,30 @@ export default function Home() {
               </Button>
             }
           />
-          <div className="rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_26px_70px_rgba(148,163,184,0.12)] md:p-6">
+          <div className="rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
             <div className="mb-5 flex flex-col gap-3 rounded-[28px] border border-white/85 bg-white/72 px-4 py-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <div className="text-lg font-semibold text-slate-900">热门资源浏览</div>
-                <div className="mt-1 text-sm text-slate-500">
-                  壁纸和头像分开排布，浏览时会更舒服一点。
-                </div>
+                <div className="text-lg font-semibold text-slate-900">本期资源</div>
+                <div className="mt-1 text-sm text-slate-500">最近整理出的图像内容。</div>
               </div>
               <div className="rounded-full bg-[#edf5ff] px-4 py-2 text-sm text-[#5b87b3]">
                 {resources.length} 项内容
               </div>
             </div>
             {loadingResources ? (
-              <div className="grid gap-4 lg:grid-cols-[1.35fr_0.82fr]">
+              <div className="grid gap-4 lg:grid-cols-[1.5fr_0.74fr]">
                 <div className="space-y-4">
                   <Skeleton className="h-[280px] rounded-[30px]" />
-                  <div className="grid gap-4 md:grid-cols-3">
-                    {Array.from({ length: 3 }).map((_, index) => (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {Array.from({ length: 2 }).map((_, index) => (
                       <Skeleton key={index} className="h-[148px] rounded-[24px]" />
                     ))}
                   </div>
                 </div>
-                <Skeleton className="h-[448px] rounded-[30px]" />
+                <Skeleton className="h-[360px] rounded-[30px]" />
               </div>
             ) : resources.length > 0 ? (
-              <div className="grid gap-5 lg:grid-cols-[1.35fr_0.82fr]">
+              <div className="grid gap-5 lg:grid-cols-[1.54fr_0.72fr]">
                 <div className="space-y-5">
                   {featuredWallpaper ? (
                     <button
@@ -556,7 +643,7 @@ export default function Home() {
                       onClick={() => navigate(`/resource/${featuredWallpaper.id}`)}
                       className="group block w-full overflow-hidden rounded-[32px] border border-[#d5e6f5] bg-white text-left shadow-[0_20px_56px_rgba(96,165,250,0.12)] transition hover:-translate-y-1 hover:shadow-[0_26px_64px_rgba(96,165,250,0.18)]"
                     >
-                      <div className="relative h-[360px] overflow-hidden bg-slate-100">
+                      <div className="relative h-[336px] overflow-hidden bg-slate-100">
                         <img
                           src={featuredWallpaper.url}
                           alt={featuredWallpaper.title}
@@ -588,15 +675,15 @@ export default function Home() {
                     </button>
                   ) : null}
                   {wallpaperRail.length > 0 ? (
-                    <div className="grid gap-4 md:grid-cols-3">
-                      {wallpaperRail.map((resource) => (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {wallpaperRail.slice(0, 2).map((resource) => (
                         <button
                           key={resource.id}
                           type="button"
                           onClick={() => navigate(`/resource/${resource.id}`)}
                           className="group overflow-hidden rounded-[26px] border border-[#d8e6f3] bg-white text-left shadow-[0_16px_40px_rgba(148,163,184,0.1)] transition hover:-translate-y-1 hover:shadow-[0_20px_52px_rgba(96,165,250,0.14)]"
                         >
-                          <div className="relative h-40 overflow-hidden bg-slate-100">
+                          <div className="relative h-44 overflow-hidden bg-slate-100">
                             <img
                               src={resource.url}
                               alt={resource.title}
@@ -623,8 +710,8 @@ export default function Home() {
                 <div className="rounded-[32px] border border-[#d8e6f2] bg-white/84 p-5 shadow-[0_18px_50px_rgba(148,163,184,0.1)]">
                   <div className="mb-5 flex items-center justify-between">
                     <div>
-                      <div className="text-lg font-semibold text-slate-900">头像收藏夹</div>
-                      <div className="mt-1 text-sm text-slate-500">头像适合更小、更紧凑地看。</div>
+                      <div className="text-lg font-semibold text-slate-900">头像收藏</div>
+                      <div className="mt-1 text-sm text-slate-500">最近整理的头像内容。</div>
                     </div>
                     <div className="rounded-full bg-[#f4f8fc] px-3 py-1 text-xs text-slate-500">
                       {avatarShelf.length} 项
@@ -646,7 +733,7 @@ export default function Home() {
                                 onClick={(event) => handleFavoriteResource(event, resource)}
                               />
                             </div>
-                            <div className="mx-auto h-28 w-28 overflow-hidden rounded-[24px] border border-[#e6edf5] bg-white shadow-[0_8px_24px_rgba(148,163,184,0.1)]">
+                            <div className="mx-auto h-24 w-24 overflow-hidden rounded-[22px] border border-[#e6edf5] bg-white shadow-[0_8px_24px_rgba(148,163,184,0.1)]">
                               <img
                                 src={resource.url}
                                 alt={resource.title}
@@ -675,7 +762,7 @@ export default function Home() {
             ) : (
               <EmptyPanel
                 title="还没有可展示的资源"
-                description="之后这里会先放当前资源列表里更适合展示的图片内容。"
+                description="之后这里会先放当前资源列表里的图片内容。"
                 action={
                   <Button
                     variant="outline"
@@ -690,11 +777,11 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mt-20">
+        <section className="mt-24">
           <SectionHeading
             eyebrow="UPDATES"
             title="内容更新"
-            description="最近更新的博客和图文会先放在这里。"
+            description="最新发布的博客和图文会先出现在这里。"
             action={
               <Button
                 variant="outline"
@@ -705,11 +792,11 @@ export default function Home() {
               </Button>
             }
           />
-          <div className="rounded-[36px] border border-[#ecdcc8] bg-[linear-gradient(180deg,rgba(255,250,244,0.92),rgba(255,255,255,0.88))] p-5 shadow-[0_26px_70px_rgba(225,188,145,0.14)] md:p-6">
+          <div className="rounded-[36px] border border-[#ecdcc8] bg-[linear-gradient(180deg,rgba(255,250,244,0.92),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(225,188,145,0.1)] md:p-6">
             <div className="mb-5 flex items-center justify-between rounded-[28px] border border-white/85 bg-white/72 px-4 py-4">
               <div>
-                <div className="text-lg font-semibold text-slate-900">最近更新的内容</div>
-                <div className="mt-1 text-sm text-slate-500">博客和图文会一起出现在这里。</div>
+                <div className="text-lg font-semibold text-slate-900">最近更新</div>
+                <div className="mt-1 text-sm text-slate-500">博客与图文的最新内容。</div>
               </div>
               <div className="rounded-full bg-[#fff4e6] px-4 py-2 text-sm text-[#b87731]">
                 {posts.length} 条更新
@@ -724,7 +811,12 @@ export default function Home() {
             ) : posts.length > 0 ? (
               <div className="grid gap-5 xl:grid-cols-3">
                 {posts.slice(0, 3).map((post) => (
-                  <BlogFeedCard key={post.id} post={post} />
+                  <div
+                    key={post.id}
+                    className="rounded-[30px] bg-white/68 p-2 shadow-[0_14px_40px_rgba(225,188,145,0.08)]"
+                  >
+                    <BlogFeedCard post={post} />
+                  </div>
                 ))}
               </div>
             ) : (
@@ -747,45 +839,66 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mt-20">
-          <div className="overflow-hidden rounded-[36px] border border-[#e8d8c6] bg-[linear-gradient(135deg,rgba(255,251,247,0.98),rgba(247,251,255,0.92))] p-8 shadow-[0_24px_70px_rgba(148,163,184,0.1)] md:p-10">
-            <div className="grid gap-8 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
-              <div className="space-y-4">
+        <section className="mt-24">
+          <div className="overflow-hidden rounded-[40px] border border-[#e8d8c6] bg-[linear-gradient(135deg,rgba(255,251,247,0.98),rgba(247,251,255,0.92))] p-8 shadow-[0_22px_58px_rgba(148,163,184,0.1)] md:p-10">
+            <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+              <div className="space-y-5">
                 <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-500">
                   <UserRound className="h-3.5 w-3.5 text-[#b87731]" />
                   继续逛逛
                 </div>
-                <h3 className="text-3xl font-semibold tracking-tight text-slate-950 md:text-[38px]">
-                  内容、资源和创作者入口
+                <h3 className="text-3xl font-semibold tracking-tight text-slate-950 md:text-[40px]">
+                  内容、资源与创作者入口
                   <br />
-                  都已经准备好了。
+                  都在这里继续展开。
                 </h3>
+                <p className="max-w-xl text-sm leading-8 text-slate-500 md:text-base">
+                  如果你想继续浏览、找资源，或者看看最近活跃的创作者，可以从这里接着往下走。
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <HeroRibbon
+                    icon={<BookOpen className="h-4 w-4" />}
+                    label="内容"
+                    value="博客与图文"
+                  />
+                  <HeroRibbon
+                    icon={<Images className="h-4 w-4" />}
+                    label="资源"
+                    value="完整资源列表"
+                  />
+                </div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => navigate('/blog')}
-                  className="rounded-[26px] border border-white/80 bg-white/82 px-5 py-6 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                  className="rounded-[28px] border border-white/80 bg-white/84 px-5 py-6 text-left shadow-[0_14px_36px_rgba(148,163,184,0.08)] transition hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(148,163,184,0.12)]"
                 >
-                  <BookOpen className="mb-4 h-5 w-5 text-[#b87731]" />
+                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#fff4e8] text-[#b87731]">
+                    <BookOpen className="h-5 w-5" />
+                  </div>
                   <div className="text-lg font-medium text-slate-900">内容页</div>
                   <div className="mt-2 text-sm leading-7 text-slate-500">继续浏览博客和图文。</div>
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate('/resources')}
-                  className="rounded-[26px] border border-white/80 bg-white/82 px-5 py-6 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                  className="rounded-[28px] border border-white/80 bg-white/84 px-5 py-6 text-left shadow-[0_14px_36px_rgba(148,163,184,0.08)] transition hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(148,163,184,0.12)]"
                 >
-                  <Images className="mb-4 h-5 w-5 text-sky-500" />
+                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#eef6ff] text-sky-500">
+                    <Images className="h-5 w-5" />
+                  </div>
                   <div className="text-lg font-medium text-slate-900">资源页</div>
                   <div className="mt-2 text-sm leading-7 text-slate-500">去看完整的资源列表。</div>
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate('/creators')}
-                  className="rounded-[26px] border border-white/80 bg-white/82 px-5 py-6 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                  className="rounded-[28px] border border-white/80 bg-white/84 px-5 py-6 text-left shadow-[0_14px_36px_rgba(148,163,184,0.08)] transition hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(148,163,184,0.12)]"
                 >
-                  <SquareChartGantt className="mb-4 h-5 w-5 text-emerald-500" />
+                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#edf9f3] text-emerald-500">
+                    <SquareChartGantt className="h-5 w-5" />
+                  </div>
                   <div className="text-lg font-medium text-slate-900">创作者页</div>
                   <div className="mt-2 text-sm leading-7 text-slate-500">
                     看看最近活跃的创作者。

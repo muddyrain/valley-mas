@@ -278,6 +278,48 @@
 - “这个是不是也可以抽成一个 skill”
 - “以后这种改动 AI 应该默认知道”
 
+### `task-completion-guard`
+
+文件：
+- [task-completion-guard](./task-completion-guard/SKILL.md)
+
+什么时候触发：
+- 任务先有 task list，再要继续落地
+- 用户说“继续吧”“直接改吧”“帮我更新吧”
+- 任务包含分析、实施、验证、收尾多个阶段
+- 你担心自己会停在规划、口头承诺或部分执行
+- 需要明确判断“这次到底是真的做完了，还是只做了一部分”
+
+不适合什么时候用：
+- 用户明确只要一个方案、一个脑暴结果或一份 task list
+- 本次任务纯问答，没有实际执行动作
+
+典型触发语：
+- “继续吧”
+- “你先排个 task list 然后更新吧”
+- “帮我看看这项任务是不是已经真正做完了”
+- “别只说在做，确认下有没有真的执行”
+
+### `public-copy-boundary`
+
+文件：
+- [public-copy-boundary](./public-copy-boundary/SKILL.md)
+
+什么时候触发：
+- 改首页、栏目说明、空状态、辅助文案
+- 用户明确说“不要把这些内部指引写给用户看”
+- 你在写文案时出现了“更舒服、更适合、更好看”这类设计推理句式
+- 文案里混入了本来只该对开发者或 AI 说的话
+
+不适合什么时候用：
+- 纯内部文档、任务拆解、协作说明
+- 纯逻辑改动，没有用户可见文案
+
+典型触发语：
+- “这个只是给你的改动指引，不要展示给用户”
+- “项目里不要出现这种解释型字样”
+- “不要把设计推理写到页面上”
+
 ## 常见组合
 
 ### 改图文编辑页
@@ -337,3 +379,5 @@
 2. 功能改完后，顺手想一下这次有没有把某个 skill 的前提改掉。
 3. 如果触发了 skill，按 [skill-usage-disclosure](./skill-usage-disclosure/SKILL.md) 主动告诉用户。
 4. 如果某类规则已经稳定出现多次，按 [skill-opportunity-scout](./skill-opportunity-scout/SKILL.md) 评估是否该新增 skill。
+5. 如果任务包含“计划 + 实施 + 校验”多阶段，按 [task-completion-guard](./task-completion-guard/SKILL.md) 自检是否真的已执行、已完成。
+6. 如果改的是用户可见文案，按 [public-copy-boundary](./public-copy-boundary/SKILL.md) 检查有没有把内部设计理由写进页面。
