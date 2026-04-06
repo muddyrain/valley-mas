@@ -2,6 +2,7 @@ package handler
 
 import (
 	"strconv"
+	"strings"
 	"valley-server/internal/database"
 	"valley-server/internal/logger"
 	"valley-server/internal/model"
@@ -51,12 +52,14 @@ func GetCreatorSpace(c *gin.Context) {
 	var totalViews int64
 	var totalDownloads int64
 	var resourceCount int64
+	var followerCount int64
 	db.Model(&model.CodeAccessLog{}).Where("creator_id = ?", creator.ID).Count(&totalViews)
 	db.Model(&model.DownloadRecord{}).Where("creator_id = ?", creator.ID).Count(&totalDownloads)
 	db.Model(&model.Resource{}).
 		Where("user_id = ? AND deleted_at IS NULL", creator.UserID).
 		Where("(visibility = ? OR visibility IS NULL OR visibility = '')", "public").
 		Count(&resourceCount)
+	db.Model(&model.UserFollow{}).Where("creator_id = ?", creator.ID).Count(&followerCount)
 
 	creatorName := ""
 	creatorAvatar := ""
@@ -77,6 +80,7 @@ func GetCreatorSpace(c *gin.Context) {
 			"totalViews":     totalViews,
 			"totalDownloads": totalDownloads,
 			"resourceCount":  resourceCount,
+			"followerCount":  followerCount,
 		},
 	}
 
@@ -242,6 +246,7 @@ func GetCreatorResourcesList(c *gin.Context) {
 	pageSize := GetIntQuery(c, "pageSize", 20)
 	resourceType := c.Query("type")
 	keyword := c.Query("keyword")
+	albumIDRaw := strings.TrimSpace(c.Query("albumId"))
 
 	if pageSize > 50 {
 		pageSize = 50
@@ -272,6 +277,18 @@ func GetCreatorResourcesList(c *gin.Context) {
 	if keyword != "" {
 		like := "%" + keyword + "%"
 		query = query.Where("title LIKE ? OR description LIKE ?", like, like)
+	}
+
+	if albumIDRaw != "" {
+		var albumID model.Int64String
+		if err := albumID.Scan(albumIDRaw); err != nil {
+			Error(c, 400, "专辑ID格式错误")
+			return
+		}
+		query = query.
+			Joins("JOIN creator_album_resources ON creator_album_resources.resource_id = resources.id").
+			Joins("JOIN creator_albums ON creator_albums.id = creator_album_resources.creator_album_id").
+			Where("creator_albums.id = ? AND creator_albums.creator_id = ? AND creator_albums.deleted_at IS NULL", albumID, creator.ID)
 	}
 
 	// 统计总数

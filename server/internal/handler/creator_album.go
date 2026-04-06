@@ -1,0 +1,503 @@
+package handler
+
+import (
+	"fmt"
+	"strings"
+
+	"valley-server/internal/database"
+	"valley-server/internal/model"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+type creatorAlbumResourcePayload struct {
+	ID         string `json:"id"`
+	Title      string `json:"title"`
+	URL        string `json:"url"`
+	Type       string `json:"type"`
+	Visibility string `json:"visibility,omitempty"`
+}
+
+type creatorAlbumPayload struct {
+	ID              string                        `json:"id"`
+	Name            string                        `json:"name"`
+	Description     string                        `json:"description"`
+	CoverURL        string                        `json:"coverUrl"`
+	CoverResourceID string                        `json:"coverResourceId,omitempty"`
+	ResourceCount   int                           `json:"resourceCount"`
+	CreatorID       string                        `json:"creatorId"`
+	Resources       []creatorAlbumResourcePayload `json:"resources,omitempty"`
+}
+
+func loadCurrentCreator(c *gin.Context) (*model.Creator, error) {
+	userID := model.Int64String(GetCurrentUserID(c))
+	if userID == 0 {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	var creator model.Creator
+	if err := database.GetDB().
+		Where("user_id = ? AND deleted_at IS NULL", userID).
+		First(&creator).Error; err != nil {
+		return nil, err
+	}
+
+	return &creator, nil
+}
+
+func parseOwnedAlbumResources(
+	db *gorm.DB,
+	creator *model.Creator,
+	resourceIDs []string,
+) ([]model.Resource, map[string]model.Resource, error) {
+	resources := make([]model.Resource, 0, len(resourceIDs))
+	resourceMap := make(map[string]model.Resource, len(resourceIDs))
+
+	for _, idStr := range resourceIDs {
+		idStr = strings.TrimSpace(idStr)
+		if idStr == "" {
+			continue
+		}
+		if _, exists := resourceMap[idStr]; exists {
+			continue
+		}
+
+		var resourceID model.Int64String
+		if err := resourceID.Scan(idStr); err != nil {
+			return nil, nil, fmt.Errorf("invalid resource id")
+		}
+
+		var resource model.Resource
+		if err := db.
+			Where("id = ? AND user_id = ? AND deleted_at IS NULL", resourceID, creator.UserID).
+			First(&resource).Error; err != nil {
+			return nil, nil, fmt.Errorf("resource not found")
+		}
+
+		resources = append(resources, resource)
+		resourceMap[idStr] = resource
+	}
+
+	return resources, resourceMap, nil
+}
+
+func resolveCoverResourceID(
+	coverResourceID string,
+	resourceMap map[string]model.Resource,
+) (*model.Int64String, error) {
+	coverResourceID = strings.TrimSpace(coverResourceID)
+	if coverResourceID == "" {
+		return nil, nil
+	}
+
+	resource, exists := resourceMap[coverResourceID]
+	if !exists {
+		return nil, fmt.Errorf("cover resource must be included in album resources")
+	}
+
+	value := resource.ID
+	return &value, nil
+}
+
+func serializeCreatorAlbum(
+	album model.CreatorAlbum,
+	resourceCount int,
+	coverURL string,
+	resources []creatorAlbumResourcePayload,
+) creatorAlbumPayload {
+	payload := creatorAlbumPayload{
+		ID:            album.ID.String(),
+		Name:          album.Name,
+		Description:   album.Description,
+		CoverURL:      coverURL,
+		ResourceCount: resourceCount,
+		CreatorID:     album.CreatorID.String(),
+		Resources:     resources,
+	}
+
+	if album.CoverResourceID != nil && *album.CoverResourceID != 0 {
+		payload.CoverResourceID = album.CoverResourceID.String()
+	}
+
+	return payload
+}
+
+func buildAlbumResourcePayloads(resources []model.Resource) []creatorAlbumResourcePayload {
+	list := make([]creatorAlbumResourcePayload, 0, len(resources))
+	for _, resource := range resources {
+		list = append(list, creatorAlbumResourcePayload{
+			ID:         resource.ID.String(),
+			Title:      resource.Title,
+			URL:        resource.URL,
+			Type:       resource.Type,
+			Visibility: resource.Visibility,
+		})
+	}
+	return list
+}
+
+func ListMyCreatorAlbums(c *gin.Context) {
+	creator, err := loadCurrentCreator(c)
+	if err != nil {
+		Error(c, 403, "当前账号还不是创作者")
+		return
+	}
+
+	db := database.GetDB()
+	var albums []model.CreatorAlbum
+	if err := db.
+		Where("creator_id = ? AND deleted_at IS NULL", creator.ID).
+		Preload("CoverResource").
+		Preload("Resources", func(tx *gorm.DB) *gorm.DB {
+			return tx.Where("deleted_at IS NULL").Order("created_at DESC")
+		}).
+		Order("updated_at DESC").
+		Find(&albums).Error; err != nil {
+		Error(c, 500, "加载资源专辑失败")
+		return
+	}
+
+	list := make([]creatorAlbumPayload, 0, len(albums))
+	for _, album := range albums {
+		resources := buildAlbumResourcePayloads(album.Resources)
+		coverURL := ""
+		if album.CoverResource != nil {
+			coverURL = album.CoverResource.URL
+		} else if len(resources) > 0 {
+			coverURL = resources[0].URL
+		}
+
+		list = append(list, serializeCreatorAlbum(album, len(resources), coverURL, resources))
+	}
+
+	Success(c, gin.H{
+		"list":  list,
+		"total": len(list),
+	})
+}
+
+func CreateCreatorAlbum(c *gin.Context) {
+	creator, err := loadCurrentCreator(c)
+	if err != nil {
+		Error(c, 403, "当前账号还不是创作者")
+		return
+	}
+
+	var req struct {
+		Name            string   `json:"name"`
+		Description     string   `json:"description"`
+		CoverResourceID string   `json:"coverResourceId"`
+		ResourceIDs     []string `json:"resourceIds"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Error(c, 400, "参数错误")
+		return
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		Error(c, 400, "请输入专辑名称")
+		return
+	}
+
+	db := database.GetDB()
+	resources, resourceMap, err := parseOwnedAlbumResources(db, creator, req.ResourceIDs)
+	if err != nil {
+		Error(c, 400, "专辑资源无效")
+		return
+	}
+
+	coverResourceID, err := resolveCoverResourceID(req.CoverResourceID, resourceMap)
+	if err != nil {
+		Error(c, 400, err.Error())
+		return
+	}
+
+	album := model.CreatorAlbum{
+		CreatorID:       creator.ID,
+		Name:            name,
+		Description:     strings.TrimSpace(req.Description),
+		CoverResourceID: coverResourceID,
+	}
+
+	if err := db.Create(&album).Error; err != nil {
+		Error(c, 500, "创建资源专辑失败")
+		return
+	}
+
+	if len(resources) > 0 {
+		if err := db.Model(&album).Association("Resources").Replace(&resources); err != nil {
+			Error(c, 500, "保存专辑资源失败")
+			return
+		}
+	}
+
+	db.Preload("CoverResource").
+		Preload("Resources", func(tx *gorm.DB) *gorm.DB {
+			return tx.Where("deleted_at IS NULL").Order("created_at DESC")
+		}).
+		First(&album, album.ID)
+
+	resourcePayloads := buildAlbumResourcePayloads(album.Resources)
+	coverURL := ""
+	if album.CoverResource != nil {
+		coverURL = album.CoverResource.URL
+	} else if len(resourcePayloads) > 0 {
+		coverURL = resourcePayloads[0].URL
+	}
+
+	Success(c, serializeCreatorAlbum(album, len(resourcePayloads), coverURL, resourcePayloads))
+}
+
+func UpdateCreatorAlbum(c *gin.Context) {
+	creator, err := loadCurrentCreator(c)
+	if err != nil {
+		Error(c, 403, "当前账号还不是创作者")
+		return
+	}
+
+	albumID := c.Param("id")
+	db := database.GetDB()
+
+	var album model.CreatorAlbum
+	if err := db.
+		Where("id = ? AND creator_id = ? AND deleted_at IS NULL", albumID, creator.ID).
+		First(&album).Error; err != nil {
+		Error(c, 404, "资源专辑不存在")
+		return
+	}
+
+	var req struct {
+		Name            string   `json:"name"`
+		Description     string   `json:"description"`
+		CoverResourceID string   `json:"coverResourceId"`
+		ResourceIDs     []string `json:"resourceIds"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Error(c, 400, "参数错误")
+		return
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		Error(c, 400, "请输入专辑名称")
+		return
+	}
+
+	resources, resourceMap, err := parseOwnedAlbumResources(db, creator, req.ResourceIDs)
+	if err != nil {
+		Error(c, 400, "专辑资源无效")
+		return
+	}
+
+	coverResourceID, err := resolveCoverResourceID(req.CoverResourceID, resourceMap)
+	if err != nil {
+		Error(c, 400, err.Error())
+		return
+	}
+
+	if err := db.Model(&album).Updates(map[string]interface{}{
+		"name":              name,
+		"description":       strings.TrimSpace(req.Description),
+		"cover_resource_id": coverResourceID,
+	}).Error; err != nil {
+		Error(c, 500, "更新资源专辑失败")
+		return
+	}
+
+	if len(resources) > 0 {
+		if err := db.Model(&album).Association("Resources").Replace(&resources); err != nil {
+			Error(c, 500, "更新专辑资源失败")
+			return
+		}
+	} else {
+		if err := db.Model(&album).Association("Resources").Clear(); err != nil {
+			Error(c, 500, "更新专辑资源失败")
+			return
+		}
+	}
+
+	db.Preload("CoverResource").
+		Preload("Resources", func(tx *gorm.DB) *gorm.DB {
+			return tx.Where("deleted_at IS NULL").Order("created_at DESC")
+		}).
+		First(&album, album.ID)
+
+	resourcePayloads := buildAlbumResourcePayloads(album.Resources)
+	coverURL := ""
+	if album.CoverResource != nil {
+		coverURL = album.CoverResource.URL
+	} else if len(resourcePayloads) > 0 {
+		coverURL = resourcePayloads[0].URL
+	}
+
+	Success(c, serializeCreatorAlbum(album, len(resourcePayloads), coverURL, resourcePayloads))
+}
+
+func DeleteCreatorAlbum(c *gin.Context) {
+	creator, err := loadCurrentCreator(c)
+	if err != nil {
+		Error(c, 403, "当前账号还不是创作者")
+		return
+	}
+
+	albumID := c.Param("id")
+	db := database.GetDB()
+
+	var album model.CreatorAlbum
+	if err := db.
+		Where("id = ? AND creator_id = ? AND deleted_at IS NULL", albumID, creator.ID).
+		First(&album).Error; err != nil {
+		Error(c, 404, "资源专辑不存在")
+		return
+	}
+
+	if err := db.Select("Resources").Delete(&album).Error; err != nil {
+		Error(c, 500, "删除资源专辑失败")
+		return
+	}
+
+	Success(c, gin.H{"ok": true})
+}
+
+func ListCreatorAlbums(c *gin.Context) {
+	creatorID := c.Param("id")
+	page := GetIntQuery(c, "page", 1)
+	pageSize := GetIntQuery(c, "pageSize", 20)
+	keyword := strings.TrimSpace(c.Query("keyword"))
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 50 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	db := database.GetDB()
+	var creator model.Creator
+	if err := db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", creatorID, true).First(&creator).Error; err != nil {
+		Error(c, 404, "创作者不存在或未激活")
+		return
+	}
+
+	base := db.Model(&model.CreatorAlbum{}).
+		Distinct("creator_albums.id").
+		Joins("JOIN creator_album_resources ON creator_album_resources.creator_album_id = creator_albums.id").
+		Joins("JOIN resources ON resources.id = creator_album_resources.resource_id").
+		Where("creator_albums.creator_id = ? AND creator_albums.deleted_at IS NULL", creator.ID).
+		Where("resources.deleted_at IS NULL").
+		Where("(resources.visibility = ? OR resources.visibility IS NULL OR resources.visibility = '')", "public")
+
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		base = base.Where("creator_albums.name LIKE ? OR creator_albums.description LIKE ?", like, like)
+	}
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		Error(c, 500, "加载资源专辑失败")
+		return
+	}
+
+	var albumIDs []model.Int64String
+	if err := base.
+		Order("creator_albums.updated_at DESC").
+		Offset(offset).
+		Limit(pageSize).
+		Pluck("creator_albums.id", &albumIDs).Error; err != nil {
+		Error(c, 500, "加载资源专辑失败")
+		return
+	}
+
+	if len(albumIDs) == 0 {
+		Success(c, gin.H{
+			"list":     []creatorAlbumPayload{},
+			"total":    total,
+			"page":     page,
+			"pageSize": pageSize,
+		})
+		return
+	}
+
+	var albums []model.CreatorAlbum
+	if err := db.
+		Where("id IN ?", albumIDs).
+		Preload("CoverResource").
+		Find(&albums).Error; err != nil {
+		Error(c, 500, "加载资源专辑失败")
+		return
+	}
+
+	albumMap := make(map[string]model.CreatorAlbum, len(albums))
+	for _, album := range albums {
+		albumMap[album.ID.String()] = album
+	}
+
+	type countRow struct {
+		AlbumID model.Int64String
+		Count   int64
+	}
+	var countRows []countRow
+	db.Table("creator_album_resources").
+		Select("creator_album_resources.creator_album_id AS album_id, COUNT(resources.id) AS count").
+		Joins("JOIN resources ON resources.id = creator_album_resources.resource_id").
+		Where("creator_album_resources.creator_album_id IN ?", albumIDs).
+		Where("resources.deleted_at IS NULL").
+		Where("(resources.visibility = ? OR resources.visibility IS NULL OR resources.visibility = '')", "public").
+		Group("creator_album_resources.creator_album_id").
+		Scan(&countRows)
+
+	countMap := make(map[string]int, len(countRows))
+	for _, row := range countRows {
+		countMap[row.AlbumID.String()] = int(row.Count)
+	}
+
+	type coverRow struct {
+		AlbumID model.Int64String
+		URL     string
+	}
+	var coverRows []coverRow
+	db.Table("creator_album_resources").
+		Select("creator_album_resources.creator_album_id AS album_id, resources.url").
+		Joins("JOIN resources ON resources.id = creator_album_resources.resource_id").
+		Where("creator_album_resources.creator_album_id IN ?", albumIDs).
+		Where("resources.deleted_at IS NULL").
+		Where("(resources.visibility = ? OR resources.visibility IS NULL OR resources.visibility = '')", "public").
+		Order("resources.created_at DESC").
+		Scan(&coverRows)
+
+	fallbackCoverMap := make(map[string]string, len(coverRows))
+	for _, row := range coverRows {
+		key := row.AlbumID.String()
+		if fallbackCoverMap[key] == "" {
+			fallbackCoverMap[key] = row.URL
+		}
+	}
+
+	list := make([]creatorAlbumPayload, 0, len(albumIDs))
+	for _, albumID := range albumIDs {
+		album, exists := albumMap[albumID.String()]
+		if !exists {
+			continue
+		}
+
+		coverURL := ""
+		if album.CoverResource != nil && album.CoverResource.URL != "" && (album.CoverResource.Visibility == "public" || album.CoverResource.Visibility == "") {
+			coverURL = album.CoverResource.URL
+		}
+		if coverURL == "" {
+			coverURL = fallbackCoverMap[albumID.String()]
+		}
+
+		list = append(list, serializeCreatorAlbum(album, countMap[albumID.String()], coverURL, nil))
+	}
+
+	Success(c, gin.H{
+		"list":     list,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+	})
+}

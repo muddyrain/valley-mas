@@ -1,0 +1,4 @@
+interface:
+  display_name: "Web 功能迭代"
+  short_description: "维护 Valley MAS Web 端的小而清晰的活跃 backlog，做完就删旧任务继续往前推"
+  default_prompt: "当用户要盘点 Valley MAS Web 还能做什么、决定下一项、开始做其中一项，或要求删掉旧任务继续迭代时，先把活跃 backlog 收口到 3 到 5 项，再优先选择最能延长现有能力、能形成完整闭环的下一项直接落地；完成后移出已做项，并刷新新的下一步。"

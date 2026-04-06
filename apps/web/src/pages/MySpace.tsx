@@ -2,6 +2,7 @@
   ChevronDown,
   ExternalLink,
   FileText,
+  FolderOpen,
   FolderTree,
   Image as ImageIcon,
   Loader2,
@@ -494,6 +495,21 @@ export default function MySpace() {
                 <div className="text-lg font-semibold text-slate-900">上传资源</div>
                 <div className="mt-2 text-sm leading-7 text-slate-500">
                   把新壁纸、头像或图像素材加入资源库。
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate('/my-space/resource-albums')}
+                className="rounded-[28px] border border-white/80 bg-white/82 p-5 text-left shadow-[0_18px_42px_rgba(148,163,184,0.08)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_24px_52px_rgba(148,163,184,0.12)]"
+              >
+                <div className="bg-theme-soft text-theme-primary mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  专辑入口
+                </div>
+                <div className="text-lg font-semibold text-slate-900">管理资源专辑</div>
+                <div className="mt-2 text-sm leading-7 text-slate-500">
+                  把现有资源整理成系列合集，给创作者详情页补上更清晰的浏览入口。
                 </div>
               </button>
             </div>

@@ -1,4 +1,5 @@
 import http from '@/utils/request';
+import type { MyResource } from './resource';
 
 // 创作者类型
 export interface Creator {
@@ -27,6 +28,7 @@ interface CreatorSpaceResponse {
     totalViews: number;
     totalDownloads: number;
     resourceCount: number;
+    followerCount: number;
   };
   space?: {
     id: string;
@@ -54,9 +56,16 @@ export interface Resource {
 export interface Album {
   id: string;
   name: string;
+  description: string;
   coverUrl: string;
+  coverResourceId?: string;
   resourceCount: number;
   creatorId: string;
+  resources?: Array<
+    Pick<MyResource, 'id' | 'title' | 'url' | 'type'> & {
+      visibility?: string;
+    }
+  >;
 }
 
 export interface MyFollowItem {
@@ -97,6 +106,7 @@ export const getCreatorByCode = async (code: string): Promise<Creator> => {
   const response = await http.get<unknown, CreatorSpaceResponse>(`/public/space/${code}`);
   // 适配后端返回的数据结构
   if (response.creator) {
+    // 公开详情接口现在直接返回粉丝数，避免详情页先展示 0 再被关注状态接口覆盖。
     return {
       id: response.creator.id,
       code: response.creator.code,
@@ -105,7 +115,7 @@ export const getCreatorByCode = async (code: string): Promise<Creator> => {
       description: response.creator.description,
       resourceCount: response.stats?.resourceCount || 0,
       downloadCount: response.stats?.totalDownloads || 0,
-      followerCount: 0, // 后端暂未提供
+      followerCount: response.stats.followerCount || 0,
       createdAt: response.creator.createdAt || '',
     };
   }
@@ -120,12 +130,14 @@ export const getCreatorWorks = (
     pageSize?: number;
     type?: string; // 资源类型: avatar/wallpaper
     keyword?: string;
+    albumId?: string;
   } = {},
 ) => {
-  const { page = 1, pageSize = 20, type, keyword } = params;
+  const { page = 1, pageSize = 20, type, keyword, albumId } = params;
   let url = `/public/creators/${creatorId}/resources?page=${page}&pageSize=${pageSize}`;
   if (type) url += `&type=${type}`;
   if (keyword) url += `&keyword=${keyword}`;
+  if (albumId) url += `&albumId=${albumId}`;
 
   return http.get<unknown, ListResponse<Resource>>(url);
 };
@@ -146,6 +158,35 @@ export const getCreatorAlbums = (
   return http.get<unknown, ListResponse<Album>>(url);
 };
 
+export const getMyCreatorAlbums = () => {
+  return http.get<unknown, { list: Album[]; total: number }>('/creator/albums');
+};
+
+export const createCreatorAlbum = (data: {
+  name: string;
+  description?: string;
+  coverResourceId?: string;
+  resourceIds: string[];
+}) => {
+  return http.post<unknown, Album>('/creator/albums', data);
+};
+
+export const updateCreatorAlbum = (
+  id: string,
+  data: {
+    name: string;
+    description?: string;
+    coverResourceId?: string;
+    resourceIds: string[];
+  },
+) => {
+  return http.put<unknown, Album>(`/creator/albums/${id}`, data);
+};
+
+export const deleteCreatorAlbum = (id: string) => {
+  return http.delete<unknown, { ok: boolean }>(`/creator/albums/${id}`);
+};
+
 // 关注创作者
 export const followCreator = (creatorId: string) => {
   return http.post<unknown, { following: boolean }>(`/user/creators/${creatorId}/follow`);
@@ -160,7 +201,6 @@ export const unfollowCreator = (creatorId: string) => {
 export const getCreatorFollowStatus = (creatorId: string) => {
   return http.get<unknown, { following: boolean; followerCount: number; isSelf: boolean }>(
     `/user/creators/${creatorId}/follow/status`,
-    { skipAuth: true } as any,
   );
 };
 
