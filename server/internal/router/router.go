@@ -52,6 +52,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 				handler.GetCreatorResourcesList,
 			)
 			public.GET("/resources/:id", middleware.OptionalAuth(cfg), handler.GetResourceDetail)
+
+			// 资源标签（公开）
+			public.GET("/resource-tags", handler.ListResourceTags)
+			public.GET("/resource-tags/:slug/resources", handler.GetResourcesByTag)
 		}
 
 		api.POST("/login", handler.Login(cfg))
@@ -117,6 +121,12 @@ func Setup(cfg *config.Config) *gin.Engine {
 			creator.POST("/resources/batch-visibility", handler.BatchUpdateVisibility)
 			creator.PATCH("/resources/:id", handler.UpdateResource)
 			creator.DELETE("/resources/:id", handler.DeleteResource)
+
+			// 资源标签绑定（创作者端）
+			creator.GET("/resources/:id/tags", handler.GetResourceTags)
+			creator.PUT("/resources/:id/tags", handler.SetResourceTags)
+			creator.POST("/resources/:id/tags/ai-match", handler.AIMatchResourceTags)
+
 			creator.GET("/albums", handler.ListMyCreatorAlbums)
 			creator.POST("/albums", handler.CreateCreatorAlbum)
 			creator.PUT("/albums/:id", handler.UpdateCreatorAlbum)
@@ -186,6 +196,16 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.PATCH("/resources/:id", handler.UpdateResource)
 				content.PUT("/resources/:id/creator", handler.UpdateResourceCreator)
 				content.DELETE("/resources/:id", handler.DeleteResource)
+
+				// 资源标签管理（管理员 / 创作者）
+				content.GET("/resource-tags", handler.ListResourceTags)
+				content.POST("/resource-tags", handler.CreateResourceTag)
+				content.PATCH("/resource-tags/:id", handler.UpdateResourceTag)
+				content.DELETE("/resource-tags/:id", handler.DeleteResourceTag)
+				// 资源标签绑定（管理端复用创作者端接口路径前缀不同，单独注册）
+				content.GET("/resources/:id/tags", handler.GetResourceTags)
+				content.PUT("/resources/:id/tags", handler.SetResourceTags)
+				content.POST("/resources/:id/tags/ai-match", handler.AIMatchResourceTags)
 			}
 		}
 	}

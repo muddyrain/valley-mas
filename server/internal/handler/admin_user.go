@@ -3,6 +3,7 @@ package handler
 import (
 	"strconv"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -81,7 +82,8 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 	if err := database.DB.Create(&user).Error; err != nil {
-		Error(c, 500, "创建用户失败")
+		logger.Log.WithField("error", err).Error("CreateUser db create failed")
+		Error(c, 500, "创建用户失败："+err.Error())
 		return
 	}
 	Success(c, user)
@@ -139,7 +141,8 @@ func UpdateUser(c *gin.Context) {
 	}
 
 	if err := database.DB.Save(&user).Error; err != nil {
-		Error(c, 500, "更新用户失败")
+		logger.Log.WithField("error", err).Error("UpdateUser db save failed")
+		Error(c, 500, "更新用户失败："+err.Error())
 		return
 	}
 	Success(c, user)
@@ -161,7 +164,8 @@ func UpdateUser(c *gin.Context) {
 func DeleteUser(c *gin.Context) {
 	id := c.Param("id")
 	if err := database.DB.Delete(&model.User{}, id).Error; err != nil {
-		Error(c, 500, "删除用户失败")
+		logger.Log.WithField("error", err).Error("DeleteUser db delete failed")
+		Error(c, 500, "删除用户失败："+err.Error())
 		return
 	}
 	Success(c, nil)
@@ -193,7 +197,8 @@ func UpdateUserStatus(c *gin.Context) {
 	}
 
 	if err := database.DB.Model(&model.User{}).Where("id = ?", id).Update("is_active", req.IsActive).Error; err != nil {
-		Error(c, 500, "更新状态失败")
+		logger.Log.WithField("error", err).Error("UpdateUserStatus db update failed")
+		Error(c, 500, "更新状态失败："+err.Error())
 		return
 	}
 	Success(c, nil)

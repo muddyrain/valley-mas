@@ -2,6 +2,7 @@ package handler
 
 import (
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -42,7 +43,8 @@ func ListCreatorSpaces(c *gin.Context) {
 		if err == gorm.ErrRecordNotFound {
 			Error(c, 404, "创作者不存在")
 		} else {
-			Error(c, 500, "查询创作者失败")
+			logger.Log.WithField("error", err).Error("ListCreatorSpaces query creator failed")
+			Error(c, 500, "查询创作者失败："+err.Error())
 		}
 		return
 	}
@@ -59,7 +61,8 @@ func ListCreatorSpaces(c *gin.Context) {
 			Success(c, gin.H{"space": nil})
 			return
 		}
-		Error(c, 500, "查询空间失败")
+		logger.Log.WithField("error", err).Error("ListCreatorSpaces query space failed")
+		Error(c, 500, "查询空间失败："+err.Error())
 		return
 	}
 
@@ -109,7 +112,8 @@ func CreateCreatorSpace(c *gin.Context) {
 		if err == gorm.ErrRecordNotFound {
 			Error(c, 404, "创作者不存在")
 		} else {
-			Error(c, 500, "查询创作者失败")
+			logger.Log.WithField("error", err).Error("CreateCreatorSpace query creator failed")
+			Error(c, 500, "查询创作者失败："+err.Error())
 		}
 		return
 	}
@@ -150,7 +154,8 @@ func CreateCreatorSpace(c *gin.Context) {
 		existingSpace.IsActive = isActive
 		space = existingSpace
 		if err := db.Save(&space).Error; err != nil {
-			Error(c, 500, "更新空间失败")
+			logger.Log.WithField("error", err).Error("CreateCreatorSpace save space failed")
+			Error(c, 500, "更新空间失败："+err.Error())
 			return
 		}
 	} else {
@@ -162,7 +167,8 @@ func CreateCreatorSpace(c *gin.Context) {
 			IsActive:    isActive,
 		}
 		if err := db.Create(&space).Error; err != nil {
-			Error(c, 500, "创建空间失败")
+			logger.Log.WithField("error", err).Error("CreateCreatorSpace create space failed")
+			Error(c, 500, "创建空间失败："+err.Error())
 			return
 		}
 	}
@@ -233,7 +239,8 @@ func GetCreatorSpaceDetail(c *gin.Context) {
 		if err == gorm.ErrRecordNotFound {
 			Error(c, 404, "创作者不存在")
 		} else {
-			Error(c, 500, "查询创作者失败")
+			logger.Log.WithField("error", err).Error("GetCreatorSpaceDetail query creator failed")
+			Error(c, 500, "查询创作者失败："+err.Error())
 		}
 		return
 	}
@@ -248,7 +255,8 @@ func GetCreatorSpaceDetail(c *gin.Context) {
 		if err == gorm.ErrRecordNotFound {
 			Error(c, 404, "空间不存在")
 		} else {
-			Error(c, 500, "查询空间失败")
+			logger.Log.WithField("error", err).Error("GetCreatorSpaceDetail query space failed")
+			Error(c, 500, "查询空间失败："+err.Error())
 		}
 		return
 	}
@@ -296,7 +304,8 @@ func UpdateCreatorSpace(c *gin.Context) {
 		if err == gorm.ErrRecordNotFound {
 			Error(c, 404, "创作者不存在")
 		} else {
-			Error(c, 500, "查询创作者失败")
+			logger.Log.WithField("error", err).Error("UpdateCreatorSpace query creator failed")
+			Error(c, 500, "查询创作者失败："+err.Error())
 		}
 		return
 	}
@@ -311,7 +320,8 @@ func UpdateCreatorSpace(c *gin.Context) {
 		if err == gorm.ErrRecordNotFound {
 			Error(c, 404, "空间不存在")
 		} else {
-			Error(c, 500, "查询空间失败")
+			logger.Log.WithField("error", err).Error("UpdateCreatorSpace query space failed")
+			Error(c, 500, "查询空间失败："+err.Error())
 		}
 		return
 	}
@@ -343,7 +353,8 @@ func UpdateCreatorSpace(c *gin.Context) {
 
 	if len(updates) > 0 {
 		if err := db.Model(&space).Updates(updates).Error; err != nil {
-			Error(c, 500, "更新空间失败")
+			logger.Log.WithField("error", err).Error("UpdateCreatorSpace db update failed")
+			Error(c, 500, "更新空间失败："+err.Error())
 			return
 		}
 	}
@@ -411,7 +422,8 @@ func AddResourcesToSpace(c *gin.Context) {
 		if err == gorm.ErrRecordNotFound {
 			Error(c, 404, "创作者不存在")
 		} else {
-			Error(c, 500, "查询创作者失败")
+			logger.Log.WithField("error", err).Error("AddResourcesToSpace query creator failed")
+			Error(c, 500, "查询创作者失败："+err.Error())
 		}
 		return
 	}
@@ -426,7 +438,8 @@ func AddResourcesToSpace(c *gin.Context) {
 		if err == gorm.ErrRecordNotFound {
 			Error(c, 404, "空间不存在，请先创建空间")
 		} else {
-			Error(c, 500, "查询空间失败")
+			logger.Log.WithField("error", err).Error("AddResourcesToSpace query space failed")
+			Error(c, 500, "查询空间失败："+err.Error())
 		}
 		return
 	}
@@ -460,7 +473,8 @@ func AddResourcesToSpace(c *gin.Context) {
 	}
 
 	if err := db.Model(&space).Association("Resources").Append(&resources); err != nil {
-		Error(c, 500, "添加资源失败")
+		logger.Log.WithField("error", err).Error("AddResourcesToSpace association append failed")
+		Error(c, 500, "添加资源失败："+err.Error())
 		return
 	}
 
@@ -498,7 +512,8 @@ func RemoveResourcesFromSpace(c *gin.Context) {
 		if err == gorm.ErrRecordNotFound {
 			Error(c, 404, "创作者不存在")
 		} else {
-			Error(c, 500, "查询创作者失败")
+			logger.Log.WithField("error", err).Error("RemoveResourcesFromSpace query creator failed")
+			Error(c, 500, "查询创作者失败："+err.Error())
 		}
 		return
 	}
@@ -513,7 +528,8 @@ func RemoveResourcesFromSpace(c *gin.Context) {
 		if err == gorm.ErrRecordNotFound {
 			Error(c, 404, "空间不存在")
 		} else {
-			Error(c, 500, "查询空间失败")
+			logger.Log.WithField("error", err).Error("RemoveResourcesFromSpace query space failed")
+			Error(c, 500, "查询空间失败："+err.Error())
 		}
 		return
 	}
@@ -546,7 +562,8 @@ func RemoveResourcesFromSpace(c *gin.Context) {
 	}
 
 	if err := db.Model(&space).Association("Resources").Delete(&resources); err != nil {
-		Error(c, 500, "移除资源失败")
+		logger.Log.WithField("error", err).Error("RemoveResourcesFromSpace association delete failed")
+		Error(c, 500, "移除资源失败："+err.Error())
 		return
 	}
 

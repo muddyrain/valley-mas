@@ -2,13 +2,16 @@ import {
   CheckSquare,
   FolderOpen,
   Globe,
+  Hash,
   Image as ImageIcon,
   Layers,
   Loader2,
   Lock,
   Pencil,
   Plus,
+  Sparkles,
   Square,
+  Tag,
   Trash2,
   Users,
   X,
@@ -18,12 +21,17 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { type Album, getMyCreatorAlbums } from '@/api/creator';
 import {
+  aiMatchResourceTags,
   batchDeleteResources,
   batchUpdateVisibility,
   deleteResource,
   getMyResources,
+  getResourceTags,
+  getResourceTagsById,
   type MyResource,
+  type ResourceTag,
   type ResourceVisibility,
+  setResourceTags,
   updateResource,
 } from '@/api/resource';
 import EmptyState from '@/components/EmptyState';
@@ -75,6 +83,12 @@ export default function MyResources() {
   const [editType, setEditType] = useState('');
   const [editVisibility, setEditVisibility] = useState<ResourceVisibility>('private');
   const [editing, setEditing] = useState(false);
+
+  // 编辑弹窗 - 标签状态
+  const [allTags, setAllTags] = useState<ResourceTag[]>([]);
+  const [editTags, setEditTags] = useState<ResourceTag[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
+  const [aiTagLoading, setAiTagLoading] = useState(false);
 
   // 专辑筛选
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -220,6 +234,18 @@ export default function MyResources() {
     setEditDesc(resource.description ?? '');
     setEditType(resource.type);
     setEditVisibility(resource.visibility || 'private');
+    setEditTags([]);
+    // 并行加载：当前资源标签 + 全部标签库
+    setTagsLoading(true);
+    Promise.all([getResourceTagsById(resource.id), getResourceTags({ pageSize: 200 })])
+      .then(([resTags, allTagsData]) => {
+        setEditTags(resTags);
+        setAllTags(allTagsData.list ?? []);
+      })
+      .catch(() => {
+        /* 静默失败 */
+      })
+      .finally(() => setTagsLoading(false));
   };
 
   // 提交编辑
@@ -227,12 +253,19 @@ export default function MyResources() {
     if (!editTarget) return;
     try {
       setEditing(true);
-      await updateResource(editTarget.id, {
-        title: editTitle.trim() || undefined,
-        description: editDesc.trim() || undefined,
-        type: editType || undefined,
-        visibility: editVisibility,
-      });
+      // 并行保存：资源信息 + 标签
+      await Promise.all([
+        updateResource(editTarget.id, {
+          title: editTitle.trim() || undefined,
+          description: editDesc.trim() || undefined,
+          type: editType || undefined,
+          visibility: editVisibility,
+        }),
+        setResourceTags(
+          editTarget.id,
+          editTags.map((t) => t.id),
+        ),
+      ]);
       toast.success('修改成功');
       setResources((prev) =>
         prev.map((r) =>
@@ -612,7 +645,12 @@ export default function MyResources() {
       </Dialog>
 
       {/* ===== 编辑弹窗 ===== */}
-      <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
+      <Dialog
+        open={!!editTarget}
+        onOpenChange={(open) => {
+          if (!open && !editing && !aiTagLoading) setEditTarget(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
@@ -683,6 +721,112 @@ export default function MyResources() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* ── 标签 ── */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                  <Tag className="h-3.5 w-3.5 text-theme-primary" />
+                  标签
+                  <span className="text-gray-400 font-normal">（可选）</span>
+                </label>
+                <button
+                  type="button"
+                  disabled={!editTarget || aiTagLoading || tagsLoading}
+                  onClick={async () => {
+                    if (!editTarget) return;
+                    try {
+                      setAiTagLoading(true);
+                      const result = await aiMatchResourceTags(editTarget.id, editTarget.url);
+                      setEditTags(result.tags);
+                      toast.success(`AI 匹配了 ${result.tags.length} 个标签`);
+                    } catch {
+                      // 统一处理
+                    } finally {
+                      setAiTagLoading(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full border border-theme-soft-strong bg-theme-soft px-2.5 py-0.5 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/70 disabled:opacity-50"
+                >
+                  {aiTagLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                  AI 自动匹配
+                </button>
+              </div>
+
+              {tagsLoading ? (
+                <div className="flex items-center gap-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2.5 text-xs text-slate-400">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  加载标签中…
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {/* 已选标签 */}
+                  <div className="flex min-h-8 flex-wrap gap-1.5 rounded-xl border border-slate-100 bg-slate-50/70 p-2">
+                    {editTags.length === 0 ? (
+                      <span className="text-xs text-slate-400">
+                        点击下方标签添加，或使用 AI 自动匹配
+                      </span>
+                    ) : (
+                      editTags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          onClick={() => setEditTags((prev) => prev.filter((t) => t.id !== tag.id))}
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition hover:opacity-70"
+                          style={{
+                            backgroundColor: (tag.color || '#6366f1') + '18',
+                            color: tag.color || '#6366f1',
+                            border: `1px solid ${tag.color || '#6366f1'}40`,
+                          }}
+                        >
+                          <Hash className="h-2.5 w-2.5" />
+                          {tag.name}
+                          <X className="h-2.5 w-2.5 ml-0.5 opacity-60" />
+                        </span>
+                      ))
+                    )}
+                  </div>
+                  {/* 候选标签 */}
+                  {allTags.length > 0 && (
+                    <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-xl border border-slate-100 bg-white p-2">
+                      {allTags.map((tag) => {
+                        const selected = editTags.some((t) => t.id === tag.id);
+                        return (
+                          <span
+                            key={tag.id}
+                            onClick={() =>
+                              setEditTags((prev) =>
+                                selected ? prev.filter((t) => t.id !== tag.id) : [...prev, tag],
+                              )
+                            }
+                            className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition"
+                            style={{
+                              backgroundColor: selected
+                                ? (tag.color || '#6366f1') + '25'
+                                : (tag.color || '#6366f1') + '10',
+                              color: tag.color || '#6366f1',
+                              border: `1px solid ${tag.color || '#6366f1'}${selected ? '70' : '30'}`,
+                              opacity: selected ? 1 : 0.65,
+                            }}
+                          >
+                            <Hash className="h-2.5 w-2.5" />
+                            {tag.name}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {allTags.length === 0 && (
+                    <p className="text-xs text-slate-400 px-1">
+                      暂无可用标签，请先在「资源标签管理」中创建。
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex gap-3 pt-1">
               <Button

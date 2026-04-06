@@ -165,13 +165,20 @@ interface MyResourcesResponse {
 
 // 获取我上传的资源列表（需要创作者/管理员权限）
 export const getMyResources = (
-  params: { page?: number; pageSize?: number; type?: string; albumId?: string } = {},
+  params: {
+    page?: number;
+    pageSize?: number;
+    type?: string;
+    albumId?: string;
+    keyword?: string;
+  } = {},
   config?: RequestConfig,
 ) => {
-  const { page = 1, pageSize = 20, type, albumId } = params;
+  const { page = 1, pageSize = 20, type, albumId, keyword } = params;
   let url = `/creator/resources?page=${page}&pageSize=${pageSize}`;
   if (type) url += `&type=${type}`;
   if (albumId) url += `&albumId=${albumId}`;
+  if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
   return http.get<unknown, MyResourcesResponse>(url, config);
 };
 
@@ -210,6 +217,67 @@ export const suggestResourceTitle = (imageBase64: string, type: 'wallpaper' | 'a
     imageBase64,
     type,
   });
+};
+
+// ========== 资源标签接口 ==========
+
+export interface ResourceTag {
+  id: string;
+  name: string;
+  slug: string;
+  color: string;
+  resourceCount: number;
+  createdAt: string;
+}
+
+interface TagListResponse {
+  list: ResourceTag[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+// 获取全部标签（公开 / 管理端通用）
+export const getResourceTags = (
+  params: { keyword?: string; page?: number; pageSize?: number } = {},
+) => {
+  const { keyword, page = 1, pageSize = 100 } = params;
+  const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (keyword) q.set('keyword', keyword);
+  return http.get<unknown, TagListResponse>(`/admin/resource-tags?${q.toString()}`);
+};
+
+// 创建标签
+export const createResourceTag = (data: { name: string; slug?: string; color?: string }) => {
+  return http.post<unknown, ResourceTag>('/admin/resource-tags', data);
+};
+
+// 更新标签
+export const updateResourceTag = (id: string, data: { name?: string; color?: string }) => {
+  return http.patch<unknown, ResourceTag>(`/admin/resource-tags/${id}`, data);
+};
+
+// 删除标签
+export const deleteResourceTag = (id: string) => {
+  return http.delete<void>(`/admin/resource-tags/${id}`);
+};
+
+// 获取某资源当前绑定的标签
+export const getResourceTagsById = (resourceId: string) => {
+  return http.get<unknown, ResourceTag[]>(`/creator/resources/${resourceId}/tags`);
+};
+
+// 设置某资源的标签（全量覆盖）
+export const setResourceTags = (resourceId: string, tagIds: string[]) => {
+  return http.put<unknown, ResourceTag[]>(`/creator/resources/${resourceId}/tags`, { tagIds });
+};
+
+// AI 自动匹配标签
+export const aiMatchResourceTags = (resourceId: string, imageBase64?: string) => {
+  return http.post<unknown, { tags: ResourceTag[]; model: string }>(
+    `/creator/resources/${resourceId}/tags/ai-match`,
+    imageBase64 ? { imageBase64 } : {},
+  );
 };
 
 // 批量删除资源

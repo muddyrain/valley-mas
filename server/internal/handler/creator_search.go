@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 
 	"github.com/gin-gonic/gin"
 )
@@ -74,7 +75,8 @@ func SearchCreators(c *gin.Context) {
 
 	var total int64
 	if err := baseQuery.Count(&total).Error; err != nil {
-		Error(c, 500, "查询创作者失败")
+		logger.Log.WithField("error", err).Error("SearchCreators count failed")
+		Error(c, 500, "查询创作者失败："+err.Error())
 		return
 	}
 
@@ -90,7 +92,8 @@ func SearchCreators(c *gin.Context) {
 		Limit(pageSize).
 		Offset(offset).
 		Scan(&rows).Error; err != nil {
-		Error(c, 500, "查询创作者失败")
+		logger.Log.WithField("error", err).Error("SearchCreators scan failed")
+		Error(c, 500, "查询创作者失败："+err.Error())
 		return
 	}
 

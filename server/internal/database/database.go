@@ -128,6 +128,8 @@ func autoMigrate() error {
 		&model.Creator{},
 		&model.CreatorSpace{},
 		&model.Resource{},
+		&model.ResourceTag{},
+		&model.ResourceTagRelation{},
 		&model.DownloadRecord{},
 		&model.CodeAccessLog{},
 		&model.CreatorApplication{},

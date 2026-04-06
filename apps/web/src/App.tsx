@@ -26,6 +26,7 @@ import Register from './pages/Register';
 import ResourceAlbumManage from './pages/ResourceAlbumManage';
 import ResourceDetail from './pages/ResourceDetail';
 import Resources from './pages/Resources';
+import ResourceTagManage from './pages/ResourceTagManage';
 import TTSStudio from './pages/TTSStudio';
 
 function RouteTitle() {
@@ -59,6 +60,8 @@ function RouteTitle() {
       title = '博客分组管理 | Valley';
     } else if (pathname === '/my-space/resource-albums') {
       title = '资源专辑管理 | Valley';
+    } else if (pathname === '/my-space/resource-tags') {
+      title = '资源标签管理 | Valley';
     } else if (pathname === '/my-space/resources') {
       title = '资源管理 | Valley';
     } else if (pathname === '/my-space/posts') {
@@ -124,6 +127,7 @@ function App() {
           <Route path="my-space/blog-edit/:id" element={<BlogCreate />} />
           <Route path="my-space/blog-groups" element={<BlogGroupManage />} />
           <Route path="my-space/resource-albums" element={<ResourceAlbumManage />} />
+          <Route path="my-space/resource-tags" element={<ResourceTagManage />} />
           <Route path="my-space/resources" element={<MyResources />} />
           <Route path="my-space/posts" element={<MyPosts />} />
           <Route path="profile" element={<Profile />} />
