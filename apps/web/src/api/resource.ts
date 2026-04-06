@@ -297,6 +297,19 @@ export const aiMatchResourceTags = (resourceId: string) => {
   );
 };
 
+// AI 根据图片 base64 + 类型 + 标题建议标签（上传前使用，无需 resourceId）
+export const aiSuggestResourceTags = (data: {
+  imageBase64?: string;
+  type: string;
+  title?: string;
+  description?: string;
+}) => {
+  return http.post<unknown, { tags: ResourceTag[]; model: string }>(
+    '/creator/ai/suggest-tags',
+    data,
+  );
+};
+
 // 批量删除资源
 export const batchDeleteResources = (ids: string[]) => {
   return http.delete<unknown, { deleted: number }>('/creator/resources/batch', { data: { ids } });

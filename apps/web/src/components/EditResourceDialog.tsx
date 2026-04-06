@@ -3,18 +3,17 @@
  * 编辑资源信息弹窗（标题、描述、类型、可见范围、标签）
  * 图片不可更换，如需替换请重新上传。
  */
-import { Hash, Image as ImageIcon, Loader2, Pencil, Sparkles, Tag, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Image as ImageIcon, Loader2, Pencil } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  aiMatchResourceTags,
-  getResourceTags,
   getResourceTagsById,
   type ResourceTag,
   type ResourceVisibility,
   setResourceTags,
   updateResource,
 } from '@/api/resource';
+import ResourceTagSelector from '@/components/ResourceTagSelector';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
@@ -82,13 +81,8 @@ export default function EditResourceDialog({
   const [visibility, setVisibility] = useState<ResourceVisibility>('private');
   const [saving, setSaving] = useState(false);
 
-  // 标签状态
+  // 标签状态（由 ResourceTagSelector 管理内部逻辑，这里只保存已选列表）
   const [tags, setTags] = useState<ResourceTag[]>([]);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [tagKeyword, setTagKeyword] = useState('');
-  const [tagResults, setTagResults] = useState<ResourceTag[]>([]);
-  const [tagSearching, setTagSearching] = useState(false);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // resource 变化时重置表单
   useEffect(() => {
@@ -98,10 +92,7 @@ export default function EditResourceDialog({
     setType(resource.type);
     setVisibility(resource.visibility ?? 'private');
     setTags([]);
-    setTagKeyword('');
-    setTagResults([]);
     setSaving(false);
-    setAiLoading(false);
 
     getResourceTagsById(resource.id)
       .then((t) => setTags(t))
@@ -109,42 +100,6 @@ export default function EditResourceDialog({
         /* 静默失败 */
       });
   }, [resource]);
-
-  // 标签搜索（300ms 防抖）
-  const handleTagKeyword = (kw: string) => {
-    setTagKeyword(kw);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (!kw.trim()) {
-      setTagResults([]);
-      return;
-    }
-    searchTimer.current = setTimeout(async () => {
-      try {
-        setTagSearching(true);
-        const res = await getResourceTags({ keyword: kw.trim(), pageSize: 20 });
-        setTagResults(res.list ?? []);
-      } catch {
-        // 静默失败
-      } finally {
-        setTagSearching(false);
-      }
-    }, 300);
-  };
-
-  // AI 自动匹配
-  const handleAiMatch = async () => {
-    if (!resource) return;
-    try {
-      setAiLoading(true);
-      const result = await aiMatchResourceTags(resource.id);
-      setTags(result.tags);
-      toast.success(`AI 匹配了 ${result.tags.length} 个标签`);
-    } catch {
-      // 统一处理
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
   // 提交保存
   const handleSubmit = async () => {
@@ -183,7 +138,7 @@ export default function EditResourceDialog({
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        if (!o && !saving && !aiLoading) onOpenChange(false);
+        if (!o && !saving) onOpenChange(false);
       }}
     >
       <DialogContent className="flex h-[90vh] w-[90vw] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
@@ -332,103 +287,7 @@ export default function EditResourceDialog({
               </div>
 
               {/* ── 标签 ── */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-                    <Tag className="h-3 w-3" />
-                    标签
-                    {tags.length > 0 && (
-                      <span
-                        className={`text-xs font-medium px-1.5 py-0.5 rounded-full normal-case tracking-normal ${tags.length >= 10 ? 'bg-red-100 text-red-500' : 'bg-slate-100 text-slate-500'}`}
-                      >
-                        {tags.length}/10
-                      </span>
-                    )}
-                  </label>
-                  <button
-                    type="button"
-                    disabled={!resource || aiLoading}
-                    onClick={handleAiMatch}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[linear-gradient(135deg,rgba(var(--theme-primary-rgb),0.10),rgba(var(--theme-primary-rgb),0.06))] border border-theme-primary/25 px-2.5 py-1 text-xs font-medium text-theme-primary transition-all hover:bg-theme-primary hover:text-white hover:border-theme-primary hover:shadow-[0_2px_8px_rgba(var(--theme-primary-rgb),0.30)] disabled:opacity-35 disabled:cursor-not-allowed"
-                  >
-                    {aiLoading ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-3 w-3" />
-                    )}
-                    {aiLoading ? 'AI 匹配中…' : 'AI 自动匹配'}
-                  </button>
-                </div>
-
-                {/* 已选标签 */}
-                <div className="flex min-h-8 flex-wrap gap-1.5 rounded-xl border border-slate-100 bg-slate-50/70 p-2">
-                  {tags.length === 0 ? (
-                    <span className="text-xs text-slate-400">
-                      搜索并添加标签，或使用 AI 自动匹配
-                    </span>
-                  ) : (
-                    tags.map((tag) => (
-                      <span
-                        key={tag.id}
-                        onClick={() => setTags((prev) => prev.filter((t) => t.id !== tag.id))}
-                        className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition hover:opacity-70 bg-theme-soft text-theme-primary border border-theme-soft-strong"
-                      >
-                        <Hash className="h-2.5 w-2.5" />
-                        {tag.name}
-                        <X className="h-2.5 w-2.5 ml-0.5 opacity-60" />
-                      </span>
-                    ))
-                  )}
-                </div>
-
-                {/* 实时搜索框 */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={tagKeyword}
-                    onChange={(e) => handleTagKeyword(e.target.value)}
-                    placeholder="搜索标签…"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-theme-primary focus:ring-2 focus:ring-theme-primary/15 pr-8"
-                  />
-                  {tagSearching && (
-                    <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 animate-spin" />
-                  )}
-                </div>
-
-                {/* 搜索结果 */}
-                {tagResults.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 rounded-xl border border-slate-100 bg-white p-2 max-h-28 overflow-y-auto">
-                    {tags.length >= 10 && (
-                      <p className="w-full text-xs text-red-400 px-1 py-0.5">
-                        已达上限（最多 10 个标签），请先移除部分标签
-                      </p>
-                    )}
-                    {tagResults.map((tag) => {
-                      const selected = tags.some((t) => t.id === tag.id);
-                      const reachedLimit = !selected && tags.length >= 10;
-                      return (
-                        <span
-                          key={tag.id}
-                          title={tag.description || tag.name}
-                          onClick={() => {
-                            if (reachedLimit) return;
-                            setTags((prev) =>
-                              selected ? prev.filter((t) => t.id !== tag.id) : [...prev, tag],
-                            );
-                          }}
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition ${reachedLimit ? 'cursor-not-allowed opacity-30' : 'cursor-pointer'} ${selected ? 'bg-theme-soft text-theme-primary border border-theme-soft-strong' : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'}`}
-                        >
-                          <Hash className="h-2.5 w-2.5" />
-                          {tag.name}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-                {tagKeyword && !tagSearching && tagResults.length === 0 && (
-                  <p className="text-xs text-slate-400 px-1">未找到匹配的标签</p>
-                )}
-              </div>
+              <ResourceTagSelector value={tags} onChange={setTags} resourceId={resource?.id} />
             </div>
 
             {/* ── 底部操作栏 ── */}

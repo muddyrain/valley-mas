@@ -1,4 +1,6 @@
 import {
+  AlertCircle,
+  CheckCircle2,
   Hash,
   Loader2,
   Pencil,
@@ -8,6 +10,7 @@ import {
   Sparkles,
   Tag,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -282,6 +285,20 @@ export default function ResourceTagManage() {
   const [tagDescription, setTagDescription] = useState('');
   const [tagSubmitting, setTagSubmitting] = useState(false);
 
+  // ── 批量导入弹窗 ──
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
+  const [batchInput, setBatchInput] = useState('');
+  // 解析后的预览条目
+  type BatchItem = {
+    name: string;
+    description: string;
+    status: 'pending' | 'success' | 'error' | 'duplicate';
+    error?: string;
+  };
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchDone, setBatchDone] = useState(false);
+
   // ── 删除标签 ──
   const [deleteTarget, setDeleteTarget] = useState<ResourceTag | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -462,6 +479,85 @@ export default function ResourceTagManage() {
     setResources((prev) => prev.map((r) => (r.id === resourceId ? { ...r, tags: newTags } : r)));
   };
 
+  // ── 批量导入 ──
+
+  /** 将文本框内容解析成 { name, description } 列表 */
+  const parseBatchInput = (text: string): BatchItem[] => {
+    return text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        // 去掉行首序号（"1. " / "1、" 等）
+        const cleaned = line.replace(/^\d+[.、．\s]+/, '').trim();
+        // 用中文冒号或英文冒号做分隔，取第一个
+        const colonIdx = cleaned.search(/[：:]/);
+        if (colonIdx <= 0) {
+          // 没有冒号：整行作为名称，无描述
+          return { name: cleaned, description: '', status: 'pending' as const };
+        }
+        const rawName = cleaned.slice(0, colonIdx).trim();
+        const desc = cleaned.slice(colonIdx + 1).trim();
+        // 名称中可能含括号备注，如"我的世界（Minecraft）"→ 保留全名
+        return { name: rawName, description: desc, status: 'pending' as const };
+      })
+      .filter((item) => item.name.length > 0 && item.name.length <= 30);
+  };
+
+  const handleBatchPreview = () => {
+    const items = parseBatchInput(batchInput);
+    if (items.length === 0) {
+      toast.error('未能识别到有效标签，请检查格式');
+      return;
+    }
+    setBatchItems(items);
+  };
+
+  const handleBatchImport = async () => {
+    if (batchItems.length === 0) return;
+    setBatchRunning(true);
+    setBatchDone(false);
+    const results: BatchItem[] = [...batchItems];
+    const createdTags: ResourceTag[] = [];
+    for (let i = 0; i < results.length; i++) {
+      const item = results[i];
+      if (item.status !== 'pending') continue;
+      try {
+        const created = await createResourceTag({ name: item.name, description: item.description });
+        results[i] = { ...item, status: 'success' };
+        createdTags.push(created);
+      } catch (err: unknown) {
+        const msg = (err as { message?: string })?.message ?? '';
+        const isDuplicate =
+          msg.includes('已存在') || msg.includes('duplicate') || msg.includes('already');
+        results[i] = { ...item, status: isDuplicate ? 'duplicate' : 'error', error: msg };
+      }
+      // 每条完成后只刷新进度列表，不触发列表请求
+      setBatchItems([...results]);
+    }
+    setBatchRunning(false);
+    setBatchDone(true);
+    const successCount = results.filter((r) => r.status === 'success').length;
+    const dupCount = results.filter((r) => r.status === 'duplicate').length;
+    const errCount = results.filter((r) => r.status === 'error').length;
+    if (successCount > 0)
+      toast.success(
+        `成功创建 ${successCount} 个标签${dupCount > 0 ? `，${dupCount} 个已存在跳过` : ''}`,
+      );
+    if (errCount > 0) toast.error(`${errCount} 个标签创建失败`);
+    // 全部完成后一次性合并到标签列表，不重新请求接口
+    if (createdTags.length > 0) {
+      setTags((prev) => [...createdTags.reverse(), ...prev]);
+    }
+  };
+
+  const resetBatchDialog = () => {
+    setBatchInput('');
+    setBatchItems([]);
+    setBatchRunning(false);
+    setBatchDone(false);
+  };
+
   const totalTagPages = Math.ceil(tagsTotal / TAGS_PAGE_SIZE);
   const totalPages = Math.ceil(resourceTotal / PAGE_SIZE);
 
@@ -484,14 +580,27 @@ export default function ResourceTagManage() {
             </div>
           </div>
           {tab === 'tags' && isAdmin && (
-            <Button
-              type="button"
-              onClick={openCreateTagDialog}
-              className="rounded-2xl bg-white px-5 font-semibold text-theme-primary shadow-lg hover:bg-white/92"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              新建标签
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                onClick={() => {
+                  resetBatchDialog();
+                  setBatchDialogOpen(true);
+                }}
+                className="rounded-2xl bg-white/20 border border-white/40 px-5 font-semibold text-white shadow-lg hover:bg-white/30 backdrop-blur-sm"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                批量导入
+              </Button>
+              <Button
+                type="button"
+                onClick={openCreateTagDialog}
+                className="rounded-2xl bg-white px-5 font-semibold text-theme-primary shadow-lg hover:bg-white/92"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                新建标签
+              </Button>
+            </div>
           )}
         </div>
       </PageBanner>
@@ -822,6 +931,209 @@ export default function ResourceTagManage() {
                 {deleting && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
                 确认删除
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 批量导入标签弹窗 ── */}
+      <Dialog
+        open={batchDialogOpen}
+        onOpenChange={(v) => {
+          if (!batchRunning) {
+            setBatchDialogOpen(v);
+            if (!v) resetBatchDialog();
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-4 w-4 text-theme-primary" />
+              批量导入标签
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-1">
+            {/* 格式说明 */}
+            <div className="rounded-xl border border-theme-primary/20 bg-theme-soft px-4 py-3 text-xs text-slate-600 leading-5">
+              <p className="font-semibold text-theme-primary mb-1">格式说明</p>
+              <p>
+                每行一条，格式为{' '}
+                <code className="bg-white/80 px-1 rounded text-slate-700">标签名称：标签描述</code>
+                （中英文冒号均可）
+              </p>
+              <p className="mt-0.5 text-slate-400">
+                名称不超过 30 字 · 描述可选 · 重复标签自动跳过
+              </p>
+            </div>
+
+            {/* 输入区 */}
+            {!batchItems.length && (
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-slate-600">粘贴标签内容</label>
+                <textarea
+                  value={batchInput}
+                  onChange={(e) => setBatchInput(e.target.value)}
+                  placeholder={`二次元：标准的动漫风格，开启跨次元的视觉之旅。\n少女：洋溢青春气息，记录美好且纯粹的少女感。\n空灵：干净、透明、不食人间烟火的感觉。`}
+                  rows={10}
+                  className="w-full resize-y rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-300 focus:border-theme-primary focus:ring-2 focus:ring-theme-primary/15 font-mono"
+                />
+                <p className="text-right text-xs text-slate-400">
+                  已输入 {batchInput.split('\n').filter((l) => l.trim()).length} 行
+                </p>
+              </div>
+            )}
+
+            {/* 预览 / 执行进度 */}
+            {batchItems.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-slate-600">
+                    识别结果（共 {batchItems.length} 条）
+                  </label>
+                  {!batchRunning && !batchDone && (
+                    <button
+                      type="button"
+                      onClick={() => setBatchItems([])}
+                      className="text-xs text-slate-400 hover:text-slate-600 transition"
+                    >
+                      重新编辑
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-72 overflow-y-auto space-y-1.5 rounded-xl border border-slate-100 bg-slate-50/60 p-2">
+                  {batchItems.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex items-start gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
+                        item.status === 'success'
+                          ? 'bg-emerald-50 border border-emerald-100'
+                          : item.status === 'duplicate'
+                            ? 'bg-amber-50 border border-amber-100'
+                            : item.status === 'error'
+                              ? 'bg-rose-50 border border-rose-100'
+                              : 'bg-white border border-slate-100'
+                      }`}
+                    >
+                      {/* 状态图标 */}
+                      <div className="mt-0.5 shrink-0">
+                        {item.status === 'pending' && batchRunning ? (
+                          <Loader2 className="h-3.5 w-3.5 text-theme-primary animate-spin" />
+                        ) : item.status === 'pending' ? (
+                          <div className="h-3.5 w-3.5 rounded-full border-2 border-slate-300" />
+                        ) : item.status === 'success' ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                        ) : item.status === 'duplicate' ? (
+                          <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                        ) : (
+                          <X className="h-3.5 w-3.5 text-rose-500" />
+                        )}
+                      </div>
+                      {/* 内容 */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              item.status === 'success'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : item.status === 'duplicate'
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : item.status === 'error'
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : 'bg-theme-soft text-theme-primary border border-theme-soft-strong'
+                            }`}
+                          >
+                            <Hash className="h-2.5 w-2.5" />
+                            {item.name}
+                          </span>
+                          {item.status === 'duplicate' && (
+                            <span className="text-xs text-amber-500">已存在，跳过</span>
+                          )}
+                          {item.status === 'error' && (
+                            <span className="text-xs text-rose-500">
+                              {item.error || '创建失败'}
+                            </span>
+                          )}
+                        </div>
+                        {item.description && (
+                          <p className="mt-0.5 truncate text-xs text-slate-400">
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 统计 */}
+                {batchDone && (
+                  <div className="flex gap-3 text-xs">
+                    <span className="text-emerald-600">
+                      ✓ {batchItems.filter((i) => i.status === 'success').length} 成功
+                    </span>
+                    {batchItems.filter((i) => i.status === 'duplicate').length > 0 && (
+                      <span className="text-amber-500">
+                        ⚠ {batchItems.filter((i) => i.status === 'duplicate').length} 已存在
+                      </span>
+                    )}
+                    {batchItems.filter((i) => i.status === 'error').length > 0 && (
+                      <span className="text-rose-500">
+                        ✕ {batchItems.filter((i) => i.status === 'error').length} 失败
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 底部按钮 */}
+            <div className="flex justify-end gap-3 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={batchRunning}
+                onClick={() => {
+                  setBatchDialogOpen(false);
+                  resetBatchDialog();
+                }}
+              >
+                {batchDone ? '关闭' : '取消'}
+              </Button>
+              {!batchItems.length ? (
+                <Button type="button" disabled={!batchInput.trim()} onClick={handleBatchPreview}>
+                  解析预览
+                </Button>
+              ) : !batchDone ? (
+                <Button
+                  type="button"
+                  disabled={batchRunning}
+                  onClick={() => void handleBatchImport()}
+                  className="theme-btn-primary"
+                >
+                  {batchRunning ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      导入中…
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-1.5 h-4 w-4" />
+                      确认导入 {batchItems.length} 条
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    resetBatchDialog();
+                    setBatchDialogOpen(false);
+                  }}
+                >
+                  完成
+                </Button>
+              )}
             </div>
           </div>
         </DialogContent>
