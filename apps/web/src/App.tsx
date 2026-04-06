@@ -17,6 +17,8 @@ import Follows from './pages/Follows';
 import Home from './pages/Home';
 import ImageTextCreate from './pages/ImageTextCreate';
 import Login from './pages/Login';
+import MyPosts from './pages/MyPosts';
+import MyResources from './pages/MyResources';
 import MySpace from './pages/MySpace';
 import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
@@ -57,6 +59,10 @@ function RouteTitle() {
       title = '博客分组管理 | Valley';
     } else if (pathname === '/my-space/resource-albums') {
       title = '资源专辑管理 | Valley';
+    } else if (pathname === '/my-space/resources') {
+      title = '资源管理 | Valley';
+    } else if (pathname === '/my-space/posts') {
+      title = '内容管理 | Valley';
     } else if (pathname === '/creators') {
       title = '创作者列表 | Valley';
     } else if (pathname.startsWith('/creator/')) {
@@ -118,6 +124,8 @@ function App() {
           <Route path="my-space/blog-edit/:id" element={<BlogCreate />} />
           <Route path="my-space/blog-groups" element={<BlogGroupManage />} />
           <Route path="my-space/resource-albums" element={<ResourceAlbumManage />} />
+          <Route path="my-space/resources" element={<MyResources />} />
+          <Route path="my-space/posts" element={<MyPosts />} />
           <Route path="profile" element={<Profile />} />
           <Route path="favorites" element={<Favorites />} />
           <Route path="follows" element={<Follows />} />

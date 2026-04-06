@@ -113,6 +113,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 		{
 			creator.GET("/resources", handler.ListResources)
 			creator.POST("/resources/upload", handler.UploadResource)
+			creator.DELETE("/resources/batch", handler.BatchDeleteResources)
+			creator.POST("/resources/batch-visibility", handler.BatchUpdateVisibility)
 			creator.PATCH("/resources/:id", handler.UpdateResource)
 			creator.DELETE("/resources/:id", handler.DeleteResource)
 			creator.GET("/albums", handler.ListMyCreatorAlbums)

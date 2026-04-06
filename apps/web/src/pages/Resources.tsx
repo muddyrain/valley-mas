@@ -1,5 +1,6 @@
-import { ImageIcon, Loader2, Search, Sparkles } from 'lucide-react';
+import { ExternalLink, ImageIcon, Loader2, Search, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   favoriteResource,
@@ -12,6 +13,7 @@ import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
 import TypeFilterBar from '@/components/TypeFilterBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const RESOURCE_TYPES = [
   { label: '全部', value: '' },
@@ -46,6 +48,10 @@ function SectionTitle({
 }
 
 export default function Resources() {
+  const navigate = useNavigate();
+  const { user, profile, fetchProfile } = useAuthStore();
+  const isCreator = user?.role === 'creator';
+
   const [resources, setResources] = useState<Resource[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -55,6 +61,11 @@ export default function Resources() {
   const [keyword, setKeyword] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [favoritedMap, setFavoritedMap] = useState<Record<string, boolean>>({});
+
+  // 若是创作者，预加载 profile 以获取 creatorCode
+  useEffect(() => {
+    if (isCreator) void fetchProfile();
+  }, [isCreator, fetchProfile]);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,6 +184,19 @@ export default function Resources() {
                   {avatarCount} 个头像
                 </div>
               </div>
+
+              {/* 创作者快捷入口 */}
+              {isCreator && profile?.creatorCode && (
+                <div>
+                  <Button
+                    onClick={() => navigate(`/creator/${profile.creatorCode}`)}
+                    className="theme-btn-primary gap-2 rounded-full px-5 font-semibold shadow-md"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    前往我的创作者主页
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="rounded-[32px] border border-white/80 bg-white/82 p-5 shadow-[0_20px_48px_rgba(148,163,184,0.08)] backdrop-blur">

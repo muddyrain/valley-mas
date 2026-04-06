@@ -30,6 +30,15 @@ func GetUserInfo(c *gin.Context) {
 	var downloadCount int64
 	db.Model(&model.DownloadRecord{}).Where("user_id = ?", userID).Count(&downloadCount)
 
+	// 若是创作者，附带 creatorCode（用于前端跳转创作者主页）
+	var creatorCode string
+	if user.Role == "creator" {
+		var creator model.Creator
+		if err := db.Select("code").Where("user_id = ?", user.ID).First(&creator).Error; err == nil {
+			creatorCode = creator.Code
+		}
+	}
+
 	Success(c, gin.H{
 		"id":            user.ID,
 		"username":      user.Username,
@@ -40,6 +49,7 @@ func GetUserInfo(c *gin.Context) {
 		"phone":         user.Phone,
 		"createdAt":     user.CreatedAt,
 		"downloadCount": downloadCount,
+		"creatorCode":   creatorCode,
 	})
 }
 

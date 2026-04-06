@@ -221,6 +221,13 @@ func GetMyDownloads(c *gin.Context) {
 		Order("created_at DESC").
 		Find(&records)
 
+	// 填充缩略图 URL（Resource.ThumbnailURL 不存储在数据库中，需要动态生成）
+	for i := range records {
+		if records[i].Resource != nil {
+			records[i].Resource.FillThumbnailURL()
+		}
+	}
+
 	Success(c, gin.H{
 		"list":  records,
 		"total": total,

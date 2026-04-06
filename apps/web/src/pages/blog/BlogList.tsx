@@ -1,11 +1,12 @@
-﻿import { BookOpen, FolderTree, Sparkles, Tag, X } from 'lucide-react';
+﻿import { BookOpen, ExternalLink, FolderTree, Sparkles, Tag, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Group, Post, Tag as TagType } from '@/api/blog';
 import { getGroups, getPosts, getTags } from '@/api/blog';
 import { BlogFeedCard, TagCloud } from '@/components/blog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 function SectionTitle({
   eyebrow,
@@ -54,6 +55,10 @@ function FilterPanel({
 }
 
 export default function BlogList() {
+  const navigate = useNavigate();
+  const { user, profile, fetchProfile } = useAuthStore();
+  const isCreator = user?.role === 'creator';
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState<Post[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -93,6 +98,11 @@ export default function BlogList() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  // 若是创作者，预加载 profile 以获取 creatorCode
+  useEffect(() => {
+    if (isCreator) void fetchProfile();
+  }, [isCreator, fetchProfile]);
 
   const handleTagClick = (tagSlug: string) => {
     if (!tagSlug) return;
@@ -167,6 +177,19 @@ export default function BlogList() {
                   {tags.length} 个标签
                 </div>
               </div>
+
+              {/* 创作者快捷入口 */}
+              {isCreator && profile?.creatorCode && (
+                <div>
+                  <Button
+                    onClick={() => navigate(`/creator/${profile.creatorCode}`)}
+                    className="theme-btn-primary gap-2 rounded-full px-5 font-semibold shadow-md"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    前往我的创作者主页
+                  </Button>
+                </div>
+              )}
 
               {(selectedTag || selectedGroupId) && (
                 <div className="rounded-[28px] border border-white/80 bg-white/82 p-4 shadow-[0_16px_40px_rgba(148,163,184,0.08)]">

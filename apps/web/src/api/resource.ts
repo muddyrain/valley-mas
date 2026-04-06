@@ -165,12 +165,13 @@ interface MyResourcesResponse {
 
 // 获取我上传的资源列表（需要创作者/管理员权限）
 export const getMyResources = (
-  params: { page?: number; pageSize?: number; type?: string } = {},
+  params: { page?: number; pageSize?: number; type?: string; albumId?: string } = {},
   config?: RequestConfig,
 ) => {
-  const { page = 1, pageSize = 20, type } = params;
+  const { page = 1, pageSize = 20, type, albumId } = params;
   let url = `/creator/resources?page=${page}&pageSize=${pageSize}`;
   if (type) url += `&type=${type}`;
+  if (albumId) url += `&albumId=${albumId}`;
   return http.get<unknown, MyResourcesResponse>(url, config);
 };
 
@@ -208,5 +209,18 @@ export const suggestResourceTitle = (imageBase64: string, type: 'wallpaper' | 'a
   return http.post<unknown, { titles: string[] }>('/creator/ai/suggest-title', {
     imageBase64,
     type,
+  });
+};
+
+// 批量删除资源
+export const batchDeleteResources = (ids: string[]) => {
+  return http.delete<unknown, { deleted: number }>('/creator/resources/batch', { data: { ids } });
+};
+
+// 批量设置资源访问范围
+export const batchUpdateVisibility = (ids: string[], visibility: ResourceVisibility) => {
+  return http.post<unknown, { updated: number }>('/creator/resources/batch-visibility', {
+    ids,
+    visibility,
   });
 };
