@@ -4,6 +4,7 @@
   Download,
   Eye,
   Globe,
+  Hash,
   Heart,
   Lock,
   Pencil,
@@ -36,6 +37,7 @@ export interface ResourceCardItem {
   creatorName?: string;
   creatorAvatar?: string;
   isFavorited?: boolean;
+  tags?: Array<{ id: string; name: string }>;
 }
 
 interface ResourceCardProps<T extends ResourceCardItem = ResourceCardItem> {
@@ -49,6 +51,7 @@ interface ResourceCardProps<T extends ResourceCardItem = ResourceCardItem> {
   showDate?: boolean;
   showEngagement?: boolean;
   showVisibilityTag?: boolean;
+  showTags?: boolean; // 是否在卡片底部展示前 3 个标签
   onClick?: (resource: T) => void;
   animationDelay?: number;
   contentPadding?: string;
@@ -83,7 +86,7 @@ const VISIBILITY_META = {
 } as const;
 
 export function getAspectClass(_type: string) {
-  return 'aspect-square';
+  return 'aspect-[4/3]';
 }
 
 function formatSize(bytes?: number): string {
@@ -104,6 +107,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
   showDate = false,
   showEngagement = false,
   showVisibilityTag = false,
+  showTags = false,
   onClick,
   animationDelay,
   contentPadding = 'p-3',
@@ -161,12 +165,12 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
           src={resource.thumbnailUrl ?? resource.url}
           alt=""
           aria-hidden
-          className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover scale-110 blur-xl opacity-60"
+          className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover scale-110 blur-xl opacity-40"
         />
         <img
           src={resource.thumbnailUrl ?? resource.url}
           alt={resource.title}
-          className="relative h-full w-full object-contain transition-transform duration-500 group-hover:scale-105"
+          className="relative h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
         />
 
@@ -320,6 +324,25 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
             ) : null}
           </div>
         ) : null}
+
+        {showTags && resource.tags && resource.tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {resource.tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag.id}
+                className="inline-flex items-center gap-0.5 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-600 border border-purple-100"
+              >
+                <Hash className="h-2.5 w-2.5" />
+                {tag.name}
+              </span>
+            ))}
+            {resource.tags.length > 3 && (
+              <span className="text-[10px] text-slate-400 self-center">
+                +{resource.tags.length - 3}
+              </span>
+            )}
+          </div>
+        )}
       </CardContent>
 
       <ImagePreviewDialog

@@ -1,15 +1,13 @@
 -- 资源标签表
 CREATE TABLE IF NOT EXISTS resource_tags (
-    id BIGINT PRIMARY KEY,
-    name VARCHAR(30) NOT NULL,
-    slug VARCHAR(30) NOT NULL,
-    color VARCHAR(20) NOT NULL DEFAULT '',
-    resource_count INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    deleted_at TIMESTAMPTZ,
-    CONSTRAINT uq_resource_tags_name UNIQUE (name),
-    CONSTRAINT uq_resource_tags_slug UNIQUE (slug)
+    id             BIGINT       PRIMARY KEY,
+    name           VARCHAR(30)  NOT NULL,
+    description    VARCHAR(100) NOT NULL DEFAULT '',
+    resource_count INTEGER      NOT NULL DEFAULT 0,
+    created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    deleted_at     TIMESTAMPTZ,
+    CONSTRAINT uq_resource_tags_name UNIQUE (name)
 );
 
 CREATE INDEX IF NOT EXISTS idx_resource_tags_deleted_at ON resource_tags (deleted_at);

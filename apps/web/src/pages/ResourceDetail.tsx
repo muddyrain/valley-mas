@@ -6,6 +6,7 @@
   Heart,
   Loader2,
   MonitorSmartphone,
+  Pencil,
   Share2,
   User,
 } from 'lucide-react';
@@ -394,6 +395,22 @@ export default function ResourceDetail() {
                   </>
                 )}
               </Button>
+
+              {(user?.id === resource.userId || user?.role === 'admin') && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() =>
+                    navigate('/my-space/resources', {
+                      state: { editResourceId: resource.id },
+                    })
+                  }
+                  className="h-11 w-11 rounded-xl border-2 border-gray-200 transition-all hover:border-theme-shell-border hover:text-theme-primary"
+                  title="编辑资源"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
 
               <Button
                 variant="outline"

@@ -19,7 +19,7 @@ export interface Resource {
   creatorName: string;
   creatorAvatar: string;
   creatorCode?: string; // 创作者页跳转 code
-  tags: string[];
+  tags: Array<{ id: string; name: string }>;
   createdAt: string;
   size?: number;
   width?: number; // 图片宽度（px）
@@ -42,14 +42,21 @@ export const getHotResources = (page = 1, pageSize = 20) => {
   );
 };
 
-// 获取全部资源（资源广场，支持分页+类型+关键词筛选）
+// 获取全部资源（资源广场，支持分页+类型+关键词+标签筛选）
 export const getAllResources = (
-  params: { page?: number; pageSize?: number; type?: string; keyword?: string } = {},
+  params: {
+    page?: number;
+    pageSize?: number;
+    type?: string;
+    keyword?: string;
+    tagId?: string;
+  } = {},
 ) => {
-  const { page = 1, pageSize = 20, type, keyword } = params;
+  const { page = 1, pageSize = 20, type, keyword, tagId } = params;
   const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (type) query.set('type', type);
   if (keyword) query.set('keyword', keyword);
+  if (tagId) query.set('tagId', tagId);
   return http.get<unknown, ListResponse<Resource>>(`/public/resources?${query.toString()}`);
 };
 
@@ -156,6 +163,7 @@ export interface MyResource {
   downloadCount: number;
   createdAt: string;
   storageKey: string;
+  tags?: ResourceTag[];
 }
 
 interface MyResourcesResponse {
@@ -224,8 +232,7 @@ export const suggestResourceTitle = (imageBase64: string, type: 'wallpaper' | 'a
 export interface ResourceTag {
   id: string;
   name: string;
-  slug: string;
-  color: string;
+  description: string;
   resourceCount: number;
   createdAt: string;
 }
@@ -247,13 +254,23 @@ export const getResourceTags = (
   return http.get<unknown, TagListResponse>(`/admin/resource-tags?${q.toString()}`);
 };
 
+// 获取公开资源标签（无需鉴权）
+export const getPublicResourceTags = (
+  params: { keyword?: string; page?: number; pageSize?: number } = {},
+) => {
+  const { keyword, page = 1, pageSize = 50 } = params;
+  const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (keyword) q.set('keyword', keyword);
+  return http.get<unknown, TagListResponse>(`/public/resource-tags?${q.toString()}`);
+};
+
 // 创建标签
-export const createResourceTag = (data: { name: string; slug?: string; color?: string }) => {
+export const createResourceTag = (data: { name: string; description?: string }) => {
   return http.post<unknown, ResourceTag>('/admin/resource-tags', data);
 };
 
 // 更新标签
-export const updateResourceTag = (id: string, data: { name?: string; color?: string }) => {
+export const updateResourceTag = (id: string, data: { name?: string; description?: string }) => {
   return http.patch<unknown, ResourceTag>(`/admin/resource-tags/${id}`, data);
 };
 
@@ -272,11 +289,11 @@ export const setResourceTags = (resourceId: string, tagIds: string[]) => {
   return http.put<unknown, ResourceTag[]>(`/creator/resources/${resourceId}/tags`, { tagIds });
 };
 
-// AI 自动匹配标签
-export const aiMatchResourceTags = (resourceId: string, imageBase64?: string) => {
+// AI 自动匹配标签（后端直接使用资源 URL，无需前端传图片）
+export const aiMatchResourceTags = (resourceId: string) => {
   return http.post<unknown, { tags: ResourceTag[]; model: string }>(
     `/creator/resources/${resourceId}/tags/ai-match`,
-    imageBase64 ? { imageBase64 } : {},
+    {},
   );
 };
 

@@ -11,6 +11,7 @@
   Palette,
   RefreshCw,
   Sparkles,
+  Tag,
   User,
   Users,
 } from 'lucide-react';
@@ -502,6 +503,15 @@ export default function Header() {
                   >
                     <Sparkles className="text-theme-primary h-4 w-4" />
                     <span className="font-medium">我的创作空间</span>
+                  </DropdownMenuItem>
+                )}
+                {user?.role === 'admin' && (
+                  <DropdownMenuItem
+                    onClick={() => navigate('/my-space/resource-tags')}
+                    className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+                  >
+                    <Tag className="text-theme-primary h-4 w-4" />
+                    <span className="font-medium">资源标签管理</span>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator className="bg-theme-border" />

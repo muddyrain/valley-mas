@@ -97,7 +97,8 @@ func ListResources(c *gin.Context) {
 		query = query.Where("title LIKE ? OR description LIKE ?", like, like)
 	}
 
-	query.Count(&total)
+	countQuery := query
+	countQuery.Count(&total)
 	query.Preload("User").Preload("Tags").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&resources)
 	fillResourceThumbnails(resources)
 

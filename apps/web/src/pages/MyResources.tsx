@@ -2,38 +2,30 @@ import {
   CheckSquare,
   FolderOpen,
   Globe,
-  Hash,
   Image as ImageIcon,
   Layers,
   Loader2,
   Lock,
-  Pencil,
   Plus,
-  Sparkles,
+  RefreshCw,
   Square,
-  Tag,
   Trash2,
   Users,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { type Album, getMyCreatorAlbums } from '@/api/creator';
 import {
-  aiMatchResourceTags,
   batchDeleteResources,
   batchUpdateVisibility,
   deleteResource,
   getMyResources,
-  getResourceTags,
-  getResourceTagsById,
   type MyResource,
-  type ResourceTag,
   type ResourceVisibility,
-  setResourceTags,
-  updateResource,
 } from '@/api/resource';
+import EditResourceDialog from '@/components/EditResourceDialog';
 import EmptyState from '@/components/EmptyState';
 import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
 import TypeFilterBar from '@/components/TypeFilterBar';
@@ -48,12 +40,6 @@ const RESOURCE_TYPES = [
   { label: '头像', value: 'avatar' },
 ];
 
-const VISIBILITY_OPTIONS = [
-  { value: 'private' as const, icon: '🔒', label: '私密', desc: '仅自己可见' },
-  { value: 'shared' as const, icon: '🔗', label: '共享', desc: '有链接可见' },
-  { value: 'public' as const, icon: '🌐', label: '公开', desc: '所有人可见' },
-];
-
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -62,6 +48,7 @@ function formatSize(bytes: number) {
 
 export default function MyResources() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isAuthenticated } = useAuthStore();
 
   const [resources, setResources] = useState<MyResource[]>([]);
@@ -78,17 +65,6 @@ export default function MyResources() {
 
   // 编辑弹窗状态
   const [editTarget, setEditTarget] = useState<MyResource | null>(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editDesc, setEditDesc] = useState('');
-  const [editType, setEditType] = useState('');
-  const [editVisibility, setEditVisibility] = useState<ResourceVisibility>('private');
-  const [editing, setEditing] = useState(false);
-
-  // 编辑弹窗 - 标签状态
-  const [allTags, setAllTags] = useState<ResourceTag[]>([]);
-  const [editTags, setEditTags] = useState<ResourceTag[]>([]);
-  const [tagsLoading, setTagsLoading] = useState(false);
-  const [aiTagLoading, setAiTagLoading] = useState(false);
 
   // 专辑筛选
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -101,6 +77,9 @@ export default function MyResources() {
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [batchUpdatingVisibility, setBatchUpdatingVisibility] = useState(false);
   const [batchVisibilityOpen, setBatchVisibilityOpen] = useState(false);
+
+  // 刷新状态
+  const [refreshing, setRefreshing] = useState(false);
 
   // 权限检查
   useEffect(() => {
@@ -125,7 +104,11 @@ export default function MyResources() {
       setAlbumsLoading(false);
     }
   }, []);
-
+  const loadResource = useCallback(async () => {
+    setRefreshing(true);
+    await loadResources(activeType, activeAlbumId);
+    setRefreshing(false);
+  }, []);
   const loadResources = useCallback(
     async (type = activeType, albumId = activeAlbumId) => {
       try {
@@ -151,6 +134,19 @@ export default function MyResources() {
       loadResources(activeType, activeAlbumId);
     }
   }, [isAuthenticated, user, activeType, activeAlbumId, loadResources, loadAlbums]);
+
+  // 从详情页跳转过来时自动打开编辑弹框
+  useEffect(() => {
+    const editId = (location.state as { editResourceId?: string } | null)?.editResourceId;
+    if (!editId || resources.length === 0) return;
+    const target = resources.find((r) => r.id === editId);
+    if (target) {
+      handleOpenEdit(target);
+      // 清掉 state，防止刷新再次触发
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resources, location.state]);
 
   // 删除资源
   const handleDelete = async () => {
@@ -230,62 +226,6 @@ export default function MyResources() {
   // 打开编辑弹窗
   const handleOpenEdit = (resource: MyResource) => {
     setEditTarget(resource);
-    setEditTitle(resource.title);
-    setEditDesc(resource.description ?? '');
-    setEditType(resource.type);
-    setEditVisibility(resource.visibility || 'private');
-    setEditTags([]);
-    // 并行加载：当前资源标签 + 全部标签库
-    setTagsLoading(true);
-    Promise.all([getResourceTagsById(resource.id), getResourceTags({ pageSize: 200 })])
-      .then(([resTags, allTagsData]) => {
-        setEditTags(resTags);
-        setAllTags(allTagsData.list ?? []);
-      })
-      .catch(() => {
-        /* 静默失败 */
-      })
-      .finally(() => setTagsLoading(false));
-  };
-
-  // 提交编辑
-  const handleEditSubmit = async () => {
-    if (!editTarget) return;
-    try {
-      setEditing(true);
-      // 并行保存：资源信息 + 标签
-      await Promise.all([
-        updateResource(editTarget.id, {
-          title: editTitle.trim() || undefined,
-          description: editDesc.trim() || undefined,
-          type: editType || undefined,
-          visibility: editVisibility,
-        }),
-        setResourceTags(
-          editTarget.id,
-          editTags.map((t) => t.id),
-        ),
-      ]);
-      toast.success('修改成功');
-      setResources((prev) =>
-        prev.map((r) =>
-          r.id === editTarget.id
-            ? {
-                ...r,
-                title: editTitle.trim() || r.title,
-                description: editDesc.trim() || r.description,
-                type: editType || r.type,
-                visibility: editVisibility,
-              }
-            : r,
-        ),
-      );
-      setEditTarget(null);
-    } catch {
-      // 错误已在 request.ts 中通过 toast 显示
-    } finally {
-      setEditing(false);
-    }
   };
 
   if (!isAuthenticated || user?.role !== 'creator') return null;
@@ -318,6 +258,17 @@ export default function MyResources() {
           <div className="flex items-center gap-3">
             {!batchMode ? (
               <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    loadResource();
+                  }}
+                  disabled={refreshing || loading}
+                  className="gap-2 border-slate-200 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary"
+                >
+                  <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  刷新
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => setBatchMode(true)}
@@ -481,7 +432,7 @@ export default function MyResources() {
               />
 
               {loading ? (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
                   {Array.from({ length: 10 }).map((_, i) => (
                     <ResourceCardSkeleton key={i} />
                   ))}
@@ -553,7 +504,7 @@ export default function MyResources() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                  <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
                     {resources.map((resource, i) => (
                       <ResourceCard
                         key={resource.id}
@@ -563,6 +514,7 @@ export default function MyResources() {
                         showSize
                         showDate
                         showVisibilityTag
+                        showTags
                         animationDelay={i * 30}
                         selectable={batchMode}
                         selected={selectedIds.has(resource.id)}
@@ -644,220 +596,29 @@ export default function MyResources() {
         </DialogContent>
       </Dialog>
 
-      {/* ===== 编辑弹窗 ===== */}
-      <Dialog
-        open={!!editTarget}
+      {/* ===== 编辑弹窗（抽离为独立组件） ===== */}
+      <EditResourceDialog
+        resource={editTarget}
         onOpenChange={(open) => {
-          if (!open && !editing && !aiTagLoading) setEditTarget(null);
+          if (!open) setEditTarget(null);
         }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <Pencil className="h-5 w-5 text-theme-primary" />
-              编辑资源信息
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 pt-2">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">资源标题</label>
-              <input
-                type="text"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                placeholder="给这个资源起个名字"
-                maxLength={100}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-primary/40 transition"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                描述 <span className="text-gray-400 font-normal">（可选）</span>
-              </label>
-              <textarea
-                value={editDesc}
-                onChange={(e) => setEditDesc(e.target.value)}
-                placeholder="简单描述一下这个资源…"
-                maxLength={255}
-                rows={2}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-primary/40 transition resize-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">资源类型</label>
-              <div className="flex gap-3">
-                {(['wallpaper', 'avatar'] as const).map((type) => (
-                  <button
-                    type="button"
-                    key={type}
-                    onClick={() => setEditType(type)}
-                    className={`flex-1 py-2.5 rounded-xl font-medium text-sm border-2 transition-all ${
-                      editType === type
-                        ? 'border-theme-primary bg-theme-soft text-theme-primary'
-                        : 'border-gray-200 text-gray-500 hover:border-theme-shell-border'
-                    }`}
-                  >
-                    {type === 'wallpaper' ? '🖼️ 壁纸' : '🙂 头像'}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">可见范围</label>
-              <div className="flex gap-3">
-                {VISIBILITY_OPTIONS.map((option) => (
-                  <button
-                    type="button"
-                    key={option.value}
-                    onClick={() => setEditVisibility(option.value)}
-                    className={`flex-1 py-2.5 rounded-xl font-medium text-sm border-2 transition-all ${
-                      editVisibility === option.value
-                        ? 'border-theme-primary bg-theme-soft text-theme-primary'
-                        : 'border-gray-200 text-gray-500 hover:border-theme-shell-border'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* ── 标签 ── */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                  <Tag className="h-3.5 w-3.5 text-theme-primary" />
-                  标签
-                  <span className="text-gray-400 font-normal">（可选）</span>
-                </label>
-                <button
-                  type="button"
-                  disabled={!editTarget || aiTagLoading || tagsLoading}
-                  onClick={async () => {
-                    if (!editTarget) return;
-                    try {
-                      setAiTagLoading(true);
-                      const result = await aiMatchResourceTags(editTarget.id, editTarget.url);
-                      setEditTags(result.tags);
-                      toast.success(`AI 匹配了 ${result.tags.length} 个标签`);
-                    } catch {
-                      // 统一处理
-                    } finally {
-                      setAiTagLoading(false);
-                    }
-                  }}
-                  className="inline-flex items-center gap-1 rounded-full border border-theme-soft-strong bg-theme-soft px-2.5 py-0.5 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/70 disabled:opacity-50"
-                >
-                  {aiTagLoading ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3 w-3" />
-                  )}
-                  AI 自动匹配
-                </button>
-              </div>
-
-              {tagsLoading ? (
-                <div className="flex items-center gap-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2.5 text-xs text-slate-400">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  加载标签中…
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {/* 已选标签 */}
-                  <div className="flex min-h-8 flex-wrap gap-1.5 rounded-xl border border-slate-100 bg-slate-50/70 p-2">
-                    {editTags.length === 0 ? (
-                      <span className="text-xs text-slate-400">
-                        点击下方标签添加，或使用 AI 自动匹配
-                      </span>
-                    ) : (
-                      editTags.map((tag) => (
-                        <span
-                          key={tag.id}
-                          onClick={() => setEditTags((prev) => prev.filter((t) => t.id !== tag.id))}
-                          className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition hover:opacity-70"
-                          style={{
-                            backgroundColor: (tag.color || '#6366f1') + '18',
-                            color: tag.color || '#6366f1',
-                            border: `1px solid ${tag.color || '#6366f1'}40`,
-                          }}
-                        >
-                          <Hash className="h-2.5 w-2.5" />
-                          {tag.name}
-                          <X className="h-2.5 w-2.5 ml-0.5 opacity-60" />
-                        </span>
-                      ))
-                    )}
-                  </div>
-                  {/* 候选标签 */}
-                  {allTags.length > 0 && (
-                    <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-xl border border-slate-100 bg-white p-2">
-                      {allTags.map((tag) => {
-                        const selected = editTags.some((t) => t.id === tag.id);
-                        return (
-                          <span
-                            key={tag.id}
-                            onClick={() =>
-                              setEditTags((prev) =>
-                                selected ? prev.filter((t) => t.id !== tag.id) : [...prev, tag],
-                              )
-                            }
-                            className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition"
-                            style={{
-                              backgroundColor: selected
-                                ? (tag.color || '#6366f1') + '25'
-                                : (tag.color || '#6366f1') + '10',
-                              color: tag.color || '#6366f1',
-                              border: `1px solid ${tag.color || '#6366f1'}${selected ? '70' : '30'}`,
-                              opacity: selected ? 1 : 0.65,
-                            }}
-                          >
-                            <Hash className="h-2.5 w-2.5" />
-                            {tag.name}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {allTags.length === 0 && (
-                    <p className="text-xs text-slate-400 px-1">
-                      暂无可用标签，请先在「资源标签管理」中创建。
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="flex gap-3 pt-1">
-              <Button
-                variant="outline"
-                onClick={() => setEditTarget(null)}
-                className="flex-1"
-                disabled={editing}
-              >
-                取消
-              </Button>
-              <Button
-                onClick={handleEditSubmit}
-                disabled={editing}
-                className="theme-btn-primary flex-1 font-semibold shadow-md"
-              >
-                {editing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    保存中...
-                  </>
-                ) : (
-                  <>
-                    <Pencil className="h-4 w-4 mr-2" />
-                    保存修改
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        onSuccess={(updated) => {
+          setResources((prev) =>
+            prev.map((r) =>
+              r.id === updated.id
+                ? {
+                    ...r,
+                    title: updated.title,
+                    description: updated.description,
+                    type: updated.type as MyResource['type'],
+                    visibility: updated.visibility,
+                  }
+                : r,
+            ),
+          );
+          loadResource();
+        }}
+      />
 
       {/* ===== 批量设置访问范围弹窗 ===== */}
       <Dialog open={batchVisibilityOpen} onOpenChange={setBatchVisibilityOpen}>

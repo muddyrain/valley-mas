@@ -166,7 +166,7 @@ export default function Home() {
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [favoritedMap, setFavoritedMap] = useState<Record<string, boolean>>({});
 
-  const isCreator = user?.role === 'creator' || user?.role === 'admin';
+  const isCreator = user?.role === 'creator';
 
   useEffect(() => {
     let cancelled = false;

@@ -161,6 +161,11 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 				adminOnly.GET("/records/downloads", handler.ListDownloadRecords)
 				adminOnly.GET("/records/downloads/export", handler.ExportDownloadRecords)
+
+				// 资源标签增删改（仅管理员）
+				adminOnly.POST("/resource-tags", handler.CreateResourceTag)
+				adminOnly.PATCH("/resource-tags/:id", handler.UpdateResourceTag)
+				adminOnly.DELETE("/resource-tags/:id", handler.DeleteResourceTag)
 			}
 
 			content := admin.Group("")
@@ -197,11 +202,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.PUT("/resources/:id/creator", handler.UpdateResourceCreator)
 				content.DELETE("/resources/:id", handler.DeleteResource)
 
-				// 资源标签管理（管理员 / 创作者）
+				// 资源标签管理（查询：创作者+管理员；增删改已移至 adminOnly 组）
 				content.GET("/resource-tags", handler.ListResourceTags)
-				content.POST("/resource-tags", handler.CreateResourceTag)
-				content.PATCH("/resource-tags/:id", handler.UpdateResourceTag)
-				content.DELETE("/resource-tags/:id", handler.DeleteResourceTag)
 				// 资源标签绑定（管理端复用创作者端接口路径前缀不同，单独注册）
 				content.GET("/resources/:id/tags", handler.GetResourceTags)
 				content.PUT("/resources/:id/tags", handler.SetResourceTags)
