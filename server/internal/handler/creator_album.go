@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -158,7 +159,8 @@ func ListMyCreatorAlbums(c *gin.Context) {
 		}).
 		Order("updated_at DESC").
 		Find(&albums).Error; err != nil {
-		Error(c, 500, "加载资源专辑失败")
+		logger.Log.WithField("error", err).Error("ListMyCreatorAlbums query failed")
+		Error(c, 500, "加载资源专辑失败："+err.Error())
 		return
 	}
 
@@ -226,13 +228,15 @@ func CreateCreatorAlbum(c *gin.Context) {
 	}
 
 	if err := db.Create(&album).Error; err != nil {
-		Error(c, 500, "创建资源专辑失败")
+		logger.Log.WithField("error", err).Error("CreateCreatorAlbum insert failed")
+		Error(c, 500, "创建资源专辑失败："+err.Error())
 		return
 	}
 
 	if len(resources) > 0 {
 		if err := db.Model(&album).Association("Resources").Replace(&resources); err != nil {
-			Error(c, 500, "保存专辑资源失败")
+			logger.Log.WithField("error", err).Error("CreateCreatorAlbum associate resources failed")
+			Error(c, 500, "保存专辑资源失败："+err.Error())
 			return
 		}
 	}
@@ -306,18 +310,21 @@ func UpdateCreatorAlbum(c *gin.Context) {
 		"description":       strings.TrimSpace(req.Description),
 		"cover_resource_id": coverResourceID,
 	}).Error; err != nil {
-		Error(c, 500, "更新资源专辑失败")
+		logger.Log.WithField("error", err).Error("UpdateCreatorAlbum update fields failed")
+		Error(c, 500, "更新资源专辑失败："+err.Error())
 		return
 	}
 
 	if len(resources) > 0 {
 		if err := db.Model(&album).Association("Resources").Replace(&resources); err != nil {
-			Error(c, 500, "更新专辑资源失败")
+			logger.Log.WithField("error", err).Error("UpdateCreatorAlbum replace resources failed")
+			Error(c, 500, "更新专辑资源失败："+err.Error())
 			return
 		}
 	} else {
 		if err := db.Model(&album).Association("Resources").Clear(); err != nil {
-			Error(c, 500, "更新专辑资源失败")
+			logger.Log.WithField("error", err).Error("UpdateCreatorAlbum clear resources failed")
+			Error(c, 500, "更新专辑资源失败："+err.Error())
 			return
 		}
 	}
@@ -358,7 +365,8 @@ func DeleteCreatorAlbum(c *gin.Context) {
 	}
 
 	if err := db.Select("Resources").Delete(&album).Error; err != nil {
-		Error(c, 500, "删除资源专辑失败")
+		logger.Log.WithField("error", err).Error("DeleteCreatorAlbum delete failed")
+		Error(c, 500, "删除资源专辑失败："+err.Error())
 		return
 	}
 
@@ -386,32 +394,39 @@ func ListCreatorAlbums(c *gin.Context) {
 		return
 	}
 
-	base := db.Model(&model.CreatorAlbum{}).
-		Distinct("creator_albums.id").
-		Joins("JOIN creator_album_resources ON creator_album_resources.creator_album_id = creator_albums.id").
+	// 子查询：找出"含有公开资源"的专辑 ID 集合（去重交给子查询，外层直接排序）
+	subQuery := db.
+		Table("creator_album_resources").
+		Select("creator_album_resources.creator_album_id").
 		Joins("JOIN resources ON resources.id = creator_album_resources.resource_id").
-		Where("creator_albums.creator_id = ? AND creator_albums.deleted_at IS NULL", creator.ID).
 		Where("resources.deleted_at IS NULL").
-		Where("(resources.visibility = ? OR resources.visibility IS NULL OR resources.visibility = '')", "public")
+		Where("resources.visibility = ? OR resources.visibility IS NULL OR resources.visibility = ''", "public")
+
+	// 外层：在专辑表上过滤 + 关键词 + 排序，不再需要 DISTINCT
+	query := db.Model(&model.CreatorAlbum{}).
+		Where("creator_id = ? AND deleted_at IS NULL", creator.ID).
+		Where("id IN (?)", subQuery)
 
 	if keyword != "" {
 		like := "%" + keyword + "%"
-		base = base.Where("creator_albums.name LIKE ? OR creator_albums.description LIKE ?", like, like)
+		query = query.Where("name LIKE ? OR description LIKE ?", like, like)
 	}
 
 	var total int64
-	if err := base.Count(&total).Error; err != nil {
-		Error(c, 500, "加载资源专辑失败")
+	if err := query.Count(&total).Error; err != nil {
+		logger.Log.WithField("error", err).Error("ListCreatorAlbums count failed")
+		Error(c, 500, "加载资源专辑失败："+err.Error())
 		return
 	}
 
 	var albumIDs []model.Int64String
-	if err := base.
-		Order("creator_albums.updated_at DESC").
+	if err := query.
+		Order("updated_at DESC").
 		Offset(offset).
 		Limit(pageSize).
-		Pluck("creator_albums.id", &albumIDs).Error; err != nil {
-		Error(c, 500, "加载资源专辑失败")
+		Pluck("id", &albumIDs).Error; err != nil {
+		logger.Log.WithField("error", err).Error("ListCreatorAlbums pluck albumIDs failed")
+		Error(c, 500, "加载资源专辑失败："+err.Error())
 		return
 	}
 
@@ -430,7 +445,8 @@ func ListCreatorAlbums(c *gin.Context) {
 		Where("id IN ?", albumIDs).
 		Preload("CoverResource").
 		Find(&albums).Error; err != nil {
-		Error(c, 500, "加载资源专辑失败")
+		logger.Log.WithField("error", err).Error("ListCreatorAlbums find albums failed")
+		Error(c, 500, "加载资源专辑失败："+err.Error())
 		return
 	}
 

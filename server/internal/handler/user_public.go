@@ -307,6 +307,7 @@ func GetCreatorResourcesList(c *gin.Context) {
 	err := query.Order("created_at DESC").
 		Limit(pageSize).
 		Offset(offset).
+		Preload("Tags").
 		Find(&resources).Error
 
 	if err != nil {
@@ -343,6 +344,7 @@ func GetCreatorResourcesList(c *gin.Context) {
 			"title":         resource.Title,
 			"type":          resource.Type,
 			"url":           resource.URL,
+			"thumbnailUrl":  resource.ThumbnailURL,
 			"size":          resource.Size,
 			"width":         resource.Width,
 			"height":        resource.Height,
@@ -354,6 +356,7 @@ func GetCreatorResourcesList(c *gin.Context) {
 			"creatorAvatar": creatorAvatar,
 			"createdAt":     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			"isFavorited":   favoritedSet[rid],
+			"tags":          resource.Tags,
 		})
 	}
 

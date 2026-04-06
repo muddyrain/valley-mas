@@ -4,6 +4,7 @@ import (
 	"log"
 	"strconv"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 	"valley-server/internal/service"
 	"valley-server/internal/utils"
@@ -78,7 +79,8 @@ func ListAvatarHistory(c *gin.Context) {
 		Order("created_at DESC").
 		Limit(pageSize).
 		Find(&list).Error; err != nil {
-		Error(c, 500, "获取头像历史失败")
+		logger.Log.WithField("error", err).Error("ListAvatarHistory query failed")
+		Error(c, 500, "获取头像历史失败："+err.Error())
 		return
 	}
 
@@ -116,7 +118,8 @@ func UseAvatarHistory(c *gin.Context) {
 	}
 
 	if err := db.Model(&user).Update("avatar", history.AvatarURL).Error; err != nil {
-		Error(c, 500, "切换历史头像失败")
+		logger.Log.WithField("error", err).Error("UseAvatarHistory update failed")
+		Error(c, 500, "切换历史头像失败："+err.Error())
 		return
 	}
 
@@ -166,7 +169,8 @@ func UpdateMyProfile(c *gin.Context) {
 	}
 
 	if err := db.Model(&user).Updates(updates).Error; err != nil {
-		Error(c, 500, "更新失败")
+		logger.Log.WithField("error", err).Error("UpdateMyProfile update failed")
+		Error(c, 500, "更新失败："+err.Error())
 		return
 	}
 
@@ -215,7 +219,8 @@ func ChangePassword(c *gin.Context) {
 	hashed := utils.HashPassword(req.NewPassword)
 
 	if err := db.Model(&user).Update("password", hashed).Error; err != nil {
-		Error(c, 500, "修改密码失败")
+		logger.Log.WithField("error", err).Error("ChangePassword update failed")
+		Error(c, 500, "修改密码失败："+err.Error())
 		return
 	}
 
@@ -297,7 +302,8 @@ func UploadAvatar(c *gin.Context) {
 
 	if err := db.Model(&user).Update("avatar", result.URL).Error; err != nil {
 		_ = uploadService.DeleteByKey(result.Key)
-		Error(c, 500, "更新头像失败")
+		logger.Log.WithField("error", err).Error("UpdateAvatar db update failed")
+		Error(c, 500, "更新头像失败："+err.Error())
 		return
 	}
 

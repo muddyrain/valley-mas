@@ -6,6 +6,7 @@
   Image as ImageIcon,
   Plus,
   Sparkles,
+  Tag,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -465,7 +466,7 @@ export default function MySpace() {
                 description="资源专辑、博客分组等管理入口。"
               />
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <button
                 type="button"
                 onClick={() => navigate('/my-space/resource-albums')}
@@ -513,6 +514,18 @@ export default function MySpace() {
                 </div>
                 <div className="font-semibold text-slate-900">全部资源</div>
                 <div className="mt-1 text-sm text-slate-500">查看并管理所有上传资源</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/my-space/resource-tags')}
+                className="rounded-[24px] border border-white/80 bg-white/82 p-5 text-left shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="bg-theme-soft text-theme-primary mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
+                  <Tag className="h-3.5 w-3.5" />
+                  标签管理
+                </div>
+                <div className="font-semibold text-slate-900">资源标签</div>
+                <div className="mt-1 text-sm text-slate-500">为资源添加标签，支持 AI 自动匹配</div>
               </button>
             </div>
           </div>

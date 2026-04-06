@@ -98,7 +98,7 @@ func ListResources(c *gin.Context) {
 	}
 
 	query.Count(&total)
-	query.Preload("User").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&resources)
+	query.Preload("User").Preload("Tags").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&resources)
 	fillResourceThumbnails(resources)
 
 	Success(c, gin.H{
@@ -242,7 +242,8 @@ func DeleteResource(c *gin.Context) {
 
 	// 从数据库软删除
 	if err := db.Delete(&resource).Error; err != nil {
-		Error(c, 500, "删除失败")
+		logrus.WithField("error", err).Error("AdminDeleteResource db delete failed")
+		Error(c, 500, "删除失败："+err.Error())
 		return
 	}
 
@@ -276,7 +277,8 @@ func BatchDeleteResources(c *gin.Context) {
 		query = query.Where("user_id = ?", userID)
 	}
 	if err := query.Find(&resources).Error; err != nil {
-		Error(c, 500, "查询资源失败")
+		logrus.WithField("error", err).Error("BatchDeleteResources query failed")
+		Error(c, 500, "查询资源失败："+err.Error())
 		return
 	}
 	if len(resources) == 0 {
@@ -478,12 +480,13 @@ func UpdateResource(c *gin.Context) {
 	}
 
 	// 返回最新数据
-	db.First(&resource, "id = ?", id)
+	db.Preload("Tags").First(&resource, "id = ?", id)
 	resource.FillThumbnailURL()
 	Success(c, gin.H{
 		"id":          resource.ID,
 		"title":       resource.Title,
 		"description": resource.Description,
 		"type":        resource.Type,
+		"tags":        resource.Tags,
 	})
 }

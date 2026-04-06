@@ -256,7 +256,7 @@ func GetResourceDetail(c *gin.Context) {
 	db := database.GetDB()
 
 	var resource model.Resource
-	if err := db.Where("id = ? AND deleted_at IS NULL", id).First(&resource).Error; err != nil {
+	if err := db.Where("id = ? AND deleted_at IS NULL", id).Preload("Tags").First(&resource).Error; err != nil {
 		Error(c, 404, "资源不存在")
 		return
 	}
@@ -282,7 +282,7 @@ func GetResourceDetail(c *gin.Context) {
 		}
 	}
 	if !canView {
-		Error(c, 404, "?????")
+		Error(c, 404, "资源不存在或无权访问")
 		return
 	}
 
@@ -331,25 +331,27 @@ func GetResourceDetail(c *gin.Context) {
 		"creatorAvatar": user.Avatar,
 		"creatorCode":   creatorCode,
 		"isFavorited":   isFavorited,
+		"tags":          resource.Tags,
 	})
 } // HotResourceResponse 热门资源响应
 type HotResourceResponse struct {
-	ID            string `json:"id"`
-	Title         string `json:"title"`
-	Type          string `json:"type"`
-	URL           string `json:"url"`
-	ThumbnailURL  string `json:"thumbnailUrl"`
-	Size          int64  `json:"size"`
-	Width         int    `json:"width"`
-	Height        int    `json:"height"`
-	Extension     string `json:"extension"`
-	DownloadCount int64  `json:"downloadCount"`
-	FavoriteCount int    `json:"favoriteCount"`
-	UserId        string `json:"userId"`
-	CreatorName   string `json:"creatorName"`
-	CreatorAvatar string `json:"creatorAvatar"`
-	CreatedAt     string `json:"createdAt"`
-	IsFavorited   bool   `json:"isFavorited"`
+	ID            string              `json:"id"`
+	Title         string              `json:"title"`
+	Type          string              `json:"type"`
+	URL           string              `json:"url"`
+	ThumbnailURL  string              `json:"thumbnailUrl"`
+	Size          int64               `json:"size"`
+	Width         int                 `json:"width"`
+	Height        int                 `json:"height"`
+	Extension     string              `json:"extension"`
+	DownloadCount int64               `json:"downloadCount"`
+	FavoriteCount int                 `json:"favoriteCount"`
+	UserId        string              `json:"userId"`
+	CreatorName   string              `json:"creatorName"`
+	CreatorAvatar string              `json:"creatorAvatar"`
+	CreatedAt     string              `json:"createdAt"`
+	IsFavorited   bool                `json:"isFavorited"`
+	Tags          []model.ResourceTag `json:"tags"`
 }
 
 // GetHotResources 获取热门资源
@@ -394,6 +396,7 @@ func GetHotResources(c *gin.Context) {
 		Order("download_count DESC, created_at DESC").
 		Limit(pageSize).
 		Offset(offset).
+		Preload("Tags").
 		Find(&resources).Error
 
 	if err != nil {
@@ -445,6 +448,7 @@ func GetHotResources(c *gin.Context) {
 			CreatorAvatar: user.Avatar,
 			CreatedAt:     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			IsFavorited:   favoritedSet[rid],
+			Tags:          resource.Tags,
 		})
 	}
 
@@ -490,7 +494,7 @@ func GetAllResources(c *gin.Context) {
 	query.Count(&total)
 
 	var resources []model.Resource
-	if err := query.Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&resources).Error; err != nil {
+	if err := query.Order("created_at DESC").Limit(pageSize).Offset(offset).Preload("Tags").Find(&resources).Error; err != nil {
 		Error(c, 500, "查询失败: "+err.Error())
 		return
 	}
@@ -533,6 +537,7 @@ func GetAllResources(c *gin.Context) {
 			CreatorAvatar: user.Avatar,
 			CreatedAt:     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			IsFavorited:   favoritedSet[rid],
+			Tags:          resource.Tags,
 		})
 	}
 

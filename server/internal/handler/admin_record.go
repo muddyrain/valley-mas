@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -64,7 +65,8 @@ func ListDownloadRecords(c *gin.Context) {
 	// 查询总数
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
-		Error(c, 500, "查询下载记录总数失败")
+		logger.Log.WithField("error", err).Error("ListDownloadRecords count failed")
+		Error(c, 500, "查询下载记录总数失败："+err.Error())
 		return
 	}
 
@@ -79,7 +81,8 @@ func ListDownloadRecords(c *gin.Context) {
 		Offset(offset).
 		Limit(pageSize).
 		Find(&records).Error; err != nil {
-		Error(c, 500, "查询下载记录列表失败")
+		logger.Log.WithField("error", err).Error("ListDownloadRecords list failed")
+		Error(c, 500, "查询下载记录列表失败："+err.Error())
 		return
 	}
 
@@ -182,7 +185,8 @@ func ExportDownloadRecords(c *gin.Context) {
 		Preload("Creator.User").
 		Order("download_records.created_at DESC").
 		Find(&records).Error; err != nil {
-		Error(c, 500, "导出下载记录失败")
+		logger.Log.WithField("error", err).Error("ExportDownloadRecords query failed")
+		Error(c, 500, "导出下载记录失败："+err.Error())
 		return
 	}
 

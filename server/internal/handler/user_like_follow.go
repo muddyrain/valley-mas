@@ -3,6 +3,7 @@ package handler
 import (
 	"strconv"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 	"valley-server/internal/utils"
 
@@ -42,7 +43,8 @@ func FavoriteResource(c *gin.Context) {
 		if existing.DeletedAt.Valid {
 			// 已软删除，恢复
 			if err := db.Unscoped().Model(&existing).Update("deleted_at", nil).Error; err != nil {
-				Error(c, 500, "收藏失败")
+				logger.Log.WithField("error", err).Error("FavoriteResource restore failed")
+				Error(c, 500, "收藏失败："+err.Error())
 				return
 			}
 			// 收藏数 +1
@@ -60,13 +62,15 @@ func FavoriteResource(c *gin.Context) {
 			ResourceID: rid,
 		}
 		if err := db.Create(&fav).Error; err != nil {
-			Error(c, 500, "收藏失败")
+			logger.Log.WithField("error", err).Error("FavoriteResource create failed")
+			Error(c, 500, "收藏失败："+err.Error())
 			return
 		}
 		// 收藏数 +1
 		db.Model(&model.Resource{}).Where("id = ?", rid).UpdateColumn("favorite_count", gorm.Expr("favorite_count + 1"))
 	} else {
-		Error(c, 500, "操作失败")
+		logger.Log.WithField("error", err).Error("FavoriteResource check existing failed")
+		Error(c, 500, "操作失败："+err.Error())
 		return
 	}
 
@@ -90,7 +94,8 @@ func UnfavoriteResource(c *gin.Context) {
 	result := db.Where("user_id = ? AND resource_id = ?", uid, resourceID).
 		Delete(&model.UserFavorite{})
 	if result.Error != nil {
-		Error(c, 500, "取消收藏失败")
+		logger.Log.WithField("error", result.Error).Error("UnfavoriteResource delete failed")
+		Error(c, 500, "取消收藏失败："+result.Error.Error())
 		return
 	}
 	// 若确实删除了记录，收藏数 -1（不低于 0）
@@ -246,7 +251,8 @@ func FollowCreator(c *gin.Context) {
 		if existing.DeletedAt.Valid {
 			// 恢复关注
 			if err := db.Unscoped().Model(&existing).Update("deleted_at", nil).Error; err != nil {
-				Error(c, 500, "关注失败")
+				logger.Log.WithField("error", err).Error("FollowCreator restore failed")
+				Error(c, 500, "关注失败："+err.Error())
 				return
 			}
 		} else {
@@ -260,11 +266,13 @@ func FollowCreator(c *gin.Context) {
 			CreatorID: cid,
 		}
 		if err := db.Create(&follow).Error; err != nil {
-			Error(c, 500, "关注失败")
+			logger.Log.WithField("error", err).Error("FollowCreator create failed")
+			Error(c, 500, "关注失败："+err.Error())
 			return
 		}
 	} else {
-		Error(c, 500, "操作失败")
+		logger.Log.WithField("error", err).Error("FollowCreator check existing failed")
+		Error(c, 500, "操作失败："+err.Error())
 		return
 	}
 
@@ -288,7 +296,8 @@ func UnfollowCreator(c *gin.Context) {
 	result := db.Where("user_id = ? AND creator_id = ?", uid, creatorID).
 		Delete(&model.UserFollow{})
 	if result.Error != nil {
-		Error(c, 500, "取消关注失败")
+		logger.Log.WithField("error", result.Error).Error("UnfollowCreator delete failed")
+		Error(c, 500, "取消关注失败："+result.Error.Error())
 		return
 	}
 
