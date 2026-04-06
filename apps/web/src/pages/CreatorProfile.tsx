@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   Award,
   Download,
+  FolderOpen,
   Image as ImageIcon,
   Search,
   Share2,
@@ -14,8 +15,10 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
+  type Album,
   type Creator,
   followCreator,
+  getCreatorAlbums,
   getCreatorByCode,
   getCreatorFollowStatus,
   getCreatorWorks,
@@ -64,7 +67,9 @@ export default function CreatorProfile() {
   const { code } = useParams<{ code: string }>();
   const [creator, setCreator] = useState<Creator | null>(null);
   const [works, setWorks] = useState<Resource[]>([]);
+  const [albums, setAlbums] = useState<Album[]>([]);
   const [activeCategory, setActiveCategory] = useState('');
+  const [activeAlbumId, setActiveAlbumId] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isFollowing, setIsFollowing] = useState(false);
   const [isSelf, setIsSelf] = useState(false);
@@ -76,6 +81,35 @@ export default function CreatorProfile() {
   // 作品收藏状态：key = resourceId, value = boolean
   const [favoritedMap, setFavoritedMap] = useState<Record<string, boolean>>({});
   const user = useAuthStore((state) => state.user);
+
+  const hydrateWorks = (list: Resource[]) => {
+    setWorks(list);
+    const map: Record<string, boolean> = {};
+    list.forEach((work) => {
+      map[work.id] = work.isFavorited ?? false;
+    });
+    setFavoritedMap(map);
+  };
+
+  const loadWorks = async (
+    creatorId: string,
+    params: {
+      keyword?: string;
+      type?: string;
+      albumId?: string;
+    } = {},
+  ) => {
+    setWorksLoading(true);
+    try {
+      const data = await getCreatorWorks(creatorId, params);
+      hydrateWorks(data.list);
+    } catch (error) {
+      console.error('加载作品失败:', error);
+    } finally {
+      setWorksLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!code) return;
 
@@ -86,9 +120,10 @@ export default function CreatorProfile() {
         setCreator(creatorData);
         setFollowerCount(creatorData.followerCount || 0);
 
-        // 并行加载作品和关注状态
-        const [worksData] = await Promise.all([
+        // 并行加载作品、专辑和关注状态
+        const [worksData, albumsData] = await Promise.all([
           getCreatorWorks(creatorData.id),
+          getCreatorAlbums(creatorData.id),
           // 查询关注状态（接口失败不影响主流程）
           user?.id
             ? getCreatorFollowStatus(creatorData.id)
@@ -100,14 +135,8 @@ export default function CreatorProfile() {
                 .catch(() => {})
             : Promise.resolve(),
         ]);
-        setWorks(worksData.list);
-
-        // 直接从列表响应中读取 isFavorited 字段（服务端对登录用户返回收藏状态）
-        const map: Record<string, boolean> = {};
-        worksData.list.forEach((w) => {
-          map[w.id] = w.isFavorited ?? false;
-        });
-        setFavoritedMap(map);
+        hydrateWorks(worksData.list);
+        setAlbums(albumsData.list || []);
       } catch (error) {
         console.error('加载创作者数据失败:', error);
       } finally {
@@ -161,24 +190,16 @@ export default function CreatorProfile() {
     if (!creator) return;
 
     try {
-      setWorksLoading(true);
-      const params: { keyword?: string; type?: string } = {};
+      const params: { keyword?: string; type?: string; albumId?: string } = {};
       if (searchKeyword) params.keyword = searchKeyword;
       if (activeCategory) params.type = activeCategory;
+      if (activeAlbumId) params.albumId = activeAlbumId;
 
       if (activeTab === 'works') {
-        const data = await getCreatorWorks(creator.id, params);
-        setWorks(data.list);
-        const map: Record<string, boolean> = {};
-        data.list.forEach((w) => {
-          map[w.id] = w.isFavorited ?? false;
-        });
-        setFavoritedMap(map);
+        await loadWorks(creator.id, params);
       }
     } catch (error) {
       console.error('搜索失败:', error);
-    } finally {
-      setWorksLoading(false);
     }
   };
 
@@ -187,23 +208,35 @@ export default function CreatorProfile() {
     if (!creator) return;
     setActiveCategory(categoryValue);
     try {
-      setWorksLoading(true);
-      const params: { keyword?: string; type?: string } = {};
+      const params: { keyword?: string; type?: string; albumId?: string } = {};
       if (searchKeyword) params.keyword = searchKeyword;
       if (categoryValue) params.type = categoryValue;
+      if (activeAlbumId) params.albumId = activeAlbumId;
 
-      const data = await getCreatorWorks(creator.id, params);
-      setWorks(data.list);
-      const map: Record<string, boolean> = {};
-      data.list.forEach((w) => {
-        map[w.id] = w.isFavorited ?? false;
-      });
-      setFavoritedMap(map);
+      await loadWorks(creator.id, params);
     } catch (error) {
       console.error('筛选失败:', error);
-    } finally {
-      setWorksLoading(false);
     }
+  };
+
+  const handleAlbumOpen = async (albumId: string) => {
+    if (!creator) return;
+    setActiveAlbumId(albumId);
+    setActiveTab('works');
+    await loadWorks(creator.id, {
+      keyword: searchKeyword || undefined,
+      type: activeCategory || undefined,
+      albumId,
+    });
+  };
+
+  const handleClearAlbumFilter = async () => {
+    if (!creator) return;
+    setActiveAlbumId('');
+    await loadWorks(creator.id, {
+      keyword: searchKeyword || undefined,
+      type: activeCategory || undefined,
+    });
   };
 
   if (loading) {
@@ -374,6 +407,13 @@ export default function CreatorProfile() {
                   {works.length}
                 </Badge>
               </TabsTrigger>
+              <TabsTrigger value="albums" className={triggerClassName}>
+                <FolderOpen className="mr-2 h-5 w-5" />
+                专辑
+                <Badge className="ml-2 border-0 bg-theme-soft text-theme-primary data-[state=active]:bg-white/18 data-[state=active]:text-white">
+                  {albums.length}
+                </Badge>
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -387,7 +427,19 @@ export default function CreatorProfile() {
                     <div className="h-6 w-1 rounded-full bg-[var(--theme-primary)]" />
                     <h3 className="text-lg font-bold text-slate-900">分类筛选</h3>
                   </div>
-                  <span className="text-sm text-slate-500">{works.length} 个作品</span>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {activeAlbumId ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleClearAlbumFilter()}
+                        className="rounded-full bg-theme-soft px-3 py-1 text-xs font-medium text-theme-primary transition hover:bg-theme-soft-strong"
+                      >
+                        当前专辑：
+                        {albums.find((album) => album.id === activeAlbumId)?.name || '已选专辑'}
+                      </button>
+                    ) : null}
+                    <span className="text-sm text-slate-500">{works.length} 个作品</span>
+                  </div>
                 </div>
                 <TypeFilterBar
                   options={categories}
@@ -449,6 +501,66 @@ export default function CreatorProfile() {
                       onFavorite={handleFavorite}
                       contentPadding="p-4"
                     />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="albums" className="mt-0">
+              {albums.length === 0 ? (
+                <div className="rounded-2xl border border-theme-shell-border bg-white/80 px-6 py-20 text-center shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.08)]">
+                  <div className="mb-6 inline-flex h-24 w-24 items-center justify-center rounded-full bg-theme-soft">
+                    <FolderOpen className="h-12 w-12 text-theme-primary" />
+                  </div>
+                  <h3 className="mb-2 text-xl font-semibold text-slate-900">还没有公开专辑</h3>
+                  <p className="text-slate-500">这个创作者暂时还没有整理出可浏览的资源专辑。</p>
+                </div>
+              ) : (
+                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {albums.map((album) => (
+                    <div
+                      key={album.id}
+                      className="overflow-hidden rounded-2xl border border-theme-shell-border bg-white/84 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_rgba(var(--theme-primary-rgb),0.16)]"
+                    >
+                      <div className="h-44 overflow-hidden bg-theme-soft">
+                        {album.coverUrl ? (
+                          <img
+                            src={album.coverUrl}
+                            alt={album.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            <FolderOpen className="h-12 w-12 text-theme-primary/50" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="truncate text-lg font-semibold text-slate-900">
+                              {album.name}
+                            </h3>
+                            <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
+                              {album.description || '这个专辑暂时还没有补充更多说明。'}
+                            </p>
+                          </div>
+                          <span className="rounded-full bg-theme-soft px-3 py-1 text-xs font-medium text-theme-primary">
+                            {album.resourceCount} 项
+                          </span>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void handleAlbumOpen(album.id)}
+                          className="mt-4 w-full rounded-xl border-theme-soft-strong bg-white/80 text-theme-primary hover:bg-theme-soft"
+                        >
+                          查看专辑作品
+                        </Button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

@@ -1,8 +1,6 @@
 ﻿import {
   AudioLines,
-  BadgeCheck,
   Bell,
-  BellRing,
   BookOpen,
   CheckCheck,
   Download,
@@ -15,7 +13,6 @@
   Sparkles,
   User,
   Users,
-  XCircle,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -40,36 +37,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { THEME_OPTIONS, useThemeStore } from '@/stores/useThemeStore';
-
-const formatNotifyTime = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return `${date.getMonth() + 1}-${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-};
-
-const getNotificationVisual = (type: string, content: string) => {
-  if (type === 'creator_application_review') {
-    const rejected = content.includes('未通过') || content.includes('拒绝');
-    if (rejected) {
-      return {
-        icon: XCircle,
-        iconClass: 'text-rose-600',
-        iconBgClass: 'bg-rose-100',
-      };
-    }
-    return {
-      icon: BadgeCheck,
-      iconClass: 'text-emerald-600',
-      iconBgClass: 'bg-emerald-100',
-    };
-  }
-
-  return {
-    icon: BellRing,
-    iconClass: 'text-amber-700',
-    iconBgClass: 'bg-amber-100',
-  };
-};
+import {
+  emitNotificationStateChanged,
+  formatNotificationTime,
+  getNotificationVisual,
+  NOTIFICATION_STATE_CHANGED_EVENT,
+  type NotificationStateChangedDetail,
+} from '@/utils/notification';
 
 export default function Header() {
   const navigate = useNavigate();
@@ -117,6 +91,22 @@ export default function Header() {
     };
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const handleNotificationStateChanged = (event: Event) => {
+      const detail = (event as CustomEvent<NotificationStateChangedDetail>).detail;
+      if (typeof detail?.unreadCount === 'number') {
+        setUnreadCount(Math.max(0, detail.unreadCount));
+      }
+    };
+
+    window.addEventListener(NOTIFICATION_STATE_CHANGED_EVENT, handleNotificationStateChanged);
+    return () => {
+      window.removeEventListener(NOTIFICATION_STATE_CHANGED_EVENT, handleNotificationStateChanged);
+    };
+  }, [isAuthenticated]);
+
   const loadNotifications = async () => {
     if (!isAuthenticated) return;
     setNotifyLoading(true);
@@ -139,7 +129,11 @@ export default function Header() {
           n.id === item.id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n,
         ),
       );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
+      setUnreadCount((prev) => {
+        const next = Math.max(0, prev - 1);
+        emitNotificationStateChanged({ unreadCount: next });
+        return next;
+      });
     } catch {
       // request.ts 已统一 toast
     }
@@ -153,6 +147,7 @@ export default function Header() {
         prev.map((n) => (n.isRead ? n : { ...n, isRead: true, readAt: new Date().toISOString() })),
       );
       setUnreadCount(0);
+      emitNotificationStateChanged({ unreadCount: 0 });
       toast.success('已全部标记为已读');
     } catch {
       // request.ts 已统一 toast
@@ -415,7 +410,7 @@ export default function Header() {
                                   {item.content}
                                 </p>
                                 <p className="mt-1 text-[11px] text-slate-400">
-                                  {formatNotifyTime(item.createdAt)}
+                                  {formatNotificationTime(item.createdAt)}
                                 </p>
                               </div>
                             </div>
@@ -425,6 +420,13 @@ export default function Header() {
                     ))
                   )}
                 </div>
+                <DropdownMenuSeparator className="bg-theme-border" />
+                <DropdownMenuItem
+                  onClick={() => navigate('/notifications')}
+                  className="hover:bg-theme-soft cursor-pointer justify-center rounded-xl py-2.5 text-sm font-medium text-theme-primary transition-colors"
+                >
+                  查看全部通知
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}

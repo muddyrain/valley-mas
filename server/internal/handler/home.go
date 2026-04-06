@@ -117,6 +117,7 @@ type HotCreatorResponse struct {
 	Avatar        string `json:"avatar" example:"https://example.com/avatar.jpg"`
 	ResourceCount int    `json:"resourceCount" example:"156"`
 	DownloadCount int64  `json:"downloadCount" example:"8920"`
+	FollowerCount int64  `json:"followerCount" example:"365"`
 	Description   string `json:"description" example:"分享精美头像和壁纸"`
 	CreatedAt     string `json:"createdAt" example:"2026-03-01T12:00:00Z"`
 }
@@ -217,6 +218,7 @@ func GetHotCreators(c *gin.Context) {
 	for i, creator := range creators {
 		var resourceCount int64
 		var downloadCount int64
+		var followerCount int64
 
 		db.Model(&model.Resource{}).
 			Where("user_id = ? AND deleted_at IS NULL", creator.UserID).
@@ -227,8 +229,13 @@ func GetHotCreators(c *gin.Context) {
 			Select("COALESCE(SUM(download_count), 0)").
 			Scan(&downloadCount)
 
+		db.Model(&model.UserFollow{}).
+			Where("creator_id = ?", creator.ID).
+			Count(&followerCount)
+
 		response[i].ResourceCount = int(resourceCount)
 		response[i].DownloadCount = downloadCount
+		response[i].FollowerCount = followerCount
 	}
 
 	c.JSON(200, gin.H{

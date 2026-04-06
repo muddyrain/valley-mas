@@ -52,6 +52,21 @@ func Init(cfg *config.Config) error {
 		return fmt.Errorf("failed to connect database: %w", err)
 	}
 
+	sqlDB, err := DB.DB()
+	if err != nil {
+		return fmt.Errorf("failed to get sql db handle: %w", err)
+	}
+
+	// 对 Supabase / 远程 PostgreSQL 默认收紧连接池，避免 session pool 被单进程占满。
+	sqlDB.SetMaxOpenConns(cfg.Database.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.Database.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(time.Duration(cfg.Database.ConnMaxLifetimeMin) * time.Minute)
+	sqlDB.SetConnMaxIdleTime(time.Duration(cfg.Database.ConnMaxIdleTimeMin) * time.Minute)
+
+	if err := sqlDB.Ping(); err != nil {
+		return fmt.Errorf("failed to ping database: %w", err)
+	}
+
 	if cfg.Database.AutoMigrate {
 		if err := autoMigrate(); err != nil {
 			return fmt.Errorf("failed to migrate database: %w", err)
@@ -60,7 +75,14 @@ func Init(cfg *config.Config) error {
 		log.Printf("Auto migrate skipped (DB_AUTO_MIGRATE=false)")
 	}
 
-	log.Printf("Database connected successfully (driver: %s)", cfg.Database.Driver)
+	log.Printf(
+		"Database connected successfully (driver: %s, max_open=%d, max_idle=%d, lifetime_min=%d, idle_min=%d)",
+		cfg.Database.Driver,
+		cfg.Database.MaxOpenConns,
+		cfg.Database.MaxIdleConns,
+		cfg.Database.ConnMaxLifetimeMin,
+		cfg.Database.ConnMaxIdleTimeMin,
+	)
 	return nil
 }
 
@@ -113,6 +135,7 @@ func autoMigrate() error {
 		&model.UserFollow{},
 		&model.UserAvatarHistory{},
 		&model.UserNotification{},
+		&model.CreatorAlbum{},
 		&model.PostGroup{},
 		&model.Post{},
 		&model.PostCategory{},

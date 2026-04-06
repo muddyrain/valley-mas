@@ -18,8 +18,10 @@ import Home from './pages/Home';
 import ImageTextCreate from './pages/ImageTextCreate';
 import Login from './pages/Login';
 import MySpace from './pages/MySpace';
+import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
 import Register from './pages/Register';
+import ResourceAlbumManage from './pages/ResourceAlbumManage';
 import ResourceDetail from './pages/ResourceDetail';
 import Resources from './pages/Resources';
 import TTSStudio from './pages/TTSStudio';
@@ -53,6 +55,8 @@ function RouteTitle() {
       title = '编辑博客 | Valley';
     } else if (pathname === '/my-space/blog-groups') {
       title = '博客分组管理 | Valley';
+    } else if (pathname === '/my-space/resource-albums') {
+      title = '资源专辑管理 | Valley';
     } else if (pathname === '/creators') {
       title = '创作者列表 | Valley';
     } else if (pathname.startsWith('/creator/')) {
@@ -63,6 +67,8 @@ function RouteTitle() {
       title = '我的关注 | Valley';
     } else if (pathname === '/downloads') {
       title = '下载记录 | Valley';
+    } else if (pathname === '/notifications') {
+      title = '通知中心 | Valley';
     } else if (pathname === '/profile') {
       title = '个人资料 | Valley';
     } else if (pathname === '/apply-creator') {
@@ -111,10 +117,12 @@ function App() {
           <Route path="my-space/blog-create" element={<BlogCreate />} />
           <Route path="my-space/blog-edit/:id" element={<BlogCreate />} />
           <Route path="my-space/blog-groups" element={<BlogGroupManage />} />
+          <Route path="my-space/resource-albums" element={<ResourceAlbumManage />} />
           <Route path="profile" element={<Profile />} />
           <Route path="favorites" element={<Favorites />} />
           <Route path="follows" element={<Follows />} />
           <Route path="downloads" element={<Downloads />} />
+          <Route path="notifications" element={<Notifications />} />
           <Route path="apply-creator" element={<ApplyCreator />} />
           <Route path="blog" element={<BlogList />} />
           <Route path="blog/:id" element={<BlogPost />} />

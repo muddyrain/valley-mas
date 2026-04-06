@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 	"valley-server/internal/utils"
@@ -118,32 +119,110 @@ func VerifyCode(c *gin.Context) {
 
 // GetCreatorResources 获取创作者资源列表
 func GetCreatorResources(c *gin.Context) {
-	code := c.Param("code")
+	code := utils.NormalizeCode(c.Param("code"))
 	resourceType := c.Query("type") // avatar, wallpaper, 空则全部
-	page := c.DefaultQuery("page", "1")
-	pageSize := c.DefaultQuery("pageSize", "20")
+	keyword := c.Query("keyword")
+	page := GetIntQuery(c, "page", 1)
+	pageSize := GetIntQuery(c, "pageSize", 20)
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 50 {
+		pageSize = 50
+	}
+	offset := (page - 1) * pageSize
 
-	_ = code
-	_ = resourceType
-	_ = page
-	_ = pageSize
+	db := database.GetDB()
 
-	// TODO: 查询数据库
+	// 兼容旧接口：通过创作者口令查找创作者，再返回公开资源列表。
+	var creator model.Creator
+	if err := db.Where("code = ? AND is_active = ? AND deleted_at IS NULL", code, true).
+		First(&creator).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(c, http.StatusNotFound, "创作者不存在或未激活")
+			return
+		}
+		Error(c, http.StatusInternalServerError, "查询创作者失败")
+		return
+	}
+
+	query := db.Model(&model.Resource{}).
+		Where("user_id = ? AND deleted_at IS NULL", creator.UserID).
+		Where("(visibility = ? OR visibility IS NULL OR visibility = '')", "public")
+
+	if resourceType != "" {
+		query = query.Where("type = ?", resourceType)
+	}
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		query = query.Where("title LIKE ? OR description LIKE ?", like, like)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "查询资源总数失败")
+		return
+	}
+
+	var resources []model.Resource
+	if err := query.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&resources).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "查询资源列表失败")
+		return
+	}
+
+	var creatorName, creatorAvatar string
+	var user model.User
+	if err := db.Where("id = ? AND deleted_at IS NULL", creator.UserID).First(&user).Error; err == nil {
+		creatorName = user.Nickname
+		creatorAvatar = user.Avatar
+	}
+
+	favoritedSet := map[string]bool{}
+	if uid, exists := c.Get("userId"); exists {
+		if userID, ok := uid.(int64); ok {
+			var favs []model.UserFavorite
+			db.Where("user_id = ? AND deleted_at IS NULL", userID).Find(&favs)
+			for _, fav := range favs {
+				favoritedSet[strconv.FormatInt(int64(fav.ResourceID), 10)] = true
+			}
+		}
+	}
+
+	resourceList := make([]gin.H, 0, len(resources))
+	for _, resource := range resources {
+		rid := strconv.FormatInt(int64(resource.ID), 10)
+		resourceList = append(resourceList, gin.H{
+			"id":            resource.ID,
+			"title":         resource.Title,
+			"type":          resource.Type,
+			"url":           resource.URL,
+			"size":          resource.Size,
+			"width":         resource.Width,
+			"height":        resource.Height,
+			"extension":     resource.Extension,
+			"downloadCount": resource.DownloadCount,
+			"favoriteCount": resource.FavoriteCount,
+			"userId":        resource.UserID,
+			"creatorName":   creatorName,
+			"creatorAvatar": creatorAvatar,
+			"createdAt":     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			"isFavorited":   favoritedSet[rid],
+		})
+	}
+
+	totalPages := 0
+	if total > 0 {
+		totalPages = int((total + int64(pageSize) - 1) / int64(pageSize))
+	}
 
 	Success(c, gin.H{
-		"list": []gin.H{
-			{
-				"id":            "1",
-				"title":         "可爱卡通头像",
-				"type":          "avatar",
-				"url":           "https://placeholder.co/400x400",
-				"size":          102400,
-				"downloadCount": 128,
-			},
-		},
-		"total":      1,
-		"page":       1,
-		"pageSize":   20,
-		"totalPages": 1,
+		"list":       resourceList,
+		"total":      total,
+		"page":       page,
+		"pageSize":   pageSize,
+		"totalPages": totalPages,
 	})
 }
