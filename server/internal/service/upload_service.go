@@ -60,7 +60,7 @@ func GetDefaultConfig(uploadType UploadType) UploadConfig {
 	configs := map[UploadType]UploadConfig{
 		UploadTypeUserAvatar: {
 			Type:        UploadTypeUserAvatar,
-			MaxSize:     2, // 2MB
+			MaxSize:     5, // 5MB
 			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
 		},
 		UploadTypeAvatar: {
@@ -70,17 +70,17 @@ func GetDefaultConfig(uploadType UploadType) UploadConfig {
 		},
 		UploadTypeWallpaper: {
 			Type:        UploadTypeWallpaper,
-			MaxSize:     5, // 5MB
+			MaxSize:     10, // 10MB
 			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
 		},
 		UploadTypeCover: {
 			Type:        UploadTypeCover,
-			MaxSize:     3, // 3MB
+			MaxSize:     10, // 10MB
 			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
 		},
 		UploadTypeImageText: {
 			Type:        UploadTypeImageText,
-			MaxSize:     8, // 8MB
+			MaxSize:     10, // 10MB
 			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
 		},
 	}
