@@ -119,6 +119,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			creator.POST("/albums", handler.CreateCreatorAlbum)
 			creator.PUT("/albums/:id", handler.UpdateCreatorAlbum)
 			creator.DELETE("/albums/:id", handler.DeleteCreatorAlbum)
+			creator.POST("/ai/suggest-title", handler.SuggestResourceTitle)
 		}
 
 		admin := api.Group("/admin")

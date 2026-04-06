@@ -202,3 +202,11 @@ export const updateResource = (
     }
   >(`/creator/resources/${id}`, data);
 };
+
+// AI 根据图片内容建议多个资源标题
+export const suggestResourceTitle = (imageBase64: string, type: 'wallpaper' | 'avatar') => {
+  return http.post<unknown, { titles: string[] }>('/creator/ai/suggest-title', {
+    imageBase64,
+    type,
+  });
+};

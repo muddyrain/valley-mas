@@ -28,6 +28,7 @@ import {
   getMyResources,
   type MyResource,
   type ResourceVisibility,
+  suggestResourceTitle,
   updateResource,
   uploadResource,
 } from '@/api/resource';
@@ -113,6 +114,8 @@ export default function MySpace() {
   const [uploadDesc, setUploadDesc] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [aiNaming, setAiNaming] = useState(false);
+  const [aiTitles, setAiTitles] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 删除确认状态
@@ -244,6 +247,53 @@ export default function MySpace() {
     setUploadTitle(file.name.replace(/\.[^/.]+$/, ''));
   };
 
+  // 将图片压缩为小尺寸 base64（给 AI 用，不影响实际上传）
+  const resizeImageForAI = (file: File, maxSize = 512): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  };
+
+  // AI 起名
+  const handleAiSuggestTitle = async () => {
+    if (!uploadFile || !previewUrl) {
+      toast.error('请先选择图片');
+      return;
+    }
+    try {
+      setAiNaming(true);
+      setAiTitles([]);
+      // 压缩到 512px 以内再发给 AI，大幅减少传输与解析时间
+      const base64 = await resizeImageForAI(uploadFile, 512);
+      const result = await suggestResourceTitle(base64, uploadType);
+      if (result.titles && result.titles.length > 0) {
+        setAiTitles(result.titles);
+        setUploadTitle(result.titles[0]);
+        toast.success('AI 已生成名称建议，点击选用');
+      } else {
+        toast.error('AI 未返回有效名称');
+      }
+    } catch {
+      toast.error('AI 起名失败，请稍后重试');
+    } finally {
+      setAiNaming(false);
+    }
+  };
+
   // 提交上传
   const handleUpload = async () => {
     if (!uploadFile) {
@@ -278,6 +328,7 @@ export default function MySpace() {
     setUploadVisibility('private');
     setUploadTitle('');
     setUploadDesc('');
+    setAiTitles([]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -853,9 +904,23 @@ export default function MySpace() {
 
             {/* 标题 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                资源标题 <span className="text-red-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-gray-700">
+                  资源标题 <span className="text-red-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAiSuggestTitle}
+                  disabled={!uploadFile || aiNaming}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-theme-primary px-2.5 py-1 text-xs font-medium text-theme-primary transition-all
+                    hover:bg-theme-primary hover:text-white
+                    disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={uploadFile ? 'AI 根据图片内容自动起名' : '请先选择图片'}
+                >
+                  {aiNaming ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>✨</span>}
+                  {aiNaming ? 'AI 生成中…' : 'AI 起名'}
+                </button>
+              </div>
               <input
                 type="text"
                 value={uploadTitle}
@@ -864,6 +929,32 @@ export default function MySpace() {
                 maxLength={100}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-primary/40 transition"
               />
+              {/* AI 名称建议 chips */}
+              {aiTitles.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {aiTitles.map((t, i) => (
+                    <button
+                      key={i}
+                      type={'button'}
+                      onClick={() => setUploadTitle(t)}
+                      className={
+                        t === uploadTitle
+                          ? 'rounded-full px-3 py-0.5 text-xs transition-all bg-theme-primary text-white border border-theme-primary'
+                          : 'rounded-full border border-theme-primary/50 bg-theme-primary/5 px-3 py-0.5 text-xs text-theme-primary hover:bg-theme-primary hover:text-white transition-all'
+                      }
+                    >
+                      {t}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setAiTitles([])}
+                    className="rounded-full border border-gray-200 px-2 py-0.5 text-xs text-gray-400 hover:bg-gray-100 transition-all"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* 描述（可选） */}
