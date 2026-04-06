@@ -13,6 +13,7 @@ export interface ResourceCardItem {
   id: string;
   title: string;
   url: string;
+  thumbnailUrl?: string; // 缩略图（800px WebP），未定义时回退到 url
   type: string;
   visibility?: 'private' | 'shared' | 'public';
   downloadCount: number;
@@ -129,13 +130,13 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
         }}
       >
         <img
-          src={resource.url}
+          src={resource.thumbnailUrl ?? resource.url}
           alt=""
           aria-hidden
           className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover scale-110 blur-xl opacity-60"
         />
         <img
-          src={resource.url}
+          src={resource.thumbnailUrl ?? resource.url}
           alt={resource.title}
           className="relative h-full w-full object-contain transition-transform duration-500 group-hover:scale-105"
           loading="lazy"

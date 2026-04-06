@@ -12,11 +12,12 @@ import (
 )
 
 type creatorAlbumResourcePayload struct {
-	ID         string `json:"id"`
-	Title      string `json:"title"`
-	URL        string `json:"url"`
-	Type       string `json:"type"`
-	Visibility string `json:"visibility,omitempty"`
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	URL          string `json:"url"`
+	ThumbnailURL string `json:"thumbnailUrl"`
+	Type         string `json:"type"`
+	Visibility   string `json:"visibility,omitempty"`
 }
 
 type creatorAlbumPayload struct {
@@ -125,13 +126,16 @@ func serializeCreatorAlbum(
 
 func buildAlbumResourcePayloads(resources []model.Resource) []creatorAlbumResourcePayload {
 	list := make([]creatorAlbumResourcePayload, 0, len(resources))
-	for _, resource := range resources {
+	for i := range resources {
+		resources[i].FillThumbnailURL()
+		r := resources[i]
 		list = append(list, creatorAlbumResourcePayload{
-			ID:         resource.ID.String(),
-			Title:      resource.Title,
-			URL:        resource.URL,
-			Type:       resource.Type,
-			Visibility: resource.Visibility,
+			ID:           r.ID.String(),
+			Title:        r.Title,
+			URL:          r.URL,
+			ThumbnailURL: r.ThumbnailURL,
+			Type:         r.Type,
+			Visibility:   r.Visibility,
 		})
 	}
 	return list

@@ -158,7 +158,7 @@ export default function Favorites() {
                     <div className="relative aspect-square overflow-hidden bg-slate-100">
                       {resource?.url ? (
                         <img
-                          src={resource.url}
+                          src={resource.thumbnailUrl ?? resource.url}
                           alt={resource.title}
                           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />

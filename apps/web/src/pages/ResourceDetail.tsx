@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { toInlineUrl } from '@/utils/tos';
 
 const TYPE_LABEL: Record<string, string> = {
   wallpaper: '壁纸',
@@ -58,6 +59,7 @@ function mapMyResourceToDetail(
     title: resource.title,
     description: resource.description || '',
     url: resource.url,
+    thumbnailUrl: resource.thumbnailUrl,
     type: resource.type as Resource['type'],
     visibility: resource.visibility,
     downloadCount: resource.downloadCount,
@@ -257,13 +259,13 @@ export default function ResourceDetail() {
               onClick={() => setPreviewOpen(true)}
             >
               <img
-                src={resource.url}
+                src={resource.thumbnailUrl ?? resource.url}
                 alt=""
                 aria-hidden
                 className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover scale-110 blur-2xl opacity-50"
               />
               <img
-                src={resource.url}
+                src={toInlineUrl(resource.url)}
                 alt={resource.title}
                 className={`relative h-full w-full object-contain transition-opacity duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
                 onLoad={() => setImgLoaded(true)}

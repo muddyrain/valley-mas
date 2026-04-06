@@ -309,6 +309,8 @@ func GetResourceDetail(c *gin.Context) {
 		}
 	}
 
+	resource.FillThumbnailURL()
+
 	Success(c, gin.H{
 		"id":            strconv.FormatInt(int64(resource.ID), 10),
 		"title":         resource.Title,
@@ -316,6 +318,7 @@ func GetResourceDetail(c *gin.Context) {
 		"type":          resource.Type,
 		"visibility":    visibility,
 		"url":           resource.URL,
+		"thumbnailUrl":  resource.ThumbnailURL,
 		"size":          resource.Size,
 		"width":         resource.Width,
 		"height":        resource.Height,
@@ -335,6 +338,7 @@ type HotResourceResponse struct {
 	Title         string `json:"title"`
 	Type          string `json:"type"`
 	URL           string `json:"url"`
+	ThumbnailURL  string `json:"thumbnailUrl"`
 	Size          int64  `json:"size"`
 	Width         int    `json:"width"`
 	Height        int    `json:"height"`
@@ -399,6 +403,7 @@ func GetHotResources(c *gin.Context) {
 		})
 		return
 	}
+	fillResourceThumbnails(resources)
 
 	// 构建响应数据
 	// 如果当前请求携带了有效 token（OptionalAuth 已解析），则查询收藏状态
@@ -422,11 +427,13 @@ func GetHotResources(c *gin.Context) {
 		}
 
 		rid := strconv.FormatInt(int64(resource.ID), 10)
+		resource.FillThumbnailURL()
 		response = append(response, HotResourceResponse{
 			ID:            rid,
 			Title:         resource.Title,
 			Type:          resource.Type,
 			URL:           resource.URL,
+			ThumbnailURL:  resource.ThumbnailURL,
 			Size:          resource.Size,
 			Width:         resource.Width,
 			Height:        resource.Height,
@@ -487,6 +494,7 @@ func GetAllResources(c *gin.Context) {
 		Error(c, 500, "查询失败: "+err.Error())
 		return
 	}
+	fillResourceThumbnails(resources)
 
 	// 收藏状态（OptionalAuth）
 	favoritedSet := map[string]bool{}
@@ -507,11 +515,13 @@ func GetAllResources(c *gin.Context) {
 			user = model.User{}
 		}
 		rid := strconv.FormatInt(int64(resource.ID), 10)
+		resource.FillThumbnailURL()
 		response = append(response, HotResourceResponse{
 			ID:            rid,
 			Title:         resource.Title,
 			Type:          resource.Type,
 			URL:           resource.URL,
+			ThumbnailURL:  resource.ThumbnailURL,
 			Size:          resource.Size,
 			Width:         resource.Width,
 			Height:        resource.Height,

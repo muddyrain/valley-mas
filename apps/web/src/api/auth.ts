@@ -64,6 +64,7 @@ export interface DownloadHistoryItem {
     title: string;
     type: string;
     url: string;
+    thumbnailUrl?: string;
     size?: number;
   };
   creator?: {

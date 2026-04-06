@@ -141,7 +141,7 @@ export default function Downloads() {
                         <div className="h-24 w-full shrink-0 overflow-hidden rounded-2xl bg-slate-100 sm:w-24">
                           {resource?.url ? (
                             <img
-                              src={resource.url}
+                              src={resource.thumbnailUrl ?? resource.url}
                               alt={resource.title}
                               className="h-full w-full object-cover"
                             />

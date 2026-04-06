@@ -198,6 +198,29 @@ type Resource struct {
 
 	// 关联
 	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"` // 上传者用户信息
+
+	// 计算字段（不存 DB，JSON 序列化时自动填充）
+	ThumbnailURL string `gorm:"-" json:"thumbnailUrl"`
+}
+
+// thumbnailMaxWidth 缩略图最大宽度（px）
+// 火山引擎 TOS 图片处理参数：?x-tos-process=image/resize,w_800,m_lfit/format,webp/quality,q_85
+const thumbnailMaxWidth = 800
+
+// FillThumbnailURL 根据原图 URL 生成缩略图 URL（利用 TOS 图片处理参数，不额外存储）
+// 规则：
+//   - 宽度 <= thumbnailMaxWidth 或无宽度信息时：缩略图 = 原图 URL（无需缩放）
+//   - 否则：追加 TOS 图片处理参数，限宽 800px，转 WebP，质量 85
+func (r *Resource) FillThumbnailURL() {
+	if r.URL == "" {
+		return
+	}
+	// 宽度不超过阈值，无需缩略图，直接复用原图
+	if r.Width <= thumbnailMaxWidth || r.Width == 0 {
+		r.ThumbnailURL = r.URL
+		return
+	}
+	r.ThumbnailURL = r.URL + "?x-tos-process=image/resize,w_800,m_lfit/format,webp/quality,q_85"
 }
 
 // BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
