@@ -172,6 +172,7 @@ func GetCreatorResources(c *gin.Context) {
 		Error(c, http.StatusInternalServerError, "查询资源列表失败")
 		return
 	}
+	fillResourceThumbnails(resources)
 
 	var creatorName, creatorAvatar string
 	var user model.User

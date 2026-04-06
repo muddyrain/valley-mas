@@ -306,6 +306,7 @@ func GetCreatorResourcesList(c *gin.Context) {
 		Error(c, 500, "查询失败: "+err.Error())
 		return
 	}
+	fillResourceThumbnails(resources)
 
 	// 获取创作者名称和头像（统一从 User 读取）
 	var creatorName, creatorAvatar string

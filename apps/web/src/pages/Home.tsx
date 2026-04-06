@@ -653,7 +653,7 @@ export default function Home() {
                     >
                       <div className="relative h-[336px] overflow-hidden bg-slate-100">
                         <img
-                          src={featuredWallpaper.url}
+                          src={featuredWallpaper.thumbnailUrl ?? featuredWallpaper.url}
                           alt={featuredWallpaper.title}
                           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
                         />
@@ -693,7 +693,7 @@ export default function Home() {
                         >
                           <div className="relative h-44 overflow-hidden bg-slate-100">
                             <img
-                              src={resource.url}
+                              src={resource.thumbnailUrl ?? resource.url}
                               alt={resource.title}
                               className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
                             />
@@ -743,7 +743,7 @@ export default function Home() {
                             </div>
                             <div className="mx-auto h-24 w-24 overflow-hidden rounded-[22px] border border-theme-shell-border bg-white shadow-[0_8px_24px_rgba(148,163,184,0.1)]">
                               <img
-                                src={resource.url}
+                                src={resource.thumbnailUrl ?? resource.url}
                                 alt={resource.title}
                                 className="h-full w-full object-cover"
                               />

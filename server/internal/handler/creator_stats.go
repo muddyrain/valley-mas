@@ -200,6 +200,7 @@ func GetCreatorStats(c *gin.Context) {
 		Order("download_count DESC").
 		Limit(5).
 		Find(&resources)
+	fillResourceThumbnails(resources)
 
 	stats.TopResources = make([]TopResource, len(resources))
 	for i, r := range resources {

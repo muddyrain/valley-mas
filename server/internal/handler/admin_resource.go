@@ -34,6 +34,13 @@ func normalizeResourceVisibility(value string) string {
 	}
 }
 
+// fillResourceThumbnails 批量填充缩略图 URL（就地修改）
+func fillResourceThumbnails(resources []model.Resource) {
+	for i := range resources {
+		resources[i].FillThumbnailURL()
+	}
+}
+
 // ListResources 资源列表
 // @Summary      获取资源列表
 // @Description  管理员查看所有资源列表
@@ -84,6 +91,7 @@ func ListResources(c *gin.Context) {
 
 	query.Count(&total)
 	query.Preload("User").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&resources)
+	fillResourceThumbnails(resources)
 
 	Success(c, gin.H{
 		"list":  resources,
@@ -178,6 +186,7 @@ func UploadResource(c *gin.Context) {
 		return
 	}
 
+	resource.FillThumbnailURL()
 	Success(c, gin.H{
 		"resource":    resource,
 		"storagePath": result.Key, // 返回存储路径，便于调试
@@ -370,6 +379,7 @@ func UpdateResource(c *gin.Context) {
 
 	// 返回最新数据
 	db.First(&resource, "id = ?", id)
+	resource.FillThumbnailURL()
 	Success(c, gin.H{
 		"id":          resource.ID,
 		"title":       resource.Title,

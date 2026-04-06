@@ -8,6 +8,7 @@ export interface Resource {
   title: string;
   description: string;
   url: string;
+  thumbnailUrl?: string; // 缩略图 URL（800px WebP，大图时由 TOS 参数生成，小图同原图）
   type: 'wallpaper' | 'avatar' | 'emoji' | 'background' | 'dynamic';
   visibility?: ResourceVisibility;
   downloadCount: number;
@@ -147,6 +148,7 @@ export interface MyResource {
   type: string;
   visibility?: ResourceVisibility;
   url: string;
+  thumbnailUrl: string;
   size: number;
   width: number;
   height: number;

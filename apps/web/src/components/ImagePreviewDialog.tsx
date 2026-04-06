@@ -1,6 +1,7 @@
-﻿import { Maximize2, RotateCcw, RotateCw, X, ZoomIn, ZoomOut } from 'lucide-react';
+﻿import { ExternalLink, Maximize2, RotateCcw, RotateCw, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { toInlineUrl } from '@/utils/tos';
 
 interface ImagePreviewDialogProps {
   open: boolean;
@@ -46,6 +47,9 @@ export default function ImagePreviewDialog({
     const trimmed = (title || '').trim();
     return trimmed || guessTitle(src);
   }, [title, src]);
+
+  // 转为 inline URL：加 TOS 图片处理参数后浏览器新标签可直接展示（不触发下载）
+  const inlineSrc = useMemo(() => toInlineUrl(src), [src]);
 
   useEffect(() => {
     if (!open) return;
@@ -134,7 +138,7 @@ export default function ImagePreviewDialog({
           >
             {canPreview ? (
               <img
-                src={src}
+                src={inlineSrc}
                 alt={displayTitle}
                 className="select-none rounded-xl shadow-[0_32px_80px_rgba(0,0,0,0.7)] cursor-grab active:cursor-grabbing"
                 onPointerDown={handlePointerDown}
@@ -235,6 +239,22 @@ export default function ImagePreviewDialog({
                 title="复位"
               >
                 复位
+              </button>
+
+              {/* 分隔线 */}
+              <div className="mx-1 h-5 w-px bg-white/15" />
+
+              {/* 在新标签打开（使用 inline URL 避免触发下载） */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (inlineSrc) window.open(inlineSrc, '_blank', 'noopener,noreferrer');
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-white/70 transition-all hover:bg-white/20 hover:text-white"
+                title="在新标签打开"
+              >
+                <ExternalLink className="h-4 w-4" />
               </button>
             </div>
           </div>

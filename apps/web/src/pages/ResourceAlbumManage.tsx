@@ -179,7 +179,7 @@ function ResourcePicker({
                   <div className="aspect-square bg-slate-100">
                     {resource.url ? (
                       <img
-                        src={resource.url}
+                        src={resource.thumbnailUrl || resource.url}
                         alt={resource.title}
                         className="h-full w-full object-cover"
                       />
@@ -329,7 +329,7 @@ function SelectedList({
             <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-slate-100">
               {resource.url ? (
                 <img
-                  src={resource.url}
+                  src={resource.thumbnailUrl || resource.url}
                   alt={resource.title}
                   className="h-full w-full object-cover"
                 />
