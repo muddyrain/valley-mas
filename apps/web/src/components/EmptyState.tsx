@@ -5,47 +5,48 @@ interface EmptyStateProps {
   icon: LucideIcon;
   title: string;
   description?: string;
-  /** 操作按钮文字，不传则不显示按钮 */
+  /** 操作文案，不传则不显示按钮 */
   actionLabel?: string;
   onAction?: () => void;
-  /** 图标容器背景色，默认 bg-purple-100 */
+  /** 图标容器背景，默认跟随当前主题 */
   iconBg?: string;
-  /** 图标颜色，默认 text-purple-400 */
+  /** 图标颜色，默认跟随当前主题主色 */
   iconColor?: string;
-  /** 外层容器的 padding，默认 py-24 */
+  /** 外层留白，方便在不同空状态区块复用 */
   padding?: string;
+  /** 允许页面覆盖 CTA 样式，但默认仍走主题按钮 */
+  actionClassName?: string;
 }
 
-/**
- * 通用空状态组件（暂无数据、加载失败等场景）
- */
+/** 通用空状态组件，默认跟随当前主题，适合个人中心与列表页复用 */
 export default function EmptyState({
   icon: Icon,
   title,
   description,
   actionLabel,
   onAction,
-  iconBg = 'bg-purple-100',
-  iconColor = 'text-purple-400',
+  iconBg = 'bg-theme-soft',
+  iconColor = 'text-theme-primary',
   padding = 'py-24',
+  actionClassName = 'theme-btn-primary rounded-xl px-8 font-semibold',
 }: EmptyStateProps) {
   return (
-    <div className={`flex flex-col items-center justify-center ${padding} text-center`}>
+    <div className={`flex flex-col items-center justify-center text-center ${padding}`}>
+      {/* 默认跟随当前主题，避免空状态按钮和图标永远固定成紫色 */}
       <div
-        className={`inline-flex items-center justify-center w-24 h-24 rounded-full ${iconBg} mb-6`}
+        className={`mb-6 inline-flex h-24 w-24 items-center justify-center rounded-full ${iconBg}`}
       >
         <Icon className={`h-12 w-12 ${iconColor}`} />
       </div>
-      <h3 className="text-xl font-semibold text-gray-700 mb-2">{title}</h3>
-      {description && <p className="text-gray-400 mb-6 max-w-xs leading-relaxed">{description}</p>}
-      {actionLabel && onAction && (
-        <Button
-          onClick={onAction}
-          className="bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-8 rounded-xl font-semibold shadow-md"
-        >
+      <h3 className="mb-2 text-xl font-semibold text-slate-700">{title}</h3>
+      {description ? (
+        <p className="mb-6 max-w-xs leading-relaxed text-slate-500">{description}</p>
+      ) : null}
+      {actionLabel && onAction ? (
+        <Button onClick={onAction} className={actionClassName}>
           {actionLabel}
         </Button>
-      )}
+      ) : null}
     </div>
   );
 }

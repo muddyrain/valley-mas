@@ -7,7 +7,6 @@
 - Root workspaces: `apps/*`, `packages/*`
 - Backend language: Go
 - Frontends: React + Vite
-- Mini app: Taro + React
 - Local TTS service: Python project in `apps/f5-tts`
 
 ## Main Directories
@@ -33,13 +32,6 @@ Admin console for management and operations.
   React + Vite + Ant Design ecosystem
 - Typical validation:
   `pnpm --filter admin exec tsc --noEmit`
-
-### `apps/mini-app`
-
-Mini program / H5 app built with Taro.
-
-- Use when the request explicitly mentions mini app, Taro, or cross-platform mobile output.
-- Build/dev commands live in `apps/mini-app/package.json`.
 
 ### `apps/f5-tts`
 

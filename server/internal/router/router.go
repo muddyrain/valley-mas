@@ -40,8 +40,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 		{
 			registerTTSRoutes(public)
 
-			public.GET("/space/:code", handler.GetCreatorSpace)             // 新增：获取创作者空间
-			public.POST("/resource/:id/download", handler.DownloadResource) // 新增：下载资源
+			public.GET("/space/:code", handler.GetCreatorSpace) // 新增：获取创作者空间
+			// 下载接口保持公开可访问，但需要 OptionalAuth 才能把登录用户的下载写入“我的下载记录”
+			public.POST("/resource/:id/download", middleware.OptionalAuth(cfg), handler.DownloadResource)
 			public.GET("/hot-creators", handler.GetHotCreators)             // 新增：获取热门创作者
 
 			// 博客相关接口

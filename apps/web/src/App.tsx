@@ -11,7 +11,9 @@ import BlogList from './pages/blog/BlogList';
 import BlogPost from './pages/blog/BlogPost';
 import Creator from './pages/Creator';
 import CreatorProfile from './pages/CreatorProfile';
+import Downloads from './pages/Downloads';
 import Favorites from './pages/Favorites';
+import Follows from './pages/Follows';
 import Home from './pages/Home';
 import ImageTextCreate from './pages/ImageTextCreate';
 import Login from './pages/Login';
@@ -30,7 +32,7 @@ function RouteTitle() {
     let title = 'Valley';
 
     if (pathname === '/') {
-      title = 'Valley | 内容主页';
+      title = 'Valley | 内容首页';
     } else if (pathname === '/blog') {
       title = '博客与图文 | Valley';
     } else if (pathname.startsWith('/blog/')) {
@@ -57,6 +59,10 @@ function RouteTitle() {
       title = '创作者空间 | Valley';
     } else if (pathname === '/favorites') {
       title = '我的收藏 | Valley';
+    } else if (pathname === '/follows') {
+      title = '我的关注 | Valley';
+    } else if (pathname === '/downloads') {
+      title = '下载记录 | Valley';
     } else if (pathname === '/profile') {
       title = '个人资料 | Valley';
     } else if (pathname === '/apply-creator') {
@@ -107,6 +113,8 @@ function App() {
           <Route path="my-space/blog-groups" element={<BlogGroupManage />} />
           <Route path="profile" element={<Profile />} />
           <Route path="favorites" element={<Favorites />} />
+          <Route path="follows" element={<Follows />} />
+          <Route path="downloads" element={<Downloads />} />
           <Route path="apply-creator" element={<ApplyCreator />} />
           <Route path="blog" element={<BlogList />} />
           <Route path="blog/:id" element={<BlogPost />} />

@@ -35,35 +35,55 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { createRandomCnNickname } from '@/utils/randomNickname';
 
-const ROLE_MAP: Record<string, { label: string; color: string }> = {
-  admin: { label: '管理员', color: 'bg-red-100 text-red-600' },
-  creator: { label: '创作者', color: 'bg-purple-100 text-purple-600' },
-  user: { label: '普通用户', color: 'bg-gray-100 text-gray-600' },
+// 个人中心主页需要和全局主题联动，因此背景、Banner、卡片头和主按钮
+// 都统一走 theme token，而不是继续保留紫色、橙色这类固定配色。
+const ROLE_MAP: Record<string, { label: string; badgeClass: string }> = {
+  admin: { label: '管理员', badgeClass: 'bg-rose-100 text-rose-600' },
+  creator: { label: '创作者', badgeClass: 'bg-theme-soft text-theme-primary' },
+  user: { label: '普通用户', badgeClass: 'bg-slate-100 text-slate-600' },
 };
+
+const PAGE_BACKGROUND = {
+  background:
+    'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-primary-soft) 28%, white) 42%, var(--theme-page-cool) 100%)',
+};
+
+const BANNER_BACKGROUND = {
+  background:
+    'linear-gradient(135deg, rgba(var(--theme-primary-rgb),0.97) 0%, color-mix(in srgb, rgba(var(--theme-secondary-rgb),1) 32%, var(--theme-primary-hover)) 52%, var(--theme-primary-deep) 100%)',
+};
+
+const sectionCardClass =
+  'overflow-hidden rounded-2xl border border-theme-shell-border bg-white/84 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm';
+
+const sectionHeaderClass =
+  'border-b border-theme-shell-border bg-[linear-gradient(90deg,color-mix(in_srgb,var(--theme-primary-soft)_72%,white),rgba(255,255,255,0.92))] px-6 py-4';
+
+const statPanelClass =
+  'rounded-xl border border-white/24 bg-white/12 px-5 py-3 backdrop-blur-md shadow-[0_14px_30px_rgba(15,23,42,0.10)]';
+
+const inputClassName =
+  'h-10 theme-input-border bg-white/82 focus-visible:border-theme-primary focus-visible:ring-theme-primary/20';
 
 export default function Profile() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuthStore();
-  const hasHydrated = useAuthStore((s) => s.hasHydrated);
-  // 从 store 获取 profile 及相关 actions
-  const profile = useAuthStore((s) => s.profile);
-  const profileLoading = useAuthStore((s) => s.profileLoading);
-  const fetchProfile = useAuthStore((s) => s.fetchProfile);
-  const setStoreProfile = useAuthStore((s) => s.setProfile);
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
+  const profile = useAuthStore((state) => state.profile);
+  const profileLoading = useAuthStore((state) => state.profileLoading);
+  const fetchProfile = useAuthStore((state) => state.fetchProfile);
+  const setStoreProfile = useAuthStore((state) => state.setProfile);
 
   const loading = profileLoading && !profile;
 
-  // 头像上传
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
   const [avatarHistory, setAvatarHistory] = useState<AvatarHistoryItem[]>([]);
   const [avatarHistoryLoading, setAvatarHistoryLoading] = useState(false);
 
-  // 基本信息表单
   const [infoForm, setInfoForm] = useState({ nickname: '', email: '', phone: '' });
   const [infoSaving, setInfoSaving] = useState(false);
 
-  // 密码表单
   const [pwdForm, setPwdForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [pwdSaving, setPwdSaving] = useState(false);
   const [showOld, setShowOld] = useState(false);
@@ -76,19 +96,16 @@ export default function Profile() {
       navigate('/login');
       return;
     }
-    // 强制刷新 profile（每次进入 Profile 页都拉最新数据）
     fetchProfile(true);
   }, [hasHydrated, isAuthenticated, navigate, fetchProfile]);
 
-  // profile 加载后同步到表单
   useEffect(() => {
-    if (profile) {
-      setInfoForm({
-        nickname: profile.nickname || '',
-        email: profile.email || '',
-        phone: profile.phone || '',
-      });
-    }
+    if (!profile) return;
+    setInfoForm({
+      nickname: profile.nickname || '',
+      email: profile.email || '',
+      phone: profile.phone || '',
+    });
   }, [profile]);
 
   const handleAvatarSaveFromEditor = async (blob: Blob) => {
@@ -106,10 +123,10 @@ export default function Profile() {
     }
   };
 
-  const handleUseHistoryAvatar = async (historyID: string) => {
+  const handleUseHistoryAvatar = async (historyId: string) => {
     try {
       setAvatarUploading(true);
-      const { avatarUrl } = await getUseAvatarHistory(historyID);
+      const { avatarUrl } = await getUseAvatarHistory(historyId);
       if (profile) {
         setStoreProfile({ ...profile, avatar: avatarUrl });
       }
@@ -139,13 +156,12 @@ export default function Profile() {
         email: infoForm.email,
         phone: infoForm.phone,
       });
-      // 同步更新 store（setProfile 会自动同步 user + cookie）
       if (profile) {
         setStoreProfile({ ...profile, ...updated });
       }
       toast.success('个人信息已更新');
     } catch {
-      // 错误已在 request.ts 中通过 toast 显示
+      // request.ts 已统一处理错误提示
     } finally {
       setInfoSaving(false);
     }
@@ -173,46 +189,49 @@ export default function Profile() {
       toast.success('密码修改成功，请重新登录');
       setPwdForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
     } catch {
-      // 错误已在 request.ts 中通过 toast 显示
+      // request.ts 已统一处理错误提示
     } finally {
       setPwdSaving(false);
     }
   };
 
-  // 水合未完成时不渲染（避免闪跳到 /login）
   if (!hasHydrated) return null;
   if (!isAuthenticated) return null;
 
   const roleInfo = ROLE_MAP[profile?.role || user?.role || 'user'];
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-50 via-purple-50/30 to-indigo-50/30">
-      {/* 头部 Banner */}
-      <PageBanner maxWidth="max-w-4xl">
-        <div className="flex items-center gap-6">
-          {/* 头像 */}
+    <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
+      {/* 顶部信息区复用主题 Banner，头像光晕和统计块也跟随当前主题变化 */}
+      <PageBanner backgroundStyle={BANNER_BACKGROUND} padding="py-10" maxWidth="max-w-4xl">
+        <div className="flex flex-wrap items-center gap-6">
           <div className="relative shrink-0">
-            <div className="absolute -inset-2 bg-linear-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full opacity-75 blur-xl" />
+            <div
+              className="absolute -inset-2 rounded-full opacity-80 blur-xl"
+              style={{
+                background:
+                  'linear-gradient(135deg, rgba(var(--theme-tertiary-rgb),0.50), rgba(var(--theme-secondary-rgb),0.34), rgba(var(--theme-primary-rgb),0.58))',
+              }}
+            />
             {loading ? (
-              <Skeleton className="relative h-24 w-24 rounded-full" />
+              <Skeleton className="relative h-24 w-24 rounded-full bg-white/20" />
             ) : (
               <button
                 type="button"
                 onClick={() => setAvatarEditorOpen(true)}
-                className="relative group focus:outline-none"
+                className="group relative focus:outline-none"
                 title="点击更换头像"
                 disabled={avatarUploading}
               >
-                <Avatar className="h-24 w-24 border-4 border-white/30 shadow-2xl ring-4 ring-purple-500/30">
+                <Avatar className="h-24 w-24 border-4 border-white/30 shadow-2xl ring-4 ring-white/15">
                   <AvatarImage src={profile?.avatar} className="object-cover" />
-                  <AvatarFallback className="bg-linear-to-br from-purple-400 to-indigo-600 text-white text-3xl font-bold">
+                  <AvatarFallback className="theme-avatar-fallback text-3xl font-bold text-white">
                     {(profile?.nickname?.[0] || profile?.username?.[0] || 'U').toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                {/* 悬浮遮罩 */}
-                <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                   {avatarUploading ? (
-                    <Loader2 className="h-6 w-6 text-white animate-spin" />
+                    <Loader2 className="h-6 w-6 animate-spin text-white" />
                   ) : (
                     <Camera className="h-6 w-6 text-white" />
                   )}
@@ -221,8 +240,7 @@ export default function Profile() {
             )}
           </div>
 
-          {/* 信息 */}
-          <div className="text-white min-w-0">
+          <div className="min-w-0 flex-1 text-white">
             {loading ? (
               <div className="space-y-2">
                 <Skeleton className="h-8 w-40 bg-white/20" />
@@ -230,21 +248,20 @@ export default function Profile() {
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-3 mb-2 flex-wrap">
-                  <h1 className="text-2xl md:text-3xl font-bold drop-shadow-lg">
+                <div className="mb-2 flex flex-wrap items-center gap-3">
+                  <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">
                     {profile?.nickname || profile?.username}
                   </h1>
-                  <Badge className={`${roleInfo.color} border-0 px-3 py-1 font-medium`}>
+                  <Badge className={`${roleInfo.badgeClass} border-0 px-3 py-1 font-medium`}>
                     {roleInfo.label}
                   </Badge>
                 </div>
-                <p className="text-purple-200 text-sm mb-4">@{profile?.username}</p>
-                {/* 统计 */}
-                <div className="flex gap-4 flex-wrap">
-                  <div className="bg-white/10 backdrop-blur-md rounded-xl px-5 py-3 border border-white/20">
-                    <div className="flex items-center gap-2 text-purple-200 mb-1">
+                <p className="mb-4 text-sm text-white/78">@{profile?.username}</p>
+                <div className="flex flex-wrap gap-4">
+                  <div className={statPanelClass}>
+                    <div className="mb-1 flex items-center gap-2 text-xs font-medium text-white/76">
                       <Download className="h-3.5 w-3.5" />
-                      <span className="text-xs font-medium">累计下载</span>
+                      <span>累计下载</span>
                     </div>
                     <div className="text-2xl font-bold">{profile?.downloadCount ?? 0}</div>
                   </div>
@@ -255,23 +272,22 @@ export default function Profile() {
         </div>
       </PageBanner>
 
-      {/* 内容区 */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* ===== 基本信息 ===== */}
-        <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 bg-linear-to-r from-purple-50 to-indigo-50 border-b border-gray-100">
+      <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        {/* 基本信息卡片承接个人资料编辑，是个人中心里的核心操作区 */}
+        <Card className={sectionCardClass}>
+          <div className={sectionHeaderClass}>
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-purple-100">
-                <User className="h-4 w-4 text-purple-600" />
+              <div className="rounded-lg bg-theme-soft p-2">
+                <User className="h-4 w-4 text-theme-primary" />
               </div>
-              <h2 className="font-bold text-gray-900">基本信息</h2>
+              <h2 className="font-bold text-slate-900">基本信息</h2>
             </div>
           </div>
           <CardContent className="p-6">
             {loading ? (
               <div className="space-y-5">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="space-y-2">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="space-y-2">
                     <Skeleton className="h-4 w-16" />
                     <Skeleton className="h-10 w-full" />
                   </div>
@@ -279,28 +295,27 @@ export default function Profile() {
               </div>
             ) : (
               <div className="space-y-5">
-                {/* 用户名（只读） */}
                 <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-1.5 block">用户名</Label>
+                  <Label className="mb-1.5 block text-sm font-medium text-slate-700">用户名</Label>
                   <Input
                     value={profile?.username || ''}
                     disabled
-                    className="bg-gray-50 text-gray-500 cursor-not-allowed"
+                    className="h-10 cursor-not-allowed bg-slate-50 text-slate-500"
                   />
-                  <p className="text-xs text-gray-400 mt-1">用户名不可修改</p>
+                  <p className="mt-1 text-xs text-slate-400">用户名不可修改</p>
                 </div>
 
-                {/* 昵称 */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Label className="text-sm font-medium text-gray-700 block">
-                      昵称 <span className="text-red-500">*</span>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <Label className="block text-sm font-medium text-slate-700">
+                      昵称 <span className="text-rose-500">*</span>
                     </Label>
                     <Button
-                      size={'sm'}
-                      variant={'link'}
+                      size="sm"
+                      variant="link"
+                      className="px-0 text-theme-primary hover:text-theme-primary-hover"
                       onClick={() => {
-                        setInfoForm((f) => ({ ...f, nickname: createRandomCnNickname() }));
+                        setInfoForm((form) => ({ ...form, nickname: createRandomCnNickname() }));
                       }}
                     >
                       换一个
@@ -308,40 +323,44 @@ export default function Profile() {
                   </div>
                   <Input
                     value={infoForm.nickname}
-                    onChange={(e) => setInfoForm((f) => ({ ...f, nickname: e.target.value }))}
+                    onChange={(event) =>
+                      setInfoForm((form) => ({ ...form, nickname: event.target.value }))
+                    }
                     placeholder="请输入昵称"
-                    className="focus:ring-2 focus:ring-purple-200 focus:border-purple-500"
+                    className={inputClassName}
                     maxLength={50}
                   />
                 </div>
 
-                {/* 邮箱 */}
                 <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                    <Mail className="h-3.5 w-3.5 inline mr-1" />
+                  <Label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    <Mail className="mr-1 inline h-3.5 w-3.5" />
                     邮箱
                   </Label>
                   <Input
                     type="email"
                     value={infoForm.email}
-                    onChange={(e) => setInfoForm((f) => ({ ...f, email: e.target.value }))}
+                    onChange={(event) =>
+                      setInfoForm((form) => ({ ...form, email: event.target.value }))
+                    }
                     placeholder="请输入邮箱"
-                    className="focus:ring-2 focus:ring-purple-200 focus:border-purple-500"
+                    className={inputClassName}
                   />
                 </div>
 
-                {/* 手机号 */}
                 <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                    <Phone className="h-3.5 w-3.5 inline mr-1" />
+                  <Label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    <Phone className="mr-1 inline h-3.5 w-3.5" />
                     手机号
                   </Label>
                   <Input
                     type="tel"
                     value={infoForm.phone}
-                    onChange={(e) => setInfoForm((f) => ({ ...f, phone: e.target.value }))}
+                    onChange={(event) =>
+                      setInfoForm((form) => ({ ...form, phone: event.target.value }))
+                    }
                     placeholder="请输入手机号"
-                    className="focus:ring-2 focus:ring-purple-200 focus:border-purple-500"
+                    className={inputClassName}
                     maxLength={20}
                   />
                 </div>
@@ -350,16 +369,16 @@ export default function Profile() {
                   <Button
                     onClick={handleInfoSave}
                     disabled={infoSaving}
-                    className="bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold px-8 shadow-md hover:shadow-lg transition-all"
+                    className="theme-btn-primary px-8 font-semibold"
                   >
                     {infoSaving ? (
                       <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         保存中...
                       </>
                     ) : (
                       <>
-                        <Save className="h-4 w-4 mr-2" />
+                        <Save className="mr-2 h-4 w-4" />
                         保存修改
                       </>
                     )}
@@ -370,104 +389,109 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* ===== 修改密码 ===== */}
-        <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 bg-linear-to-r from-orange-50 to-red-50 border-b border-gray-100">
+        {/* 密码区域保留安全感，但视觉仍然跟随当前主题，不再单独使用橙红色系 */}
+        <Card className={sectionCardClass}>
+          <div className={sectionHeaderClass}>
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-orange-100">
-                <KeyRound className="h-4 w-4 text-orange-600" />
+              <div className="rounded-lg bg-theme-soft p-2">
+                <KeyRound className="h-4 w-4 text-theme-primary" />
               </div>
-              <h2 className="font-bold text-gray-900">修改密码</h2>
+              <h2 className="font-bold text-slate-900">修改密码</h2>
             </div>
           </div>
           <CardContent className="p-6">
             <div className="space-y-5">
-              {/* 原密码 */}
               <div>
-                <Label className="text-sm font-medium text-gray-700 mb-1.5 block">原密码</Label>
+                <Label className="mb-1.5 block text-sm font-medium text-slate-700">原密码</Label>
                 <div className="relative">
                   <Input
                     type={showOld ? 'text' : 'password'}
                     value={pwdForm.oldPassword}
-                    onChange={(e) => setPwdForm((f) => ({ ...f, oldPassword: e.target.value }))}
+                    onChange={(event) =>
+                      setPwdForm((form) => ({ ...form, oldPassword: event.target.value }))
+                    }
                     placeholder="请输入原密码"
-                    className="pr-12 focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
+                    className={`${inputClassName} pr-12`}
                   />
                   <button
                     type="button"
-                    onClick={() => setShowOld((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    onClick={() => setShowOld((value) => !value)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-theme-primary"
                   >
                     {showOld ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
 
-              {/* 新密码 */}
               <div>
-                <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  新密码 <span className="text-gray-400 font-normal">（至少 6 位）</span>
+                <Label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  新密码<span className="ml-1 font-normal text-slate-400">（至少 6 位）</span>
                 </Label>
                 <div className="relative">
                   <Input
                     type={showNew ? 'text' : 'password'}
                     value={pwdForm.newPassword}
-                    onChange={(e) => setPwdForm((f) => ({ ...f, newPassword: e.target.value }))}
+                    onChange={(event) =>
+                      setPwdForm((form) => ({ ...form, newPassword: event.target.value }))
+                    }
                     placeholder="请输入新密码"
-                    className="pr-12 focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
+                    className={`${inputClassName} pr-12`}
                   />
                   <button
                     type="button"
-                    onClick={() => setShowNew((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    onClick={() => setShowNew((value) => !value)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-theme-primary"
                   >
                     {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
 
-              {/* 确认新密码 */}
               <div>
-                <Label className="text-sm font-medium text-gray-700 mb-1.5 block">确认新密码</Label>
+                <Label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  确认新密码
+                </Label>
                 <div className="relative">
                   <Input
                     type={showConfirm ? 'text' : 'password'}
                     value={pwdForm.confirmPassword}
-                    onChange={(e) => setPwdForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                    onChange={(event) =>
+                      setPwdForm((form) => ({ ...form, confirmPassword: event.target.value }))
+                    }
                     placeholder="请再次输入新密码"
-                    className={`pr-12 focus:ring-2 focus:ring-orange-200 focus:border-orange-400 ${
+                    className={`${inputClassName} pr-12 ${
                       pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword
-                        ? 'border-red-400 focus:border-red-400 focus:ring-red-200'
+                        ? 'border-rose-400 focus-visible:border-rose-400 focus-visible:ring-rose-200'
                         : ''
                     }`}
                   />
                   <button
                     type="button"
-                    onClick={() => setShowConfirm((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    onClick={() => setShowConfirm((value) => !value)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-theme-primary"
                   >
                     {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword && (
-                  <p className="text-xs text-red-500 mt-1">两次输入的密码不一致</p>
-                )}
+                {pwdForm.confirmPassword && pwdForm.confirmPassword !== pwdForm.newPassword ? (
+                  <p className="mt-1 text-xs text-rose-500">两次输入的密码不一致</p>
+                ) : null}
               </div>
 
               <div className="pt-1">
                 <Button
                   onClick={handlePasswordSave}
                   disabled={pwdSaving}
-                  className="bg-linear-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold px-8 shadow-md hover:shadow-lg transition-all"
+                  className="theme-btn-primary px-8 font-semibold"
                 >
                   {pwdSaving ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       修改中...
                     </>
                   ) : (
                     <>
-                      <Shield className="h-4 w-4 mr-2" />
+                      <Shield className="mr-2 h-4 w-4" />
                       修改密码
                     </>
                   )}
@@ -477,30 +501,30 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* ===== 账号信息（只读） ===== */}
-        {!loading && profile && (
-          <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-linear-to-r from-gray-50 to-slate-50 border-b border-gray-100">
+        {/* 账号信息区用更轻的主题面板承接只读信息，避免信息块跳出整体视觉语言 */}
+        {!loading && profile ? (
+          <Card className={sectionCardClass}>
+            <div className={sectionHeaderClass}>
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-gray-100">
-                  <Shield className="h-4 w-4 text-gray-600" />
+                <div className="rounded-lg bg-theme-soft p-2">
+                  <Shield className="h-4 w-4 text-theme-primary" />
                 </div>
-                <h2 className="font-bold text-gray-900">账号信息</h2>
+                <h2 className="font-bold text-slate-900">账号信息</h2>
               </div>
             </div>
             <CardContent className="p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
-                  <span className="text-gray-500">账号角色</span>
-                  <Badge className={`${roleInfo.color} border-0`}>{roleInfo.label}</Badge>
+              <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                <div className="flex items-center justify-between rounded-xl bg-theme-soft/72 p-3">
+                  <span className="text-slate-500">账号角色</span>
+                  <Badge className={`${roleInfo.badgeClass} border-0`}>{roleInfo.label}</Badge>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
-                  <span className="text-gray-500">累计下载</span>
-                  <span className="font-semibold text-gray-900">{profile.downloadCount} 次</span>
+                <div className="flex items-center justify-between rounded-xl bg-theme-soft/72 p-3">
+                  <span className="text-slate-500">累计下载</span>
+                  <span className="font-semibold text-slate-900">{profile.downloadCount} 次</span>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 sm:col-span-2">
-                  <span className="text-gray-500">注册时间</span>
-                  <span className="font-medium text-gray-900">
+                <div className="flex items-center justify-between rounded-xl bg-theme-soft/72 p-3 sm:col-span-2">
+                  <span className="text-slate-500">注册时间</span>
+                  <span className="font-medium text-slate-900">
                     {profile.createdAt
                       ? new Date(profile.createdAt).toLocaleDateString('zh-CN', {
                           year: 'numeric',
@@ -513,10 +537,10 @@ export default function Profile() {
               </div>
             </CardContent>
           </Card>
-        )}
+        ) : null}
 
-        {/* ===== 申请创作者入口（仅普通用户显示，逻辑封装在组件内） ===== */}
-        {!loading && <ApplyCreatorBanner />}
+        {/* 普通用户的申请入口也要跟随主题，避免在个人中心末尾突然出现另一套紫色卡片 */}
+        {!loading ? <ApplyCreatorBanner /> : null}
       </div>
 
       <AvatarBeadEditorDialog

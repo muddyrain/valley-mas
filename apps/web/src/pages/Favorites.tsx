@@ -11,7 +11,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
 
-// 与后端 UserFavorite JSON 结构对齐
 interface FavoriteItem {
   id: string;
   userId: string;
@@ -20,54 +19,63 @@ interface FavoriteItem {
   resource?: Resource;
 }
 
+const PAGE_SIZE = 20;
+
+const PAGE_BACKGROUND = {
+  background:
+    'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-primary-soft) 24%, white) 44%, var(--theme-page-cool) 100%)',
+};
+
+const BANNER_BACKGROUND = {
+  background:
+    'linear-gradient(135deg, rgba(var(--theme-primary-rgb),0.96) 0%, color-mix(in srgb, rgba(var(--theme-tertiary-rgb),1) 26%, var(--theme-primary-hover)) 54%, var(--theme-primary-deep) 100%)',
+};
+
+function formatResourceType(type?: string) {
+  if (type === 'wallpaper') return '壁纸';
+  if (type === 'avatar') return '头像';
+  return type || '资源';
+}
+
 export default function Favorites() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuthStore();
+  const { hasHydrated, isAuthenticated } = useAuthStore();
 
   const [items, setItems] = useState<FavoriteItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  // 正在取消收藏的资源 id set
   const [removingSet, setRemovingSet] = useState<Set<string>>(new Set());
 
-  const PAGE_SIZE = 20;
+  const loadFavorites = async (nextPage: number, append: boolean) => {
+    try {
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+
+      const data = await getMyFavorites({ page: nextPage, pageSize: PAGE_SIZE });
+      setTotal(data.total);
+      setItems((prev) => (append ? [...prev, ...data.list] : data.list));
+      setPage(nextPage);
+    } catch {
+      // request.ts 已统一处理错误提示
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
-    const load = async () => {
-      try {
-        setLoading(true);
-        const data = await getMyFavorites({ page: 1, pageSize: PAGE_SIZE });
-        setTotal(data.total);
-        setItems(data.list);
-        setPage(1);
-      } catch {
-        toast.error('加载收藏列表失败');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [isAuthenticated, navigate]);
-
-  const loadFavorites = async (p: number) => {
-    try {
-      setLoadingMore(true);
-      const data = await getMyFavorites({ page: p, pageSize: PAGE_SIZE });
-      setTotal(data.total);
-      setItems((prev) => [...prev, ...data.list]);
-      setPage(p);
-    } catch {
-      toast.error('加载更多失败');
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+    void loadFavorites(1, false);
+  }, [hasHydrated, isAuthenticated, navigate]);
 
   const handleRemove = async (item: FavoriteItem) => {
     const rid = item.resource?.id ?? item.resourceId;
@@ -75,10 +83,10 @@ export default function Favorites() {
     try {
       await unfavoriteResource(rid);
       setItems((prev) => prev.filter((i) => (i.resource?.id ?? i.resourceId) !== rid));
-      setTotal((t) => t - 1);
+      setTotal((count) => Math.max(0, count - 1));
       toast.success('已取消收藏');
     } catch {
-      toast.error('操作失败，请重试');
+      // request.ts 已统一处理错误提示
     } finally {
       setRemovingSet((prev) => {
         const next = new Set(prev);
@@ -91,33 +99,31 @@ export default function Favorites() {
   const hasMore = items.length < total;
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-50 via-purple-50/30 to-indigo-50/30">
-      {/* 头部 Banner */}
-      <PageBanner
-        gradient="from-pink-500 via-purple-600 to-indigo-700"
-        padding="py-10"
-        maxWidth="max-w-5xl"
-      >
+    <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
+      <PageBanner backgroundStyle={BANNER_BACKGROUND} padding="py-10" maxWidth="max-w-5xl">
         <div className="flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 shadow-lg">
-            <Heart className="h-7 w-7 text-white fill-white" />
+          <div className="rounded-2xl border border-white/30 bg-white/18 p-3 shadow-lg backdrop-blur-md">
+            <Heart className="h-7 w-7 fill-white text-white" />
           </div>
           <div className="text-white">
-            <h1 className="text-2xl md:text-3xl font-bold drop-shadow-lg">我的收藏</h1>
-            <p className="text-purple-200 text-sm mt-1">共收藏了 {loading ? '…' : total} 个资源</p>
+            <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">我的收藏</h1>
+            <p className="mt-1 text-sm text-white/82">
+              {loading ? '正在整理你收藏的内容...' : `共收藏 ${total} 个资源`}
+            </p>
           </div>
         </div>
       </PageBanner>
 
-      {/* 内容区 */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         {loading ? (
-          // 骨架屏
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {[...Array(10)].map((_, i) => (
-              <Card key={i} className="border-0 shadow-md rounded-2xl overflow-hidden">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {Array.from({ length: 10 }).map((_, index) => (
+              <Card
+                key={index}
+                className="overflow-hidden rounded-2xl border border-theme-shell-border bg-white/86 shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm"
+              >
                 <Skeleton className="aspect-square w-full" />
-                <CardContent className="p-3 space-y-2">
+                <CardContent className="space-y-2 p-3">
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-3 w-2/3" />
                 </CardContent>
@@ -125,55 +131,52 @@ export default function Favorites() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          // 空状态
-          <EmptyState
-            icon={Heart}
-            iconBg="bg-pink-50"
-            iconColor="text-pink-300"
-            title="还没有收藏"
-            description="浏览首页或创作者主页，点击心形按钮收藏喜欢的资源"
-            actionLabel="去逛逛"
-            onAction={() => navigate('/')}
-          />
+          <div className="rounded-[28px] border border-theme-shell-border bg-white/72 px-6 shadow-[0_20px_50px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm">
+            <EmptyState
+              icon={Heart}
+              title="还没有收藏"
+              description="浏览首页、资源页或创作者主页时，看到喜欢的内容就先收藏起来。"
+              actionLabel="去逛逛"
+              onAction={() => navigate('/')}
+            />
+          </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {items.map((item) => {
-                const res = item.resource;
-                const rid = res?.id ?? item.resourceId;
-                const isRemoving = removingSet.has(rid);
+                const resource = item.resource;
+                const resourceId = resource?.id ?? item.resourceId;
+                const isRemoving = removingSet.has(resourceId);
+                const creatorName = resource?.creatorName || '创作者';
 
                 return (
                   <Card
                     key={item.id}
-                    className="group border-0 shadow-md rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 cursor-pointer"
-                    onClick={() => res && navigate(`/resource/${res.id}`)}
+                    className="group cursor-pointer overflow-hidden rounded-2xl border border-theme-shell-border bg-white/86 shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_rgba(var(--theme-primary-rgb),0.16)]"
+                    onClick={() => resource && navigate(`/resource/${resource.id}`)}
                   >
-                    {/* 缩略图 */}
-                    <div className="relative aspect-square bg-gray-100 overflow-hidden">
-                      {res?.url ? (
+                    <div className="relative aspect-square overflow-hidden bg-slate-100">
+                      {resource?.url ? (
                         <img
-                          src={res.url}
-                          alt={res.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          src={resource.url}
+                          alt={resource.title}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <ImageIcon className="h-10 w-10 text-gray-300" />
+                        <div className="flex h-full w-full items-center justify-center">
+                          <ImageIcon className="h-10 w-10 text-slate-300" />
                         </div>
                       )}
 
-                      {/* 悬浮操作遮罩 */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                        {/* 取消收藏按钮 */}
+                      <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition-all duration-300 group-hover:bg-black/30 group-hover:opacity-100">
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemove(item);
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleRemove(item);
                           }}
                           disabled={isRemoving}
-                          className="p-2 rounded-full bg-white/90 hover:bg-red-50 text-red-500 shadow-md transition-all hover:scale-110 disabled:opacity-60"
+                          className="rounded-full bg-white/92 p-2 text-rose-500 shadow-md transition-all hover:scale-110 hover:bg-rose-50 disabled:opacity-60"
                           title="取消收藏"
                         >
                           {isRemoving ? (
@@ -184,36 +187,30 @@ export default function Favorites() {
                         </button>
                       </div>
 
-                      {/* 类型标签 */}
-                      {res?.type && (
-                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-medium bg-black/50 text-white backdrop-blur-sm">
-                          {res.type === 'wallpaper'
-                            ? '壁纸'
-                            : res.type === 'avatar'
-                              ? '头像'
-                              : res.type}
+                      {resource?.type ? (
+                        <div className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+                          {formatResourceType(resource.type)}
                         </div>
-                      )}
+                      ) : null}
                     </div>
 
-                    {/* 信息区 */}
                     <CardContent className="p-3">
-                      <p className="text-sm font-medium text-gray-800 truncate mb-1">
-                        {res?.title || '未知资源'}
+                      <p className="mb-1 truncate text-sm font-medium text-slate-800">
+                        {resource?.title || '未知资源'}
                       </p>
-                      <div className="flex items-center justify-between text-xs text-gray-400">
-                        <div className="flex items-center gap-1">
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <div className="flex min-w-0 items-center gap-1">
                           <Avatar className="h-4 w-4">
-                            <AvatarImage src={res?.creatorAvatar} />
-                            <AvatarFallback className="text-[8px] bg-purple-100 text-purple-600">
-                              {res?.creatorName?.[0]?.toUpperCase() || 'C'}
+                            <AvatarImage src={resource?.creatorAvatar} />
+                            <AvatarFallback className="bg-theme-soft text-[8px] text-theme-primary">
+                              {creatorName[0]?.toUpperCase() || 'C'}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="truncate max-w-15">{res?.creatorName || '-'}</span>
+                          <span className="max-w-15 truncate">{creatorName}</span>
                         </div>
-                        <div className="flex items-center gap-0.5">
+                        <div className="flex items-center gap-0.5 text-theme-primary">
                           <Download className="h-3 w-3" />
-                          <span>{res?.downloadCount ?? 0}</span>
+                          <span className="text-slate-500">{resource?.downloadCount ?? 0}</span>
                         </div>
                       </div>
                     </CardContent>
@@ -222,26 +219,25 @@ export default function Favorites() {
               })}
             </div>
 
-            {/* 加载更多 */}
-            {hasMore && (
-              <div className="flex justify-center mt-8">
+            {hasMore ? (
+              <div className="mt-8 flex justify-center">
                 <Button
                   variant="outline"
-                  onClick={() => loadFavorites(page + 1)}
+                  onClick={() => void loadFavorites(page + 1, true)}
                   disabled={loadingMore}
-                  className="px-10 rounded-xl border-purple-200 text-purple-600 hover:bg-purple-50"
+                  className="rounded-xl border-theme-soft-strong bg-white/80 px-10 text-theme-primary hover:bg-theme-soft"
                 >
                   {loadingMore ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      加载中…
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      加载中...
                     </>
                   ) : (
                     `加载更多（还剩 ${total - items.length} 个）`
                   )}
                 </Button>
               </div>
-            )}
+            ) : null}
           </>
         )}
       </div>

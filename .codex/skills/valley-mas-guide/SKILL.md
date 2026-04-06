@@ -20,8 +20,6 @@ Keep the first pass lightweight:
   Open `apps/web/src`.
 - Admin dashboards and management pages:
   Open `apps/admin/src`.
-- Mini app or Taro behavior:
-  Open `apps/mini-app`.
 - Go API, auth, database, upload/download, blog/resource rules:
   Open `server/internal`.
 - Shared TypeScript helpers or cross-app types:

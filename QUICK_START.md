@@ -73,12 +73,15 @@ node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
 ## 9. 常见问题
 
 1. `tts async submit failed: upstream error: {"detail":"Not Found"}`
+
 - 原因：Python 本地 API 仍是旧版本
 - 处理：重启 `apps/f5-tts/scripts/start_local_api.cmd`
 
 2. 进度条不动
+
 - 确认 Go 服务与 Python 服务都在运行
 - 确认浏览器可访问 SSE 路由
 
 3. 历史播放刷新后失效
-- 已改为 IndexedDB 本地持久化；如果旧历史是老数据，建议清空一次历史后重新生成
+
+- 目前已改为 IndexedDB 本地持久化；如果旧历史是老数据，建议清空一次历史后重新生成

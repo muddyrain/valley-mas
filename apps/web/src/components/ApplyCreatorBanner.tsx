@@ -1,24 +1,16 @@
-/**
- * 申请创作者入口卡片
- *
- * 只对 role === 'user' 的普通用户显示，创作者/管理员自动隐藏。
- * 可在 Profile 页、个人设置侧栏等多处复用。
- */
 import { ChevronRight, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 interface ApplyCreatorBannerProps {
-  /** 额外的外层 className */
   className?: string;
 }
 
 export default function ApplyCreatorBanner({ className = '' }: ApplyCreatorBannerProps) {
   const navigate = useNavigate();
-  const user = useAuthStore((s) => s.user);
-  const profile = useAuthStore((s) => s.profile);
+  const user = useAuthStore((state) => state.user);
+  const profile = useAuthStore((state) => state.profile);
 
-  // 只对普通用户显示（profile 优先，profile 未加载时回退到 user）
   const role = profile?.role ?? user?.role;
   if (role !== 'user') return null;
 
@@ -26,22 +18,18 @@ export default function ApplyCreatorBanner({ className = '' }: ApplyCreatorBanne
     <button
       type="button"
       onClick={() => navigate('/apply-creator')}
-      className={`w-full cursor-pointer group flex items-center justify-between p-5
-        bg-linear-to-r from-purple-50 to-indigo-50
-        border border-purple-200 rounded-2xl
-        hover:from-purple-100 hover:to-indigo-100 hover:border-purple-300
-        transition-all ${className}`}
+      className={`group flex w-full cursor-pointer items-center justify-between rounded-2xl border border-theme-shell-border bg-[linear-gradient(135deg,color-mix(in_srgb,var(--theme-primary-soft)_78%,white),rgba(255,255,255,0.92))] p-5 text-left shadow-[0_16px_38px_rgba(var(--theme-primary-rgb),0.10)] transition-all hover:-translate-y-0.5 hover:bg-[linear-gradient(135deg,color-mix(in_srgb,var(--theme-primary-soft)_88%,white),rgba(255,255,255,0.96))] hover:shadow-[0_22px_48px_rgba(var(--theme-primary-rgb),0.16)] ${className}`}
     >
       <div className="flex items-center gap-3">
-        <div className="p-2.5 rounded-xl bg-purple-100 group-hover:bg-purple-200 transition-colors">
-          <Sparkles className="h-5 w-5 text-purple-600" />
+        <div className="rounded-xl bg-theme-soft p-2.5 transition-colors group-hover:bg-theme-soft-strong">
+          <Sparkles className="h-5 w-5 text-theme-primary" />
         </div>
         <div>
-          <p className="font-semibold text-purple-900 text-left">申请成为创作者</p>
-          <p className="text-xs text-purple-600 mt-0.5">上传作品 · 个人主页 · 获得粉丝</p>
+          <p className="font-semibold text-slate-900">申请成为创作者</p>
+          <p className="mt-0.5 text-xs text-slate-500">上传作品 · 个人主页 · 获得粉丝</p>
         </div>
       </div>
-      <ChevronRight className="h-5 w-5 text-purple-400 group-hover:translate-x-1 transition-transform" />
+      <ChevronRight className="h-5 w-5 text-theme-primary transition-transform group-hover:translate-x-1" />
     </button>
   );
 }
