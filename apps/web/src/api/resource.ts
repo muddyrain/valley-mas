@@ -148,6 +148,9 @@ export interface MyResource {
   visibility?: ResourceVisibility;
   url: string;
   size: number;
+  width: number;
+  height: number;
+  extension: string;
   downloadCount: number;
   createdAt: string;
   storageKey: string;

@@ -1,5 +1,15 @@
-import { FolderOpen, ImageIcon, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+﻿import {
+  Crown,
+  FolderOpen,
+  ImageIcon,
+  Loader2,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -29,22 +39,375 @@ const BANNER_BACKGROUND = {
     'linear-gradient(135deg, rgba(var(--theme-primary-rgb),0.97) 0%, color-mix(in srgb, rgba(var(--theme-secondary-rgb),1) 36%, var(--theme-primary-hover)) 54%, var(--theme-primary-deep) 100%)',
 };
 
+const TYPE_OPTIONS = [
+  { value: '', label: '全部' },
+  { value: 'wallpaper', label: '壁纸' },
+  { value: 'avatar', label: '头像' },
+];
+
+const PAGE_SIZE = 20;
+
+function formatSize(bytes: number): string {
+  if (!bytes || bytes <= 0) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function formatResolution(w: number, h: number): string {
+  if (!w || !h) return '—';
+  return `${w} × ${h}`;
+}
+
+// ─── 资源选择器 ────────────────────────────────────────────────────────────
+function ResourcePicker({
+  selectedIds,
+  coverResourceId,
+  onToggle,
+  onSetCover,
+}: {
+  selectedIds: string[];
+  coverResourceId: string;
+  onToggle: (resource: MyResource) => void;
+  onSetCover: (id: string) => void;
+}) {
+  const [resources, setResources] = useState<MyResource[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [keyword, setKeyword] = useState('');
+  const [inputValue, setInputValue] = useState('');
+  const [type, setType] = useState('');
+  const [fetching, setFetching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchResources = useCallback(async (p: number, kw: string, tp: string) => {
+    try {
+      setFetching(true);
+      const res = await getMyResources({ page: p, pageSize: PAGE_SIZE, type: tp || undefined });
+      const list = res.list || [];
+      const filtered = kw
+        ? list.filter((item) => item.title.toLowerCase().includes(kw.toLowerCase()))
+        : list;
+      setResources(filtered);
+      setTotal(kw ? filtered.length : res.total);
+    } catch {
+      // 统一处理
+    } finally {
+      setFetching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchResources(page, keyword, type);
+  }, [fetchResources, page, keyword, type]);
+
+  const handleSearch = (val: string) => {
+    setInputValue(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setKeyword(val);
+      setPage(1);
+    }, 300);
+  };
+
+  const handleType = (val: string) => {
+    setType(val);
+    setPage(1);
+  };
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  return (
+    <div className="flex h-full flex-col gap-3">
+      {/* 搜索 + 类型筛选 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <Input
+            value={inputValue}
+            onChange={(e) => handleSearch(e.target.value)}
+            placeholder="搜索资源标题…"
+            className="theme-input-border h-8 pl-8 text-sm"
+          />
+        </div>
+        <div className="flex gap-1">
+          {TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => handleType(opt.value)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                type === opt.value
+                  ? 'bg-(--theme-primary) text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 资源网格 */}
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/60 p-2">
+        {fetching ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="aspect-square rounded-xl" />
+            ))}
+          </div>
+        ) : resources.length === 0 ? (
+          <div className="flex h-40 flex-col items-center justify-center gap-2 text-slate-400">
+            <ImageIcon className="h-8 w-8 opacity-40" />
+            <span className="text-sm">{keyword ? '没有匹配的资源' : '暂无资源'}</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {resources.map((resource) => {
+              const selected = selectedIds.includes(resource.id);
+              const isCover = coverResourceId === resource.id;
+              return (
+                <div
+                  key={resource.id}
+                  onClick={() => onToggle(resource)}
+                  className={`group relative cursor-pointer overflow-hidden rounded-xl border-2 transition-all ${
+                    selected
+                      ? 'border-(--theme-primary) shadow-[0_0_0_3px_rgba(var(--theme-primary-rgb),0.15)]'
+                      : 'border-transparent hover:border-slate-200'
+                  }`}
+                >
+                  <div className="aspect-square bg-slate-100">
+                    {resource.url ? (
+                      <img
+                        src={resource.url}
+                        alt={resource.title}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <ImageIcon className="h-6 w-6 text-slate-300" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 选中角标 */}
+                  {selected && (
+                    <div className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-(--theme-primary) shadow">
+                      <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
+                        <path
+                          d="M2 6l3 3 5-5"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                  )}
+
+                  {/* 封面标记 */}
+                  {isCover && (
+                    <div className="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
+                      <Crown className="h-2.5 w-2.5" />
+                      封面
+                    </div>
+                  )}
+
+                  {/* hover 悬浮信息 */}
+                  <div className="absolute inset-x-0 bottom-0 translate-y-full bg-linear-to-t from-black/80 to-transparent px-2.5 pb-2.5 pt-8 transition-transform group-hover:translate-y-0">
+                    <p className="truncate text-[11px] font-semibold text-white">
+                      {resource.title}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      {/* 分类 */}
+                      <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] text-white/90">
+                        {resource.type === 'wallpaper' ? '壁纸' : '头像'}
+                      </span>
+                      {/* 扩展名 */}
+                      {resource.extension && (
+                        <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] uppercase text-white/90">
+                          {resource.extension}
+                        </span>
+                      )}
+                      {/* 分辨率 */}
+                      {resource.width > 0 && resource.height > 0 && (
+                        <span className="text-[10px] text-white/75">
+                          {formatResolution(resource.width, resource.height)}
+                        </span>
+                      )}
+                      {/* 文件大小 */}
+                      {resource.size > 0 && (
+                        <span className="text-[10px] text-white/75">
+                          {formatSize(resource.size)}
+                        </span>
+                      )}
+                    </div>
+                    {selected && !isCover && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSetCover(resource.id);
+                        }}
+                        className="mt-1.5 rounded-full bg-white/20 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm hover:bg-white/40"
+                      >
+                        设为封面
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 分页 */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-xs text-slate-500">
+          <span>
+            第 {page} / {totalPages} 页，共 {total} 项
+          </span>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              disabled={page <= 1 || fetching}
+              onClick={() => setPage((p) => p - 1)}
+              className="rounded-lg px-2.5 py-1 hover:bg-slate-100 disabled:opacity-40"
+            >
+              上一页
+            </button>
+            <button
+              type="button"
+              disabled={page >= totalPages || fetching}
+              onClick={() => setPage((p) => p + 1)}
+              className="rounded-lg px-2.5 py-1 hover:bg-slate-100 disabled:opacity-40"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── 已选资源列表 ─────────────────────────────────────────────────────────
+function SelectedList({
+  selectedIds,
+  coverResourceId,
+  allResources,
+  onRemove,
+  onSetCover,
+}: {
+  selectedIds: string[];
+  coverResourceId: string;
+  allResources: MyResource[];
+  onRemove: (id: string) => void;
+  onSetCover: (id: string) => void;
+}) {
+  const selected = allResources.filter((r) => selectedIds.includes(r.id));
+
+  if (selectedIds.length === 0) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 text-slate-400">
+        <FolderOpen className="h-8 w-8 opacity-40" />
+        <p className="text-sm">从左侧点击资源加入专辑</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full flex-col gap-2 overflow-y-auto rounded-2xl border border-theme-shell-border bg-white/70 p-2">
+      {selected.map((resource) => {
+        const isCover = coverResourceId === resource.id;
+        return (
+          <div
+            key={resource.id}
+            className="group flex items-center gap-2.5 rounded-xl border border-slate-100 bg-white p-2 shadow-sm transition hover:border-theme-shell-border"
+          >
+            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+              {resource.url ? (
+                <img
+                  src={resource.url}
+                  alt={resource.title}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <ImageIcon className="m-auto h-5 w-5 text-slate-300" />
+              )}
+              {isCover && (
+                <div className="absolute inset-0 flex items-center justify-center bg-amber-400/80">
+                  <Crown className="h-4 w-4 text-white" />
+                </div>
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-slate-800">{resource.title}</p>
+              <p className="text-[11px] text-slate-400">
+                {resource.type === 'wallpaper' ? '壁纸' : '头像'}
+              </p>
+              {!isCover && (
+                <button
+                  type="button"
+                  onClick={() => onSetCover(resource.id)}
+                  className="mt-0.5 text-[10px] text-(--theme-primary) hover:underline"
+                >
+                  设为封面
+                </button>
+              )}
+              {isCover && <span className="text-[10px] font-medium text-amber-500">当前封面</span>}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onRemove(resource.id)}
+              className="shrink-0 rounded-lg p-1 text-slate-300 transition hover:bg-rose-50 hover:text-rose-400"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── 主页面 ──────────────────────────────────────────────────────────────────
 export default function ResourceAlbumManage() {
   const navigate = useNavigate();
   const { hasHydrated, isAuthenticated, user } = useAuthStore();
 
   const [albums, setAlbums] = useState<Album[]>([]);
-  const [resources, setResources] = useState<MyResource[]>([]);
+  const [allResources, setAllResources] = useState<MyResource[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Album | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedResourceIds, setSelectedResourceIds] = useState<string[]>([]);
   const [coverResourceId, setCoverResourceId] = useState('');
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [albumData, resourceData] = await Promise.all([
+        getMyCreatorAlbums(),
+        getMyResources({ page: 1, pageSize: 100 }),
+      ]);
+      setAlbums(albumData.list || []);
+      setAllResources(resourceData.list || []);
+    } catch {
+      // request.ts 已统一处理错误提示
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -57,28 +420,7 @@ export default function ResourceAlbumManage() {
       return;
     }
     void loadData();
-  }, [hasHydrated, isAuthenticated, navigate, user?.role]);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [albumData, resourceData] = await Promise.all([
-        getMyCreatorAlbums(),
-        getMyResources({ page: 1, pageSize: 100 }),
-      ]);
-      setAlbums(albumData.list || []);
-      setResources(resourceData.list || []);
-    } catch {
-      // request.ts 已统一处理错误提示
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const selectedResources = useMemo(
-    () => resources.filter((item) => selectedResourceIds.includes(item.id)),
-    [resources, selectedResourceIds],
-  );
+  }, [hasHydrated, isAuthenticated, navigate, user?.role, loadData]);
 
   const resetForm = () => {
     setEditingAlbum(null);
@@ -97,34 +439,53 @@ export default function ResourceAlbumManage() {
     setEditingAlbum(album);
     setName(album.name);
     setDescription(album.description || '');
-    setSelectedResourceIds(album.resources?.map((item) => item.id) || []);
-    setCoverResourceId(album.coverResourceId || '');
+    const ids = album.resources?.map((item) => item.id) || [];
+    setSelectedResourceIds(ids);
+    setCoverResourceId(album.coverResourceId || ids[0] || '');
     setDialogOpen(true);
   };
 
-  const toggleResource = (resourceId: string) => {
-    setSelectedResourceIds((prev) => {
-      if (prev.includes(resourceId)) {
-        const next = prev.filter((id) => id !== resourceId);
-        if (coverResourceId === resourceId) {
+  const toggleResource = useCallback(
+    (resource: MyResource) => {
+      setAllResources((prev) =>
+        prev.some((r) => r.id === resource.id) ? prev : [...prev, resource],
+      );
+      setSelectedResourceIds((prev) => {
+        if (prev.includes(resource.id)) {
+          const next = prev.filter((id) => id !== resource.id);
+          if (coverResourceId === resource.id) {
+            setCoverResourceId(next[0] || '');
+          }
+          return next;
+        }
+        const next = [...prev, resource.id];
+        if (!coverResourceId) {
+          setCoverResourceId(resource.id);
+        }
+        return next;
+      });
+    },
+    [coverResourceId],
+  );
+
+  const removeResource = useCallback(
+    (id: string) => {
+      setSelectedResourceIds((prev) => {
+        const next = prev.filter((rid) => rid !== id);
+        if (coverResourceId === id) {
           setCoverResourceId(next[0] || '');
         }
         return next;
-      }
-      const next = [...prev, resourceId];
-      if (!coverResourceId) {
-        setCoverResourceId(resourceId);
-      }
-      return next;
-    });
-  };
+      });
+    },
+    [coverResourceId],
+  );
 
   const handleSubmit = async () => {
     if (!name.trim()) {
       toast.error('请输入专辑名称');
       return;
     }
-
     try {
       setSubmitting(true);
       const payload = {
@@ -133,7 +494,6 @@ export default function ResourceAlbumManage() {
         resourceIds: selectedResourceIds,
         coverResourceId: coverResourceId || undefined,
       };
-
       if (editingAlbum) {
         await updateCreatorAlbum(editingAlbum.id, payload);
         toast.success('资源专辑已更新');
@@ -141,7 +501,6 @@ export default function ResourceAlbumManage() {
         await createCreatorAlbum(payload);
         toast.success('资源专辑已创建');
       }
-
       setDialogOpen(false);
       resetForm();
       await loadData();
@@ -182,7 +541,6 @@ export default function ResourceAlbumManage() {
               </p>
             </div>
           </div>
-
           <Button
             type="button"
             onClick={openCreateDialog}
@@ -245,17 +603,12 @@ export default function ResourceAlbumManage() {
                   </div>
                 </div>
                 <CardContent className="p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h2 className="truncate text-lg font-semibold text-slate-900">
-                        {album.name}
-                      </h2>
-                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
-                        {album.description || '暂未填写专辑说明'}
-                      </p>
-                    </div>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-lg font-semibold text-slate-900">{album.name}</h2>
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
+                      {album.description || '暂未填写专辑说明'}
+                    </p>
                   </div>
-
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -285,6 +638,7 @@ export default function ResourceAlbumManage() {
         )}
       </div>
 
+      {/* ── 创建 / 编辑弹窗 ── */}
       <Dialog
         open={dialogOpen}
         onOpenChange={(open) => {
@@ -292,147 +646,85 @@ export default function ResourceAlbumManage() {
           if (!open) resetForm();
         }}
       >
-        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingAlbum ? '编辑资源专辑' : '新建资源专辑'}</DialogTitle>
+        <DialogContent className="flex h-[90vh] w-[90vw] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl">
+          <DialogHeader className="shrink-0 border-b border-slate-100 px-6 py-4">
+            <DialogTitle className="text-base font-semibold">
+              {editingAlbum ? '编辑资源专辑' : '新建资源专辑'}
+            </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-5 pt-2">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">专辑名称</label>
-                <Input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="例如：奶油风头像合集"
-                  className="theme-input-border"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">专辑说明</label>
-                <Input
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  placeholder="给访客一句简短说明"
-                  className="theme-input-border"
-                />
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {/* 基本信息栏 */}
+            <div className="shrink-0 border-b border-slate-100 bg-slate-50/60 px-6 py-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-600">专辑名称 *</label>
+                  <Input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="例如：奶油风头像合集"
+                    className="theme-input-border h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-600">专辑说明</label>
+                  <Input
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="给访客一句简短说明（可选）"
+                    className="theme-input-border h-9 text-sm"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-medium text-slate-700">专辑资源</h3>
-                  <p className="text-xs text-slate-500">
-                    勾选后会出现在这个专辑里，专辑封面也从已选资源里挑。
-                  </p>
+            {/* 左右双栏 */}
+            <div className="flex min-h-0 flex-1 divide-x divide-slate-100 overflow-hidden">
+              {/* 左：资源库 */}
+              <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-slate-700">资源库</p>
+                  <span className="text-xs text-slate-400">点击资源即可添加 / 移除</span>
                 </div>
-                <span className="rounded-full bg-theme-soft px-3 py-1 text-xs font-medium text-theme-primary">
-                  已选 {selectedResourceIds.length} 项
-                </span>
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <ResourcePicker
+                    selectedIds={selectedResourceIds}
+                    coverResourceId={coverResourceId}
+                    onToggle={toggleResource}
+                    onSetCover={setCoverResourceId}
+                  />
+                </div>
               </div>
 
-              {resources.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-theme-shell-border bg-theme-soft/50 px-4 py-8 text-center text-sm text-slate-500">
-                  你还没有可加入专辑的资源，先去创作者空间上传一些作品吧。
-                </div>
-              ) : (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {resources.map((resource) => {
-                    const checked = selectedResourceIds.includes(resource.id);
-                    const isCover = coverResourceId === resource.id;
-
-                    return (
-                      <label
-                        key={resource.id}
-                        className={`cursor-pointer rounded-2xl border p-3 transition ${
-                          checked
-                            ? 'border-theme-soft-strong bg-theme-soft/55 shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.10)]'
-                            : 'border-slate-200 bg-white hover:border-theme-shell-border'
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleResource(resource.id)}
-                            className="mt-1 h-4 w-4 accent-[var(--theme-primary)]"
-                          />
-                          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-100">
-                            {resource.url ? (
-                              <img
-                                src={resource.url}
-                                alt={resource.title}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center">
-                                <ImageIcon className="h-6 w-6 text-slate-300" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-medium text-slate-900">
-                              {resource.title}
-                            </div>
-                            <div className="mt-1 text-xs text-slate-500">
-                              {resource.type === 'wallpaper' ? '壁纸' : '头像'}
-                            </div>
-                            {checked ? (
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  setCoverResourceId(resource.id);
-                                }}
-                                className={`mt-2 rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
-                                  isCover
-                                    ? 'bg-theme-primary text-white'
-                                    : 'bg-white text-theme-primary ring-1 ring-theme-soft-strong hover:bg-theme-soft'
-                                }`}
-                              >
-                                {isCover ? '当前封面' : '设为封面'}
-                              </button>
-                            ) : null}
-                          </div>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {selectedResources.length > 0 ? (
-              <div className="rounded-2xl border border-theme-shell-border bg-white/82 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-medium text-slate-800">封面预览</h3>
-                    <p className="text-xs text-slate-500">默认使用你设为封面的那项资源。</p>
-                  </div>
-                  <span className="text-xs text-slate-400">
-                    {selectedResources.find((item) => item.id === coverResourceId)?.title ||
-                      '未选择'}
+              {/* 右：已选 */}
+              <div className="flex w-56 shrink-0 flex-col gap-3 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-slate-700">已选资源</p>
+                  <span className="rounded-full bg-theme-soft px-2 py-0.5 text-xs font-medium text-theme-primary">
+                    {selectedResourceIds.length} 项
                   </span>
                 </div>
-                <div className="h-40 overflow-hidden rounded-2xl bg-theme-soft">
-                  {selectedResources.find((item) => item.id === coverResourceId)?.url ? (
-                    <img
-                      src={selectedResources.find((item) => item.id === coverResourceId)?.url}
-                      alt="专辑封面预览"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <ImageIcon className="h-8 w-8 text-theme-primary/50" />
-                    </div>
-                  )}
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <SelectedList
+                    selectedIds={selectedResourceIds}
+                    coverResourceId={coverResourceId}
+                    allResources={allResources}
+                    onRemove={removeResource}
+                    onSetCover={setCoverResourceId}
+                  />
                 </div>
               </div>
-            ) : null}
+            </div>
+          </div>
 
-            <div className="flex justify-end gap-3">
+          {/* 底部操作栏 */}
+          <div className="flex shrink-0 items-center justify-between border-t border-slate-100 px-6 py-4">
+            <p className="text-xs text-slate-400">
+              {coverResourceId
+                ? `封面：${allResources.find((r) => r.id === coverResourceId)?.title ?? '已设置'}`
+                : '未设置封面，将自动使用第一项资源'}
+            </p>
+            <div className="flex gap-3">
               <Button
                 type="button"
                 variant="outline"
@@ -450,6 +742,7 @@ export default function ResourceAlbumManage() {
         </DialogContent>
       </Dialog>
 
+      {/* ── 删除确认弹窗 ── */}
       <Dialog
         open={!!deleteTarget}
         onOpenChange={(open) => {
@@ -462,7 +755,7 @@ export default function ResourceAlbumManage() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm leading-6 text-slate-600">
-              确认删除“{deleteTarget?.name}”？专辑会消失，但其中资源本身不会被删除。
+              确认删除「{deleteTarget?.name}」？专辑会消失，但其中资源本身不会被删除。
             </p>
             <div className="flex justify-end gap-3">
               <Button
