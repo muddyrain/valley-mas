@@ -19,6 +19,12 @@ const http: AxiosInstance = axios.create({
   withCredentials: true,
 });
 
+const GLOBAL_ERROR_TOAST_ID = 'global-error-toast';
+
+const showLatestErrorToast = (message: string) => {
+  toast.error(message, { id: GLOBAL_ERROR_TOAST_ID });
+};
+
 http.interceptors.request.use(
   (config) => {
     const requestConfig = config as typeof config & RequestConfig;
@@ -40,7 +46,7 @@ http.interceptors.request.use(
   (error) => {
     const requestConfig = error.config as RequestConfig | undefined;
     if (!requestConfig?.suppressErrorToast) {
-      toast.error('请求失败，请稍后重试');
+      showLatestErrorToast('请求失败，请稍后重试');
     }
     return Promise.reject(error);
   },
@@ -56,7 +62,7 @@ http.interceptors.response.use(
           window.location.href = '/login';
         }
       }
-      toast.error(msg || '请求失败');
+      showLatestErrorToast(msg || '请求失败');
       return Promise.reject(new Error(msg || 'Error'));
     }
 
@@ -104,7 +110,7 @@ http.interceptors.response.use(
     }
 
     if (!requestConfig?.suppressErrorToast) {
-      toast.error(msg);
+      showLatestErrorToast(msg);
     }
     return Promise.reject(error);
   },

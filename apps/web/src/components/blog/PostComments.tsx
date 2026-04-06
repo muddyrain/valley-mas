@@ -64,7 +64,7 @@ export function PostComments({
     >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#fff3e4] px-3 py-1 text-xs font-medium text-[#f06b14]">
+          <div className="inline-flex items-center gap-2 rounded-full theme-panel-shell px-3 py-1 text-xs font-medium text-theme-primary">
             <MessageCircle className="h-3.5 w-3.5" />
             {title}
           </div>
@@ -78,7 +78,7 @@ export function PostComments({
           onChange={(event) => setDraft(event.target.value)}
           placeholder={isAuthenticated ? '写下你的想法...' : '登录后可以参与评论'}
           disabled={!isAuthenticated || submitting}
-          className="min-h-[108px] w-full resize-none border-0 bg-transparent text-sm leading-7 text-slate-700 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed"
+          className="min-h-27 w-full resize-none border-0 bg-transparent text-sm leading-7 text-slate-700 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed"
         />
         <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-200/80 pt-3">
           <span className="text-xs text-slate-400">支持纯文本评论，适合记录想法和交流反馈。</span>
@@ -86,7 +86,7 @@ export function PostComments({
             type="button"
             onClick={handleSubmit}
             disabled={!isAuthenticated || !canPublish}
-            className="rounded-full bg-[#ff7a18] px-5 text-white hover:bg-[#f26d0a]"
+            className="rounded-full theme-panel-shell px-5 duration-300 text-primary hover:bg-theme-primary/75!"
           >
             {submitting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

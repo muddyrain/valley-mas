@@ -68,16 +68,6 @@
           }
         }
       }
-    },
-    {
-      "includes": ["apps/mini-app/src/**"],
-      "linter": {
-        "rules": {
-          "a11y": {
-            "recommended": false
-          }
-        }
-      }
     }
   ],
   "javascript": {

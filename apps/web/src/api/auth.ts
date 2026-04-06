@@ -51,6 +51,31 @@ export interface AvatarHistoryItem {
   createdAt: string;
 }
 
+export interface DownloadHistoryItem {
+  id: string;
+  userId: string;
+  resourceId: string;
+  creatorId: string;
+  ip: string;
+  userAgent: string;
+  createdAt: string;
+  resource?: {
+    id: string;
+    title: string;
+    type: string;
+    url: string;
+    size?: number;
+  };
+  creator?: {
+    id: string;
+    code: string;
+    user?: {
+      nickname: string;
+      avatar: string;
+    };
+  };
+}
+
 export const getMyProfile = () => {
   return http.get<unknown, UserProfile>('/user/info');
 };
@@ -83,4 +108,11 @@ export const getAvatarHistory = (pageSize = 12) => {
 
 export const getUseAvatarHistory = (id: string) => {
   return http.post<unknown, { avatarUrl: string }>(`/user/avatar/history/${id}/use`);
+};
+
+export const getMyDownloads = (params: { page?: number; pageSize?: number } = {}) => {
+  const { page = 1, pageSize = 20 } = params;
+  return http.get<unknown, { list: DownloadHistoryItem[]; total: number }>(
+    `/user/downloads?page=${page}&pageSize=${pageSize}`,
+  );
 };

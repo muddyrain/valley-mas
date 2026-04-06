@@ -5,6 +5,7 @@
   BellRing,
   BookOpen,
   CheckCheck,
+  Download,
   Heart,
   Home,
   ImageIcon,
@@ -477,6 +478,20 @@ export default function Header() {
                 >
                   <Heart className="h-4 w-4 text-pink-500" />
                   <span className="font-medium">我的收藏</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate('/follows')}
+                  className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+                >
+                  <Users className="text-theme-primary h-4 w-4" />
+                  <span className="font-medium">我的关注</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate('/downloads')}
+                  className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+                >
+                  <Download className="h-4 w-4 text-sky-500" />
+                  <span className="font-medium">下载记录</span>
                 </DropdownMenuItem>
                 {user?.role === 'creator' && (
                   <DropdownMenuItem

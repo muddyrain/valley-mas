@@ -211,6 +211,7 @@ func GetMyDownloads(c *gin.Context) {
 	query.Count(&total)
 	query.Preload("Resource").
 		Preload("Creator").
+		Preload("Creator.User").
 		Offset(offset).
 		Limit(pageSize).
 		Order("created_at DESC").

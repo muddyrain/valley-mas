@@ -59,6 +59,24 @@ export interface Album {
   creatorId: string;
 }
 
+export interface MyFollowItem {
+  id: string;
+  userId: string;
+  creatorId: string;
+  createdAt: string;
+  creator?: {
+    id: string;
+    userId: string;
+    code: string;
+    description: string;
+    createdAt: string;
+    user?: {
+      nickname: string;
+      avatar: string;
+    };
+  };
+}
+
 // 列表响应类型
 interface ListResponse<T> {
   list: T[];
@@ -149,7 +167,7 @@ export const getCreatorFollowStatus = (creatorId: string) => {
 // 获取我关注的创作者列表
 export const getMyFollows = (params: { page?: number; pageSize?: number } = {}) => {
   const { page = 1, pageSize = 20 } = params;
-  return http.get<unknown, { list: unknown[]; total: number }>(
+  return http.get<unknown, { list: MyFollowItem[]; total: number }>(
     `/user/follows?page=${page}&pageSize=${pageSize}`,
   );
 };
