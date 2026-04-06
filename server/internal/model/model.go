@@ -197,8 +197,8 @@ type Resource struct {
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// 关联
-	User *User         `gorm:"foreignKey:UserID" json:"user,omitempty"`                 // 上传者用户信息
-	Tags []ResourceTag `gorm:"many2many:resource_tag_relations;" json:"tags,omitempty"` // 资源标签
+	User *User         `gorm:"foreignKey:UserID" json:"user,omitempty"`                                                     // 上传者用户信息
+	Tags []ResourceTag `gorm:"many2many:resource_tag_relations;joinForeignKey:ResourceID;joinReferences:TagID" json:"tags"` // 资源标签
 
 	// 计算字段（不存 DB，JSON 序列化时自动填充）
 	ThumbnailURL string `gorm:"-" json:"thumbnailUrl"`
@@ -208,9 +208,8 @@ type Resource struct {
 type ResourceTag struct {
 	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	Name          string         `gorm:"size:30;uniqueIndex;not null" json:"name"`
-	Slug          string         `gorm:"size:30;uniqueIndex;not null" json:"slug"`
-	Color         string         `gorm:"size:20;default:''" json:"color"` // 可选颜色，如 #FF6B6B
-	ResourceCount int            `gorm:"default:0" json:"resourceCount"`  // 冗余计数，方便排序
+	Description   string         `gorm:"size:100;default:''" json:"description"` // 标签介绍
+	ResourceCount int            `gorm:"default:0" json:"resourceCount"`         // 冗余计数，方便排序
 	CreatedAt     time.Time      `json:"createdAt"`
 	UpdatedAt     time.Time      `json:"updatedAt"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`

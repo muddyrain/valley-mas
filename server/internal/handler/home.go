@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
@@ -472,6 +473,7 @@ func GetAllResources(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
 	resourceType := c.Query("type")
 	keyword := c.Query("keyword")
+	tagID := strings.TrimSpace(c.Query("tagId"))
 
 	if page < 1 {
 		page = 1
@@ -488,6 +490,11 @@ func GetAllResources(c *gin.Context) {
 	if keyword != "" {
 		like := "%" + keyword + "%"
 		query = query.Where("title LIKE ? OR description LIKE ?", like, like)
+	}
+	if tagID != "" {
+		query = query.
+			Joins("JOIN resource_tag_relations ON resource_tag_relations.resource_id = resources.id").
+			Where("resource_tag_relations.tag_id = ?", tagID)
 	}
 
 	var total int64

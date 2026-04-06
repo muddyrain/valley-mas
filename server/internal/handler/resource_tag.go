@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -40,7 +39,7 @@ func ListResourceTags(c *gin.Context) {
 	query := db.Model(&model.ResourceTag{})
 	if keyword != "" {
 		like := "%" + keyword + "%"
-		query = query.Where("name LIKE ? OR slug LIKE ?", like, like)
+		query = query.Where("name LIKE ? OR description LIKE ?", like, like)
 	}
 
 	var total int64
@@ -60,12 +59,11 @@ func ListResourceTags(c *gin.Context) {
 }
 
 // CreateResourceTag 创建资源标签（管理员 / 创作者）
-// POST /admin/resource-tags  body: { name, slug?, color? }
+// POST /admin/resource-tags  body: { name, description? }
 func CreateResourceTag(c *gin.Context) {
 	var req struct {
-		Name  string `json:"name" binding:"required"`
-		Slug  string `json:"slug"`
-		Color string `json:"color"`
+		Name        string `json:"name" binding:"required"`
+		Description string `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Error(c, 400, "参数错误："+err.Error())
@@ -78,26 +76,20 @@ func CreateResourceTag(c *gin.Context) {
 		return
 	}
 
-	slug := strings.TrimSpace(req.Slug)
-	if slug == "" {
-		slug = buildTagSlug(name)
-	}
-
 	db := database.GetDB()
 
 	// 重名检测
 	var count int64
-	db.Model(&model.ResourceTag{}).Where("name = ? OR slug = ?", name, slug).Count(&count)
+	db.Model(&model.ResourceTag{}).Where("name = ?", name).Count(&count)
 	if count > 0 {
-		Error(c, 400, "标签名称或标识已存在")
+		Error(c, 400, "标签名称已存在")
 		return
 	}
 
 	tag := model.ResourceTag{
-		ID:    model.Int64String(utils.GenerateID()),
-		Name:  name,
-		Slug:  slug,
-		Color: strings.TrimSpace(req.Color),
+		ID:          model.Int64String(utils.GenerateID()),
+		Name:        name,
+		Description: strings.TrimSpace(req.Description),
 	}
 	if err := db.Create(&tag).Error; err != nil {
 		Error(c, 500, "创建标签失败："+err.Error())
@@ -108,7 +100,7 @@ func CreateResourceTag(c *gin.Context) {
 }
 
 // UpdateResourceTag 更新资源标签（管理员 / 创作者）
-// PATCH /admin/resource-tags/:id  body: { name?, color? }
+// PATCH /admin/resource-tags/:id  body: { name?, description? }
 func UpdateResourceTag(c *gin.Context) {
 	id := c.Param("id")
 	db := database.GetDB()
@@ -120,8 +112,8 @@ func UpdateResourceTag(c *gin.Context) {
 	}
 
 	var req struct {
-		Name  string `json:"name"`
-		Color string `json:"color"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Error(c, 400, "参数错误："+err.Error())
@@ -142,8 +134,8 @@ func UpdateResourceTag(c *gin.Context) {
 		}
 		updates["name"] = name
 	}
-	if color := strings.TrimSpace(req.Color); color != tag.Color {
-		updates["color"] = color
+	if desc := strings.TrimSpace(req.Description); desc != tag.Description {
+		updates["description"] = desc
 	}
 
 	if len(updates) == 0 {
@@ -323,11 +315,11 @@ func SetResourceTags(c *gin.Context) {
 
 // AIMatchResourceTags 使用视觉 AI 根据图片 + 标题自动推荐已有标签
 // POST /creator/resources/:id/tags/ai-match
-// Body: { "imageBase64": "data:image/jpeg;base64,..." }
+// Body: {} （无需传图片，后端直接使用资源 URL）
 //
 // 工作流：
 //  1. 加载系统中已有的全部标签名
-//  2. 把图片 + 标题 + 标签候选列表发给视觉模型
+//  2. 把图片 URL + 标题 + 标签候选列表发给视觉模型
 //  3. 模型从候选列表中选出最匹配的若干个（不会生成新标签）
 //  4. 直接将选中的标签写入 resource_tag_relations（覆盖旧绑定）
 func AIMatchResourceTags(c *gin.Context) {
@@ -344,11 +336,6 @@ func AIMatchResourceTags(c *gin.Context) {
 		return
 	}
 
-	var req struct {
-		ImageBase64 string `json:"imageBase64"` // 可选；若为空则仅凭标题+描述匹配
-	}
-	_ = c.ShouldBindJSON(&req)
-
 	// 读取 AI 配置
 	apiKey := strings.TrimSpace(os.Getenv("ARK_API_KEY"))
 	if apiKey == "" {
@@ -357,8 +344,9 @@ func AIMatchResourceTags(c *gin.Context) {
 	}
 	visionModel := strings.TrimSpace(os.Getenv("ARK_VISION_MODEL"))
 	textModel := strings.TrimSpace(os.Getenv("ARK_TEXT_MODEL"))
-	// 优先用视觉模型（有图片时），否则退到文本模型
-	useVision := req.ImageBase64 != "" && strings.HasPrefix(visionModel, "ep-")
+	// 有图片 URL 且配置了视觉模型时使用视觉模型，否则退到文本模型
+	hasImage := strings.HasPrefix(resource.URL, "http")
+	useVision := hasImage && strings.HasPrefix(visionModel, "ep-")
 	useText := !useVision && strings.HasPrefix(textModel, "ep-")
 	if !useVision && !useText {
 		Error(c, 503, "AI 功能未配置（ARK_VISION_MODEL 或 ARK_TEXT_MODEL 须以 ep- 开头）")
@@ -381,12 +369,16 @@ func AIMatchResourceTags(c *gin.Context) {
 		return
 	}
 
-	// 构造候选标签字符串
-	tagNames := make([]string, 0, len(allTags))
+	// 构造候选标签字符串（名称 + 描述，帮助 AI 更准确匹配）
+	tagLines := make([]string, 0, len(allTags))
 	for _, t := range allTags {
-		tagNames = append(tagNames, t.Name)
+		if t.Description != "" {
+			tagLines = append(tagLines, fmt.Sprintf("%s（%s）", t.Name, t.Description))
+		} else {
+			tagLines = append(tagLines, t.Name)
+		}
 	}
-	candidateStr := strings.Join(tagNames, "、")
+	candidateStr := strings.Join(tagLines, "\n")
 
 	resourceType := map[string]string{
 		"wallpaper": "壁纸",
@@ -409,8 +401,8 @@ func AIMatchResourceTags(c *gin.Context) {
 		"你是一个图片标签专家。\n"+
 			"%s%s"+
 			"资源类型：%s\n"+
-			"以下是系统中所有可用的标签，请从中选出最符合这张图片的 1-5 个，只输出标签名称，每行一个，不要编号，不要额外解释，绝对不要创造候选列表以外的新标签。\n\n"+
-			"候选标签：%s",
+			"以下是系统中所有可用的标签（格式为【名称（描述）】），请从中选出最符合这张图片的 1-5 个，只输出标签名称，每行一个，不要带括号和描述，不要编号，不要额外解释，绝对不要创造候选列表以外的新标签。\n\n"+
+			"候选标签：\n%s",
 		titleHint, descHint, resourceType, candidateStr,
 	)
 
@@ -429,7 +421,7 @@ func AIMatchResourceTags(c *gin.Context) {
 	var aiErr error
 
 	if useVision {
-		rawText, aiErr = callVisionModel(client, activeModel, req.ImageBase64, prompt)
+		rawText, aiErr = callVisionModel(client, activeModel, resource.URL, prompt)
 	} else {
 		rawText, aiErr = callTextModel(client, activeModel, prompt)
 	}
@@ -495,10 +487,10 @@ func AIMatchResourceTags(c *gin.Context) {
 //  公开接口 - 按标签筛选资源
 // ─────────────────────────────────────────────
 
-// GetResourcesByTag 按标签 slug 获取公开资源列表
+// GetResourcesByTag 按标签 ID 获取公开资源列表
 // GET /public/resource-tags/:slug/resources
 func GetResourcesByTag(c *gin.Context) {
-	slug := c.Param("slug")
+	tagID := c.Param("slug") // 路由参数名暂保持兼容，实际传 id
 	page := GetIntQuery(c, "page", 1)
 	pageSize := GetIntQuery(c, "pageSize", 20)
 	if pageSize > 50 {
@@ -509,7 +501,7 @@ func GetResourcesByTag(c *gin.Context) {
 	db := database.GetDB()
 
 	var tag model.ResourceTag
-	if err := db.Where("slug = ? AND deleted_at IS NULL", slug).First(&tag).Error; err != nil {
+	if err := db.Where("id = ? AND deleted_at IS NULL", tagID).First(&tag).Error; err != nil {
 		Error(c, 404, "标签不存在")
 		return
 	}
@@ -559,22 +551,13 @@ func assertResourceOwner(c *gin.Context, resource model.Resource) error {
 	return nil
 }
 
-// buildTagSlug 将标签名转换为 slug（英文小写 + 数字；中文直接用拼音近似 → 取 Snowflake 后缀）
-func buildTagSlug(name string) string {
-	slug := strings.ToLower(name)
-	slug = regexp.MustCompile(`[^a-z0-9\-_]+`).ReplaceAllString(slug, "-")
-	slug = strings.Trim(slug, "-")
-	if slug == "" || len(slug) < 2 {
-		// 全是非 ASCII（如中文），用 ID 后缀保证唯一
-		slug = fmt.Sprintf("tag-%d", utils.GenerateID())
-	}
-	return slug
-}
-
 // callVisionModel 调用火山方舟视觉模型
-func callVisionModel(client *arkruntime.Client, modelID, imageBase64, prompt string) (string, error) {
-	imageURL := imageBase64
-	if !strings.HasPrefix(imageURL, "data:") {
+// imageURL 支持两种格式：
+//   - HTTPS URL（如 https://cdn.example.com/img.jpg）—— 直接传给模型
+//   - base64 data URI（如 data:image/jpeg;base64,...）—— 直接传给模型
+func callVisionModel(client *arkruntime.Client, modelID, imageURL, prompt string) (string, error) {
+	// HTTPS URL 直接使用；裸 base64 补全 data URI 前缀
+	if !strings.HasPrefix(imageURL, "http") && !strings.HasPrefix(imageURL, "data:") {
 		imageURL = "data:image/jpeg;base64," + imageURL
 	}
 
@@ -718,6 +701,13 @@ func parseAndMatchTags(rawText string, allTags []model.ResourceTag) []model.Reso
 		// 去掉常见前缀符号
 		line = strings.TrimLeft(line, "·•-*1234567890.、 ")
 		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// 去掉括号及其后内容（AI 可能把描述也输出了，如 "少女（描述...）"）
+		if idx := strings.IndexAny(line, "（(【"); idx > 0 {
+			line = strings.TrimSpace(line[:idx])
+		}
 		if line == "" {
 			continue
 		}

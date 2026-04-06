@@ -1,4 +1,15 @@
-import { Hash, Loader2, Pencil, Plus, Sparkles, Tag, Trash2, X } from 'lucide-react';
+import {
+  Hash,
+  Loader2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Sparkles,
+  Tag,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -32,29 +43,12 @@ const BANNER_BACKGROUND = {
     'linear-gradient(135deg, rgba(var(--theme-primary-rgb),0.97) 0%, color-mix(in srgb, rgba(var(--theme-secondary-rgb),1) 36%, var(--theme-primary-hover)) 54%, var(--theme-primary-deep) 100%)',
 };
 
-// 预设颜色
-const PRESET_COLORS = [
-  '#6366f1',
-  '#8b5cf6',
-  '#a855f7',
-  '#ec4899',
-  '#ef4444',
-  '#f97316',
-  '#eab308',
-  '#22c55e',
-  '#14b8a6',
-  '#3b82f6',
-  '#64748b',
-  '#0ea5e9',
-];
-
+// ─── 标签徽章（统一主题色，无颜色依赖） ─────────────────────────────────────
 function TagBadge({ tag, onClick }: { tag: ResourceTag; onClick?: () => void }) {
-  const bg = tag.color || '#6366f1';
   return (
     <span
       onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${onClick ? 'cursor-pointer' : ''}`}
-      style={{ backgroundColor: bg + '18', color: bg, border: `1px solid ${bg}40` }}
+      className={`inline-flex items-center gap-1 rounded-full border border-theme-soft-strong bg-theme-soft px-2.5 py-0.5 text-xs font-medium text-theme-primary ${onClick ? 'cursor-pointer transition hover:bg-theme-primary/10' : ''}`}
     >
       <Hash className="h-2.5 w-2.5" />
       {tag.name}
@@ -62,7 +56,7 @@ function TagBadge({ tag, onClick }: { tag: ResourceTag; onClick?: () => void }) 
   );
 }
 
-// ─── 资源选择器（绑定标签用） ─────────────────────────────────────────
+// ─── 资源绑定行 ──────────────────────────────────────────────────────────────
 function ResourceRow({
   resource,
   allTags,
@@ -77,7 +71,6 @@ function ResourceRow({
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
 
-  // 同步外部数据
   useEffect(() => {
     setCurrentTags(resource.tags ?? []);
   }, [resource.tags]);
@@ -109,7 +102,7 @@ function ResourceRow({
   const handleAiMatch = async () => {
     try {
       setAiLoading(true);
-      const result = await aiMatchResourceTags(resource.id, resource.url);
+      const result = await aiMatchResourceTags(resource.id);
       setCurrentTags(result.tags);
       onTagsChange(resource.id, result.tags);
       toast.success(`AI 匹配了 ${result.tags.length} 个标签`);
@@ -181,16 +174,11 @@ function ResourceRow({
                     <span
                       key={tag.id}
                       onClick={() => handleToggle(tag)}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition hover:opacity-80"
-                      style={{
-                        backgroundColor: (tag.color || '#6366f1') + '18',
-                        color: tag.color || '#6366f1',
-                        border: `1px solid ${tag.color || '#6366f1'}40`,
-                      }}
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-theme-soft-strong bg-theme-soft px-2.5 py-0.5 text-xs font-medium text-theme-primary transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
                     >
                       <Hash className="h-2.5 w-2.5" />
                       {tag.name}
-                      <X className="h-2.5 w-2.5 ml-0.5 opacity-60" />
+                      <X className="ml-0.5 h-2.5 w-2.5 opacity-60" />
                     </span>
                   ))
                 )}
@@ -200,7 +188,7 @@ function ResourceRow({
             {/* 候选标签池 */}
             <div>
               <p className="mb-2 text-xs font-medium text-slate-500">全部标签（点击选择）</p>
-              <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-xl border border-slate-100 bg-white p-2">
+              <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto rounded-xl border border-slate-100 bg-white p-2">
                 {allTags.length === 0 ? (
                   <span className="text-xs text-slate-400">暂无标签，请先在「标签库」中创建</span>
                 ) : (
@@ -210,15 +198,11 @@ function ResourceRow({
                       <span
                         key={tag.id}
                         onClick={() => handleToggle(tag)}
-                        className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition"
-                        style={{
-                          backgroundColor: selected
-                            ? (tag.color || '#6366f1') + '25'
-                            : (tag.color || '#6366f1') + '10',
-                          color: tag.color || '#6366f1',
-                          border: `1px solid ${tag.color || '#6366f1'}${selected ? '70' : '30'}`,
-                          opacity: selected ? 1 : 0.7,
-                        }}
+                        className={`inline-flex cursor-pointer items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition ${
+                          selected
+                            ? 'border-theme-primary/40 bg-theme-primary/10 text-theme-primary'
+                            : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-theme-soft-strong hover:bg-theme-soft hover:text-theme-primary'
+                        }`}
                       >
                         <Hash className="h-2.5 w-2.5" />
                         {tag.name}
@@ -284,12 +268,18 @@ export default function ResourceTagManage() {
   // ── 标签库 ──
   const [tags, setTags] = useState<ResourceTag[]>([]);
   const [tagsLoading, setTagsLoading] = useState(true);
+  const [tagsTotal, setTagsTotal] = useState(0);
+  const [tagsPage, setTagsPage] = useState(1);
+  const [tagsKeyword, setTagsKeyword] = useState('');
+  const [tagsInputKeyword, setTagsInputKeyword] = useState('');
+  const tagsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const TAGS_PAGE_SIZE = 24;
 
   // ── 创建 / 编辑标签弹窗 ──
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [editingTag, setEditingTag] = useState<ResourceTag | null>(null);
   const [tagName, setTagName] = useState('');
-  const [tagColor, setTagColor] = useState(PRESET_COLORS[0]);
+  const [tagDescription, setTagDescription] = useState('');
   const [tagSubmitting, setTagSubmitting] = useState(false);
 
   // ── 删除标签 ──
@@ -309,31 +299,42 @@ export default function ResourceTagManage() {
   // ── Tab ──
   const [tab, setTab] = useState<'tags' | 'bind'>('tags');
 
-  // 权限检查
+  // 是否是管理员（只有管理员可增删改标签）
+  const isAdmin = user?.role === 'admin';
+
+  // 权限检查：管理员或创作者才能访问，普通用户跳走
   useEffect(() => {
     if (!hasHydrated) return;
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
-    if (user?.role !== 'creator') {
+    if (user?.role !== 'creator' && user?.role !== 'admin') {
       navigate('/');
       return;
     }
   }, [hasHydrated, isAuthenticated, user, navigate]);
 
   // 加载标签
-  const loadTags = useCallback(async () => {
-    try {
-      setTagsLoading(true);
-      const data = await getResourceTags({ pageSize: 200 });
-      setTags(data.list ?? []);
-    } catch {
-      // 统一处理
-    } finally {
-      setTagsLoading(false);
-    }
-  }, []);
+  const loadTags = useCallback(
+    async (page: number, keyword: string) => {
+      try {
+        setTagsLoading(true);
+        const data = await getResourceTags({
+          page,
+          pageSize: TAGS_PAGE_SIZE,
+          keyword: keyword || undefined,
+        });
+        setTags(data.list ?? []);
+        setTagsTotal(data.total ?? 0);
+      } catch {
+        // 统一处理
+      } finally {
+        setTagsLoading(false);
+      }
+    },
+    [TAGS_PAGE_SIZE],
+  );
 
   // 加载资源（用于绑定 tab）
   const loadResources = useCallback(async (page: number, keyword: string) => {
@@ -345,8 +346,6 @@ export default function ResourceTagManage() {
         keyword: keyword || undefined,
       });
       const list = data.list ?? [];
-
-      // 批量拉取每条资源当前绑定的标签
       const withTags = await Promise.all(
         list.map(async (r) => {
           try {
@@ -367,16 +366,27 @@ export default function ResourceTagManage() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || user?.role !== 'creator') return;
-    void loadTags();
-  }, [isAuthenticated, user, loadTags]);
+    if (!isAuthenticated || (user?.role !== 'creator' && user?.role !== 'admin')) return;
+    void loadTags(tagsPage, tagsKeyword);
+  }, [isAuthenticated, user, loadTags, tagsPage, tagsKeyword]);
 
   useEffect(() => {
-    if (tab !== 'bind' || !isAuthenticated || user?.role !== 'creator') return;
+    if (tab !== 'bind' || !isAuthenticated || (user?.role !== 'creator' && user?.role !== 'admin'))
+      return;
     void loadResources(resourcePage, resourceKeyword);
   }, [tab, resourcePage, resourceKeyword, isAuthenticated, user, loadResources]);
 
-  // ── 搜索防抖 ──
+  // ── 标签库搜索防抖 ──
+  const handleTagsSearch = (val: string) => {
+    setTagsInputKeyword(val);
+    if (tagsDebounceRef.current) clearTimeout(tagsDebounceRef.current);
+    tagsDebounceRef.current = setTimeout(() => {
+      setTagsKeyword(val);
+      setTagsPage(1);
+    }, 300);
+  };
+
+  // ── 资源搜索防抖 ──
   const handleSearch = (val: string) => {
     setInputKeyword(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -390,14 +400,14 @@ export default function ResourceTagManage() {
   const openCreateTagDialog = () => {
     setEditingTag(null);
     setTagName('');
-    setTagColor(PRESET_COLORS[0]);
+    setTagDescription('');
     setTagDialogOpen(true);
   };
 
   const openEditTagDialog = (tag: ResourceTag) => {
     setEditingTag(tag);
     setTagName(tag.name);
-    setTagColor(tag.color || PRESET_COLORS[0]);
+    setTagDescription(tag.description ?? '');
     setTagDialogOpen(true);
   };
 
@@ -414,11 +424,14 @@ export default function ResourceTagManage() {
     try {
       setTagSubmitting(true);
       if (editingTag) {
-        const updated = await updateResourceTag(editingTag.id, { name, color: tagColor });
+        const updated = await updateResourceTag(editingTag.id, {
+          name,
+          description: tagDescription.trim(),
+        });
         setTags((prev) => prev.map((t) => (t.id === editingTag.id ? updated : t)));
         toast.success('标签已更新');
       } else {
-        const created = await createResourceTag({ name, color: tagColor });
+        const created = await createResourceTag({ name, description: tagDescription.trim() });
         setTags((prev) => [created, ...prev]);
         toast.success('标签已创建');
       }
@@ -449,6 +462,7 @@ export default function ResourceTagManage() {
     setResources((prev) => prev.map((r) => (r.id === resourceId ? { ...r, tags: newTags } : r)));
   };
 
+  const totalTagPages = Math.ceil(tagsTotal / TAGS_PAGE_SIZE);
   const totalPages = Math.ceil(resourceTotal / PAGE_SIZE);
 
   return (
@@ -463,11 +477,13 @@ export default function ResourceTagManage() {
             <div className="text-white">
               <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">资源标签管理</h1>
               <p className="mt-1 text-sm text-white/82">
-                创建标签、给资源打标签，支持 AI 自动匹配，让资源更易被发现。
+                {isAdmin
+                  ? '创建标签、给资源打标签，支持 AI 自动匹配，让资源更易被发现。'
+                  : '查看全部标签，并为自己的资源绑定合适的标签。'}
               </p>
             </div>
           </div>
-          {tab === 'tags' && (
+          {tab === 'tags' && isAdmin && (
             <Button
               type="button"
               onClick={openCreateTagDialog}
@@ -480,9 +496,9 @@ export default function ResourceTagManage() {
         </div>
       </PageBanner>
 
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         {/* Tab 切换 */}
-        <div className="flex gap-1 rounded-2xl border border-theme-shell-border bg-white/80 p-1 shadow-sm w-fit">
+        <div className="flex w-fit gap-1 rounded-2xl border border-theme-shell-border bg-white/80 p-1 shadow-sm">
           {(
             [
               ['tags', '标签库'],
@@ -507,59 +523,124 @@ export default function ResourceTagManage() {
         {/* ══ Tab: 标签库 ══ */}
         {tab === 'tags' && (
           <>
+            {/* 工具栏：搜索 + 刷新 */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={tagsInputKeyword}
+                  onChange={(e) => handleTagsSearch(e.target.value)}
+                  placeholder="搜索标签名称或介绍…"
+                  className="h-9 w-full rounded-xl border border-slate-200 bg-white/80 pl-9 pr-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-theme-primary focus:ring-1 focus:ring-theme-primary/30"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadTags(tagsPage, tagsKeyword)}
+                disabled={tagsLoading}
+                title="刷新"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-slate-500 transition hover:border-theme-soft-strong hover:bg-theme-soft hover:text-theme-primary disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${tagsLoading ? 'animate-spin' : ''}`} />
+              </button>
+              <span className="text-xs text-slate-400 shrink-0">共 {tagsTotal} 个标签</span>
+            </div>
+
             {tagsLoading ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <Skeleton key={i} className="h-20 rounded-2xl" />
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 9 }).map((_, i) => (
+                  <Skeleton key={i} className="h-24 rounded-2xl" />
                 ))}
               </div>
             ) : tags.length === 0 ? (
               <div className="rounded-[28px] border border-theme-shell-border bg-white/72 px-6 shadow-[0_20px_50px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm">
                 <EmptyState
                   icon={Tag}
-                  title="还没有标签"
-                  description="先创建几个标签，例如「极简」「暗黑」「治愈」，然后去「资源绑定」页面给资源打标签。"
-                  actionLabel="新建第一个标签"
-                  onAction={openCreateTagDialog}
+                  title={tagsKeyword ? '没有匹配的标签' : '还没有标签'}
+                  description={
+                    tagsKeyword
+                      ? `没有找到包含「${tagsKeyword}」的标签，换个关键词试试？`
+                      : '先创建几个标签，例如「极简」「暗黑」「治愈」，然后去「资源绑定」页面给资源打标签。'
+                  }
+                  actionLabel={tagsKeyword ? undefined : '新建第一个标签'}
+                  onAction={tagsKeyword ? undefined : openCreateTagDialog}
                 />
               </div>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {tags.map((tag) => (
-                  <div
-                    key={tag.id}
-                    className="flex items-center justify-between rounded-2xl border border-theme-shell-border bg-white/86 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* 色块 */}
-                      <div
-                        className="h-8 w-8 shrink-0 rounded-xl shadow-sm"
-                        style={{ backgroundColor: tag.color || '#6366f1' }}
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-slate-900">{tag.name}</p>
-                        <p className="text-xs text-slate-400">{tag.resourceCount} 个资源</p>
+              <>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {tags.map((tag) => (
+                    <div
+                      key={tag.id}
+                      className="group flex flex-col gap-2 rounded-2xl border border-theme-shell-border bg-white/86 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      {/* 顶部：标签名 + 操作按钮 */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-theme-soft-strong bg-theme-soft px-3 py-1 text-sm font-semibold text-theme-primary">
+                          <Hash className="h-3 w-3" />
+                          {tag.name}
+                        </span>
+                        {isAdmin && (
+                          <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
+                            <button
+                              type="button"
+                              onClick={() => openEditTagDialog(tag)}
+                              className="rounded-xl p-1.5 text-slate-400 transition hover:bg-theme-soft hover:text-theme-primary"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteTarget(tag)}
+                              className="rounded-xl p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 介绍文字 */}
+                      <p className="line-clamp-2 min-h-10 text-xs leading-5 text-slate-500">
+                        {tag.description || <span className="italic text-slate-300">暂无介绍</span>}
+                      </p>
+
+                      {/* 底部：资源数 */}
+                      <div className="flex items-center gap-1 text-xs text-slate-400">
+                        <Tag className="h-3 w-3" />
+                        <span>{tag.resourceCount} 个资源</span>
                       </div>
                     </div>
-                    <div className="flex shrink-0 gap-1.5 ml-2">
+                  ))}
+                </div>
+
+                {/* 分页 */}
+                {totalTagPages > 1 && (
+                  <div className="flex items-center justify-between rounded-xl bg-white/70 px-4 py-2.5 text-xs text-slate-500">
+                    <span>
+                      第 {tagsPage} / {totalTagPages} 页，共 {tagsTotal} 个
+                    </span>
+                    <div className="flex gap-1">
                       <button
                         type="button"
-                        onClick={() => openEditTagDialog(tag)}
-                        className="rounded-xl p-1.5 text-slate-400 transition hover:bg-theme-soft hover:text-theme-primary"
+                        disabled={tagsPage <= 1 || tagsLoading}
+                        onClick={() => setTagsPage((p) => p - 1)}
+                        className="rounded-lg px-3 py-1 hover:bg-slate-100 disabled:opacity-40"
                       >
-                        <Pencil className="h-3.5 w-3.5" />
+                        上一页
                       </button>
                       <button
                         type="button"
-                        onClick={() => setDeleteTarget(tag)}
-                        className="rounded-xl p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
+                        disabled={tagsPage >= totalTagPages || tagsLoading}
+                        onClick={() => setTagsPage((p) => p + 1)}
+                        className="rounded-lg px-3 py-1 hover:bg-slate-100 disabled:opacity-40"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        下一页
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -663,47 +744,30 @@ export default function ResourceTagManage() {
               />
             </div>
 
-            {/* 颜色 */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-slate-600">标签颜色</label>
-              <div className="flex flex-wrap gap-2">
-                {PRESET_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setTagColor(c)}
-                    className={`h-6 w-6 rounded-full transition ${
-                      tagColor === c
-                        ? 'ring-2 ring-offset-2 ring-slate-400 scale-110'
-                        : 'hover:scale-110'
-                    }`}
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-              </div>
+            {/* 介绍 */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-600">标签介绍</label>
+              <textarea
+                value={tagDescription}
+                onChange={(e) => setTagDescription(e.target.value)}
+                placeholder="简单描述这个标签的含义，方便 AI 匹配"
+                maxLength={100}
+                rows={3}
+                className="theme-input-border w-full resize-none rounded-md border px-3 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-theme-primary focus:ring-1 focus:ring-theme-primary/30"
+              />
+              <p className="text-right text-xs text-slate-400">{tagDescription.length}/100</p>
+            </div>
 
-              {/* 自定义颜色 */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={tagColor}
-                  onChange={(e) => setTagColor(e.target.value)}
-                  className="h-7 w-7 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
-                />
-                <span className="text-xs text-slate-400">自定义颜色</span>
-                <span
-                  className="ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium"
-                  style={{
-                    backgroundColor: tagColor + '18',
-                    color: tagColor,
-                    border: `1px solid ${tagColor}40`,
-                  }}
-                >
+            {/* 预览 */}
+            {tagName && (
+              <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
+                <span className="text-xs text-slate-400">预览：</span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-theme-soft-strong bg-theme-soft px-2.5 py-0.5 text-xs font-medium text-theme-primary">
                   <Hash className="h-2.5 w-2.5" />
-                  {tagName || '预览'}
+                  {tagName}
                 </span>
               </div>
-            </div>
+            )}
 
             {/* 按钮 */}
             <div className="flex justify-end gap-3 pt-1">
