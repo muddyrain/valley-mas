@@ -132,6 +132,13 @@ func GetMyFavorites(c *gin.Context) {
 		Limit(pageSize).
 		Find(&favorites)
 
+	// 填充缩略图 URL（Resource.ThumbnailURL 不存储在数据库中，需要动态生成）
+	for i := range favorites {
+		if favorites[i].Resource != nil {
+			favorites[i].Resource.FillThumbnailURL()
+		}
+	}
+
 	Success(c, gin.H{
 		"list":     favorites,
 		"total":    total,

@@ -1,4 +1,15 @@
-﻿import { Calendar, Download, Eye, Globe, Heart, Lock, Pencil, Trash2, Users } from 'lucide-react';
+﻿import {
+  Calendar,
+  Check,
+  Download,
+  Eye,
+  Globe,
+  Heart,
+  Lock,
+  Pencil,
+  Trash2,
+  Users,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ImagePreviewDialog from '@/components/ImagePreviewDialog';
@@ -42,6 +53,10 @@ interface ResourceCardProps<T extends ResourceCardItem = ResourceCardItem> {
   animationDelay?: number;
   contentPadding?: string;
   enablePreview?: boolean;
+  // 批量选择
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: (resource: T, selected: boolean) => void;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -93,6 +108,9 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
   animationDelay,
   contentPadding = 'p-3',
   enablePreview = true,
+  selectable = false,
+  selected = false,
+  onSelect,
 }: ResourceCardProps<T>) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -102,6 +120,11 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // 批量选择模式：点击卡片即切换选中
+    if (selectable) {
+      onSelect?.(resource, !selected);
+      return;
+    }
     if (onClick) {
       onClick(resource);
     } else {
@@ -117,13 +140,18 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
 
   return (
     <Card
-      className="group cursor-pointer overflow-hidden rounded-2xl border-2 border-transparent bg-white transition-all duration-300 hover:-translate-y-1.5 hover:border-theme-soft-strong hover:shadow-[0_20px_44px_rgba(var(--theme-primary-rgb),0.16)]"
+      className={`group cursor-pointer overflow-hidden rounded-2xl border-2 bg-white transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_44px_rgba(var(--theme-primary-rgb),0.16)] ${
+        selected
+          ? 'border-theme-primary shadow-[0_0_0_2px_rgba(var(--theme-primary-rgb),0.18)]'
+          : 'border-transparent hover:border-theme-soft-strong'
+      }`}
       onClick={handleCardClick}
       style={animationDelay !== undefined ? { animationDelay: `${animationDelay}ms` } : undefined}
     >
       <div
         className={`relative ${getAspectClass(resource.type)} overflow-hidden bg-black`}
         onClick={(e) => {
+          if (selectable) return; // 选择模式下不触发预览
           if (!enablePreview) return;
           e.stopPropagation();
           setPreviewOpen(true);
@@ -143,9 +171,27 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
         />
 
         <div className="absolute left-2.5 right-2.5 top-2.5 flex items-start justify-between gap-2">
-          <span className="rounded-lg bg-black/65 px-2.5 py-1 text-xs font-medium text-white shadow-lg backdrop-blur-sm">
-            {TYPE_LABEL[resource.type] ?? resource.type}
-          </span>
+          {/* 批量选择 checkbox */}
+          {selectable ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect?.(resource, !selected);
+              }}
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 shadow-md transition-all ${
+                selected
+                  ? 'border-theme-primary bg-theme-primary'
+                  : 'border-white/80 bg-black/30 backdrop-blur-sm hover:border-white'
+              }`}
+            >
+              {selected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+            </button>
+          ) : (
+            <span className="rounded-lg bg-black/65 px-2.5 py-1 text-xs font-medium text-white shadow-lg backdrop-blur-sm">
+              {TYPE_LABEL[resource.type] ?? resource.type}
+            </span>
+          )}
           {showVisibilityTag && visibilityMeta ? (
             <span
               className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-medium shadow-lg backdrop-blur-sm ${visibilityMeta.className}`}

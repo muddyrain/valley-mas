@@ -61,6 +61,7 @@ func ListResources(c *gin.Context) {
 	resourceType := c.Query("type")
 	keyword := strings.TrimSpace(c.Query("keyword"))
 	uploaderID := strings.TrimSpace(c.Query("uploaderId"))
+	albumID := strings.TrimSpace(c.Query("albumId"))
 
 	offset := (page - 1) * pageSize
 
@@ -79,6 +80,13 @@ func ListResources(c *gin.Context) {
 		query = query.Where("user_id = ?", userId)
 	} else if uploaderID != "" {
 		query = query.Where("user_id = ?", uploaderID)
+	}
+
+	// 按专辑过滤
+	if albumID != "" {
+		query = query.
+			Joins("JOIN creator_album_resources ON creator_album_resources.resource_id = resources.id").
+			Where("creator_album_resources.creator_album_id = ?", albumID)
 	}
 
 	if resourceType != "" {
@@ -239,6 +247,98 @@ func DeleteResource(c *gin.Context) {
 	}
 
 	Success(c, nil)
+}
+
+// BatchDeleteResources 批量删除资源（创作者只能删自己的）
+// DELETE /creator/resources/batch
+func BatchDeleteResources(c *gin.Context) {
+	userRole, _ := c.Get("userRole")
+	userID, _ := c.Get("userId")
+
+	var req struct {
+		IDs []string `json:"ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		Error(c, 400, "参数错误：ids 不能为空")
+		return
+	}
+	if len(req.IDs) > 100 {
+		Error(c, 400, "单次最多批量删除 100 个")
+		return
+	}
+
+	db := database.GetDB()
+	uploadService := service.NewUploadService()
+
+	var resources []model.Resource
+	query := db.Where("id IN ?", req.IDs)
+	if userRole == "creator" {
+		query = query.Where("user_id = ?", userID)
+	}
+	if err := query.Find(&resources).Error; err != nil {
+		Error(c, 500, "查询资源失败")
+		return
+	}
+	if len(resources) == 0 {
+		Error(c, 404, "未找到可删除的资源")
+		return
+	}
+
+	deletedCount := 0
+	for _, resource := range resources {
+		// 删除存储文件（失败不阻断）
+		if resource.StorageKey != "" {
+			if err := uploadService.DeleteByKey(resource.StorageKey); err != nil {
+				logrus.Warnf("批量删除：删除文件失败 key=%s err=%v", resource.StorageKey, err)
+			}
+		} else if resource.URL != "" {
+			if err := uploadService.Delete(resource.URL); err != nil {
+				logrus.Warnf("批量删除：删除文件失败 url=%s err=%v", resource.URL, err)
+			}
+		}
+		if err := db.Delete(&resource).Error; err != nil {
+			logrus.Warnf("批量删除：删除记录失败 id=%v err=%v", resource.ID, err)
+			continue
+		}
+		deletedCount++
+	}
+
+	Success(c, gin.H{"deleted": deletedCount})
+}
+
+// BatchUpdateVisibility 批量设置资源访问范围（创作者只能改自己的）
+// POST /creator/resources/batch-visibility
+func BatchUpdateVisibility(c *gin.Context) {
+	userRole, _ := c.Get("userRole")
+	userID, _ := c.Get("userId")
+
+	var req struct {
+		IDs        []string `json:"ids" binding:"required"`
+		Visibility string   `json:"visibility" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		Error(c, 400, "参数错误：ids 和 visibility 不能为空")
+		return
+	}
+	if len(req.IDs) > 100 {
+		Error(c, 400, "单次最多批量修改 100 个")
+		return
+	}
+
+	normalized := normalizeResourceVisibility(req.Visibility)
+	db := database.GetDB()
+
+	query := db.Model(&model.Resource{}).Where("id IN ?", req.IDs)
+	if userRole == "creator" {
+		query = query.Where("user_id = ?", userID)
+	}
+	result := query.Update("visibility", normalized)
+	if result.Error != nil {
+		Error(c, 500, "批量更新失败："+result.Error.Error())
+		return
+	}
+
+	Success(c, gin.H{"updated": result.RowsAffected})
 }
 
 // UpdateResourceCreator 更新资源的上传者

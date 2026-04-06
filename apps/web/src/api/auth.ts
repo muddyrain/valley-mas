@@ -43,6 +43,8 @@ export interface UserProfile extends User {
   phone: string;
   createdAt: string;
   downloadCount: number;
+  /** 创作者口令，仅 role=creator 时有值，用于跳转创作者主页 */
+  creatorCode?: string;
 }
 
 export interface AvatarHistoryItem {
