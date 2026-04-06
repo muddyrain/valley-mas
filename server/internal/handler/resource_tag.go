@@ -2,10 +2,14 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"sync"
 	"time"
+	"unicode"
 
 	"valley-server/internal/database"
 	"valley-server/internal/model"
@@ -13,8 +17,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
-	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model/responses"
+	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"gorm.io/gorm"
+)
+
+// ─────────────────────────────────────────────
+//  包级 ARK 客户端单例（避免每次请求重建 HTTP 连接）
+// ─────────────────────────────────────────────
+
+var (
+	arkClientOnce sync.Once
+	arkClient     *arkruntime.Client
 )
 
 // ─────────────────────────────────────────────
@@ -319,9 +332,8 @@ func SetResourceTags(c *gin.Context) {
 //
 // 工作流：
 //  1. 加载系统中已有的全部标签名
-//  2. 把图片 URL + 标题 + 标签候选列表发给视觉模型
-//  3. 模型从候选列表中选出最匹配的若干个（不会生成新标签）
-//  4. 直接将选中的标签写入 resource_tag_relations（覆盖旧绑定）
+//  2. 把图片 URL + 标题 + 标签候选列表发给视觉/文本模型（SSE 流式输出）
+//  3. 收集完整文本后匹配到已有标签，写入 DB，通过 SSE 返回结果
 func AIMatchResourceTags(c *gin.Context) {
 	resourceID := c.Param("id")
 	db := database.GetDB()
@@ -344,7 +356,6 @@ func AIMatchResourceTags(c *gin.Context) {
 	}
 	visionModel := strings.TrimSpace(os.Getenv("ARK_VISION_MODEL"))
 	textModel := strings.TrimSpace(os.Getenv("ARK_TEXT_MODEL"))
-	// 有图片 URL 且配置了视觉模型时使用视觉模型，否则退到文本模型
 	hasImage := strings.HasPrefix(resource.URL, "http")
 	useVision := hasImage && strings.HasPrefix(visionModel, "ep-")
 	useText := !useVision && strings.HasPrefix(textModel, "ep-")
@@ -352,33 +363,23 @@ func AIMatchResourceTags(c *gin.Context) {
 		Error(c, 503, "AI 功能未配置（ARK_VISION_MODEL 或 ARK_TEXT_MODEL 须以 ep- 开头）")
 		return
 	}
-
 	activeModel := visionModel
 	if !useVision {
 		activeModel = textModel
 	}
 
-	// 读取系统全量标签
+	// 读取系统全量标签（只取名称，减少 prompt token 数）
 	var allTags []model.ResourceTag
 	if err := db.Where("deleted_at IS NULL").Order("resource_count DESC").Find(&allTags).Error; err != nil {
 		Error(c, 500, "获取标签列表失败")
 		return
 	}
-	if len(allTags) == 0 {
-		Error(c, 400, "系统暂无标签，请先创建标签")
-		return
-	}
 
-	// 构造候选标签字符串（名称 + 描述，帮助 AI 更准确匹配）
-	tagLines := make([]string, 0, len(allTags))
+	// 只传标签名，去掉描述，减少 prompt 长度
+	tagNames := make([]string, 0, len(allTags))
 	for _, t := range allTags {
-		if t.Description != "" {
-			tagLines = append(tagLines, fmt.Sprintf("%s（%s）", t.Name, t.Description))
-		} else {
-			tagLines = append(tagLines, t.Name)
-		}
+		tagNames = append(tagNames, t.Name)
 	}
-	candidateStr := strings.Join(tagLines, "\n")
 
 	resourceType := map[string]string{
 		"wallpaper": "壁纸",
@@ -390,55 +391,79 @@ func AIMatchResourceTags(c *gin.Context) {
 
 	titleHint := ""
 	if resource.Title != "" {
-		titleHint = fmt.Sprintf("资源标题：《%s》\n", resource.Title)
+		titleHint = fmt.Sprintf("标题：%s。", resource.Title)
 	}
 	descHint := ""
 	if resource.Description != "" {
-		descHint = fmt.Sprintf("资源描述：%s\n", resource.Description)
+		descHint = fmt.Sprintf("描述：%s。", resource.Description)
 	}
 
-	prompt := fmt.Sprintf(
-		"你是一个图片标签专家。\n"+
-			"%s%s"+
-			"资源类型：%s\n"+
-			"以下是系统中所有可用的标签（格式为【名称（描述）】），请从中选出最符合这张图片的 1-5 个，只输出标签名称，每行一个，不要带括号和描述，不要编号，不要额外解释，绝对不要创造候选列表以外的新标签。\n\n"+
-			"候选标签：\n%s",
-		titleHint, descHint, resourceType, candidateStr,
-	)
+	var prompt string
+	if len(tagNames) > 0 {
+		candidateStr := strings.Join(tagNames, "\n")
+		prompt = fmt.Sprintf(
+			"你是图片标签专家。%s%s类型：%s。\n"+
+				"优先从以下候选标签中选 1-5 个最匹配的；若候选标签不够准确，可额外补充 1-2 个新标签（每个不超过 6 字）。\n"+
+				"只输出标签名，每行一个，不要编号，不要解释，不要输出候选列表以外的多余文字。\n"+
+				"候选标签（每行一个）：\n%s",
+			titleHint, descHint, resourceType, candidateStr,
+		)
+	} else {
+		prompt = fmt.Sprintf(
+			"你是图片标签专家。%s%s类型：%s。\n"+
+				"为该资源生成 1-5 个最合适的标签（每个不超过 6 字）。\n"+
+				"只输出标签名，每行一个，不要编号，不要解释。",
+			titleHint, descHint, resourceType,
+		)
+	}
 
+	// 获取/初始化单例 client
 	arkBaseURL := strings.TrimSpace(os.Getenv("ARK_BASE_URL"))
 	if arkBaseURL == "" {
 		arkBaseURL = "https://ark.cn-beijing.volces.com/api/v3"
 	}
+	arkClientOnce.Do(func() {
+		arkClient = arkruntime.NewClientWithApiKey(
+			apiKey,
+			arkruntime.WithBaseUrl(arkBaseURL),
+			arkruntime.WithTimeout(60*time.Second),
+		)
+	})
+	client := arkClient
 
-	client := arkruntime.NewClientWithApiKey(
-		apiKey,
-		arkruntime.WithBaseUrl(arkBaseURL),
-		arkruntime.WithTimeout(30*time.Second),
-	)
-
-	var rawText string
-	var aiErr error
-
-	if useVision {
-		rawText, aiErr = callVisionModel(client, activeModel, resource.URL, prompt)
-	} else {
-		rawText, aiErr = callTextModel(client, activeModel, prompt)
-	}
-
+	// 调用 Chat Completions Stream（流式读取，收集完整输出后匹配）
+	rawText, aiErr := callChatStream(client, activeModel, resource.URL, prompt, useVision)
 	if aiErr != nil {
 		Error(c, 502, "AI 服务请求失败："+aiErr.Error())
 		return
 	}
 
-	// 解析 AI 返回，匹配到已有标签
-	matchedTags := parseAndMatchTags(rawText, allTags)
+	// 解析 AI 返回：匹配已有标签，对不存在的标签名自动创建
+	matchedTags, newTagNames := parseAndMatchTagsWithNew(rawText, allTags)
+
+	// 自动创建不存在的新标签
+	for _, name := range newTagNames {
+		newTag := model.ResourceTag{
+			ID:   model.Int64String(utils.GenerateID()),
+			Name: name,
+		}
+		if err := db.Create(&newTag).Error; err != nil {
+			// 若并发重名，尝试查出已有的
+			var existing model.ResourceTag
+			if db.Where("name = ? AND deleted_at IS NULL", name).First(&existing).Error == nil {
+				matchedTags = append(matchedTags, existing)
+			}
+		} else {
+			matchedTags = append(matchedTags, newTag)
+		}
+	}
+
 	if len(matchedTags) == 0 {
-		Error(c, 200, "AI 未能从候选标签中匹配到合适的标签，请手动选择")
+		Error(c, 200, "AI 未能匹配或生成合适的标签，请手动选择")
 		return
 	}
 
-	// 写入绑定（复用 SetResourceTags 的事务逻辑）
+	// 写入绑定
 	err := db.Transaction(func(tx *gorm.DB) error {
 		var oldRelations []model.ResourceTagRelation
 		tx.Where("resource_id = ?", resource.ID).Find(&oldRelations)
@@ -551,176 +576,135 @@ func assertResourceOwner(c *gin.Context, resource model.Resource) error {
 	return nil
 }
 
-// callVisionModel 调用火山方舟视觉模型
-// imageURL 支持两种格式：
-//   - HTTPS URL（如 https://cdn.example.com/img.jpg）—— 直接传给模型
-//   - base64 data URI（如 data:image/jpeg;base64,...）—— 直接传给模型
-func callVisionModel(client *arkruntime.Client, modelID, imageURL, prompt string) (string, error) {
-	// HTTPS URL 直接使用；裸 base64 补全 data URI 前缀
-	if !strings.HasPrefix(imageURL, "http") && !strings.HasPrefix(imageURL, "data:") {
-		imageURL = "data:image/jpeg;base64," + imageURL
-	}
+// callChatStream 使用 Chat Completions Stream API 调用 ARK 模型。
+// useVision=true 时在消息中附带图片 URL（low detail，减少 token 消耗）。
+// 函数阻塞直到流结束，返回完整拼接的文本。
+func callChatStream(client *arkruntime.Client, modelID, imageURL, prompt string, useVision bool) (string, error) {
+	maxTokens := 200 // 标签输出，留足余量避免截断
 
-	imgType := responses.ContentItemType_Enum(responses.ContentItemType_Enum_value["input_image"])
-	txtType := responses.ContentItemType_Enum(responses.ContentItemType_Enum_value["input_text"])
-
-	resp, err := client.CreateResponses(
-		context.Background(),
-		&responses.ResponsesRequest{
-			Model: modelID,
-			Input: &responses.ResponsesInput{
-				Union: &responses.ResponsesInput_ListValue{
-					ListValue: &responses.InputItemList{
-						ListValue: []*responses.InputItem{
-							{
-								Union: &responses.InputItem_EasyMessage{
-									EasyMessage: &responses.ItemEasyMessage{
-										Role: responses.MessageRole_Enum(responses.MessageRole_Enum_value["user"]),
-										Content: &responses.MessageContent{
-											Union: &responses.MessageContent_ListValue{
-												ListValue: &responses.ContentItemList{
-													ListValue: []*responses.ContentItem{
-														{
-															Union: &responses.ContentItem_Image{
-																Image: &responses.ContentItemImage{
-																	Type:     imgType,
-																	ImageUrl: &imageURL,
-																},
-															},
-														},
-														{
-															Union: &responses.ContentItem_Text{
-																Text: &responses.ContentItemText{
-																	Type: txtType,
-																	Text: prompt,
-																},
-															},
-														},
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
+	var content *arkmodel.ChatCompletionMessageContent
+	if useVision {
+		if !strings.HasPrefix(imageURL, "http") && !strings.HasPrefix(imageURL, "data:") {
+			imageURL = "data:image/jpeg;base64," + imageURL
+		}
+		content = &arkmodel.ChatCompletionMessageContent{
+			ListValue: []*arkmodel.ChatCompletionMessageContentPart{
+				{
+					Type: arkmodel.ChatCompletionMessageContentPartTypeImageURL,
+					ImageURL: &arkmodel.ChatMessageImageURL{
+						URL:    imageURL,
+						Detail: arkmodel.ImageURLDetailLow, // low detail：更快，足够分辨图片内容
 					},
 				},
+				{
+					Type: arkmodel.ChatCompletionMessageContentPartTypeText,
+					Text: prompt,
+				},
 			},
+		}
+	} else {
+		strVal := prompt
+		content = &arkmodel.ChatCompletionMessageContent{StringValue: &strVal}
+	}
+
+	stream, err := client.CreateChatCompletionStream(
+		context.Background(),
+		arkmodel.CreateChatCompletionRequest{
+			Model: modelID,
+			Messages: []*arkmodel.ChatCompletionMessage{
+				{Role: "user", Content: content},
+			},
+			MaxTokens: &maxTokens,
 		},
 	)
 	if err != nil {
 		return "", err
 	}
+	defer stream.Close()
 
-	var text string
-	for _, item := range resp.Output {
-		if msg := item.GetOutputMessage(); msg != nil {
-			for _, ct := range msg.Content {
-				if t := ct.GetText(); t != nil {
-					text += t.Text
-				}
-			}
+	var sb strings.Builder
+	for {
+		resp, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+		for _, choice := range resp.Choices {
+			sb.WriteString(choice.Delta.Content)
 		}
 	}
-	return text, nil
+	return sb.String(), nil
 }
 
-// callTextModel 调用火山方舟纯文本模型（无图片时使用）
-func callTextModel(client *arkruntime.Client, modelID, prompt string) (string, error) {
-	txtType := responses.ContentItemType_Enum(responses.ContentItemType_Enum_value["input_text"])
-
-	resp, err := client.CreateResponses(
-		context.Background(),
-		&responses.ResponsesRequest{
-			Model: modelID,
-			Input: &responses.ResponsesInput{
-				Union: &responses.ResponsesInput_ListValue{
-					ListValue: &responses.InputItemList{
-						ListValue: []*responses.InputItem{
-							{
-								Union: &responses.InputItem_EasyMessage{
-									EasyMessage: &responses.ItemEasyMessage{
-										Role: responses.MessageRole_Enum(responses.MessageRole_Enum_value["user"]),
-										Content: &responses.MessageContent{
-											Union: &responses.MessageContent_ListValue{
-												ListValue: &responses.ContentItemList{
-													ListValue: []*responses.ContentItem{
-														{
-															Union: &responses.ContentItem_Text{
-																Text: &responses.ContentItemText{
-																	Type: txtType,
-																	Text: prompt,
-																},
-															},
-														},
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	)
-	if err != nil {
-		return "", err
-	}
-
-	var text string
-	for _, item := range resp.Output {
-		if msg := item.GetOutputMessage(); msg != nil {
-			for _, ct := range msg.Content {
-				if t := ct.GetText(); t != nil {
-					text += t.Text
-				}
-			}
-		}
-	}
-	return text, nil
-}
-
-// parseAndMatchTags 解析 AI 输出的每行标签名，与已有标签列表做精确/模糊匹配
-func parseAndMatchTags(rawText string, allTags []model.ResourceTag) []model.ResourceTag {
-	// 构建名称索引（大小写不敏感）
+// parseAndMatchTagsWithNew 解析 AI 输出的每行标签名：
+//   - 与已有标签精确匹配 → 放入 matched
+//   - 有效但不存在的标签名 → 放入 newNames（调用方负责创建）
+func parseAndMatchTagsWithNew(rawText string, allTags []model.ResourceTag) (matched []model.ResourceTag, newNames []string) {
 	nameIndex := make(map[string]model.ResourceTag, len(allTags))
 	for _, t := range allTags {
 		nameIndex[strings.ToLower(t.Name)] = t
 	}
 
 	lines := strings.Split(rawText, "\n")
-	seen := map[string]bool{}
-	var matched []model.ResourceTag
+	seenKey := map[string]bool{}
+	total := 0
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		// 去掉常见前缀符号
-		line = strings.TrimLeft(line, "·•-*1234567890.、 ")
-		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		// 去掉括号及其后内容（AI 可能把描述也输出了，如 "少女（描述...）"）
-		if idx := strings.IndexAny(line, "（(【"); idx > 0 {
-			line = strings.TrimSpace(line[:idx])
+		// 安全地裁剪行首的序号/符号（逐 rune 处理，不误伤汉字）
+		runes := []rune(line)
+		start := 0
+		for start < len(runes) {
+			r := runes[start]
+			if unicode.IsDigit(r) || r == '.' || r == '、' || r == '·' || r == '•' || r == '-' || r == '*' || r == ' ' || r == '\t' {
+				start++
+			} else {
+				break
+			}
+		}
+		line = strings.TrimSpace(string(runes[start:]))
+		if line == "" {
+			continue
+		}
+		// 去掉括号及其后内容（注释说明）
+		for _, sep := range []string{"（", "(", "【", " -", " —"} {
+			if idx := strings.Index(line, sep); idx > 0 {
+				line = strings.TrimSpace(line[:idx])
+			}
 		}
 		if line == "" {
+			continue
+		}
+		// 超过 10 个字的大概率是 AI 废话，跳过
+		if len([]rune(line)) > 10 {
 			continue
 		}
 		key := strings.ToLower(line)
-		if t, ok := nameIndex[key]; ok {
-			if !seen[key] {
-				seen[key] = true
-				matched = append(matched, t)
-			}
+		if seenKey[key] {
+			continue
 		}
-		if len(matched) >= 5 {
+		seenKey[key] = true
+
+		if t, ok := nameIndex[key]; ok {
+			matched = append(matched, t)
+		} else {
+			newNames = append(newNames, line)
+		}
+		total++
+		if total >= 5 {
 			break
 		}
 	}
+	return
+}
+
+// parseAndMatchTags 解析 AI 输出的每行标签名，与已有标签列表做精确匹配（兼容旧调用）
+func parseAndMatchTags(rawText string, allTags []model.ResourceTag) []model.ResourceTag {
+	matched, _ := parseAndMatchTagsWithNew(rawText, allTags)
 	return matched
 }

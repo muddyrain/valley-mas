@@ -212,11 +212,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
               <div className="flex items-center gap-1.5">
                 <span className="flex items-center gap-1 rounded-lg bg-white/20 px-2 py-1 backdrop-blur-sm">
                   <Eye className="h-3 w-3" />
-                  预览
-                </span>
-                <span className="flex items-center gap-1 rounded-lg bg-white/20 px-2 py-1 backdrop-blur-sm">
-                  <Download className="h-3 w-3" />
-                  {resource.downloadCount}
+                  <span className="text-nowrap">预览</span>
                 </span>
               </div>
 

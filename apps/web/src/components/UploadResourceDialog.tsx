@@ -12,7 +12,14 @@
 import { Image as ImageIcon, Loader2, Sparkles, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { type ResourceVisibility, suggestResourceTitle, uploadResource } from '@/api/resource';
+import {
+  type ResourceTag,
+  type ResourceVisibility,
+  setResourceTags,
+  suggestResourceTitle,
+  uploadResource,
+} from '@/api/resource';
+import ResourceTagSelector from '@/components/ResourceTagSelector';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
@@ -82,6 +89,10 @@ export default function UploadResourceDialog({
   const [uploading, setUploading] = useState(false);
   const [aiNaming, setAiNaming] = useState(false);
   const [aiTitles, setAiTitles] = useState<string[]>([]);
+  // 标签预选（上传前选好，上传成功后立即绑定）
+  const [selectedTags, setSelectedTags] = useState<ResourceTag[]>([]);
+  // 压缩后的 base64（AI 起名和 AI 标签共用）
+  const [previewBase64, setPreviewBase64] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── 重置 ────────────────────────────────────────────────────────────────────
@@ -94,6 +105,8 @@ export default function UploadResourceDialog({
     setUploadTitle('');
     setUploadDesc('');
     setAiTitles([]);
+    setSelectedTags([]);
+    setPreviewBase64('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -110,6 +123,12 @@ export default function UploadResourceDialog({
     setUploadFile(file);
     setPreviewUrl(URL.createObjectURL(file));
     setUploadTitle(file.name.replace(/\.[^/.]+$/, ''));
+    // 同步生成压缩 base64，供 AI 起名和 AI 标签复用
+    resizeImageForAI(file, 512)
+      .then((b64) => setPreviewBase64(b64))
+      .catch(() => {
+        /* 静默失败，AI 功能降级为仅文本模式 */
+      });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,7 +151,8 @@ export default function UploadResourceDialog({
     try {
       setAiNaming(true);
       setAiTitles([]);
-      const base64 = await resizeImageForAI(uploadFile, 512);
+      // 复用已生成的 base64，没有则现场生成
+      const base64 = previewBase64 || (await resizeImageForAI(uploadFile, 512));
       const result = await suggestResourceTitle(base64, uploadType);
       if (result.titles && result.titles.length > 0) {
         setAiTitles(result.titles);
@@ -162,9 +182,19 @@ export default function UploadResourceDialog({
       formData.append('visibility', uploadVisibility);
       formData.append('title', uploadTitle.trim());
       formData.append('description', uploadDesc.trim());
-      await uploadResource(formData);
-      toast.success('上传成功');
+      const { resource } = await uploadResource(formData);
+      // 上传完成后若有预选标签，立即绑定（静默处理失败，不影响上传成功提示）
+      if (selectedTags.length > 0 && resource?.id) {
+        setResourceTags(
+          resource.id,
+          selectedTags.map((t) => t.id),
+        ).catch(() => {
+          /* 静默 */
+        });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1500));
       onOpenChange(false);
+      toast.success('上传成功');
       reset();
       onSuccess?.();
     } catch {
@@ -415,10 +445,22 @@ export default function UploadResourceDialog({
                   onChange={(e) => setUploadDesc(e.target.value)}
                   placeholder="简单描述一下这个资源的用途、风格或来源…"
                   maxLength={255}
-                  rows={3}
+                  rows={2}
                   className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-theme-primary focus:ring-2 focus:ring-theme-primary/15"
                 />
               </div>
+
+              {/* 标签 */}
+              <ResourceTagSelector
+                value={selectedTags}
+                onChange={setSelectedTags}
+                aiPreUpload={{
+                  imageBase64: previewBase64,
+                  type: uploadType,
+                  title: uploadTitle,
+                  description: uploadDesc,
+                }}
+              />
             </div>
 
             {/* 底部操作栏 */}
