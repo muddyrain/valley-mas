@@ -3,7 +3,7 @@
 .markdown-body {
   font-size: 15px;
   line-height: 1.8;
-  color: hsl(var(--foreground));
+  color: var(--foreground);
   word-wrap: break-word;
 }
 
@@ -18,21 +18,21 @@
   margin-bottom: 0.8em;
   font-weight: 600;
   line-height: 1.4;
-  color: hsl(var(--foreground));
+  color: var(--foreground);
   scroll-margin-top: calc(var(--blog-scroll-offset, 120px) + 8px);
 }
 
 .markdown-body h1 {
   font-size: 1.75em;
   padding-bottom: 0.4em;
-  border-bottom: 2px solid hsl(var(--border));
+  border-bottom: 2px solid var(--border);
   margin-top: 0;
 }
 
 .markdown-body h2 {
   font-size: 1.5em;
   padding-bottom: 0.3em;
-  border-bottom: 1px solid hsl(var(--border));
+  border-bottom: 1px solid var(--border);
 }
 
 .markdown-body h3 {
@@ -49,7 +49,7 @@
 
 .markdown-body h6 {
   font-size: 0.9em;
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
 }
 
 /* 段落 */
@@ -59,14 +59,14 @@
 
 /* 链接 */
 .markdown-body a {
-  color: hsl(var(--primary));
+  color: var(--primary);
   text-decoration: none;
   border-bottom: 1px solid transparent;
   transition: all 0.2s;
 }
 
 .markdown-body a:hover {
-  border-bottom-color: hsl(var(--primary));
+  border-bottom-color: color-mix(in srgb, var(--primary) 65%, transparent);
 }
 
 /* 列表 */
@@ -77,28 +77,19 @@
 }
 
 .markdown-body ul {
-  list-style: none;
-}
-
-.markdown-body ul li {
-  position: relative;
-  margin: 0.5em 0;
-}
-
-.markdown-body ul li::before {
-  content: "";
-  position: absolute;
-  left: -1.3em;
-  top: 0.7em;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: hsl(var(--primary));
-  opacity: 0.6;
+  list-style: disc;
 }
 
 .markdown-body ol {
   list-style: decimal;
+}
+
+.markdown-body li {
+  margin: 0.5em 0;
+}
+
+.markdown-body li::marker {
+  color: color-mix(in srgb, var(--primary) 75%, #9ca3af);
 }
 
 .markdown-body ol li {
@@ -114,8 +105,8 @@
 .markdown-body blockquote {
   margin: 1.5em 0;
   padding: 1em 1.2em;
-  border-left: 4px solid hsl(var(--primary));
-  background: hsl(var(--muted) / 0.5);
+  border-left: 4px solid var(--primary);
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
   border-radius: 0 8px 8px 0;
 }
 
@@ -132,9 +123,9 @@
   font-family: "JetBrains Mono", "Fira Code", Consolas, Monaco, monospace;
   font-size: 0.9em;
   padding: 0.2em 0.4em;
-  background: hsl(var(--muted));
+  background: var(--muted);
   border-radius: 4px;
-  color: hsl(var(--primary));
+  color: var(--primary);
 }
 
 .markdown-body pre {
@@ -181,17 +172,17 @@
 .markdown-body td {
   padding: 0.8em 1em;
   text-align: left;
-  border: 1px solid hsl(var(--border));
+  border: 1px solid var(--border);
 }
 
 .markdown-body th {
-  background: hsl(var(--muted) / 0.8);
+  background: color-mix(in srgb, var(--muted) 80%, white);
   font-weight: 600;
-  color: hsl(var(--foreground));
+  color: var(--foreground);
 }
 
 .markdown-body tr:nth-child(even) {
-  background: hsl(var(--muted) / 0.3);
+  background: color-mix(in srgb, var(--muted) 30%, white);
 }
 
 /* 分割线 */
@@ -199,13 +190,13 @@
   margin: 2.5em 0;
   border: none;
   height: 1px;
-  background: linear-gradient(to right, transparent, hsl(var(--border)), transparent);
+  background: linear-gradient(to right, transparent, var(--border), transparent);
 }
 
 /* 强调 */
 .markdown-body strong {
   font-weight: 600;
-  color: hsl(var(--foreground));
+  color: var(--foreground);
 }
 
 .markdown-body em {

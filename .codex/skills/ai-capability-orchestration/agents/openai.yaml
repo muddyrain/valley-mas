@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI 能力编排（ARK）"
+  short_description: "统一 Valley MAS 在 Go 服务中接入和维护火山引擎 ARK AI 能力。"
+  default_prompt: "在修改 Go 中调用火山 ARK 模型的代码前，先使用 $ai-capability-orchestration。"
