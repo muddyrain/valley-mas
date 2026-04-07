@@ -1,19 +1,24 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"valley-server/internal/config"
+	"valley-server/internal/database"
+	"valley-server/internal/model"
 	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
+
+var errInactiveUser = errors.New("inactive user")
 
 // Cors 跨域中间件
 func Cors() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 允许特定源（开发环境）
 		origin := c.GetHeader("Origin")
 		if origin == "" {
 			origin = "*"
@@ -21,7 +26,6 @@ func Cors() gin.HandlerFunc {
 		c.Header("Access-Control-Allow-Origin", origin)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
-		// 允许携带 Cookie
 		c.Header("Access-Control-Allow-Credentials", "true")
 
 		if c.Request.Method == "OPTIONS" {
@@ -33,79 +37,82 @@ func Cors() gin.HandlerFunc {
 	}
 }
 
+func extractTokenFromRequest(c *gin.Context) string {
+	authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
+	if authHeader != "" {
+		return strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+	}
+	cookieToken, _ := c.Cookie("token")
+	return strings.TrimSpace(cookieToken)
+}
+
+func loadAuthUserFromToken(token string, cfg *config.Config) (int64, string, string, error) {
+	claims, err := utils.ParseToken(token, cfg.JWT.Secret)
+	if err != nil {
+		return 0, "", "", err
+	}
+
+	userID, err := strconv.ParseInt(claims.UserID, 10, 64)
+	if err != nil {
+		return 0, "", "", err
+	}
+
+	var user model.User
+	db := database.GetDB()
+	if err := db.Select("id", "username", "role", "is_active").First(&user, userID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, "", "", errors.New("user not found")
+		}
+		return 0, "", "", err
+	}
+
+	if !user.IsActive {
+		return 0, "", "", errInactiveUser
+	}
+
+	return userID, user.Username, user.Role, nil
+}
+
 // Auth 认证中间件
 func Auth(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var token string
-
-		// 优先从 Authorization header 获取（web 端使用，避免与 admin Cookie 冲突）
-		authHeader := c.GetHeader("Authorization")
-		if authHeader != "" {
-			token = strings.TrimPrefix(authHeader, "Bearer ")
-		}
-
-		// 其次从 Cookie 获取（admin 端使用 HttpOnly Cookie）
-		if token == "" {
-			token, _ = c.Cookie("token")
-		}
-
+		token := extractTokenFromRequest(c)
 		if token == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "未授权"})
 			c.Abort()
 			return
 		}
 
-		// 验证 JWT token
-		claims, err := utils.ParseToken(token, cfg.JWT.Secret)
+		userID, username, role, err := loadAuthUserFromToken(token, cfg)
 		if err != nil {
+			if errors.Is(err, errInactiveUser) {
+				c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "账号已被禁用"})
+				c.Abort()
+				return
+			}
 			c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "token已过期或无效"})
 			c.Abort()
 			return
 		}
 
-		// 将字符串ID转换回int64
-		userID, err := strconv.ParseInt(claims.UserID, 10, 64)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "无效的用户ID"})
-			c.Abort()
-			return
-		}
-
-		// 将用户信息存入上下文
-		c.Set("userId", userID)            // int64 类型（从字符串转换）
-		c.Set("username", claims.Username) // string 类型
-		c.Set("userRole", claims.Role)     // string 类型
-
+		c.Set("userId", userID)
+		c.Set("username", username)
+		c.Set("userRole", role)
 		c.Next()
 	}
 }
 
-// OptionalAuth 可选认证中间件 - token 有效则写入 userId，无 token 或无效 token 则跳过（不 Abort）
+// OptionalAuth 可选认证中间件：token 有效则写入 userId/username/userRole，失败则忽略
 func OptionalAuth(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var token string
-
-		// 优先从 Authorization header 获取
-		authHeader := c.GetHeader("Authorization")
-		if authHeader != "" {
-			token = strings.TrimPrefix(authHeader, "Bearer ")
-		}
-
-		// 其次从 Cookie 获取
-		if token == "" {
-			token, _ = c.Cookie("token")
-		}
-
+		token := extractTokenFromRequest(c)
 		if token != "" {
-			if claims, err := utils.ParseToken(token, cfg.JWT.Secret); err == nil {
-				if userID, err := strconv.ParseInt(claims.UserID, 10, 64); err == nil {
-					c.Set("userId", userID)
-					c.Set("username", claims.Username)
-					c.Set("userRole", claims.Role)
-				}
+			if userID, username, role, err := loadAuthUserFromToken(token, cfg); err == nil {
+				c.Set("userId", userID)
+				c.Set("username", username)
+				c.Set("userRole", role)
 			}
 		}
-
 		c.Next()
 	}
 }

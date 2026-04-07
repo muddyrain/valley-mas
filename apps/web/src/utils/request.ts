@@ -15,7 +15,7 @@ export interface RequestConfig extends AxiosRequestConfig {
 
 const http: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
-  timeout: 30000,
+  timeout: 60000,
   withCredentials: true,
 });
 

@@ -70,17 +70,17 @@ func GetDefaultConfig(uploadType UploadType) UploadConfig {
 		},
 		UploadTypeWallpaper: {
 			Type:        UploadTypeWallpaper,
-			MaxSize:     10, // 10MB
+			MaxSize:     30, // 30MB
 			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
 		},
 		UploadTypeCover: {
 			Type:        UploadTypeCover,
-			MaxSize:     10, // 10MB
+			MaxSize:     30, // 30MB
 			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
 		},
 		UploadTypeImageText: {
 			Type:        UploadTypeImageText,
-			MaxSize:     10, // 10MB
+			MaxSize:     30, // 30MB
 			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
 		},
 	}

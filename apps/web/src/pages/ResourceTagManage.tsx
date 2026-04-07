@@ -946,7 +946,7 @@ export default function ResourceTagManage() {
           }
         }}
       >
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-160!">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="h-4 w-4 text-theme-primary" />
@@ -1031,7 +1031,7 @@ export default function ResourceTagManage() {
                         )}
                       </div>
                       {/* 内容 */}
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 w-120">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${

@@ -15,6 +15,11 @@ interface LoginResponse {
   userInfo: User;
 }
 
+export interface RefreshTokenResponse {
+  token: string;
+  userInfo: User;
+}
+
 // 登录
 export const login = async (data: { username: string; password: string }) => {
   const res = await http.post<unknown, LoginResponse>('/login', data);
@@ -81,6 +86,10 @@ export interface DownloadHistoryItem {
 
 export const getMyProfile = () => {
   return http.get<unknown, UserProfile>('/user/info');
+};
+
+export const refreshToken = () => {
+  return http.post<unknown, RefreshTokenResponse>('/user/refresh-token');
 };
 
 // 更新个人信息

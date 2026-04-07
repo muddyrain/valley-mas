@@ -162,6 +162,20 @@ export interface CreatePostData {
   publishNow?: boolean;
 }
 
+export interface BlogAIExcerptResponse {
+  excerpt: string;
+  model?: string;
+}
+
+export interface BlogAICoverResponse {
+  prompt?: string;
+  imageBase64?: string;
+  imageUrl?: string;
+  mimeType?: string;
+  size?: string;
+  model?: string;
+}
+
 export function getPosts(params: PostListParams = {}) {
   return request.get<unknown, PostListData>('/public/blog/posts', { params });
 }
@@ -232,6 +246,28 @@ export function uploadBlogCover(formData: FormData) {
   >('/admin/blog/cover/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+}
+
+export function uploadBlogCoverByUrl(data: { url: string }) {
+  return request.post<
+    unknown,
+    {
+      url: string;
+      storageKey: string;
+      fileName: string;
+      size: number;
+      width: number;
+      height: number;
+    }
+  >('/admin/blog/cover/upload-by-url', data);
+}
+
+export function generateBlogExcerpt(data: { title?: string; content: string }) {
+  return request.post<unknown, BlogAIExcerptResponse>('/admin/blog/ai/excerpt', data);
+}
+
+export function generateBlogCover(data: { title?: string; excerpt?: string; content: string }) {
+  return request.post<unknown, BlogAICoverResponse>('/admin/blog/ai/cover', data);
 }
 
 export function updatePost(id: string, data: Partial<CreatePostData>) {

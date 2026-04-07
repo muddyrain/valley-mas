@@ -32,7 +32,7 @@ const RESOURCE_TYPES = [
   { label: '头像', value: 'avatar' },
 ];
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 8;
 
 function SectionTitle({
   eyebrow,
@@ -67,7 +67,6 @@ export default function Resources() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [activeType, setActiveType] = useState('');
   const [keyword, setKeyword] = useState('');
   const [inputValue, setInputValue] = useState('');
@@ -93,7 +92,7 @@ export default function Resources() {
     let cancelled = false;
     setLoading(true);
     getAllResources({
-      page: 1,
+      page,
       pageSize: PAGE_SIZE,
       type: activeType || undefined,
       keyword: keyword || undefined,
@@ -104,7 +103,6 @@ export default function Resources() {
         const list = data.list ?? [];
         setResources(list);
         setTotal(data.total ?? 0);
-        setPage(1);
         const map: Record<string, boolean> = {};
         list.forEach((r) => {
           map[r.id] = r.isFavorited ?? false;
@@ -120,38 +118,11 @@ export default function Resources() {
     return () => {
       cancelled = true;
     };
-  }, [activeType, keyword, activeTag]);
-
-  const handleLoadMore = async () => {
-    const nextPage = page + 1;
-    setLoadingMore(true);
-    try {
-      const data = await getAllResources({
-        page: nextPage,
-        pageSize: PAGE_SIZE,
-        type: activeType || undefined,
-        keyword: keyword || undefined,
-        tagId: activeTag?.id || undefined,
-      });
-      const list = data.list ?? [];
-      setResources((prev) => [...prev, ...list]);
-      setTotal(data.total ?? 0);
-      setPage(nextPage);
-      setFavoritedMap((prev) => {
-        const map = { ...prev };
-        list.forEach((r) => {
-          map[r.id] = r.isFavorited ?? false;
-        });
-        return map;
-      });
-    } catch {
-      toast.error('加载更多失败');
-    } finally {
-      setLoadingMore(false);
-    }
+  }, [page, activeType, keyword, activeTag?.id]);
+  const handleSearch = () => {
+    setPage(1);
+    setKeyword(inputValue.trim());
   };
-
-  const handleSearch = () => setKeyword(inputValue.trim());
 
   // 标签关键词搜索（防抖 300ms）
   useEffect(() => {
@@ -174,7 +145,7 @@ export default function Resources() {
     setRefreshing(true);
     try {
       const data = await getAllResources({
-        page: 1,
+        page,
         pageSize: PAGE_SIZE,
         type: activeType || undefined,
         keyword: keyword || undefined,
@@ -183,7 +154,6 @@ export default function Resources() {
       const list = data.list ?? [];
       setResources(list);
       setTotal(data.total ?? 0);
-      setPage(1);
       const map: Record<string, boolean> = {};
       list.forEach((r) => {
         map[r.id] = r.isFavorited ?? false;
@@ -214,7 +184,7 @@ export default function Resources() {
     }
   };
 
-  const hasMore = resources.length < total;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
   const wallpaperCount = useMemo(
     () =>
       resources.filter((item) => item.type === 'wallpaper' || item.type === 'background').length,
@@ -306,7 +276,10 @@ export default function Resources() {
               <TypeFilterBar
                 options={RESOURCE_TYPES}
                 value={activeType}
-                onChange={setActiveType}
+                onChange={(nextType) => {
+                  setPage(1);
+                  setActiveType(nextType);
+                }}
                 prefix="类型："
                 extra={
                   keyword ? (
@@ -315,6 +288,7 @@ export default function Resources() {
                       <button
                         type="button"
                         onClick={() => {
+                          setPage(1);
                           setKeyword('');
                           setInputValue('');
                         }}
@@ -336,7 +310,10 @@ export default function Resources() {
                     <span className="font-medium">{activeTag.name}</span>
                     <button
                       type="button"
-                      onClick={() => setActiveTag(null)}
+                      onClick={() => {
+                        setPage(1);
+                        setActiveTag(null);
+                      }}
                       className="ml-0.5 rounded-full p-0.5 hover:bg-purple-200 transition-colors"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -389,6 +366,7 @@ export default function Resources() {
                               key={tag.id}
                               type="button"
                               onClick={() => {
+                                setPage(1);
                                 setActiveTag(tag);
                                 setTagDropdownOpen(false);
                               }}
@@ -443,11 +421,15 @@ export default function Resources() {
                   onAction={
                     keyword
                       ? () => {
+                          setPage(1);
                           setKeyword('');
                           setInputValue('');
                         }
                       : activeTag
-                        ? () => setActiveTag(null)
+                        ? () => {
+                            setPage(1);
+                            setActiveTag(null);
+                          }
                         : undefined
                   }
                 />
@@ -460,7 +442,6 @@ export default function Resources() {
                     已显示 {resources.length} / {total}
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
                   {resources.map((resource, index) => (
                     <ResourceCard
@@ -476,28 +457,31 @@ export default function Resources() {
                     />
                   ))}
                 </div>
-
-                {hasMore ? (
-                  <div className="mt-10 flex justify-center">
-                    <Button
-                      variant="outline"
-                      onClick={handleLoadMore}
-                      disabled={loadingMore}
-                      className="border-theme-soft-strong rounded-full border bg-white/82 px-8 text-slate-700"
-                    >
-                      {loadingMore ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          加载中
-                        </>
-                      ) : (
-                        `加载更多（还剩 ${total - resources.length} 项）`
-                      )}
-                    </Button>
-                  </div>
-                ) : null}
               </>
             )}
+            {totalPages > 1 ? (
+              <div className="mt-10 flex items-center justify-center gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  disabled={page <= 1 || loading}
+                  className="border-theme-soft-strong rounded-full border bg-white/82 px-5 text-slate-700"
+                >
+                  上一页
+                </Button>
+                <div className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
+                  {page} / {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={page >= totalPages || loading}
+                  className="border-theme-soft-strong rounded-full border bg-white/82 px-5 text-slate-700"
+                >
+                  下一页
+                </Button>
+              </div>
+            ) : null}
           </div>
         </section>
       </div>
