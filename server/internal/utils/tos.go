@@ -107,6 +107,29 @@ func (u *TOSUploader) UploadFileWithPath(customPath string, file *multipart.File
 }
 
 // GetPublicURL 获取文件的公开访问 URL
+// UploadBytesWithPath 浣跨敤鑷畾涔夎矾寰勪笂浼犲瓧鑺傛暟鎹埌 TOS
+func (u *TOSUploader) UploadBytesWithPath(customPath string, fileBytes []byte) (string, error) {
+	if u == nil || u.client == nil {
+		return "", fmt.Errorf("TOS uploader not initialized")
+	}
+
+	ctx := context.Background()
+	input := &tos.PutObjectV2Input{
+		PutObjectBasicInput: tos.PutObjectBasicInput{
+			Bucket: u.bucket,
+			Key:    customPath,
+		},
+		Content: bytes.NewReader(fileBytes),
+	}
+
+	_, err := u.client.PutObjectV2(ctx, input)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload to TOS: %w", err)
+	}
+
+	return u.GetPublicURL(customPath), nil
+}
+
 func (u *TOSUploader) GetPublicURL(key string) string {
 	// 火山引擎 TOS 公开访问 URL 格式
 	// https://{bucket}.{endpoint}/{key}

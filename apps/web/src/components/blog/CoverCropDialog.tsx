@@ -121,7 +121,7 @@ export function CoverCropDialog({
     setOffsetY(clamp(y, -limit.maxY, limit.maxY));
   };
 
-  // 输出到 1200×480 canvas，与预览完全相同的数学
+  // 输出到 1200x480 canvas，与预览保持一致
   const renderToBlob = async (): Promise<Blob | null> => {
     const canvas = canvasRef.current;
     const img = loadedImageRef.current;
@@ -208,7 +208,7 @@ export function CoverCropDialog({
 
         <div className="space-y-4 bg-[linear-gradient(180deg,#f8f7ff_0%,#f2f7ff_100%)] p-5">
           <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
-            {/* canvas 预览，与输出完全一致的绘制逻辑 */}
+            {/* canvas 预览，与输出保持一致的绘制逻辑 */}
             <canvas
               ref={canvasRef}
               className="block aspect-5/2 w-full touch-none rounded-xl bg-slate-950/90"
@@ -246,7 +246,7 @@ export function CoverCropDialog({
                 <Move className="h-3.5 w-3.5" />
                 拖动图片调整位置
               </span>
-              <span>输出比例固定为 1200 × 480</span>
+              <span>输出比例固定为 1200 x 480</span>
             </div>
           </div>
 
@@ -258,7 +258,7 @@ export function CoverCropDialog({
               {processing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  生成中
+                  生成中...
                 </>
               ) : (
                 '确认裁剪'

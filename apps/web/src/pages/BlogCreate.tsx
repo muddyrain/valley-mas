@@ -17,10 +17,13 @@ import {
   createGroup,
   createPost,
   type Group,
+  generateBlogCover,
+  generateBlogExcerpt,
   getAdminGroups,
   getAdminPostDetail,
   updatePost,
   uploadBlogCover,
+  uploadBlogCoverByUrl,
   type Visibility,
 } from '@/api/blog';
 import { MarkdownPreview } from '@/components/blog';
@@ -46,6 +49,16 @@ function createAutoExcerpt(excerpt: string, content: string) {
   return createPlainTextExcerpt(content.trim(), 180);
 }
 
+function base64ToImageFile(base64: string, mimeType: string, fileName: string) {
+  const normalized = base64.includes(',') ? (base64.split(',').pop() ?? '') : base64;
+  const binary = atob(normalized);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new File([bytes], fileName, { type: mimeType });
+}
+
 export default function BlogCreate() {
   const navigate = useNavigate();
   const { id: editingId } = useParams<{ id?: string }>();
@@ -61,12 +74,15 @@ export default function BlogCreate() {
   const [coverStorageKey, setCoverStorageKey] = useState('');
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverObjectUrl, setCoverObjectUrl] = useState('');
+  const [pendingCoverRemoteUrl, setPendingCoverRemoteUrl] = useState('');
   const [coverImageMeta, setCoverImageMeta] = useState<CoverImageMeta | null>(null);
   const [coverZoom, setCoverZoom] = useState(1);
   const [coverOffsetX, setCoverOffsetX] = useState(0);
   const [coverOffsetY, setCoverOffsetY] = useState(0);
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [aiExcerptLoading, setAiExcerptLoading] = useState(false);
+  const [aiCoverLoading, setAiCoverLoading] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
@@ -77,14 +93,19 @@ export default function BlogCreate() {
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [pendingCropFile, setPendingCropFile] = useState<File | null>(null);
   const [pendingCropUrl, setPendingCropUrl] = useState('');
+  const currentEditingIdRef = useRef<string | undefined>(editingId);
 
   const coverViewportRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    currentEditingIdRef.current = editingId;
+  }, [editingId]);
 
   const loadGroups = async () => {
     try {
       const list = await getAdminGroups({ groupType: 'blog' });
       setGroups(list || []);
-      if (!groupId && list?.[0]?.id) {
+      if ((!groupId || !isEditMode) && list?.[0]?.id) {
         setGroupId(list[0].id);
       }
     } catch {
@@ -96,6 +117,7 @@ export default function BlogCreate() {
     try {
       setLoadingPost(true);
       const detail = await getAdminPostDetail(postId);
+      if (currentEditingIdRef.current !== postId) return;
       if (detail.postType !== 'blog') {
         toast.error('当前仅支持编辑博客类型内容');
         navigate('/my-space');
@@ -105,6 +127,7 @@ export default function BlogCreate() {
       setExcerpt(detail.excerpt || '');
       setCover(detail.cover || '');
       setCoverStorageKey(detail.coverStorageKey || '');
+      setPendingCoverRemoteUrl('');
       setContent(detail.content || '');
       setGroupId(detail.groupId || '');
       setVisibility(detail.visibility || 'private');
@@ -112,7 +135,9 @@ export default function BlogCreate() {
       toast.error('加载博客内容失败');
       navigate('/my-space');
     } finally {
-      setLoadingPost(false);
+      if (currentEditingIdRef.current === postId) {
+        setLoadingPost(false);
+      }
     }
   };
 
@@ -130,6 +155,8 @@ export default function BlogCreate() {
     void loadGroups();
     if (editingId) {
       void loadPost(editingId);
+    } else {
+      resetCreateForm();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, navigate, user?.role, editingId]);
@@ -184,6 +211,43 @@ export default function BlogCreate() {
     setCoverOffsetY(0);
   };
 
+  const applyTemporaryCoverFile = async (file: File) => {
+    const objectUrl = URL.createObjectURL(file);
+    const meta = await new Promise<CoverImageMeta>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = () => reject(new Error('read cover failed'));
+      img.src = objectUrl;
+    });
+
+    if (coverObjectUrl) {
+      URL.revokeObjectURL(coverObjectUrl);
+    }
+
+    setCoverFile(file);
+    setCoverObjectUrl(objectUrl);
+    setCoverImageMeta(meta);
+    setCoverZoom(1);
+    setCoverOffsetX(0);
+    setCoverOffsetY(0);
+    setCover('');
+    setCoverStorageKey('');
+    setPendingCoverRemoteUrl('');
+  };
+
+  const resetCreateForm = () => {
+    setTitle('');
+    setExcerpt('');
+    setCover('');
+    setCoverStorageKey('');
+    setPendingCoverRemoteUrl('');
+    setContent('');
+    setVisibility('private');
+    setGroupId('');
+    setLoadingPost(false);
+    resetLocalCoverEditing();
+  };
+
   const renderCoverToBlob = async (): Promise<Blob | null> => {
     if (!coverFile || !coverImageMeta) return null;
     const viewport = coverViewportRef.current;
@@ -225,13 +289,43 @@ export default function BlogCreate() {
     return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
   };
 
-  const uploadCoverIfNeeded = async () => {
-    if (!coverFile || !coverObjectUrl) {
+  const uploadCoverIfNeeded = async (shouldUpload: boolean) => {
+    if (!shouldUpload) {
+      if (pendingCoverRemoteUrl) {
+        return {
+          cover: '',
+          coverStorageKey: '',
+        };
+      }
       return {
         cover: cover.trim(),
         coverStorageKey: coverStorageKey.trim(),
       };
     }
+
+    if (!coverFile || !coverObjectUrl) {
+      if (!pendingCoverRemoteUrl) {
+        return {
+          cover: cover.trim(),
+          coverStorageKey: coverStorageKey.trim(),
+        };
+      }
+
+      setCoverUploading(true);
+      try {
+        const result = await uploadBlogCoverByUrl({ url: pendingCoverRemoteUrl });
+        setCover(result.url);
+        setCoverStorageKey(result.storageKey);
+        setPendingCoverRemoteUrl('');
+        return {
+          cover: result.url,
+          coverStorageKey: result.storageKey,
+        };
+      } finally {
+        setCoverUploading(false);
+      }
+    }
+
     setCoverUploading(true);
     try {
       const blob = await renderCoverToBlob();
@@ -243,6 +337,7 @@ export default function BlogCreate() {
       const result = await uploadBlogCover(formData);
       setCover(result.url);
       setCoverStorageKey(result.storageKey);
+      setPendingCoverRemoteUrl('');
       resetLocalCoverEditing();
       return {
         cover: result.url,
@@ -253,6 +348,73 @@ export default function BlogCreate() {
     }
   };
 
+  const handleAIGenerateExcerpt = async () => {
+    const trimmedContent = content.trim();
+    if (!trimmedContent) return;
+
+    try {
+      setAiExcerptLoading(true);
+      const result = await generateBlogExcerpt({
+        title: title.trim(),
+        content: trimmedContent,
+      });
+      const nextExcerpt = result.excerpt?.trim();
+      if (!nextExcerpt) {
+        toast.error('AI 未生成有效摘要');
+        return;
+      }
+      setExcerpt(nextExcerpt);
+      toast.success('AI 摘要已填充');
+    } catch {
+      // 请求层已统一处理并展示后端错误信息（例如模型配置错误）
+    } finally {
+      setAiExcerptLoading(false);
+    }
+  };
+
+  const handleAIGenerateCover = async () => {
+    const trimmedContent = content.trim();
+    if (!trimmedContent) return;
+
+    try {
+      setAiCoverLoading(true);
+      const result = await generateBlogCover({
+        title: title.trim(),
+        excerpt: excerpt.trim(),
+        content: trimmedContent,
+      });
+
+      if (result.imageBase64) {
+        const mimeType = result.mimeType || 'image/jpeg';
+        const fileExt = mimeType.includes('png') ? 'png' : 'jpg';
+        const nextCoverFile = base64ToImageFile(
+          result.imageBase64,
+          mimeType,
+          `ai-blog-cover-${Date.now()}.${fileExt}`,
+        );
+        await applyTemporaryCoverFile(nextCoverFile);
+        toast.success('AI 封面已生成（临时预览，发布时上传）');
+        return;
+      }
+
+      if (result.imageUrl) {
+        if (coverFile || coverObjectUrl) {
+          resetLocalCoverEditing();
+        }
+        setCover(result.imageUrl);
+        setCoverStorageKey('');
+        setPendingCoverRemoteUrl(result.imageUrl);
+        toast.success('AI 封面已生成（临时预览，发布时上传）');
+        return;
+      }
+
+      toast.error('AI 未返回可用封面图');
+    } catch {
+      // 请求层已统一处理并展示后端错误信息（例如模型配置错误）
+    } finally {
+      setAiCoverLoading(false);
+    }
+  };
   const handleSubmit = async (
     status: 'draft' | 'published',
     options?: { stayOnPage?: boolean; fromShortcut?: boolean },
@@ -270,13 +432,15 @@ export default function BlogCreate() {
 
     try {
       setSubmitting(true);
-      const resolvedCover = await uploadCoverIfNeeded();
+      const resolvedCover = await uploadCoverIfNeeded(status === 'published');
+      const resolvedExcerpt =
+        status === 'published' ? createAutoExcerpt(excerpt, trimmedContent) : excerpt.trim();
       if (isEditMode && editingId) {
         await updatePost(editingId, {
           title: trimmedTitle,
           postType: 'blog',
           content: trimmedContent,
-          excerpt: createAutoExcerpt(excerpt, trimmedContent),
+          excerpt: resolvedExcerpt,
           cover: resolvedCover.cover || '',
           coverStorageKey: resolvedCover.coverStorageKey || '',
           groupId: groupId || '0',
@@ -295,7 +459,7 @@ export default function BlogCreate() {
           title: trimmedTitle,
           postType: 'blog',
           content: trimmedContent,
-          excerpt: createAutoExcerpt(excerpt, trimmedContent),
+          excerpt: resolvedExcerpt,
           cover: resolvedCover.cover || undefined,
           coverStorageKey: resolvedCover.coverStorageKey || undefined,
           groupId: groupId || undefined,
@@ -307,7 +471,7 @@ export default function BlogCreate() {
       }
 
       if (!options?.stayOnPage) {
-        navigate('/blog');
+        navigate(-1);
       }
     } catch {
       toast.error(status === 'published' ? '提交失败，请稍后重试' : '保存失败，请稍后重试');
@@ -323,8 +487,8 @@ export default function BlogCreate() {
       toast.error('封面仅支持图片');
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('封面大小不能超过 10MB');
+    if (file.size > 30 * 1024 * 1024) {
+      toast.error('封面大小不能超过 30MB');
       return;
     }
     try {
@@ -357,7 +521,9 @@ export default function BlogCreate() {
       setCoverZoom(1);
       setCoverOffsetX(0);
       setCoverOffsetY(0);
+      setCover('');
       setCoverStorageKey('');
+      setPendingCoverRemoteUrl('');
       // 清理 pending 状态
       if (pendingCropUrl) URL.revokeObjectURL(pendingCropUrl);
       setPendingCropFile(null);
@@ -395,6 +561,8 @@ export default function BlogCreate() {
 
   const wordCount = useMemo(() => content.replace(/\s+/g, '').length, [content]);
   const readMinutes = useMemo(() => Math.max(1, Math.ceil(wordCount / 500)), [wordCount]);
+  const isContentEmpty = !content.trim();
+  const actionBusy = submitting || coverUploading || aiExcerptLoading || aiCoverLoading;
   const previewMarkdown = useMemo(() => {
     return `# ${title.trim() || '未命名标题'}\n\n${content.trim() || '开始输入正文内容吧。'}`;
   }, [title, content]);
@@ -473,7 +641,7 @@ export default function BlogCreate() {
             </span>
             <Button
               variant="outline"
-              disabled={submitting || coverUploading}
+              disabled={actionBusy}
               onClick={() => void handleSubmit('draft', { stayOnPage: isEditMode })}
               className="rounded-xl"
             >
@@ -481,7 +649,7 @@ export default function BlogCreate() {
               保存草稿
             </Button>
             <Button
-              disabled={submitting || coverUploading}
+              disabled={actionBusy}
               onClick={() => void handleSubmit('published')}
               className="rounded-xl"
             >
@@ -507,14 +675,14 @@ export default function BlogCreate() {
               </div>
 
               {loadingPost ? (
-                <div className="mb-3 h-12 animate-pulse rounded-xl bg-slate-100" />
+                <div className="mb-2 h-12 animate-pulse rounded-xl bg-slate-100" />
               ) : (
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="输入标题，抓住读者注意力"
                   maxLength={200}
-                  className="theme-input-border mb-3 h-12 rounded-xl text-base"
+                  className="theme-input-border mb-2 h-12 rounded-xl text-base"
                 />
               )}
 
@@ -525,14 +693,30 @@ export default function BlogCreate() {
           {(previewMode === 'split' || previewMode === 'preview') && (
             <section className="space-y-4 lg:sticky lg:top-20 lg:self-start">
               <div className="theme-panel-shell rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
-                <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-800">
+                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-800">
                   <Sparkles className="text-theme-primary h-4 w-4" />
                   发布设置
                 </div>
 
                 <div className="space-y-3">
                   <div>
-                    <div className="mb-1 text-xs text-slate-500">摘要（可选）</div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-slate-500">摘要（可选）</span>
+                      <button
+                        type="button"
+                        onClick={() => void handleAIGenerateExcerpt()}
+                        disabled={isContentEmpty || aiExcerptLoading || submitting}
+                        className="inline-flex h-6 items-center gap-1 rounded-lg border border-theme-primary/30 bg-theme-soft px-1.5 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/75 disabled:cursor-not-allowed disabled:opacity-45"
+                        title={isContentEmpty ? '请先输入正文内容' : 'AI 自动提取摘要'}
+                      >
+                        {aiExcerptLoading ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5" />
+                        )}
+                        {aiExcerptLoading ? '提取中' : 'AI截取摘要'}
+                      </button>
+                    </div>
                     <Input
                       value={excerpt}
                       onChange={(e) => setExcerpt(e.target.value)}
@@ -543,7 +727,23 @@ export default function BlogCreate() {
                   </div>
 
                   <div>
-                    <div className="mb-1 text-xs text-slate-500">封面 URL（可选）</div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-slate-500">封面 URL（可选）</span>
+                      <button
+                        type="button"
+                        onClick={() => void handleAIGenerateCover()}
+                        disabled={isContentEmpty || aiCoverLoading || coverUploading || submitting}
+                        className="inline-flex h-6 items-center gap-1 rounded-lg border border-theme-primary/30 bg-theme-soft px-1.5 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/75 disabled:cursor-not-allowed disabled:opacity-45"
+                        title={isContentEmpty ? '请先输入正文内容' : 'AI 自动配图为封面'}
+                      >
+                        {aiCoverLoading ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <ImagePlus className="h-3.5 w-3.5" />
+                        )}
+                        {aiCoverLoading ? '配图中' : 'AI配图封面'}
+                      </button>
+                    </div>
                     <div className="flex gap-2">
                       <Input
                         value={cover}
@@ -551,6 +751,7 @@ export default function BlogCreate() {
                           if (coverFile || coverObjectUrl) resetLocalCoverEditing();
                           setCover(e.target.value);
                           setCoverStorageKey('');
+                          setPendingCoverRemoteUrl('');
                         }}
                         placeholder="https://..."
                         maxLength={500}
@@ -569,7 +770,7 @@ export default function BlogCreate() {
                       </label>
                     </div>
                     {(!!cover || !!coverObjectUrl) && (
-                      <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                      <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                         <div
                           ref={coverViewportRef}
                           className="relative aspect-[5/2] w-full overflow-hidden"
@@ -595,7 +796,7 @@ export default function BlogCreate() {
                   </div>
 
                   <div>
-                    <div className="mb-1 text-xs text-slate-500">可见范围</div>
+                    <div className="mb-2 text-xs text-slate-500">可见范围</div>
                     <div className="border-theme-panel-border bg-theme-soft/45 flex flex-wrap gap-2 rounded-xl border p-2">
                       {[
                         { label: '私密', value: 'private' as const },
@@ -619,7 +820,7 @@ export default function BlogCreate() {
                   </div>
 
                   <div>
-                    <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
+                    <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
                       <span>文章分组</span>
                       <div className="flex items-center gap-2">
                         <button
@@ -721,7 +922,7 @@ export default function BlogCreate() {
         </div>
       </div>
 
-      {/* 封面裁剪弹框 */}
+      {/* 封面裁剪弹窗 */}
       {pendingCropUrl && pendingCropFile && (
         <CoverCropDialog
           open={cropDialogOpen}

@@ -23,6 +23,42 @@ type LoginResponse struct {
 	UserInfo interface{} `json:"userInfo"`
 }
 
+func issueTokenForUser(c *gin.Context, cfg *config.Config, user model.User) (string, error) {
+	token, err := utils.GenerateToken(
+		strconv.FormatInt(int64(user.ID), 10),
+		user.Username,
+		user.Role,
+		cfg.JWT.Secret,
+		cfg.JWT.Expire,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	c.SetCookie(
+		"token",
+		token,
+		int(cfg.JWT.Expire*3600),
+		"/",
+		"",
+		false,
+		true,
+	)
+	return token, nil
+}
+
+func userInfoPayload(user model.User) gin.H {
+	return gin.H{
+		"id":       user.ID,
+		"username": user.Username,
+		"nickname": user.Nickname,
+		"avatar":   user.Avatar,
+		"role":     user.Role,
+		"email":    user.Email,
+		"phone":    user.Phone,
+	}
+}
+
 // Login 管理员登录
 func Login(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -113,6 +149,39 @@ func GetCurrentUser() gin.HandlerFunc {
 			"role":     user.Role,
 			"email":    user.Email,
 			"phone":    user.Phone,
+		})
+	}
+}
+
+// RefreshToken 刷新当前登录会话的 token（用于角色/昵称变更后快速同步）
+func RefreshToken(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, exists := c.Get("userId")
+		if !exists {
+			Error(c, http.StatusUnauthorized, "未登录")
+			return
+		}
+
+		var user model.User
+		db := database.GetDB()
+		if err := db.First(&user, userID).Error; err != nil {
+			Error(c, http.StatusNotFound, "用户不存在")
+			return
+		}
+		if !user.IsActive {
+			Error(c, http.StatusForbidden, "账号已被禁用")
+			return
+		}
+
+		token, err := issueTokenForUser(c, cfg, user)
+		if err != nil {
+			Error(c, http.StatusInternalServerError, "生成token失败")
+			return
+		}
+
+		Success(c, gin.H{
+			"token":    token,
+			"userInfo": userInfoPayload(user),
 		})
 	}
 }

@@ -68,6 +68,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 		{
 			user.GET("/downloads", handler.GetMyDownloads)
 			user.GET("/info", handler.GetUserInfo)
+			user.POST("/refresh-token", handler.RefreshToken(cfg))
 			user.PUT("/profile", handler.UpdateMyProfile)
 			user.PUT("/password", handler.ChangePassword)
 			user.POST("/avatar", handler.UploadAvatar)
@@ -177,6 +178,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.GET("/blog/posts", handler.AdminGetPosts)
 				content.GET("/blog/posts/:id", handler.AdminGetPostDetail)
 				content.POST("/blog/cover/upload", handler.AdminUploadBlogCover)
+				content.POST("/blog/cover/upload-by-url", handler.AdminUploadBlogCoverByURL)
+				content.POST("/blog/ai/excerpt", handler.AdminAIGenerateBlogExcerpt)
+				content.POST("/blog/ai/cover", handler.AdminAIGenerateBlogCover)
 				content.POST("/blog/image-text/assets/upload", handler.AdminUploadImageTextAsset)
 				content.POST("/blog/posts", handler.AdminCreatePost)
 				content.PUT("/blog/posts/:id", handler.AdminUpdatePost)

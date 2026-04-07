@@ -144,7 +144,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
 
   return (
     <Card
-      className={`group cursor-pointer overflow-hidden rounded-2xl border-2 bg-white transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_44px_rgba(var(--theme-primary-rgb),0.16)] ${
+      className={`h-96 group cursor-pointer overflow-hidden rounded-2xl border-2 bg-white transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_44px_rgba(var(--theme-primary-rgb),0.16)] ${
         selected
           ? 'border-theme-primary shadow-[0_0_0_2px_rgba(var(--theme-primary-rgb),0.18)]'
           : 'border-transparent hover:border-theme-soft-strong'
@@ -359,7 +359,7 @@ export function ResourceCardSkeleton({
   type?: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm h-96">
       <Skeleton className={`${getAspectClass(type ?? '')} w-full`} />
       <div className={`${contentPadding} space-y-2`}>
         <Skeleton className="h-4 w-3/4" />

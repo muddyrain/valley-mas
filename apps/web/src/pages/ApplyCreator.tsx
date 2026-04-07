@@ -148,6 +148,11 @@ function ApplicationResult({ app }: { app: CreatorApplicationStatus }) {
   );
 }
 
+const BANNER_BACKGROUND = {
+  background:
+    'linear-gradient(135deg, rgba(var(--theme-primary-rgb),0.96) 0%, color-mix(in srgb, rgba(var(--theme-tertiary-rgb),1) 26%, var(--theme-primary-hover)) 54%, var(--theme-primary-deep) 100%)',
+};
+
 export default function ApplyCreator() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuthStore();
@@ -252,7 +257,7 @@ export default function ApplyCreator() {
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-50 via-purple-50/30 to-indigo-50/30">
       {/* Banner */}
-      <PageBanner>
+      <PageBanner backgroundStyle={BANNER_BACKGROUND}>
         <div className="text-white">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm">
@@ -287,7 +292,7 @@ export default function ApplyCreator() {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-6 py-5 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <FileText className="h-5 w-5 text-purple-600" />
+                <FileText className="h-5 w-5 text-theme-primary" />
                 填写申请信息
               </h2>
               <p className="text-sm text-gray-500 mt-1">管理员将在 1-3 个工作日内审核</p>
@@ -307,7 +312,7 @@ export default function ApplyCreator() {
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="你希望展示给其他用户的创作者名称"
                     maxLength={50}
-                    className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 transition"
+                    className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-primary transition"
                   />
                 </div>
               </div>
@@ -323,7 +328,7 @@ export default function ApplyCreator() {
                   placeholder="介绍一下你的创作风格、擅长的内容类型等"
                   maxLength={500}
                   rows={3}
-                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 transition resize-none"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-primary transition resize-none"
                 />
                 <p className="text-xs text-gray-400 mt-1 text-right">
                   {form.description.length}/500
@@ -341,7 +346,7 @@ export default function ApplyCreator() {
                   placeholder="请说明你申请成为创作者的理由，例如：擅长的创作方向、已有的作品经历等（至少 10 字）"
                   maxLength={500}
                   rows={4}
-                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 transition resize-none"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-primary transition resize-none"
                 />
                 <p className="text-xs text-gray-400 mt-1 text-right">{form.reason.length}/500</p>
               </div>
@@ -360,7 +365,7 @@ export default function ApplyCreator() {
                       onChange={(e) => setForm({ ...form, phone: e.target.value })}
                       placeholder="方便联系"
                       maxLength={20}
-                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 transition"
+                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-primary transition"
                     />
                   </div>
                 </div>
@@ -376,7 +381,7 @@ export default function ApplyCreator() {
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
                       placeholder="用于接收审核通知"
                       maxLength={100}
-                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 transition"
+                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-primary transition"
                     />
                   </div>
                 </div>
@@ -388,7 +393,7 @@ export default function ApplyCreator() {
                   type="button"
                   variant="outline"
                   onClick={() => navigate(-1)}
-                  className="flex-none"
+                  className="flex-none h-8"
                   disabled={submitting}
                 >
                   取消
@@ -396,7 +401,7 @@ export default function ApplyCreator() {
                 <Button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold shadow-md"
+                  className="flex-1 h-8 bg-theme-primary px-6 text-white hover:bg-theme-primary-hover font-semibold shadow-md"
                 >
                   {submitting ? (
                     <>
@@ -415,9 +420,9 @@ export default function ApplyCreator() {
           </div>
 
           {/* 说明卡片 */}
-          <div className="mt-4 bg-blue-50 rounded-xl p-4 border border-blue-100">
-            <p className="text-sm text-blue-700 font-medium mb-2">📋 审核说明</p>
-            <ul className="text-xs text-blue-600 space-y-1 list-disc list-inside">
+          <div className="mt-4 bg-theme-primary/5 rounded-xl p-4 border border-theme-primary/25">
+            <p className="text-sm text-theme-primary-deep font-medium mb-2">📋 审核说明</p>
+            <ul className="text-xs text-theme-primary space-y-1 list-disc list-inside">
               <li>管理员将在 1-3 个工作日内完成审核</li>
               <li>审核通过后你的账号角色将升级为"创作者"</li>
               <li>可通过"我的资料"页面查看申请状态</li>

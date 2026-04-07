@@ -116,8 +116,8 @@ export default function UploadResourceDialog({
       toast.error('仅支持图片文件');
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('文件大小不能超过 10MB');
+    if (file.size > 30 * 1024 * 1024) {
+      toast.error('文件大小不能超过 30MB');
       return;
     }
     setUploadFile(file);
@@ -195,8 +195,9 @@ export default function UploadResourceDialog({
       await new Promise((resolve) => setTimeout(resolve, 1500));
       onOpenChange(false);
       toast.success('上传成功');
-      reset();
       onSuccess?.();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      reset();
     } catch {
       // 错误已在 request.ts 中通过 toast 显示
     } finally {
@@ -223,7 +224,7 @@ export default function UploadResourceDialog({
             <DialogTitle className="text-base font-semibold text-slate-900 leading-tight">
               上传新资源
             </DialogTitle>
-            <p className="mt-0.5 text-xs text-slate-500">支持壁纸、头像等图片资源，最大 10MB</p>
+            <p className="mt-0.5 text-xs text-slate-500">支持壁纸、头像等图片资源，最大 30MB</p>
           </div>
         </div>
 
@@ -291,7 +292,7 @@ export default function UploadResourceDialog({
                   <p className="text-sm font-medium text-slate-600 mb-1">
                     拖拽图片到这里，或点击选择
                   </p>
-                  <p className="text-xs text-slate-400">JPG、PNG、WebP · 最大 10MB</p>
+                  <p className="text-xs text-slate-400">JPG、PNG、WebP · 最大 30MB</p>
                 </div>
               )}
             </div>

@@ -1,7 +1,7 @@
 import Cookies from 'js-cookie';
 import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
-import { getMyProfile, type UserProfile } from '@/api/auth';
+import { getMyProfile, refreshToken as refreshSessionToken, type UserProfile } from '@/api/auth';
 
 // 用户信息接口
 export interface User {
@@ -89,6 +89,32 @@ export const useAuthStore = create<AuthState>()(
             });
           } else {
             set({ profile: data });
+          }
+
+          if (force) {
+            try {
+              const session = await refreshSessionToken();
+              set((state) => {
+                const nextUser = state.user
+                  ? { ...state.user, ...session.userInfo }
+                  : session.userInfo;
+
+                return {
+                  token: session.token,
+                  user: nextUser,
+                  ...(state.profile && {
+                    profile: {
+                      ...state.profile,
+                      nickname: nextUser.nickname,
+                      avatar: nextUser.avatar,
+                      role: nextUser.role,
+                    },
+                  }),
+                };
+              });
+            } catch {
+              // token refresh failure should not block profile refresh
+            }
           }
         } catch {
           // 静默失败，不影响页面
