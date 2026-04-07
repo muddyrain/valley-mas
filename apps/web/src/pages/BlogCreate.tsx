@@ -25,34 +25,16 @@ import {
 } from '@/api/blog';
 import { MarkdownPreview } from '@/components/blog';
 import { CoverCropDialog } from '@/components/blog/CoverCropDialog';
+import { MdxMarkdownEditor } from '@/components/blog/MdxMarkdownEditor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { createPlainTextExcerpt } from '@/utils/blog';
 
-type LocalDraft = {
-  title: string;
-  excerpt: string;
-  cover: string;
-  coverStorageKey: string;
-  content: string;
-  groupId: string;
-  visibility: Visibility;
-  updatedAt: string;
-};
-
 type CoverImageMeta = {
   width: number;
   height: number;
 };
-
-const LOCAL_CREATE_DRAFT_KEY = 'valley-blog-create-draft-v3';
-
-function formatTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '--';
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-}
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -92,8 +74,6 @@ export default function BlogCreate() {
   const [loadingPost, setLoadingPost] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
-  const [lastAutoSavedAt, setLastAutoSavedAt] = useState('');
-  const [draftRecovered, setDraftRecovered] = useState(false);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [pendingCropFile, setPendingCropFile] = useState<File | null>(null);
   const [pendingCropUrl, setPendingCropUrl] = useState('');
@@ -155,65 +135,11 @@ export default function BlogCreate() {
   }, [isAuthenticated, navigate, user?.role, editingId]);
 
   useEffect(() => {
-    if (isEditMode) return;
-    try {
-      const raw = localStorage.getItem(LOCAL_CREATE_DRAFT_KEY);
-      if (!raw) return;
-      const draft = JSON.parse(raw) as LocalDraft;
-      if (!draft) return;
-      if (!draft.title && !draft.content && !draft.excerpt && !draft.cover) return;
-      setTitle(draft.title || '');
-      setExcerpt(draft.excerpt || '');
-      setCover(draft.cover || '');
-      setCoverStorageKey(draft.coverStorageKey || '');
-      setContent(draft.content || '');
-      setGroupId(draft.groupId || '');
-      setVisibility(draft.visibility || 'private');
-      setLastAutoSavedAt(draft.updatedAt || '');
-      setDraftRecovered(true);
-    } catch {
-      // ignore
+    // 彻底禁用本地草稿缓存，并清理历史遗留数据
+    if (!isEditMode) {
+      localStorage.removeItem('valley-blog-create-draft-v3');
     }
   }, [isEditMode]);
-
-  useEffect(() => {
-    if (isEditMode || loadingPost) return;
-    const timer = setTimeout(() => {
-      const draft: LocalDraft = {
-        title,
-        excerpt,
-        cover,
-        coverStorageKey,
-        content,
-        groupId,
-        visibility,
-        updatedAt: new Date().toISOString(),
-      };
-
-      const hasData = [title, excerpt, cover, coverStorageKey, content, groupId, visibility].some(
-        (item) => item.trim(),
-      );
-      if (!hasData) {
-        localStorage.removeItem(LOCAL_CREATE_DRAFT_KEY);
-        setLastAutoSavedAt('');
-        return;
-      }
-      localStorage.setItem(LOCAL_CREATE_DRAFT_KEY, JSON.stringify(draft));
-      setLastAutoSavedAt(draft.updatedAt);
-    }, 700);
-
-    return () => clearTimeout(timer);
-  }, [
-    isEditMode,
-    loadingPost,
-    title,
-    excerpt,
-    cover,
-    coverStorageKey,
-    content,
-    groupId,
-    visibility,
-  ]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -378,9 +304,6 @@ export default function BlogCreate() {
           publishNow: status === 'published',
         });
         toast.success(status === 'published' ? '博客发布成功' : '草稿保存成功');
-        if (status !== 'published') {
-          localStorage.removeItem(LOCAL_CREATE_DRAFT_KEY);
-        }
       }
 
       if (!options?.stayOnPage) {
@@ -479,10 +402,10 @@ export default function BlogCreate() {
 
   if (isEditBootLoading) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] bg-[linear-gradient(145deg,#f4f3ff_0%,#edf6ff_48%,#f8fbff_100%)] px-4 py-6 md:px-8">
+      <div className="min-h-[calc(100vh-4rem)] px-4 py-6 md:px-8">
         <div className="mx-auto max-w-[1400px]">
-          <div className="mb-5 flex items-center gap-3 rounded-2xl border border-violet-200/70 bg-white/80 px-4 py-3 shadow-sm backdrop-blur">
-            <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
+          <div className="theme-panel-shell mb-5 flex items-center gap-3 rounded-2xl border bg-white/80 px-4 py-3 shadow-sm backdrop-blur">
+            <Loader2 className="text-theme-primary h-4 w-4 animate-spin" />
             <span className="text-sm text-slate-600">正在加载博客内容...</span>
           </div>
         </div>
@@ -491,9 +414,9 @@ export default function BlogCreate() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[linear-gradient(145deg,#f4f3ff_0%,#edf6ff_48%,#f8fbff_100%)] px-4 py-6 md:px-8">
+    <div className="min-h-[calc(100vh-4rem)] px-4 py-6 md:px-8">
       <div className="mx-auto max-w-350">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-200/70 bg-white/75 px-4 py-3 shadow-sm backdrop-blur">
+        <div className="theme-panel-shell mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white/75 px-4 py-3 shadow-sm backdrop-blur">
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="rounded-xl">
               <ArrowLeft className="mr-1 h-4 w-4" />
@@ -502,22 +425,17 @@ export default function BlogCreate() {
             <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">
               {isEditMode ? '编辑博客' : '博客创作'}
             </h1>
-            <span className="rounded-full bg-violet-100 px-3 py-1 text-xs text-violet-700 shadow-sm">
+            <span className="border-theme-shell-border bg-theme-soft text-theme-primary rounded-full border px-3 py-1 text-xs shadow-sm">
               Markdown Pro
             </span>
-            {!isEditMode && draftRecovered && (
-              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700">
-                已恢复本地草稿
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-2">
-            <div className="hidden items-center rounded-lg border border-slate-200 bg-white p-1 md:inline-flex">
+            <div className="border-theme-panel-border bg-theme-soft/65 hidden items-center rounded-lg border p-1 md:inline-flex">
               <button
                 type="button"
                 className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition ${
                   previewMode === 'editor'
-                    ? 'bg-violet-50 text-violet-700 shadow-sm'
+                    ? 'bg-theme-soft text-theme-primary shadow-sm'
                     : 'text-slate-500 hover:text-slate-700'
                 }`}
                 onClick={() => setPreviewMode('editor')}
@@ -529,7 +447,7 @@ export default function BlogCreate() {
                 type="button"
                 className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition ${
                   previewMode === 'split'
-                    ? 'bg-violet-50 text-violet-700 shadow-sm'
+                    ? 'bg-theme-soft text-theme-primary shadow-sm'
                     : 'text-slate-500 hover:text-slate-700'
                 }`}
                 onClick={() => setPreviewMode('split')}
@@ -540,7 +458,7 @@ export default function BlogCreate() {
                 type="button"
                 className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition ${
                   previewMode === 'preview'
-                    ? 'bg-violet-50 text-violet-700 shadow-sm'
+                    ? 'bg-theme-soft text-theme-primary shadow-sm'
                     : 'text-slate-500 hover:text-slate-700'
                 }`}
                 onClick={() => setPreviewMode('preview')}
@@ -579,17 +497,12 @@ export default function BlogCreate() {
           }
         >
           {previewMode !== 'preview' && (
-            <section className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5 w-full">
+            <section className="theme-panel-shell w-full rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm text-slate-500">写作区</div>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <span>字数：{wordCount}</span>
                   <span>预计阅读：{readMinutes} 分钟</span>
-                  {lastAutoSavedAt && (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">
-                      自动保存 {formatTime(lastAutoSavedAt)}
-                    </span>
-                  )}
                 </div>
               </div>
 
@@ -601,24 +514,19 @@ export default function BlogCreate() {
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="输入标题，抓住读者注意力"
                   maxLength={200}
-                  className="mb-3 h-12 rounded-xl border-slate-300 text-base"
+                  className="theme-input-border mb-3 h-12 rounded-xl text-base"
                 />
               )}
 
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="在这里直接写 Markdown 原文，支持标题、列表、代码块、引用等标准语法。"
-                className="min-h-[620px] w-full rounded-xl border border-slate-300 bg-[#fcfcff] p-4 font-mono text-[15px] leading-8 outline-none focus:ring-2 focus:ring-violet-200"
-              />
+              <MdxMarkdownEditor value={content} onChange={setContent} />
             </section>
           )}
 
           {(previewMode === 'split' || previewMode === 'preview') && (
             <section className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-              <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5">
+              <div className="theme-panel-shell rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
                 <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-800">
-                  <Sparkles className="h-4 w-4 text-violet-500" />
+                  <Sparkles className="text-theme-primary h-4 w-4" />
                   发布设置
                 </div>
 
@@ -648,7 +556,7 @@ export default function BlogCreate() {
                         maxLength={500}
                         className="rounded-xl"
                       />
-                      <label className="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl border border-violet-300 bg-violet-50 px-2.5 text-sm text-violet-700 whitespace-nowrap hover:bg-violet-100">
+                      <label className="border-theme-shell-border bg-theme-soft text-theme-primary hover:bg-theme-soft/75 inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl border px-2.5 text-sm whitespace-nowrap">
                         <ImagePlus className="mr-1 h-4 w-4" />
                         {coverUploading ? '上传中' : coverObjectUrl ? '重新选图' : '选择图片'}
                         <input
@@ -688,7 +596,7 @@ export default function BlogCreate() {
 
                   <div>
                     <div className="mb-1 text-xs text-slate-500">可见范围</div>
-                    <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2">
+                    <div className="border-theme-panel-border bg-theme-soft/45 flex flex-wrap gap-2 rounded-xl border p-2">
                       {[
                         { label: '私密', value: 'private' as const },
                         { label: '共享', value: 'shared' as const },
@@ -700,7 +608,7 @@ export default function BlogCreate() {
                           onClick={() => setVisibility(item.value)}
                           className={`rounded-full px-3 py-1.5 text-sm transition ${
                             visibility === item.value
-                              ? 'bg-violet-600 text-white shadow-sm'
+                              ? 'bg-theme-primary text-white shadow-sm'
                               : 'bg-white text-slate-600 hover:bg-slate-100'
                           }`}
                         >
@@ -723,7 +631,7 @@ export default function BlogCreate() {
                         </button>
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1 text-violet-600 hover:text-violet-700"
+                          className="text-theme-primary hover:text-theme-primary-hover inline-flex items-center gap-1"
                           onClick={() => setShowCreateGroup((v) => !v)}
                         >
                           <Plus className="h-3 w-3" />
@@ -731,13 +639,13 @@ export default function BlogCreate() {
                         </button>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2">
+                    <div className="border-theme-panel-border bg-theme-soft/45 flex flex-wrap gap-2 rounded-xl border p-2">
                       <button
                         type="button"
                         onClick={() => setGroupId('')}
                         className={`rounded-full px-3 py-1.5 text-sm transition ${
                           !groupId
-                            ? 'bg-violet-600 text-white shadow-sm'
+                            ? 'bg-theme-primary text-white shadow-sm'
                             : 'bg-white text-slate-600 hover:bg-slate-100'
                         }`}
                       >
@@ -750,7 +658,7 @@ export default function BlogCreate() {
                           onClick={() => setGroupId(item.id)}
                           className={`rounded-full px-3 py-1.5 text-sm transition ${
                             groupId === item.id
-                              ? 'bg-violet-600 text-white shadow-sm'
+                              ? 'bg-theme-primary text-white shadow-sm'
                               : 'bg-white text-slate-600 hover:bg-slate-100'
                           }`}
                         >
@@ -760,7 +668,7 @@ export default function BlogCreate() {
                     </div>
 
                     {showCreateGroup && (
-                      <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50/50 p-3">
+                      <div className="border-theme-shell-border bg-theme-soft/65 mt-3 rounded-xl border p-3">
                         <Input
                           value={newGroupName}
                           onChange={(e) => setNewGroupName(e.target.value)}
@@ -798,10 +706,10 @@ export default function BlogCreate() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm md:p-5">
+              <div className="theme-panel-shell rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
                 <div className="mb-2 text-sm font-medium text-slate-800">实时预览</div>
                 <div
-                  className={`overflow-auto rounded-xl border border-slate-200 bg-[#fdfdff] p-4 ${
+                  className={`border-theme-panel-border bg-theme-soft/20 overflow-auto rounded-xl border p-4 ${
                     previewMode === 'preview' ? 'max-h-[760px]' : 'max-h-[520px]'
                   }`}
                 >
