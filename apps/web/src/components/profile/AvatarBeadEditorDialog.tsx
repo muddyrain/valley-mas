@@ -627,7 +627,7 @@ export default function AvatarBeadEditorDialog({
       <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)] sm:max-w-[1020px] p-0 overflow-hidden">
         <DialogHeader className="border-b border-slate-200 bg-white px-5 py-4">
           <DialogTitle className="flex items-center gap-2 text-base">
-            <Sparkles className="h-4 w-4 text-violet-600" />
+            <Sparkles className="h-4 w-4 text-theme-primary" />
             头像拼豆工坊
           </DialogTitle>
         </DialogHeader>
@@ -722,7 +722,7 @@ export default function AvatarBeadEditorDialog({
                       }
                       className={`rounded-full px-3 py-1.5 text-sm transition ${
                         effect === item.key
-                          ? 'bg-violet-600 text-white'
+                          ? 'bg-theme-primary text-white'
                           : !canApplyPixelEffects && (item.key === 'pixel' || item.key === 'beads')
                             ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -791,7 +791,7 @@ export default function AvatarBeadEditorDialog({
                   type="checkbox"
                   checked={showBeadHole}
                   onChange={(e) => setShowBeadHole(e.target.checked)}
-                  className="h-4 w-4 accent-violet-600"
+                  className="h-4 w-4  accent-theme-primary"
                   disabled={!canApplyPixelEffects || effect === 'none'}
                 />
               </label>
@@ -823,8 +823,8 @@ export default function AvatarBeadEditorDialog({
                           disabled={saving || active}
                           className={`group relative aspect-square overflow-hidden rounded-md border transition ${
                             active
-                              ? 'border-violet-500 ring-2 ring-violet-200'
-                              : 'border-slate-200 hover:border-violet-400'
+                              ? 'border-theme-primary ring-2 ring-theme-primary/50'
+                              : 'border-slate-200 hover:border-theme-primary'
                           }`}
                           title="点击预览该历史头像"
                         >
@@ -843,7 +843,7 @@ export default function AvatarBeadEditorDialog({
                 )}
               </div>
 
-              <div className="rounded-xl bg-violet-50 p-3 text-xs leading-5 text-violet-700">
+              <div className="rounded-xl bg-theme-primary/10 p-3 text-xs leading-5 text-theme-primary">
                 点击历史头像会先在左侧预览，只有点“保存头像”才会真正更新。
               </div>
 

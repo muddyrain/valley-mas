@@ -54,7 +54,7 @@ export default function Header() {
     isAuthenticated,
     logout: logoutStore,
     initAuth,
-    fetchProfile,
+    refreshUserState,
     profileLoading,
   } = useAuthStore();
   const currentTheme = useThemeStore((state) => state.theme);
@@ -176,7 +176,7 @@ export default function Header() {
 
   const handleRefreshUser = async () => {
     try {
-      await fetchProfile(true);
+      await refreshUserState();
       toast.success('已刷新用户信息');
     } catch {
       // store 内部已做容错

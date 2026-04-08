@@ -5,6 +5,18 @@
   line-height: 1.8;
   color: var(--foreground);
   word-wrap: break-word;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.markdown-body > * {
+  max-width: 100%;
+}
+
+.markdown-body :where(div, section, article) {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 /* 标题 */
@@ -134,6 +146,7 @@
   background: #1e1e2e;
   border-radius: 12px;
   overflow-x: auto;
+  max-width: 100%;
   position: relative;
   font-size: 0.9em;
   line-height: 1.6;
@@ -159,12 +172,16 @@
 
 /* 表格 */
 .markdown-body table {
-  width: 100%;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   margin: 1.5em 0;
   border-collapse: collapse;
   font-size: 0.95em;
   border-radius: 8px;
-  overflow: hidden;
+  overflow-y: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
@@ -173,6 +190,7 @@
   padding: 0.8em 1em;
   text-align: left;
   border: 1px solid var(--border);
+  white-space: nowrap;
 }
 
 .markdown-body th {

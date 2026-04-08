@@ -65,6 +65,10 @@ const statPanelClass =
 const inputClassName =
   'h-10 theme-input-border bg-white/82 focus-visible:border-theme-primary focus-visible:ring-theme-primary/20';
 
+function extractEmailName(email?: string) {
+  return (email || '').split('@')[0]?.trim() || '';
+}
+
 export default function Profile() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuthStore();
@@ -145,16 +149,28 @@ export default function Profile() {
   }, [avatarEditorOpen]);
 
   const handleInfoSave = async () => {
-    if (!infoForm.nickname.trim()) {
+    const trimmedNickname = infoForm.nickname.trim();
+    const trimmedEmail = infoForm.email.trim();
+    const trimmedPhone = infoForm.phone.trim();
+
+    if (!trimmedNickname) {
       toast.error('昵称不能为空');
+      return;
+    }
+    if (!trimmedEmail) {
+      toast.error('邮箱不能为空');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      toast.error('请输入正确的邮箱地址');
       return;
     }
     try {
       setInfoSaving(true);
       const updated = await updateMyProfile({
-        nickname: infoForm.nickname,
-        email: infoForm.email,
-        phone: infoForm.phone,
+        nickname: trimmedNickname,
+        email: trimmedEmail,
+        phone: trimmedPhone,
       });
       if (profile) {
         setStoreProfile({ ...profile, ...updated });
@@ -199,6 +215,8 @@ export default function Profile() {
   if (!isAuthenticated) return null;
 
   const roleInfo = ROLE_MAP[profile?.role || user?.role || 'user'];
+  const displayName = profile?.nickname?.trim() || extractEmailName(profile?.email) || '未命名用户';
+  const avatarFallbackText = (displayName[0] || 'U').toUpperCase();
 
   return (
     <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
@@ -226,7 +244,7 @@ export default function Profile() {
                 <Avatar className="h-24 w-24 border-4 border-white/30 shadow-2xl ring-4 ring-white/15">
                   <AvatarImage src={profile?.avatar} className="object-cover" />
                   <AvatarFallback className="theme-avatar-fallback text-3xl font-bold text-white">
-                    {(profile?.nickname?.[0] || profile?.username?.[0] || 'U').toUpperCase()}
+                    {avatarFallbackText}
                   </AvatarFallback>
                 </Avatar>
                 <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
@@ -249,14 +267,15 @@ export default function Profile() {
             ) : (
               <>
                 <div className="mb-2 flex flex-wrap items-center gap-3">
-                  <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">
-                    {profile?.nickname || profile?.username}
-                  </h1>
+                  <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">{displayName}</h1>
                   <Badge className={`${roleInfo.badgeClass} border-0 px-3 py-1 font-medium`}>
                     {roleInfo.label}
                   </Badge>
                 </div>
-                <p className="mb-4 text-sm text-white/78">@{profile?.username}</p>
+                <p className="mb-4 text-sm text-white/78">
+                  <Mail className="mr-1 inline h-3.5 w-3.5" />
+                  {profile?.email || '未绑定邮箱'}
+                </p>
                 <div className="flex flex-wrap gap-4">
                   <div className={statPanelClass}>
                     <div className="mb-1 flex items-center gap-2 text-xs font-medium text-white/76">
@@ -296,16 +315,6 @@ export default function Profile() {
             ) : (
               <div className="space-y-5">
                 <div>
-                  <Label className="mb-1.5 block text-sm font-medium text-slate-700">用户名</Label>
-                  <Input
-                    value={profile?.username || ''}
-                    disabled
-                    className="h-10 cursor-not-allowed bg-slate-50 text-slate-500"
-                  />
-                  <p className="mt-1 text-xs text-slate-400">用户名不可修改</p>
-                </div>
-
-                <div>
                   <div className="mb-1.5 flex items-center justify-between">
                     <Label className="block text-sm font-medium text-slate-700">
                       昵称 <span className="text-rose-500">*</span>
@@ -335,7 +344,7 @@ export default function Profile() {
                 <div>
                   <Label className="mb-1.5 block text-sm font-medium text-slate-700">
                     <Mail className="mr-1 inline h-3.5 w-3.5" />
-                    邮箱
+                    邮箱 <span className="text-rose-500">*</span>
                   </Label>
                   <Input
                     type="email"
@@ -343,9 +352,11 @@ export default function Profile() {
                     onChange={(event) =>
                       setInfoForm((form) => ({ ...form, email: event.target.value }))
                     }
-                    placeholder="请输入邮箱"
+                    disabled
+                    placeholder="请输入登录邮箱"
                     className={inputClassName}
                   />
+                  <p className="mt-1 text-xs text-slate-400">该邮箱用于登录与接收验证码</p>
                 </div>
 
                 <div>
@@ -514,6 +525,10 @@ export default function Profile() {
             </div>
             <CardContent className="p-6">
               <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                <div className="flex items-center justify-between rounded-xl bg-theme-soft/72 p-3 sm:col-span-2">
+                  <span className="text-slate-500">登录邮箱</span>
+                  <span className="font-medium text-slate-900">{profile.email || '-'}</span>
+                </div>
                 <div className="flex items-center justify-between rounded-xl bg-theme-soft/72 p-3">
                   <span className="text-slate-500">账号角色</span>
                   <Badge className={`${roleInfo.badgeClass} border-0`}>{roleInfo.label}</Badge>

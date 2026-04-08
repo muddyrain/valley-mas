@@ -1,12 +1,17 @@
 import {
   BlockTypeSelect,
   BoldItalicUnderlineToggles,
+  CodeMirrorEditor,
   CreateLink,
+  codeBlockPlugin,
+  codeMirrorPlugin,
   DiffSourceToggleWrapper,
   diffSourcePlugin,
   headingsPlugin,
+  InsertCodeBlock,
   InsertTable,
   InsertThematicBreak,
+  imagePlugin,
   ListsToggle,
   linkDialogPlugin,
   linkPlugin,
@@ -78,7 +83,44 @@ export function MdxMarkdownEditor({ value, onChange, className }: MdxMarkdownEdi
 
   const plugins = useMemo(
     () => [
+      codeBlockPlugin({
+        defaultCodeBlockLanguage: 'txt',
+        codeBlockEditorDescriptors: [
+          {
+            priority: 0,
+            match: () => true,
+            Editor: CodeMirrorEditor,
+          },
+        ],
+      }),
+      codeMirrorPlugin({
+        codeBlockLanguages: {
+          '': '纯文本',
+          txt: '纯文本',
+          text: '纯文本',
+          plaintext: '纯文本',
+          'N/A': '纯文本',
+          'n/a': '纯文本',
+          markdown: 'Markdown',
+          md: 'Markdown',
+          js: 'JavaScript',
+          ts: 'TypeScript',
+          jsx: 'JavaScript (React)',
+          tsx: 'TypeScript (React)',
+          json: 'JSON',
+          bash: 'Bash',
+          sh: 'Shell',
+          python: 'Python',
+          py: 'Python',
+          yaml: 'YAML',
+          yml: 'YAML',
+          sql: 'SQL',
+          css: 'CSS',
+          html: 'HTML',
+        },
+      }),
       headingsPlugin({ allowedHeadingLevels: [1, 2, 3, 4] }),
+      imagePlugin(),
       listsPlugin(),
       quotePlugin(),
       linkPlugin(),
@@ -103,6 +145,7 @@ export function MdxMarkdownEditor({ value, onChange, className }: MdxMarkdownEdi
             </DiffSourceToggleWrapper>
             <Separator />
             <InsertTable />
+            <InsertCodeBlock />
             <InsertThematicBreak />
           </>
         ),

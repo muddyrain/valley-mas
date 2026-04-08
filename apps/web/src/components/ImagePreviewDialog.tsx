@@ -1,5 +1,6 @@
-﻿import { ExternalLink, Maximize2, RotateCcw, RotateCw, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ExternalLink, Maximize2, RotateCcw, RotateCw, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toInlineUrl } from '@/utils/tos';
 
@@ -40,6 +41,7 @@ export default function ImagePreviewDialog({
   const [rotate, setRotate] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [imageLoading, setImageLoading] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0, baseX: 0, baseY: 0, pointerId: -1 });
 
   const canPreview = useMemo(() => Boolean(src), [src]);
@@ -57,6 +59,7 @@ export default function ImagePreviewDialog({
     setRotate(0);
     setOffset({ x: 0, y: 0 });
     setDragging(false);
+    setImageLoading(Boolean(src));
   }, [open, src]);
 
   const reset = () => {
@@ -137,26 +140,39 @@ export default function ImagePreviewDialog({
             onClick={() => onOpenChange(false)}
           >
             {canPreview ? (
-              <img
-                src={inlineSrc}
-                alt={displayTitle}
-                className="select-none rounded-xl shadow-[0_32px_80px_rgba(0,0,0,0.7)] cursor-grab active:cursor-grabbing"
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerUp}
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  maxWidth: '84vw',
-                  maxHeight: '72vh',
-                  width: 'auto',
-                  height: 'auto',
-                  transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale}) rotate(${rotate}deg)`,
-                  transformOrigin: 'center center',
-                  transition: dragging ? 'none' : 'transform 260ms cubic-bezier(0.22,1,0.36,1)',
-                  willChange: 'transform',
-                }}
-              />
+              <>
+                <img
+                  src={inlineSrc}
+                  alt={displayTitle}
+                  className={`select-none rounded-xl shadow-[0_32px_80px_rgba(0,0,0,0.7)] cursor-grab active:cursor-grabbing transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
+                  onLoad={() => setImageLoading(false)}
+                  onError={() => setImageLoading(false)}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  onPointerCancel={handlePointerUp}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    maxWidth: '84vw',
+                    maxHeight: '72vh',
+                    width: 'auto',
+                    height: 'auto',
+                    transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale}) rotate(${rotate}deg)`,
+                    transformOrigin: 'center center',
+                    transition: dragging ? 'none' : 'transform 260ms cubic-bezier(0.22,1,0.36,1)',
+                    willChange: 'transform',
+                  }}
+                />
+                {imageLoading && (
+                  <BoxLoadingOverlay
+                    show={imageLoading}
+                    title="图片加载中..."
+                    hint="高分辨率图片可能稍慢"
+                    tone="dark"
+                    className="pointer-events-none rounded-xl"
+                  />
+                )}
+              </>
             ) : (
               <div className="text-sm text-white/60">暂无可预览图片</div>
             )}

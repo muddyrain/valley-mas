@@ -182,11 +182,11 @@ export default function BlogList() {
               {isCreator && profile?.creatorCode && (
                 <div>
                   <Button
-                    onClick={() => navigate(`/creator/${profile.creatorCode}`)}
+                    onClick={() => navigate(`/my-space/posts`)}
                     className="theme-btn-primary gap-2 rounded-full px-5 font-semibold shadow-md"
                   >
                     <ExternalLink className="h-4 w-4" />
-                    前往我的创作者主页
+                    前往我的创作者空间
                   </Button>
                 </div>
               )}

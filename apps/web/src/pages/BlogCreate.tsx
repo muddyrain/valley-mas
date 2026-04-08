@@ -104,6 +104,12 @@ function parseMarkdownImport(fileName: string, rawText: string) {
   };
 }
 
+function waitNextPaint() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
 export default function BlogCreate() {
   const navigate = useNavigate();
   const { id: editingId } = useParams<{ id?: string }>();
@@ -495,7 +501,10 @@ export default function BlogCreate() {
       setCoverStorageKey('');
       setPendingCoverRemoteUrl('');
 
-      toast.success('MD 导入成功，正在生成 AI 封面...');
+      // 先让标题和正文完成一次渲染，再触发 AI 配图，保证导入顺序清晰可感知。
+      await waitNextPaint();
+      toast.success('MD 导入成功，正在根据标题和正文生成 AI 封面...');
+      setImportingMarkdown(false);
       await handleAIGenerateCover({
         title: parsed.title,
         excerpt: '',
@@ -782,7 +791,7 @@ export default function BlogCreate() {
           }
         >
           {previewMode !== 'preview' && (
-            <section className="theme-panel-shell w-full rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
+            <section className="theme-panel-shell w-full min-w-0 rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm text-slate-500">写作区</div>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
@@ -808,7 +817,7 @@ export default function BlogCreate() {
           )}
 
           {(previewMode === 'split' || previewMode === 'preview') && (
-            <section className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+            <section className="min-w-0 space-y-4 lg:sticky lg:top-20 lg:self-start">
               <div className="theme-panel-shell rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
                 <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-800">
                   <Sparkles className="text-theme-primary h-4 w-4" />
@@ -1057,7 +1066,7 @@ export default function BlogCreate() {
               <div className="theme-panel-shell rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
                 <div className="mb-2 text-sm font-medium text-slate-800">实时预览</div>
                 <div
-                  className={`border-theme-panel-border bg-theme-soft/20 overflow-auto rounded-xl border p-4 ${
+                  className={`border-theme-panel-border bg-theme-soft/20 min-w-0 overflow-auto rounded-xl border p-4 ${
                     previewMode === 'preview' ? 'max-h-[760px]' : 'max-h-[520px]'
                   }`}
                 >

@@ -231,7 +231,7 @@ export default function Resources() {
                     className="theme-btn-primary gap-2 rounded-full px-5 font-semibold shadow-md"
                   >
                     <ExternalLink className="h-4 w-4" />
-                    前往我的创作者资源页
+                    前往我的创作者空间
                   </Button>
                 </div>
               )}

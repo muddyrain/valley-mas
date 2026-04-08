@@ -167,7 +167,7 @@ export default function BlogGroupManage() {
                 onClick={() => setSearchParams({ type: 'blog' })}
                 className={`rounded-full px-3 py-1 text-xs transition ${
                   groupType === 'blog'
-                    ? 'bg-violet-600 text-white shadow-sm'
+                    ? 'bg-theme-primary text-white shadow-sm'
                     : 'bg-white text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -178,7 +178,7 @@ export default function BlogGroupManage() {
                 onClick={() => setSearchParams({ type: 'image_text' })}
                 className={`rounded-full px-3 py-1 text-xs transition ${
                   groupType === 'image_text'
-                    ? 'bg-orange-500 text-white shadow-sm'
+                    ? 'bg-theme-primary text-white shadow-sm'
                     : 'bg-white text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -227,7 +227,7 @@ export default function BlogGroupManage() {
                     <h3 className="text-lg font-semibold text-slate-900">{group.name}</h3>
                     <p className="mt-1 text-xs text-slate-500">内容数：{group.postCount || 0}</p>
                   </div>
-                  <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
+                  <span className="rounded-full bg-theme-primary/10 px-2 py-0.5 text-xs text-theme-primary">
                     ID {group.id}
                   </span>
                 </div>

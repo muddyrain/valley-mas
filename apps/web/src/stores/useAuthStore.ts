@@ -30,6 +30,8 @@ interface AuthState {
   initAuth: () => void;
   /** 从接口拉取并缓存 profile（已有则跳过，force=true 强制刷新） */
   fetchProfile: (force?: boolean) => Promise<void>;
+  /** 主动刷新用户状态（用于角色权限立即生效场景） */
+  refreshUserState: () => Promise<User | null>;
   /** 直接更新本地 profile 缓存（用于保存成功后同步） */
   setProfile: (profile: UserProfile) => void;
 }
@@ -121,6 +123,11 @@ export const useAuthStore = create<AuthState>()(
         } finally {
           set({ profileLoading: false });
         }
+      },
+
+      refreshUserState: async () => {
+        await get().fetchProfile(true);
+        return get().user;
       },
 
       setProfile: (profile) => {
