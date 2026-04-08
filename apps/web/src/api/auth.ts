@@ -7,6 +7,8 @@ export interface User {
   nickname: string;
   avatar: string;
   role: string;
+  email?: string;
+  phone?: string;
 }
 
 // 登录响应
@@ -21,15 +23,29 @@ export interface RefreshTokenResponse {
 }
 
 // 登录
-export const login = async (data: { username: string; password: string }) => {
+export const login = async (data: {
+  email: string;
+  password?: string;
+  verificationCode?: string;
+  loginType?: 'code' | 'password';
+}) => {
   const res = await http.post<unknown, LoginResponse>('/login', data);
   return res;
 };
 
 // 注册
-export const register = async (data: { username: string; password: string; nickname?: string }) => {
+export const register = async (data: {
+  email: string;
+  password: string;
+  verificationCode: string;
+  nickname?: string;
+}) => {
   const res = await http.post<unknown, LoginResponse>('/register', data);
   return res;
+};
+
+export const sendEmailCode = async (data: { email: string; purpose: 'login' | 'register' }) => {
+  return http.post<unknown, { message: string }>('/email-code/send', data);
 };
 
 // 登出

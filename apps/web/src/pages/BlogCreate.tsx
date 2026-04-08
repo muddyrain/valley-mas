@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   Clock3,
   Eye,
+  FileUp,
   ImagePlus,
   Loader2,
   PenSquare,
@@ -59,6 +60,50 @@ function base64ToImageFile(base64: string, mimeType: string, fileName: string) {
   return new File([bytes], fileName, { type: mimeType });
 }
 
+function normalizeImportedTitle(value: string) {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+function parseMarkdownImport(fileName: string, rawText: string) {
+  const normalized = rawText.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+  let body = normalized.trim();
+  let frontMatterTitle = '';
+
+  const frontMatterMatch = body.match(/^---\n([\s\S]*?)\n---\n*/);
+  if (frontMatterMatch) {
+    const frontMatter = frontMatterMatch[1];
+    body = body.slice(frontMatterMatch[0].length).trim();
+    const titleMatch = frontMatter.match(/^\s*title\s*:\s*(.+)\s*$/im);
+    if (titleMatch) {
+      frontMatterTitle = normalizeImportedTitle(titleMatch[1]);
+    }
+  }
+
+  const headingMatch = body.match(/^(?:\s*\n)*#\s+(.+?)\s*(?:\n|$)/);
+  const headingTitle = headingMatch ? normalizeImportedTitle(headingMatch[1]) : '';
+  const fileTitle = fileName
+    .replace(/\.[^.]+$/, '')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+  const parsedTitle = frontMatterTitle || headingTitle || fileTitle || '未命名博客';
+
+  if (!frontMatterTitle && headingMatch) {
+    body = body.slice(headingMatch[0].length).trim();
+  }
+
+  return {
+    title: parsedTitle,
+    content: body,
+  };
+}
+
 export default function BlogCreate() {
   const navigate = useNavigate();
   const { id: editingId } = useParams<{ id?: string }>();
@@ -83,6 +128,8 @@ export default function BlogCreate() {
   const [submitting, setSubmitting] = useState(false);
   const [aiExcerptLoading, setAiExcerptLoading] = useState(false);
   const [aiCoverLoading, setAiCoverLoading] = useState(false);
+  const [aiCoverSource, setAiCoverSource] = useState<'manual' | 'import'>('manual');
+  const [importingMarkdown, setImportingMarkdown] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
@@ -96,6 +143,7 @@ export default function BlogCreate() {
   const currentEditingIdRef = useRef<string | undefined>(editingId);
 
   const coverViewportRef = useRef<HTMLDivElement | null>(null);
+  const markdownImportInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     currentEditingIdRef.current = editingId;
@@ -372,15 +420,21 @@ export default function BlogCreate() {
     }
   };
 
-  const handleAIGenerateCover = async () => {
-    const trimmedContent = content.trim();
+  const handleAIGenerateCover = async (payload?: {
+    title?: string;
+    excerpt?: string;
+    content?: string;
+    source?: 'manual' | 'import';
+  }) => {
+    const trimmedContent = (payload?.content ?? content).trim();
     if (!trimmedContent) return;
 
     try {
+      setAiCoverSource(payload?.source ?? 'manual');
       setAiCoverLoading(true);
       const result = await generateBlogCover({
-        title: title.trim(),
-        excerpt: excerpt.trim(),
+        title: (payload?.title ?? title).trim(),
+        excerpt: (payload?.excerpt ?? excerpt).trim(),
         content: trimmedContent,
       });
 
@@ -413,8 +467,49 @@ export default function BlogCreate() {
       // 请求层已统一处理并展示后端错误信息（例如模型配置错误）
     } finally {
       setAiCoverLoading(false);
+      setAiCoverSource('manual');
     }
   };
+
+  const handleImportMarkdown = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImportingMarkdown(true);
+      const rawText = await file.text();
+      const parsed = parseMarkdownImport(file.name, rawText);
+      const parsedContent = parsed.content.trim();
+      if (!parsedContent) {
+        toast.error('导入失败，文件正文为空');
+        return;
+      }
+
+      if (coverFile || coverObjectUrl) {
+        resetLocalCoverEditing();
+      }
+      setTitle(parsed.title);
+      setContent(parsedContent);
+      setExcerpt('');
+      setCover('');
+      setCoverStorageKey('');
+      setPendingCoverRemoteUrl('');
+
+      toast.success('MD 导入成功，正在生成 AI 封面...');
+      await handleAIGenerateCover({
+        title: parsed.title,
+        excerpt: '',
+        content: parsedContent,
+        source: 'import',
+      });
+    } catch {
+      toast.error('MD 导入失败，请检查文件后重试');
+    } finally {
+      setImportingMarkdown(false);
+      event.target.value = '';
+    }
+  };
+
   const handleSubmit = async (
     status: 'draft' | 'published',
     options?: { stayOnPage?: boolean; fromShortcut?: boolean },
@@ -562,7 +657,8 @@ export default function BlogCreate() {
   const wordCount = useMemo(() => content.replace(/\s+/g, '').length, [content]);
   const readMinutes = useMemo(() => Math.max(1, Math.ceil(wordCount / 500)), [wordCount]);
   const isContentEmpty = !content.trim();
-  const actionBusy = submitting || coverUploading || aiExcerptLoading || aiCoverLoading;
+  const actionBusy =
+    submitting || coverUploading || aiExcerptLoading || aiCoverLoading || importingMarkdown;
   const previewMarkdown = useMemo(() => {
     return `# ${title.trim() || '未命名标题'}\n\n${content.trim() || '开始输入正文内容吧。'}`;
   }, [title, content]);
@@ -640,6 +736,20 @@ export default function BlogCreate() {
               Ctrl/Cmd + S 草稿保存
             </span>
             <Button
+              type="button"
+              variant="outline"
+              disabled={actionBusy || loadingPost}
+              onClick={() => markdownImportInputRef.current?.click()}
+              className="rounded-xl"
+            >
+              {importingMarkdown ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <FileUp className="mr-2 h-4 w-4" />
+              )}
+              {importingMarkdown ? '导入中' : '导入 MD'}
+            </Button>
+            <Button
               variant="outline"
               disabled={actionBusy}
               onClick={() => void handleSubmit('draft', { stayOnPage: isEditMode })}
@@ -656,6 +766,13 @@ export default function BlogCreate() {
               <Send className="mr-2 h-4 w-4" />
               {isEditMode ? '更新并发布' : '发布博客'}
             </Button>
+            <input
+              ref={markdownImportInputRef}
+              type="file"
+              accept=".md,.markdown,text/markdown"
+              className="hidden"
+              onChange={(event) => void handleImportMarkdown(event)}
+            />
           </div>
         </div>
 
@@ -769,6 +886,36 @@ export default function BlogCreate() {
                         />
                       </label>
                     </div>
+                    {aiCoverLoading && (
+                      <div className="border-theme-panel-border bg-theme-soft/55 relative mt-3 overflow-hidden rounded-xl border p-3">
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/20 via-transparent to-white/20 animate-pulse" />
+                        <div className="relative flex items-center gap-3">
+                          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-theme-primary/25 bg-white/80">
+                            <div className="absolute inset-0 animate-ping rounded-xl bg-theme-primary/12" />
+                            <Sparkles className="text-theme-primary relative h-5 w-5" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium text-slate-700">
+                              {aiCoverSource === 'import'
+                                ? '正在根据导入内容生成封面图...'
+                                : 'AI 正在生成封面图...'}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              你可以继续编辑正文，完成后会自动更新封面预览。
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          {[0, 1, 2].map((item) => (
+                            <span
+                              key={`ai-cover-loading-${item}`}
+                              className="bg-theme-primary/20 h-1.5 rounded-full animate-pulse"
+                              style={{ animationDelay: `${item * 180}ms` }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {(!!cover || !!coverObjectUrl) && (
                       <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                         <div

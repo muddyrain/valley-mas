@@ -1,8 +1,8 @@
-import { ArrowRight, Eye, EyeOff, Lock, Sparkles, User } from 'lucide-react';
-import { useState } from 'react';
+﻿import { ArrowRight, Eye, EyeOff, Lock, Mail, Sparkles, User } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { register } from '@/api/auth';
+import { register, sendEmailCode } from '@/api/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,8 @@ export default function Register() {
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
+    verificationCode: '',
     password: '',
     confirmPassword: '',
     nickname: '',
@@ -22,20 +23,56 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [codeCountdown, setCodeCountdown] = useState(0);
+
+  useEffect(() => {
+    if (codeCountdown <= 0) return;
+    const timer = window.setTimeout(() => setCodeCountdown((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [codeCountdown]);
 
   const handleGenerateNickname = () => {
     setFormData((prev) => ({ ...prev, nickname: createRandomCnNickname() }));
   };
 
+  const handleSendCode = async () => {
+    const email = formData.email.trim();
+    if (!email) {
+      toast.error('请先输入邮箱');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('请输入正确的邮箱地址');
+      return;
+    }
+
+    try {
+      setSendingCode(true);
+      await sendEmailCode({ email, purpose: 'register' });
+      setCodeCountdown(60);
+      toast.success('验证码已发送');
+    } catch (error) {
+      console.error('发送验证码失败:', error);
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.username || !formData.password) {
-      toast.error('请填写用户名和密码');
+    const email = formData.email.trim();
+    if (!email || !formData.password) {
+      toast.error('请填写邮箱和密码');
       return;
     }
-    if (formData.username.length < 3) {
-      toast.error('用户名至少 3 个字符');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('请输入正确的邮箱地址');
+      return;
+    }
+    if (!formData.verificationCode.trim()) {
+      toast.error('请输入邮箱验证码');
       return;
     }
     if (formData.password.length < 6) {
@@ -50,8 +87,9 @@ export default function Register() {
     try {
       setLoading(true);
       const { token, userInfo } = await register({
-        username: formData.username,
+        email,
         password: formData.password,
+        verificationCode: formData.verificationCode.trim(),
         nickname: formData.nickname.trim() || createRandomCnNickname(),
       });
 
@@ -64,6 +102,12 @@ export default function Register() {
       setLoading(false);
     }
   };
+
+  const codeButtonText = sendingCode
+    ? '发送中...'
+    : codeCountdown > 0
+      ? `${codeCountdown}s`
+      : '发送验证码';
 
   return (
     <div className="relative min-h-screen flex">
@@ -174,21 +218,52 @@ export default function Register() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="username" className="text-slate-700 text-sm font-medium">
-                  用户名 <span className="text-red-400">*</span>
-                </Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
-                    id="username"
-                    type="text"
-                    placeholder="3-20 个字符"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    className="pl-10 h-12 border-theme-border bg-theme-soft/60 focus-visible:ring-theme-primary/40 focus-visible:border-theme-primary"
-                    maxLength={20}
-                  />
+              <div className="space-y-4 rounded-2xl border border-theme-shell-border bg-gradient-to-br from-theme-soft/70 via-white to-theme-soft/30 p-4 shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.10)]">
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-slate-700 text-sm font-medium">
+                    邮箱 <span className="text-red-400">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="请输入邮箱"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="pl-10 h-12 rounded-xl border-theme-border/80 bg-white shadow-[0_6px_18px_rgba(var(--theme-primary-rgb),0.08)] transition-all focus-visible:ring-theme-primary/50 focus-visible:border-theme-primary focus-visible:shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.16)]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="verificationCode" className="text-slate-700 text-sm font-medium">
+                    邮箱验证码 <span className="text-red-400">*</span>
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="verificationCode"
+                      type="text"
+                      placeholder="请输入6位验证码"
+                      value={formData.verificationCode}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          verificationCode: e.target.value.replace(/\D/g, '').slice(0, 6),
+                        })
+                      }
+                      className="h-12 rounded-xl border-theme-border/80 bg-white tracking-[0.32em] text-center text-base font-semibold shadow-[0_6px_18px_rgba(var(--theme-primary-rgb),0.08)] transition-all focus-visible:ring-theme-primary/50 focus-visible:border-theme-primary focus-visible:shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.14)]"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-12 shrink-0 rounded-xl border-theme-primary/35 bg-white/90 px-4 text-theme-primary shadow-[0_6px_18px_rgba(var(--theme-primary-rgb),0.12)] transition-all hover:bg-theme-soft hover:text-theme-primary-hover hover:shadow-[0_10px_22px_rgba(var(--theme-primary-rgb),0.2)]"
+                      onClick={handleSendCode}
+                      disabled={sendingCode || codeCountdown > 0}
+                    >
+                      {codeButtonText}
+                    </Button>
+                  </div>
                 </div>
               </div>
 

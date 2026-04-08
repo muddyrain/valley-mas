@@ -1,13 +1,11 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 	"valley-server/internal/database"
 	"valley-server/internal/logger"
 	"valley-server/internal/model"
@@ -147,10 +145,24 @@ func SubmitCreatorApplication(c *gin.Context) {
 		"applicationId": application.ID,
 	}).Info("用户提交创作者申请")
 
+	// 自动 AI 审核（失败时自动回退为人工审核）
+	tryAutoReviewCreatorApplication(db, &application)
+
+	// 重新读取申请状态（兼容自动审核后立即变更）
+	if err := db.Preload("Reviewer").First(&application, "id = ?", application.ID).Error; err != nil {
+		logger.Log.WithFields(logrus.Fields{
+			"userId":        userIDInt64,
+			"applicationId": application.ID,
+			"error":         err.Error(),
+		}).Warn("重载创作者申请状态失败，返回初始状态")
+	}
+
 	Success(c, gin.H{
-		"id":        application.ID,
-		"status":    application.Status,
-		"createdAt": application.CreatedAt,
+		"id":         application.ID,
+		"status":     application.Status,
+		"createdAt":  application.CreatedAt,
+		"reviewedAt": application.ReviewedAt,
+		"reviewNote": application.ReviewNote,
 	})
 }
 
@@ -326,106 +338,15 @@ func ReviewCreatorApplication(c *gin.Context) {
 		return
 	}
 
-	// 开启事务
 	err := db.Transaction(func(tx *gorm.DB) error {
-		// 更新申请状态
-		now := time.Now()
-		application.Status = req.Status
-		application.ReviewerID = &reviewerID
-		application.ReviewNote = req.ReviewNote
-		application.ReviewedAt = &now
-
-		if err := tx.Save(&application).Error; err != nil {
-			return err
-		}
-
-		extraData := map[string]interface{}{
-			"applicationId": application.ID,
-			"status":        req.Status,
-		}
-		extraDataBytes, _ := json.Marshal(extraData)
-		notifyContent := "你的创作者申请已通过审核，已为你开通创作者权限。"
-		if req.Status == "rejected" {
-			notifyContent = "你的创作者申请未通过审核。"
-			if strings.TrimSpace(req.ReviewNote) != "" {
-				notifyContent += " 备注：" + strings.TrimSpace(req.ReviewNote)
-			}
-		}
-		notification := model.UserNotification{
-			UserID:    application.UserID,
-			Type:      "creator_application_review",
-			Title:     "创作者申请审核结果",
-			Content:   notifyContent,
-			IsRead:    false,
-			ExtraData: string(extraDataBytes),
-		}
-		if err := tx.Create(&notification).Error; err != nil {
-			return err
-		}
-
-		// 如果审核通过，创建创作者和默认空间
-		if req.Status == "approved" {
-			// 检查用户是否已经是创作者（二次检查）
-			var existingCreator model.Creator
-			err := tx.Where("user_id = ?", application.UserID).First(&existingCreator).Error
-			if err == nil {
-				return errors.New("该用户已经是创作者")
-			}
-			if !errors.Is(err, gorm.ErrRecordNotFound) {
-				return err
-			}
-
-			// 生成创作者口令
-			code, err := generateCreatorCodeForApplication(tx)
-			if err != nil {
-				return err
-			}
-
-			// 创建创作者（名称使用用户昵称，不单独存储）
-			creator := model.Creator{
-				UserID:      application.UserID,
-				Description: application.Description,
-				Code:        code,
-				IsActive:    true,
-			}
-
-			if err := tx.Create(&creator).Error; err != nil {
-				return err
-			}
-
-			// 创建默认空间
-			space := model.CreatorSpace{
-				CreatorID:   creator.ID,
-				Description: application.Description,
-				IsActive:    true,
-			}
-
-			if err := tx.Create(&space).Error; err != nil {
-				return err
-			}
-
-			// 更新用户角色为 creator
-			if err := tx.Model(&application.User).Update("role", "creator").Error; err != nil {
-				return err
-			}
-
-			logger.Log.WithFields(logrus.Fields{
-				"applicationId": application.ID,
-				"userId":        application.UserID,
-				"creatorId":     creator.ID,
-				"spaceId":       space.ID,
-				"reviewerId":    reviewerID,
-			}).Info("创作者申请审核通过，已自动创建创作者和空间")
-		} else {
-			logger.Log.WithFields(logrus.Fields{
-				"applicationId": application.ID,
-				"userId":        application.UserID,
-				"reviewerId":    reviewerID,
-				"reason":        req.ReviewNote,
-			}).Info("创作者申请被拒绝")
-		}
-
-		return nil
+		return applyCreatorApplicationReview(
+			tx,
+			&application,
+			req.Status,
+			req.ReviewNote,
+			&reviewerID,
+			"manual",
+		)
 	})
 
 	if err != nil {

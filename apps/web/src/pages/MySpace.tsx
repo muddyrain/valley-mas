@@ -96,7 +96,7 @@ export default function MySpace() {
   const loadMyPosts = useCallback(async () => {
     try {
       setLoadingPosts(true);
-      const postsData = await getAdminPosts({ page: 1, pageSize: 8 });
+      const postsData = await getAdminPosts({ page: 1, pageSize: 10 });
       setMyPosts(postsData.list || []);
     } catch {
       toast.error('加载博客内容失败');
@@ -112,7 +112,7 @@ export default function MySpace() {
   }, [isAuthenticated, user, loadMyPosts]);
 
   const previewBlogPosts = useMemo(
-    () => myPosts.filter((p) => p.postType === 'blog').slice(0, 4),
+    () => myPosts.filter((p) => p.postType === 'blog').slice(0, 6),
     [myPosts],
   );
   const previewImageTextPosts = useMemo(
@@ -278,7 +278,7 @@ export default function MySpace() {
             </div>
 
             {loading ? (
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <ResourceCardSkeleton key={i} />
                 ))}
@@ -297,13 +297,14 @@ export default function MySpace() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4">
                   {resources.map((resource, i) => (
                     <ResourceCard
                       key={resource.id}
                       resource={resource}
                       showSize
                       showDate
+                      showTags
                       showVisibilityTag
                       animationDelay={i * 30}
                     />
@@ -386,7 +387,7 @@ export default function MySpace() {
 
               {loadingPosts ? (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {Array.from({ length: 4 }).map((_, i) => (
+                  {Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="h-44 animate-pulse rounded-2xl bg-theme-soft" />
                   ))}
                 </div>

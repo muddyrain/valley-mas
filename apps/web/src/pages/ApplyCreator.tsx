@@ -123,7 +123,7 @@ function ApplicationResult({ app }: { app: CreatorApplicationStatus }) {
         </div>
 
         {/* 底部操作 */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+        <div className="px-6 py-4 bg-theme-primary/5 border-t border-theme-primary/25 flex items-center justify-between">
           {app.status === 'approved' ? (
             <p className="text-sm text-green-700 font-medium">
               🎉 恭喜！请前往「我的空间」开始上传作品
@@ -136,7 +136,7 @@ function ApplicationResult({ app }: { app: CreatorApplicationStatus }) {
           {app.status === 'approved' && (
             <Button
               onClick={() => navigate('/my-space')}
-              className="bg-purple-600 hover:bg-purple-700 text-white text-sm"
+              className="bg-theme-primary hover:bg-theme-primary/80 text-white text-sm"
             >
               前往我的空间
               <ChevronRight className="h-4 w-4 ml-1" />

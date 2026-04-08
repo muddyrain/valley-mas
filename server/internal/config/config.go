@@ -11,23 +11,24 @@ type Config struct {
 	Database DatabaseConfig
 	TOS      TOSConfig
 	JWT      JWTConfig
+	SMTP     SMTPConfig
 	TTS      TTSConfig
 }
 
 type DatabaseConfig struct {
-	Driver      string // mysql, postgres
-	DSN         string
-	SlowLogMs   int
-	AutoMigrate bool
-	MaxOpenConns int
-	MaxIdleConns int
+	Driver             string // mysql, postgres
+	DSN                string
+	SlowLogMs          int
+	AutoMigrate        bool
+	MaxOpenConns       int
+	MaxIdleConns       int
 	ConnMaxLifetimeMin int
 	ConnMaxIdleTimeMin int
-	Host        string
-	Port        string
-	User        string
-	Password    string
-	DBName      string
+	Host               string
+	Port               string
+	User               string
+	Password           string
+	DBName             string
 }
 
 type TOSConfig struct {
@@ -41,6 +42,15 @@ type TOSConfig struct {
 type JWTConfig struct {
 	Secret string
 	Expire int64 // hours
+}
+
+type SMTPConfig struct {
+	Host        string
+	Port        string
+	User        string
+	Pass        string
+	FromName    string
+	FromAddress string
 }
 
 type TTSConfig struct {
@@ -82,6 +92,14 @@ func Load() *Config {
 		JWT: JWTConfig{
 			Secret: getEnv("JWT_SECRET", "valley-secret-key"),
 			Expire: 24 * 7,
+		},
+		SMTP: SMTPConfig{
+			Host:        getEnv("SMTP_HOST", ""),
+			Port:        getEnv("SMTP_PORT", "587"),
+			User:        getEnv("SMTP_USER", ""),
+			Pass:        getEnv("SMTP_PASS", ""),
+			FromName:    getEnv("SMTP_FROM_NAME", "Valley"),
+			FromAddress: getEnv("SMTP_FROM_ADDRESS", ""),
 		},
 		TTS: TTSConfig{
 			BaseURL:      getEnv("TTS_BASE_URL", ""),
