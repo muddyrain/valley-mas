@@ -1,5 +1,7 @@
 import {
   CheckSquare,
+  ChevronLeft,
+  ChevronRight,
   FolderOpen,
   Globe,
   Image as ImageIcon,
@@ -25,6 +27,7 @@ import {
   type MyResource,
   type ResourceVisibility,
 } from '@/api/resource';
+import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import EditResourceDialog from '@/components/EditResourceDialog';
 import EmptyState from '@/components/EmptyState';
 import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
@@ -39,6 +42,7 @@ const RESOURCE_TYPES = [
   { label: '壁纸', value: 'wallpaper' },
   { label: '头像', value: 'avatar' },
 ];
+const PAGE_SIZE = 20;
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -53,6 +57,7 @@ export default function MyResources() {
 
   const [resources, setResources] = useState<MyResource[]>([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [activeType, setActiveType] = useState('');
 
@@ -104,16 +109,13 @@ export default function MyResources() {
       setAlbumsLoading(false);
     }
   }, []);
-  const loadResource = useCallback(async () => {
-    setRefreshing(true);
-    await loadResources(activeType, activeAlbumId);
-    setRefreshing(false);
-  }, []);
   const loadResources = useCallback(
-    async (type = activeType, albumId = activeAlbumId) => {
+    async (type = activeType, albumId = activeAlbumId, nextPage = page) => {
       try {
         setLoading(true);
         const data = await getMyResources({
+          page: nextPage,
+          pageSize: PAGE_SIZE,
           type: type || undefined,
           albumId: albumId || undefined,
         });
@@ -125,15 +127,28 @@ export default function MyResources() {
         setLoading(false);
       }
     },
-    [activeType, activeAlbumId],
+    [activeType, activeAlbumId, page],
   );
+  const loadResource = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadResources(activeType, activeAlbumId, page);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [activeAlbumId, activeType, loadResources, page]);
 
   useEffect(() => {
     if (isAuthenticated && user?.role === 'creator') {
       void loadAlbums();
-      loadResources(activeType, activeAlbumId);
     }
-  }, [isAuthenticated, user, activeType, activeAlbumId, loadResources, loadAlbums]);
+  }, [isAuthenticated, user, loadAlbums]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.role === 'creator') {
+      void loadResources(activeType, activeAlbumId, page);
+    }
+  }, [isAuthenticated, user, activeType, activeAlbumId, page, loadResources]);
 
   // 从详情页跳转过来时自动打开编辑弹框
   useEffect(() => {
@@ -156,7 +171,11 @@ export default function MyResources() {
       await deleteResource(deleteTarget.id);
       toast.success('删除成功');
       setDeleteTarget(null);
-      loadResources(activeType, activeAlbumId);
+      if (resources.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        void loadResources(activeType, activeAlbumId, page);
+      }
     } catch {
       // 错误已在 request.ts 中通过 toast 显示
     } finally {
@@ -196,7 +215,11 @@ export default function MyResources() {
       const result = await batchDeleteResources(ids);
       toast.success(`已删除 ${result.deleted} 个资源`);
       handleExitBatch();
-      loadResources(activeType, activeAlbumId);
+      if (selectedIds.size >= resources.length && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        void loadResources(activeType, activeAlbumId, page);
+      }
     } catch {
       // 错误已在 request.ts 中通过 toast 显示
     } finally {
@@ -233,9 +256,11 @@ export default function MyResources() {
   const selectedCount = selectedIds.size;
   const allSelected = resources.length > 0 && selectedIds.size === resources.length;
   const activeAlbum = albums.find((a) => a.id === activeAlbumId);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const handleAlbumClick = (albumId: string) => {
     if (batchMode) handleExitBatch();
+    setPage(1);
     setActiveAlbumId(albumId);
   };
 
@@ -423,6 +448,7 @@ export default function MyResources() {
                 options={RESOURCE_TYPES}
                 value={activeType}
                 onChange={(v) => {
+                  setPage(1);
                   setActiveType(v);
                   if (batchMode) handleExitBatch();
                 }}
@@ -431,99 +457,140 @@ export default function MyResources() {
                 className="mb-6"
               />
 
-              {loading ? (
-                <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <ResourceCardSkeleton key={i} />
-                  ))}
-                </div>
-              ) : resources.length === 0 ? (
-                <div className="rounded-4xl bg-white/60 p-4">
-                  <EmptyState
-                    icon={activeAlbum ? FolderOpen : ImageIcon}
-                    title={
-                      activeAlbum ? `专辑「${activeAlbum.name}」暂无资源` : '还没有上传任何资源'
-                    }
-                    description={
-                      activeAlbum
-                        ? '可以前往专辑管理页把资源加入此专辑。'
-                        : '点击右上角「上传新资源」，把第一张壁纸或头像放进来。'
-                    }
-                    actionLabel={activeAlbum ? '管理专辑' : '立即上传'}
-                    onAction={
-                      activeAlbum ? () => navigate('/my-space/albums') : () => setUploadOpen(true)
-                    }
-                  />
-                </div>
-              ) : (
-                <>
-                  {/* 批量操作工具栏 */}
-                  {batchMode && (
-                    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-theme-soft-strong bg-theme-soft/40 px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={handleSelectAll}
-                        className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-theme-primary transition-colors"
-                      >
-                        {allSelected ? (
-                          <CheckSquare className="h-4 w-4 text-theme-primary" />
-                        ) : (
-                          <Square className="h-4 w-4" />
-                        )}
-                        {allSelected ? '取消全选' : '全选'}
-                      </button>
-                      <span className="text-sm text-slate-400">
-                        已选{' '}
-                        <span className="font-semibold text-theme-primary">{selectedCount}</span> 个
-                      </span>
-                      <div className="ml-auto flex flex-wrap items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={selectedCount === 0 || batchUpdatingVisibility}
-                          onClick={() => setBatchVisibilityOpen(true)}
-                          className="gap-1.5 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary"
-                        >
-                          <Globe className="h-3.5 w-3.5" />
-                          设置访问范围
-                        </Button>
-                        <Button
-                          size="sm"
-                          disabled={selectedCount === 0 || batchDeleting}
-                          onClick={handleBatchDelete}
-                          className="gap-1.5 bg-red-500 text-white hover:bg-red-600"
-                        >
-                          {batchDeleting ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-3.5 w-3.5" />
-                          )}
-                          批量删除
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
+              <div className="relative min-h-[320px]">
+                {loading ? (
                   <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
-                    {resources.map((resource, i) => (
-                      <ResourceCard
-                        key={resource.id}
-                        resource={resource}
-                        onDelete={batchMode ? undefined : setDeleteTarget}
-                        onEdit={batchMode ? undefined : handleOpenEdit}
-                        showSize
-                        showDate
-                        showVisibilityTag
-                        showTags
-                        animationDelay={i * 30}
-                        selectable={batchMode}
-                        selected={selectedIds.has(resource.id)}
-                        onSelect={handleSelect}
-                      />
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <ResourceCardSkeleton key={i} />
                     ))}
                   </div>
-                </>
-              )}
+                ) : resources.length === 0 ? (
+                  <div className="rounded-4xl bg-white/60 p-4">
+                    <EmptyState
+                      icon={activeAlbum ? FolderOpen : ImageIcon}
+                      title={
+                        activeAlbum ? `专辑「${activeAlbum.name}」暂无资源` : '还没有上传任何资源'
+                      }
+                      description={
+                        activeAlbum
+                          ? '可以前往专辑管理页把资源加入此专辑。'
+                          : '点击右上角「上传新资源」，把第一张壁纸或头像放进来。'
+                      }
+                      actionLabel={activeAlbum ? '管理专辑' : '立即上传'}
+                      onAction={
+                        activeAlbum ? () => navigate('/my-space/albums') : () => setUploadOpen(true)
+                      }
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {/* 批量操作工具栏 */}
+                    {batchMode && (
+                      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-theme-soft-strong bg-theme-soft/40 px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={handleSelectAll}
+                          className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-theme-primary transition-colors"
+                        >
+                          {allSelected ? (
+                            <CheckSquare className="h-4 w-4 text-theme-primary" />
+                          ) : (
+                            <Square className="h-4 w-4" />
+                          )}
+                          {allSelected ? '取消全选' : '全选'}
+                        </button>
+                        <span className="text-sm text-slate-400">
+                          已选{' '}
+                          <span className="font-semibold text-theme-primary">{selectedCount}</span>{' '}
+                          个
+                        </span>
+                        <div className="ml-auto flex flex-wrap items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={selectedCount === 0 || batchUpdatingVisibility}
+                            onClick={() => setBatchVisibilityOpen(true)}
+                            className="gap-1.5 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary"
+                          >
+                            <Globe className="h-3.5 w-3.5" />
+                            设置访问范围
+                          </Button>
+                          <Button
+                            size="sm"
+                            disabled={selectedCount === 0 || batchDeleting}
+                            onClick={handleBatchDelete}
+                            className="gap-1.5 bg-red-500 text-white hover:bg-red-600"
+                          >
+                            {batchDeleting ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3.5 w-3.5" />
+                            )}
+                            批量删除
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
+                      {resources.map((resource, i) => (
+                        <ResourceCard
+                          key={resource.id}
+                          resource={resource}
+                          onDelete={batchMode ? undefined : setDeleteTarget}
+                          onEdit={batchMode ? undefined : handleOpenEdit}
+                          showSize
+                          showDate
+                          showVisibilityTag
+                          showTags
+                          animationDelay={i * 30}
+                          selectable={batchMode}
+                          selected={selectedIds.has(resource.id)}
+                          onSelect={handleSelect}
+                        />
+                      ))}
+                    </div>
+                    {totalPages > 1 && (
+                      <div className="mt-6 flex items-center justify-center gap-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={page <= 1 || loading}
+                          onClick={() => {
+                            if (batchMode) handleExitBatch();
+                            setPage((prev) => Math.max(1, prev - 1));
+                          }}
+                          className="gap-1.5"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          上一页
+                        </Button>
+                        <span className="text-sm text-slate-500">
+                          第 {page} / {totalPages} 页，共 {total} 项
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={page >= totalPages || loading}
+                          onClick={() => {
+                            if (batchMode) handleExitBatch();
+                            setPage((prev) => Math.min(totalPages, prev + 1));
+                          }}
+                          className="gap-1.5"
+                        >
+                          下一页
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+                <BoxLoadingOverlay
+                  show={loading}
+                  title={resources.length > 0 ? '正在同步资源列表...' : '正在加载资源列表...'}
+                  hint={resources.length > 0 ? '分页和筛选结果更新中' : '首次加载可能稍慢，请稍候'}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -532,7 +599,10 @@ export default function MyResources() {
       <UploadResourceDialog
         open={uploadOpen}
         onOpenChange={setUploadOpen}
-        onSuccess={() => loadResources(activeType, activeAlbumId)}
+        onSuccess={() => {
+          setPage(1);
+          void loadResources(activeType, activeAlbumId, 1);
+        }}
       />
 
       {/* ===== 删除确认弹窗 ===== */}

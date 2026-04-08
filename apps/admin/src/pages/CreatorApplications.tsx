@@ -6,6 +6,7 @@ import {
   SearchOutlined,
 } from '@ant-design/icons';
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -15,6 +16,7 @@ import {
   Modal,
   message,
   Select,
+  Slider,
   Space,
   Table,
   Tag,
@@ -25,7 +27,9 @@ import type { ApplicationStatus, CreatorApplication } from '../api/creator-appli
 import {
   reqGetApplicationDetail,
   reqGetApplicationList,
+  reqGetCreatorApplicationAuditConfig,
   reqReviewApplication,
+  reqUpdateCreatorApplicationAuditConfig,
 } from '../api/creator-application';
 
 const { TextArea } = Input;
@@ -45,6 +49,9 @@ export default function CreatorApplications() {
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [currentApplication, setCurrentApplication] = useState<CreatorApplication | null>(null);
   const [reviewForm] = Form.useForm();
+  const [auditStrictness, setAuditStrictness] = useState(20);
+  const [auditStrictnessLoading, setAuditStrictnessLoading] = useState(false);
+  const [savingAuditStrictness, setSavingAuditStrictness] = useState(false);
 
   // 加载申请列表
   const fetchList = useCallback(async () => {
@@ -69,6 +76,37 @@ export default function CreatorApplications() {
   useEffect(() => {
     fetchList();
   }, [fetchList]);
+
+  const fetchAuditConfig = useCallback(async () => {
+    setAuditStrictnessLoading(true);
+    try {
+      const response = await reqGetCreatorApplicationAuditConfig();
+      setAuditStrictness(response.strictness ?? 20);
+    } catch {
+      message.error('加载 AI 审核配置失败');
+    } finally {
+      setAuditStrictnessLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAuditConfig();
+  }, [fetchAuditConfig]);
+
+  const handleSaveAuditStrictness = async () => {
+    setSavingAuditStrictness(true);
+    try {
+      const response = await reqUpdateCreatorApplicationAuditConfig({
+        strictness: auditStrictness,
+      });
+      setAuditStrictness(response.strictness ?? auditStrictness);
+      message.success('AI 审核严谨度已更新');
+    } catch {
+      message.error('保存 AI 审核严谨度失败');
+    } finally {
+      setSavingAuditStrictness(false);
+    }
+  };
 
   // 查看详情
   const handleViewDetail = async (id: string) => {
@@ -117,6 +155,12 @@ export default function CreatorApplications() {
     const config = statusMap[status];
     return <Tag color={config.color}>{config.text}</Tag>;
   };
+
+  const strictnessLevelText = (() => {
+    if (auditStrictness <= 30) return '宽松（建议新系统初期）';
+    if (auditStrictness <= 70) return '适中';
+    return '严格';
+  })();
 
   // 表格列定义
   const columns: ColumnsType<CreatorApplication> = [
@@ -222,6 +266,37 @@ export default function CreatorApplications() {
     <div>
       <Card>
         <Space direction="vertical" style={{ width: '100%' }} size="large">
+          <Card
+            size="small"
+            title="AI 自动审核设置"
+            loading={auditStrictnessLoading}
+            extra={
+              <Button
+                type="primary"
+                onClick={handleSaveAuditStrictness}
+                loading={savingAuditStrictness}
+              >
+                保存严谨度
+              </Button>
+            }
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Alert
+                type="info"
+                showIcon
+                message={`当前严谨度：${auditStrictness} / 100（${strictnessLevelText}）`}
+                description="严谨度越低，越容易通过；前期建议保持在 20-35。"
+              />
+              <Slider
+                min={0}
+                max={100}
+                step={1}
+                value={auditStrictness}
+                onChange={(value) => setAuditStrictness(Array.isArray(value) ? value[0] : value)}
+              />
+            </Space>
+          </Card>
+
           {/* 筛选区域 */}
           <Space wrap>
             <Input

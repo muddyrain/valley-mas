@@ -2,8 +2,10 @@ import http from '../utils/request';
 
 // 登录请求参数
 export interface LoginParams {
-  username: string;
-  password: string;
+  email: string;
+  password?: string;
+  verificationCode?: string;
+  loginType?: 'code' | 'password';
 }
 
 // 登录响应
@@ -34,6 +36,10 @@ export interface CurrentUser {
 // 登录
 export const reqLogin = (data: LoginParams) => {
   return http.post<unknown, LoginResponse>('/login', data);
+};
+
+export const reqSendEmailCode = (data: { email: string; purpose: 'login' | 'register' }) => {
+  return http.post<unknown, { message: string }>('/email-code/send', data);
 };
 
 // 获取当前用户信息

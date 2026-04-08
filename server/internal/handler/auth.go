@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
@@ -13,8 +16,11 @@ import (
 
 // LoginRequest 登录请求
 type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Email            string `json:"email"`
+	Username         string `json:"username"`
+	Password         string `json:"password"`
+	VerificationCode string `json:"verificationCode"`
+	LoginType        string `json:"loginType"`
 }
 
 // LoginResponse 登录响应
@@ -22,6 +28,8 @@ type LoginResponse struct {
 	Token    string      `json:"token"`
 	UserInfo interface{} `json:"userInfo"`
 }
+
+var usernameSanitizer = regexp.MustCompile(`[^a-z0-9_]+`)
 
 func issueTokenForUser(c *gin.Context, cfg *config.Config, user model.User) (string, error) {
 	token, err := utils.GenerateToken(
@@ -59,6 +67,48 @@ func userInfoPayload(user model.User) gin.H {
 	}
 }
 
+func buildUsernameBaseFromEmail(email string) string {
+	parts := strings.SplitN(strings.ToLower(strings.TrimSpace(email)), "@", 2)
+	base := ""
+	if len(parts) > 0 {
+		base = parts[0]
+	}
+	base = usernameSanitizer.ReplaceAllString(base, "_")
+	base = strings.Trim(base, "_")
+	base = strings.ReplaceAll(base, "__", "_")
+	if base == "" {
+		base = "user"
+	}
+	if len(base) < 3 {
+		base += strings.Repeat("0", 3-len(base))
+	}
+	// Reserve room for suffix like _1234.
+	if len(base) > 12 {
+		base = base[:12]
+	}
+	return base
+}
+
+func resolveUniqueUsernameByEmail(email string) string {
+	db := database.GetDB()
+	base := buildUsernameBaseFromEmail(email)
+
+	for i := 0; i < 10000; i++ {
+		candidate := base
+		if i > 0 {
+			candidate = fmt.Sprintf("%s_%d", base, i)
+		}
+		var count int64
+		db.Model(&model.User{}).Where("username = ?", candidate).Count(&count)
+		if count == 0 {
+			return candidate
+		}
+	}
+
+	// Extremely unlikely fallback.
+	return fmt.Sprintf("user_%d", utils.GenerateID())
+}
+
 // Login 管理员登录
 func Login(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -71,15 +121,22 @@ func Login(cfg *config.Config) gin.HandlerFunc {
 		// 查询用户
 		var user model.User
 		db := database.GetDB()
-		if err := db.Where("username = ?", req.Username).First(&user).Error; err != nil {
-			Error(c, http.StatusUnauthorized, "用户名或密码错误")
-			return
-		}
-
-		// 验证密码
-		if !utils.CheckPassword(req.Password, user.Password) {
-			Error(c, http.StatusUnauthorized, "用户名或密码错误")
-			return
+		email := strings.ToLower(strings.TrimSpace(req.Email))
+		username := strings.TrimSpace(req.Username)
+		if email != "" {
+			if err := db.Where("LOWER(email) = ?", email).First(&user).Error; err != nil {
+				Error(c, http.StatusUnauthorized, "用户名或密码错误")
+				return
+			}
+		} else {
+			if username == "" {
+				Error(c, http.StatusBadRequest, "参数错误")
+				return
+			}
+			if err := db.Where("username = ?", username).First(&user).Error; err != nil {
+				Error(c, http.StatusUnauthorized, "用户名或密码错误")
+				return
+			}
 		}
 
 		// 检查用户状态
@@ -88,37 +145,50 @@ func Login(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
+		loginType := strings.TrimSpace(req.LoginType)
+		if loginType == "" {
+			loginType = "code"
+		}
+
+		if loginType == "password" {
+			if strings.TrimSpace(req.Password) == "" {
+				Error(c, http.StatusBadRequest, "请输入密码")
+				return
+			}
+			if !utils.CheckPassword(req.Password, user.Password) {
+				Error(c, http.StatusUnauthorized, "用户名或密码错误")
+				return
+			}
+		} else {
+			verifyEmail := email
+			if verifyEmail == "" {
+				verifyEmail = strings.ToLower(strings.TrimSpace(user.Email))
+			}
+			if verifyEmail == "" {
+				Error(c, http.StatusBadRequest, "该账号未绑定邮箱，无法验证码登录")
+				return
+			}
+			if strings.TrimSpace(req.VerificationCode) == "" {
+				Error(c, http.StatusBadRequest, "请输入邮箱验证码")
+				return
+			}
+			if err := consumeEmailVerificationCode(verifyEmail, emailCodePurposeLogin, req.VerificationCode); err != nil {
+				Error(c, http.StatusUnauthorized, err.Error())
+				return
+			}
+		}
+
 		// 生成 token (将ID转换为字符串以避免JavaScript精度丢失)
-		token, err := utils.GenerateToken(strconv.FormatInt(int64(user.ID), 10), user.Username, user.Role, cfg.JWT.Secret, cfg.JWT.Expire)
+		token, err := issueTokenForUser(c, cfg, user)
 		if err != nil {
 			Error(c, http.StatusInternalServerError, "生成token失败")
 			return
 		}
 
-		// 将 token 设置到 HttpOnly Cookie 中（兼容旧版本，逐步废弃）
-		// TODO: 后续完全切换为 header 认证后可移除此行
-		c.SetCookie(
-			"token",
-			token,
-			int(cfg.JWT.Expire*3600),
-			"/",
-			"",
-			false,
-			true,
-		)
-
 		// 返回用户信息 + token（admin 端通过 header 携带 token，避免与 web Cookie 冲突）
 		Success(c, gin.H{
-			"token": token,
-			"userInfo": gin.H{
-				"id":       user.ID,
-				"username": user.Username,
-				"nickname": user.Nickname,
-				"avatar":   user.Avatar,
-				"role":     user.Role,
-				"email":    user.Email,
-				"phone":    user.Phone,
-			},
+			"token":    token,
+			"userInfo": userInfoPayload(user),
 		})
 	}
 }
@@ -219,9 +289,11 @@ func Logout() gin.HandlerFunc {
 func Register(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			Username string `json:"username" binding:"required,min=3,max=20"`
-			Password string `json:"password" binding:"required,min=6"`
-			Nickname string `json:"nickname"`
+			Username         string `json:"username" binding:"omitempty,min=3,max=20"`
+			Email            string `json:"email" binding:"required,email,max=100"`
+			Password         string `json:"password" binding:"required,min=6"`
+			VerificationCode string `json:"verificationCode" binding:"required,len=6"`
+			Nickname         string `json:"nickname"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			Error(c, http.StatusBadRequest, "参数错误："+err.Error())
@@ -229,22 +301,37 @@ func Register(cfg *config.Config) gin.HandlerFunc {
 		}
 
 		db := database.GetDB()
+		username := strings.TrimSpace(req.Username)
+		email := strings.ToLower(strings.TrimSpace(req.Email))
+		if err := consumeEmailVerificationCode(email, emailCodePurposeRegister, req.VerificationCode); err != nil {
+			Error(c, http.StatusUnauthorized, err.Error())
+			return
+		}
+		if username == "" {
+			username = resolveUniqueUsernameByEmail(email)
+		}
 
 		// 检查用户名是否已存在
 		var count int64
-		db.Model(&model.User{}).Where("username = ?", req.Username).Count(&count)
+		db.Model(&model.User{}).Where("username = ?", username).Count(&count)
 		if count > 0 {
 			Error(c, http.StatusBadRequest, "用户名已被占用")
+			return
+		}
+		db.Model(&model.User{}).Where("LOWER(email) = ?", email).Count(&count)
+		if count > 0 {
+			Error(c, http.StatusBadRequest, "该邮箱已被使用")
 			return
 		}
 
 		nickname := req.Nickname
 		if nickname == "" {
-			nickname = req.Username
+			nickname = username
 		}
 
 		user := model.User{
-			Username: req.Username,
+			Username: username,
+			Email:    email,
 			Password: utils.HashPassword(req.Password),
 			Nickname: nickname,
 			Role:     "user",
@@ -258,30 +345,15 @@ func Register(cfg *config.Config) gin.HandlerFunc {
 		}
 
 		// 注册成功后自动登录，返回 token
-		token, err := utils.GenerateToken(
-			strconv.FormatInt(int64(user.ID), 10),
-			user.Username,
-			user.Role,
-			cfg.JWT.Secret,
-			cfg.JWT.Expire,
-		)
+		token, err := issueTokenForUser(c, cfg, user)
 		if err != nil {
 			Error(c, http.StatusInternalServerError, "生成token失败")
 			return
 		}
 
-		c.SetCookie("token", token, int(cfg.JWT.Expire*3600), "/", "", false, true)
-
 		Success(c, gin.H{
-			"userInfo": gin.H{
-				"id":       user.ID,
-				"username": user.Username,
-				"nickname": user.Nickname,
-				"avatar":   user.Avatar,
-				"role":     user.Role,
-				"email":    user.Email,
-				"phone":    user.Phone,
-			},
+			"token":    token,
+			"userInfo": userInfoPayload(user),
 		})
 	}
 }

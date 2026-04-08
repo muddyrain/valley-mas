@@ -133,6 +133,7 @@ func autoMigrate() error {
 		&model.DownloadRecord{},
 		&model.CodeAccessLog{},
 		&model.CreatorApplication{},
+		&model.CreatorAuditConfig{},
 		&model.UserFavorite{},
 		&model.UserFollow{},
 		&model.UserAvatarHistory{},

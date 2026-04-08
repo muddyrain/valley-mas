@@ -1,8 +1,8 @@
-import { ArrowRight, Eye, EyeOff, Lock, Sparkles, User } from 'lucide-react';
+﻿import { ArrowRight, Eye, EyeOff, Lock, Mail, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { login } from '@/api/auth';
+import { login, sendEmailCode } from '@/api/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,8 +14,6 @@ export default function Login() {
   const setAuth = useAuthStore((state) => state.setAuth);
   const setTheme = useThemeStore((state) => state.setTheme);
 
-  // 首次进入（localStorage 无 valley_theme 记录）默认切换到 amber
-  // setTheme 是 zustand stable 引用，只需挂载时执行一次
   useEffect(() => {
     const raw = localStorage.getItem('valley_theme');
     const saved = raw ? (JSON.parse(raw) as { state?: { theme?: string } })?.state?.theme : null;
@@ -27,26 +25,80 @@ export default function Login() {
   }, [setTheme]);
 
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: '',
+    verificationCode: '',
   });
+  const [loginType, setLoginType] = useState<'code' | 'password'>('code');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [codeCountdown, setCodeCountdown] = useState(0);
+
+  useEffect(() => {
+    if (codeCountdown <= 0) return;
+    const timer = window.setTimeout(() => setCodeCountdown((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [codeCountdown]);
+
+  const handleSendCode = async () => {
+    const email = formData.email.trim();
+    if (!email) {
+      toast.error('请先输入邮箱');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('请输入正确的邮箱地址');
+      return;
+    }
+
+    try {
+      setSendingCode(true);
+      await sendEmailCode({ email, purpose: 'login' });
+      setCodeCountdown(60);
+      toast.success('验证码已发送');
+    } catch (error) {
+      console.error('发送验证码失败:', error);
+    } finally {
+      setSendingCode(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.username || !formData.password) {
-      toast.error('请输入用户名和密码');
+    const email = formData.email.trim();
+    if (!email) {
+      toast.error('请输入邮箱');
+      return;
+    }
+
+    if (loginType === 'password') {
+      if (!formData.password) {
+        toast.error('请输入密码');
+        return;
+      }
+    } else if (!formData.verificationCode.trim()) {
+      toast.error('请输入邮箱验证码');
       return;
     }
 
     try {
       setLoading(true);
-      const { token, userInfo } = await login({
-        username: formData.username,
-        password: formData.password,
-      });
+      const payload =
+        loginType === 'password'
+          ? {
+              email,
+              password: formData.password,
+              loginType: 'password' as const,
+            }
+          : {
+              email,
+              verificationCode: formData.verificationCode.trim(),
+              loginType: 'code' as const,
+            };
+
+      const { token, userInfo } = await login(payload);
       setAuth(userInfo, token);
       toast.success('登录成功！');
       navigate('/');
@@ -56,6 +108,12 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  const codeButtonText = sendingCode
+    ? '发送中...'
+    : codeCountdown > 0
+      ? `${codeCountdown}s`
+      : '发送验证码';
 
   return (
     <div className="relative min-h-screen flex">
@@ -167,56 +225,115 @@ export default function Login() {
               <p className="text-slate-500 mt-1.5 text-sm">登录账号，继续探索</p>
             </div>
 
+            <div className="mb-5 grid grid-cols-2 rounded-2xl border border-theme-shell-border bg-gradient-to-r from-theme-soft/70 via-white to-theme-soft/70 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+              <button
+                type="button"
+                onClick={() => setLoginType('code')}
+                className={`h-9 rounded-lg text-sm font-medium transition-colors ${
+                  loginType === 'code'
+                    ? 'bg-white text-slate-900 shadow-[0_8px_18px_rgba(var(--theme-primary-rgb),0.22)]'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                邮箱验证码登录
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginType('password')}
+                className={`h-9 rounded-lg text-sm font-medium transition-colors ${
+                  loginType === 'password'
+                    ? 'bg-white text-slate-900 shadow-[0_8px_18px_rgba(var(--theme-primary-rgb),0.22)]'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                密码登录
+              </button>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-1.5">
-                <Label htmlFor="username" className="text-slate-700 text-sm font-medium">
-                  用户名
+                <Label htmlFor="email" className="text-slate-700 text-sm font-medium">
+                  邮箱
                 </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
-                    id="username"
-                    type="text"
-                    placeholder="请输入用户名"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    className="pl-10 h-12 border-theme-border bg-theme-soft/60 focus-visible:ring-theme-primary/40 focus-visible:border-theme-primary"
+                    id="email"
+                    type="email"
+                    placeholder="请输入邮箱"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="pl-10 h-12 rounded-xl border-theme-border/80 bg-theme-soft/80 shadow-[0_6px_18px_rgba(var(--theme-primary-rgb),0.08)] transition-all focus-visible:ring-theme-primary/50 focus-visible:border-theme-primary focus-visible:shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.16)]"
                   />
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="password" className="text-slate-700 text-sm font-medium">
-                  密码
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="请输入密码"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="pl-10 pr-11 h-12 border-theme-border bg-theme-soft/60 focus-visible:ring-theme-primary/40 focus-visible:border-theme-primary"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+              {loginType === 'password' ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="password" className="text-slate-700 text-sm font-medium">
+                    密码
+                  </Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="请输入密码"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      className="pl-10 pr-11 h-12 border-theme-border bg-theme-soft/60 focus-visible:ring-theme-primary/40 focus-visible:border-theme-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1.5 rounded-2xl border border-theme-shell-border bg-gradient-to-br from-theme-soft/70 via-white to-theme-soft/30 p-3 shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.10)]">
+                  <Label htmlFor="verificationCode" className="text-slate-700 text-sm font-medium">
+                    邮箱验证码
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="verificationCode"
+                      type="text"
+                      placeholder="请输入6位验证码"
+                      value={formData.verificationCode}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          verificationCode: e.target.value.replace(/\D/g, '').slice(0, 6),
+                        })
+                      }
+                      className="h-12 rounded-xl border-theme-border/80 bg-white tracking-[0.32em] text-center text-base font-semibold shadow-[0_6px_18px_rgba(var(--theme-primary-rgb),0.08)] transition-all focus-visible:ring-theme-primary/50 focus-visible:border-theme-primary focus-visible:shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.14)]"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-12 shrink-0 rounded-xl border-theme-primary/35 bg-white/90 px-4 text-theme-primary shadow-[0_6px_18px_rgba(var(--theme-primary-rgb),0.12)] transition-all hover:bg-theme-soft hover:text-theme-primary-hover hover:shadow-[0_10px_22px_rgba(var(--theme-primary-rgb),0.2)]"
+                      onClick={handleSendCode}
+                      disabled={sendingCode || codeCountdown > 0}
+                    >
+                      {codeButtonText}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {loginType === 'password' && (
+                <div className="flex justify-end">
+                  <Link
+                    to="/forgot-password"
+                    className="text-sm text-theme-primary hover:text-theme-primary-hover font-medium transition-colors"
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+                    忘记密码？
+                  </Link>
                 </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Link
-                  to="/forgot-password"
-                  className="text-sm text-theme-primary hover:text-theme-primary-hover font-medium transition-colors"
-                >
-                  忘记密码？
-                </Link>
-              </div>
+              )}
 
               <Button
                 type="submit"

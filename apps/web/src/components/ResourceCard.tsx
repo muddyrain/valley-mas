@@ -120,6 +120,9 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
   const location = useLocation();
   const favored = isFavorited ?? resource.isFavorited ?? false;
   const [previewOpen, setPreviewOpen] = useState(false);
+  const imageSrc = resource.thumbnailUrl ?? resource.url;
+  const [loadedSrc, setLoadedSrc] = useState('');
+  const imageReady = loadedSrc === imageSrc;
   const visibilityMeta = resource.visibility ? VISIBILITY_META[resource.visibility] : null;
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -162,15 +165,22 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
         }}
       >
         <img
-          src={resource.thumbnailUrl ?? resource.url}
+          src={imageSrc}
           alt=""
           aria-hidden
           className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover scale-110 blur-xl opacity-40"
         />
+        {!imageReady && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_18%_20%,rgba(var(--theme-primary-rgb),0.14),transparent_38%),linear-gradient(180deg,rgba(15,23,42,0.20),rgba(15,23,42,0.36))]">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/35 border-t-white border-r-white/80" />
+          </div>
+        )}
         <img
-          src={resource.thumbnailUrl ?? resource.url}
+          src={imageSrc}
           alt={resource.title}
-          className="relative h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          className={`relative h-full w-full object-cover transition-[transform,opacity] duration-500 group-hover:scale-105 ${imageReady ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => setLoadedSrc(imageSrc)}
+          onError={() => setLoadedSrc(imageSrc)}
           loading="lazy"
         />
 

@@ -57,13 +57,24 @@ export interface GetApplicationListParams {
   keyword?: string;
 }
 
+export interface CreatorApplicationAuditConfig {
+  strictness: number;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
 // 提交创作者申请
 export const reqSubmitApplication = (params: SubmitApplicationParams) => {
-  return request.post<{
-    id: string;
-    status: string;
-    createdAt: string;
-  }>('/creator/application', params);
+  return request.post<
+    unknown,
+    {
+      id: string;
+      status: ApplicationStatus;
+      createdAt: string;
+      reviewedAt?: string;
+      reviewNote?: string;
+    }
+  >('/creator/application', params);
 };
 
 // 获取我的申请状态
@@ -94,8 +105,23 @@ export const reqReviewApplication = (id: string, params: ReviewApplicationParams
   return request.post<
     unknown,
     {
-      status: string;
-      reviewedAt: string;
+      status: ApplicationStatus;
+      reviewedAt?: string;
     }
   >(`/admin/creator-applications/${id}/review`, params);
+};
+
+// 获取 AI 自动审核配置（管理员）
+export const reqGetCreatorApplicationAuditConfig = () => {
+  return request.get<unknown, CreatorApplicationAuditConfig>(
+    '/admin/creator-application-audit-config',
+  );
+};
+
+// 更新 AI 自动审核配置（管理员）
+export const reqUpdateCreatorApplicationAuditConfig = (params: { strictness: number }) => {
+  return request.put<unknown, CreatorApplicationAuditConfig>(
+    '/admin/creator-application-audit-config',
+    params,
+  );
 };

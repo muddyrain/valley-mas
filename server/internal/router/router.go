@@ -60,6 +60,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 		api.POST("/login", handler.Login(cfg))
 		api.POST("/register", handler.Register(cfg))
+		api.POST("/email-code/send", handler.SendEmailVerificationCode(cfg))
 		api.POST("/code/verify", handler.VerifyCode)
 		api.GET("/creator/:code/resources", middleware.OptionalAuth(cfg), handler.GetCreatorResources)
 
@@ -157,6 +158,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.GET("/creator-applications", handler.ListCreatorApplications)
 				adminOnly.GET("/creator-applications/:id", handler.GetCreatorApplicationDetail)
 				adminOnly.POST("/creator-applications/:id/review", handler.ReviewCreatorApplication)
+				adminOnly.GET("/creator-application-audit-config", handler.GetCreatorApplicationAuditConfig)
+				adminOnly.PUT("/creator-application-audit-config", handler.UpdateCreatorApplicationAuditConfig)
 
 				adminOnly.GET("/stats", handler.GetStats)
 				adminOnly.GET("/trends", handler.GetTrends)

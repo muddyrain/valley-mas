@@ -56,8 +56,14 @@ export default function ApplyCreator() {
     try {
       const values = await form.validateFields();
       setSubmitting(true);
-      await reqSubmitApplication(values);
-      message.success('申请提交成功，请等待管理员审核');
+      const submitResult = await reqSubmitApplication(values);
+      if (submitResult.status === 'approved') {
+        message.success('申请已通过自动审核，创作者权限已开通');
+      } else if (submitResult.status === 'rejected') {
+        message.warning(submitResult.reviewNote || '申请未通过自动审核，请修改后重试');
+      } else {
+        message.success('申请提交成功，正在审核中');
+      }
       form.resetFields();
       fetchMyApplication();
     } catch (error) {
