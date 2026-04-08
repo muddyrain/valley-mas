@@ -11,7 +11,7 @@ import {
   User,
   XCircle,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -50,9 +50,15 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // 已有申请记录展示
-function ApplicationResult({ app }: { app: CreatorApplicationStatus }) {
-  const navigate = useNavigate();
-
+function ApplicationResult({
+  app,
+  enteringMySpace,
+  onEnterMySpace,
+}: {
+  app: CreatorApplicationStatus;
+  enteringMySpace: boolean;
+  onEnterMySpace: () => Promise<void>;
+}) {
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -135,11 +141,21 @@ function ApplicationResult({ app }: { app: CreatorApplicationStatus }) {
           )}
           {app.status === 'approved' && (
             <Button
-              onClick={() => navigate('/my-space')}
+              onClick={() => void onEnterMySpace()}
+              disabled={enteringMySpace}
               className="bg-theme-primary hover:bg-theme-primary/80 text-white text-sm"
             >
-              前往我的空间
-              <ChevronRight className="h-4 w-4 ml-1" />
+              {enteringMySpace ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  刷新中...
+                </>
+              ) : (
+                <>
+                  前往我的空间
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </>
+              )}
             </Button>
           )}
         </div>
@@ -159,6 +175,7 @@ export default function ApplyCreator() {
   // 从 store 读取已缓存的 profile（其他页面可能已经加载过）
   const profile = useAuthStore((s) => s.profile);
   const fetchProfile = useAuthStore((s) => s.fetchProfile);
+  const refreshUserState = useAuthStore((s) => s.refreshUserState);
   // persist 水合完成标志——水合前不能依赖 isAuthenticated 做决策
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
 
@@ -166,6 +183,7 @@ export default function ApplyCreator() {
     undefined,
   ); // undefined=加载中
   const [submitting, setSubmitting] = useState(false);
+  const [enteringMySpace, setEnteringMySpace] = useState(false);
 
   const [form, setForm] = useState({
     name: '',
@@ -213,6 +231,23 @@ export default function ApplyCreator() {
       setForm((f) => (f.name ? f : { ...f, name: nickname }));
     }
   }, [profile?.nickname, user?.nickname]);
+
+  const handleEnterMySpace = useCallback(async () => {
+    try {
+      setEnteringMySpace(true);
+      const latestUser = await refreshUserState();
+      const latestRole = latestUser?.role ?? useAuthStore.getState().profile?.role;
+      if (latestRole === 'creator' || latestRole === 'admin') {
+        navigate('/my-space');
+        return;
+      }
+      toast.error('用户权限还在刷新，请稍后重试');
+    } catch {
+      toast.error('刷新用户信息失败，请稍后重试');
+    } finally {
+      setEnteringMySpace(false);
+    }
+  }, [navigate, refreshUserState]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,7 +320,11 @@ export default function ApplyCreator() {
 
       {/* 已有申请记录 */}
       {existingApp ? (
-        <ApplicationResult app={existingApp} />
+        <ApplicationResult
+          app={existingApp}
+          enteringMySpace={enteringMySpace}
+          onEnterMySpace={handleEnterMySpace}
+        />
       ) : (
         /* 申请表单 */
         <div className="max-w-2xl mx-auto px-4 py-10">

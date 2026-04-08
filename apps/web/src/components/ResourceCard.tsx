@@ -14,6 +14,7 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ImagePreviewDialog from '@/components/ImagePreviewDialog';
+import MediaLoadingOverlay from '@/components/MediaLoadingOverlay';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -170,11 +171,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
           aria-hidden
           className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover scale-110 blur-xl opacity-40"
         />
-        {!imageReady && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_18%_20%,rgba(var(--theme-primary-rgb),0.14),transparent_38%),linear-gradient(180deg,rgba(15,23,42,0.20),rgba(15,23,42,0.36))]">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/35 border-t-white border-r-white/80" />
-          </div>
-        )}
+        <MediaLoadingOverlay show={!imageReady} />
         <img
           src={imageSrc}
           alt={resource.title}
