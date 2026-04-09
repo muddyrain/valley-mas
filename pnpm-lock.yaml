@@ -123,6 +123,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.62.0
         version: 5.90.21(react@19.2.4)
+      '@valley/format-tools':
+        specifier: workspace:*
+        version: link:../../packages/format-tools
       '@valley/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -202,6 +205,15 @@ importers:
       vite:
         specifier: catalog:vite-6
         version: 6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
+
+  packages/format-tools:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(@swc/core@1.15.17)(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
   packages/shared:
     devDependencies:

@@ -10,16 +10,16 @@ export const THEME_OPTIONS: Array<{
   preview: [string, string];
 }> = [
   {
-    value: 'amber',
-    label: '暖金',
-    description: '温润、干净、适合内容型页面',
-    preview: ['#cb8b3c', '#fff5e9'],
-  },
-  {
     value: 'rose',
     label: '雾粉',
     description: '更柔和，也更偏轻盈',
     preview: ['#c87485', '#fff1f4'],
+  },
+  {
+    value: 'amber',
+    label: '暖金',
+    description: '温润、干净、适合内容型页面',
+    preview: ['#cb8b3c', '#fff5e9'],
   },
   {
     value: 'ocean',
@@ -48,7 +48,7 @@ export const applyThemeToDocument = (theme: ThemePreset) => {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
-      theme: 'amber',
+      theme: 'rose',
       setTheme: (theme) => {
         applyThemeToDocument(theme);
         set({ theme });

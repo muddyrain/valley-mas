@@ -20,8 +20,8 @@ import {
 } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBeforeUnload, useNavigate, useParams } from 'react-router-dom';
-import type { Category, CreatePostData, PostType, Tag as TagType, Visibility } from '@/api/blog';
-import { createPost, getAdminPostDetail, getCategories, getTags, updatePost } from '@/api/blog';
+import type { Category, CreatePostData, PostType, Visibility } from '@/api/blog';
+import { createPost, getAdminPostDetail, getCategories, updatePost } from '@/api/blog';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -37,7 +37,6 @@ type EditorFormValues = {
   categoryId: string;
   status: 'draft' | 'published' | 'archived';
   isTop: boolean;
-  tagIds?: string[];
 };
 
 type LocalUserInfo = {
@@ -57,7 +56,6 @@ type Snapshot = {
   categoryId: string;
   status: 'draft' | 'published' | 'archived';
   isTop: boolean;
-  tagIds: string[];
   content: string;
 };
 
@@ -72,7 +70,6 @@ const defaultValues: EditorFormValues = {
   categoryId: '',
   status: 'draft',
   isTop: false,
-  tagIds: [],
 };
 
 const IMAGE_TEXT_TEMPLATES = [
@@ -108,7 +105,6 @@ function makeSnapshot(values: Partial<EditorFormValues>, content: string): Snaps
     categoryId: values.categoryId || '',
     status: values.status || 'draft',
     isTop: Boolean(values.isTop),
-    tagIds: [...(values.tagIds || [])].sort(),
     content: content || '',
   };
 }
@@ -126,7 +122,6 @@ export default function BlogPostEdit() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [tags, setTags] = useState<TagType[]>([]);
   const [content, setContent] = useState('');
   const [initialSnapshot, setInitialSnapshot] = useState<Snapshot>(makeSnapshot(defaultValues, ''));
   const bypassNavigationGuardRef = useRef(false);
@@ -136,7 +131,7 @@ export default function BlogPostEdit() {
   const postType = watchedValues?.postType || 'blog';
 
   useEffect(() => {
-    void loadCategoriesAndTags();
+    void loadCategories();
   }, []);
 
   useEffect(() => {
@@ -224,14 +219,13 @@ export default function BlogPostEdit() {
   const charCount = useMemo(() => countReadableChars(content), [content]);
   const readingMinutes = useMemo(() => Math.max(1, Math.ceil(charCount / 500)), [charCount]);
 
-  const loadCategoriesAndTags = async () => {
+  const loadCategories = async () => {
     try {
-      const [categoriesData, tagsData] = await Promise.all([getCategories(), getTags()]);
+      const categoriesData = await getCategories();
       setCategories(categoriesData || []);
-      setTags(tagsData || []);
     } catch (error) {
-      console.error('Failed to load categories and tags:', error);
-      message.error('加载分类和标签失败');
+      console.error('Failed to load categories:', error);
+      message.error('加载分类失败');
     }
   };
 
@@ -250,7 +244,6 @@ export default function BlogPostEdit() {
         categoryId: post.categoryId,
         status: post.status,
         isTop: post.isTop,
-        tagIds: post.tags?.map((t) => t.id) || [],
       };
 
       form.setFieldsValue(values);
@@ -295,7 +288,6 @@ export default function BlogPostEdit() {
       const payload: CreatePostData = {
         ...values,
         content: content || '',
-        tagIds: values.tagIds || [],
         status: publishNow ? 'published' : values.status,
         publishNow,
       };
@@ -375,13 +367,6 @@ export default function BlogPostEdit() {
           <div className="flex min-w-[100px] flex-col">
             <Text className="text-xs text-slate-500">预计阅读</Text>
             <Text className="text-lg font-semibold text-slate-900">{readingMinutes} 分钟</Text>
-          </div>
-          <Divider type="vertical" className="mx-3 h-7" />
-          <div className="flex min-w-[100px] flex-col">
-            <Text className="text-xs text-slate-500">标签</Text>
-            <Text className="text-lg font-semibold text-slate-900">
-              {(watchedValues?.tagIds || []).length}
-            </Text>
           </div>
         </div>
 
@@ -510,16 +495,6 @@ export default function BlogPostEdit() {
                 </Card>
 
                 <Card className="rounded-xl border border-slate-200" title="可选信息">
-                  <Form.Item label="标签" name="tagIds">
-                    <Select
-                      mode="multiple"
-                      allowClear
-                      maxTagCount="responsive"
-                      placeholder="选择标签（可选）"
-                      options={tags.map((tag) => ({ label: tag.name, value: tag.id }))}
-                    />
-                  </Form.Item>
-
                   <Form.Item label="摘要" name="excerpt">
                     <TextArea
                       placeholder="列表页展示的简短摘要（可选）"

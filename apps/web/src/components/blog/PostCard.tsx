@@ -1,4 +1,4 @@
-import { Calendar, Tag, User } from 'lucide-react';
+import { Calendar, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import type { PostMeta } from '@/types/blog';
@@ -56,14 +56,6 @@ export function PostCard({ post }: PostCardProps) {
                 </div>
               )}
             </div>
-
-            {post.tags.length > 0 && (
-              <div className="flex items-center gap-1">
-                <Tag className="w-3.5 h-3.5" />
-                <span>{post.tags.slice(0, 2).join(', ')}</span>
-                {post.tags.length > 2 && <span>+{post.tags.length - 2}</span>}
-              </div>
-            )}
           </div>
         </div>
       </Link>

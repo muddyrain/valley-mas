@@ -1,4 +1,5 @@
 ﻿import {
+  ArrowLeftRight,
   Bell,
   BookOpen,
   CheckCheck,
@@ -272,6 +273,20 @@ export default function Header() {
             >
               <MessageCircleHeart className="h-4 w-4" />
               <span className="hidden sm:inline">留言墙</span>
+            </Button>
+          </Link>
+
+          <Link to="/tools/format">
+            <Button
+              variant="ghost"
+              className={`gap-2 transition-colors ${
+                location.pathname.startsWith('/tools/format')
+                  ? 'bg-theme-soft text-theme-primary-hover'
+                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
+              }`}
+            >
+              <ArrowLeftRight className="h-4 w-4" />
+              <span className="hidden sm:inline">格式转换</span>
             </Button>
           </Link>
         </nav>

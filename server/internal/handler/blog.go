@@ -134,6 +134,7 @@ func GetPosts(c *gin.Context) {
 	categorySlug := c.Query("category")
 	tagSlug := c.Query("tag")
 	keyword := c.Query("keyword")
+	sort := strings.TrimSpace(c.Query("sort"))
 	postType := ""
 	if raw := strings.TrimSpace(c.Query("postType")); raw != "" {
 		postType = normalizePostType(raw)
@@ -193,8 +194,13 @@ func GetPosts(c *gin.Context) {
 	var total int64
 	query.Count(&total)
 
+	orderExpr := "is_top DESC, COALESCE(published_at, created_at) DESC"
+	if strings.EqualFold(sort, "oldest") {
+		orderExpr = "is_top DESC, COALESCE(published_at, created_at) ASC"
+	}
+
 	var posts []model.Post
-	query.Order("is_top DESC, published_at DESC").
+	query.Order(orderExpr).
 		Limit(pageSize).
 		Offset(offset).
 		Find(&posts)
@@ -1001,6 +1007,7 @@ func AdminGetPosts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
 	status := c.Query("status")
+	groupIDRaw := strings.TrimSpace(c.Query("groupId"))
 	postType := ""
 	if raw := strings.TrimSpace(c.Query("postType")); raw != "" {
 		postType = normalizePostType(raw)
@@ -1034,6 +1041,11 @@ func AdminGetPosts(c *gin.Context) {
 	}
 	if status != "" {
 		query = query.Where("status = ?", status)
+	}
+	if groupIDRaw != "" {
+		if groupID, err := strconv.ParseInt(groupIDRaw, 10, 64); err == nil {
+			query = query.Where("group_id = ?", groupID)
+		}
 	}
 	if postType != "" {
 		query = query.Where("post_type = ?", postType)
