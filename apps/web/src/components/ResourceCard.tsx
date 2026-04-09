@@ -240,6 +240,31 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
   const [loadedSrc, setLoadedSrc] = useState('');
   const imageReady = loadedSrc === imageSrc;
   const visibilityMeta = resource.visibility ? VISIBILITY_META[resource.visibility] : null;
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const [titleOverflow, setTitleOverflow] = useState(false);
+
+  const refreshTitleOverflow = useCallback(() => {
+    const titleNode = titleRef.current;
+    if (!titleNode) {
+      setTitleOverflow(false);
+      return;
+    }
+    setTitleOverflow(titleNode.scrollWidth > titleNode.clientWidth + 1);
+  }, []);
+
+  useLayoutEffect(() => {
+    const titleNode = titleRef.current;
+    if (!titleNode) {
+      setTitleOverflow(false);
+      return;
+    }
+
+    refreshTitleOverflow();
+
+    const observer = new ResizeObserver(refreshTitleOverflow);
+    observer.observe(titleNode);
+    return () => observer.disconnect();
+  }, [resource.title, refreshTitleOverflow]);
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -386,7 +411,12 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
       </div>
 
       <CardContent className={contentPadding}>
-        <h3 className="mb-1.5 truncate text-sm font-medium text-gray-900 transition-colors group-hover:text-theme-primary">
+        <h3
+          ref={titleRef}
+          title={titleOverflow ? resource.title : undefined}
+          onMouseEnter={refreshTitleOverflow}
+          className="mb-1.5 truncate text-sm font-medium text-gray-900 transition-colors group-hover:text-theme-primary"
+        >
           {resource.title}
         </h3>
 
