@@ -865,7 +865,7 @@ export default function BlogCreate() {
                       <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                         <div
                           ref={coverViewportRef}
-                          className="relative aspect-[5/2] w-full overflow-hidden"
+                          className="relative aspect-5/2.5 w-full overflow-hidden"
                         >
                           <img
                             src={coverObjectUrl || cover}

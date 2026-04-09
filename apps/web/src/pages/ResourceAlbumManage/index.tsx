@@ -123,7 +123,7 @@ function ResourcePicker({
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className="relative flex h-full flex-col gap-3">
       {/* 搜索 + 类型筛选 */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1">
@@ -282,13 +282,6 @@ function ResourcePicker({
             })}
           </div>
         )}
-        <BoxLoadingOverlay
-          show={fetching && resources.length > 0}
-          title="正在同步资源库..."
-          hint="筛选结果更新中"
-          compact
-          className="rounded-2xl"
-        />
       </div>
 
       {/* 分页 */}
@@ -317,6 +310,13 @@ function ResourcePicker({
           </div>
         </div>
       )}
+      <BoxLoadingOverlay
+        show={fetching}
+        title="正在同步资源库..."
+        hint="筛选结果更新中"
+        compact
+        className="rounded-2xl"
+      />
     </div>
   );
 }

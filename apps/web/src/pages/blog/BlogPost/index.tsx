@@ -577,10 +577,10 @@ export default function BlogPost() {
                 <img
                   src={post.cover}
                   alt={post.title}
-                  className="h-[320px] w-full object-cover sm:h-[420px]"
+                  className="h-64 w-full object-cover sm:h-80"
                 />
               ) : (
-                <DefaultBlogCover className="h-[320px] sm:h-[420px]" />
+                <DefaultBlogCover className="h-64 sm:h-80" />
               )}
             </div>
           </section>
