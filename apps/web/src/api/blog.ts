@@ -134,6 +134,7 @@ export interface PostListParams {
   tag?: string;
   keyword?: string;
   postType?: PostType;
+  sort?: 'newest' | 'oldest';
 }
 
 export interface PostListData {
@@ -279,7 +280,13 @@ export function deletePost(id: string) {
 }
 
 export function getAdminPosts(
-  params: { page?: number; pageSize?: number; status?: string; postType?: PostType } = {},
+  params: {
+    page?: number;
+    pageSize?: number;
+    status?: string;
+    postType?: PostType;
+    groupId?: string;
+  } = {},
 ) {
   return request.get<unknown, PostListData>('/admin/blog/posts', { params });
 }

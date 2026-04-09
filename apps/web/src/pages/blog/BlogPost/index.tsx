@@ -435,19 +435,6 @@ export default function BlogPost() {
                   </p>
                 )}
 
-                {post.tags?.length ? (
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {post.tags.map((tag) => (
-                      <span
-                        key={tag.id}
-                        className="bg-theme-soft text-theme-primary rounded-full px-3 py-1.5 text-sm"
-                      >
-                        #{tag.name}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-
                 <div className="border-theme-soft-strong mt-6 grid gap-3 rounded-[22px] border bg-white/60 p-4 text-sm text-slate-500">
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4" />
@@ -591,19 +578,6 @@ export default function BlogPost() {
               <p className="mt-3 text-sm leading-7 text-slate-600">
                 {excerpt || '这篇文章还没有补充摘要，可以直接从正文开始阅读。'}
               </p>
-
-              {post.tags?.length ? (
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {post.tags.map((tag) => (
-                    <span
-                      key={tag.id}
-                      className="bg-theme-soft text-theme-primary rounded-full px-3 py-1.5 text-sm"
-                    >
-                      #{tag.name}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
             </section>
 
             {toc.length > 0 && (

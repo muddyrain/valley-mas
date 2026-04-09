@@ -90,34 +90,34 @@
    ════════════════════════════════════════════════ */
 
 :root {
-  /* —— 默认主题 = amber —— */
-  --theme-page-start: #fffaf5;
-  --theme-page-mid: #fffefc;
-  --theme-page-cool: #f7fbff;
-  --theme-page-end: #fffaf6;
-  --theme-primary: #b87731;
-  --theme-primary-hover: #a56827;
-  --theme-primary-deep: #8f5c22;
-  --theme-primary-soft: #fff5e9;
-  --theme-primary-soft-strong: #f3dcc0;
-  --theme-surface-alt: #edf6ff;
-  --theme-shell-border: #eedcc8;
-  --theme-border: #e7d8c6;
-  --theme-primary-rgb: 184, 119, 49;
-  --theme-secondary-rgb: 96, 165, 250;
-  --theme-tertiary-rgb: 251, 191, 36;
+  /* —— 默认主题 = rose —— */
+  --theme-page-start: #fff8f9;
+  --theme-page-mid: #fffdfd;
+  --theme-page-cool: #fbf7ff;
+  --theme-page-end: #fff7f8;
+  --theme-primary: #c87485;
+  --theme-primary-hover: #b86476;
+  --theme-primary-deep: #9a4c5e;
+  --theme-primary-soft: #fff0f4;
+  --theme-primary-soft-strong: #f6d7df;
+  --theme-surface-alt: #f3f3ff;
+  --theme-shell-border: #f0d6dc;
+  --theme-border: #ead5db;
+  --theme-primary-rgb: 200, 116, 133;
+  --theme-secondary-rgb: 168, 139, 250;
+  --theme-tertiary-rgb: 244, 114, 182;
   --theme-hero-background: radial-gradient(
     circle at top left,
     rgba(255, 255, 255, 0.96),
-    rgba(255, 248, 240, 0.92) 42%,
-    rgba(243, 248, 255, 0.95) 100%
+    rgba(255, 241, 245, 0.95) 42%,
+    rgba(248, 243, 255, 0.95) 100%
   );
   --theme-panel-background: linear-gradient(
     180deg,
-    rgba(248, 252, 255, 0.96),
-    rgba(255, 255, 255, 0.88)
+    rgba(255, 243, 246, 0.95),
+    rgba(255, 255, 255, 0.9)
   );
-  --theme-panel-border: #d9e7f3;
+  --theme-panel-border: #edd5db;
 
   /* —— shadcn/ui 语义 token（指向主题变量）—— */
   --background: #ffffff;

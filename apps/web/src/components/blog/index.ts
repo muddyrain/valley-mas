@@ -8,5 +8,4 @@ export { MdxMarkdownEditor } from './MdxMarkdownEditor';
 export { PostCard } from './PostCard';
 export { PostComments } from './PostComments';
 export { TableOfContents } from './TableOfContents';
-export { TagCloud } from './TagCloud';
 export { ThemeToggle } from './ThemeToggle';
