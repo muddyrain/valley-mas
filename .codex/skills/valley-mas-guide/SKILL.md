@@ -1,6 +1,6 @@
 ---
 name: valley-mas-guide
-description: Navigate the Valley MAS monorepo and choose the right code entry points, validation commands, and project-specific guardrails. Use when a task touches this repository and Codex would otherwise need to rediscover the app layout, backend/frontend ownership, migration flow, TTS integration, or common verification steps before editing.
+description: Navigate the Valley MAS monorepo and choose the right code entry points, validation commands, and project-specific guardrails. Use when a task touches this repository and Codex would otherwise need to rediscover the app layout, backend/frontend ownership, migration flow, or common verification steps before editing.
 ---
 
 # Valley MAS Guide
@@ -24,8 +24,6 @@ Keep the first pass lightweight:
   Open `server/internal`.
 - Shared TypeScript helpers or cross-app types:
   Open `packages/shared`.
-- Local F5-TTS service or Python-side audio generation:
-  Open `apps/f5-tts`.
 
 If the request is broad or cross-stack, read `references/project-map.md`.
 
@@ -58,5 +56,4 @@ Read `references/project-map.md` when you need:
 - Startup and local run commands
 - Backend handler/database entry points
 - Frontend folder ownership by app
-- TTS-related paths
 - Project-specific gotchas worth checking before coding

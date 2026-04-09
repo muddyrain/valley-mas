@@ -8,7 +8,6 @@ import (
 	"sync"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
-	"valley-server/internal/handler"
 	"valley-server/internal/logger"
 	"valley-server/internal/router"
 	"valley-server/internal/utils"
@@ -54,7 +53,6 @@ func Init() (*config.Config, http.Handler, error) {
 			return
 		}
 
-		handler.InitTTSConfig(globalCfg)
 		globalHTTP = router.Setup(globalCfg)
 	})
 

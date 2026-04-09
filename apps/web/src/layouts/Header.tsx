@@ -1,5 +1,4 @@
 ﻿import {
-  AudioLines,
   Bell,
   BookOpen,
   CheckCheck,
@@ -27,7 +26,6 @@ import {
   markNotificationRead,
   type UserNotification,
 } from '@/api/notification';
-import AiChatAssistant from '@/components/AiChatAssistant';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -276,25 +274,9 @@ export default function Header() {
               <span className="hidden sm:inline">留言墙</span>
             </Button>
           </Link>
-
-          <Link to="/tts">
-            <Button
-              variant="ghost"
-              className={`gap-2 transition-colors ${
-                location.pathname.startsWith('/tts')
-                  ? 'bg-theme-soft text-theme-primary-hover'
-                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
-              }`}
-            >
-              <AudioLines className="h-4 w-4" />
-              <span className="hidden sm:inline">TTS</span>
-            </Button>
-          </Link>
         </nav>
 
         <div className="flex items-center gap-3">
-          {isAuthenticated && <AiChatAssistant />}
-
           <DropdownMenu>
             <DropdownMenuTrigger className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-theme-soft hover:text-theme-primary">
               <Palette className="h-5 w-5" />

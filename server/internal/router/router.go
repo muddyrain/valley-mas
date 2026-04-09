@@ -28,8 +28,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 	{
 		public := api.Group("/public")
 		{
-			registerTTSRoutes(public)
-
 			public.GET("/space/:code", handler.GetCreatorSpace)
 			public.POST("/resource/:id/download", middleware.OptionalAuth(cfg), handler.DownloadResource)
 			public.GET("/hot-creators", handler.GetHotCreators)

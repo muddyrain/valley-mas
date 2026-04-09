@@ -12,7 +12,6 @@ type Config struct {
 	TOS      TOSConfig
 	JWT      JWTConfig
 	SMTP     SMTPConfig
-	TTS      TTSConfig
 }
 
 type DatabaseConfig struct {
@@ -51,14 +50,6 @@ type SMTPConfig struct {
 	Pass        string
 	FromName    string
 	FromAddress string
-}
-
-type TTSConfig struct {
-	BaseURL      string
-	APIKey       string
-	UpstreamPath string
-	OutputDir    string
-	TimeoutSec   int
 }
 
 func Load() *Config {
@@ -100,13 +91,6 @@ func Load() *Config {
 			Pass:        getEnv("SMTP_PASS", ""),
 			FromName:    getEnv("SMTP_FROM_NAME", "Valley"),
 			FromAddress: getEnv("SMTP_FROM_ADDRESS", ""),
-		},
-		TTS: TTSConfig{
-			BaseURL:      getEnv("TTS_BASE_URL", ""),
-			APIKey:       getEnv("TTS_API_KEY", ""),
-			UpstreamPath: getEnv("TTS_UPSTREAM_PATH", "/synthesize"),
-			OutputDir:    getEnv("TTS_OUTPUT_DIR", "./data/tts"),
-			TimeoutSec:   getEnvInt("TTS_TIMEOUT_SEC", 120),
 		},
 	}
 }

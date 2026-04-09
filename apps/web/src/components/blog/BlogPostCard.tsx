@@ -91,7 +91,7 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
         state={{ returnTo, returnLabel, source: mode === 'creator' ? 'my-space' : 'blog-list' }}
         className="block"
       >
-        <div className="relative h-44 overflow-hidden border-b border-slate-100 bg-theme-soft">
+        <div className="relative h-40 overflow-hidden border-b border-slate-100 bg-theme-soft">
           {post.cover ? (
             <img
               src={post.cover}
