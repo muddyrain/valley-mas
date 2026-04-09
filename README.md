@@ -1,42 +1,14 @@
 # Valley MAS
 
-一个以个人内容展示与创作管理为主的站点项目，当前包含博客、图文、资源、AI Chat、TTS 等能力。
+Valley MAS 是一个以个人内容展示与创作管理为核心的网站项目，当前包含博客、图文、资源、AI Chat 等能力。
 
-项目采用：
+## 项目结构
 
 - `apps/web`：前台 Web 站点
-- `apps/admin`：后台管理端
+- `apps/admin`：管理端
 - `server`：Go 服务端
-- `apps/f5-tts`：本地 F5-TTS 能力
-
-当前线上发布方式是：
-
-- `Vercel` 部署
-- 包含 `Go server`
-
-## 当前主要功能
-
-- 内容首页展示
-- 博客与图文内容发布
-- 资源上传、展示与下载
-- 创作空间管理
-- AI Chat 页面
-- TTS 页面与本地 `F5-TTS` 联动
-
-## 目录结构
-
-```text
-valley-mas/
-├─ apps/
-│  ├─ web/
-│  ├─ admin/
-│  └─ f5-tts/
-├─ server/
-├─ packages/
-├─ docs/
-├─ README.md
-└─ QUICK_START.md
-```
+- `packages`：共享包
+- `docs`：项目文档
 
 ## 本地开发
 
@@ -46,7 +18,7 @@ valley-mas/
 pnpm install
 ```
 
-2. 启动 Go 服务端
+2. 启动 Go 服务
 
 ```bash
 cd server
@@ -58,13 +30,6 @@ go run main.go
 ```bash
 cd apps/web
 pnpm dev
-```
-
-4. 启动本地 TTS（可选）
-
-```bash
-cd apps/f5-tts
-scripts\start_local_api.cmd
 ```
 
 ## 常用校验
@@ -82,4 +47,3 @@ go build ./cmd/server
 
 - [QUICK_START.md](./QUICK_START.md)
 - [docs/INDEX.md](./docs/INDEX.md)
-- [apps/f5-tts/LOCAL_API_CN.md](./apps/f5-tts/LOCAL_API_CN.md)

@@ -7,7 +7,6 @@
 - Root workspaces: `apps/*`, `packages/*`
 - Backend language: Go
 - Frontends: React + Vite
-- Local TTS service: Python project in `apps/f5-tts`
 
 ## Main Directories
 
@@ -33,20 +32,12 @@ Admin console for management and operations.
 - Typical validation:
   `pnpm --filter admin exec tsc --noEmit`
 
-### `apps/f5-tts`
-
-Local Python-based TTS service.
-
-- Main files:
-  `pyproject.toml`, `LOCAL_API_CN.md`, `scripts/`, `local_api/`, `src/`
-- Use when the task involves speech synthesis, async progress, or local audio generation.
-
 ### `server`
 
 Go API server and database-facing logic.
 
 - Main focus:
-  auth, users, creators, resources, blogs, uploads/downloads, TTS proxy APIs
+  auth, users, creators, resources, blogs, uploads/downloads
 - Important folders:
   `internal/handler`
   `internal/service`
@@ -131,12 +122,6 @@ Cross-check both:
 - Public browsing and creator self-management are separate surfaces
 - Bugs around "creator can see but public cannot" often involve different endpoints and permission rules
 
-### TTS
-
-- Public APIs exist on the Go server
-- Heavy synthesis runs in the local Python service
-- If progress/streaming is broken, inspect both the Go API layer and `apps/f5-tts`
-
 ## Fast Start Commands
 
 ### Root
@@ -168,13 +153,6 @@ pnpm exec tsc --noEmit
 cd apps/admin
 pnpm dev
 pnpm exec tsc --noEmit
-```
-
-### TTS
-
-```bash
-cd apps/f5-tts
-scripts\start_local_api.cmd
 ```
 
 ## Project-Specific Gotchas

@@ -3,7 +3,6 @@ import { Route, Routes, useLocation } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { applyThemeToDocument, useThemeStore } from '@/stores/useThemeStore';
 import Layout from './layouts/Layout';
-import AIChat from './pages/AIChat';
 import ApplyCreator from './pages/ApplyCreator';
 import BlogCreate from './pages/BlogCreate';
 import BlogGroupManage from './pages/BlogGroupManage';
@@ -21,6 +20,7 @@ import Login from './pages/Login';
 import MyPosts from './pages/MyPosts';
 import MyResources from './pages/MyResources';
 import MySpace from './pages/MySpace';
+import NotFound from './pages/NotFound';
 import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
 import Register from './pages/Register';
@@ -28,7 +28,6 @@ import ResourceAlbumManage from './pages/ResourceAlbumManage';
 import ResourceDetail from './pages/ResourceDetail';
 import Resources from './pages/Resources';
 import ResourceTagManage from './pages/ResourceTagManage';
-import TTSStudio from './pages/TTSStudio';
 
 function RouteTitle() {
   const location = useLocation();
@@ -85,14 +84,14 @@ function RouteTitle() {
       title = '个人资料 | Valley';
     } else if (pathname === '/apply-creator') {
       title = '申请创作者 | Valley';
-    } else if (pathname === '/tts') {
-      title = 'TTS Studio | Valley';
     } else if (pathname === '/ai-chat') {
       title = 'AI Chat | Valley';
     } else if (pathname === '/login') {
       title = '登录 | Valley';
     } else if (pathname === '/register') {
       title = '注册 | Valley';
+    } else {
+      title = '页面未找到 | Valley';
     }
 
     document.title = title;
@@ -142,8 +141,7 @@ function App() {
           <Route path="blog" element={<BlogList />} />
           <Route path="guestbook" element={<Guestbook />} />
           <Route path="blog/:id" element={<BlogPost />} />
-          <Route path="tts" element={<TTSStudio />} />
-          <Route path="ai-chat" element={<AIChat />} />
+          <Route path="*" element={<NotFound />} />
         </Route>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
