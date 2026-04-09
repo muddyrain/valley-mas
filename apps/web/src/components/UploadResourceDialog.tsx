@@ -455,6 +455,7 @@ export default function UploadResourceDialog({
               <ResourceTagSelector
                 value={selectedTags}
                 onChange={setSelectedTags}
+                allowCreateTag
                 aiPreUpload={{
                   imageBase64: previewBase64,
                   type: uploadType,

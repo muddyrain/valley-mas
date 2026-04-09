@@ -8,71 +8,44 @@
   Sparkles,
   Tag,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import { type Group as BlogGroup, type Post as BlogPost, getAdminPosts } from '@/api/blog';
+import { type Post as BlogPost, getAdminPosts } from '@/api/blog';
 import { getMyResources, type MyResource } from '@/api/resource';
 import { BlogPostCard, ImageTextPostCard } from '@/components/blog';
+import HeroSectionTitle from '@/components/page/HeroSectionTitle';
+import HeroStatChip from '@/components/page/HeroStatChip';
 import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
 import UploadResourceDialog from '@/components/UploadResourceDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { useAuthStore } from '@/stores/useAuthStore';
+import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
 
-function SectionTitle({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="theme-eyebrow inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
-        {eyebrow}
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-[34px] font-semibold tracking-[-0.04em] text-slate-950 md:text-[40px]">
-          {title}
-        </h2>
-        <p className="max-w-2xl text-[15px] leading-8 text-slate-500 md:text-base">{description}</p>
-      </div>
-    </div>
-  );
-}
+const BLOG_PREVIEW_SIZE = 6;
+const IMAGE_TEXT_PREVIEW_SIZE = 2;
 
 export default function MySpace() {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuthStore();
+  const { canAccess, user } = usePageRoleGuard({
+    allowRoles: ['creator'],
+    unauthorizedMessage: '该页面仅创作者可访问',
+  });
 
   // 资源（只取最新 8 条用于预览）
   const [resources, setResources] = useState<MyResource[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // 博客/图文（各取最新 4 条用于预览）
-  const [myPosts, setMyPosts] = useState<BlogPost[]>([]);
-  const [blogGroups] = useState<BlogGroup[]>([]);
-  const [imageTextGroups] = useState<BlogGroup[]>([]);
-  const [loadingPosts, setLoadingPosts] = useState(true);
+  // 博客/图文：分开请求，博客默认 4 条，图文默认 2 条
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [imageTextPosts, setImageTextPosts] = useState<BlogPost[]>([]);
+  const [blogTotal, setBlogTotal] = useState(0);
+  const [imageTextTotal, setImageTextTotal] = useState(0);
+  const [loadingBlogPosts, setLoadingBlogPosts] = useState(true);
+  const [loadingImageTextPosts, setLoadingImageTextPosts] = useState(true);
 
   // 上传弹窗状态
   const [uploadOpen, setUploadOpen] = useState(false);
-
-  // 权限检查
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    if (user?.role !== 'creator') {
-      toast.error('该页面仅创作者可访问');
-      navigate('/');
-    }
-  }, [isAuthenticated, user, navigate]);
 
   const loadResources = useCallback(async () => {
     try {
@@ -81,60 +54,68 @@ export default function MySpace() {
       setResources(data.list || []);
       setTotal(data.total || 0);
     } catch {
-      toast.error('加载资源失败');
+      // request.ts 已统一处理错误提示
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'creator') {
-      loadResources();
+    if (canAccess) {
+      void loadResources();
     }
-  }, [isAuthenticated, user, loadResources]);
+  }, [canAccess, loadResources]);
 
-  const loadMyPosts = useCallback(async () => {
+  const loadBlogPosts = useCallback(async () => {
     try {
-      setLoadingPosts(true);
-      const postsData = await getAdminPosts({ page: 1, pageSize: 10 });
-      setMyPosts(postsData.list || []);
+      setLoadingBlogPosts(true);
+      const postsData = await getAdminPosts({
+        page: 1,
+        pageSize: BLOG_PREVIEW_SIZE,
+        postType: 'blog',
+      });
+      setBlogPosts(postsData.list || []);
+      setBlogTotal(postsData.total || 0);
     } catch {
-      toast.error('加载博客内容失败');
+      // request.ts 已统一处理错误提示
     } finally {
-      setLoadingPosts(false);
+      setLoadingBlogPosts(false);
     }
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'creator') {
-      void loadMyPosts();
+    if (canAccess) {
+      void loadBlogPosts();
     }
-  }, [isAuthenticated, user, loadMyPosts]);
+  }, [canAccess, loadBlogPosts]);
 
-  const previewBlogPosts = useMemo(
-    () => myPosts.filter((p) => p.postType === 'blog').slice(0, 6),
-    [myPosts],
-  );
-  const previewImageTextPosts = useMemo(
-    () => myPosts.filter((p) => p.postType === 'image_text').slice(0, 4),
-    [myPosts],
-  );
+  const loadImageTextPosts = useCallback(async () => {
+    try {
+      setLoadingImageTextPosts(true);
+      const postsData = await getAdminPosts({
+        page: 1,
+        pageSize: IMAGE_TEXT_PREVIEW_SIZE,
+        postType: 'image_text',
+      });
+      setImageTextPosts(postsData.list || []);
+      setImageTextTotal(postsData.total || 0);
+    } catch {
+      // request.ts 已统一处理错误提示
+    } finally {
+      setLoadingImageTextPosts(false);
+    }
+  }, []);
 
-  // 统计数（从 posts 中算）
-  const blogCount = useMemo(() => myPosts.filter((p) => p.postType === 'blog').length, [myPosts]);
-  const imageTextCount = useMemo(
-    () => myPosts.filter((p) => p.postType === 'image_text').length,
-    [myPosts],
-  );
+  useEffect(() => {
+    if (canAccess) {
+      void loadImageTextPosts();
+    }
+  }, [canAccess, loadImageTextPosts]);
 
   // ===== 上传相关 =====
   // （逻辑已封装至 UploadResourceDialog 组件）
 
-  if (!isAuthenticated || user?.role !== 'creator') return null;
-
-  // 用于消除 blogGroups / imageTextGroups 的 unused 警告（已移至 MyPosts.tsx）
-  void blogGroups;
-  void imageTextGroups;
+  if (!canAccess) return null;
 
   return (
     <div className="min-h-screen bg-transparent text-slate-900">
@@ -144,23 +125,23 @@ export default function MySpace() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(251,191,36,0.16),transparent_24%),radial-gradient(circle_at_88%_20%,rgba(96,165,250,0.18),transparent_22%),radial-gradient(circle_at_80%_72%,rgba(251,191,36,0.1),transparent_28%)]" />
           <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
             <div className="space-y-6">
-              <SectionTitle
+              <HeroSectionTitle
                 eyebrow="CREATOR"
                 title="创作者空间"
                 description="这里承接你的资源、博客和图文内容，方便继续整理、编辑、发布和回看每一条创作记录。"
+                eyebrowClassName="theme-eyebrow text-theme-primary"
+                titleClassName="text-[34px] md:text-[40px]"
               />
               <div className="flex flex-wrap gap-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <ImageIcon className="text-theme-primary h-4 w-4" />共 {total} 项资源
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <FileText className="h-4 w-4 text-emerald-500" />
-                  {blogCount} 篇博客
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <Sparkles className="h-4 w-4 text-theme-primary" />
-                  {imageTextCount} 组图文
-                </div>
+                <HeroStatChip icon={<ImageIcon className="text-theme-primary h-4 w-4" />}>
+                  共 {total} 项资源
+                </HeroStatChip>
+                <HeroStatChip icon={<FileText className="h-4 w-4 text-emerald-500" />}>
+                  {blogTotal} 篇博客
+                </HeroStatChip>
+                <HeroStatChip icon={<Sparkles className="h-4 w-4 text-theme-primary" />}>
+                  {imageTextTotal} 组图文
+                </HeroStatChip>
               </div>
               <div className="rounded-[28px] border border-white/80 bg-white/82 p-4 shadow-[0_16px_40px_rgba(148,163,184,0.08)] backdrop-blur">
                 <div className="flex items-center gap-4">
@@ -251,10 +232,12 @@ export default function MySpace() {
           <div className="rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <SectionTitle
+                <HeroSectionTitle
                   eyebrow="RESOURCES"
                   title="我的资源"
                   description="最近上传的资源预览，点击「管理全部」查看完整列表并进行编辑、删除操作。"
+                  titleClassName="text-[30px] md:text-[34px]"
+                  descriptionClassName="max-w-xl"
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -331,10 +314,12 @@ export default function MySpace() {
         <section className="mt-24">
           <div className="rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6 space-y-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <SectionTitle
+              <HeroSectionTitle
                 eyebrow="CONTENT"
                 title="博客与图文"
                 description="最近发布的内容预览，点击「管理全部」进入完整内容管理页。"
+                titleClassName="text-[30px] md:text-[34px]"
+                descriptionClassName="max-w-xl"
               />
               <div className="flex items-center gap-2">
                 <Button
@@ -371,10 +356,10 @@ export default function MySpace() {
                   <FileText className="h-4 w-4 text-theme-primary" />
                   博客
                   <span className="rounded-full bg-theme-soft px-2.5 py-0.5 text-xs text-theme-primary">
-                    {blogCount} 篇
+                    {blogTotal} 篇
                   </span>
                 </h3>
-                {blogCount > 4 && (
+                {blogTotal > BLOG_PREVIEW_SIZE && (
                   <button
                     type="button"
                     onClick={() => navigate('/my-space/posts')}
@@ -385,19 +370,19 @@ export default function MySpace() {
                 )}
               </div>
 
-              {loadingPosts ? (
+              {loadingBlogPosts ? (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {Array.from({ length: 6 }).map((_, i) => (
+                  {Array.from({ length: BLOG_PREVIEW_SIZE }).map((_, i) => (
                     <div key={i} className="h-44 animate-pulse rounded-2xl bg-theme-soft" />
                   ))}
                 </div>
-              ) : previewBlogPosts.length === 0 ? (
+              ) : blogPosts.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
                   还没有博客内容，先去发布一篇吧。
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {previewBlogPosts.map((post) => (
+                  {blogPosts.map((post) => (
                     <BlogPostCard key={post.id} post={post} mode="creator" />
                   ))}
                 </div>
@@ -411,10 +396,10 @@ export default function MySpace() {
                   <Sparkles className="h-4 w-4 text-theme-primary" />
                   图文
                   <span className="rounded-full bg-theme-soft px-2.5 py-0.5 text-xs text-theme-primary-hover">
-                    {imageTextCount} 组
+                    {imageTextTotal} 组
                   </span>
                 </h3>
-                {imageTextCount > 4 && (
+                {imageTextTotal > IMAGE_TEXT_PREVIEW_SIZE && (
                   <button
                     type="button"
                     onClick={() => navigate('/my-space/posts')}
@@ -425,19 +410,19 @@ export default function MySpace() {
                 )}
               </div>
 
-              {loadingPosts ? (
+              {loadingImageTextPosts ? (
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                  {Array.from({ length: 2 }).map((_, i) => (
+                  {Array.from({ length: IMAGE_TEXT_PREVIEW_SIZE }).map((_, i) => (
                     <div key={i} className="h-44 animate-pulse rounded-2xl bg-theme-soft" />
                   ))}
                 </div>
-              ) : previewImageTextPosts.length === 0 ? (
+              ) : imageTextPosts.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-theme-shell-border bg-theme-soft p-6 text-center text-sm text-theme-primary-hover">
                   还没有图文内容。
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                  {previewImageTextPosts.map((post) => (
+                  {imageTextPosts.map((post) => (
                     <ImageTextPostCard key={post.id} post={post} mode="creator" />
                   ))}
                 </div>
@@ -461,10 +446,12 @@ export default function MySpace() {
         <section className="mt-24">
           <div className="rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
             <div className="mb-5">
-              <SectionTitle
+              <HeroSectionTitle
                 eyebrow="TOOLS"
                 title="管理工具"
                 description="资源专辑、博客分组等管理入口。"
+                titleClassName="text-[30px] md:text-[34px]"
+                descriptionClassName="max-w-xl"
               />
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">

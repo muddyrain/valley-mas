@@ -328,6 +328,7 @@ export default function Home() {
                   size="lg"
                   variant="outline"
                   className="border-theme-soft-strong rounded-full border bg-white/76 px-6 text-slate-700 shadow-sm hover:bg-white"
+                  onClick={() => navigate('/resources')}
                 >
                   去看资源页
                 </Button>

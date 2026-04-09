@@ -30,9 +30,10 @@ import {
 } from '@/api/resource';
 import EmptyState from '@/components/EmptyState';
 import PageBanner from '@/components/PageBanner';
+import ResourceTagUpsertDialog from '@/components/ResourceTagUpsertDialog';
 import { Button } from '@/components/ui/button';
+import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
 
@@ -281,9 +282,6 @@ export default function ResourceTagManage() {
   // ── 创建 / 编辑标签弹窗 ──
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [editingTag, setEditingTag] = useState<ResourceTag | null>(null);
-  const [tagName, setTagName] = useState('');
-  const [tagDescription, setTagDescription] = useState('');
-  const [tagSubmitting, setTagSubmitting] = useState(false);
 
   // ── 批量导入弹窗 ──
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
@@ -300,7 +298,6 @@ export default function ResourceTagManage() {
   const [batchDone, setBatchDone] = useState(false);
 
   // ── 删除标签 ──
-  const [deleteTarget, setDeleteTarget] = useState<ResourceTag | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // ── 资源列表（用于绑定标签） ──
@@ -416,63 +413,37 @@ export default function ResourceTagManage() {
   // ── 标签对话框 ──
   const openCreateTagDialog = () => {
     setEditingTag(null);
-    setTagName('');
-    setTagDescription('');
     setTagDialogOpen(true);
   };
 
   const openEditTagDialog = (tag: ResourceTag) => {
     setEditingTag(tag);
-    setTagName(tag.name);
-    setTagDescription(tag.description ?? '');
     setTagDialogOpen(true);
   };
 
-  const handleTagSubmit = async () => {
-    const name = tagName.trim();
-    if (!name) {
-      toast.error('请输入标签名称');
-      return;
-    }
-    if (name.length > 30) {
-      toast.error('标签名称不超过 30 个字符');
-      return;
-    }
-    try {
-      setTagSubmitting(true);
-      if (editingTag) {
-        const updated = await updateResourceTag(editingTag.id, {
-          name,
-          description: tagDescription.trim(),
-        });
-        setTags((prev) => prev.map((t) => (t.id === editingTag.id ? updated : t)));
-        toast.success('标签已更新');
-      } else {
-        const created = await createResourceTag({ name, description: tagDescription.trim() });
-        setTags((prev) => [created, ...prev]);
-        toast.success('标签已创建');
-      }
-      setTagDialogOpen(false);
-    } catch {
-      // 统一处理
-    } finally {
-      setTagSubmitting(false);
-    }
-  };
-
-  const handleTagDelete = async () => {
-    if (!deleteTarget) return;
+  const handleTagDelete = async (target: ResourceTag) => {
     try {
       setDeleting(true);
-      await deleteResourceTag(deleteTarget.id);
-      setTags((prev) => prev.filter((t) => t.id !== deleteTarget.id));
+      await deleteResourceTag(target.id);
+      setTags((prev) => prev.filter((t) => t.id !== target.id));
       toast.success('标签已删除');
-      setDeleteTarget(null);
     } catch {
       // 统一处理
     } finally {
       setDeleting(false);
     }
+  };
+
+  const openDeleteConfirm = (target: ResourceTag) => {
+    if (deleting) return;
+    openConfirmToast({
+      title: `确认删除标签「${target.name}」？`,
+      description: '所有使用该标签的资源关联也会被清除，操作不可撤销。',
+      confirmText: '确认删除',
+      cancelText: '取消',
+      confirmVariant: 'danger',
+      onConfirm: () => handleTagDelete(target),
+    });
   };
 
   const handleResourceTagsChange = (resourceId: string, newTags: ResourceTag[]) => {
@@ -700,7 +671,7 @@ export default function ResourceTagManage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setDeleteTarget(tag)}
+                              onClick={() => openDeleteConfirm(tag)}
                               className="rounded-xl p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -827,115 +798,38 @@ export default function ResourceTagManage() {
       </div>
 
       {/* ── 创建 / 编辑标签弹窗 ── */}
-      <Dialog
+      <ResourceTagUpsertDialog
         open={tagDialogOpen}
-        onOpenChange={(v) => {
-          if (!tagSubmitting) setTagDialogOpen(v);
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setEditingTag(null);
+          }
+          setTagDialogOpen(nextOpen);
         }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{editingTag ? '编辑标签' : '新建标签'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-1">
-            {/* 名称 */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-600">标签名称 *</label>
-              <Input
-                value={tagName}
-                onChange={(e) => setTagName(e.target.value)}
-                placeholder="例如：极简、暗黑、治愈系"
-                maxLength={30}
-                className="theme-input-border h-9 text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleTagSubmit();
-                }}
-              />
-            </div>
-
-            {/* 介绍 */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-600">标签介绍</label>
-              <textarea
-                value={tagDescription}
-                onChange={(e) => setTagDescription(e.target.value)}
-                placeholder="简单描述这个标签的含义，方便 AI 匹配"
-                maxLength={100}
-                rows={3}
-                className="theme-input-border w-full resize-none rounded-md border px-3 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-theme-primary focus:ring-1 focus:ring-theme-primary/30"
-              />
-              <p className="text-right text-xs text-slate-400">{tagDescription.length}/100</p>
-            </div>
-
-            {/* 预览 */}
-            {tagName && (
-              <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
-                <span className="text-xs text-slate-400">预览：</span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-theme-soft-strong bg-theme-soft px-2.5 py-0.5 text-xs font-medium text-theme-primary">
-                  <Hash className="h-2.5 w-2.5" />
-                  {tagName}
-                </span>
-              </div>
-            )}
-
-            {/* 按钮 */}
-            <div className="flex justify-end gap-3 pt-1">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setTagDialogOpen(false)}
-                disabled={tagSubmitting}
-              >
-                取消
-              </Button>
-              <Button type="button" onClick={() => void handleTagSubmit()} disabled={tagSubmitting}>
-                {tagSubmitting && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-                {editingTag ? '保存' : '创建'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── 删除确认 ── */}
-      <Dialog
-        open={!!deleteTarget}
-        onOpenChange={(v) => {
-          if (!deleting && !v) setDeleteTarget(null);
+        mode={editingTag ? 'edit' : 'create'}
+        initialValue={
+          editingTag
+            ? {
+                name: editingTag.name,
+                description: editingTag.description,
+              }
+            : undefined
+        }
+        onSubmit={(payload) => {
+          if (editingTag) {
+            return updateResourceTag(editingTag.id, payload);
+          }
+          return createResourceTag(payload);
         }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>删除标签</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-sm leading-6 text-slate-600">
-              确认删除标签「<span className="font-medium text-slate-800">{deleteTarget?.name}</span>
-              」？ 所有使用该标签的资源关联也会被清除，操作不可撤销。
-            </p>
-            <div className="flex justify-end gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDeleteTarget(null)}
-                disabled={deleting}
-              >
-                取消
-              </Button>
-              <Button
-                type="button"
-                onClick={() => void handleTagDelete()}
-                disabled={deleting}
-                className="bg-rose-500 text-white hover:bg-rose-600"
-              >
-                {deleting && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-                确认删除
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
+        onSuccess={(tag) => {
+          if (editingTag) {
+            setTags((prev) => prev.map((item) => (item.id === editingTag.id ? tag : item)));
+          } else {
+            setTags((prev) => [tag, ...prev]);
+          }
+          setEditingTag(null);
+        }}
+      />
       {/* ── 批量导入标签弹窗 ── */}
       <Dialog
         open={batchDialogOpen}
@@ -1070,16 +964,16 @@ export default function ResourceTagManage() {
                 {batchDone && (
                   <div className="flex gap-3 text-xs">
                     <span className="text-emerald-600">
-                      ✓ {batchItems.filter((i) => i.status === 'success').length} 成功
+                      成功 {batchItems.filter((i) => i.status === 'success').length}
                     </span>
                     {batchItems.filter((i) => i.status === 'duplicate').length > 0 && (
                       <span className="text-amber-500">
-                        ⚠ {batchItems.filter((i) => i.status === 'duplicate').length} 已存在
+                        已存在 {batchItems.filter((i) => i.status === 'duplicate').length}
                       </span>
                     )}
                     {batchItems.filter((i) => i.status === 'error').length > 0 && (
                       <span className="text-rose-500">
-                        ✕ {batchItems.filter((i) => i.status === 'error').length} 失败
+                        失败 {batchItems.filter((i) => i.status === 'error').length}
                       </span>
                     )}
                   </div>

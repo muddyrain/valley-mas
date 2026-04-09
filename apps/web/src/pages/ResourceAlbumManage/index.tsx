@@ -20,10 +20,13 @@ import {
   updateCreatorAlbum,
 } from '@/api/creator';
 import { getMyResources, type MyResource } from '@/api/resource';
+import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import EmptyState from '@/components/EmptyState';
 import PageBanner from '@/components/PageBanner';
+import UploadResourceDialog from '@/components/UploadResourceDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -65,11 +68,13 @@ function ResourcePicker({
   coverResourceId,
   onToggle,
   onSetCover,
+  refreshToken = 0,
 }: {
   selectedIds: string[];
   coverResourceId: string;
   onToggle: (resource: MyResource) => void;
   onSetCover: (id: string) => void;
+  refreshToken?: number;
 }) {
   const [resources, setResources] = useState<MyResource[]>([]);
   const [total, setTotal] = useState(0);
@@ -99,7 +104,7 @@ function ResourcePicker({
 
   useEffect(() => {
     void fetchResources(page, keyword, type);
-  }, [fetchResources, page, keyword, type]);
+  }, [fetchResources, page, keyword, type, refreshToken]);
 
   const handleSearch = (val: string) => {
     setInputValue(val);
@@ -149,8 +154,8 @@ function ResourcePicker({
       </div>
 
       {/* 资源网格 */}
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/60 p-2">
-        {fetching ? (
+      <div className="relative min-h-0 flex-1 overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/60 p-2">
+        {fetching && resources.length === 0 ? (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="aspect-square rounded-xl" />
@@ -242,6 +247,23 @@ function ResourcePicker({
                         </span>
                       )}
                     </div>
+                    {resource.tags && resource.tags.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                        {resource.tags.slice(0, 2).map((tag) => (
+                          <span
+                            key={tag.id}
+                            className="rounded-full border border-white/35 bg-white/20 px-1.5 py-0.5 text-[10px] text-white/92 backdrop-blur-sm"
+                          >
+                            #{tag.name}
+                          </span>
+                        ))}
+                        {resource.tags.length > 2 && (
+                          <span className="text-[10px] text-white/75">
+                            +{resource.tags.length - 2}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {selected && !isCover && (
                       <button
                         type="button"
@@ -260,6 +282,13 @@ function ResourcePicker({
             })}
           </div>
         )}
+        <BoxLoadingOverlay
+          show={fetching && resources.length > 0}
+          title="正在同步资源库..."
+          hint="筛选结果更新中"
+          compact
+          className="rounded-2xl"
+        />
       </div>
 
       {/* 分页 */}
@@ -384,14 +413,16 @@ export default function ResourceAlbumManage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Album | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [albumUploadOpen, setAlbumUploadOpen] = useState(false);
+  const [pickerRefreshToken, setPickerRefreshToken] = useState(0);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedResourceIds, setSelectedResourceIds] = useState<string[]>([]);
   const [coverResourceId, setCoverResourceId] = useState('');
+  const coverTitle = allResources.find((r) => r.id === coverResourceId)?.title || '已设置';
 
   const loadData = useCallback(async () => {
     try {
@@ -406,6 +437,15 @@ export default function ResourceAlbumManage() {
       // request.ts 已统一处理错误提示
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const refreshResourcePool = useCallback(async () => {
+    try {
+      const resourceData = await getMyResources({ page: 1, pageSize: 100 });
+      setAllResources(resourceData.list || []);
+    } catch {
+      // request.ts 已统一处理
     }
   }, []);
 
@@ -511,19 +551,29 @@ export default function ResourceAlbumManage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
+  const handleDelete = async (target: Album) => {
     try {
       setDeleting(true);
-      await deleteCreatorAlbum(deleteTarget.id);
+      await deleteCreatorAlbum(target.id);
       toast.success('资源专辑已删除');
-      setDeleteTarget(null);
       await loadData();
     } catch {
       // request.ts 已统一处理错误提示
     } finally {
       setDeleting(false);
     }
+  };
+
+  const openDeleteConfirm = (target: Album) => {
+    if (deleting) return;
+    openConfirmToast({
+      title: `确认删除「${target.name}」？`,
+      description: '专辑会消失，但其中资源本身不会被删除。',
+      confirmText: '确认删除',
+      cancelText: '取消',
+      confirmVariant: 'danger',
+      onConfirm: () => handleDelete(target),
+    });
   };
 
   return (
@@ -624,7 +674,7 @@ export default function ResourceAlbumManage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setDeleteTarget(album)}
+                      onClick={() => openDeleteConfirm(album)}
                       className="rounded-xl border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100"
                     >
                       <Trash2 className="mr-1.5 h-3.5 w-3.5" />
@@ -684,7 +734,19 @@ export default function ResourceAlbumManage() {
               <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold text-slate-700">资源库</p>
-                  <span className="text-xs text-slate-400">点击资源即可添加 / 移除</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAlbumUploadOpen(true)}
+                      className="h-7 rounded-lg border-theme-soft-strong bg-white/80 px-2.5 text-xs text-theme-primary hover:bg-theme-soft"
+                    >
+                      <Plus className="mr-1 h-3.5 w-3.5" />
+                      新增资源
+                    </Button>
+                    <span className="text-xs text-slate-400">点击资源即可添加 / 移除</span>
+                  </div>
                 </div>
                 <div className="min-h-0 flex-1 overflow-hidden">
                   <ResourcePicker
@@ -692,6 +754,7 @@ export default function ResourceAlbumManage() {
                     coverResourceId={coverResourceId}
                     onToggle={toggleResource}
                     onSetCover={setCoverResourceId}
+                    refreshToken={pickerRefreshToken}
                   />
                 </div>
               </div>
@@ -720,9 +783,7 @@ export default function ResourceAlbumManage() {
           {/* 底部操作栏 */}
           <div className="flex shrink-0 items-center justify-between border-t border-slate-100 px-6 py-4">
             <p className="text-xs text-slate-400">
-              {coverResourceId
-                ? `封面：${allResources.find((r) => r.id === coverResourceId)?.title ?? '已设置'}`
-                : '未设置封面，将自动使用第一项资源'}
+              {coverResourceId ? `封面：${coverTitle}` : '未设置封面，将自动使用第一项资源'}
             </p>
             <div className="flex gap-3">
               <Button
@@ -742,43 +803,14 @@ export default function ResourceAlbumManage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── 删除确认弹窗 ── */}
-      <Dialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => {
-          if (!open && !deleting) setDeleteTarget(null);
+      <UploadResourceDialog
+        open={albumUploadOpen}
+        onOpenChange={setAlbumUploadOpen}
+        onSuccess={() => {
+          void refreshResourcePool();
+          setPickerRefreshToken((prev) => prev + 1);
         }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>删除资源专辑</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-sm leading-6 text-slate-600">
-              确认删除「{deleteTarget?.name}」？专辑会消失，但其中资源本身不会被删除。
-            </p>
-            <div className="flex justify-end gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDeleteTarget(null)}
-                disabled={deleting}
-              >
-                取消
-              </Button>
-              <Button
-                type="button"
-                onClick={() => void handleDelete()}
-                disabled={deleting}
-                className="bg-rose-500 text-white hover:bg-rose-600"
-              >
-                {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                确认删除
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      />
     </div>
   );
 }

@@ -4,33 +4,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Group, Post, Tag as TagType } from '@/api/blog';
 import { getGroups, getPosts, getTags } from '@/api/blog';
 import { BlogFeedCard, TagCloud } from '@/components/blog';
+import HeroSectionTitle from '@/components/page/HeroSectionTitle';
+import HeroStatChip from '@/components/page/HeroStatChip';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
-
-function SectionTitle({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="border-theme-soft-strong inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] text-theme-primary uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
-        {eyebrow}
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-[34px] font-semibold tracking-[-0.04em] text-slate-950 md:text-[40px]">
-          {title}
-        </h2>
-        <p className="max-w-2xl text-[15px] leading-8 text-slate-500 md:text-base">{description}</p>
-      </div>
-    </div>
-  );
-}
 
 function FilterPanel({
   title,
@@ -158,24 +136,22 @@ export default function BlogList() {
           <div className="theme-hero-glow absolute inset-0" />
           <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
             <div className="space-y-6">
-              <SectionTitle
+              <HeroSectionTitle
                 eyebrow="UPDATES"
                 title="博客与图文"
                 description="最近发布的博客、图文和内容分组都会先汇在这里，方便继续浏览和筛选。"
+                titleClassName="text-[34px] md:text-[40px]"
               />
               <div className="flex flex-wrap gap-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <BookOpen className="text-theme-primary h-4 w-4" />
+                <HeroStatChip icon={<BookOpen className="text-theme-primary h-4 w-4" />}>
                   {total} 篇内容
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <FolderTree className="h-4 w-4 text-theme-primary" />
+                </HeroStatChip>
+                <HeroStatChip icon={<FolderTree className="h-4 w-4 text-theme-primary" />}>
                   {groups.length} 个分组
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <Tag className="h-4 w-4 text-theme-primary" />
+                </HeroStatChip>
+                <HeroStatChip icon={<Tag className="h-4 w-4 text-theme-primary" />}>
                   {tags.length} 个标签
-                </div>
+                </HeroStatChip>
               </div>
 
               {/* 创作者快捷入口 */}

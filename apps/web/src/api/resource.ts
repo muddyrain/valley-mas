@@ -266,7 +266,7 @@ export const getPublicResourceTags = (
 
 // 创建标签
 export const createResourceTag = (data: { name: string; description?: string }) => {
-  return http.post<unknown, ResourceTag>('/admin/resource-tags', data);
+  return http.post<unknown, ResourceTag>('/creator/resource-tags', data);
 };
 
 // 更新标签
@@ -307,6 +307,14 @@ export const aiSuggestResourceTags = (data: {
   return http.post<unknown, { tags: ResourceTag[]; model: string }>(
     '/creator/ai/suggest-tags',
     data,
+  );
+};
+
+// AI 根据标签名称生成描述
+export const suggestResourceTagDescription = (name: string) => {
+  return http.post<unknown, { description: string; model: string }>(
+    '/creator/ai/suggest-tag-description',
+    { name },
   );
 };
 

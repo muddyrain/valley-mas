@@ -35,7 +35,7 @@ import TypeFilterBar from '@/components/TypeFilterBar';
 import UploadResourceDialog from '@/components/UploadResourceDialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useAuthStore } from '@/stores/useAuthStore';
+import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
 
 const RESOURCE_TYPES = [
   { label: '全部', value: '' },
@@ -53,7 +53,10 @@ function formatSize(bytes: number) {
 export default function MyResources() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAuthenticated } = useAuthStore();
+  const { canAccess } = usePageRoleGuard({
+    allowRoles: ['creator'],
+    unauthorizedMessage: '该页面仅创作者可访问',
+  });
 
   const [resources, setResources] = useState<MyResource[]>([]);
   const [total, setTotal] = useState(0);
@@ -85,18 +88,6 @@ export default function MyResources() {
 
   // 刷新状态
   const [refreshing, setRefreshing] = useState(false);
-
-  // 权限检查
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    if (user?.role !== 'creator') {
-      toast.error('该页面仅创作者可访问');
-      navigate('/');
-    }
-  }, [isAuthenticated, user, navigate]);
 
   const loadAlbums = useCallback(async () => {
     try {
@@ -139,16 +130,16 @@ export default function MyResources() {
   }, [activeAlbumId, activeType, loadResources, page]);
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'creator') {
+    if (canAccess) {
       void loadAlbums();
     }
-  }, [isAuthenticated, user, loadAlbums]);
+  }, [canAccess, loadAlbums]);
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'creator') {
+    if (canAccess) {
       void loadResources(activeType, activeAlbumId, page);
     }
-  }, [isAuthenticated, user, activeType, activeAlbumId, page, loadResources]);
+  }, [activeAlbumId, activeType, canAccess, loadResources, page]);
 
   // 从详情页跳转过来时自动打开编辑弹框
   useEffect(() => {
@@ -251,7 +242,7 @@ export default function MyResources() {
     setEditTarget(resource);
   };
 
-  if (!isAuthenticated || user?.role !== 'creator') return null;
+  if (!canAccess) return null;
 
   const selectedCount = selectedIds.size;
   const allSelected = resources.length > 0 && selectedIds.size === resources.length;

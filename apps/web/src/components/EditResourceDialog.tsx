@@ -13,6 +13,7 @@ import {
   setResourceTags,
   updateResource,
 } from '@/api/resource';
+import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import ResourceTagSelector from '@/components/ResourceTagSelector';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -80,25 +81,41 @@ export default function EditResourceDialog({
   const [type, setType] = useState('');
   const [visibility, setVisibility] = useState<ResourceVisibility>('private');
   const [saving, setSaving] = useState(false);
+  const [loadingTags, setLoadingTags] = useState(false);
 
   // 标签状态（由 ResourceTagSelector 管理内部逻辑，这里只保存已选列表）
   const [tags, setTags] = useState<ResourceTag[]>([]);
 
   // resource 变化时重置表单
   useEffect(() => {
-    if (!resource) return;
+    if (!resource) {
+      setLoadingTags(false);
+      return;
+    }
     setTitle(resource.title);
     setDesc(resource.description ?? '');
     setType(resource.type);
     setVisibility(resource.visibility ?? 'private');
     setTags([]);
     setSaving(false);
+    setLoadingTags(true);
+
+    let active = true;
 
     getResourceTagsById(resource.id)
-      .then((t) => setTags(t))
+      .then((t) => {
+        if (active) setTags(t);
+      })
       .catch(() => {
         /* 静默失败 */
+      })
+      .finally(() => {
+        if (active) setLoadingTags(false);
       });
+
+    return () => {
+      active = false;
+    };
   }, [resource]);
 
   // 提交保存
@@ -138,10 +155,10 @@ export default function EditResourceDialog({
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        if (!o && !saving) onOpenChange(false);
+        if (!o && !saving && !loadingTags) onOpenChange(false);
       }}
     >
-      <DialogContent className="flex h-[90vh] w-[90vw] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+      <DialogContent className="flex h-[90vh] w-[90vw] max-w-4xl flex-col gap-0 overflow-hidden bg-white p-0 sm:max-w-4xl">
         {/* ── 顶部标题栏 ── */}
         <div className="shrink-0 border-b border-slate-100 bg-[linear-gradient(135deg,rgba(var(--theme-primary-rgb),0.10)_0%,rgba(var(--theme-primary-rgb),0.03)_100%)] px-6 py-4 flex items-center gap-4">
           <div className="shrink-0 w-10 h-10 rounded-2xl bg-theme-primary/10 flex items-center justify-center shadow-[0_4px_12px_rgba(var(--theme-primary-rgb),0.18)]">
@@ -185,8 +202,8 @@ export default function EditResourceDialog({
           </div>
 
           {/* ── 右栏：表单 ── */}
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[linear-gradient(180deg,rgba(248,252,255,0.68),rgba(255,255,255,0.95))]">
+            <div className="flex-1 space-y-5 overflow-y-auto p-6">
               {/* 资源类型 */}
               <div className="space-y-2">
                 <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">
@@ -287,7 +304,12 @@ export default function EditResourceDialog({
               </div>
 
               {/* ── 标签 ── */}
-              <ResourceTagSelector value={tags} onChange={setTags} resourceId={resource?.id} />
+              <ResourceTagSelector
+                value={tags}
+                onChange={setTags}
+                resourceId={resource?.id}
+                allowCreateTag
+              />
             </div>
 
             {/* ── 底部操作栏 ── */}
@@ -296,13 +318,13 @@ export default function EditResourceDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
                 className="flex-1 rounded-xl"
-                disabled={saving}
+                disabled={saving || loadingTags}
               >
                 取消
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={saving}
+                disabled={saving || loadingTags}
                 className="flex-2 rounded-xl theme-btn-primary font-semibold shadow-[0_4px_16px_rgba(var(--theme-primary-rgb),0.28)] disabled:shadow-none transition-all"
               >
                 {saving ? (
@@ -318,6 +340,12 @@ export default function EditResourceDialog({
                 )}
               </Button>
             </div>
+            <BoxLoadingOverlay
+              show={loadingTags || saving}
+              title={saving ? '正在保存资源信息...' : '正在同步资源标签...'}
+              hint={saving ? '保存后会自动刷新当前资源状态' : '加载完成后即可继续编辑'}
+              className="rounded-none"
+            />
           </div>
         </div>
       </DialogContent>

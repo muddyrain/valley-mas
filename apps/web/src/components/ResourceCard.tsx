@@ -11,7 +11,7 @@
   Trash2,
   Users,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ImagePreviewDialog from '@/components/ImagePreviewDialog';
 import MediaLoadingOverlay from '@/components/MediaLoadingOverlay';
@@ -52,7 +52,7 @@ interface ResourceCardProps<T extends ResourceCardItem = ResourceCardItem> {
   showDate?: boolean;
   showEngagement?: boolean;
   showVisibilityTag?: boolean;
-  showTags?: boolean; // 是否在卡片底部展示前 3 个标签
+  showTags?: boolean; // 是否在卡片底部展示标签（按剩余宽度自适应）
   onClick?: (resource: T) => void;
   animationDelay?: number;
   contentPadding?: string;
@@ -95,6 +95,121 @@ function formatSize(bytes?: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function AdaptiveTagRow({ tags }: { tags: Array<{ id: string; name: string }> }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const measureMoreRef = useRef<HTMLSpanElement | null>(null);
+  const measureTagRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const [visibleCount, setVisibleCount] = useState(tags.length);
+
+  const recalcVisibleCount = useCallback(() => {
+    const containerWidth = containerRef.current?.clientWidth ?? 0;
+    if (containerWidth <= 0 || tags.length === 0) {
+      setVisibleCount(tags.length);
+      return;
+    }
+
+    const GAP = 4;
+    const MAX_ROWS = 2;
+    const moreWidth = measureMoreRef.current?.offsetWidth ?? 28;
+    const widths = tags.map((_, idx) => measureTagRefs.current[idx]?.offsetWidth ?? 0);
+
+    const canLayout = (count: number, withMore: boolean) => {
+      let row = 1;
+      let rowWidth = 0;
+
+      const place = (itemWidth: number) => {
+        const nextWidth = rowWidth === 0 ? itemWidth : rowWidth + GAP + itemWidth;
+        if (nextWidth <= containerWidth) {
+          rowWidth = nextWidth;
+          return true;
+        }
+        if (row < MAX_ROWS && itemWidth <= containerWidth) {
+          row += 1;
+          rowWidth = itemWidth;
+          return true;
+        }
+        return false;
+      };
+
+      for (let i = 0; i < count; i += 1) {
+        if (!place(widths[i])) return false;
+      }
+      if (withMore && !place(moreWidth)) return false;
+      return true;
+    };
+
+    if (canLayout(tags.length, false)) {
+      setVisibleCount(tags.length);
+      return;
+    }
+
+    let count = tags.length;
+    while (count > 0 && !canLayout(count, true)) {
+      count -= 1;
+    }
+    setVisibleCount(count);
+  }, [tags]);
+
+  useLayoutEffect(() => {
+    recalcVisibleCount();
+  }, [recalcVisibleCount]);
+
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+    const observer = new ResizeObserver(() => recalcVisibleCount());
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [recalcVisibleCount]);
+
+  const hiddenTags = tags.slice(visibleCount);
+
+  return (
+    <div className="relative mt-2">
+      <div ref={containerRef} className="flex min-w-0 flex-wrap items-center gap-1">
+        {tags.slice(0, visibleCount).map((tag) => (
+          <span
+            key={tag.id}
+            className="inline-flex items-center gap-0.5 rounded-full border border-purple-100 bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-600"
+          >
+            <Hash className="h-2.5 w-2.5" />
+            {tag.name}
+          </span>
+        ))}
+        {hiddenTags.length > 0 && (
+          <span className="group/tag-more relative inline-flex shrink-0 cursor-default items-center self-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-500">
+            +{hiddenTags.length}
+            <span className="pointer-events-none absolute bottom-[calc(100%+6px)] right-0 z-20 min-w-36 max-w-56 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] leading-4 text-slate-600 opacity-0 shadow-lg transition-opacity group-hover/tag-more:opacity-100">
+              {hiddenTags.map((tag) => `#${tag.name}`).join(' · ')}
+            </span>
+          </span>
+        )}
+      </div>
+
+      <div className="pointer-events-none absolute -left-[9999px] -top-[9999px] flex items-center gap-1 whitespace-nowrap opacity-0">
+        {tags.map((tag, idx) => (
+          <span
+            key={`measure-${tag.id}`}
+            ref={(el) => {
+              measureTagRefs.current[idx] = el;
+            }}
+            className="inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border border-purple-100 bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-600"
+          >
+            <Hash className="h-2.5 w-2.5" />
+            {tag.name}
+          </span>
+        ))}
+        <span
+          ref={measureMoreRef}
+          className="inline-flex whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-500"
+        >
+          +99
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export default function ResourceCard<T extends ResourceCardItem = ResourceCardItem>({
@@ -329,22 +444,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
         ) : null}
 
         {showTags && resource.tags && resource.tags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {resource.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag.id}
-                className="inline-flex items-center gap-0.5 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-600 border border-purple-100"
-              >
-                <Hash className="h-2.5 w-2.5" />
-                {tag.name}
-              </span>
-            ))}
-            {resource.tags.length > 3 && (
-              <span className="text-[10px] text-slate-400 self-center">
-                +{resource.tags.length - 3}
-              </span>
-            )}
-          </div>
+          <AdaptiveTagRow tags={resource.tags} />
         )}
       </CardContent>
 

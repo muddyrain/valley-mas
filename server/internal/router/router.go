@@ -56,6 +56,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 			// 资源标签（公开）
 			public.GET("/resource-tags", handler.ListResourceTags)
 			public.GET("/resource-tags/:slug/resources", handler.GetResourcesByTag)
+			public.GET("/guestbook/messages", handler.ListGuestbookMessages)
+			public.POST("/guestbook/messages", middleware.OptionalAuth(cfg), handler.CreateGuestbookMessage)
 		}
 
 		api.POST("/login", handler.Login(cfg))
@@ -98,6 +100,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 		{
 			auth.POST("/logout", handler.Logout())
 			auth.GET("/user/current", handler.GetCurrentUser())
+			auth.DELETE("/guestbook/messages/:id", handler.DeleteGuestbookMessage)
+			auth.PATCH("/guestbook/messages/:id/pin", handler.UpdateGuestbookMessagePin)
 
 			auth.POST("/resource/download", handler.RecordDownload)
 
@@ -117,6 +121,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 		creator.Use(middleware.Auth(cfg))
 		creator.Use(middleware.CreatorOrAdmin())
 		{
+			creator.POST("/resource-tags", handler.CreateResourceTag)
 			creator.GET("/resources", handler.ListResources)
 			creator.POST("/resources/upload", handler.UploadResource)
 			creator.DELETE("/resources/batch", handler.BatchDeleteResources)
@@ -135,6 +140,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			creator.DELETE("/albums/:id", handler.DeleteCreatorAlbum)
 			creator.POST("/ai/suggest-title", handler.SuggestResourceTitle)
 			creator.POST("/ai/suggest-tags", handler.SuggestResourceTags)
+			creator.POST("/ai/suggest-tag-description", handler.SuggestResourceTagDescription)
 		}
 
 		admin := api.Group("/admin")

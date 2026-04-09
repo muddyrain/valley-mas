@@ -5,34 +5,12 @@ import { toast } from 'sonner';
 import { type Creator as CreatorType, getHotCreators } from '@/api/creator';
 import CreatorCard from '@/components/CreatorCard';
 import EmptyState from '@/components/EmptyState';
+import HeroSectionTitle from '@/components/page/HeroSectionTitle';
+import HeroStatChip from '@/components/page/HeroStatChip';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const PAGE_SIZE = 20;
-
-function SectionTitle({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="border-theme-soft-strong inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] text-theme-primary uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
-        {eyebrow}
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-[36px] font-semibold tracking-[-0.04em] text-slate-950 md:text-[42px]">
-          {title}
-        </h2>
-        <p className="max-w-2xl text-[15px] leading-8 text-slate-500 md:text-base">{description}</p>
-      </div>
-    </div>
-  );
-}
 
 export default function Creator() {
   const navigate = useNavigate();
@@ -81,25 +59,22 @@ export default function Creator() {
           <div className="theme-hero-glow absolute inset-0" />
           <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
             <div className="space-y-6">
-              <SectionTitle
+              <HeroSectionTitle
                 eyebrow="CREATORS"
                 title="创作者广场"
                 description="这里展示最近活跃的创作者，以及他们正在持续整理的资源和内容，方便继续浏览、进入空间或找到喜欢的风格。"
               />
 
               <div className="flex flex-wrap gap-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <Users className="text-theme-primary h-4 w-4" />
+                <HeroStatChip icon={<Users className="text-theme-primary h-4 w-4" />}>
                   {loading ? '...' : creators.length} 位创作者
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <Sparkles className="h-4 w-4 text-sky-500" />
+                </HeroStatChip>
+                <HeroStatChip icon={<Sparkles className="h-4 w-4 text-sky-500" />}>
                   {loading ? '...' : totalResources} 项内容
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <Download className="h-4 w-4 text-emerald-500" />
+                </HeroStatChip>
+                <HeroStatChip icon={<Download className="h-4 w-4 text-emerald-500" />}>
                   {loading ? '...' : totalDownloads} 次下载
-                </div>
+                </HeroStatChip>
               </div>
             </div>
 

@@ -445,3 +445,27 @@ func (n *UserNotification) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+// GuestbookMessage 访客留言
+type GuestbookMessage struct {
+	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID    *Int64String   `gorm:"index" json:"userId,omitempty"`
+	Nickname  string         `gorm:"size:40;not null" json:"nickname"`
+	Avatar    string         `gorm:"size:500" json:"avatar,omitempty"`
+	Content   string         `gorm:"size:1000;not null" json:"content"`
+	Status    string         `gorm:"size:20;not null;default:'approved';index" json:"status"`
+	IsPinned  bool           `gorm:"index;default:false" json:"isPinned"`
+	ClientIP  string         `gorm:"size:64" json:"-"`
+	UserAgent string         `gorm:"size:500" json:"-"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	User      *User          `gorm:"foreignKey:UserID" json:"user,omitempty"`
+}
+
+func (m *GuestbookMessage) BeforeCreate(tx *gorm.DB) error {
+	if m.ID == 0 {
+		m.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}

@@ -1,4 +1,4 @@
-import {
+﻿import {
   ExternalLink,
   Hash,
   ImageIcon,
@@ -19,7 +19,10 @@ import {
   type ResourceTag,
   unfavoriteResource,
 } from '@/api/resource';
+import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import EmptyState from '@/components/EmptyState';
+import HeroSectionTitle from '@/components/page/HeroSectionTitle';
+import HeroStatChip from '@/components/page/HeroStatChip';
 import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
 import TypeFilterBar from '@/components/TypeFilterBar';
 import { Button } from '@/components/ui/button';
@@ -33,30 +36,6 @@ const RESOURCE_TYPES = [
 ];
 
 const PAGE_SIZE = 8;
-
-function SectionTitle({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="border-theme-soft-strong inline-flex items-center rounded-full border bg-white/82 px-4 py-1.5 text-[11px] tracking-[0.32em] text-theme-primary uppercase shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)] backdrop-blur">
-        {eyebrow}
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-[36px] font-semibold tracking-[-0.04em] text-slate-950 md:text-[42px]">
-          {title}
-        </h2>
-        <p className="max-w-2xl text-[15px] leading-8 text-slate-500 md:text-base">{description}</p>
-      </div>
-    </div>
-  );
-}
 
 export default function Resources() {
   const navigate = useNavigate();
@@ -202,25 +181,22 @@ export default function Resources() {
           <div className="theme-hero-glow absolute inset-0" />
           <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
             <div className="space-y-6">
-              <SectionTitle
+              <HeroSectionTitle
                 eyebrow="RESOURCES"
                 title="资源整理"
                 description="壁纸、头像和最近整理出的图像资源都会先汇在这里，方便继续浏览、筛选和收藏。"
               />
 
               <div className="flex flex-wrap gap-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <ImageIcon className="text-theme-primary h-4 w-4" />共 {loading ? '...' : total}{' '}
-                  项资源
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <Sparkles className="h-4 w-4 text-theme-primary" />
+                <HeroStatChip icon={<ImageIcon className="text-theme-primary h-4 w-4" />}>
+                  共 {loading ? '...' : total} 项资源
+                </HeroStatChip>
+                <HeroStatChip icon={<Sparkles className="h-4 w-4 text-theme-primary" />}>
                   {wallpaperCount} 张壁纸
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_28px_rgba(148,163,184,0.08)]">
-                  <Sparkles className="h-4 w-4 text-theme-primary" />
+                </HeroStatChip>
+                <HeroStatChip icon={<Sparkles className="h-4 w-4 text-theme-primary" />}>
                   {avatarCount} 个头像
-                </div>
+                </HeroStatChip>
               </div>
 
               {/* 创作者快捷入口 */}
@@ -256,7 +232,7 @@ export default function Resources() {
                 </div>
                 <Button
                   onClick={handleSearch}
-                  className="h-11 rounded-full bg-slate-950 px-5 text-white hover:bg-slate-800"
+                  className="h-11 rounded-full bg-theme-primary px-5 text-white hover:bg-theme-primary-hover"
                 >
                   搜索
                 </Button>
@@ -399,66 +375,73 @@ export default function Resources() {
               </button>
             </div>
 
-            {loading ? (
-              <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
-                {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-                  <ResourceCardSkeleton key={i} />
-                ))}
-              </div>
-            ) : resources.length === 0 ? (
-              <div className="rounded-4xl bg-white/66 p-4">
-                <EmptyState
-                  icon={ImageIcon}
-                  title="暂无资源"
-                  description={
-                    keyword
-                      ? `没有找到包含"${keyword}"的资源`
-                      : activeTag
-                        ? `标签"${activeTag.name}"下暂无资源`
-                        : '这个分类下还没有资源内容'
-                  }
-                  actionLabel={keyword ? '清除搜索' : activeTag ? '清除标签' : undefined}
-                  onAction={
-                    keyword
-                      ? () => {
-                          setPage(1);
-                          setKeyword('');
-                          setInputValue('');
-                        }
-                      : activeTag
-                        ? () => {
-                            setPage(1);
-                            setActiveTag(null);
-                          }
-                        : undefined
-                  }
-                />
-              </div>
-            ) : (
-              <>
-                <div className="mb-6 flex items-center justify-between gap-4">
-                  <div className="text-sm text-slate-500">当前展示最近整理出的资源内容。</div>
-                  <div className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
-                    已显示 {resources.length} / {total}
-                  </div>
-                </div>
+            <div className="relative min-h-[280px]">
+              {loading && resources.length === 0 ? (
                 <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
-                  {resources.map((resource, index) => (
-                    <ResourceCard
-                      key={resource.id}
-                      resource={resource}
-                      isFavorited={favoritedMap[resource.id]}
-                      onFavorite={handleFavorite}
-                      showCreator
-                      showDate
-                      showEngagement
-                      showTags
-                      animationDelay={index * 30}
-                    />
+                  {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+                    <ResourceCardSkeleton key={i} />
                   ))}
                 </div>
-              </>
-            )}
+              ) : resources.length === 0 ? (
+                <div className="rounded-4xl bg-white/66 p-4">
+                  <EmptyState
+                    icon={ImageIcon}
+                    title="暂无资源"
+                    description={
+                      keyword
+                        ? `没有找到包含"${keyword}"的资源`
+                        : activeTag
+                          ? `标签"${activeTag.name}"下暂无资源`
+                          : '这个分类下还没有资源内容'
+                    }
+                    actionLabel={keyword ? '清除搜索' : activeTag ? '清除标签' : undefined}
+                    onAction={
+                      keyword
+                        ? () => {
+                            setPage(1);
+                            setKeyword('');
+                            setInputValue('');
+                          }
+                        : activeTag
+                          ? () => {
+                              setPage(1);
+                              setActiveTag(null);
+                            }
+                          : undefined
+                    }
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="mb-6 flex items-center justify-between gap-4">
+                    <div className="text-sm text-slate-500">当前展示最近整理出的资源内容。</div>
+                    <div className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
+                      已显示 {resources.length} / {total}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
+                    {resources.map((resource, index) => (
+                      <ResourceCard
+                        key={resource.id}
+                        resource={resource}
+                        isFavorited={favoritedMap[resource.id]}
+                        onFavorite={handleFavorite}
+                        showCreator
+                        showDate
+                        showEngagement
+                        showTags
+                        animationDelay={index * 30}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+              <BoxLoadingOverlay
+                show={(loading && resources.length > 0) || refreshing}
+                title={refreshing ? '正在刷新资源列表...' : '正在加载资源列表...'}
+                hint={refreshing ? '最新内容同步中' : '筛选结果更新中'}
+              />
+            </div>
             {totalPages > 1 ? (
               <div className="mt-10 flex items-center justify-center gap-3">
                 <Button
