@@ -32,7 +32,7 @@ import {
   renderMarkdownWithAnchors,
   type TocItem,
 } from '@/utils/blog';
-import { DefaultBlogCover } from './components/DefaultBlogCover';
+import { DefaultBlogCover } from '../components/DefaultBlogCover';
 
 type ImageTextPayload = {
   images?: string[];

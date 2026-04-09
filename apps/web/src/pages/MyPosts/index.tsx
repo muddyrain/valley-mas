@@ -28,11 +28,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useAuthStore } from '@/stores/useAuthStore';
+import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
 
 export default function MyPosts() {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuthStore();
+  const { canAccess } = usePageRoleGuard({
+    allowRoles: ['creator'],
+    unauthorizedMessage: '该页面仅创作者可访问',
+  });
 
   const [myPosts, setMyPosts] = useState<BlogPost[]>([]);
   const [blogGroups, setBlogGroups] = useState<BlogGroup[]>([]);
@@ -44,18 +47,6 @@ export default function MyPosts() {
   // 删除确认
   const [deletePostTarget, setDeletePostTarget] = useState<BlogPost | null>(null);
   const [deletingPost, setDeletingPost] = useState(false);
-
-  // 权限检查
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    if (user?.role !== 'creator') {
-      toast.error('该页面仅创作者可访问');
-      navigate('/');
-    }
-  }, [isAuthenticated, user, navigate]);
 
   const loadMyPosts = useCallback(async () => {
     try {
@@ -76,10 +67,10 @@ export default function MyPosts() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'creator') {
+    if (canAccess) {
       void loadMyPosts();
     }
-  }, [isAuthenticated, user, loadMyPosts]);
+  }, [canAccess, loadMyPosts]);
 
   const filteredBlogPosts = useMemo(
     () =>
@@ -162,7 +153,7 @@ export default function MyPosts() {
     </div>
   );
 
-  if (!isAuthenticated || user?.role !== 'creator') return null;
+  if (!canAccess) return null;
 
   return (
     <div className="min-h-screen bg-transparent text-slate-900">

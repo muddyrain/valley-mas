@@ -1,5 +1,5 @@
 import { Edit3, FolderTree, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -11,9 +11,10 @@ import {
   updateGroup,
 } from '@/api/blog';
 import { Button } from '@/components/ui/button';
+import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { useAuthStore } from '@/stores/useAuthStore';
+import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
 
 const GROUP_TYPE_META: Record<
   GroupType,
@@ -48,7 +49,10 @@ function resolveGroupType(raw: string | null): GroupType {
 export default function BlogGroupManage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, isAuthenticated } = useAuthStore();
+  const { canAccess } = usePageRoleGuard({
+    allowRoles: ['creator', 'admin'],
+    unauthorizedMessage: '仅创作者可管理分组',
+  });
   const groupType = resolveGroupType(searchParams.get('type'));
   const meta = useMemo(() => GROUP_TYPE_META[groupType], [groupType]);
 
@@ -65,10 +69,9 @@ export default function BlogGroupManage() {
   const [editDesc, setEditDesc] = useState('');
   const [updating, setUpdating] = useState(false);
 
-  const [deleteTarget, setDeleteTarget] = useState<Group | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     try {
       setLoading(true);
       const data = await getAdminGroups({ groupType });
@@ -78,20 +81,12 @@ export default function BlogGroupManage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [groupType]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    if (user?.role !== 'creator' && user?.role !== 'admin') {
-      toast.error('仅创作者可管理分组');
-      navigate('/');
-      return;
-    }
+    if (!canAccess) return;
     void loadGroups();
-  }, [groupType, isAuthenticated, navigate, user?.role]);
+  }, [canAccess, loadGroups]);
 
   const handleCreate = async () => {
     const name = createName.trim();
@@ -141,19 +136,29 @@ export default function BlogGroupManage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
+  const handleDelete = async (target: Group) => {
     try {
       setDeleting(true);
-      await deleteGroup(deleteTarget.id);
+      await deleteGroup(target.id);
       toast.success('分组删除成功');
-      setDeleteTarget(null);
       await loadGroups();
     } catch {
       toast.error('分组删除失败');
     } finally {
       setDeleting(false);
     }
+  };
+
+  const openDeleteConfirm = (target: Group) => {
+    if (deleting) return;
+    openConfirmToast({
+      title: `确认删除「${target.name}」？`,
+      description: '该分组下的内容会取消分组，不会删除内容本身。',
+      confirmText: '确认删除',
+      cancelText: '取消',
+      confirmVariant: 'danger',
+      onConfirm: () => handleDelete(target),
+    });
   };
 
   return (
@@ -252,7 +257,7 @@ export default function BlogGroupManage() {
                     size="sm"
                     variant="outline"
                     className="rounded-lg border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => setDeleteTarget(group)}
+                    onClick={() => openDeleteConfirm(group)}
                   >
                     <Trash2 className="mr-1 h-3.5 w-3.5" />
                     删除
@@ -316,30 +321,6 @@ export default function BlogGroupManage() {
                 保存
               </Button>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>删除分组</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-slate-600">
-            确认删除“{deleteTarget?.name}”？该分组下的内容会取消分组，不会删除内容本身。
-          </p>
-          <div className="mt-3 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
-              取消
-            </Button>
-            <Button
-              variant="outline"
-              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-              onClick={() => void handleDelete()}
-              disabled={deleting}
-            >
-              删除
-            </Button>
           </div>
         </DialogContent>
       </Dialog>

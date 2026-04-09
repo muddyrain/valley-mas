@@ -14,6 +14,7 @@ import CreatorProfile from './pages/CreatorProfile';
 import Downloads from './pages/Downloads';
 import Favorites from './pages/Favorites';
 import Follows from './pages/Follows';
+import Guestbook from './pages/Guestbook';
 import Home from './pages/Home';
 import ImageTextCreate from './pages/ImageTextCreate';
 import Login from './pages/Login';
@@ -40,6 +41,8 @@ function RouteTitle() {
       title = 'Valley | 内容首页';
     } else if (pathname === '/blog') {
       title = '博客与图文 | Valley';
+    } else if (pathname === '/guestbook') {
+      title = '访客留言墙 | Valley';
     } else if (pathname.startsWith('/blog/')) {
       title = '内容详情 | Valley';
     } else if (pathname === '/resources') {
@@ -137,6 +140,7 @@ function App() {
           <Route path="notifications" element={<Notifications />} />
           <Route path="apply-creator" element={<ApplyCreator />} />
           <Route path="blog" element={<BlogList />} />
+          <Route path="guestbook" element={<Guestbook />} />
           <Route path="blog/:id" element={<BlogPost />} />
           <Route path="tts" element={<TTSStudio />} />
           <Route path="ai-chat" element={<AIChat />} />

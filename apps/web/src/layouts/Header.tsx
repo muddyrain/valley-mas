@@ -8,6 +8,7 @@
   Home,
   ImageIcon,
   LogOut,
+  MessageCircleHeart,
   Palette,
   RefreshCw,
   Sparkles,
@@ -259,6 +260,20 @@ export default function Header() {
             >
               <BookOpen className="h-4 w-4" />
               <span className="hidden sm:inline">博客</span>
+            </Button>
+          </Link>
+
+          <Link to="/guestbook">
+            <Button
+              variant="ghost"
+              className={`gap-2 transition-colors ${
+                location.pathname.startsWith('/guestbook')
+                  ? 'bg-theme-soft text-theme-primary-hover'
+                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
+              }`}
+            >
+              <MessageCircleHeart className="h-4 w-4" />
+              <span className="hidden sm:inline">留言墙</span>
             </Button>
           </Link>
 
