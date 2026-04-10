@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { type Post as BlogPost, getAdminPosts } from '@/api/blog';
 import { getMyResources, type MyResource } from '@/api/resource';
 import { BlogPostCard, ImageTextPostCard } from '@/components/blog';
+import PanelLoadingOverlay from '@/components/PanelLoadingOverlay';
 import HeroSectionTitle from '@/components/page/HeroSectionTitle';
 import HeroStatChip from '@/components/page/HeroStatChip';
 import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
@@ -46,6 +47,10 @@ export default function MySpace() {
 
   // 上传弹窗状态
   const [uploadOpen, setUploadOpen] = useState(false);
+  const showResourcesOverlay = loading && resources.length > 0;
+  const showPostsOverlay =
+    (loadingBlogPosts && blogPosts.length > 0) ||
+    (loadingImageTextPosts && imageTextPosts.length > 0);
 
   const loadResources = useCallback(async () => {
     try {
@@ -229,7 +234,7 @@ export default function MySpace() {
 
         {/* ===== 资源预览 ===== */}
         <section className="mt-24">
-          <div className="rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
+          <div className="relative rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <HeroSectionTitle
@@ -260,7 +265,7 @@ export default function MySpace() {
               </div>
             </div>
 
-            {loading ? (
+            {loading && resources.length === 0 ? (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <ResourceCardSkeleton key={i} />
@@ -307,12 +312,19 @@ export default function MySpace() {
                 )}
               </>
             )}
+
+            <PanelLoadingOverlay
+              show={showResourcesOverlay}
+              title="正在同步资源列表..."
+              hint="刚上传或刚更新的内容马上就到"
+              className="rounded-[30px]"
+            />
           </div>
         </section>
 
         {/* ===== 内容预览 ===== */}
         <section className="mt-24">
-          <div className="rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6 space-y-8">
+          <div className="relative space-y-8 rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <HeroSectionTitle
                 eyebrow="CONTENT"
@@ -370,7 +382,7 @@ export default function MySpace() {
                 )}
               </div>
 
-              {loadingBlogPosts ? (
+              {loadingBlogPosts && blogPosts.length === 0 ? (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {Array.from({ length: BLOG_PREVIEW_SIZE }).map((_, i) => (
                     <div key={i} className="h-44 animate-pulse rounded-2xl bg-theme-soft" />
@@ -410,7 +422,7 @@ export default function MySpace() {
                 )}
               </div>
 
-              {loadingImageTextPosts ? (
+              {loadingImageTextPosts && imageTextPosts.length === 0 ? (
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                   {Array.from({ length: IMAGE_TEXT_PREVIEW_SIZE }).map((_, i) => (
                     <div key={i} className="h-44 animate-pulse rounded-2xl bg-theme-soft" />
@@ -439,6 +451,13 @@ export default function MySpace() {
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
+
+            <PanelLoadingOverlay
+              show={showPostsOverlay}
+              title="正在刷新内容预览..."
+              hint="博客和图文列表更新中"
+              className="rounded-[30px]"
+            />
           </div>
         </section>
 

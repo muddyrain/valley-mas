@@ -131,21 +131,86 @@ func GetMyFavorites(c *gin.Context) {
 
 	query := db.Model(&model.UserFavorite{}).Where("user_id = ?", uid)
 	query.Count(&total)
-	query.Preload("Resource").
+	query.Preload("Resource.Tags").
+		Preload("Resource.User").
 		Order("created_at DESC").
 		Offset(offset).
 		Limit(pageSize).
 		Find(&favorites)
 
-	// 填充缩略图 URL（Resource.ThumbnailURL 不存储在数据库中，需要动态生成）
+	creatorCodeMap := map[model.Int64String]string{}
+	resourceUserIDs := make([]model.Int64String, 0, len(favorites))
+	seenUserIDs := map[model.Int64String]struct{}{}
 	for i := range favorites {
-		if favorites[i].Resource != nil {
-			favorites[i].Resource.FillThumbnailURL()
+		if favorites[i].Resource == nil {
+			continue
+		}
+		resourceUserID := favorites[i].Resource.UserID
+		if _, ok := seenUserIDs[resourceUserID]; ok {
+			continue
+		}
+		seenUserIDs[resourceUserID] = struct{}{}
+		resourceUserIDs = append(resourceUserIDs, resourceUserID)
+	}
+	if len(resourceUserIDs) > 0 {
+		var creators []model.Creator
+		db.Select("user_id, code").
+			Where("user_id IN ? AND is_active = ? AND deleted_at IS NULL", resourceUserIDs, true).
+			Find(&creators)
+		for i := range creators {
+			creatorCodeMap[creators[i].UserID] = creators[i].Code
 		}
 	}
 
+	list := make([]gin.H, 0, len(favorites))
+	for i := range favorites {
+		var resourcePayload gin.H
+		if favorites[i].Resource != nil {
+			resource := favorites[i].Resource
+			resource.FillThumbnailURL()
+
+			creatorName := ""
+			creatorAvatar := ""
+			if resource.User != nil {
+				creatorName = resource.User.Nickname
+				creatorAvatar = resource.User.Avatar
+			}
+
+			resourcePayload = gin.H{
+				"id":            resource.ID,
+				"title":         resource.Title,
+				"description":   resource.Description,
+				"url":           resource.URL,
+				"thumbnailUrl":  resource.ThumbnailURL,
+				"type":          resource.Type,
+				"visibility":    resource.Visibility,
+				"downloadCount": resource.DownloadCount,
+				"favoriteCount": resource.FavoriteCount,
+				"userId":        resource.UserID,
+				"creatorName":   creatorName,
+				"creatorAvatar": creatorAvatar,
+				"creatorCode":   creatorCodeMap[resource.UserID],
+				"tags":          resource.Tags,
+				"createdAt":     resource.CreatedAt,
+				"size":          resource.Size,
+				"width":         resource.Width,
+				"height":        resource.Height,
+				"extension":     resource.Extension,
+				"isFavorited":   true,
+			}
+		}
+
+		list = append(list, gin.H{
+			"id":         favorites[i].ID,
+			"userId":     favorites[i].UserID,
+			"resourceId": favorites[i].ResourceID,
+			"createdAt":  favorites[i].CreatedAt,
+			"resource":   resourcePayload,
+		})
+	}
+
 	Success(c, gin.H{
-		"list":     favorites,
+		"list":     list,
 		"total":    total,
 		"page":     page,
 		"pageSize": pageSize,

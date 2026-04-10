@@ -30,6 +30,7 @@ import {
   type Visibility,
 } from '@/api/blog';
 import { BlogPostCard, ImageTextPostCard } from '@/components/blog';
+import PanelLoadingOverlay from '@/components/PanelLoadingOverlay';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -78,6 +79,8 @@ export default function MyPosts() {
     () => [...blogPosts, ...imageTextPosts],
     [blogPosts, imageTextPosts],
   );
+  const hasLoadedPosts = visiblePosts.length > 0;
+  const showPostLoadingOverlay = loadingPosts && hasLoadedPosts;
   const selectedCount = selectedIds.size;
   const allVisibleSelected =
     visiblePosts.length > 0 && visiblePosts.every((post) => selectedIds.has(post.id));
@@ -382,7 +385,7 @@ export default function MyPosts() {
           </div>
         </div>
 
-        <div className="space-y-10 rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
+        <div className="relative space-y-10 rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
           {batchMode && (
             <div className="rounded-2xl border border-theme-soft-strong bg-theme-soft/45 px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -448,7 +451,7 @@ export default function MyPosts() {
               </DropdownMenu>
             </div>
 
-            {loadingPosts ? (
+            {loadingPosts && !hasLoadedPosts ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: BLOG_PAGE_SIZE }).map((_, i) => (
                   <div key={i} className="h-44 animate-pulse rounded-2xl bg-theme-soft" />
@@ -537,7 +540,7 @@ export default function MyPosts() {
               </DropdownMenu>
             </div>
 
-            {loadingPosts ? (
+            {loadingPosts && !hasLoadedPosts ? (
               <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                 {Array.from({ length: IMAGE_TEXT_PAGE_SIZE }).map((_, i) => (
                   <div key={i} className="h-44 animate-pulse rounded-2xl bg-theme-soft" />
@@ -591,6 +594,13 @@ export default function MyPosts() {
               </>
             )}
           </div>
+
+          <PanelLoadingOverlay
+            show={showPostLoadingOverlay}
+            title="正在同步内容列表..."
+            hint="分页和筛选结果更新中"
+            className="rounded-[30px]"
+          />
         </div>
       </div>
 
