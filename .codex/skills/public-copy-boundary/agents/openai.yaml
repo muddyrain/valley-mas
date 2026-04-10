@@ -1,4 +1,0 @@
-interface:
-  display_name: "对外文案边界"
-  short_description: "避免把内部设计推理直接写进用户可见页面文案。"
-  default_prompt: "使用 $public-copy-boundary 检查这次改动里的页面文案，确保只展示产品结果，不暴露内部设计理由和协作指引。"

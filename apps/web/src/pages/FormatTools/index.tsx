@@ -126,8 +126,7 @@ export default function FormatTools() {
           <div>
             <h1 className="text-2xl font-bold drop-shadow-lg md:text-3xl">格式转换工具箱</h1>
             <p className="mt-2 max-w-3xl text-sm text-white/84 md:text-[15px]">
-              这页由 workspace package 驱动。后续新增工具时，只要在 shared
-              转换器注册表追加一条定义，页面会自动扩展。
+              把常用的数据、编码和文本格式转换集中到一页，复制即用，减少来回切换工具的成本。
             </p>
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-white/85">
@@ -296,13 +295,10 @@ export default function FormatTools() {
 
           <Card className="rounded-3xl border border-theme-shell-border bg-white/75 shadow-[0_16px_40px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm">
             <CardContent className="space-y-2 p-5">
-              <p className="text-sm font-semibold text-slate-900">扩展方式</p>
+              <p className="text-sm font-semibold text-slate-900">使用小贴士</p>
               <p className="text-sm text-slate-600">
-                后续新增转换器，建议直接在 workspace 包里追加定义：
+                先在左侧选择转换类型，再粘贴原始内容并执行转换。结果支持一键复制，方便直接复用到你的工作流。
               </p>
-              <code className="block rounded-xl bg-slate-900 px-3 py-2 text-xs text-slate-100">
-                packages/format-tools/src/index.ts
-              </code>
             </CardContent>
           </Card>
         </div>

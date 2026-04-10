@@ -10,6 +10,7 @@ import {
   getAdminGroups,
   updateGroup,
 } from '@/api/blog';
+import PanelLoadingOverlay from '@/components/PanelLoadingOverlay';
 import { Button } from '@/components/ui/button';
 import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -58,6 +59,7 @@ export default function BlogGroupManage() {
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+  const showGroupsOverlay = loading && groups.length > 0;
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState('');
@@ -204,69 +206,78 @@ export default function BlogGroupManage() {
           </div>
         </div>
 
-        {loading ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-36 animate-pulse rounded-2xl bg-slate-100" />
-            ))}
-          </div>
-        ) : groups.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-14 text-center">
-            <FolderTree className="mx-auto h-10 w-10 text-slate-300" />
-            <p className="mt-3 text-slate-500">{meta.empty}</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {groups.map((group) => (
-              <div
-                key={group.id}
-                className="rounded-2xl border border-violet-200/70 bg-white p-5 shadow-[0_8px_22px_rgba(99,73,190,0.1)]"
-              >
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <div>
-                    <div className="mb-2">
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                        {meta.manageLabel}
-                      </span>
+        <div className="relative">
+          {loading && groups.length === 0 ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-36 animate-pulse rounded-2xl bg-slate-100" />
+              ))}
+            </div>
+          ) : groups.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-14 text-center">
+              <FolderTree className="mx-auto h-10 w-10 text-slate-300" />
+              <p className="mt-3 text-slate-500">{meta.empty}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {groups.map((group) => (
+                <div
+                  key={group.id}
+                  className="rounded-2xl border border-violet-200/70 bg-white p-5 shadow-[0_8px_22px_rgba(99,73,190,0.1)]"
+                >
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div>
+                      <div className="mb-2">
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                          {meta.manageLabel}
+                        </span>
+                      </div>
+                      <h3 className="text-lg font-semibold text-slate-900">{group.name}</h3>
+                      <p className="mt-1 text-xs text-slate-500">内容数：{group.postCount || 0}</p>
                     </div>
-                    <h3 className="text-lg font-semibold text-slate-900">{group.name}</h3>
-                    <p className="mt-1 text-xs text-slate-500">内容数：{group.postCount || 0}</p>
+                    <span className="rounded-full bg-theme-primary/10 px-2 py-0.5 text-xs text-theme-primary">
+                      ID {group.id}
+                    </span>
                   </div>
-                  <span className="rounded-full bg-theme-primary/10 px-2 py-0.5 text-xs text-theme-primary">
-                    ID {group.id}
-                  </span>
+                  <p className="line-clamp-2 min-h-[40px] text-sm text-slate-600">
+                    {group.description || '暂未填写分组说明'}
+                  </p>
+                  <div className="mt-4 flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-lg"
+                      onClick={() => {
+                        setEditTarget(group);
+                        setEditName(group.name);
+                        setEditDesc(group.description || '');
+                      }}
+                    >
+                      <Edit3 className="mr-1 h-3.5 w-3.5" />
+                      编辑
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-lg border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                      onClick={() => openDeleteConfirm(group)}
+                    >
+                      <Trash2 className="mr-1 h-3.5 w-3.5" />
+                      删除
+                    </Button>
+                  </div>
                 </div>
-                <p className="line-clamp-2 min-h-[40px] text-sm text-slate-600">
-                  {group.description || '暂未填写分组说明'}
-                </p>
-                <div className="mt-4 flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="rounded-lg"
-                    onClick={() => {
-                      setEditTarget(group);
-                      setEditName(group.name);
-                      setEditDesc(group.description || '');
-                    }}
-                  >
-                    <Edit3 className="mr-1 h-3.5 w-3.5" />
-                    编辑
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="rounded-lg border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => openDeleteConfirm(group)}
-                  >
-                    <Trash2 className="mr-1 h-3.5 w-3.5" />
-                    删除
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+
+          <PanelLoadingOverlay
+            show={showGroupsOverlay}
+            title="正在同步分组列表..."
+            hint="变更已提交，列表马上更新"
+            className="rounded-[24px]"
+          />
+        </div>
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

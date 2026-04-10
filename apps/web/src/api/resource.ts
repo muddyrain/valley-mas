@@ -142,6 +142,8 @@ export const getMyFavorites = (params: { page?: number; pageSize?: number } = {}
         resource?: Resource;
       }>;
       total: number;
+      page: number;
+      pageSize: number;
     }
   >(`/user/favorites?page=${page}&pageSize=${pageSize}`);
 };
