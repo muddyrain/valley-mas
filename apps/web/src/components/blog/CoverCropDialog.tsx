@@ -1,5 +1,10 @@
 import { ImagePlus, Loader2, Move, ZoomIn } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import {
+  BLOG_COVER_ASPECT_CLASS,
+  BLOG_COVER_OUTPUT_HEIGHT,
+  BLOG_COVER_OUTPUT_WIDTH,
+} from '@/components/blog/BlogCoverMedia';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -14,9 +19,6 @@ type CoverCropDialogProps = {
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
-
-const OUTPUT_W = 1200;
-const OUTPUT_H = 480;
 
 export function CoverCropDialog({
   open,
@@ -36,7 +38,6 @@ export function CoverCropDialog({
   const [processing, setProcessing] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // 加载图片
   useEffect(() => {
     if (!open || !imageUrl) return;
     let canceled = false;
@@ -59,13 +60,25 @@ export function CoverCropDialog({
     };
   }, [open, imageUrl]);
 
-  // 每次 zoom/offset/imageLoaded 变化，重绘预览 canvas
+  const getRenderRect = (boxW: number, boxH: number, nextZoom = zoom) => {
+    const img = loadedImageRef.current;
+    if (!img || !boxW || !boxH) {
+      return { drawX: 0, drawY: 0, drawW: 0, drawH: 0 };
+    }
+    const base = Math.max(boxW / img.naturalWidth, boxH / img.naturalHeight);
+    const scale = base * nextZoom;
+    const drawW = img.naturalWidth * scale;
+    const drawH = img.naturalHeight * scale;
+    const drawX = (boxW - drawW) / 2 + offsetX;
+    const drawY = (boxH - drawH) / 2 + offsetY;
+    return { drawX, drawY, drawW, drawH };
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const img = loadedImageRef.current;
     if (!canvas || !img || !imageLoaded) return;
 
-    // 同步 canvas buffer 分辨率与实际显示尺寸
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     const viewW = rect.width;
@@ -78,25 +91,14 @@ export function CoverCropDialog({
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const base = Math.max(viewW / img.naturalWidth, viewH / img.naturalHeight);
-    const scale = base * zoom;
-    const srcX = clamp(
-      -((viewW - img.naturalWidth * scale) / 2 + offsetX) / scale,
-      0,
-      img.naturalWidth,
-    );
-    const srcY = clamp(
-      -((viewH - img.naturalHeight * scale) / 2 + offsetY) / scale,
-      0,
-      img.naturalHeight,
-    );
-    const srcW = clamp(viewW / scale, 1, img.naturalWidth - srcX);
-    const srcH = clamp(viewH / scale, 1, img.naturalHeight - srcY);
+    const { drawX, drawY, drawW, drawH } = getRenderRect(viewW, viewH);
 
     ctx.clearRect(0, 0, viewW, viewH);
+    ctx.fillStyle = '#f6eef3';
+    ctx.fillRect(0, 0, viewW, viewH);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, viewW, viewH);
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
   }, [zoom, offsetX, offsetY, imageLoaded]);
 
   const getDragLimit = (nextZoom = zoom) => {
@@ -121,7 +123,6 @@ export function CoverCropDialog({
     setOffsetY(clamp(y, -limit.maxY, limit.maxY));
   };
 
-  // 输出到 1200x480 canvas，与预览保持一致
   const renderToBlob = async (): Promise<Blob | null> => {
     const canvas = canvasRef.current;
     const img = loadedImageRef.current;
@@ -131,30 +132,22 @@ export function CoverCropDialog({
     const viewH = rect.height;
     if (!viewW || !viewH) return null;
 
-    const base = Math.max(viewW / img.naturalWidth, viewH / img.naturalHeight);
-    const scale = base * zoom;
-    const srcX = clamp(
-      -((viewW - img.naturalWidth * scale) / 2 + offsetX) / scale,
-      0,
-      img.naturalWidth,
-    );
-    const srcY = clamp(
-      -((viewH - img.naturalHeight * scale) / 2 + offsetY) / scale,
-      0,
-      img.naturalHeight,
-    );
-    const srcW = clamp(viewW / scale, 1, img.naturalWidth - srcX);
-    const srcH = clamp(viewH / scale, 1, img.naturalHeight - srcY);
+    const outW = BLOG_COVER_OUTPUT_WIDTH;
+    const outH = BLOG_COVER_OUTPUT_HEIGHT;
+    const scaleX = outW / viewW;
+    const scaleY = outH / viewH;
+    const { drawX, drawY, drawW, drawH } = getRenderRect(viewW, viewH);
 
     const out = document.createElement('canvas');
-    out.width = OUTPUT_W;
-    out.height = OUTPUT_H;
+    out.width = outW;
+    out.height = outH;
     const ctx = out.getContext('2d');
     if (!ctx) return null;
+
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, OUTPUT_W, OUTPUT_H);
-    return await new Promise((resolve) => out.toBlob(resolve, 'image/jpeg', 0.92));
+    ctx.drawImage(img, drawX * scaleX, drawY * scaleY, drawW * scaleX, drawH * scaleY);
+    return await new Promise((resolve) => out.toBlob(resolve, 'image/jpeg', 0.95));
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -208,10 +201,9 @@ export function CoverCropDialog({
 
         <div className="space-y-4 bg-[linear-gradient(180deg,#f8f7ff_0%,#f2f7ff_100%)] p-5">
           <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
-            {/* canvas 预览，与输出保持一致的绘制逻辑 */}
             <canvas
               ref={canvasRef}
-              className="block aspect-5/2 w-full touch-none rounded-xl bg-slate-950/90"
+              className={`block w-full touch-none rounded-xl bg-slate-950/90 ${BLOG_COVER_ASPECT_CLASS}`}
               style={{ cursor: dragging ? 'grabbing' : 'grab' }}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
@@ -224,7 +216,7 @@ export function CoverCropDialog({
             <div className="mb-2 flex items-center justify-between text-sm text-slate-600">
               <span className="inline-flex items-center gap-1.5">
                 <ZoomIn className="h-4 w-4 text-violet-500" />
-                缩放裁剪
+                缩放预览
               </span>
               <span>{zoom.toFixed(2)}x</span>
             </div>
@@ -246,7 +238,9 @@ export function CoverCropDialog({
                 <Move className="h-3.5 w-3.5" />
                 拖动图片调整位置
               </span>
-              <span>输出比例固定为 1200 x 480</span>
+              <span>
+                输出比例固定为 {BLOG_COVER_OUTPUT_WIDTH} x {BLOG_COVER_OUTPUT_HEIGHT}
+              </span>
             </div>
           </div>
 

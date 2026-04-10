@@ -1,7 +1,7 @@
 import { ArrowRight, Github, Sparkles } from 'lucide-react';
 import type { CSSProperties } from 'react';
-import type { ContributionOverview } from '@/components/home/githubContribution';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { ContributionOverview } from './githubContribution';
 
 export interface GithubProfile {
   login: string;
@@ -123,7 +123,7 @@ export default function HomeAuthorProfileCard({
   contributionOverview,
 }: HomeAuthorProfileCardProps) {
   return (
-    <div className="rounded-[34px] border border-white/84 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,248,241,0.86))] p-5 shadow-[0_20px_60px_rgba(var(--theme-primary-rgb),0.16)] backdrop-blur">
+    <div className="rounded-[34px] border border-white/84 bg-[linear-gradient(160deg,rgba(255,255,255,0.94),rgba(var(--theme-primary-rgb),0.11),rgba(var(--theme-secondary-rgb),0.08))] p-5 shadow-[0_20px_60px_rgba(var(--theme-primary-rgb),0.16)] backdrop-blur">
       <div className="mb-4 flex items-center justify-between">
         <div className="bg-theme-soft text-theme-primary inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
           <Github className="h-3.5 w-3.5" />

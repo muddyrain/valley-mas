@@ -2,14 +2,13 @@
   ArrowRight,
   BookOpen,
   Download,
-  Heart,
   Images,
   Search,
   Sparkles,
   SquareChartGantt,
   UserRound,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { getPosts, type Post } from '@/api/blog';
@@ -22,161 +21,26 @@ import {
 } from '@/api/resource';
 import { BlogFeedCard } from '@/components/blog/BlogFeedCard';
 import CreatorCard from '@/components/CreatorCard';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAuthStore } from '@/stores/useAuthStore';
 import {
   buildContributionOverview,
   GITHUB_AUTHOR_LOGIN,
   type GithubContributionPayload,
   type GithubContributionPoint,
-} from '@/components/home/githubContribution';
-import HomeAuthorProfileCard, { type GithubProfile } from '@/components/home/HomeAuthorProfileCard';
-import HomeEnergyCore from '@/components/home/HomeEnergyCore';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useAuthStore } from '@/stores/useAuthStore';
-
-function SectionHeading({
-  eyebrow,
-  title,
-  description,
-  action,
-}: {
-  eyebrow: string;
-  title: string;
-  description?: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-      <div className="space-y-3">
-        <div className="theme-eyebrow inline-flex items-center rounded-full border bg-white/88 px-4 py-1.5 text-[11px] tracking-[0.3em] uppercase shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur">
-          {eyebrow}
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-[36px] font-semibold tracking-[-0.045em] text-slate-950 md:text-[46px]">
-            {title}
-          </h2>
-          {description ? (
-            <p className="max-w-2xl text-[15px] leading-8 text-slate-500 md:text-base">
-              {description}
-            </p>
-          ) : null}
-        </div>
-      </div>
-      {action}
-    </div>
-  );
-}
-
-function HeroStat({ label, value, accent }: { label: string; value: string; accent: string }) {
-  return (
-    <div className="group relative overflow-hidden rounded-[26px] border border-white/80 bg-white/82 p-4 shadow-[0_18px_48px_rgba(var(--theme-primary-rgb),0.12)] backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_24px_58px_rgba(var(--theme-primary-rgb),0.2)]">
-      <div className="pointer-events-none absolute -right-8 -top-8 h-20 w-20 rounded-full bg-white/40 blur-xl transition group-hover:scale-125" />
-      <div className={`mb-3 h-1.5 w-16 rounded-full ${accent}`} />
-      <div className="text-2xl font-semibold text-slate-950">{value}</div>
-      <div className="mt-1 text-sm text-slate-500">{label}</div>
-    </div>
-  );
-}
-
-function HeroRibbon({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return (
-    <div className="inline-flex items-center gap-3 rounded-full border border-white/85 bg-white/84 px-4 py-2 shadow-[0_14px_36px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur">
-      <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-theme-soft text-theme-primary shadow-[0_8px_20px_rgba(var(--theme-primary-rgb),0.18)]">
-        {icon}
-      </div>
-      <div className="leading-tight">
-        <div className="text-[11px] tracking-[0.16em] text-slate-400 uppercase">{label}</div>
-        <div className="text-sm font-medium text-slate-900">{value}</div>
-      </div>
-    </div>
-  );
-}
-
-function QuickEntryCard({
-  icon,
-  title,
-  description,
-  onClick,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group rounded-[24px] border border-white/84 bg-white/86 px-4 py-4 text-left shadow-[0_12px_30px_rgba(var(--theme-primary-rgb),0.08)] transition hover:-translate-y-1 hover:border-theme-soft-strong hover:shadow-[0_20px_44px_rgba(var(--theme-primary-rgb),0.16)]"
-    >
-      <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-theme-soft text-theme-primary shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.16)]">
-        {icon}
-      </div>
-      <div className="text-sm font-medium text-slate-900">{title}</div>
-      <div className="mt-1 text-xs leading-6 text-slate-500">{description}</div>
-      <div className="mt-3 inline-flex items-center gap-1 text-xs text-theme-primary opacity-0 transition group-hover:opacity-100">
-        立即进入
-        <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-      </div>
-    </button>
-  );
-}
-
-function EmptyPanel({
-  title,
-  description,
-  action,
-}: {
-  title: string;
-  description: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="rounded-[32px] border border-dashed border-theme-shell-border bg-white/70 px-8 py-12 text-center shadow-[0_20px_56px_rgba(var(--theme-primary-rgb),0.1)] backdrop-blur">
-      <div className="mx-auto max-w-xl space-y-3">
-        <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
-        <p className="text-sm leading-7 text-slate-500">{description}</p>
-        {action ? <div className="pt-2">{action}</div> : null}
-      </div>
-    </div>
-  );
-}
-
-function ResourceFavoriteButton({
-  active,
-  onClick,
-  size,
-}: {
-  active: boolean;
-  onClick: (event: React.MouseEvent) => void;
-  size: 'sm' | 'md';
-}) {
-  const sizeClassMap: Record<'sm' | 'md', string> = {
-    sm: 'h-6.5 w-6.5',
-    md: 'h-8.5 w-8.5',
-  };
-  const iconClassMap: Record<'sm' | 'md', string> = {
-    sm: 'h-3 w-3',
-    md: 'h-4 w-4',
-  };
-  const sizeClass = sizeClassMap[size];
-  const iconClass = iconClassMap[size];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex ${sizeClass} items-center justify-center rounded-full border border-white/70 backdrop-blur transition ${
-        active
-          ? 'bg-rose-500 text-white shadow-[0_8px_20px_rgba(244,63,94,0.32)]'
-          : 'bg-black/22 text-white hover:bg-black/34'
-      }`}
-      aria-label={active ? '取消收藏' : '收藏资源'}
-    >
-      <Heart className={`${iconClass} ${active ? 'fill-current' : ''}`} />
-    </button>
-  );
-}
+} from './components/githubContribution';
+import HomeAuthorProfileCard, { type GithubProfile } from './components/HomeAuthorProfileCard';
+import HomeEnergyCore from './components/HomeEnergyCore';
+import {
+  EmptyPanel,
+  HeroRibbon,
+  HeroStat,
+  QuickEntryCard,
+  ResourceFavoriteButton,
+  SectionHeading,
+} from './components/HomeSectionBlocks';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -224,18 +88,14 @@ export default function Home() {
         list: [] as Resource[],
         total: 0,
       })),
-      getAllResources({ page: 1, pageSize: 3, type: 'background' }).catch(() => ({
-        list: [] as Resource[],
-        total: 0,
-      })),
       getAllResources({ page: 1, pageSize: 6, type: 'avatar' }).catch(() => ({
         list: [] as Resource[],
         total: 0,
       })),
     ])
-      .then(([wallpaperData, backgroundData, avatarData]) => {
+      .then(([wallpaperData, avatarData]) => {
         if (cancelled) return;
-        const wallpaperPool = [...(wallpaperData.list ?? []), ...(backgroundData.list ?? [])];
+        const wallpaperPool = [...(wallpaperData.list ?? [])];
         const seenWallpaperIds = new Set<string>();
         const mergedWallpaper = wallpaperPool
           .filter((item) => {
@@ -490,12 +350,12 @@ export default function Home() {
                 <HeroStat
                   label="内容入口持续更新"
                   value={loadingPosts ? '...' : `${posts.length}+`}
-                  accent="bg-[color-mix(in_srgb,var(--theme-tertiary-rgb)_70%,white)]"
+                  accent="bg-[rgba(var(--theme-tertiary-rgb),0.72)]"
                 />
                 <HeroStat
                   label="可浏览资源数量"
                   value={loadingResources ? '...' : `${resources.length}+`}
-                  accent="bg-[color-mix(in_srgb,var(--theme-secondary-rgb)_70%,white)]"
+                  accent="bg-[rgba(var(--theme-secondary-rgb),0.72)]"
                 />
                 <HeroStat
                   label="展示中的创作者"
@@ -505,7 +365,7 @@ export default function Home() {
               </div>
 
               <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
-                <div className="overflow-hidden rounded-[30px] border border-white/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(255,247,236,0.86))] p-5 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.12)] backdrop-blur">
+                <div className="overflow-hidden rounded-[30px] border border-white/80 bg-[linear-gradient(138deg,rgba(255,255,255,0.95),rgba(var(--theme-primary-rgb),0.10),rgba(var(--theme-secondary-rgb),0.08))] p-5 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.12)] backdrop-blur">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-500">
                     <Sparkles className="text-theme-primary h-3.5 w-3.5" />
                     信号总览
@@ -568,26 +428,32 @@ export default function Home() {
                 loadingGithubContributions={loadingGithubContributions}
                 contributionOverview={contributionOverview}
               />
-              <div className="rounded-[34px] border border-theme-shell-border bg-[linear-gradient(180deg,rgba(247,251,255,0.96),rgba(255,255,255,0.9))] p-5 shadow-[0_20px_56px_rgba(var(--theme-primary-rgb),0.12)]">
+              <div className="relative overflow-hidden rounded-[34px] border border-theme-shell-border bg-[linear-gradient(155deg,rgba(255,255,255,0.96),rgba(var(--theme-primary-rgb),0.10),rgba(var(--theme-secondary-rgb),0.08),rgba(255,255,255,0.92))] p-5 shadow-[0_24px_64px_rgba(var(--theme-primary-rgb),0.16)]">
+                <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-[rgba(var(--theme-secondary-rgb),0.20)] blur-3xl" />
+                <div className="pointer-events-none absolute -left-12 -bottom-14 h-40 w-40 rounded-full bg-[rgba(var(--theme-tertiary-rgb),0.16)] blur-3xl" />
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-600">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/90 px-3 py-1 text-xs text-slate-600 shadow-[0_8px_20px_rgba(var(--theme-primary-rgb),0.1)]">
                     <Images className="h-3.5 w-3.5 text-theme-primary" />
                     快速通道
                   </div>
-                  <div className="text-xs text-slate-400">极速导航</div>
+                  <div className="rounded-full border border-white/75 bg-white/80 px-3 py-1 text-xs text-slate-500">
+                    极速导航
+                  </div>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                <div className="relative grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                   <QuickEntryCard
                     icon={<Images className="h-4 w-4 text-theme-primary" />}
                     title="资源整理"
                     description="资源浏览与收藏入口。"
                     onClick={() => navigate('/resources')}
+                    tone="secondary"
                   />
                   <QuickEntryCard
                     icon={<BookOpen className="h-4 w-4 text-theme-primary" />}
                     title="博客与图文"
                     description="最近更新的内容都在这里。"
                     onClick={() => navigate('/blog')}
+                    tone="primary"
                   />
                   {isCreator ? (
                     <QuickEntryCard
@@ -595,6 +461,7 @@ export default function Home() {
                       title="创作空间"
                       description="继续整理和管理自己的内容。"
                       onClick={() => navigate('/my-space')}
+                      tone="tertiary"
                     />
                   ) : null}
                 </div>

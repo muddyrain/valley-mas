@@ -1,3 +1,10 @@
+export {
+  BLOG_COVER_ASPECT_CLASS,
+  BLOG_COVER_OUTPUT_HEIGHT,
+  BLOG_COVER_OUTPUT_SIZE_TEXT,
+  BLOG_COVER_OUTPUT_WIDTH,
+  BlogCoverMedia,
+} from './BlogCoverMedia';
 export { BlogFeedCard } from './BlogFeedCard';
 export { BlogPostCard } from './BlogPostCard';
 export { ExternalPreviewPostCard } from './ExternalPreviewPostCard';

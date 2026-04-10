@@ -1,5 +1,5 @@
 import { Sparkles } from 'lucide-react';
-import HeroImmersiveShowcase from '@/components/home/HeroImmersiveShowcase';
+import HeroImmersiveShowcase from './HeroImmersiveShowcase';
 
 export default function HomeEnergyCore() {
   return (

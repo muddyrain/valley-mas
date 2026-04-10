@@ -27,19 +27,18 @@ import {
   uploadBlogCoverByUrl,
   type Visibility,
 } from '@/api/blog';
-import { MarkdownPreview } from '@/components/blog';
+import {
+  BLOG_COVER_ASPECT_CLASS,
+  BLOG_COVER_OUTPUT_HEIGHT,
+  BLOG_COVER_OUTPUT_WIDTH,
+  MarkdownPreview,
+} from '@/components/blog';
 import { CoverCropDialog } from '@/components/blog/CoverCropDialog';
 import { MdxMarkdownEditor } from '@/components/blog/MdxMarkdownEditor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/useAuthStore';
-import {
-  base64ToImageFile,
-  clamp,
-  createAutoExcerpt,
-  parseMarkdownImport,
-  waitNextPaint,
-} from './utils';
+import { base64ToImageFile, createAutoExcerpt, parseMarkdownImport, waitNextPaint } from './utils';
 
 type CoverImageMeta = {
   width: number;
@@ -225,6 +224,24 @@ export default function BlogCreate() {
     setPendingCoverRemoteUrl('');
   };
 
+  const importRemoteCoverAsLocalFile = async (url: string, filePrefix = 'ai-blog-cover') => {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('remote cover fetch failed');
+    }
+    const blob = await response.blob();
+    if (!blob.size) {
+      throw new Error('remote cover is empty');
+    }
+
+    const mimeType = blob.type || 'image/jpeg';
+    const extension = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
+    const file = new File([blob], `${filePrefix}-${Date.now()}.${extension}`, {
+      type: mimeType,
+    });
+    await applyTemporaryCoverFile(file);
+  };
+
   const resetCreateForm = () => {
     setTitle('');
     setExcerpt('');
@@ -261,22 +278,46 @@ export default function BlogCreate() {
     const drawX = (boxW - renderW) / 2 + coverOffsetX;
     const drawY = (boxH - renderH) / 2 + coverOffsetY;
 
-    const sourceX = clamp((0 - drawX) / renderScale, 0, coverImageMeta.width);
-    const sourceY = clamp((0 - drawY) / renderScale, 0, coverImageMeta.height);
-    const sourceW = clamp(boxW / renderScale, 1, coverImageMeta.width - sourceX);
-    const sourceH = clamp(boxH / renderScale, 1, coverImageMeta.height - sourceY);
-
-    const outputW = 1200;
-    const outputH = 480;
+    const outputW = BLOG_COVER_OUTPUT_WIDTH;
+    const outputH = BLOG_COVER_OUTPUT_HEIGHT;
+    const boxScaleX = outputW / boxW;
+    const boxScaleY = outputH / boxH;
     const canvas = document.createElement('canvas');
     canvas.width = outputW;
     canvas.height = outputH;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
+
+    const backdropScale = Math.max(outputW / coverImageMeta.width, outputH / coverImageMeta.height);
+    const backdropW = coverImageMeta.width * backdropScale;
+    const backdropH = coverImageMeta.height * backdropScale;
+    const gradient = ctx.createLinearGradient(0, 0, 0, outputH);
+    gradient.addColorStop(0, '#f7eff3');
+    gradient.addColorStop(1, '#efe3ea');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, outputW, outputH);
+    ctx.save();
+    ctx.filter = 'blur(26px)';
+    ctx.globalAlpha = 0.28;
+    ctx.drawImage(
+      image,
+      (outputW - backdropW) / 2,
+      (outputH - backdropH) / 2,
+      backdropW,
+      backdropH,
+    );
+    ctx.restore();
+
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(image, sourceX, sourceY, sourceW, sourceH, 0, 0, outputW, outputH);
-    return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+    ctx.drawImage(
+      image,
+      drawX * boxScaleX,
+      drawY * boxScaleY,
+      renderW * boxScaleX,
+      renderH * boxScaleY,
+    );
+    return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.95));
   };
 
   const uploadCoverIfNeeded = async (shouldUpload: boolean) => {
@@ -394,12 +435,16 @@ export default function BlogCreate() {
       }
 
       if (result.imageUrl) {
-        if (coverFile || coverObjectUrl) {
-          resetLocalCoverEditing();
+        try {
+          await importRemoteCoverAsLocalFile(result.imageUrl);
+        } catch {
+          if (coverFile || coverObjectUrl) {
+            resetLocalCoverEditing();
+          }
+          setCover(result.imageUrl);
+          setCoverStorageKey('');
+          setPendingCoverRemoteUrl(result.imageUrl);
         }
-        setCover(result.imageUrl);
-        setCoverStorageKey('');
-        setPendingCoverRemoteUrl(result.imageUrl);
         toast.success('AI 封面已生成（临时预览，发布时上传）');
         return;
       }
@@ -865,8 +910,15 @@ export default function BlogCreate() {
                       <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                         <div
                           ref={coverViewportRef}
-                          className="relative h-48 w-full overflow-hidden"
+                          className={`relative w-full overflow-hidden ${BLOG_COVER_ASPECT_CLASS}`}
                         >
+                          <img
+                            src={coverObjectUrl || cover}
+                            alt=""
+                            aria-hidden
+                            className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-55 blur-3xl"
+                          />
+                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,rgba(255,255,255,0.34),rgba(255,255,255,0.06)_48%,transparent_78%)]" />
                           <img
                             src={coverObjectUrl || cover}
                             alt="博客封面预览"

@@ -5,6 +5,7 @@ import type { Group, Post } from '@/api/blog';
 import { getGroups, getPosts } from '@/api/blog';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import { BlogFeedCard } from '@/components/blog';
+import { BLOG_COVER_ASPECT_CLASS } from '@/components/blog/BlogCoverMedia';
 import HeroSectionTitle from '@/components/page/HeroSectionTitle';
 import HeroStatChip from '@/components/page/HeroStatChip';
 import { Button } from '@/components/ui/button';
@@ -39,7 +40,9 @@ function BlogFeedCardSkeleton() {
   return (
     <div className="overflow-hidden rounded-[30px] border border-theme-soft-strong bg-white/80 p-2 shadow-[0_14px_40px_rgba(148,163,184,0.08)]">
       <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
-        <div className="relative h-40 border-b border-slate-100 bg-theme-soft">
+        <div
+          className={`relative border-b border-slate-100 bg-theme-soft ${BLOG_COVER_ASPECT_CLASS}`}
+        >
           <Skeleton className="absolute inset-0 rounded-none" />
           <div className="absolute left-3 top-3 flex gap-2">
             <Skeleton className="h-6 w-20 rounded-full bg-white/80" />
