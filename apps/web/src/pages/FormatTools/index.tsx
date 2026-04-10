@@ -6,7 +6,7 @@ import {
   getFormatConverterById,
   runFormatConverter,
 } from '@valley/format-tools';
-import { ArrowLeftRight, Copy, Search, Sparkles, Wand2 } from 'lucide-react';
+import { ArrowLeftRight, Copy, Loader2, Search, Sparkles, Wand2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import PageBanner from '@/components/PageBanner';
@@ -29,6 +29,7 @@ const CATEGORY_FILTERS: Array<{ value: CategoryFilter; label: string }> = [
   { value: 'all', label: '全部' },
   { value: 'data', label: FORMAT_CONVERTER_CATEGORIES.data },
   { value: 'encoding', label: FORMAT_CONVERTER_CATEGORIES.encoding },
+  { value: 'crypto', label: FORMAT_CONVERTER_CATEGORIES.crypto },
   { value: 'text', label: FORMAT_CONVERTER_CATEGORIES.text },
 ];
 
@@ -42,6 +43,7 @@ export default function FormatTools() {
   const [inputValue, setInputValue] = useState('');
   const [outputValue, setOutputValue] = useState('');
   const [error, setError] = useState('');
+  const [converting, setConverting] = useState(false);
 
   const selectedConverter =
     getFormatConverterById(selectedConverterId) ?? FORMAT_CONVERTER_LIST[0] ?? null;
@@ -75,20 +77,25 @@ export default function FormatTools() {
     }
   }, [direction, selectedConverter]);
 
-  const handleConvert = () => {
+  const handleConvert = async () => {
     if (!selectedConverter) return;
-    const result = runFormatConverter({
-      converterId: selectedConverter.id,
-      direction,
-      input: inputValue,
-    });
-    if (!result.ok) {
-      setOutputValue('');
-      setError(result.error || '转换失败，请检查输入。');
-      return;
+    setConverting(true);
+    try {
+      const result = await runFormatConverter({
+        converterId: selectedConverter.id,
+        direction,
+        input: inputValue,
+      });
+      if (!result.ok) {
+        setOutputValue('');
+        setError(result.error || '转换失败，请检查输入。');
+        return;
+      }
+      setError('');
+      setOutputValue(result.output);
+    } finally {
+      setConverting(false);
     }
-    setError('');
-    setOutputValue(result.output);
   };
 
   const handleCopyOutput = async () => {
@@ -134,7 +141,7 @@ export default function FormatTools() {
               已接入 {FORMAT_CONVERTER_LIST.length} 个转换器
             </span>
             <span className="rounded-full border border-white/30 bg-white/14 px-3 py-1">
-              数据 / 编码 / 文本 三类
+              数据 / 编码 / 加密 / 文本 四类
             </span>
           </div>
         </div>
@@ -271,12 +278,22 @@ export default function FormatTools() {
               <div className="flex flex-wrap items-center gap-3">
                 <Button
                   onClick={handleConvert}
+                  disabled={converting}
                   className="theme-btn-primary rounded-xl px-5 text-sm font-medium"
                 >
-                  <Wand2 className="mr-2 h-4 w-4" />
-                  {direction === 'forward'
-                    ? selectedConverter.forwardActionLabel
-                    : selectedConverter.reverseActionLabel || '执行转换'}
+                  {converting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      转换中...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="mr-2 h-4 w-4" />
+                      {direction === 'forward'
+                        ? selectedConverter.forwardActionLabel
+                        : selectedConverter.reverseActionLabel || '执行转换'}
+                    </>
+                  )}
                 </Button>
                 <Button
                   variant="outline"

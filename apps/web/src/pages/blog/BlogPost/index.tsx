@@ -22,7 +22,7 @@ import {
   type PostComment,
   type PostDetail,
 } from '@/api/blog';
-import { MarkdownContent, PostComments, TableOfContents } from '@/components/blog';
+import { BlogCoverMedia, MarkdownContent, PostComments, TableOfContents } from '@/components/blog';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
@@ -32,7 +32,6 @@ import {
   renderMarkdownWithAnchors,
   type TocItem,
 } from '@/utils/blog';
-import { DefaultBlogCover } from '../components/DefaultBlogCover';
 
 type ImageTextPayload = {
   images?: string[];
@@ -560,15 +559,7 @@ export default function BlogPost() {
             </div>
 
             <div className="theme-panel-shell mt-8 overflow-hidden rounded-[28px] border">
-              {post.cover ? (
-                <img
-                  src={post.cover}
-                  alt={post.title}
-                  className="h-64 w-full object-cover sm:h-80"
-                />
-              ) : (
-                <DefaultBlogCover className="h-64 sm:h-80" />
-              )}
+              <BlogCoverMedia src={post.cover} alt={post.title} compactFallback={false} />
             </div>
           </section>
 

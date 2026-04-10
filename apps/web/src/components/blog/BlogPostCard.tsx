@@ -12,8 +12,8 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import type { Post } from '@/api/blog';
-import { DefaultBlogCover } from '@/pages/blog/components/DefaultBlogCover';
 import { createPlainTextExcerpt, formatDate } from '@/utils/blog';
+import { BlogCoverMedia } from './BlogCoverMedia';
 
 type ImageTextPayload = {
   pages?: Array<string | { text?: string }>;
@@ -91,22 +91,18 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
         state={{ returnTo, returnLabel, source: mode === 'creator' ? 'my-space' : 'blog-list' }}
         className="block"
       >
-        <div className="relative h-40 overflow-hidden border-b border-slate-100 bg-theme-soft">
-          {post.cover ? (
-            <img
-              src={post.cover}
-              alt={post.title}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-            />
-          ) : (
-            <DefaultBlogCover compact>
+        <div className="relative overflow-hidden border-b border-slate-100 bg-theme-soft">
+          <BlogCoverMedia
+            src={post.cover}
+            alt={post.title}
+            hoverZoom
+            fallback={
               <div className="relative flex h-full w-full items-center justify-center text-slate-500">
                 <TypeIcon className="h-12 w-12" />
               </div>
-            </DefaultBlogCover>
-          )}
-
-          <div className="absolute left-3 right-3 top-3 flex items-start justify-between gap-2">
+            }
+          />
+          <div className="absolute left-3 right-3 top-3 z-20 flex items-start justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2.5 py-1 text-xs text-white backdrop-blur">
                 <TypeIcon className="h-3.5 w-3.5" />
