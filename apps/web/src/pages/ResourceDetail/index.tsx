@@ -14,7 +14,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  downloadResource,
   favoriteResource,
   getMyResources,
   getResourceDetail,
@@ -28,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { triggerResourceDownload } from '@/utils/resourceDownload';
 import { toInlineUrl } from '@/utils/tos';
 
 const TYPE_LABEL: Record<string, string> = {
@@ -171,19 +171,21 @@ export default function ResourceDetail() {
   };
 
   const handleDownload = async () => {
-    if (!isAuthenticated) {
-      toast.error('请先登录后下载');
-      navigate('/login');
-      return;
-    }
     if (!resource) return;
-    try {
-      setDownloading(true);
-      const { downloadUrl } = await downloadResource(resource.id);
-      window.open(downloadUrl, '_blank', 'noopener');
+
+    const downloaded = await triggerResourceDownload({
+      resourceId: resource.id,
+      isAuthenticated,
+      onRequireAuth: () => {
+        toast.error('请先登录后下载');
+        navigate('/login');
+      },
+      onStart: () => setDownloading(true),
+      onFinally: () => setDownloading(false),
+    });
+
+    if (downloaded) {
       setResource((prev) => (prev ? { ...prev, downloadCount: prev.downloadCount + 1 } : prev));
-    } finally {
-      setDownloading(false);
     }
   };
 
@@ -448,7 +450,11 @@ export default function ResourceDetail() {
       <ImagePreviewDialog
         open={previewOpen}
         src={resource.url}
+        resourceId={resource.id}
         title={resource.title || '资源预览'}
+        onDownloaded={() =>
+          setResource((prev) => (prev ? { ...prev, downloadCount: prev.downloadCount + 1 } : prev))
+        }
         onOpenChange={setPreviewOpen}
       />
     </div>

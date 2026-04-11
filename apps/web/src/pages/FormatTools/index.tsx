@@ -20,11 +20,6 @@ const PAGE_BACKGROUND = {
     'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-surface-alt) 64%, white) 42%, var(--theme-page-cool) 100%)',
 };
 
-const BANNER_BACKGROUND = {
-  background:
-    'linear-gradient(130deg, rgba(var(--theme-primary-rgb),0.96) 0%, color-mix(in srgb, rgba(var(--theme-secondary-rgb),1) 54%, var(--theme-primary-hover)) 60%, var(--theme-primary-deep) 100%)',
-};
-
 const CATEGORY_FILTERS: Array<{ value: CategoryFilter; label: string }> = [
   { value: 'all', label: '全部' },
   { value: 'data', label: FORMAT_CONVERTER_CATEGORIES.data },
@@ -124,7 +119,7 @@ export default function FormatTools() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
-      <PageBanner backgroundStyle={BANNER_BACKGROUND} padding="py-10 md:py-12" maxWidth="max-w-7xl">
+      <PageBanner padding="py-10 md:py-12" maxWidth="max-w-7xl">
         <div className="flex flex-col gap-4 text-white">
           <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/35 bg-white/16 px-3 py-1 text-xs backdrop-blur-md">
             <Sparkles className="h-3.5 w-3.5" />

@@ -290,7 +290,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="border-theme-shell-border rounded-full border bg-white/82 px-7 text-slate-700 shadow-sm hover:bg-white"
+                  className="border-theme-shell-border rounded-full border bg-white/78 px-7 text-slate-700 shadow-[0_12px_30px_rgba(var(--theme-primary-rgb),0.12)] backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-white hover:bg-white/92 hover:shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.18)]"
                   onClick={() => navigate('/resources')}
                 >
                   查看资源精选
@@ -299,7 +299,7 @@ export default function Home() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="border-theme-shell-border rounded-full border bg-white/82 px-7 text-slate-700 shadow-sm hover:bg-white"
+                    className="border-theme-shell-border rounded-full border bg-white/78 px-7 text-slate-700 shadow-[0_12px_30px_rgba(var(--theme-primary-rgb),0.12)] backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-white hover:bg-white/92 hover:shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.18)]"
                     onClick={() => navigate('/my-space')}
                   >
                     进入创作空间
@@ -323,7 +323,8 @@ export default function Home() {
                   value={loadingCreators ? '内容持续更新中' : `${creators.length}+ 位展示中`}
                 />
               </div>
-              <div className="rounded-[28px] border border-white/82 bg-white/82 p-3 shadow-[0_16px_40px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur">
+              <div className="group relative overflow-hidden rounded-[28px] border border-white/82 bg-[linear-gradient(140deg,rgba(255,255,255,0.88),rgba(255,255,255,0.76))] p-3 shadow-[0_16px_40px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur-md">
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_18%,rgba(255,255,255,0.46)_52%,transparent_82%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <div className="relative flex-1">
                     <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -334,12 +335,12 @@ export default function Home() {
                         if (event.key === 'Enter') handleSearchCreator();
                       }}
                       placeholder="输入创作者口令"
-                      className="h-12 rounded-full border-theme-border bg-theme-soft pl-10 text-sm shadow-none"
+                      className="h-12 rounded-full border-white/85 bg-white/66 pl-10 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-sm"
                     />
                   </div>
                   <Button
                     size="lg"
-                    className="h-12 rounded-full bg-theme-primary px-6 text-white hover:bg-theme-primary-hover"
+                    className="h-12 rounded-full bg-theme-primary px-6 text-white shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.28)] transition duration-300 hover:-translate-y-0.5 hover:bg-theme-primary-hover hover:shadow-[0_18px_38px_rgba(var(--theme-primary-rgb),0.34)]"
                     onClick={handleSearchCreator}
                   >
                     查看创作者
@@ -365,13 +366,16 @@ export default function Home() {
               </div>
 
               <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
-                <div className="overflow-hidden rounded-[30px] border border-white/80 bg-[linear-gradient(138deg,rgba(255,255,255,0.95),rgba(var(--theme-primary-rgb),0.10),rgba(var(--theme-secondary-rgb),0.08))] p-5 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.12)] backdrop-blur">
+                <div className="group relative overflow-hidden rounded-[30px] border border-white/80 bg-[linear-gradient(138deg,rgba(255,255,255,0.95),rgba(var(--theme-primary-rgb),0.14),rgba(var(--theme-secondary-rgb),0.12))] p-5 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.12)] backdrop-blur-md">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(255,255,255,0.58),transparent_38%),radial-gradient(circle_at_86%_82%,rgba(var(--theme-secondary-rgb),0.14),transparent_42%)]" />
+                  <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,transparent_12%,rgba(255,255,255,0.48)_52%,transparent_88%)] opacity-0 transition-opacity duration-700 group-hover:opacity-100" />
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs text-slate-500">
                     <Sparkles className="text-theme-primary h-3.5 w-3.5" />
                     信号总览
                   </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-[1.12fr_0.88fr]">
-                    <div className="rounded-[26px] border border-theme-shell-border bg-[linear-gradient(145deg,rgba(255,255,255,0.98),color-mix(in_srgb,var(--theme-primary-soft)_62%,white))] p-5 shadow-[0_14px_36px_rgba(var(--theme-primary-rgb),0.14)]">
+                  <div className="relative mt-4 grid gap-3 sm:grid-cols-[1.12fr_0.88fr]">
+                    <div className="group/summary relative rounded-[26px] border border-theme-shell-border bg-[linear-gradient(145deg,rgba(255,255,255,0.96),color-mix(in_srgb,var(--theme-primary-soft)_66%,white))] p-5 shadow-[0_14px_36px_rgba(var(--theme-primary-rgb),0.14)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_44px_rgba(var(--theme-primary-rgb),0.2)]">
+                      <div className="pointer-events-none absolute inset-x-8 top-0 h-[1px] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.95),transparent)]" />
                       <div className="text-theme-primary text-xs tracking-[0.18em] uppercase">
                         Pulse
                       </div>
@@ -380,13 +384,13 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="grid gap-3">
-                      <div className="rounded-[22px] border border-white/80 bg-white/86 p-4">
+                      <div className="rounded-[22px] border border-white/80 bg-[linear-gradient(140deg,rgba(255,255,255,0.9),rgba(255,255,255,0.78))] p-4 backdrop-blur-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(var(--theme-primary-rgb),0.16)]">
                         <div className="text-theme-primary text-xs tracking-[0.12em]">最新标题</div>
                         <div className="mt-2 line-clamp-2 text-base font-medium leading-7 text-slate-900">
                           {featuredPost ? featuredPost.title : '下一篇内容正在路上'}
                         </div>
                       </div>
-                      <div className="rounded-[22px] border border-white/80 bg-white/86 p-4">
+                      <div className="rounded-[22px] border border-white/80 bg-[linear-gradient(140deg,rgba(255,255,255,0.9),rgba(255,255,255,0.78))] p-4 backdrop-blur-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(var(--theme-primary-rgb),0.16)]">
                         <div className="text-theme-primary text-xs tracking-[0.12em]">当前资源</div>
                         <div className="mt-2 line-clamp-2 text-base font-medium leading-7 text-slate-900">
                           {featuredWallpaper ? featuredWallpaper.title : '资源正在持续补充'}
@@ -397,7 +401,8 @@ export default function Home() {
                 </div>
 
                 <div className="grid gap-3">
-                  <div className="rounded-[24px] border border-theme-shell-border bg-[linear-gradient(135deg,rgba(255,255,255,0.92),color-mix(in_srgb,var(--theme-primary-soft)_52%,white))] px-4 py-4 shadow-[0_16px_36px_rgba(var(--theme-primary-rgb),0.1)]">
+                  <div className="group/flow relative overflow-hidden rounded-[24px] border border-theme-shell-border bg-[linear-gradient(135deg,rgba(255,255,255,0.92),color-mix(in_srgb,var(--theme-primary-soft)_52%,white))] px-4 py-4 shadow-[0_16px_36px_rgba(var(--theme-primary-rgb),0.1)] backdrop-blur-sm">
+                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,transparent_20%,rgba(255,255,255,0.42)_52%,transparent_84%)] opacity-0 transition-opacity duration-700 group-hover/flow:opacity-100" />
                     <div className="text-theme-primary text-xs tracking-[0.18em] uppercase">
                       Live Flow
                     </div>
@@ -406,13 +411,13 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-[22px] border border-white/75 bg-white/82 px-4 py-4">
+                    <div className="rounded-[22px] border border-white/75 bg-[linear-gradient(140deg,rgba(255,255,255,0.88),rgba(255,255,255,0.74))] px-4 py-4 backdrop-blur-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(var(--theme-primary-rgb),0.16)]">
                       <div className="text-theme-primary text-xs tracking-[0.12em]">浏览入口</div>
                       <div className="mt-2 text-sm font-medium text-slate-900">
                         博客、图文、资源
                       </div>
                     </div>
-                    <div className="rounded-[22px] border border-white/75 bg-white/82 px-4 py-4">
+                    <div className="rounded-[22px] border border-white/75 bg-[linear-gradient(140deg,rgba(255,255,255,0.88),rgba(255,255,255,0.74))] px-4 py-4 backdrop-blur-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(var(--theme-primary-rgb),0.16)]">
                       <div className="text-theme-primary text-xs tracking-[0.12em]">创作节奏</div>
                       <div className="mt-2 text-sm font-medium text-slate-900">保持连续更新</div>
                     </div>

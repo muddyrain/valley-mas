@@ -27,6 +27,7 @@ import {
   markNotificationRead,
   type UserNotification,
 } from '@/api/notification';
+import BrandLogo from '@/components/BrandLogo';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -196,11 +197,12 @@ export default function Header() {
       className="theme-header sticky top-0 z-50 w-full border-b bg-white/82 backdrop-blur-xl"
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center px-4 md:px-8">
-        <Link to="/" className="group mr-8 flex items-center gap-3">
-          <div className="theme-logo-icon flex h-10 w-10 items-center justify-center rounded-xl transition-transform group-hover:scale-110">
-            <span className="text-lg font-bold text-white">V</span>
-          </div>
-          <span className="theme-logo-text hidden text-2xl font-bold sm:block">Valley</span>
+        <Link to="/" className="group mr-8">
+          <BrandLogo
+            className="transition-transform group-hover:scale-105"
+            iconClassName="h-10"
+            wordmarkClassName="hidden text-[1.28rem] sm:block"
+          />
         </Link>
 
         <nav className="flex flex-1 items-center gap-1">

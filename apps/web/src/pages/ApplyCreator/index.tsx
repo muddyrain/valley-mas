@@ -164,9 +164,9 @@ function ApplicationResult({
   );
 }
 
-const BANNER_BACKGROUND = {
+const PAGE_BACKGROUND = {
   background:
-    'linear-gradient(135deg, rgba(var(--theme-primary-rgb),0.96) 0%, color-mix(in srgb, rgba(var(--theme-tertiary-rgb),1) 26%, var(--theme-primary-hover)) 54%, var(--theme-primary-deep) 100%)',
+    'linear-gradient(180deg, var(--theme-page-start) 0%, var(--theme-page-mid) 24%, var(--theme-page-cool) 56%, var(--theme-page-end) 100%)',
 };
 
 export default function ApplyCreator() {
@@ -290,9 +290,9 @@ export default function ApplyCreator() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-50 via-purple-50/30 to-indigo-50/30">
+    <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
       {/* Banner */}
-      <PageBanner backgroundStyle={BANNER_BACKGROUND}>
+      <PageBanner>
         <div className="text-white">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm">

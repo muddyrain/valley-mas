@@ -481,6 +481,7 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
       <ImagePreviewDialog
         open={previewOpen}
         src={resource.url}
+        resourceId={resource.id}
         title={resource.title || '资源预览'}
         onOpenChange={setPreviewOpen}
       />

@@ -1,13 +1,28 @@
-import { ExternalLink, Maximize2, RotateCcw, RotateCw, X, ZoomIn, ZoomOut } from 'lucide-react';
+import {
+  Download,
+  Loader2,
+  Maximize2,
+  RotateCcw,
+  RotateCw,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { triggerResourceDownload } from '@/utils/resourceDownload';
 import { toInlineUrl } from '@/utils/tos';
 
 interface ImagePreviewDialogProps {
   open: boolean;
   src?: string;
+  resourceId?: string;
   title?: string;
+  onDownloaded?: () => void;
   onOpenChange: (open: boolean) => void;
 }
 
@@ -34,14 +49,19 @@ function guessTitle(src?: string) {
 export default function ImagePreviewDialog({
   open,
   src,
+  resourceId,
   title,
+  onDownloaded,
   onOpenChange,
 }: ImagePreviewDialogProps) {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuthStore();
   const [scale, setScale] = useState(1);
   const [rotate, setRotate] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [imageLoading, setImageLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0, baseX: 0, baseY: 0, pointerId: -1 });
 
   const canPreview = useMemo(() => Boolean(src), [src]);
@@ -260,17 +280,37 @@ export default function ImagePreviewDialog({
               {/* 分隔线 */}
               <div className="mx-1 h-5 w-px bg-white/15" />
 
-              {/* 在新标签打开（使用 inline URL 避免触发下载） */}
+              {/* 下载资源 */}
               <button
                 type="button"
-                onClick={(e) => {
+                disabled={downloading}
+                onClick={async (e) => {
                   e.stopPropagation();
-                  if (inlineSrc) window.open(inlineSrc, '_blank', 'noopener,noreferrer');
+                  const downloaded = await triggerResourceDownload({
+                    resourceId,
+                    isAuthenticated,
+                    onRequireAuth: () => {
+                      toast.error('请先登录后下载');
+                      navigate('/login');
+                    },
+                    onStart: () => setDownloading(true),
+                    onFinally: () => setDownloading(false),
+                  });
+                  if (!resourceId && inlineSrc) {
+                    window.open(inlineSrc, '_blank', 'noopener,noreferrer');
+                  }
+                  if (downloaded) {
+                    onDownloaded?.();
+                  }
                 }}
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-white/70 transition-all hover:bg-white/20 hover:text-white"
-                title="在新标签打开"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-white/70 transition-all hover:bg-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                title="下载原图"
               >
-                <ExternalLink className="h-4 w-4" />
+                {downloading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
               </button>
             </div>
           </div>

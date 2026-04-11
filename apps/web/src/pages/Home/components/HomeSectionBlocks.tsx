@@ -44,8 +44,10 @@ export function HeroStat({
   accent: string;
 }) {
   return (
-    <div className="group relative overflow-hidden rounded-[26px] border border-white/80 bg-white/82 p-4 shadow-[0_18px_48px_rgba(var(--theme-primary-rgb),0.12)] backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_24px_58px_rgba(var(--theme-primary-rgb),0.2)]">
-      <div className="pointer-events-none absolute -right-8 -top-8 h-20 w-20 rounded-full bg-white/40 blur-xl transition group-hover:scale-125" />
+    <div className="group relative overflow-hidden rounded-[26px] border border-white/82 bg-[linear-gradient(140deg,rgba(255,255,255,0.9),rgba(255,255,255,0.72))] p-4 shadow-[0_18px_48px_rgba(var(--theme-primary-rgb),0.12)] backdrop-blur-md transition duration-300 hover:-translate-y-1.5 hover:border-white hover:shadow-[0_28px_64px_rgba(var(--theme-primary-rgb),0.2)]">
+      <div className="pointer-events-none absolute -right-8 -top-8 h-20 w-20 rounded-full bg-white/50 blur-xl transition duration-500 group-hover:scale-125" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,transparent_14%,rgba(255,255,255,0.48)_52%,transparent_86%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.95),transparent)]" />
       <div className={`mb-3 h-1.5 w-16 rounded-full ${accent}`} />
       <div className="text-2xl font-semibold text-slate-950">{value}</div>
       <div className="mt-1 text-sm text-slate-500">{label}</div>
@@ -63,11 +65,12 @@ export function HeroRibbon({
   value: string;
 }) {
   return (
-    <div className="inline-flex items-center gap-3 rounded-full border border-white/85 bg-white/84 px-4 py-2 shadow-[0_14px_36px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur">
+    <div className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full border border-white/88 bg-[linear-gradient(135deg,rgba(255,255,255,0.88),rgba(255,255,255,0.72))] px-4 py-2 shadow-[0_14px_36px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-white hover:shadow-[0_18px_42px_rgba(var(--theme-primary-rgb),0.2)]">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,transparent_18%,rgba(255,255,255,0.46)_52%,transparent_82%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
       <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-theme-soft text-theme-primary shadow-[0_8px_20px_rgba(var(--theme-primary-rgb),0.18)]">
         {icon}
       </div>
-      <div className="leading-tight">
+      <div className="relative leading-tight">
         <div className="text-[11px] tracking-[0.16em] text-slate-400 uppercase">{label}</div>
         <div className="text-sm font-medium text-slate-900">{value}</div>
       </div>
