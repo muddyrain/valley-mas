@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Award,
+  Copy,
   Download,
   FolderOpen,
   Image as ImageIcon,
@@ -50,13 +51,13 @@ const PAGE_BACKGROUND = {
 };
 
 const glassStatClass =
-  'group relative overflow-hidden rounded-2xl border border-white/78 bg-white/58 p-4 backdrop-blur-2xl shadow-[0_16px_34px_rgba(var(--theme-primary-rgb),0.11)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/76 hover:shadow-[0_22px_44px_rgba(var(--theme-primary-rgb),0.16)]';
+  'group relative overflow-hidden rounded-2xl border border-white/78 bg-white/62 p-3.5 backdrop-blur-2xl shadow-[0_14px_30px_rgba(var(--theme-primary-rgb),0.10)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/82 hover:shadow-[0_20px_40px_rgba(var(--theme-primary-rgb),0.14)]';
 
 const creatorHeroInnerClass =
-  'relative overflow-hidden rounded-[30px] border border-white/72 bg-white/46 p-4 shadow-[0_26px_70px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur-2xl md:p-6';
+  'relative overflow-hidden rounded-[30px] border border-white/76 bg-white/62 p-4 shadow-[0_24px_62px_rgba(var(--theme-primary-rgb),0.13)] backdrop-blur-2xl md:p-6';
 
 const creatorHeroActionCardClass =
-  'rounded-2xl border border-white/76 bg-white/56 p-4 shadow-[0_16px_38px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-2xl';
+  'rounded-2xl border border-white/78 bg-white/72 p-3.5 shadow-[0_14px_34px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-2xl';
 
 const sectionCardClass =
   'rounded-3xl border border-theme-shell-border bg-white/88 p-5 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-xl md:p-6';
@@ -222,6 +223,25 @@ export default function CreatorProfile() {
     }
   };
 
+  const handleShareProfile = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success('主页链接已复制');
+    } catch {
+      toast.error('复制失败，请手动复制地址栏链接');
+    }
+  };
+
+  const handleCopyCreatorCode = async () => {
+    if (!creator?.code) return;
+    try {
+      await navigator.clipboard.writeText(creator.code);
+      toast.success('创作者编号已复制');
+    } catch {
+      toast.error('复制失败，请稍后重试');
+    }
+  };
+
   const handleSearch = async () => {
     if (!creator) return;
 
@@ -286,16 +306,45 @@ export default function CreatorProfile() {
   if (loading) {
     return (
       <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
-        <PageBanner padding="py-8 md:py-10" maxWidth="max-w-7xl">
-          <div className="flex items-center gap-6">
-            <Skeleton className="h-24 w-24 rounded-full bg-white/65" />
-            <div className="flex-1 space-y-3">
-              <Skeleton className="h-8 w-48 bg-white/65" />
-              <Skeleton className="h-4 w-64 bg-white/65" />
-              <div className="flex gap-6 pt-2">
-                <Skeleton className="h-6 w-20 bg-white/65" />
-                <Skeleton className="h-6 w-20 bg-white/65" />
-                <Skeleton className="h-6 w-20 bg-white/65" />
+        <PageBanner padding="py-6 md:py-8" maxWidth="max-w-6xl" tone="soft">
+          <div className="overflow-hidden rounded-[30px] border border-white/76 bg-white/62 p-4 shadow-[0_24px_58px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-2xl md:p-6">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <Skeleton className="h-9 w-[5.5rem] rounded-xl bg-white/75" />
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-8 w-24 rounded-full bg-white/75" />
+                <Skeleton className="h-8 w-[5.5rem] rounded-full bg-white/75" />
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[280px,1fr]">
+              <div className="rounded-2xl border border-white/78 bg-white/72 p-4 shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.10)]">
+                <Skeleton className="mx-auto h-24 w-24 rounded-full bg-white/80 md:h-28 md:w-28" />
+                <Skeleton className="mx-auto mt-3 h-6 w-[8.5rem] rounded-lg bg-white/80" />
+                <Skeleton className="mx-auto mt-2 h-4 w-24 rounded-md bg-white/80" />
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Skeleton className="h-14 rounded-xl bg-white/80" />
+                  <Skeleton className="h-14 rounded-xl bg-white/80" />
+                  <Skeleton className="h-14 rounded-xl bg-white/80" />
+                  <Skeleton className="h-14 rounded-xl bg-white/80" />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/76 bg-white/68 p-4 shadow-[0_12px_30px_rgba(var(--theme-primary-rgb),0.10)]">
+                <div className="space-y-3">
+                  <Skeleton className="h-9 w-2/3 rounded-xl bg-white/80" />
+                  <Skeleton className="h-4 w-full rounded-md bg-white/80" />
+                  <Skeleton className="h-4 w-5/6 rounded-md bg-white/80" />
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <Skeleton className="h-[4.5rem] rounded-2xl bg-white/80" />
+                  <Skeleton className="h-[4.5rem] rounded-2xl bg-white/80" />
+                  <Skeleton className="h-[4.5rem] rounded-2xl bg-white/80" />
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Skeleton className="h-9 w-32 rounded-xl bg-white/80" />
+                  <Skeleton className="h-9 w-28 rounded-xl bg-white/80" />
+                  <Skeleton className="h-9 w-[6.5rem] rounded-xl bg-white/80" />
+                </div>
               </div>
             </div>
           </div>
@@ -325,13 +374,16 @@ export default function CreatorProfile() {
   return (
     <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
       {/* 创作者页也跟随当前主题背景，避免继续保留独立紫色专题风格 */}
-      <PageBanner padding="py-8 md:py-10" maxWidth="max-w-7xl" tone="soft">
+      <PageBanner padding="py-6 md:py-8" maxWidth="max-w-6xl" tone="soft">
         <div className={creatorHeroInnerClass}>
-          <div className="pointer-events-none absolute -left-12 -top-12 h-44 w-44 rounded-full bg-white/70 blur-3xl" />
-          <div className="pointer-events-none absolute right-10 top-5 h-32 w-32 rounded-full bg-[rgba(var(--theme-secondary-rgb),0.22)] blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-8 left-1/3 h-36 w-36 rounded-full bg-[rgba(var(--theme-tertiary-rgb),0.18)] blur-3xl" />
+          <div className="pointer-events-none absolute -left-14 -top-14 h-44 w-44 rounded-full bg-white/70 blur-3xl" />
+          <div className="pointer-events-none absolute right-10 top-8 h-36 w-36 rounded-full bg-[rgba(var(--theme-secondary-rgb),0.22)] blur-3xl" />
+          <div className="pointer-events-none absolute bottom-0 left-1/2 h-28 w-56 -translate-x-1/2 rounded-full bg-[rgba(var(--theme-tertiary-rgb),0.12)] blur-3xl" />
+          <div className="pointer-events-none absolute -right-8 bottom-1 text-[58px] leading-none font-black tracking-[0.14em] text-white/24">
+            CREATOR
+          </div>
 
-          <div className="relative flex flex-wrap items-center justify-between gap-3">
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
             <Button
               variant="ghost"
               onClick={() => window.history.back()}
@@ -340,38 +392,114 @@ export default function CreatorProfile() {
               <ArrowLeft className="h-4 w-4" />
               返回
             </Button>
-            <Badge className="h-8 border border-white/84 bg-white/72 px-3 text-theme-primary shadow-[0_10px_20px_rgba(var(--theme-primary-rgb),0.10)]">
-              <Sparkles className="mr-1 h-3.5 w-3.5" />
-              创作者主页
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className="h-8 border border-white/84 bg-white/72 px-3 text-theme-primary shadow-[0_10px_20px_rgba(var(--theme-primary-rgb),0.10)]">
+                <Sparkles className="mr-1 h-3.5 w-3.5" />
+                创作者主页
+              </Badge>
+              <Badge className="h-8 border border-white/84 bg-white/72 px-3 text-theme-primary shadow-[0_10px_20px_rgba(var(--theme-primary-rgb),0.10)]">
+                <Award className="mr-1 h-3.5 w-3.5" />
+                品牌创作者
+              </Badge>
+            </div>
           </div>
 
-          <div className="relative mt-5 grid w-full gap-5 xl:grid-cols-[auto,1fr,240px]">
-            <div className="relative mx-auto self-start xl:mx-0">
-              <div className="absolute -inset-4 rounded-full bg-[radial-gradient(circle,rgba(var(--theme-primary-rgb),0.2)_0%,transparent_72%)] blur-2xl" />
-              <Avatar className="relative h-28 w-28 border-4 border-white/88 shadow-[0_20px_48px_rgba(var(--theme-primary-rgb),0.16)] md:h-32 md:w-32">
-                <AvatarImage src={creator.avatar} className="object-cover" />
-                <AvatarFallback className="theme-avatar-fallback text-3xl font-bold text-white md:text-4xl">
-                  {creator.name[0]}
-                </AvatarFallback>
-              </Avatar>
-              <div className="absolute -bottom-1 -right-1 inline-flex items-center gap-1 rounded-full border border-white/90 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-theme-primary shadow-md">
-                <Award className="h-3 w-3" />
-                认证
+          <div className="relative z-10 mt-5 grid gap-4 lg:grid-cols-[280px,1fr]">
+            <aside className={`${creatorHeroActionCardClass} space-y-3`}>
+              <div className="relative mx-auto w-fit">
+                <div className="absolute -inset-4 rounded-full bg-[radial-gradient(circle,rgba(var(--theme-primary-rgb),0.2)_0%,transparent_72%)] blur-2xl" />
+                <Avatar className="relative h-24 w-24 border-4 border-white/90 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.16)]">
+                  <AvatarImage src={creator.avatar} className="object-cover" />
+                  <AvatarFallback className="theme-avatar-fallback text-3xl font-bold text-white">
+                    {creator.name[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="absolute -bottom-1 -right-1 inline-flex items-center gap-1 rounded-full border border-white/90 bg-white/92 px-2.5 py-1 text-[11px] font-medium text-theme-primary shadow-md">
+                  <Award className="h-3 w-3" />
+                  认证
+                </div>
               </div>
-            </div>
 
-            <div className="min-w-0">
-              <div className="mb-3 flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl font-bold text-slate-900 md:text-4xl">{creator.name}</h1>
-                <Badge className="border border-white/84 bg-white/72 text-theme-primary">
-                  活跃创作者
-                </Badge>
+              <div className="rounded-xl border border-white/85 bg-white/78 px-3 py-2 text-center">
+                <div className="text-sm font-medium text-slate-700">
+                  {isSelf ? '我的创作空间' : '创作者空间'}
+                </div>
+                {creator.code ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyCreatorCode()}
+                    className="mt-1 inline-flex items-center gap-1 rounded-full border border-theme-primary/24 bg-theme-soft px-2.5 py-1 text-xs font-medium text-theme-primary transition-colors hover:bg-theme-primary hover:text-white"
+                  >
+                    <Copy className="h-3 w-3" />@{creator.code}
+                  </button>
+                ) : (
+                  <div className="mt-1 text-xs text-slate-500">公开创作者主页</div>
+                )}
               </div>
-              <p className="max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
-                {creator.description || '这个创作者暂未填写个人介绍。'}
-              </p>
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-white/85 bg-white/80 px-2.5 py-2 text-center">
+                  <div className="text-sm font-medium text-slate-600">作品</div>
+                  <div className="text-sm font-semibold text-slate-800">
+                    {creator.resourceCount}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/85 bg-white/80 px-2.5 py-2 text-center">
+                  <div className="text-sm font-medium text-slate-600">粉丝</div>
+                  <div className="text-sm font-semibold text-slate-800">{followerCount}</div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {!isSelf ? (
+                  <Button
+                    onClick={handleFollow}
+                    disabled={followLoading}
+                    className={
+                      isFollowing
+                        ? 'h-9 border border-white/82 bg-white/72 text-slate-700 shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.10)] hover:bg-white'
+                        : 'h-9 bg-gradient-to-r from-theme-primary to-theme-primary-deep text-white shadow-[0_14px_30px_rgba(var(--theme-primary-rgb),0.24)] hover:from-theme-primary-hover hover:to-theme-primary-deep'
+                    }
+                    variant={isFollowing ? 'outline' : 'default'}
+                  >
+                    {isFollowing ? (
+                      <>
+                        <UserCheck className="mr-1.5 h-4 w-4" />
+                        已关注
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="mr-1.5 h-4 w-4" />
+                        关注创作者
+                      </>
+                    )}
+                  </Button>
+                ) : null}
+                <Button
+                  variant="outline"
+                  onClick={() => void handleShareProfile()}
+                  className="h-9 border-theme-primary/50 duration-300 bg-theme-primary/15 text-theme-primary hover:bg-theme-primary/50 hover:text-white"
+                >
+                  <Share2 className="mr-1.5 h-4 w-4" />
+                  分享主页
+                </Button>
+              </div>
+            </aside>
+
+            <section className="space-y-4">
+              <div className="rounded-2xl border border-white/78 bg-white/72 p-4 shadow-[0_14px_34px_rgba(var(--theme-primary-rgb),0.10)]">
+                <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
+                  <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">{creator.name}</h1>
+                  <Badge className="border border-white/84 bg-white/82 text-theme-primary">
+                    活跃创作者
+                  </Badge>
+                </div>
+                <p className="text-sm leading-7 text-slate-600">
+                  {creator.description || '这个创作者暂未填写个人介绍。'}
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
                 <div className={glassStatClass}>
                   <div className="mb-1 flex items-center gap-1.5 text-xs text-slate-500">
                     <ImageIcon className="h-3.5 w-3.5 text-theme-primary" />
@@ -400,49 +528,24 @@ export default function CreatorProfile() {
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className={creatorHeroActionCardClass}>
-              <div className="text-xs text-slate-500">互动操作</div>
-              <div className="mt-3 flex flex-col gap-2.5">
-                {!isSelf ? (
-                  <Button
-                    onClick={handleFollow}
-                    disabled={followLoading}
-                    className={
-                      isFollowing
-                        ? 'h-11 border border-white/82 bg-white/72 text-slate-700 shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.10)] hover:bg-white'
-                        : 'h-11 bg-gradient-to-r from-theme-primary to-theme-primary-deep text-white shadow-[0_14px_30px_rgba(var(--theme-primary-rgb),0.24)] hover:from-theme-primary-hover hover:to-theme-primary-deep'
-                    }
-                    variant={isFollowing ? 'outline' : 'default'}
-                  >
-                    {isFollowing ? (
-                      <>
-                        <UserCheck className="mr-1.5 h-4 w-4" />
-                        已关注
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="mr-1.5 h-4 w-4" />
-                        关注创作者
-                      </>
-                    )}
-                  </Button>
-                ) : null}
-                <Button
-                  variant="outline"
-                  className="h-11 border-white/82 bg-white/70 text-slate-700 shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.10)] hover:bg-white"
-                >
-                  <Share2 className="mr-1.5 h-4 w-4" />
-                  分享主页
-                </Button>
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/76 bg-white/68 p-3 shadow-[0_12px_26px_rgba(var(--theme-primary-rgb),0.09)]">
+                <span className="rounded-full border border-white/90 bg-white/82 px-3 py-1 text-xs text-slate-600">
+                  创作者编号 · {creator.code || '未设置'}
+                </span>
+                <span className="rounded-full border border-white/90 bg-white/82 px-3 py-1 text-xs text-slate-600">
+                  当前展示 · {worksTotal} 个资源
+                </span>
+                <span className="rounded-full border border-white/90 bg-white/82 px-3 py-1 text-xs text-slate-600">
+                  可见专辑 · {albums.length} 个
+                </span>
               </div>
-            </div>
+            </section>
           </div>
         </div>
       </PageBanner>
 
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-col gap-4">
           <div className={sectionCardClass}>
             <TabsList className="h-auto gap-3 bg-transparent p-0">
