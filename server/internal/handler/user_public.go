@@ -271,19 +271,20 @@ func GetCreatorResourcesList(c *gin.Context) {
 	}
 
 	// 查询资源（resources 表用 user_id 关联上传者，不是 creator_id）
+	// 注意：album 过滤会 JOIN 多张带 deleted_at 的表，这里必须显式表前缀避免歧义。
 	query := db.Model(&model.Resource{}).
-		Where("user_id = ? AND deleted_at IS NULL", creator.UserID).
-		Where("(visibility = ? OR visibility IS NULL OR visibility = '')", "public")
+		Where("resources.user_id = ? AND resources.deleted_at IS NULL", creator.UserID).
+		Where("(resources.visibility = ? OR resources.visibility IS NULL OR resources.visibility = '')", "public")
 
 	// 按类型筛选
 	if resourceType != "" {
-		query = query.Where("type = ?", resourceType)
+		query = query.Where("resources.type = ?", resourceType)
 	}
 
 	// 关键词搜索（匹配标题或描述）
 	if keyword != "" {
 		like := "%" + keyword + "%"
-		query = query.Where("title LIKE ? OR description LIKE ?", like, like)
+		query = query.Where("resources.title LIKE ? OR resources.description LIKE ?", like, like)
 	}
 
 	if albumIDRaw != "" {
@@ -294,7 +295,7 @@ func GetCreatorResourcesList(c *gin.Context) {
 		}
 		query = query.
 			Joins("JOIN creator_album_resources ON creator_album_resources.resource_id = resources.id").
-			Joins("JOIN creator_albums ON creator_albums.id = creator_album_resources.creator_album_id").
+			Joins("JOIN creator_albums ON creator_albums.id = creator_album_resources.creator_album_id AND creator_albums.deleted_at IS NULL").
 			Where("creator_albums.id = ? AND creator_albums.creator_id = ? AND creator_albums.deleted_at IS NULL", albumID, creator.ID)
 	}
 
@@ -304,7 +305,7 @@ func GetCreatorResourcesList(c *gin.Context) {
 
 	// 查询资源列表
 	var resources []model.Resource
-	err := query.Order("created_at DESC").
+	err := query.Order("resources.created_at DESC").
 		Limit(pageSize).
 		Offset(offset).
 		Preload("Tags").

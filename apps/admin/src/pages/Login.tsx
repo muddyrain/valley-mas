@@ -3,6 +3,7 @@ import { Button, Card, Form, Input, message } from 'antd';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { reqLogin } from '../api/auth';
+import BrandLogo from '../components/BrandLogo';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -42,7 +43,9 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <Card className="w-96 shadow-lg">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-600">Valley</h1>
+          <div className="mb-3 flex justify-center">
+            <BrandLogo iconClassName="h-12 w-12" wordmarkClassName="text-[1.32rem]" />
+          </div>
           <p className="text-gray-500 mt-2">创作者·管理后台</p>
         </div>
         <Form onFinish={onFinish} size="large">

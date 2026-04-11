@@ -17,11 +17,6 @@ const PAGE_BACKGROUND = {
     'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-primary-soft) 34%, white) 48%, var(--theme-page-cool) 100%)',
 };
 
-const BANNER_BACKGROUND = {
-  background:
-    'linear-gradient(135deg, rgba(var(--theme-primary-rgb),0.96) 0%, color-mix(in srgb, var(--theme-primary-hover) 76%, white) 52%, var(--theme-primary-deep) 100%)',
-};
-
 export default function Follows() {
   const navigate = useNavigate();
   const { hasHydrated, isAuthenticated } = useAuthStore();
@@ -65,7 +60,7 @@ export default function Follows() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
-      <PageBanner backgroundStyle={BANNER_BACKGROUND} padding="py-10" maxWidth="max-w-5xl">
+      <PageBanner padding="py-10" maxWidth="max-w-5xl">
         <div className="flex items-center gap-4">
           <div className="rounded-2xl border border-white/30 bg-white/18 p-3 shadow-lg backdrop-blur-md">
             <Users className="h-7 w-7 text-white" />

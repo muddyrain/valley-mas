@@ -26,11 +26,6 @@ const PAGE_BACKGROUND = {
     'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-primary-soft) 24%, white) 44%, var(--theme-page-cool) 100%)',
 };
 
-const BANNER_BACKGROUND = {
-  background:
-    'linear-gradient(135deg, rgba(var(--theme-primary-rgb),0.96) 0%, color-mix(in srgb, rgba(var(--theme-tertiary-rgb),1) 26%, var(--theme-primary-hover)) 54%, var(--theme-primary-deep) 100%)',
-};
-
 function formatResourceType(type?: string) {
   if (type === 'wallpaper') return '壁纸';
   if (type === 'avatar') return '头像';
@@ -109,7 +104,7 @@ export default function Favorites() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
-      <PageBanner backgroundStyle={BANNER_BACKGROUND} padding="py-10" maxWidth="max-w-5xl">
+      <PageBanner padding="py-10" maxWidth="max-w-5xl">
         <div className="flex items-center gap-4">
           <div className="rounded-2xl border border-white/30 bg-white/18 p-3 shadow-lg backdrop-blur-md">
             <Heart className="h-7 w-7 fill-white text-white" />

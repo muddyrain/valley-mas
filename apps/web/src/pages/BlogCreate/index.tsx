@@ -27,6 +27,7 @@ import {
   uploadBlogCoverByUrl,
   type Visibility,
 } from '@/api/blog';
+import type { Resource } from '@/api/resource';
 import {
   BLOG_COVER_ASPECT_CLASS,
   BLOG_COVER_OUTPUT_HEIGHT,
@@ -35,8 +36,10 @@ import {
 } from '@/components/blog';
 import { CoverCropDialog } from '@/components/blog/CoverCropDialog';
 import { MdxMarkdownEditor } from '@/components/blog/MdxMarkdownEditor';
+import { PublicWallpaperPickerDialog } from '@/components/blog/PublicWallpaperPickerDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { base64ToImageFile, createAutoExcerpt, parseMarkdownImport, waitNextPaint } from './utils';
 
@@ -81,6 +84,7 @@ export default function BlogCreate() {
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [pendingCropFile, setPendingCropFile] = useState<File | null>(null);
   const [pendingCropUrl, setPendingCropUrl] = useState('');
+  const [wallpaperPickerOpen, setWallpaperPickerOpen] = useState(false);
   const currentEditingIdRef = useRef<string | undefined>(editingId);
 
   const coverViewportRef = useRef<HTMLDivElement | null>(null);
@@ -618,6 +622,17 @@ export default function BlogCreate() {
     }
   };
 
+  const handleSelectPublicWallpaperCover = (resource: Resource) => {
+    if (coverFile || coverObjectUrl) {
+      resetLocalCoverEditing();
+    }
+    setCover(resource.url || '');
+    setCoverStorageKey('');
+    setPendingCoverRemoteUrl('');
+    setWallpaperPickerOpen(false);
+    toast.success('已选择公用壁纸作为封面');
+  };
+
   const handleCreateGroup = async () => {
     const name = newGroupName.trim();
     if (!name) {
@@ -657,10 +672,39 @@ export default function BlogCreate() {
   if (isEditBootLoading) {
     return (
       <div className="min-h-[calc(100vh-4rem)] px-4 py-6 md:px-8">
-        <div className="mx-auto max-w-[1400px]">
-          <div className="theme-panel-shell mb-5 flex items-center gap-3 rounded-2xl border bg-white/80 px-4 py-3 shadow-sm backdrop-blur">
-            <Loader2 className="text-theme-primary h-4 w-4 animate-spin" />
-            <span className="text-sm text-slate-600">正在加载博客内容...</span>
+        <div className="mx-auto max-w-350 space-y-5">
+          <div className="theme-panel-shell flex items-center gap-3 rounded-2xl border bg-white/85 px-4 py-3 shadow-sm backdrop-blur">
+            <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-theme-primary/20 bg-theme-soft/80">
+              <Loader2 className="text-theme-primary h-4 w-4 animate-spin" />
+              <span className="absolute inset-0 rounded-xl border border-theme-primary/15" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-700">正在加载博客内容...</p>
+              <p className="text-xs text-slate-500">即将恢复编辑状态</p>
+            </div>
+          </div>
+
+          <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+            <section className="theme-panel-shell w-full min-w-0 rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
+              <Skeleton className="mb-4 h-5 w-28 rounded-lg bg-theme-soft/85" />
+              <Skeleton className="mb-3 h-12 w-full rounded-xl" />
+              <Skeleton className="mb-3 h-28 w-full rounded-xl" />
+              <Skeleton className="mb-3 h-28 w-full rounded-xl" />
+              <Skeleton className="h-24 w-full rounded-xl" />
+            </section>
+
+            <section className="min-w-0 space-y-4 lg:sticky lg:top-20 lg:self-start">
+              <div className="theme-panel-shell rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
+                <Skeleton className="mb-4 h-5 w-32 rounded-lg bg-theme-soft/85" />
+                <Skeleton className="mb-3 h-9 w-full rounded-xl" />
+                <Skeleton className="mb-3 h-9 w-full rounded-xl" />
+                <Skeleton className="h-28 w-full rounded-xl" />
+              </div>
+              <div className="theme-panel-shell rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
+                <Skeleton className="mb-3 h-5 w-28 rounded-lg bg-theme-soft/85" />
+                <Skeleton className="h-52 w-full rounded-xl" />
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -875,6 +919,16 @@ export default function BlogCreate() {
                           onChange={handleSelectLocalCover}
                         />
                       </label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 rounded-xl whitespace-nowrap"
+                        disabled={actionBusy || loadingPost}
+                        onClick={() => setWallpaperPickerOpen(true)}
+                      >
+                        <ImagePlus className="mr-1 h-4 w-4" />
+                        选择壁纸
+                      </Button>
                     </div>
                     {aiCoverLoading && (
                       <div className="border-theme-panel-border bg-theme-soft/55 relative mt-3 overflow-hidden rounded-xl border p-3">
@@ -1083,6 +1137,12 @@ export default function BlogCreate() {
           onConfirm={(file) => void handleCropConfirm(file)}
         />
       )}
+      <PublicWallpaperPickerDialog
+        open={wallpaperPickerOpen}
+        onOpenChange={setWallpaperPickerOpen}
+        currentCoverUrl={cover}
+        onSelect={handleSelectPublicWallpaperCover}
+      />
     </div>
   );
 }

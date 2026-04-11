@@ -21,6 +21,7 @@ import {
 } from '@/api/resource';
 import ResourceTagSelector from '@/components/ResourceTagSelector';
 import { Button } from '@/components/ui/button';
+import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 // ─── 常量 ────────────────────────────────────────────────────────────────────
@@ -94,6 +95,16 @@ export default function UploadResourceDialog({
   // 压缩后的 base64（AI 起名和 AI 标签共用）
   const [previewBase64, setPreviewBase64] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const closeConfirmToastIdRef = useRef<string | number | null>(null);
+  const closeConfirmTimeoutRef = useRef<number | null>(null);
+
+  const clearCloseConfirmGuard = () => {
+    closeConfirmToastIdRef.current = null;
+    if (closeConfirmTimeoutRef.current !== null) {
+      window.clearTimeout(closeConfirmTimeoutRef.current);
+      closeConfirmTimeoutRef.current = null;
+    }
+  };
 
   // ── 重置 ────────────────────────────────────────────────────────────────────
   const reset = () => {
@@ -205,13 +216,37 @@ export default function UploadResourceDialog({
     }
   };
 
+  const requestDialogClose = () => {
+    if (uploading) return;
+    if (closeConfirmToastIdRef.current !== null) return;
+    closeConfirmToastIdRef.current = openConfirmToast({
+      title: '确认关闭上传弹窗？',
+      description: '关闭后，当前已填写的上传信息将不会保留。',
+      confirmText: '确认关闭',
+      cancelText: '继续编辑',
+      onConfirm: () => {
+        clearCloseConfirmGuard();
+        reset();
+        onOpenChange(false);
+      },
+      onCancel: clearCloseConfirmGuard,
+    });
+    closeConfirmTimeoutRef.current = window.setTimeout(() => {
+      clearCloseConfirmGuard();
+    }, 8200);
+  };
+
   // ── 渲染 ────────────────────────────────────────────────────────────────────
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) reset();
-        onOpenChange(next);
+        if (next) {
+          clearCloseConfirmGuard();
+          onOpenChange(true);
+          return;
+        }
+        requestDialogClose();
       }}
     >
       <DialogContent className="flex h-[90vh] w-[90vw] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">

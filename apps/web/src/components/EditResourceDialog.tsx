@@ -4,7 +4,7 @@
  * 图片不可更换，如需替换请重新上传。
  */
 import { Image as ImageIcon, Loader2, Pencil } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   getResourceTagsById,
@@ -16,6 +16,7 @@ import {
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import ResourceTagSelector from '@/components/ResourceTagSelector';
 import { Button } from '@/components/ui/button';
+import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 // ── 资源的最小必要字段（可兼容 MyResource / Resource 等多种类型）──
@@ -82,6 +83,16 @@ export default function EditResourceDialog({
   const [visibility, setVisibility] = useState<ResourceVisibility>('private');
   const [saving, setSaving] = useState(false);
   const [loadingTags, setLoadingTags] = useState(false);
+  const closeConfirmToastIdRef = useRef<string | number | null>(null);
+  const closeConfirmTimeoutRef = useRef<number | null>(null);
+
+  const clearCloseConfirmGuard = () => {
+    closeConfirmToastIdRef.current = null;
+    if (closeConfirmTimeoutRef.current !== null) {
+      window.clearTimeout(closeConfirmTimeoutRef.current);
+      closeConfirmTimeoutRef.current = null;
+    }
+  };
 
   // 标签状态（由 ResourceTagSelector 管理内部逻辑，这里只保存已选列表）
   const [tags, setTags] = useState<ResourceTag[]>([]);
@@ -151,11 +162,35 @@ export default function EditResourceDialog({
     }
   };
 
+  const requestDialogClose = () => {
+    if (saving || loadingTags) return;
+    if (closeConfirmToastIdRef.current !== null) return;
+    closeConfirmToastIdRef.current = openConfirmToast({
+      title: '确认关闭编辑弹窗？',
+      description: '关闭后，当前未保存的修改将丢失。',
+      confirmText: '确认关闭',
+      cancelText: '继续编辑',
+      onConfirm: () => {
+        clearCloseConfirmGuard();
+        onOpenChange(false);
+      },
+      onCancel: clearCloseConfirmGuard,
+    });
+    closeConfirmTimeoutRef.current = window.setTimeout(() => {
+      clearCloseConfirmGuard();
+    }, 8200);
+  };
+
   return (
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        if (!o && !saving && !loadingTags) onOpenChange(false);
+        if (o) {
+          clearCloseConfirmGuard();
+          onOpenChange(true);
+          return;
+        }
+        requestDialogClose();
       }}
     >
       <DialogContent className="flex h-[90vh] w-[90vw] max-w-4xl flex-col gap-0 overflow-hidden bg-white p-0 sm:max-w-4xl">

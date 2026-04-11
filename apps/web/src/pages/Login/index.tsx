@@ -1,8 +1,9 @@
-﻿import { ArrowRight, Eye, EyeOff, Lock, Mail, Sparkles } from 'lucide-react';
+﻿import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { login, sendEmailCode } from '@/api/auth';
+import BrandLogo from '@/components/BrandLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -140,13 +141,11 @@ export default function Login() {
 
         {/* 顶部 Logo */}
         <Link to="/blog" className="relative flex items-center gap-3 w-fit group">
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-white/10 transition-all group-hover:ring-white/25"
-            style={{ background: `rgba(var(--theme-primary-rgb),0.85)` }}
-          >
-            <Sparkles className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-xl font-bold tracking-tight text-white">Valley</span>
+          <BrandLogo
+            tone="light"
+            iconClassName="h-10 transition-all group-hover:scale-105"
+            wordmarkClassName="text-[1.22rem]"
+          />
         </Link>
 
         {/* 主文案 */}
@@ -208,14 +207,12 @@ export default function Login() {
       <div className="w-full lg:w-[56%] flex items-center justify-center bg-slate-50 p-6">
         <div className="w-full max-w-md">
           {/* Mobile Logo（仅移动端显示，右侧白底上用深色） */}
-          <div className="lg:hidden text-center mb-8">
-            <div
-              className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4"
-              style={{ background: `rgba(var(--theme-primary-rgb),1)` }}
-            >
-              <Sparkles className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-slate-900">Valley</h1>
+          <div className="lg:hidden mb-8">
+            <BrandLogo
+              className="justify-center"
+              iconClassName="h-14 w-14"
+              wordmarkClassName="text-[1.6rem]"
+            />
           </div>
 
           {/* Login Card */}

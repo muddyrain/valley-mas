@@ -49,19 +49,32 @@ const PAGE_BACKGROUND = {
     'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-primary-soft) 30%, white) 44%, var(--theme-page-cool) 100%)',
 };
 
-const BANNER_BACKGROUND = {
-  background:
-    'linear-gradient(135deg, rgba(var(--theme-primary-rgb),0.97) 0%, color-mix(in srgb, rgba(var(--theme-secondary-rgb),1) 34%, var(--theme-primary-hover)) 54%, var(--theme-primary-deep) 100%)',
-};
-
 const glassStatClass =
-  'rounded-2xl border border-white/18 bg-white/12 p-4 backdrop-blur-md shadow-[0_14px_30px_rgba(15,23,42,0.10)] transition-all hover:bg-white/18';
+  'group relative overflow-hidden rounded-2xl border border-white/78 bg-white/58 p-4 backdrop-blur-2xl shadow-[0_16px_34px_rgba(var(--theme-primary-rgb),0.11)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/76 hover:shadow-[0_22px_44px_rgba(var(--theme-primary-rgb),0.16)]';
+
+const creatorHeroInnerClass =
+  'relative overflow-hidden rounded-[30px] border border-white/72 bg-white/46 p-4 shadow-[0_26px_70px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur-2xl md:p-6';
+
+const creatorHeroActionCardClass =
+  'rounded-2xl border border-white/76 bg-white/56 p-4 shadow-[0_16px_38px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-2xl';
 
 const sectionCardClass =
-  'rounded-2xl border border-theme-shell-border bg-white/84 p-6 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm';
+  'rounded-3xl border border-theme-shell-border bg-white/88 p-5 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-xl md:p-6';
+
+const sectionSubCardClass =
+  'rounded-2xl border border-theme-shell-border bg-white/84 p-4 shadow-[0_10px_24px_rgba(148,163,184,0.09)] backdrop-blur-sm';
 
 const triggerClassName =
-  'rounded-xl px-6 py-3 font-semibold transition-all hover:bg-theme-soft data-[state=active]:bg-[var(--theme-primary)] data-[state=active]:text-white data-[state=active]:shadow-[0_16px_30px_rgba(var(--theme-primary-rgb),0.22)]';
+  'rounded-xl px-5 py-2.5 font-semibold transition-all hover:bg-theme-soft data-[state=active]:bg-[var(--theme-primary)] data-[state=active]:text-white data-[state=active]:shadow-[0_14px_26px_rgba(var(--theme-primary-rgb),0.22)]';
+
+const WORKS_PAGE_SIZE = 20;
+
+type WorksQueryParams = {
+  keyword?: string;
+  type?: string;
+  albumId?: string;
+  page?: number;
+};
 
 export default function CreatorProfile() {
   const { code } = useParams<{ code: string }>();
@@ -76,11 +89,32 @@ export default function CreatorProfile() {
   const [followerCount, setFollowerCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [worksLoading, setWorksLoading] = useState(false);
+  const [worksPage, setWorksPage] = useState(1);
+  const [worksTotal, setWorksTotal] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('works');
   // 作品收藏状态：key = resourceId, value = boolean
   const [favoritedMap, setFavoritedMap] = useState<Record<string, boolean>>({});
   const user = useAuthStore((state) => state.user);
+  const worksTotalPages = Math.max(1, Math.ceil(worksTotal / WORKS_PAGE_SIZE));
+
+  const buildWorksParams = (overrides: WorksQueryParams = {}) => {
+    const params: WorksQueryParams = {
+      keyword: searchKeyword.trim() || undefined,
+      type: activeCategory || undefined,
+      albumId: activeAlbumId || undefined,
+      page: worksPage,
+      ...overrides,
+    };
+
+    if (params.keyword !== undefined && !params.keyword.trim()) {
+      delete params.keyword;
+    }
+    if (!params.type) delete params.type;
+    if (!params.albumId) delete params.albumId;
+    if (!params.page || params.page < 1) params.page = 1;
+    return params;
+  };
 
   const hydrateWorks = (list: Resource[]) => {
     setWorks(list);
@@ -91,18 +125,18 @@ export default function CreatorProfile() {
     setFavoritedMap(map);
   };
 
-  const loadWorks = async (
-    creatorId: string,
-    params: {
-      keyword?: string;
-      type?: string;
-      albumId?: string;
-    } = {},
-  ) => {
+  const loadWorks = async (creatorId: string, params: WorksQueryParams = {}) => {
     setWorksLoading(true);
     try {
-      const data = await getCreatorWorks(creatorId, params);
+      const page = params.page ?? 1;
+      const data = await getCreatorWorks(creatorId, {
+        ...params,
+        page,
+        pageSize: WORKS_PAGE_SIZE,
+      });
       hydrateWorks(data.list);
+      setWorksTotal(data.total || 0);
+      setWorksPage(data.page || page);
     } catch (error) {
       console.error('加载作品失败:', error);
     } finally {
@@ -122,7 +156,7 @@ export default function CreatorProfile() {
 
         // 并行加载作品、专辑和关注状态
         const [worksData, albumsData] = await Promise.all([
-          getCreatorWorks(creatorData.id),
+          getCreatorWorks(creatorData.id, { page: 1, pageSize: WORKS_PAGE_SIZE }),
           getCreatorAlbums(creatorData.id),
           // 查询关注状态（接口失败不影响主流程）
           user?.id
@@ -136,6 +170,8 @@ export default function CreatorProfile() {
             : Promise.resolve(),
         ]);
         hydrateWorks(worksData.list);
+        setWorksTotal(worksData.total || 0);
+        setWorksPage(worksData.page || 1);
         setAlbums(albumsData.list || []);
       } catch (error) {
         console.error('加载创作者数据失败:', error);
@@ -190,13 +226,8 @@ export default function CreatorProfile() {
     if (!creator) return;
 
     try {
-      const params: { keyword?: string; type?: string; albumId?: string } = {};
-      if (searchKeyword) params.keyword = searchKeyword;
-      if (activeCategory) params.type = activeCategory;
-      if (activeAlbumId) params.albumId = activeAlbumId;
-
       if (activeTab === 'works') {
-        await loadWorks(creator.id, params);
+        await loadWorks(creator.id, buildWorksParams({ page: 1 }));
       }
     } catch (error) {
       console.error('搜索失败:', error);
@@ -208,12 +239,13 @@ export default function CreatorProfile() {
     if (!creator) return;
     setActiveCategory(categoryValue);
     try {
-      const params: { keyword?: string; type?: string; albumId?: string } = {};
-      if (searchKeyword) params.keyword = searchKeyword;
-      if (categoryValue) params.type = categoryValue;
-      if (activeAlbumId) params.albumId = activeAlbumId;
-
-      await loadWorks(creator.id, params);
+      await loadWorks(
+        creator.id,
+        buildWorksParams({
+          type: categoryValue || undefined,
+          page: 1,
+        }),
+      );
     } catch (error) {
       console.error('筛选失败:', error);
     }
@@ -223,35 +255,47 @@ export default function CreatorProfile() {
     if (!creator) return;
     setActiveAlbumId(albumId);
     setActiveTab('works');
-    await loadWorks(creator.id, {
-      keyword: searchKeyword || undefined,
-      type: activeCategory || undefined,
-      albumId,
-    });
+    await loadWorks(
+      creator.id,
+      buildWorksParams({
+        albumId,
+        page: 1,
+      }),
+    );
   };
 
   const handleClearAlbumFilter = async () => {
     if (!creator) return;
     setActiveAlbumId('');
-    await loadWorks(creator.id, {
-      keyword: searchKeyword || undefined,
-      type: activeCategory || undefined,
-    });
+    await loadWorks(
+      creator.id,
+      buildWorksParams({
+        albumId: undefined,
+        page: 1,
+      }),
+    );
+  };
+
+  const handleWorksPageChange = async (page: number) => {
+    if (!creator || worksLoading) return;
+    const nextPage = Math.max(1, Math.min(worksTotalPages, page));
+    if (nextPage === worksPage) return;
+    await loadWorks(creator.id, buildWorksParams({ page: nextPage }));
   };
 
   if (loading) {
     return (
       <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
-        <PageBanner backgroundStyle={BANNER_BACKGROUND} padding="py-12" maxWidth="max-w-7xl">
+        <PageBanner padding="py-8 md:py-10" maxWidth="max-w-7xl">
           <div className="flex items-center gap-6">
-            <Skeleton className="h-24 w-24 rounded-full bg-white/20" />
+            <Skeleton className="h-24 w-24 rounded-full bg-white/65" />
             <div className="flex-1 space-y-3">
-              <Skeleton className="h-8 w-48 bg-white/20" />
-              <Skeleton className="h-4 w-64 bg-white/20" />
+              <Skeleton className="h-8 w-48 bg-white/65" />
+              <Skeleton className="h-4 w-64 bg-white/65" />
               <div className="flex gap-6 pt-2">
-                <Skeleton className="h-6 w-20 bg-white/20" />
-                <Skeleton className="h-6 w-20 bg-white/20" />
-                <Skeleton className="h-6 w-20 bg-white/20" />
+                <Skeleton className="h-6 w-20 bg-white/65" />
+                <Skeleton className="h-6 w-20 bg-white/65" />
+                <Skeleton className="h-6 w-20 bg-white/65" />
               </div>
             </div>
           </div>
@@ -281,130 +325,132 @@ export default function CreatorProfile() {
   return (
     <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
       {/* 创作者页也跟随当前主题背景，避免继续保留独立紫色专题风格 */}
-      <PageBanner backgroundStyle={BANNER_BACKGROUND} padding="py-12 md:py-16" maxWidth="max-w-7xl">
-        <Button
-          variant="ghost"
-          onClick={() => window.history.back()}
-          className="mb-6 gap-2 text-white/90 backdrop-blur-sm hover:bg-white/10 hover:text-white"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          返回
-        </Button>
+      <PageBanner padding="py-8 md:py-10" maxWidth="max-w-7xl" tone="soft">
+        <div className={creatorHeroInnerClass}>
+          <div className="pointer-events-none absolute -left-12 -top-12 h-44 w-44 rounded-full bg-white/70 blur-3xl" />
+          <div className="pointer-events-none absolute right-10 top-5 h-32 w-32 rounded-full bg-[rgba(var(--theme-secondary-rgb),0.22)] blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-8 left-1/3 h-36 w-36 rounded-full bg-[rgba(var(--theme-tertiary-rgb),0.18)] blur-3xl" />
 
-        <div className="flex flex-col items-start gap-8 md:flex-row md:items-center">
-          <div className="relative shrink-0">
-            <div
-              className="absolute -inset-2 rounded-full opacity-80 blur-xl"
-              style={{
-                background:
-                  'linear-gradient(135deg, rgba(var(--theme-tertiary-rgb),0.52), rgba(var(--theme-secondary-rgb),0.30), rgba(var(--theme-primary-rgb),0.58))',
-              }}
-            />
-            <Avatar className="relative h-32 w-32 border-4 border-white/30 shadow-2xl ring-4 ring-white/15 md:h-40 md:w-40">
-              <AvatarImage src={creator.avatar} className="object-cover" />
-              <AvatarFallback className="theme-avatar-fallback text-4xl font-bold text-white md:text-5xl">
-                {creator.name[0]}
-              </AvatarFallback>
-            </Avatar>
-            <div
-              className="absolute -bottom-2 -right-2 flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold text-white shadow-lg"
-              style={{
-                background:
-                  'linear-gradient(135deg, rgba(var(--theme-tertiary-rgb),0.95), rgba(var(--theme-secondary-rgb),0.92))',
-              }}
+          <div className="relative flex flex-wrap items-center justify-between gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => window.history.back()}
+              className="h-10 gap-2 rounded-xl border border-white/84 bg-white/72 px-4 text-slate-700 backdrop-blur-xl shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.10)] hover:bg-white"
             >
-              <Award className="h-3 w-3" />
-              认证创作者
-            </div>
+              <ArrowLeft className="h-4 w-4" />
+              返回
+            </Button>
+            <Badge className="h-8 border border-white/84 bg-white/72 px-3 text-theme-primary shadow-[0_10px_20px_rgba(var(--theme-primary-rgb),0.10)]">
+              <Sparkles className="mr-1 h-3.5 w-3.5" />
+              创作者主页
+            </Badge>
           </div>
 
-          <div className="min-w-0 flex-1 text-white">
-            <div className="mb-3 flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-bold drop-shadow-lg md:text-4xl lg:text-5xl">
-                {creator.name}
-              </h1>
-              <Badge className="border-white/24 bg-white/16 px-3 py-1 text-white backdrop-blur-sm hover:bg-white/24">
-                <Sparkles className="mr-1 h-3 w-3" />
-                活跃
-              </Badge>
-            </div>
-
-            <p className="mb-6 max-w-2xl text-base leading-relaxed text-white/86 drop-shadow md:text-lg">
-              {creator.description || '这是一个优秀的内容创作者，持续分享高质量的设计作品。'}
-            </p>
-
-            <div className="mb-6 grid grid-cols-3 gap-4">
-              <div className={glassStatClass}>
-                <div className="mb-2 flex items-center gap-2 text-white/78">
-                  <ImageIcon className="h-4 w-4" />
-                  <span className="text-xs font-medium">作品</span>
-                </div>
-                <div className="text-2xl font-bold md:text-3xl">{creator.resourceCount}</div>
-              </div>
-              <div className={glassStatClass}>
-                <div className="mb-2 flex items-center gap-2 text-white/78">
-                  <Download className="h-4 w-4" />
-                  <span className="text-xs font-medium">下载</span>
-                </div>
-                <div className="text-2xl font-bold md:text-3xl">{creator.downloadCount}</div>
-              </div>
-              <div className={glassStatClass}>
-                <div className="mb-2 flex items-center gap-2 text-white/78">
-                  <Users className="h-4 w-4" />
-                  <span className="text-xs font-medium">粉丝</span>
-                </div>
-                <div className="text-2xl font-bold md:text-3xl">{followerCount}</div>
+          <div className="relative mt-5 grid w-full gap-5 xl:grid-cols-[auto,1fr,240px]">
+            <div className="relative mx-auto self-start xl:mx-0">
+              <div className="absolute -inset-4 rounded-full bg-[radial-gradient(circle,rgba(var(--theme-primary-rgb),0.2)_0%,transparent_72%)] blur-2xl" />
+              <Avatar className="relative h-28 w-28 border-4 border-white/88 shadow-[0_20px_48px_rgba(var(--theme-primary-rgb),0.16)] md:h-32 md:w-32">
+                <AvatarImage src={creator.avatar} className="object-cover" />
+                <AvatarFallback className="theme-avatar-fallback text-3xl font-bold text-white md:text-4xl">
+                  {creator.name[0]}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute -bottom-1 -right-1 inline-flex items-center gap-1 rounded-full border border-white/90 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-theme-primary shadow-md">
+                <Award className="h-3 w-3" />
+                认证
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              {!isSelf && (
+            <div className="min-w-0">
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-bold text-slate-900 md:text-4xl">{creator.name}</h1>
+                <Badge className="border border-white/84 bg-white/72 text-theme-primary">
+                  活跃创作者
+                </Badge>
+              </div>
+              <p className="max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
+                {creator.description || '这个创作者暂未填写个人介绍。'}
+              </p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className={glassStatClass}>
+                  <div className="mb-1 flex items-center gap-1.5 text-xs text-slate-500">
+                    <ImageIcon className="h-3.5 w-3.5 text-theme-primary" />
+                    作品
+                  </div>
+                  <div className="text-xl font-semibold text-slate-900 md:text-2xl">
+                    {creator.resourceCount}
+                  </div>
+                </div>
+                <div className={glassStatClass}>
+                  <div className="mb-1 flex items-center gap-1.5 text-xs text-slate-500">
+                    <Download className="h-3.5 w-3.5 text-theme-primary" />
+                    下载
+                  </div>
+                  <div className="text-xl font-semibold text-slate-900 md:text-2xl">
+                    {creator.downloadCount}
+                  </div>
+                </div>
+                <div className={glassStatClass}>
+                  <div className="mb-1 flex items-center gap-1.5 text-xs text-slate-500">
+                    <Users className="h-3.5 w-3.5 text-theme-primary" />
+                    粉丝
+                  </div>
+                  <div className="text-xl font-semibold text-slate-900 md:text-2xl">
+                    {followerCount}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className={creatorHeroActionCardClass}>
+              <div className="text-xs text-slate-500">互动操作</div>
+              <div className="mt-3 flex flex-col gap-2.5">
+                {!isSelf ? (
+                  <Button
+                    onClick={handleFollow}
+                    disabled={followLoading}
+                    className={
+                      isFollowing
+                        ? 'h-11 border border-white/82 bg-white/72 text-slate-700 shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.10)] hover:bg-white'
+                        : 'h-11 bg-gradient-to-r from-theme-primary to-theme-primary-deep text-white shadow-[0_14px_30px_rgba(var(--theme-primary-rgb),0.24)] hover:from-theme-primary-hover hover:to-theme-primary-deep'
+                    }
+                    variant={isFollowing ? 'outline' : 'default'}
+                  >
+                    {isFollowing ? (
+                      <>
+                        <UserCheck className="mr-1.5 h-4 w-4" />
+                        已关注
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="mr-1.5 h-4 w-4" />
+                        关注创作者
+                      </>
+                    )}
+                  </Button>
+                ) : null}
                 <Button
-                  onClick={handleFollow}
-                  disabled={followLoading}
-                  size="lg"
-                  variant={isFollowing ? 'ghost' : 'default'}
-                  className={
-                    isFollowing
-                      ? 'border-2 border-white/50 bg-white/12 px-8 font-semibold text-white backdrop-blur-sm hover:bg-white/20'
-                      : 'bg-white px-8 font-semibold text-[var(--theme-primary)] shadow-xl transition-all hover:scale-[1.01] hover:bg-white/94'
-                  }
+                  variant="outline"
+                  className="h-11 border-white/82 bg-white/70 text-slate-700 shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.10)] hover:bg-white"
                 >
-                  {isFollowing ? (
-                    <>
-                      <UserCheck className="mr-2 h-5 w-5" />
-                      已关注
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="mr-2 h-5 w-5" />
-                      关注创作者
-                    </>
-                  )}
+                  <Share2 className="mr-1.5 h-4 w-4" />
+                  分享主页
                 </Button>
-              )}
-              <Button
-                size="lg"
-                variant="ghost"
-                className="border-2 border-white/50 bg-transparent px-6 font-semibold text-white backdrop-blur-sm hover:bg-white/14"
-              >
-                <Share2 className="mr-2 h-5 w-5" />
-                分享
-              </Button>
+              </div>
             </div>
           </div>
         </div>
       </PageBanner>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
-          <div className="rounded-2xl border border-theme-shell-border bg-white/84 p-2 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm">
-            <TabsList className="h-auto gap-4 bg-transparent p-0">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-col gap-4">
+          <div className={sectionCardClass}>
+            <TabsList className="h-auto gap-3 bg-transparent p-0">
               <TabsTrigger value="works" className={triggerClassName}>
                 <ImageIcon className="mr-2 h-5 w-5" />
                 作品集
                 <Badge className="ml-2 border-0 bg-theme-soft text-theme-primary data-[state=active]:bg-white/18 data-[state=active]:text-white">
-                  {works.length}
+                  {worksTotal}
                 </Badge>
               </TabsTrigger>
               <TabsTrigger value="albums" className={triggerClassName}>
@@ -418,152 +464,170 @@ export default function CreatorProfile() {
           </div>
 
           <div className="flex flex-1 flex-col">
-            <div
-              className={`mb-4 flex w-full flex-col gap-6 lg:flex-row lg:items-start ${sectionCardClass}`}
-            >
-              <div className="flex flex-1 flex-col">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-6 w-1 rounded-full bg-[var(--theme-primary)]" />
-                    <h3 className="text-lg font-bold text-slate-900">分类筛选</h3>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    {activeAlbumId ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleClearAlbumFilter()}
-                        className="rounded-full bg-theme-soft px-3 py-1 text-xs font-medium text-theme-primary transition hover:bg-theme-soft-strong"
-                      >
-                        当前专辑：
-                        {albums.find((album) => album.id === activeAlbumId)?.name || '已选专辑'}
-                      </button>
-                    ) : null}
-                    <span className="text-sm text-slate-500">{works.length} 个作品</span>
-                  </div>
-                </div>
-                <TypeFilterBar
-                  options={categories}
-                  value={activeCategory}
-                  onChange={handleCategoryChange}
-                  className="border-none! bg-transparent! p-0! shadow-none!"
-                />
-              </div>
-
-              <div className="flex flex-1 flex-col">
-                <div className="mb-4 flex items-center gap-3">
-                  <div className="h-6 w-1 rounded-full bg-[var(--theme-primary)]" />
-                  <h3 className="text-lg font-bold text-slate-900">搜索作品</h3>
-                </div>
-                <div className="relative">
-                  <div className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2">
-                    <Search className="h-5 w-5 text-theme-primary" />
-                  </div>
-                  <Input
-                    type="text"
-                    placeholder="输入关键词搜索作品..."
-                    value={searchKeyword}
-                    onChange={(e) => setSearchKeyword(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    className="theme-input-border h-14 rounded-xl border-2 bg-white/82 pl-14 pr-28 text-base focus-visible:border-theme-primary focus-visible:ring-theme-primary/20"
-                  />
-                  <Button
-                    onClick={handleSearch}
-                    className="theme-btn-primary absolute right-2 top-1/2 h-10 -translate-y-1/2 rounded-lg px-6 font-semibold"
-                  >
-                    搜索
-                  </Button>
-                </div>
-              </div>
-            </div>
-
             <TabsContent value="works" className="mt-0">
-              {worksLoading ? (
-                <div className="grid grid-cols-2 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <ResourceCardSkeleton key={i} contentPadding="p-4" />
-                  ))}
-                </div>
-              ) : works.length === 0 ? (
-                <div className="rounded-2xl border border-theme-shell-border bg-white/80 px-6 py-20 text-center shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.08)]">
-                  <div className="mb-6 inline-flex h-24 w-24 items-center justify-center rounded-full bg-theme-soft">
-                    <ImageIcon className="h-12 w-12 text-theme-primary" />
-                  </div>
-                  <h3 className="mb-2 text-xl font-semibold text-slate-900">暂无作品</h3>
-                  <p className="text-slate-500">该创作者还没有上传任何作品</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {works.map((work) => (
-                    <ResourceCard
-                      key={work.id}
-                      resource={work}
-                      isFavorited={favoritedMap[work.id]}
-                      onFavorite={handleFavorite}
-                      contentPadding="p-4"
+              <div className={`${sectionCardClass} space-y-5`}>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className={sectionSubCardClass}>
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <h3 className="text-base font-semibold text-slate-900">分类筛选</h3>
+                      {activeAlbumId ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleClearAlbumFilter()}
+                          className="rounded-full border border-theme-shell-border bg-white px-3 py-1 text-xs text-theme-primary hover:bg-theme-soft"
+                        >
+                          当前专辑：
+                          {albums.find((album) => album.id === activeAlbumId)?.name || '已选专辑'}
+                        </button>
+                      ) : null}
+                    </div>
+                    <TypeFilterBar
+                      options={categories}
+                      value={activeCategory}
+                      onChange={handleCategoryChange}
+                      className="border-none! bg-transparent! p-0! shadow-none!"
                     />
-                  ))}
+                  </div>
+
+                  <div className={sectionSubCardClass}>
+                    <div className="mb-3 flex items-center gap-2">
+                      <Search className="h-4 w-4 text-theme-primary" />
+                      <h3 className="text-base font-semibold text-slate-900">搜索作品</h3>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        placeholder="输入关键词搜索作品..."
+                        value={searchKeyword}
+                        onChange={(e) => setSearchKeyword(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && void handleSearch()}
+                        className="theme-input-border h-12 rounded-xl border-2 bg-white pr-24 text-base focus-visible:border-theme-primary focus-visible:ring-theme-primary/20"
+                      />
+                      <Button
+                        onClick={() => void handleSearch()}
+                        className="theme-btn-primary absolute right-1.5 top-1/2 h-9 -translate-y-1/2 rounded-lg px-5 text-sm"
+                      >
+                        搜索
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                {worksLoading ? (
+                  <div className="grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-4">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <ResourceCardSkeleton key={i} contentPadding="p-4" />
+                    ))}
+                  </div>
+                ) : works.length === 0 ? (
+                  <div className="rounded-2xl border border-theme-shell-border bg-white/82 px-6 py-16 text-center shadow-[0_14px_34px_rgba(var(--theme-primary-rgb),0.08)]">
+                    <div className="mb-5 inline-flex h-20 w-20 items-center justify-center rounded-full bg-theme-soft">
+                      <ImageIcon className="h-10 w-10 text-theme-primary" />
+                    </div>
+                    <h3 className="mb-2 text-xl font-semibold text-slate-900">暂无作品</h3>
+                    <p className="text-slate-500">该创作者还没有上传任何作品。</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-4">
+                    {works.map((work) => (
+                      <ResourceCard
+                        key={work.id}
+                        resource={work}
+                        isFavorited={favoritedMap[work.id]}
+                        onFavorite={handleFavorite}
+                        contentPadding="p-4"
+                        showTags
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {worksTotalPages > 1 ? (
+                  <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => void handleWorksPageChange(worksPage - 1)}
+                      disabled={worksPage <= 1 || worksLoading}
+                      className="rounded-xl border-theme-shell-border bg-white/84 px-6 text-slate-700 hover:bg-theme-soft"
+                    >
+                      上一页
+                    </Button>
+                    <div className="rounded-xl border border-theme-shell-border bg-white/84 px-5 py-2 text-sm text-slate-600">
+                      第 {worksPage} / {worksTotalPages} 页，共 {worksTotal} 个作品
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => void handleWorksPageChange(worksPage + 1)}
+                      disabled={worksPage >= worksTotalPages || worksLoading}
+                      className="rounded-xl border-theme-shell-border bg-white/84 px-6 text-slate-700 hover:bg-theme-soft"
+                    >
+                      下一页
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
             </TabsContent>
 
             <TabsContent value="albums" className="mt-0">
-              {albums.length === 0 ? (
-                <div className="rounded-2xl border border-theme-shell-border bg-white/80 px-6 py-20 text-center shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.08)]">
-                  <div className="mb-6 inline-flex h-24 w-24 items-center justify-center rounded-full bg-theme-soft">
-                    <FolderOpen className="h-12 w-12 text-theme-primary" />
+              <div className={sectionCardClass}>
+                {albums.length === 0 ? (
+                  <div className="rounded-2xl border border-theme-shell-border bg-white/82 px-6 py-16 text-center shadow-[0_14px_34px_rgba(var(--theme-primary-rgb),0.08)]">
+                    <div className="mb-5 inline-flex h-20 w-20 items-center justify-center rounded-full bg-theme-soft">
+                      <FolderOpen className="h-10 w-10 text-theme-primary" />
+                    </div>
+                    <h3 className="mb-2 text-xl font-semibold text-slate-900">还没有公开专辑</h3>
+                    <p className="text-slate-500">这个创作者暂时还没有整理出可浏览的资源专辑。</p>
                   </div>
-                  <h3 className="mb-2 text-xl font-semibold text-slate-900">还没有公开专辑</h3>
-                  <p className="text-slate-500">这个创作者暂时还没有整理出可浏览的资源专辑。</p>
-                </div>
-              ) : (
-                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                  {albums.map((album) => (
-                    <div
-                      key={album.id}
-                      className="overflow-hidden rounded-2xl border border-theme-shell-border bg-white/84 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_54px_rgba(var(--theme-primary-rgb),0.16)]"
-                    >
-                      <div className="h-44 overflow-hidden bg-theme-soft">
-                        {album.coverUrl ? (
-                          <img
-                            src={album.coverUrl}
-                            alt={album.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full items-center justify-center">
-                            <FolderOpen className="h-12 w-12 text-theme-primary/50" />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="p-5">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <h3 className="truncate text-lg font-semibold text-slate-900">
-                              {album.name}
-                            </h3>
-                            <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
-                              {album.description || '这个专辑暂时还没有补充更多说明。'}
-                            </p>
-                          </div>
-                          <span className="rounded-full bg-theme-soft px-3 py-1 text-xs font-medium text-theme-primary">
-                            {album.resourceCount} 项
-                          </span>
+                ) : (
+                  <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {albums.map((album) => (
+                      <div
+                        key={album.id}
+                        className="overflow-hidden rounded-2xl border border-theme-shell-border bg-white/84 shadow-[0_16px_36px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(var(--theme-primary-rgb),0.16)]"
+                      >
+                        <div className="h-44 overflow-hidden bg-theme-soft">
+                          {album.coverUrl ? (
+                            <img
+                              src={album.coverUrl}
+                              alt={album.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center">
+                              <FolderOpen className="h-12 w-12 text-theme-primary/50" />
+                            </div>
+                          )}
                         </div>
 
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => void handleAlbumOpen(album.id)}
-                          className="mt-4 w-full rounded-xl border-theme-soft-strong bg-white/80 text-theme-primary hover:bg-theme-soft"
-                        >
-                          查看专辑作品
-                        </Button>
+                        <div className="p-5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h3 className="truncate text-lg font-semibold text-slate-900">
+                                {album.name}
+                              </h3>
+                              <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
+                                {album.description || '这个专辑暂时还没有补充更多说明。'}
+                              </p>
+                            </div>
+                            <span className="rounded-full bg-theme-soft px-3 py-1 text-xs font-medium text-theme-primary">
+                              {album.resourceCount} 项
+                            </span>
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void handleAlbumOpen(album.id)}
+                            className="mt-4 w-full rounded-xl border-theme-soft-strong bg-white/80 text-theme-primary hover:bg-theme-soft"
+                          >
+                            查看专辑作品
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </TabsContent>
           </div>
         </Tabs>

@@ -48,11 +48,6 @@ const PAGE_BACKGROUND = {
     'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-primary-soft) 28%, white) 42%, var(--theme-page-cool) 100%)',
 };
 
-const BANNER_BACKGROUND = {
-  background:
-    'linear-gradient(135deg, rgba(var(--theme-primary-rgb),0.97) 0%, color-mix(in srgb, rgba(var(--theme-secondary-rgb),1) 32%, var(--theme-primary-hover)) 52%, var(--theme-primary-deep) 100%)',
-};
-
 const sectionCardClass =
   'overflow-hidden rounded-2xl border border-theme-shell-border bg-white/84 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-sm';
 
@@ -221,7 +216,7 @@ export default function Profile() {
   return (
     <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
       {/* 顶部信息区复用主题 Banner，头像光晕和统计块也跟随当前主题变化 */}
-      <PageBanner backgroundStyle={BANNER_BACKGROUND} padding="py-10" maxWidth="max-w-4xl">
+      <PageBanner padding="py-10" maxWidth="max-w-4xl">
         <div className="flex flex-wrap items-center gap-6">
           <div className="relative shrink-0">
             <div

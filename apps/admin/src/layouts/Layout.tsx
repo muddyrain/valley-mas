@@ -14,6 +14,7 @@ import {
 import { Layout as AntLayout, Avatar, Dropdown, Menu, message, theme } from 'antd';
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import BrandLogo from '../components/BrandLogo';
 import http from '../utils/request';
 
 const { Header, Sider, Content } = AntLayout;
@@ -97,7 +98,12 @@ export default function Layout() {
     <AntLayout className="h-screen">
       <Sider trigger={null} collapsible collapsed={collapsed} theme="light">
         <div className="h-16 flex items-center justify-center border-b border-gray-100">
-          <span className="text-xl font-bold text-blue-600">{collapsed ? 'V' : 'Valley'}</span>
+          <BrandLogo
+            showWordmark={!collapsed}
+            className="justify-center"
+            iconClassName={collapsed ? 'h-8' : 'h-9'}
+            wordmarkClassName="text-[1.02rem]"
+          />
         </div>
         <Menu
           mode="inline"

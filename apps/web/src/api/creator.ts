@@ -50,6 +50,7 @@ export interface Resource {
   isTop: boolean;
   /** 当前用户是否已收藏（仅登录用户时服务端返回 true/false，未登录为 false） */
   isFavorited?: boolean;
+  tags?: Array<{ id: string; name: string }>;
 }
 
 // 专辑类型
