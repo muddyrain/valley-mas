@@ -339,7 +339,8 @@ export default function BlogCreate() {
     }
 
     if (!coverFile || !coverObjectUrl) {
-      if (!pendingCoverRemoteUrl) {
+      const remoteCoverUrl = pendingCoverRemoteUrl || (!coverStorageKey ? cover.trim() : '');
+      if (!remoteCoverUrl) {
         return {
           cover: cover.trim(),
           coverStorageKey: coverStorageKey.trim(),
@@ -348,7 +349,7 @@ export default function BlogCreate() {
 
       setCoverUploading(true);
       try {
-        const result = await uploadBlogCoverByUrl({ url: pendingCoverRemoteUrl });
+        const result = await uploadBlogCoverByUrl({ url: remoteCoverUrl });
         setCover(result.url);
         setCoverStorageKey(result.storageKey);
         setPendingCoverRemoteUrl('');
@@ -626,11 +627,12 @@ export default function BlogCreate() {
     if (coverFile || coverObjectUrl) {
       resetLocalCoverEditing();
     }
-    setCover(resource.url || '');
+    const selectedUrl = (resource.url || '').trim();
+    setCover(selectedUrl);
     setCoverStorageKey('');
-    setPendingCoverRemoteUrl('');
+    setPendingCoverRemoteUrl(selectedUrl);
     setWallpaperPickerOpen(false);
-    toast.success('已选择公用壁纸作为封面');
+    toast.success('已选择公用壁纸，发布时会自动转存为你的博客封面');
   };
 
   const handleCreateGroup = async () => {

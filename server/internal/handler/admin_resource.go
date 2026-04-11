@@ -224,6 +224,12 @@ func DeleteResource(c *gin.Context) {
 		Error(c, 404, "资源不存在")
 		return
 	}
+	affectedAlbumIDs, err := collectAlbumIDsByResourceIDs(db, []model.Int64String{resource.ID})
+	if err != nil {
+		logrus.WithField("error", err).Error("DeleteResource collect affected albums failed")
+		Error(c, 500, "删除失败："+err.Error())
+		return
+	}
 
 	// 使用上传服务删除文件
 	uploadService := service.NewUploadService()
@@ -244,6 +250,11 @@ func DeleteResource(c *gin.Context) {
 	// 从数据库软删除
 	if err := db.Delete(&resource).Error; err != nil {
 		logrus.WithField("error", err).Error("AdminDeleteResource db delete failed")
+		Error(c, 500, "删除失败："+err.Error())
+		return
+	}
+	if err := reconcileAlbumCoverResourceByAlbumIDs(db, affectedAlbumIDs); err != nil {
+		logrus.WithField("error", err).Error("DeleteResource reconcile album cover failed")
 		Error(c, 500, "删除失败："+err.Error())
 		return
 	}
@@ -286,6 +297,16 @@ func BatchDeleteResources(c *gin.Context) {
 		Error(c, 404, "未找到可删除的资源")
 		return
 	}
+	resourceIDs := make([]model.Int64String, 0, len(resources))
+	for _, resource := range resources {
+		resourceIDs = append(resourceIDs, resource.ID)
+	}
+	affectedAlbumIDs, err := collectAlbumIDsByResourceIDs(db, resourceIDs)
+	if err != nil {
+		logrus.WithField("error", err).Error("BatchDeleteResources collect affected albums failed")
+		Error(c, 500, "批量删除失败："+err.Error())
+		return
+	}
 
 	deletedCount := 0
 	for _, resource := range resources {
@@ -304,6 +325,11 @@ func BatchDeleteResources(c *gin.Context) {
 			continue
 		}
 		deletedCount++
+	}
+	if err := reconcileAlbumCoverResourceByAlbumIDs(db, affectedAlbumIDs); err != nil {
+		logrus.WithField("error", err).Error("BatchDeleteResources reconcile album cover failed")
+		Error(c, 500, "批量删除失败："+err.Error())
+		return
 	}
 
 	Success(c, gin.H{"deleted": deletedCount})

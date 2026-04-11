@@ -32,6 +32,108 @@ type creatorAlbumPayload struct {
 	Resources       []creatorAlbumResourcePayload `json:"resources,omitempty"`
 }
 
+func queryFirstValidAlbumResourceID(db *gorm.DB, albumID model.Int64String) (*model.Int64String, error) {
+	var firstResourceID model.Int64String
+	err := db.
+		Table("creator_album_resources").
+		Select("resources.id").
+		Joins("JOIN resources ON resources.id = creator_album_resources.resource_id").
+		Where("creator_album_resources.creator_album_id = ?", albumID).
+		Where("resources.deleted_at IS NULL").
+		Order("resources.created_at DESC").
+		Limit(1).
+		Scan(&firstResourceID).Error
+	if err != nil {
+		return nil, err
+	}
+	if firstResourceID == 0 {
+		return nil, nil
+	}
+	value := firstResourceID
+	return &value, nil
+}
+
+func isAlbumCoverResourceValid(db *gorm.DB, albumID model.Int64String, coverResourceID *model.Int64String) (bool, error) {
+	if coverResourceID == nil || *coverResourceID == 0 {
+		return false, nil
+	}
+
+	var count int64
+	err := db.
+		Table("creator_album_resources").
+		Joins("JOIN resources ON resources.id = creator_album_resources.resource_id").
+		Where("creator_album_resources.creator_album_id = ?", albumID).
+		Where("creator_album_resources.resource_id = ?", *coverResourceID).
+		Where("resources.deleted_at IS NULL").
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func reconcileAlbumCoverResourceByAlbumIDs(db *gorm.DB, albumIDs []model.Int64String) error {
+	if len(albumIDs) == 0 {
+		return nil
+	}
+
+	seen := make(map[int64]struct{}, len(albumIDs))
+	for _, albumID := range albumIDs {
+		if albumID == 0 {
+			continue
+		}
+		if _, exists := seen[int64(albumID)]; exists {
+			continue
+		}
+		seen[int64(albumID)] = struct{}{}
+
+		var album model.CreatorAlbum
+		if err := db.Select("id", "cover_resource_id").First(&album, "id = ? AND deleted_at IS NULL", albumID).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				continue
+			}
+			return err
+		}
+
+		valid, err := isAlbumCoverResourceValid(db, album.ID, album.CoverResourceID)
+		if err != nil {
+			return err
+		}
+		if valid {
+			continue
+		}
+
+		nextCoverID, err := queryFirstValidAlbumResourceID(db, album.ID)
+		if err != nil {
+			return err
+		}
+
+		if err := db.Model(&model.CreatorAlbum{}).
+			Where("id = ?", album.ID).
+			Update("cover_resource_id", nextCoverID).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func collectAlbumIDsByResourceIDs(db *gorm.DB, resourceIDs []model.Int64String) ([]model.Int64String, error) {
+	if len(resourceIDs) == 0 {
+		return nil, nil
+	}
+
+	var albumIDs []model.Int64String
+	if err := db.
+		Table("creator_album_resources").
+		Where("resource_id IN ?", resourceIDs).
+		Distinct().
+		Pluck("creator_album_id", &albumIDs).Error; err != nil {
+		return nil, err
+	}
+	return albumIDs, nil
+}
+
 func loadCurrentCreator(c *gin.Context) (*model.Creator, error) {
 	userID := model.Int64String(GetCurrentUserID(c))
 	if userID == 0 {
@@ -106,6 +208,7 @@ func serializeCreatorAlbum(
 	album model.CreatorAlbum,
 	resourceCount int,
 	coverURL string,
+	coverResourceID string,
 	resources []creatorAlbumResourcePayload,
 ) creatorAlbumPayload {
 	payload := creatorAlbumPayload{
@@ -118,8 +221,8 @@ func serializeCreatorAlbum(
 		Resources:     resources,
 	}
 
-	if album.CoverResourceID != nil && *album.CoverResourceID != 0 {
-		payload.CoverResourceID = album.CoverResourceID.String()
+	if strings.TrimSpace(coverResourceID) != "" {
+		payload.CoverResourceID = strings.TrimSpace(coverResourceID)
 	}
 
 	return payload
@@ -168,13 +271,16 @@ func ListMyCreatorAlbums(c *gin.Context) {
 	for _, album := range albums {
 		resources := buildAlbumResourcePayloads(album.Resources)
 		coverURL := ""
+		coverResourceID := ""
 		if album.CoverResource != nil {
 			coverURL = album.CoverResource.URL
+			coverResourceID = album.CoverResource.ID.String()
 		} else if len(resources) > 0 {
 			coverURL = resources[0].URL
+			coverResourceID = resources[0].ID
 		}
 
-		list = append(list, serializeCreatorAlbum(album, len(resources), coverURL, resources))
+		list = append(list, serializeCreatorAlbum(album, len(resources), coverURL, coverResourceID, resources))
 	}
 
 	Success(c, gin.H{
@@ -240,6 +346,11 @@ func CreateCreatorAlbum(c *gin.Context) {
 			return
 		}
 	}
+	if err := reconcileAlbumCoverResourceByAlbumIDs(db, []model.Int64String{album.ID}); err != nil {
+		logger.Log.WithField("error", err).Error("CreateCreatorAlbum reconcile cover failed")
+		Error(c, 500, "创建资源专辑失败："+err.Error())
+		return
+	}
 
 	db.Preload("CoverResource").
 		Preload("Resources", func(tx *gorm.DB) *gorm.DB {
@@ -249,13 +360,16 @@ func CreateCreatorAlbum(c *gin.Context) {
 
 	resourcePayloads := buildAlbumResourcePayloads(album.Resources)
 	coverURL := ""
+	coverResourceIDText := ""
 	if album.CoverResource != nil {
 		coverURL = album.CoverResource.URL
+		coverResourceIDText = album.CoverResource.ID.String()
 	} else if len(resourcePayloads) > 0 {
 		coverURL = resourcePayloads[0].URL
+		coverResourceIDText = resourcePayloads[0].ID
 	}
 
-	Success(c, serializeCreatorAlbum(album, len(resourcePayloads), coverURL, resourcePayloads))
+	Success(c, serializeCreatorAlbum(album, len(resourcePayloads), coverURL, coverResourceIDText, resourcePayloads))
 }
 
 func UpdateCreatorAlbum(c *gin.Context) {
@@ -328,6 +442,11 @@ func UpdateCreatorAlbum(c *gin.Context) {
 			return
 		}
 	}
+	if err := reconcileAlbumCoverResourceByAlbumIDs(db, []model.Int64String{album.ID}); err != nil {
+		logger.Log.WithField("error", err).Error("UpdateCreatorAlbum reconcile cover failed")
+		Error(c, 500, "更新资源专辑失败："+err.Error())
+		return
+	}
 
 	db.Preload("CoverResource").
 		Preload("Resources", func(tx *gorm.DB) *gorm.DB {
@@ -337,13 +456,16 @@ func UpdateCreatorAlbum(c *gin.Context) {
 
 	resourcePayloads := buildAlbumResourcePayloads(album.Resources)
 	coverURL := ""
+	coverResourceIDText := ""
 	if album.CoverResource != nil {
 		coverURL = album.CoverResource.URL
+		coverResourceIDText = album.CoverResource.ID.String()
 	} else if len(resourcePayloads) > 0 {
 		coverURL = resourcePayloads[0].URL
+		coverResourceIDText = resourcePayloads[0].ID
 	}
 
-	Success(c, serializeCreatorAlbum(album, len(resourcePayloads), coverURL, resourcePayloads))
+	Success(c, serializeCreatorAlbum(album, len(resourcePayloads), coverURL, coverResourceIDText, resourcePayloads))
 }
 
 func DeleteCreatorAlbum(c *gin.Context) {
@@ -511,7 +633,7 @@ func ListCreatorAlbums(c *gin.Context) {
 			coverURL = fallbackCoverMap[albumID.String()]
 		}
 
-		list = append(list, serializeCreatorAlbum(album, countMap[albumID.String()], coverURL, nil))
+		list = append(list, serializeCreatorAlbum(album, countMap[albumID.String()], coverURL, "", nil))
 	}
 
 	Success(c, gin.H{
