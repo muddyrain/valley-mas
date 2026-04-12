@@ -9,6 +9,7 @@
   ImageIcon,
   LogOut,
   MessageCircleHeart,
+  Mountain,
   Palette,
   RefreshCw,
   Sparkles,
@@ -289,6 +290,20 @@ export default function Header() {
             >
               <ArrowLeftRight className="h-4 w-4" />
               <span className="hidden sm:inline">格式转换</span>
+            </Button>
+          </Link>
+
+          <Link to="/labs/climber">
+            <Button
+              variant="ghost"
+              className={`gap-2 transition-colors ${
+                location.pathname.startsWith('/labs/climber')
+                  ? 'bg-theme-soft text-theme-primary-hover'
+                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
+              }`}
+            >
+              <Mountain className="h-4 w-4" />
+              <span className="hidden sm:inline">跳跳乐实验</span>
             </Button>
           </Link>
         </nav>
