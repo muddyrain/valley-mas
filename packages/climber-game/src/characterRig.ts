@@ -19,25 +19,18 @@ import {
   Vector3,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import {
+  CHARACTER_MODEL_URLS,
+  CLIMBER_CHARACTER_OPTIONS,
+  isModelCharacter,
+} from './characterAssets';
 import type {
   ClimberCharacterAnimationState,
   ClimberCharacterId,
-  ClimberCharacterOption,
   ClimberCharacterRuntimeStatus,
 } from './types';
 
-export const CLIMBER_CHARACTER_OPTIONS: ClimberCharacterOption[] = [
-  {
-    id: 'peach',
-    name: '碧姬',
-    description: '加载 peach.glb；若资源异常会自动回退占位角色。',
-  },
-  {
-    id: 'daisy',
-    name: '黛西',
-    description: '加载 daisy.glb；若资源异常会自动回退占位角色。',
-  },
-];
+export { CLIMBER_CHARACTER_OPTIONS } from './characterAssets';
 
 interface CharacterUpdateContext {
   delta: number;
@@ -86,17 +79,6 @@ interface BoneEntry {
 
 interface ProceduralBoneAnimator {
   update: (context: CharacterUpdateContext, state: ClimberCharacterAnimationState) => void;
-}
-
-const CHARACTER_MODEL_URLS: Record<Exclude<ClimberCharacterId, 'orb'>, string[]> = {
-  peach: ['/game/models/peach.glb?v=20260412-peach', '/game/models/peach.glb?raw=1'],
-  daisy: ['/game/models/daisy.glb?v=20260412-daisy', '/game/models/daisy.glb?raw=1'],
-};
-
-function isModelCharacter(
-  characterId: ClimberCharacterId,
-): characterId is Exclude<ClimberCharacterId, 'orb'> {
-  return characterId !== 'orb';
 }
 
 function usesPrincessRigHeuristics(characterId: Exclude<ClimberCharacterId, 'orb'>): boolean {
@@ -1491,6 +1473,12 @@ function loadCharacterModel(
   const tryLoad = (index: number) => {
     if (disposed) return;
     if (index >= modelUrls.length) {
+      if (
+        typeof window !== 'undefined' &&
+        /localhost|127\.0\.0\.1/.test(window.location.hostname)
+      ) {
+        console.warn('[climber-game] character model load failed', { characterId, modelUrls });
+      }
       onFailed();
       return;
     }
@@ -1524,6 +1512,15 @@ function loadCharacterModel(
       },
       undefined,
       () => {
+        if (
+          typeof window !== 'undefined' &&
+          /localhost|127\.0\.0\.1/.test(window.location.hostname)
+        ) {
+          console.warn('[climber-game] character model url failed, try next', {
+            characterId,
+            url: modelUrls[index],
+          });
+        }
         tryLoad(index + 1);
       },
     );

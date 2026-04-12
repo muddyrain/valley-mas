@@ -5,9 +5,11 @@ import { defineConfig } from 'vite';
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  assetsInclude: ['**/*.glb'],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@valley/climber-game': path.resolve(__dirname, '../../packages/climber-game/src/index.ts'),
     },
   },
   server: {
