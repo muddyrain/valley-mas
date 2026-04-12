@@ -32,7 +32,8 @@
       },
       "suspicious": {
         "noExplicitAny": "warn",
-        "noArrayIndexKey": "off"
+        "noArrayIndexKey": "off",
+        "useIterableCallbackReturn": "warn"
       },
       "style": {
         "useImportType": "warn",

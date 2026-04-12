@@ -8,6 +8,7 @@ import BlogCreate from './pages/BlogCreate';
 import BlogGroupManage from './pages/BlogGroupManage';
 import BlogList from './pages/blog/BlogList';
 import BlogPost from './pages/blog/BlogPost';
+import ClimberLab from './pages/ClimberLab';
 import Creator from './pages/Creator';
 import CreatorProfile from './pages/CreatorProfile';
 import Downloads from './pages/Downloads';
@@ -45,6 +46,8 @@ function RouteTitle() {
       title = '访客留言墙 | Valley';
     } else if (pathname === '/tools/format') {
       title = '格式转换工具 | Valley';
+    } else if (pathname === '/labs/climber') {
+      title = '3D 跳跳乐实验场 | Valley';
     } else if (pathname.startsWith('/blog/')) {
       title = '内容详情 | Valley';
     } else if (pathname === '/resources') {
@@ -144,6 +147,7 @@ function App() {
           <Route path="blog" element={<BlogList />} />
           <Route path="guestbook" element={<Guestbook />} />
           <Route path="tools/format" element={<FormatTools />} />
+          <Route path="labs/climber" element={<ClimberLab />} />
           <Route path="blog/:id" element={<BlogPost />} />
           <Route path="*" element={<NotFound />} />
         </Route>
