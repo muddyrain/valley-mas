@@ -1,23 +1,38 @@
 import {
   AmbientLight,
   BoxGeometry,
+  BufferGeometry,
   Clock,
   Color,
   DirectionalLight,
+  EdgesGeometry,
+  Float32BufferAttribute,
   GridHelper,
+  Group,
   HemisphereLight,
+  LineBasicMaterial,
+  LineSegments,
   type Material,
   MathUtils,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   PerspectiveCamera,
   PlaneGeometry,
+  Quaternion,
   Scene,
   TorusGeometry,
   Vector3,
   WebGLRenderer,
 } from 'three';
 import { createCharacterRig } from './characterRig';
+import {
+  appendBoxCollider,
+  type PlatformCollisionData,
+  solveSolidCollisions,
+  tryLandOnTop,
+} from './prototype/collision';
+import { createSetPieceRuntime } from './prototype/setPieceRuntime';
 import { createPrototypeAudio } from './prototypeAudio';
 import type {
   ClimberCharacterAnimationState,
@@ -33,25 +48,16 @@ interface CreateClimberPrototypeOptions {
   level: ClimberLevelDefinition;
   characterId: ClimberCharacterId;
   audioEnabled: boolean;
+  debugCollidersVisible?: boolean;
   onStats: (stats: ClimberRunStats) => void;
   onPointerLockChange?: (locked: boolean) => void;
   onCharacterStatusChange?: (status: ClimberCharacterRuntimeStatus) => void;
 }
 
-interface PlatformCollisionData {
-  top: number;
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-  minZ: number;
-  maxZ: number;
-}
-
 const PLAYER_RADIUS = 0.42;
 const WALK_SPEED = 5.4;
 const SPRINT_SPEED = 8.2;
-const JUMP_SPEED = 8.2;
+const JUMP_SPEED = 8.8;
 const GRAVITY = 21;
 const RESPAWN_Y = -20;
 const LANDING_ASSIST = PLAYER_RADIUS * 0.95;
@@ -64,6 +70,14 @@ const BOUNDARY_WALL_THICKNESS = 2;
 const GOAL_REACH_Y_TOLERANCE = 0.18;
 const GOAL_REACH_XZ_MARGIN = 0.16;
 const GOAL_CELEBRATION_DURATION = 1.25;
+const MAX_MOUSE_DELTA = 48;
+const POINTER_LOCK_INPUT_COOLDOWN_MS = 120;
+const MOUSE_FILTER_ALPHA = 0.42;
+const CAMERA_YAW_SPEED_LIMIT = 8.4;
+const CAMERA_PITCH_SPEED_LIMIT = 5.2;
+const LAND_SOUND_COOLDOWN_MS = 180;
+const GROUND_STICK_VELOCITY_MAX = 1.35;
+const RAMP_TOP_FLAT_RATIO = 0.36;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -71,6 +85,49 @@ function clamp(value: number, min: number, max: number): number {
 
 function toVector3(value: [number, number, number]): Vector3 {
   return new Vector3(value[0], value[1], value[2]);
+}
+
+function createRampDebugGeometry(width: number, height: number, depth: number): BufferGeometry {
+  const halfW = width / 2;
+  const halfH = height / 2;
+  const halfD = depth / 2;
+  const topFlatDepth = Math.max(0.001, Math.min(depth * 0.7, depth * RAMP_TOP_FLAT_RATIO));
+  const topFlatEndZ = -halfD + topFlatDepth;
+  const positions = [
+    -halfW,
+    -halfH,
+    -halfD,
+    halfW,
+    -halfH,
+    -halfD,
+    -halfW,
+    -halfH,
+    halfD,
+    halfW,
+    -halfH,
+    halfD,
+    -halfW,
+    halfH,
+    -halfD,
+    halfW,
+    halfH,
+    -halfD,
+    -halfW,
+    halfH,
+    topFlatEndZ,
+    halfW,
+    halfH,
+    topFlatEndZ,
+  ];
+  const indices = [
+    0, 1, 3, 0, 3, 2, 0, 4, 5, 0, 5, 1, 4, 6, 7, 4, 7, 5, 6, 2, 3, 6, 3, 7, 0, 2, 6, 0, 6, 4, 1, 5,
+    7, 1, 7, 3,
+  ];
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function disposeMaterial(material: Material | Material[]): void {
@@ -90,6 +147,7 @@ export function createClimberPrototype(
     level,
     characterId,
     audioEnabled,
+    debugCollidersVisible = false,
     onPointerLockChange,
     onCharacterStatusChange,
   } = options;
@@ -123,9 +181,9 @@ export function createClimberPrototype(
   const camera = new PerspectiveCamera(50, 1, 0.1, 260);
   camera.position.copy(startPosition).add(cameraOffset);
 
-  const ambient = new AmbientLight('#ffffff', 0.68);
-  const hemi = new HemisphereLight('#ffffff', '#dbeafe', 0.4);
-  const mainLight = new DirectionalLight(sunColor, 1.15);
+  const ambient = new AmbientLight('#ffffff', 0.46);
+  const hemi = new HemisphereLight('#ffffff', '#dbeafe', 0.26);
+  const mainLight = new DirectionalLight(sunColor, 1.05);
   mainLight.position.set(11, 20, 8);
   mainLight.castShadow = true;
   mainLight.shadow.mapSize.set(2048, 2048);
@@ -150,6 +208,14 @@ export function createClimberPrototype(
 
   const grid = new GridHelper(160, 80, gridPrimaryColor, gridSecondaryColor);
   grid.position.y = -0.49;
+  const gridMaterial = grid.material as Material | Material[];
+  if (Array.isArray(gridMaterial)) {
+    gridMaterial.forEach((material) => {
+      const anyMaterial = material as Material & { opacity?: number; transparent?: boolean };
+      anyMaterial.transparent = true;
+      anyMaterial.opacity = 0.58;
+    });
+  }
   scene.add(grid);
 
   const platformColliders: PlatformCollisionData[] = [];
@@ -157,26 +223,102 @@ export function createClimberPrototype(
   const boundaryWallMaterials: MeshStandardMaterial[] = [];
   const boundaryWallGeometries: BoxGeometry[] = [];
   const platformGeometry = new BoxGeometry(1, 1, 1);
+  const colliderDebugGroup = new Group();
+  const colliderDebugGeometries: BufferGeometry[] = [];
+  const colliderDebugEdgeGeometries: EdgesGeometry[] = [];
+  const colliderDebugMaterials: MeshBasicMaterial[] = [];
+  const colliderDebugLineMaterials: LineBasicMaterial[] = [];
+  const colliderDebugQuaternion = new Quaternion();
+  const colliderDebugTopRange = { min: 0, max: 1 };
+  let colliderDebugDirty = true;
+  colliderDebugGroup.visible = debugCollidersVisible;
+  scene.add(colliderDebugGroup);
 
-  const appendBoxCollider = (params: {
+  const clearColliderDebugMeshes = () => {
+    while (colliderDebugGroup.children.length) {
+      colliderDebugGroup.remove(colliderDebugGroup.children[0]);
+    }
+    colliderDebugGeometries.forEach((geometry) => geometry.dispose());
+    colliderDebugEdgeGeometries.forEach((geometry) => geometry.dispose());
+    colliderDebugMaterials.forEach((material) => material.dispose());
+    colliderDebugLineMaterials.forEach((material) => material.dispose());
+    colliderDebugGeometries.length = 0;
+    colliderDebugEdgeGeometries.length = 0;
+    colliderDebugMaterials.length = 0;
+    colliderDebugLineMaterials.length = 0;
+  };
+
+  const rebuildColliderDebugMeshes = () => {
+    clearColliderDebugMeshes();
+    if (!platformColliders.length) {
+      colliderDebugDirty = false;
+      return;
+    }
+    colliderDebugTopRange.min = Math.min(...platformColliders.map((collider) => collider.top));
+    colliderDebugTopRange.max = Math.max(...platformColliders.map((collider) => collider.top));
+    const topSpan = Math.max(0.0001, colliderDebugTopRange.max - colliderDebugTopRange.min);
+
+    platformColliders.forEach((collider) => {
+      const width = Math.max(0.001, collider.size[0]);
+      const height = Math.max(0.001, collider.size[1]);
+      const depth = Math.max(0.001, collider.size[2]);
+      const geometry =
+        collider.shape === 'ramp'
+          ? createRampDebugGeometry(width, height, depth)
+          : new BoxGeometry(width, height, depth);
+      const normalizedTop = clamp((collider.top - colliderDebugTopRange.min) / topSpan, 0, 1);
+      const fillColor = new Color().setHSL(0.56 - normalizedTop * 0.42, 0.82, 0.54);
+      const edgeColor = fillColor.clone().offsetHSL(0, -0.1, -0.08);
+      const material = new MeshBasicMaterial({
+        color: fillColor,
+        transparent: true,
+        opacity: 0.16,
+        depthTest: true,
+        depthWrite: false,
+      });
+      const mesh = new Mesh(geometry, material);
+      mesh.position.set(collider.center[0], collider.center[1], collider.center[2]);
+      colliderDebugQuaternion.set(
+        collider.rotation[0],
+        collider.rotation[1],
+        collider.rotation[2],
+        collider.rotation[3],
+      );
+      mesh.quaternion.copy(colliderDebugQuaternion);
+      colliderDebugGroup.add(mesh);
+      colliderDebugGeometries.push(geometry);
+      colliderDebugMaterials.push(material);
+
+      const edgeGeometry = new EdgesGeometry(geometry);
+      const lineMaterial = new LineBasicMaterial({
+        color: edgeColor,
+        transparent: true,
+        opacity: 0.35,
+        depthTest: true,
+        depthWrite: false,
+      });
+      const edgeLines = new LineSegments(edgeGeometry, lineMaterial);
+      edgeLines.position.copy(mesh.position);
+      edgeLines.quaternion.copy(mesh.quaternion);
+      colliderDebugGroup.add(edgeLines);
+      colliderDebugEdgeGeometries.push(edgeGeometry);
+      colliderDebugLineMaterials.push(lineMaterial);
+    });
+    colliderDebugDirty = false;
+  };
+
+  const pushCollider = (params: {
     center: [number, number, number];
     size: [number, number, number];
+    rotation?: [number, number, number, number];
+    shape?: 'box' | 'ramp';
   }) => {
-    const [cx, cy, cz] = params.center;
-    const [width, height, depth] = params.size;
-    const halfW = width / 2;
-    const halfH = height / 2;
-    const halfD = depth / 2;
-
-    platformColliders.push({
-      top: cy + halfH,
-      minX: cx - halfW,
-      maxX: cx + halfW,
-      minY: cy - halfH,
-      maxY: cy + halfH,
-      minZ: cz - halfD,
-      maxZ: cz + halfD,
-    });
+    const appended = appendBoxCollider(platformColliders, params);
+    colliderDebugDirty = true;
+    if (colliderDebugGroup.visible) {
+      rebuildColliderDebugMeshes();
+    }
+    return appended;
   };
 
   level.platforms.forEach((platform) => {
@@ -195,13 +337,13 @@ export function createClimberPrototype(
     scene.add(mesh);
 
     platformMaterials.push(material);
-    appendBoxCollider({
+    pushCollider({
       center: [x, y, z],
       size: [width, height, depth],
     });
   });
 
-  appendBoxCollider({
+  pushCollider({
     center: [0, -1, 0],
     size: [FLOOR_COLLIDER_SIZE, FLOOR_COLLIDER_HEIGHT, FLOOR_COLLIDER_SIZE],
   });
@@ -255,8 +397,30 @@ export function createClimberPrototype(
 
     boundaryWallMaterials.push(wallMaterial);
     boundaryWallGeometries.push(wallGeometry);
-    appendBoxCollider(wallConfig);
+    pushCollider(wallConfig);
   });
+  const setPieceRuntime = createSetPieceRuntime({
+    scene,
+    setPieces: level.setPieces,
+    reachabilityStart: {
+      id: level.platforms[0]?.id ?? 'start',
+      center: [
+        level.platforms[0]?.position[0] ?? 0,
+        level.platforms[0]?.position[1] ?? 0,
+        level.platforms[0]?.position[2] ?? 0,
+      ],
+      size: [
+        level.platforms[0]?.size[0] ?? FLOOR_COLLIDER_SIZE,
+        level.platforms[0]?.size[1] ?? FLOOR_COLLIDER_HEIGHT,
+        level.platforms[0]?.size[2] ?? FLOOR_COLLIDER_SIZE,
+      ],
+    },
+    appendCollider: (params) => pushCollider(params),
+  });
+
+  if (colliderDebugGroup.visible && colliderDebugDirty) {
+    rebuildColliderDebugMeshes();
+  }
 
   const goalPlatform = level.platforms[level.platforms.length - 1];
   const goalTop = goalPlatform.position[1] + goalPlatform.size[1] / 2;
@@ -314,11 +478,11 @@ export function createClimberPrototype(
   const tempDesiredCameraPosition = new Vector3();
 
   let grounded = false;
-  let previousGrounded = false;
   let bestHeight = startPosition.y;
   let goalReached = false;
   let goalReachedAtMs: number | null = null;
   let goalCelebrationTimer = 0;
+  let lastLandAudioAtMs = -10000;
   let rafId = 0;
   let disposed = false;
   let lastStatsAt = 0;
@@ -328,8 +492,13 @@ export function createClimberPrototype(
   const cameraBaseDistance = cameraOffset.length();
   let cameraYaw = Math.atan2(cameraOffset.x, cameraOffset.z);
   let cameraPitch = Math.asin(clamp(cameraOffset.y / cameraBaseDistance, -0.98, 0.98));
+  let targetCameraYaw = cameraYaw;
+  let targetCameraPitch = cameraPitch;
   let cameraZoomOffset = 0;
   let pointerLocked = false;
+  let ignoreMouseMoveUntil = 0;
+  let filteredMouseDeltaX = 0;
+  let filteredMouseDeltaY = 0;
 
   const updateSize = () => {
     const width = Math.max(mount.clientWidth, 1);
@@ -356,13 +525,20 @@ export function createClimberPrototype(
     playerPosition.copy(startPosition);
     velocity.set(0, 0, 0);
     camera.position.copy(startPosition).add(cameraOffset);
+    cameraYaw = Math.atan2(cameraOffset.x, cameraOffset.z);
+    cameraPitch = Math.asin(clamp(cameraOffset.y / cameraBaseDistance, -0.98, 0.98));
+    targetCameraYaw = cameraYaw;
+    targetCameraPitch = cameraPitch;
+    filteredMouseDeltaX = 0;
+    filteredMouseDeltaY = 0;
+    ignoreMouseMoveUntil = 0;
     cameraTarget.copy(playerPosition);
     grounded = false;
-    previousGrounded = false;
     bestHeight = startPosition.y;
     goalReached = false;
     goalReachedAtMs = null;
     goalCelebrationTimer = 0;
+    lastLandAudioAtMs = -10000;
     goalBurst.visible = false;
     goalBurst.scale.setScalar(1);
     goalBurstMaterial.opacity = 0;
@@ -376,31 +552,6 @@ export function createClimberPrototype(
       goalReached: false,
       goalReachedAtMs: null,
     });
-  }
-
-  function tryLandOnTop(previousBottom: number): boolean {
-    let landed = false;
-    for (const platform of platformColliders) {
-      const withinX =
-        playerPosition.x >= platform.minX - LANDING_ASSIST &&
-        playerPosition.x <= platform.maxX + LANDING_ASSIST;
-      if (!withinX) continue;
-
-      const withinZ =
-        playerPosition.z >= platform.minZ - LANDING_ASSIST &&
-        playerPosition.z <= platform.maxZ + LANDING_ASSIST;
-      if (!withinZ) continue;
-
-      const nextBottom = playerPosition.y - PLAYER_RADIUS;
-      const canLand = previousBottom >= platform.top - 0.03 && nextBottom <= platform.top + 0.09;
-      if (!canLand || velocity.y > 0) continue;
-
-      playerPosition.y = platform.top + PLAYER_RADIUS;
-      velocity.y = 0;
-      landed = true;
-      break;
-    }
-    return landed;
   }
 
   function isOnGoalPlatform(): boolean {
@@ -418,100 +569,8 @@ export function createClimberPrototype(
     return Math.abs(feetY - goalTop) <= GOAL_REACH_Y_TOLERANCE;
   }
 
-  function solveSolidCollisions(initiallyLanded: boolean): boolean {
-    let landed = initiallyLanded;
-
-    for (let iteration = 0; iteration < 3; iteration += 1) {
-      let corrected = false;
-      for (const platform of platformColliders) {
-        const expandedMinX = platform.minX - PLAYER_RADIUS;
-        const expandedMaxX = platform.maxX + PLAYER_RADIUS;
-        const expandedMinY = platform.minY - PLAYER_RADIUS;
-        const expandedMaxY = platform.maxY + PLAYER_RADIUS;
-        const expandedMinZ = platform.minZ - PLAYER_RADIUS;
-        const expandedMaxZ = platform.maxZ + PLAYER_RADIUS;
-
-        if (
-          playerPosition.x <= expandedMinX ||
-          playerPosition.x >= expandedMaxX ||
-          playerPosition.y <= expandedMinY ||
-          playerPosition.y >= expandedMaxY ||
-          playerPosition.z <= expandedMinZ ||
-          playerPosition.z >= expandedMaxZ
-        ) {
-          continue;
-        }
-
-        const distToMinX = playerPosition.x - expandedMinX;
-        const distToMaxX = expandedMaxX - playerPosition.x;
-        const distToMinY = playerPosition.y - expandedMinY;
-        const distToMaxY = expandedMaxY - playerPosition.y;
-        const distToMinZ = playerPosition.z - expandedMinZ;
-        const distToMaxZ = expandedMaxZ - playerPosition.z;
-
-        let normalX = 0;
-        let normalY = 0;
-        let normalZ = 0;
-        let correction = distToMinX;
-        normalX = -1;
-
-        if (distToMaxX < correction) {
-          correction = distToMaxX;
-          normalX = 1;
-          normalY = 0;
-          normalZ = 0;
-        }
-        if (distToMinY < correction) {
-          correction = distToMinY;
-          normalX = 0;
-          normalY = -1;
-          normalZ = 0;
-        }
-        if (distToMaxY < correction) {
-          correction = distToMaxY;
-          normalX = 0;
-          normalY = 1;
-          normalZ = 0;
-        }
-        if (distToMinZ < correction) {
-          correction = distToMinZ;
-          normalX = 0;
-          normalY = 0;
-          normalZ = -1;
-        }
-        if (distToMaxZ < correction) {
-          correction = distToMaxZ;
-          normalX = 0;
-          normalY = 0;
-          normalZ = 1;
-        }
-
-        const epsilon = 0.0008;
-        playerPosition.x += normalX * (correction + epsilon);
-        playerPosition.y += normalY * (correction + epsilon);
-        playerPosition.z += normalZ * (correction + epsilon);
-
-        const normalDotVelocity =
-          velocity.x * normalX + velocity.y * normalY + velocity.z * normalZ;
-        if (normalDotVelocity < 0) {
-          velocity.x -= normalX * normalDotVelocity;
-          velocity.y -= normalY * normalDotVelocity;
-          velocity.z -= normalZ * normalDotVelocity;
-        }
-
-        if (normalY > 0.5 && velocity.y <= 0.2) {
-          landed = true;
-          velocity.y = Math.max(velocity.y, 0);
-        }
-        corrected = true;
-      }
-      if (!corrected) break;
-    }
-
-    return landed;
-  }
-
   function updatePlayer(delta: number) {
+    const wasGrounded = grounded;
     const speed = keyState.sprint ? SPRINT_SPEED : WALK_SPEED;
     const inputForward = Number(keyState.forward) - Number(keyState.backward);
     const inputStrafe = Number(keyState.right) - Number(keyState.left);
@@ -554,18 +613,35 @@ export function createClimberPrototype(
     const previousBottom = playerPosition.y - PLAYER_RADIUS;
     playerPosition.addScaledVector(velocity, delta);
 
-    const topLanded = tryLandOnTop(previousBottom);
-    grounded = solveSolidCollisions(topLanded);
+    const topLanded = tryLandOnTop({
+      colliders: platformColliders,
+      playerPosition,
+      velocity,
+      playerRadius: PLAYER_RADIUS,
+      landingAssist: LANDING_ASSIST,
+      previousBottom,
+      stickDistance: wasGrounded ? 0.1 : 0,
+    });
+    const stickyGrounded = wasGrounded && velocity.y > -GROUND_STICK_VELOCITY_MAX;
+    grounded = solveSolidCollisions({
+      colliders: platformColliders,
+      playerPosition,
+      velocity,
+      playerRadius: PLAYER_RADIUS,
+      initiallyLanded: topLanded || stickyGrounded,
+      allowStepAssist: wasGrounded,
+    });
 
-    if (!previousGrounded && grounded) {
+    const elapsedMs = clock.getElapsedTime() * 1000;
+    if (!wasGrounded && grounded && elapsedMs - lastLandAudioAtMs >= LAND_SOUND_COOLDOWN_MS) {
       audio.playLand();
+      lastLandAudioAtMs = elapsedMs;
     }
 
     if (playerPosition.y < RESPAWN_Y) {
       playerPosition.copy(startPosition);
       velocity.set(0, 0, 0);
       grounded = false;
-      previousGrounded = false;
     }
 
     if (playerPosition.y > bestHeight) {
@@ -608,6 +684,26 @@ export function createClimberPrototype(
   }
 
   function updateCamera(delta: number) {
+    if (!Number.isFinite(cameraYaw) || !Number.isFinite(cameraPitch)) {
+      cameraYaw = Math.atan2(cameraOffset.x, cameraOffset.z);
+      cameraPitch = Math.asin(clamp(cameraOffset.y / cameraBaseDistance, -0.98, 0.98));
+      targetCameraYaw = cameraYaw;
+      targetCameraPitch = cameraPitch;
+    }
+    const yawDelta = targetCameraYaw - cameraYaw;
+    const pitchDelta = targetCameraPitch - cameraPitch;
+    const yawStep = clamp(
+      yawDelta,
+      -CAMERA_YAW_SPEED_LIMIT * delta,
+      CAMERA_YAW_SPEED_LIMIT * delta,
+    );
+    const pitchStep = clamp(
+      pitchDelta,
+      -CAMERA_PITCH_SPEED_LIMIT * delta,
+      CAMERA_PITCH_SPEED_LIMIT * delta,
+    );
+    cameraYaw += yawStep;
+    cameraPitch += pitchStep;
     cameraTarget.copy(playerPosition);
     const distanceToGoal = playerPosition.distanceTo(goalTarget);
     const approach = clamp((24 - distanceToGoal) / 24, 0, 1);
@@ -644,8 +740,12 @@ export function createClimberPrototype(
   function renderFrame(timestamp: number) {
     if (disposed) return;
     const delta = Math.min(clock.getDelta(), 0.033);
+    const simulationSteps = Math.max(1, Math.min(4, Math.ceil(delta / 0.012)));
+    const simulationDelta = delta / simulationSteps;
 
-    updatePlayer(delta);
+    for (let step = 0; step < simulationSteps; step += 1) {
+      updatePlayer(simulationDelta);
+    }
     updateCharacter(delta, clock.getElapsedTime());
     updateCamera(delta);
 
@@ -685,7 +785,6 @@ export function createClimberPrototype(
 
     renderer.render(scene, camera);
     reportStats(timestamp);
-    previousGrounded = grounded;
     rafId = window.requestAnimationFrame(renderFrame);
   }
 
@@ -706,8 +805,17 @@ export function createClimberPrototype(
     const nextLocked = document.pointerLockElement === renderer.domElement;
     if (nextLocked === pointerLocked) return;
     pointerLocked = nextLocked;
+    if (nextLocked) {
+      ignoreMouseMoveUntil = performance.now() + POINTER_LOCK_INPUT_COOLDOWN_MS;
+      targetCameraYaw = cameraYaw;
+      targetCameraPitch = cameraPitch;
+      filteredMouseDeltaX = 0;
+      filteredMouseDeltaY = 0;
+    }
     onPointerLockChange?.(nextLocked);
     if (!nextLocked) {
+      filteredMouseDeltaX = 0;
+      filteredMouseDeltaY = 0;
       clearInputState();
     }
   };
@@ -729,8 +837,17 @@ export function createClimberPrototype(
 
   const handleMouseMove = (event: MouseEvent) => {
     if (!pointerLocked) return;
-    cameraYaw -= event.movementX * 0.0028;
-    cameraPitch = clamp(cameraPitch + event.movementY * 0.0024, -0.25, 1.2);
+    if (performance.now() < ignoreMouseMoveUntil) {
+      return;
+    }
+    if (!Number.isFinite(event.movementX) || !Number.isFinite(event.movementY)) return;
+    if (Math.abs(event.movementX) > 180 || Math.abs(event.movementY) > 180) return;
+    const rawDeltaX = clamp(event.movementX, -MAX_MOUSE_DELTA, MAX_MOUSE_DELTA);
+    const rawDeltaY = clamp(event.movementY, -MAX_MOUSE_DELTA, MAX_MOUSE_DELTA);
+    filteredMouseDeltaX = MathUtils.lerp(filteredMouseDeltaX, rawDeltaX, MOUSE_FILTER_ALPHA);
+    filteredMouseDeltaY = MathUtils.lerp(filteredMouseDeltaY, rawDeltaY, MOUSE_FILTER_ALPHA);
+    targetCameraYaw -= filteredMouseDeltaX * 0.00255;
+    targetCameraPitch = clamp(targetCameraPitch + filteredMouseDeltaY * 0.0022, -0.25, 1.2);
   };
 
   const handleWheel = (event: WheelEvent) => {
@@ -756,6 +873,12 @@ export function createClimberPrototype(
     },
     setAudioEnabled: (enabled: boolean) => {
       audio.setEnabled(enabled);
+    },
+    setDebugCollidersVisible: (visible: boolean) => {
+      colliderDebugGroup.visible = visible;
+      if (visible && colliderDebugDirty) {
+        rebuildColliderDebugMeshes();
+      }
     },
     requestPointerLock: () => {
       renderer.domElement.requestPointerLock();
@@ -785,6 +908,7 @@ export function createClimberPrototype(
       platformMaterials.forEach((material) => material.dispose());
       boundaryWallGeometries.forEach((geometry) => geometry.dispose());
       boundaryWallMaterials.forEach((material) => material.dispose());
+      setPieceRuntime.dispose();
 
       goalPulse.geometry.dispose();
       goalPulseMaterial.dispose();
@@ -793,6 +917,8 @@ export function createClimberPrototype(
 
       grid.geometry.dispose();
       disposeMaterial(grid.material);
+      clearColliderDebugMeshes();
+      scene.remove(colliderDebugGroup);
 
       characterRig.dispose();
       audio.dispose();

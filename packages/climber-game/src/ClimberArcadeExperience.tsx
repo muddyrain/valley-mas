@@ -1,6 +1,6 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { CLIMBER_CHARACTER_OPTIONS } from './characterRig';
-import { CLIMBER_LEVELS, getClimberLevelById } from './climberLevels';
+import { CLIMBER_LEVELS } from './climberLevels';
 import { createClimberPrototype } from './createClimberPrototype';
 import type {
   ClimberCharacterId,
@@ -229,9 +229,10 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
   const { title = 'Climber Playground' } = props;
   const mountRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<ClimberPrototypeController | null>(null);
-  const [activeLevelId, setActiveLevelId] = useState(CLIMBER_LEVELS[0]?.id ?? '');
+  const activeLevel = CLIMBER_LEVELS[0];
   const [activeCharacterId, setActiveCharacterId] = useState<ClimberCharacterId>('peach');
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [debugCollidersVisible, setDebugCollidersVisible] = useState(false);
   const [pointerLocked, setPointerLocked] = useState(false);
   const [hasEnteredSession, setHasEnteredSession] = useState(false);
   const [characterStatus, setCharacterStatus] =
@@ -245,11 +246,6 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
     goalReached: false,
     goalReachedAtMs: null,
   });
-  const activeLevel = useMemo(
-    () => getClimberLevelById(activeLevelId) ?? CLIMBER_LEVELS[0],
-    [activeLevelId],
-  );
-
   useEffect(() => {
     if (!mountRef.current || !activeLevel) return;
     setCharacterStatus(activeCharacterId === 'orb' ? 'procedural' : 'model-loading');
@@ -258,6 +254,7 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
       level: activeLevel,
       characterId: activeCharacterId,
       audioEnabled,
+      debugCollidersVisible,
       onStats: (next) => setStats(next),
       onCharacterStatusChange: (nextStatus) => setCharacterStatus(nextStatus),
       onPointerLockChange: (locked) => {
@@ -272,11 +269,15 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
       controller.dispose();
       controllerRef.current = null;
     };
-  }, [activeLevel, activeCharacterId]);
+  }, [activeCharacterId]);
 
   useEffect(() => {
     controllerRef.current?.setAudioEnabled(audioEnabled);
   }, [audioEnabled]);
+
+  useEffect(() => {
+    controllerRef.current?.setDebugCollidersVisible(debugCollidersVisible);
+  }, [debugCollidersVisible]);
 
   const progressPercent = useMemo(() => Math.round((stats.progress || 0) * 100), [stats.progress]);
   const progressLabel = useMemo(
@@ -291,7 +292,7 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
     () => (stats.goalReachedAtMs == null ? '--:--' : formatTime(stats.goalReachedAtMs)),
     [stats.goalReachedAtMs],
   );
-  const currentLevelName = activeLevel ? activeLevel.name : '--';
+  const currentMapName = activeLevel ? activeLevel.name : '--';
   const currentCharacterName = activeCharacter ? activeCharacter.name : '--';
 
   return (
@@ -323,12 +324,13 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
               {title}
             </h2>
             <p style={{ margin: '8px 0 0', color: '#475569', lineHeight: 1.75, fontSize: 14 }}>
-              这是第一阶段的可玩底座版本，目标是先验证跳跃手感、落地判定和镜头跟随。后续高复杂逻辑会继续留在
-              `packages/climber-game` 迭代，不污染 `apps/web` 业务入口代码。
+              这是单张超大地图版本，目标是构建“高空密集悬浮板块 +
+              高难登顶”的核心体验。后续复杂玩法继续在 `packages/climber-game` 迭代，不污染
+              `apps/web` 业务入口代码。
             </p>
             {activeLevel ? (
               <p style={{ margin: '6px 0 0', color: '#334155', fontSize: 13, lineHeight: 1.75 }}>
-                当前关卡：{activeLevel.name}。{activeLevel.description}
+                当前地图：{activeLevel.name}。{activeLevel.description}
               </p>
             ) : null}
             {activeCharacter ? (
@@ -338,9 +340,10 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
             ) : null}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-            <span style={TAG_STYLE}>当前关卡: {currentLevelName}</span>
+            <span style={TAG_STYLE}>当前地图: {currentMapName}</span>
             <span style={TAG_STYLE}>当前角色: {currentCharacterName}</span>
             <span style={TAG_STYLE}>声音: {audioEnabled ? '开' : '关'}</span>
+            <span style={TAG_STYLE}>碰撞体: {debugCollidersVisible ? '显示' : '隐藏'}</span>
             <span style={TAG_STYLE}>菜单: Esc</span>
           </div>
         </div>
@@ -428,7 +431,7 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                   {hasEnteredSession ? '暂停菜单' : '进入游戏'}
                 </div>
                 <div style={{ fontSize: 13, lineHeight: 1.7, color: '#cbd5e1', textAlign: 'left' }}>
-                  所有游戏操作都在这里完成：切换角色、切换关卡、重新开始与设置。点击继续后进入第三人称操作。
+                  所有游戏操作都在这里完成：切换角色、重新开始与设置。点击继续后进入第三人称操作。
                 </div>
 
                 <div style={MENU_ROW_STYLE}>
@@ -450,26 +453,26 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                     </select>
                   </div>
                   <div>
-                    <div style={MENU_LABEL_STYLE}>关卡</div>
-                    <select
-                      id="climber-menu-level-select"
-                      value={activeLevelId}
-                      style={MENU_SELECT_STYLE}
-                      onChange={(event) => setActiveLevelId(event.target.value)}
+                    <div style={MENU_LABEL_STYLE}>地图</div>
+                    <div
+                      style={{
+                        ...MENU_SELECT_STYLE,
+                        minHeight: 41,
+                        display: 'flex',
+                        alignItems: 'center',
+                        color: '#e2e8f0',
+                        fontWeight: 600,
+                      }}
                     >
-                      {CLIMBER_LEVELS.map((level) => (
-                        <option key={level.id} value={level.id}>
-                          {level.name}
-                        </option>
-                      ))}
-                    </select>
+                      {activeLevel?.name ?? '单图模式'}
+                    </div>
                   </div>
                 </div>
 
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
                     gap: 10,
                   }}
                 >
@@ -499,11 +502,18 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                   >
                     {audioEnabled ? '声音: 开' : '声音: 关'}
                   </button>
+                  <button
+                    type="button"
+                    style={MENU_BUTTON_SECONDARY_STYLE}
+                    onClick={() => setDebugCollidersVisible((prev) => !prev)}
+                  >
+                    {debugCollidersVisible ? '碰撞体: 开' : '碰撞体: 关'}
+                  </button>
                 </div>
 
                 <div style={{ fontSize: 12, color: '#cbd5e1', textAlign: 'left', lineHeight: 1.6 }}>
-                  当前角色状态: {resolveCharacterRuntimeLabel(characterStatus)}。按 `Esc`
-                  可随时回到此菜单。
+                  当前角色状态: {resolveCharacterRuntimeLabel(characterStatus)}；碰撞体调试:
+                  {debugCollidersVisible ? ' 开启' : ' 关闭'}。按 `Esc` 可随时回到此菜单。
                 </div>
               </div>
             </div>
@@ -513,8 +523,8 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
 
       <div style={{ ...PANEL_STYLE, padding: '14px 18px' }}>
         <p style={{ margin: 0, color: '#334155', fontSize: 13, lineHeight: 1.75 }}>
-          P2 模型接入收口：角色模型会按菜单选择尝试加载 `peach / daisy` 对应的 glb
-          资源，加载失败会自动回退占位角色； HUD 会实时显示“角色状态”（含“GLB 已加载但无动画”）。
+          单图玩法版本：场景以大量高空悬浮板块构成，目标是在一张大地图内连续跳跃并登顶；角色模型会按菜单选择加载
+          `peach / daisy` 对应的 glb 资源，失败时自动回退占位角色。
         </p>
       </div>
     </section>

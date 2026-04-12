@@ -12,4 +12,7 @@ export type {
   ClimberLevelDefinition,
   ClimberPlatformDefinition,
   ClimberRunStats,
+  ClimberSetPieceAssetDefinition,
+  ClimberSetPieceAssetId,
+  ClimberSetPieceDefinition,
 } from './types';

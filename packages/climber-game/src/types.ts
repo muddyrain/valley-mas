@@ -32,6 +32,59 @@ export interface ClimberPlatformDefinition {
   color: string;
 }
 
+export type ClimberSetPieceAssetId =
+  | 'plank_long'
+  | 'pipe_long'
+  | 'container_short'
+  | 'container_long'
+  | 'ramp_wedge'
+  | 'beam_hazard'
+  | 'round_stool'
+  | 'tree_pine'
+  | 'grass_patch'
+  | 'road_segment';
+
+export type ClimberSetPieceSurfacePreset =
+  | 'wood'
+  | 'hazard'
+  | 'container'
+  | 'metal'
+  | 'concrete'
+  | 'grass'
+  | 'asphalt'
+  | 'leaf';
+
+export type ClimberSetPieceColliderShape = 'box' | 'ramp';
+
+export interface ClimberSetPieceAssetDefinition {
+  id: ClimberSetPieceAssetId;
+  name: string;
+  url: string;
+  colliderSize: [number, number, number];
+  colliderOffset: [number, number, number];
+  colliderShape?: ClimberSetPieceColliderShape;
+  colliderLocalRotation?: [number, number, number];
+  baseColor: string;
+  surfacePreset: ClimberSetPieceSurfacePreset;
+  preserveMaterial?: boolean;
+}
+
+export interface ClimberSetPieceDefinition {
+  id: string;
+  assetId: ClimberSetPieceAssetId;
+  position: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: [number, number, number];
+  solid?: boolean;
+  colliderSize?: [number, number, number];
+  colliderOffset?: [number, number, number];
+  colliderInset?: number;
+  colliderShape?: ClimberSetPieceColliderShape;
+  colliderLocalRotation?: [number, number, number];
+  color?: string;
+  surfacePreset?: ClimberSetPieceSurfacePreset;
+}
+
 export interface ClimberLevelTheme {
   skyColor?: string;
   floorColor?: string;
@@ -47,12 +100,14 @@ export interface ClimberLevelDefinition {
   startPosition: [number, number, number];
   cameraOffset?: [number, number, number];
   platforms: ClimberPlatformDefinition[];
+  setPieces?: ClimberSetPieceDefinition[];
   theme?: ClimberLevelTheme;
 }
 
 export interface ClimberPrototypeController {
   reset: () => void;
   setAudioEnabled: (enabled: boolean) => void;
+  setDebugCollidersVisible: (visible: boolean) => void;
   requestPointerLock: () => void;
   dispose: () => void;
 }
