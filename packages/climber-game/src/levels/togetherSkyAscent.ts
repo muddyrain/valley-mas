@@ -1126,7 +1126,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#81af7a',
         rotation: [0, 0.3, 0],
-        scale: [0.72, 1, 0.72],
+        scale: [0.72, 0.72, 0.72],
       },
       {
         id: 'sp134',
@@ -1134,15 +1134,15 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [28, 57.6, -11.4],
         solid: true,
         color: '#f7fbff',
-        scale: [0.44, 1, 0.44],
+        scale: [0.44, 0.44, 0.44],
       },
       {
         id: 'sp135',
         assetId: 'spiral_pillar',
-        position: [30, 58.7, -12.8],
+        position: [30, 57.3, -12.8],
         solid: true,
         color: '#9fa1a4',
-        scale: [0.46, 1, 0.46],
+        scale: [0.46, 0.46, 0.46],
       },
       {
         id: 'sp136',
@@ -1151,16 +1151,16 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#f8fcff',
         rotation: [0, 0.4, 0],
-        scale: [0.42, 1, 0.42],
+        scale: [0.42, 0.42, 0.42],
       },
       {
         id: 'sp137',
         assetId: 'prism_gate',
-        position: [33.3, 60.8, -15.1],
+        position: [33.3, 59.8, -15.1],
         solid: true,
         color: '#92a0b0',
         rotation: [0, -0.28, 0],
-        scale: [0.46, 1, 0.46],
+        scale: [0.46, 0.46, 0.46],
       },
       {
         id: 'sp138',
@@ -1169,16 +1169,16 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#f8fcff',
         rotation: [0, 0.36, 0],
-        scale: [0.4, 1, 0.4],
+        scale: [0.4, 0.4, 0.4],
       },
       {
         id: 'sp139',
         assetId: 'cube_frame',
-        position: [35.9, 62.6, -16.9],
+        position: [35.9, 62, -16.9],
         solid: true,
         color: '#9b734a',
         rotation: [0, -0.42, 0],
-        scale: [0.52, 1, 0.52],
+        scale: [0.52, 0.52, 0.52],
       },
       {
         id: 'sp140',
@@ -1186,7 +1186,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [37, 63.3, -17.6],
         solid: true,
         color: '#f7fbff',
-        scale: [0.38, 1, 0.38],
+        scale: [0.38, 0.38, 0.38],
       },
       {
         id: 'sp141',
@@ -1195,7 +1195,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#a06f45',
         rotation: [0, -0.6, 0],
-        scale: [0.44, 1, 0.44],
+        scale: [0.44, 0.44, 0.44],
       },
       {
         id: 'sp142',
@@ -1203,7 +1203,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [31.4, 64.9, -17.1],
         solid: true,
         color: '#f8fcff',
-        scale: [0.36, 1, 0.36],
+        scale: [0.36, 0.36, 0.36],
       },
       {
         id: 'sp143',
@@ -1212,7 +1212,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#81af7a',
         rotation: [0, 0.5, 0],
-        scale: [0.58, 1, 0.58],
+        scale: [0.58, 0.58, 0.58],
       },
       {
         id: 'sp144',
@@ -1220,16 +1220,16 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [27.7, 66.6, -15.4],
         solid: true,
         color: '#f8fcff',
-        scale: [0.34, 1, 0.34],
+        scale: [0.34, 0.34, 0.34],
       },
       {
         id: 'sp145',
         assetId: 'prism_gate',
-        position: [26.4, 67.5, -14.6],
+        position: [26.4, 67, -14.6],
         solid: true,
         color: '#92a0b0',
         rotation: [0, -0.35, 0],
-        scale: [0.4, 1, 0.4],
+        scale: [0.4, 0.4, 0.4],
       },
       {
         id: 'sp146',
@@ -1237,15 +1237,15 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [28.1, 68.4, -15.8],
         solid: true,
         color: '#f7fbff',
-        scale: [0.32, 1, 0.32],
+        scale: [0.32, 0.32, 0.32],
       },
       {
         id: 'sp147',
         assetId: 'spiral_pillar',
-        position: [30.2, 69.4, -17.2],
+        position: [30.2, 68.3, -17.2],
         solid: true,
         color: '#9fa1a4',
-        scale: [0.4, 1, 0.4],
+        scale: [0.4, 0.4, 0.4],
       },
       {
         id: 'sp148',
@@ -1254,16 +1254,16 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#f8fcff',
         rotation: [0, 0.25, 0],
-        scale: [0.3, 1, 0.3],
+        scale: [0.3, 0.3, 0.3],
       },
       {
         id: 'sp149',
         assetId: 'arch_gate',
-        position: [34, 71.3, -19.6],
+        position: [34, 70.6, -19.6],
         solid: true,
         color: '#8d9194',
         rotation: [0, -0.3, 0],
-        scale: [0.42, 1, 0.42],
+        scale: [0.42, 0.42, 0.42],
       },
       {
         id: 'sp150',
@@ -1271,7 +1271,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [35.6, 72.1, -20.4],
         solid: true,
         color: '#f8fcff',
-        scale: [0.28, 1, 0.28],
+        scale: [0.28, 0.28, 0.28],
       },
       {
         id: 'sp151',
@@ -1280,7 +1280,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#a06f45',
         rotation: [0, 0.18, 0],
-        scale: [0.38, 1, 0.38],
+        scale: [0.38, 0.38, 0.38],
       },
       {
         id: 'sp152',
@@ -1288,7 +1288,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [40.5, 73.8, -20.8],
         solid: true,
         color: '#f7fbff',
-        scale: [0.27, 1, 0.27],
+        scale: [0.27, 0.27, 0.27],
       },
       {
         id: 'sp153',
@@ -1297,7 +1297,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#81af7a',
         rotation: [0, -0.22, 0],
-        scale: [0.46, 1, 0.46],
+        scale: [0.46, 0.46, 0.46],
       },
       {
         id: 'sp154',
@@ -1305,16 +1305,16 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [43.8, 75.4, -22.1],
         solid: true,
         color: '#f8fcff',
-        scale: [0.24, 1, 0.24],
+        scale: [0.24, 0.24, 0.24],
       },
       {
         id: 'sp155',
         assetId: 'prism_gate',
-        position: [45, 76.4, -22.4],
+        position: [45, 76, -22.4],
         solid: true,
         color: '#92a0b0',
         rotation: [0, 0.44, 0],
-        scale: [0.34, 1, 0.34],
+        scale: [0.34, 0.34, 0.34],
       },
       {
         id: 'sp156',
@@ -1322,7 +1322,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [45.5, 77.1, -21.1],
         solid: true,
         color: '#f8fcff',
-        scale: [0.22, 1, 0.22],
+        scale: [0.22, 0.22, 0.22],
       },
       {
         id: 'sp157',
@@ -1331,7 +1331,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#9b734a',
         rotation: [0, -0.5, 0],
-        scale: [0.36, 1, 0.36],
+        scale: [0.36, 0.36, 0.36],
       },
       {
         id: 'sp158',
@@ -1339,15 +1339,15 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [43.6, 78.8, -18.7],
         solid: true,
         color: '#f7fbff',
-        scale: [0.2, 1, 0.2],
+        scale: [0.2, 0.2, 0.2],
       },
       {
         id: 'sp159',
         assetId: 'spiral_pillar',
-        position: [42.4, 79.8, -19.4],
+        position: [42.4, 79, -19.4],
         solid: true,
         color: '#9fa1a4',
-        scale: [0.32, 1, 0.32],
+        scale: [0.32, 0.32, 0.32],
       },
       {
         id: 'sp160',
@@ -1355,7 +1355,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [41.1, 80.5, -20.2],
         solid: true,
         color: '#f8fcff',
-        scale: [0.18, 1, 0.18],
+        scale: [0.18, 0.18, 0.18],
       },
       {
         id: 'sp161',
@@ -1364,7 +1364,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#92a0b0',
         rotation: [0, 0.22, 0],
-        scale: [0.3, 1, 0.3],
+        scale: [0.3, 0.3, 0.3],
       },
       {
         id: 'sp162',
@@ -1372,7 +1372,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [38.6, 82.1, -21.8],
         solid: true,
         color: '#f8fcff',
-        scale: [0.17, 1, 0.17],
+        scale: [0.17, 0.17, 0.17],
       },
       {
         id: 'sp163',
@@ -1381,7 +1381,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#a06f45',
         rotation: [0, -0.18, 0],
-        scale: [0.26, 1, 0.26],
+        scale: [0.26, 0.26, 0.26],
       },
       {
         id: 'sp164',
@@ -1389,7 +1389,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [42.8, 83.3, -21.4],
         solid: true,
         color: '#f7fbff',
-        scale: [0.16, 1, 0.16],
+        scale: [0.16, 0.16, 0.16],
       },
       {
         id: 'sp165',
@@ -1398,7 +1398,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#81af7a',
         rotation: [0, 0.3, 0],
-        scale: [0.26, 1, 0.26],
+        scale: [0.26, 0.26, 0.26],
       },
       {
         id: 'sp166',
@@ -1406,7 +1406,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [45.7, 84.5, -20.2],
         solid: true,
         color: '#f8fcff',
-        scale: [0.14, 1, 0.14],
+        scale: [0.14, 0.14, 0.14],
       },
       {
         id: 'sp167',
@@ -1414,7 +1414,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [46.2, 85.1, -19.4],
         solid: true,
         color: '#92a0b0',
-        scale: [0.24, 1, 0.24],
+        scale: [0.24, 0.24, 0.24],
       },
       {
         id: 'sp168',
@@ -1422,7 +1422,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [45.2, 85.6, -18.8],
         solid: true,
         color: '#f8fcff',
-        scale: [0.13, 1, 0.13],
+        scale: [0.13, 0.13, 0.13],
       },
       {
         id: 'sp169',
@@ -1431,7 +1431,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#9b734a',
         rotation: [0, -0.4, 0],
-        scale: [0.22, 1, 0.22],
+        scale: [0.22, 0.22, 0.22],
       },
       {
         id: 'sp170',
@@ -1439,7 +1439,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [42.6, 86.6, -18.9],
         solid: true,
         color: '#f7fbff',
-        scale: [0.12, 1, 0.12],
+        scale: [0.12, 0.12, 0.12],
       },
       {
         id: 'sp171',
@@ -1447,7 +1447,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [41.5, 87.1, -19.3],
         solid: true,
         color: '#9fa1a4',
-        scale: [0.2, 1, 0.2],
+        scale: [0.2, 0.2, 0.2],
       },
       {
         id: 'sp172',
@@ -1455,7 +1455,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [40.8, 87.4, -19.8],
         solid: true,
         color: '#f8fcff',
-        scale: [0.11, 1, 0.11],
+        scale: [0.11, 0.11, 0.11],
       },
       {
         id: 'sp173',
@@ -1463,7 +1463,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [40.4, 87.9, -20.4],
         solid: true,
         color: '#92a0b0',
-        scale: [0.18, 1, 0.18],
+        scale: [0.18, 0.18, 0.18],
       },
       {
         id: 'sp174',
@@ -1471,7 +1471,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [40.7, 88.2, -21],
         solid: true,
         color: '#f8fcff',
-        scale: [0.1, 1, 0.1],
+        scale: [0.1, 0.1, 0.1],
       },
       {
         id: 'sp175',
@@ -1480,7 +1480,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#a06f45',
         rotation: [0, 0.25, 0],
-        scale: [0.16, 1, 0.16],
+        scale: [0.16, 0.16, 0.16],
       },
       {
         id: 'sp176',
@@ -1488,7 +1488,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [42.2, 88.9, -21.2],
         solid: true,
         color: '#f7fbff',
-        scale: [0.09, 1, 0.09],
+        scale: [0.09, 0.09, 0.09],
       },
       {
         id: 'sp177',
@@ -1496,7 +1496,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [42.8, 89.2, -20.8],
         solid: true,
         color: '#81af7a',
-        scale: [0.16, 1, 0.16],
+        scale: [0.16, 0.16, 0.16],
       },
       {
         id: 'sp178',
@@ -1504,7 +1504,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [43.2, 89.5, -20.4],
         solid: true,
         color: '#f8fcff',
-        scale: [0.08, 1, 0.08],
+        scale: [0.08, 0.08, 0.08],
       },
       {
         id: 'sp179',
@@ -1512,7 +1512,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [43.5, 89.8, -20.1],
         solid: true,
         color: '#f8fcff',
-        scale: [0.07, 1, 0.07],
+        scale: [0.07, 0.07, 0.07],
       },
       {
         id: 'sp180',
@@ -1520,7 +1520,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [43, 90.1, -20],
         solid: true,
         color: '#92a0b0',
-        scale: [0.14, 1, 0.14],
+        scale: [0.14, 0.14, 0.14],
       },
       {
         id: 'sp181',
@@ -1528,7 +1528,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [44.1, 90.8, -21.2],
         solid: true,
         color: '#77ac79',
-        scale: [0.3, 1, 0.3],
+        scale: [0.3, 0.3, 0.3],
       },
       {
         id: 'sp182',
@@ -1536,7 +1536,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [45.5, 91.7, -22.4],
         solid: true,
         color: '#60626d',
-        scale: [0.28, 1, 0.28],
+        scale: [0.28, 0.28, 0.28],
       },
       {
         id: 'sp183',
@@ -1544,7 +1544,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [47.1, 92.8, -23.8],
         solid: true,
         color: '#b5eeff',
-        scale: [0.28, 1, 0.28],
+        scale: [0.28, 0.28, 0.28],
       },
       {
         id: 'sp184',
@@ -1552,7 +1552,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [48.8, 93.7, -25.2],
         solid: true,
         color: '#995749',
-        scale: [0.3, 1, 0.3],
+        scale: [0.3, 0.3, 0.3],
       },
       {
         id: 'sp185',
@@ -1561,7 +1561,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#a6764c',
         rotation: [0, 0.42, 0],
-        scale: [0.28, 1, 0.28],
+        scale: [0.28, 0.28, 0.28],
       },
       {
         id: 'sp186',
@@ -1570,7 +1570,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#8992a0',
         rotation: [0, -0.35, 0],
-        scale: [0.26, 1, 0.26],
+        scale: [0.26, 0.26, 0.26],
       },
       {
         id: 'sp187',
@@ -1579,7 +1579,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#9c7049',
         rotation: [0, 0.28, 0],
-        scale: [0.24, 1, 0.24],
+        scale: [0.24, 0.24, 0.24],
       },
       {
         id: 'sp188',
@@ -1587,7 +1587,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [55.2, 97.8, -29],
         solid: true,
         color: '#a8dcf3',
-        scale: [0.26, 1, 0.26],
+        scale: [0.26, 0.26, 0.26],
       },
       {
         id: 'sp189',
@@ -1595,7 +1595,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [56.5, 98.7, -29.6],
         solid: true,
         color: '#e5e8ec',
-        scale: [0.22, 1, 0.22],
+        scale: [0.22, 0.22, 0.22],
       },
       {
         id: 'sp190',
@@ -1604,7 +1604,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#f5c865',
         rotation: [0, 0.5, 0],
-        scale: [0.24, 1, 0.24],
+        scale: [0.24, 0.24, 0.24],
       },
       {
         id: 'sp191',
@@ -1612,7 +1612,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [58.1, 100.3, -30.4],
         solid: true,
         color: '#8a5e39',
-        scale: [0.22, 1, 0.22],
+        scale: [0.22, 0.22, 0.22],
       },
       {
         id: 'sp192',
@@ -1620,7 +1620,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [57.1, 100.9, -30.8],
         solid: true,
         color: '#a9774f',
-        scale: [0.2, 1, 0.2],
+        scale: [0.2, 0.2, 0.2],
       },
       {
         id: 'sp193',
@@ -1628,7 +1628,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [56.1, 101.4, -31],
         solid: true,
         color: '#e2ccba',
-        scale: [0.2, 1, 0.2],
+        scale: [0.2, 0.2, 0.2],
       },
       {
         id: 'sp194',
@@ -1637,7 +1637,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#aeb6c1',
         rotation: [0, -0.4, 0],
-        scale: [0.18, 1, 0.18],
+        scale: [0.18, 0.18, 0.18],
       },
       {
         id: 'sp195',
@@ -1645,7 +1645,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [54.5, 102.3, -31.2],
         solid: true,
         color: '#7d93b6',
-        scale: [0.18, 1, 0.18],
+        scale: [0.18, 0.18, 0.18],
       },
       {
         id: 'sp196',
@@ -1653,7 +1653,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [54, 102.7, -31.3],
         solid: true,
         color: '#8b9298',
-        scale: [0.18, 1, 0.18],
+        scale: [0.18, 0.18, 0.18],
       },
       {
         id: 'sp197',
@@ -1661,7 +1661,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [54.6, 103.1, -31.2],
         solid: true,
         color: '#89a7d0',
-        scale: [0.16, 1, 0.16],
+        scale: [0.16, 0.16, 0.16],
       },
       {
         id: 'sp198',
@@ -1670,7 +1670,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         solid: true,
         color: '#9a7048',
         rotation: [0, 0.3, 0],
-        scale: [0.15, 1, 0.15],
+        scale: [0.15, 0.15, 0.15],
       },
       {
         id: 'sp199',
@@ -1678,7 +1678,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [55.9, 103.7, -31],
         solid: true,
         color: '#7f8790',
-        scale: [0.14, 1, 0.14],
+        scale: [0.14, 0.14, 0.14],
       },
       {
         id: 'sp200',
@@ -1686,7 +1686,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
         position: [56, 104, -31],
         solid: true,
         color: '#c0a97d',
-        scale: [0.13, 1, 0.13],
+        scale: [0.13, 0.13, 0.13],
       },
 
       {

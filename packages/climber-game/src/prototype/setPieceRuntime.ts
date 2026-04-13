@@ -17,6 +17,12 @@ import {
   Vector3,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import {
+  CLIMBER_GRAVITY,
+  CLIMBER_JUMP_SPEED,
+  CLIMBER_SPRINT_SPEED,
+  CLIMBER_WALK_SPEED,
+} from '../climberPhysics';
 import { getClimberSetPieceAsset } from '../setpieceCatalog';
 import type { ClimberSetPieceColliderShape, ClimberSetPieceDefinition } from '../types';
 
@@ -73,10 +79,6 @@ export interface ResolvedColliderData {
   shape: ClimberSetPieceColliderShape;
 }
 
-const REPORT_WALK_SPEED = 5.4;
-const REPORT_SPRINT_SPEED = 8.2;
-const REPORT_JUMP_SPEED = 8.8;
-const REPORT_GRAVITY = 21;
 const RAMP_TOP_FLAT_RATIO = 0.36;
 
 function isProceduralSetPieceAsset(assetId: ClimberSetPieceDefinition['assetId']): boolean {
@@ -97,9 +99,9 @@ function resolveLinkGapXZ(
 }
 
 function estimateAirtimeToHeight(deltaY: number): number | null {
-  const discriminant = REPORT_JUMP_SPEED ** 2 - 2 * REPORT_GRAVITY * deltaY;
+  const discriminant = CLIMBER_JUMP_SPEED ** 2 - 2 * CLIMBER_GRAVITY * deltaY;
   if (discriminant < 0) return null;
-  return (REPORT_JUMP_SPEED + Math.sqrt(discriminant)) / REPORT_GRAVITY;
+  return (CLIMBER_JUMP_SPEED + Math.sqrt(discriminant)) / CLIMBER_GRAVITY;
 }
 
 function reportReachability(nodes: ReachabilityNode[]): void {
@@ -125,8 +127,8 @@ function reportReachability(nodes: ReachabilityNode[]): void {
       status = 'too-high';
       riskCount += 1;
     } else {
-      walkRange = REPORT_WALK_SPEED * airtime;
-      sprintRange = REPORT_SPRINT_SPEED * airtime;
+      walkRange = CLIMBER_WALK_SPEED * airtime;
+      sprintRange = CLIMBER_SPRINT_SPEED * airtime;
       if (gapXZ > sprintRange + 0.12) {
         status = 'too-far';
         riskCount += 1;
