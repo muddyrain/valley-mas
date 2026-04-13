@@ -251,6 +251,20 @@ function createSurfaceTexture(
     for (let x = 14; x < 256; x += 44) {
       ctx.fillRect(x, 123, 22, 10);
     }
+  } else if (preset === 'cloud') {
+    const puff = mixColor(base, new Color('#ffffff'), 0.6);
+    const shade = mixColor(base, new Color('#dce8f6'), 0.55);
+    for (let i = 0; i < 48; i += 1) {
+      const x = (i * 53) % 256;
+      const y = (i * 37) % 256;
+      const r = 10 + (i % 6) * 4;
+      ctx.fillStyle = colorToCss(i % 3 === 0 ? shade : puff);
+      ctx.globalAlpha = 0.28;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   } else {
     for (let i = 0; i < 520; i += 1) {
       const x = (i * 37) % 256;
@@ -296,6 +310,9 @@ function applySurfacePresetMaterial(
   } else if (resolvedPreset === 'asphalt') {
     material.roughness = 0.9;
     material.metalness = 0.02;
+  } else if (resolvedPreset === 'cloud') {
+    material.roughness = 0.96;
+    material.metalness = 0;
   } else {
     material.roughness = 0.72;
     material.metalness = 0.06;
