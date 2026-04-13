@@ -29,6 +29,7 @@ import { createCharacterRig } from './characterRig';
 import {
   appendBoxCollider,
   type PlatformCollisionData,
+  type PlatformCollisionDebugMeta,
   solveSolidCollisions,
   tryLandOnTop,
 } from './prototype/collision';
@@ -41,6 +42,7 @@ import type {
   ClimberLevelDefinition,
   ClimberPrototypeController,
   ClimberRunStats,
+  ClimberSetPieceAssetId,
 } from './types';
 
 interface CreateClimberPrototypeOptions {
@@ -49,6 +51,7 @@ interface CreateClimberPrototypeOptions {
   characterId: ClimberCharacterId;
   audioEnabled: boolean;
   debugCollidersVisible?: boolean;
+  debugColliderFocusAssetId?: ClimberSetPieceAssetId | null;
   onStats: (stats: ClimberRunStats) => void;
   onPointerLockChange?: (locked: boolean) => void;
   onCharacterStatusChange?: (status: ClimberCharacterRuntimeStatus) => void;
@@ -148,6 +151,7 @@ export function createClimberPrototype(
     characterId,
     audioEnabled,
     debugCollidersVisible = false,
+    debugColliderFocusAssetId = null,
     onPointerLockChange,
     onCharacterStatusChange,
   } = options;
@@ -234,6 +238,7 @@ export function createClimberPrototype(
   const colliderDebugQuaternion = new Quaternion();
   const colliderDebugTopRange = { min: 0, max: 1 };
   let colliderDebugDirty = true;
+  let colliderDebugFocusAssetId: ClimberSetPieceAssetId | null = debugColliderFocusAssetId;
   colliderDebugGroup.visible = debugCollidersVisible;
   scene.add(colliderDebugGroup);
 
@@ -253,15 +258,24 @@ export function createClimberPrototype(
 
   const rebuildColliderDebugMeshes = () => {
     clearColliderDebugMeshes();
-    if (!platformColliders.length) {
+    const collidersForDebug =
+      colliderDebugFocusAssetId == null
+        ? platformColliders
+        : platformColliders.filter(
+            (collider) =>
+              collider.debugMeta?.category === 'setpiece' &&
+              collider.debugMeta.assetId === colliderDebugFocusAssetId,
+          );
+
+    if (!collidersForDebug.length) {
       colliderDebugDirty = false;
       return;
     }
-    colliderDebugTopRange.min = Math.min(...platformColliders.map((collider) => collider.top));
-    colliderDebugTopRange.max = Math.max(...platformColliders.map((collider) => collider.top));
+    colliderDebugTopRange.min = Math.min(...collidersForDebug.map((collider) => collider.top));
+    colliderDebugTopRange.max = Math.max(...collidersForDebug.map((collider) => collider.top));
     const topSpan = Math.max(0.0001, colliderDebugTopRange.max - colliderDebugTopRange.min);
 
-    platformColliders.forEach((collider) => {
+    collidersForDebug.forEach((collider) => {
       const width = Math.max(0.001, collider.size[0]);
       const height = Math.max(0.001, collider.size[1]);
       const depth = Math.max(0.001, collider.size[2]);
@@ -272,10 +286,11 @@ export function createClimberPrototype(
       const normalizedTop = clamp((collider.top - colliderDebugTopRange.min) / topSpan, 0, 1);
       const fillColor = new Color().setHSL(0.56 - normalizedTop * 0.42, 0.82, 0.54);
       const edgeColor = fillColor.clone().offsetHSL(0, -0.1, -0.08);
+      const inFocusedMode = colliderDebugFocusAssetId != null;
       const material = new MeshBasicMaterial({
         color: fillColor,
         transparent: true,
-        opacity: 0.16,
+        opacity: inFocusedMode ? 0.34 : 0.16,
         depthTest: true,
         depthWrite: false,
       });
@@ -296,7 +311,7 @@ export function createClimberPrototype(
       const lineMaterial = new LineBasicMaterial({
         color: edgeColor,
         transparent: true,
-        opacity: 0.35,
+        opacity: inFocusedMode ? 0.78 : 0.35,
         depthTest: true,
         depthWrite: false,
       });
@@ -315,6 +330,7 @@ export function createClimberPrototype(
     size: [number, number, number];
     rotation?: [number, number, number, number];
     shape?: 'box' | 'ramp';
+    debugMeta?: PlatformCollisionDebugMeta;
   }) => {
     const appended = appendBoxCollider(platformColliders, params);
     colliderDebugDirty = true;
@@ -343,12 +359,20 @@ export function createClimberPrototype(
     pushCollider({
       center: [x, y, z],
       size: [width, height, depth],
+      debugMeta: {
+        category: 'platform',
+        instanceId: platform.id,
+      },
     });
   });
 
   pushCollider({
     center: [0, -1, 0],
     size: [FLOOR_COLLIDER_SIZE, FLOOR_COLLIDER_HEIGHT, FLOOR_COLLIDER_SIZE],
+    debugMeta: {
+      category: 'system',
+      instanceId: 'floor',
+    },
   });
 
   const wallY = BOUNDARY_WALL_HEIGHT / 2 - 0.5;
@@ -400,7 +424,13 @@ export function createClimberPrototype(
 
     boundaryWallMaterials.push(wallMaterial);
     boundaryWallGeometries.push(wallGeometry);
-    pushCollider(wallConfig);
+    pushCollider({
+      ...wallConfig,
+      debugMeta: {
+        category: 'system',
+        instanceId: 'boundary-wall',
+      },
+    });
   });
   const setPieceRuntime = createSetPieceRuntime({
     scene,
@@ -880,6 +910,14 @@ export function createClimberPrototype(
     setDebugCollidersVisible: (visible: boolean) => {
       colliderDebugGroup.visible = visible;
       if (visible && colliderDebugDirty) {
+        rebuildColliderDebugMeshes();
+      }
+    },
+    setDebugColliderFocusAssetId: (assetId: ClimberSetPieceAssetId | null) => {
+      if (colliderDebugFocusAssetId === assetId) return;
+      colliderDebugFocusAssetId = assetId;
+      colliderDebugDirty = true;
+      if (colliderDebugGroup.visible) {
         rebuildColliderDebugMeshes();
       }
     },

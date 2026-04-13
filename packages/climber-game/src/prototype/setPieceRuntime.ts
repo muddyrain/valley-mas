@@ -33,6 +33,11 @@ interface SetPieceRuntimeOptions {
     size: [number, number, number];
     rotation?: [number, number, number, number];
     shape?: ClimberSetPieceColliderShape;
+    debugMeta?: {
+      category: 'platform' | 'setpiece' | 'system';
+      assetId?: string;
+      instanceId?: string;
+    };
   }) => {
     minX: number;
     maxX: number;
@@ -652,7 +657,14 @@ export function createSetPieceRuntime(options: SetPieceRuntimeOptions): {
         if (definition.solid !== false) {
           const localBounds = localBoundsMap.get(definition.assetId) ?? null;
           const collider = resolveColliderData(definition, localBounds);
-          const worldBounds = appendCollider(collider);
+          const worldBounds = appendCollider({
+            ...collider,
+            debugMeta: {
+              category: 'setpiece',
+              assetId: definition.assetId,
+              instanceId: definition.id,
+            },
+          });
           const center: [number, number, number] = [
             (worldBounds.minX + worldBounds.maxX) * 0.5,
             (worldBounds.minY + worldBounds.maxY) * 0.5,

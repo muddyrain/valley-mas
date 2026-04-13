@@ -9,6 +9,12 @@ interface ColliderPlane {
   constant: number;
 }
 
+export interface PlatformCollisionDebugMeta {
+  category: 'platform' | 'setpiece' | 'system';
+  assetId?: string;
+  instanceId?: string;
+}
+
 export interface PlatformCollisionData {
   shape: PlatformColliderShape;
   center: [number, number, number];
@@ -23,6 +29,7 @@ export interface PlatformCollisionData {
   minZ: number;
   maxZ: number;
   planes: ColliderPlane[];
+  debugMeta?: PlatformCollisionDebugMeta;
 }
 
 const WORLD_POINT = new Vector3();
@@ -318,6 +325,7 @@ export function appendBoxCollider(
     size: [number, number, number];
     rotation?: [number, number, number, number];
     shape?: PlatformColliderShape;
+    debugMeta?: PlatformCollisionDebugMeta;
   },
 ): PlatformCollisionData {
   const size: [number, number, number] = [
@@ -361,6 +369,7 @@ export function appendBoxCollider(
     minZ: bounds.minZ,
     maxZ: bounds.maxZ,
     planes,
+    debugMeta: params.debugMeta,
   };
 
   colliders.push(collider);

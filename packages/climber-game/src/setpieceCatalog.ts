@@ -562,3 +562,7 @@ export function getClimberSetPieceAsset(
 ): ClimberSetPieceAssetDefinition {
   return SETPIECE_CATALOG[assetId];
 }
+
+export function getAllClimberSetPieceAssets(): ClimberSetPieceAssetDefinition[] {
+  return Object.values(SETPIECE_CATALOG);
+}
