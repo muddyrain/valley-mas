@@ -154,6 +154,7 @@ export interface ClimberPrototypeController {
   reset: () => void;
   setAudioEnabled: (enabled: boolean) => void;
   setDebugCollidersVisible: (visible: boolean) => void;
+  setDebugColliderFocusAssetId: (assetId: ClimberSetPieceAssetId | null) => void;
   requestPointerLock: () => void;
   dispose: () => void;
 }

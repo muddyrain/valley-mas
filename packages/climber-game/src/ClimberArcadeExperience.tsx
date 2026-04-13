@@ -1,12 +1,42 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AmbientLight,
+  Box3,
+  BoxGeometry,
+  Color,
+  DirectionalLight,
+  DoubleSide,
+  EdgesGeometry,
+  Euler,
+  Group,
+  HemisphereLight,
+  LineBasicMaterial,
+  LineSegments,
+  type Material,
+  Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  type Object3D,
+  PerspectiveCamera,
+  Quaternion,
+  Scene,
+  Sphere,
+  Vector3,
+  WebGLRenderer,
+} from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { CHARACTER_MODEL_URLS } from './characterAssets';
 import { CLIMBER_CHARACTER_OPTIONS } from './characterRig';
 import { CLIMBER_LEVELS } from './climberLevels';
 import { createClimberPrototype } from './createClimberPrototype';
+import { getAllClimberSetPieceAssets } from './setpieceCatalog';
 import type {
   ClimberCharacterId,
   ClimberCharacterRuntimeStatus,
   ClimberPrototypeController,
   ClimberRunStats,
+  ClimberSetPieceAssetId,
+  ClimberSetPieceDefinition,
 } from './types';
 
 const CONTAINER_STYLE: CSSProperties = {
@@ -193,6 +223,106 @@ const MENU_BUTTON_SECONDARY_STYLE: CSSProperties = {
   background: 'rgba(15,23,42,0.42)',
 };
 
+const MODEL_EXHIBITION_OVERLAY_STYLE: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  zIndex: 5,
+  background: 'linear-gradient(160deg, rgba(2,6,23,0.52), rgba(2,6,23,0.42), rgba(2,6,23,0.56))',
+  display: 'grid',
+  placeItems: 'center',
+  padding: 18,
+  pointerEvents: 'auto',
+};
+
+const MODEL_EXHIBITION_PANEL_STYLE: CSSProperties = {
+  width: 'min(96%, 1120px)',
+  maxHeight: '92%',
+  overflow: 'hidden',
+  borderRadius: 16,
+  border: '1px solid rgba(148,163,184,0.36)',
+  background: 'linear-gradient(160deg, rgba(15,23,42,0.92), rgba(15,23,42,0.88))',
+  boxShadow: '0 30px 80px rgba(2,6,23,0.6)',
+  display: 'grid',
+  gridTemplateRows: 'auto auto 1fr',
+  gap: 12,
+  padding: 14,
+};
+
+const MODEL_EXHIBITION_CONTENT_STYLE: CSSProperties = {
+  display: 'grid',
+  gap: 14,
+  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+  overflow: 'hidden',
+};
+
+const MODEL_SHOWCASE_STAGE_STYLE: CSSProperties = {
+  borderRadius: 12,
+  border: '1px solid rgba(148,163,184,0.3)',
+  background: 'rgba(2,6,23,0.46)',
+  overflow: 'hidden',
+  display: 'grid',
+  gridTemplateRows: 'minmax(260px, 1fr) auto',
+};
+
+const MODEL_PREVIEW_CANVAS_WRAP_STYLE: CSSProperties = {
+  position: 'relative',
+  overflow: 'hidden',
+  minHeight: 260,
+  background:
+    'radial-gradient(circle at 28% 18%, rgba(59,130,246,0.35), rgba(15,23,42,0.9) 68%), linear-gradient(180deg, rgba(15,23,42,0.82), rgba(2,6,23,0.92))',
+};
+
+const MODEL_PREVIEW_CANVAS_STYLE: CSSProperties = {
+  width: '100%',
+  height: '100%',
+  display: 'block',
+};
+
+const MODEL_PREVIEW_STATUS_STYLE: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  display: 'grid',
+  placeItems: 'center',
+  color: '#cbd5e1',
+  fontSize: 11,
+  letterSpacing: 0.2,
+  background: 'rgba(2,6,23,0.24)',
+};
+
+const MODEL_SHOWCASE_META_STYLE: CSSProperties = {
+  padding: '8px 10px 10px',
+  display: 'grid',
+  gap: 6,
+};
+
+const MODEL_EXHIBITION_LIST_STYLE: CSSProperties = {
+  borderRadius: 12,
+  border: '1px solid rgba(148,163,184,0.3)',
+  background: 'rgba(2,6,23,0.38)',
+  overflowY: 'auto',
+  padding: 10,
+  display: 'grid',
+  gap: 8,
+};
+
+const MODEL_EXHIBITION_ITEM_BUTTON_STYLE: CSSProperties = {
+  borderRadius: 10,
+  border: '1px solid rgba(148,163,184,0.26)',
+  background: 'rgba(15,23,42,0.44)',
+  padding: '8px 9px',
+  display: 'grid',
+  gap: 4,
+  textAlign: 'left',
+  cursor: 'pointer',
+};
+
+const MODEL_META_TEXT_STYLE: CSSProperties = {
+  fontSize: 11,
+  color: '#cbd5e1',
+  lineHeight: 1.5,
+  wordBreak: 'break-word',
+};
+
 function formatTime(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
   const minutes = Math.floor(total / 60);
@@ -202,6 +332,366 @@ function formatTime(ms: number): string {
 
 function formatHeight(value: number): string {
   return `${Math.max(0, value).toFixed(1)} m`;
+}
+
+function formatTuple(value: [number, number, number]): string {
+  return value.map((item) => item.toFixed(2)).join(' x ');
+}
+
+function resolveAssetFileName(url: string): string {
+  const clean = url.split('?')[0] ?? '';
+  const parts = clean.split('/').filter(Boolean);
+  return parts[parts.length - 1] ?? clean;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function disposeMaterial(material: Material | Material[] | undefined): void {
+  if (!material) return;
+  if (Array.isArray(material)) {
+    material.forEach((item) => item.dispose());
+    return;
+  }
+  material.dispose();
+}
+
+function disposeObjectResources(root: Object3D): void {
+  root.traverse((node) => {
+    const mesh = node as Mesh;
+    if (!mesh.isMesh) return;
+    mesh.geometry?.dispose();
+    disposeMaterial(mesh.material as Material | Material[] | undefined);
+  });
+}
+
+function createRampPreviewGeometry(width: number, height: number, depth: number): BoxGeometry {
+  const geometry = new BoxGeometry(width, height, depth, 1, 1, 1);
+  const position = geometry.attributes.position;
+  const halfDepth = depth * 0.5;
+  const topFlatDepth = Math.max(0.001, Math.min(depth * 0.7, depth * 0.36));
+  const topFlatEndZ = -halfDepth + topFlatDepth;
+  for (let index = 0; index < position.count; index += 1) {
+    const y = position.getY(index);
+    const z = position.getZ(index);
+    if (y > 0 && z > topFlatEndZ) {
+      const ratio = (z - topFlatEndZ) / Math.max(0.001, halfDepth - topFlatEndZ);
+      position.setY(index, height * 0.5 - ratio * height);
+    }
+  }
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+interface ModelPreviewColliderConfig {
+  shape: 'box' | 'ramp';
+  size: [number, number, number];
+  offset: [number, number, number];
+  localRotation?: [number, number, number];
+  instance?: {
+    scale?: [number, number, number];
+    rotation?: [number, number, number];
+    colliderInset?: number;
+    colliderSize?: [number, number, number];
+    colliderOffset?: [number, number, number];
+    colliderShape?: 'box' | 'ramp';
+    colliderLocalRotation?: [number, number, number];
+  };
+}
+
+interface ModelShowcaseViewerProps {
+  modelUrls: string[];
+  modelName: string;
+  collider?: ModelPreviewColliderConfig | null;
+}
+
+function ModelShowcaseViewer(props: ModelShowcaseViewerProps) {
+  const { modelUrls, modelName, collider = null } = props;
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  const [statusText, setStatusText] = useState('模型加载中...');
+
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount) return;
+    setStatusText('模型加载中...');
+    if (!modelUrls.length) {
+      setStatusText('暂无模型资源');
+      return;
+    }
+
+    let disposed = false;
+    let rafId = 0;
+    let loadedModelRoot: Group | null = null;
+    let loadedPreviewRoot: Group | null = null;
+    const localResourcesToDispose: Array<{
+      geometry?: { dispose: () => void };
+      material?: { dispose: () => void };
+    }> = [];
+
+    const scene = new Scene();
+    scene.background = new Color('#0f172a');
+    const camera = new PerspectiveCamera(45, 1, 0.1, 120);
+    camera.position.set(0, 1, 3.2);
+    scene.add(new AmbientLight('#ffffff', 0.65));
+    scene.add(new HemisphereLight('#c7e5ff', '#0f172a', 0.56));
+    const keyLight = new DirectionalLight('#fff6d5', 1.05);
+    keyLight.position.set(4.8, 6.2, 3.2);
+    scene.add(keyLight);
+
+    const renderer = new WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.domElement.style.display = 'block';
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    mount.appendChild(renderer.domElement);
+
+    const updateSize = () => {
+      const width = Math.max(1, mount.clientWidth);
+      const height = Math.max(1, mount.clientHeight);
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    };
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(mount);
+    updateSize();
+
+    const loader = new GLTFLoader();
+
+    const animate = () => {
+      if (disposed) return;
+      if (loadedPreviewRoot) {
+        loadedPreviewRoot.rotation.y += 0.005;
+      }
+      renderer.render(scene, camera);
+      rafId = window.requestAnimationFrame(animate);
+    };
+
+    const loadWithFallback = async () => {
+      let root: Group | null = null;
+      const useProceduralRampVisual =
+        collider != null && (collider.instance?.colliderShape ?? collider.shape) === 'ramp';
+
+      if (useProceduralRampVisual) {
+        const rampSize = collider.instance?.colliderSize ?? collider.size;
+        const rampGeometry = createRampPreviewGeometry(rampSize[0], rampSize[1], rampSize[2]);
+        rampGeometry.translate(0, rampSize[1] * 0.5, 0);
+        const rampMaterial = new MeshStandardMaterial({
+          color: '#b9a06c',
+          roughness: 0.7,
+          metalness: 0.06,
+        });
+        const rampMesh = new Mesh(rampGeometry, rampMaterial);
+        rampMesh.castShadow = true;
+        rampMesh.receiveShadow = true;
+        const rampRoot = new Group();
+        rampRoot.add(rampMesh);
+        localResourcesToDispose.push({ geometry: rampGeometry }, { material: rampMaterial });
+        root = rampRoot;
+      } else {
+        for (let index = 0; index < modelUrls.length; index += 1) {
+          try {
+            const gltf = await loader.loadAsync(modelUrls[index]);
+            if (disposed) {
+              disposeObjectResources(gltf.scene);
+              return;
+            }
+            root = gltf.scene as Group;
+            break;
+          } catch {}
+        }
+      }
+
+      if (!root || disposed) {
+        setStatusText(`${modelName} 加载失败`);
+        renderer.render(scene, camera);
+        return;
+      }
+
+      const localModelBounds = new Box3().setFromObject(root);
+      const localModelCenter = localModelBounds.getCenter(new Vector3());
+      const localModelSize = localModelBounds.getSize(new Vector3());
+      const instanceScaleTuple = collider?.instance?.scale ?? [1, 1, 1];
+      const instanceRotationTuple = collider?.instance?.rotation ?? [0, 0, 0];
+      root.scale.set(instanceScaleTuple[0], instanceScaleTuple[1], instanceScaleTuple[2]);
+      root.rotation.set(
+        instanceRotationTuple[0],
+        instanceRotationTuple[1],
+        instanceRotationTuple[2],
+      );
+
+      root.traverse((node) => {
+        const mesh = node as Mesh;
+        if (!mesh.isMesh || !mesh.material) return;
+        mesh.frustumCulled = false;
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        materials.forEach((material) => {
+          const sidedMaterial = material as Material & {
+            side?: number;
+            transparent?: boolean;
+            alphaTest?: number;
+            depthWrite?: boolean;
+            depthTest?: boolean;
+          };
+          sidedMaterial.side = DoubleSide;
+          sidedMaterial.depthTest = true;
+          if (sidedMaterial.transparent) {
+            sidedMaterial.alphaTest = Math.max(0.12, sidedMaterial.alphaTest ?? 0);
+            sidedMaterial.depthWrite = true;
+          }
+        });
+      });
+
+      const previewRoot = new Group();
+      previewRoot.add(root);
+
+      if (collider) {
+        const resolvedShape = collider.instance?.colliderShape ?? collider.shape;
+        const useAssetDefaultCollider = resolvedShape === 'ramp';
+        const boundsSize: [number, number, number] = useAssetDefaultCollider
+          ? collider.size
+          : [localModelSize.x, localModelSize.y, localModelSize.z];
+        const boundsCenter: [number, number, number] = useAssetDefaultCollider
+          ? collider.offset
+          : [localModelCenter.x, localModelCenter.y, localModelCenter.z];
+        const baseColliderSize = collider.instance?.colliderSize ?? boundsSize;
+        const baseColliderOffset = collider.instance?.colliderOffset ?? boundsCenter;
+        const colliderInset = clamp(collider.instance?.colliderInset ?? 1, 0.45, 1);
+        const insetColliderSize: [number, number, number] = [
+          baseColliderSize[0] * colliderInset,
+          baseColliderSize[1],
+          baseColliderSize[2] * colliderInset,
+        ];
+        const scaledColliderSize: [number, number, number] = [
+          Math.max(0.001, insetColliderSize[0] * Math.abs(instanceScaleTuple[0])),
+          Math.max(0.001, insetColliderSize[1] * Math.abs(instanceScaleTuple[1])),
+          Math.max(0.001, insetColliderSize[2] * Math.abs(instanceScaleTuple[2])),
+        ];
+        const modelQuaternion = new Quaternion().setFromEuler(
+          new Euler(instanceRotationTuple[0], instanceRotationTuple[1], instanceRotationTuple[2]),
+        );
+        const localColliderRotationTuple = collider.instance?.colliderLocalRotation ??
+          collider.localRotation ?? [0, 0, 0];
+        const localColliderQuaternion = new Quaternion().setFromEuler(
+          new Euler(
+            localColliderRotationTuple[0],
+            localColliderRotationTuple[1],
+            localColliderRotationTuple[2],
+          ),
+        );
+        const colliderQuaternion = modelQuaternion.clone().multiply(localColliderQuaternion);
+        const colliderOffset = new Vector3(
+          baseColliderOffset[0] * instanceScaleTuple[0],
+          baseColliderOffset[1] * instanceScaleTuple[1],
+          baseColliderOffset[2] * instanceScaleTuple[2],
+        ).applyQuaternion(modelQuaternion);
+        const colliderGeometry =
+          resolvedShape === 'ramp'
+            ? createRampPreviewGeometry(
+                scaledColliderSize[0],
+                scaledColliderSize[1],
+                scaledColliderSize[2],
+              )
+            : new BoxGeometry(scaledColliderSize[0], scaledColliderSize[1], scaledColliderSize[2]);
+        const colliderMaterial = new MeshBasicMaterial({
+          color: '#22d3ee',
+          transparent: true,
+          opacity: 0.28,
+          depthTest: false,
+          depthWrite: false,
+          side: DoubleSide,
+        });
+        const colliderMesh = new Mesh(colliderGeometry, colliderMaterial);
+        colliderMesh.position.copy(colliderOffset);
+        colliderMesh.quaternion.copy(colliderQuaternion);
+        previewRoot.add(colliderMesh);
+
+        const edgeGeometry = new EdgesGeometry(colliderGeometry);
+        const edgeMaterial = new LineBasicMaterial({
+          color: '#67e8f9',
+          transparent: true,
+          opacity: 1,
+          depthTest: false,
+          depthWrite: false,
+        });
+        const edgeLines = new LineSegments(edgeGeometry, edgeMaterial);
+        edgeLines.position.copy(colliderMesh.position);
+        edgeLines.quaternion.copy(colliderMesh.quaternion);
+        previewRoot.add(edgeLines);
+
+        localResourcesToDispose.push(
+          { geometry: colliderGeometry },
+          { material: colliderMaterial },
+          { geometry: edgeGeometry },
+          { material: edgeMaterial },
+        );
+      }
+
+      const bounds = new Box3().setFromObject(previewRoot);
+      const center = bounds.getCenter(new Vector3());
+      const size = bounds.getSize(new Vector3());
+      const maxSide = Math.max(0.001, size.x, size.y, size.z);
+      const scale = 1.55 / maxSide;
+      previewRoot.scale.setScalar(scale);
+      previewRoot.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
+      const framedBounds = new Box3().setFromObject(previewRoot);
+      const sphere = framedBounds.getBoundingSphere(new Sphere());
+      const radius = Math.max(0.2, sphere.radius);
+      const halfFov = (camera.fov * Math.PI) / 180 / 2;
+      const distance = (radius / Math.sin(halfFov)) * 1.12;
+      camera.position.set(distance * 0.9, distance * 0.58, distance * 1.05);
+      camera.near = Math.max(0.08, distance - radius * 1.9);
+      camera.far = distance + radius * 2.8;
+      camera.updateProjectionMatrix();
+      camera.lookAt(sphere.center);
+
+      scene.add(previewRoot);
+      loadedModelRoot = root;
+      loadedPreviewRoot = previewRoot;
+      setStatusText('');
+      animate();
+    };
+
+    void loadWithFallback();
+
+    return () => {
+      disposed = true;
+      window.cancelAnimationFrame(rafId);
+      resizeObserver.disconnect();
+      if (loadedPreviewRoot) {
+        scene.remove(loadedPreviewRoot);
+      }
+      if (loadedModelRoot) {
+        disposeObjectResources(loadedModelRoot);
+      }
+      localResourcesToDispose.forEach((item) => item.geometry?.dispose());
+      localResourcesToDispose.forEach((item) => item.material?.dispose());
+      renderer.dispose();
+      if (renderer.domElement.parentElement === mount) {
+        mount.removeChild(renderer.domElement);
+      }
+    };
+  }, [collider, modelName, modelUrls]);
+
+  return (
+    <div style={MODEL_SHOWCASE_STAGE_STYLE}>
+      <div style={MODEL_PREVIEW_CANVAS_WRAP_STYLE}>
+        <div ref={mountRef} style={MODEL_PREVIEW_CANVAS_STYLE} />
+        {statusText ? <div style={MODEL_PREVIEW_STATUS_STYLE}>{statusText}</div> : null}
+      </div>
+      <div style={MODEL_SHOWCASE_META_STYLE}>
+        <strong style={{ fontSize: 13, color: '#f8fafc', lineHeight: 1.2 }}>{modelName}</strong>
+        <span style={{ fontSize: 11, color: '#cbd5e1' }}>
+          自动旋转预览，方便快速筛掉效果不佳的模型。
+        </span>
+        {collider ? (
+          <span style={{ fontSize: 11, color: '#67e8f9' }}>青色线框与半透明区域 = 碰撞体</span>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function resolveCharacterRuntimeLabel(status: ClimberCharacterRuntimeStatus): string {
@@ -234,6 +724,10 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
   const [activeCharacterId, setActiveCharacterId] = useState<ClimberCharacterId>('peach');
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [debugCollidersVisible, setDebugCollidersVisible] = useState(false);
+  const [modelExhibitionVisible, setModelExhibitionVisible] = useState(false);
+  const [activeExhibitionItemId, setActiveExhibitionItemId] = useState<string | null>(null);
+  const [debugColliderFocusAssetId, setDebugColliderFocusAssetId] =
+    useState<ClimberSetPieceAssetId | null>(null);
   const [pointerLocked, setPointerLocked] = useState(false);
   const [hasEnteredSession, setHasEnteredSession] = useState(false);
   const [characterStatus, setCharacterStatus] =
@@ -256,6 +750,7 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
       characterId: activeCharacterId,
       audioEnabled,
       debugCollidersVisible,
+      debugColliderFocusAssetId,
       onStats: (next) => setStats(next),
       onCharacterStatusChange: (nextStatus) => setCharacterStatus(nextStatus),
       onPointerLockChange: (locked) => {
@@ -280,6 +775,16 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
     controllerRef.current?.setDebugCollidersVisible(debugCollidersVisible);
   }, [debugCollidersVisible]);
 
+  useEffect(() => {
+    controllerRef.current?.setDebugColliderFocusAssetId(debugColliderFocusAssetId);
+  }, [debugColliderFocusAssetId]);
+
+  useEffect(() => {
+    if (pointerLocked) {
+      setModelExhibitionVisible(false);
+    }
+  }, [pointerLocked]);
+
   const progressPercent = useMemo(() => Math.round((stats.progress || 0) * 100), [stats.progress]);
   const progressLabel = useMemo(
     () => `${progressPercent.toString().padStart(2, '0')}%`,
@@ -292,6 +797,101 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
   const goalTimeLabel = useMemo(
     () => (stats.goalReachedAtMs == null ? '--:--' : formatTime(stats.goalReachedAtMs)),
     [stats.goalReachedAtMs],
+  );
+  const setPieceAssets = useMemo(() => getAllClimberSetPieceAssets(), []);
+  const setPieceUsageMap = useMemo(() => {
+    const usage = new Map<ClimberSetPieceAssetId, number>();
+    (activeLevel?.setPieces ?? []).forEach((item) => {
+      usage.set(item.assetId, (usage.get(item.assetId) ?? 0) + 1);
+    });
+    return usage;
+  }, [activeLevel]);
+  const setPieceRepresentativeMap = useMemo(() => {
+    const map = new Map<ClimberSetPieceAssetId, ClimberSetPieceDefinition>();
+    (activeLevel?.setPieces ?? []).forEach((item) => {
+      if (!map.has(item.assetId)) {
+        map.set(item.assetId, item);
+      }
+    });
+    return map;
+  }, [activeLevel]);
+  const characterModelEntries = useMemo(
+    () =>
+      CLIMBER_CHARACTER_OPTIONS.map((character) => ({
+        ...character,
+        modelUrls: character.id === 'orb' ? [] : CHARACTER_MODEL_URLS[character.id],
+      })),
+    [],
+  );
+  const exhibitionItems = useMemo(() => {
+    const characterItems = characterModelEntries.map((character) => ({
+      id: `character:${character.id}`,
+      kind: 'character' as const,
+      name: `角色 · ${character.name}`,
+      modelUrls: character.modelUrls,
+      meta: `模型文件: ${character.modelUrls.map((url) => resolveAssetFileName(url)).join(' / ')}`,
+    }));
+
+    const setPieceItems = setPieceAssets.map((asset) => {
+      const representative = setPieceRepresentativeMap.get(asset.id);
+      return {
+        id: `setpiece:${asset.id}`,
+        kind: 'setpiece' as const,
+        name: asset.name,
+        modelUrls: [asset.url],
+        assetId: asset.id,
+        collider: {
+          shape: asset.colliderShape ?? 'box',
+          size: asset.colliderSize,
+          offset: asset.colliderOffset,
+          localRotation: asset.colliderLocalRotation ?? [0, 0, 0],
+          instance: representative
+            ? {
+                scale: representative.scale,
+                rotation: representative.rotation,
+                colliderInset: representative.colliderInset,
+                colliderSize: representative.colliderSize,
+                colliderOffset: representative.colliderOffset,
+                colliderShape: representative.colliderShape,
+                colliderLocalRotation: representative.colliderLocalRotation,
+              }
+            : undefined,
+        },
+        meta: `使用次数: ${setPieceUsageMap.get(asset.id) ?? 0} | 碰撞体: ${
+          asset.colliderShape === 'ramp' ? 'Ramp' : 'Box'
+        } | 尺寸 ${formatTuple(asset.colliderSize)} | 偏移 ${formatTuple(asset.colliderOffset)}`,
+      };
+    });
+
+    return [...characterItems, ...setPieceItems];
+  }, [characterModelEntries, setPieceAssets, setPieceRepresentativeMap, setPieceUsageMap]);
+  const activeExhibitionItem = useMemo(
+    () => exhibitionItems.find((item) => item.id === activeExhibitionItemId) ?? exhibitionItems[0],
+    [activeExhibitionItemId, exhibitionItems],
+  );
+  useEffect(() => {
+    if (!exhibitionItems.length) {
+      setActiveExhibitionItemId(null);
+      return;
+    }
+    if (
+      !activeExhibitionItemId ||
+      !exhibitionItems.some((item) => item.id === activeExhibitionItemId)
+    ) {
+      setActiveExhibitionItemId(exhibitionItems[0].id);
+    }
+  }, [activeExhibitionItemId, exhibitionItems]);
+  const activeFocusSetPieceName = useMemo(
+    () =>
+      debugColliderFocusAssetId == null
+        ? null
+        : (setPieceAssets.find((asset) => asset.id === debugColliderFocusAssetId)?.name ??
+          debugColliderFocusAssetId),
+    [debugColliderFocusAssetId, setPieceAssets],
+  );
+  const activeLevelSetPieceCount = useMemo(
+    () => (activeLevel?.setPieces ?? []).length,
+    [activeLevel],
   );
   const currentMapName = activeLevel ? activeLevel.name : '--';
   const currentCharacterName = activeCharacter ? activeCharacter.name : '--';
@@ -345,6 +945,9 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
             <span style={TAG_STYLE}>当前角色: {currentCharacterName}</span>
             <span style={TAG_STYLE}>声音: {audioEnabled ? '开' : '关'}</span>
             <span style={TAG_STYLE}>碰撞体: {debugCollidersVisible ? '显示' : '隐藏'}</span>
+            <span style={TAG_STYLE}>
+              碰撞体筛选: {activeFocusSetPieceName == null ? '全部模型' : activeFocusSetPieceName}
+            </span>
             <span style={TAG_STYLE}>菜单: Esc</span>
           </div>
         </div>
@@ -473,7 +1076,7 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(102px, 1fr))',
                     gap: 10,
                   }}
                 >
@@ -510,13 +1113,192 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                   >
                     {debugCollidersVisible ? '碰撞体: 开' : '碰撞体: 关'}
                   </button>
+                  <button
+                    type="button"
+                    style={MENU_BUTTON_SECONDARY_STYLE}
+                    onClick={() => {
+                      setModelExhibitionVisible(true);
+                      setDebugCollidersVisible(true);
+                    }}
+                  >
+                    模型展览
+                  </button>
                 </div>
 
                 <div style={{ fontSize: 12, color: '#cbd5e1', textAlign: 'left', lineHeight: 1.6 }}>
                   当前角色状态: {resolveCharacterRuntimeLabel(characterStatus)}；碰撞体调试:
-                  {debugCollidersVisible ? ' 开启' : ' 关闭'}。按 `Esc` 可随时回到此菜单。
+                  {debugCollidersVisible ? ' 开启' : ' 关闭'}；模型筛选:
+                  {activeFocusSetPieceName == null ? ' 全部' : ` ${activeFocusSetPieceName}`}。按
+                  `Esc` 可随时回到此菜单。
                 </div>
               </div>
+              {modelExhibitionVisible ? (
+                <div style={MODEL_EXHIBITION_OVERLAY_STYLE}>
+                  <div style={MODEL_EXHIBITION_PANEL_STYLE}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div style={{ display: 'grid', gap: 3, textAlign: 'left' }}>
+                        <strong style={{ fontSize: 16, color: '#f8fafc' }}>模型展览</strong>
+                        <span style={{ fontSize: 12, color: '#cbd5e1' }}>
+                          直接预览每个模型；可联动“只看该模型碰撞体”观察游戏里的碰撞效果。
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        style={MENU_BUTTON_SECONDARY_STYLE}
+                        onClick={() => setModelExhibitionVisible(false)}
+                      >
+                        关闭展览
+                      </button>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div style={{ fontSize: 12, color: '#cbd5e1', textAlign: 'left' }}>
+                        当前地图实例数: {activeLevelSetPieceCount} | 角色模型:{' '}
+                        {characterModelEntries.length} | 场景模型: {setPieceAssets.length} |
+                        碰撞体筛选:
+                        {activeFocusSetPieceName == null
+                          ? ' 全部模型'
+                          : ` ${activeFocusSetPieceName}`}
+                      </div>
+                      <button
+                        type="button"
+                        style={{
+                          ...MENU_BUTTON_SECONDARY_STYLE,
+                          padding: '8px 10px',
+                          fontSize: 12,
+                        }}
+                        onClick={() => {
+                          setDebugColliderFocusAssetId(null);
+                          setDebugCollidersVisible(true);
+                        }}
+                      >
+                        显示全部碰撞体
+                      </button>
+                    </div>
+
+                    <div style={MODEL_EXHIBITION_CONTENT_STYLE}>
+                      <div style={{ display: 'grid', gap: 10, minHeight: 0 }}>
+                        {activeExhibitionItem ? (
+                          <ModelShowcaseViewer
+                            modelName={activeExhibitionItem.name}
+                            modelUrls={activeExhibitionItem.modelUrls}
+                            collider={
+                              activeExhibitionItem.kind === 'setpiece'
+                                ? activeExhibitionItem.collider
+                                : null
+                            }
+                          />
+                        ) : (
+                          <div style={MODEL_SHOWCASE_STAGE_STYLE}>
+                            <div
+                              style={{
+                                display: 'grid',
+                                placeItems: 'center',
+                                color: '#cbd5e1',
+                                fontSize: 12,
+                              }}
+                            >
+                              暂无模型数据
+                            </div>
+                          </div>
+                        )}
+                        <div style={MODEL_META_TEXT_STYLE}>
+                          {activeExhibitionItem?.meta ?? '当前没有可展示的模型。'}
+                        </div>
+                        {activeExhibitionItem?.kind === 'setpiece' ? (
+                          <button
+                            type="button"
+                            style={{
+                              ...MENU_BUTTON_SECONDARY_STYLE,
+                              padding: '8px 10px',
+                              fontSize: 12,
+                              justifySelf: 'start',
+                              borderColor:
+                                debugColliderFocusAssetId === activeExhibitionItem.assetId
+                                  ? 'rgba(250,204,21,0.7)'
+                                  : undefined,
+                              color:
+                                debugColliderFocusAssetId === activeExhibitionItem.assetId
+                                  ? '#fde68a'
+                                  : '#e2e8f0',
+                            }}
+                            onClick={() => {
+                              const assetId = activeExhibitionItem.assetId ?? null;
+                              setDebugColliderFocusAssetId((prev) =>
+                                prev === assetId ? null : assetId,
+                              );
+                              setDebugCollidersVisible(true);
+                            }}
+                          >
+                            {debugColliderFocusAssetId === activeExhibitionItem.assetId
+                              ? '取消单模型碰撞体'
+                              : '只看该模型碰撞体'}
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div style={MODEL_EXHIBITION_LIST_STYLE}>
+                        {exhibitionItems.map((item) => {
+                          const selected = item.id === activeExhibitionItem?.id;
+                          const isSetPiece = item.kind === 'setpiece';
+                          const focusSelected =
+                            isSetPiece && item.assetId === debugColliderFocusAssetId;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              style={{
+                                ...MODEL_EXHIBITION_ITEM_BUTTON_STYLE,
+                                borderColor: selected
+                                  ? 'rgba(125,211,252,0.58)'
+                                  : 'rgba(148,163,184,0.26)',
+                                background: selected
+                                  ? 'rgba(30,41,59,0.75)'
+                                  : 'rgba(15,23,42,0.44)',
+                              }}
+                              onClick={() => {
+                                setActiveExhibitionItemId(item.id);
+                                if (item.kind === 'setpiece') {
+                                  setDebugColliderFocusAssetId(item.assetId ?? null);
+                                  setDebugCollidersVisible(true);
+                                  return;
+                                }
+                                setDebugColliderFocusAssetId(null);
+                              }}
+                            >
+                              <strong style={{ fontSize: 12, color: '#f8fafc' }}>
+                                {item.name}
+                              </strong>
+                              <span style={MODEL_META_TEXT_STYLE}>{item.meta}</span>
+                              {focusSelected ? (
+                                <span style={{ fontSize: 11, color: '#fde68a' }}>
+                                  正在查看该模型碰撞体
+                                </span>
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
