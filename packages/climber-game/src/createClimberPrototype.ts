@@ -175,6 +175,9 @@ export function createClimberPrototype(
   const renderer = new WebGLRenderer({ antialias: true, alpha: false });
   renderer.shadowMap.enabled = true;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.domElement.style.display = 'block';
+  renderer.domElement.style.width = '100%';
+  renderer.domElement.style.height = '100%';
   renderer.domElement.style.touchAction = 'none';
   mount.appendChild(renderer.domElement);
 
@@ -501,8 +504,8 @@ export function createClimberPrototype(
   let filteredMouseDeltaY = 0;
 
   const updateSize = () => {
-    const width = Math.max(mount.clientWidth, 1);
-    const height = Math.max(mount.clientHeight, 1);
+    const width = Math.min(Math.max(mount.clientWidth, 1), 4096);
+    const height = Math.min(Math.max(mount.clientHeight, 1), 2160);
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();

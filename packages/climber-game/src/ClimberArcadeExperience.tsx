@@ -11,9 +11,9 @@ import type {
 
 const CONTAINER_STYLE: CSSProperties = {
   width: '100%',
-  maxWidth: '1180px',
+  maxWidth: '980px',
   margin: '0 auto',
-  padding: '32px 24px 72px',
+  padding: '28px 18px 56px',
   display: 'grid',
   gap: '18px',
 };
@@ -27,8 +27,9 @@ const PANEL_STYLE: CSSProperties = {
 };
 
 const GAME_VIEWPORT_STYLE: CSSProperties = {
-  height: 'min(68vh, 620px)',
-  minHeight: 420,
+  width: '100%',
+  height: 'min(62vh, 560px)',
+  minHeight: 380,
   borderRadius: 22,
   overflow: 'hidden',
   border: '1px solid color-mix(in srgb, var(--theme-shell-border) 78%, transparent)',
