@@ -79,6 +79,8 @@ const MOUSE_FILTER_ALPHA = 0.42;
 const CAMERA_YAW_SPEED_LIMIT = 8.4;
 const CAMERA_PITCH_SPEED_LIMIT = 5.2;
 const LAND_SOUND_COOLDOWN_MS = 180;
+const MIN_JUMP_INTERVAL_MS = 220;
+const MIN_GROUNDED_BEFORE_JUMP_MS = 45;
 const GROUND_STICK_VELOCITY_MAX = 1.35;
 const RAMP_TOP_FLAT_RATIO = 0.36;
 
@@ -236,7 +238,6 @@ export function createClimberPrototype(
   const colliderDebugMaterials: MeshBasicMaterial[] = [];
   const colliderDebugLineMaterials: LineBasicMaterial[] = [];
   const colliderDebugQuaternion = new Quaternion();
-  const colliderDebugTopRange = { min: 0, max: 1 };
   let colliderDebugDirty = true;
   let colliderDebugFocusAssetId: ClimberSetPieceAssetId | null = debugColliderFocusAssetId;
   colliderDebugGroup.visible = debugCollidersVisible;
@@ -258,7 +259,7 @@ export function createClimberPrototype(
 
   const rebuildColliderDebugMeshes = () => {
     clearColliderDebugMeshes();
-    const collidersForDebug =
+    const focusedColliders =
       colliderDebugFocusAssetId == null
         ? platformColliders
         : platformColliders.filter(
@@ -266,14 +267,18 @@ export function createClimberPrototype(
               collider.debugMeta?.category === 'setpiece' &&
               collider.debugMeta.assetId === colliderDebugFocusAssetId,
           );
+    const collidersForDebug =
+      focusedColliders.length > 0 || colliderDebugFocusAssetId == null
+        ? focusedColliders
+        : platformColliders;
+    if (!focusedColliders.length && colliderDebugFocusAssetId != null) {
+      colliderDebugFocusAssetId = null;
+    }
 
     if (!collidersForDebug.length) {
       colliderDebugDirty = false;
       return;
     }
-    colliderDebugTopRange.min = Math.min(...collidersForDebug.map((collider) => collider.top));
-    colliderDebugTopRange.max = Math.max(...collidersForDebug.map((collider) => collider.top));
-    const topSpan = Math.max(0.0001, colliderDebugTopRange.max - colliderDebugTopRange.min);
 
     collidersForDebug.forEach((collider) => {
       const width = Math.max(0.001, collider.size[0]);
@@ -283,19 +288,19 @@ export function createClimberPrototype(
         collider.shape === 'ramp'
           ? createRampDebugGeometry(width, height, depth)
           : new BoxGeometry(width, height, depth);
-      const normalizedTop = clamp((collider.top - colliderDebugTopRange.min) / topSpan, 0, 1);
-      const fillColor = new Color().setHSL(0.56 - normalizedTop * 0.42, 0.82, 0.54);
-      const edgeColor = fillColor.clone().offsetHSL(0, -0.1, -0.08);
+      const fillColor = new Color('#64748b');
+      const edgeColor = new Color('#94a3b8');
       const inFocusedMode = colliderDebugFocusAssetId != null;
       const material = new MeshBasicMaterial({
         color: fillColor,
         transparent: true,
-        opacity: inFocusedMode ? 0.34 : 0.16,
+        opacity: inFocusedMode ? 0.14 : 0.08,
         depthTest: true,
         depthWrite: false,
       });
       const mesh = new Mesh(geometry, material);
       mesh.position.set(collider.center[0], collider.center[1], collider.center[2]);
+      mesh.renderOrder = 120;
       colliderDebugQuaternion.set(
         collider.rotation[0],
         collider.rotation[1],
@@ -311,13 +316,14 @@ export function createClimberPrototype(
       const lineMaterial = new LineBasicMaterial({
         color: edgeColor,
         transparent: true,
-        opacity: inFocusedMode ? 0.78 : 0.35,
+        opacity: inFocusedMode ? 0.46 : 0.28,
         depthTest: true,
         depthWrite: false,
       });
       const edgeLines = new LineSegments(edgeGeometry, lineMaterial);
       edgeLines.position.copy(mesh.position);
       edgeLines.quaternion.copy(mesh.quaternion);
+      edgeLines.renderOrder = 121;
       colliderDebugGroup.add(edgeLines);
       colliderDebugEdgeGeometries.push(edgeGeometry);
       colliderDebugLineMaterials.push(lineMaterial);
@@ -501,6 +507,7 @@ export function createClimberPrototype(
     right: false,
     sprint: false,
     jumpQueued: false,
+    jumpHeld: false,
   };
 
   const playerPosition = startPosition.clone();
@@ -516,6 +523,8 @@ export function createClimberPrototype(
   let goalReachedAtMs: number | null = null;
   let goalCelebrationTimer = 0;
   let lastLandAudioAtMs = -10000;
+  let lastJumpAtMs = -10000;
+  let lastGroundedAtMs = -10000;
   let rafId = 0;
   let disposed = false;
   let lastStatsAt = 0;
@@ -552,6 +561,7 @@ export function createClimberPrototype(
     keyState.right = false;
     keyState.sprint = false;
     keyState.jumpQueued = false;
+    keyState.jumpHeld = false;
   };
 
   function resetPlayer() {
@@ -572,6 +582,8 @@ export function createClimberPrototype(
     goalReachedAtMs = null;
     goalCelebrationTimer = 0;
     lastLandAudioAtMs = -10000;
+    lastJumpAtMs = -10000;
+    lastGroundedAtMs = -10000;
     goalBurst.visible = false;
     goalBurst.scale.setScalar(1);
     goalBurstMaterial.opacity = 0;
@@ -603,6 +615,7 @@ export function createClimberPrototype(
   }
 
   function updatePlayer(delta: number) {
+    const elapsedMs = clock.getElapsedTime() * 1000;
     const wasGrounded = grounded;
     const speed = keyState.sprint ? SPRINT_SPEED : WALK_SPEED;
     const inputForward = Number(keyState.forward) - Number(keyState.backward);
@@ -636,9 +649,19 @@ export function createClimberPrototype(
     );
     velocity.y -= GRAVITY * delta;
 
-    if (keyState.jumpQueued && grounded) {
+    const canJumpByInterval = elapsedMs - lastJumpAtMs >= MIN_JUMP_INTERVAL_MS;
+    const groundedDurationMs = elapsedMs - lastGroundedAtMs;
+    const canJumpAfterGrounded = groundedDurationMs >= MIN_GROUNDED_BEFORE_JUMP_MS;
+    if (
+      keyState.jumpQueued &&
+      grounded &&
+      canJumpByInterval &&
+      canJumpAfterGrounded &&
+      velocity.y <= 0.18
+    ) {
       velocity.y = JUMP_SPEED;
       grounded = false;
+      lastJumpAtMs = elapsedMs;
       audio.playJump();
     }
     keyState.jumpQueued = false;
@@ -664,8 +687,10 @@ export function createClimberPrototype(
       initiallyLanded: topLanded || stickyGrounded,
       allowStepAssist: wasGrounded,
     });
+    if (!wasGrounded && grounded) {
+      lastGroundedAtMs = elapsedMs;
+    }
 
-    const elapsedMs = clock.getElapsedTime() * 1000;
     if (!wasGrounded && grounded && elapsedMs - lastLandAudioAtMs >= LAND_SOUND_COOLDOWN_MS) {
       audio.playLand();
       lastLandAudioAtMs = elapsedMs;
@@ -858,7 +883,14 @@ export function createClimberPrototype(
     const mapped = keyMap[event.code];
     if (mapped) keyState[mapped] = true;
     if (event.code === 'Space') {
-      keyState.jumpQueued = true;
+      if (event.repeat) {
+        event.preventDefault();
+        return;
+      }
+      if (!keyState.jumpHeld) {
+        keyState.jumpQueued = true;
+      }
+      keyState.jumpHeld = true;
       event.preventDefault();
     }
   };
@@ -866,6 +898,9 @@ export function createClimberPrototype(
   const handleKeyUp = (event: KeyboardEvent) => {
     const mapped = keyMap[event.code];
     if (mapped) keyState[mapped] = false;
+    if (event.code === 'Space') {
+      keyState.jumpHeld = false;
+    }
   };
 
   const handleMouseMove = (event: MouseEvent) => {
