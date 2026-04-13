@@ -27,6 +27,12 @@ import {
 } from 'three';
 import { createCharacterRig } from './characterRig';
 import {
+  CLIMBER_GRAVITY,
+  CLIMBER_JUMP_SPEED,
+  CLIMBER_SPRINT_SPEED,
+  CLIMBER_WALK_SPEED,
+} from './climberPhysics';
+import {
   appendBoxCollider,
   type PlatformCollisionData,
   type PlatformCollisionDebugMeta,
@@ -58,10 +64,6 @@ interface CreateClimberPrototypeOptions {
 }
 
 const PLAYER_RADIUS = 0.42;
-const WALK_SPEED = 5.4;
-const SPRINT_SPEED = 8.2;
-const JUMP_SPEED = 8.8;
-const GRAVITY = 21;
 const RESPAWN_Y = -20;
 const LANDING_ASSIST = PLAYER_RADIUS * 0.95;
 const DEFAULT_CAMERA_OFFSET = new Vector3(0, 4.8, 9.4);
@@ -617,7 +619,7 @@ export function createClimberPrototype(
   function updatePlayer(delta: number) {
     const elapsedMs = clock.getElapsedTime() * 1000;
     const wasGrounded = grounded;
-    const speed = keyState.sprint ? SPRINT_SPEED : WALK_SPEED;
+    const speed = keyState.sprint ? CLIMBER_SPRINT_SPEED : CLIMBER_WALK_SPEED;
     const inputForward = Number(keyState.forward) - Number(keyState.backward);
     const inputStrafe = Number(keyState.right) - Number(keyState.left);
     const inputMagnitude = Math.hypot(inputForward, inputStrafe);
@@ -647,7 +649,7 @@ export function createClimberPrototype(
       responsiveness,
       delta,
     );
-    velocity.y -= GRAVITY * delta;
+    velocity.y -= CLIMBER_GRAVITY * delta;
 
     const canJumpByInterval = elapsedMs - lastJumpAtMs >= MIN_JUMP_INTERVAL_MS;
     const groundedDurationMs = elapsedMs - lastGroundedAtMs;
@@ -659,7 +661,7 @@ export function createClimberPrototype(
       canJumpAfterGrounded &&
       velocity.y <= 0.18
     ) {
-      velocity.y = JUMP_SPEED;
+      velocity.y = CLIMBER_JUMP_SPEED;
       grounded = false;
       lastJumpAtMs = elapsedMs;
       audio.playJump();
