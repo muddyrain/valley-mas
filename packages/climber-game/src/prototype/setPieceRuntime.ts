@@ -53,7 +53,7 @@ interface DisposableSetPieceResources {
   materials: Material[];
 }
 
-interface LocalBoundsData {
+export interface LocalBoundsData {
   center: [number, number, number];
   size: [number, number, number];
 }
@@ -66,7 +66,7 @@ interface ReachabilityNode {
   };
 }
 
-interface ResolvedColliderData {
+export interface ResolvedColliderData {
   center: [number, number, number];
   size: [number, number, number];
   rotation: [number, number, number, number];
@@ -325,6 +325,20 @@ function applySurfacePresetMaterial(
   material.needsUpdate = true;
 }
 
+function hasMaterialTexture(material: MeshStandardMaterial): boolean {
+  return Boolean(
+    material.map ||
+      material.normalMap ||
+      material.roughnessMap ||
+      material.metalnessMap ||
+      material.emissiveMap ||
+      material.aoMap ||
+      material.alphaMap ||
+      material.bumpMap ||
+      material.displacementMap,
+  );
+}
+
 function createProceduralRampInstance(params: {
   size: [number, number, number];
   resolvedColor: string;
@@ -443,7 +457,7 @@ function cloneWithUniqueResources(template: Group): {
   };
 }
 
-function readLocalBounds(root: Group): LocalBoundsData | null {
+export function readSetPieceLocalBounds(root: Group): LocalBoundsData | null {
   root.updateWorldMatrix(true, true);
   let bestBox: Box3 | null = null;
   let bestFootprint = 0;
@@ -487,7 +501,7 @@ function readLocalBounds(root: Group): LocalBoundsData | null {
   };
 }
 
-function resolveColliderData(
+export function resolveSetPieceColliderData(
   definition: ClimberSetPieceDefinition,
   localBounds: LocalBoundsData | null,
 ): ResolvedColliderData {
@@ -568,7 +582,7 @@ export function createSetPieceRuntime(options: SetPieceRuntimeOptions): {
         if (disposed) return;
         const sceneRoot = gltf.scene as Group;
         templateMap.set(assetId, sceneRoot);
-        const localBounds = readLocalBounds(sceneRoot);
+        const localBounds = readSetPieceLocalBounds(sceneRoot);
         if (localBounds) {
           localBoundsMap.set(assetId, localBounds);
         }
@@ -633,6 +647,7 @@ export function createSetPieceRuntime(options: SetPieceRuntimeOptions): {
               materials.forEach((item) => {
                 const standard = item as MeshStandardMaterial;
                 if (!standard || !standard.isMeshStandardMaterial) return;
+                if (hasMaterialTexture(standard)) return;
                 applySurfacePresetMaterial(standard, resolvedColor, resolvedPreset, texture);
               });
             });
@@ -656,7 +671,7 @@ export function createSetPieceRuntime(options: SetPieceRuntimeOptions): {
         }
         if (definition.solid !== false) {
           const localBounds = localBoundsMap.get(definition.assetId) ?? null;
-          const collider = resolveColliderData(definition, localBounds);
+          const collider = resolveSetPieceColliderData(definition, localBounds);
           const worldBounds = appendCollider({
             ...collider,
             debugMeta: {

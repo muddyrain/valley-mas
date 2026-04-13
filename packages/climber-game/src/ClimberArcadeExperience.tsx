@@ -7,7 +7,6 @@ import {
   DirectionalLight,
   DoubleSide,
   EdgesGeometry,
-  Euler,
   Group,
   HemisphereLight,
   LineBasicMaterial,
@@ -18,7 +17,6 @@ import {
   MeshStandardMaterial,
   type Object3D,
   PerspectiveCamera,
-  Quaternion,
   Scene,
   Sphere,
   Vector3,
@@ -29,7 +27,8 @@ import { CHARACTER_MODEL_URLS } from './characterAssets';
 import { CLIMBER_CHARACTER_OPTIONS } from './characterRig';
 import { CLIMBER_LEVELS } from './climberLevels';
 import { createClimberPrototype } from './createClimberPrototype';
-import { getAllClimberSetPieceAssets } from './setpieceCatalog';
+import { readSetPieceLocalBounds, resolveSetPieceColliderData } from './prototype/setPieceRuntime';
+import { getAllClimberSetPieceAssets, getClimberSetPieceAsset } from './setpieceCatalog';
 import type {
   ClimberCharacterId,
   ClimberCharacterRuntimeStatus,
@@ -344,10 +343,6 @@ function resolveAssetFileName(url: string): string {
   return parts[parts.length - 1] ?? clean;
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
 function disposeMaterial(material: Material | Material[] | undefined): void {
   if (!material) return;
   if (Array.isArray(material)) {
@@ -386,19 +381,8 @@ function createRampPreviewGeometry(width: number, height: number, depth: number)
 }
 
 interface ModelPreviewColliderConfig {
-  shape: 'box' | 'ramp';
-  size: [number, number, number];
-  offset: [number, number, number];
-  localRotation?: [number, number, number];
-  instance?: {
-    scale?: [number, number, number];
-    rotation?: [number, number, number];
-    colliderInset?: number;
-    colliderSize?: [number, number, number];
-    colliderOffset?: [number, number, number];
-    colliderShape?: 'box' | 'ramp';
-    colliderLocalRotation?: [number, number, number];
-  };
+  assetId: ClimberSetPieceAssetId;
+  definition?: ClimberSetPieceDefinition;
 }
 
 interface ModelShowcaseViewerProps {
@@ -471,11 +455,28 @@ function ModelShowcaseViewer(props: ModelShowcaseViewerProps) {
 
     const loadWithFallback = async () => {
       let root: Group | null = null;
+      const previewDefinition: ClimberSetPieceDefinition | null = collider
+        ? {
+            id: collider.definition?.id ?? '__preview__',
+            assetId: collider.assetId,
+            position: [0, 0, 0],
+            solid: true,
+            scale: collider.definition?.scale,
+            rotation: collider.definition?.rotation,
+            colliderInset: collider.definition?.colliderInset,
+            colliderSize: collider.definition?.colliderSize,
+            colliderOffset: collider.definition?.colliderOffset,
+            colliderShape: collider.definition?.colliderShape,
+            colliderLocalRotation: collider.definition?.colliderLocalRotation,
+          }
+        : null;
+      const previewAsset = collider ? getClimberSetPieceAsset(collider.assetId) : null;
       const useProceduralRampVisual =
-        collider != null && (collider.instance?.colliderShape ?? collider.shape) === 'ramp';
+        (previewDefinition?.colliderShape ?? previewAsset?.colliderShape ?? 'box') === 'ramp';
 
       if (useProceduralRampVisual) {
-        const rampSize = collider.instance?.colliderSize ?? collider.size;
+        const rampSize = previewDefinition?.colliderSize ??
+          previewAsset?.colliderSize ?? [2, 1, 1.4];
         const rampGeometry = createRampPreviewGeometry(rampSize[0], rampSize[1], rampSize[2]);
         rampGeometry.translate(0, rampSize[1] * 0.5, 0);
         const rampMaterial = new MeshStandardMaterial({
@@ -510,11 +511,9 @@ function ModelShowcaseViewer(props: ModelShowcaseViewerProps) {
         return;
       }
 
-      const localModelBounds = new Box3().setFromObject(root);
-      const localModelCenter = localModelBounds.getCenter(new Vector3());
-      const localModelSize = localModelBounds.getSize(new Vector3());
-      const instanceScaleTuple = collider?.instance?.scale ?? [1, 1, 1];
-      const instanceRotationTuple = collider?.instance?.rotation ?? [0, 0, 0];
+      const localBounds = collider ? readSetPieceLocalBounds(root) : null;
+      const instanceScaleTuple = previewDefinition?.scale ?? [1, 1, 1];
+      const instanceRotationTuple = previewDefinition?.rotation ?? [0, 0, 0];
       root.scale.set(instanceScaleTuple[0], instanceScaleTuple[1], instanceScaleTuple[2]);
       root.rotation.set(
         instanceRotationTuple[0],
@@ -538,8 +537,8 @@ function ModelShowcaseViewer(props: ModelShowcaseViewerProps) {
           sidedMaterial.side = DoubleSide;
           sidedMaterial.depthTest = true;
           if (sidedMaterial.transparent) {
-            sidedMaterial.alphaTest = Math.max(0.12, sidedMaterial.alphaTest ?? 0);
-            sidedMaterial.depthWrite = true;
+            sidedMaterial.alphaTest = Math.max(0.08, sidedMaterial.alphaTest ?? 0);
+            sidedMaterial.depthWrite = false;
           }
         });
       });
@@ -547,65 +546,36 @@ function ModelShowcaseViewer(props: ModelShowcaseViewerProps) {
       const previewRoot = new Group();
       previewRoot.add(root);
 
-      if (collider) {
-        const resolvedShape = collider.instance?.colliderShape ?? collider.shape;
-        const useAssetDefaultCollider = resolvedShape === 'ramp';
-        const boundsSize: [number, number, number] = useAssetDefaultCollider
-          ? collider.size
-          : [localModelSize.x, localModelSize.y, localModelSize.z];
-        const boundsCenter: [number, number, number] = useAssetDefaultCollider
-          ? collider.offset
-          : [localModelCenter.x, localModelCenter.y, localModelCenter.z];
-        const baseColliderSize = collider.instance?.colliderSize ?? boundsSize;
-        const baseColliderOffset = collider.instance?.colliderOffset ?? boundsCenter;
-        const colliderInset = clamp(collider.instance?.colliderInset ?? 1, 0.45, 1);
-        const insetColliderSize: [number, number, number] = [
-          baseColliderSize[0] * colliderInset,
-          baseColliderSize[1],
-          baseColliderSize[2] * colliderInset,
-        ];
-        const scaledColliderSize: [number, number, number] = [
-          Math.max(0.001, insetColliderSize[0] * Math.abs(instanceScaleTuple[0])),
-          Math.max(0.001, insetColliderSize[1] * Math.abs(instanceScaleTuple[1])),
-          Math.max(0.001, insetColliderSize[2] * Math.abs(instanceScaleTuple[2])),
-        ];
-        const modelQuaternion = new Quaternion().setFromEuler(
-          new Euler(instanceRotationTuple[0], instanceRotationTuple[1], instanceRotationTuple[2]),
-        );
-        const localColliderRotationTuple = collider.instance?.colliderLocalRotation ??
-          collider.localRotation ?? [0, 0, 0];
-        const localColliderQuaternion = new Quaternion().setFromEuler(
-          new Euler(
-            localColliderRotationTuple[0],
-            localColliderRotationTuple[1],
-            localColliderRotationTuple[2],
-          ),
-        );
-        const colliderQuaternion = modelQuaternion.clone().multiply(localColliderQuaternion);
-        const colliderOffset = new Vector3(
-          baseColliderOffset[0] * instanceScaleTuple[0],
-          baseColliderOffset[1] * instanceScaleTuple[1],
-          baseColliderOffset[2] * instanceScaleTuple[2],
-        ).applyQuaternion(modelQuaternion);
+      if (collider && previewDefinition) {
+        const resolvedCollider = resolveSetPieceColliderData(previewDefinition, localBounds);
+        const [colliderCenterX, colliderCenterY, colliderCenterZ] = resolvedCollider.center;
+        const [colliderSizeX, colliderSizeY, colliderSizeZ] = resolvedCollider.size;
+        const [colliderRotationX, colliderRotationY, colliderRotationZ, colliderRotationW] =
+          resolvedCollider.rotation;
         const colliderGeometry =
-          resolvedShape === 'ramp'
-            ? createRampPreviewGeometry(
-                scaledColliderSize[0],
-                scaledColliderSize[1],
-                scaledColliderSize[2],
-              )
-            : new BoxGeometry(scaledColliderSize[0], scaledColliderSize[1], scaledColliderSize[2]);
+          resolvedCollider.shape === 'ramp'
+            ? createRampPreviewGeometry(colliderSizeX, colliderSizeY, colliderSizeZ)
+            : new BoxGeometry(colliderSizeX, colliderSizeY, colliderSizeZ);
         const colliderMaterial = new MeshBasicMaterial({
           color: '#22d3ee',
           transparent: true,
-          opacity: 0.28,
+          opacity: 0.34,
           depthTest: false,
           depthWrite: false,
           side: DoubleSide,
+          polygonOffset: true,
+          polygonOffsetFactor: -2,
+          polygonOffsetUnits: -2,
         });
         const colliderMesh = new Mesh(colliderGeometry, colliderMaterial);
-        colliderMesh.position.copy(colliderOffset);
-        colliderMesh.quaternion.copy(colliderQuaternion);
+        colliderMesh.position.set(colliderCenterX, colliderCenterY, colliderCenterZ);
+        colliderMesh.quaternion.set(
+          colliderRotationX,
+          colliderRotationY,
+          colliderRotationZ,
+          colliderRotationW,
+        );
+        colliderMesh.renderOrder = 40;
         previewRoot.add(colliderMesh);
 
         const edgeGeometry = new EdgesGeometry(colliderGeometry);
@@ -619,6 +589,7 @@ function ModelShowcaseViewer(props: ModelShowcaseViewerProps) {
         const edgeLines = new LineSegments(edgeGeometry, edgeMaterial);
         edgeLines.position.copy(colliderMesh.position);
         edgeLines.quaternion.copy(colliderMesh.quaternion);
+        edgeLines.renderOrder = 41;
         previewRoot.add(edgeLines);
 
         localResourcesToDispose.push(
@@ -841,21 +812,8 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
         modelUrls: [asset.url],
         assetId: asset.id,
         collider: {
-          shape: asset.colliderShape ?? 'box',
-          size: asset.colliderSize,
-          offset: asset.colliderOffset,
-          localRotation: asset.colliderLocalRotation ?? [0, 0, 0],
-          instance: representative
-            ? {
-                scale: representative.scale,
-                rotation: representative.rotation,
-                colliderInset: representative.colliderInset,
-                colliderSize: representative.colliderSize,
-                colliderOffset: representative.colliderOffset,
-                colliderShape: representative.colliderShape,
-                colliderLocalRotation: representative.colliderLocalRotation,
-              }
-            : undefined,
+          assetId: asset.id,
+          definition: representative,
         },
         meta: `使用次数: ${setPieceUsageMap.get(asset.id) ?? 0} | 碰撞体: ${
           asset.colliderShape === 'ramp' ? 'Ramp' : 'Box'
@@ -881,6 +839,15 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
       setActiveExhibitionItemId(exhibitionItems[0].id);
     }
   }, [activeExhibitionItemId, exhibitionItems]);
+  useEffect(() => {
+    if (debugColliderFocusAssetId == null) return;
+    const focusExistsInLevel = (activeLevel?.setPieces ?? []).some(
+      (piece) => piece.assetId === debugColliderFocusAssetId,
+    );
+    if (!focusExistsInLevel) {
+      setDebugColliderFocusAssetId(null);
+    }
+  }, [activeLevel, debugColliderFocusAssetId]);
   const activeFocusSetPieceName = useMemo(
     () =>
       debugColliderFocusAssetId == null
@@ -1147,7 +1114,7 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                       <div style={{ display: 'grid', gap: 3, textAlign: 'left' }}>
                         <strong style={{ fontSize: 16, color: '#f8fafc' }}>模型展览</strong>
                         <span style={{ fontSize: 12, color: '#cbd5e1' }}>
-                          直接预览每个模型；可联动“只看该模型碰撞体”观察游戏里的碰撞效果。
+                          直接预览每个模型；点击“只看该模型碰撞体”才会联动游戏内筛选。
                         </span>
                       </div>
                       <button
@@ -1274,12 +1241,6 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                               }}
                               onClick={() => {
                                 setActiveExhibitionItemId(item.id);
-                                if (item.kind === 'setpiece') {
-                                  setDebugColliderFocusAssetId(item.assetId ?? null);
-                                  setDebugCollidersVisible(true);
-                                  return;
-                                }
-                                setDebugColliderFocusAssetId(null);
                               }}
                             >
                               <strong style={{ fontSize: 12, color: '#f8fafc' }}>

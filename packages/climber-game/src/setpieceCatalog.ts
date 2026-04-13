@@ -54,6 +54,7 @@ import vortexRingUrl from '../assets/models/setpieces/vortex_ring.glb';
 import wingPlatformUrl from '../assets/models/setpieces/wing_platform.glb';
 import zigzagBeamUrl from '../assets/models/setpieces/zigzag_beam.glb';
 import { toRuntimeAssetUrl } from './assetUrl';
+import { isRemovedSetPieceAsset } from './removedSetPieceAssets';
 import type { ClimberSetPieceAssetDefinition, ClimberSetPieceAssetId } from './types';
 
 const SETPIECE_CATALOG: Record<ClimberSetPieceAssetId, ClimberSetPieceAssetDefinition> = {
@@ -564,5 +565,5 @@ export function getClimberSetPieceAsset(
 }
 
 export function getAllClimberSetPieceAssets(): ClimberSetPieceAssetDefinition[] {
-  return Object.values(SETPIECE_CATALOG);
+  return Object.values(SETPIECE_CATALOG).filter((asset) => !isRemovedSetPieceAsset(asset.id));
 }

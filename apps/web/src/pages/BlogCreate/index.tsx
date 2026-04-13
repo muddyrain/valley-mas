@@ -38,6 +38,7 @@ import { CoverCropDialog } from '@/components/blog/CoverCropDialog';
 import { MdxMarkdownEditor } from '@/components/blog/MdxMarkdownEditor';
 import { PublicWallpaperPickerDialog } from '@/components/blog/PublicWallpaperPickerDialog';
 import { Button } from '@/components/ui/button';
+import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -487,15 +488,22 @@ export default function BlogCreate() {
       setCoverStorageKey('');
       setPendingCoverRemoteUrl('');
 
-      // 先让标题和正文完成一次渲染，再触发 AI 配图，保证导入顺序清晰可感知。
+      // 先让标题和正文完成一次渲染，再弹出 AI 配图确认。
       await waitNextPaint();
-      toast.success('MD 导入成功，正在根据标题和正文生成 AI 封面...');
+      toast.success('MD 导入成功');
       setImportingMarkdown(false);
-      await handleAIGenerateCover({
-        title: parsed.title,
-        excerpt: '',
-        content: parsedContent,
-        source: 'import',
+      openConfirmToast({
+        title: '是否立即生成 AI 封面？',
+        description: '你也可以稍后手动点击「AI配图封面」。',
+        confirmText: '立即生成',
+        cancelText: '稍后再说',
+        onConfirm: () =>
+          handleAIGenerateCover({
+            title: parsed.title,
+            excerpt: '',
+            content: parsedContent,
+            source: 'import',
+          }),
       });
     } catch {
       toast.error('MD 导入失败，请检查文件后重试');
