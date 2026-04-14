@@ -32,6 +32,7 @@ import { getAllClimberSetPieceAssets, getClimberSetPieceAsset } from './setpiece
 import type {
   ClimberCharacterId,
   ClimberCharacterRuntimeStatus,
+  ClimberJumpClearanceReport,
   ClimberPrototypeController,
   ClimberRunStats,
   ClimberSetPieceAssetId,
@@ -695,6 +696,7 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
   const [activeCharacterId, setActiveCharacterId] = useState<ClimberCharacterId>('peach');
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [debugCollidersVisible, setDebugCollidersVisible] = useState(false);
+  const [debugJumpClearanceVisible, setDebugJumpClearanceVisible] = useState(false);
   const [modelExhibitionVisible, setModelExhibitionVisible] = useState(false);
   const [activeExhibitionItemId, setActiveExhibitionItemId] = useState<string | null>(null);
   const [debugColliderFocusAssetId, setDebugColliderFocusAssetId] =
@@ -712,6 +714,15 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
     goalReached: false,
     goalReachedAtMs: null,
   });
+  const [jumpClearanceReport, setJumpClearanceReport] = useState<ClimberJumpClearanceReport>({
+    generatedAt: Date.now(),
+    checkedLinks: 0,
+    highRiskCount: 0,
+    mediumRiskCount: 0,
+    smallPieceCount: 0,
+    denseSmallPieceClusterCount: 0,
+    issues: [],
+  });
   useEffect(() => {
     if (!mountRef.current || !activeLevel) return;
     setCharacterStatus(activeCharacterId === 'orb' ? 'procedural' : 'model-loading');
@@ -721,8 +732,10 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
       characterId: activeCharacterId,
       audioEnabled,
       debugCollidersVisible,
+      debugJumpClearanceVisible,
       debugColliderFocusAssetId,
       onStats: (next) => setStats(next),
+      onJumpClearanceReport: (report) => setJumpClearanceReport(report),
       onCharacterStatusChange: (nextStatus) => setCharacterStatus(nextStatus),
       onPointerLockChange: (locked) => {
         setPointerLocked(locked);
@@ -747,6 +760,10 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
   }, [debugCollidersVisible]);
 
   useEffect(() => {
+    controllerRef.current?.setDebugJumpClearanceVisible(debugJumpClearanceVisible);
+  }, [debugJumpClearanceVisible]);
+
+  useEffect(() => {
     controllerRef.current?.setDebugColliderFocusAssetId(debugColliderFocusAssetId);
   }, [debugColliderFocusAssetId]);
 
@@ -769,23 +786,23 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
     () => (stats.goalReachedAtMs == null ? '--:--' : formatTime(stats.goalReachedAtMs)),
     [stats.goalReachedAtMs],
   );
-  const setPieceAssets = useMemo(() => getAllClimberSetPieceAssets(), []);
-  const setPieceUsageMap = useMemo(() => {
+  const activeSetPieceInstances = useMemo(() => activeLevel?.setPieces ?? [], [activeLevel]);
+  const allSetPieceAssets = useMemo(() => getAllClimberSetPieceAssets(), []);
+  const setPieceUsageByAssetId = useMemo(() => {
     const usage = new Map<ClimberSetPieceAssetId, number>();
-    (activeLevel?.setPieces ?? []).forEach((item) => {
-      usage.set(item.assetId, (usage.get(item.assetId) ?? 0) + 1);
+    activeSetPieceInstances.forEach((instance) => {
+      const prev = usage.get(instance.assetId) ?? 0;
+      usage.set(instance.assetId, prev + 1);
     });
     return usage;
-  }, [activeLevel]);
-  const setPieceRepresentativeMap = useMemo(() => {
-    const map = new Map<ClimberSetPieceAssetId, ClimberSetPieceDefinition>();
-    (activeLevel?.setPieces ?? []).forEach((item) => {
-      if (!map.has(item.assetId)) {
-        map.set(item.assetId, item);
-      }
+  }, [activeSetPieceInstances]);
+  const usedSetPieceAssetTypeCount = useMemo(() => {
+    let count = 0;
+    setPieceUsageByAssetId.forEach((value) => {
+      if (value > 0) count += 1;
     });
-    return map;
-  }, [activeLevel]);
+    return count;
+  }, [setPieceUsageByAssetId]);
   const characterModelEntries = useMemo(
     () =>
       CLIMBER_CHARACTER_OPTIONS.map((character) => ({
@@ -803,26 +820,42 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
       meta: `模型文件: ${character.modelUrls.map((url) => resolveAssetFileName(url)).join(' / ')}`,
     }));
 
-    const setPieceItems = setPieceAssets.map((asset) => {
-      const representative = setPieceRepresentativeMap.get(asset.id);
+    const setPieceCatalogItems = allSetPieceAssets.map((asset) => ({
+      id: `asset:${asset.id}`,
+      kind: 'setpiece-catalog' as const,
+      name: `${asset.name}（目录）`,
+      modelUrls: [asset.url],
+      assetId: asset.id,
+      collider: {
+        assetId: asset.id,
+      },
+      meta: `资产ID: ${asset.id} | 当前地图出现: ${
+        setPieceUsageByAssetId.get(asset.id) ?? 0
+      } 次 | 碰撞体: ${asset.colliderShape === 'ramp' ? 'Ramp' : 'Box'} | 尺寸 ${formatTuple(
+        asset.colliderSize,
+      )} | 偏移 ${formatTuple(asset.colliderOffset)}`,
+    }));
+
+    const setPieceInstanceItems = activeSetPieceInstances.map((instance) => {
+      const asset = getClimberSetPieceAsset(instance.assetId);
       return {
-        id: `setpiece:${asset.id}`,
-        kind: 'setpiece' as const,
-        name: asset.name,
+        id: `setpiece:${instance.id}`,
+        kind: 'setpiece-instance' as const,
+        name: `${asset.name} · ${instance.id}`,
         modelUrls: [asset.url],
         assetId: asset.id,
         collider: {
           assetId: asset.id,
-          definition: representative,
+          definition: instance,
         },
-        meta: `使用次数: ${setPieceUsageMap.get(asset.id) ?? 0} | 碰撞体: ${
+        meta: `实例位置: ${formatTuple(instance.position)} | 碰撞体: ${
           asset.colliderShape === 'ramp' ? 'Ramp' : 'Box'
         } | 尺寸 ${formatTuple(asset.colliderSize)} | 偏移 ${formatTuple(asset.colliderOffset)}`,
       };
     });
 
-    return [...characterItems, ...setPieceItems];
-  }, [characterModelEntries, setPieceAssets, setPieceRepresentativeMap, setPieceUsageMap]);
+    return [...characterItems, ...setPieceCatalogItems, ...setPieceInstanceItems];
+  }, [allSetPieceAssets, characterModelEntries, activeSetPieceInstances, setPieceUsageByAssetId]);
   const activeExhibitionItem = useMemo(
     () => exhibitionItems.find((item) => item.id === activeExhibitionItemId) ?? exhibitionItems[0],
     [activeExhibitionItemId, exhibitionItems],
@@ -852,9 +885,14 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
     () =>
       debugColliderFocusAssetId == null
         ? null
-        : (setPieceAssets.find((asset) => asset.id === debugColliderFocusAssetId)?.name ??
-          debugColliderFocusAssetId),
-    [debugColliderFocusAssetId, setPieceAssets],
+        : (() => {
+            try {
+              return getClimberSetPieceAsset(debugColliderFocusAssetId).name;
+            } catch {
+              return debugColliderFocusAssetId;
+            }
+          })(),
+    [debugColliderFocusAssetId],
   );
   const activeLevelSetPieceCount = useMemo(
     () => (activeLevel?.setPieces ?? []).length,
@@ -912,8 +950,17 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
             <span style={TAG_STYLE}>当前角色: {currentCharacterName}</span>
             <span style={TAG_STYLE}>声音: {audioEnabled ? '开' : '关'}</span>
             <span style={TAG_STYLE}>碰撞体: {debugCollidersVisible ? '显示' : '隐藏'}</span>
+            <span style={TAG_STYLE}>净空检测: {debugJumpClearanceVisible ? '显示' : '隐藏'}</span>
             <span style={TAG_STYLE}>
               碰撞体筛选: {activeFocusSetPieceName == null ? '全部模型' : activeFocusSetPieceName}
+            </span>
+            <span style={TAG_STYLE}>
+              跳点风险: 高 {jumpClearanceReport.highRiskCount} / 中{' '}
+              {jumpClearanceReport.mediumRiskCount}
+            </span>
+            <span style={TAG_STYLE}>
+              小件模型: {jumpClearanceReport.smallPieceCount}（密集区{' '}
+              {jumpClearanceReport.denseSmallPieceClusterCount}）
             </span>
             <span style={TAG_STYLE}>菜单: Esc</span>
           </div>
@@ -1083,6 +1130,13 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                   <button
                     type="button"
                     style={MENU_BUTTON_SECONDARY_STYLE}
+                    onClick={() => setDebugJumpClearanceVisible((prev) => !prev)}
+                  >
+                    {debugJumpClearanceVisible ? '净空调试: 开' : '净空调试: 关'}
+                  </button>
+                  <button
+                    type="button"
+                    style={MENU_BUTTON_SECONDARY_STYLE}
                     onClick={() => {
                       setModelExhibitionVisible(true);
                       setDebugCollidersVisible(true);
@@ -1096,7 +1150,11 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                   当前角色状态: {resolveCharacterRuntimeLabel(characterStatus)}；碰撞体调试:
                   {debugCollidersVisible ? ' 开启' : ' 关闭'}；模型筛选:
                   {activeFocusSetPieceName == null ? ' 全部' : ` ${activeFocusSetPieceName}`}。按
-                  `Esc` 可随时回到此菜单。
+                  `Esc` 可随时回到此菜单。关键跳点检测：已检查 {jumpClearanceReport.checkedLinks}{' '}
+                  段，高风险 {jumpClearanceReport.highRiskCount}，中风险{' '}
+                  {jumpClearanceReport.mediumRiskCount}。小件模型{' '}
+                  {jumpClearanceReport.smallPieceCount}
+                  ，密集小件区 {jumpClearanceReport.denseSmallPieceClusterCount}。
                 </div>
               </div>
               {modelExhibitionVisible ? (
@@ -1114,7 +1172,7 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                       <div style={{ display: 'grid', gap: 3, textAlign: 'left' }}>
                         <strong style={{ fontSize: 16, color: '#f8fafc' }}>模型展览</strong>
                         <span style={{ fontSize: 12, color: '#cbd5e1' }}>
-                          直接预览每个模型；点击“只看该模型碰撞体”才会联动游戏内筛选。
+                          展示全模型目录 + 当前地图实例；新增模型或新增实例都会自动出现在这里。
                         </span>
                       </div>
                       <button
@@ -1137,26 +1195,28 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                     >
                       <div style={{ fontSize: 12, color: '#cbd5e1', textAlign: 'left' }}>
                         当前地图实例数: {activeLevelSetPieceCount} | 角色模型:{' '}
-                        {characterModelEntries.length} | 场景模型: {setPieceAssets.length} |
-                        碰撞体筛选:
+                        {characterModelEntries.length} | 模型目录总数: {allSetPieceAssets.length} |
+                        已使用模型种类: {usedSetPieceAssetTypeCount} | 碰撞体筛选:
                         {activeFocusSetPieceName == null
                           ? ' 全部模型'
                           : ` ${activeFocusSetPieceName}`}
                       </div>
-                      <button
-                        type="button"
-                        style={{
-                          ...MENU_BUTTON_SECONDARY_STYLE,
-                          padding: '8px 10px',
-                          fontSize: 12,
-                        }}
-                        onClick={() => {
-                          setDebugColliderFocusAssetId(null);
-                          setDebugCollidersVisible(true);
-                        }}
-                      >
-                        显示全部碰撞体
-                      </button>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        <button
+                          type="button"
+                          style={{
+                            ...MENU_BUTTON_SECONDARY_STYLE,
+                            padding: '8px 10px',
+                            fontSize: 12,
+                          }}
+                          onClick={() => {
+                            setDebugColliderFocusAssetId(null);
+                            setDebugCollidersVisible(true);
+                          }}
+                        >
+                          显示全部碰撞体
+                        </button>
+                      </div>
                     </div>
 
                     <div style={MODEL_EXHIBITION_CONTENT_STYLE}>
@@ -1166,7 +1226,8 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                             modelName={activeExhibitionItem.name}
                             modelUrls={activeExhibitionItem.modelUrls}
                             collider={
-                              activeExhibitionItem.kind === 'setpiece'
+                              activeExhibitionItem.kind === 'setpiece-instance' ||
+                              activeExhibitionItem.kind === 'setpiece-catalog'
                                 ? activeExhibitionItem.collider
                                 : null
                             }
@@ -1188,7 +1249,8 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                         <div style={MODEL_META_TEXT_STYLE}>
                           {activeExhibitionItem?.meta ?? '当前没有可展示的模型。'}
                         </div>
-                        {activeExhibitionItem?.kind === 'setpiece' ? (
+                        {activeExhibitionItem?.kind === 'setpiece-instance' ||
+                        activeExhibitionItem?.kind === 'setpiece-catalog' ? (
                           <button
                             type="button"
                             style={{
@@ -1223,7 +1285,8 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                       <div style={MODEL_EXHIBITION_LIST_STYLE}>
                         {exhibitionItems.map((item) => {
                           const selected = item.id === activeExhibitionItem?.id;
-                          const isSetPiece = item.kind === 'setpiece';
+                          const isSetPiece =
+                            item.kind === 'setpiece-instance' || item.kind === 'setpiece-catalog';
                           const focusSelected =
                             isSetPiece && item.assetId === debugColliderFocusAssetId;
                           return (
