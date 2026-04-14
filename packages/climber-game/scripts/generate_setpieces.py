@@ -238,82 +238,6 @@ def build_beam_hazard():
     export_model("beam_hazard")
 
 
-def build_round_stool():
-    clear_scene()
-    top = make_material("mat_stool_top", (0.86, 0.24, 0.2, 1.0))
-    stem = make_material("mat_stool_stem", (0.91, 0.93, 0.96, 1.0))
-    ring = make_material("mat_stool_ring", (0.48, 0.54, 0.61, 1.0))
-
-    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.6, depth=0.2, location=(0, 1.05, 0))
-    head = bpy.context.active_object
-    apply_material(head, top)
-    bevel_object(head, 0.02, 2)
-
-    bpy.ops.mesh.primitive_cylinder_add(vertices=18, radius=0.24, depth=1.8, location=(0, 0.48, 0))
-    pole = bpy.context.active_object
-    apply_material(pole, stem)
-    bevel_object(pole, 0.01, 2)
-
-    bpy.ops.mesh.primitive_torus_add(location=(0, 0.1, 0), major_radius=0.42, minor_radius=0.05)
-    base = bpy.context.active_object
-    base.rotation_euler = (math.pi / 2, 0, 0)
-    apply_material(base, ring)
-
-    export_model("round_stool")
-
-
-def build_tree_pine():
-    clear_scene()
-    trunk_mat = make_material("mat_tree_trunk", (0.41, 0.27, 0.12, 1.0))
-    leaf_mat = make_material("mat_tree_leaf", (0.16, 0.55, 0.24, 1.0))
-
-    bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.18, depth=1.6, location=(0, 0.8, 0))
-    trunk = bpy.context.active_object
-    apply_material(trunk, trunk_mat)
-
-    for radius, height, y in ((0.92, 1.15, 1.7), (0.72, 0.98, 2.25), (0.5, 0.82, 2.72)):
-        bpy.ops.mesh.primitive_cone_add(vertices=9, radius1=radius, depth=height, location=(0, y, 0))
-        leaf = bpy.context.active_object
-        apply_material(leaf, leaf_mat)
-
-    export_model("tree_pine")
-
-
-def build_grass_patch():
-    clear_scene()
-    grass_mat = make_material("mat_grass", (0.26, 0.66, 0.31, 1.0))
-
-    for i in range(14):
-        x = ((i * 37) % 9 - 4) * 0.08
-        z = ((i * 53) % 9 - 4) * 0.08
-        h = 0.2 + (i % 4) * 0.06
-        bpy.ops.mesh.primitive_cone_add(vertices=5, radius1=0.06, depth=h, location=(x, h / 2, z))
-        blade = bpy.context.active_object
-        blade.rotation_euler = (0.0, (i % 6) * 0.42, 0.0)
-        apply_material(blade, grass_mat)
-
-    export_model("grass_patch")
-
-
-def build_road_segment():
-    clear_scene()
-    asphalt = make_material("mat_asphalt", (0.22, 0.23, 0.24, 1.0))
-    paint = make_material("mat_paint", (0.95, 0.95, 0.84, 1.0))
-
-    bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0.08, 0))
-    road = bpy.context.active_object
-    road.scale = (4.5, 0.08, 1.6)
-    apply_material(road, asphalt)
-
-    for x in (-2.8, -1.2, 0.4, 2.0):
-        bpy.ops.mesh.primitive_cube_add(size=2, location=(x, 0.17, 0))
-        line = bpy.context.active_object
-        line.scale = (0.42, 0.01, 0.09)
-        apply_material(line, paint)
-
-    export_model("road_segment")
-
-
 if __name__ == "__main__":
     build_plank_long()
     build_pipe_long()
@@ -321,8 +245,4 @@ if __name__ == "__main__":
     build_container_long()
     build_ramp_wedge()
     build_beam_hazard()
-    build_round_stool()
-    build_tree_pine()
-    build_grass_patch()
-    build_road_segment()
     print(f"Setpieces generated: {OUTPUT_DIR}")

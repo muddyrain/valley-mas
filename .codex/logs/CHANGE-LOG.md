@@ -97,3 +97,46 @@
 - 风险与后续：
   - 当前风险：无新增功能风险，属于展示层收敛。
   - 下一步动作：如需进一步提效，可做“按模型名搜索”而不是某单模型快捷按钮。
+
+## 2026-04-14 13:22 (Asia/Shanghai)
+
+- 任务：排查“sp 步骤缺失”并清理无效关卡模型配置，同时核对缺失 glb 引用。
+- 改动文件：
+  - `packages/climber-game/src/levels/togetherSkyAscent.ts`
+  - `.codex/skills/web-feature-iteration/CLIMBER-GAME-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 审计结果：`climber-game` 当前 `setpieceCatalog` 与角色模型导入未发现“代码引用但 glb 文件不存在”的情况。
+  - 根因定位：`togetherSkyAscent` 内存在大量已禁用模型的 `sp` 定义，运行时被 `REMOVED_SETPIECE_ASSET_IDS` 过滤，导致体感上“关卡步骤缺失”。
+  - 直接清理：从关卡源码物理删除 192 个被禁用模型对应的 `sp`，保留 62 个真实生效点位，并移除该文件内的末尾过滤依赖。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+  - `pnpm --filter @valley/climber-game exec tsc --noEmit`：未执行（环境缺少 `pnpm/node`）
+- 风险与后续：
+  - 当前风险：关卡点位数量大幅收敛后，部分高度段可能变稀疏，需一轮实机可达性复测。
+  - 下一步动作：按你的“不要的小模型”清单继续收缩 `setpieceCatalog` 与对应 glb（含脚本产物）做第二轮彻底剔除。
+
+## 2026-04-14 14:06 (Asia/Shanghai)
+
+- 任务：清理 `SETPIECE_CATALOG` 未使用模型，并同步剔除不再保留的 setpiece 资产与生成脚本冗余逻辑。
+- 改动文件：
+  - `packages/climber-game/src/setpieceCatalog.ts`
+  - `packages/climber-game/src/types.ts`
+  - `packages/climber-game/src/removedSetPieceAssets.ts`
+  - `packages/climber-game/scripts/generate_setpieces.py`
+  - `packages/climber-game/assets/models/setpieces/*.glb`（删除未使用资产）
+  - `.codex/skills/web-feature-iteration/CLIMBER-GAME-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - `SETPIECE_CATALOG` 与 `ClimberSetPieceAssetId` 收敛到当前关卡真实使用的 11 个模型。
+  - 删除 45 个不再使用的 setpiece glb 文件，仅保留关卡实际使用的资产文件。
+  - `removedSetPieceAssets` 收敛为空集合，避免类型与资产收缩后残留无效配置。
+  - 生成脚本移除不再保留模型（round_stool/tree_pine/grass_patch/road_segment）的构建逻辑与调用。
+- 校验：
+  - `python3 -m py_compile packages/climber-game/scripts/generate_setpieces.py`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+  - `python3` 扫描 `packages/climber-game/src` 的 `.glb` import：`missing_glb_refs = 0`
+  - `pnpm --filter @valley/climber-game exec tsc --noEmit`：未执行（环境缺少 `pnpm/node`）
+- 风险与后续：
+  - 当前风险：资产大幅收缩后，若后续要恢复旧主题区块需重新导入模型与碰撞参数。
+  - 下一步动作：如你同意，我下一步把 `sp` 命名按现存点位重排为连续编号，便于后续继续加点。
