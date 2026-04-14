@@ -29,6 +29,7 @@
 - Go + Vercel 发布链路：`vercel-go-release`
 - Go 调用火山 ARK 的 AI 能力：`ai-capability-orchestration`
 - 持续迭代任务管理：`web-feature-iteration`
+- climber-game 关卡与目标职责改动：`climber-game-design-guard`
 - 技能沉淀与更新：`skill-opportunity-scout`、`skill-sync-guard`
 
 ## 最低校验要求

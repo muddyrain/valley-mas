@@ -386,6 +386,15 @@
 - [vercel-go-release](./vercel-go-release/SKILL.md)
 - [valley-mas-guide](./valley-mas-guide/SKILL.md)
 
+### 改 climber-game 关卡、手感或职责边界
+
+优先触发：
+- [climber-game-design-guard](./climber-game-design-guard/SKILL.md)
+- [web-feature-iteration](./web-feature-iteration/SKILL.md)
+
+如果涉及产品行为一致性，再补：
+- [valley-mas-product-guard](./valley-mas-product-guard/SKILL.md)
+
 ### 准备提交代码
 
 优先触发：
@@ -426,3 +435,25 @@
 - "头部和主体颜色对不上"
 - "紫色不要再主导整站了"
 - "新页面要跟上暖金主题"
+
+## 八、climber-game 专项
+
+### `climber-game-design-guard`
+
+文件：
+- [climber-game-design-guard](./climber-game-design-guard/SKILL.md)
+
+什么时候触发：
+- 调整 `packages/climber-game` 的关卡路线、障碍机制、相机或角色手感
+- 讨论或修改 climber-game 的目标职责与产品边界
+- 改 HUD、暂停菜单、游戏内角色切换等玩法内交互
+- 改碰撞、斜坡、可达性回归与视觉-物理贴合策略
+
+不适合什么时候用：
+- 与 climber-game 无关的普通 Web 页面需求
+- 只改文档排版且不涉及玩法或职责边界
+
+典型触发语：
+- "这个 climber-game 后续该怎么收口"
+- "关卡这里再加一段高难挑战"
+- "这个需求会不会让游戏定位跑偏"
