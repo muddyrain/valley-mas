@@ -4,7 +4,10 @@ import {
   BufferGeometry,
   Clock,
   Color,
+  ConeGeometry,
+  CylinderGeometry,
   DirectionalLight,
+  DodecahedronGeometry,
   EdgesGeometry,
   Float32BufferAttribute,
   GridHelper,
@@ -22,6 +25,7 @@ import {
   PlaneGeometry,
   Quaternion,
   Scene,
+  SphereGeometry,
   TorusGeometry,
   Vector3,
   WebGLRenderer,
@@ -43,6 +47,7 @@ import {
 import { createSetPieceRuntime } from './prototype/setPieceRuntime';
 import { createPrototypeAudio } from './prototypeAudio';
 import type {
+  ClimberCharacterAnimationDebugSnapshot,
   ClimberCharacterAnimationState,
   ClimberCharacterId,
   ClimberCharacterRuntimeStatus,
@@ -61,9 +66,12 @@ interface CreateClimberPrototypeOptions {
   audioEnabled: boolean;
   debugCollidersVisible?: boolean;
   debugJumpClearanceVisible?: boolean;
+  debugCharacterAnimationVisible?: boolean;
+  characterAutoFootCalibrationEnabled?: boolean;
   debugColliderFocusAssetId?: ClimberSetPieceAssetId | null;
   onStats: (stats: ClimberRunStats) => void;
   onJumpClearanceReport?: (report: ClimberJumpClearanceReport) => void;
+  onCharacterAnimationDebug?: (snapshot: ClimberCharacterAnimationDebugSnapshot) => void;
   onPointerLockChange?: (locked: boolean) => void;
   onCharacterStatusChange?: (status: ClimberCharacterRuntimeStatus) => void;
 }
@@ -89,6 +97,7 @@ const LAND_SOUND_COOLDOWN_MS = 180;
 const MIN_JUMP_INTERVAL_MS = 220;
 const MIN_GROUNDED_BEFORE_JUMP_MS = 45;
 const GROUND_STICK_VELOCITY_MAX = 1.35;
+const LANDING_ANIMATION_LOCK_MS = 140;
 const RAMP_TOP_FLAT_RATIO = 0.36;
 const DEFAULT_MIN_PLAYABLE_SURFACE_SIZE = 1.36;
 const DEFAULT_SMALL_PIECE_CLUSTER_RADIUS = 2.8;
@@ -218,10 +227,13 @@ export function createClimberPrototype(
     audioEnabled,
     debugCollidersVisible = false,
     debugJumpClearanceVisible = false,
+    debugCharacterAnimationVisible = false,
+    characterAutoFootCalibrationEnabled = true,
     debugColliderFocusAssetId = null,
     onPointerLockChange,
     onCharacterStatusChange,
     onJumpClearanceReport,
+    onCharacterAnimationDebug,
   } = options;
 
   if (!level.platforms.length) {
@@ -292,6 +304,71 @@ export function createClimberPrototype(
     });
   }
   scene.add(grid);
+
+  const sceneryMaterials: MeshStandardMaterial[] = [];
+  const sceneryGeometries: BufferGeometry[] = [];
+
+  const soilPatchGeometry = new BoxGeometry(1, 1, 1);
+  const soilPatchMaterial = new MeshStandardMaterial({
+    color: '#8b6a48',
+    roughness: 0.96,
+    metalness: 0.01,
+  });
+  sceneryGeometries.push(soilPatchGeometry);
+  sceneryMaterials.push(soilPatchMaterial);
+  const soilPatchConfigs: Array<{
+    size: [number, number, number];
+    position: [number, number, number];
+  }> = [
+    { size: [64, 0.28, 30], position: [-30, -0.36, 33] },
+    { size: [56, 0.26, 28], position: [34, -0.37, -33] },
+    { size: [30, 0.22, 22], position: [0, -0.38, 44] },
+    { size: [34, 0.24, 18], position: [-48, -0.37, 12] },
+    { size: [28, 0.2, 16], position: [49, -0.38, 20] },
+    { size: [24, 0.2, 14], position: [-14, -0.39, -50] },
+    { size: [26, 0.2, 12], position: [12, -0.39, 52] },
+  ];
+  soilPatchConfigs.forEach((item) => {
+    const mesh = new Mesh(soilPatchGeometry, soilPatchMaterial);
+    mesh.position.set(item.position[0], item.position[1], item.position[2]);
+    mesh.scale.set(item.size[0], item.size[1], item.size[2]);
+    mesh.receiveShadow = true;
+    mesh.castShadow = false;
+    scene.add(mesh);
+  });
+
+  const concretePatchGeometry = new BoxGeometry(1, 1, 1);
+  const concretePatchMaterial = new MeshStandardMaterial({
+    color: '#9ca3af',
+    roughness: 0.84,
+    metalness: 0.04,
+  });
+  sceneryGeometries.push(concretePatchGeometry);
+  sceneryMaterials.push(concretePatchMaterial);
+  const concretePatchConfigs: Array<{
+    size: [number, number, number];
+    position: [number, number, number];
+    yaw?: number;
+  }> = [
+    { size: [44, 0.22, 22], position: [-34, -0.34, -30], yaw: 0.18 },
+    { size: [36, 0.22, 18], position: [30, -0.34, 32], yaw: -0.14 },
+    { size: [24, 0.2, 14], position: [46, -0.35, -6], yaw: 0.1 },
+    { size: [32, 0.2, 14], position: [-47, -0.35, -8], yaw: -0.12 },
+    { size: [30, 0.2, 16], position: [44, -0.35, 44], yaw: 0.16 },
+    { size: [34, 0.22, 14], position: [-38, -0.35, 46], yaw: -0.08 },
+    { size: [22, 0.18, 12], position: [8, -0.36, -46], yaw: 0.06 },
+  ];
+  concretePatchConfigs.forEach((item) => {
+    const mesh = new Mesh(concretePatchGeometry, concretePatchMaterial);
+    mesh.position.set(item.position[0], item.position[1], item.position[2]);
+    mesh.scale.set(item.size[0], item.size[1], item.size[2]);
+    if (item.yaw) {
+      mesh.rotation.y = item.yaw;
+    }
+    mesh.receiveShadow = true;
+    mesh.castShadow = false;
+    scene.add(mesh);
+  });
 
   const platformColliders: PlatformCollisionData[] = [];
   const platformMaterials: MeshStandardMaterial[] = [];
@@ -734,6 +811,247 @@ export function createClimberPrototype(
     return appended;
   };
 
+  const createGroundScenery = () => {
+    const treeTrunkGeometry = new CylinderGeometry(0.9, 1.15, 15.5, 10);
+    const treeLeafLargeGeometry = new ConeGeometry(4.9, 8.6, 9);
+    const treeLeafMediumGeometry = new ConeGeometry(3.9, 7.2, 9);
+    const treeLeafTopGeometry = new ConeGeometry(2.8, 5.2, 8);
+    const rockLargeGeometry = new DodecahedronGeometry(3.3, 0);
+    const rockMediumGeometry = new DodecahedronGeometry(2.2, 0);
+    const grassBladeGeometry = new ConeGeometry(0.44, 1.95, 6);
+    const flowerCoreGeometry = new SphereGeometry(0.22, 10, 8);
+    const flowerPetalGeometry = new SphereGeometry(0.16, 8, 6);
+    sceneryGeometries.push(
+      treeTrunkGeometry,
+      treeLeafLargeGeometry,
+      treeLeafMediumGeometry,
+      treeLeafTopGeometry,
+      rockLargeGeometry,
+      rockMediumGeometry,
+      grassBladeGeometry,
+      flowerCoreGeometry,
+      flowerPetalGeometry,
+    );
+
+    const treeTrunkMaterial = new MeshStandardMaterial({
+      color: '#6b4a2d',
+      roughness: 0.88,
+      metalness: 0.02,
+    });
+    const treeLeafMaterial = new MeshStandardMaterial({
+      color: '#3f8a45',
+      roughness: 0.9,
+      metalness: 0.01,
+    });
+    const rockMaterial = new MeshStandardMaterial({
+      color: '#707a84',
+      roughness: 0.94,
+      metalness: 0.03,
+    });
+    const grassMaterial = new MeshStandardMaterial({
+      color: '#57a85c',
+      roughness: 0.9,
+      metalness: 0.01,
+    });
+    const flowerCoreMaterial = new MeshStandardMaterial({
+      color: '#fcd34d',
+      roughness: 0.75,
+      metalness: 0.05,
+    });
+    const flowerPetalMaterial = new MeshStandardMaterial({
+      color: '#f472b6',
+      roughness: 0.82,
+      metalness: 0.03,
+    });
+    sceneryMaterials.push(
+      treeTrunkMaterial,
+      treeLeafMaterial,
+      rockMaterial,
+      grassMaterial,
+      flowerCoreMaterial,
+      flowerPetalMaterial,
+    );
+
+    const treeConfigs: Array<{
+      id: string;
+      position: [number, number, number];
+      scale: number;
+      yaw: number;
+    }> = [
+      { id: 'ground-tree-01', position: [-52, 0, -42], scale: 1.24, yaw: 0.22 },
+      { id: 'ground-tree-02', position: [54, 0, -38], scale: 1.18, yaw: -0.16 },
+      { id: 'ground-tree-03', position: [-56, 0, 28], scale: 1.34, yaw: 0.38 },
+      { id: 'ground-tree-04', position: [52, 0, 34], scale: 1.28, yaw: -0.28 },
+      { id: 'ground-tree-05', position: [-42, 0, 50], scale: 1.16, yaw: 0.14 },
+      { id: 'ground-tree-06', position: [40, 0, -52], scale: 1.12, yaw: -0.32 },
+      { id: 'ground-tree-07', position: [-58, 0, -8], scale: 1.22, yaw: 0.3 },
+      { id: 'ground-tree-08', position: [58, 0, 8], scale: 1.18, yaw: -0.26 },
+      { id: 'ground-tree-09', position: [-20, 0, 56], scale: 1.2, yaw: 0.18 },
+      { id: 'ground-tree-10', position: [22, 0, -56], scale: 1.18, yaw: -0.2 },
+      { id: 'ground-tree-11', position: [-6, 0, 58], scale: 1.14, yaw: 0.1 },
+      { id: 'ground-tree-12', position: [6, 0, -58], scale: 1.14, yaw: -0.1 },
+    ];
+
+    treeConfigs.forEach((treeConfig) => {
+      const tree = new Group();
+      tree.position.set(treeConfig.position[0], treeConfig.position[1], treeConfig.position[2]);
+      tree.rotation.y = treeConfig.yaw;
+      tree.scale.setScalar(treeConfig.scale);
+
+      const trunk = new Mesh(treeTrunkGeometry, treeTrunkMaterial);
+      trunk.position.y = 7.75;
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
+      tree.add(trunk);
+
+      const leafBottom = new Mesh(treeLeafLargeGeometry, treeLeafMaterial);
+      leafBottom.position.y = 13.4;
+      leafBottom.castShadow = true;
+      leafBottom.receiveShadow = true;
+      tree.add(leafBottom);
+
+      const leafMiddle = new Mesh(treeLeafMediumGeometry, treeLeafMaterial);
+      leafMiddle.position.y = 17.2;
+      leafMiddle.castShadow = true;
+      leafMiddle.receiveShadow = true;
+      tree.add(leafMiddle);
+
+      const leafTop = new Mesh(treeLeafTopGeometry, treeLeafMaterial);
+      leafTop.position.y = 20.6;
+      leafTop.castShadow = true;
+      leafTop.receiveShadow = true;
+      tree.add(leafTop);
+
+      scene.add(tree);
+      pushCollider({
+        center: [treeConfig.position[0], 9.8, treeConfig.position[2]],
+        size: [5.8 * treeConfig.scale, 19.6 * treeConfig.scale, 5.8 * treeConfig.scale],
+        debugMeta: {
+          category: 'system',
+          instanceId: treeConfig.id,
+        },
+      });
+    });
+
+    const rockConfigs: Array<{
+      id: string;
+      position: [number, number, number];
+      scale: [number, number, number];
+      yaw: number;
+      large?: boolean;
+    }> = [
+      {
+        id: 'ground-rock-01',
+        position: [-46, 1.7, -22],
+        scale: [1.3, 1.05, 1.15],
+        yaw: 0.2,
+        large: true,
+      },
+      {
+        id: 'ground-rock-02',
+        position: [44, 1.6, -20],
+        scale: [1.2, 0.98, 1.1],
+        yaw: -0.3,
+        large: true,
+      },
+      { id: 'ground-rock-03', position: [-34, 1.4, 40], scale: [1.05, 0.9, 0.98], yaw: 0.4 },
+      { id: 'ground-rock-04', position: [38, 1.3, 42], scale: [1.12, 0.86, 1], yaw: -0.24 },
+      { id: 'ground-rock-05', position: [50, 1.2, 10], scale: [0.92, 0.84, 0.9], yaw: 0.18 },
+      { id: 'ground-rock-06', position: [-50, 1.2, 8], scale: [0.9, 0.8, 0.86], yaw: -0.18 },
+      { id: 'ground-rock-07', position: [-57, 1.4, -26], scale: [1.06, 0.9, 0.96], yaw: 0.28 },
+      { id: 'ground-rock-08', position: [56, 1.45, 26], scale: [1.08, 0.9, 0.98], yaw: -0.22 },
+      { id: 'ground-rock-09', position: [-22, 1.3, 54], scale: [0.96, 0.82, 0.92], yaw: 0.36 },
+      { id: 'ground-rock-10', position: [24, 1.3, -54], scale: [0.98, 0.84, 0.94], yaw: -0.3 },
+      { id: 'ground-rock-11', position: [58, 1.2, -8], scale: [0.9, 0.78, 0.86], yaw: 0.14 },
+      { id: 'ground-rock-12', position: [-58, 1.2, 8], scale: [0.92, 0.8, 0.88], yaw: -0.16 },
+    ];
+
+    rockConfigs.forEach((rockConfig) => {
+      const geometry = rockConfig.large ? rockLargeGeometry : rockMediumGeometry;
+      const mesh = new Mesh(geometry, rockMaterial);
+      mesh.position.set(rockConfig.position[0], rockConfig.position[1], rockConfig.position[2]);
+      mesh.rotation.set(0.08, rockConfig.yaw, -0.03);
+      mesh.scale.set(rockConfig.scale[0], rockConfig.scale[1], rockConfig.scale[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      pushCollider({
+        center: [rockConfig.position[0], rockConfig.position[1], rockConfig.position[2]],
+        size: [
+          (rockConfig.large ? 6.2 : 4.2) * rockConfig.scale[0],
+          (rockConfig.large ? 5.1 : 3.8) * rockConfig.scale[1],
+          (rockConfig.large ? 5.7 : 4) * rockConfig.scale[2],
+        ],
+        debugMeta: {
+          category: 'system',
+          instanceId: rockConfig.id,
+        },
+      });
+    });
+
+    const grassClusterCenters: Array<[number, number, number]> = [
+      [-30, -0.04, -44],
+      [34, -0.04, -46],
+      [-44, -0.04, 36],
+      [42, -0.04, 38],
+      [54, -0.04, 2],
+      [-54, -0.04, -2],
+      [-58, -0.04, -30],
+      [58, -0.04, 30],
+      [-18, -0.04, 54],
+      [20, -0.04, -54],
+      [0, -0.04, 58],
+      [0, -0.04, -58],
+    ];
+    grassClusterCenters.forEach((center, clusterIndex) => {
+      for (let bladeIndex = 0; bladeIndex < 9; bladeIndex += 1) {
+        const angle = (Math.PI * 2 * bladeIndex) / 9;
+        const radius = 1 + ((bladeIndex + clusterIndex) % 3) * 0.42;
+        const blade = new Mesh(grassBladeGeometry, grassMaterial);
+        blade.position.set(
+          center[0] + Math.cos(angle) * radius,
+          center[1] + 0.98,
+          center[2] + Math.sin(angle) * radius,
+        );
+        blade.rotation.y = angle * 0.6;
+        blade.scale.set(
+          0.9 + ((bladeIndex + 2) % 4) * 0.12,
+          1.02 + ((bladeIndex + 1) % 3) * 0.16,
+          0.9 + (bladeIndex % 2) * 0.18,
+        );
+        blade.castShadow = true;
+        blade.receiveShadow = true;
+        scene.add(blade);
+      }
+
+      const flowerCore = new Mesh(flowerCoreGeometry, flowerCoreMaterial);
+      flowerCore.position.set(center[0], center[1] + 1.82, center[2]);
+      flowerCore.castShadow = true;
+      flowerCore.receiveShadow = true;
+      scene.add(flowerCore);
+      for (let petalIndex = 0; petalIndex < 5; petalIndex += 1) {
+        const petalAngle = (Math.PI * 2 * petalIndex) / 5;
+        const petal = new Mesh(flowerPetalGeometry, flowerPetalMaterial);
+        petal.position.set(
+          center[0] + Math.cos(petalAngle) * 0.36,
+          center[1] + 1.82,
+          center[2] + Math.sin(petalAngle) * 0.36,
+        );
+        petal.castShadow = true;
+        petal.receiveShadow = true;
+        scene.add(petal);
+      }
+      pushCollider({
+        center: [center[0], 0.62, center[2]],
+        size: [4.2, 1.24, 4.2],
+        debugMeta: {
+          category: 'system',
+          instanceId: `ground-grass-cluster-${(clusterIndex + 1).toString().padStart(2, '0')}`,
+        },
+      });
+    });
+  };
+
   level.platforms.forEach((platform) => {
     const [width, height, depth] = platform.size;
     const [x, y, z] = platform.position;
@@ -826,6 +1144,8 @@ export function createClimberPrototype(
       },
     });
   });
+
+  createGroundScenery();
   const setPieceRuntime = createSetPieceRuntime({
     scene,
     setPieces: level.setPieces,
@@ -884,6 +1204,7 @@ export function createClimberPrototype(
   const characterRig = createCharacterRig(characterId, {
     onRuntimeStatusChange: onCharacterStatusChange,
   });
+  characterRig.setAutoFootCalibrationEnabled(characterAutoFootCalibrationEnabled);
   scene.add(characterRig.group);
 
   const audio = createPrototypeAudio(audioEnabled);
@@ -910,6 +1231,8 @@ export function createClimberPrototype(
   let goalReached = false;
   let goalReachedAtMs: number | null = null;
   let goalCelebrationTimer = 0;
+  let landingAnimationLockMs = 0;
+  let debugCharacterAnimationVisibleInternal = debugCharacterAnimationVisible;
   let lastLandAudioAtMs = -10000;
   let lastJumpAtMs = -10000;
   let lastGroundedAtMs = -10000;
@@ -969,6 +1292,7 @@ export function createClimberPrototype(
     goalReached = false;
     goalReachedAtMs = null;
     goalCelebrationTimer = 0;
+    landingAnimationLockMs = 0;
     lastLandAudioAtMs = -10000;
     lastJumpAtMs = -10000;
     lastGroundedAtMs = -10000;
@@ -1003,6 +1327,9 @@ export function createClimberPrototype(
   }
 
   function updatePlayer(delta: number) {
+    if (landingAnimationLockMs > 0) {
+      landingAnimationLockMs = Math.max(0, landingAnimationLockMs - delta * 1000);
+    }
     const elapsedMs = clock.getElapsedTime() * 1000;
     const wasGrounded = grounded;
     const speed = keyState.sprint ? CLIMBER_SPRINT_SPEED : CLIMBER_WALK_SPEED;
@@ -1077,6 +1404,7 @@ export function createClimberPrototype(
     });
     if (!wasGrounded && grounded) {
       lastGroundedAtMs = elapsedMs;
+      landingAnimationLockMs = LANDING_ANIMATION_LOCK_MS;
     }
 
     if (!wasGrounded && grounded && elapsedMs - lastLandAudioAtMs >= LAND_SOUND_COOLDOWN_MS) {
@@ -1088,6 +1416,7 @@ export function createClimberPrototype(
       playerPosition.copy(startPosition);
       velocity.set(0, 0, 0);
       grounded = false;
+      landingAnimationLockMs = 0;
     }
 
     if (playerPosition.y > bestHeight) {
@@ -1103,8 +1432,11 @@ export function createClimberPrototype(
   }
 
   function resolveAnimationState(horizontalSpeed: number): ClimberCharacterAnimationState {
+    if (landingAnimationLockMs > 0) {
+      return 'land';
+    }
     if (!grounded) {
-      return 'jump';
+      return velocity.y > 0.45 ? 'jump' : 'fall';
     }
     if (horizontalSpeed > 0.65) {
       return 'run';
@@ -1116,6 +1448,8 @@ export function createClimberPrototype(
     const horizontalSpeed = Math.hypot(velocity.x, velocity.z);
     const state = resolveAnimationState(horizontalSpeed);
     characterRig.setState(state);
+    characterRig.setGrounded(grounded);
+    characterRig.setLandingLockMs(landingAnimationLockMs);
     characterRig.update({
       delta,
       elapsed,
@@ -1126,6 +1460,10 @@ export function createClimberPrototype(
     characterRig.group.position.copy(playerPosition);
     if (horizontalSpeed > 0.02) {
       characterRig.group.rotation.y = Math.atan2(velocity.x, velocity.z);
+    }
+
+    if (debugCharacterAnimationVisibleInternal) {
+      onCharacterAnimationDebug?.(characterRig.getDebugSnapshot());
     }
   }
 
@@ -1268,6 +1606,11 @@ export function createClimberPrototype(
 
   const handleKeyDown = (event: KeyboardEvent) => {
     if (!pointerLocked) return;
+    if (event.code === 'KeyP') {
+      event.preventDefault();
+      document.exitPointerLock();
+      return;
+    }
     const mapped = keyMap[event.code];
     if (mapped) keyState[mapped] = true;
     if (event.code === 'Space') {
@@ -1350,6 +1693,18 @@ export function createClimberPrototype(
         rebuildColliderDebugMeshes();
       }
     },
+    setDebugCharacterAnimationVisible: (visible: boolean) => {
+      debugCharacterAnimationVisibleInternal = visible;
+      if (visible) {
+        onCharacterAnimationDebug?.(characterRig.getDebugSnapshot());
+      }
+    },
+    setCharacterAutoFootCalibrationEnabled: (enabled: boolean) => {
+      characterRig.setAutoFootCalibrationEnabled(enabled);
+      if (debugCharacterAnimationVisibleInternal) {
+        onCharacterAnimationDebug?.(characterRig.getDebugSnapshot());
+      }
+    },
     requestPointerLock: () => {
       renderer.domElement.requestPointerLock();
     },
@@ -1391,6 +1746,8 @@ export function createClimberPrototype(
 
       grid.geometry.dispose();
       disposeMaterial(grid.material);
+      sceneryGeometries.forEach((geometry) => geometry.dispose());
+      sceneryMaterials.forEach((material) => material.dispose());
       clearColliderDebugMeshes();
       scene.remove(colliderDebugGroup);
       clearJumpClearanceDebugMeshes();

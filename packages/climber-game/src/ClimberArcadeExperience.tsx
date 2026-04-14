@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AmbientLight,
   Box3,
@@ -30,6 +30,7 @@ import { createClimberPrototype } from './createClimberPrototype';
 import { readSetPieceLocalBounds, resolveSetPieceColliderData } from './prototype/setPieceRuntime';
 import { getAllClimberSetPieceAssets, getClimberSetPieceAsset } from './setpieceCatalog';
 import type {
+  ClimberCharacterAnimationDebugSnapshot,
   ClimberCharacterId,
   ClimberCharacterRuntimeStatus,
   ClimberJumpClearanceReport,
@@ -336,6 +337,12 @@ function formatHeight(value: number): string {
 
 function formatTuple(value: [number, number, number]): string {
   return value.map((item) => item.toFixed(2)).join(' x ');
+}
+
+function formatAnimationActions(actions: Partial<Record<string, string>>): string {
+  const entries = Object.entries(actions).filter(([, value]) => Boolean(value));
+  if (!entries.length) return '无';
+  return entries.map(([key, value]) => `${key}:${value}`).join(' | ');
 }
 
 function resolveAssetFileName(url: string): string {
@@ -690,6 +697,7 @@ export interface ClimberArcadeExperienceProps {
 
 export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
   const { title = 'Climber Playground' } = props;
+  const isDevBuild = import.meta.env.DEV;
   const mountRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<ClimberPrototypeController | null>(null);
   const activeLevel = CLIMBER_LEVELS[0];
@@ -697,6 +705,10 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [debugCollidersVisible, setDebugCollidersVisible] = useState(false);
   const [debugJumpClearanceVisible, setDebugJumpClearanceVisible] = useState(false);
+  const [debugCharacterAnimationVisible, setDebugCharacterAnimationVisible] = useState(false);
+  const [characterAutoFootCalibrationEnabled, setCharacterAutoFootCalibrationEnabled] =
+    useState(true);
+  const [fullscreenEnabled, setFullscreenEnabled] = useState(false);
   const [modelExhibitionVisible, setModelExhibitionVisible] = useState(false);
   const [activeExhibitionItemId, setActiveExhibitionItemId] = useState<string | null>(null);
   const [debugColliderFocusAssetId, setDebugColliderFocusAssetId] =
@@ -723,6 +735,22 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
     denseSmallPieceClusterCount: 0,
     issues: [],
   });
+  const [characterAnimationDebugSnapshot, setCharacterAnimationDebugSnapshot] =
+    useState<ClimberCharacterAnimationDebugSnapshot | null>(null);
+
+  const toggleFullscreen = useCallback(async () => {
+    const host = mountRef.current;
+    if (!host) return;
+    try {
+      if (document.fullscreenElement === host) {
+        await document.exitFullscreen();
+        return;
+      }
+      await host.requestFullscreen();
+    } catch {
+      // 浏览器策略或用户手势限制导致失败时，保持当前状态即可。
+    }
+  }, []);
   useEffect(() => {
     if (!mountRef.current || !activeLevel) return;
     setCharacterStatus(activeCharacterId === 'orb' ? 'procedural' : 'model-loading');
@@ -733,9 +761,12 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
       audioEnabled,
       debugCollidersVisible,
       debugJumpClearanceVisible,
+      debugCharacterAnimationVisible,
+      characterAutoFootCalibrationEnabled,
       debugColliderFocusAssetId,
       onStats: (next) => setStats(next),
       onJumpClearanceReport: (report) => setJumpClearanceReport(report),
+      onCharacterAnimationDebug: (snapshot) => setCharacterAnimationDebugSnapshot(snapshot),
       onCharacterStatusChange: (nextStatus) => setCharacterStatus(nextStatus),
       onPointerLockChange: (locked) => {
         setPointerLocked(locked);
@@ -762,6 +793,31 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
   useEffect(() => {
     controllerRef.current?.setDebugJumpClearanceVisible(debugJumpClearanceVisible);
   }, [debugJumpClearanceVisible]);
+
+  useEffect(() => {
+    controllerRef.current?.setDebugCharacterAnimationVisible(debugCharacterAnimationVisible);
+    if (!debugCharacterAnimationVisible) {
+      setCharacterAnimationDebugSnapshot(null);
+    }
+  }, [debugCharacterAnimationVisible]);
+
+  useEffect(() => {
+    controllerRef.current?.setCharacterAutoFootCalibrationEnabled(
+      characterAutoFootCalibrationEnabled,
+    );
+  }, [characterAutoFootCalibrationEnabled]);
+
+  useEffect(() => {
+    const sync = () => {
+      const host = mountRef.current;
+      setFullscreenEnabled(Boolean(host && document.fullscreenElement === host));
+    };
+    document.addEventListener('fullscreenchange', sync);
+    sync();
+    return () => {
+      document.removeEventListener('fullscreenchange', sync);
+    };
+  }, []);
 
   useEffect(() => {
     controllerRef.current?.setDebugColliderFocusAssetId(debugColliderFocusAssetId);
@@ -949,6 +1005,7 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
             <span style={TAG_STYLE}>当前地图: {currentMapName}</span>
             <span style={TAG_STYLE}>当前角色: {currentCharacterName}</span>
             <span style={TAG_STYLE}>声音: {audioEnabled ? '开' : '关'}</span>
+            <span style={TAG_STYLE}>全屏: {fullscreenEnabled ? '开' : '关'}</span>
             <span style={TAG_STYLE}>碰撞体: {debugCollidersVisible ? '显示' : '隐藏'}</span>
             <span style={TAG_STYLE}>净空检测: {debugJumpClearanceVisible ? '显示' : '隐藏'}</span>
             <span style={TAG_STYLE}>
@@ -962,7 +1019,7 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
               小件模型: {jumpClearanceReport.smallPieceCount}（密集区{' '}
               {jumpClearanceReport.denseSmallPieceClusterCount}）
             </span>
-            <span style={TAG_STYLE}>菜单: Esc</span>
+            <span style={TAG_STYLE}>菜单: P（Esc 系统键）</span>
           </div>
         </div>
       </div>
@@ -1027,7 +1084,8 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
               <div style={{ ...HUD_PANEL_STYLE, maxWidth: 540 }}>
                 <div style={{ fontSize: 12, color: '#f8fafc', fontWeight: 600 }}>按键说明</div>
                 <div style={{ fontSize: 12, lineHeight: 1.6, color: '#cbd5e1' }}>
-                  W A S D / 方向键 移动 | 空格 跳跃 | Shift 冲刺 | 鼠标 视角 | 滚轮 缩放 | Esc 暂停
+                  W A S D / 方向键 移动 | 空格 跳跃 | Shift 冲刺 | 鼠标 视角 | 滚轮 缩放 | P 菜单 |
+                  Esc 系统退出
                 </div>
               </div>
               <div style={{ ...HUD_PANEL_STYLE, maxWidth: 300 }}>
@@ -1049,7 +1107,8 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                   {hasEnteredSession ? '暂停菜单' : '进入游戏'}
                 </div>
                 <div style={{ fontSize: 13, lineHeight: 1.7, color: '#cbd5e1', textAlign: 'left' }}>
-                  所有游戏操作都在这里完成：切换角色、重新开始与设置。点击继续后进入第三人称操作。
+                  所有游戏操作都在这里完成：切换角色、重新开始与设置。点击继续后进入第三人称操作；
+                  游戏中按 `P` 可快速回到菜单。
                 </div>
 
                 <div style={MENU_ROW_STYLE}>
@@ -1123,6 +1182,15 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                   <button
                     type="button"
                     style={MENU_BUTTON_SECONDARY_STYLE}
+                    onClick={() => {
+                      void toggleFullscreen();
+                    }}
+                  >
+                    {fullscreenEnabled ? '全屏: 关' : '全屏: 开'}
+                  </button>
+                  <button
+                    type="button"
+                    style={MENU_BUTTON_SECONDARY_STYLE}
                     onClick={() => setDebugCollidersVisible((prev) => !prev)}
                   >
                     {debugCollidersVisible ? '碰撞体: 开' : '碰撞体: 关'}
@@ -1134,6 +1202,24 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                   >
                     {debugJumpClearanceVisible ? '净空调试: 开' : '净空调试: 关'}
                   </button>
+                  {isDevBuild ? (
+                    <button
+                      type="button"
+                      style={MENU_BUTTON_SECONDARY_STYLE}
+                      onClick={() => setDebugCharacterAnimationVisible((prev) => !prev)}
+                    >
+                      {debugCharacterAnimationVisible ? '动画调试: 开' : '动画调试: 关'}
+                    </button>
+                  ) : null}
+                  {isDevBuild ? (
+                    <button
+                      type="button"
+                      style={MENU_BUTTON_SECONDARY_STYLE}
+                      onClick={() => setCharacterAutoFootCalibrationEnabled((prev) => !prev)}
+                    >
+                      {characterAutoFootCalibrationEnabled ? '脚底校准: 开' : '脚底校准: 关'}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     style={MENU_BUTTON_SECONDARY_STYLE}
@@ -1150,12 +1236,57 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                   当前角色状态: {resolveCharacterRuntimeLabel(characterStatus)}；碰撞体调试:
                   {debugCollidersVisible ? ' 开启' : ' 关闭'}；模型筛选:
                   {activeFocusSetPieceName == null ? ' 全部' : ` ${activeFocusSetPieceName}`}。按
-                  `Esc` 可随时回到此菜单。关键跳点检测：已检查 {jumpClearanceReport.checkedLinks}{' '}
-                  段，高风险 {jumpClearanceReport.highRiskCount}，中风险{' '}
-                  {jumpClearanceReport.mediumRiskCount}。小件模型{' '}
+                  `P` 可随时回到此菜单，`Esc` 为浏览器系统退出键。关键跳点检测：已检查{' '}
+                  {jumpClearanceReport.checkedLinks} 段，高风险 {jumpClearanceReport.highRiskCount}
+                  ，中风险 {jumpClearanceReport.mediumRiskCount}。小件模型{' '}
                   {jumpClearanceReport.smallPieceCount}
                   ，密集小件区 {jumpClearanceReport.denseSmallPieceClusterCount}。
                 </div>
+                {isDevBuild && debugCharacterAnimationVisible ? (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: '#93c5fd',
+                      textAlign: 'left',
+                      lineHeight: 1.6,
+                      border: '1px solid rgba(148,163,184,0.28)',
+                      borderRadius: 10,
+                      padding: '8px 10px',
+                      background: 'rgba(15,23,42,0.28)',
+                    }}
+                  >
+                    <div>
+                      动画调试：状态 {characterAnimationDebugSnapshot?.currentState ?? '--'} |
+                      active {characterAnimationDebugSnapshot?.activeActionName ?? '--'} | grounded{' '}
+                      {characterAnimationDebugSnapshot?.grounded ? 'yes' : 'no'} | vSpeed{' '}
+                      {characterAnimationDebugSnapshot
+                        ? characterAnimationDebugSnapshot.verticalSpeed.toFixed(2)
+                        : '--'}{' '}
+                      | hSpeed{' '}
+                      {characterAnimationDebugSnapshot
+                        ? characterAnimationDebugSnapshot.horizontalSpeed.toFixed(2)
+                        : '--'}{' '}
+                      | landLock{' '}
+                      {characterAnimationDebugSnapshot
+                        ? `${characterAnimationDebugSnapshot.landingLockMs.toFixed(0)}ms`
+                        : '--'}
+                    </div>
+                    <div>
+                      ClipMap:{' '}
+                      {formatAnimationActions(
+                        characterAnimationDebugSnapshot?.availableActions ?? {},
+                      )}
+                    </div>
+                    <div>
+                      Skeleton: {characterAnimationDebugSnapshot?.hasSkeleton ? 'yes' : 'no'} |
+                      Animated: {characterAnimationDebugSnapshot?.isAnimated ? 'yes' : 'no'} |
+                      Overlay:{' '}
+                      {characterAnimationDebugSnapshot?.usesProceduralOverlay ? 'yes' : 'no'} |
+                      AutoFootCal:{' '}
+                      {characterAnimationDebugSnapshot?.autoFootCalibrationEnabled ? 'on' : 'off'}
+                    </div>
+                  </div>
+                ) : null}
               </div>
               {modelExhibitionVisible ? (
                 <div style={MODEL_EXHIBITION_OVERLAY_STYLE}>

@@ -42,6 +42,20 @@ export type ClimberCharacterRuntimeStatus =
   | 'model-no-rig'
   | 'model-fallback';
 
+export interface ClimberCharacterAnimationDebugSnapshot {
+  currentState: ClimberCharacterAnimationState;
+  horizontalSpeed: number;
+  verticalSpeed: number;
+  grounded: boolean;
+  landingLockMs: number;
+  activeActionName: string;
+  availableActions: Partial<Record<ClimberCharacterAnimationState, string>>;
+  hasSkeleton: boolean;
+  isAnimated: boolean;
+  usesProceduralOverlay: boolean;
+  autoFootCalibrationEnabled: boolean;
+}
+
 export interface ClimberCharacterOption {
   id: ClimberCharacterId;
   name: string;
@@ -143,6 +157,8 @@ export interface ClimberPrototypeController {
   setDebugCollidersVisible: (visible: boolean) => void;
   setDebugJumpClearanceVisible: (visible: boolean) => void;
   setDebugColliderFocusAssetId: (assetId: ClimberSetPieceAssetId | null) => void;
+  setDebugCharacterAnimationVisible: (visible: boolean) => void;
+  setCharacterAutoFootCalibrationEnabled: (enabled: boolean) => void;
   requestPointerLock: () => void;
   dispose: () => void;
 }

@@ -140,3 +140,116 @@
 - 风险与后续：
   - 当前风险：资产大幅收缩后，若后续要恢复旧主题区块需重新导入模型与碰撞参数。
   - 下一步动作：如你同意，我下一步把 `sp` 命名按现存点位重排为连续编号，便于后续继续加点。
+
+## 2026-04-14 16:35 (Asia/Shanghai)
+
+- 任务：优先推进 P2（角色与动画），补齐 Daisy 跳跃手感、动画调试面板与脚底自动校准能力。
+- 改动文件：
+  - `packages/climber-game/src/types.ts`
+  - `packages/climber-game/src/characterRig.ts`
+  - `packages/climber-game/src/createClimberPrototype.ts`
+  - `packages/climber-game/src/ClimberArcadeExperience.tsx`
+  - `.codex/skills/web-feature-iteration/CLIMBER-GAME-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - Daisy 跳跃分段参数收敛，调整 jump/fall/land 比例，减少起跳段过长导致的动作粘滞感。
+  - 动画状态机从“空中统一 jump”细化为 `jump/fall/land`，新增落地锁定窗口，确保落地动作可见。
+  - 新增角色动画调试快照（状态、速度、active clip、clip map、骨骼/overlay 信息），并接入暂停菜单开发态面板与开关。
+  - 新增脚底自动校准能力：按足部骨骼最低点计算偏移，支持运行时开关，减少模型“漂浮/陷地”手工调参。
+  - 扩展 prototype controller：支持 `setDebugCharacterAnimationVisible` 与 `setCharacterAutoFootCalibrationEnabled`。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+  - `pnpm --filter @valley/climber-game exec tsc --noEmit`：未执行（环境缺少 `pnpm/node`）
+- 风险与后续：
+  - 当前风险：未做实机动作手感回归，Daisy 在极端落差段可能还需微调落地锁定时长。
+  - 下一步动作：你实测后我按体感再细调 `LANDING_ANIMATION_LOCK_MS` 与 Daisy 分段比例。
+
+## 2026-04-14 16:41 (Asia/Shanghai)
+
+- 任务：新增菜单内全屏功能，并优化 `Esc` 与游戏菜单的冲突交互。
+- 改动文件：
+  - `packages/climber-game/src/createClimberPrototype.ts`
+  - `packages/climber-game/src/ClimberArcadeExperience.tsx`
+  - `.codex/skills/web-feature-iteration/CLIMBER-GAME-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 暂停菜单新增“全屏开/关”按钮，并监听 `fullscreenchange` 同步全屏状态标签。
+  - 新增 `P` 键快速回菜单（释放 pointer lock），减少与浏览器 `Esc` 系统行为冲突。
+  - 按键提示与菜单文案更新为“`P` 菜单，`Esc` 系统退出”语义，避免用户误解。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+  - `pnpm --filter @valley/climber-game exec tsc --noEmit`：未执行（环境缺少 `pnpm/node`）
+- 风险与后续：
+  - 当前风险：不同浏览器对全屏 + pointer lock 的 `Esc` 处理仍有细微差异，但交互路径已清晰分流。
+  - 下一步动作：你实测后若需，我可以再加“全屏失败提示文案”与“首次进入时键位提示”。
+
+## 2026-04-14 16:54 (Asia/Shanghai)
+
+- 任务：针对“底层地面过空、模型辨识度不足”补充分批落地任务清单。
+- 改动文件：
+  - `.codex/skills/web-feature-iteration/CLIMBER-GAME-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 P3 新增地面场景与地表分层任务（大树/花草/岩石、土地/水泥地、碰撞回归与密度校准）。
+  - 在 P4 新增可辨识度与比例基线任务（大树高度、草花尺寸、纹理策略升级）。
+  - 在“下轮优先任务”新增地面冲刺包（按 3 批推进，先可辨识再精细化）。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+  - `pnpm --filter @valley/climber-game exec tsc --noEmit`：未执行（环境缺少 `pnpm/node`）
+- 风险与后续：
+  - 当前风险：任务量较大，若不分批可能再次出现“模型多但体验乱”。
+  - 下一步动作：按新清单先执行第一批“树石 + 碰撞 + 出生区回归”。
+
+## 2026-04-14 16:58 (Asia/Shanghai)
+
+- 任务：执行底层地面场景第一批落地（树石草花 + 土地/水泥地分层），改善“地面空与辨识度低”问题。
+- 改动文件：
+  - `packages/climber-game/src/createClimberPrototype.ts`
+  - `.codex/skills/web-feature-iteration/CLIMBER-GAME-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在底层边缘区域新增大树与岩石场景组，并为树/岩石添加碰撞体（`system` 分类，避免影响主路线 setpiece 统计）。
+  - 新增草簇与花簇装饰（可见性优先，体量放大到第三人称镜头下一眼可见）。
+  - 地面新增土地区与水泥区分层补丁，缓解单一平面“空白感”。
+  - 场景资源在销毁流程中补充统一释放，避免新增几何/材质泄漏。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+  - `pnpm --filter @valley/climber-game exec tsc --noEmit`：未执行（环境缺少 `pnpm/node`）
+- 风险与后续：
+  - 当前风险：树石碰撞虽然放在边缘，但仍需实机走一遍出生区和前段路线确认无遮挡感。
+  - 下一步动作：继续第二批“密度校准 + 主路线前 3 段回归 + 纹理策略升级（程序贴图）”。
+
+## 2026-04-14 17:58 (Asia/Shanghai)
+
+- 任务：继续补齐底层空白区，执行第二批地面密度填充。
+- 改动文件：
+  - `packages/climber-game/src/createClimberPrototype.ts`
+  - `.codex/skills/web-feature-iteration/CLIMBER-GAME-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 扩充土地/水泥地补丁数量，覆盖此前“只有纯地面”的空白区域。
+  - 地面大树从 6 棵扩到 12 棵，岩石从 6 组扩到 12 组，进一步填充边缘环带。
+  - 草花簇从 6 组扩到 12 组，并为每组新增低矮碰撞体，保证底层场景可触达反馈。
+  - 保持新增碰撞体归类为 `system`，避免影响 setpiece 关卡调试统计。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+  - `pnpm --filter @valley/climber-game exec tsc --noEmit`：未执行（环境缺少 `pnpm/node`）
+- 风险与后续：
+  - 当前风险：草簇碰撞数量增加后，边缘绕行手感可能偏“绊脚”，需要实机确认密度是否仍舒适。
+  - 下一步动作：按你的体感反馈再做一轮“局部疏密调参 + 纹理层次增强”。
+
+## 2026-04-14 18:01 (Asia/Shanghai)
+
+- 任务：修复 `climber-game` 中 `ImportMeta` 缺少 `env` 属性的 TypeScript 类型错误。
+- 改动文件：
+  - `packages/climber-game/src/env.d.ts`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增本地 `ImportMetaEnv` 与 `ImportMeta` 声明，补齐 `import.meta.env.DEV/PROD/MODE/BASE_URL` 类型。
+  - 采用包内声明文件方案，避免额外依赖 `vite/client` 类型引入。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+  - `pnpm --filter @valley/climber-game exec tsc --noEmit`：未执行（环境缺少 `pnpm/node`）
+- 风险与后续：
+  - 当前风险：若后续读取新的 `env` 字段（自定义变量），需继续在该声明中补充类型。
+  - 下一步动作：等你确认后，我可顺手补一个最小 `tsc` CI 校验，防止同类错误回归。
