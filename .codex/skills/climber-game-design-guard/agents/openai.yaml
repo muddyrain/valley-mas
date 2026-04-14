@@ -1,0 +1,4 @@
+interface:
+  display_name: "Climber Game 设计护栏"
+  short_description: "统一 climber-game 的目标职责、关卡边界与迭代校验，避免玩法和定位漂移"
+  default_prompt: "当任务涉及 packages/climber-game 的功能新增、关卡调整、玩法规则更新或体验打磨时，先校验是否仍服务于《攀爬动物：在一起》的核心定位，再按“单大地图可达性、相机与角色一致性、HUD/菜单内聚、不污染 apps/web、回归校验命令”落地改动；若需求超出定位，先收敛为可复用且可验证的最小实现。"
