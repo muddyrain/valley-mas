@@ -1,7 +1,9 @@
 import {
   AmbientLight,
+  Box3,
   BoxGeometry,
   BufferGeometry,
+  CanvasTexture,
   Clock,
   Color,
   ConeGeometry,
@@ -14,6 +16,7 @@ import {
   Group,
   HemisphereLight,
   Line,
+  LinearFilter,
   LineBasicMaterial,
   LineSegments,
   type Material,
@@ -26,6 +29,8 @@ import {
   Quaternion,
   Scene,
   SphereGeometry,
+  Sprite,
+  SpriteMaterial,
   TorusGeometry,
   Vector3,
   WebGLRenderer,
@@ -65,6 +70,7 @@ interface CreateClimberPrototypeOptions {
   characterId: ClimberCharacterId;
   audioEnabled: boolean;
   debugCollidersVisible?: boolean;
+  debugInstanceLabelsVisible?: boolean;
   debugJumpClearanceVisible?: boolean;
   debugCharacterAnimationVisible?: boolean;
   characterAutoFootCalibrationEnabled?: boolean;
@@ -82,7 +88,10 @@ const LANDING_ASSIST = PLAYER_RADIUS * 0.95;
 const DEFAULT_CAMERA_OFFSET = new Vector3(0, 4.8, 9.4);
 const FLOOR_COLLIDER_SIZE = 220;
 const FLOOR_COLLIDER_HEIGHT = 1;
+const FLOOR_SURFACE_Y = -0.5;
+const FLOOR_COLLIDER_CENTER_Y = FLOOR_SURFACE_Y - FLOOR_COLLIDER_HEIGHT * 0.5;
 const BOUNDARY_HALF_RANGE = 70;
+const FLOOR_VISUAL_SIZE = FLOOR_COLLIDER_SIZE;
 const BOUNDARY_WALL_HEIGHT = 16;
 const BOUNDARY_WALL_THICKNESS = 2;
 const GOAL_REACH_Y_TOLERANCE = 0.18;
@@ -109,6 +118,10 @@ const JUMP_ROUTE_SIDE_PADDING = PLAYER_RADIUS * 1.65;
 const JUMP_ROUTE_BASE_HEIGHT_PADDING = 0.3;
 const JUMP_ROUTE_ARC_BASE = 1.35;
 const JUMP_ROUTE_ARC_MAX = 4.6;
+const SPAWN_BLOCKER_CHECK_RADIUS = 7.2;
+const SPAWN_BLOCKER_CHECK_HEIGHT = 3.4;
+const EARLY_ROUTE_CHECK_LINKS = 3;
+const DYNAMIC_HAZARD_COLLIDER_MIN_SIZE = 0.6;
 
 interface JumpRouteNode {
   id: string;
@@ -226,6 +239,7 @@ export function createClimberPrototype(
     characterId,
     audioEnabled,
     debugCollidersVisible = false,
+    debugInstanceLabelsVisible = false,
     debugJumpClearanceVisible = false,
     debugCharacterAnimationVisible = false,
     characterAutoFootCalibrationEnabled = true,
@@ -285,83 +299,77 @@ export function createClimberPrototype(
   scene.add(mainLight);
 
   const floor = new Mesh(
-    new PlaneGeometry(220, 220),
+    new PlaneGeometry(FLOOR_VISUAL_SIZE, FLOOR_VISUAL_SIZE),
     new MeshStandardMaterial({ color: floorColor, roughness: 0.9, metalness: 0.02 }),
   );
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -0.5;
+  floor.position.y = FLOOR_SURFACE_Y;
   floor.receiveShadow = true;
   scene.add(floor);
 
-  const grid = new GridHelper(160, 80, gridPrimaryColor, gridSecondaryColor);
-  grid.position.y = -0.49;
+  const grid = new GridHelper(FLOOR_VISUAL_SIZE, 110, gridPrimaryColor, gridSecondaryColor);
+  grid.position.y = FLOOR_SURFACE_Y + 0.01;
   const gridMaterial = grid.material as Material | Material[];
   if (Array.isArray(gridMaterial)) {
     gridMaterial.forEach((material) => {
       const anyMaterial = material as Material & { opacity?: number; transparent?: boolean };
       anyMaterial.transparent = true;
-      anyMaterial.opacity = 0.58;
+      anyMaterial.opacity = 0.12;
     });
   }
+  grid.visible = false;
   scene.add(grid);
 
   const sceneryMaterials: MeshStandardMaterial[] = [];
   const sceneryGeometries: BufferGeometry[] = [];
 
-  const soilPatchGeometry = new BoxGeometry(1, 1, 1);
-  const soilPatchMaterial = new MeshStandardMaterial({
+  const groundBaseOverlayGeometry = new PlaneGeometry(1, 1);
+  const groundBaseOverlayMaterial = new MeshStandardMaterial({
+    color: '#8f989f',
+    roughness: 0.88,
+    metalness: 0.02,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  });
+  sceneryGeometries.push(groundBaseOverlayGeometry);
+  sceneryMaterials.push(groundBaseOverlayMaterial);
+  const groundBaseOverlay = new Mesh(groundBaseOverlayGeometry, groundBaseOverlayMaterial);
+  groundBaseOverlay.rotation.x = -Math.PI / 2;
+  groundBaseOverlay.position.set(0, FLOOR_SURFACE_Y, 0);
+  groundBaseOverlay.scale.set(FLOOR_VISUAL_SIZE, FLOOR_VISUAL_SIZE, 1);
+  groundBaseOverlay.receiveShadow = true;
+  groundBaseOverlay.castShadow = false;
+  scene.add(groundBaseOverlay);
+
+  // 地面采用“整面基础覆盖 + 土地区薄层贴面”，确保全图有地表模型且不发生层间冲突。
+  const soilOverlayGeometry = new PlaneGeometry(1, 1);
+  const soilOverlayMaterial = new MeshStandardMaterial({
     color: '#8b6a48',
     roughness: 0.96,
     metalness: 0.01,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
   });
-  sceneryGeometries.push(soilPatchGeometry);
-  sceneryMaterials.push(soilPatchMaterial);
-  const soilPatchConfigs: Array<{
-    size: [number, number, number];
-    position: [number, number, number];
-  }> = [
-    { size: [64, 0.28, 30], position: [-30, -0.36, 33] },
-    { size: [56, 0.26, 28], position: [34, -0.37, -33] },
-    { size: [30, 0.22, 22], position: [0, -0.38, 44] },
-    { size: [34, 0.24, 18], position: [-48, -0.37, 12] },
-    { size: [28, 0.2, 16], position: [49, -0.38, 20] },
-    { size: [24, 0.2, 14], position: [-14, -0.39, -50] },
-    { size: [26, 0.2, 12], position: [12, -0.39, 52] },
-  ];
-  soilPatchConfigs.forEach((item) => {
-    const mesh = new Mesh(soilPatchGeometry, soilPatchMaterial);
-    mesh.position.set(item.position[0], item.position[1], item.position[2]);
-    mesh.scale.set(item.size[0], item.size[1], item.size[2]);
-    mesh.receiveShadow = true;
-    mesh.castShadow = false;
-    scene.add(mesh);
-  });
-
-  const concretePatchGeometry = new BoxGeometry(1, 1, 1);
-  const concretePatchMaterial = new MeshStandardMaterial({
-    color: '#9ca3af',
-    roughness: 0.84,
-    metalness: 0.04,
-  });
-  sceneryGeometries.push(concretePatchGeometry);
-  sceneryMaterials.push(concretePatchMaterial);
-  const concretePatchConfigs: Array<{
-    size: [number, number, number];
+  sceneryGeometries.push(soilOverlayGeometry);
+  sceneryMaterials.push(soilOverlayMaterial);
+  const soilOverlayConfigs: Array<{
+    size: [number, number];
     position: [number, number, number];
     yaw?: number;
   }> = [
-    { size: [44, 0.22, 22], position: [-34, -0.34, -30], yaw: 0.18 },
-    { size: [36, 0.22, 18], position: [30, -0.34, 32], yaw: -0.14 },
-    { size: [24, 0.2, 14], position: [46, -0.35, -6], yaw: 0.1 },
-    { size: [32, 0.2, 14], position: [-47, -0.35, -8], yaw: -0.12 },
-    { size: [30, 0.2, 16], position: [44, -0.35, 44], yaw: 0.16 },
-    { size: [34, 0.22, 14], position: [-38, -0.35, 46], yaw: -0.08 },
-    { size: [22, 0.18, 12], position: [8, -0.36, -46], yaw: 0.06 },
+    { size: [112, 58], position: [0, FLOOR_SURFACE_Y, -56], yaw: 0.01 },
+    { size: [112, 58], position: [0, FLOOR_SURFACE_Y, 56], yaw: -0.01 },
+    { size: [58, 112], position: [-56, FLOOR_SURFACE_Y, 0], yaw: -0.02 },
+    { size: [58, 112], position: [56, FLOOR_SURFACE_Y, 0], yaw: 0.02 },
+    { size: [64, 64], position: [0, FLOOR_SURFACE_Y, 0], yaw: 0 },
   ];
-  concretePatchConfigs.forEach((item) => {
-    const mesh = new Mesh(concretePatchGeometry, concretePatchMaterial);
+  soilOverlayConfigs.forEach((item) => {
+    const mesh = new Mesh(soilOverlayGeometry, soilOverlayMaterial);
+    mesh.rotation.x = -Math.PI / 2;
     mesh.position.set(item.position[0], item.position[1], item.position[2]);
-    mesh.scale.set(item.size[0], item.size[1], item.size[2]);
+    mesh.scale.set(item.size[0], item.size[1], 1);
     if (item.yaw) {
       mesh.rotation.y = item.yaw;
     }
@@ -380,11 +388,19 @@ export function createClimberPrototype(
   const colliderDebugEdgeGeometries: EdgesGeometry[] = [];
   const colliderDebugMaterials: MeshBasicMaterial[] = [];
   const colliderDebugLineMaterials: LineBasicMaterial[] = [];
+  const colliderDebugLabelTextures: CanvasTexture[] = [];
+  const colliderDebugLabelMaterials: SpriteMaterial[] = [];
+  const playerAxisLabelTextures: CanvasTexture[] = [];
+  const playerAxisLabelMaterials: SpriteMaterial[] = [];
   const colliderDebugQuaternion = new Quaternion();
   let colliderDebugDirty = true;
+  let debugInstanceLabelsVisibleInternal = debugInstanceLabelsVisible;
   let colliderDebugFocusAssetId: ClimberSetPieceAssetId | null = debugColliderFocusAssetId;
   colliderDebugGroup.visible = debugCollidersVisible;
   scene.add(colliderDebugGroup);
+  const playerAxisLabelGroup = new Group();
+  playerAxisLabelGroup.visible = debugInstanceLabelsVisibleInternal;
+  scene.add(playerAxisLabelGroup);
 
   const jumpClearanceDebugGroup = new Group();
   const jumpClearanceDebugGeometries: BufferGeometry[] = [];
@@ -410,10 +426,15 @@ export function createClimberPrototype(
     report: {
       generatedAt: Date.now(),
       checkedLinks: 0,
+      earlyRouteCheckedLinks: 0,
       highRiskCount: 0,
+      earlyRouteHighRiskCount: 0,
       mediumRiskCount: 0,
       smallPieceCount: 0,
       denseSmallPieceClusterCount: 0,
+      spawnBlockerCount: 0,
+      spawnZoneClear: true,
+      routeRegressionPassed: true,
       issues: [],
     },
     segments: [],
@@ -429,11 +450,101 @@ export function createClimberPrototype(
     colliderDebugEdgeGeometries.forEach((geometry) => geometry.dispose());
     colliderDebugMaterials.forEach((material) => material.dispose());
     colliderDebugLineMaterials.forEach((material) => material.dispose());
+    colliderDebugLabelTextures.forEach((texture) => texture.dispose());
+    colliderDebugLabelMaterials.forEach((material) => material.dispose());
     colliderDebugGeometries.length = 0;
     colliderDebugEdgeGeometries.length = 0;
     colliderDebugMaterials.length = 0;
     colliderDebugLineMaterials.length = 0;
+    colliderDebugLabelTextures.length = 0;
+    colliderDebugLabelMaterials.length = 0;
   };
+
+  const createDebugIdLabelSprite = (text: string): Sprite => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.75)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 28px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, canvas.width * 0.5, canvas.height * 0.52);
+    }
+    const texture = new CanvasTexture(canvas);
+    texture.minFilter = LinearFilter;
+    texture.magFilter = LinearFilter;
+    texture.needsUpdate = true;
+    const material = new SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const sprite = new Sprite(material);
+    sprite.scale.set(1.85, 0.46, 1);
+    sprite.renderOrder = 122;
+    colliderDebugLabelTextures.push(texture);
+    colliderDebugLabelMaterials.push(material);
+    return sprite;
+  };
+
+  const createPlayerAxisLabelSprite = (text: string): Sprite => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 192;
+    canvas.height = 56;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.72)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 24px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, canvas.width * 0.5, canvas.height * 0.52);
+    }
+    const texture = new CanvasTexture(canvas);
+    texture.minFilter = LinearFilter;
+    texture.magFilter = LinearFilter;
+    texture.needsUpdate = true;
+    const material = new SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const sprite = new Sprite(material);
+    sprite.scale.set(1.3, 0.38, 1);
+    sprite.renderOrder = 122;
+    playerAxisLabelTextures.push(texture);
+    playerAxisLabelMaterials.push(material);
+    return sprite;
+  };
+
+  const playerAxisLabelDefs: Array<{ text: string; offset: [number, number, number] }> = [
+    { text: '+X', offset: [2.3, 1.25, 0] },
+    { text: '-X', offset: [-2.3, 1.25, 0] },
+    { text: '+Y', offset: [0, 3.1, 0] },
+    { text: '-Y', offset: [0, 0.1, 0] },
+    { text: '+Z', offset: [0, 1.25, 2.3] },
+    { text: '-Z', offset: [0, 1.25, -2.3] },
+  ];
+  playerAxisLabelDefs.forEach((def) => {
+    const sprite = createPlayerAxisLabelSprite(def.text);
+    sprite.position.set(def.offset[0], def.offset[1], def.offset[2]);
+    playerAxisLabelGroup.add(sprite);
+  });
 
   const rebuildColliderDebugMeshes = () => {
     clearColliderDebugMeshes();
@@ -505,6 +616,22 @@ export function createClimberPrototype(
       colliderDebugGroup.add(edgeLines);
       colliderDebugEdgeGeometries.push(edgeGeometry);
       colliderDebugLineMaterials.push(lineMaterial);
+
+      const instanceId = collider.debugMeta?.instanceId;
+      if (
+        debugInstanceLabelsVisibleInternal &&
+        instanceId &&
+        instanceId !== 'floor' &&
+        instanceId !== 'boundary-wall'
+      ) {
+        const label = createDebugIdLabelSprite(instanceId);
+        label.position.set(
+          collider.center[0],
+          collider.maxY + Math.max(0.35, collider.size[1] * 0.2),
+          collider.center[2],
+        );
+        colliderDebugGroup.add(label);
+      }
     });
     colliderDebugDirty = false;
   };
@@ -762,12 +889,82 @@ export function createClimberPrototype(
     const report: ClimberJumpClearanceReport = {
       generatedAt: Date.now(),
       checkedLinks: Math.max(0, nodes.length - 1),
+      earlyRouteCheckedLinks: 0,
       highRiskCount: issues.filter((issue) => issue.severity === 'high').length,
+      earlyRouteHighRiskCount: 0,
       mediumRiskCount: issues.filter((issue) => issue.severity === 'medium').length,
       smallPieceCount: smallSetPieceColliders.length,
       denseSmallPieceClusterCount: denseSmallPieceClusters.size,
+      spawnBlockerCount: 0,
+      spawnZoneClear: true,
+      routeRegressionPassed: true,
       issues,
     };
+
+    const earlyRouteLinkIds = new Set(
+      segments.slice(0, EARLY_ROUTE_CHECK_LINKS).map((segment) => segment.linkId),
+    );
+    report.earlyRouteCheckedLinks = Math.min(EARLY_ROUTE_CHECK_LINKS, segments.length);
+    report.earlyRouteHighRiskCount = issues.filter(
+      (issue) => issue.severity === 'high' && earlyRouteLinkIds.has(issue.linkId),
+    ).length;
+
+    const spawnBlockerCandidates = platformColliders.filter((collider) => {
+      const meta = collider.debugMeta;
+      if (!meta) return false;
+      if (meta.category === 'platform') return false;
+      if (
+        meta.category === 'system' &&
+        (meta.instanceId === 'floor' || meta.instanceId === 'boundary-wall')
+      ) {
+        return false;
+      }
+      const dx = Math.max(collider.minX - startPosition.x, 0, startPosition.x - collider.maxX);
+      const dz = Math.max(collider.minZ - startPosition.z, 0, startPosition.z - collider.maxZ);
+      const distanceXZ = Math.hypot(dx, dz);
+      if (distanceXZ > SPAWN_BLOCKER_CHECK_RADIUS) return false;
+      if (collider.maxY < startPosition.y + 0.2) return false;
+      if (collider.minY > startPosition.y + SPAWN_BLOCKER_CHECK_HEIGHT) return false;
+      return true;
+    });
+
+    report.spawnBlockerCount = spawnBlockerCandidates.length;
+    report.spawnZoneClear = spawnBlockerCandidates.length === 0;
+
+    spawnBlockerCandidates.forEach((collider, index) => {
+      const blockerId = collider.debugMeta?.instanceId ?? `spawn-blocker-${index + 1}`;
+      const issueId = `spawn-zone::${blockerId}`;
+      if (!issues.some((issue) => issue.id === issueId)) {
+        issues.push({
+          id: issueId,
+          severity: 'high',
+          linkId: 'spawn-zone',
+          sourceId: 'spawn',
+          targetId: nodes[0]?.id ?? 'start',
+          blockerId,
+          blockerAssetId: collider.debugMeta?.assetId,
+          reason: '出生区附近检测到阻挡碰撞体，可能影响起步与前3段节奏',
+        });
+      }
+      blockers.push({
+        issueId,
+        center: [
+          (collider.minX + collider.maxX) * 0.5,
+          (collider.minY + collider.maxY) * 0.5,
+          (collider.minZ + collider.maxZ) * 0.5,
+        ],
+        size: [
+          Math.max(0.001, collider.maxX - collider.minX),
+          Math.max(0.001, collider.maxY - collider.minY),
+          Math.max(0.001, collider.maxZ - collider.minZ),
+        ],
+        severity: 'high',
+      });
+    });
+
+    report.highRiskCount = issues.filter((issue) => issue.severity === 'high').length;
+    report.routeRegressionPassed =
+      report.spawnZoneClear && report.earlyRouteHighRiskCount === 0 && report.highRiskCount === 0;
 
     return {
       report,
@@ -809,6 +1006,74 @@ export function createClimberPrototype(
       rebuildColliderDebugMeshes();
     }
     return appended;
+  };
+
+  const syncAxisAlignedColliderWithObjectBounds = (
+    collider: PlatformCollisionData,
+    object: Mesh,
+  ) => {
+    object.updateWorldMatrix(true, true);
+    const bounds = new Box3().setFromObject(object);
+    if (bounds.isEmpty()) return;
+    const center = new Vector3();
+    const size = new Vector3();
+    bounds.getCenter(center);
+    bounds.getSize(size);
+    const halfX = Math.max(DYNAMIC_HAZARD_COLLIDER_MIN_SIZE * 0.5, size.x * 0.5);
+    const halfY = Math.max(DYNAMIC_HAZARD_COLLIDER_MIN_SIZE * 0.5, size.y * 0.5);
+    const halfZ = Math.max(DYNAMIC_HAZARD_COLLIDER_MIN_SIZE * 0.5, size.z * 0.5);
+    collider.shape = 'box';
+    collider.center = [center.x, center.y, center.z];
+    collider.size = [halfX * 2, halfY * 2, halfZ * 2];
+    collider.rotation = [0, 0, 0, 1];
+    collider.inverseRotation = [0, 0, 0, 1];
+    collider.top = center.y + halfY;
+    collider.minX = center.x - halfX;
+    collider.maxX = center.x + halfX;
+    collider.minY = center.y - halfY;
+    collider.maxY = center.y + halfY;
+    collider.minZ = center.z - halfZ;
+    collider.maxZ = center.z + halfZ;
+    collider.planes = [
+      { nx: 1, ny: 0, nz: 0, constant: -halfX },
+      { nx: -1, ny: 0, nz: 0, constant: -halfX },
+      { nx: 0, ny: 1, nz: 0, constant: -halfY },
+      { nx: 0, ny: -1, nz: 0, constant: -halfY },
+      { nx: 0, ny: 0, nz: 1, constant: -halfZ },
+      { nx: 0, ny: 0, nz: -1, constant: -halfZ },
+    ];
+  };
+
+  const dynamicObstacleUpdaters: Array<(elapsed: number) => void> = [];
+
+  const pushColliderFromObjectBounds = (
+    object: Group | Mesh,
+    debugMeta: PlatformCollisionDebugMeta,
+    options?: {
+      insetXZ?: number;
+      insetY?: number;
+      minSize?: [number, number, number];
+    },
+  ) => {
+    object.updateWorldMatrix(true, true);
+    const worldBounds = new Box3().setFromObject(object);
+    if (worldBounds.isEmpty()) return null;
+    const center = new Vector3();
+    const size = new Vector3();
+    worldBounds.getCenter(center);
+    worldBounds.getSize(size);
+    const insetXZ = MathUtils.clamp(options?.insetXZ ?? 1, 0.45, 1);
+    const insetY = MathUtils.clamp(options?.insetY ?? 1, 0.45, 1);
+    const minSize = options?.minSize ?? [0.25, 0.2, 0.25];
+    return pushCollider({
+      center: [center.x, center.y, center.z],
+      size: [
+        Math.max(minSize[0], size.x * insetXZ),
+        Math.max(minSize[1], size.y * insetY),
+        Math.max(minSize[2], size.z * insetXZ),
+      ],
+      debugMeta,
+    });
   };
 
   const createGroundScenery = () => {
@@ -923,14 +1188,38 @@ export function createClimberPrototype(
       tree.add(leafTop);
 
       scene.add(tree);
-      pushCollider({
-        center: [treeConfig.position[0], 9.8, treeConfig.position[2]],
-        size: [5.8 * treeConfig.scale, 19.6 * treeConfig.scale, 5.8 * treeConfig.scale],
-        debugMeta: {
+      pushColliderFromObjectBounds(
+        trunk,
+        {
           category: 'system',
-          instanceId: treeConfig.id,
+          instanceId: `${treeConfig.id}-trunk`,
         },
-      });
+        { insetXZ: 0.92, insetY: 0.98, minSize: [0.6, 1.4, 0.6] },
+      );
+      pushColliderFromObjectBounds(
+        leafBottom,
+        {
+          category: 'system',
+          instanceId: `${treeConfig.id}-leaf-bottom`,
+        },
+        { insetXZ: 0.84, insetY: 0.82, minSize: [0.9, 0.9, 0.9] },
+      );
+      pushColliderFromObjectBounds(
+        leafMiddle,
+        {
+          category: 'system',
+          instanceId: `${treeConfig.id}-leaf-middle`,
+        },
+        { insetXZ: 0.82, insetY: 0.8, minSize: [0.8, 0.8, 0.8] },
+      );
+      pushColliderFromObjectBounds(
+        leafTop,
+        {
+          category: 'system',
+          instanceId: `${treeConfig.id}-leaf-top`,
+        },
+        { insetXZ: 0.8, insetY: 0.78, minSize: [0.7, 0.7, 0.7] },
+      );
     });
 
     const rockConfigs: Array<{
@@ -975,18 +1264,14 @@ export function createClimberPrototype(
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       scene.add(mesh);
-      pushCollider({
-        center: [rockConfig.position[0], rockConfig.position[1], rockConfig.position[2]],
-        size: [
-          (rockConfig.large ? 6.2 : 4.2) * rockConfig.scale[0],
-          (rockConfig.large ? 5.1 : 3.8) * rockConfig.scale[1],
-          (rockConfig.large ? 5.7 : 4) * rockConfig.scale[2],
-        ],
-        debugMeta: {
+      pushColliderFromObjectBounds(
+        mesh,
+        {
           category: 'system',
           instanceId: rockConfig.id,
         },
-      });
+        { insetXZ: 0.9, insetY: 0.9, minSize: [0.8, 0.6, 0.8] },
+      );
     });
 
     const grassClusterCenters: Array<[number, number, number]> = [
@@ -1042,12 +1327,221 @@ export function createClimberPrototype(
         scene.add(petal);
       }
       pushCollider({
-        center: [center[0], 0.62, center[2]],
-        size: [4.2, 1.24, 4.2],
+        center: [center[0], 0.4, center[2]],
+        size: [2.2, 0.8, 2.2],
         debugMeta: {
           category: 'system',
           instanceId: `ground-grass-cluster-${(clusterIndex + 1).toString().padStart(2, '0')}`,
         },
+      });
+    });
+
+    const themeZoneBaseGeometry = new PlaneGeometry(1, 1);
+    const containerZoneMaterial = new MeshStandardMaterial({
+      color: '#c9733b',
+      roughness: 0.9,
+      metalness: 0.04,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
+    });
+    const woodZoneMaterial = new MeshStandardMaterial({
+      color: '#8b5a3c',
+      roughness: 0.92,
+      metalness: 0.02,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
+    });
+    const pipeZoneMaterial = new MeshStandardMaterial({
+      color: '#5b7288',
+      roughness: 0.84,
+      metalness: 0.08,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
+    });
+    const farmZoneMaterial = new MeshStandardMaterial({
+      color: '#6a8f4d',
+      roughness: 0.9,
+      metalness: 0.02,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
+    });
+    sceneryGeometries.push(themeZoneBaseGeometry);
+    sceneryMaterials.push(
+      containerZoneMaterial,
+      woodZoneMaterial,
+      pipeZoneMaterial,
+      farmZoneMaterial,
+    );
+    const themeZoneConfigs: Array<{
+      zoneId: 'container' | 'wood' | 'pipe' | 'farm';
+      center: [number, number, number];
+      size: [number, number];
+      yaw?: number;
+      material: MeshStandardMaterial;
+    }> = [
+      {
+        zoneId: 'container',
+        center: [-42, FLOOR_SURFACE_Y, -8],
+        size: [26, 20],
+        yaw: 0.08,
+        material: containerZoneMaterial,
+      },
+      {
+        zoneId: 'wood',
+        center: [42, FLOOR_SURFACE_Y, -8],
+        size: [24, 18],
+        yaw: -0.06,
+        material: woodZoneMaterial,
+      },
+      {
+        zoneId: 'pipe',
+        center: [-42, FLOOR_SURFACE_Y, 34],
+        size: [24, 18],
+        yaw: 0.04,
+        material: pipeZoneMaterial,
+      },
+      {
+        zoneId: 'farm',
+        center: [42, FLOOR_SURFACE_Y, 34],
+        size: [26, 20],
+        yaw: -0.05,
+        material: farmZoneMaterial,
+      },
+    ];
+    themeZoneConfigs.forEach((zone) => {
+      const mesh = new Mesh(themeZoneBaseGeometry, zone.material);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(zone.center[0], zone.center[1], zone.center[2]);
+      mesh.scale.set(zone.size[0], zone.size[1], 1);
+      if (zone.yaw) mesh.rotation.y = zone.yaw;
+      mesh.receiveShadow = true;
+      mesh.castShadow = false;
+      scene.add(mesh);
+    });
+
+    const themedPropGeometry = new BoxGeometry(1, 1, 1);
+    const themedPipeGeometry = new CylinderGeometry(0.48, 0.48, 4.6, 12);
+    sceneryGeometries.push(themedPropGeometry, themedPipeGeometry);
+    themeZoneConfigs.forEach((zone, zoneIndex) => {
+      for (let i = 0; i < 4; i += 1) {
+        const offsetX = (i - 1.5) * 4.2;
+        const offsetZ = zone.zoneId === 'container' || zone.zoneId === 'wood' ? 3.2 : -3.2;
+        const x = zone.center[0] + offsetX;
+        const z = zone.center[2] + offsetZ + (i % 2 === 0 ? 1.2 : -1.2);
+        if (zone.zoneId === 'pipe') {
+          const pipe = new Mesh(themedPipeGeometry, pipeZoneMaterial);
+          pipe.position.set(x, -0.08, z);
+          pipe.rotation.z = Math.PI * 0.5;
+          pipe.rotation.y = zone.yaw ?? 0;
+          pipe.castShadow = true;
+          pipe.receiveShadow = true;
+          scene.add(pipe);
+        } else {
+          const prop = new Mesh(themedPropGeometry, zone.material);
+          const height = zone.zoneId === 'container' ? 2.2 : zone.zoneId === 'wood' ? 0.5 : 1.1;
+          prop.position.set(x, FLOOR_SURFACE_Y + height * 0.5, z);
+          prop.scale.set(
+            zone.zoneId === 'farm' ? 1.1 : zone.zoneId === 'wood' ? 3.2 : 2.4,
+            height,
+            zone.zoneId === 'wood' ? 0.55 : 1.2,
+          );
+          prop.rotation.y = (zone.yaw ?? 0) + (zoneIndex % 2 === 0 ? 0.1 : -0.08);
+          prop.castShadow = true;
+          prop.receiveShadow = true;
+          scene.add(prop);
+        }
+      }
+    });
+  };
+
+  const createDynamicHazards = () => {
+    const ropeGeometry = new CylinderGeometry(0.08, 0.08, 1, 10);
+    const bobGeometry = new SphereGeometry(0.74, 12, 10);
+    const anchorGeometry = new SphereGeometry(0.18, 8, 6);
+    const ropeMaterial = new MeshStandardMaterial({
+      color: '#5a6570',
+      roughness: 0.86,
+      metalness: 0.16,
+    });
+    const bobMaterial = new MeshStandardMaterial({
+      color: '#f59e0b',
+      roughness: 0.74,
+      metalness: 0.12,
+    });
+    const anchorMaterial = new MeshStandardMaterial({
+      color: '#9aa6b2',
+      roughness: 0.8,
+      metalness: 0.08,
+    });
+    sceneryGeometries.push(ropeGeometry, bobGeometry, anchorGeometry);
+    sceneryMaterials.push(ropeMaterial, bobMaterial, anchorMaterial);
+
+    const pendulumConfigs: Array<{
+      id: string;
+      pivot: [number, number, number];
+      length: number;
+      amplitude: number;
+      speed: number;
+      phase: number;
+    }> = [
+      {
+        id: 'hazard-pendulum-01',
+        pivot: [19.2, 34.6, -0.8],
+        length: 6.2,
+        amplitude: 0.48,
+        speed: 1.45,
+        phase: 0,
+      },
+      {
+        id: 'hazard-pendulum-02',
+        pivot: [33.8, 56.8, -14.4],
+        length: 5.7,
+        amplitude: 0.52,
+        speed: 1.68,
+        phase: 1.3,
+      },
+    ];
+
+    pendulumConfigs.forEach((config) => {
+      const pivotGroup = new Group();
+      pivotGroup.position.set(config.pivot[0], config.pivot[1], config.pivot[2]);
+      scene.add(pivotGroup);
+
+      const anchor = new Mesh(anchorGeometry, anchorMaterial);
+      anchor.castShadow = true;
+      anchor.receiveShadow = true;
+      pivotGroup.add(anchor);
+
+      const rope = new Mesh(ropeGeometry, ropeMaterial);
+      rope.position.y = -config.length * 0.5;
+      rope.scale.set(1, config.length, 1);
+      rope.castShadow = true;
+      rope.receiveShadow = true;
+      pivotGroup.add(rope);
+
+      const bob = new Mesh(bobGeometry, bobMaterial);
+      bob.position.y = -config.length;
+      bob.castShadow = true;
+      bob.receiveShadow = true;
+      pivotGroup.add(bob);
+
+      const hazardCollider = pushCollider({
+        center: [config.pivot[0], config.pivot[1] - config.length, config.pivot[2]],
+        size: [1.5, 1.5, 1.5],
+        debugMeta: {
+          category: 'system',
+          instanceId: config.id,
+        },
+      });
+
+      dynamicObstacleUpdaters.push((elapsed) => {
+        const angle = Math.sin(elapsed * config.speed + config.phase) * config.amplitude;
+        pivotGroup.rotation.z = angle;
+        syncAxisAlignedColliderWithObjectBounds(hazardCollider, bob);
       });
     });
   };
@@ -1079,7 +1573,7 @@ export function createClimberPrototype(
   });
 
   pushCollider({
-    center: [0, -1, 0],
+    center: [0, FLOOR_COLLIDER_CENTER_Y, 0],
     size: [FLOOR_COLLIDER_SIZE, FLOOR_COLLIDER_HEIGHT, FLOOR_COLLIDER_SIZE],
     debugMeta: {
       category: 'system',
@@ -1146,6 +1640,7 @@ export function createClimberPrototype(
   });
 
   createGroundScenery();
+  createDynamicHazards();
   const setPieceRuntime = createSetPieceRuntime({
     scene,
     setPieces: level.setPieces,
@@ -1524,12 +2019,16 @@ export function createClimberPrototype(
   function renderFrame(timestamp: number) {
     if (disposed) return;
     const delta = Math.min(clock.getDelta(), 0.033);
+    const frameElapsed = clock.getElapsedTime();
     const simulationSteps = Math.max(1, Math.min(4, Math.ceil(delta / 0.012)));
     const simulationDelta = delta / simulationSteps;
 
     for (let step = 0; step < simulationSteps; step += 1) {
+      const stepElapsed = frameElapsed + simulationDelta * step;
+      dynamicObstacleUpdaters.forEach((update) => update(stepElapsed));
       updatePlayer(simulationDelta);
     }
+    playerAxisLabelGroup.position.copy(playerPosition);
     updateCharacter(delta, clock.getElapsedTime());
     updateCamera(delta);
 
@@ -1679,6 +2178,15 @@ export function createClimberPrototype(
         rebuildColliderDebugMeshes();
       }
     },
+    setDebugInstanceLabelsVisible: (visible: boolean) => {
+      if (debugInstanceLabelsVisibleInternal === visible) return;
+      debugInstanceLabelsVisibleInternal = visible;
+      playerAxisLabelGroup.visible = visible;
+      colliderDebugDirty = true;
+      if (colliderDebugGroup.visible) {
+        rebuildColliderDebugMeshes();
+      }
+    },
     setDebugJumpClearanceVisible: (visible: boolean) => {
       jumpClearanceDebugGroup.visible = visible;
       if (visible) {
@@ -1752,6 +2260,9 @@ export function createClimberPrototype(
       scene.remove(colliderDebugGroup);
       clearJumpClearanceDebugMeshes();
       scene.remove(jumpClearanceDebugGroup);
+      scene.remove(playerAxisLabelGroup);
+      playerAxisLabelTextures.forEach((texture) => texture.dispose());
+      playerAxisLabelMaterials.forEach((material) => material.dispose());
 
       characterRig.dispose();
       audio.dispose();

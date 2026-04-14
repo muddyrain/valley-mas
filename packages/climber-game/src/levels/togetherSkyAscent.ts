@@ -1,4 +1,4 @@
-import type { ClimberLevelDefinition, ClimberSetPieceDefinition } from '../types';
+import type { ClimberLevelDefinition } from '../types';
 
 export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
   id: 'together-sky-ascent',
@@ -67,7 +67,7 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
     {
       id: 'sp006',
       assetId: 'ramp_wedge',
-      position: [20.2, 5.1, 0.8],
+      position: [20.2, 4.5, 1.8],
       solid: true,
       color: '#b99f6b',
     },
@@ -103,14 +103,14 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
     {
       id: 'sp012',
       assetId: 'ramp_wedge',
-      position: [15.3, 10.2, 0.1],
+      position: [15.3, 10.2, -2.1],
       solid: true,
       color: '#c0a777',
     },
     {
       id: 'sp013',
       assetId: 'plank_long',
-      position: [13.5, 11.5, 2.1],
+      position: [13.5, 11.5, 0.5],
       solid: true,
       color: '#b1784c',
     },
@@ -428,18 +428,35 @@ export const TOGETHER_SKY_ASCENT_LEVEL: ClimberLevelDefinition = {
     {
       id: 'sp077',
       assetId: 'crate_tall',
-      position: [17.8, 16.2, 8.4],
+      position: [16.6, 15, 8.1],
       solid: true,
       color: '#845931',
-      scale: [1.05, 1.1, 1.05],
+      scale: [0.94, 1, 0.94],
+    },
+    {
+      id: 'sp078',
+      assetId: 'stepping_stone',
+      position: [21, 16.6, 7.2],
+      solid: true,
+      color: '#949ba2',
+      scale: [1.02, 1, 1.02],
+    },
+    {
+      id: 'sp079',
+      assetId: 'rock_slab',
+      position: [24.1, 17.1, 6.1],
+      solid: true,
+      color: '#7f8891',
+      rotation: [0, -0.22, 0],
+      scale: [0.96, 1, 0.96],
     },
     {
       id: 'sp080',
       assetId: 'stepping_stone',
-      position: [29.8, 19, 1.6],
+      position: [27.2, 17.5, 4.3],
       solid: true,
       color: '#949ba2',
-      scale: [0.96, 1, 0.96],
+      scale: [1.02, 1, 1.02],
     },
     {
       id: 'sp087',
