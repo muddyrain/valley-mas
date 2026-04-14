@@ -114,6 +114,23 @@ const HUD_PANEL_STYLE: CSSProperties = {
   backdropFilter: 'blur(3px)',
 };
 
+const DEBUG_COORD_PANEL_STYLE: CSSProperties = {
+  position: 'absolute',
+  top: 14,
+  right: 14,
+  maxWidth: 360,
+  padding: '10px 12px',
+  borderRadius: 12,
+  border: '1px solid rgba(255,255,255,0.24)',
+  background: 'linear-gradient(140deg, rgba(15,23,42,0.68), rgba(15,23,42,0.46))',
+  color: '#e2e8f0',
+  boxShadow: '0 8px 22px rgba(2,6,23,0.28)',
+  backdropFilter: 'blur(3px)',
+  pointerEvents: 'none',
+  fontSize: 12,
+  lineHeight: 1.55,
+};
+
 const HUD_META_ROW_STYLE: CSSProperties = {
   display: 'flex',
   gap: 8,
@@ -700,10 +717,12 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
   const isDevBuild = import.meta.env.DEV;
   const mountRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<ClimberPrototypeController | null>(null);
+  const pendingPointerLockAfterFullscreenRef = useRef(false);
   const activeLevel = CLIMBER_LEVELS[0];
   const [activeCharacterId, setActiveCharacterId] = useState<ClimberCharacterId>('peach');
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [debugCollidersVisible, setDebugCollidersVisible] = useState(false);
+  const [debugStudioMode, setDebugStudioMode] = useState(false);
   const [debugJumpClearanceVisible, setDebugJumpClearanceVisible] = useState(false);
   const [debugCharacterAnimationVisible, setDebugCharacterAnimationVisible] = useState(false);
   const [characterAutoFootCalibrationEnabled, setCharacterAutoFootCalibrationEnabled] =
@@ -729,10 +748,15 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
   const [jumpClearanceReport, setJumpClearanceReport] = useState<ClimberJumpClearanceReport>({
     generatedAt: Date.now(),
     checkedLinks: 0,
+    earlyRouteCheckedLinks: 0,
     highRiskCount: 0,
+    earlyRouteHighRiskCount: 0,
     mediumRiskCount: 0,
     smallPieceCount: 0,
     denseSmallPieceClusterCount: 0,
+    spawnBlockerCount: 0,
+    spawnZoneClear: true,
+    routeRegressionPassed: true,
     issues: [],
   });
   const [characterAnimationDebugSnapshot, setCharacterAnimationDebugSnapshot] =
@@ -741,16 +765,23 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
   const toggleFullscreen = useCallback(async () => {
     const host = mountRef.current;
     if (!host) return;
+    const shouldRelockPointer = pointerLocked || hasEnteredSession;
     try {
       if (document.fullscreenElement === host) {
+        pendingPointerLockAfterFullscreenRef.current = false;
         await document.exitFullscreen();
         return;
       }
+      pendingPointerLockAfterFullscreenRef.current = shouldRelockPointer;
       await host.requestFullscreen();
+      if (shouldRelockPointer) {
+        controllerRef.current?.requestPointerLock();
+      }
     } catch {
+      pendingPointerLockAfterFullscreenRef.current = false;
       // 浏览器策略或用户手势限制导致失败时，保持当前状态即可。
     }
-  }, []);
+  }, [hasEnteredSession, pointerLocked]);
   useEffect(() => {
     if (!mountRef.current || !activeLevel) return;
     setCharacterStatus(activeCharacterId === 'orb' ? 'procedural' : 'model-loading');
@@ -760,6 +791,7 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
       characterId: activeCharacterId,
       audioEnabled,
       debugCollidersVisible,
+      debugInstanceLabelsVisible: debugStudioMode,
       debugJumpClearanceVisible,
       debugCharacterAnimationVisible,
       characterAutoFootCalibrationEnabled,
@@ -791,6 +823,10 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
   }, [debugCollidersVisible]);
 
   useEffect(() => {
+    controllerRef.current?.setDebugInstanceLabelsVisible(debugStudioMode);
+  }, [debugStudioMode]);
+
+  useEffect(() => {
     controllerRef.current?.setDebugJumpClearanceVisible(debugJumpClearanceVisible);
   }, [debugJumpClearanceVisible]);
 
@@ -810,7 +846,18 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
   useEffect(() => {
     const sync = () => {
       const host = mountRef.current;
-      setFullscreenEnabled(Boolean(host && document.fullscreenElement === host));
+      const isFullscreenActive = Boolean(host && document.fullscreenElement === host);
+      setFullscreenEnabled(isFullscreenActive);
+      if (
+        isFullscreenActive &&
+        pendingPointerLockAfterFullscreenRef.current &&
+        controllerRef.current
+      ) {
+        pendingPointerLockAfterFullscreenRef.current = false;
+        controllerRef.current.requestPointerLock();
+      } else if (!isFullscreenActive) {
+        pendingPointerLockAfterFullscreenRef.current = false;
+      }
     };
     document.addEventListener('fullscreenchange', sync);
     sync();
@@ -1007,6 +1054,7 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
             <span style={TAG_STYLE}>声音: {audioEnabled ? '开' : '关'}</span>
             <span style={TAG_STYLE}>全屏: {fullscreenEnabled ? '开' : '关'}</span>
             <span style={TAG_STYLE}>碰撞体: {debugCollidersVisible ? '显示' : '隐藏'}</span>
+            <span style={TAG_STYLE}>调试专用模式: {debugStudioMode ? '开' : '关'}</span>
             <span style={TAG_STYLE}>净空检测: {debugJumpClearanceVisible ? '显示' : '隐藏'}</span>
             <span style={TAG_STYLE}>
               碰撞体筛选: {activeFocusSetPieceName == null ? '全部模型' : activeFocusSetPieceName}
@@ -1014,6 +1062,14 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
             <span style={TAG_STYLE}>
               跳点风险: 高 {jumpClearanceReport.highRiskCount} / 中{' '}
               {jumpClearanceReport.mediumRiskCount}
+            </span>
+            <span style={TAG_STYLE}>
+              前{jumpClearanceReport.earlyRouteCheckedLinks}段高风险:{' '}
+              {jumpClearanceReport.earlyRouteHighRiskCount}
+            </span>
+            <span style={TAG_STYLE}>出生区阻挡: {jumpClearanceReport.spawnBlockerCount}</span>
+            <span style={TAG_STYLE}>
+              回归门槛: {jumpClearanceReport.routeRegressionPassed ? '通过' : '待修复'}
             </span>
             <span style={TAG_STYLE}>
               小件模型: {jumpClearanceReport.smallPieceCount}（密集区{' '}
@@ -1028,6 +1084,20 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
         <div style={GAME_SHELL_STYLE}>
           <div ref={mountRef} style={GAME_VIEWPORT_STYLE} />
           <div style={HUD_LAYER_STYLE}>
+            {debugStudioMode ? (
+              <div style={DEBUG_COORD_PANEL_STYLE}>
+                <div style={{ fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
+                  调试坐标方位
+                </div>
+                <div>`position: [x, y, z]`</div>
+                <div>X+ 向右，X- 向左</div>
+                <div>Y+ 向上，Y- 向下</div>
+                <div>Z+ 朝初始相机方向，Z- 远离初始相机</div>
+                <div style={{ marginTop: 4, color: '#cbd5e1' }}>
+                  快速改值：右移 `x+`，升高 `y+`，往远处推 `z-`。
+                </div>
+              </div>
+            ) : null}
             <div style={HUD_TOP_ROW_STYLE}>
               <div style={HUD_PANEL_STYLE}>
                 <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 0.2 }}>
@@ -1186,7 +1256,7 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                       void toggleFullscreen();
                     }}
                   >
-                    {fullscreenEnabled ? '全屏: 关' : '全屏: 开'}
+                    {fullscreenEnabled ? '切换全屏（当前: 开）' : '切换全屏（当前: 关）'}
                   </button>
                   <button
                     type="button"
@@ -1195,6 +1265,18 @@ export function ClimberArcadeExperience(props: ClimberArcadeExperienceProps) {
                   >
                     {debugCollidersVisible ? '碰撞体: 开' : '碰撞体: 关'}
                   </button>
+                  {isDevBuild ? (
+                    <button
+                      type="button"
+                      style={MENU_BUTTON_SECONDARY_STYLE}
+                      onClick={() => {
+                        setDebugStudioMode((prev) => !prev);
+                        setDebugCollidersVisible(true);
+                      }}
+                    >
+                      {debugStudioMode ? '调试专用模式: 开' : '调试专用模式: 关'}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     style={MENU_BUTTON_SECONDARY_STYLE}

@@ -23,10 +23,15 @@ export interface ClimberJumpClearanceIssue {
 export interface ClimberJumpClearanceReport {
   generatedAt: number;
   checkedLinks: number;
+  earlyRouteCheckedLinks: number;
   highRiskCount: number;
+  earlyRouteHighRiskCount: number;
   mediumRiskCount: number;
   smallPieceCount: number;
   denseSmallPieceClusterCount: number;
+  spawnBlockerCount: number;
+  spawnZoneClear: boolean;
+  routeRegressionPassed: boolean;
   issues: ClimberJumpClearanceIssue[];
 }
 
@@ -155,6 +160,7 @@ export interface ClimberPrototypeController {
   reset: () => void;
   setAudioEnabled: (enabled: boolean) => void;
   setDebugCollidersVisible: (visible: boolean) => void;
+  setDebugInstanceLabelsVisible: (visible: boolean) => void;
   setDebugJumpClearanceVisible: (visible: boolean) => void;
   setDebugColliderFocusAssetId: (assetId: ClimberSetPieceAssetId | null) => void;
   setDebugCharacterAnimationVisible: (visible: boolean) => void;
