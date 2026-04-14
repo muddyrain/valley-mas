@@ -547,3 +547,244 @@
 - 风险与后续：
   - 当前风险：无功能风险，属于调试显示层优化。
   - 下一步动作：你按新便签体系继续调点位，我根据 `spid + 偏移方向` 帮你批量改坐标。
+
+## 2026-04-14 23:40 (Asia/Shanghai)
+
+- 任务：为 Unity 新项目建立专用 skill，明确与 Three.js 旧链路的过渡规则与任务清单。
+- 改动文件：
+  - `.codex/skills/unity-climber-iteration/SKILL.md`
+  - `.codex/skills/unity-climber-iteration/agents/openai.yaml`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `AGENTS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新建 `unity-climber-iteration` skill，定义 Unity 迭代流程、提交边界、最小校验与输出要求。
+  - 新增 Unity 任务清单模板，约束活跃 backlog 数量并沉淀过渡状态。
+  - 在仓库 `AGENTS.md` 加入场景强制 skill：Unity Climber 迭代与 Three.js 过渡使用新 skill。
+  - 修复新 skill `agents/openai.yaml` 的编码问题，统一为 UTF-8 可读内容。
+- 校验：
+  - `PYTHONUTF8=1 python C:\\Users\\A\\.codex\\skills\\.system\\skill-creator\\scripts\\quick_validate.py .codex/skills/unity-climber-iteration`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/unity-climber-iteration/SKILL.md .codex/skills/unity-climber-iteration/agents/openai.yaml .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md AGENTS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：无明显结构与编码风险。
+  - 下一步动作：按新 skill 先推进 Unity P0（目录规范 + 首个可演示闭环 + 提交边界稳定）。
+
+## 2026-04-14 23:48 (Asia/Shanghai)
+
+- 任务：启动 Unity 主线第一轮可执行任务，解决“项目打开后场景空白”的起步问题。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scripts/Runtime/ClimberSceneBootstrap.cs`
+  - `apps/unity-climber/Assets/Scripts/Gameplay/ClimberPlayerController.cs`
+  - `apps/unity-climber/Assets/Scripts/Gameplay/ClimberFollowCamera.cs`
+  - `apps/unity-climber/Assets/Scripts/Gameplay/ClimberFinishTrigger.cs`
+  - `apps/unity-climber/.gitignore`
+  - `apps/unity-climber/README.md`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增运行时自动引导：空场景进入 Play 时自动生成地面、阶梯路线、玩家、相机跟随与终点触发。
+  - 新增基础玩法脚本：第三人称移动/跳跃、相机跟随、终点触发日志。
+  - 新增 `apps/unity-climber/.gitignore`，收敛 Unity 缓存与 IDE 噪音文件。
+  - 新增 `apps/unity-climber/README.md`，给出快速启动、目录约定和提交边界。
+  - 更新 Unity 任务清单：P0 三项落地完成，并补充下一步活跃项。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/unity-climber/README.md .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+  - `git status --short apps/unity-climber`：通过（结果：`?? apps/unity-climber/`，当前目录整体为新建未跟踪）
+- 风险与后续：
+  - 当前风险：尚未在 Unity Editor 实机播放验证，需要你本地点 Play 确认体感。
+  - 下一步动作：先完成 Unity 内实测，确认后进入“手工正式场景替换自动铺场 + 最小 HUD”。
+
+## 2026-04-14 23:55 (Asia/Shanghai)
+
+- 任务：修复用户反馈的 Unity 场景空白与角色控制异常问题。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scripts/Gameplay/ClimberPlayerController.cs`
+  - `apps/unity-climber/Assets/Scripts/Gameplay/ClimberFollowCamera.cs`
+  - `apps/unity-climber/Assets/Scripts/Editor/ClimberSceneSetupEditor.cs`
+  - `apps/unity-climber/README.md`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 修复地面检测：改为基于 `CapsuleCollider.bounds` 的 SphereCast，避免角色“无法起跳”。
+  - 相机跟随偏移改为世界空间，减少 A/S/D 时“画面像在扭动”的感知。
+  - 新增编辑器菜单 `Tools > Unity Climber > Setup Sample Scene`，支持在编辑模式一键创建并保存可玩原型。
+  - README 新增快速排障说明（Game 视图焦点、菜单初始化步骤）。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/unity-climber/README.md .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：尚未在你本地 Unity Editor 实机验证输入焦点与跳跃手感。
+  - 下一步动作：你按新菜单重建场景并 Play，我再根据实测继续调移动/相机参数。
+
+## 2026-04-15 00:00 (Asia/Shanghai)
+
+- 任务：按用户反馈移除“Play 时自动插入场景对象”的模式，回归 Unity 编辑器先搭建场景的默认工作流。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scripts/Runtime/ClimberSceneBootstrap.cs`
+  - `apps/unity-climber/Assets/Scripts/Editor/ClimberSceneSetupEditor.cs`
+  - `apps/unity-climber/README.md`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 删除运行时自动初始化入口，不再通过 `RuntimeInitializeOnLoadMethod` 在开始游戏时插入对象。
+  - 将场景构建能力收敛为共享函数，由编辑器菜单 `Tools > Unity Climber > Setup Sample Scene` 主动触发并保存。
+  - 文档明确更新为“先在编辑器插入并保存，再 Play”的流程。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/unity-climber/README.md .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`：通过
+- 风险与后续：
+  - 当前风险：由于未在本地 Unity Editor 直接运行，仍需你实机确认菜单生成与保存流程。
+  - 下一步动作：你执行一次菜单生成并保存，我接着把“原型对象”替换成正式预制体结构。
+
+## 2026-04-15 00:02 (Asia/Shanghai)
+
+- 任务：按用户要求支持“直接在场景里创建模型”，减少手工步骤。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scripts/Editor/ClimberSceneSetupEditor.cs`
+  - `apps/unity-climber/README.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增编辑器自动初始化：首次打开 `SampleScene.scene` 且场景为空时，自动创建原型对象并保存场景。
+  - 新增菜单 `Tools > Unity Climber > Setup Sample Scene And Save`，支持一键重建并保存。
+  - README 同步为“自动初始化 + 可手动重建”的流程说明。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/unity-climber/README.md apps/unity-climber/Assets/Scripts/Editor/ClimberSceneSetupEditor.cs`：通过
+- 风险与后续：
+  - 当前风险：自动初始化逻辑当前只针对 `SampleScene.scene`，其他场景不会自动处理。
+  - 下一步动作：若你需要，我可以加“仅在用户确认后自动生成”的开关，避免误改场景。
+
+## 2026-04-15 00:16 (Asia/Shanghai)
+
+- 任务：按用户硬性要求切换为“Scene 直接建模”，禁止 Play 时脚本生成场景对象。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scenes/SampleScene.scene`
+  - `apps/unity-climber/Assets/Scripts/Editor/ClimberSceneSetupEditor.cs`（删除）
+  - `apps/unity-climber/Assets/Scripts/Runtime/ClimberSceneBootstrap.cs`（删除）
+  - `apps/unity-climber/Assets/Scripts/Runtime/ClimberSceneBootstrap.cs.meta`（删除）
+  - `apps/unity-climber/README.md`
+  - `.codex/skills/unity-climber-iteration/SKILL.md`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 直接在 `SampleScene.scene` 写入可见对象：`Ground`、`StartPlatform`、`Step_01~03`、`Player`、`FinishPlatform`、`FinishTrigger`。
+  - 直接在 Scene 里挂载玩家控制、相机跟随、终点触发组件，不再依赖运行时建场景。
+  - 删除 Editor/Runtime 建场脚本入口，避免后续继续走“脚本生成场景”的路线。
+  - 在 `unity-climber-iteration` skill 中新增硬约束：Scene 模型必须直接写入 scene，禁止 Play 时脚本生成作为默认交付。
+- 校验：
+  - `rg -n "ClimberSceneBootstrap|Setup Sample Scene|RuntimeInitializeOnLoadMethod" apps/unity-climber`：通过（无匹配）
+  - `rg -n "m_Name: (Ground|Player|StartPlatform|Step_01|FinishPlatform|FinishTrigger)" apps/unity-climber/Assets/Scenes/SampleScene.scene`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/unity-climber/README.md .codex/skills/unity-climber-iteration/SKILL.md .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`：通过
+- 风险与后续：
+  - 当前风险：`SampleScene.scene` 为手工 YAML 落地，需你在 Unity 中打开一次确认组件序列化无告警。
+  - 下一步动作：你打开场景验证通过后，我再按同样规则继续补更多关卡模型与布局。
+
+## 2026-04-15 00:21 (Asia/Shanghai)
+
+- 任务：按用户要求正式启动 Unity 任务清单，并把“对齐《攀爬动物：在一起》”写入 skill 硬约束。
+- 改动文件：
+  - `.codex/skills/unity-climber-iteration/SKILL.md`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 skill 中新增“核心产品定位（必须对齐）”：目标与《攀爬动物：在一起》一致，所有改动服务向上攀爬主循环。
+  - 将任务清单升级为 P0~P5 版本路线，替换为当前可执行活跃项（P1-01、P1-02、P2-01、P3-01）。
+  - 明确看板状态：Unity 主线为“可演示”，产品对齐状态为“对齐核心攀爬循环”。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/unity-climber-iteration/SKILL.md .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`：通过
+- 风险与后续：
+  - 当前风险：P1 活跃任务尚未开始落地到场景对象。
+  - 下一步动作：下一轮直接执行 P1-01（在 Scene 内补 Step_04~Step_10 与终点缓冲平台）。
+
+## 2026-04-15 00:34 (Asia/Shanghai)
+
+- 任务：执行 P1-01，直接在 Scene 中补齐可达主路线（Step_04~Step_10 + 终点缓冲平台）。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scenes/SampleScene.scene`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 `SampleScene.scene` 直接新增 `Step_04` 到 `Step_10` 与 `FinishBuffer`，并写入 `SceneRoots`，打开场景即可在 Hierarchy 看到。
+  - 修正 Scene 中三个核心组件的脚本引用与参数：`ClimberPlayerController`、`ClimberFollowCamera`、`ClimberFinishTrigger`。
+  - 任务清单中将 `P1-01` 标记为完成。
+- 校验：
+  - `rg -n "m_Name: (Step_0[1-9]|Step_10|FinishBuffer|FinishPlatform|FinishTrigger|Player)" apps/unity-climber/Assets/Scenes/SampleScene.scene`：通过
+  - `rg -n "&200000107|&200005106|&963194229|m_Script:" apps/unity-climber/Assets/Scenes/SampleScene.scene`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：`SampleScene.scene` 为手工 YAML 更新，仍需在 Unity Editor 打开一次确认无 Missing Script/序列化告警。
+  - 下一步动作：你验收 P1-01 后，我直接进入 `P1-02`（Checkpoint_01）。
+
+## 2026-04-15 00:39 (Asia/Shanghai)
+
+- 任务：修复“player 不能移动/跳跃”并继续执行 P1-02（Checkpoint_01）。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scripts/Gameplay/ClimberPlayerController.cs`
+  - `apps/unity-climber/Assets/Scenes/SampleScene.scene`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 玩家控制增加键位硬兜底：`W/A/S/D + 方向键 + Space` 可直接驱动移动与跳跃，不依赖轴配置稳定性。
+  - 明确强制 `Rigidbody` 为可受力状态（`useGravity=true`、`isKinematic=false`），降低场景序列化差异导致不可动风险。
+  - 在 Scene 中新增 `Checkpoint_01`（直接落在 `SampleScene.scene`），并在玩家脚本中加入跌落自动回到检查点逻辑。
+  - 将任务清单 `P1-02` 标记为完成。
+- 校验：
+  - `rg -n "m_Name: (Checkpoint_01|Step_0[1-9]|Step_10|FinishBuffer|Player)" apps/unity-climber/Assets/Scenes/SampleScene.scene`：通过
+  - `rg -n "m_Script: \\{fileID: 11500000" apps/unity-climber/Assets/Scenes/SampleScene.scene`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`：通过
+- 风险与后续：
+  - 当前风险：未在本地 Unity Editor 实际按键验证，仍需你在 `Game` 视图焦点下实测。
+  - 下一步动作：你确认移动/跳跃恢复后，我继续做 `P2-01`（最小调参面板）。
+
+## 2026-04-15 00:44 (Asia/Shanghai)
+
+- 任务：继续修复玩家可控性并完成 P2-01 最小调参面板。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scripts/Gameplay/ClimberPlayerController.cs`
+  - `apps/unity-climber/Assets/Scripts/Gameplay/ClimberFollowCamera.cs`
+  - `apps/unity-climber/Assets/Scenes/SampleScene.scene`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将脚本语法降级为 Unity 兼容的保守写法（移除 `null!` 与目标类型 `new(...)`），降低编译失败导致脚本不运行的风险。
+  - 调整 Player 初始高度到 `y=2`，避免胶囊体嵌入起始平台造成“看起来不能移动”。
+  - `ClimberFollowCamera` 新增 offset 读写接口，用于运行时调参。
+  - `ClimberPlayerController` 新增最小调参面板（`F2` 开关），支持移动速度、跳跃力、相机高度/距离实时调节。
+  - 任务清单 `P2-01` 标记完成。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md apps/unity-climber/Assets/Scripts/Gameplay/ClimberPlayerController.cs apps/unity-climber/Assets/Scripts/Gameplay/ClimberFollowCamera.cs`：通过
+- 风险与后续：
+  - 当前风险：仍需你在 Unity Editor 中实测确认 Console 无编译错误。
+  - 下一步动作：你确认角色可动后，我继续 `P3-01`（最小 HUD：高度、进度、重开提示）。
+
+## 2026-04-15 00:49 (Asia/Shanghai)
+
+- 任务：修复场景里 `None (Mono Script)` 绑定丢失问题。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scripts/Gameplay/ClimberPlayerController.cs.meta`
+  - `apps/unity-climber/Assets/Scripts/Gameplay/ClimberFollowCamera.cs.meta`
+  - `apps/unity-climber/Assets/Scripts/Gameplay/ClimberFinishTrigger.cs.meta`
+  - `apps/unity-climber/Assets/Scenes/SampleScene.scene`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将三个 gameplay 脚本的 `.meta guid` 从异常格式改为 Unity 标准 32 位十六进制 guid。
+  - 同步替换 `SampleScene.scene` 中三处 `m_Script.guid` 到新 guid，恢复脚本引用链路。
+- 校验：
+  - `rg -n "m_Script:" apps/unity-climber/Assets/Scenes/SampleScene.scene`：通过（3 处 guid 已替换）
+  - `rg -n "C3oWsS3|D3hKtiir|Bn8ctyOl" apps/unity-climber/Assets/Scripts apps/unity-climber/Assets/Scenes/SampleScene.scene`：通过（无残留）
+- 风险与后续：
+  - 当前风险：需 Unity 重新导入资源后才会在 Inspector 反映最新绑定状态。
+  - 下一步动作：你执行一次 Reimport/重开工程后验证 Player 与 Main Camera 脚本组件是否恢复。
+
+## 2026-04-15 00:51 (Asia/Shanghai)
+
+- 任务：把“脚本丢失绑定（None Mono Script）”问题沉淀进技能规则，防止后续复发。
+- 改动文件：
+  - `.codex/skills/unity-climber-iteration/SKILL.md`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 skill 中新增“脚本绑定防呆（必须检查）”章节，明确 `.meta guid` 格式、scene 引用一致性与重导验证步骤。
+  - 在任务清单“每轮提交前检查”里加入 Inspector 抽查项：`Player/Camera/FinishTrigger` 不能出现 `None (Mono Script)`。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/unity-climber-iteration/SKILL.md .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：规则已落地，但仍需在下一轮实操中按检查项执行并闭环。
+  - 下一步动作：继续当前 Unity 任务，先确认脚本绑定恢复再推进 P3-01。

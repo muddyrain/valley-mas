@@ -31,6 +31,7 @@
 - Go 调用火山 ARK 的 AI 能力：`ai-capability-orchestration`
 - 持续迭代任务管理：`web-feature-iteration`
 - climber-game 关卡与目标职责改动：`climber-game-design-guard`
+- Unity Climber 项目迭代与 Three.js 过渡：`unity-climber-iteration`
 - 任何真实文件改动后的日志沉淀：`change-log-guard`
 - 技能沉淀与更新：`skill-opportunity-scout`、`skill-sync-guard`
 
