@@ -7,6 +7,29 @@ export interface ClimberRunStats {
   goalReachedAtMs: number | null;
 }
 
+export type ClimberJumpClearanceSeverity = 'high' | 'medium';
+
+export interface ClimberJumpClearanceIssue {
+  id: string;
+  severity: ClimberJumpClearanceSeverity;
+  linkId: string;
+  sourceId: string;
+  targetId: string;
+  blockerId: string;
+  blockerAssetId?: string;
+  reason: string;
+}
+
+export interface ClimberJumpClearanceReport {
+  generatedAt: number;
+  checkedLinks: number;
+  highRiskCount: number;
+  mediumRiskCount: number;
+  smallPieceCount: number;
+  denseSmallPieceClusterCount: number;
+  issues: ClimberJumpClearanceIssue[];
+}
+
 export type ClimberCharacterId = 'orb' | 'peach' | 'daisy';
 
 export type ClimberCharacterAnimationState = 'idle' | 'run' | 'stop' | 'jump' | 'fall' | 'land';
@@ -139,6 +162,13 @@ export interface ClimberLevelTheme {
   sunColor?: string;
 }
 
+export interface ClimberLevelDesignRules {
+  minPlayableSurfaceSize?: number;
+  smallPieceClusterRadius?: number;
+  maxNearbySmallPieces?: number;
+  minJumpHeadroom?: number;
+}
+
 export interface ClimberLevelDefinition {
   id: string;
   name: string;
@@ -148,12 +178,14 @@ export interface ClimberLevelDefinition {
   platforms: ClimberPlatformDefinition[];
   setPieces?: ClimberSetPieceDefinition[];
   theme?: ClimberLevelTheme;
+  designRules?: ClimberLevelDesignRules;
 }
 
 export interface ClimberPrototypeController {
   reset: () => void;
   setAudioEnabled: (enabled: boolean) => void;
   setDebugCollidersVisible: (visible: boolean) => void;
+  setDebugJumpClearanceVisible: (visible: boolean) => void;
   setDebugColliderFocusAssetId: (assetId: ClimberSetPieceAssetId | null) => void;
   requestPointerLock: () => void;
   dispose: () => void;

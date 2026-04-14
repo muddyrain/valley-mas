@@ -10,6 +10,7 @@ import {
   GridHelper,
   Group,
   HemisphereLight,
+  Line,
   LineBasicMaterial,
   LineSegments,
   type Material,
@@ -45,6 +46,8 @@ import type {
   ClimberCharacterAnimationState,
   ClimberCharacterId,
   ClimberCharacterRuntimeStatus,
+  ClimberJumpClearanceIssue,
+  ClimberJumpClearanceReport,
   ClimberLevelDefinition,
   ClimberPrototypeController,
   ClimberRunStats,
@@ -57,8 +60,10 @@ interface CreateClimberPrototypeOptions {
   characterId: ClimberCharacterId;
   audioEnabled: boolean;
   debugCollidersVisible?: boolean;
+  debugJumpClearanceVisible?: boolean;
   debugColliderFocusAssetId?: ClimberSetPieceAssetId | null;
   onStats: (stats: ClimberRunStats) => void;
+  onJumpClearanceReport?: (report: ClimberJumpClearanceReport) => void;
   onPointerLockChange?: (locked: boolean) => void;
   onCharacterStatusChange?: (status: ClimberCharacterRuntimeStatus) => void;
 }
@@ -85,6 +90,43 @@ const MIN_JUMP_INTERVAL_MS = 220;
 const MIN_GROUNDED_BEFORE_JUMP_MS = 45;
 const GROUND_STICK_VELOCITY_MAX = 1.35;
 const RAMP_TOP_FLAT_RATIO = 0.36;
+const DEFAULT_MIN_PLAYABLE_SURFACE_SIZE = 1.36;
+const DEFAULT_SMALL_PIECE_CLUSTER_RADIUS = 2.8;
+const DEFAULT_MAX_NEARBY_SMALL_PIECES = 2;
+const DEFAULT_MIN_JUMP_HEADROOM = 1.08;
+const JUMP_PATH_SAMPLE_STEPS = 14;
+const JUMP_CLEARANCE_RADIUS = PLAYER_RADIUS * 0.92;
+const JUMP_ROUTE_SIDE_PADDING = PLAYER_RADIUS * 1.65;
+const JUMP_ROUTE_BASE_HEIGHT_PADDING = 0.3;
+const JUMP_ROUTE_ARC_BASE = 1.35;
+const JUMP_ROUTE_ARC_MAX = 4.6;
+
+interface JumpRouteNode {
+  id: string;
+  collider: PlatformCollisionData;
+}
+
+interface JumpClearanceSegment {
+  linkId: string;
+  sourceId: string;
+  targetId: string;
+  source: [number, number, number];
+  target: [number, number, number];
+  status: 'safe' | 'tight' | 'blocked';
+}
+
+interface JumpClearanceBlocker {
+  issueId: string;
+  center: [number, number, number];
+  size: [number, number, number];
+  severity: ClimberJumpClearanceIssue['severity'];
+}
+
+interface JumpClearanceAnalysis {
+  report: ClimberJumpClearanceReport;
+  segments: JumpClearanceSegment[];
+  blockers: JumpClearanceBlocker[];
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -92,6 +134,26 @@ function clamp(value: number, min: number, max: number): number {
 
 function toVector3(value: [number, number, number]): Vector3 {
   return new Vector3(value[0], value[1], value[2]);
+}
+
+function lerpNumber(from: number, to: number, ratio: number): number {
+  return from + (to - from) * ratio;
+}
+
+function intersectsExpandedAabb(params: {
+  point: Vector3;
+  radius: number;
+  collider: PlatformCollisionData;
+}): boolean {
+  const { point, radius, collider } = params;
+  return !(
+    point.x < collider.minX - radius ||
+    point.x > collider.maxX + radius ||
+    point.y < collider.minY - radius ||
+    point.y > collider.maxY + radius ||
+    point.z < collider.minZ - radius ||
+    point.z > collider.maxZ + radius
+  );
 }
 
 function createRampDebugGeometry(width: number, height: number, depth: number): BufferGeometry {
@@ -155,9 +217,11 @@ export function createClimberPrototype(
     characterId,
     audioEnabled,
     debugCollidersVisible = false,
+    debugJumpClearanceVisible = false,
     debugColliderFocusAssetId = null,
     onPointerLockChange,
     onCharacterStatusChange,
+    onJumpClearanceReport,
   } = options;
 
   if (!level.platforms.length) {
@@ -244,6 +308,41 @@ export function createClimberPrototype(
   let colliderDebugFocusAssetId: ClimberSetPieceAssetId | null = debugColliderFocusAssetId;
   colliderDebugGroup.visible = debugCollidersVisible;
   scene.add(colliderDebugGroup);
+
+  const jumpClearanceDebugGroup = new Group();
+  const jumpClearanceDebugGeometries: BufferGeometry[] = [];
+  const jumpClearanceDebugMaterials: Material[] = [];
+  jumpClearanceDebugGroup.visible = debugJumpClearanceVisible;
+  scene.add(jumpClearanceDebugGroup);
+  const jumpRouteSample = new Vector3();
+  const designRules = level.designRules ?? {};
+  const minPlayableSurfaceSize = Math.max(
+    0.6,
+    designRules.minPlayableSurfaceSize ?? DEFAULT_MIN_PLAYABLE_SURFACE_SIZE,
+  );
+  const smallPieceClusterRadius = Math.max(
+    0.8,
+    designRules.smallPieceClusterRadius ?? DEFAULT_SMALL_PIECE_CLUSTER_RADIUS,
+  );
+  const maxNearbySmallPieces = Math.max(
+    1,
+    Math.floor(designRules.maxNearbySmallPieces ?? DEFAULT_MAX_NEARBY_SMALL_PIECES),
+  );
+  const minJumpHeadroom = Math.max(0.45, designRules.minJumpHeadroom ?? DEFAULT_MIN_JUMP_HEADROOM);
+  let lastJumpClearanceAnalysis: JumpClearanceAnalysis = {
+    report: {
+      generatedAt: Date.now(),
+      checkedLinks: 0,
+      highRiskCount: 0,
+      mediumRiskCount: 0,
+      smallPieceCount: 0,
+      denseSmallPieceClusterCount: 0,
+      issues: [],
+    },
+    segments: [],
+    blockers: [],
+  };
+  let jumpClearanceRecomputeTimer = 0;
 
   const clearColliderDebugMeshes = () => {
     while (colliderDebugGroup.children.length) {
@@ -333,6 +432,292 @@ export function createClimberPrototype(
     colliderDebugDirty = false;
   };
 
+  const clearJumpClearanceDebugMeshes = () => {
+    while (jumpClearanceDebugGroup.children.length) {
+      jumpClearanceDebugGroup.remove(jumpClearanceDebugGroup.children[0]);
+    }
+    jumpClearanceDebugGeometries.forEach((geometry) => geometry.dispose());
+    jumpClearanceDebugMaterials.forEach((material) => material.dispose());
+    jumpClearanceDebugGeometries.length = 0;
+    jumpClearanceDebugMaterials.length = 0;
+  };
+
+  const rebuildJumpClearanceDebugMeshes = (analysis: JumpClearanceAnalysis) => {
+    clearJumpClearanceDebugMeshes();
+
+    analysis.segments.forEach((segment) => {
+      const color =
+        segment.status === 'blocked'
+          ? '#ef4444'
+          : segment.status === 'tight'
+            ? '#f59e0b'
+            : '#22c55e';
+      const geometry = new BufferGeometry();
+      geometry.setAttribute(
+        'position',
+        new Float32BufferAttribute(
+          [
+            segment.source[0],
+            segment.source[1],
+            segment.source[2],
+            segment.target[0],
+            segment.target[1],
+            segment.target[2],
+          ],
+          3,
+        ),
+      );
+      const material = new LineBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.78,
+        depthWrite: false,
+      });
+      const line = new Line(geometry, material);
+      line.renderOrder = 132;
+      jumpClearanceDebugGroup.add(line);
+      jumpClearanceDebugGeometries.push(geometry);
+      jumpClearanceDebugMaterials.push(material);
+    });
+
+    analysis.blockers.forEach((blocker) => {
+      const geometry = new BoxGeometry(
+        Math.max(0.001, blocker.size[0]),
+        Math.max(0.001, blocker.size[1]),
+        Math.max(0.001, blocker.size[2]),
+      );
+      const material = new MeshBasicMaterial({
+        color: blocker.severity === 'high' ? '#ef4444' : '#f59e0b',
+        transparent: true,
+        opacity: blocker.severity === 'high' ? 0.16 : 0.12,
+        depthWrite: false,
+      });
+      const mesh = new Mesh(geometry, material);
+      mesh.position.set(blocker.center[0], blocker.center[1], blocker.center[2]);
+      mesh.renderOrder = 131;
+      jumpClearanceDebugGroup.add(mesh);
+      jumpClearanceDebugGeometries.push(geometry);
+      jumpClearanceDebugMaterials.push(material);
+    });
+  };
+
+  const getColliderByInstance = (
+    category: PlatformCollisionDebugMeta['category'],
+    instanceId: string,
+  ): PlatformCollisionData | null => {
+    const hit =
+      platformColliders.find(
+        (collider) =>
+          collider.debugMeta?.category === category && collider.debugMeta.instanceId === instanceId,
+      ) ?? null;
+    return hit;
+  };
+
+  const buildJumpRouteNodes = (): JumpRouteNode[] => {
+    const routeRefs: Array<{ category: PlatformCollisionDebugMeta['category']; id: string }> = [];
+    const startPlatformId = level.platforms[0]?.id;
+    const goalPlatformId = level.platforms[level.platforms.length - 1]?.id;
+    if (startPlatformId) {
+      routeRefs.push({ category: 'platform', id: startPlatformId });
+    }
+    (level.setPieces ?? []).forEach((piece) => {
+      if (piece.solid === false) return;
+      routeRefs.push({ category: 'setpiece', id: piece.id });
+    });
+    if (goalPlatformId && goalPlatformId !== startPlatformId) {
+      routeRefs.push({ category: 'platform', id: goalPlatformId });
+    }
+
+    const nodes: JumpRouteNode[] = [];
+    routeRefs.forEach((ref) => {
+      const collider = getColliderByInstance(ref.category, ref.id);
+      if (!collider) return;
+      const last = nodes[nodes.length - 1];
+      if (last?.id === ref.id) return;
+      nodes.push({
+        id: ref.id,
+        collider,
+      });
+    });
+    return nodes;
+  };
+
+  const analyzeJumpClearance = (): JumpClearanceAnalysis => {
+    const nodes = buildJumpRouteNodes();
+    const candidateSetPieceColliders = platformColliders.filter(
+      (collider) => collider.debugMeta?.category === 'setpiece',
+    );
+    const issues: ClimberJumpClearanceIssue[] = [];
+    const blockers: JumpClearanceBlocker[] = [];
+    const segments: JumpClearanceSegment[] = [];
+
+    for (let index = 1; index < nodes.length; index += 1) {
+      const source = nodes[index - 1];
+      const target = nodes[index];
+      const linkId = `${source.id}=>${target.id}`;
+      const sourceCenterX = source.collider.center[0];
+      const sourceCenterZ = source.collider.center[2];
+      const targetCenterX = target.collider.center[0];
+      const targetCenterZ = target.collider.center[2];
+      const sourceTop = source.collider.maxY;
+      const targetTop = target.collider.maxY;
+      const apexBoost = clamp(
+        JUMP_ROUTE_ARC_BASE + (targetTop - sourceTop) * 0.32,
+        JUMP_ROUTE_ARC_BASE,
+        JUMP_ROUTE_ARC_MAX,
+      );
+      const sourceY = sourceTop + PLAYER_RADIUS + 0.02;
+      const targetY = targetTop + PLAYER_RADIUS + 0.02;
+      let status: JumpClearanceSegment['status'] = 'safe';
+
+      const routeMinX = Math.min(sourceCenterX, targetCenterX) - JUMP_ROUTE_SIDE_PADDING;
+      const routeMaxX = Math.max(sourceCenterX, targetCenterX) + JUMP_ROUTE_SIDE_PADDING;
+      const routeMinZ = Math.min(sourceCenterZ, targetCenterZ) - JUMP_ROUTE_SIDE_PADDING;
+      const routeMaxZ = Math.max(sourceCenterZ, targetCenterZ) + JUMP_ROUTE_SIDE_PADDING;
+      const routeMinY = Math.min(sourceY, targetY) + JUMP_ROUTE_BASE_HEIGHT_PADDING;
+      const routeMaxY = Math.max(sourceY, targetY) + apexBoost + minJumpHeadroom;
+
+      candidateSetPieceColliders.forEach((blockerCollider) => {
+        const blockerId = blockerCollider.debugMeta?.instanceId;
+        if (!blockerId) return;
+        if (blockerId === source.id || blockerId === target.id) return;
+        if (
+          blockerCollider.maxX < routeMinX ||
+          blockerCollider.minX > routeMaxX ||
+          blockerCollider.maxY < routeMinY ||
+          blockerCollider.minY > routeMaxY ||
+          blockerCollider.maxZ < routeMinZ ||
+          blockerCollider.minZ > routeMaxZ
+        ) {
+          return;
+        }
+
+        let blocked = false;
+        let tight = false;
+        for (let sampleStep = 1; sampleStep < JUMP_PATH_SAMPLE_STEPS; sampleStep += 1) {
+          const ratio = sampleStep / JUMP_PATH_SAMPLE_STEPS;
+          jumpRouteSample.set(
+            lerpNumber(sourceCenterX, targetCenterX, ratio),
+            lerpNumber(sourceY, targetY, ratio) + 4 * apexBoost * ratio * (1 - ratio),
+            lerpNumber(sourceCenterZ, targetCenterZ, ratio),
+          );
+          if (
+            intersectsExpandedAabb({
+              point: jumpRouteSample,
+              radius: JUMP_CLEARANCE_RADIUS,
+              collider: blockerCollider,
+            })
+          ) {
+            blocked = true;
+            break;
+          }
+          const expectedHeadTop = jumpRouteSample.y + PLAYER_RADIUS + minJumpHeadroom;
+          if (
+            blockerCollider.minY <= expectedHeadTop &&
+            blockerCollider.maxY >= jumpRouteSample.y + PLAYER_RADIUS * 0.3
+          ) {
+            tight = true;
+          }
+        }
+
+        if (!blocked && !tight) return;
+        const severity: ClimberJumpClearanceIssue['severity'] = blocked ? 'high' : 'medium';
+        const issueId = `${linkId}::${blockerId}::${severity}`;
+        if (issues.some((issue) => issue.id === issueId)) return;
+        issues.push({
+          id: issueId,
+          severity,
+          linkId,
+          sourceId: source.id,
+          targetId: target.id,
+          blockerId,
+          blockerAssetId: blockerCollider.debugMeta?.assetId,
+          reason: blocked ? '跳跃路径被模型碰撞体直接阻塞' : '跳跃路径头顶净空不足，存在顶头风险',
+        });
+        blockers.push({
+          issueId,
+          center: [
+            (blockerCollider.minX + blockerCollider.maxX) * 0.5,
+            (blockerCollider.minY + blockerCollider.maxY) * 0.5,
+            (blockerCollider.minZ + blockerCollider.maxZ) * 0.5,
+          ],
+          size: [
+            Math.max(0.001, blockerCollider.maxX - blockerCollider.minX),
+            Math.max(0.001, blockerCollider.maxY - blockerCollider.minY),
+            Math.max(0.001, blockerCollider.maxZ - blockerCollider.minZ),
+          ],
+          severity,
+        });
+        status = blocked ? 'blocked' : status === 'safe' ? 'tight' : status;
+      });
+
+      segments.push({
+        linkId,
+        sourceId: source.id,
+        targetId: target.id,
+        source: [sourceCenterX, sourceY, sourceCenterZ],
+        target: [targetCenterX, targetY, targetCenterZ],
+        status,
+      });
+    }
+
+    const smallSetPieceColliders = candidateSetPieceColliders.filter((collider) => {
+      const footprint = Math.min(collider.size[0], collider.size[2]);
+      return footprint < minPlayableSurfaceSize;
+    });
+    const denseSmallPieceClusters = new Set<string>();
+    smallSetPieceColliders.forEach((candidate, index) => {
+      let nearbyCount = 0;
+      for (let peerIndex = 0; peerIndex < smallSetPieceColliders.length; peerIndex += 1) {
+        if (peerIndex === index) continue;
+        const peer = smallSetPieceColliders[peerIndex];
+        const dx = peer.center[0] - candidate.center[0];
+        const dz = peer.center[2] - candidate.center[2];
+        if (Math.hypot(dx, dz) <= smallPieceClusterRadius) {
+          nearbyCount += 1;
+        }
+      }
+      if (nearbyCount > maxNearbySmallPieces) {
+        denseSmallPieceClusters.add(candidate.debugMeta?.instanceId ?? `small:${index}`);
+      }
+    });
+
+    const report: ClimberJumpClearanceReport = {
+      generatedAt: Date.now(),
+      checkedLinks: Math.max(0, nodes.length - 1),
+      highRiskCount: issues.filter((issue) => issue.severity === 'high').length,
+      mediumRiskCount: issues.filter((issue) => issue.severity === 'medium').length,
+      smallPieceCount: smallSetPieceColliders.length,
+      denseSmallPieceClusterCount: denseSmallPieceClusters.size,
+      issues,
+    };
+
+    return {
+      report,
+      segments,
+      blockers,
+    };
+  };
+
+  const rebuildJumpClearanceAnalysis = () => {
+    const analysis = analyzeJumpClearance();
+    lastJumpClearanceAnalysis = analysis;
+    onJumpClearanceReport?.(analysis.report);
+    if (jumpClearanceDebugGroup.visible) {
+      rebuildJumpClearanceDebugMeshes(analysis);
+    }
+  };
+
+  const scheduleJumpClearanceRebuild = () => {
+    if (jumpClearanceRecomputeTimer) {
+      window.clearTimeout(jumpClearanceRecomputeTimer);
+    }
+    jumpClearanceRecomputeTimer = window.setTimeout(() => {
+      jumpClearanceRecomputeTimer = 0;
+      rebuildJumpClearanceAnalysis();
+    }, 80);
+  };
+
   const pushCollider = (params: {
     center: [number, number, number];
     size: [number, number, number];
@@ -342,6 +727,7 @@ export function createClimberPrototype(
   }) => {
     const appended = appendBoxCollider(platformColliders, params);
     colliderDebugDirty = true;
+    scheduleJumpClearanceRebuild();
     if (colliderDebugGroup.visible) {
       rebuildColliderDebugMeshes();
     }
@@ -950,6 +1336,12 @@ export function createClimberPrototype(
         rebuildColliderDebugMeshes();
       }
     },
+    setDebugJumpClearanceVisible: (visible: boolean) => {
+      jumpClearanceDebugGroup.visible = visible;
+      if (visible) {
+        rebuildJumpClearanceDebugMeshes(lastJumpClearanceAnalysis);
+      }
+    },
     setDebugColliderFocusAssetId: (assetId: ClimberSetPieceAssetId | null) => {
       if (colliderDebugFocusAssetId === assetId) return;
       colliderDebugFocusAssetId = assetId;
@@ -964,6 +1356,10 @@ export function createClimberPrototype(
     dispose: () => {
       disposed = true;
       window.cancelAnimationFrame(rafId);
+      if (jumpClearanceRecomputeTimer) {
+        window.clearTimeout(jumpClearanceRecomputeTimer);
+        jumpClearanceRecomputeTimer = 0;
+      }
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       document.removeEventListener('pointerlockchange', handlePointerLockChange);
@@ -997,6 +1393,8 @@ export function createClimberPrototype(
       disposeMaterial(grid.material);
       clearColliderDebugMeshes();
       scene.remove(colliderDebugGroup);
+      clearJumpClearanceDebugMeshes();
+      scene.remove(jumpClearanceDebugGroup);
 
       characterRig.dispose();
       audio.dispose();
