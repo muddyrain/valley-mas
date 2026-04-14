@@ -25,6 +25,7 @@ import {
   isModelCharacter,
 } from './characterAssets';
 import type {
+  ClimberCharacterAnimationDebugSnapshot,
   ClimberCharacterAnimationState,
   ClimberCharacterId,
   ClimberCharacterRuntimeStatus,
@@ -42,6 +43,10 @@ interface CharacterUpdateContext {
 interface CharacterRigController {
   group: Group;
   setState: (state: ClimberCharacterAnimationState) => void;
+  setGrounded: (grounded: boolean) => void;
+  setLandingLockMs: (ms: number) => void;
+  setAutoFootCalibrationEnabled: (enabled: boolean) => void;
+  getDebugSnapshot: () => ClimberCharacterAnimationDebugSnapshot;
   update: (context: CharacterUpdateContext) => void;
   dispose: () => void;
 }
@@ -66,6 +71,9 @@ interface ModelRuntime {
   usesProceduralOverlay: boolean;
   baseOffsetY: number;
   baseScale: Vector3;
+  autoFootCalibrationOffsetY: number;
+  autoFootCalibrationEnabled: boolean;
+  actionNames: Partial<Record<ClimberCharacterAnimationState, string>>;
   update: (context: CharacterUpdateContext, state: ClimberCharacterAnimationState) => void;
   dispose: () => void;
 }
@@ -124,13 +132,13 @@ interface JumpPhaseTuning {
 const CHARACTER_JUMP_PHASE_TUNING: Partial<
   Record<Exclude<ClimberCharacterId, 'orb'>, JumpPhaseTuning>
 > = {
-  // Daisy 的原始 jump 片段较长，拆分后更贴近“起跳-下落-落地”的手感。
+  // Daisy 的原始 jump 片段偏长，收敛到与 Peach 更接近的起跳-下落-落地节奏。
   daisy: {
-    jumpStartRatio: 0.06,
-    jumpEndRatio: 0.56,
-    fallStartRatio: 0.56,
-    fallEndRatio: 0.86,
-    landStartRatio: 0.84,
+    jumpStartRatio: 0.08,
+    jumpEndRatio: 0.5,
+    fallStartRatio: 0.5,
+    fallEndRatio: 0.82,
+    landStartRatio: 0.82,
     landEndRatio: 1,
   },
 };
@@ -247,6 +255,33 @@ function normalizeModelHeight(root: Group, targetHeight: number) {
   const nextBounds = new Box3().setFromObject(root);
   const minY = nextBounds.min.y;
   root.position.y -= minY + 0.42;
+}
+
+function resolveAutoFootCalibrationOffsetY(root: Group): number {
+  const bounds = new Box3().setFromObject(root);
+  const fallbackMinY = Number.isFinite(bounds.min.y) ? bounds.min.y : -0.42;
+  let minFootY = Number.POSITIVE_INFINITY;
+  const world = new Vector3();
+
+  root.traverse((node) => {
+    const boneLike = node as Object3D & { isBone?: boolean };
+    if (!boneLike.isBone) return;
+    const normalized = normalizeNodeName(node.name);
+    if (
+      !hasAnyKeyword(normalized, LEFT_FOOT_KEYWORDS) &&
+      !hasAnyKeyword(normalized, RIGHT_FOOT_KEYWORDS)
+    ) {
+      return;
+    }
+    node.getWorldPosition(world);
+    if (Number.isFinite(world.y) && world.y < minFootY) {
+      minFootY = world.y;
+    }
+  });
+
+  const referenceMinY = Number.isFinite(minFootY) ? minFootY : fallbackMinY;
+  const desiredMinY = -0.42;
+  return desiredMinY - referenceMinY;
 }
 
 function findClip(
@@ -1295,6 +1330,7 @@ function createModelRuntime(
   runtimeRoot.add(gltfScene);
   setCastShadowDeep(runtimeRoot);
   normalizeModelHeight(runtimeRoot, 1.32);
+  const autoFootCalibrationOffsetY = resolveAutoFootCalibrationOffsetY(runtimeRoot);
   const baseOffsetY = runtimeRoot.position.y;
   const baseScale = runtimeRoot.scale.clone();
   let hasSkeleton = false;
@@ -1328,6 +1364,14 @@ function createModelRuntime(
   bindStateClip('jump', resolvedClips.jump);
   bindStateClip('fall', resolvedClips.fall);
   bindStateClip('land', resolvedClips.land);
+  const actionNames: Partial<Record<ClimberCharacterAnimationState, string>> = {
+    idle: resolvedClips.idle?.name,
+    run: resolvedClips.run?.name,
+    stop: resolvedClips.stop?.name,
+    jump: resolvedClips.jump?.name,
+    fall: resolvedClips.fall?.name,
+    land: resolvedClips.land?.name,
+  };
 
   if (typeof window !== 'undefined' && /localhost|127\.0\.0\.1/.test(window.location.hostname)) {
     const clipName = (clip: AnimationClip | undefined) =>
@@ -1372,6 +1416,9 @@ function createModelRuntime(
       usesProceduralOverlay,
       baseOffsetY,
       baseScale,
+      autoFootCalibrationOffsetY,
+      autoFootCalibrationEnabled: true,
+      actionNames,
       update(context, state) {
         if (hasSkeleton) {
           proceduralAnimator?.update(context, state);
@@ -1431,6 +1478,9 @@ function createModelRuntime(
     usesProceduralOverlay,
     baseOffsetY,
     baseScale,
+    autoFootCalibrationOffsetY,
+    autoFootCalibrationEnabled: true,
+    actionNames,
     update(context, state) {
       playState(state);
       const runAction = actions.run;
@@ -1547,6 +1597,10 @@ export function createCharacterRig(
   root.add(fallback.root);
 
   let state: ClimberCharacterAnimationState = 'idle';
+  let grounded = false;
+  let landingLockMs = 0;
+  let latestHorizontalSpeed = 0;
+  let latestVerticalSpeed = 0;
   let disposed = false;
   let modelRuntime: ModelRuntime | null = null;
   let modelLoaderDisposable: { dispose: () => void } | null = null;
@@ -1582,7 +1636,38 @@ export function createCharacterRig(
     setState(nextState) {
       state = nextState;
     },
+    setGrounded(nextGrounded) {
+      grounded = nextGrounded;
+    },
+    setLandingLockMs(ms) {
+      landingLockMs = Math.max(0, ms);
+    },
+    setAutoFootCalibrationEnabled(enabled) {
+      if (!modelRuntime) return;
+      modelRuntime.autoFootCalibrationEnabled = enabled;
+    },
+    getDebugSnapshot() {
+      const availableActions: Partial<Record<ClimberCharacterAnimationState, string>> = modelRuntime
+        ? modelRuntime.actionNames
+        : {};
+      const activeActionName = availableActions[state] ?? 'fallback';
+      return {
+        currentState: state,
+        horizontalSpeed: latestHorizontalSpeed,
+        verticalSpeed: latestVerticalSpeed,
+        grounded,
+        landingLockMs,
+        activeActionName,
+        availableActions,
+        hasSkeleton: modelRuntime?.hasSkeleton ?? false,
+        isAnimated: modelRuntime?.isAnimated ?? false,
+        usesProceduralOverlay: modelRuntime?.usesProceduralOverlay ?? true,
+        autoFootCalibrationEnabled: modelRuntime?.autoFootCalibrationEnabled ?? true,
+      };
+    },
     update(context) {
+      latestHorizontalSpeed = context.horizontalSpeed;
+      latestVerticalSpeed = context.verticalSpeed;
       if (modelRuntime) {
         modelRuntime.update(context, state);
 
@@ -1632,6 +1717,9 @@ export function createCharacterRig(
           (state === 'run' ? 0.028 : 0.012);
 
         let targetYOffset = modelRuntime.baseOffsetY + locomotionSway * Math.max(0.2, runBlend);
+        if (modelRuntime.autoFootCalibrationEnabled) {
+          targetYOffset += modelRuntime.autoFootCalibrationOffsetY;
+        }
         let targetScaleX = modelRuntime.baseScale.x;
         let targetScaleY = modelRuntime.baseScale.y;
         let targetScaleZ = modelRuntime.baseScale.z;
