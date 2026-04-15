@@ -1,0 +1,2049 @@
+fileFormatVersion: 2
+guid: 5bf7457179df3ea4f81f34beace4d97f
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -4954168418209778818
+    second: Spike Blood2x-Sheet_0
+  - first:
+      213: -2363389971783398453
+    second: Spike Blood2x-Sheet_1
+  - first:
+      213: -2903753299095038419
+    second: Spike Blood2x-Sheet_2
+  - first:
+      213: 1329021493722299219
+    second: Spike Blood2x-Sheet_3
+  - first:
+      213: -6492502054402203378
+    second: Spike Blood2x-Sheet_4
+  - first:
+      213: -1289996035419060391
+    second: Spike Blood2x-Sheet_5
+  - first:
+      213: 7730787151688221190
+    second: Spike Blood2x-Sheet_6
+  - first:
+      213: 7311575987882002878
+    second: Spike Blood2x-Sheet_7
+  - first:
+      213: -2101053605685351234
+    second: Spike Blood2x-Sheet_8
+  - first:
+      213: -8747404567471552654
+    second: Spike Blood2x-Sheet_9
+  - first:
+      213: -7242357187943789076
+    second: Spike Blood2x-Sheet_10
+  - first:
+      213: -5408232302280184754
+    second: Spike Blood2x-Sheet_11
+  - first:
+      213: -5154753029550299933
+    second: Spike Blood2x-Sheet_12
+  - first:
+      213: 3206195481645265318
+    second: Spike Blood2x-Sheet_13
+  - first:
+      213: -6632763975132816374
+    second: Spike Blood2x-Sheet_14
+  - first:
+      213: -1492608606159376148
+    second: Spike Blood2x-Sheet_15
+  - first:
+      213: -9132992911097743709
+    second: Spike Blood2x-Sheet_16
+  - first:
+      213: -3131541513164988320
+    second: Spike Blood2x-Sheet_17
+  - first:
+      213: 5948669843193121785
+    second: Spike Blood2x-Sheet_18
+  - first:
+      213: -5954353876563539201
+    second: Spike Blood2x-Sheet_19
+  - first:
+      213: 4192356954028681778
+    second: Spike Blood2x-Sheet_20
+  - first:
+      213: 6097125480247697613
+    second: Spike Blood2x-Sheet_21
+  - first:
+      213: 5082930599510078314
+    second: Spike Blood2x-Sheet_22
+  - first:
+      213: 2173393758683928454
+    second: Spike Blood2x-Sheet_23
+  - first:
+      213: -8994302330536490730
+    second: Spike Blood2x-Sheet_24
+  - first:
+      213: -8461636241369347321
+    second: Spike Blood2x-Sheet_25
+  - first:
+      213: 4238112708942751506
+    second: Spike Blood2x-Sheet_26
+  - first:
+      213: -7010282458275532517
+    second: Spike Blood2x-Sheet_27
+  - first:
+      213: 1277008550471288973
+    second: Spike Blood2x-Sheet_28
+  - first:
+      213: 8939750154420719530
+    second: Spike Blood2x-Sheet_29
+  - first:
+      213: 675048576387731972
+    second: Spike Blood2x-Sheet_30
+  - first:
+      213: -1318297340897511291
+    second: Spike Blood2x-Sheet_31
+  - first:
+      213: 8644882351311257857
+    second: Spike Blood2x-Sheet_32
+  - first:
+      213: 3398821826582683961
+    second: Spike Blood2x-Sheet_33
+  - first:
+      213: -3638561965756452542
+    second: Spike Blood2x-Sheet_34
+  - first:
+      213: -6376313181342692981
+    second: Spike Blood2x-Sheet_35
+  - first:
+      213: 4687012091763291129
+    second: Spike Blood2x-Sheet_36
+  - first:
+      213: 3057282385124741851
+    second: Spike Blood2x-Sheet_37
+  - first:
+      213: 5458956025650849377
+    second: Spike Blood2x-Sheet_38
+  - first:
+      213: -167266098781689946
+    second: Spike Blood2x-Sheet_39
+  - first:
+      213: 638513886489814641
+    second: Spike Blood2x-Sheet_40
+  - first:
+      213: 8605082241720899774
+    second: Spike Blood2x-Sheet_41
+  - first:
+      213: 1807001506604754354
+    second: Spike Blood2x-Sheet_42
+  - first:
+      213: -5523645774965082061
+    second: Spike Blood2x-Sheet_43
+  - first:
+      213: -5769771402362606622
+    second: Spike Blood2x-Sheet_44
+  - first:
+      213: -7235919573510661396
+    second: Spike Blood2x-Sheet_45
+  - first:
+      213: -8594486064578183368
+    second: Spike Blood2x-Sheet_46
+  - first:
+      213: 3253668251563582484
+    second: Spike Blood2x-Sheet_47
+  - first:
+      213: 8826002910332220109
+    second: Spike Blood2x-Sheet_48
+  - first:
+      213: -6365667368083805028
+    second: Spike Blood2x-Sheet_49
+  - first:
+      213: -6913271263268678701
+    second: Spike Blood2x-Sheet_50
+  - first:
+      213: 345690413382889102
+    second: Spike Blood2x-Sheet_51
+  - first:
+      213: 4996210022160874509
+    second: Spike Blood2x-Sheet_52
+  - first:
+      213: -1707623334137984856
+    second: Spike Blood2x-Sheet_53
+  - first:
+      213: -7999820479396733422
+    second: Spike Blood2x-Sheet_54
+  - first:
+      213: 8330120570212613999
+    second: Spike Blood2x-Sheet_55
+  - first:
+      213: -3598259005718052773
+    second: Spike Blood2x-Sheet_56
+  - first:
+      213: 5884329633616885936
+    second: Spike Blood2x-Sheet_57
+  - first:
+      213: 2537514006310102972
+    second: Spike Blood2x-Sheet_58
+  - first:
+      213: 8836295367143924085
+    second: Spike Blood2x-Sheet_59
+  - first:
+      213: 2802033270493168164
+    second: Spike Blood2x-Sheet_60
+  - first:
+      213: 2967214091692898288
+    second: Spike Blood2x-Sheet_61
+  - first:
+      213: 7385041832003840830
+    second: Spike Blood2x-Sheet_62
+  - first:
+      213: 6283540699240102346
+    second: Spike Blood2x-Sheet_63
+  - first:
+      213: 2040750240521490104
+    second: Spike Blood2x-Sheet_64
+  - first:
+      213: 2022541868413737174
+    second: Spike Blood2x-Sheet_65
+  - first:
+      213: 4231802974100588593
+    second: Spike Blood2x-Sheet_66
+  - first:
+      213: -5009204852728509572
+    second: Spike Blood2x-Sheet_67
+  - first:
+      213: 1785675812552486764
+    second: Spike Blood2x-Sheet_68
+  - first:
+      213: 4363394096640364290
+    second: Spike Blood2x-Sheet_69
+  - first:
+      213: 7371114486744047060
+    second: Spike Blood2x-Sheet_70
+  - first:
+      213: -1513593622393915849
+    second: Spike Blood2x-Sheet_71
+  - first:
+      213: 4223958354095885394
+    second: Spike Blood2x-Sheet_72
+  - first:
+      213: 4136260473495121446
+    second: Spike Blood2x-Sheet_73
+  - first:
+      213: 1156622831998165818
+    second: Spike Blood2x-Sheet_74
+  - first:
+      213: -3275027438045003196
+    second: Spike Blood2x-Sheet_75
+  - first:
+      213: -9127037590688163594
+    second: Spike Blood2x-Sheet_76
+  externalObjects: {}
+  serializedVersion: 12
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_0
+      rect:
+        serializedVersion: 2
+        x: 1
+        y: 0
+        width: 12
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e73b52b62124f3bb0800000000000000
+      internalID: -4954168418209778818
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_1
+      rect:
+        serializedVersion: 2
+        x: 11
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bcb412aa75d833fd0800000000000000
+      internalID: -2363389971783398453
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_2
+      rect:
+        serializedVersion: 2
+        x: 21
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d26521c52cbc3b7d0800000000000000
+      internalID: -2903753299095038419
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_3
+      rect:
+        serializedVersion: 2
+        x: 33
+        y: 19
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 35b3d20d102a17210800000000000000
+      internalID: 1329021493722299219
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_4
+      rect:
+        serializedVersion: 2
+        x: 33
+        y: 7
+        width: 12
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e01ecdfb7cff5e5a0800000000000000
+      internalID: -6492502054402203378
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_5
+      rect:
+        serializedVersion: 2
+        x: 43
+        y: 19
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9574f23c073091ee0800000000000000
+      internalID: -1289996035419060391
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_6
+      rect:
+        serializedVersion: 2
+        x: 43
+        y: 9
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 602c78a74f5494b60800000000000000
+      internalID: 7730787151688221190
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_7
+      rect:
+        serializedVersion: 2
+        x: 53
+        y: 19
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: eb98bf16f9fe77560800000000000000
+      internalID: 7311575987882002878
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_8
+      rect:
+        serializedVersion: 2
+        x: 53
+        y: 9
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ebc2213a0ee87d2e0800000000000000
+      internalID: -2101053605685351234
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_9
+      rect:
+        serializedVersion: 2
+        x: 65
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2778a3144e9fa9680800000000000000
+      internalID: -8747404567471552654
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_10
+      rect:
+        serializedVersion: 2
+        x: 75
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ced0d1c528afd7b90800000000000000
+      internalID: -7242357187943789076
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_11
+      rect:
+        serializedVersion: 2
+        x: 85
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e4cebc7006912f4b0800000000000000
+      internalID: -5408232302280184754
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_12
+      rect:
+        serializedVersion: 2
+        x: 97
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3e429c04e63a678b0800000000000000
+      internalID: -5154753029550299933
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_13
+      rect:
+        serializedVersion: 2
+        x: 107
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6a1bdebadc1be7c20800000000000000
+      internalID: 3206195481645265318
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_14
+      rect:
+        serializedVersion: 2
+        x: 117
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a0c53377e40b3f3a0800000000000000
+      internalID: -6632763975132816374
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_15
+      rect:
+        serializedVersion: 2
+        x: 129
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ce0fd218160394be0800000000000000
+      internalID: -1492608606159376148
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_16
+      rect:
+        serializedVersion: 2
+        x: 139
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3a6bbd50657114180800000000000000
+      internalID: -9132992911097743709
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_17
+      rect:
+        serializedVersion: 2
+        x: 149
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 060696cd5978a84d0800000000000000
+      internalID: -3131541513164988320
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_18
+      rect:
+        serializedVersion: 2
+        x: 161
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9fbca9974bbed8250800000000000000
+      internalID: 5948669843193121785
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_19
+      rect:
+        serializedVersion: 2
+        x: 171
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ffac57062b2ed5da0800000000000000
+      internalID: -5954353876563539201
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_20
+      rect:
+        serializedVersion: 2
+        x: 181
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 23aa488007e3e2a30800000000000000
+      internalID: 4192356954028681778
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_21
+      rect:
+        serializedVersion: 2
+        x: 193
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dc0a52102575d9450800000000000000
+      internalID: 6097125480247697613
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_22
+      rect:
+        serializedVersion: 2
+        x: 203
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a63f2c123723a8640800000000000000
+      internalID: 5082930599510078314
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_23
+      rect:
+        serializedVersion: 2
+        x: 213
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 687186fbb12792e10800000000000000
+      internalID: 2173393758683928454
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_24
+      rect:
+        serializedVersion: 2
+        x: 225
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 61987e92fa1dd2380800000000000000
+      internalID: -8994302330536490730
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_25
+      rect:
+        serializedVersion: 2
+        x: 235
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 70bcb9e8baa329a80800000000000000
+      internalID: -8461636241369347321
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_26
+      rect:
+        serializedVersion: 2
+        x: 245
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 217e996ed0dc0da30800000000000000
+      internalID: 4238112708942751506
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_27
+      rect:
+        serializedVersion: 2
+        x: 257
+        y: 0
+        width: 20
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b11b55b0f3976be90800000000000000
+      internalID: -7010282458275532517
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_28
+      rect:
+        serializedVersion: 2
+        x: 277
+        y: 0
+        width: 10
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d884af1c288d8b110800000000000000
+      internalID: 1277008550471288973
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_29
+      rect:
+        serializedVersion: 2
+        x: 289
+        y: 0
+        width: 12
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: aaf8dfe866f501c70800000000000000
+      internalID: 8939750154420719530
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_30
+      rect:
+        serializedVersion: 2
+        x: 299
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 40259b98a114e5900800000000000000
+      internalID: 675048576387731972
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_31
+      rect:
+        serializedVersion: 2
+        x: 309
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 58836779d8774bde0800000000000000
+      internalID: -1318297340897511291
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_32
+      rect:
+        serializedVersion: 2
+        x: 321
+        y: 0
+        width: 12
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 10183fa22bac8f770800000000000000
+      internalID: 8644882351311257857
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_33
+      rect:
+        serializedVersion: 2
+        x: 331
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9312e4c817a0b2f20800000000000000
+      internalID: 3398821826582683961
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_34
+      rect:
+        serializedVersion: 2
+        x: 341
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 241f6d98b2b318dc0800000000000000
+      internalID: -3638561965756452542
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_35
+      rect:
+        serializedVersion: 2
+        x: 353
+        y: 0
+        width: 12
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b898d69d1f8c287a0800000000000000
+      internalID: -6376313181342692981
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_36
+      rect:
+        serializedVersion: 2
+        x: 363
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9f3f2832aac9b0140800000000000000
+      internalID: 4687012091763291129
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_37
+      rect:
+        serializedVersion: 2
+        x: 373
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bd25b6f8126ad6a20800000000000000
+      internalID: 3057282385124741851
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_38
+      rect:
+        serializedVersion: 2
+        x: 33
+        y: 0
+        width: 10
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 166a561259b12cb40800000000000000
+      internalID: 5458956025650849377
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_39
+      rect:
+        serializedVersion: 2
+        x: 43
+        y: 0
+        width: 10
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6a7e62f8e50cdadf0800000000000000
+      internalID: -167266098781689946
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_40
+      rect:
+        serializedVersion: 2
+        x: 53
+        y: 0
+        width: 10
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 176216c2ff47cd800800000000000000
+      internalID: 638513886489814641
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_41
+      rect:
+        serializedVersion: 2
+        x: 65
+        y: 7
+        width: 12
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: eb8dbc805b46b6770800000000000000
+      internalID: 8605082241720899774
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_42
+      rect:
+        serializedVersion: 2
+        x: 75
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2b5a5cddb42c31910800000000000000
+      internalID: 1807001506604754354
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_43
+      rect:
+        serializedVersion: 2
+        x: 85
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3387e16ee611853b0800000000000000
+      internalID: -5523645774965082061
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_44
+      rect:
+        serializedVersion: 2
+        x: 97
+        y: 7
+        width: 12
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2eb28f6aa77adefa0800000000000000
+      internalID: -5769771402362606622
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_45
+      rect:
+        serializedVersion: 2
+        x: 107
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cead9954c79d49b90800000000000000
+      internalID: -7235919573510661396
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_46
+      rect:
+        serializedVersion: 2
+        x: 117
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 83fb5c5b5704ab880800000000000000
+      internalID: -8594486064578183368
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_47
+      rect:
+        serializedVersion: 2
+        x: 129
+        y: 7
+        width: 12
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 414e96f390a572d20800000000000000
+      internalID: 3253668251563582484
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_48
+      rect:
+        serializedVersion: 2
+        x: 139
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dc27ae082e24c7a70800000000000000
+      internalID: 8826002910332220109
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_49
+      rect:
+        serializedVersion: 2
+        x: 149
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c9ca117614b98a7a0800000000000000
+      internalID: -6365667368083805028
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_50
+      rect:
+        serializedVersion: 2
+        x: 161
+        y: 7
+        width: 12
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3d354f40a602f00a0800000000000000
+      internalID: -6913271263268678701
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_51
+      rect:
+        serializedVersion: 2
+        x: 171
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e8ee1f379932cc400800000000000000
+      internalID: 345690413382889102
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_52
+      rect:
+        serializedVersion: 2
+        x: 181
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d0c352a4b8a165540800000000000000
+      internalID: 4996210022160874509
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_53
+      rect:
+        serializedVersion: 2
+        x: 193
+        y: 7
+        width: 12
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8a8898eff9d4d48e0800000000000000
+      internalID: -1707623334137984856
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_54
+      rect:
+        serializedVersion: 2
+        x: 203
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 21e99aaa8adeaf090800000000000000
+      internalID: -7999820479396733422
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_55
+      rect:
+        serializedVersion: 2
+        x: 213
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f6f72b316888a9370800000000000000
+      internalID: 8330120570212613999
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_56
+      rect:
+        serializedVersion: 2
+        x: 225
+        y: 7
+        width: 12
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b50435aaf7a601ec0800000000000000
+      internalID: -3598259005718052773
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_57
+      rect:
+        serializedVersion: 2
+        x: 235
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0b8f90110a659a150800000000000000
+      internalID: 5884329633616885936
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_58
+      rect:
+        serializedVersion: 2
+        x: 245
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cb721be5b8f073320800000000000000
+      internalID: 2537514006310102972
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_59
+      rect:
+        serializedVersion: 2
+        x: 65
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5712b09d1d3d0aa70800000000000000
+      internalID: 8836295367143924085
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_60
+      rect:
+        serializedVersion: 2
+        x: 75
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4224298e962d2e620800000000000000
+      internalID: 2802033270493168164
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_61
+      rect:
+        serializedVersion: 2
+        x: 85
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0f773e3de79ad2920800000000000000
+      internalID: 2967214091692898288
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_62
+      rect:
+        serializedVersion: 2
+        x: 97
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e3b2df72b60fc7660800000000000000
+      internalID: 7385041832003840830
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_63
+      rect:
+        serializedVersion: 2
+        x: 107
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ac97aed69fe933750800000000000000
+      internalID: 6283540699240102346
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_64
+      rect:
+        serializedVersion: 2
+        x: 117
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8be83990883325c10800000000000000
+      internalID: 2040750240521490104
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_65
+      rect:
+        serializedVersion: 2
+        x: 129
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6d8d72a0d13811c10800000000000000
+      internalID: 2022541868413737174
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_66
+      rect:
+        serializedVersion: 2
+        x: 139
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 13805b642626aba30800000000000000
+      internalID: 4231802974100588593
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_67
+      rect:
+        serializedVersion: 2
+        x: 149
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c7b44f1f9babb7ab0800000000000000
+      internalID: -5009204852728509572
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_68
+      rect:
+        serializedVersion: 2
+        x: 161
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c6fa23bc0bef7c810800000000000000
+      internalID: 1785675812552486764
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_69
+      rect:
+        serializedVersion: 2
+        x: 171
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 20f094900d3ed8c30800000000000000
+      internalID: 4363394096640364290
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_70
+      rect:
+        serializedVersion: 2
+        x: 181
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4dd5d1562957b4660800000000000000
+      internalID: 7371114486744047060
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_71
+      rect:
+        serializedVersion: 2
+        x: 193
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 736f9eaae92aefae0800000000000000
+      internalID: -1513593622393915849
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_72
+      rect:
+        serializedVersion: 2
+        x: 203
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 25ccde95eb38e9a30800000000000000
+      internalID: 4223958354095885394
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_73
+      rect:
+        serializedVersion: 2
+        x: 213
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 62e6a2d5cf2f66930800000000000000
+      internalID: 4136260473495121446
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_74
+      rect:
+        serializedVersion: 2
+        x: 225
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a336b5076562d0010800000000000000
+      internalID: 1156622831998165818
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_75
+      rect:
+        serializedVersion: 2
+        x: 235
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4428bad95e3cc82d0800000000000000
+      internalID: -3275027438045003196
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike Blood2x-Sheet_76
+      rect:
+        serializedVersion: 2
+        x: 245
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6f8156b1baf365180800000000000000
+      internalID: -9127037590688163594
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      Spike Blood2x-Sheet_0: -4954168418209778818
+      Spike Blood2x-Sheet_1: -2363389971783398453
+      Spike Blood2x-Sheet_10: -7242357187943789076
+      Spike Blood2x-Sheet_11: -5408232302280184754
+      Spike Blood2x-Sheet_12: -5154753029550299933
+      Spike Blood2x-Sheet_13: 3206195481645265318
+      Spike Blood2x-Sheet_14: -6632763975132816374
+      Spike Blood2x-Sheet_15: -1492608606159376148
+      Spike Blood2x-Sheet_16: -9132992911097743709
+      Spike Blood2x-Sheet_17: -3131541513164988320
+      Spike Blood2x-Sheet_18: 5948669843193121785
+      Spike Blood2x-Sheet_19: -5954353876563539201
+      Spike Blood2x-Sheet_2: -2903753299095038419
+      Spike Blood2x-Sheet_20: 4192356954028681778
+      Spike Blood2x-Sheet_21: 6097125480247697613
+      Spike Blood2x-Sheet_22: 5082930599510078314
+      Spike Blood2x-Sheet_23: 2173393758683928454
+      Spike Blood2x-Sheet_24: -8994302330536490730
+      Spike Blood2x-Sheet_25: -8461636241369347321
+      Spike Blood2x-Sheet_26: 4238112708942751506
+      Spike Blood2x-Sheet_27: -7010282458275532517
+      Spike Blood2x-Sheet_28: 1277008550471288973
+      Spike Blood2x-Sheet_29: 8939750154420719530
+      Spike Blood2x-Sheet_3: 1329021493722299219
+      Spike Blood2x-Sheet_30: 675048576387731972
+      Spike Blood2x-Sheet_31: -1318297340897511291
+      Spike Blood2x-Sheet_32: 8644882351311257857
+      Spike Blood2x-Sheet_33: 3398821826582683961
+      Spike Blood2x-Sheet_34: -3638561965756452542
+      Spike Blood2x-Sheet_35: -6376313181342692981
+      Spike Blood2x-Sheet_36: 4687012091763291129
+      Spike Blood2x-Sheet_37: 3057282385124741851
+      Spike Blood2x-Sheet_38: 5458956025650849377
+      Spike Blood2x-Sheet_39: -167266098781689946
+      Spike Blood2x-Sheet_4: -6492502054402203378
+      Spike Blood2x-Sheet_40: 638513886489814641
+      Spike Blood2x-Sheet_41: 8605082241720899774
+      Spike Blood2x-Sheet_42: 1807001506604754354
+      Spike Blood2x-Sheet_43: -5523645774965082061
+      Spike Blood2x-Sheet_44: -5769771402362606622
+      Spike Blood2x-Sheet_45: -7235919573510661396
+      Spike Blood2x-Sheet_46: -8594486064578183368
+      Spike Blood2x-Sheet_47: 3253668251563582484
+      Spike Blood2x-Sheet_48: 8826002910332220109
+      Spike Blood2x-Sheet_49: -6365667368083805028
+      Spike Blood2x-Sheet_5: -1289996035419060391
+      Spike Blood2x-Sheet_50: -6913271263268678701
+      Spike Blood2x-Sheet_51: 345690413382889102
+      Spike Blood2x-Sheet_52: 4996210022160874509
+      Spike Blood2x-Sheet_53: -1707623334137984856
+      Spike Blood2x-Sheet_54: -7999820479396733422
+      Spike Blood2x-Sheet_55: 8330120570212613999
+      Spike Blood2x-Sheet_56: -3598259005718052773
+      Spike Blood2x-Sheet_57: 5884329633616885936
+      Spike Blood2x-Sheet_58: 2537514006310102972
+      Spike Blood2x-Sheet_59: 8836295367143924085
+      Spike Blood2x-Sheet_6: 7730787151688221190
+      Spike Blood2x-Sheet_60: 2802033270493168164
+      Spike Blood2x-Sheet_61: 2967214091692898288
+      Spike Blood2x-Sheet_62: 7385041832003840830
+      Spike Blood2x-Sheet_63: 6283540699240102346
+      Spike Blood2x-Sheet_64: 2040750240521490104
+      Spike Blood2x-Sheet_65: 2022541868413737174
+      Spike Blood2x-Sheet_66: 4231802974100588593
+      Spike Blood2x-Sheet_67: -5009204852728509572
+      Spike Blood2x-Sheet_68: 1785675812552486764
+      Spike Blood2x-Sheet_69: 4363394096640364290
+      Spike Blood2x-Sheet_7: 7311575987882002878
+      Spike Blood2x-Sheet_70: 7371114486744047060
+      Spike Blood2x-Sheet_71: -1513593622393915849
+      Spike Blood2x-Sheet_72: 4223958354095885394
+      Spike Blood2x-Sheet_73: 4136260473495121446
+      Spike Blood2x-Sheet_74: 1156622831998165818
+      Spike Blood2x-Sheet_75: -3275027438045003196
+      Spike Blood2x-Sheet_76: -9127037590688163594
+      Spike Blood2x-Sheet_8: -2101053605685351234
+      Spike Blood2x-Sheet_9: -8747404567471552654
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

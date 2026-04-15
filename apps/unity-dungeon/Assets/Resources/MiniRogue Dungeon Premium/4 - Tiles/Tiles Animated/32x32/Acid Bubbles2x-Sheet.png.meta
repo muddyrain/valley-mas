@@ -1,0 +1,724 @@
+fileFormatVersion: 2
+guid: e90cf548427e91c4182fb120aebfc651
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -2808016992699161850
+    second: Acid Bubbles2x-Sheet_0
+  - first:
+      213: 1377159368804350107
+    second: Acid Bubbles2x-Sheet_1
+  - first:
+      213: 7297862114540454533
+    second: Acid Bubbles2x-Sheet_2
+  - first:
+      213: 8398759553393627522
+    second: Acid Bubbles2x-Sheet_3
+  - first:
+      213: 4236505969102489751
+    second: Acid Bubbles2x-Sheet_4
+  - first:
+      213: -8343488854265758390
+    second: Acid Bubbles2x-Sheet_5
+  - first:
+      213: -2284856324924362894
+    second: Acid Bubbles2x-Sheet_6
+  - first:
+      213: -8688689095583146286
+    second: Acid Bubbles2x-Sheet_7
+  - first:
+      213: 2555706548779690245
+    second: Acid Bubbles2x-Sheet_8
+  - first:
+      213: -3142183085687034370
+    second: Acid Bubbles2x-Sheet_9
+  - first:
+      213: 2064706988808234395
+    second: Acid Bubbles2x-Sheet_10
+  - first:
+      213: 8514242755559904075
+    second: Acid Bubbles2x-Sheet_11
+  - first:
+      213: 4484966551155738997
+    second: Acid Bubbles2x-Sheet_12
+  - first:
+      213: 3960934462894789261
+    second: Acid Bubbles2x-Sheet_13
+  - first:
+      213: -4392177935499403689
+    second: Acid Bubbles2x-Sheet_14
+  - first:
+      213: -6373867433781288605
+    second: Acid Bubbles2x-Sheet_15
+  - first:
+      213: 3710173939696059704
+    second: Acid Bubbles2x-Sheet_16
+  - first:
+      213: 1557738047051742382
+    second: Acid Bubbles2x-Sheet_17
+  - first:
+      213: 4016595858766285489
+    second: Acid Bubbles2x-Sheet_18
+  - first:
+      213: -2018107472244038502
+    second: Acid Bubbles2x-Sheet_19
+  - first:
+      213: -8909025183314117513
+    second: Acid Bubbles2x-Sheet_20
+  - first:
+      213: 7896984664002651616
+    second: Acid Bubbles2x-Sheet_21
+  - first:
+      213: 5449124567687483608
+    second: Acid Bubbles2x-Sheet_22
+  - first:
+      213: 4578007284441072702
+    second: Acid Bubbles2x-Sheet_23
+  externalObjects: {}
+  serializedVersion: 12
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_0
+      rect:
+        serializedVersion: 2
+        x: 195
+        y: 0
+        width: 24
+        height: 27
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 603e7e23c6be709d0800000000000000
+      internalID: -2808016992699161850
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_1
+      rect:
+        serializedVersion: 2
+        x: 225
+        y: 19
+        width: 14
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b983fa04627ac1310800000000000000
+      internalID: 1377159368804350107
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_2
+      rect:
+        serializedVersion: 2
+        x: 257
+        y: 21
+        width: 14
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 58207fc6de6374560800000000000000
+      internalID: 7297862114540454533
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_3
+      rect:
+        serializedVersion: 2
+        x: 289
+        y: 27
+        width: 6
+        height: 5
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 28112f5b0536e8470800000000000000
+      internalID: 8398759553393627522
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_4
+      rect:
+        serializedVersion: 2
+        x: 289
+        y: 21
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7980d21abb71bca30800000000000000
+      internalID: 4236505969102489751
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_5
+      rect:
+        serializedVersion: 2
+        x: 297
+        y: 27
+        width: 6
+        height: 5
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a4dfe0eb719f53c80800000000000000
+      internalID: -8343488854265758390
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_6
+      rect:
+        serializedVersion: 2
+        x: 297
+        y: 21
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 27f2416374f8a40e0800000000000000
+      internalID: -2284856324924362894
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_7
+      rect:
+        serializedVersion: 2
+        x: 321
+        y: 3
+        width: 26
+        height: 29
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2ded4fd5d439b6780800000000000000
+      internalID: -8688689095583146286
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_8
+      rect:
+        serializedVersion: 2
+        x: 5
+        y: 7
+        width: 24
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 509272eb091b77320800000000000000
+      internalID: 2555706548779690245
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_9
+      rect:
+        serializedVersion: 2
+        x: 49
+        y: 11
+        width: 14
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: efd226ea129b464d0800000000000000
+      internalID: -3142183085687034370
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_10
+      rect:
+        serializedVersion: 2
+        x: 81
+        y: 13
+        width: 14
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b956e29211057ac10800000000000000
+      internalID: 2064706988808234395
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_11
+      rect:
+        serializedVersion: 2
+        x: 113
+        y: 19
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b4357900daaa82670800000000000000
+      internalID: 8514242755559904075
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_12
+      rect:
+        serializedVersion: 2
+        x: 113
+        y: 13
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 579852fd05dcd3e30800000000000000
+      internalID: 4484966551155738997
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_13
+      rect:
+        serializedVersion: 2
+        x: 121
+        y: 19
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d82527778e018f630800000000000000
+      internalID: 3960934462894789261
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_14
+      rect:
+        serializedVersion: 2
+        x: 121
+        y: 13
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 75edf3c3079db03c0800000000000000
+      internalID: -4392177935499403689
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_15
+      rect:
+        serializedVersion: 2
+        x: 133
+        y: 11
+        width: 6
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3612904d6597b87a0800000000000000
+      internalID: -6373867433781288605
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_16
+      rect:
+        serializedVersion: 2
+        x: 145
+        y: 13
+        width: 28
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 835ce727a8f2d7330800000000000000
+      internalID: 3710173939696059704
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_17
+      rect:
+        serializedVersion: 2
+        x: 35
+        y: 7
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: eac31a320823e9510800000000000000
+      internalID: 1557738047051742382
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_18
+      rect:
+        serializedVersion: 2
+        x: 67
+        y: 7
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1bac11817a0ddb730800000000000000
+      internalID: 4016595858766285489
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_19
+      rect:
+        serializedVersion: 2
+        x: 99
+        y: 7
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a94255642fd3ef3e0800000000000000
+      internalID: -2018107472244038502
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_20
+      rect:
+        serializedVersion: 2
+        x: 275
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 77c7d8d3cc8cc5480800000000000000
+      internalID: -8909025183314117513
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_21
+      rect:
+        serializedVersion: 2
+        x: 307
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0e5e59e36b9b79d60800000000000000
+      internalID: 7896984664002651616
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_22
+      rect:
+        serializedVersion: 2
+        x: 371
+        y: 7
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8d0ddd17ced2f9b40800000000000000
+      internalID: 5449124567687483608
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Acid Bubbles2x-Sheet_23
+      rect:
+        serializedVersion: 2
+        x: 243
+        y: 0
+        width: 10
+        height: 5
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e34c240be59588f30800000000000000
+      internalID: 4578007284441072702
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      Acid Bubbles2x-Sheet_0: -2808016992699161850
+      Acid Bubbles2x-Sheet_1: 1377159368804350107
+      Acid Bubbles2x-Sheet_10: 2064706988808234395
+      Acid Bubbles2x-Sheet_11: 8514242755559904075
+      Acid Bubbles2x-Sheet_12: 4484966551155738997
+      Acid Bubbles2x-Sheet_13: 3960934462894789261
+      Acid Bubbles2x-Sheet_14: -4392177935499403689
+      Acid Bubbles2x-Sheet_15: -6373867433781288605
+      Acid Bubbles2x-Sheet_16: 3710173939696059704
+      Acid Bubbles2x-Sheet_17: 1557738047051742382
+      Acid Bubbles2x-Sheet_18: 4016595858766285489
+      Acid Bubbles2x-Sheet_19: -2018107472244038502
+      Acid Bubbles2x-Sheet_2: 7297862114540454533
+      Acid Bubbles2x-Sheet_20: -8909025183314117513
+      Acid Bubbles2x-Sheet_21: 7896984664002651616
+      Acid Bubbles2x-Sheet_22: 5449124567687483608
+      Acid Bubbles2x-Sheet_23: 4578007284441072702
+      Acid Bubbles2x-Sheet_3: 8398759553393627522
+      Acid Bubbles2x-Sheet_4: 4236505969102489751
+      Acid Bubbles2x-Sheet_5: -8343488854265758390
+      Acid Bubbles2x-Sheet_6: -2284856324924362894
+      Acid Bubbles2x-Sheet_7: -8688689095583146286
+      Acid Bubbles2x-Sheet_8: 2555706548779690245
+      Acid Bubbles2x-Sheet_9: -3142183085687034370
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

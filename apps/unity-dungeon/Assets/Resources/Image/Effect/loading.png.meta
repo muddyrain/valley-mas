@@ -1,0 +1,820 @@
+fileFormatVersion: 2
+guid: 5e83e11fb0855804688f7caeac0ba6f5
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -2926172951762979286
+    second: Untitled 03-20-2025 04-58-36_0
+  - first:
+      213: 8255704592891415460
+    second: Untitled 03-20-2025 04-58-36_1
+  - first:
+      213: 6451401998461185874
+    second: Untitled 03-20-2025 04-58-36_2
+  - first:
+      213: -3251090977507645766
+    second: Untitled 03-20-2025 04-58-36_3
+  - first:
+      213: 4901868312572304667
+    second: Untitled 03-20-2025 04-58-36_4
+  - first:
+      213: 3268532011164603500
+    second: Untitled 03-20-2025 04-58-36_5
+  - first:
+      213: 1749327828363797209
+    second: Untitled 03-20-2025 04-58-36_6
+  - first:
+      213: 8419370597518035122
+    second: Untitled 03-20-2025 04-58-36_7
+  - first:
+      213: -3002615855101518829
+    second: Untitled 03-20-2025 04-58-36_8
+  - first:
+      213: -5708133554319204144
+    second: Untitled 03-20-2025 04-58-36_9
+  - first:
+      213: 2128277999137383740
+    second: Untitled 03-20-2025 04-58-36_10
+  - first:
+      213: 2097717425872285604
+    second: Untitled 03-20-2025 04-58-36_11
+  - first:
+      213: 5028195410879251896
+    second: Untitled 03-20-2025 04-58-36_12
+  - first:
+      213: -1174669761078106057
+    second: Untitled 03-20-2025 04-58-36_13
+  - first:
+      213: -6129856659766596133
+    second: Untitled 03-20-2025 04-58-36_14
+  - first:
+      213: 4136908428576892783
+    second: Untitled 03-20-2025 04-58-36_15
+  - first:
+      213: 8572719574243631786
+    second: Untitled 03-20-2025 04-58-36_16
+  - first:
+      213: 7807140012202146550
+    second: Untitled 03-20-2025 04-58-36_17
+  - first:
+      213: 1639611905909129757
+    second: Untitled 03-20-2025 04-58-36_18
+  - first:
+      213: 6512087156115087568
+    second: Untitled 03-20-2025 04-58-36_19
+  - first:
+      213: -2859031112499946365
+    second: Untitled 03-20-2025 04-58-36_20
+  - first:
+      213: 81427275917435981
+    second: Untitled 03-20-2025 04-58-36_21
+  - first:
+      213: -8773053150921956101
+    second: Untitled 03-20-2025 04-58-36_22
+  - first:
+      213: 1531244745409410574
+    second: Untitled 03-20-2025 04-58-36_23
+  - first:
+      213: -5422120127980719407
+    second: Untitled 03-20-2025 04-58-36_24
+  - first:
+      213: 2490130251019136673
+    second: Untitled 03-20-2025 04-58-36_25
+  - first:
+      213: 5455899031096601169
+    second: Untitled 03-20-2025 04-58-36_26
+  - first:
+      213: -4739894699172576623
+    second: Untitled 03-20-2025 04-58-36_27
+  - first:
+      213: -3795406247686050107
+    second: Untitled 03-20-2025 04-58-36_28
+  - first:
+      213: 5248929372074847327
+    second: Untitled 03-20-2025 04-58-36_29
+  - first:
+      213: 93988811934660494
+    second: Untitled 03-20-2025 04-58-36_30
+  - first:
+      213: 3939397862396994604
+    second: Untitled 03-20-2025 04-58-36_31
+  - first:
+      213: -4498334728502885890
+    second: Untitled 03-20-2025 04-58-36_32
+  - first:
+      213: 1245392241265765353
+    second: Untitled 03-20-2025 04-58-36_33
+  - first:
+      213: 7890515593213833329
+    second: Untitled 03-20-2025 04-58-36_34
+  - first:
+      213: -1563094773198546192
+    second: Untitled 03-20-2025 04-58-36_35
+  - first:
+      213: -4405621310626127646
+    second: Untitled 03-20-2025 04-58-36_36
+  - first:
+      213: 2043466751240933174
+    second: Untitled 03-20-2025 04-58-36_37
+  - first:
+      213: -5963107945305391063
+    second: Untitled 03-20-2025 04-58-36_38
+  - first:
+      213: -8673740344101530951
+    second: Untitled 03-20-2025 04-58-36_39
+  - first:
+      213: 8041234847331887412
+    second: Untitled 03-20-2025 04-58-36_40
+  - first:
+      213: 3901805077437558225
+    second: Untitled 03-20-2025 04-58-36_41
+  - first:
+      213: -1569802833988093192
+    second: Untitled 03-20-2025 04-58-36_42
+  - first:
+      213: -8861907171383603327
+    second: Untitled 03-20-2025 04-58-36_43
+  - first:
+      213: -4560555801817117199
+    second: Untitled 03-20-2025 04-58-36_44
+  - first:
+      213: -6076170600136069986
+    second: Untitled 03-20-2025 04-58-36_45
+  - first:
+      213: -8194304368405592191
+    second: Untitled 03-20-2025 04-58-36_46
+  - first:
+      213: 1617519877194890226
+    second: Untitled 03-20-2025 04-58-36_47
+  - first:
+      213: -6570179243479850668
+    second: Untitled 03-20-2025 04-58-36_48
+  - first:
+      213: -7155126372886540974
+    second: Untitled 03-20-2025 04-58-36_49
+  - first:
+      213: 7453154971186349769
+    second: Untitled 03-20-2025 04-58-36_50
+  - first:
+      213: -7563411046906141534
+    second: Untitled 03-20-2025 04-58-36_51
+  - first:
+      213: 7601322226791047008
+    second: Untitled 03-20-2025 04-58-36_52
+  - first:
+      213: 6358952173758595372
+    second: Untitled 03-20-2025 04-58-36_53
+  - first:
+      213: -202837625708335028
+    second: Untitled 03-20-2025 04-58-36_54
+  - first:
+      213: -2568991995077856649
+    second: Untitled 03-20-2025 04-58-36_55
+  - first:
+      213: -6103815765978377847
+    second: Untitled 03-20-2025 04-58-36_56
+  - first:
+      213: 4366787043646952917
+    second: Untitled 03-20-2025 04-58-36_57
+  - first:
+      213: -169754557687192307
+    second: Untitled 03-20-2025 04-58-36_58
+  - first:
+      213: -6562626952707233857
+    second: Untitled 03-20-2025 04-58-36_59
+  - first:
+      213: -403198636779362477
+    second: Untitled 03-20-2025 04-58-36_60
+  - first:
+      213: 3427278968055088555
+    second: Untitled 03-20-2025 04-58-36_61
+  - first:
+      213: -8108420342348397164
+    second: Untitled 03-20-2025 04-58-36_62
+  - first:
+      213: 1917250917066696813
+    second: Untitled 03-20-2025 04-58-36_63
+  - first:
+      213: -8365135194318124938
+    second: Untitled 03-20-2025 04-58-36_64
+  - first:
+      213: -1192082392202110217
+    second: Untitled 03-20-2025 04-58-36_65
+  - first:
+      213: -6153614819040714347
+    second: Untitled 03-20-2025 04-58-36_66
+  - first:
+      213: -6243788532684591172
+    second: Untitled 03-20-2025 04-58-36_67
+  - first:
+      213: -7778469199195075804
+    second: Untitled 03-20-2025 04-58-36_68
+  - first:
+      213: 538042961992282019
+    second: Untitled 03-20-2025 04-58-36_69
+  - first:
+      213: 7009861495719002640
+    second: Untitled 03-20-2025 04-58-36_70
+  - first:
+      213: 2794571877826580355
+    second: Untitled 03-20-2025 04-58-36_71
+  - first:
+      213: -8383173717326537448
+    second: Untitled 03-20-2025 04-58-36_72
+  - first:
+      213: -5426945753344741394
+    second: Untitled 03-20-2025 04-58-36_73
+  - first:
+      213: -958263003883365231
+    second: Untitled 03-20-2025 04-58-36_74
+  - first:
+      213: 9185779100945476990
+    second: Untitled 03-20-2025 04-58-36_75
+  - first:
+      213: 1011840382102394132
+    second: Untitled 03-20-2025 04-58-36_76
+  - first:
+      213: 5211254030769449897
+    second: Untitled 03-20-2025 04-58-36_77
+  - first:
+      213: 5073130798596337605
+    second: Untitled 03-20-2025 04-58-36_78
+  - first:
+      213: -417802008236691471
+    second: Untitled 03-20-2025 04-58-36_79
+  - first:
+      213: -1412922695543511754
+    second: Untitled 03-20-2025 04-58-36_80
+  - first:
+      213: 8292006106764452291
+    second: Untitled 03-20-2025 04-58-36_81
+  - first:
+      213: 3397700790611256127
+    second: Untitled 03-20-2025 04-58-36_82
+  - first:
+      213: -5852920624389995963
+    second: Untitled 03-20-2025 04-58-36_83
+  - first:
+      213: -152853382253392931
+    second: Untitled 03-20-2025 04-58-36_84
+  - first:
+      213: 6929720066252547451
+    second: Untitled 03-20-2025 04-58-36_85
+  - first:
+      213: -3045080366742606870
+    second: Untitled 03-20-2025 04-58-36_86
+  - first:
+      213: -7123179901417736323
+    second: Untitled 03-20-2025 04-58-36_87
+  - first:
+      213: -4229901785694773656
+    second: Untitled 03-20-2025 04-58-36_88
+  - first:
+      213: -6917671714564799698
+    second: Untitled 03-20-2025 04-58-36_89
+  - first:
+      213: -6666488085775780447
+    second: Untitled 03-20-2025 04-58-36_90
+  - first:
+      213: 5548011263301087947
+    second: Untitled 03-20-2025 04-58-36_91
+  - first:
+      213: -2613836429131314142
+    second: Untitled 03-20-2025 04-58-36_92
+  - first:
+      213: 1413952731204036227
+    second: Untitled 03-20-2025 04-58-36_93
+  - first:
+      213: 6183198823723322718
+    second: Untitled 03-20-2025 04-58-36_94
+  - first:
+      213: 2588768636526042654
+    second: Untitled 03-20-2025 04-58-36_95
+  - first:
+      213: -7026755206000367762
+    second: Untitled 03-20-2025 04-58-36_96
+  - first:
+      213: 2605637167710534689
+    second: Untitled 03-20-2025 04-58-36_97
+  - first:
+      213: 3715093737605795159
+    second: Untitled 03-20-2025 04-58-36_98
+  - first:
+      213: 5057097636021360831
+    second: Untitled 03-20-2025 04-58-36_99
+  - first:
+      213: 3963784569048852489
+    second: Untitled 03-20-2025 04-58-36_100
+  - first:
+      213: -6675966264196152751
+    second: Untitled 03-20-2025 04-58-36_101
+  - first:
+      213: 3540800496721921958
+    second: Untitled 03-20-2025 04-58-36_102
+  - first:
+      213: -4900338981212085427
+    second: Untitled 03-20-2025 04-58-36_103
+  - first:
+      213: 1843547060665015416
+    second: Untitled 03-20-2025 04-58-36_104
+  - first:
+      213: 8722909599715735178
+    second: Untitled 03-20-2025 04-58-36_105
+  - first:
+      213: -6177932508803678862
+    second: Untitled 03-20-2025 04-58-36_106
+  - first:
+      213: -1777504706676757041
+    second: Untitled 03-20-2025 04-58-36_107
+  - first:
+      213: 4551725809078836491
+    second: Untitled 03-20-2025 04-58-36_108
+  - first:
+      213: 6899307207561754744
+    second: Untitled 03-20-2025 04-58-36_109
+  - first:
+      213: 3285491426076113145
+    second: Untitled 03-20-2025 04-58-36_110
+  - first:
+      213: 8779689010976266692
+    second: Untitled 03-20-2025 04-58-36_111
+  - first:
+      213: -110431318961954612
+    second: Untitled 03-20-2025 04-58-36_112
+  - first:
+      213: -7185540788641519787
+    second: Untitled 03-20-2025 04-58-36_113
+  - first:
+      213: 6656500251910112846
+    second: Untitled 03-20-2025 04-58-36_114
+  - first:
+      213: 6204140043798672946
+    second: Untitled 03-20-2025 04-58-36_115
+  - first:
+      213: 2956537750595637408
+    second: Untitled 03-20-2025 04-58-36_116
+  - first:
+      213: -2018139875412556008
+    second: Untitled 03-20-2025 04-58-36_117
+  - first:
+      213: 3083426982945239286
+    second: Untitled 03-20-2025 04-58-36_118
+  - first:
+      213: 8850438348372064872
+    second: Untitled 03-20-2025 04-58-36_119
+  - first:
+      213: 8007912624602284452
+    second: Untitled 03-20-2025 04-58-36_120
+  - first:
+      213: -3466573447755393681
+    second: Untitled 03-20-2025 04-58-36_121
+  - first:
+      213: 3770522719784141251
+    second: Untitled 03-20-2025 04-58-36_122
+  - first:
+      213: 7220739718802479799
+    second: Untitled 03-20-2025 04-58-36_123
+  - first:
+      213: 7655624629225592891
+    second: Untitled 03-20-2025 04-58-36_124
+  - first:
+      213: 2040299016230338859
+    second: Untitled 03-20-2025 04-58-36_125
+  - first:
+      213: -2868318972595612497
+    second: Untitled 03-20-2025 04-58-36_126
+  - first:
+      213: -1497834874414415242
+    second: Untitled 03-20-2025 04-58-36_127
+  - first:
+      213: -1986570095426326454
+    second: Untitled 03-20-2025 04-58-36_128
+  - first:
+      213: -5793872205713014125
+    second: Untitled 03-20-2025 04-58-36_129
+  - first:
+      213: -1285248212221595903
+    second: Untitled 03-20-2025 04-58-36_130
+  - first:
+      213: -5081482860181398879
+    second: Untitled 03-20-2025 04-58-36_131
+  - first:
+      213: 5648121016320164012
+    second: Untitled 03-20-2025 04-58-36_132
+  - first:
+      213: -2577101686631328711
+    second: Untitled 03-20-2025 04-58-36_133
+  - first:
+      213: -6870094923083840001
+    second: Untitled 03-20-2025 04-58-36_134
+  - first:
+      213: 6509012957604288667
+    second: Untitled 03-20-2025 04-58-36_135
+  - first:
+      213: -9068360112152542637
+    second: Untitled 03-20-2025 04-58-36_136
+  - first:
+      213: 1196620894060677046
+    second: Untitled 03-20-2025 04-58-36_137
+  - first:
+      213: -3977554803708229470
+    second: Untitled 03-20-2025 04-58-36_138
+  - first:
+      213: -7227410348802013614
+    second: Untitled 03-20-2025 04-58-36_139
+  - first:
+      213: -8289958154104250348
+    second: Untitled 03-20-2025 04-58-36_140
+  - first:
+      213: -3434953342002798781
+    second: Untitled 03-20-2025 04-58-36_141
+  - first:
+      213: -1005839685880687990
+    second: Untitled 03-20-2025 04-58-36_142
+  - first:
+      213: 3590262525808578052
+    second: Untitled 03-20-2025 04-58-36_143
+  externalObjects: {}
+  serializedVersion: 12
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: loading_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 84
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 2bf6446fa329e0d4bb289aae36e39e9c
+      internalID: -98537044
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: loading_1
+      rect:
+        serializedVersion: 2
+        x: 42
+        y: 84
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: ee970a924ec5da84e879fcc86109d297
+      internalID: 1297323490
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: loading_2
+      rect:
+        serializedVersion: 2
+        x: 84
+        y: 84
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: add0ea5c6a9651345978ffd02a5d8224
+      internalID: -1347144225
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: loading_3
+      rect:
+        serializedVersion: 2
+        x: 126
+        y: 84
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c79c73cb22b06ef44bee24a5473fbb19
+      internalID: 1539238350
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: loading_4
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 42
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 545762dbad1234043beef016c1968e89
+      internalID: 1794963232
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: loading_5
+      rect:
+        serializedVersion: 2
+        x: 42
+        y: 42
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: eb3f21cbea1928e48a7d8bd37ab5c33d
+      internalID: -152295577
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: loading_6
+      rect:
+        serializedVersion: 2
+        x: 84
+        y: 42
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 913002776f960df4bb07850a863859be
+      internalID: 992985812
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: loading_7
+      rect:
+        serializedVersion: 2
+        x: 126
+        y: 42
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 868fe6263cda1c44dbff47c6655b85b7
+      internalID: -927591204
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: loading_8
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 82eb050c7809e4d4381cc9fb4e38e242
+      internalID: -381755228
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: loading_9
+      rect:
+        serializedVersion: 2
+        x: 42
+        y: 0
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: be2860cecf6179c428888d8ef5a616a5
+      internalID: -1293525458
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: loading_10
+      rect:
+        serializedVersion: 2
+        x: 84
+        y: 0
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 0dc67cb6a83d9cf4c84b72225f9bbcd9
+      internalID: -1994383181
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: loading_11
+      rect:
+        serializedVersion: 2
+        x: 126
+        y: 0
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: e254de36471a72f41898391487560c96
+      internalID: -1562952185
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 160bd205f2df05e4a8966fe84606b167
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      loading_0: -98537044
+      loading_1: 1297323490
+      loading_10: -1994383181
+      loading_11: -1562952185
+      loading_2: -1347144225
+      loading_3: 1539238350
+      loading_4: 1794963232
+      loading_5: -152295577
+      loading_6: 992985812
+      loading_7: -927591204
+      loading_8: -381755228
+      loading_9: -1293525458
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

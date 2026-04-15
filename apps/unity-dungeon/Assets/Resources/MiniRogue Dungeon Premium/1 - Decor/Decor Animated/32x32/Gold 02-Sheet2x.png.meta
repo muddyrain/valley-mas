@@ -1,0 +1,874 @@
+fileFormatVersion: 2
+guid: 73957746292f9de4eb18e7c9094c9693
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -5025619557561464695
+    second: Gold 02-Sheet2x_0
+  - first:
+      213: -8132253938510985144
+    second: Gold 02-Sheet2x_1
+  - first:
+      213: -3740514413728836043
+    second: Gold 02-Sheet2x_2
+  - first:
+      213: -3143581348381189890
+    second: Gold 02-Sheet2x_3
+  - first:
+      213: 2649574914190165054
+    second: Gold 02-Sheet2x_4
+  - first:
+      213: 4211784456176978574
+    second: Gold 02-Sheet2x_5
+  - first:
+      213: 4284333958466966684
+    second: Gold 02-Sheet2x_6
+  - first:
+      213: 4234655684724411323
+    second: Gold 02-Sheet2x_7
+  - first:
+      213: 776688343360978129
+    second: Gold 02-Sheet2x_8
+  - first:
+      213: 6592989815938484129
+    second: Gold 02-Sheet2x_9
+  - first:
+      213: 2666303955602269002
+    second: Gold 02-Sheet2x_10
+  - first:
+      213: -8993062688746685828
+    second: Gold 02-Sheet2x_11
+  - first:
+      213: 8949747295934713107
+    second: Gold 02-Sheet2x_12
+  - first:
+      213: -6923141299446641729
+    second: Gold 02-Sheet2x_13
+  - first:
+      213: 5288381012257101744
+    second: Gold 02-Sheet2x_14
+  - first:
+      213: -405022007156305595
+    second: Gold 02-Sheet2x_15
+  - first:
+      213: -7060984891385271961
+    second: Gold 02-Sheet2x_16
+  - first:
+      213: -7943537434397892529
+    second: Gold 02-Sheet2x_17
+  - first:
+      213: 3985354098780102718
+    second: Gold 02-Sheet2x_18
+  - first:
+      213: 5016117843415291319
+    second: Gold 02-Sheet2x_19
+  - first:
+      213: 1646375915532245044
+    second: Gold 02-Sheet2x_20
+  - first:
+      213: -8908798554360705256
+    second: Gold 02-Sheet2x_21
+  - first:
+      213: 5926015963484575644
+    second: Gold 02-Sheet2x_22
+  - first:
+      213: 3414856479529789636
+    second: Gold 02-Sheet2x_23
+  - first:
+      213: -2543480155223400959
+    second: Gold 02-Sheet2x_24
+  - first:
+      213: 2556596917717197319
+    second: Gold 02-Sheet2x_25
+  - first:
+      213: -9183504156782015614
+    second: Gold 02-Sheet2x_26
+  - first:
+      213: -2126821558581605763
+    second: Gold 02-Sheet2x_27
+  - first:
+      213: 8180819428444481426
+    second: Gold 02-Sheet2x_28
+  - first:
+      213: -8792953040216254257
+    second: Gold 02-Sheet2x_29
+  externalObjects: {}
+  serializedVersion: 12
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_0
+      rect:
+        serializedVersion: 2
+        x: 3
+        y: 15
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9880b47a3a9614ab0800000000000000
+      internalID: -5025619557561464695
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_1
+      rect:
+        serializedVersion: 2
+        x: 11
+        y: 11
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 84808c3212e642f80800000000000000
+      internalID: -8132253938510985144
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_2
+      rect:
+        serializedVersion: 2
+        x: 17
+        y: 15
+        width: 14
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 536d67475f5071cc0800000000000000
+      internalID: -3740514413728836043
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_3
+      rect:
+        serializedVersion: 2
+        x: 35
+        y: 15
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ef812374b61cf54d0800000000000000
+      internalID: -3143581348381189890
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_4
+      rect:
+        serializedVersion: 2
+        x: 43
+        y: 11
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e34471ea85e25c420800000000000000
+      internalID: 2649574914190165054
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_5
+      rect:
+        serializedVersion: 2
+        x: 49
+        y: 15
+        width: 14
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e8ac0fcd5a3437a30800000000000000
+      internalID: 4211784456176978574
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_6
+      rect:
+        serializedVersion: 2
+        x: 67
+        y: 15
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c94119d2903057b30800000000000000
+      internalID: 4284333958466966684
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_7
+      rect:
+        serializedVersion: 2
+        x: 75
+        y: 11
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bbb461ab8e484ca30800000000000000
+      internalID: 4234655684724411323
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_8
+      rect:
+        serializedVersion: 2
+        x: 81
+        y: 15
+        width: 14
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1dcb737eee957ca00800000000000000
+      internalID: 776688343360978129
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_9
+      rect:
+        serializedVersion: 2
+        x: 99
+        y: 15
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1a708c27e410f7b50800000000000000
+      internalID: 6592989815938484129
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_10
+      rect:
+        serializedVersion: 2
+        x: 107
+        y: 11
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a4364e8225d900520800000000000000
+      internalID: 2666303955602269002
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_11
+      rect:
+        serializedVersion: 2
+        x: 113
+        y: 15
+        width: 14
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c7a3f62c129323380800000000000000
+      internalID: -8993062688746685828
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_12
+      rect:
+        serializedVersion: 2
+        x: 131
+        y: 15
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 31d83b37fb3e33c70800000000000000
+      internalID: 8949747295934713107
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_13
+      rect:
+        serializedVersion: 2
+        x: 139
+        y: 11
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fbb85a42baf0cef90800000000000000
+      internalID: -6923141299446641729
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_14
+      rect:
+        serializedVersion: 2
+        x: 145
+        y: 15
+        width: 14
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0b75188f28a146940800000000000000
+      internalID: 5288381012257101744
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_15
+      rect:
+        serializedVersion: 2
+        x: 163
+        y: 15
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5419b3161a2116af0800000000000000
+      internalID: -405022007156305595
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_16
+      rect:
+        serializedVersion: 2
+        x: 171
+        y: 11
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 769a498e6a7520e90800000000000000
+      internalID: -7060984891385271961
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_17
+      rect:
+        serializedVersion: 2
+        x: 177
+        y: 15
+        width: 14
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f4022b24ac2e2c190800000000000000
+      internalID: -7943537434397892529
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_18
+      rect:
+        serializedVersion: 2
+        x: 1
+        y: 7
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e306fe10072de4730800000000000000
+      internalID: 3985354098780102718
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_19
+      rect:
+        serializedVersion: 2
+        x: 15
+        y: 1
+        width: 16
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7b554402a94dc9540800000000000000
+      internalID: 5016117843415291319
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_20
+      rect:
+        serializedVersion: 2
+        x: 33
+        y: 7
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 438de0c1c2a19d610800000000000000
+      internalID: 1646375915532245044
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_21
+      rect:
+        serializedVersion: 2
+        x: 47
+        y: 1
+        width: 16
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 81f01d76ae69d5480800000000000000
+      internalID: -8908798554360705256
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_22
+      rect:
+        serializedVersion: 2
+        x: 65
+        y: 7
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c97dac41f107d3250800000000000000
+      internalID: 5926015963484575644
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_23
+      rect:
+        serializedVersion: 2
+        x: 79
+        y: 1
+        width: 16
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4c8605d10e1046f20800000000000000
+      internalID: 3414856479529789636
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_24
+      rect:
+        serializedVersion: 2
+        x: 97
+        y: 7
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 10e57a6564eb3bcd0800000000000000
+      internalID: -2543480155223400959
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_25
+      rect:
+        serializedVersion: 2
+        x: 111
+        y: 1
+        width: 16
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 702646ae95bda7320800000000000000
+      internalID: 2556596917717197319
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_26
+      rect:
+        serializedVersion: 2
+        x: 129
+        y: 7
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 28b4fad20a3ad8080800000000000000
+      internalID: -9183504156782015614
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_27
+      rect:
+        serializedVersion: 2
+        x: 143
+        y: 1
+        width: 16
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d7ac9149f030c72e0800000000000000
+      internalID: -2126821558581605763
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_28
+      rect:
+        serializedVersion: 2
+        x: 161
+        y: 7
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2972c042deb188170800000000000000
+      internalID: 8180819428444481426
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gold 02-Sheet2x_29
+      rect:
+        serializedVersion: 2
+        x: 175
+        y: 1
+        width: 16
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fc818370cc729f580800000000000000
+      internalID: -8792953040216254257
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      Gold 02-Sheet2x_0: -5025619557561464695
+      Gold 02-Sheet2x_1: -8132253938510985144
+      Gold 02-Sheet2x_10: 2666303955602269002
+      Gold 02-Sheet2x_11: -8993062688746685828
+      Gold 02-Sheet2x_12: 8949747295934713107
+      Gold 02-Sheet2x_13: -6923141299446641729
+      Gold 02-Sheet2x_14: 5288381012257101744
+      Gold 02-Sheet2x_15: -405022007156305595
+      Gold 02-Sheet2x_16: -7060984891385271961
+      Gold 02-Sheet2x_17: -7943537434397892529
+      Gold 02-Sheet2x_18: 3985354098780102718
+      Gold 02-Sheet2x_19: 5016117843415291319
+      Gold 02-Sheet2x_2: -3740514413728836043
+      Gold 02-Sheet2x_20: 1646375915532245044
+      Gold 02-Sheet2x_21: -8908798554360705256
+      Gold 02-Sheet2x_22: 5926015963484575644
+      Gold 02-Sheet2x_23: 3414856479529789636
+      Gold 02-Sheet2x_24: -2543480155223400959
+      Gold 02-Sheet2x_25: 2556596917717197319
+      Gold 02-Sheet2x_26: -9183504156782015614
+      Gold 02-Sheet2x_27: -2126821558581605763
+      Gold 02-Sheet2x_28: 8180819428444481426
+      Gold 02-Sheet2x_29: -8792953040216254257
+      Gold 02-Sheet2x_3: -3143581348381189890
+      Gold 02-Sheet2x_4: 2649574914190165054
+      Gold 02-Sheet2x_5: 4211784456176978574
+      Gold 02-Sheet2x_6: 4284333958466966684
+      Gold 02-Sheet2x_7: 4234655684724411323
+      Gold 02-Sheet2x_8: 776688343360978129
+      Gold 02-Sheet2x_9: 6592989815938484129
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

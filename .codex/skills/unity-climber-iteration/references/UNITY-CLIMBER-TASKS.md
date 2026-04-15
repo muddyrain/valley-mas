@@ -17,8 +17,10 @@
 - [x] P1-01：补齐 `Step_04~Step_10` 与终点前缓冲平台，形成连续可达主路线。
 - [x] P1-02：增加一次坠落恢复点（Checkpoint_01），避免失败后总是回到起点。
 - [x] P2-01：补最小调参面板（移动速度、跳跃力、相机偏移）并固化默认参数。
-- [ ] P3-01：补最小 HUD（高度、进度、重开提示）。
-- [ ] 评估 Web 挂载策略（是否继续保留 Three.js 入口作为 Legacy）。
+- [x] P3-01：补最小 HUD（高度、进度、重开提示）。
+- [x] P4-01：完成资产规范文档与目录骨架（Models/Materials/Prefabs/Audio）。
+- [ ] P4-02：执行首批模型替换（`Tools > Unity Climber > Apply P4 First Asset Swap`）。
+- [ ] P4-03：补首批 SFX（jump/land/checkpoint/finish）并接入。
 
 ## 过渡状态看板
 
@@ -26,6 +28,7 @@
 - Unity 主线（`apps/unity-climber`）：`可演示`
 - Scene 建模规则：`必须直接写入 scene，禁止 Play 时脚本生成`
 - 产品对齐状态：`对齐《攀爬动物：在一起》核心攀爬循环`
+- 当前策略：`先推进 Unity 主线，暂不处理 threejs/web 迁移决策`
 
 ## 每轮提交前检查
 
@@ -34,6 +37,7 @@
 - [ ] 若涉及 Web：`pnpm --filter web exec tsc --noEmit`
 - [ ] 若改中文：`python .codex/skills/encoding-guard/scripts/check_mojibake.py`
 - [ ] Unity Inspector 抽查脚本绑定：`Player/Camera/FinishTrigger` 不得出现 `None (Mono Script)`
+- [ ] 若要“模型直接落 Scene”：先验证 `LoadAssetAtPath<GameObject>() != null`，失败则必须阻断并改走导入修复/格式切换
 
 ## 迭代记录（追加）
 
@@ -52,3 +56,4 @@
 - 强化约束：Scene 模型和 3D 对象必须直接写入场景文件，不走 Play 时脚本生成。
 - 任务清单升级为版本路线（P0-P5），并切换到 P1/P2/P3 可执行活跃项。
 - 明确产品目标：Unity 主线对齐《攀爬动物：在一起》的核心体验，不偏离为泛 3D 演示。
+- P4-01 已落地：新增资产规范与目录骨架，准备进入首批模型/音频替换。

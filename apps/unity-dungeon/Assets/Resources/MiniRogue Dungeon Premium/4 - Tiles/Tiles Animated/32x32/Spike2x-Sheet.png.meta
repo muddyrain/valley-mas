@@ -1,0 +1,2074 @@
+fileFormatVersion: 2
+guid: d55b156c9c63f7d4ba97e3611db233b0
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 4168015970654954330
+    second: Spike2x-Sheet_0
+  - first:
+      213: -7600530002405759846
+    second: Spike2x-Sheet_1
+  - first:
+      213: 3971126001187271437
+    second: Spike2x-Sheet_2
+  - first:
+      213: -3395853853727309106
+    second: Spike2x-Sheet_3
+  - first:
+      213: -7251991699235109565
+    second: Spike2x-Sheet_4
+  - first:
+      213: -5976515397013084907
+    second: Spike2x-Sheet_5
+  - first:
+      213: -7020807216378897451
+    second: Spike2x-Sheet_6
+  - first:
+      213: 6507292024744991024
+    second: Spike2x-Sheet_7
+  - first:
+      213: 8641638496618246181
+    second: Spike2x-Sheet_8
+  - first:
+      213: 298314829334404884
+    second: Spike2x-Sheet_9
+  - first:
+      213: 6642996746934378836
+    second: Spike2x-Sheet_10
+  - first:
+      213: 4473238467839596166
+    second: Spike2x-Sheet_11
+  - first:
+      213: -5753220600833186314
+    second: Spike2x-Sheet_12
+  - first:
+      213: -5791348482543245337
+    second: Spike2x-Sheet_13
+  - first:
+      213: 1986406553223743014
+    second: Spike2x-Sheet_14
+  - first:
+      213: -7727769543037073548
+    second: Spike2x-Sheet_15
+  - first:
+      213: -5302207151862964113
+    second: Spike2x-Sheet_16
+  - first:
+      213: 1734842936408340876
+    second: Spike2x-Sheet_17
+  - first:
+      213: -1759516104196880683
+    second: Spike2x-Sheet_18
+  - first:
+      213: -165305311067697074
+    second: Spike2x-Sheet_19
+  - first:
+      213: -1457031467292836029
+    second: Spike2x-Sheet_20
+  - first:
+      213: 7057985428552448661
+    second: Spike2x-Sheet_21
+  - first:
+      213: 3937404905695956056
+    second: Spike2x-Sheet_22
+  - first:
+      213: -5468115692159869591
+    second: Spike2x-Sheet_23
+  - first:
+      213: -6980871761386416825
+    second: Spike2x-Sheet_24
+  - first:
+      213: -267329013800923155
+    second: Spike2x-Sheet_25
+  - first:
+      213: 4293618117762454526
+    second: Spike2x-Sheet_26
+  - first:
+      213: 4934100150283584536
+    second: Spike2x-Sheet_27
+  - first:
+      213: -4089777183805680260
+    second: Spike2x-Sheet_28
+  - first:
+      213: 7800340447029038833
+    second: Spike2x-Sheet_29
+  - first:
+      213: 7401867153791323157
+    second: Spike2x-Sheet_30
+  - first:
+      213: -7971006153313814456
+    second: Spike2x-Sheet_31
+  - first:
+      213: -6704891909316759285
+    second: Spike2x-Sheet_32
+  - first:
+      213: 1156707529148916877
+    second: Spike2x-Sheet_33
+  - first:
+      213: -1100297792735069098
+    second: Spike2x-Sheet_34
+  - first:
+      213: 6996973792861804449
+    second: Spike2x-Sheet_35
+  - first:
+      213: 585818495545083117
+    second: Spike2x-Sheet_36
+  - first:
+      213: 4870019133333860156
+    second: Spike2x-Sheet_37
+  - first:
+      213: -767937695425932251
+    second: Spike2x-Sheet_38
+  - first:
+      213: 7788914225864317193
+    second: Spike2x-Sheet_39
+  - first:
+      213: -3548334430207392738
+    second: Spike2x-Sheet_40
+  - first:
+      213: 4706470898221400238
+    second: Spike2x-Sheet_41
+  - first:
+      213: -3279389105270070170
+    second: Spike2x-Sheet_42
+  - first:
+      213: 5759562051739648733
+    second: Spike2x-Sheet_43
+  - first:
+      213: 295787215547072480
+    second: Spike2x-Sheet_44
+  - first:
+      213: 1383340121658133065
+    second: Spike2x-Sheet_45
+  - first:
+      213: 1312342430553194815
+    second: Spike2x-Sheet_46
+  - first:
+      213: 286718616613370590
+    second: Spike2x-Sheet_47
+  - first:
+      213: -4531745838950455196
+    second: Spike2x-Sheet_48
+  - first:
+      213: -3921051207723706124
+    second: Spike2x-Sheet_49
+  - first:
+      213: -1358356730769852329
+    second: Spike2x-Sheet_50
+  - first:
+      213: -847564445984987753
+    second: Spike2x-Sheet_51
+  - first:
+      213: 7280427362057881408
+    second: Spike2x-Sheet_52
+  - first:
+      213: 5283032187895549528
+    second: Spike2x-Sheet_53
+  - first:
+      213: 2528384414767245328
+    second: Spike2x-Sheet_54
+  - first:
+      213: 5105486772224705612
+    second: Spike2x-Sheet_55
+  - first:
+      213: 1749290664745343616
+    second: Spike2x-Sheet_56
+  - first:
+      213: 2250622017059110307
+    second: Spike2x-Sheet_57
+  - first:
+      213: 4588802452082377637
+    second: Spike2x-Sheet_58
+  - first:
+      213: 6404654803658827277
+    second: Spike2x-Sheet_59
+  - first:
+      213: -7258307630639140172
+    second: Spike2x-Sheet_60
+  - first:
+      213: 958019827584318517
+    second: Spike2x-Sheet_61
+  - first:
+      213: -7793832532461032683
+    second: Spike2x-Sheet_62
+  - first:
+      213: 3958191305855336475
+    second: Spike2x-Sheet_63
+  - first:
+      213: 2340375740355735266
+    second: Spike2x-Sheet_64
+  - first:
+      213: -6016203488772876670
+    second: Spike2x-Sheet_65
+  - first:
+      213: -5285777783416060996
+    second: Spike2x-Sheet_66
+  - first:
+      213: -2160048213984482874
+    second: Spike2x-Sheet_67
+  - first:
+      213: 413988291096010097
+    second: Spike2x-Sheet_68
+  - first:
+      213: -3026897574650597069
+    second: Spike2x-Sheet_69
+  - first:
+      213: -769123629216627804
+    second: Spike2x-Sheet_70
+  - first:
+      213: 5219971285822706246
+    second: Spike2x-Sheet_71
+  - first:
+      213: -5891588793175914614
+    second: Spike2x-Sheet_72
+  - first:
+      213: -214982121925782798
+    second: Spike2x-Sheet_73
+  - first:
+      213: -4994301227448107510
+    second: Spike2x-Sheet_74
+  - first:
+      213: 7945471700046230502
+    second: Spike2x-Sheet_75
+  - first:
+      213: -6477785804455546720
+    second: Spike2x-Sheet_76
+  - first:
+      213: -3405057122813378005
+    second: Spike2x-Sheet_77
+  externalObjects: {}
+  serializedVersion: 12
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Spike2x-Sheet_0
+      rect:
+        serializedVersion: 2
+        x: 1
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a532b053174c7d930800000000000000
+      internalID: 4168015970654954330
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_1
+      rect:
+        serializedVersion: 2
+        x: 11
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a94e7ed6b3e758690800000000000000
+      internalID: -7600530002405759846
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_2
+      rect:
+        serializedVersion: 2
+        x: 21
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d03b513ee064c1730800000000000000
+      internalID: 3971126001187271437
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_3
+      rect:
+        serializedVersion: 2
+        x: 33
+        y: 19
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ec2417b79e08fd0d0800000000000000
+      internalID: -3395853853727309106
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_4
+      rect:
+        serializedVersion: 2
+        x: 33
+        y: 9
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3458205e8ffbb5b90800000000000000
+      internalID: -7251991699235109565
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_5
+      rect:
+        serializedVersion: 2
+        x: 43
+        y: 19
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 515e16e49e62f0da0800000000000000
+      internalID: -5976515397013084907
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_6
+      rect:
+        serializedVersion: 2
+        x: 43
+        y: 9
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5db9c37d805119e90800000000000000
+      internalID: -7020807216378897451
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_7
+      rect:
+        serializedVersion: 2
+        x: 53
+        y: 19
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 03958a09e9b8e4a50800000000000000
+      internalID: 6507292024744991024
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_8
+      rect:
+        serializedVersion: 2
+        x: 53
+        y: 9
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 52075446d644de770800000000000000
+      internalID: 8641638496618246181
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_9
+      rect:
+        serializedVersion: 2
+        x: 65
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 41f55b9b1c3d32400800000000000000
+      internalID: 298314829334404884
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_10
+      rect:
+        serializedVersion: 2
+        x: 75
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4516911685aa03c50800000000000000
+      internalID: 6642996746934378836
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_11
+      rect:
+        serializedVersion: 2
+        x: 85
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 686113fafa2241e30800000000000000
+      internalID: 4473238467839596166
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_12
+      rect:
+        serializedVersion: 2
+        x: 97
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6f5e0ec68547820b0800000000000000
+      internalID: -5753220600833186314
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_13
+      rect:
+        serializedVersion: 2
+        x: 107
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7e7238f2d3ff0afa0800000000000000
+      internalID: -5791348482543245337
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_14
+      rect:
+        serializedVersion: 2
+        x: 117
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 626c8685c32219b10800000000000000
+      internalID: 1986406553223743014
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_15
+      rect:
+        serializedVersion: 2
+        x: 129
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 47741394b8271c490800000000000000
+      internalID: -7727769543037073548
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_16
+      rect:
+        serializedVersion: 2
+        x: 139
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f602cab00b6ca66b0800000000000000
+      internalID: -5302207151862964113
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_17
+      rect:
+        serializedVersion: 2
+        x: 149
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c89f6b58576631810800000000000000
+      internalID: 1734842936408340876
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_18
+      rect:
+        serializedVersion: 2
+        x: 161
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5d604c0fc61f497e0800000000000000
+      internalID: -1759516104196880683
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_19
+      rect:
+        serializedVersion: 2
+        x: 171
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e40135602b7b4bdf0800000000000000
+      internalID: -165305311067697074
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_20
+      rect:
+        serializedVersion: 2
+        x: 181
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 34fb175a99597cbe0800000000000000
+      internalID: -1457031467292836029
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_21
+      rect:
+        serializedVersion: 2
+        x: 193
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 59a70ca3a5003f160800000000000000
+      internalID: 7057985428552448661
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_22
+      rect:
+        serializedVersion: 2
+        x: 203
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 85c43e486e874a630800000000000000
+      internalID: 3937404905695956056
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_23
+      rect:
+        serializedVersion: 2
+        x: 213
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 96d5212dfb95d14b0800000000000000
+      internalID: -5468115692159869591
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_24
+      rect:
+        serializedVersion: 2
+        x: 225
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 745d1088e16fe1f90800000000000000
+      internalID: -6980871761386416825
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_25
+      rect:
+        serializedVersion: 2
+        x: 235
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: def8d36ada14a4cf0800000000000000
+      internalID: -267329013800923155
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_26
+      rect:
+        serializedVersion: 2
+        x: 245
+        y: 19
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ef39966fdeef59b30800000000000000
+      internalID: 4293618117762454526
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_27
+      rect:
+        serializedVersion: 2
+        x: 257
+        y: 0
+        width: 10
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 814cad7d1f1797440800000000000000
+      internalID: 4934100150283584536
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_28
+      rect:
+        serializedVersion: 2
+        x: 267
+        y: 0
+        width: 10
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c75d3c4e1513e37c0800000000000000
+      internalID: -4089777183805680260
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_29
+      rect:
+        serializedVersion: 2
+        x: 277
+        y: 0
+        width: 10
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1fe07400f40604c60800000000000000
+      internalID: 7800340447029038833
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_30
+      rect:
+        serializedVersion: 2
+        x: 289
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 51c0d58a5f6b8b660800000000000000
+      internalID: 7401867153791323157
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_31
+      rect:
+        serializedVersion: 2
+        x: 299
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 848f641c22c416190800000000000000
+      internalID: -7971006153313814456
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_32
+      rect:
+        serializedVersion: 2
+        x: 309
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b01b8cf155073f2a0800000000000000
+      internalID: -6704891909316759285
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_33
+      rect:
+        serializedVersion: 2
+        x: 321
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d84e0f78e537d0010800000000000000
+      internalID: 1156707529148916877
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_34
+      rect:
+        serializedVersion: 2
+        x: 331
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 65c31e4bcf4fab0f0800000000000000
+      internalID: -1100297792735069098
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_35
+      rect:
+        serializedVersion: 2
+        x: 341
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1a7de32d79e3a1160800000000000000
+      internalID: 6996973792861804449
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_36
+      rect:
+        serializedVersion: 2
+        x: 353
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: de481d161de312800800000000000000
+      internalID: 585818495545083117
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_37
+      rect:
+        serializedVersion: 2
+        x: 363
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c3f68bb6998c59340800000000000000
+      internalID: 4870019133333860156
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_38
+      rect:
+        serializedVersion: 2
+        x: 373
+        y: 0
+        width: 10
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 52451861cbcb755f0800000000000000
+      internalID: -767937695425932251
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_39
+      rect:
+        serializedVersion: 2
+        x: 33
+        y: 0
+        width: 10
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 90911a29838c71c60800000000000000
+      internalID: 7788914225864317193
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_40
+      rect:
+        serializedVersion: 2
+        x: 43
+        y: 0
+        width: 10
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e144337b2a8c1cec0800000000000000
+      internalID: -3548334430207392738
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_41
+      rect:
+        serializedVersion: 2
+        x: 53
+        y: 0
+        width: 10
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ea04332985eb05140800000000000000
+      internalID: 4706470898221400238
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_42
+      rect:
+        serializedVersion: 2
+        x: 65
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6646714dbf44d72d0800000000000000
+      internalID: -3279389105270070170
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_43
+      rect:
+        serializedVersion: 2
+        x: 75
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dd203cbab231eef40800000000000000
+      internalID: 5759562051739648733
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_44
+      rect:
+        serializedVersion: 2
+        x: 85
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0eff8c7c7e8da1400800000000000000
+      internalID: 295787215547072480
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_45
+      rect:
+        serializedVersion: 2
+        x: 97
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 94a8afae28c923310800000000000000
+      internalID: 1383340121658133065
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_46
+      rect:
+        serializedVersion: 2
+        x: 107
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f31cbcccc70663210800000000000000
+      internalID: 1312342430553194815
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_47
+      rect:
+        serializedVersion: 2
+        x: 117
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: eda3bbd0011aaf300800000000000000
+      internalID: 286718616613370590
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_48
+      rect:
+        serializedVersion: 2
+        x: 129
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 468e0017b210c11c0800000000000000
+      internalID: -4531745838950455196
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_49
+      rect:
+        serializedVersion: 2
+        x: 139
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4f8138183b0a599c0800000000000000
+      internalID: -3921051207723706124
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_50
+      rect:
+        serializedVersion: 2
+        x: 149
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 758b33010c5262de0800000000000000
+      internalID: -1358356730769852329
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_51
+      rect:
+        serializedVersion: 2
+        x: 161
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 79560d080a8dc34f0800000000000000
+      internalID: -847564445984987753
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_52
+      rect:
+        serializedVersion: 2
+        x: 171
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0478e78cc16490560800000000000000
+      internalID: 7280427362057881408
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_53
+      rect:
+        serializedVersion: 2
+        x: 181
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 85e0870c8c9115940800000000000000
+      internalID: 5283032187895549528
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_54
+      rect:
+        serializedVersion: 2
+        x: 193
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 018e5d1ba30a61320800000000000000
+      internalID: 2528384414767245328
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_55
+      rect:
+        serializedVersion: 2
+        x: 203
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c44c8e75b255ad640800000000000000
+      internalID: 5105486772224705612
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_56
+      rect:
+        serializedVersion: 2
+        x: 213
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 08a9d09679ab64810800000000000000
+      internalID: 1749290664745343616
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_57
+      rect:
+        serializedVersion: 2
+        x: 225
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3ad3b7adcc0db3f10800000000000000
+      internalID: 2250622017059110307
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_58
+      rect:
+        serializedVersion: 2
+        x: 235
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5a3cfc48483beaf30800000000000000
+      internalID: 4588802452082377637
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_59
+      rect:
+        serializedVersion: 2
+        x: 245
+        y: 9
+        width: 10
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d0665115c97e1e850800000000000000
+      internalID: 6404654803658827277
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_60
+      rect:
+        serializedVersion: 2
+        x: 65
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4b23f358aaf454b90800000000000000
+      internalID: -7258307630639140172
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_61
+      rect:
+        serializedVersion: 2
+        x: 75
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 53cb1f615f19b4d00800000000000000
+      internalID: 958019827584318517
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_62
+      rect:
+        serializedVersion: 2
+        x: 85
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 51be6cfea9eb6d390800000000000000
+      internalID: -7793832532461032683
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_63
+      rect:
+        serializedVersion: 2
+        x: 97
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b100c8275025ee630800000000000000
+      internalID: 3958191305855336475
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_64
+      rect:
+        serializedVersion: 2
+        x: 107
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2ee68d4065faa7020800000000000000
+      internalID: 2340375740355735266
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_65
+      rect:
+        serializedVersion: 2
+        x: 117
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2861a3b5dc6228ca0800000000000000
+      internalID: -6016203488772876670
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_66
+      rect:
+        serializedVersion: 2
+        x: 129
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cb385d97c1525a6b0800000000000000
+      internalID: -5285777783416060996
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_67
+      rect:
+        serializedVersion: 2
+        x: 139
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6c9ecb30897f502e0800000000000000
+      internalID: -2160048213984482874
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_68
+      rect:
+        serializedVersion: 2
+        x: 149
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 17dd2f74828ceb500800000000000000
+      internalID: 413988291096010097
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_69
+      rect:
+        serializedVersion: 2
+        x: 161
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 331b57b61bc4ef5d0800000000000000
+      internalID: -3026897574650597069
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_70
+      rect:
+        serializedVersion: 2
+        x: 171
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4a30f2c52268355f0800000000000000
+      internalID: -769123629216627804
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_71
+      rect:
+        serializedVersion: 2
+        x: 181
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 64293355a30117840800000000000000
+      internalID: 5219971285822706246
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_72
+      rect:
+        serializedVersion: 2
+        x: 193
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a87c314253fdc3ea0800000000000000
+      internalID: -5891588793175914614
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_73
+      rect:
+        serializedVersion: 2
+        x: 203
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2f2dd8d26ea340df0800000000000000
+      internalID: -214982121925782798
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_74
+      rect:
+        serializedVersion: 2
+        x: 213
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a0e78ac9e7da0bab0800000000000000
+      internalID: -4994301227448107510
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_75
+      rect:
+        serializedVersion: 2
+        x: 225
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6e3bc2e0a6cf34e60800000000000000
+      internalID: 7945471700046230502
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_76
+      rect:
+        serializedVersion: 2
+        x: 235
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0a0fb52b1284a16a0800000000000000
+      internalID: -6477785804455546720
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Spike2x-Sheet_77
+      rect:
+        serializedVersion: 2
+        x: 245
+        y: 0
+        width: 10
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b228bca669eceb0d0800000000000000
+      internalID: -3405057122813378005
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      Spike2x-Sheet_0: 4168015970654954330
+      Spike2x-Sheet_1: -7600530002405759846
+      Spike2x-Sheet_10: 6642996746934378836
+      Spike2x-Sheet_11: 4473238467839596166
+      Spike2x-Sheet_12: -5753220600833186314
+      Spike2x-Sheet_13: -5791348482543245337
+      Spike2x-Sheet_14: 1986406553223743014
+      Spike2x-Sheet_15: -7727769543037073548
+      Spike2x-Sheet_16: -5302207151862964113
+      Spike2x-Sheet_17: 1734842936408340876
+      Spike2x-Sheet_18: -1759516104196880683
+      Spike2x-Sheet_19: -165305311067697074
+      Spike2x-Sheet_2: 3971126001187271437
+      Spike2x-Sheet_20: -1457031467292836029
+      Spike2x-Sheet_21: 7057985428552448661
+      Spike2x-Sheet_22: 3937404905695956056
+      Spike2x-Sheet_23: -5468115692159869591
+      Spike2x-Sheet_24: -6980871761386416825
+      Spike2x-Sheet_25: -267329013800923155
+      Spike2x-Sheet_26: 4293618117762454526
+      Spike2x-Sheet_27: 4934100150283584536
+      Spike2x-Sheet_28: -4089777183805680260
+      Spike2x-Sheet_29: 7800340447029038833
+      Spike2x-Sheet_3: -3395853853727309106
+      Spike2x-Sheet_30: 7401867153791323157
+      Spike2x-Sheet_31: -7971006153313814456
+      Spike2x-Sheet_32: -6704891909316759285
+      Spike2x-Sheet_33: 1156707529148916877
+      Spike2x-Sheet_34: -1100297792735069098
+      Spike2x-Sheet_35: 6996973792861804449
+      Spike2x-Sheet_36: 585818495545083117
+      Spike2x-Sheet_37: 4870019133333860156
+      Spike2x-Sheet_38: -767937695425932251
+      Spike2x-Sheet_39: 7788914225864317193
+      Spike2x-Sheet_4: -7251991699235109565
+      Spike2x-Sheet_40: -3548334430207392738
+      Spike2x-Sheet_41: 4706470898221400238
+      Spike2x-Sheet_42: -3279389105270070170
+      Spike2x-Sheet_43: 5759562051739648733
+      Spike2x-Sheet_44: 295787215547072480
+      Spike2x-Sheet_45: 1383340121658133065
+      Spike2x-Sheet_46: 1312342430553194815
+      Spike2x-Sheet_47: 286718616613370590
+      Spike2x-Sheet_48: -4531745838950455196
+      Spike2x-Sheet_49: -3921051207723706124
+      Spike2x-Sheet_5: -5976515397013084907
+      Spike2x-Sheet_50: -1358356730769852329
+      Spike2x-Sheet_51: -847564445984987753
+      Spike2x-Sheet_52: 7280427362057881408
+      Spike2x-Sheet_53: 5283032187895549528
+      Spike2x-Sheet_54: 2528384414767245328
+      Spike2x-Sheet_55: 5105486772224705612
+      Spike2x-Sheet_56: 1749290664745343616
+      Spike2x-Sheet_57: 2250622017059110307
+      Spike2x-Sheet_58: 4588802452082377637
+      Spike2x-Sheet_59: 6404654803658827277
+      Spike2x-Sheet_6: -7020807216378897451
+      Spike2x-Sheet_60: -7258307630639140172
+      Spike2x-Sheet_61: 958019827584318517
+      Spike2x-Sheet_62: -7793832532461032683
+      Spike2x-Sheet_63: 3958191305855336475
+      Spike2x-Sheet_64: 2340375740355735266
+      Spike2x-Sheet_65: -6016203488772876670
+      Spike2x-Sheet_66: -5285777783416060996
+      Spike2x-Sheet_67: -2160048213984482874
+      Spike2x-Sheet_68: 413988291096010097
+      Spike2x-Sheet_69: -3026897574650597069
+      Spike2x-Sheet_7: 6507292024744991024
+      Spike2x-Sheet_70: -769123629216627804
+      Spike2x-Sheet_71: 5219971285822706246
+      Spike2x-Sheet_72: -5891588793175914614
+      Spike2x-Sheet_73: -214982121925782798
+      Spike2x-Sheet_74: -4994301227448107510
+      Spike2x-Sheet_75: 7945471700046230502
+      Spike2x-Sheet_76: -6477785804455546720
+      Spike2x-Sheet_77: -3405057122813378005
+      Spike2x-Sheet_8: 8641638496618246181
+      Spike2x-Sheet_9: 298314829334404884
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

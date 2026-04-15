@@ -773,6 +773,145 @@
   - 当前风险：需 Unity 重新导入资源后才会在 Inspector 反映最新绑定状态。
   - 下一步动作：你执行一次 Reimport/重开工程后验证 Player 与 Main Camera 脚本组件是否恢复。
 
+## 2026-04-15 20:11 (Asia/Shanghai)
+
+- 任务：切换到 P4 资产替换准备，先落规范与目录骨架（不改玩法逻辑）。
+- 改动文件：
+  - `apps/unity-climber/ASSET_PIPELINE.md`
+  - `apps/unity-climber/README.md`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 `ASSET_PIPELINE.md`，定义模型/材质/预制体/音频目录、命名规范、尺寸与碰撞基线、首批替换目标和下载清单。
+  - 建立资产目录骨架：`Assets/Models/*`、`Assets/Materials`、`Assets/Prefabs/*`、`Assets/Audio/*`（含占位文件）。
+  - 任务清单将 `P4-01` 标记完成，并切换下一步为 `P4-02/P4-03`。
+  - 明确当前策略：先推进 Unity 主线，暂不处理 threejs/web 迁移决策。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/unity-climber/ASSET_PIPELINE.md apps/unity-climber/README.md .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`：通过
+  - 目录检查：`Get-ChildItem -Recurse apps/unity-climber/Assets/Models,apps/unity-climber/Assets/Materials,apps/unity-climber/Assets/Prefabs,apps/unity-climber/Assets/Audio`：通过
+- 风险与后续：
+  - 当前风险：首批替换所需模型与音频资源尚未入库，P4-02/P4-03 仍阻塞。
+  - 下一步动作：你先准备最小资源包（角色 1~2、台阶/平台 3~5、终点装置 1、SFX 4 条），我收到后立即开始替换接入。
+
+## 2026-04-15 20:35 (Asia/Shanghai)
+
+- 任务：在模型已入库后推进 P4-02 的首批替换执行路径（保持 Scene 持久化落地）。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scripts/Editor/ClimberAssetSwapEditor.cs`
+  - `apps/unity-climber/ASSET_PIPELINE.md`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 Unity Editor 菜单工具 `Tools > Unity Climber > Apply P4 First Asset Swap`，用于一次性替换 `Step_01~03 + FinishBuffer` 并保存场景。
+  - 工具默认映射：`Step_01->stepping_stone`、`Step_02->rock_slab`、`Step_03->plank_long`、`FinishBuffer->container_short`。
+  - 对无碰撞模型自动补 `BoxCollider`，避免替换后角色穿透。
+  - 资产规范文档补充了具体执行步骤，任务清单将 P4-02 改为“执行替换工具”动作项。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/unity-climber/ASSET_PIPELINE.md .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md apps/unity-climber/Assets/Scripts/Editor/ClimberAssetSwapEditor.cs`：通过
+- 风险与后续：
+  - 当前风险：替换动作需要在 Unity Editor 中手动点击菜单执行一次。
+  - 下一步动作：你执行菜单后，我继续做 P4-03 音效接入（等待音频资源）。
+
+## 2026-04-15 20:41 (Asia/Shanghai)
+
+- 任务：响应用户“直接在 Player 上换角色模型”的要求，补充一键替换工具。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scripts/Editor/ClimberAssetSwapEditor.cs`
+  - `apps/unity-climber/ASSET_PIPELINE.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增菜单：
+    - `Tools > Unity Climber > Apply Player Model > Peach`
+    - `Tools > Unity Climber > Apply Player Model > Daisy`
+  - 替换逻辑在编辑器中直接操作 Scene：将角色模型作为 `Player` 子对象挂载，保留 Player 的 Rigidbody/Collider/控制脚本。
+  - 自动关闭 Player 原始胶囊体可视网格，避免模型与胶囊重叠显示。
+  - 执行后自动保存场景，确保结果是 Scene 持久化对象。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/unity-climber/Assets/Scripts/Editor/ClimberAssetSwapEditor.cs apps/unity-climber/ASSET_PIPELINE.md`：通过
+- 风险与后续：
+  - 当前风险：模型骨骼与原点可能存在个体差异，`localPosition` 可能需要小幅微调。
+  - 下一步动作：你在 Unity 点菜单实测后告诉我偏移量，我再把默认位置参数固化到工具里。
+
+## 2026-04-15 20:43 (Asia/Shanghai)
+
+- 任务：按用户要求将 Player 角色默认设为 Peach，避免每次手动点击替换按钮。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scripts/Editor/ClimberAssetSwapEditor.cs`
+  - `apps/unity-climber/ASSET_PIPELINE.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将角色替换工具改为 `InitializeOnLoad` 自动流程：打开 `SampleScene` 且 Player 尚无可视角色时，自动绑定 `peach.glb` 并保存场景。
+  - 仍保留手动菜单（Peach/Daisy）作为覆盖入口。
+  - 资产规范文档同步说明“默认自动绑定 Peach”。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/unity-climber/Assets/Scripts/Editor/ClimberAssetSwapEditor.cs apps/unity-climber/ASSET_PIPELINE.md`：通过
+- 风险与后续：
+  - 当前风险：自动绑定仅在 `SampleScene` 生效，其他场景不会自动处理。
+  - 下一步动作：你重开 `SampleScene` 确认 Peach 自动挂载后，我继续推进 P4-03 音效接入。
+
+## 2026-04-15 21:10 (Asia/Shanghai)
+
+- 任务：响应用户“必须直接改 Scene”的要求，排查默认 Peach 绑定失败原因并清理临时文件。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scripts/Editor/ClimberAssetSwapEditor.cs`
+  - `apps/unity-climber/Packages/manifest.json`
+  - `apps/unity-climber/Assets/Scenes/SampleScene.unity`（删除）
+  - `apps/unity-climber/Assets/Scenes/SampleScene.unity.meta`（删除）
+  - `.codex/skills/unity-climber-iteration/SKILL.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 去除自动触发方向，保留仅编辑器执行的方法，避免“打开场景自动脚本改动”。
+  - 修复 `manifest.json` 无效依赖：移除 `com.unity.modules.infinity`。
+  - 排查日志确认当前阻塞：`peach.glb` 在项目中无法作为 `GameObject` 资产加载（`DefaultImporter`），因此无法直接绑定到 Scene。
+  - 清理临时 `SampleScene.unity` 文件，回归单一 `SampleScene.scene` 工作流。
+  - 在 skill 增加“模型导入前置检查”：`.glb` 必须先有可用导入器。
+- 校验：
+  - `tmp/unity-bind-peach.log` 关键日志：`[unity-climber] 角色模型未找到: Assets/Models/Characters/peach.glb`
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/unity-climber-iteration/SKILL.md .codex/logs/CHANGE-LOG.md`：未执行（下一步执行）
+- 风险与后续：
+  - 当前风险：在 glTF 导入器可用前，仍无法把 `.glb` 角色直接落入 Scene。
+  - 下一步动作：二选一推进：安装 glTF 导入器，或让用户改提供 FBX 再直接写入 Scene。
+
+## 2026-04-15 21:14 (Asia/Shanghai)
+
+- 任务：将“直接改 Scene”行为写为不可绕过的强制约束，避免同类问题再次出现。
+- 改动文件：
+  - `.codex/skills/unity-climber-iteration/SKILL.md`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 skill 中新增“强制阻断规则（不可绕过）”：用户要求直接改 Scene 时，禁止运行时生成、自动触发绑定、按钮替代交付。
+  - 强制前置检查：模型必须 `LoadAssetAtPath<GameObject>() != null`；不满足即中止该路径并切换到导入修复/格式切换。
+  - 在任务清单每轮检查里加入同样阻断检查项，要求显式验证后才能执行 Scene 绑定。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/unity-climber-iteration/SKILL.md .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`：通过
+- 风险与后续：
+  - 当前风险：无新增实现风险，约束已落地。
+  - 下一步动作：后续涉及模型绑定任务时，先跑可加载性检查，再决定是否进入 Scene 改动。
+
+## 2026-04-15 21:28 (Asia/Shanghai)
+
+- 任务：继续推进 glTF 导入修复，消除 `.glb` 被 `DefaultImporter` 锁死的问题。
+- 改动文件：
+  - `apps/unity-climber/Packages/manifest.json`
+  - `apps/unity-climber/Assets/Models/Characters/peach.glb.meta`
+  - `apps/unity-climber/Assets/Models/Characters/daisy.glb.meta`
+  - `apps/unity-climber/Assets/Models/Setpieces/stepping_stone.glb.meta`
+  - `apps/unity-climber/Assets/Models/Setpieces/rock_slab.glb.meta`
+  - `apps/unity-climber/Assets/Models/Setpieces/plank_long.glb.meta`
+  - `apps/unity-climber/Assets/Models/Setpieces/container_short.glb.meta`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 安装 glTF 包依赖：`com.unity.cloud.gltfast@5.2.0`。
+  - 对关键 `.glb` 重建 `.meta`，显式指定 `ScriptedImporter`（脚本 guid 指向 glTFast 的 `GltfImporter`）。
+  - 目标是让角色和首批关卡模型都能被当成可绑定的 `GameObject` 资产。
+- 校验：
+  - 关键 `.meta` 检查：`script: {fileID: 11500000, guid: 715df9372183c47e389bb6e19fbc3b52, type: 3}`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/logs/CHANGE-LOG.md`：未执行（下一步执行）
+- 风险与后续：
+  - 当前风险：当前终端会话无法稳定定位 Unity 可执行路径，尚未完成批处理重导与 Scene 直绑 peach。
+  - 下一步动作：拿到可执行路径后，立即重导资源并直接把 `PlayerVisual_Peach` 写入 `SampleScene.scene`。
+
 ## 2026-04-15 00:51 (Asia/Shanghai)
 
 - 任务：把“脚本丢失绑定（None Mono Script）”问题沉淀进技能规则，防止后续复发。
@@ -788,6 +927,25 @@
 - 风险与后续：
   - 当前风险：规则已落地，但仍需在下一轮实操中按检查项执行并闭环。
   - 下一步动作：继续当前 Unity 任务，先确认脚本绑定恢复再推进 P3-01。
+
+## 2026-04-15 19:57 (Asia/Shanghai)
+
+- 任务：按用户确认执行 P3-01，仅推进 Unity 主线任务（暂不处理 `packages/climber-game`）。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scripts/Gameplay/ClimberPlayerController.cs`
+  - `.codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增最小 HUD：显示高度（Height）、进度（Progress）和重开提示（Restart 键）。
+  - 新增重开逻辑：按 `R` 重置到 `Checkpoint_01`（无 checkpoint 时回初始出生点）。
+  - 进度算法接入 `StartPlatform -> FinishPlatform` 的 `z` 轴比例，输出百分比。
+  - 保持现有调参面板（`F2`）并与 HUD 共存。
+  - 任务清单将 `P3-01` 标记为完成。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/unity-climber/Assets/Scripts/Gameplay/ClimberPlayerController.cs .codex/skills/unity-climber-iteration/references/UNITY-CLIMBER-TASKS.md`：通过
+- 风险与后续：
+  - 当前风险：HUD 采用 `OnGUI` 最小实现，样式较基础，后续可替换为 Canvas 版。
+  - 下一步动作：在 Unity 中确认脚本绑定恢复后，验证 `WASD/Space/R/F2` 全链路并进入 P4 资产替换准备。
 
 ## 2026-04-15 11:16 (Asia/Shanghai)
 

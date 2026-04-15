@@ -17,8 +17,14 @@ namespace UnityClimber.Gameplay
 
         [Header("Respawn")]
         [SerializeField] private string checkpointObjectName = "Checkpoint_01";
+        [SerializeField] private string startPlatformObjectName = "StartPlatform";
+        [SerializeField] private string finishPlatformObjectName = "FinishPlatform";
         [SerializeField] private float fallRespawnY = -3f;
         [SerializeField] private Vector3 respawnOffset = new Vector3(0f, 1.2f, 0f);
+        [SerializeField] private KeyCode restartKey = KeyCode.R;
+
+        [Header("HUD")]
+        [SerializeField] private bool hudEnabled = true;
 
         [Header("Tuning Panel")]
         [SerializeField] private bool tuningPanelEnabled = true;
@@ -28,7 +34,10 @@ namespace UnityClimber.Gameplay
         private Camera _mainCamera;
         private CapsuleCollider _capsuleCollider;
         private Transform _checkpointTransform;
+        private Transform _startPlatformTransform;
+        private Transform _finishPlatformTransform;
         private ClimberFollowCamera _followCamera;
+        private Vector3 _spawnPosition;
         private bool _showTuningPanel;
         private Rect _panelRect = new Rect(12f, 12f, 320f, 230f);
 
@@ -42,6 +51,7 @@ namespace UnityClimber.Gameplay
             _rigidbody.isKinematic = false;
             _rigidbody.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
             _rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+            _spawnPosition = transform.position;
         }
 
         private void Start()
@@ -50,6 +60,18 @@ namespace UnityClimber.Gameplay
             if (checkpoint != null)
             {
                 _checkpointTransform = checkpoint.transform;
+            }
+
+            var startPlatform = GameObject.Find(startPlatformObjectName);
+            if (startPlatform != null)
+            {
+                _startPlatformTransform = startPlatform.transform;
+            }
+
+            var finishPlatform = GameObject.Find(finishPlatformObjectName);
+            if (finishPlatform != null)
+            {
+                _finishPlatformTransform = finishPlatform.transform;
             }
 
             if (_mainCamera != null)
@@ -67,12 +89,17 @@ namespace UnityClimber.Gameplay
 
             if (_checkpointTransform != null && transform.position.y < fallRespawnY)
             {
-                RespawnAtCheckpoint();
+                RespawnToSafePoint();
             }
 
             if (tuningPanelEnabled && Input.GetKeyDown(tuningToggleKey))
             {
                 _showTuningPanel = !_showTuningPanel;
+            }
+
+            if (Input.GetKeyDown(restartKey))
+            {
+                RespawnToSafePoint();
             }
         }
 
@@ -163,15 +190,28 @@ namespace UnityClimber.Gameplay
             );
         }
 
-        private void RespawnAtCheckpoint()
+        private void RespawnToSafePoint()
         {
-            transform.position = _checkpointTransform.position + respawnOffset;
+            if (_checkpointTransform != null)
+            {
+                transform.position = _checkpointTransform.position + respawnOffset;
+            }
+            else
+            {
+                transform.position = _spawnPosition;
+            }
+
             _rigidbody.velocity = Vector3.zero;
             _rigidbody.angularVelocity = Vector3.zero;
         }
 
         private void OnGUI()
         {
+            if (hudEnabled)
+            {
+                DrawHudPanel();
+            }
+
             if (!tuningPanelEnabled || !_showTuningPanel)
             {
                 return;
@@ -209,6 +249,37 @@ namespace UnityClimber.Gameplay
 
             GUI.Label(new Rect(12f, y, 280f, 20f), "Toggle: " + tuningToggleKey + " | Jump: Space");
             GUI.DragWindow(new Rect(0f, 0f, 320f, 20f));
+        }
+
+        private void DrawHudPanel()
+        {
+            var panel = new Rect(12f, 12f, 300f, 96f);
+            GUI.Box(panel, "Climber HUD");
+
+            var currentHeight = transform.position.y;
+            var progressPercent = GetProgressPercent();
+
+            GUI.Label(new Rect(24f, 40f, 260f, 20f), "Height: " + currentHeight.ToString("0.00") + "m");
+            GUI.Label(new Rect(24f, 60f, 260f, 20f), "Progress: " + progressPercent.ToString("0") + "%");
+            GUI.Label(new Rect(24f, 80f, 260f, 20f), "Jump: Space  |  Restart: " + restartKey);
+        }
+
+        private float GetProgressPercent()
+        {
+            if (_startPlatformTransform == null || _finishPlatformTransform == null)
+            {
+                return 0f;
+            }
+
+            var startZ = _startPlatformTransform.position.z;
+            var finishZ = _finishPlatformTransform.position.z;
+            if (Mathf.Approximately(startZ, finishZ))
+            {
+                return 0f;
+            }
+
+            var progress01 = Mathf.InverseLerp(startZ, finishZ, transform.position.z);
+            return Mathf.Clamp01(progress01) * 100f;
         }
     }
 }
