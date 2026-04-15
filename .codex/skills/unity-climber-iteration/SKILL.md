@@ -1,6 +1,7 @@
 ---
 name: unity-climber-iteration
 description: 管理 `apps/unity-climber` 的持续迭代、提交边界与迁移节奏。用于 Unity 新项目初始化、`.gitignore`/提交噪音收敛、任务清单维护、Three.js 旧链路过渡（`packages/climber-game`）以及“下一步做什么”的迭代决策场景。
+category: unity
 ---
 
 # Unity Climber Iteration

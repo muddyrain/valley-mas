@@ -1,6 +1,7 @@
 ---
 name: creator-space-ux
 description: 保护 Valley MAS 创作空间的管理体验。适用于我的创作空间卡片、管理操作、创作者专属入口、返回路径、私密内容访问或工作台型体验改动。
+category: web
 ---
 
 # 创作空间体验

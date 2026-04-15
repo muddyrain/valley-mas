@@ -1,6 +1,7 @@
 ---
 name: change-log-guard
 description: 在 Valley MAS 中强制记录每次真实落地改动的结构化日志，保证后续可追溯。用于任何代码、配置、文档、skill 规则、任务清单的新增/修改/删除任务；若本轮无实际改动，明确说明并可不写日志。
+category: general
 ---
 
 # 变更日志护栏

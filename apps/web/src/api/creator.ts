@@ -102,6 +102,19 @@ export const getHotCreators = (page = 1, pageSize = 10) => {
   );
 };
 
+// 公开创作者检索（支持关键词 + 分页）
+export const searchPublicCreators = (
+  params: { page?: number; pageSize?: number; keyword?: string } = {},
+) => {
+  const { page = 1, pageSize = 20, keyword } = params;
+  const query = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+  if (keyword) query.set('keyword', keyword);
+  return http.get<unknown, ListResponse<Creator>>(`/public/creators?${query.toString()}`);
+};
+
 // 获取创作者详情
 export const getCreatorByCode = async (code: string): Promise<Creator> => {
   const response = await http.get<unknown, CreatorSpaceResponse>(`/public/space/${code}`);

@@ -36,6 +36,7 @@ import UploadResourceDialog from '@/components/UploadResourceDialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
+import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 
 const RESOURCE_TYPES = [
   { label: '全部', value: '' },
@@ -53,6 +54,7 @@ function formatSize(bytes: number) {
 export default function MyResources() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { page: currentPage, setPage } = useUrlPaginationQuery();
   const { canAccess } = usePageRoleGuard({
     allowRoles: ['creator'],
     unauthorizedMessage: '该页面仅创作者可访问',
@@ -60,7 +62,6 @@ export default function MyResources() {
 
   const [resources, setResources] = useState<MyResource[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [activeType, setActiveType] = useState('');
 
@@ -101,7 +102,7 @@ export default function MyResources() {
     }
   }, []);
   const loadResources = useCallback(
-    async (type = activeType, albumId = activeAlbumId, nextPage = page) => {
+    async (type = activeType, albumId = activeAlbumId, nextPage = currentPage) => {
       try {
         setLoading(true);
         const data = await getMyResources({
@@ -118,16 +119,16 @@ export default function MyResources() {
         setLoading(false);
       }
     },
-    [activeType, activeAlbumId, page],
+    [activeType, activeAlbumId, currentPage],
   );
   const loadResource = useCallback(async () => {
     setRefreshing(true);
     try {
-      await loadResources(activeType, activeAlbumId, page);
+      await loadResources(activeType, activeAlbumId, currentPage);
     } finally {
       setRefreshing(false);
     }
-  }, [activeAlbumId, activeType, loadResources, page]);
+  }, [activeAlbumId, activeType, loadResources, currentPage]);
 
   useEffect(() => {
     if (canAccess) {
@@ -137,9 +138,9 @@ export default function MyResources() {
 
   useEffect(() => {
     if (canAccess) {
-      void loadResources(activeType, activeAlbumId, page);
+      void loadResources(activeType, activeAlbumId, currentPage);
     }
-  }, [activeAlbumId, activeType, canAccess, loadResources, page]);
+  }, [activeAlbumId, activeType, canAccess, loadResources, currentPage]);
 
   // 从详情页跳转过来时自动打开编辑弹框
   useEffect(() => {
@@ -162,10 +163,10 @@ export default function MyResources() {
       await deleteResource(deleteTarget.id);
       toast.success('删除成功');
       setDeleteTarget(null);
-      if (resources.length === 1 && page > 1) {
-        setPage((prev) => prev - 1);
+      if (resources.length === 1 && currentPage > 1) {
+        setPage(currentPage - 1);
       } else {
-        void loadResources(activeType, activeAlbumId, page);
+        void loadResources(activeType, activeAlbumId, currentPage);
       }
     } catch {
       // 错误已在 request.ts 中通过 toast 显示
@@ -206,10 +207,10 @@ export default function MyResources() {
       const result = await batchDeleteResources(ids);
       toast.success(`已删除 ${result.deleted} 个资源`);
       handleExitBatch();
-      if (selectedIds.size >= resources.length && page > 1) {
-        setPage((prev) => prev - 1);
+      if (selectedIds.size >= resources.length && currentPage > 1) {
+        setPage(currentPage - 1);
       } else {
-        void loadResources(activeType, activeAlbumId, page);
+        void loadResources(activeType, activeAlbumId, currentPage);
       }
     } catch {
       // 错误已在 request.ts 中通过 toast 显示
@@ -546,10 +547,10 @@ export default function MyResources() {
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={page <= 1 || loading}
+                          disabled={currentPage <= 1 || loading}
                           onClick={() => {
                             if (batchMode) handleExitBatch();
-                            setPage((prev) => Math.max(1, prev - 1));
+                            setPage(Math.max(1, currentPage - 1));
                           }}
                           className="gap-1.5"
                         >
@@ -557,15 +558,15 @@ export default function MyResources() {
                           上一页
                         </Button>
                         <span className="text-sm text-slate-500">
-                          第 {page} / {totalPages} 页，共 {total} 项
+                          第 {currentPage} / {totalPages} 页，共 {total} 项
                         </span>
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={page >= totalPages || loading}
+                          disabled={currentPage >= totalPages || loading}
                           onClick={() => {
                             if (batchMode) handleExitBatch();
-                            setPage((prev) => Math.min(totalPages, prev + 1));
+                            setPage(Math.min(totalPages, currentPage + 1));
                           }}
                           className="gap-1.5"
                         >

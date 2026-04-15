@@ -10,6 +10,23 @@ export interface NotificationStateChangedDetail {
   unreadCount?: number;
 }
 
+export interface NotificationNavigationInput {
+  type: string;
+  extraData?: string;
+}
+
+interface NotificationExtraData {
+  postId?: string;
+  blogId?: string;
+  postSlug?: string;
+  resourceId?: string;
+  resourceSlug?: string;
+  creatorCode?: string;
+  creatorId?: string;
+  redirectUrl?: string;
+  path?: string;
+}
+
 export const NOTIFICATION_STATE_CHANGED_EVENT = 'valley-notification-state-changed';
 
 export const formatNotificationTime = (value: string) => {
@@ -47,4 +64,61 @@ export const emitNotificationStateChanged = (detail: NotificationStateChangedDet
   window.dispatchEvent(
     new CustomEvent<NotificationStateChangedDetail>(NOTIFICATION_STATE_CHANGED_EVENT, { detail }),
   );
+};
+
+const parseNotificationExtraData = (raw?: string): NotificationExtraData | null => {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as NotificationExtraData;
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+export const resolveNotificationTarget = (notification: NotificationNavigationInput) => {
+  const extra = parseNotificationExtraData(notification.extraData);
+  const normalizedType = notification.type.toLowerCase();
+
+  if (extra?.redirectUrl) {
+    return extra.redirectUrl;
+  }
+  if (extra?.path) {
+    return extra.path;
+  }
+
+  if (extra?.postId || extra?.blogId) {
+    return `/blog/${extra.postId || extra.blogId}`;
+  }
+  if (extra?.postSlug) {
+    return `/blog/${extra.postSlug}`;
+  }
+  if (extra?.resourceId) {
+    return `/resource/${extra.resourceId}`;
+  }
+  if (extra?.resourceSlug) {
+    return `/resource/${extra.resourceSlug}`;
+  }
+  if (extra?.creatorCode) {
+    return `/creator/${extra.creatorCode}`;
+  }
+  if (extra?.creatorId) {
+    return '/creators';
+  }
+
+  if (normalizedType.includes('blog')) {
+    return '/blog';
+  }
+  if (normalizedType.includes('resource')) {
+    return '/resources';
+  }
+  if (normalizedType.includes('creator')) {
+    return '/creators';
+  }
+
+  if (notification.type === 'creator_application_review') {
+    return '/apply-creator';
+  }
+
+  return '';
 };

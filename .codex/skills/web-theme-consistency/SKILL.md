@@ -1,6 +1,7 @@
 ---
 name: web-theme-consistency
 description: 在 Valley MAS Web 端维护整站主题一致性。适用于任何 Web 页面、共享组件、导航、Banner、空状态、按钮、卡片、表单、个人中心页、资源页、创作者页以及后续新增页面；当实现可能写死紫蓝橙粉等独立色系、绕开 theme token、或让局部页面脱离当前主题设定时，使用这个 skill，把样式收口到当前主题变量、theme-* 工具类和共享组件上。
+category: web
 ---
 
 # Web 主题一致性

@@ -53,6 +53,9 @@ importers:
       '@valley/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@valley/shared-request':
+        specifier: workspace:*
+        version: link:../../packages/shared-request
       antd:
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -132,6 +135,15 @@ importers:
       '@valley/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@valley/shared-format':
+        specifier: workspace:*
+        version: link:../../packages/shared-format
+      '@valley/shared-request':
+        specifier: workspace:*
+        version: link:../../packages/shared-request
+      '@valley/shared-router':
+        specifier: workspace:*
+        version: link:../../packages/shared-router
       axios:
         specifier: ^1.7.0
         version: 1.13.6
@@ -248,6 +260,47 @@ importers:
 
   packages/shared:
     devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(@swc/core@1.15.17)(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/shared-format:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(@swc/core@1.15.17)(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/shared-request:
+    dependencies:
+      axios:
+        specifier: ^1.7.0
+        version: 1.13.6
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(@swc/core@1.15.17)(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/shared-router:
+    dependencies:
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-router-dom:
+        specifier: ^7.0.0
+        version: 7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
       tsup:
         specifier: ^8.3.0
         version: 8.5.1(@swc/core@1.15.17)(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)

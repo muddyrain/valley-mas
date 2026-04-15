@@ -1,6 +1,7 @@
 ---
 name: blog-resource-access-guard
 description: 保护 Valley MAS 博客与资源的访问行为。适用于公共/管理详情接口、可见范围判断、作者自访问、上下文返回路径，或任何可能导致错误 404 与回跳异常的改动。
+category: web
 ---
 
 # 博客资源访问护栏

@@ -27,6 +27,7 @@ import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
 import TypeFilterBar from '@/components/TypeFilterBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const RESOURCE_TYPES = [
@@ -41,14 +42,19 @@ export default function Resources() {
   const navigate = useNavigate();
   const { user, profile, fetchProfile } = useAuthStore();
   const isCreator = user?.role === 'creator';
+  const {
+    page: currentPage,
+    keyword: currentKeyword,
+    setPage,
+    setKeyword,
+    clearKeyword,
+  } = useUrlPaginationQuery();
 
   const [resources, setResources] = useState<Resource[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [activeType, setActiveType] = useState('');
-  const [keyword, setKeyword] = useState('');
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState(currentKeyword);
   const [favoritedMap, setFavoritedMap] = useState<Record<string, boolean>>({});
 
   // 标签筛选
@@ -68,13 +74,17 @@ export default function Resources() {
   }, [isCreator, fetchProfile]);
 
   useEffect(() => {
+    setInputValue(currentKeyword);
+  }, [currentKeyword]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     getAllResources({
-      page,
+      page: currentPage,
       pageSize: PAGE_SIZE,
       type: activeType || undefined,
-      keyword: keyword || undefined,
+      keyword: currentKeyword || undefined,
       tagId: activeTag?.id || undefined,
     })
       .then((data) => {
@@ -97,10 +107,9 @@ export default function Resources() {
     return () => {
       cancelled = true;
     };
-  }, [page, activeType, keyword, activeTag?.id]);
+  }, [currentPage, activeType, currentKeyword, activeTag?.id]);
   const handleSearch = () => {
-    setPage(1);
-    setKeyword(inputValue.trim());
+    setKeyword(inputValue, true);
   };
 
   // 标签关键词搜索（防抖 300ms）
@@ -124,10 +133,10 @@ export default function Resources() {
     setRefreshing(true);
     try {
       const data = await getAllResources({
-        page,
+        page: currentPage,
         pageSize: PAGE_SIZE,
         type: activeType || undefined,
-        keyword: keyword || undefined,
+        keyword: currentKeyword || undefined,
         tagId: activeTag?.id || undefined,
       });
       const list = data.list ?? [];
@@ -163,7 +172,7 @@ export default function Resources() {
     }
   };
 
-  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const wallpaperCount = useMemo(
     () =>
       resources.filter((item) => item.type === 'wallpaper' || item.type === 'background').length,
@@ -258,14 +267,13 @@ export default function Resources() {
                 }}
                 prefix="类型："
                 extra={
-                  keyword ? (
+                  currentKeyword ? (
                     <span className="text-sm text-slate-400">
-                      搜索"{keyword}"
+                      搜索"{currentKeyword}"
                       <button
                         type="button"
                         onClick={() => {
-                          setPage(1);
-                          setKeyword('');
+                          clearKeyword(true);
                           setInputValue('');
                         }}
                         className="text-theme-primary ml-1.5 underline hover:opacity-80"
@@ -388,18 +396,17 @@ export default function Resources() {
                     icon={ImageIcon}
                     title="暂无资源"
                     description={
-                      keyword
-                        ? `没有找到包含"${keyword}"的资源`
+                      currentKeyword
+                        ? `没有找到包含"${currentKeyword}"的资源`
                         : activeTag
                           ? `标签"${activeTag.name}"下暂无资源`
                           : '这个分类下还没有资源内容'
                     }
-                    actionLabel={keyword ? '清除搜索' : activeTag ? '清除标签' : undefined}
+                    actionLabel={currentKeyword ? '清除搜索' : activeTag ? '清除标签' : undefined}
                     onAction={
-                      keyword
+                      currentKeyword
                         ? () => {
-                            setPage(1);
-                            setKeyword('');
+                            clearKeyword(true);
                             setInputValue('');
                           }
                         : activeTag
@@ -446,19 +453,23 @@ export default function Resources() {
               <div className="mt-10 flex items-center justify-center gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                  disabled={page <= 1 || loading}
+                  onClick={() => {
+                    setPage(Math.max(1, currentPage - 1));
+                  }}
+                  disabled={currentPage <= 1 || loading}
                   className="border-theme-soft-strong rounded-full border bg-white/82 px-5 text-slate-700"
                 >
                   上一页
                 </Button>
                 <div className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
-                  {page} / {totalPages}
+                  {currentPage} / {totalPages}
                 </div>
                 <Button
                   variant="outline"
-                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={page >= totalPages || loading}
+                  onClick={() => {
+                    setPage(Math.min(totalPages, currentPage + 1));
+                  }}
+                  disabled={currentPage >= totalPages || loading}
                   className="border-theme-soft-strong rounded-full border bg-white/82 px-5 text-slate-700"
                 >
                   下一页

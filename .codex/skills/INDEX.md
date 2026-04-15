@@ -266,6 +266,24 @@
 - "这个功能都变了，skill 也要跟着改"
 - "别只改代码不改 skill"
 
+### `skill-category-guard`
+
+文件：
+- [skill-category-guard](./skill-category-guard/SKILL.md)
+
+什么时候触发：
+- 新增 skill，需要明确归类到 `general/web/climber/unity`
+- skill 职责迁移，需要调整分类与索引分区
+- 你怀疑当前 skill 分类已经混乱或边界重叠
+
+不适合什么时候用：
+- 纯功能开发且没有 skill 结构变更
+
+典型触发语：
+- "新建 skill 时顺手做分类"
+- "这个 skill 到底算 web 还是 climber"
+- "把 skills 分类规则补齐"
+
 ### `skill-usage-disclosure`
 
 文件：
@@ -408,7 +426,7 @@
 
 优先触发：
 - [climber-game-design-guard](./climber-game-design-guard/SKILL.md)
-- [web-feature-iteration](./web-feature-iteration/SKILL.md)
+- [climber-game-iteration](./climber-game-iteration/SKILL.md)
 
 如果涉及产品行为一致性，再补：
 - [valley-mas-product-guard](./valley-mas-product-guard/SKILL.md)
@@ -456,6 +474,25 @@
 
 ## 八、climber-game 专项
 
+### `climber-game-iteration`
+
+文件：
+- [climber-game-iteration](./climber-game-iteration/SKILL.md)
+
+什么时候触发：
+- 维护 `packages/climber-game` 任务清单与活跃 backlog
+- 用户说“继续做下一项”“把已完成移出并补下一项”
+- 需要把 climber 迭代与 web/unity 任务边界拆开
+
+不适合什么时候用：
+- 普通 Web 页面功能迭代（应走 `web-feature-iteration`）
+- Unity 主线迭代（应走 `unity-climber-iteration`）
+
+典型触发语：
+- "climber 下一项做什么"
+- "把 climber 清单收口到 3-5 项"
+- "这个别并到 web backlog 里"
+
 ### `climber-game-design-guard`
 
 文件：
@@ -475,3 +512,25 @@
 - "这个 climber-game 后续该怎么收口"
 - "关卡这里再加一段高难挑战"
 - "这个需求会不会让游戏定位跑偏"
+
+## 九、Web 列表闭环
+
+### `web-url-state-sync`
+
+文件：
+- [web-url-state-sync](./web-url-state-sync/SKILL.md)
+
+什么时候触发：
+- Web 列表页需要把 `keyword/page` 与 URL 查询参数联动
+- 你已经发现“后端支持 keyword，但页面刷新/回退会丢条件”
+- 搜索、分页、清除、重试逻辑分散导致体验不一致
+- 用户要求把这类问题沉淀成统一规范
+
+不适合什么时候用：
+- 不涉及搜索或分页状态的静态页面
+- 纯样式调整、与 URL 状态无关的交互优化
+
+典型触发语：
+- "这个页面也要做 keyword/page URL 联动"
+- "刷新后把筛选条件丢了，帮我补齐"
+- "把这个记成一个 skill，后面统一按这个做"

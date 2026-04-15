@@ -1,6 +1,7 @@
 ---
 name: component-reuse-guard
 description: 自动判断当前改动是否存在可提取的公用组件或可复用逻辑，避免在多处重复写相同 JSX 和 handler，降低维护成本。
+category: general
 ---
 
 # component-reuse-guard

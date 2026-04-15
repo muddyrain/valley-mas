@@ -1,0 +1,4 @@
+interface:
+  display_name: "Web URL 状态联动"
+  short_description: "统一 keyword/page 与 URL 查询参数同步，保证搜索分页可刷新与可回退"
+  default_prompt: "当 Valley MAS Web 列表页涉及 keyword/page 搜索分页时，优先把状态收敛到 URL 查询参数并完成完整闭环：以 URL 派生请求条件、keyword 变化重置 page=1、清除搜索时保留无关参数、分页时保留 keyword，且失败重试优先无刷新方案。"

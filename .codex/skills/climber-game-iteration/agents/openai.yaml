@@ -1,0 +1,4 @@
+interface:
+  display_name: "Climber Game 迭代"
+  short_description: "维护 packages/climber-game 的活跃 backlog，并与 web/unity 任务边界解耦"
+  default_prompt: "当任务涉及 packages/climber-game 的持续迭代、下一项选择、完成项移出或 backlog 收敛时，先维护 .codex/skills/climber-game-iteration/references/CLIMBER-GAME-TASKS.md，把活跃项控制在 3 到 5 项，并明确排除 apps/web 业务功能与 apps/unity-climber 主线任务。"

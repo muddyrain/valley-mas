@@ -1,6 +1,7 @@
 ---
 name: image-text-studio
 description: 构建和优化 Valley MAS 的图文创作体验。适用于图文编辑页、预览、导出、卡片展示、分页结构、文本样式或生成图一致性相关任务。
+category: web
 ---
 
 # 图文创作工作台

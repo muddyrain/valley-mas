@@ -1,3 +1,4 @@
+import { formatResourceType } from '@valley/shared-format';
 import { Download, Heart, ImageIcon, Loader2, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 interface FavoriteItem {
@@ -26,19 +28,13 @@ const PAGE_BACKGROUND = {
     'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-primary-soft) 24%, white) 44%, var(--theme-page-cool) 100%)',
 };
 
-function formatResourceType(type?: string) {
-  if (type === 'wallpaper') return '壁纸';
-  if (type === 'avatar') return '头像';
-  return type || '资源';
-}
-
 export default function Favorites() {
   const navigate = useNavigate();
+  const { page: currentPage, setPage } = useUrlPaginationQuery();
   const { hasHydrated, isAuthenticated } = useAuthStore();
 
   const [items, setItems] = useState<FavoriteItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [removingSet, setRemovingSet] = useState<Set<string>>(new Set());
 
@@ -63,13 +59,13 @@ export default function Favorites() {
       navigate('/login');
       return;
     }
-    void loadFavorites(page);
-  }, [hasHydrated, isAuthenticated, loadFavorites, navigate, page]);
+    void loadFavorites(currentPage);
+  }, [hasHydrated, isAuthenticated, loadFavorites, navigate, currentPage]);
 
   const handlePageChange = (targetPage: number) => {
     if (loading) return;
     const nextPage = Math.min(Math.max(1, targetPage), totalPages);
-    if (nextPage === page) return;
+    if (nextPage === currentPage) return;
     setPage(nextPage);
   };
 
@@ -85,8 +81,8 @@ export default function Favorites() {
       setTotal(nextTotal);
 
       const nextTotalPages = Math.max(1, Math.ceil(nextTotal / PAGE_SIZE));
-      const nextPage = Math.min(page, nextTotalPages);
-      if (nextPage !== page) {
+      const nextPage = Math.min(currentPage, nextTotalPages);
+      if (nextPage !== currentPage) {
         setPage(nextPage);
       } else {
         await loadFavorites(nextPage);
@@ -225,19 +221,19 @@ export default function Favorites() {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Button
             variant="outline"
-            onClick={() => handlePageChange(page - 1)}
-            disabled={page <= 1 || loading}
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage <= 1 || loading}
             className="rounded-xl border-theme-soft-strong bg-white/80 px-6 text-theme-primary hover:bg-theme-soft"
           >
             上一页
           </Button>
           <div className="rounded-xl border border-theme-soft-strong bg-white/80 px-5 py-2 text-sm text-slate-600">
-            第 {page} / {totalPages} 页
+            第 {currentPage} / {totalPages} 页
           </div>
           <Button
             variant="outline"
-            onClick={() => handlePageChange(page + 1)}
-            disabled={page >= totalPages || loading}
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages || loading}
             className="rounded-xl border-theme-soft-strong bg-white/80 px-6 text-theme-primary hover:bg-theme-soft"
           >
             下一页

@@ -36,6 +36,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 // 分类映射:中文名 -> 后端类型
@@ -79,18 +80,23 @@ type WorksQueryParams = {
 
 export default function CreatorProfile() {
   const { code } = useParams<{ code: string }>();
+  const {
+    page: currentPage,
+    keyword: currentKeyword,
+    setPage,
+    setKeyword,
+  } = useUrlPaginationQuery();
   const [creator, setCreator] = useState<Creator | null>(null);
   const [works, setWorks] = useState<Resource[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [activeCategory, setActiveCategory] = useState('');
   const [activeAlbumId, setActiveAlbumId] = useState('');
-  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchKeyword, setSearchKeyword] = useState(currentKeyword);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isSelf, setIsSelf] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [worksLoading, setWorksLoading] = useState(false);
-  const [worksPage, setWorksPage] = useState(1);
   const [worksTotal, setWorksTotal] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('works');
@@ -101,10 +107,10 @@ export default function CreatorProfile() {
 
   const buildWorksParams = (overrides: WorksQueryParams = {}) => {
     const params: WorksQueryParams = {
-      keyword: searchKeyword.trim() || undefined,
+      keyword: currentKeyword || undefined,
       type: activeCategory || undefined,
       albumId: activeAlbumId || undefined,
-      page: worksPage,
+      page: currentPage,
       ...overrides,
     };
 
@@ -137,13 +143,16 @@ export default function CreatorProfile() {
       });
       hydrateWorks(data.list);
       setWorksTotal(data.total || 0);
-      setWorksPage(data.page || page);
     } catch (error) {
       console.error('加载作品失败:', error);
     } finally {
       setWorksLoading(false);
     }
   };
+
+  useEffect(() => {
+    setSearchKeyword(currentKeyword);
+  }, [currentKeyword]);
 
   useEffect(() => {
     if (!code) return;
@@ -155,9 +164,8 @@ export default function CreatorProfile() {
         setCreator(creatorData);
         setFollowerCount(creatorData.followerCount || 0);
 
-        // 并行加载作品、专辑和关注状态
-        const [worksData, albumsData] = await Promise.all([
-          getCreatorWorks(creatorData.id, { page: 1, pageSize: WORKS_PAGE_SIZE }),
+        // 并行加载专辑和关注状态
+        const [albumsData] = await Promise.all([
           getCreatorAlbums(creatorData.id),
           // 查询关注状态（接口失败不影响主流程）
           user?.id
@@ -170,9 +178,6 @@ export default function CreatorProfile() {
                 .catch(() => {})
             : Promise.resolve(),
         ]);
-        hydrateWorks(worksData.list);
-        setWorksTotal(worksData.total || 0);
-        setWorksPage(worksData.page || 1);
         setAlbums(albumsData.list || []);
       } catch (error) {
         console.error('加载创作者数据失败:', error);
@@ -183,6 +188,11 @@ export default function CreatorProfile() {
 
     loadCreatorData();
   }, [code, user?.id]);
+
+  useEffect(() => {
+    if (!creator) return;
+    void loadWorks(creator.id, buildWorksParams());
+  }, [creator, currentKeyword, currentPage, activeCategory, activeAlbumId]);
 
   const handleFollow = async () => {
     if (!creator || followLoading) return;
@@ -243,64 +253,31 @@ export default function CreatorProfile() {
   };
 
   const handleSearch = async () => {
-    if (!creator) return;
-
-    try {
-      if (activeTab === 'works') {
-        await loadWorks(creator.id, buildWorksParams({ page: 1 }));
-      }
-    } catch (error) {
-      console.error('搜索失败:', error);
-    }
+    setKeyword(searchKeyword, true);
   };
 
   // 切换分类的处理函数
   const handleCategoryChange = async (categoryValue: string) => {
-    if (!creator) return;
     setActiveCategory(categoryValue);
-    try {
-      await loadWorks(
-        creator.id,
-        buildWorksParams({
-          type: categoryValue || undefined,
-          page: 1,
-        }),
-      );
-    } catch (error) {
-      console.error('筛选失败:', error);
-    }
+    setPage(1);
   };
 
   const handleAlbumOpen = async (albumId: string) => {
-    if (!creator) return;
     setActiveAlbumId(albumId);
     setActiveTab('works');
-    await loadWorks(
-      creator.id,
-      buildWorksParams({
-        albumId,
-        page: 1,
-      }),
-    );
+    setPage(1);
   };
 
   const handleClearAlbumFilter = async () => {
-    if (!creator) return;
     setActiveAlbumId('');
-    await loadWorks(
-      creator.id,
-      buildWorksParams({
-        albumId: undefined,
-        page: 1,
-      }),
-    );
+    setPage(1);
   };
 
   const handleWorksPageChange = async (page: number) => {
-    if (!creator || worksLoading) return;
+    if (worksLoading) return;
     const nextPage = Math.max(1, Math.min(worksTotalPages, page));
-    if (nextPage === worksPage) return;
-    await loadWorks(creator.id, buildWorksParams({ page: nextPage }));
+    if (nextPage === currentPage) return;
+    setPage(nextPage);
   };
 
   if (loading) {
@@ -649,19 +626,19 @@ export default function CreatorProfile() {
                   <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
                     <Button
                       variant="outline"
-                      onClick={() => void handleWorksPageChange(worksPage - 1)}
-                      disabled={worksPage <= 1 || worksLoading}
+                      onClick={() => void handleWorksPageChange(currentPage - 1)}
+                      disabled={currentPage <= 1 || worksLoading}
                       className="rounded-xl border-theme-shell-border bg-white/84 px-6 text-slate-700 hover:bg-theme-soft"
                     >
                       上一页
                     </Button>
                     <div className="rounded-xl border border-theme-shell-border bg-white/84 px-5 py-2 text-sm text-slate-600">
-                      第 {worksPage} / {worksTotalPages} 页，共 {worksTotal} 个作品
+                      第 {currentPage} / {worksTotalPages} 页，共 {worksTotal} 个作品
                     </div>
                     <Button
                       variant="outline"
-                      onClick={() => void handleWorksPageChange(worksPage + 1)}
-                      disabled={worksPage >= worksTotalPages || worksLoading}
+                      onClick={() => void handleWorksPageChange(currentPage + 1)}
+                      disabled={currentPage >= worksTotalPages || worksLoading}
                       className="rounded-xl border-theme-shell-border bg-white/84 px-6 text-slate-700 hover:bg-theme-soft"
                     >
                       下一页

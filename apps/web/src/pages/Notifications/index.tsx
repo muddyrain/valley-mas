@@ -1,6 +1,7 @@
 import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   getMyNotifications,
   markAllNotificationsRead,
@@ -12,11 +13,13 @@ import PageBanner from '@/components/PageBanner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
   emitNotificationStateChanged,
   formatNotificationTime,
   getNotificationVisual,
+  resolveNotificationTarget,
 } from '@/utils/notification';
 
 const PAGE_SIZE = 20;
@@ -28,14 +31,13 @@ const PAGE_BACKGROUND = {
 
 export default function Notifications() {
   const navigate = useNavigate();
+  const { page: currentPage, setPage } = useUrlPaginationQuery();
   const { hasHydrated, isAuthenticated } = useAuthStore();
 
   const [items, setItems] = useState<UserNotification[]>([]);
   const [total, setTotal] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
 
   useEffect(() => {
@@ -44,23 +46,22 @@ export default function Notifications() {
     emitNotificationStateChanged({ unreadCount: nextUnreadCount });
   }, [items]);
 
-  const loadNotifications = async (nextPage: number, append: boolean) => {
+  const loadNotificationsToPage = async (targetPage: number) => {
     try {
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
+      setLoading(true);
+      let merged: UserNotification[] = [];
+      let latestTotal = 0;
+      for (let pageNo = 1; pageNo <= targetPage; pageNo += 1) {
+        const data = await getMyNotifications(pageNo, PAGE_SIZE);
+        merged = [...merged, ...(data.list ?? [])];
+        latestTotal = data.total ?? latestTotal;
       }
-
-      const data = await getMyNotifications(nextPage, PAGE_SIZE);
-      setItems((prev) => (append ? [...prev, ...data.list] : data.list));
-      setTotal(data.total);
-      setPage(nextPage);
+      setItems(merged);
+      setTotal(latestTotal);
     } catch {
       // request.ts 已统一处理错误提示
     } finally {
       setLoading(false);
-      setLoadingMore(false);
     }
   };
 
@@ -70,11 +71,11 @@ export default function Notifications() {
       navigate('/login');
       return;
     }
-    void loadNotifications(1, false);
-  }, [hasHydrated, isAuthenticated, navigate]);
+    void loadNotificationsToPage(currentPage);
+  }, [hasHydrated, isAuthenticated, navigate, currentPage]);
 
   const handleMarkOneRead = async (item: UserNotification) => {
-    if (item.isRead) return;
+    if (item.isRead) return true;
     try {
       await markNotificationRead(item.id);
       setItems((prev) =>
@@ -84,8 +85,10 @@ export default function Notifications() {
             : current,
         ),
       );
+      return true;
     } catch {
       // request.ts 已统一处理错误提示
+      return false;
     }
   };
 
@@ -107,6 +110,20 @@ export default function Notifications() {
   };
 
   const hasMore = items.length < total;
+
+  const handleOpenNotificationTarget = async (item: UserNotification) => {
+    const target = resolveNotificationTarget(item);
+    if (!target) {
+      toast.info('这条通知暂不支持直接跳转，你可以先在对应页面查看。');
+      return;
+    }
+    const marked = item.isRead ? true : await handleMarkOneRead(item);
+    if (!marked) {
+      toast.error('状态更新失败，暂未跳转。请稍后重试。');
+      return;
+    }
+    navigate(target);
+  };
 
   return (
     <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
@@ -178,6 +195,7 @@ export default function Notifications() {
               {items.map((item) => {
                 const visual = getNotificationVisual(item.type, item.content);
                 const Icon = visual.icon;
+                const target = resolveNotificationTarget(item);
 
                 return (
                   <Card
@@ -221,16 +239,28 @@ export default function Notifications() {
                           </div>
                         </div>
 
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void handleMarkOneRead(item)}
-                          disabled={item.isRead}
-                          className="shrink-0 rounded-xl border-theme-soft-strong bg-white/75 text-theme-primary hover:bg-theme-soft disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                        >
-                          {item.isRead ? '已处理' : '标记已读'}
-                        </Button>
+                        <div className="flex shrink-0 gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void handleOpenNotificationTarget(item)}
+                            disabled={!target}
+                            className="rounded-xl border-theme-soft-strong bg-white/75 text-theme-primary hover:bg-theme-soft disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                          >
+                            查看详情
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void handleMarkOneRead(item)}
+                            disabled={item.isRead}
+                            className="rounded-xl border-theme-soft-strong bg-white/75 text-theme-primary hover:bg-theme-soft disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                          >
+                            {item.isRead ? '已处理' : '标记已读'}
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -242,11 +272,11 @@ export default function Notifications() {
               <div className="mt-8 flex justify-center">
                 <Button
                   variant="outline"
-                  onClick={() => void loadNotifications(page + 1, true)}
-                  disabled={loadingMore}
+                  onClick={() => setPage(currentPage + 1)}
+                  disabled={loading}
                   className="rounded-xl border-theme-soft-strong bg-white/80 px-10 text-theme-primary hover:bg-theme-soft"
                 >
-                  {loadingMore ? (
+                  {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       加载中...

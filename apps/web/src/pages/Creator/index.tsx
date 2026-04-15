@@ -1,32 +1,49 @@
-﻿import { Download, Sparkles, Users } from 'lucide-react';
+﻿import { Download, Search, Sparkles, Users, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { type Creator as CreatorType, getHotCreators } from '@/api/creator';
+import { type Creator as CreatorType, searchPublicCreators } from '@/api/creator';
 import CreatorCard from '@/components/CreatorCard';
 import EmptyState from '@/components/EmptyState';
 import HeroSectionTitle from '@/components/page/HeroSectionTitle';
 import HeroStatChip from '@/components/page/HeroStatChip';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 12;
 
 export default function Creator() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [creators, setCreators] = useState<CreatorType[]>([]);
+  const [total, setTotal] = useState(0);
+  const [inputKeyword, setInputKeyword] = useState(searchParams.get('keyword')?.trim() || '');
+  const [retryTick, setRetryTick] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const currentKeyword = searchParams.get('keyword')?.trim() || '';
+  const parsedPage = Number.parseInt(searchParams.get('page') || '1', 10);
+  const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+
+  useEffect(() => {
+    setInputKeyword(currentKeyword);
+  }, [currentKeyword]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(false);
 
-    getHotCreators(1, PAGE_SIZE)
+    searchPublicCreators({
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      keyword: currentKeyword || undefined,
+    })
       .then((data) => {
         if (cancelled) return;
         setCreators(data.list ?? []);
+        setTotal(data.total ?? 0);
       })
       .catch(() => {
         if (cancelled) return;
@@ -40,7 +57,28 @@ export default function Creator() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [currentKeyword, currentPage, retryTick]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const handleSearch = () => {
+    const nextKeyword = inputKeyword.trim();
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextKeyword) {
+      nextParams.set('keyword', nextKeyword);
+    } else {
+      nextParams.delete('keyword');
+    }
+    nextParams.set('page', '1');
+    setSearchParams(nextParams);
+  };
+
+  const clearSearch = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('keyword');
+    nextParams.set('page', '1');
+    setSearchParams(nextParams);
+  };
 
   const totalResources = useMemo(
     () => creators.reduce((sum, creator) => sum + (creator.resourceCount || 0), 0),
@@ -114,6 +152,40 @@ export default function Creator() {
                     </div>
                   </button>
                 </div>
+
+                <div className="rounded-[22px] border border-white/80 bg-white/80 p-4">
+                  <div className="mb-3 text-xs text-slate-500">创作者检索</div>
+                  <div className="flex flex-wrap gap-2">
+                    <div className="relative min-w-[220px] grow">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        value={inputKeyword}
+                        onChange={(event) => setInputKeyword(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') handleSearch();
+                        }}
+                        placeholder="搜索创作者昵称、口令或简介"
+                        className="h-10 rounded-xl border-white/90 bg-white pl-9"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleSearch}
+                      className="rounded-full bg-theme-primary px-4 text-white hover:bg-theme-primary-hover"
+                    >
+                      搜索
+                    </Button>
+                    {currentKeyword ? (
+                      <Button
+                        variant="ghost"
+                        onClick={clearSearch}
+                        className="rounded-full px-4 text-slate-500 hover:bg-white hover:text-slate-900"
+                      >
+                        <X className="mr-1 h-4 w-4" />
+                        清除
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -140,7 +212,7 @@ export default function Creator() {
                   title="创作者暂时没有加载出来"
                   description="稍后再试一次，或者先去其他内容页继续浏览。"
                   actionLabel="重新加载"
-                  onAction={() => window.location.reload()}
+                  onAction={() => setRetryTick((prev) => prev + 1)}
                 />
               </div>
             ) : creators.length === 0 ? (
@@ -148,7 +220,11 @@ export default function Creator() {
                 <EmptyState
                   icon={Users}
                   title="还没有展示中的创作者"
-                  description="新的创作者加入后，会先出现在这里。"
+                  description={
+                    currentKeyword
+                      ? `没有找到包含“${currentKeyword}”的创作者，换个关键词试试。`
+                      : '新的创作者加入后，会先出现在这里。'
+                  }
                   actionLabel="去申请创作者"
                   onAction={() => navigate('/apply-creator')}
                 />
@@ -156,9 +232,13 @@ export default function Creator() {
             ) : (
               <>
                 <div className="mb-6 flex items-center justify-between gap-4">
-                  <div className="text-sm text-slate-500">当前展示最近活跃的创作者内容入口。</div>
+                  <div className="text-sm text-slate-500">
+                    {currentKeyword
+                      ? `当前按关键词“${currentKeyword}”筛选创作者。`
+                      : '当前展示最近活跃的创作者内容入口。'}
+                  </div>
                   <div className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
-                    共 {creators.length} 位
+                    本页 {creators.length} / 共 {total} 位
                   </div>
                 </div>
 
@@ -174,13 +254,45 @@ export default function Creator() {
                 </div>
 
                 <div className="mt-10 flex justify-center">
-                  <Button
-                    variant="outline"
-                    onClick={() => navigate('/apply-creator')}
-                    className="border-theme-soft-strong rounded-full border bg-white/82 px-8 text-slate-700"
-                  >
-                    成为下一位创作者
-                  </Button>
+                  {total > PAGE_SIZE ? (
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                      <Button
+                        variant="outline"
+                        className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
+                        disabled={currentPage <= 1}
+                        onClick={() => {
+                          const nextParams = new URLSearchParams(searchParams);
+                          nextParams.set('page', String(Math.max(1, currentPage - 1)));
+                          setSearchParams(nextParams);
+                        }}
+                      >
+                        上一页
+                      </Button>
+                      <span className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-500 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
+                        第 {currentPage} / {totalPages} 页
+                      </span>
+                      <Button
+                        variant="outline"
+                        className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
+                        disabled={currentPage >= totalPages}
+                        onClick={() => {
+                          const nextParams = new URLSearchParams(searchParams);
+                          nextParams.set('page', String(Math.min(totalPages, currentPage + 1)));
+                          setSearchParams(nextParams);
+                        }}
+                      >
+                        下一页
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate('/apply-creator')}
+                      className="border-theme-soft-strong rounded-full border bg-white/82 px-8 text-slate-700"
+                    >
+                      成为下一位创作者
+                    </Button>
+                  )}
                 </div>
               </>
             )}

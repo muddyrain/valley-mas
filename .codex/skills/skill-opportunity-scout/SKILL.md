@@ -1,6 +1,7 @@
 ---
 name: skill-opportunity-scout
 description: 在 Valley MAS 开发过程中主动识别“这类改动已经值得沉淀成一个 skill”的机会。适用于反复出现的规则、固定流程、重复判断、稳定校验链路或明显的产品/工程模式。
+category: general
 ---
 
 # 技能机会侦察
