@@ -30,6 +30,7 @@
 
 - `Assets/Scenes/`：场景文件
 - `Assets/Scripts/Gameplay/`：玩法脚本（控制、相机、终点）
+- `ASSET_PIPELINE.md`：P4 资产规范与下载清单
 
 ## Git 提交边界
 

@@ -1,0 +1,424 @@
+fileFormatVersion: 2
+guid: 53ae292e76e301347a75be2c59eb8c14
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 3001328703939292222
+    second: Enemy08Idle-Sheet2x_0
+  - first:
+      213: 1096799373578602144
+    second: Enemy08Idle-Sheet2x_1
+  - first:
+      213: 2774522202693502521
+    second: Enemy08Idle-Sheet2x_2
+  - first:
+      213: 2385025732043702781
+    second: Enemy08Idle-Sheet2x_3
+  - first:
+      213: 998290825860427545
+    second: Enemy08Idle-Sheet2x_4
+  - first:
+      213: 6934627178288104742
+    second: Enemy08Idle-Sheet2x_5
+  - first:
+      213: -129853782563286232
+    second: Enemy08Idle-Sheet2x_6
+  - first:
+      213: 801357612491029002
+    second: Enemy08Idle-Sheet2x_7
+  - first:
+      213: 4697259061290667978
+    second: Enemy08Idle-Sheet2x_8
+  - first:
+      213: -1545108562632563518
+    second: Enemy08Idle-Sheet2x_9
+  - first:
+      213: 3457312254192070573
+    second: Enemy08Idle-Sheet2x_10
+  - first:
+      213: 6166380041903039540
+    second: Enemy08Idle-Sheet2x_11
+  externalObjects: {}
+  serializedVersion: 12
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Enemy08Idle-Sheet2x_0
+      rect:
+        serializedVersion: 2
+        x: 9
+        y: 0
+        width: 34
+        height: 35
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e3c2c74fd8cd6a920800000000000000
+      internalID: 3001328703939292222
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy08Idle-Sheet2x_1
+      rect:
+        serializedVersion: 2
+        x: 55
+        y: 0
+        width: 34
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0a6060c183d983f00800000000000000
+      internalID: 1096799373578602144
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy08Idle-Sheet2x_2
+      rect:
+        serializedVersion: 2
+        x: 101
+        y: 0
+        width: 34
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9360bf84e35118620800000000000000
+      internalID: 2774522202693502521
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy08Idle-Sheet2x_3
+      rect:
+        serializedVersion: 2
+        x: 147
+        y: 0
+        width: 34
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: df181a25440591120800000000000000
+      internalID: 2385025732043702781
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy08Idle-Sheet2x_4
+      rect:
+        serializedVersion: 2
+        x: 193
+        y: 0
+        width: 34
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 91f21f98734aadd00800000000000000
+      internalID: 998290825860427545
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy08Idle-Sheet2x_5
+      rect:
+        serializedVersion: 2
+        x: 239
+        y: 0
+        width: 34
+        height: 35
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 625c1ab6daebc3060800000000000000
+      internalID: 6934627178288104742
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy08Idle-Sheet2x_6
+      rect:
+        serializedVersion: 2
+        x: 285
+        y: 0
+        width: 34
+        height: 35
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 82313993caaa23ef0800000000000000
+      internalID: -129853782563286232
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy08Idle-Sheet2x_7
+      rect:
+        serializedVersion: 2
+        x: 331
+        y: 0
+        width: 34
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a0a3596b08efe1b00800000000000000
+      internalID: 801357612491029002
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy08Idle-Sheet2x_8
+      rect:
+        serializedVersion: 2
+        x: 377
+        y: 0
+        width: 34
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: acf0736aa34003140800000000000000
+      internalID: 4697259061290667978
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy08Idle-Sheet2x_9
+      rect:
+        serializedVersion: 2
+        x: 423
+        y: 0
+        width: 34
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2c42fd8d2fbae8ae0800000000000000
+      internalID: -1545108562632563518
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy08Idle-Sheet2x_10
+      rect:
+        serializedVersion: 2
+        x: 469
+        y: 0
+        width: 34
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: daf29b47d27daff20800000000000000
+      internalID: 3457312254192070573
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy08Idle-Sheet2x_11
+      rect:
+        serializedVersion: 2
+        x: 515
+        y: 0
+        width: 34
+        height: 35
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 43460bb2af1639550800000000000000
+      internalID: 6166380041903039540
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      Enemy08Idle-Sheet2x_0: 3001328703939292222
+      Enemy08Idle-Sheet2x_1: 1096799373578602144
+      Enemy08Idle-Sheet2x_10: 3457312254192070573
+      Enemy08Idle-Sheet2x_11: 6166380041903039540
+      Enemy08Idle-Sheet2x_2: 2774522202693502521
+      Enemy08Idle-Sheet2x_3: 2385025732043702781
+      Enemy08Idle-Sheet2x_4: 998290825860427545
+      Enemy08Idle-Sheet2x_5: 6934627178288104742
+      Enemy08Idle-Sheet2x_6: -129853782563286232
+      Enemy08Idle-Sheet2x_7: 801357612491029002
+      Enemy08Idle-Sheet2x_8: 4697259061290667978
+      Enemy08Idle-Sheet2x_9: -1545108562632563518
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

@@ -1,0 +1,624 @@
+fileFormatVersion: 2
+guid: e8e9f935030f97243a4edef3a66d3406
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 3789804445642839397
+    second: Potion Mana-Sheet2x_0
+  - first:
+      213: -7032309583330976721
+    second: Potion Mana-Sheet2x_1
+  - first:
+      213: 2234236181869442039
+    second: Potion Mana-Sheet2x_2
+  - first:
+      213: -3042820681348330708
+    second: Potion Mana-Sheet2x_3
+  - first:
+      213: -7321624054210263424
+    second: Potion Mana-Sheet2x_4
+  - first:
+      213: -4716058280051625124
+    second: Potion Mana-Sheet2x_5
+  - first:
+      213: -8502639861377322010
+    second: Potion Mana-Sheet2x_6
+  - first:
+      213: 4650180573988926292
+    second: Potion Mana-Sheet2x_7
+  - first:
+      213: 1177952807280237526
+    second: Potion Mana-Sheet2x_8
+  - first:
+      213: 1554615269073114984
+    second: Potion Mana-Sheet2x_9
+  - first:
+      213: 6515816519594817512
+    second: Potion Mana-Sheet2x_10
+  - first:
+      213: -2982620615939834358
+    second: Potion Mana-Sheet2x_11
+  - first:
+      213: -8289622576592249421
+    second: Potion Mana-Sheet2x_12
+  - first:
+      213: 5867537473320885426
+    second: Potion Mana-Sheet2x_13
+  - first:
+      213: -5381163543143900987
+    second: Potion Mana-Sheet2x_14
+  - first:
+      213: -9128061197709557983
+    second: Potion Mana-Sheet2x_15
+  - first:
+      213: -4363832278929523041
+    second: Potion Mana-Sheet2x_16
+  - first:
+      213: 551907884249375155
+    second: Potion Mana-Sheet2x_17
+  - first:
+      213: 555960408291495906
+    second: Potion Mana-Sheet2x_18
+  - first:
+      213: 9117215995997692765
+    second: Potion Mana-Sheet2x_19
+  externalObjects: {}
+  serializedVersion: 12
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_0
+      rect:
+        serializedVersion: 2
+        x: 235
+        y: 27
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 565dcb66017189430800000000000000
+      internalID: 3789804445642839397
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_1
+      rect:
+        serializedVersion: 2
+        x: 265
+        y: 29
+        width: 14
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f2c5bf651b7386e90800000000000000
+      internalID: -7032309583330976721
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_2
+      rect:
+        serializedVersion: 2
+        x: 297
+        y: 31
+        width: 14
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7f337ac48f9910f10800000000000000
+      internalID: 2234236181869442039
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_3
+      rect:
+        serializedVersion: 2
+        x: 329
+        y: 37
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c2b450d36bab5c5d0800000000000000
+      internalID: -3042820681348330708
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_4
+      rect:
+        serializedVersion: 2
+        x: 329
+        y: 31
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 08687ddd6bd546a90800000000000000
+      internalID: -7321624054210263424
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_5
+      rect:
+        serializedVersion: 2
+        x: 337
+        y: 37
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c53bb752bf13d8eb0800000000000000
+      internalID: -4716058280051625124
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_6
+      rect:
+        serializedVersion: 2
+        x: 337
+        y: 31
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6e33781581e800a80800000000000000
+      internalID: -8502639861377322010
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_7
+      rect:
+        serializedVersion: 2
+        x: 359
+        y: 0
+        width: 18
+        height: 43
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 45338062892c88040800000000000000
+      internalID: 4650180573988926292
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_8
+      rect:
+        serializedVersion: 2
+        x: 103
+        y: 0
+        width: 18
+        height: 25
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6dbdc1056dde85010800000000000000
+      internalID: 1177952807280237526
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_9
+      rect:
+        serializedVersion: 2
+        x: 135
+        y: 0
+        width: 18
+        height: 25
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 867508bb95a139510800000000000000
+      internalID: 1554615269073114984
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_10
+      rect:
+        serializedVersion: 2
+        x: 167
+        y: 0
+        width: 18
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8e732103a94dc6a50800000000000000
+      internalID: 6515816519594817512
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_11
+      rect:
+        serializedVersion: 2
+        x: 203
+        y: 25
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a0e36273a5a9b96d0800000000000000
+      internalID: -2982620615939834358
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_12
+      rect:
+        serializedVersion: 2
+        x: 7
+        y: 0
+        width: 18
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3bd1928df2855fc80800000000000000
+      internalID: -8289622576592249421
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_13
+      rect:
+        serializedVersion: 2
+        x: 39
+        y: 0
+        width: 18
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2bc95939e3ead6150800000000000000
+      internalID: 5867537473320885426
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_14
+      rect:
+        serializedVersion: 2
+        x: 71
+        y: 0
+        width: 18
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5c810a4a4444255b0800000000000000
+      internalID: -5381163543143900987
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_15
+      rect:
+        serializedVersion: 2
+        x: 199
+        y: 0
+        width: 18
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 12fbe7604bc925180800000000000000
+      internalID: -9128061197709557983
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_16
+      rect:
+        serializedVersion: 2
+        x: 231
+        y: 0
+        width: 18
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f9eb503b9ad8073c0800000000000000
+      internalID: -4363832278929523041
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_17
+      rect:
+        serializedVersion: 2
+        x: 263
+        y: 0
+        width: 18
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3b1eb6deb45c8a700800000000000000
+      internalID: 551907884249375155
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_18
+      rect:
+        serializedVersion: 2
+        x: 295
+        y: 0
+        width: 18
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2ef4565bb0b27b700800000000000000
+      internalID: 555960408291495906
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Potion Mana-Sheet2x_19
+      rect:
+        serializedVersion: 2
+        x: 327
+        y: 0
+        width: 18
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d53a3fda4abd68e70800000000000000
+      internalID: 9117215995997692765
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      Potion Mana-Sheet2x_0: 3789804445642839397
+      Potion Mana-Sheet2x_1: -7032309583330976721
+      Potion Mana-Sheet2x_10: 6515816519594817512
+      Potion Mana-Sheet2x_11: -2982620615939834358
+      Potion Mana-Sheet2x_12: -8289622576592249421
+      Potion Mana-Sheet2x_13: 5867537473320885426
+      Potion Mana-Sheet2x_14: -5381163543143900987
+      Potion Mana-Sheet2x_15: -9128061197709557983
+      Potion Mana-Sheet2x_16: -4363832278929523041
+      Potion Mana-Sheet2x_17: 551907884249375155
+      Potion Mana-Sheet2x_18: 555960408291495906
+      Potion Mana-Sheet2x_19: 9117215995997692765
+      Potion Mana-Sheet2x_2: 2234236181869442039
+      Potion Mana-Sheet2x_3: -3042820681348330708
+      Potion Mana-Sheet2x_4: -7321624054210263424
+      Potion Mana-Sheet2x_5: -4716058280051625124
+      Potion Mana-Sheet2x_6: -8502639861377322010
+      Potion Mana-Sheet2x_7: 4650180573988926292
+      Potion Mana-Sheet2x_8: 1177952807280237526
+      Potion Mana-Sheet2x_9: 1554615269073114984
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

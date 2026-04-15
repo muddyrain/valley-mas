@@ -1,0 +1,449 @@
+fileFormatVersion: 2
+guid: 788f5359ce396bd4cb0f702abc8b4f0c
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -838027794234667595
+    second: Hero01 Mage Atk2x-Sheet_0
+  - first:
+      213: -3934201490645255130
+    second: Hero01 Mage Atk2x-Sheet_1
+  - first:
+      213: 193278406362638618
+    second: Hero01 Mage Atk2x-Sheet_2
+  - first:
+      213: 5634918491464967530
+    second: Hero01 Mage Atk2x-Sheet_3
+  - first:
+      213: 9197557527994982959
+    second: Hero01 Mage Atk2x-Sheet_4
+  - first:
+      213: -5719978408248167226
+    second: Hero01 Mage Atk2x-Sheet_5
+  - first:
+      213: -3851326636378896763
+    second: Hero01 Mage Atk2x-Sheet_6
+  - first:
+      213: 9140517845553084853
+    second: Hero01 Mage Atk2x-Sheet_7
+  - first:
+      213: -8039832258559666171
+    second: Hero01 Mage Atk2x-Sheet_8
+  - first:
+      213: -6235369269833646750
+    second: Hero01 Mage Atk2x-Sheet_9
+  - first:
+      213: -9151624566526477991
+    second: Hero01 Mage Atk2x-Sheet_10
+  - first:
+      213: 4159165899505129616
+    second: Hero01 Mage Atk2x-Sheet_11
+  - first:
+      213: 6770353004055894618
+    second: Hero01 Mage Atk2x-Sheet_12
+  externalObjects: {}
+  serializedVersion: 12
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Hero01 Mage Atk2x-Sheet_0
+      rect:
+        serializedVersion: 2
+        x: 5
+        y: 0
+        width: 24
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5bd0db4492abe54f0800000000000000
+      internalID: -838027794234667595
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero01 Mage Atk2x-Sheet_1
+      rect:
+        serializedVersion: 2
+        x: 37
+        y: 0
+        width: 24
+        height: 35
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 62cf64ba698e669c0800000000000000
+      internalID: -3934201490645255130
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero01 Mage Atk2x-Sheet_2
+      rect:
+        serializedVersion: 2
+        x: 67
+        y: 0
+        width: 26
+        height: 36
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a19aff1cfa9aea200800000000000000
+      internalID: 193278406362638618
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero01 Mage Atk2x-Sheet_3
+      rect:
+        serializedVersion: 2
+        x: 99
+        y: 0
+        width: 26
+        height: 35
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a65ac0e4380433e40800000000000000
+      internalID: 5634918491464967530
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero01 Mage Atk2x-Sheet_4
+      rect:
+        serializedVersion: 2
+        x: 131
+        y: 0
+        width: 26
+        height: 35
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f226c5947d944af70800000000000000
+      internalID: 9197557527994982959
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero01 Mage Atk2x-Sheet_5
+      rect:
+        serializedVersion: 2
+        x: 165
+        y: 0
+        width: 28
+        height: 29
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6c4b67581fd8e90b0800000000000000
+      internalID: -5719978408248167226
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero01 Mage Atk2x-Sheet_6
+      rect:
+        serializedVersion: 2
+        x: 193
+        y: 0
+        width: 28
+        height: 29
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 586c2a454d65d8ac0800000000000000
+      internalID: -3851326636378896763
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero01 Mage Atk2x-Sheet_7
+      rect:
+        serializedVersion: 2
+        x: 223
+        y: 0
+        width: 28
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5b97f4f4d84a9de70800000000000000
+      internalID: 9140517845553084853
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero01 Mage Atk2x-Sheet_8
+      rect:
+        serializedVersion: 2
+        x: 255
+        y: 7
+        width: 28
+        height: 26
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 50813de5827cc6090800000000000000
+      internalID: -8039832258559666171
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero01 Mage Atk2x-Sheet_9
+      rect:
+        serializedVersion: 2
+        x: 257
+        y: 0
+        width: 24
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 26dbd2c7fa48779a0800000000000000
+      internalID: -6235369269833646750
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero01 Mage Atk2x-Sheet_10
+      rect:
+        serializedVersion: 2
+        x: 291
+        y: 0
+        width: 24
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9597372b1f5eef080800000000000000
+      internalID: -9151624566526477991
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero01 Mage Atk2x-Sheet_11
+      rect:
+        serializedVersion: 2
+        x: 325
+        y: 0
+        width: 24
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 098dbe1795358b930800000000000000
+      internalID: 4159165899505129616
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero01 Mage Atk2x-Sheet_12
+      rect:
+        serializedVersion: 2
+        x: 357
+        y: 0
+        width: 24
+        height: 29
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a5a10c2bf2025fd50800000000000000
+      internalID: 6770353004055894618
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      Hero01 Mage Atk2x-Sheet_0: -838027794234667595
+      Hero01 Mage Atk2x-Sheet_1: -3934201490645255130
+      Hero01 Mage Atk2x-Sheet_10: -9151624566526477991
+      Hero01 Mage Atk2x-Sheet_11: 4159165899505129616
+      Hero01 Mage Atk2x-Sheet_12: 6770353004055894618
+      Hero01 Mage Atk2x-Sheet_2: 193278406362638618
+      Hero01 Mage Atk2x-Sheet_3: 5634918491464967530
+      Hero01 Mage Atk2x-Sheet_4: 9197557527994982959
+      Hero01 Mage Atk2x-Sheet_5: -5719978408248167226
+      Hero01 Mage Atk2x-Sheet_6: -3851326636378896763
+      Hero01 Mage Atk2x-Sheet_7: 9140517845553084853
+      Hero01 Mage Atk2x-Sheet_8: -8039832258559666171
+      Hero01 Mage Atk2x-Sheet_9: -6235369269833646750
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

@@ -1,0 +1,474 @@
+fileFormatVersion: 2
+guid: f43bd242f7b48f84d810f3e98ae02510
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -1191336069741274637
+    second: Enemy10atk-Sheet_0
+  - first:
+      213: 4689188800597340893
+    second: Enemy10atk-Sheet_1
+  - first:
+      213: 2444690280387120252
+    second: Enemy10atk-Sheet_2
+  - first:
+      213: -5996751998593791761
+    second: Enemy10atk-Sheet_3
+  - first:
+      213: 4134364016849993724
+    second: Enemy10atk-Sheet_4
+  - first:
+      213: 9150697270773210213
+    second: Enemy10atk-Sheet_5
+  - first:
+      213: -6999572490149867866
+    second: Enemy10atk-Sheet_6
+  - first:
+      213: 5398312311174722114
+    second: Enemy10atk-Sheet_7
+  - first:
+      213: -5818818269585161700
+    second: Enemy10atk-Sheet_8
+  - first:
+      213: 1604893129017118131
+    second: Enemy10atk-Sheet_9
+  - first:
+      213: 187195518136961659
+    second: Enemy10atk-Sheet_10
+  - first:
+      213: 8761983185477157826
+    second: Enemy10atk-Sheet_11
+  - first:
+      213: -7622448912263357913
+    second: Enemy10atk-Sheet_12
+  - first:
+      213: -985490684400725021
+    second: Enemy10atk-Sheet_13
+  externalObjects: {}
+  serializedVersion: 12
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_0
+      rect:
+        serializedVersion: 2
+        x: 18
+        y: 0
+        width: 30
+        height: 35
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3f916f21826877fe0800000000000000
+      internalID: -1191336069741274637
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_1
+      rect:
+        serializedVersion: 2
+        x: 66
+        y: 6
+        width: 11
+        height: 11
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dd23858ae58531140800000000000000
+      internalID: 4689188800597340893
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_2
+      rect:
+        serializedVersion: 2
+        x: 75
+        y: 0
+        width: 28
+        height: 34
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c7c03548bd84de120800000000000000
+      internalID: 2444690280387120252
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_3
+      rect:
+        serializedVersion: 2
+        x: 110
+        y: 0
+        width: 22
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fe804b554d147cca0800000000000000
+      internalID: -5996751998593791761
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_4
+      rect:
+        serializedVersion: 2
+        x: 130
+        y: 0
+        width: 28
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cff30842b26306930800000000000000
+      internalID: 4134364016849993724
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_5
+      rect:
+        serializedVersion: 2
+        x: 167
+        y: 8
+        width: 12
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 56cd29f6faecdfe70800000000000000
+      internalID: 9150697270773210213
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_6
+      rect:
+        serializedVersion: 2
+        x: 173
+        y: 0
+        width: 11
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6ae4501d7e58cde90800000000000000
+      internalID: -6999572490149867866
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_7
+      rect:
+        serializedVersion: 2
+        x: 182
+        y: 0
+        width: 31
+        height: 30
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 242ff2e0278aaea40800000000000000
+      internalID: 5398312311174722114
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_8
+      rect:
+        serializedVersion: 2
+        x: 224
+        y: 8
+        width: 7
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c12c2dcfc976f3fa0800000000000000
+      internalID: -5818818269585161700
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_9
+      rect:
+        serializedVersion: 2
+        x: 229
+        y: 1
+        width: 8
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3bdc7893cc9b54610800000000000000
+      internalID: 1604893129017118131
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_10
+      rect:
+        serializedVersion: 2
+        x: 237
+        y: 0
+        width: 31
+        height: 30
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b7a491af45d099200800000000000000
+      internalID: 187195518136961659
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_11
+      rect:
+        serializedVersion: 2
+        x: 281
+        y: 0
+        width: 42
+        height: 30
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2c3cf42c841d89970800000000000000
+      internalID: 8761983185477157826
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_12
+      rect:
+        serializedVersion: 2
+        x: 339
+        y: 0
+        width: 39
+        height: 30
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 72adaf9891f973690800000000000000
+      internalID: -7622448912263357913
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy10atk-Sheet_13
+      rect:
+        serializedVersion: 2
+        x: 405
+        y: 0
+        width: 28
+        height: 34
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3e396d2a175d252f0800000000000000
+      internalID: -985490684400725021
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      Enemy10atk-Sheet_0: -1191336069741274637
+      Enemy10atk-Sheet_1: 4689188800597340893
+      Enemy10atk-Sheet_10: 187195518136961659
+      Enemy10atk-Sheet_11: 8761983185477157826
+      Enemy10atk-Sheet_12: -7622448912263357913
+      Enemy10atk-Sheet_13: -985490684400725021
+      Enemy10atk-Sheet_2: 2444690280387120252
+      Enemy10atk-Sheet_3: -5996751998593791761
+      Enemy10atk-Sheet_4: 4134364016849993724
+      Enemy10atk-Sheet_5: 9150697270773210213
+      Enemy10atk-Sheet_6: -6999572490149867866
+      Enemy10atk-Sheet_7: 5398312311174722114
+      Enemy10atk-Sheet_8: -5818818269585161700
+      Enemy10atk-Sheet_9: 1604893129017118131
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

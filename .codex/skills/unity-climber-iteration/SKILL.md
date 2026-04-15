@@ -63,6 +63,23 @@ category: unity
    - `Main Camera` 上应挂 `ClimberFollowCamera`。
    - 终点触发物上应挂 `ClimberFinishTrigger`。
 
+## 模型导入前置检查（必须检查）
+
+1. 角色/场景模型若是 `.glb`，先确认项目已安装可用的 glTF 导入器；否则 `AssetDatabase.LoadAssetAtPath<GameObject>()` 会返回空。
+2. 若 `.glb` 在项目中显示为 `DefaultImporter`，不得继续推进“直接绑定到 Scene”的任务，先解决导入器或改用 `FBX`。
+3. 只有当模型在 Project 里可作为 `GameObject` 资产加载时，才执行 Scene 绑定与替换。
+
+## 强制阻断规则（不可绕过）
+
+1. 用户要求“直接改 Scene”时，严禁使用运行时生成、自动触发绑定、或让用户手动点按钮作为替代交付。
+2. 任何“把模型直接落进 Scene”的任务，必须先通过可加载性检查：
+   - `AssetDatabase.LoadAssetAtPath<GameObject>(...)` 不为 `null`；
+   - 资产导入器不是 `DefaultImporter`（对模型资产）。
+3. 上述检查任一失败时，必须立即停止该实现路径，并只给出两种合规选项：
+   - 修复导入链路；
+   - 切换为可导入格式（如 `FBX`）。
+4. 未通过可加载性检查前，不得承诺“已绑定到 Scene”或“下轮自动生效”。
+
 ## Three.js 过渡策略
 
 1. 默认策略是“冻结旧链路”，不是“立即删除”：

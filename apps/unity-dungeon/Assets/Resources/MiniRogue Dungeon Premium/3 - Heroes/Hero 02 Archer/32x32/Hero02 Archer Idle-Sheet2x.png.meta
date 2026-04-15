@@ -1,0 +1,424 @@
+fileFormatVersion: 2
+guid: 815b39169ce08664ebae4104be923af0
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 2730903356912373620
+    second: Hero02 Archer Idle-Sheet2x_0
+  - first:
+      213: 8625905451125246822
+    second: Hero02 Archer Idle-Sheet2x_1
+  - first:
+      213: -2452384646605529174
+    second: Hero02 Archer Idle-Sheet2x_2
+  - first:
+      213: -3171007040372815229
+    second: Hero02 Archer Idle-Sheet2x_3
+  - first:
+      213: 3771344984306833354
+    second: Hero02 Archer Idle-Sheet2x_4
+  - first:
+      213: -6762509440258128662
+    second: Hero02 Archer Idle-Sheet2x_5
+  - first:
+      213: 4896778728549644983
+    second: Hero02 Archer Idle-Sheet2x_6
+  - first:
+      213: 3428081276477978740
+    second: Hero02 Archer Idle-Sheet2x_7
+  - first:
+      213: -4392137176049457684
+    second: Hero02 Archer Idle-Sheet2x_8
+  - first:
+      213: 481205477241624485
+    second: Hero02 Archer Idle-Sheet2x_9
+  - first:
+      213: 664505944652955475
+    second: Hero02 Archer Idle-Sheet2x_10
+  - first:
+      213: 7023096737863755135
+    second: Hero02 Archer Idle-Sheet2x_11
+  externalObjects: {}
+  serializedVersion: 12
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Hero02 Archer Idle-Sheet2x_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 29
+        height: 34
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 47f0fa8522e16e520800000000000000
+      internalID: 2730903356912373620
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero02 Archer Idle-Sheet2x_1
+      rect:
+        serializedVersion: 2
+        x: 29
+        y: 0
+        width: 30
+        height: 34
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 66b0d684e4f55b770800000000000000
+      internalID: 8625905451125246822
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero02 Archer Idle-Sheet2x_2
+      rect:
+        serializedVersion: 2
+        x: 59
+        y: 0
+        width: 30
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: aaf947e382167fdd0800000000000000
+      internalID: -2452384646605529174
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero02 Archer Idle-Sheet2x_3
+      rect:
+        serializedVersion: 2
+        x: 89
+        y: 0
+        width: 30
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 38ac052c5e15ef3d0800000000000000
+      internalID: -3171007040372815229
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero02 Archer Idle-Sheet2x_4
+      rect:
+        serializedVersion: 2
+        x: 119
+        y: 0
+        width: 30
+        height: 29
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ac75f032842865430800000000000000
+      internalID: 3771344984306833354
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero02 Archer Idle-Sheet2x_5
+      rect:
+        serializedVersion: 2
+        x: 149
+        y: 0
+        width: 30
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ae4403f4e7db622a0800000000000000
+      internalID: -6762509440258128662
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero02 Archer Idle-Sheet2x_6
+      rect:
+        serializedVersion: 2
+        x: 179
+        y: 0
+        width: 30
+        height: 34
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7baf3e23f4ad4f340800000000000000
+      internalID: 4896778728549644983
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero02 Archer Idle-Sheet2x_7
+      rect:
+        serializedVersion: 2
+        x: 209
+        y: 0
+        width: 30
+        height: 34
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 47833a912cdf29f20800000000000000
+      internalID: 3428081276477978740
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero02 Archer Idle-Sheet2x_8
+      rect:
+        serializedVersion: 2
+        x: 239
+        y: 0
+        width: 30
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ce5e8c8428efb03c0800000000000000
+      internalID: -4392137176049457684
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero02 Archer Idle-Sheet2x_9
+      rect:
+        serializedVersion: 2
+        x: 269
+        y: 0
+        width: 30
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5a795fef4d59da600800000000000000
+      internalID: 481205477241624485
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero02 Archer Idle-Sheet2x_10
+      rect:
+        serializedVersion: 2
+        x: 299
+        y: 0
+        width: 30
+        height: 29
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 35fbc2ec2acc83900800000000000000
+      internalID: 664505944652955475
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Hero02 Archer Idle-Sheet2x_11
+      rect:
+        serializedVersion: 2
+        x: 329
+        y: 0
+        width: 30
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f75e29be54d077160800000000000000
+      internalID: 7023096737863755135
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      Hero02 Archer Idle-Sheet2x_0: 2730903356912373620
+      Hero02 Archer Idle-Sheet2x_1: 8625905451125246822
+      Hero02 Archer Idle-Sheet2x_10: 664505944652955475
+      Hero02 Archer Idle-Sheet2x_11: 7023096737863755135
+      Hero02 Archer Idle-Sheet2x_2: -2452384646605529174
+      Hero02 Archer Idle-Sheet2x_3: -3171007040372815229
+      Hero02 Archer Idle-Sheet2x_4: 3771344984306833354
+      Hero02 Archer Idle-Sheet2x_5: -6762509440258128662
+      Hero02 Archer Idle-Sheet2x_6: 4896778728549644983
+      Hero02 Archer Idle-Sheet2x_7: 3428081276477978740
+      Hero02 Archer Idle-Sheet2x_8: -4392137176049457684
+      Hero02 Archer Idle-Sheet2x_9: 481205477241624485
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

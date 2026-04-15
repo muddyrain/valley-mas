@@ -1,0 +1,599 @@
+fileFormatVersion: 2
+guid: 4516f767e4deaa8499896e5811abb782
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 3083737339272797343
+    second: Enemy05Dying-Sheet2x_0
+  - first:
+      213: -4040110904427832381
+    second: Enemy05Dying-Sheet2x_1
+  - first:
+      213: 1288406272984973371
+    second: Enemy05Dying-Sheet2x_2
+  - first:
+      213: 8145970799619137626
+    second: Enemy05Dying-Sheet2x_3
+  - first:
+      213: 7124921310174332109
+    second: Enemy05Dying-Sheet2x_4
+  - first:
+      213: 2934185402001506042
+    second: Enemy05Dying-Sheet2x_5
+  - first:
+      213: 5388190249277913483
+    second: Enemy05Dying-Sheet2x_6
+  - first:
+      213: 1693702171329601209
+    second: Enemy05Dying-Sheet2x_7
+  - first:
+      213: -2325526727211409693
+    second: Enemy05Dying-Sheet2x_8
+  - first:
+      213: -2675730549911852003
+    second: Enemy05Dying-Sheet2x_9
+  - first:
+      213: -7751227716154257291
+    second: Enemy05Dying-Sheet2x_10
+  - first:
+      213: -8834337950010971330
+    second: Enemy05Dying-Sheet2x_11
+  - first:
+      213: 4401677902179228641
+    second: Enemy05Dying-Sheet2x_12
+  - first:
+      213: -2434913374395398271
+    second: Enemy05Dying-Sheet2x_13
+  - first:
+      213: -7276979827508087252
+    second: Enemy05Dying-Sheet2x_14
+  - first:
+      213: -6834652215168445030
+    second: Enemy05Dying-Sheet2x_15
+  - first:
+      213: -3148168323760575464
+    second: Enemy05Dying-Sheet2x_16
+  - first:
+      213: -6334938339611993061
+    second: Enemy05Dying-Sheet2x_17
+  - first:
+      213: 6328644392513728849
+    second: Enemy05Dying-Sheet2x_18
+  externalObjects: {}
+  serializedVersion: 12
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_0
+      rect:
+        serializedVersion: 2
+        x: 3
+        y: 0
+        width: 34
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f9c96ff85c2abca20800000000000000
+      internalID: 3083737339272797343
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_1
+      rect:
+        serializedVersion: 2
+        x: 39
+        y: 0
+        width: 32
+        height: 29
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3cb9560b984aee7c0800000000000000
+      internalID: -4040110904427832381
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_2
+      rect:
+        serializedVersion: 2
+        x: 51
+        y: 17
+        width: 14
+        height: 16
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b3087a3dda651e110800000000000000
+      internalID: 1288406272984973371
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_3
+      rect:
+        serializedVersion: 2
+        x: 65
+        y: 9
+        width: 8
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a50e006784d4c0170800000000000000
+      internalID: 8145970799619137626
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_4
+      rect:
+        serializedVersion: 2
+        x: 75
+        y: 0
+        width: 34
+        height: 25
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dc44d81ae2ec0e260800000000000000
+      internalID: 7124921310174332109
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_5
+      rect:
+        serializedVersion: 2
+        x: 87
+        y: 17
+        width: 14
+        height: 14
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: afebf6fb31258b820800000000000000
+      internalID: 2934185402001506042
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_6
+      rect:
+        serializedVersion: 2
+        x: 111
+        y: 0
+        width: 34
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b89fe6edb72b6ca40800000000000000
+      internalID: 5388190249277913483
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_7
+      rect:
+        serializedVersion: 2
+        x: 195
+        y: 7
+        width: 14
+        height: 14
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9be9865b62d318710800000000000000
+      internalID: 1693702171329601209
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_8
+      rect:
+        serializedVersion: 2
+        x: 229
+        y: 9
+        width: 14
+        height: 14
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3ee13e443c11abfd0800000000000000
+      internalID: -2325526727211409693
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_9
+      rect:
+        serializedVersion: 2
+        x: 147
+        y: 0
+        width: 34
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d1ce7d1dd35eddad0800000000000000
+      internalID: -2675730549911852003
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_10
+      rect:
+        serializedVersion: 2
+        x: 183
+        y: 0
+        width: 34
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 570967db57b1e6490800000000000000
+      internalID: -7751227716154257291
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_11
+      rect:
+        serializedVersion: 2
+        x: 219
+        y: 0
+        width: 34
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e3be7d7d070266580800000000000000
+      internalID: -8834337950010971330
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_12
+      rect:
+        serializedVersion: 2
+        x: 255
+        y: 0
+        width: 34
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1eb541f1bb6e51d30800000000000000
+      internalID: 4401677902179228641
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_13
+      rect:
+        serializedVersion: 2
+        x: 291
+        y: 0
+        width: 34
+        height: 13
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 187805ccf23753ed0800000000000000
+      internalID: -2434913374395398271
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_14
+      rect:
+        serializedVersion: 2
+        x: 327
+        y: 0
+        width: 34
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c2672b7e669f20b90800000000000000
+      internalID: -7276979827508087252
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_15
+      rect:
+        serializedVersion: 2
+        x: 363
+        y: 0
+        width: 34
+        height: 13
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a955c8795007621a0800000000000000
+      internalID: -6834652215168445030
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_16
+      rect:
+        serializedVersion: 2
+        x: 399
+        y: 0
+        width: 34
+        height: 13
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 81c2d19d6957f44d0800000000000000
+      internalID: -3148168323760575464
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_17
+      rect:
+        serializedVersion: 2
+        x: 435
+        y: 0
+        width: 34
+        height: 13
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b1c9c61e427c518a0800000000000000
+      internalID: -6334938339611993061
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Enemy05Dying-Sheet2x_18
+      rect:
+        serializedVersion: 2
+        x: 471
+        y: 0
+        width: 33
+        height: 13
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1517c8d5b8cd3d750800000000000000
+      internalID: 6328644392513728849
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      Enemy05Dying-Sheet2x_0: 3083737339272797343
+      Enemy05Dying-Sheet2x_1: -4040110904427832381
+      Enemy05Dying-Sheet2x_10: -7751227716154257291
+      Enemy05Dying-Sheet2x_11: -8834337950010971330
+      Enemy05Dying-Sheet2x_12: 4401677902179228641
+      Enemy05Dying-Sheet2x_13: -2434913374395398271
+      Enemy05Dying-Sheet2x_14: -7276979827508087252
+      Enemy05Dying-Sheet2x_15: -6834652215168445030
+      Enemy05Dying-Sheet2x_16: -3148168323760575464
+      Enemy05Dying-Sheet2x_17: -6334938339611993061
+      Enemy05Dying-Sheet2x_18: 6328644392513728849
+      Enemy05Dying-Sheet2x_2: 1288406272984973371
+      Enemy05Dying-Sheet2x_3: 8145970799619137626
+      Enemy05Dying-Sheet2x_4: 7124921310174332109
+      Enemy05Dying-Sheet2x_5: 2934185402001506042
+      Enemy05Dying-Sheet2x_6: 5388190249277913483
+      Enemy05Dying-Sheet2x_7: 1693702171329601209
+      Enemy05Dying-Sheet2x_8: -2325526727211409693
+      Enemy05Dying-Sheet2x_9: -2675730549911852003
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
