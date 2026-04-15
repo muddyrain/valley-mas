@@ -90,8 +90,6 @@ function RouteTitle() {
       title = '个人资料 | Valley';
     } else if (pathname === '/apply-creator') {
       title = '申请创作者 | Valley';
-    } else if (pathname === '/ai-chat') {
-      title = 'AI Chat | Valley';
     } else if (pathname === '/login') {
       title = '登录 | Valley';
     } else if (pathname === '/register') {

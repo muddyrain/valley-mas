@@ -1,6 +1,7 @@
 ---
 name: valley-mas-product-guard
 description: 在 Valley MAS 里保护产品行为一致性。适用于会影响创作空间、博客、资源、图文、导航、可见范围或其他用户体验链路的改动。
+category: general
 ---
 
 # 产品行为护栏

@@ -1,6 +1,7 @@
 ---
 name: web-loading-overlay-strategy
 description: 统一 Valley MAS Web 端 loading 体验的决策与落地方式。适用于需要新增/改造加载态、判断是否使用 BoxLoadingOverlay、或在小尺寸媒体区域抽取轻量公共 loading 组件的场景。
+category: web
 ---
 
 # Web Loading Overlay Strategy

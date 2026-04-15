@@ -1,6 +1,7 @@
 ---
 name: product-copy-cn
 description: 为 Valley MAS 编写和调整中文产品文案。适用于按钮、辅助说明、空状态、状态标签、卡片文案或任何需要贴合产品语境而不是通用 AI 语气的中文内容。
+category: web
 ---
 
 # 中文产品文案

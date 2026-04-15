@@ -1,6 +1,7 @@
 ---
 name: brand-theme-guard
 description: 维护 Valley MAS 的全站主题一致性。适用于首页、导航、按钮、品牌色、栏目容器或新页面改造，确保暖金与奶油色作为主主题，紫色只作为少量功能点缀。
+category: web
 ---
 
 # 品牌主题护栏

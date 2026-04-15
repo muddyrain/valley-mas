@@ -1,6 +1,7 @@
 ---
 name: vercel-go-release
 description: 面向 Vercel + Go server 一体部署安全交付 Valley MAS。适用于任何可能影响构建、路由、环境变量、Go 服务行为或前后端联动部署效果的改动。
+category: general
 ---
 
 # Vercel-Go 发布检查

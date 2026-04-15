@@ -1,93 +1,57 @@
+import {
+  type ApiResponse,
+  createHttpClient,
+  type ErrorMessageResolver,
+  type RequestConfig,
+} from '@valley/shared-request';
 import { message } from 'antd';
-import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
 
-// 定义接口返回的标准结构
-export interface ApiResponse<T = unknown> {
-  code: number;
-  message: string;
-  data: T;
-}
+export type { ApiResponse, RequestConfig };
 
-// 创建 axios 实例
-const http: AxiosInstance = axios.create({
+const redirectToLogin = () => {
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
+};
+
+const resolveErrorMessage: ErrorMessageResolver = (error, fallback) => {
+  const axiosError = error as {
+    response?: { status?: number; data?: { message?: string } };
+    code?: string;
+  };
+  const status = axiosError.response?.status;
+
+  if (status === 401) return '认证失败，请重新登录';
+  if (status === 403) return '您没有权限执行此操作';
+  if (status === 404) return '请求的资源不存在';
+  if (status === 500) return '服务器内部错误';
+  if (status === 502) return '网关错误';
+  if (status === 503) return '服务暂时不可用';
+  if (status && status >= 500) return '服务器端发生错误';
+
+  if (!status) {
+    if (axiosError.code === 'ECONNABORTED') return '请求超时，请检查网络连接';
+    if (axiosError.code === 'ERR_NETWORK') return '网络连接失败，请检查网络';
+    return '网络请求失败，请稍后重试';
+  }
+
+  return fallback;
+};
+
+const http = createHttpClient({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 30000,
-  withCredentials: true, // 允许携带 Cookie
-});
-
-// 请求拦截器
-http.interceptors.request.use(
-  (config) => {
-    // 从 localStorage 读取 admin token，通过 Authorization header 发送
-    // 避免与 web 端的 Cookie token 在同一 localhost 域下冲突
-    const token = localStorage.getItem('admin_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
+  withCredentials: true,
+  getToken: () => localStorage.getItem('admin_token'),
+  clearAuth: () => {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('userInfo');
   },
-  (error) => {
-    return Promise.reject(error);
-  },
-);
-
-// 响应拦截器
-http.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse>) => {
-    const { code, message: msg, data } = response.data;
-
-    // 假设非 0 均为错误情况，具体看后端约定
-    if (code !== 0) {
-      message.error(msg || '请求失败');
-      return Promise.reject(new Error(msg || 'Error'));
-    }
-
-    return data as typeof response; // 直接返回 data 部分
-  },
-  (error) => {
-    console.error('API Error:', error);
-
-    const status = error.response?.status;
-    const responseData = error.response?.data;
-    let msg = error.message;
-    // 优先使用后端返回的错误信息
-    if (status === 401) {
-      msg = '认证失败，请重新登录';
-      localStorage.removeItem('admin_token');
-      localStorage.removeItem('userInfo');
-      // 避免在登录页重复跳转
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
-    } else if (status === 403) {
-      msg = '您没有权限执行此操作';
-    } else if (status === 404) {
-      msg = '请求的资源不存在';
-    } else if (status === 500) {
-      msg = '服务器内部错误';
-    } else if (status === 502) {
-      msg = '网关错误';
-    } else if (status === 503) {
-      msg = '服务暂时不可用';
-    } else if (status >= 500) {
-      msg = '服务器端发生错误';
-    } else if (!status) {
-      // 网络错误或请求被取消
-      if (error.code === 'ECONNABORTED') {
-        msg = '请求超时，请检查网络连接';
-      } else if (error.code === 'ERR_NETWORK') {
-        msg = '网络连接失败，请检查网络';
-      } else {
-        msg = '网络请求失败，请稍后重试';
-      }
-    }
-    if (responseData?.message) {
-      msg = responseData.message;
-    }
-    // 显示错误提示
+  redirectToLogin,
+  resolveErrorMessage,
+  showError: (msg) => {
     message.error(msg);
-    return Promise.reject(error);
   },
-);
+});
 
 export default http;

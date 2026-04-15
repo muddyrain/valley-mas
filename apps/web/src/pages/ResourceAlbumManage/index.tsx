@@ -30,6 +30,7 @@ import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_BACKGROUND = {
@@ -71,11 +72,15 @@ function ResourcePicker({
   onSetCover: (id: string) => void;
   refreshToken?: number;
 }) {
+  const {
+    page: currentPage,
+    keyword: currentKeyword,
+    setPage,
+    setKeyword,
+  } = useUrlPaginationQuery();
   const [resources, setResources] = useState<MyResource[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [keyword, setKeyword] = useState('');
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState(currentKeyword);
   const [type, setType] = useState('');
   const [fetching, setFetching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,15 +103,18 @@ function ResourcePicker({
   }, []);
 
   useEffect(() => {
-    void fetchResources(page, keyword, type);
-  }, [fetchResources, page, keyword, type, refreshToken]);
+    setInputValue(currentKeyword);
+  }, [currentKeyword]);
+
+  useEffect(() => {
+    void fetchResources(currentPage, currentKeyword, type);
+  }, [fetchResources, currentPage, currentKeyword, type, refreshToken]);
 
   const handleSearch = (val: string) => {
     setInputValue(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      setKeyword(val);
-      setPage(1);
+      setKeyword(val, true);
     }, 300);
   };
 
@@ -115,7 +123,7 @@ function ResourcePicker({
     setPage(1);
   };
 
-  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="relative flex h-full flex-col gap-3">
@@ -159,7 +167,7 @@ function ResourcePicker({
         ) : resources.length === 0 ? (
           <div className="flex h-40 flex-col items-center justify-center gap-2 text-slate-400">
             <ImageIcon className="h-8 w-8 opacity-40" />
-            <span className="text-sm">{keyword ? '没有匹配的资源' : '暂无资源'}</span>
+            <span className="text-sm">{currentKeyword ? '没有匹配的资源' : '暂无资源'}</span>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -283,21 +291,21 @@ function ResourcePicker({
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-xs text-slate-500">
           <span>
-            第 {page} / {totalPages} 页，共 {total} 项
+            第 {currentPage} / {totalPages} 页，共 {total} 项
           </span>
           <div className="flex gap-1">
             <button
               type="button"
-              disabled={page <= 1 || fetching}
-              onClick={() => setPage((p) => p - 1)}
+              disabled={currentPage <= 1 || fetching}
+              onClick={() => setPage(Math.max(1, currentPage - 1))}
               className="rounded-lg px-2.5 py-1 hover:bg-slate-100 disabled:opacity-40"
             >
               上一页
             </button>
             <button
               type="button"
-              disabled={page >= totalPages || fetching}
-              onClick={() => setPage((p) => p + 1)}
+              disabled={currentPage >= totalPages || fetching}
+              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
               className="rounded-lg px-2.5 py-1 hover:bg-slate-100 disabled:opacity-40"
             >
               下一页

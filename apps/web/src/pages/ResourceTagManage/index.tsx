@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   aiMatchResourceTags,
@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button';
 import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_BACKGROUND = {
@@ -262,15 +263,19 @@ function ResourceRow({
 // ─── 主页面 ──────────────────────────────────────────────────────────────────
 export default function ResourceTagManage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tagsPager = useUrlPaginationQuery({ pageKey: 'tagsPage', keywordKey: 'tagsKeyword' });
+  const resourcePager = useUrlPaginationQuery({
+    pageKey: 'resourcePage',
+    keywordKey: 'resourceKeyword',
+  });
   const { hasHydrated, isAuthenticated, user } = useAuthStore();
 
   // ── 标签库 ──
   const [tags, setTags] = useState<ResourceTag[]>([]);
   const [tagsLoading, setTagsLoading] = useState(true);
   const [tagsTotal, setTagsTotal] = useState(0);
-  const [tagsPage, setTagsPage] = useState(1);
-  const [tagsKeyword, setTagsKeyword] = useState('');
-  const [tagsInputKeyword, setTagsInputKeyword] = useState('');
+  const [tagsInputKeyword, setTagsInputKeyword] = useState(tagsPager.keyword);
   const tagsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const TAGS_PAGE_SIZE = 24;
 
@@ -298,15 +303,16 @@ export default function ResourceTagManage() {
   // ── 资源列表（用于绑定标签） ──
   const [resources, setResources] = useState<(MyResource & { tags?: ResourceTag[] })[]>([]);
   const [resourcesLoading, setResourcesLoading] = useState(true);
-  const [resourcePage, setResourcePage] = useState(1);
   const [resourceTotal, setResourceTotal] = useState(0);
-  const [resourceKeyword, setResourceKeyword] = useState('');
-  const [inputKeyword, setInputKeyword] = useState('');
+  const [inputKeyword, setInputKeyword] = useState(resourcePager.keyword);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const PAGE_SIZE = 20;
 
-  // ── Tab ──
-  const [tab, setTab] = useState<'tags' | 'bind'>('tags');
+  const tagsKeyword = tagsPager.keyword;
+  const tagsPage = tagsPager.page;
+  const resourceKeyword = resourcePager.keyword;
+  const resourcePage = resourcePager.page;
+  const tab = searchParams.get('tab') === 'bind' ? 'bind' : 'tags';
 
   // 是否是管理员（只有管理员可增删改标签）
   const isAdmin = user?.role === 'admin';
@@ -385,13 +391,20 @@ export default function ResourceTagManage() {
     void loadResources(resourcePage, resourceKeyword);
   }, [tab, resourcePage, resourceKeyword, isAuthenticated, user, loadResources]);
 
+  useEffect(() => {
+    setTagsInputKeyword(tagsKeyword);
+  }, [tagsKeyword]);
+
+  useEffect(() => {
+    setInputKeyword(resourceKeyword);
+  }, [resourceKeyword]);
+
   // ── 标签库搜索防抖 ──
   const handleTagsSearch = (val: string) => {
     setTagsInputKeyword(val);
     if (tagsDebounceRef.current) clearTimeout(tagsDebounceRef.current);
     tagsDebounceRef.current = setTimeout(() => {
-      setTagsKeyword(val);
-      setTagsPage(1);
+      tagsPager.setKeyword(val, true);
     }, 300);
   };
 
@@ -400,8 +413,7 @@ export default function ResourceTagManage() {
     setInputKeyword(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      setResourceKeyword(val);
-      setResourcePage(1);
+      resourcePager.setKeyword(val, true);
     }, 300);
   };
 
@@ -524,8 +536,8 @@ export default function ResourceTagManage() {
     setBatchDone(false);
   };
 
-  const totalTagPages = Math.ceil(tagsTotal / TAGS_PAGE_SIZE);
-  const totalPages = Math.ceil(resourceTotal / PAGE_SIZE);
+  const totalTagPages = Math.max(1, Math.ceil(tagsTotal / TAGS_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(resourceTotal / PAGE_SIZE));
 
   return (
     <div className="min-h-[calc(100vh-4rem)]" style={PAGE_BACKGROUND}>
@@ -583,7 +595,11 @@ export default function ResourceTagManage() {
             <button
               key={key}
               type="button"
-              onClick={() => setTab(key)}
+              onClick={() => {
+                const nextParams = new URLSearchParams(searchParams);
+                nextParams.set('tab', key);
+                setSearchParams(nextParams);
+              }}
               className={`rounded-xl px-5 py-2 text-sm font-medium transition ${
                 tab === key
                   ? 'bg-theme-primary text-white shadow-sm'
@@ -699,7 +715,7 @@ export default function ResourceTagManage() {
                       <button
                         type="button"
                         disabled={tagsPage <= 1 || tagsLoading}
-                        onClick={() => setTagsPage((p) => p - 1)}
+                        onClick={() => tagsPager.setPage(Math.max(1, tagsPage - 1))}
                         className="rounded-lg px-3 py-1 hover:bg-slate-100 disabled:opacity-40"
                       >
                         上一页
@@ -707,7 +723,7 @@ export default function ResourceTagManage() {
                       <button
                         type="button"
                         disabled={tagsPage >= totalTagPages || tagsLoading}
-                        onClick={() => setTagsPage((p) => p + 1)}
+                        onClick={() => tagsPager.setPage(Math.min(totalTagPages, tagsPage + 1))}
                         className="rounded-lg px-3 py-1 hover:bg-slate-100 disabled:opacity-40"
                       >
                         下一页
@@ -770,7 +786,7 @@ export default function ResourceTagManage() {
                       <button
                         type="button"
                         disabled={resourcePage <= 1 || resourcesLoading}
-                        onClick={() => setResourcePage((p) => p - 1)}
+                        onClick={() => resourcePager.setPage(Math.max(1, resourcePage - 1))}
                         className="rounded-lg px-3 py-1 hover:bg-slate-100 disabled:opacity-40"
                       >
                         上一页
@@ -778,7 +794,9 @@ export default function ResourceTagManage() {
                       <button
                         type="button"
                         disabled={resourcePage >= totalPages || resourcesLoading}
-                        onClick={() => setResourcePage((p) => p + 1)}
+                        onClick={() =>
+                          resourcePager.setPage(Math.min(totalPages, resourcePage + 1))
+                        }
                         className="rounded-lg px-3 py-1 hover:bg-slate-100 disabled:opacity-40"
                       >
                         下一页

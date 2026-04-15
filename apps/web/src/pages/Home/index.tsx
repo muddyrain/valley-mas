@@ -523,15 +523,28 @@ export default function Home() {
             ) : (
               <EmptyPanel
                 title="还没有展示中的创作者"
-                description="之后这里会放最近活跃的创作者入口。"
+                description={
+                  isCreator
+                    ? '你可以先完善创作者主页与内容，系统会在活跃度提升后优先推荐你的入口。'
+                    : '当前还没有进入推荐位的创作者，先去创作者页浏览全部创作者，或申请成为创作者。'
+                }
                 action={
-                  <Button
-                    variant="outline"
-                    className="rounded-full border-theme-shell-border bg-white/80 px-5"
-                    onClick={() => navigate('/blog')}
-                  >
-                    先去看内容
-                  </Button>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    <Button
+                      variant="outline"
+                      className="rounded-full border-theme-shell-border bg-white/80 px-5"
+                      onClick={() => navigate('/creators')}
+                    >
+                      查看创作者页
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="rounded-full border-theme-shell-border bg-white/80 px-5"
+                      onClick={() => navigate(isCreator ? '/my-space' : '/apply-creator')}
+                    >
+                      {isCreator ? '去完善创作空间' : '申请成为创作者'}
+                    </Button>
+                  </div>
                 }
               />
             )}
@@ -706,15 +719,28 @@ export default function Home() {
             ) : (
               <EmptyPanel
                 title="还没有可展示的资源"
-                description="之后这里会先放当前资源列表里的图片内容。"
+                description={
+                  isCreator
+                    ? '你可以先上传壁纸或头像资源，完成整理后会优先展示在首页资源区。'
+                    : '当前首页资源位暂时为空，你可以先去资源页浏览全部内容，或关注创作者后继续回看更新。'
+                }
                 action={
-                  <Button
-                    variant="outline"
-                    className="rounded-full border-theme-shell-border bg-white/85 px-5"
-                    onClick={() => navigate('/resources')}
-                  >
-                    去看资源页
-                  </Button>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    <Button
+                      variant="outline"
+                      className="rounded-full border-theme-shell-border bg-white/85 px-5"
+                      onClick={() => navigate('/resources')}
+                    >
+                      去看资源页
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="rounded-full border-theme-shell-border bg-white/85 px-5"
+                      onClick={() => navigate(isCreator ? '/my-space/resources' : '/creators')}
+                    >
+                      {isCreator ? '去上传我的资源' : '去看创作者页'}
+                    </Button>
+                  </div>
                 }
               />
             )}
@@ -766,17 +792,28 @@ export default function Home() {
             ) : (
               <EmptyPanel
                 title="还没有可展示的内容更新"
-                description="新的博客或图文发布后，会先出现在这里。"
+                description={
+                  isCreator
+                    ? '发布博客或图文后，这里会优先展示你的最新更新，方便用户持续回访。'
+                    : '当前没有新的首页推荐内容，你可以先去内容页浏览历史更新，或关注创作者获取后续动态。'
+                }
                 action={
-                  isCreator ? (
+                  <div className="flex flex-wrap justify-center gap-3">
                     <Button
                       variant="outline"
                       className="rounded-full border-theme-shell-border bg-white/80 px-5"
-                      onClick={() => navigate('/my-space')}
+                      onClick={() => navigate('/blog')}
                     >
-                      去创作空间看看
+                      去看内容页
                     </Button>
-                  ) : undefined
+                    <Button
+                      variant="outline"
+                      className="rounded-full border-theme-shell-border bg-white/80 px-5"
+                      onClick={() => navigate(isCreator ? '/my-space/blog-create' : '/creators')}
+                    >
+                      {isCreator ? '去发布新内容' : '去看创作者更新'}
+                    </Button>
+                  </div>
                 }
               />
             )}

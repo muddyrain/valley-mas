@@ -1,6 +1,7 @@
 ---
 name: ai-capability-orchestration
 description: 统一 Valley MAS 在 Go 服务中接入和维护火山引擎 ARK AI 能力的方法。适用于新增、重构、排查任何调用 github.com/volcengine/volcengine-go-sdk/service/arkruntime 的接口，包括模型与环境变量接线、提示词设计、多模态输入处理、响应解析、降级策略、超时配置与 API 错误码映射。
+category: general
 ---
 
 # AI 能力编排（火山 ARK + Go）

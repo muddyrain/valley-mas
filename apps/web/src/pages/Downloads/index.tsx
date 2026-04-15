@@ -1,3 +1,4 @@
+import { formatFileSize, formatResourceType } from '@valley/shared-format';
 import { Download, ExternalLink, ImageIcon, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_SIZE = 20;
@@ -17,46 +19,31 @@ const PAGE_BACKGROUND = {
     'linear-gradient(180deg, var(--theme-page-start) 0%, color-mix(in srgb, var(--theme-surface-alt) 58%, white) 44%, var(--theme-page-cool) 100%)',
 };
 
-function formatSize(size?: number) {
-  if (!size || size <= 0) return '大小未知';
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function formatResourceType(type?: string) {
-  if (type === 'wallpaper') return '壁纸';
-  if (type === 'avatar') return '头像';
-  return type || '资源';
-}
-
 export default function Downloads() {
   const navigate = useNavigate();
+  const { page: currentPage, setPage } = useUrlPaginationQuery();
   const { hasHydrated, isAuthenticated } = useAuthStore();
 
   const [items, setItems] = useState<DownloadHistoryItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
 
-  const loadDownloads = async (nextPage: number, append: boolean) => {
+  const loadDownloadsToPage = async (targetPage: number) => {
     try {
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
+      setLoading(true);
+      let merged: DownloadHistoryItem[] = [];
+      let latestTotal = 0;
+      for (let pageNo = 1; pageNo <= targetPage; pageNo += 1) {
+        const data = await getMyDownloads({ page: pageNo, pageSize: PAGE_SIZE });
+        latestTotal = data.total;
+        merged = [...merged, ...(data.list ?? [])];
       }
-
-      const data = await getMyDownloads({ page: nextPage, pageSize: PAGE_SIZE });
-      setTotal(data.total);
-      setItems((prev) => (append ? [...prev, ...data.list] : data.list));
-      setPage(nextPage);
+      setTotal(latestTotal);
+      setItems(merged);
     } catch {
       // request.ts 已统一处理错误提示
     } finally {
       setLoading(false);
-      setLoadingMore(false);
     }
   };
 
@@ -66,8 +53,8 @@ export default function Downloads() {
       navigate('/login');
       return;
     }
-    void loadDownloads(1, false);
-  }, [hasHydrated, isAuthenticated, navigate]);
+    void loadDownloadsToPage(currentPage);
+  }, [hasHydrated, isAuthenticated, navigate, currentPage]);
 
   const hasMore = items.length < total;
 
@@ -155,7 +142,9 @@ export default function Downloads() {
                               </div>
                               <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-400">
                                 <span>{formatResourceType(resource?.type)}</span>
-                                <span>{formatSize(resource?.size)}</span>
+                                <span>
+                                  {formatFileSize(resource?.size, { zeroLabel: '大小未知' })}
+                                </span>
                                 <span>
                                   下载于{' '}
                                   {new Date(item.createdAt).toLocaleString('zh-CN', {
@@ -205,11 +194,11 @@ export default function Downloads() {
               <div className="mt-8 flex justify-center">
                 <Button
                   variant="outline"
-                  onClick={() => void loadDownloads(page + 1, true)}
-                  disabled={loadingMore}
+                  onClick={() => setPage(currentPage + 1)}
+                  disabled={loading}
                   className="rounded-xl border-theme-soft-strong bg-white/80 px-10 text-theme-primary hover:bg-theme-soft"
                 >
-                  {loadingMore ? (
+                  {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       加载中...

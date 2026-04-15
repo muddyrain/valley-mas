@@ -1,6 +1,7 @@
 ---
 name: task-completion-guard
 description: 在 Valley MAS 执行任务时强制检查“是否真的已经开始做、是否真的已经落地、是否真的已经完成”。适用于先计划后实施的任务、连续多步修改、需要验证的改动，或任何容易出现“已经在做/已经完成”与实际执行状态不一致的场景。
+category: general
 ---
 
 # 任务完成度护栏

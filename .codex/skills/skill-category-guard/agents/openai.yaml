@@ -1,0 +1,4 @@
+interface:
+  display_name: "技能分类护栏"
+  short_description: "新增或调整 skill 时强制完成分类、索引与边界同步"
+  default_prompt: "当任务涉及新增 skill、重构 skill 职责边界、或修复分类混乱时，先按 general/web/climber/unity 确认主分类，再同步更新 SKILL.md、agents/openai.yaml、INDEX.md（必要时含 AGENTS.md），避免技能边界继续混用。"

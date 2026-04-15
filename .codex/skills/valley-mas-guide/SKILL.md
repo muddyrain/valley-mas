@@ -1,6 +1,7 @@
 ---
 name: valley-mas-guide
 description: Navigate the Valley MAS monorepo and choose the right code entry points, validation commands, and project-specific guardrails. Use when a task touches this repository and Codex would otherwise need to rediscover the app layout, backend/frontend ownership, migration flow, or common verification steps before editing.
+category: general
 ---
 
 # Valley MAS Guide

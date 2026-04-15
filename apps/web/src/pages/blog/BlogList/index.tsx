@@ -81,10 +81,12 @@ export default function BlogList() {
   const [metaLoading, setMetaLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [groupKeyword, setGroupKeyword] = useState('');
+  const [postKeywordInput, setPostKeywordInput] = useState('');
   const [showAllGroups, setShowAllGroups] = useState(false);
   const firstLoadRef = useRef(true);
 
   const selectedGroupId = searchParams.get('groupId') || '';
+  const currentKeyword = searchParams.get('keyword')?.trim() || '';
   const currentPage = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const currentSort: 'oldest' | 'newest' =
     searchParams.get('sort') === 'newest' ? 'newest' : 'oldest';
@@ -96,6 +98,10 @@ export default function BlogList() {
     newParams.delete('tag');
     setSearchParams(newParams, { replace: true });
   }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    setPostKeywordInput(currentKeyword);
+  }, [currentKeyword]);
 
   const loadTaxonomy = useCallback(async () => {
     try {
@@ -125,6 +131,7 @@ export default function BlogList() {
         page: currentPage,
         pageSize: PAGE_SIZE,
         groupId: selectedGroupId || undefined,
+        keyword: currentKeyword || undefined,
         sort: currentSort,
       });
 
@@ -139,7 +146,7 @@ export default function BlogList() {
       }
       setRefreshing(false);
     }
-  }, [currentPage, currentSort, selectedGroupId]);
+  }, [currentKeyword, currentPage, currentSort, selectedGroupId]);
 
   useEffect(() => {
     void loadPosts();
@@ -165,6 +172,26 @@ export default function BlogList() {
   const clearFilters = () => {
     const newParams = new URLSearchParams();
     newParams.set('sort', currentSort);
+    setSearchParams(newParams);
+  };
+
+  const handlePostKeywordSearch = () => {
+    const trimmed = postKeywordInput.trim();
+    const newParams = new URLSearchParams(searchParams);
+    if (trimmed) {
+      newParams.set('keyword', trimmed);
+    } else {
+      newParams.delete('keyword');
+    }
+    newParams.set('page', '1');
+    setSearchParams(newParams);
+  };
+
+  const clearPostKeyword = () => {
+    setPostKeywordInput('');
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('keyword');
+    newParams.set('page', '1');
     setSearchParams(newParams);
   };
 
@@ -268,6 +295,47 @@ export default function BlogList() {
                   </div>
                 </div>
               )}
+
+              <div className="rounded-[28px] border border-white/80 bg-white/82 p-4 shadow-[0_16px_40px_rgba(148,163,184,0.08)]">
+                <div className="mb-3 text-sm text-slate-500">关键词搜索</div>
+                <div className="flex flex-wrap gap-2">
+                  <div className="relative min-w-[220px] grow">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={postKeywordInput}
+                      onChange={(event) => setPostKeywordInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') handlePostKeywordSearch();
+                      }}
+                      placeholder="搜索标题或摘要"
+                      className="theme-input-border h-10 w-full rounded-xl border bg-white/82 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-theme-soft"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handlePostKeywordSearch}
+                    className="rounded-full bg-theme-primary px-4 text-white hover:bg-theme-primary-hover"
+                  >
+                    搜索
+                  </Button>
+                  {currentKeyword ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={clearPostKeyword}
+                      className="rounded-full px-4 text-slate-500 hover:bg-white hover:text-slate-900"
+                    >
+                      清除搜索
+                    </Button>
+                  ) : null}
+                </div>
+                {currentKeyword ? (
+                  <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-theme-soft px-3 py-1 text-xs text-theme-primary">
+                    <Search className="h-3.5 w-3.5" />
+                    搜索词：{currentKeyword}
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div>
@@ -360,7 +428,9 @@ export default function BlogList() {
               <div className="mx-auto max-w-xl space-y-3">
                 <h3 className="text-2xl font-semibold text-slate-900">还没有可展示的内容</h3>
                 <p className="text-sm leading-8 text-slate-500">
-                  新的博客或图文发布后，会优先出现在这里。
+                  {currentKeyword
+                    ? `没有找到包含“${currentKeyword}”的内容，试试其他关键词。`
+                    : '新的博客或图文发布后，会优先出现在这里。'}
                 </p>
               </div>
             </div>

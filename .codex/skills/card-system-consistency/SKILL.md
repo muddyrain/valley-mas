@@ -1,6 +1,7 @@
 ---
 name: card-system-consistency
 description: 维护 Valley MAS 卡片系统的一致性。适用于博客、图文、资源卡片，卡片参数区、预览区、状态标签或共享卡片组件的创建与修改。
+category: web
 ---
 
 # 卡片系统一致性

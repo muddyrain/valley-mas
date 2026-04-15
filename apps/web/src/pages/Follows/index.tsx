@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_SIZE = 20;
@@ -19,31 +20,29 @@ const PAGE_BACKGROUND = {
 
 export default function Follows() {
   const navigate = useNavigate();
+  const { page: currentPage, setPage } = useUrlPaginationQuery();
   const { hasHydrated, isAuthenticated } = useAuthStore();
 
   const [items, setItems] = useState<MyFollowItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
 
-  const loadFollows = async (nextPage: number, append: boolean) => {
+  const loadFollowsToPage = async (targetPage: number) => {
     try {
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
+      setLoading(true);
+      let merged: MyFollowItem[] = [];
+      let latestTotal = 0;
+      for (let pageNo = 1; pageNo <= targetPage; pageNo += 1) {
+        const data = await getMyFollows({ page: pageNo, pageSize: PAGE_SIZE });
+        latestTotal = data.total;
+        merged = [...merged, ...(data.list ?? [])];
       }
-
-      const data = await getMyFollows({ page: nextPage, pageSize: PAGE_SIZE });
-      setTotal(data.total);
-      setItems((prev) => (append ? [...prev, ...data.list] : data.list));
-      setPage(nextPage);
+      setTotal(latestTotal);
+      setItems(merged);
     } catch {
       // request.ts 已统一处理错误提示
     } finally {
       setLoading(false);
-      setLoadingMore(false);
     }
   };
 
@@ -53,8 +52,8 @@ export default function Follows() {
       navigate('/login');
       return;
     }
-    void loadFollows(1, false);
-  }, [hasHydrated, isAuthenticated, navigate]);
+    void loadFollowsToPage(currentPage);
+  }, [hasHydrated, isAuthenticated, navigate, currentPage]);
 
   const hasMore = items.length < total;
 
@@ -175,11 +174,11 @@ export default function Follows() {
               <div className="mt-8 flex justify-center">
                 <Button
                   variant="outline"
-                  onClick={() => void loadFollows(page + 1, true)}
-                  disabled={loadingMore}
+                  onClick={() => setPage(currentPage + 1)}
+                  disabled={loading}
                   className="rounded-xl border-theme-soft-strong bg-white/80 px-10 text-theme-primary hover:bg-theme-soft"
                 >
-                  {loadingMore ? (
+                  {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       加载中...

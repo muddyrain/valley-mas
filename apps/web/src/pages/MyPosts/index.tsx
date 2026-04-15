@@ -40,12 +40,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
+import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 
 const BLOG_PAGE_SIZE = 6;
 const IMAGE_TEXT_PAGE_SIZE = 4;
 
 export default function MyPosts() {
   const navigate = useNavigate();
+  const blogPager = useUrlPaginationQuery({ pageKey: 'blogPage' });
+  const imageTextPager = useUrlPaginationQuery({ pageKey: 'imageTextPage' });
   const { canAccess } = usePageRoleGuard({
     allowRoles: ['creator'],
     unauthorizedMessage: '该页面仅创作者可访问',
@@ -61,8 +64,8 @@ export default function MyPosts() {
 
   const [blogGroupFilter, setBlogGroupFilter] = useState('');
   const [imageTextGroupFilter, setImageTextGroupFilter] = useState('');
-  const [blogPage, setBlogPage] = useState(1);
-  const [imageTextPage, setImageTextPage] = useState(1);
+  const blogPage = blogPager.page;
+  const imageTextPage = imageTextPager.page;
 
   const [deletePostTarget, setDeletePostTarget] = useState<BlogPost | null>(null);
   const [deletingPost, setDeletingPost] = useState(false);
@@ -137,19 +140,21 @@ export default function MyPosts() {
   }, [canAccess, loadPostsPage]);
 
   useEffect(() => {
-    setBlogPage(1);
+    blogPager.setPage(1);
   }, [blogGroupFilter]);
 
   useEffect(() => {
-    setImageTextPage(1);
+    imageTextPager.setPage(1);
   }, [imageTextGroupFilter]);
 
   useEffect(() => {
-    setBlogPage((prev) => Math.min(prev, blogTotalPages));
+    if (blogPage <= blogTotalPages) return;
+    blogPager.setPage(blogTotalPages);
   }, [blogTotalPages]);
 
   useEffect(() => {
-    setImageTextPage((prev) => Math.min(prev, imageTextTotalPages));
+    if (imageTextPage <= imageTextTotalPages) return;
+    imageTextPager.setPage(imageTextTotalPages);
   }, [imageTextTotalPages]);
 
   useEffect(() => {
@@ -479,7 +484,7 @@ export default function MyPosts() {
                       variant="outline"
                       size="sm"
                       disabled={blogPage <= 1}
-                      onClick={() => setBlogPage((prev) => Math.max(1, prev - 1))}
+                      onClick={() => blogPager.setPage(Math.max(1, blogPage - 1))}
                       className="gap-1.5"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -492,7 +497,7 @@ export default function MyPosts() {
                       variant="outline"
                       size="sm"
                       disabled={blogPage >= blogTotalPages}
-                      onClick={() => setBlogPage((prev) => Math.min(blogTotalPages, prev + 1))}
+                      onClick={() => blogPager.setPage(Math.min(blogTotalPages, blogPage + 1))}
                       className="gap-1.5"
                     >
                       下一页
@@ -568,7 +573,7 @@ export default function MyPosts() {
                       variant="outline"
                       size="sm"
                       disabled={imageTextPage <= 1}
-                      onClick={() => setImageTextPage((prev) => Math.max(1, prev - 1))}
+                      onClick={() => imageTextPager.setPage(Math.max(1, imageTextPage - 1))}
                       className="gap-1.5"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -582,7 +587,7 @@ export default function MyPosts() {
                       size="sm"
                       disabled={imageTextPage >= imageTextTotalPages}
                       onClick={() =>
-                        setImageTextPage((prev) => Math.min(imageTextTotalPages, prev + 1))
+                        imageTextPager.setPage(Math.min(imageTextTotalPages, imageTextPage + 1))
                       }
                       className="gap-1.5"
                     >

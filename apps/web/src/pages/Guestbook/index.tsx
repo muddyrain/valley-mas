@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_SIZE = 16;
@@ -84,45 +85,44 @@ function getPinStyle(id: string, index: number): CSSProperties {
 
 export default function Guestbook() {
   const navigate = useNavigate();
+  const { page: currentPage, setPage } = useUrlPaginationQuery();
   const { user, isAuthenticated, hasHydrated } = useAuthStore();
   const [messages, setMessages] = useState<GuestbookMessage[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string>('');
   const [pinningId, setPinningId] = useState<string>('');
   const [content, setContent] = useState('');
 
-  const loadMessages = useCallback(async (nextPage: number, append: boolean) => {
+  const loadMessagesToPage = useCallback(async (targetPage: number) => {
     try {
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
+      setLoading(true);
+      let merged: GuestbookMessage[] = [];
+      let latestTotal = 0;
+      for (let pageNo = 1; pageNo <= targetPage; pageNo += 1) {
+        const data = await getGuestbookMessages({ page: pageNo, pageSize: PAGE_SIZE });
+        merged = [...merged, ...(data.list ?? [])];
+        latestTotal = data.total ?? latestTotal;
       }
-      const data = await getGuestbookMessages({ page: nextPage, pageSize: PAGE_SIZE });
-      setMessages((prev) => (append ? [...prev, ...data.list] : data.list));
-      setTotal(data.total);
-      setPage(nextPage);
+      setMessages(merged);
+      setTotal(latestTotal);
     } catch {
       // request.ts handles toast globally
     } finally {
       setLoading(false);
-      setLoadingMore(false);
     }
   }, []);
 
   useEffect(() => {
     if (!hasHydrated) return;
-    void loadMessages(1, false);
-  }, [hasHydrated, loadMessages]);
+    void loadMessagesToPage(currentPage);
+  }, [hasHydrated, loadMessagesToPage, currentPage]);
 
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated) return;
-    void loadMessages(1, false);
-  }, [hasHydrated, isAuthenticated, loadMessages]);
+    void loadMessagesToPage(currentPage);
+  }, [hasHydrated, isAuthenticated, loadMessagesToPage, currentPage]);
 
   const remainingCount = Math.max(0, total - messages.length);
   const canLoadMore = messages.length < total;
@@ -146,7 +146,7 @@ export default function Guestbook() {
       await createGuestbookMessage({ content: content.trim() });
       toast.success('\u7559\u8a00\u5df2\u4e0a\u5899\uff0c\u6b22\u8fce\u5e38\u6765');
       setContent('');
-      await loadMessages(1, false);
+      setPage(1);
     } catch {
       // request.ts handles toast globally
     } finally {
@@ -188,7 +188,7 @@ export default function Guestbook() {
       toast.success(
         item.isPinned ? '\u5df2\u53d6\u6d88\u7f6e\u9876' : '\u5df2\u7f6e\u9876\u5230\u9876\u90e8',
       );
-      await loadMessages(1, false);
+      setPage(1);
     } catch {
       // request.ts handles toast globally
     } finally {
@@ -446,11 +446,11 @@ export default function Guestbook() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => void loadMessages(page + 1, true)}
-                      disabled={loadingMore}
+                      onClick={() => setPage(currentPage + 1)}
+                      disabled={loading}
                       className="rounded-xl border-theme-soft-strong bg-white/82 px-8 text-theme-primary hover:bg-theme-soft"
                     >
-                      {loadingMore ? (
+                      {loading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           {'\u52a0\u8f7d\u4e2d...'}

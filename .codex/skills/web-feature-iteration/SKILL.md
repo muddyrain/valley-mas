@@ -1,10 +1,17 @@
 ---
 name: web-feature-iteration
 description: 在 Valley MAS Web 端管理持续迭代型功能任务。适用于盘点 Web 还能加什么、确定下一批版本任务、开始做其中一项、删除已完成旧任务并继续推进下一项的场景。
+category: web
 ---
 
 # Web 功能迭代
 这个 skill 关注的是 Web 端功能如何持续往前推，而不是只列一份越堆越长的待办清单。目标是让活跃任务始终保持短、小、可执行：做完一项就把它移出活跃 backlog，再把下一项顶上来。
+
+## 边界声明（强约束）
+
+- 本 skill 只用于 `apps/web` 的产品功能迭代（资源、博客、创作者空间、个人中心、导航、分发与消费链路）。
+- `packages/climber-game` 不属于本 skill 的任务范围；climber 任务应走 `climber-game-design-guard` 及其专用任务清单。
+- `apps/unity-climber` 不属于本 skill 的任务范围；Unity 任务应走 `unity-climber-iteration`。
 
 ## 适用场景
 
@@ -29,9 +36,10 @@ description: 在 Valley MAS Web 端管理持续迭代型功能任务。适用于
 ## 推荐工作顺序
 
 1. 先盘点现有 Web 里已经有一半能力、但还没闭环的地方。
-2. 给出短版任务列表，并明确“现在就做哪一项”。
-3. 用户确认后直接落地，不停留在只写建议。
-4. 做完后刷新当前活跃 backlog：
+2. 优先读取并维护 `WEB-TASKS.md`，把活跃 backlog 收口到 3 到 5 项。
+3. 给出短版任务列表，并明确“现在就做哪一项”。
+4. 用户确认后直接落地，不停留在只写建议。
+5. 做完后刷新当前活跃 backlog：
    - 删除已完成项
    - 标记新的下一项
    - 如有必要补充新发现的高价值任务
@@ -49,6 +57,7 @@ description: 在 Valley MAS Web 端管理持续迭代型功能任务。适用于
 - 个人中心与创作者空间附近可以继续增强留存的能力
 - 搜索、通知、合集、推荐、数据看板这类能够串起现有内容资源的功能
 - 已有后端接口但 Web 端尚未交付页面或交互的地方
+- 统一以 `.codex/skills/web-feature-iteration/WEB-TASKS.md` 作为 Web 活跃任务入口
 
 ## 输出要求
 
