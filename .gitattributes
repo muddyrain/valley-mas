@@ -1,5 +1,48 @@
-*.psd filter=lfs diff=lfs merge=lfs -text
-*.jpg filter=lfs diff=lfs merge=lfs -text
-*.png filter=lfs diff=lfs merge=lfs -text
-*.fbx filter=lfs diff=lfs merge=lfs -text
-*.mp3 filter=lfs diff=lfs merge=lfs -text
+# ========================================
+# Git LFS - 大文件处理（二进制文件）
+# ========================================
+
+# 贴图 / 图像
+*.png  filter=lfs diff=lfs merge=lfs -text
+*.jpg  filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text
+*.tga  filter=lfs diff=lfs merge=lfs -text
+*.psd  filter=lfs diff=lfs merge=lfs -text
+*.tiff filter=lfs diff=lfs merge=lfs -text
+*.exr  filter=lfs diff=lfs merge=lfs -text
+*.hdr  filter=lfs diff=lfs merge=lfs -text
+
+# 3D 模型
+*.fbx  filter=lfs diff=lfs merge=lfs -text
+*.obj  filter=lfs diff=lfs merge=lfs -text
+*.blend filter=lfs diff=lfs merge=lfs -text
+*.max  filter=lfs diff=lfs merge=lfs -text
+*.dae  filter=lfs diff=lfs merge=lfs -text
+
+# 音频 / 视频
+*.wav  filter=lfs diff=lfs merge=lfs -text
+*.mp3  filter=lfs diff=lfs merge=lfs -text
+*.ogg  filter=lfs diff=lfs merge=lfs -text
+*.mp4  filter=lfs diff=lfs merge=lfs -text
+*.webm filter=lfs diff=lfs merge=lfs -text
+
+# Unity 资源包和其他
+*.unitypackage filter=lfs diff=lfs merge=lfs -text
+*.bytes        filter=lfs diff=lfs merge=lfs -text
+
+# ========================================
+# Unity 文本序列化文件（推荐不进 LFS，便于 diff）
+# ========================================
+
+# 让 Unity 的 YAML 文件正常文本处理和 merge
+*.mat      merge=unityyamlmerge eol=lf
+*.anim     merge=unityyamlmerge eol=lf
+*.unity    merge=unityyamlmerge eol=lf
+*.prefab   merge=unityyamlmerge eol=lf
+*.asset    merge=unityyamlmerge eol=lf
+*.controller merge=unityyamlmerge eol=lf
+
+# 如果你有特别大的 Terrain / Lighting / NavMesh，可以额外加下面这几行（放在最后，优先级更高）
+# *.terrain.asset   filter=lfs diff=lfs merge=lfs -text
+# LightingData.asset filter=lfs diff=lfs merge=lfs -text
+# NavMesh-*.asset   filter=lfs diff=lfs merge=lfs -text
