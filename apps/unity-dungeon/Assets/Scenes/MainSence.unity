@@ -190,6 +190,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   IsEnterGame: 0
   _splashScreen: {fileID: 0}
+  timeline: {fileID: 0}
+  _newGameButton: {fileID: 0}
 --- !u!4 &75519286
 Transform:
   m_ObjectHideFlags: 0
@@ -252,8 +254,9 @@ GameObject:
   m_Component:
   - component: {fileID: 261416408}
   - component: {fileID: 261416407}
+  - component: {fileID: 261416409}
   m_Layer: 0
-  m_Name: GameObject
+  m_Name: back
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -324,8 +327,29 @@ Transform:
   m_LocalScale: {x: 28.464231, y: 4.5279694, z: 1.1414}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 700269588}
+  m_Father: {fileID: 1185070707}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!95 &261416409
+Animator:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 261416406}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &284679460
 GameObject:
   m_ObjectHideFlags: 0
@@ -497,7 +521,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1, y: 2.0980039, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -549,6 +573,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 403259508}
+  - component: {fileID: 403259509}
   m_Layer: 5
   m_Name: MainMenuScreen
   m_TagString: Untagged
@@ -579,6 +604,27 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 1027}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!95 &403259509
+Animator:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 403259507}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &407971286
 GameObject:
   m_ObjectHideFlags: 0
@@ -770,7 +816,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.16909933, g: 0.17649542, b: 0.3773585, a: 0}
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -1068,8 +1114,19 @@ PlayableDirector:
     value: {fileID: 618144394}
   - key: {fileID: -2442587456901717246, guid: 9d9c21cefb64d1044836501e0d853543, type: 2}
     value: {fileID: 519420033}
+  - key: {fileID: 242209744883904170, guid: 9d9c21cefb64d1044836501e0d853543, type: 2}
+    value: {fileID: 1122470143}
+  - key: {fileID: 1863958012020686127, guid: 9d9c21cefb64d1044836501e0d853543, type: 2}
+    value: {fileID: 700269587}
+  - key: {fileID: 7164653755288036537, guid: 9d9c21cefb64d1044836501e0d853543, type: 2}
+    value: {fileID: 403259509}
+  - key: {fileID: -7107219069343899449, guid: 9d9c21cefb64d1044836501e0d853543, type: 2}
+    value: {fileID: 261416409}
+  - key: {fileID: -7654035592772900629, guid: 9d9c21cefb64d1044836501e0d853543, type: 2}
+    value: {fileID: 1139391894}
   m_ExposedReferences:
-    m_References: []
+    m_References:
+    - 1e0f0a0e2f0df794a8e23d96d2f48eb8: {fileID: 403259507}
 --- !u!4 &647598387
 Transform:
   m_ObjectHideFlags: 0
@@ -1094,6 +1151,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 700269588}
+  - component: {fileID: 700269589}
   m_Layer: 0
   m_Name: Background
   m_TagString: Untagged
@@ -1116,9 +1174,29 @@ Transform:
   m_Children:
   - {fileID: 29118526}
   - {fileID: 1349174464}
-  - {fileID: 261416408}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!95 &700269589
+Animator:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 700269587}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &717148773
 GameObject:
   m_ObjectHideFlags: 0
@@ -1319,7 +1397,7 @@ GameObject:
   - component: {fileID: 877194387}
   - component: {fileID: 877194386}
   m_Layer: 5
-  m_Name: NewGameButton (2)
+  m_Name: QuitButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1629,7 +1707,7 @@ GameObject:
   - component: {fileID: 1013110161}
   - component: {fileID: 1013110160}
   m_Layer: 5
-  m_Name: Text (Legacy) (1)
+  m_Name: version
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2020,6 +2098,7 @@ GameObject:
   - component: {fileID: 1122470140}
   - component: {fileID: 1122470142}
   - component: {fileID: 1122470141}
+  - component: {fileID: 1122470143}
   m_Layer: 0
   m_Name: Tilemap
   m_TagString: Untagged
@@ -4437,6 +4516,27 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
+--- !u!95 &1122470143
+Animator:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1122470139}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &1139391889
 GameObject:
   m_ObjectHideFlags: 0
@@ -4449,6 +4549,7 @@ GameObject:
   - component: {fileID: 1139391892}
   - component: {fileID: 1139391891}
   - component: {fileID: 1139391893}
+  - component: {fileID: 1139391894}
   m_Layer: 5
   m_Name: press any key
   m_TagString: Untagged
@@ -4533,6 +4634,27 @@ Animation:
   m_PlayAutomatically: 1
   m_AnimatePhysics: 1
   m_CullingType: 0
+--- !u!95 &1139391894
+Animator:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1139391889}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &1185070705
 GameObject:
   m_ObjectHideFlags: 0
@@ -4576,6 +4698,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1122470140}
+  - {fileID: 261416408}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1213518396
@@ -4834,6 +4957,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1314648922}
+  - component: {fileID: 1314648923}
   m_Layer: 5
   m_Name: SplashScreen
   m_TagString: Untagged
@@ -4862,6 +4986,27 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!95 &1314648923
+Animator:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1314648921}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &1349174463
 GameObject:
   m_ObjectHideFlags: 0
@@ -5067,7 +5212,7 @@ GameObject:
   - component: {fileID: 1540565100}
   - component: {fileID: 1540565099}
   m_Layer: 5
-  m_Name: Text (Legacy)
+  m_Name: The dungeon
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5469,7 +5614,7 @@ GameObject:
   - component: {fileID: 1987763226}
   - component: {fileID: 1987763225}
   m_Layer: 5
-  m_Name: NewGameButton (1)
+  m_Name: ContinueButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
