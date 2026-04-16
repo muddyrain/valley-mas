@@ -912,6 +912,25 @@
   - 当前风险：当前终端会话无法稳定定位 Unity 可执行路径，尚未完成批处理重导与 Scene 直绑 peach。
   - 下一步动作：拿到可执行路径后，立即重导资源并直接把 `PlayerVisual_Peach` 写入 `SampleScene.scene`。
 
+## 2026-04-16 21:22 (Asia/Shanghai)
+
+- 任务：按用户硬要求完成“直接改 Scene”，将 Peach 模型绑定到 Player（非运行时脚本触发）。
+- 改动文件：
+  - `apps/unity-climber/Assets/Scenes/SampleScene.scene`
+  - `apps/unity-climber/Assets/Scenes/SampleScene.unity`（删除）
+  - `apps/unity-climber/Assets/Scenes/SampleScene.unity.meta`（删除）
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 通过 Unity Editor 批处理完成模型实例绑定，`Player` 下新增 `PlayerVisual_Peach` 预制实例。
+  - `Player` 自身胶囊网格已隐藏（`MeshRenderer` 关闭，`MeshFilter.m_Mesh` 置空），避免白色胶囊可视化。
+  - 最终结果已回写到正式 `SampleScene.scene`，并清理临时 `.unity` 文件，保持单一 Scene 文件交付。
+- 校验：
+  - `tmp/unity-bind-peach.log`：包含 `Player 角色外观已替换并保存: PlayerVisual_Peach`
+  - `rg -n "PlayerVisual_Peach|m_Mesh: {fileID: 0}|m_Enabled: 0" apps/unity-climber/Assets/Scenes/SampleScene.scene`：通过
+- 风险与后续：
+  - 当前风险：无运行时替换依赖，主要风险已解除。
+  - 下一步动作：你在 Unity 打开 `SampleScene` 目视确认 Peach 模型显示；确认后继续 P4-02 场景模块替换。
+
 ## 2026-04-15 00:51 (Asia/Shanghai)
 
 - 任务：把“脚本丢失绑定（None Mono Script）”问题沉淀进技能规则，防止后续复发。
