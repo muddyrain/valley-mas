@@ -4,13 +4,36 @@ description: 在 Valley MAS 中编写符合 Conventional Commits 规范的提交
 category: general
 ---
 
-# Conventional Commit 护栏
+# Conventional Commit 护栏（强约束版）
 
 当任务涉及编写或建议 `git commit message` 时，使用这个技能。
 
 ## 目标
 
-让提交信息默认符合 Conventional Commits 习惯，而不是临时随手写一句。
+让提交信息默认符合 Conventional Commits，并与仓库既有风格一致。
+
+## 强制执行规则（Agent 必须遵守）
+
+1. 在生成 commit message 前，先查看最近提交风格（至少 5 条），避免风格漂移。
+2. 首行必须是 Conventional Commits：
+   - `type(scope): summary`
+   - 或 `type: summary`
+3. `summary` 默认使用中文，短句、明确、可读，不写空泛词。
+4. 默认提交信息**只写一行首行**，不自动附加长正文、解释段落或 trailers。
+5. 只有在用户明确要求（例如“写详细 commit message / 带 Lore trailers”）时，才允许写正文与 trailers。
+6. 生成 message 后，先自检再提交：格式、语义、长度是否符合“短 message”要求。
+
+## 失败处理（Agent 必须执行）
+
+- 若提交被 hook 拒绝，不允许只说“已失败”；必须立刻修正 message 并重提。
+- 若用户指出风格不一致，必须优先对齐仓库历史风格并 `amend`，而不是解释原因。
+- 若用户指出“太长”，必须改成短提交首行并优先 `amend` 修正历史。
+
+## 长度约束（默认）
+
+1. 仅保留首行：`type(scope): summary` 或 `type: summary`。
+2. `summary` 建议控制在 18 字以内（中文），避免逗号连接多动作。
+3. 一个提交只表达一个主动作，避免“并列句 + 解释句”。
 
 ## 默认格式
 
@@ -78,7 +101,7 @@ type: summary
 
 ## 推荐输出方式
 
-如果用户让你生成 commit message，优先直接给出 1 条推荐；必要时再补 2 到 3 条备选。
+如果用户让你生成 commit message，优先直接给出 1 条推荐；必要时再补 2 到 3 条备选。若已经进入“执行提交”阶段，不要给多选，直接给最优解并执行。
 
 例如：
 
