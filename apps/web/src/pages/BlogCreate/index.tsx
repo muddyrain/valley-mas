@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   Clock3,
   Eye,
+  FileStack,
   FileUp,
   ImagePlus,
   Loader2,
@@ -39,6 +40,13 @@ import { MdxMarkdownEditor } from '@/components/blog/MdxMarkdownEditor';
 import { PublicWallpaperPickerDialog } from '@/components/blog/PublicWallpaperPickerDialog';
 import { Button } from '@/components/ui/button';
 import { openConfirmToast } from '@/components/ui/confirm-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -48,6 +56,24 @@ type CoverImageMeta = {
   width: number;
   height: number;
 };
+
+type BatchMarkdownItem = {
+  fileName: string;
+  title: string;
+  content: string;
+  status: 'pending' | 'running' | 'success' | 'error';
+  error?: string;
+};
+
+const MAX_BATCH_IMPORT_FILES = 50;
+
+function getErrorText(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    const message = error.message.trim();
+    return message || fallback;
+  }
+  return fallback;
+}
 
 export default function BlogCreate() {
   const navigate = useNavigate();
@@ -75,6 +101,11 @@ export default function BlogCreate() {
   const [aiCoverLoading, setAiCoverLoading] = useState(false);
   const [aiCoverSource, setAiCoverSource] = useState<'manual' | 'import'>('manual');
   const [importingMarkdown, setImportingMarkdown] = useState(false);
+  const [batchPreparing, setBatchPreparing] = useState(false);
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
+  const [batchItems, setBatchItems] = useState<BatchMarkdownItem[]>([]);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchDone, setBatchDone] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
@@ -90,6 +121,7 @@ export default function BlogCreate() {
 
   const coverViewportRef = useRef<HTMLDivElement | null>(null);
   const markdownImportInputRef = useRef<HTMLInputElement | null>(null);
+  const markdownBatchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     currentEditingIdRef.current = editingId;
@@ -513,6 +545,137 @@ export default function BlogCreate() {
     }
   };
 
+  const resetBatchDialog = () => {
+    setBatchItems([]);
+    setBatchRunning(false);
+    setBatchDone(false);
+  };
+
+  const handleBatchSelectMarkdown = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files || []);
+    const files = selectedFiles.slice(0, MAX_BATCH_IMPORT_FILES);
+    if (!files.length) return;
+    if (!groupId) {
+      toast.error('请先选择文章分组，再批量导入');
+      event.target.value = '';
+      return;
+    }
+    if (selectedFiles.length > MAX_BATCH_IMPORT_FILES) {
+      toast.error(
+        `单次最多导入 ${MAX_BATCH_IMPORT_FILES} 个文件，已自动截取前 ${MAX_BATCH_IMPORT_FILES} 个`,
+      );
+    }
+
+    try {
+      setBatchPreparing(true);
+      const parsedItems = await Promise.all(
+        files.map(async (file): Promise<BatchMarkdownItem> => {
+          try {
+            const rawText = await file.text();
+            const parsed = parseMarkdownImport(file.name, rawText);
+            const parsedContent = parsed.content.trim();
+            if (!parsedContent) {
+              return {
+                fileName: file.name,
+                title: parsed.title,
+                content: '',
+                status: 'error',
+                error: '正文为空，已跳过',
+              };
+            }
+            return {
+              fileName: file.name,
+              title: parsed.title.trim() || '未命名博客',
+              content: parsedContent,
+              status: 'pending',
+            };
+          } catch {
+            return {
+              fileName: file.name,
+              title: file.name.replace(/\.[^.]+$/, '') || '未命名博客',
+              content: '',
+              status: 'error',
+              error: '文件读取失败',
+            };
+          }
+        }),
+      );
+
+      setBatchItems(parsedItems);
+      setBatchDone(false);
+      setBatchDialogOpen(true);
+      toast.success(`已识别 ${parsedItems.length} 篇 MD，请确认后批量创建`);
+    } catch {
+      toast.error('批量读取 MD 失败，请稍后重试');
+    } finally {
+      setBatchPreparing(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleBatchImport = async (options?: { retryFailedOnly?: boolean }) => {
+    if (!groupId) {
+      toast.error('请先选择文章分组');
+      return;
+    }
+
+    const retryFailedOnly = options?.retryFailedOnly ?? false;
+    const results = [...batchItems];
+    const runnableIndexes = results
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => (retryFailedOnly ? item.status === 'error' : item.status === 'pending'))
+      .map(({ index }) => index);
+
+    if (!runnableIndexes.length) {
+      toast.error(retryFailedOnly ? '没有可重试的失败项' : '没有可创建的博客，请检查导入结果');
+      return;
+    }
+
+    try {
+      setBatchRunning(true);
+      setBatchDone(false);
+
+      for (const index of runnableIndexes) {
+        const item = results[index];
+        results[index] = { ...item, status: 'running', error: undefined };
+        setBatchItems([...results]);
+        try {
+          await createPost({
+            title: item.title.trim(),
+            postType: 'blog',
+            content: item.content,
+            excerpt: createAutoExcerpt('', item.content),
+            groupId,
+            visibility,
+            status: 'published',
+            publishNow: true,
+          });
+          results[index] = { ...item, status: 'success', error: undefined };
+        } catch (error) {
+          results[index] = {
+            ...item,
+            status: 'error',
+            error: getErrorText(error, '创建失败，请稍后重试'),
+          };
+        }
+        setBatchItems([...results]);
+      }
+
+      setBatchDone(true);
+      const successCount = results.filter((item) => item.status === 'success').length;
+      const errorCount = results.filter((item) => item.status === 'error').length;
+      if (successCount > 0) {
+        toast.success(
+          `批量创建完成：成功 ${successCount} 篇${errorCount ? `，失败 ${errorCount} 篇` : ''}`,
+        );
+      } else {
+        toast.error('批量创建失败，请检查结果后重试');
+      }
+    } finally {
+      setBatchRunning(false);
+    }
+  };
+
   const handleSubmit = async (
     status: 'draft' | 'published',
     options?: { stayOnPage?: boolean; fromShortcut?: boolean },
@@ -672,8 +835,18 @@ export default function BlogCreate() {
   const wordCount = useMemo(() => content.replace(/\s+/g, '').length, [content]);
   const readMinutes = useMemo(() => Math.max(1, Math.ceil(wordCount / 500)), [wordCount]);
   const isContentEmpty = !content.trim();
+  const currentGroupName = useMemo(
+    () => groups.find((item) => item.id === groupId)?.name || '',
+    [groups, groupId],
+  );
   const actionBusy =
-    submitting || coverUploading || aiExcerptLoading || aiCoverLoading || importingMarkdown;
+    submitting ||
+    coverUploading ||
+    aiExcerptLoading ||
+    aiCoverLoading ||
+    importingMarkdown ||
+    batchPreparing ||
+    batchRunning;
   const previewMarkdown = useMemo(() => {
     return `# ${title.trim() || '未命名标题'}\n\n${content.trim() || '开始输入正文内容吧。'}`;
   }, [title, content]);
@@ -793,6 +966,22 @@ export default function BlogCreate() {
               )}
               {importingMarkdown ? '导入中' : '导入 MD'}
             </Button>
+            {!isEditMode && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={actionBusy || loadingPost}
+                onClick={() => markdownBatchInputRef.current?.click()}
+                className="rounded-xl"
+              >
+                {batchPreparing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <FileStack className="mr-2 h-4 w-4" />
+                )}
+                {batchPreparing ? '识别中' : '批量导入 MD'}
+              </Button>
+            )}
             <Button
               variant="outline"
               disabled={actionBusy}
@@ -816,6 +1005,14 @@ export default function BlogCreate() {
               accept=".md,.markdown,text/markdown"
               className="hidden"
               onChange={(event) => void handleImportMarkdown(event)}
+            />
+            <input
+              ref={markdownBatchInputRef}
+              type="file"
+              accept=".md,.markdown,text/markdown"
+              multiple
+              className="hidden"
+              onChange={(event) => void handleBatchSelectMarkdown(event)}
             />
           </div>
         </div>
@@ -1153,6 +1350,156 @@ export default function BlogCreate() {
         currentCoverUrl={cover}
         onSelect={handleSelectPublicWallpaperCover}
       />
+      <Dialog
+        open={batchDialogOpen}
+        onOpenChange={(open) => {
+          if (!batchRunning) {
+            setBatchDialogOpen(open);
+            if (!open) resetBatchDialog();
+          }
+        }}
+      >
+        <DialogContent className="max-w-160!">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileStack className="text-theme-primary h-4 w-4" />
+              批量导入博客 MD
+            </DialogTitle>
+            <DialogDescription>
+              这些文章会直接创建到当前分组，不会自动生成 AI 封面。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-1">
+            <div className="rounded-xl border border-theme-primary/20 bg-theme-soft px-4 py-3 text-xs leading-5 text-slate-600">
+              <p className="mb-1 font-semibold text-theme-primary">本次批量创建设置</p>
+              <p>目标分组：{currentGroupName || '未分组'}</p>
+              <p>
+                可见范围：
+                {visibility === 'public' ? '公开' : visibility === 'shared' ? '共享' : '私密'}
+              </p>
+              <p className="mt-0.5 text-slate-400">
+                标题会优先识别 frontmatter / 一级标题，摘要直接按正文内容截取。
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-slate-600">
+                  识别结果（共 {batchItems.length} 篇）
+                </label>
+                {!batchRunning && !batchDone && (
+                  <button
+                    type="button"
+                    className="text-xs text-slate-400 transition hover:text-slate-600"
+                    onClick={() => markdownBatchInputRef.current?.click()}
+                  >
+                    重新选择文件
+                  </button>
+                )}
+              </div>
+              <div className="max-h-84 space-y-1.5 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/60 p-2">
+                {batchItems.map((item, index) => (
+                  <div
+                    key={`${item.fileName}-${index}`}
+                    className={`rounded-lg border px-3 py-2 text-sm transition ${
+                      item.status === 'success'
+                        ? 'border-emerald-100 bg-emerald-50'
+                        : item.status === 'error'
+                          ? 'border-rose-100 bg-rose-50'
+                          : item.status === 'running'
+                            ? 'border-theme-primary/30 bg-theme-soft/50'
+                            : 'border-slate-100 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <div className="mt-0.5 shrink-0">
+                        {item.status === 'running' ? (
+                          <Loader2 className="text-theme-primary h-3.5 w-3.5 animate-spin" />
+                        ) : item.status === 'success' ? (
+                          <span className="inline-block h-3.5 w-3.5 rounded-full bg-emerald-500" />
+                        ) : item.status === 'error' ? (
+                          <span className="inline-block h-3.5 w-3.5 rounded-full bg-rose-500" />
+                        ) : (
+                          <span className="inline-block h-3.5 w-3.5 rounded-full border-2 border-slate-300" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full border border-theme-primary/20 bg-theme-soft px-2 py-0.5 text-xs font-semibold text-theme-primary">
+                            {item.title}
+                          </span>
+                          <span className="truncate text-xs text-slate-400">{item.fileName}</span>
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                          {item.error || item.content.slice(0, 120) || '未识别到正文内容'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {batchDone && (
+                <div className="flex gap-3 text-xs">
+                  <span className="text-emerald-600">
+                    成功 {batchItems.filter((item) => item.status === 'success').length}
+                  </span>
+                  {batchItems.filter((item) => item.status === 'error').length > 0 && (
+                    <span className="text-rose-500">
+                      失败 {batchItems.filter((item) => item.status === 'error').length}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={batchRunning}
+                onClick={() => {
+                  setBatchDialogOpen(false);
+                  resetBatchDialog();
+                }}
+              >
+                {batchDone ? '关闭' : '取消'}
+              </Button>
+              {batchDone && batchItems.some((item) => item.status === 'error') && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={batchRunning}
+                  onClick={() => void handleBatchImport({ retryFailedOnly: true })}
+                >
+                  重试失败项
+                </Button>
+              )}
+              {!batchDone && (
+                <Button
+                  type="button"
+                  className="theme-btn-primary"
+                  disabled={batchRunning || batchItems.every((item) => item.status !== 'pending')}
+                  onClick={() => void handleBatchImport()}
+                >
+                  {batchRunning ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      创建中…
+                    </>
+                  ) : (
+                    <>
+                      <FileStack className="mr-1.5 h-4 w-4" />
+                      确认创建
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

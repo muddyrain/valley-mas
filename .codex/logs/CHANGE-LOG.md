@@ -1417,3 +1417,88 @@
 - 风险与后续：
   - 当前风险：`shared-request` 已包含默认中文错误映射，后续若 `web/admin` 文案策略分化，需要在调用端继续显式覆盖 `resolveErrorMessage`，避免体验漂移。
   - 下一步动作：可继续评估 `apps/admin/src/api/record.ts` 的直连 axios 逻辑是否纳入 `shared-request`，进一步统一请求层。
+
+## 2026-04-17 16:48 (Asia/Shanghai)
+
+- 任务：为博客创作页补齐批量导入 Markdown 创建博客能力，并修复直接粘贴 Markdown 代码块时编辑器展示异常。
+- 改动文件：
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `apps/web/src/components/blog/MdxMarkdownEditor.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增“批量导入 MD”入口，支持一次选择多个 Markdown 文件，预览识别结果后按当前分组与可见范围批量创建博客。
+  - 批量创建链路直接复用现有 Markdown 解析和博客创建接口，摘要按正文自动截取，显式跳过 AI 封面生成。
+  - 编辑器新增针对 Markdown 代码块粘贴的兼容处理，在检测到 fenced code 或缩进代码块时改用 `insertMarkdown`，避免富文本粘贴破坏代码结构。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前批量创建为串行调用前端单篇创建接口，文件很多时耗时会较长；后续如有需要可补后端批量接口。
+  - 粘贴修复目前聚焦代码块语法，若后续发现其他 Markdown 结构在富文本粘贴下也会失真，可继续扩展识别范围。
+
+## 2026-04-17 16:48 (Asia/Shanghai)
+
+- 任务：移除 Web 活跃 backlog 中 3 个实质增量偏低的收尾项，清空当前任务入口。
+- 改动文件：
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 从 Web 活跃 Backlog 中移除“首页运营信号增强 / 创作者广场交互增强 / 通知中心细化增强”3 项。
+  - 将活跃区改为“当前暂无活跃项”，避免后续迭代继续被旧的低优先级任务牵引。
+  - 同步更新“下一步建议”，改为重新规划一批更有实质增量的 Web 功能。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：Web 活跃 backlog 已清空，后续若不及时补新计划，任务入口会短暂处于空档状态。
+  - 下一步动作：基于现有页面闭环和产品方向，补一版新的 Web 高价值功能清单。
+
+## 2026-04-17 16:52 (Asia/Shanghai)
+
+- 任务：把新的博客改版与名著阅读方向收敛进 Web 活跃 backlog，形成下一批可执行功能计划。
+- 改动文件：
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 4 个活跃项，分别覆盖“博客视觉重做 / 博客 AI 阅读助手 / 名著书库基础建设 / 名著在线阅读闭环”。
+  - 将博客方向明确拆成“视觉层”和“AI 阅读层”，避免把改样式与改功能混成一个大任务。
+  - 将名著方向明确拆成“资源来源/版权边界”与“站内阅读闭环”，方便后续按阶段推进。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：名著板块尚未确定最终数据来源与授权边界，后续实现前必须先锁定可合法导入的首批资源。
+  - 下一步动作：补一版博客 AI 形态建议和名著资源来源决策，作为后续实施依据。
+
+## 2026-04-17 17:11 (Asia/Shanghai)
+
+- 任务：完善 Web 持续迭代任务清单，补齐“博客全面 AI 化 + 名著板块”的可执行拆解。
+- 改动文件：
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将博客重构任务升级为 P0 级可执行任务，明确信息架构与内容消费目标。
+  - 新增“博客 AI 能力定义与 MVP”任务，先收敛能力范围，再落地 2-3 个高感知能力。
+  - 将名著需求拆为“数据源与版权策略（P0）+ 阅读闭环（P1）+ AI 伴读（P1）”三步，降低一次性不确定性。
+  - 调整下一步建议，优先完成 AI 能力边界与数据源边界的方案定板。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：博客 AI 与名著 AI 仍处于能力待选阶段，若不先锁定 MVP 会导致 UI/接口反复返工。
+  - 下一步动作：先完成“博客 AI MVP 能力清单”和“名著首批数据源白名单”，再开页面与接口实现。
+
+## 2026-04-17 17:12 (Asia/Shanghai)
+
+- 任务：复核并完善博客批量创建流程的健壮性与可恢复性。
+- 改动文件：
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 为批量导入增加单次文件数上限（50）与超限提示，避免一次导入过多文件导致流程过慢或难以恢复。
+  - 批量创建状态新增 `running`，逐条创建时准确展示当前进行中的项，避免所有 pending 项同时显示“转圈”造成误判。
+  - 批量创建失败时保留后端错误信息，并新增“重试失败项”能力，无需重新选文件即可再次执行失败项。
+  - 收紧“确认创建”按钮可用条件，仅在存在 `pending` 项时可执行首轮创建。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前风险：批量创建仍是前端串行调用单条创建接口，大批量场景下总耗时依然偏长。
+  - 下一步动作：如批量规模继续上升，可考虑补后端批量创建接口与服务端事务/失败明细返回。
