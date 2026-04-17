@@ -1534,3 +1534,19 @@
 - 风险与后续：
   - 当前风险：该约束属于 skill 级执行规范，不具备 hook/CI 的技术强制拦截。
   - 下一步动作：如仍出现偏差，再评估最小化 hook 兜底（仅校验首行长度与是否存在正文）。
+
+## 2026-04-17 21:21 (Asia/Shanghai)
+
+- 任务：放行 Git 自动生成的 `Merge branch ...` 提交信息，避免 `git pull` 合并提交被 commit-msg hook 拦截。
+- 改动文件：
+  - `scripts/check-commit-msg.js`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在提交信息校验脚本中新增 merge message 正则，支持 `Merge branch 'xxx'` 与 `Merge branch 'xxx' of ...` 这类 Git 默认合并文案。
+  - 调整校验条件为“满足 Conventional Commits 或满足 merge message 规则即放行”。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py scripts/check-commit-msg.js .codex/logs/CHANGE-LOG.md`：通过
+  - `node --check scripts/check-commit-msg.js`：通过
+- 风险与后续：
+  - 当前风险：仅放行了 `Merge branch`/`Merge remote-tracking branch` 形式，`Merge pull request` 暂未纳入。
+  - 下一步动作：若你也希望放行 PR 合并文案，可再补一条白名单正则。
