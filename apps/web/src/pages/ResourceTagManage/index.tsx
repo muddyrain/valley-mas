@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   aiMatchResourceTags,
@@ -35,7 +35,7 @@ import { Button } from '@/components/ui/button';
 import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
+import { enumParam, useUrlPaginationQuery, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_BACKGROUND = {
@@ -263,7 +263,12 @@ function ResourceRow({
 // ─── 主页面 ──────────────────────────────────────────────────────────────────
 export default function ResourceTagManage() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const {
+    values: { tab },
+    setValue: setTab,
+  } = useUrlQueryState({
+    tab: enumParam(['tags', 'bind'] as const, 'tags'),
+  });
   const tagsPager = useUrlPaginationQuery({ pageKey: 'tagsPage', keywordKey: 'tagsKeyword' });
   const resourcePager = useUrlPaginationQuery({
     pageKey: 'resourcePage',
@@ -312,7 +317,6 @@ export default function ResourceTagManage() {
   const tagsPage = tagsPager.page;
   const resourceKeyword = resourcePager.keyword;
   const resourcePage = resourcePager.page;
-  const tab = searchParams.get('tab') === 'bind' ? 'bind' : 'tags';
 
   // 是否是管理员（只有管理员可增删改标签）
   const isAdmin = user?.role === 'admin';
@@ -595,11 +599,7 @@ export default function ResourceTagManage() {
             <button
               key={key}
               type="button"
-              onClick={() => {
-                const nextParams = new URLSearchParams(searchParams);
-                nextParams.set('tab', key);
-                setSearchParams(nextParams);
-              }}
+              onClick={() => setTab('tab', key)}
               className={`rounded-xl px-5 py-2 text-sm font-medium transition ${
                 tab === key
                   ? 'bg-theme-primary text-white shadow-sm'

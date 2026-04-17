@@ -1,6 +1,6 @@
 import { ArrowUpDown, BookOpen, ExternalLink, FolderTree, Search, X } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import type { Group, Post } from '@/api/blog';
 import { getGroups, getPosts } from '@/api/blog';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
@@ -10,9 +10,21 @@ import HeroSectionTitle from '@/components/page/HeroSectionTitle';
 import HeroStatChip from '@/components/page/HeroStatChip';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  enumParam,
+  numberParam,
+  stringParam,
+  useUrlQueryState,
+} from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_SIZE = 12;
+const BLOG_LIST_QUERY_SCHEMA = {
+  page: numberParam(1, { min: 1 }),
+  keyword: stringParam('', { resetPageOnChange: true }),
+  groupId: stringParam('', { resetPageOnChange: true }),
+  sort: enumParam(['oldest', 'newest'] as const, 'oldest', { resetPageOnChange: true }),
+};
 
 function FilterPanel({
   title,
@@ -73,7 +85,18 @@ export default function BlogList() {
   const { user, profile, fetchProfile } = useAuthStore();
   const isCreator = user?.role === 'creator';
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  const {
+    searchParams,
+    values: {
+      groupId: selectedGroupId,
+      keyword: currentKeyword,
+      page: currentPage,
+      sort: currentSort,
+    },
+    setValue,
+    setValues,
+    updateParams,
+  } = useUrlQueryState(BLOG_LIST_QUERY_SCHEMA, { pageKey: 'page' });
   const [posts, setPosts] = useState<Post[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,19 +108,17 @@ export default function BlogList() {
   const [showAllGroups, setShowAllGroups] = useState(false);
   const firstLoadRef = useRef(true);
 
-  const selectedGroupId = searchParams.get('groupId') || '';
-  const currentKeyword = searchParams.get('keyword')?.trim() || '';
-  const currentPage = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-  const currentSort: 'oldest' | 'newest' =
-    searchParams.get('sort') === 'newest' ? 'newest' : 'oldest';
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   useEffect(() => {
     if (!searchParams.has('tag')) return;
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete('tag');
-    setSearchParams(newParams, { replace: true });
-  }, [searchParams, setSearchParams]);
+    updateParams(
+      (next: URLSearchParams) => {
+        next.delete('tag');
+      },
+      { replace: true },
+    );
+  }, [searchParams, updateParams]);
 
   useEffect(() => {
     setPostKeywordInput(currentKeyword);
@@ -158,49 +179,33 @@ export default function BlogList() {
 
   const handleGroupClick = (targetGroupId: string) => {
     if (!targetGroupId) return;
-    const newParams = new URLSearchParams(searchParams);
     if (selectedGroupId === targetGroupId) {
-      newParams.delete('groupId');
-    } else {
-      newParams.set('groupId', targetGroupId);
+      setValue('groupId', '');
+      return;
     }
-    newParams.set('page', '1');
-    newParams.set('sort', currentSort);
-    setSearchParams(newParams);
+    setValue('groupId', targetGroupId);
   };
 
   const clearFilters = () => {
-    const newParams = new URLSearchParams();
-    newParams.set('sort', currentSort);
-    setSearchParams(newParams);
+    setValues({
+      groupId: '',
+      keyword: '',
+      page: 1,
+    });
   };
 
   const handlePostKeywordSearch = () => {
-    const trimmed = postKeywordInput.trim();
-    const newParams = new URLSearchParams(searchParams);
-    if (trimmed) {
-      newParams.set('keyword', trimmed);
-    } else {
-      newParams.delete('keyword');
-    }
-    newParams.set('page', '1');
-    setSearchParams(newParams);
+    setValue('keyword', postKeywordInput);
   };
 
   const clearPostKeyword = () => {
     setPostKeywordInput('');
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete('keyword');
-    newParams.set('page', '1');
-    setSearchParams(newParams);
+    setValue('keyword', '');
   };
 
   const handleSortChange = (nextSort: 'oldest' | 'newest') => {
     if (nextSort === currentSort) return;
-    const newParams = new URLSearchParams(searchParams);
-    newParams.set('sort', nextSort);
-    newParams.set('page', '1');
-    setSearchParams(newParams);
+    setValue('sort', nextSort);
   };
 
   const groupData = useMemo(
@@ -504,11 +509,7 @@ export default function BlogList() {
                     variant="outline"
                     className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
                     disabled={currentPage <= 1 || refreshing}
-                    onClick={() => {
-                      const newParams = new URLSearchParams(searchParams);
-                      newParams.set('page', String(currentPage - 1));
-                      setSearchParams(newParams);
-                    }}
+                    onClick={() => setValue('page', currentPage - 1)}
                   >
                     上一页
                   </Button>
@@ -519,11 +520,7 @@ export default function BlogList() {
                     variant="outline"
                     className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
                     disabled={currentPage >= totalPages || refreshing}
-                    onClick={() => {
-                      const newParams = new URLSearchParams(searchParams);
-                      newParams.set('page', String(currentPage + 1));
-                      setSearchParams(newParams);
-                    }}
+                    onClick={() => setValue('page', currentPage + 1)}
                   >
                     下一页
                   </Button>
