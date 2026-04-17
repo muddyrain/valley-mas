@@ -1550,3 +1550,132 @@
 - 风险与后续：
   - 当前风险：仅放行了 `Merge branch`/`Merge remote-tracking branch` 形式，`Merge pull request` 暂未纳入。
   - 下一步动作：若你也希望放行 PR 合并文案，可再补一条白名单正则。
+## 2026-04-17 21:36 (Asia/Shanghai)
+
+- 任务：重构博客批量导入交互，改为先开弹窗，再在弹窗内完成导入识别、分组/可见范围设置与单篇封面配置。
+- 改动文件：
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将“批量导入 MD”入口改为先打开弹窗，默认在弹窗中部展示“上传文件”区，用户点击后再触发文件选择并展示识别结果列表。
+  - 在批量弹窗中新增独立“目标分组 + 可见范围”设置，创建时使用弹窗内设置，不再强依赖主编辑区当前值。
+  - 为每条识别结果新增“设置封面”开关，支持两种来源：上传本地图片、选择资源壁纸；并在创建前拦截“已勾选但未选图”的项。
+  - 批量创建请求新增按条目携带 `cover/coverStorageKey`，实现单篇博客可选封面发布。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/BlogCreate/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：批量封面上传仍按单篇逐次触发，超大批量时操作步数较多。
+  - 下一步动作：如后续需求增加，可补“批量应用同一封面/批量清空封面”快捷操作。
+## 2026-04-17 21:49 (Asia/Shanghai)
+
+- 任务：在 `/my-space/posts` 增加批量设置壁纸操作，支持给选中内容一次应用同一张资源壁纸。
+- 改动文件：
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 批量模式工具栏新增“批量设置壁纸”按钮，并复用 `PublicWallpaperPickerDialog` 作为壁纸选择入口。
+  - 选择壁纸后先调用 `uploadBlogCoverByUrl` 转存封面，再批量调用 `updatePost` 更新选中内容的 `cover/coverStorageKey`。
+  - 增加批量设置结果回写与提示：成功项即时更新列表封面，失败项保留选中便于重试；全成功则自动退出批量模式。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/MyPosts/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：批量设置壁纸会给所有选中文章应用同一封面，误选时影响面较大。
+  - 下一步动作：可追加确认弹窗，明确提示“将覆盖当前封面”。
+
+## 2026-04-17 21:55 (Asia/Shanghai)
+
+- 任务：将 /my-space/posts 的批量设置入口调整到页面主入口，并提供统一“批量设置博客”弹框。
+- 改动文件：
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 页面右上角按钮改为“批量设置博客”，点击后进入批量模式并直接弹出“批量设置博客”弹框。
+  - 弹框内统一提供“批量设置访问状态 / 批量设置壁纸”两个操作入口，避免主操作分散在工具栏。
+  - 批量工具栏按钮也改为打开同一弹框，保持入口一致，减少找不到操作位置的问题。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/MyPosts/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：若未先勾选内容，弹框内操作按钮会禁用，首次使用可能需要一次引导。
+  - 下一步动作：可补充“未选择时一键全选当前页”的快捷按钮。
+
+## 2026-04-17 22:02 (Asia/Shanghai)
+
+- 任务：修正 /my-space/posts 批量设置入口交互，避免顶部按钮直接弹框。
+- 改动文件：
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 顶部“批量设置博客”按钮改为仅进入批量模式，不再自动打开“批量设置博客”弹框。
+  - 保持批量工具栏内“批量设置博客”按钮作为弹框触发入口，符合“先选中再设置”的操作节奏。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/MyPosts/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：用户首次进入批量模式可能不知道下一步要点批量工具栏按钮。
+  - 下一步动作：可补一条轻提示文案“先勾选内容，再点批量设置博客”。
+
+## 2026-04-17 22:16 (Asia/Shanghai)
+
+- 任务：将 /my-space/posts 的“批量设置壁纸”重构为“在线逐条设置封面”的批量弹框体验。
+- 改动文件：
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 取消原先“给全部选中文章套同一张壁纸”的单步流程，改为进入“在线批量设置封面”弹框后逐条处理。
+  - 弹框内展示已选内容列表，并为每条提供“设置封面”勾选、上传图片、选择资源壁纸、状态反馈（待处理/成功/失败）。
+  - 批量保存时按条目执行：若是资源壁纸先转存，再更新对应文章封面；支持失败项重试。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/MyPosts/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：大量条目逐条转存+更新时，整体耗时会明显增长。
+  - 下一步动作：可补“同一封面批量应用到已勾选项”的快捷操作，兼顾精细设置与效率。
+
+## 2026-04-17 22:27 (Asia/Shanghai)
+
+- 任务：调整 /my-space/posts 在线批量设置封面弹框宽度，提升列表可读性。
+- 改动文件：
+  - pps/web/src/pages/MyPosts/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 将在线批量设置封面弹框宽度从固定 max-w-4xl 调整为 w-[92vw] max-w-[1120px]，在桌面端展示更宽。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/MyPosts/index.tsx：通过
+- 风险与后续：
+  - 当前风险：超小屏幕仍会按视口缩放，信息密度较高。
+  - 下一步动作：如需可再分离移动端样式（减少信息行、改按钮排布）。
+## 2026-04-17 22:42 (Asia/Shanghai)
+
+- 任务：修复在线批量设置封面弹框的横向溢出问题。
+- 改动文件：
+  - pps/web/src/pages/MyPosts/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 弹框容器新增 overflow-hidden，防止内部内容超出可视区域。
+  - 列表容器新增 overflow-x-hidden，禁止横向滚动撑出布局。
+  - 封面地址文本新增 reak-all，长 URL 强制换行，不再把卡片宽度撑爆。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/MyPosts/index.tsx：通过
+- 风险与后续：
+  - 当前风险：长地址虽然不溢出，但可读性一般。
+  - 下一步动作：可改为“仅展示域名+截断路径 + 复制按钮”。
+## 2026-04-17 22:46 (Asia/Shanghai)
+
+- 任务：修复在线批量设置封面弹框在 sm 断点下被默认 max-width 压窄的问题。
+- 改动文件：
+  - pps/web/src/pages/MyPosts/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 将弹框宽度类调整为 w-[92vw] max-w-[92vw] sm:max-w-[1120px]。
+  - 用 sm:max-w-[1120px] 显式覆盖 DialogContent 基类里的 sm:max-w-sm，避免在中大屏被强制收窄。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/MyPosts/index.tsx：通过
+- 风险与后续：
+  - 当前风险：超宽屏下弹框上限仍为 1120px（有意限制）。
+  - 下一步动作：如你希望更宽，可再提升为 1240/1360。

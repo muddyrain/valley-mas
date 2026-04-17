@@ -63,6 +63,10 @@ type BatchMarkdownItem = {
   content: string;
   status: 'pending' | 'running' | 'success' | 'error';
   error?: string;
+  applyCover?: boolean;
+  cover?: string;
+  coverStorageKey?: string;
+  coverUploading?: boolean;
 };
 
 const MAX_BATCH_IMPORT_FILES = 50;
@@ -106,6 +110,10 @@ export default function BlogCreate() {
   const [batchItems, setBatchItems] = useState<BatchMarkdownItem[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchDone, setBatchDone] = useState(false);
+  const [batchHasUploadedFiles, setBatchHasUploadedFiles] = useState(false);
+  const [batchGroupId, setBatchGroupId] = useState('');
+  const [batchVisibility, setBatchVisibility] = useState<Visibility>('private');
+  const [batchCoverTargetIndex, setBatchCoverTargetIndex] = useState<number | null>(null);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
@@ -122,6 +130,7 @@ export default function BlogCreate() {
   const coverViewportRef = useRef<HTMLDivElement | null>(null);
   const markdownImportInputRef = useRef<HTMLInputElement | null>(null);
   const markdownBatchInputRef = useRef<HTMLInputElement | null>(null);
+  const batchCoverUploadInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     currentEditingIdRef.current = editingId;
@@ -549,17 +558,28 @@ export default function BlogCreate() {
     setBatchItems([]);
     setBatchRunning(false);
     setBatchDone(false);
+    setBatchPreparing(false);
+    setBatchHasUploadedFiles(false);
+    setBatchCoverTargetIndex(null);
+    if (markdownBatchInputRef.current) {
+      markdownBatchInputRef.current.value = '';
+    }
+    if (batchCoverUploadInputRef.current) {
+      batchCoverUploadInputRef.current.value = '';
+    }
+  };
+
+  const openBatchImportDialog = () => {
+    resetBatchDialog();
+    setBatchGroupId(groupId);
+    setBatchVisibility(visibility);
+    setBatchDialogOpen(true);
   };
 
   const handleBatchSelectMarkdown = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
     const files = selectedFiles.slice(0, MAX_BATCH_IMPORT_FILES);
     if (!files.length) return;
-    if (!groupId) {
-      toast.error('请先选择文章分组，再批量导入');
-      event.target.value = '';
-      return;
-    }
     if (selectedFiles.length > MAX_BATCH_IMPORT_FILES) {
       toast.error(
         `单次最多导入 ${MAX_BATCH_IMPORT_FILES} 个文件，已自动截取前 ${MAX_BATCH_IMPORT_FILES} 个`,
@@ -603,7 +623,7 @@ export default function BlogCreate() {
 
       setBatchItems(parsedItems);
       setBatchDone(false);
-      setBatchDialogOpen(true);
+      setBatchHasUploadedFiles(true);
       toast.success(`已识别 ${parsedItems.length} 篇 MD，请确认后批量创建`);
     } catch {
       toast.error('批量读取 MD 失败，请稍后重试');
@@ -614,11 +634,6 @@ export default function BlogCreate() {
   };
 
   const handleBatchImport = async (options?: { retryFailedOnly?: boolean }) => {
-    if (!groupId) {
-      toast.error('请先选择文章分组');
-      return;
-    }
-
     const retryFailedOnly = options?.retryFailedOnly ?? false;
     const results = [...batchItems];
     const runnableIndexes = results
@@ -628,6 +643,14 @@ export default function BlogCreate() {
 
     if (!runnableIndexes.length) {
       toast.error(retryFailedOnly ? '没有可重试的失败项' : '没有可创建的博客，请检查导入结果');
+      return;
+    }
+    const missingCoverIndexes = runnableIndexes.filter((index) => {
+      const item = results[index];
+      return Boolean(item.applyCover) && !item.cover;
+    });
+    if (missingCoverIndexes.length > 0) {
+      toast.error('有已勾选封面的博客尚未选择图片，请先上传或选择资源壁纸');
       return;
     }
 
@@ -645,8 +668,10 @@ export default function BlogCreate() {
             postType: 'blog',
             content: item.content,
             excerpt: createAutoExcerpt('', item.content),
-            groupId,
-            visibility,
+            groupId: batchGroupId || undefined,
+            visibility: batchVisibility,
+            cover: item.applyCover ? item.cover : undefined,
+            coverStorageKey: item.applyCover ? item.coverStorageKey : undefined,
             status: 'published',
             publishNow: true,
           });
@@ -794,7 +819,104 @@ export default function BlogCreate() {
     }
   };
 
+  const handleBatchCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const index = batchCoverTargetIndex;
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (index === null || !file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('封面仅支持图片');
+      return;
+    }
+    if (file.size > 30 * 1024 * 1024) {
+      toast.error('封面大小不能超过 30MB');
+      return;
+    }
+
+    setBatchItems((prev) =>
+      prev.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, coverUploading: true, applyCover: true } : item,
+      ),
+    );
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const result = await uploadBlogCover(formData);
+      setBatchItems((prev) =>
+        prev.map((item, itemIndex) =>
+          itemIndex === index
+            ? {
+                ...item,
+                applyCover: true,
+                cover: result.url,
+                coverStorageKey: result.storageKey,
+                coverUploading: false,
+              }
+            : item,
+        ),
+      );
+      toast.success('博客封面已上传');
+    } catch {
+      setBatchItems((prev) =>
+        prev.map((item, itemIndex) =>
+          itemIndex === index ? { ...item, coverUploading: false } : item,
+        ),
+      );
+      toast.error('封面上传失败，请重试');
+    } finally {
+      setBatchCoverTargetIndex(null);
+    }
+  };
+
+  const handleOpenBatchCoverUpload = (index: number) => {
+    setBatchCoverTargetIndex(index);
+    batchCoverUploadInputRef.current?.click();
+  };
+
+  const handleOpenBatchWallpaperPicker = (index: number) => {
+    setBatchCoverTargetIndex(index);
+    setWallpaperPickerOpen(true);
+  };
+
+  const handleBatchCoverToggle = (index: number, checked: boolean) => {
+    setBatchItems((prev) =>
+      prev.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, applyCover: checked } : item,
+      ),
+    );
+  };
+
+  const handleWallpaperPickerOpenChange = (open: boolean) => {
+    setWallpaperPickerOpen(open);
+    if (!open) {
+      setBatchCoverTargetIndex(null);
+    }
+  };
+
   const handleSelectPublicWallpaperCover = (resource: Resource) => {
+    if (batchCoverTargetIndex !== null) {
+      const selectedUrl = (resource.url || '').trim();
+      const targetIndex = batchCoverTargetIndex;
+      setBatchItems((prev) =>
+        prev.map((item, itemIndex) =>
+          itemIndex === targetIndex
+            ? {
+                ...item,
+                applyCover: true,
+                cover: selectedUrl,
+                coverStorageKey: '',
+                coverUploading: false,
+              }
+            : item,
+        ),
+      );
+      setBatchCoverTargetIndex(null);
+      setWallpaperPickerOpen(false);
+      toast.success('已为该博客选择资源壁纸');
+      return;
+    }
+
     if (coverFile || coverObjectUrl) {
       resetLocalCoverEditing();
     }
@@ -835,9 +957,9 @@ export default function BlogCreate() {
   const wordCount = useMemo(() => content.replace(/\s+/g, '').length, [content]);
   const readMinutes = useMemo(() => Math.max(1, Math.ceil(wordCount / 500)), [wordCount]);
   const isContentEmpty = !content.trim();
-  const currentGroupName = useMemo(
-    () => groups.find((item) => item.id === groupId)?.name || '',
-    [groups, groupId],
+  const currentBatchGroupName = useMemo(
+    () => groups.find((item) => item.id === batchGroupId)?.name || '',
+    [groups, batchGroupId],
   );
   const actionBusy =
     submitting ||
@@ -971,7 +1093,7 @@ export default function BlogCreate() {
                 type="button"
                 variant="outline"
                 disabled={actionBusy || loadingPost}
-                onClick={() => markdownBatchInputRef.current?.click()}
+                onClick={openBatchImportDialog}
                 className="rounded-xl"
               >
                 {batchPreparing ? (
@@ -1013,6 +1135,13 @@ export default function BlogCreate() {
               multiple
               className="hidden"
               onChange={(event) => void handleBatchSelectMarkdown(event)}
+            />
+            <input
+              ref={batchCoverUploadInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => void handleBatchCoverUpload(event)}
             />
           </div>
         </div>
@@ -1346,8 +1475,10 @@ export default function BlogCreate() {
       )}
       <PublicWallpaperPickerDialog
         open={wallpaperPickerOpen}
-        onOpenChange={setWallpaperPickerOpen}
-        currentCoverUrl={cover}
+        onOpenChange={handleWallpaperPickerOpenChange}
+        currentCoverUrl={
+          batchCoverTargetIndex !== null ? batchItems[batchCoverTargetIndex]?.cover || '' : cover
+        }
         onSelect={handleSelectPublicWallpaperCover}
       />
       <Dialog
@@ -1366,93 +1497,225 @@ export default function BlogCreate() {
               批量导入博客 MD
             </DialogTitle>
             <DialogDescription>
-              这些文章会直接创建到当前分组，不会自动生成 AI 封面。
+              先上传 Markdown 文件，再确认识别结果并批量创建博客。
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-1">
-            <div className="rounded-xl border border-theme-primary/20 bg-theme-soft px-4 py-3 text-xs leading-5 text-slate-600">
-              <p className="mb-1 font-semibold text-theme-primary">本次批量创建设置</p>
-              <p>目标分组：{currentGroupName || '未分组'}</p>
-              <p>
-                可见范围：
-                {visibility === 'public' ? '公开' : visibility === 'shared' ? '共享' : '私密'}
-              </p>
-              <p className="mt-0.5 text-slate-400">
-                标题会优先识别 frontmatter / 一级标题，摘要直接按正文内容截取。
+            <div className="rounded-xl border border-theme-primary/20 bg-theme-soft/60 p-3">
+              <div className="mb-2 text-xs font-medium text-theme-primary">批量发布设置</div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <div className="mb-1.5 text-xs text-slate-500">目标分组</div>
+                  <div className="border-theme-panel-border bg-theme-soft/45 flex max-h-28 flex-wrap gap-2 overflow-y-auto rounded-xl border p-2">
+                    <button
+                      type="button"
+                      onClick={() => setBatchGroupId('')}
+                      className={`rounded-full px-3 py-1.5 text-sm transition ${
+                        !batchGroupId
+                          ? 'bg-theme-primary text-white shadow-sm'
+                          : 'bg-white text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      未分组
+                    </button>
+                    {groups.map((item) => (
+                      <button
+                        type="button"
+                        key={`batch-${item.id}`}
+                        onClick={() => setBatchGroupId(item.id)}
+                        className={`rounded-full px-3 py-1.5 text-sm transition ${
+                          batchGroupId === item.id
+                            ? 'bg-theme-primary text-white shadow-sm'
+                            : 'bg-white text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {item.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-1.5 text-xs text-slate-500">可见范围</div>
+                  <div className="border-theme-panel-border bg-theme-soft/45 flex flex-wrap gap-2 rounded-xl border p-2">
+                    {[
+                      { label: '私密', value: 'private' as const },
+                      { label: '共享', value: 'shared' as const },
+                      { label: '公开', value: 'public' as const },
+                    ].map((item) => (
+                      <button
+                        type="button"
+                        key={`batch-visibility-${item.value}`}
+                        onClick={() => setBatchVisibility(item.value)}
+                        className={`rounded-full px-3 py-1.5 text-sm transition ${
+                          batchVisibility === item.value
+                            ? 'bg-theme-primary text-white shadow-sm'
+                            : 'bg-white text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                当前将发布到：{currentBatchGroupName || '未分组'}，
+                {batchVisibility === 'public'
+                  ? '公开'
+                  : batchVisibility === 'shared'
+                    ? '共享'
+                    : '私密'}
               </p>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-slate-600">
-                  识别结果（共 {batchItems.length} 篇）
-                </label>
-                {!batchRunning && !batchDone && (
-                  <button
-                    type="button"
-                    className="text-xs text-slate-400 transition hover:text-slate-600"
-                    onClick={() => markdownBatchInputRef.current?.click()}
-                  >
-                    重新选择文件
-                  </button>
-                )}
+            {!batchHasUploadedFiles && (
+              <div className="flex min-h-60 flex-col items-center justify-center rounded-2xl border border-dashed border-theme-primary/35 bg-theme-soft/35 px-6 text-center">
+                <FileUp className="text-theme-primary mb-3 h-10 w-10" />
+                <p className="mb-1 text-sm font-medium text-slate-700">上传 Markdown 文件</p>
+                <p className="mb-4 text-xs text-slate-500">
+                  支持一次导入多个 `.md` 文件并自动识别标题与正文。
+                </p>
+                <Button
+                  type="button"
+                  className="theme-btn-primary"
+                  onClick={() => markdownBatchInputRef.current?.click()}
+                  disabled={batchPreparing || batchRunning}
+                >
+                  {batchPreparing ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      识别中…
+                    </>
+                  ) : (
+                    <>
+                      <FileUp className="mr-1.5 h-4 w-4" />
+                      上传文件
+                    </>
+                  )}
+                </Button>
               </div>
-              <div className="max-h-84 space-y-1.5 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/60 p-2">
-                {batchItems.map((item, index) => (
-                  <div
-                    key={`${item.fileName}-${index}`}
-                    className={`rounded-lg border px-3 py-2 text-sm transition ${
-                      item.status === 'success'
-                        ? 'border-emerald-100 bg-emerald-50'
-                        : item.status === 'error'
-                          ? 'border-rose-100 bg-rose-50'
-                          : item.status === 'running'
-                            ? 'border-theme-primary/30 bg-theme-soft/50'
-                            : 'border-slate-100 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <div className="mt-0.5 shrink-0">
-                        {item.status === 'running' ? (
-                          <Loader2 className="text-theme-primary h-3.5 w-3.5 animate-spin" />
-                        ) : item.status === 'success' ? (
-                          <span className="inline-block h-3.5 w-3.5 rounded-full bg-emerald-500" />
-                        ) : item.status === 'error' ? (
-                          <span className="inline-block h-3.5 w-3.5 rounded-full bg-rose-500" />
-                        ) : (
-                          <span className="inline-block h-3.5 w-3.5 rounded-full border-2 border-slate-300" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full border border-theme-primary/20 bg-theme-soft px-2 py-0.5 text-xs font-semibold text-theme-primary">
-                            {item.title}
-                          </span>
-                          <span className="truncate text-xs text-slate-400">{item.fileName}</span>
-                        </div>
-                        <p className="mt-1 line-clamp-2 text-xs text-slate-500">
-                          {item.error || item.content.slice(0, 120) || '未识别到正文内容'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            )}
 
-              {batchDone && (
-                <div className="flex gap-3 text-xs">
-                  <span className="text-emerald-600">
-                    成功 {batchItems.filter((item) => item.status === 'success').length}
-                  </span>
-                  {batchItems.filter((item) => item.status === 'error').length > 0 && (
-                    <span className="text-rose-500">
-                      失败 {batchItems.filter((item) => item.status === 'error').length}
-                    </span>
+            {batchHasUploadedFiles && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-slate-600">
+                    识别结果（共 {batchItems.length} 篇）
+                  </label>
+                  {!batchRunning && !batchDone && (
+                    <button
+                      type="button"
+                      className="text-xs text-slate-400 transition hover:text-slate-600"
+                      onClick={() => markdownBatchInputRef.current?.click()}
+                    >
+                      重新上传文件
+                    </button>
                   )}
                 </div>
-              )}
-            </div>
+                <div className="max-h-84 space-y-1.5 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/60 p-2">
+                  {batchItems.map((item, index) => (
+                    <div
+                      key={`${item.fileName}-${index}`}
+                      className={`rounded-lg border px-3 py-2 text-sm transition ${
+                        item.status === 'success'
+                          ? 'border-emerald-100 bg-emerald-50'
+                          : item.status === 'error'
+                            ? 'border-rose-100 bg-rose-50'
+                            : item.status === 'running'
+                              ? 'border-theme-primary/30 bg-theme-soft/50'
+                              : 'border-slate-100 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <div className="mt-0.5 shrink-0">
+                          {item.status === 'running' ? (
+                            <Loader2 className="text-theme-primary h-3.5 w-3.5 animate-spin" />
+                          ) : item.status === 'success' ? (
+                            <span className="inline-block h-3.5 w-3.5 rounded-full bg-emerald-500" />
+                          ) : item.status === 'error' ? (
+                            <span className="inline-block h-3.5 w-3.5 rounded-full bg-rose-500" />
+                          ) : (
+                            <span className="inline-block h-3.5 w-3.5 rounded-full border-2 border-slate-300" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full border border-theme-primary/20 bg-theme-soft px-2 py-0.5 text-xs font-semibold text-theme-primary">
+                              {item.title}
+                            </span>
+                            <span className="truncate text-xs text-slate-400">{item.fileName}</span>
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                            {item.error || item.content.slice(0, 120) || '未识别到正文内容'}
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                            <label className="inline-flex cursor-pointer items-center gap-1.5 text-slate-600">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(item.applyCover)}
+                                onChange={(event) =>
+                                  handleBatchCoverToggle(index, event.target.checked)
+                                }
+                                disabled={batchRunning || item.status === 'running'}
+                              />
+                              设置封面
+                            </label>
+                            {item.applyCover && (
+                              <>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 rounded-lg px-2 text-xs"
+                                  disabled={batchRunning || item.coverUploading}
+                                  onClick={() => handleOpenBatchCoverUpload(index)}
+                                >
+                                  {item.coverUploading ? (
+                                    <>
+                                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                                      上传中
+                                    </>
+                                  ) : (
+                                    '上传图片'
+                                  )}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 rounded-lg px-2 text-xs"
+                                  disabled={batchRunning || item.coverUploading}
+                                  onClick={() => handleOpenBatchWallpaperPicker(index)}
+                                >
+                                  选择资源壁纸
+                                </Button>
+                                <span className="text-slate-400">
+                                  {item.cover ? '已设置封面' : '尚未选择图片'}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {batchDone && (
+                  <div className="flex gap-3 text-xs">
+                    <span className="text-emerald-600">
+                      成功 {batchItems.filter((item) => item.status === 'success').length}
+                    </span>
+                    {batchItems.filter((item) => item.status === 'error').length > 0 && (
+                      <span className="text-rose-500">
+                        失败 {batchItems.filter((item) => item.status === 'error').length}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex justify-end gap-3 pt-1">
               <Button
@@ -1476,7 +1739,7 @@ export default function BlogCreate() {
                   重试失败项
                 </Button>
               )}
-              {!batchDone && (
+              {!batchDone && batchHasUploadedFiles && (
                 <Button
                   type="button"
                   className="theme-btn-primary"
