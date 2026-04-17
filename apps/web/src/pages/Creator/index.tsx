@@ -1,6 +1,6 @@
 ﻿import { Download, Search, Sparkles, Users, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { type Creator as CreatorType, searchPublicCreators } from '@/api/creator';
 import CreatorCard from '@/components/CreatorCard';
@@ -10,21 +10,26 @@ import HeroStatChip from '@/components/page/HeroStatChip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { numberParam, stringParam, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
 
 const PAGE_SIZE = 12;
+const CREATOR_QUERY_SCHEMA = {
+  page: numberParam(1, { min: 1 }),
+  keyword: stringParam('', { resetPageOnChange: true }),
+};
 
 export default function Creator() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const {
+    values: { page: currentPage, keyword: currentKeyword },
+    setValue,
+  } = useUrlQueryState(CREATOR_QUERY_SCHEMA, { pageKey: 'page' });
   const [creators, setCreators] = useState<CreatorType[]>([]);
   const [total, setTotal] = useState(0);
-  const [inputKeyword, setInputKeyword] = useState(searchParams.get('keyword')?.trim() || '');
+  const [inputKeyword, setInputKeyword] = useState(currentKeyword);
   const [retryTick, setRetryTick] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const currentKeyword = searchParams.get('keyword')?.trim() || '';
-  const parsedPage = Number.parseInt(searchParams.get('page') || '1', 10);
-  const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
   useEffect(() => {
     setInputKeyword(currentKeyword);
@@ -62,22 +67,11 @@ export default function Creator() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const handleSearch = () => {
-    const nextKeyword = inputKeyword.trim();
-    const nextParams = new URLSearchParams(searchParams);
-    if (nextKeyword) {
-      nextParams.set('keyword', nextKeyword);
-    } else {
-      nextParams.delete('keyword');
-    }
-    nextParams.set('page', '1');
-    setSearchParams(nextParams);
+    setValue('keyword', inputKeyword);
   };
 
   const clearSearch = () => {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete('keyword');
-    nextParams.set('page', '1');
-    setSearchParams(nextParams);
+    setValue('keyword', '');
   };
 
   const totalResources = useMemo(
@@ -260,11 +254,7 @@ export default function Creator() {
                         variant="outline"
                         className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
                         disabled={currentPage <= 1}
-                        onClick={() => {
-                          const nextParams = new URLSearchParams(searchParams);
-                          nextParams.set('page', String(Math.max(1, currentPage - 1)));
-                          setSearchParams(nextParams);
-                        }}
+                        onClick={() => setValue('page', Math.max(1, currentPage - 1))}
                       >
                         上一页
                       </Button>
@@ -275,11 +265,7 @@ export default function Creator() {
                         variant="outline"
                         className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
                         disabled={currentPage >= totalPages}
-                        onClick={() => {
-                          const nextParams = new URLSearchParams(searchParams);
-                          nextParams.set('page', String(Math.min(totalPages, currentPage + 1)));
-                          setSearchParams(nextParams);
-                        }}
+                        onClick={() => setValue('page', Math.min(totalPages, currentPage + 1))}
                       >
                         下一页
                       </Button>
