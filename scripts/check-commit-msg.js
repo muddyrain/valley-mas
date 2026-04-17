@@ -26,8 +26,10 @@ try {
 
 // Conventional Commits 格式检查
 const pattern = /^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?: .{1,}/;
+// 允许 Git 自动生成的 merge commit message（如：Merge branch 'master' of ...）
+const mergePattern = /^Merge (branch|remote-tracking branch) '.+'(?: of .+)?$/;
 
-if (!pattern.test(msg)) {
+if (!pattern.test(msg) && !mergePattern.test(msg)) {
   console.log('');
   console.log('❌ Commit message 格式错误！');
   console.log('');
