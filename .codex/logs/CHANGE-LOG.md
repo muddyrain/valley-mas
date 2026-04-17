@@ -65,6 +65,27 @@
   - 当前风险：`MyPosts` 仍然是单页双列表结构，若后续要支持更多筛选项，可能需要再考虑是否拆分为 tab 驱动页面。
   - 下一步动作：若你继续想统一剩余列表页，我建议下一批处理 `ResourceTagManage` 这种“多分页器 + 多 keyword key”页面。
 
+## 2026-04-17 15:47 (Asia/Shanghai)
+
+- 任务：收尾剩余的 Web 查询参数联动页面，清理手写 query 同步逻辑。
+- 改动文件：
+  - `apps/web/src/pages/Creator/index.tsx`
+  - `apps/web/src/pages/BlogGroupManage/index.tsx`
+  - `apps/web/src/pages/ResourceTagManage/index.tsx`
+  - `apps/web/src/pages/ResourceAlbumManage/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - `Creator` 页改为统一 query schema，收口 `page/keyword`，不再手写 `URLSearchParams`。
+  - `BlogGroupManage` 用 schema 管理 `type`，让分组类型切换与其他页面保持一致。
+  - `ResourceTagManage` 保留双分页器结构，但把 `tab` 也纳入统一 query state。
+  - `ResourceAlbumManage` 的 `ResourcePicker` 把 `type` 收进 query state，继续保留关键词与分页联动。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前风险：`ResourceAlbumManage` 的资源选择器仍是“关键词前端过滤 + 类型后端筛选”的混合模式，后续若需要完全一致的筛选语义，可以再统一到后端查询。
+  - 下一步动作：当前 `apps/web/src/pages` 下已没有明显手写 `useSearchParams/new URLSearchParams` 的列表页 URL 同步逻辑残留，后续新增列表页时直接复用 `useUrlQueryState`。
+
 ## 2026-04-14 12:52 (Asia/Shanghai)
 
 - 任务：新增“每次改动必须记日志”的 skill，并将规则接入仓库协作约定。

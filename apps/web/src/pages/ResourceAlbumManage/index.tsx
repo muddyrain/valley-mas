@@ -30,7 +30,7 @@ import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
+import { enumParam, useUrlPaginationQuery, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_BACKGROUND = {
@@ -45,6 +45,9 @@ const TYPE_OPTIONS = [
 ];
 
 const PAGE_SIZE = 20;
+const RESOURCE_PICKER_QUERY_SCHEMA = {
+  type: enumParam(['', 'wallpaper', 'avatar'] as const, '', { resetPageOnChange: true }),
+};
 
 function formatSize(bytes: number): string {
   if (!bytes || bytes <= 0) return '—';
@@ -78,10 +81,13 @@ function ResourcePicker({
     setPage,
     setKeyword,
   } = useUrlPaginationQuery();
+  const {
+    values: { type },
+    setValue,
+  } = useUrlQueryState(RESOURCE_PICKER_QUERY_SCHEMA);
   const [resources, setResources] = useState<MyResource[]>([]);
   const [total, setTotal] = useState(0);
   const [inputValue, setInputValue] = useState(currentKeyword);
-  const [type, setType] = useState('');
   const [fetching, setFetching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -119,7 +125,7 @@ function ResourcePicker({
   };
 
   const handleType = (val: string) => {
-    setType(val);
+    setValue('type', val as '' | 'wallpaper' | 'avatar');
     setPage(1);
   };
 
