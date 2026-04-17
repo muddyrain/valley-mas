@@ -1679,3 +1679,54 @@
 - 风险与后续：
   - 当前风险：超宽屏下弹框上限仍为 1120px（有意限制）。
   - 下一步动作：如你希望更宽，可再提升为 1240/1360。
+
+## 2026-04-17 23:15 (Asia/Shanghai)
+
+- 任务：为博客详情正文图片增加点击预览能力，并复用现有资源图片预览组件。
+- 改动文件：
+  - `apps/web/src/components/blog/MarkdownContent.tsx`
+  - `apps/web/src/pages/blog/BlogPost/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 `MarkdownContent` 中新增可选能力：`enableImagePreview`，开启后可点击正文里的 `img` 直接预览。
+  - 预览能力复用现有 `ImagePreviewDialog`（与资源图片预览同组件），支持放大缩小、旋转、拖拽与下载。
+  - 仅在博客详情页开启该能力，保持其他 markdown 场景默认行为不变。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/MarkdownContent.tsx apps/web/src/pages/blog/BlogPost/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：正文中若图片被外层链接包裹，当前逻辑会优先触发预览而不是跳转外链。
+  - 下一步动作：如需保留外链跳转，可改成“点击图片预览，点击图片下方来源链接跳转”。
+
+## 2026-04-17 23:20 (Asia/Shanghai)
+
+- 任务：修复博客详情图片预览弹框打开时页面内容抖动问题。
+- 改动文件：
+  - pps/web/src/index.css
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 在全局 html 增加 scrollbar-gutter: stable both-edges，为滚动条预留稳定空间。
+  - 避免弹框打开时滚动锁定导致视口宽度变化，从而引发页面横向抖动。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/index.css：通过
+- 风险与后续：
+  - 当前风险：极少数不支持 scrollbar-gutter 的旧浏览器仍可能出现轻微位移。
+  - 下一步动作：如需兼容旧浏览器，可补 overflow-y: scroll 作为降级策略。
+## 2026-04-17 23:29 (Asia/Shanghai)
+
+- 任务：为博客正文可预览图片增加 hover 交互反馈，强化“可点击预览”的感知。
+- 改动文件：
+  - pps/web/src/components/blog/MarkdownContent.tsx
+  - pps/web/src/components/blog/markdown-styles.css
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 为开启预览能力的正文图片添加 previewable-image 标记类，支持按开关启用/移除。
+  - 新增 hover 效果：轻微上浮放大、亮度微增强、主题色描边与更明显阴影（含 dark 样式）。
+  - 保持效果只作用于“可预览图片”，不影响其他普通 markdown 图片场景。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/MarkdownContent.tsx apps/web/src/components/blog/markdown-styles.css：通过
+- 风险与后续：
+  - 当前风险：极个别图片在 hover 时轻微放大会让邻近文本重绘。
+  - 下一步动作：如需要更稳，可改为仅阴影/描边，不做缩放。

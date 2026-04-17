@@ -170,6 +170,21 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
+.markdown-body img.previewable-image {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease;
+}
+
+.markdown-body img.previewable-image:hover {
+  transform: translateY(-2px) scale(1.012);
+  filter: brightness(1.02);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--theme-primary, #c87485) 22%, transparent),
+    0 14px 34px rgba(0, 0, 0, 0.16);
+}
+
 /* 表格 */
 .markdown-body table {
   display: block;
@@ -240,4 +255,10 @@
 
 .dark .markdown-body img {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.dark .markdown-body img.previewable-image:hover {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--theme-primary, #c87485) 28%, transparent),
+    0 16px 40px rgba(0, 0, 0, 0.45);
 }

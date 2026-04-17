@@ -584,7 +584,11 @@ export default function BlogPost() {
 
         <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
           <main className="theme-panel-shell rounded-[36px] border bg-white/95 p-6 sm:p-10">
-            <MarkdownContent content={processedContent} />
+            <MarkdownContent
+              content={processedContent}
+              enableImagePreview
+              imagePreviewTitle={post.title || '博客图片预览'}
+            />
             <div className="border-theme-soft-strong mt-12 border-t pt-6">
               <Button
                 variant="ghost"
