@@ -1502,3 +1502,35 @@
 - 风险与后续：
   - 当前风险：批量创建仍是前端串行调用单条创建接口，大批量场景下总耗时依然偏长。
   - 下一步动作：如批量规模继续上升，可考虑补后端批量创建接口与服务端事务/失败明细返回。
+
+## 2026-04-17 17:40 (Asia/Shanghai)
+
+- 任务：按要求取消脚本化提交约束，改为在 skill 内强化 commit message 约束。
+- 改动文件：
+  - `.codex/skills/conventional-commit-guard/SKILL.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 回退本轮新增的 hook/alias/模板脚本方案，保持仓库现有机制不变。
+  - 将 `conventional-commit-guard` 升级为强约束说明，明确“先对齐历史风格、再生成 message、再自检提交”的执行链路。
+  - 在 skill 中补充失败处理规则：被 hook 拒绝后必须修正并重提，用户指出风格不一致时必须优先 amend 对齐。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/conventional-commit-guard/SKILL.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：skill 约束依赖 agent 执行纪律，不具备 hook/CI 那种硬拦截能力。
+  - 下一步动作：若后续仍有风格漂移，再考虑把关键约束回收为最小化 hook 规则。
+
+## 2026-04-17 17:48 (Asia/Shanghai)
+
+- 任务：将 commit message 约束收敛为“默认短提交”，并明确在 skill 内强制执行。
+- 改动文件：
+  - `.codex/skills/conventional-commit-guard/SKILL.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 `conventional-commit-guard` 中新增“默认只写一行首行”的硬规则。
+  - 明确仅在用户显式要求时才允许正文与 Lore trailers，避免 agent 自动生成长提交信息。
+  - 增补“太长即 amend 修正”的失败处理规则与默认长度约束。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/conventional-commit-guard/SKILL.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：该约束属于 skill 级执行规范，不具备 hook/CI 的技术强制拦截。
+  - 下一步动作：如仍出现偏差，再评估最小化 hook 兜底（仅校验首行长度与是否存在正文）。
