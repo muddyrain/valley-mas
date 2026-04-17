@@ -1730,3 +1730,106 @@
 - 风险与后续：
   - 当前风险：极个别图片在 hover 时轻微放大会让邻近文本重绘。
   - 下一步动作：如需要更稳，可改为仅阴影/描边，不做缩放。
+## 2026-04-18 00:33 (Asia/Shanghai)
+
+- 任务：在 BlogList 突出分组的重要性，帮助用户更快识别阅读内容类型。
+- 改动文件：
+  - pps/web/src/pages/blog/BlogList/index.tsx
+  - pps/web/src/components/blog/BlogPostCard.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 在列表页新增“按分组阅读”横向分组条，支持快速在“全部/热门分组”之间切换。
+  - 列表区文案增加当前分组上下文提示，空状态在选中分组时也会明确引导切换分组。
+  - 公开态博客卡片头部新增分组徽标（与类型标签并列），提升“内容类型可识别性”。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogList/index.tsx apps/web/src/components/blog/BlogPostCard.tsx：通过
+- 风险与后续：
+  - 当前风险：分组信息在卡片中展示频率提升，信息密度略高。
+  - 下一步动作：可结合真实数据再微调 badge 文案长度与优先级。
+## 2026-04-18 00:50 (Asia/Shanghai)
+
+- 任务：按 Web 活跃任务清单对博客页执行整体重构，重做 BlogList 与 BlogPost 的视觉与阅读结构。
+- 改动文件：
+  - pps/web/src/pages/blog/BlogList/index.tsx
+  - pps/web/src/pages/blog/BlogPost/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - BlogList：升级为“分组主导 + 搜索排序 + Featured 推荐卡”的阅读入口形态，强化科技感主视觉与信息层级。
+  - BlogList：分组导航保持高权重，新增推荐首卡与普通卡片分层，提升内容浏览节奏。
+  - BlogPost：重做详情页头部与正文承载区，新增阅读进度条与阅读状态卡，强化沉浸式阅读反馈。
+  - BlogPost：保留目录/评论链路并优化排版层次，确保从列表进入详情再返回的体验连续。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogList/index.tsx apps/web/src/pages/blog/BlogPost/index.tsx：通过
+- 风险与后续：
+  - 当前风险：重构后视觉和信息密度提升，需结合真实内容量再微调首屏节奏与阴影层级。
+  - 下一步动作：继续补“相关推荐区 + 详情页上一篇/下一篇”闭环，完成博客页重构收口。
+## 2026-04-18 01:00 (Asia/Shanghai)
+
+- 任务：根据反馈重做 BlogList 视觉结构，强化分组阅读并去除“单张大图主导”的展示方式。
+- 改动文件：
+  - pps/web/src/pages/blog/BlogList/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - BlogList 主视觉重构为“阅读舱 + 操作台”结构，替换原先单调区块式布局。
+  - 搜索区与排序区重排为高可用操作台，减少视觉噪音并提升操作效率。
+  - 分组区域重构为“分组优先导航 + 分组矩阵侧栏”，强化分组对阅读路径的主导作用。
+  - 列表数据改为仅请求 postType=blog，不再混入图文内容。
+  - 去除单篇大图主导展示方式，改为统一网格卡片流。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogList/index.tsx apps/web/src/pages/blog/BlogPost/index.tsx：通过
+- 风险与后续：
+  - 当前风险：重构后信息密度提升，极小屏设备的首屏可见内容变少。
+  - 下一步动作：补移动端专属压缩版头部与分组入口，以降低首屏负担。
+## 2026-04-18 01:06 (Asia/Shanghai)
+
+- 任务：按反馈继续重构博客页，优化 BlogList 分组按钮配色并同步强化 BlogPost 沉浸阅读视觉。
+- 改动文件：
+  - pps/web/src/pages/blog/BlogList/index.tsx
+  - pps/web/src/components/blog/BlogPostCard.tsx
+  - pps/web/src/pages/blog/BlogPost/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - BlogList：分组按钮选中态由黑色改为主题主色，统一主题风格。
+  - BlogList：维持重构后的“分组优先导航 + 分组矩阵 + 博客卡片流”结构，持续提升分组识别与阅读路径清晰度。
+  - BlogPost：补强阅读进度反馈与沉浸式阅读层次（顶部进度、阅读状态卡、正文承载区分层）。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogList/index.tsx apps/web/src/pages/blog/BlogPost/index.tsx：通过
+- 风险与后续：
+  - 当前风险：当前改动量较大，需要你按真实内容量看首屏节奏是否仍需收敛。
+  - 下一步动作：若你认可方向，再补“相关推荐 + 上一篇/下一篇”阅读闭环。## 2026-04-18 01:12 (Asia/Shanghai)
+
+- 任务：优化 BlogPost 目录导读位置，使其随阅读滚动持续可见。
+- 改动文件：
+  - `apps/web/src/pages/blog/BlogPost/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将目录导读从头部静态区域移入正文旁 `sticky` 侧栏。
+  - 目录容器增加 `max-h` + `overflow-y-auto`，长目录可滚动且不影响侧栏稳定性。
+  - 解决阅读到底部时“看不到当前章节目录”的体验问题。
+- 校验：
+  - `npx pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogPost/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：极短文章时右侧 sticky 区显得信息较密。
+  - 下一步动作：可在短文场景下折叠目录卡片默认状态。
+## 2026-04-18 01:41 (Asia/Shanghai)
+
+- 任务：阶段性提交博客重构改动，并明确 BlogPost 仍有未完成改善项。
+- 改动文件：
+  - `apps/web/src/pages/blog/BlogList/index.tsx`
+  - `apps/web/src/pages/blog/BlogPost/index.tsx`
+  - `apps/web/src/components/blog/BlogPostCard.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - BlogList 完成新版分组优先导航与视觉重构，且仅展示博客内容（不混图文）。
+  - BlogPost 已完成目录导读随滚动侧栏与部分阅读层次优化。
+- 校验：
+  - `npx pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogList/index.tsx apps/web/src/pages/blog/BlogPost/index.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：BlogPost 视觉与交互仍未全部改善（仍需继续深度打磨页面节奏、推荐阅读区、上下篇导航等）。
+  - 下一步动作：下一轮优先把 BlogPost 做完“完整沉浸阅读版”并补全阅读闭环。

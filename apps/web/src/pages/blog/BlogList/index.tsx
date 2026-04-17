@@ -1,13 +1,20 @@
-import { ArrowUpDown, BookOpen, ExternalLink, FolderTree, Search, X } from 'lucide-react';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import {
+  ArrowUpDown,
+  BookOpen,
+  ExternalLink,
+  FolderTree,
+  Orbit,
+  Search,
+  Sparkles,
+  X,
+} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Group, Post } from '@/api/blog';
 import { getGroups, getPosts } from '@/api/blog';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import { BlogFeedCard } from '@/components/blog';
 import { BLOG_COVER_ASPECT_CLASS } from '@/components/blog/BlogCoverMedia';
-import HeroSectionTitle from '@/components/page/HeroSectionTitle';
-import HeroStatChip from '@/components/page/HeroStatChip';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -23,30 +30,8 @@ const BLOG_LIST_QUERY_SCHEMA = {
   page: numberParam(1, { min: 1 }),
   keyword: stringParam('', { resetPageOnChange: true }),
   groupId: stringParam('', { resetPageOnChange: true }),
-  sort: enumParam(['oldest', 'newest'] as const, 'oldest', { resetPageOnChange: true }),
+  sort: enumParam(['oldest', 'newest'] as const, 'newest', { resetPageOnChange: true }),
 };
-
-function FilterPanel({
-  title,
-  icon,
-  children,
-}: {
-  title: string;
-  icon: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <div className="rounded-[28px] border border-white/80 bg-white/82 p-5 shadow-[0_18px_42px_rgba(148,163,184,0.08)] backdrop-blur">
-      <div className="mb-4 flex items-center gap-2 text-slate-900">
-        <span className="bg-theme-soft text-theme-primary inline-flex h-9 w-9 items-center justify-center rounded-full">
-          {icon}
-        </span>
-        <span className="text-lg font-semibold">{title}</span>
-      </div>
-      {children}
-    </div>
-  );
-}
 
 function BlogFeedCardSkeleton() {
   return (
@@ -97,6 +82,7 @@ export default function BlogList() {
     setValues,
     updateParams,
   } = useUrlQueryState(BLOG_LIST_QUERY_SCHEMA, { pageKey: 'page' });
+
   const [posts, setPosts] = useState<Post[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,7 +115,7 @@ export default function BlogList() {
       const groupsData = await getGroups();
       setGroups(groupsData || []);
     } catch (error) {
-      console.error('Failed to load blog filters:', error);
+      console.error('Failed to load blog groups:', error);
     } finally {
       setMetaLoading(false);
     }
@@ -151,6 +137,7 @@ export default function BlogList() {
       const postsData = await getPosts({
         page: currentPage,
         pageSize: PAGE_SIZE,
+        postType: 'blog',
         groupId: selectedGroupId || undefined,
         keyword: currentKeyword || undefined,
         sort: currentSort,
@@ -187,11 +174,8 @@ export default function BlogList() {
   };
 
   const clearFilters = () => {
-    setValues({
-      groupId: '',
-      keyword: '',
-      page: 1,
-    });
+    setValues({ groupId: '', keyword: '', page: 1 });
+    setPostKeywordInput('');
   };
 
   const handlePostKeywordSearch = () => {
@@ -218,26 +202,25 @@ export default function BlogList() {
     [groups],
   );
 
+  const selectedGroupName = useMemo(
+    () => groups.find((group) => group.id === selectedGroupId)?.name || '',
+    [groups, selectedGroupId],
+  );
+
   const filteredGroupData = useMemo(() => {
     const keyword = groupKeyword.trim().toLowerCase();
     if (!keyword) return groupData;
     return groupData.filter((group) => group.name.toLowerCase().includes(keyword));
   }, [groupData, groupKeyword]);
 
-  const quickGroupData = useMemo(() => {
-    const sorted = [...groupData].sort((a, b) => b.count - a.count);
-    const base = sorted.slice(0, 10);
-    if (selectedGroupId) {
-      const selected = sorted.find((group) => group.id === selectedGroupId);
-      if (selected)
-        return [selected, ...base.filter((group) => group.id !== selected.id)].slice(0, 10);
-    }
-    return base;
-  }, [groupData, selectedGroupId]);
+  const topGroups = useMemo(
+    () => [...groupData].sort((a, b) => b.count - a.count).slice(0, 8),
+    [groupData],
+  );
 
   const visibleGroupData = useMemo(() => {
     if (showAllGroups) return filteredGroupData;
-    return filteredGroupData.slice(0, 12);
+    return filteredGroupData.slice(0, 14);
   }, [filteredGroupData, showAllGroups]);
 
   const hiddenGroupCount = Math.max(filteredGroupData.length - visibleGroupData.length, 0);
@@ -248,61 +231,42 @@ export default function BlogList() {
 
   return (
     <div className="min-h-screen bg-transparent text-slate-900">
-      <div className="mx-auto max-w-7xl px-6 pb-20 pt-8 md:px-8 lg:px-10">
-        <section className="theme-hero-shell relative overflow-hidden rounded-[40px] border px-6 py-8 md:px-10 md:py-10">
-          <div className="theme-hero-glow absolute inset-0" />
-          <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
-            <div className="space-y-6">
-              <HeroSectionTitle
-                eyebrow="UPDATES"
-                title="博客与图文"
-                description="最近发布的博客、图文和内容分组都会汇在这里，方便继续浏览和筛选。"
-                titleClassName="text-[34px] md:text-[40px]"
-              />
-              <div className="flex flex-wrap gap-3">
-                <HeroStatChip icon={<BookOpen className="text-theme-primary h-4 w-4" />}>
-                  {total} 篇内容
-                </HeroStatChip>
-                <HeroStatChip icon={<FolderTree className="h-4 w-4 text-theme-primary" />}>
+      <div className="mx-auto max-w-[1500px] px-6 pb-20 pt-8 md:px-8 lg:px-10">
+        <section className="relative overflow-hidden rounded-[42px] border border-white/75 bg-white/80 px-6 py-8 shadow-[0_30px_85px_rgba(77,53,26,0.12)] md:px-9 md:py-10">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_6%_14%,rgba(var(--theme-primary-rgb),0.24),transparent_35%),radial-gradient(circle_at_93%_6%,rgba(80,160,255,0.22),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,255,255,0.72))]" />
+          <div className="relative grid gap-6 lg:grid-cols-[1.12fr_0.88fr]">
+            <div className="space-y-5">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/88 px-4 py-1.5 text-[11px] font-semibold tracking-[0.2em] uppercase text-theme-primary shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.16)]">
+                <Orbit className="h-3.5 w-3.5" />
+                Valley Blogs
+              </span>
+              <h1 className="text-[42px] font-semibold leading-[1.08] tracking-[-0.045em] text-slate-950 md:text-[54px]">
+                博客分组阅读中心
+              </h1>
+              <p className="max-w-3xl text-sm leading-8 text-slate-600 md:text-base">
+                先选分组，再深读内容。我们把博客按主题聚合，让阅读路径更清晰、更高效、更有沉浸感。
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/92 px-4 py-2 text-sm text-slate-700">
+                  <BookOpen className="h-4 w-4 text-theme-primary" />
+                  {total} 篇博客
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/92 px-4 py-2 text-sm text-slate-700">
+                  <FolderTree className="h-4 w-4 text-theme-primary" />
                   {groups.length} 个分组
-                </HeroStatChip>
+                </span>
+                {selectedGroupName && (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-theme-soft-strong bg-theme-soft px-4 py-2 text-sm text-theme-primary">
+                    <Sparkles className="h-4 w-4" />
+                    当前：{selectedGroupName}
+                  </span>
+                )}
               </div>
+            </div>
 
-              {isCreator && profile?.creatorCode && (
-                <div>
-                  <Button
-                    onClick={() => navigate('/my-space/posts')}
-                    className="theme-btn-primary gap-2 rounded-full px-5 font-semibold shadow-md"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    前往我的创作者空间
-                  </Button>
-                </div>
-              )}
-
-              {selectedGroupId && (
-                <div className="rounded-[28px] border border-white/80 bg-white/82 p-4 shadow-[0_16px_40px_rgba(148,163,184,0.08)]">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-sm text-slate-500">当前筛选</span>
-                    <span className="bg-theme-soft text-theme-primary inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm">
-                      <FolderTree className="h-3.5 w-3.5" />
-                      {groups.find((g) => g.id === selectedGroupId)?.name || selectedGroupId}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearFilters}
-                      className="rounded-full px-3 text-slate-500 hover:bg-white hover:text-slate-900"
-                    >
-                      <X className="mr-1 h-3.5 w-3.5" />
-                      清空筛选
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              <div className="rounded-[28px] border border-white/80 bg-white/82 p-4 shadow-[0_16px_40px_rgba(148,163,184,0.08)]">
-                <div className="mb-3 text-sm text-slate-500">关键词搜索</div>
+            <div className="space-y-4">
+              <div className="rounded-[28px] border border-white/85 bg-white/92 p-4 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
+                <div className="mb-2 text-sm font-medium text-slate-700">搜索博客</div>
                 <div className="flex flex-wrap gap-2">
                   <div className="relative min-w-[220px] grow">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -312,14 +276,14 @@ export default function BlogList() {
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') handlePostKeywordSearch();
                       }}
-                      placeholder="搜索标题或摘要"
-                      className="theme-input-border h-10 w-full rounded-xl border bg-white/82 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-theme-soft"
+                      placeholder="搜索标题、摘要、关键词"
+                      className="theme-input-border h-11 w-full rounded-2xl border bg-white pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-theme-soft"
                     />
                   </div>
                   <Button
                     type="button"
                     onClick={handlePostKeywordSearch}
-                    className="rounded-full bg-theme-primary px-4 text-white hover:bg-theme-primary-hover"
+                    className="theme-btn-primary h-11 rounded-2xl px-5"
                   >
                     搜索
                   </Button>
@@ -328,206 +292,257 @@ export default function BlogList() {
                       type="button"
                       variant="ghost"
                       onClick={clearPostKeyword}
-                      className="rounded-full px-4 text-slate-500 hover:bg-white hover:text-slate-900"
+                      className="h-11 rounded-2xl px-4 text-slate-500 hover:bg-theme-soft hover:text-slate-900"
                     >
-                      清除搜索
+                      清除
                     </Button>
                   ) : null}
                 </div>
-                {currentKeyword ? (
-                  <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-theme-soft px-3 py-1 text-xs text-theme-primary">
-                    <Search className="h-3.5 w-3.5" />
-                    搜索词：{currentKeyword}
-                  </div>
-                ) : null}
               </div>
-            </div>
 
-            <div>
-              <FilterPanel title="内容分组" icon={<FolderTree className="h-4 w-4" />}>
-                {metaLoading ? (
-                  <div className="space-y-2">
-                    {Array.from({ length: 6 }).map((_, index) => (
-                      <Skeleton key={index} className="h-11 rounded-[18px]" />
-                    ))}
-                  </div>
-                ) : groupData.length === 0 ? (
-                  <p className="text-sm leading-7 text-slate-500">还没有可用的内容分组。</p>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        value={groupKeyword}
-                        onChange={(event) => setGroupKeyword(event.target.value)}
-                        placeholder="搜索分组"
-                        className="theme-input-border h-10 w-full rounded-xl border bg-white/82 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-theme-soft"
-                      />
-                    </div>
-
-                    <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-                      {quickGroupData.map((group) => (
-                        <button
-                          type="button"
-                          key={`quick-${group.id}`}
-                          onClick={() => handleGroupClick(group.id)}
-                          className={`shrink-0 rounded-full px-3.5 py-2 text-sm transition ${
-                            selectedGroupId === group.id
-                              ? 'bg-slate-950 text-white shadow-[0_12px_28px_rgba(15,23,42,0.18)]'
-                              : 'bg-[#fbfaf8] text-slate-600 hover:bg-white hover:text-slate-950'
-                          }`}
-                        >
-                          {group.name}
-                          <span className="ml-1.5 text-xs opacity-70">{group.count}</span>
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="max-h-[340px] space-y-2 overflow-auto pr-1">
-                      {visibleGroupData.map((group) => (
-                        <button
-                          type="button"
-                          key={group.id}
-                          onClick={() => handleGroupClick(group.id)}
-                          className={`flex w-full items-center justify-between rounded-[18px] px-3 py-3 text-left text-sm transition ${
-                            selectedGroupId === group.id
-                              ? 'bg-slate-950 text-white shadow-[0_12px_28px_rgba(15,23,42,0.18)]'
-                              : 'bg-[#fbfaf8] text-slate-600 hover:bg-white hover:text-slate-950'
-                          }`}
-                        >
-                          <span className="min-w-0 truncate pr-3 font-medium">{group.name}</span>
-                          <span className="shrink-0 text-xs opacity-70">{group.count}</span>
-                        </button>
-                      ))}
-                    </div>
-
-                    {filteredGroupData.length === 0 ? (
-                      <p className="text-sm text-slate-500">未找到匹配分组。</p>
-                    ) : filteredGroupData.length > 12 ? (
-                      <Button
-                        variant="outline"
-                        className="border-theme-soft-strong w-full rounded-full bg-white/82 text-theme-primary"
-                        onClick={() => setShowAllGroups((prev) => !prev)}
-                      >
-                        {showAllGroups
-                          ? '收起分组列表'
-                          : `查看更多分组${hiddenGroupCount > 0 ? `（+${hiddenGroupCount}）` : ''}`}
-                      </Button>
-                    ) : null}
-                  </div>
-                )}
-              </FilterPanel>
+              <div className="rounded-[28px] border border-white/85 bg-white/92 p-4 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
+                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <ArrowUpDown className="h-4 w-4 text-theme-primary" />
+                  排序方式
+                </div>
+                <div className="inline-flex items-center gap-1 rounded-full border border-theme-soft-strong bg-white p-1">
+                  <button
+                    type="button"
+                    onClick={() => handleSortChange('newest')}
+                    className={`rounded-full px-4 py-2 text-sm transition ${
+                      currentSort === 'newest'
+                        ? 'bg-theme-primary text-white'
+                        : 'text-slate-600 hover:bg-theme-soft'
+                    }`}
+                  >
+                    最新优先
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSortChange('oldest')}
+                    className={`rounded-full px-4 py-2 text-sm transition ${
+                      currentSort === 'oldest'
+                        ? 'bg-theme-primary text-white'
+                        : 'text-slate-600 hover:bg-theme-soft'
+                    }`}
+                  >
+                    最早优先
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="mt-24">
-          {loading ? (
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <BlogFeedCardSkeleton key={index} />
-              ))}
+        <section className="mt-8 rounded-[30px] border border-white/80 bg-white/84 p-4 shadow-[0_22px_52px_rgba(148,163,184,0.12)]">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <FolderTree className="h-4 w-4 text-theme-primary" />
+              分组优先导航
             </div>
-          ) : posts.length === 0 ? (
-            <div className="rounded-[36px] border border-dashed border-[#e6d7c7] bg-white/68 px-8 py-16 text-center shadow-[0_20px_56px_rgba(148,163,184,0.08)]">
-              <div className="mx-auto max-w-xl space-y-3">
-                <h3 className="text-2xl font-semibold text-slate-900">还没有可展示的内容</h3>
-                <p className="text-sm leading-8 text-slate-500">
-                  {currentKeyword
-                    ? `没有找到包含“${currentKeyword}”的内容，试试其他关键词。`
-                    : '新的博客或图文发布后，会优先出现在这里。'}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="relative">
-                <div className="mb-6 flex items-center justify-between gap-4">
-                  <div className="text-sm text-slate-500">
-                    第 {currentPage} / {totalPages} 页，按当前排序展示内容。
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="inline-flex items-center gap-1 rounded-full border border-theme-soft-strong bg-white/82 p-1 shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)]">
-                      <button
-                        type="button"
-                        onClick={() => handleSortChange('oldest')}
-                        className={`rounded-full px-3 py-1.5 text-sm transition ${
-                          currentSort === 'oldest'
-                            ? 'bg-theme-primary text-white'
-                            : 'text-slate-600 hover:bg-theme-soft'
-                        }`}
-                      >
-                        旧到新
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSortChange('newest')}
-                        className={`rounded-full px-3 py-1.5 text-sm transition ${
-                          currentSort === 'newest'
-                            ? 'bg-theme-primary text-white'
-                            : 'text-slate-600 hover:bg-theme-soft'
-                        }`}
-                      >
-                        新到旧
-                      </button>
-                      <span className="px-1 text-slate-400">
-                        <ArrowUpDown className="h-3.5 w-3.5" />
-                      </span>
-                    </div>
-                    {total > PAGE_SIZE ? (
-                      <div className="theme-eyebrow rounded-full border bg-white/82 px-4 py-2 text-sm shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.08)]">
-                        共 {total} 篇内容
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
+            {(selectedGroupId || currentKeyword) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="rounded-full px-3 text-slate-500 hover:bg-theme-soft hover:text-slate-900"
+              >
+                <X className="mr-1 h-3.5 w-3.5" />
+                清空筛选
+              </Button>
+            )}
+          </div>
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+            <button
+              type="button"
+              onClick={() => setValue('groupId', '')}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm transition ${
+                !selectedGroupId
+                  ? 'bg-theme-primary text-white shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.28)]'
+                  : 'bg-[#fbfaf8] text-slate-600 hover:bg-white hover:text-slate-950'
+              }`}
+            >
+              全部分组
+              <span className="ml-1.5 text-xs opacity-70">{total}</span>
+            </button>
+            {topGroups.map((group) => (
+              <button
+                type="button"
+                key={group.id}
+                onClick={() => handleGroupClick(group.id)}
+                className={`shrink-0 rounded-full px-4 py-2 text-sm transition ${
+                  selectedGroupId === group.id
+                    ? 'bg-theme-primary text-white shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.28)]'
+                    : 'bg-[#fbfaf8] text-slate-600 hover:bg-white hover:text-slate-950'
+                }`}
+              >
+                {group.name}
+                <span className="ml-1.5 text-xs opacity-70">{group.count}</span>
+              </button>
+            ))}
+          </div>
+        </section>
 
-                <div
-                  className={`grid gap-5 transition-opacity duration-200 md:grid-cols-2 xl:grid-cols-3 ${
-                    refreshing ? 'opacity-75' : 'opacity-100'
-                  }`}
-                >
-                  {posts.map((post) => (
-                    <div
-                      key={post.id}
-                      className="rounded-[30px] bg-white/68 p-2 shadow-[0_14px_40px_rgba(148,163,184,0.08)]"
-                    >
-                      <BlogFeedCard post={post} />
-                    </div>
+        <section className="mt-8 grid gap-7 xl:grid-cols-[330px_minmax(0,1fr)]">
+          <aside className="space-y-4 xl:sticky xl:top-20 xl:self-start">
+            <div className="rounded-[28px] border border-white/80 bg-white/88 p-5 shadow-[0_18px_44px_rgba(148,163,184,0.12)]">
+              <div className="mb-3 flex items-center gap-2 text-slate-900">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-theme-soft text-theme-primary">
+                  <FolderTree className="h-4 w-4" />
+                </span>
+                <span className="text-base font-semibold">分组矩阵</span>
+              </div>
+
+              {metaLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <Skeleton key={index} className="h-11 rounded-[14px]" />
                   ))}
                 </div>
-                <BoxLoadingOverlay
-                  show={refreshing}
-                  title="正在刷新内容..."
-                  hint="排序与筛选结果同步中"
-                />
-              </div>
+              ) : groupData.length === 0 ? (
+                <p className="text-sm leading-7 text-slate-500">还没有可用分组。</p>
+              ) : (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={groupKeyword}
+                      onChange={(event) => setGroupKeyword(event.target.value)}
+                      placeholder="搜索分组"
+                      className="theme-input-border h-10 w-full rounded-xl border bg-white pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-theme-soft"
+                    />
+                  </div>
 
-              {total > PAGE_SIZE ? (
-                <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-                  <Button
-                    variant="outline"
-                    className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
-                    disabled={currentPage <= 1 || refreshing}
-                    onClick={() => setValue('page', currentPage - 1)}
-                  >
-                    上一页
-                  </Button>
-                  <span className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-500 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
-                    第 {currentPage} / {totalPages} 页
-                  </span>
-                  <Button
-                    variant="outline"
-                    className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
-                    disabled={currentPage >= totalPages || refreshing}
-                    onClick={() => setValue('page', currentPage + 1)}
-                  >
-                    下一页
-                  </Button>
+                  <div className="max-h-[440px] space-y-2 overflow-auto pr-1">
+                    {visibleGroupData.map((group) => (
+                      <button
+                        type="button"
+                        key={group.id}
+                        onClick={() => handleGroupClick(group.id)}
+                        className={`flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left text-sm transition ${
+                          selectedGroupId === group.id
+                            ? 'bg-theme-primary text-white shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.28)]'
+                            : 'bg-[#fbfaf8] text-slate-600 hover:bg-white hover:text-slate-950'
+                        }`}
+                      >
+                        <span className="min-w-0 truncate pr-2 font-medium">{group.name}</span>
+                        <span className="text-xs opacity-70">{group.count}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {filteredGroupData.length === 0 ? (
+                    <p className="text-sm text-slate-500">未找到匹配分组。</p>
+                  ) : filteredGroupData.length > 14 ? (
+                    <Button
+                      variant="outline"
+                      className="border-theme-soft-strong w-full rounded-full bg-white text-theme-primary"
+                      onClick={() => setShowAllGroups((prev) => !prev)}
+                    >
+                      {showAllGroups
+                        ? '收起分组列表'
+                        : `查看更多分组${hiddenGroupCount > 0 ? `（+${hiddenGroupCount}）` : ''}`}
+                    </Button>
+                  ) : null}
                 </div>
-              ) : null}
-            </>
-          )}
+              )}
+            </div>
+
+            {isCreator && profile?.creatorCode && (
+              <Button
+                onClick={() => navigate('/my-space/posts')}
+                className="theme-btn-primary h-11 w-full gap-2 rounded-2xl"
+              >
+                <ExternalLink className="h-4 w-4" />
+                前往我的创作者空间
+              </Button>
+            )}
+          </aside>
+
+          <div className="space-y-6">
+            {loading ? (
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <BlogFeedCardSkeleton key={index} />
+                ))}
+              </div>
+            ) : posts.length === 0 ? (
+              <div className="rounded-[34px] border border-dashed border-theme-soft-strong bg-white/76 px-8 py-16 text-center shadow-[0_24px_56px_rgba(148,163,184,0.1)]">
+                <div className="mx-auto max-w-xl space-y-3">
+                  <h3 className="text-2xl font-semibold text-slate-900">当前筛选下暂无博客</h3>
+                  <p className="text-sm leading-8 text-slate-500">
+                    {currentKeyword
+                      ? `没有找到包含“${currentKeyword}”的博客，试试其他关键词。`
+                      : selectedGroupName
+                        ? `当前分组「${selectedGroupName}」暂无博客，可以切换分组继续阅读。`
+                        : '新的博客发布后会优先展示在这里。'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="relative">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-sm text-slate-500">
+                      {selectedGroupName
+                        ? `当前分组：${selectedGroupName} · 第 ${currentPage} / ${totalPages} 页`
+                        : `第 ${currentPage} / ${totalPages} 页 · 共 ${total} 篇博客`}
+                    </div>
+                    {currentKeyword ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-theme-soft px-3 py-1 text-xs text-theme-primary">
+                        <Search className="h-3.5 w-3.5" />
+                        关键词：{currentKeyword}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div
+                    className={`grid gap-5 transition-opacity duration-200 md:grid-cols-2 xl:grid-cols-3 ${
+                      refreshing ? 'opacity-75' : 'opacity-100'
+                    }`}
+                  >
+                    {posts.map((post) => (
+                      <div
+                        key={post.id}
+                        className="rounded-[30px] bg-white/68 p-2 shadow-[0_14px_40px_rgba(148,163,184,0.08)]"
+                      >
+                        <BlogFeedCard post={post} />
+                      </div>
+                    ))}
+                  </div>
+                  <BoxLoadingOverlay
+                    show={refreshing}
+                    title="正在刷新博客..."
+                    hint="筛选与排序结果同步中"
+                  />
+                </div>
+
+                {total > PAGE_SIZE ? (
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <Button
+                      variant="outline"
+                      className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
+                      disabled={currentPage <= 1 || refreshing}
+                      onClick={() => setValue('page', currentPage - 1)}
+                    >
+                      上一页
+                    </Button>
+                    <span className="rounded-full bg-white/82 px-4 py-2 text-sm text-slate-500 shadow-[0_10px_24px_rgba(148,163,184,0.06)]">
+                      第 {currentPage} / {totalPages} 页
+                    </span>
+                    <Button
+                      variant="outline"
+                      className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
+                      disabled={currentPage >= totalPages || refreshing}
+                      onClick={() => setValue('page', currentPage + 1)}
+                    >
+                      下一页
+                    </Button>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
         </section>
       </div>
     </div>

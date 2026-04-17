@@ -2,6 +2,7 @@
   Calendar,
   Eye,
   FileText,
+  FolderTree,
   Heart,
   Image as ImageIcon,
   Lock,
@@ -108,6 +109,12 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
                 <TypeIcon className="h-3.5 w-3.5" />
                 {typeLabel}
               </span>
+              {mode === 'public' && post.group?.name ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs text-theme-primary backdrop-blur">
+                  <FolderTree className="h-3.5 w-3.5" />
+                  {post.group.name}
+                </span>
+              ) : null}
               {mode === 'creator' ? (
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs backdrop-blur ${visibilityMeta.className}`}
