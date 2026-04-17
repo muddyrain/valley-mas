@@ -36,7 +36,12 @@ import UploadResourceDialog from '@/components/UploadResourceDialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
-import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
+import {
+  enumParam,
+  numberParam,
+  stringParam,
+  useUrlQueryState,
+} from '@/hooks/useUrlPaginationQuery';
 
 const RESOURCE_TYPES = [
   { label: '全部', value: '' },
@@ -44,6 +49,11 @@ const RESOURCE_TYPES = [
   { label: '头像', value: 'avatar' },
 ];
 const PAGE_SIZE = 20;
+const MY_RESOURCES_QUERY_SCHEMA = {
+  page: numberParam(1, { min: 1 }),
+  type: enumParam(['', 'wallpaper', 'avatar'] as const, '', { resetPageOnChange: true }),
+  albumId: stringParam('', { resetPageOnChange: true }),
+};
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -54,7 +64,10 @@ function formatSize(bytes: number) {
 export default function MyResources() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { page: currentPage, setPage } = useUrlPaginationQuery();
+  const {
+    values: { page: currentPage, type: activeType, albumId: activeAlbumId },
+    setValue,
+  } = useUrlQueryState(MY_RESOURCES_QUERY_SCHEMA, { pageKey: 'page' });
   const { canAccess } = usePageRoleGuard({
     allowRoles: ['creator'],
     unauthorizedMessage: '该页面仅创作者可访问',
@@ -63,7 +76,6 @@ export default function MyResources() {
   const [resources, setResources] = useState<MyResource[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [activeType, setActiveType] = useState('');
 
   // 上传弹窗状态
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -78,7 +90,6 @@ export default function MyResources() {
   // 专辑筛选
   const [albums, setAlbums] = useState<Album[]>([]);
   const [albumsLoading, setAlbumsLoading] = useState(true);
-  const [activeAlbumId, setActiveAlbumId] = useState('');
 
   // 批量操作状态
   const [batchMode, setBatchMode] = useState(false);
@@ -164,7 +175,7 @@ export default function MyResources() {
       toast.success('删除成功');
       setDeleteTarget(null);
       if (resources.length === 1 && currentPage > 1) {
-        setPage(currentPage - 1);
+        setValue('page', currentPage - 1);
       } else {
         void loadResources(activeType, activeAlbumId, currentPage);
       }
@@ -208,7 +219,7 @@ export default function MyResources() {
       toast.success(`已删除 ${result.deleted} 个资源`);
       handleExitBatch();
       if (selectedIds.size >= resources.length && currentPage > 1) {
-        setPage(currentPage - 1);
+        setValue('page', currentPage - 1);
       } else {
         void loadResources(activeType, activeAlbumId, currentPage);
       }
@@ -252,8 +263,7 @@ export default function MyResources() {
 
   const handleAlbumClick = (albumId: string) => {
     if (batchMode) handleExitBatch();
-    setPage(1);
-    setActiveAlbumId(albumId);
+    setValue('albumId', albumId);
   };
 
   return (
@@ -440,8 +450,7 @@ export default function MyResources() {
                 options={RESOURCE_TYPES}
                 value={activeType}
                 onChange={(v) => {
-                  setPage(1);
-                  setActiveType(v);
+                  setValue('type', v as '' | 'wallpaper' | 'avatar');
                   if (batchMode) handleExitBatch();
                 }}
                 prefix="资源类型："
@@ -550,7 +559,7 @@ export default function MyResources() {
                           disabled={currentPage <= 1 || loading}
                           onClick={() => {
                             if (batchMode) handleExitBatch();
-                            setPage(Math.max(1, currentPage - 1));
+                            setValue('page', Math.max(1, currentPage - 1));
                           }}
                           className="gap-1.5"
                         >
@@ -566,7 +575,7 @@ export default function MyResources() {
                           disabled={currentPage >= totalPages || loading}
                           onClick={() => {
                             if (batchMode) handleExitBatch();
-                            setPage(Math.min(totalPages, currentPage + 1));
+                            setValue('page', Math.min(totalPages, currentPage + 1));
                           }}
                           className="gap-1.5"
                         >
@@ -592,7 +601,7 @@ export default function MyResources() {
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         onSuccess={() => {
-          setPage(1);
+          setValue('page', 1);
           void loadResources(activeType, activeAlbumId, 1);
         }}
       />

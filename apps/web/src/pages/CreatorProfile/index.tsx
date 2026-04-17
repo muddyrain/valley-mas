@@ -36,7 +36,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
+import {
+  enumParam,
+  numberParam,
+  stringParam,
+  useUrlQueryState,
+} from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 // 分类映射:中文名 -> 后端类型
@@ -70,6 +75,13 @@ const triggerClassName =
   'rounded-xl px-5 py-2.5 font-semibold transition-all hover:bg-theme-soft data-[state=active]:bg-[var(--theme-primary)] data-[state=active]:text-white data-[state=active]:shadow-[0_14px_26px_rgba(var(--theme-primary-rgb),0.22)]';
 
 const WORKS_PAGE_SIZE = 20;
+const CREATOR_PROFILE_QUERY_SCHEMA = {
+  page: numberParam(1, { min: 1 }),
+  keyword: stringParam('', { resetPageOnChange: true }),
+  type: enumParam(['', 'wallpaper', 'avatar'] as const, '', { resetPageOnChange: true }),
+  albumId: stringParam('', { resetPageOnChange: true }),
+  tab: enumParam(['works', 'albums'] as const, 'works'),
+};
 
 type WorksQueryParams = {
   keyword?: string;
@@ -81,16 +93,19 @@ type WorksQueryParams = {
 export default function CreatorProfile() {
   const { code } = useParams<{ code: string }>();
   const {
-    page: currentPage,
-    keyword: currentKeyword,
-    setPage,
-    setKeyword,
-  } = useUrlPaginationQuery();
+    values: {
+      page: currentPage,
+      keyword: currentKeyword,
+      type: activeCategory,
+      albumId: activeAlbumId,
+      tab: activeTab,
+    },
+    setValue,
+    setValues,
+  } = useUrlQueryState(CREATOR_PROFILE_QUERY_SCHEMA, { pageKey: 'page' });
   const [creator, setCreator] = useState<Creator | null>(null);
   const [works, setWorks] = useState<Resource[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
-  const [activeCategory, setActiveCategory] = useState('');
-  const [activeAlbumId, setActiveAlbumId] = useState('');
   const [searchKeyword, setSearchKeyword] = useState(currentKeyword);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isSelf, setIsSelf] = useState(false);
@@ -99,7 +114,6 @@ export default function CreatorProfile() {
   const [worksLoading, setWorksLoading] = useState(false);
   const [worksTotal, setWorksTotal] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('works');
   // 作品收藏状态：key = resourceId, value = boolean
   const [favoritedMap, setFavoritedMap] = useState<Record<string, boolean>>({});
   const user = useAuthStore((state) => state.user);
@@ -253,31 +267,30 @@ export default function CreatorProfile() {
   };
 
   const handleSearch = async () => {
-    setKeyword(searchKeyword, true);
+    setValue('keyword', searchKeyword);
   };
 
   // 切换分类的处理函数
   const handleCategoryChange = async (categoryValue: string) => {
-    setActiveCategory(categoryValue);
-    setPage(1);
+    setValue('type', categoryValue as '' | 'wallpaper' | 'avatar');
   };
 
   const handleAlbumOpen = async (albumId: string) => {
-    setActiveAlbumId(albumId);
-    setActiveTab('works');
-    setPage(1);
+    setValues({
+      albumId,
+      tab: 'works',
+    });
   };
 
   const handleClearAlbumFilter = async () => {
-    setActiveAlbumId('');
-    setPage(1);
+    setValue('albumId', '');
   };
 
   const handleWorksPageChange = async (page: number) => {
     if (worksLoading) return;
     const nextPage = Math.max(1, Math.min(worksTotalPages, page));
     if (nextPage === currentPage) return;
-    setPage(nextPage);
+    setValue('page', nextPage);
   };
 
   if (loading) {
@@ -523,7 +536,11 @@ export default function CreatorProfile() {
       </PageBanner>
 
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-col gap-4">
+        <Tabs
+          value={activeTab}
+          onValueChange={(nextTab) => setValue('tab', nextTab as 'works' | 'albums')}
+          className="flex-col gap-4"
+        >
           <div className={sectionCardClass}>
             <TabsList className="h-auto gap-3 bg-transparent p-0">
               <TabsTrigger value="works" className={triggerClassName}>

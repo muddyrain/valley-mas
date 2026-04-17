@@ -209,6 +209,26 @@
 - "Vercel 上是不是也要注意这个"
 - "我这边发布是 Vercel，而且带 Go server"
 
+### `git-publish-guard`
+
+文件：
+- [git-publish-guard](./git-publish-guard/SKILL.md)
+
+什么时候触发：
+- 准备 `git push`
+- 首次推送新分支、设置 upstream
+- 用户明确要求“记得推到 origin”
+- 需要和 `yeet` / `github:yeet` 配合做远端发布
+
+不适合什么时候用：
+- 只生成 commit message，不做 push
+- 纯本地 git 查看、diff、rebase 讨论
+
+典型触发语：
+- "帮我 push 一下，记得推到 origin"
+- "首次推这个分支"
+- "发布前别推错远端"
+
 ### `encoding-guard`
 
 文件：

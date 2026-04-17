@@ -2,6 +2,69 @@
 
 > 说明：记录每次真实落地改动，按时间顺序追加，不覆盖历史。
 
+## 2026-04-17 15:03 (Asia/Shanghai)
+
+- 任务：抽取通用 URL query state hook，并先迁移资源页与博客列表页的复杂查询参数同步。
+- 改动文件：
+  - `packages/shared-router/src/index.ts`
+  - `apps/web/src/hooks/useUrlPaginationQuery.ts`
+  - `apps/web/src/pages/Resources/index.tsx`
+  - `apps/web/src/pages/blog/BlogList/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 `shared-router` 新增 `useUrlQueryState` 及 `stringParam/numberParam/enumParam`，支持声明式查询参数解析、默认值清理和“筛选变化自动重置分页”。
+  - 将现有 `useUrlPaginationQuery` 改为复用新 hook，保持旧页面兼容，同时把公共能力提升到可扩展多字段。
+  - `Resources` 页面把 `type/tagId/tagName` 纳入 URL，同步保留 `keyword/page`，刷新与分享链接时可恢复更完整的筛选状态。
+  - `BlogList` 页面把 `groupId/sort` 收口到新 hook，移除分散的 `URLSearchParams` 手写更新逻辑。
+- 校验：
+  - `pnpm --filter @valley/shared-router build`：通过
+  - `pnpm --filter @valley/shared-router exec tsc --noEmit`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前风险：`Resources` 为了在无额外接口查询时保留标签文案，暂时把 `tagName` 也写进了 URL；后续若补“按 id 取标签详情”接口，可进一步收敛。
+  - 下一步动作：把 `CreatorProfile`、`MyResources`、`MyPosts` 等仍有本地筛选 state 的页面逐步迁到同一套 query schema。
+
+## 2026-04-17 15:15 (Asia/Shanghai)
+
+- 任务：新增仓库内 Git 发布护栏 skill，并继续把 URL query state 封装推广到创作者主页与资源管理页。
+- 改动文件：
+  - `.codex/skills/git-publish-guard/SKILL.md`
+  - `.codex/skills/git-publish-guard/agents/openai.yaml`
+  - `.codex/skills/INDEX.md`
+  - `apps/web/src/pages/CreatorProfile/index.tsx`
+  - `apps/web/src/pages/MyResources/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 `git-publish-guard` skill，明确 push 时显式指定 remote、默认使用 `origin`，并与 `yeet/github:yeet`、`conventional-commit-guard` 做职责分层。
+  - 在 skills 索引中补充 `git-publish-guard` 触发时机与边界，便于后续发现与复用。
+  - `CreatorProfile` 改为声明式 URL query schema，收口 `page/keyword/type/albumId/tab`，刷新或分享链接时能恢复创作者主页筛选上下文。
+  - `MyResources` 改为声明式 URL query schema，收口 `page/type/albumId`，保留批量操作逻辑的同时减少本地筛选 state。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+  - `quick_validate.py`：未执行（仓库内未找到该脚本）
+- 风险与后续：
+  - 当前风险：`CreatorProfile` 的 `tab` 已进入 URL，但专辑页切回作品列表时仍沿用同一分页字段；若后续需要“专辑 tab 独立分页”再细分 schema。
+  - 下一步动作：继续迁 `MyPosts` 等多分页/多筛选页面，并在后续需要 push 时显式按 `git push origin <branch>` 执行。
+
+## 2026-04-17 15:21 (Asia/Shanghai)
+
+- 任务：继续推进内容管理页的 URL 状态收口，覆盖多分页 + 多分组筛选场景。
+- 改动文件：
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - `MyPosts` 改为使用统一的 `useUrlQueryState`，收口 `blogPage/imageTextPage/blogGroupId/imageTextGroupId`。
+  - 博客与图文分组切换现在会自动重置对应分页，避免本地 state 与 URL 状态脱节。
+  - 当总页数缩小时，自动把当前页拉回有效范围，保持多分页列表在 URL 驱动下仍然稳定。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前风险：`MyPosts` 仍然是单页双列表结构，若后续要支持更多筛选项，可能需要再考虑是否拆分为 tab 驱动页面。
+  - 下一步动作：若你继续想统一剩余列表页，我建议下一批处理 `ResourceTagManage` 这种“多分页器 + 多 keyword key”页面。
+
 ## 2026-04-14 12:52 (Asia/Shanghai)
 
 - 任务：新增“每次改动必须记日志”的 skill，并将规则接入仓库协作约定。
