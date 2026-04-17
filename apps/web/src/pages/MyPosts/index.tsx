@@ -40,15 +40,28 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
-import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
+import { numberParam, stringParam, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
 
 const BLOG_PAGE_SIZE = 6;
 const IMAGE_TEXT_PAGE_SIZE = 4;
+const MY_POSTS_QUERY_SCHEMA = {
+  blogPage: numberParam(1, { min: 1 }),
+  imageTextPage: numberParam(1, { min: 1 }),
+  blogGroupId: stringParam('', { resetPageOnChange: true }),
+  imageTextGroupId: stringParam('', { resetPageOnChange: true }),
+};
 
 export default function MyPosts() {
   const navigate = useNavigate();
-  const blogPager = useUrlPaginationQuery({ pageKey: 'blogPage' });
-  const imageTextPager = useUrlPaginationQuery({ pageKey: 'imageTextPage' });
+  const {
+    values: {
+      blogPage,
+      imageTextPage,
+      blogGroupId: blogGroupFilter,
+      imageTextGroupId: imageTextGroupFilter,
+    },
+    setValue,
+  } = useUrlQueryState(MY_POSTS_QUERY_SCHEMA);
   const { canAccess } = usePageRoleGuard({
     allowRoles: ['creator'],
     unauthorizedMessage: '该页面仅创作者可访问',
@@ -61,11 +74,6 @@ export default function MyPosts() {
   const [blogGroups, setBlogGroups] = useState<BlogGroup[]>([]);
   const [imageTextGroups, setImageTextGroups] = useState<BlogGroup[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
-
-  const [blogGroupFilter, setBlogGroupFilter] = useState('');
-  const [imageTextGroupFilter, setImageTextGroupFilter] = useState('');
-  const blogPage = blogPager.page;
-  const imageTextPage = imageTextPager.page;
 
   const [deletePostTarget, setDeletePostTarget] = useState<BlogPost | null>(null);
   const [deletingPost, setDeletingPost] = useState(false);
@@ -140,22 +148,14 @@ export default function MyPosts() {
   }, [canAccess, loadPostsPage]);
 
   useEffect(() => {
-    blogPager.setPage(1);
-  }, [blogGroupFilter]);
-
-  useEffect(() => {
-    imageTextPager.setPage(1);
-  }, [imageTextGroupFilter]);
-
-  useEffect(() => {
     if (blogPage <= blogTotalPages) return;
-    blogPager.setPage(blogTotalPages);
-  }, [blogTotalPages]);
+    setValue('blogPage', blogTotalPages);
+  }, [blogPage, blogTotalPages, setValue]);
 
   useEffect(() => {
     if (imageTextPage <= imageTextTotalPages) return;
-    imageTextPager.setPage(imageTextTotalPages);
-  }, [imageTextTotalPages]);
+    setValue('imageTextPage', imageTextTotalPages);
+  }, [imageTextPage, imageTextTotalPages, setValue]);
 
   useEffect(() => {
     if (!batchMode) return;
@@ -444,11 +444,14 @@ export default function MyPosts() {
                   <ChevronDown className="h-3.5 w-3.5" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-48 rounded-xl">
-                  <DropdownMenuItem onClick={() => setBlogGroupFilter('')}>
+                  <DropdownMenuItem onClick={() => setValue('blogGroupId', '')}>
                     全部博客分组
                   </DropdownMenuItem>
                   {blogGroups.map((group) => (
-                    <DropdownMenuItem key={group.id} onClick={() => setBlogGroupFilter(group.id)}>
+                    <DropdownMenuItem
+                      key={group.id}
+                      onClick={() => setValue('blogGroupId', group.id)}
+                    >
                       {group.name}
                     </DropdownMenuItem>
                   ))}
@@ -484,7 +487,7 @@ export default function MyPosts() {
                       variant="outline"
                       size="sm"
                       disabled={blogPage <= 1}
-                      onClick={() => blogPager.setPage(Math.max(1, blogPage - 1))}
+                      onClick={() => setValue('blogPage', Math.max(1, blogPage - 1))}
                       className="gap-1.5"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -497,7 +500,7 @@ export default function MyPosts() {
                       variant="outline"
                       size="sm"
                       disabled={blogPage >= blogTotalPages}
-                      onClick={() => blogPager.setPage(Math.min(blogTotalPages, blogPage + 1))}
+                      onClick={() => setValue('blogPage', Math.min(blogTotalPages, blogPage + 1))}
                       className="gap-1.5"
                     >
                       下一页
@@ -530,13 +533,13 @@ export default function MyPosts() {
                   <ChevronDown className="h-3.5 w-3.5" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-48 rounded-xl">
-                  <DropdownMenuItem onClick={() => setImageTextGroupFilter('')}>
+                  <DropdownMenuItem onClick={() => setValue('imageTextGroupId', '')}>
                     全部图文分组
                   </DropdownMenuItem>
                   {imageTextGroups.map((group) => (
                     <DropdownMenuItem
                       key={group.id}
-                      onClick={() => setImageTextGroupFilter(group.id)}
+                      onClick={() => setValue('imageTextGroupId', group.id)}
                     >
                       {group.name}
                     </DropdownMenuItem>
@@ -573,7 +576,7 @@ export default function MyPosts() {
                       variant="outline"
                       size="sm"
                       disabled={imageTextPage <= 1}
-                      onClick={() => imageTextPager.setPage(Math.max(1, imageTextPage - 1))}
+                      onClick={() => setValue('imageTextPage', Math.max(1, imageTextPage - 1))}
                       className="gap-1.5"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -587,7 +590,7 @@ export default function MyPosts() {
                       size="sm"
                       disabled={imageTextPage >= imageTextTotalPages}
                       onClick={() =>
-                        imageTextPager.setPage(Math.min(imageTextTotalPages, imageTextPage + 1))
+                        setValue('imageTextPage', Math.min(imageTextTotalPages, imageTextPage + 1))
                       }
                       className="gap-1.5"
                     >

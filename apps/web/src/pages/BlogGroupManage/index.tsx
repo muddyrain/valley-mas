@@ -1,6 +1,6 @@
 import { Edit3, FolderTree, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   createGroup,
@@ -16,6 +16,7 @@ import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
+import { enumParam, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
 
 const GROUP_TYPE_META: Record<
   GroupType,
@@ -49,12 +50,17 @@ function resolveGroupType(raw: string | null): GroupType {
 
 export default function BlogGroupManage() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const {
+    values: { type },
+    setValue,
+  } = useUrlQueryState({
+    type: enumParam(['blog', 'image_text'] as const, 'blog'),
+  });
   const { canAccess } = usePageRoleGuard({
     allowRoles: ['creator', 'admin'],
     unauthorizedMessage: '仅创作者可管理分组',
   });
-  const groupType = resolveGroupType(searchParams.get('type'));
+  const groupType = resolveGroupType(type);
   const meta = useMemo(() => GROUP_TYPE_META[groupType], [groupType]);
 
   const [groups, setGroups] = useState<Group[]>([]);
@@ -171,7 +177,7 @@ export default function BlogGroupManage() {
             <div className="mb-2 flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setSearchParams({ type: 'blog' })}
+                onClick={() => setValue('type', 'blog')}
                 className={`rounded-full px-3 py-1 text-xs transition ${
                   groupType === 'blog'
                     ? 'bg-theme-primary text-white shadow-sm'
@@ -182,7 +188,7 @@ export default function BlogGroupManage() {
               </button>
               <button
                 type="button"
-                onClick={() => setSearchParams({ type: 'image_text' })}
+                onClick={() => setValue('type', 'image_text')}
                 className={`rounded-full px-3 py-1 text-xs transition ${
                   groupType === 'image_text'
                     ? 'bg-theme-primary text-white shadow-sm'

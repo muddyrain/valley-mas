@@ -2,6 +2,90 @@
 
 > 说明：记录每次真实落地改动，按时间顺序追加，不覆盖历史。
 
+## 2026-04-17 15:03 (Asia/Shanghai)
+
+- 任务：抽取通用 URL query state hook，并先迁移资源页与博客列表页的复杂查询参数同步。
+- 改动文件：
+  - `packages/shared-router/src/index.ts`
+  - `apps/web/src/hooks/useUrlPaginationQuery.ts`
+  - `apps/web/src/pages/Resources/index.tsx`
+  - `apps/web/src/pages/blog/BlogList/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 `shared-router` 新增 `useUrlQueryState` 及 `stringParam/numberParam/enumParam`，支持声明式查询参数解析、默认值清理和“筛选变化自动重置分页”。
+  - 将现有 `useUrlPaginationQuery` 改为复用新 hook，保持旧页面兼容，同时把公共能力提升到可扩展多字段。
+  - `Resources` 页面把 `type/tagId/tagName` 纳入 URL，同步保留 `keyword/page`，刷新与分享链接时可恢复更完整的筛选状态。
+  - `BlogList` 页面把 `groupId/sort` 收口到新 hook，移除分散的 `URLSearchParams` 手写更新逻辑。
+- 校验：
+  - `pnpm --filter @valley/shared-router build`：通过
+  - `pnpm --filter @valley/shared-router exec tsc --noEmit`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前风险：`Resources` 为了在无额外接口查询时保留标签文案，暂时把 `tagName` 也写进了 URL；后续若补“按 id 取标签详情”接口，可进一步收敛。
+  - 下一步动作：把 `CreatorProfile`、`MyResources`、`MyPosts` 等仍有本地筛选 state 的页面逐步迁到同一套 query schema。
+
+## 2026-04-17 15:15 (Asia/Shanghai)
+
+- 任务：新增仓库内 Git 发布护栏 skill，并继续把 URL query state 封装推广到创作者主页与资源管理页。
+- 改动文件：
+  - `.codex/skills/git-publish-guard/SKILL.md`
+  - `.codex/skills/git-publish-guard/agents/openai.yaml`
+  - `.codex/skills/INDEX.md`
+  - `apps/web/src/pages/CreatorProfile/index.tsx`
+  - `apps/web/src/pages/MyResources/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 `git-publish-guard` skill，明确 push 时显式指定 remote、默认使用 `origin`，并与 `yeet/github:yeet`、`conventional-commit-guard` 做职责分层。
+  - 在 skills 索引中补充 `git-publish-guard` 触发时机与边界，便于后续发现与复用。
+  - `CreatorProfile` 改为声明式 URL query schema，收口 `page/keyword/type/albumId/tab`，刷新或分享链接时能恢复创作者主页筛选上下文。
+  - `MyResources` 改为声明式 URL query schema，收口 `page/type/albumId`，保留批量操作逻辑的同时减少本地筛选 state。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+  - `quick_validate.py`：未执行（仓库内未找到该脚本）
+- 风险与后续：
+  - 当前风险：`CreatorProfile` 的 `tab` 已进入 URL，但专辑页切回作品列表时仍沿用同一分页字段；若后续需要“专辑 tab 独立分页”再细分 schema。
+  - 下一步动作：继续迁 `MyPosts` 等多分页/多筛选页面，并在后续需要 push 时显式按 `git push origin <branch>` 执行。
+
+## 2026-04-17 15:21 (Asia/Shanghai)
+
+- 任务：继续推进内容管理页的 URL 状态收口，覆盖多分页 + 多分组筛选场景。
+- 改动文件：
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - `MyPosts` 改为使用统一的 `useUrlQueryState`，收口 `blogPage/imageTextPage/blogGroupId/imageTextGroupId`。
+  - 博客与图文分组切换现在会自动重置对应分页，避免本地 state 与 URL 状态脱节。
+  - 当总页数缩小时，自动把当前页拉回有效范围，保持多分页列表在 URL 驱动下仍然稳定。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前风险：`MyPosts` 仍然是单页双列表结构，若后续要支持更多筛选项，可能需要再考虑是否拆分为 tab 驱动页面。
+  - 下一步动作：若你继续想统一剩余列表页，我建议下一批处理 `ResourceTagManage` 这种“多分页器 + 多 keyword key”页面。
+
+## 2026-04-17 15:47 (Asia/Shanghai)
+
+- 任务：收尾剩余的 Web 查询参数联动页面，清理手写 query 同步逻辑。
+- 改动文件：
+  - `apps/web/src/pages/Creator/index.tsx`
+  - `apps/web/src/pages/BlogGroupManage/index.tsx`
+  - `apps/web/src/pages/ResourceTagManage/index.tsx`
+  - `apps/web/src/pages/ResourceAlbumManage/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - `Creator` 页改为统一 query schema，收口 `page/keyword`，不再手写 `URLSearchParams`。
+  - `BlogGroupManage` 用 schema 管理 `type`，让分组类型切换与其他页面保持一致。
+  - `ResourceTagManage` 保留双分页器结构，但把 `tab` 也纳入统一 query state。
+  - `ResourceAlbumManage` 的 `ResourcePicker` 把 `type` 收进 query state，继续保留关键词与分页联动。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前风险：`ResourceAlbumManage` 的资源选择器仍是“关键词前端过滤 + 类型后端筛选”的混合模式，后续若需要完全一致的筛选语义，可以再统一到后端查询。
+  - 下一步动作：当前 `apps/web/src/pages` 下已没有明显手写 `useSearchParams/new URLSearchParams` 的列表页 URL 同步逻辑残留，后续新增列表页时直接复用 `useUrlQueryState`。
+
 ## 2026-04-14 12:52 (Asia/Shanghai)
 
 - 任务：新增“每次改动必须记日志”的 skill，并将规则接入仓库协作约定。
@@ -1333,3 +1417,120 @@
 - 风险与后续：
   - 当前风险：`shared-request` 已包含默认中文错误映射，后续若 `web/admin` 文案策略分化，需要在调用端继续显式覆盖 `resolveErrorMessage`，避免体验漂移。
   - 下一步动作：可继续评估 `apps/admin/src/api/record.ts` 的直连 axios 逻辑是否纳入 `shared-request`，进一步统一请求层。
+
+## 2026-04-17 16:48 (Asia/Shanghai)
+
+- 任务：为博客创作页补齐批量导入 Markdown 创建博客能力，并修复直接粘贴 Markdown 代码块时编辑器展示异常。
+- 改动文件：
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `apps/web/src/components/blog/MdxMarkdownEditor.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增“批量导入 MD”入口，支持一次选择多个 Markdown 文件，预览识别结果后按当前分组与可见范围批量创建博客。
+  - 批量创建链路直接复用现有 Markdown 解析和博客创建接口，摘要按正文自动截取，显式跳过 AI 封面生成。
+  - 编辑器新增针对 Markdown 代码块粘贴的兼容处理，在检测到 fenced code 或缩进代码块时改用 `insertMarkdown`，避免富文本粘贴破坏代码结构。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前批量创建为串行调用前端单篇创建接口，文件很多时耗时会较长；后续如有需要可补后端批量接口。
+  - 粘贴修复目前聚焦代码块语法，若后续发现其他 Markdown 结构在富文本粘贴下也会失真，可继续扩展识别范围。
+
+## 2026-04-17 16:48 (Asia/Shanghai)
+
+- 任务：移除 Web 活跃 backlog 中 3 个实质增量偏低的收尾项，清空当前任务入口。
+- 改动文件：
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 从 Web 活跃 Backlog 中移除“首页运营信号增强 / 创作者广场交互增强 / 通知中心细化增强”3 项。
+  - 将活跃区改为“当前暂无活跃项”，避免后续迭代继续被旧的低优先级任务牵引。
+  - 同步更新“下一步建议”，改为重新规划一批更有实质增量的 Web 功能。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：Web 活跃 backlog 已清空，后续若不及时补新计划，任务入口会短暂处于空档状态。
+  - 下一步动作：基于现有页面闭环和产品方向，补一版新的 Web 高价值功能清单。
+
+## 2026-04-17 16:52 (Asia/Shanghai)
+
+- 任务：把新的博客改版与名著阅读方向收敛进 Web 活跃 backlog，形成下一批可执行功能计划。
+- 改动文件：
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 4 个活跃项，分别覆盖“博客视觉重做 / 博客 AI 阅读助手 / 名著书库基础建设 / 名著在线阅读闭环”。
+  - 将博客方向明确拆成“视觉层”和“AI 阅读层”，避免把改样式与改功能混成一个大任务。
+  - 将名著方向明确拆成“资源来源/版权边界”与“站内阅读闭环”，方便后续按阶段推进。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：名著板块尚未确定最终数据来源与授权边界，后续实现前必须先锁定可合法导入的首批资源。
+  - 下一步动作：补一版博客 AI 形态建议和名著资源来源决策，作为后续实施依据。
+
+## 2026-04-17 17:11 (Asia/Shanghai)
+
+- 任务：完善 Web 持续迭代任务清单，补齐“博客全面 AI 化 + 名著板块”的可执行拆解。
+- 改动文件：
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将博客重构任务升级为 P0 级可执行任务，明确信息架构与内容消费目标。
+  - 新增“博客 AI 能力定义与 MVP”任务，先收敛能力范围，再落地 2-3 个高感知能力。
+  - 将名著需求拆为“数据源与版权策略（P0）+ 阅读闭环（P1）+ AI 伴读（P1）”三步，降低一次性不确定性。
+  - 调整下一步建议，优先完成 AI 能力边界与数据源边界的方案定板。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：博客 AI 与名著 AI 仍处于能力待选阶段，若不先锁定 MVP 会导致 UI/接口反复返工。
+  - 下一步动作：先完成“博客 AI MVP 能力清单”和“名著首批数据源白名单”，再开页面与接口实现。
+
+## 2026-04-17 17:12 (Asia/Shanghai)
+
+- 任务：复核并完善博客批量创建流程的健壮性与可恢复性。
+- 改动文件：
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 为批量导入增加单次文件数上限（50）与超限提示，避免一次导入过多文件导致流程过慢或难以恢复。
+  - 批量创建状态新增 `running`，逐条创建时准确展示当前进行中的项，避免所有 pending 项同时显示“转圈”造成误判。
+  - 批量创建失败时保留后端错误信息，并新增“重试失败项”能力，无需重新选文件即可再次执行失败项。
+  - 收紧“确认创建”按钮可用条件，仅在存在 `pending` 项时可执行首轮创建。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前风险：批量创建仍是前端串行调用单条创建接口，大批量场景下总耗时依然偏长。
+  - 下一步动作：如批量规模继续上升，可考虑补后端批量创建接口与服务端事务/失败明细返回。
+
+## 2026-04-17 17:40 (Asia/Shanghai)
+
+- 任务：按要求取消脚本化提交约束，改为在 skill 内强化 commit message 约束。
+- 改动文件：
+  - `.codex/skills/conventional-commit-guard/SKILL.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 回退本轮新增的 hook/alias/模板脚本方案，保持仓库现有机制不变。
+  - 将 `conventional-commit-guard` 升级为强约束说明，明确“先对齐历史风格、再生成 message、再自检提交”的执行链路。
+  - 在 skill 中补充失败处理规则：被 hook 拒绝后必须修正并重提，用户指出风格不一致时必须优先 amend 对齐。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/conventional-commit-guard/SKILL.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：skill 约束依赖 agent 执行纪律，不具备 hook/CI 那种硬拦截能力。
+  - 下一步动作：若后续仍有风格漂移，再考虑把关键约束回收为最小化 hook 规则。
+
+## 2026-04-17 17:48 (Asia/Shanghai)
+
+- 任务：将 commit message 约束收敛为“默认短提交”，并明确在 skill 内强制执行。
+- 改动文件：
+  - `.codex/skills/conventional-commit-guard/SKILL.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 `conventional-commit-guard` 中新增“默认只写一行首行”的硬规则。
+  - 明确仅在用户显式要求时才允许正文与 Lore trailers，避免 agent 自动生成长提交信息。
+  - 增补“太长即 amend 修正”的失败处理规则与默认长度约束。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/conventional-commit-guard/SKILL.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：该约束属于 skill 级执行规范，不具备 hook/CI 的技术强制拦截。
+  - 下一步动作：如仍出现偏差，再评估最小化 hook 兜底（仅校验首行长度与是否存在正文）。
