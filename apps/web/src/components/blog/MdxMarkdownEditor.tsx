@@ -70,9 +70,15 @@ function applyTemplate(text: string, values?: Record<string, string | number>) {
   );
 }
 
+function shouldHandleMarkdownPaste(text: string) {
+  const normalized = text.replace(/\r\n?/g, '\n');
+  return /(^|\n)(```|~~~)/.test(normalized) || /(^|\n) {4,}\S/.test(normalized);
+}
+
 export function MdxMarkdownEditor({ value, onChange, className }: MdxMarkdownEditorProps) {
   const editorRef = useRef<MDXEditorMethods>(null);
   const latestMarkdown = useRef(value);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!editorRef.current) return;
@@ -80,6 +86,24 @@ export function MdxMarkdownEditor({ value, onChange, className }: MdxMarkdownEdi
     editorRef.current.setMarkdown(value);
     latestMarkdown.current = value;
   }, [value]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const handlePaste = (event: ClipboardEvent) => {
+      const text = event.clipboardData?.getData('text/plain') || '';
+      if (!text || !shouldHandleMarkdownPaste(text) || !editorRef.current) return;
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest('[contenteditable="true"]')) return;
+
+      event.preventDefault();
+      editorRef.current.insertMarkdown(text);
+    };
+
+    root.addEventListener('paste', handlePaste);
+    return () => root.removeEventListener('paste', handlePaste);
+  }, []);
 
   const plugins = useMemo(
     () => [
@@ -164,18 +188,20 @@ export function MdxMarkdownEditor({ value, onChange, className }: MdxMarkdownEdi
   );
 
   return (
-    <MDXEditor
-      ref={editorRef}
-      markdown={value}
-      onChange={(markdown) => {
-        latestMarkdown.current = markdown;
-        onChange(markdown);
-      }}
-      plugins={plugins}
-      className={cn('valley-mdx-editor-root', className)}
-      contentEditableClassName="valley-mdx-editor-content"
-      translation={translation}
-      spellCheck
-    />
+    <div ref={rootRef}>
+      <MDXEditor
+        ref={editorRef}
+        markdown={value}
+        onChange={(markdown) => {
+          latestMarkdown.current = markdown;
+          onChange(markdown);
+        }}
+        plugins={plugins}
+        className={cn('valley-mdx-editor-root', className)}
+        contentEditableClassName="valley-mdx-editor-content"
+        translation={translation}
+        spellCheck
+      />
+    </div>
   );
 }
