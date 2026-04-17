@@ -27,7 +27,12 @@ import ResourceCard, { ResourceCardSkeleton } from '@/components/ResourceCard';
 import TypeFilterBar from '@/components/TypeFilterBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useUrlPaginationQuery } from '@/hooks/useUrlPaginationQuery';
+import {
+  enumParam,
+  numberParam,
+  stringParam,
+  useUrlQueryState,
+} from '@/hooks/useUrlPaginationQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const RESOURCE_TYPES = [
@@ -37,28 +42,31 @@ const RESOURCE_TYPES = [
 ];
 
 const PAGE_SIZE = 8;
+const RESOURCE_QUERY_SCHEMA = {
+  page: numberParam(1, { min: 1 }),
+  keyword: stringParam('', { resetPageOnChange: true }),
+  type: enumParam(['', 'wallpaper', 'avatar'] as const, '', { resetPageOnChange: true }),
+  tagId: stringParam('', { resetPageOnChange: true }),
+  tagName: stringParam(''),
+};
 
 export default function Resources() {
   const navigate = useNavigate();
   const { user, profile, fetchProfile } = useAuthStore();
   const isCreator = user?.role === 'creator';
   const {
-    page: currentPage,
-    keyword: currentKeyword,
-    setPage,
-    setKeyword,
-    clearKeyword,
-  } = useUrlPaginationQuery();
+    values: { page: currentPage, keyword: currentKeyword, type: activeType, tagId, tagName },
+    setValue,
+    setValues,
+  } = useUrlQueryState(RESOURCE_QUERY_SCHEMA, { pageKey: 'page' });
 
   const [resources, setResources] = useState<Resource[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [activeType, setActiveType] = useState('');
   const [inputValue, setInputValue] = useState(currentKeyword);
   const [favoritedMap, setFavoritedMap] = useState<Record<string, boolean>>({});
 
   // 标签筛选
-  const [activeTag, setActiveTag] = useState<ResourceTag | null>(null);
   const [tagKeyword, setTagKeyword] = useState('');
   const [tagResults, setTagResults] = useState<ResourceTag[]>([]);
   const [tagSearching, setTagSearching] = useState(false);
@@ -85,7 +93,7 @@ export default function Resources() {
       pageSize: PAGE_SIZE,
       type: activeType || undefined,
       keyword: currentKeyword || undefined,
-      tagId: activeTag?.id || undefined,
+      tagId: tagId || undefined,
     })
       .then((data) => {
         if (cancelled) return;
@@ -107,9 +115,9 @@ export default function Resources() {
     return () => {
       cancelled = true;
     };
-  }, [currentPage, activeType, currentKeyword, activeTag?.id]);
+  }, [currentPage, activeType, currentKeyword, tagId]);
   const handleSearch = () => {
-    setKeyword(inputValue, true);
+    setValue('keyword', inputValue);
   };
 
   // 标签关键词搜索（防抖 300ms）
@@ -137,7 +145,7 @@ export default function Resources() {
         pageSize: PAGE_SIZE,
         type: activeType || undefined,
         keyword: currentKeyword || undefined,
-        tagId: activeTag?.id || undefined,
+        tagId: tagId || undefined,
       });
       const list = data.list ?? [];
       setResources(list);
@@ -173,6 +181,7 @@ export default function Resources() {
   };
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const activeTagName = tagName.trim();
   const wallpaperCount = useMemo(
     () =>
       resources.filter((item) => item.type === 'wallpaper' || item.type === 'background').length,
@@ -262,8 +271,7 @@ export default function Resources() {
                 options={RESOURCE_TYPES}
                 value={activeType}
                 onChange={(nextType) => {
-                  setPage(1);
-                  setActiveType(nextType);
+                  setValue('type', nextType as '' | 'wallpaper' | 'avatar');
                 }}
                 prefix="类型："
                 extra={
@@ -273,7 +281,7 @@ export default function Resources() {
                       <button
                         type="button"
                         onClick={() => {
-                          clearKeyword(true);
+                          setValue('keyword', '');
                           setInputValue('');
                         }}
                         className="text-theme-primary ml-1.5 underline hover:opacity-80"
@@ -288,15 +296,14 @@ export default function Resources() {
 
               {/* 标签筛选 */}
               <div className="relative">
-                {activeTag ? (
+                {tagId ? (
                   <div className="flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 pl-3 pr-1.5 py-1.5 text-sm text-purple-700">
                     <Hash className="h-3.5 w-3.5" />
-                    <span className="font-medium">{activeTag.name}</span>
+                    <span className="font-medium">{activeTagName || '已选标签'}</span>
                     <button
                       type="button"
                       onClick={() => {
-                        setPage(1);
-                        setActiveTag(null);
+                        setValues({ tagId: '', tagName: '' });
                       }}
                       className="ml-0.5 rounded-full p-0.5 hover:bg-purple-200 transition-colors"
                     >
@@ -350,8 +357,7 @@ export default function Resources() {
                               key={tag.id}
                               type="button"
                               onClick={() => {
-                                setPage(1);
-                                setActiveTag(tag);
+                                setValues({ tagId: tag.id, tagName: tag.name });
                                 setTagDropdownOpen(false);
                               }}
                               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors"
@@ -398,21 +404,20 @@ export default function Resources() {
                     description={
                       currentKeyword
                         ? `没有找到包含"${currentKeyword}"的资源`
-                        : activeTag
-                          ? `标签"${activeTag.name}"下暂无资源`
+                        : tagId
+                          ? `标签"${activeTagName || '当前标签'}"下暂无资源`
                           : '这个分类下还没有资源内容'
                     }
-                    actionLabel={currentKeyword ? '清除搜索' : activeTag ? '清除标签' : undefined}
+                    actionLabel={currentKeyword ? '清除搜索' : tagId ? '清除标签' : undefined}
                     onAction={
                       currentKeyword
                         ? () => {
-                            clearKeyword(true);
+                            setValue('keyword', '');
                             setInputValue('');
                           }
-                        : activeTag
+                        : tagId
                           ? () => {
-                              setPage(1);
-                              setActiveTag(null);
+                              setValues({ tagId: '', tagName: '' });
                             }
                           : undefined
                     }
@@ -454,7 +459,7 @@ export default function Resources() {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setPage(Math.max(1, currentPage - 1));
+                    setValue('page', Math.max(1, currentPage - 1));
                   }}
                   disabled={currentPage <= 1 || loading}
                   className="border-theme-soft-strong rounded-full border bg-white/82 px-5 text-slate-700"
@@ -467,7 +472,7 @@ export default function Resources() {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setPage(Math.min(totalPages, currentPage + 1));
+                    setValue('page', Math.min(totalPages, currentPage + 1));
                   }}
                   disabled={currentPage >= totalPages || loading}
                   className="border-theme-soft-strong rounded-full border bg-white/82 px-5 text-slate-700"
