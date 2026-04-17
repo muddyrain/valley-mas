@@ -81,6 +81,7 @@ export default function BlogPost() {
   const [comments, setComments] = useState<PostComment[]>([]);
   const [commentTotal, setCommentTotal] = useState(0);
   const [imagePageIndex, setImagePageIndex] = useState(0);
+  const [readProgress, setReadProgress] = useState(0);
 
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo || '/blog';
   const returnLabel =
@@ -223,6 +224,23 @@ export default function BlogPost() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [pageCount]);
+
+  useEffect(() => {
+    if (!post || post.postType !== 'blog') return;
+    const updateProgress = () => {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (docHeight <= 0) {
+        setReadProgress(0);
+        return;
+      }
+      const value = Math.min(100, Math.max(0, (scrollTop / docHeight) * 100));
+      setReadProgress(value);
+    };
+    updateProgress();
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    return () => window.removeEventListener('scroll', updateProgress);
+  }, [post]);
 
   if (loading) {
     return (
@@ -481,127 +499,167 @@ export default function BlogPost() {
         background: `linear-gradient(180deg, var(--theme-page-start) 0%, var(--theme-page-mid) 48%, #ffffff 100%)`,
       }}
     >
+      <div className="fixed left-0 right-0 top-0 z-50 h-1 bg-transparent">
+        <div
+          className="bg-theme-primary h-full transition-[width] duration-200"
+          style={{ width: `${readProgress}%` }}
+        />
+      </div>
       <div className="theme-header sticky top-0 z-40 border-b bg-white/88 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-10">
           <button
             type="button"
             onClick={handleReturn}
-            className="border-theme-soft-strong inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm text-slate-600 transition hover:text-slate-900"
+            className="border-theme-soft-strong inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm text-slate-600 transition hover:bg-theme-soft hover:text-slate-900"
           >
             <ArrowLeft className="h-4 w-4" />
             {returnLabel}
           </button>
 
-          {canEditBlog && (
-            <Link to={`/my-space/blog-edit/${post.id}`}>
-              <Button
-                variant="outline"
-                className="border-theme-soft-strong hover:bg-theme-soft rounded-full border bg-white px-5 text-slate-700"
-              >
-                <PencilLine className="mr-2 h-4 w-4" />
-                编辑博客
-              </Button>
-            </Link>
-          )}
+          <div className="flex items-center gap-2">
+            <span className="hidden rounded-full bg-white px-3 py-1.5 text-xs text-slate-500 sm:inline-flex">
+              阅读进度 {Math.round(readProgress)}%
+            </span>
+            {canEditBlog && (
+              <Link to={`/my-space/blog-edit/${post.id}`}>
+                <Button
+                  variant="outline"
+                  className="border-theme-soft-strong hover:bg-theme-soft rounded-full border bg-white px-5 text-slate-700"
+                >
+                  <PencilLine className="mr-2 h-4 w-4" />
+                  编辑博客
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 pb-24 pt-8 sm:px-6 lg:px-8">
-        <header className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
-          <section className="theme-panel-shell rounded-[36px] border bg-white/92 p-6 sm:p-8">
-            <div className="flex flex-wrap items-center gap-2">
-              {post.group && (
-                <Link
-                  to={`/blog?groupId=${encodeURIComponent(post.group.id)}`}
-                  className="bg-theme-soft text-theme-primary rounded-full px-3 py-1 text-xs font-medium"
-                >
-                  {post.group.name}
-                </Link>
+      <div className="mx-auto max-w-[1440px] px-4 pb-24 pt-8 sm:px-6 lg:px-10">
+        <header className="grid gap-6 xl:grid-cols-[minmax(0,1.24fr)_360px]">
+          <section className="theme-panel-shell relative overflow-hidden rounded-[38px] border bg-white/92 p-6 shadow-[0_28px_72px_rgba(85,64,34,0.14)] sm:p-8">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_6%,rgba(var(--theme-primary-rgb),0.16),transparent_32%),radial-gradient(circle_at_88%_0%,rgba(77,160,255,0.14),transparent_28%)]" />
+            <div className="relative">
+              <div className="flex flex-wrap items-center gap-2">
+                {post.group && (
+                  <Link
+                    to={`/blog?groupId=${encodeURIComponent(post.group.id)}`}
+                    className="bg-theme-soft text-theme-primary rounded-full px-3 py-1 text-xs font-medium"
+                  >
+                    {post.group.name}
+                  </Link>
+                )}
+                <span className="bg-theme-soft text-theme-primary rounded-full px-3 py-1 text-xs">
+                  {visibilityLabelMap[post.visibility || 'public'] || '公开可见'}
+                </span>
+              </div>
+
+              <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-tight tracking-[-0.04em] text-slate-950 sm:text-5xl">
+                {post.title}
+              </h1>
+
+              {excerpt && (
+                <p className="mt-5 max-w-3xl text-base leading-8 text-slate-600 sm:text-lg">
+                  {excerpt}
+                </p>
               )}
-              <span className="bg-theme-soft text-theme-primary rounded-full px-3 py-1 text-xs">
-                {visibilityLabelMap[post.visibility || 'public'] || '公开可见'}
-              </span>
-            </div>
 
-            <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-tight tracking-[-0.04em] text-slate-950 sm:text-5xl">
-              {post.title}
-            </h1>
-
-            {excerpt && (
-              <p className="mt-5 max-w-3xl text-base leading-8 text-slate-600 sm:text-lg">
-                {excerpt}
-              </p>
-            )}
-
-            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-slate-500">
-              {post.author?.nickname && (
+              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-slate-500">
+                {post.author?.nickname && (
+                  <div className="inline-flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    <span>{post.author.nickname}</span>
+                  </div>
+                )}
                 <div className="inline-flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  <span>{post.author.nickname}</span>
+                  <CalendarDays className="h-4 w-4" />
+                  <span>{formatDate(post.publishedAt || post.createdAt)}</span>
                 </div>
-              )}
-              <div className="inline-flex items-center gap-2">
-                <CalendarDays className="h-4 w-4" />
-                <span>{formatDate(post.publishedAt || post.createdAt)}</span>
+                <div className="inline-flex items-center gap-2">
+                  <Clock3 className="h-4 w-4" />
+                  <span>预计阅读 {getReadingMinutes(post.content || '')} 分钟</span>
+                </div>
+                <div className="inline-flex items-center gap-2">
+                  <Eye className="h-4 w-4" />
+                  <span>{post.viewCount || 0} 次阅读</span>
+                </div>
+                <div className="inline-flex items-center gap-2">
+                  <MessageCircle className="h-4 w-4" />
+                  <span>{commentTotal} 条评论</span>
+                </div>
               </div>
-              <div className="inline-flex items-center gap-2">
-                <Clock3 className="h-4 w-4" />
-                <span>预计阅读 {getReadingMinutes(post.content || '')} 分钟</span>
-              </div>
-              <div className="inline-flex items-center gap-2">
-                <Eye className="h-4 w-4" />
-                <span>{post.viewCount || 0} 次阅读</span>
-              </div>
-              <div className="inline-flex items-center gap-2">
-                <MessageCircle className="h-4 w-4" />
-                <span>{commentTotal} 条评论</span>
-              </div>
-            </div>
 
-            <div className="theme-panel-shell mt-8 overflow-hidden rounded-[28px] border">
-              <BlogCoverMedia src={post.cover} alt={post.title} compactFallback={false} />
+              <div className="theme-panel-shell mt-8 overflow-hidden rounded-[28px] border">
+                <BlogCoverMedia src={post.cover} alt={post.title} compactFallback={false} />
+              </div>
             </div>
           </section>
 
           <aside className="space-y-6">
-            <section className="theme-hero-shell overflow-hidden rounded-[30px] border p-6">
+            <section className="theme-hero-shell overflow-hidden rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)]">
               <div className="text-sm font-medium text-slate-900">这篇文章讲什么</div>
               <p className="mt-3 text-sm leading-7 text-slate-600">
                 {excerpt || '这篇文章还没有补充摘要，可以直接从正文开始阅读。'}
               </p>
             </section>
-
-            {toc.length > 0 && (
-              <section className="theme-panel-shell rounded-[30px] border p-6">
-                <div className="text-sm font-medium text-slate-900">目录导读</div>
-                <div className="mt-4">
-                  <TableOfContents toc={toc} />
-                </div>
-              </section>
-            )}
           </aside>
         </header>
 
         <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <main className="theme-panel-shell rounded-[36px] border bg-white/95 p-6 sm:p-10">
-            <MarkdownContent
-              content={processedContent}
-              enableImagePreview
-              imagePreviewTitle={post.title || '博客图片预览'}
-            />
-            <div className="border-theme-soft-strong mt-12 border-t pt-6">
-              <Button
-                variant="ghost"
-                className="rounded-full px-0 text-slate-500 hover:bg-transparent hover:text-slate-900"
-                onClick={handleReturn}
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                {returnLabel}
-              </Button>
-            </div>
+          <main className="space-y-6">
+            <section className="theme-hero-shell rounded-[30px] border p-5 shadow-[0_20px_56px_rgba(148,163,184,0.12)] sm:p-6">
+              <p className="text-sm leading-8 text-slate-600">
+                聚焦阅读体验：正文图片可点击预览，支持缩放与旋转；目录可快速跳转定位；返回链路保留来源上下文。
+              </p>
+            </section>
+            <section className="theme-panel-shell rounded-[36px] border bg-white/95 p-6 shadow-[0_26px_70px_rgba(99,75,42,0.12)] sm:p-10">
+              <MarkdownContent
+                content={processedContent}
+                enableImagePreview
+                imagePreviewTitle={post.title || '博客图片预览'}
+              />
+              <div className="border-theme-soft-strong mt-12 border-t pt-6">
+                <Button
+                  variant="ghost"
+                  className="rounded-full px-0 text-slate-500 hover:bg-transparent hover:text-slate-900"
+                  onClick={handleReturn}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  {returnLabel}
+                </Button>
+              </div>
+            </section>
           </main>
 
-          <aside className="space-y-6">
+          <aside className="space-y-6 xl:sticky xl:top-20 xl:self-start">
+            {toc.length > 0 && (
+              <section className="theme-panel-shell rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)]">
+                <div className="text-sm font-medium text-slate-900">目录导读</div>
+                <div className="mt-4 max-h-[42vh] overflow-y-auto pr-1">
+                  <TableOfContents toc={toc} />
+                </div>
+              </section>
+            )}
+
+            <section className="theme-panel-shell rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)]">
+              <div className="text-sm font-medium text-slate-900">阅读状态</div>
+              <div className="mt-4 space-y-3 text-sm text-slate-600">
+                <div className="flex items-center justify-between">
+                  <span>进度</span>
+                  <span className="text-theme-primary font-medium">
+                    {Math.round(readProgress)}%
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-theme-soft">
+                  <div
+                    className="bg-theme-primary h-full rounded-full transition-[width] duration-200"
+                    style={{ width: `${readProgress}%` }}
+                  />
+                </div>
+                <div className="text-xs text-slate-500">继续滚动，沉浸完成本篇阅读。</div>
+              </div>
+            </section>
+
             <PostComments
               comments={comments}
               total={commentTotal}
