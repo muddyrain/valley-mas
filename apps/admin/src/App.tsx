@@ -6,6 +6,8 @@ import Layout from './layouts/Layout';
 import ApplyCreator from './pages/ApplyCreator';
 import BlogPostEdit from './pages/BlogPostEdit';
 import BlogPosts from './pages/BlogPosts';
+import ClassicsBooks from './pages/ClassicsBooks';
+import ClassicsBooksEdit from './pages/ClassicsBooksEdit';
 import CreatorApplications from './pages/CreatorApplications';
 import CreatorDashboard from './pages/CreatorDashboard';
 import CreatorSpaces from './pages/CreatorSpaces';
@@ -108,6 +110,9 @@ function App() {
           <Route path="blog-posts" element={<BlogPosts />} />
           <Route path="blog-posts/create" element={<BlogPostEdit />} />
           <Route path="blog-posts/edit/:id" element={<BlogPostEdit />} />
+          <Route path="classics-books" element={<ClassicsBooks />} />
+          <Route path="classics-books/create" element={<ClassicsBooksEdit />} />
+          <Route path="classics-books/edit/:id" element={<ClassicsBooksEdit />} />
         </Route>
       </Routes>
     </BrowserRouter>

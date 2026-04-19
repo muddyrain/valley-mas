@@ -2,7 +2,78 @@
 
 > 说明：记录每次真实落地改动，按时间顺序追加，不覆盖历史。
 
-## 2026-04-17 15:03 (Asia/Shanghai)
+## 2026-04-19 CLR-3 + CLAI-1/2/3 名著阅读闭环与 AI 伴读全链路 (Asia/Shanghai)
+
+- 任务：完成 CLR-3 书签与最近阅读、CLAI-1 AI 伴读入口、CLAI-2 能力接入、CLAI-3 阅读记录联动。
+- 改动文件：
+  - `apps/web/src/hooks/useClassicsShelf.ts`（新增）— 书架/最近阅读/AI探索记录 localStorage 工具
+  - `apps/web/src/pages/ClassicsDetail/index.tsx` — 书架按钮、最近阅读写入、AI 悬浮按钮、AI 伴读面板、TOC ✨ 徽标
+  - `apps/web/src/pages/ClassicsList/index.tsx` — 最近阅读横条（RecentBooksBar）
+  - `apps/web/src/api/classics.ts` — 新增 AI 接口类型与函数
+  - `server/internal/model/classics.go`（新增）— ClassicsChapter GORM model
+  - `server/internal/handler/classics_ai.go`（新增）— GetClassicsChapterGuide / AskClassicsChapter
+  - `server/internal/router/router.go` — 注册 2 条 AI 路由
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md` — 标记 CLR-3/CLAI-1/2/3 完成
+- 关键改动：
+  - CLR-3：`classics_shelf`（书架 id 列表）+ `classics_recent`（最近10本）写入 localStorage；列表页顶部横向卡片行展示最近阅读；详情页加入/取消书架按钮。
+  - CLAI-1/2：阅读模式右下角 ✨ 悬浮按钮展开 AI 面板，面板含「本章导读」与「问章节」两个能力，结果卡片含 highlights 标签 + citations 引用块。
+  - CLAI-3：`classics_ai_explored_{bookId}` 记录已 AI 探索章节索引，TOC 侧栏和详情页目录网格对已探索章节显示 ✨ 图标，跨会话持久化。
+  - 后端复用 blog_ai.go 的 ARK 调用链（`readArkTextModelConfig` / `callChatStream` / `extractJSONPayload`）。
+
+- 任务：启动并完成 CLR-1，产出名著列表与详情页结构稿。
+- 改动文件：
+  - `docs/architecture/2026-04-19_classic_literature_clr1_list_detail_structure.md`（新增）
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 定版 `/classics`（列表页）与 `/classic/:id`（详情页）路由，规范参考现有 `/resources`→`/resource/:id` 约定。
+  - 列表页：URL 状态（page/category/keyword）、ClassicBookCard 卡片字段（封面/书名/作者/分类/字数）、空态/加载态规则。
+  - 详情页：信息层级（书名优先中文、作者/译者展示规则、字数格式化）、版本选择交互（URL `?edition=` 参数）、章节列表字段、版权声明折叠区。
+  - 全局导航入口：在顶部导航「博客」之后增加「名著馆」入口。
+  - 后端接口需求：列出 4 个接口（列表/详情/版本章节列表/单章内容）供 server 端参考。
+  - WEB-TASKS：CLR-1 标记完成，下一步建议切换为 CLR-2 → CLR-3。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py docs/architecture/2026-04-19_classic_literature_clr1_list_detail_structure.md .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：后端接口尚未实现，CLR-1 结构稿依赖接口落地后才能进入真实页面开发。
+  - 下一步动作：执行 CLR-2，实现阅读器 MVP（`/classic/:id/read`），章节切换 + 进度恢复。
+
+
+- 改动文件：
+  - `docs/architecture/2026-04-19_classic_literature_cld3_metadata_model.md`（新增）
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 定版 Book / Author / Translator / Edition / Chapter 五层元数据模型，含字段类型、必填规则、枚举约束。
+  - 明确 Author/Translator 与 Book/Edition 的关联表结构（`book_authors`/`edition_translators`），支持合著与多译者场景。
+  - Edition 字段对齐 CLD-1 白名单（`source_name`/`source_url`/`license_type`/`rights_note`）与 CLD-2 输出（`import_format`/`import_at`/`chapter_count`/`word_count`）。
+  - Chapter 字段直接承接 CLD-2 章节数据契约（`chapter_html`/`footnotes`/`illustrations`）。
+  - 明确字段校验规则：必填项拒绝条件、`is_default` 唯一性约束、`source_name` 需在 CLD-1 白名单内。
+  - WEB-TASKS：CLD-3 标记完成，CLD 系列（P0）全部完成；下一步建议切换为 CLR-1 → CLR-2。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py docs/architecture/2026-04-19_classic_literature_cld3_metadata_model.md .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：元数据模型定版后需同步更新数据库 Schema，字段变更需评估对已有导入数据的兼容影响。
+  - 下一步动作：执行 CLR-1，产出名著列表与详情页结构稿。
+
+
+- 改动文件：
+  - `docs/architecture/2026-04-19_classic_literature_cld2_import_standard.md`（新增）
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 CLD-2 文档，冻结 epub/txt/html 三种格式的导入规则：章节切分（含 epub TOC 优先、txt 正则推断、html Readability 去噪）、脚注处理（epub 内置脚注/html 锚点/txt 括号注/译注区分）、图片占位（封面下载/插图占位/外链屏蔽）、文本清洗通则（编码归一/广告段落过滤）。
+  - 明确清洗 Pipeline 七步流程，输出标准化章节数据契约（`chapter_html`/`word_count`/`footnotes[]`/`illustrations[]`）。
+  - 定义质量校验门槛（章节数/字数/广告段落占比/图片 404 率），不达标进人工复核。
+  - 明确下游接口约定：对齐 CLD-3（元数据模型）、CLR-2（阅读器 MVP）、CLAI-1（AI 伴读入口）。
+  - WEB-TASKS：将 CLD-2 标记为已完成，下一步建议切换为 CLD-3 → CLR-1。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py docs/architecture/2026-04-19_classic_literature_cld2_import_standard.md .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：清洗规则基于常见格式约定，实际导入时可能遇到非标结构（如超长单章节、无 TOC 的 epub），需在工具链中补充兜底逻辑。
+  - 下一步动作：执行 CLD-3，定版元数据模型（作者/译者/版本/章节），字段需与 CLD-2 章节数据契约对齐。
+
+
 
 - 任务：抽取通用 URL query state hook，并先迁移资源页与博客列表页的复杂查询参数同步。
 - 改动文件：
@@ -2117,3 +2188,37 @@
 - 风险与后续：
   - 当前风险：无明显风险，改动集中在 UI 状态限制与列表排序参数。
   - 下一步动作：如需可继续补“按下载量/热度排序”选项。
+
+## 2026-04-19 14:44 (Asia/Shanghai)
+
+- 任务：启动并完成 CLD-1，冻结名著数据源白名单与版权策略首版。
+- 改动文件：
+  - `docs/architecture/2026-04-19_classic_literature_cld1_source_whitelist.md`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 CLD-1 文档，明确白名单准入规则、首批来源、暂不纳入范围、落库最小字段与导入前门槛。
+  - 将 `WEB-TASKS` 中 `CLD-1` 标记为已完成，并把下一步建议切换为 `CLD-2 -> CLD-3`。
+  - 在活跃 backlog 外补充已完成记录，保证后续迭代可追溯。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py docs/architecture/2026-04-19_classic_literature_cld1_source_whitelist.md .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：不同来源的公版定义与地域口径仍可能不一致，需在 `CLD-2` 导入环节继续做作品级校验。
+  - 下一步动作：执行 `CLD-2`，先冻结 `epub/txt/html` 的章节切分、脚注处理与清洗规则。
+
+## 2026-04-19 14:54 (Asia/Shanghai)
+
+- 任务：根据用户画像调整 CLD-1，为中国用户优先策略补齐白名单执行顺序。
+- 改动文件：
+  - `docs/architecture/2026-04-19_classic_literature_cld1_source_whitelist.md`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 CLD-1 文档中新增“中文来源优先、海外来源补充”的用户导向策略。
+  - 将首批白名单调整为中文来源优先展示，并补充“选源优先级（执行顺序）”。
+  - 在 WEB-TASKS 的 CLD-1 完成项中同步标注该优先级策略，保证任务口径一致。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py docs/architecture/2026-04-19_classic_literature_cld1_source_whitelist.md .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：中文来源中个别条目的授权口径仍可能存在差异，需要继续坚持“作品级”而非“站点级”判断。
+  - 下一步动作：在 CLD-2 中把该优先级落实到导入器规则（中文源默认优先抓取与校验）。

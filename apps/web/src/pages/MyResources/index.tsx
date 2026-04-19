@@ -27,6 +27,7 @@ import {
   type MyResource,
   type ResourceVisibility,
 } from '@/api/resource';
+import BatchUploadResourceDialog from '@/components/BatchUploadResourceDialog';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import EditResourceDialog from '@/components/EditResourceDialog';
 import EmptyState from '@/components/EmptyState';
@@ -79,6 +80,7 @@ export default function MyResources() {
 
   // 上传弹窗状态
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [batchUploadOpen, setBatchUploadOpen] = useState(false);
 
   // 删除确认状态
   const [deleteTarget, setDeleteTarget] = useState<MyResource | null>(null);
@@ -311,6 +313,14 @@ export default function MyResources() {
                 >
                   <Plus className="h-4 w-4" />
                   上传新资源
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setBatchUploadOpen(true)}
+                  className="gap-2 border-slate-200 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary"
+                >
+                  <Layers className="h-4 w-4" />
+                  批量上传
                 </Button>
               </>
             ) : (
@@ -600,6 +610,15 @@ export default function MyResources() {
       <UploadResourceDialog
         open={uploadOpen}
         onOpenChange={setUploadOpen}
+        onSuccess={() => {
+          setValue('page', 1);
+          void loadResources(activeType, activeAlbumId, 1);
+        }}
+      />
+
+      <BatchUploadResourceDialog
+        open={batchUploadOpen}
+        onOpenChange={setBatchUploadOpen}
         onSuccess={() => {
           setValue('page', 1);
           void loadResources(activeType, activeAlbumId, 1);

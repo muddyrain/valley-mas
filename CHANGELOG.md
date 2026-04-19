@@ -1,3 +1,32 @@
+# 📝 更新日志 - 2026年4月19日
+
+## ✨ [名著馆] Admin 录入 UI + 搜索增强（CLADMIN + CLSEARCH）
+
+### CLADMIN — Admin 名著录入 UI
+
+**新增文件：**
+- `server/internal/handler/admin_classics.go`：5 个 Admin Handler（列表/新建/编辑/删除/批量导入章节）
+- `apps/admin/src/api/classics.ts`：Admin API 函数层（含完整 TypeScript 类型）
+- `apps/admin/src/pages/ClassicsBooks.tsx`：名著书目列表页（搜索、分页、删除确认、章节导入 Modal）
+- `apps/admin/src/pages/ClassicsBooksEdit.tsx`：新建/编辑表单（书名/分类/朝代/作者/简介/封面/版本/发布状态）
+
+**改动文件：**
+- `server/internal/router/router.go`：在 adminOnly 路由组注册 5 条名著管理路由
+- `apps/admin/src/layouts/Layout.tsx`：添加「名著管理」菜单项（ReadOutlined 图标）
+- `apps/admin/src/App.tsx`：注册 `/classics-books`、`/classics-books/create`、`/classics-books/edit/:id` 三条路由
+
+### CLSEARCH — 名著馆搜索增强
+
+**后端：**
+- `server/internal/handler/classics.go`：`GetClassicsList` 补 `dynasty` query 参数过滤
+- `server/internal/handler/admin_classics.go`：`AdminGetClassicsList` 同步补 `category` + `dynasty` 过滤
+
+**前端：**
+- `apps/web/src/api/classics.ts`：`getClassicsList` 函数参数补 `dynasty`
+- `apps/web/src/pages/ClassicsList/index.tsx`：
+  - 筛选栏新增朝代 TypeFilterBar（先秦/汉/魏晋/唐/宋/元/明/清/近现代/外国）
+  - `dynasty` 写入 URL query，联动分页重置
+
 # 📝 更新日志 - 2026年3月1日
 
 ## 🐛 [v1.1.1] Bug 修复 - 强制初始化问题

@@ -4,6 +4,7 @@
   FolderOpen,
   FolderTree,
   Image as ImageIcon,
+  Layers,
   Plus,
   Sparkles,
   Tag,
@@ -12,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { type Post as BlogPost, getAdminPosts } from '@/api/blog';
 import { getMyResources, type MyResource } from '@/api/resource';
+import BatchUploadResourceDialog from '@/components/BatchUploadResourceDialog';
 import { BlogPostCard, ImageTextPostCard } from '@/components/blog';
 import PanelLoadingOverlay from '@/components/PanelLoadingOverlay';
 import HeroSectionTitle from '@/components/page/HeroSectionTitle';
@@ -47,6 +49,7 @@ export default function MySpace() {
 
   // 上传弹窗状态
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [batchUploadOpen, setBatchUploadOpen] = useState(false);
   const showResourcesOverlay = loading && resources.length > 0;
   const showPostsOverlay =
     (loadingBlogPosts && blogPosts.length > 0) ||
@@ -211,6 +214,21 @@ export default function MySpace() {
                 <div className="text-lg font-semibold text-slate-900">上传资源</div>
                 <div className="mt-2 text-sm leading-7 text-slate-500">
                   把新壁纸、头像或图像素材加入资源库。
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBatchUploadOpen(true)}
+                className="rounded-[28px] border border-white/80 bg-white/82 p-5 text-left shadow-[0_18px_42px_rgba(148,163,184,0.08)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_24px_52px_rgba(148,163,184,0.12)]"
+              >
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#eef4ff] px-3 py-1 text-xs text-indigo-700">
+                  <Layers className="h-3.5 w-3.5" />
+                  批量入口
+                </div>
+                <div className="text-lg font-semibold text-slate-900">批量上传</div>
+                <div className="mt-2 text-sm leading-7 text-slate-500">
+                  一次上传多张图片，支持 AI 起名与标签识别。
                 </div>
               </button>
 
@@ -542,6 +560,11 @@ export default function MySpace() {
       <UploadResourceDialog
         open={uploadOpen}
         onOpenChange={setUploadOpen}
+        onSuccess={loadResources}
+      />
+      <BatchUploadResourceDialog
+        open={batchUploadOpen}
+        onOpenChange={setBatchUploadOpen}
         onSuccess={loadResources}
       />
     </div>
