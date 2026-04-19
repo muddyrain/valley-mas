@@ -1833,3 +1833,24 @@
 - 风险与后续：
   - 当前风险：BlogPost 视觉与交互仍未全部改善（仍需继续深度打磨页面节奏、推荐阅读区、上下篇导航等）。
   - 下一步动作：下一轮优先把 BlogPost 做完“完整沉浸阅读版”并补全阅读闭环。
+
+## 2026-04-19 12:58 (Asia/Shanghai)
+
+- 任务：完成博客重构 BR-5 ~ BR-7，收口 BlogPost 视觉与交互，并完成双视角验收。
+- 改动文件：
+  - `apps/web/src/pages/blog/BlogPost/index.tsx`
+  - `apps/web/src/components/blog/TableOfContents.tsx`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - BR-5：重构 BlogPost 阅读导览信息区，弱化冗余说明卡，优化信息密度与节奏。
+  - BR-6：目录高亮改为页面级共享状态，桌面/移动目录一致跟随；新增移动端底部目录入口与抽屉目录。
+  - BR-6：新增滚动状态提示，按阅读进度与章节动态反馈。
+  - BR-7：完成访客/创作者双视角回归；修复上一篇/下一篇/相关推荐跳转后的返回上下文继承问题。
+  - WEB-TASKS：将 BR（BR-1 ~ BR-7）整体转入“已完成”，并更新下一步建议为 BAI-1 / CLD-1。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogPost/index.tsx apps/web/src/components/blog/TableOfContents.tsx .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：上一篇/下一篇仍基于列表窗口推断，极端情况下可能无相邻项。
+  - 下一步动作：推进 BAI-1，先冻结博客 AI MVP 能力边界。

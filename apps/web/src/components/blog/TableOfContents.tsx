@@ -1,11 +1,14 @@
 import { List } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { TocItem } from '@/types/blog';
 
 interface TableOfContentsProps {
   toc: TocItem[];
   className?: string;
+  activeId?: string;
+  onActiveIdChange?: (id: string) => void;
+  onItemSelect?: (id: string) => void;
 }
 
 function getStickyTopOffset() {
@@ -26,10 +29,28 @@ function getStickyTopOffset() {
   return Math.round(stickyHeight + 16);
 }
 
-export function TableOfContents({ toc, className }: TableOfContentsProps) {
-  const [activeId, setActiveId] = useState<string>('');
+export function TableOfContents({
+  toc,
+  className,
+  activeId: activeIdProp,
+  onActiveIdChange,
+  onItemSelect,
+}: TableOfContentsProps) {
+  const [internalActiveId, setInternalActiveId] = useState<string>('');
   const [scrollOffset, setScrollOffset] = useState<number>(120);
   const headingElementsRef = useRef<Map<string, IntersectionObserverEntry>>(new Map());
+  const activeId = activeIdProp ?? internalActiveId;
+
+  const updateActiveId = useCallback(
+    (id: string) => {
+      if (!id) return;
+      if (activeIdProp === undefined) {
+        setInternalActiveId(id);
+      }
+      onActiveIdChange?.(id);
+    },
+    [activeIdProp, onActiveIdChange],
+  );
 
   useEffect(() => {
     const updateOffset = () => {
@@ -68,9 +89,9 @@ export function TableOfContents({ toc, className }: TableOfContentsProps) {
       }
 
       if (currentActive) {
-        setActiveId(currentActive);
+        updateActiveId(currentActive);
       } else if (allHeadings[0]) {
-        setActiveId(allHeadings[0].id);
+        updateActiveId(allHeadings[0].id);
       }
     };
 
@@ -88,7 +109,7 @@ export function TableOfContents({ toc, className }: TableOfContentsProps) {
       );
 
       if (visibleHeadings.length > 0) {
-        setActiveId(visibleHeadings[0].target.id);
+        updateActiveId(visibleHeadings[0].target.id);
       } else {
         highlightCurrentHeading();
       }
@@ -118,7 +139,7 @@ export function TableOfContents({ toc, className }: TableOfContentsProps) {
       observer.disconnect();
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [toc, scrollOffset]);
+  }, [toc, scrollOffset, updateActiveId]);
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
     e.preventDefault();
@@ -132,7 +153,8 @@ export function TableOfContents({ toc, className }: TableOfContentsProps) {
         behavior: 'smooth',
       });
 
-      setActiveId(id);
+      updateActiveId(id);
+      onItemSelect?.(id);
     }
   };
 
