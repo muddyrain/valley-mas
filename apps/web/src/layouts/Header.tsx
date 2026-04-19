@@ -293,6 +293,20 @@ export default function Header() {
             </Button>
           </Link>
 
+          <Link to="/updates">
+            <Button
+              variant="ghost"
+              className={`gap-2 transition-colors ${
+                location.pathname.startsWith('/updates')
+                  ? 'bg-theme-soft text-theme-primary-hover'
+                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
+              }`}
+            >
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">更新日志</span>
+            </Button>
+          </Link>
+
           <Link to="/labs/climber">
             <Button
               variant="ghost"

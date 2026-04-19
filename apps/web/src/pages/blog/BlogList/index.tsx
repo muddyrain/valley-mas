@@ -3,6 +3,7 @@
   BookOpen,
   ExternalLink,
   FolderTree,
+  Loader2,
   Orbit,
   Search,
   Sparkles,
@@ -10,8 +11,8 @@
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Group, Post } from '@/api/blog';
-import { getGroups, getPosts } from '@/api/blog';
+import type { BlogRecommendResponse, Group, Post } from '@/api/blog';
+import { getGroups, getPosts, recommendBlogPosts } from '@/api/blog';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
 import { BlogFeedCard } from '@/components/blog';
 import { BLOG_COVER_ASPECT_CLASS } from '@/components/blog/BlogCoverMedia';
@@ -92,6 +93,11 @@ export default function BlogList() {
   const [groupKeyword, setGroupKeyword] = useState('');
   const [postKeywordInput, setPostKeywordInput] = useState('');
   const [showAllGroups, setShowAllGroups] = useState(false);
+  const [aiRecommendOpen, setAIRecommendOpen] = useState(false);
+  const [aiPrompt, setAIPrompt] = useState('');
+  const [aiRecommendLoading, setAIRecommendLoading] = useState(false);
+  const [aiRecommendError, setAIRecommendError] = useState('');
+  const [aiRecommendResult, setAIRecommendResult] = useState<BlogRecommendResponse | null>(null);
   const firstLoadRef = useRef(true);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -192,6 +198,37 @@ export default function BlogList() {
     setValue('sort', nextSort);
   };
 
+  const handleAIRecommend = async () => {
+    const prompt = aiPrompt.trim();
+    if (!prompt) {
+      setAIRecommendError('请输入你想读的主题或问题。');
+      return;
+    }
+    setAIRecommendLoading(true);
+    setAIRecommendError('');
+    setAIRecommendResult(null);
+    try {
+      const data = await recommendBlogPosts({
+        prompt,
+        groupId: selectedGroupId || undefined,
+        keyword: currentKeyword || undefined,
+        sort: currentSort,
+      });
+      setAIRecommendResult(data);
+    } catch (error) {
+      console.error('Failed to recommend blogs by AI:', error);
+      setAIRecommendError('暂时无法生成推荐，请稍后再试。');
+    } finally {
+      setAIRecommendLoading(false);
+    }
+  };
+
+  const quickIntents = [
+    '想看 JavaScript / TypeScript 实战技巧',
+    '想看 HTML + CSS 布局与样式进阶',
+    '想看 Vue/React 框架与工程化实践',
+  ];
+
   const groupData = useMemo(
     () =>
       groups.map((item) => ({
@@ -229,11 +266,34 @@ export default function BlogList() {
     setShowAllGroups(false);
   }, [groupKeyword]);
 
+  useEffect(() => {
+    if (!aiRecommendOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [aiRecommendOpen]);
+
   return (
     <div className="min-h-screen bg-transparent text-slate-900">
       <div className="mx-auto max-w-[1500px] px-6 pb-20 pt-8 md:px-8 lg:px-10">
         <section className="relative overflow-hidden rounded-[42px] border border-white/75 bg-white/80 px-6 py-8 shadow-[0_30px_85px_rgba(77,53,26,0.12)] md:px-9 md:py-10">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_6%_14%,rgba(var(--theme-primary-rgb),0.24),transparent_35%),radial-gradient(circle_at_93%_6%,rgba(80,160,255,0.22),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,255,255,0.72))]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_18%,rgba(var(--theme-primary-rgb),0.18),transparent_38%),radial-gradient(circle_at_86%_12%,rgba(var(--theme-primary-rgb),0.12),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.95),rgba(var(--theme-primary-rgb),0.05))]" />
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <span
+              className="absolute -left-10 top-8 h-28 w-28 rounded-full bg-theme-soft/55 blur-2xl animate-pulse"
+              style={{ animationDuration: '9s' }}
+            />
+            <span
+              className="absolute right-14 top-4 h-20 w-20 rounded-[28px] border border-theme-soft-strong/70 bg-white/45 rotate-12 animate-pulse"
+              style={{ animationDuration: '11s', animationDelay: '1.2s' }}
+            />
+            <span
+              className="absolute -bottom-8 right-28 h-36 w-36 rounded-full border border-theme-soft-strong/70 bg-theme-soft/45 blur-xl animate-pulse"
+              style={{ animationDuration: '12s', animationDelay: '0.6s' }}
+            />
+          </div>
           <div className="relative grid gap-6 lg:grid-cols-[1.12fr_0.88fr]">
             <div className="space-y-5">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/88 px-4 py-1.5 text-[11px] font-semibold tracking-[0.2em] uppercase text-theme-primary shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.16)]">
@@ -241,7 +301,7 @@ export default function BlogList() {
                 Valley Blogs
               </span>
               <h1 className="text-[42px] font-semibold leading-[1.08] tracking-[-0.045em] text-slate-950 md:text-[54px]">
-                博客分组阅读中心
+                博客主题深读中心
               </h1>
               <p className="max-w-3xl text-sm leading-8 text-slate-600 md:text-base">
                 先选分组，再深读内容。我们把博客按主题聚合，让阅读路径更清晰、更高效、更有沉浸感。
@@ -297,6 +357,15 @@ export default function BlogList() {
                       清除
                     </Button>
                   ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-theme-soft-strong h-11 rounded-2xl px-4 text-theme-primary"
+                    onClick={() => setAIRecommendOpen(true)}
+                  >
+                    <Sparkles className="mr-1.5 h-4 w-4" />
+                    AI 推荐读哪篇
+                  </Button>
                 </div>
               </div>
 
@@ -544,6 +613,131 @@ export default function BlogList() {
             )}
           </div>
         </section>
+      </div>
+
+      <div
+        className={`fixed inset-0 z-50 transition ${aiRecommendOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+      >
+        <button
+          type="button"
+          aria-label="关闭 AI 推荐抽屉"
+          onClick={() => setAIRecommendOpen(false)}
+          className={`absolute inset-0 bg-slate-900/28 transition-opacity duration-200 ${aiRecommendOpen ? 'opacity-100' : 'opacity-0'}`}
+        />
+        <aside
+          className={`absolute right-0 top-0 h-full w-[min(92vw,560px)] border-l border-theme-soft-strong bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,252,247,0.95))] shadow-[-24px_0_60px_rgba(66,42,18,0.2)] transition-transform duration-300 ease-out ${aiRecommendOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        >
+          <div className="flex h-full flex-col">
+            <div className="border-b border-theme-soft-strong px-5 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <Sparkles className="h-4 w-4 text-theme-primary animate-pulse" />
+                  AI 阅读路线
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAIRecommendOpen(false)}
+                  className="rounded-full bg-white/90 px-2.5 py-1 text-[11px] text-slate-500 transition hover:text-slate-800"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 space-y-3 overflow-y-auto px-5 pb-5 pt-4">
+              <div className="flex gap-2">
+                <input
+                  value={aiPrompt}
+                  onChange={(event) => setAIPrompt(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      void handleAIRecommend();
+                    }
+                  }}
+                  placeholder="例如：想看 JS 异步、CSS 布局、React 性能优化"
+                  className="theme-input-border h-10 min-w-0 flex-1 rounded-xl border bg-white px-3 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-theme-soft"
+                />
+                <Button
+                  type="button"
+                  className="theme-btn-primary h-10 rounded-xl px-4"
+                  onClick={() => void handleAIRecommend()}
+                  disabled={aiRecommendLoading}
+                >
+                  {aiRecommendLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '生成推荐'}
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {quickIntents.map((intent) => (
+                  <button
+                    key={intent}
+                    type="button"
+                    onClick={() => {
+                      setAIPrompt(intent);
+                      setAIRecommendError('');
+                    }}
+                    className="rounded-full border border-theme-soft-strong bg-white/90 px-2.5 py-1 text-[11px] text-slate-600 transition hover:bg-theme-soft hover:text-theme-primary"
+                  >
+                    {intent}
+                  </button>
+                ))}
+              </div>
+
+              {aiRecommendError ? (
+                <p className="text-xs text-rose-600">{aiRecommendError}</p>
+              ) : null}
+
+              {aiRecommendResult?.items?.length ? (
+                <div className="space-y-2">
+                  {aiRecommendResult.items.map((item, index) => (
+                    <button
+                      key={item.postId}
+                      type="button"
+                      onClick={() => {
+                        setAIRecommendOpen(false);
+                        navigate(`/blog/${item.postId}`, {
+                          state: {
+                            returnTo: `/blog${window.location.search}`,
+                            returnLabel: '返回博客列表',
+                            source: 'blog-ai-recommend',
+                          },
+                        });
+                      }}
+                      className="w-full rounded-xl border border-theme-soft-strong bg-theme-soft/35 px-3 py-2 text-left transition hover:-translate-y-0.5 hover:bg-theme-soft/70 hover:shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.2)]"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="line-clamp-2 text-sm font-medium text-slate-800">
+                          {index + 1}. {item.title}
+                        </div>
+                        <span className="shrink-0 rounded-full bg-white/90 px-2 py-0.5 text-[10px] text-slate-500">
+                          约 {item.readMinutes} 分钟
+                        </span>
+                      </div>
+                      {item.excerpt ? (
+                        <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-slate-500">
+                          {item.excerpt}
+                        </p>
+                      ) : null}
+                      <div className="mt-1.5 flex items-center gap-2 text-[11px]">
+                        {item.groupName ? (
+                          <span className="rounded-full bg-white/90 px-2 py-0.5 text-theme-primary">
+                            {item.groupName}
+                          </span>
+                        ) : null}
+                        <span className="text-slate-600">{item.reason}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : aiPrompt && !aiRecommendLoading && !aiRecommendError ? (
+                <p className="rounded-xl bg-white/90 px-3 py-2 text-xs text-slate-500">
+                  这次没有推荐结果，可以换个更具体的意图再试试。
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );

@@ -1,0 +1,4 @@
+﻿interface:
+  display_name: "Web 更新日志护栏"
+  short_description: "仅在 commit/push 节点写 Web 对外更新日志，屏蔽内部实现细节"
+  default_prompt: "当 Valley MAS 任务涉及 Web 更新日志发布时，仅在 commit/push 节点创建或更新系统日志；日志文案只面向终端用户，描述功能变化与更新时间，禁止出现文件名、路径、内部指令、实现细节或推理过程；平台固定为 web。"

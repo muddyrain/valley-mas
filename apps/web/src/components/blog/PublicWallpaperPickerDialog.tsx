@@ -15,6 +15,7 @@ interface PublicWallpaperPickerDialogProps {
 }
 
 const PAGE_SIZE = 12;
+type SortOrder = 'newest' | 'oldest';
 
 export function PublicWallpaperPickerDialog({
   open,
@@ -24,6 +25,7 @@ export function PublicWallpaperPickerDialog({
 }: PublicWallpaperPickerDialogProps) {
   const [keywordInput, setKeywordInput] = useState('');
   const [keyword, setKeyword] = useState('');
+  const [sort, setSort] = useState<SortOrder>('newest');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [resources, setResources] = useState<Resource[]>([]);
@@ -40,6 +42,7 @@ export function PublicWallpaperPickerDialog({
           pageSize: PAGE_SIZE,
           type: 'wallpaper',
           keyword: keyword || undefined,
+          sort,
         });
         if (cancelled) return;
         setResources(result.list || []);
@@ -56,7 +59,7 @@ export function PublicWallpaperPickerDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, page, keyword]);
+  }, [open, page, keyword, sort]);
 
   useEffect(() => {
     if (!open) return;
@@ -98,6 +101,36 @@ export function PublicWallpaperPickerDialog({
               <Search className="mr-1 h-4 w-4" />
               搜索
             </Button>
+            <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setPage(1);
+                  setSort('newest');
+                }}
+                className={`rounded-md px-2.5 py-1 text-xs transition ${
+                  sort === 'newest'
+                    ? 'bg-theme-primary text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                新到旧
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPage(1);
+                  setSort('oldest');
+                }}
+                className={`rounded-md px-2.5 py-1 text-xs transition ${
+                  sort === 'oldest'
+                    ? 'bg-theme-primary text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                旧到新
+              </button>
+            </div>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/45 p-3.5">

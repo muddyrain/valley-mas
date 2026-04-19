@@ -7,16 +7,22 @@
   Eye,
   Grid2X2,
   List,
+  Loader2,
   MessageCircle,
   PencilLine,
+  Sparkles,
   User,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
+  askBlogPost,
+  type BlogAskResponse,
+  type BlogReaderGuideResponse,
   createPostComment,
   deletePostComment,
+  generateBlogReaderGuide,
   getAdminPostDetail,
   getPostComments,
   getPostDetailById,
@@ -93,8 +99,18 @@ export default function BlogPost() {
   const [relatedLoading, setRelatedLoading] = useState(false);
   const [mobileTocOpen, setMobileTocOpen] = useState(false);
   const [activeTocId, setActiveTocId] = useState('');
+  const [statusTocId, setStatusTocId] = useState('');
+  const [aiGuide, setAIGuide] = useState<BlogReaderGuideResponse | null>(null);
+  const [aiGuideLoading, setAIGuideLoading] = useState(false);
+  const [aiGuideError, setAIGuideError] = useState('');
+  const [askQuestion, setAskQuestion] = useState('');
+  const [askResult, setAskResult] = useState<BlogAskResponse | null>(null);
+  const [askLoading, setAskLoading] = useState(false);
+  const [askError, setAskError] = useState('');
   const articleSectionRef = useRef<HTMLElement | null>(null);
   const commentSectionRef = useRef<HTMLDivElement | null>(null);
+  const progressRafRef = useRef<number | null>(null);
+  const progressRef = useRef(0);
 
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo || '/blog';
   const returnLabel =
@@ -162,7 +178,24 @@ export default function BlogPost() {
   useEffect(() => {
     setMobileTocOpen(false);
     setActiveTocId('');
+    setStatusTocId('');
+    setAIGuide(null);
+    setAIGuideError('');
+    setAskQuestion('');
+    setAskResult(null);
+    setAskError('');
   }, [id, toc.length]);
+
+  useEffect(() => {
+    if (!activeTocId) {
+      setStatusTocId('');
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setStatusTocId(activeTocId);
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [activeTocId]);
 
   useEffect(() => {
     if (!mobileTocOpen) return;
@@ -217,8 +250,8 @@ export default function BlogPost() {
     return Math.max(0, Math.ceil(totalReadMinutes * (1 - readProgress / 100)));
   }, [readProgress, totalReadMinutes]);
   const activeTocTitle = useMemo(
-    () => toc.find((item) => item.id === activeTocId)?.text || '',
-    [activeTocId, toc],
+    () => toc.find((item) => item.id === statusTocId)?.text || '',
+    [statusTocId, toc],
   );
   const scrollStatusTip = useMemo(() => {
     if (!totalReadMinutes) return '';
@@ -271,6 +304,41 @@ export default function BlogPost() {
     toast.success('评论已删除');
   };
 
+  const handleGenerateAIGuide = async () => {
+    if (!post || post.postType !== 'blog') return;
+    setAIGuideLoading(true);
+    setAIGuideError('');
+    try {
+      const data = await generateBlogReaderGuide(post.id);
+      setAIGuide(data);
+    } catch (error) {
+      console.error('Failed to generate AI guide:', error);
+      setAIGuideError('导读暂时生成失败，请稍后重试。');
+    } finally {
+      setAIGuideLoading(false);
+    }
+  };
+
+  const handleAskPost = async () => {
+    if (!post || post.postType !== 'blog') return;
+    const question = askQuestion.trim();
+    if (!question) {
+      setAskError('请输入你想问的问题。');
+      return;
+    }
+    setAskLoading(true);
+    setAskError('');
+    try {
+      const data = await askBlogPost(post.id, { question });
+      setAskResult(data);
+    } catch (error) {
+      console.error('Failed to ask blog question:', error);
+      setAskError('暂时无法回答这个问题，请换个问法或稍后再试。');
+    } finally {
+      setAskLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (pageCount <= 1) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -291,15 +359,34 @@ export default function BlogPost() {
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       const docHeight = document.documentElement.scrollHeight - window.innerHeight;
       if (docHeight <= 0) {
-        setReadProgress(0);
+        if (progressRef.current !== 0) {
+          progressRef.current = 0;
+          setReadProgress(0);
+        }
         return;
       }
       const value = Math.min(100, Math.max(0, (scrollTop / docHeight) * 100));
-      setReadProgress(value);
+      if (Math.abs(value - progressRef.current) >= 0.5) {
+        progressRef.current = value;
+        setReadProgress(value);
+      }
+    };
+    const onScroll = () => {
+      if (progressRafRef.current !== null) return;
+      progressRafRef.current = window.requestAnimationFrame(() => {
+        progressRafRef.current = null;
+        updateProgress();
+      });
     };
     updateProgress();
-    window.addEventListener('scroll', updateProgress, { passive: true });
-    return () => window.removeEventListener('scroll', updateProgress);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (progressRafRef.current !== null) {
+        window.cancelAnimationFrame(progressRafRef.current);
+        progressRafRef.current = null;
+      }
+    };
   }, [post]);
 
   useEffect(() => {
@@ -779,7 +866,50 @@ export default function BlogPost() {
                 >
                   直达评论
                 </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="theme-btn-primary relative h-8 rounded-full px-3.5 text-xs shadow-[0_10px_28px_rgba(var(--theme-primary-rgb),0.35)]"
+                  onClick={() => void handleGenerateAIGuide()}
+                  disabled={aiGuideLoading}
+                >
+                  {!aiGuideLoading ? (
+                    <span className="absolute -right-1 -top-1 inline-flex h-2.5 w-2.5 rounded-full bg-amber-300 shadow-[0_0_0_4px_rgba(251,191,36,0.18)] animate-pulse" />
+                  ) : null}
+                  {aiGuideLoading ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-1.5 h-3.5 w-3.5 animate-pulse" />
+                  )}
+                  AI 导读
+                </Button>
               </div>
+              {aiGuideError ? (
+                <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-600">
+                  {aiGuideError}
+                </p>
+              ) : null}
+              {aiGuide ? (
+                <div className="mt-3 rounded-2xl border border-theme-soft-strong bg-white/80 p-3">
+                  <div className="text-xs font-medium text-theme-primary">AI 导读</div>
+                  <p className="mt-2 text-xs leading-6 text-slate-600">{aiGuide.guide}</p>
+                  {aiGuide.highlights?.length ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {aiGuide.highlights.map((item) => (
+                        <span
+                          key={item}
+                          className="rounded-full bg-theme-soft px-2.5 py-1 text-[11px] text-theme-primary"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {aiGuide.path ? (
+                    <p className="mt-2 text-[11px] text-slate-500">阅读路径：{aiGuide.path}</p>
+                  ) : null}
+                </div>
+              ) : null}
             </section>
           </aside>
         </header>
@@ -844,6 +974,66 @@ export default function BlogPost() {
                   {returnLabel}
                 </Button>
               </div>
+            </section>
+            <section className="theme-panel-shell rounded-[28px] border p-5 shadow-[0_18px_46px_rgba(148,163,184,0.12)]">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
+                <Sparkles className="h-4 w-4 text-theme-primary" />
+                问文章
+              </div>
+              <p className="mt-2 text-xs leading-6 text-slate-500">
+                基于当前文章内容回答，不会跨文章扩展。
+              </p>
+              <div className="mt-3 flex gap-2">
+                <input
+                  value={askQuestion}
+                  onChange={(event) => setAskQuestion(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      void handleAskPost();
+                    }
+                  }}
+                  placeholder="问问这篇文章的观点、结论或细节"
+                  className="theme-input-border h-10 min-w-0 flex-1 rounded-xl border bg-white px-3 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-theme-soft"
+                />
+                <Button
+                  type="button"
+                  className="theme-btn-primary h-10 rounded-xl px-4"
+                  onClick={() => void handleAskPost()}
+                  disabled={askLoading}
+                >
+                  {askLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '提问'}
+                </Button>
+              </div>
+              {askError ? (
+                <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-600">
+                  {askError}
+                </p>
+              ) : null}
+              {askResult ? (
+                <div className="mt-3 rounded-2xl border border-theme-soft-strong bg-white/80 p-3">
+                  <p className="text-sm leading-7 text-slate-700">{askResult.answer}</p>
+                  {askResult.citations?.length ? (
+                    <div className="mt-3 space-y-2">
+                      {askResult.citations.map((item, index) => (
+                        <div
+                          key={`${item.heading}-${index}`}
+                          className="rounded-xl bg-theme-soft/60 px-3 py-2"
+                        >
+                          {item.heading ? (
+                            <div className="text-[11px] font-medium text-theme-primary">
+                              {item.heading}
+                            </div>
+                          ) : null}
+                          <div className="mt-1 text-[11px] leading-5 text-slate-600">
+                            {item.quote}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </section>
             <div ref={commentSectionRef}>
               <PostComments

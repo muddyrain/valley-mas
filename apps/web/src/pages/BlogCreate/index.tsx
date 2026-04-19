@@ -69,8 +69,6 @@ type BatchMarkdownItem = {
   coverUploading?: boolean;
 };
 
-const MAX_BATCH_IMPORT_FILES = 50;
-
 function getErrorText(error: unknown, fallback: string) {
   if (error instanceof Error) {
     const message = error.message.trim();
@@ -578,13 +576,8 @@ export default function BlogCreate() {
 
   const handleBatchSelectMarkdown = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
-    const files = selectedFiles.slice(0, MAX_BATCH_IMPORT_FILES);
+    const files = selectedFiles;
     if (!files.length) return;
-    if (selectedFiles.length > MAX_BATCH_IMPORT_FILES) {
-      toast.error(
-        `单次最多导入 ${MAX_BATCH_IMPORT_FILES} 个文件，已自动截取前 ${MAX_BATCH_IMPORT_FILES} 个`,
-      );
-    }
 
     try {
       setBatchPreparing(true);
@@ -621,10 +614,12 @@ export default function BlogCreate() {
         }),
       );
 
-      setBatchItems(parsedItems);
+      setBatchItems((prev) => [...prev, ...parsedItems]);
       setBatchDone(false);
       setBatchHasUploadedFiles(true);
-      toast.success(`已识别 ${parsedItems.length} 篇 MD，请确认后批量创建`);
+      toast.success(
+        `本次识别 ${parsedItems.length} 篇，当前共 ${batchItems.length + parsedItems.length} 篇`,
+      );
     } catch {
       toast.error('批量读取 MD 失败，请稍后重试');
     } finally {
@@ -1603,13 +1598,13 @@ export default function BlogCreate() {
                   <label className="text-xs font-medium text-slate-600">
                     识别结果（共 {batchItems.length} 篇）
                   </label>
-                  {!batchRunning && !batchDone && (
+                  {!batchRunning && (
                     <button
                       type="button"
                       className="text-xs text-slate-400 transition hover:text-slate-600"
                       onClick={() => markdownBatchInputRef.current?.click()}
                     >
-                      重新上传文件
+                      上传文件
                     </button>
                   )}
                 </div>
@@ -1657,7 +1652,11 @@ export default function BlogCreate() {
                                 onChange={(event) =>
                                   handleBatchCoverToggle(index, event.target.checked)
                                 }
-                                disabled={batchRunning || item.status === 'running'}
+                                disabled={
+                                  batchRunning ||
+                                  item.status === 'running' ||
+                                  item.status === 'success'
+                                }
                               />
                               设置封面
                             </label>
@@ -1668,7 +1667,9 @@ export default function BlogCreate() {
                                   size="sm"
                                   variant="outline"
                                   className="h-7 rounded-lg px-2 text-xs"
-                                  disabled={batchRunning || item.coverUploading}
+                                  disabled={
+                                    batchRunning || item.coverUploading || item.status === 'success'
+                                  }
                                   onClick={() => handleOpenBatchCoverUpload(index)}
                                 >
                                   {item.coverUploading ? (
@@ -1685,7 +1686,9 @@ export default function BlogCreate() {
                                   size="sm"
                                   variant="outline"
                                   className="h-7 rounded-lg px-2 text-xs"
-                                  disabled={batchRunning || item.coverUploading}
+                                  disabled={
+                                    batchRunning || item.coverUploading || item.status === 'success'
+                                  }
                                   onClick={() => handleOpenBatchWallpaperPicker(index)}
                                 >
                                   选择资源壁纸
