@@ -6,11 +6,12 @@
   Clock3,
   Eye,
   Grid2X2,
+  List,
   MessageCircle,
   PencilLine,
   User,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -19,6 +20,8 @@ import {
   getAdminPostDetail,
   getPostComments,
   getPostDetailById,
+  getPosts,
+  type Post,
   type PostComment,
   type PostDetail,
 } from '@/api/blog';
@@ -82,6 +85,16 @@ export default function BlogPost() {
   const [commentTotal, setCommentTotal] = useState(0);
   const [imagePageIndex, setImagePageIndex] = useState(0);
   const [readProgress, setReadProgress] = useState(0);
+  const [relatedPosts, setRelatedPosts] = useState<Post[]>([]);
+  const [adjacentPosts, setAdjacentPosts] = useState<{ prev: Post | null; next: Post | null }>({
+    prev: null,
+    next: null,
+  });
+  const [relatedLoading, setRelatedLoading] = useState(false);
+  const [mobileTocOpen, setMobileTocOpen] = useState(false);
+  const [activeTocId, setActiveTocId] = useState('');
+  const articleSectionRef = useRef<HTMLElement | null>(null);
+  const commentSectionRef = useRef<HTMLDivElement | null>(null);
 
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo || '/blog';
   const returnLabel =
@@ -94,6 +107,12 @@ export default function BlogPost() {
     }
     navigate(returnTo);
   }, [navigate, returnTo]);
+
+  const scrollToSection = useCallback((target: HTMLElement | null) => {
+    if (!target) return;
+    const offsetTop = target.getBoundingClientRect().top + window.scrollY - 92;
+    window.scrollTo({ top: Math.max(0, offsetTop), behavior: 'smooth' });
+  }, []);
 
   const loadComments = useCallback(async (postId: string) => {
     setCommentLoading(true);
@@ -140,6 +159,20 @@ export default function BlogPost() {
     void loadPost(id);
   }, [id, loadPost]);
 
+  useEffect(() => {
+    setMobileTocOpen(false);
+    setActiveTocId('');
+  }, [id, toc.length]);
+
+  useEffect(() => {
+    if (!mobileTocOpen) return;
+    const originOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originOverflow;
+    };
+  }, [mobileTocOpen]);
+
   const imageTextData = useMemo<ImageTextPayload | null>(() => {
     if (!post || post.postType !== 'image_text') return null;
     const raw = post.imageTextData || post.templateData;
@@ -175,6 +208,33 @@ export default function BlogPost() {
     const rawExcerpt = post.excerpt?.trim() || post.content?.trim() || '';
     return createPlainTextExcerpt(rawExcerpt, 180);
   }, [post]);
+  const totalReadMinutes = useMemo(
+    () => (post && post.postType === 'blog' ? getReadingMinutes(post.content || '') : 0),
+    [post],
+  );
+  const remainingReadMinutes = useMemo(() => {
+    if (!totalReadMinutes) return 0;
+    return Math.max(0, Math.ceil(totalReadMinutes * (1 - readProgress / 100)));
+  }, [readProgress, totalReadMinutes]);
+  const activeTocTitle = useMemo(
+    () => toc.find((item) => item.id === activeTocId)?.text || '',
+    [activeTocId, toc],
+  );
+  const scrollStatusTip = useMemo(() => {
+    if (!totalReadMinutes) return '';
+    if (readProgress < 10) return '刚进入正文，建议先看目录快速定位想读章节。';
+    if (readProgress < 55) {
+      return activeTocTitle
+        ? `当前定位在「${activeTocTitle}」，继续滚动可保持章节连贯阅读。`
+        : '正在进入主阅读段落，保持节奏继续向下即可。';
+    }
+    if (readProgress < 90) {
+      return activeTocTitle
+        ? `已读过半，当前章节「${activeTocTitle}」。还剩约 ${remainingReadMinutes} 分钟。`
+        : `已读过半，还剩约 ${remainingReadMinutes} 分钟。`;
+    }
+    return '接近结尾，读完后可以继续看相关推荐。';
+  }, [activeTocTitle, readProgress, remainingReadMinutes, totalReadMinutes]);
 
   const canEditBlog = useMemo(() => {
     if (!post || post.postType !== 'blog') return false;
@@ -240,6 +300,78 @@ export default function BlogPost() {
     updateProgress();
     window.addEventListener('scroll', updateProgress, { passive: true });
     return () => window.removeEventListener('scroll', updateProgress);
+  }, [post]);
+
+  useEffect(() => {
+    if (!post || post.postType !== 'blog') return;
+    let cancelled = false;
+
+    const loadRelated = async () => {
+      try {
+        setRelatedLoading(true);
+        const groupId =
+          post.group?.id || (post.groupId && post.groupId !== '0' ? post.groupId : '');
+
+        const [groupList, timelineList] = await Promise.all([
+          getPosts({
+            page: 1,
+            pageSize: 12,
+            postType: 'blog',
+            sort: 'newest',
+            groupId: groupId || undefined,
+          }),
+          getPosts({
+            page: 1,
+            pageSize: 50,
+            postType: 'blog',
+            sort: 'newest',
+            groupId: groupId || undefined,
+          }),
+        ]);
+
+        if (cancelled) return;
+
+        const filteredRelated = (groupList.list || [])
+          .filter((item) => item.id !== post.id)
+          .slice(0, 4);
+        setRelatedPosts(filteredRelated);
+
+        let timeline = timelineList.list || [];
+        let currentIndex = timeline.findIndex((item) => item.id === post.id);
+        if (currentIndex < 0) {
+          const globalTimeline = await getPosts({
+            page: 1,
+            pageSize: 50,
+            postType: 'blog',
+            sort: 'newest',
+          });
+          if (cancelled) return;
+          timeline = globalTimeline.list || [];
+          currentIndex = timeline.findIndex((item) => item.id === post.id);
+        }
+
+        if (currentIndex >= 0) {
+          setAdjacentPosts({
+            prev: timeline[currentIndex - 1] || null,
+            next: timeline[currentIndex + 1] || null,
+          });
+        } else {
+          setAdjacentPosts({ prev: null, next: null });
+        }
+      } catch {
+        if (!cancelled) {
+          setRelatedPosts([]);
+          setAdjacentPosts({ prev: null, next: null });
+        }
+      } finally {
+        if (!cancelled) setRelatedLoading(false);
+      }
+    };
+
+    void loadRelated();
+    return () => {
+      cancelled = true;
+    };
   }, [post]);
 
   if (loading) {
@@ -505,7 +637,10 @@ export default function BlogPost() {
           style={{ width: `${readProgress}%` }}
         />
       </div>
-      <div className="theme-header sticky top-0 z-40 border-b bg-white/88 backdrop-blur">
+      <div
+        data-blog-post-nav
+        className="theme-header sticky top-0 z-40 border-b bg-white/88 backdrop-blur"
+      >
         <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-10">
           <button
             type="button"
@@ -520,6 +655,11 @@ export default function BlogPost() {
             <span className="hidden rounded-full bg-white px-3 py-1.5 text-xs text-slate-500 sm:inline-flex">
               阅读进度 {Math.round(readProgress)}%
             </span>
+            {activeTocTitle && (
+              <span className="hidden max-w-[320px] truncate rounded-full bg-theme-soft px-3 py-1.5 text-xs text-theme-primary lg:inline-flex">
+                正在阅读 · {activeTocTitle}
+              </span>
+            )}
             {canEditBlog && (
               <Link to={`/my-space/blog-edit/${post.id}`}>
                 <Button
@@ -597,27 +737,103 @@ export default function BlogPost() {
 
           <aside className="space-y-6">
             <section className="theme-hero-shell overflow-hidden rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)]">
-              <div className="text-sm font-medium text-slate-900">这篇文章讲什么</div>
-              <p className="mt-3 text-sm leading-7 text-slate-600">
-                {excerpt || '这篇文章还没有补充摘要，可以直接从正文开始阅读。'}
-              </p>
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-medium text-slate-900">阅读导览</div>
+                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-slate-500">
+                  共 {totalReadMinutes} 分钟
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-3 xl:grid-cols-1">
+                <div className="rounded-2xl bg-white/75 px-3 py-2.5">
+                  <div className="text-[11px] text-slate-400">当前进度</div>
+                  <div className="mt-1 font-medium text-slate-800">{Math.round(readProgress)}%</div>
+                </div>
+                <div className="rounded-2xl bg-white/75 px-3 py-2.5">
+                  <div className="text-[11px] text-slate-400">预计剩余</div>
+                  <div className="mt-1 font-medium text-slate-800">{remainingReadMinutes} 分钟</div>
+                </div>
+                <div className="rounded-2xl bg-white/75 px-3 py-2.5">
+                  <div className="text-[11px] text-slate-400">当前章节</div>
+                  <div className="mt-1 line-clamp-1 font-medium text-slate-800">
+                    {activeTocTitle || '准备进入正文'}
+                  </div>
+                </div>
+              </div>
+              <p className="mt-3 text-xs leading-6 text-slate-500">{scrollStatusTip}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 rounded-full"
+                  onClick={() => scrollToSection(articleSectionRef.current)}
+                >
+                  直达正文
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 rounded-full"
+                  onClick={() => scrollToSection(commentSectionRef.current)}
+                >
+                  直达评论
+                </Button>
+              </div>
             </section>
           </aside>
         </header>
 
         <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
           <main className="space-y-6">
-            <section className="theme-hero-shell rounded-[30px] border p-5 shadow-[0_20px_56px_rgba(148,163,184,0.12)] sm:p-6">
-              <p className="text-sm leading-8 text-slate-600">
-                聚焦阅读体验：正文图片可点击预览，支持缩放与旋转；目录可快速跳转定位；返回链路保留来源上下文。
-              </p>
-            </section>
-            <section className="theme-panel-shell rounded-[36px] border bg-white/95 p-6 shadow-[0_26px_70px_rgba(99,75,42,0.12)] sm:p-10">
+            <section
+              ref={articleSectionRef}
+              className="theme-panel-shell rounded-[36px] border bg-white/95 p-6 shadow-[0_26px_70px_rgba(99,75,42,0.12)] sm:p-10"
+            >
               <MarkdownContent
                 content={processedContent}
                 enableImagePreview
                 imagePreviewTitle={post.title || '博客图片预览'}
               />
+              {(adjacentPosts.prev || adjacentPosts.next) && (
+                <div className="border-theme-soft-strong mt-12 border-t pt-6">
+                  <div className="mb-3 text-sm font-medium text-slate-800">继续阅读</div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {adjacentPosts.prev ? (
+                      <Link
+                        to={`/blog/${adjacentPosts.prev.id}`}
+                        state={{ returnTo, returnLabel, source: 'blog-post' }}
+                        className="rounded-2xl border border-theme-soft-strong bg-theme-soft/40 p-4 transition hover:bg-theme-soft/70"
+                      >
+                        <div className="text-xs text-slate-500">上一篇</div>
+                        <div className="mt-1 line-clamp-2 text-sm font-medium text-slate-800">
+                          {adjacentPosts.prev.title}
+                        </div>
+                      </Link>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-xs text-slate-400">
+                        已经是第一篇
+                      </div>
+                    )}
+                    {adjacentPosts.next ? (
+                      <Link
+                        to={`/blog/${adjacentPosts.next.id}`}
+                        state={{ returnTo, returnLabel, source: 'blog-post' }}
+                        className="rounded-2xl border border-theme-soft-strong bg-theme-soft/40 p-4 transition hover:bg-theme-soft/70"
+                      >
+                        <div className="text-xs text-slate-500">下一篇</div>
+                        <div className="mt-1 line-clamp-2 text-sm font-medium text-slate-800">
+                          {adjacentPosts.next.title}
+                        </div>
+                      </Link>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-xs text-slate-400">
+                        已经是最后一篇
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="border-theme-soft-strong mt-12 border-t pt-6">
                 <Button
                   variant="ghost"
@@ -629,14 +845,30 @@ export default function BlogPost() {
                 </Button>
               </div>
             </section>
+            <div ref={commentSectionRef}>
+              <PostComments
+                comments={comments}
+                total={commentTotal}
+                loading={commentLoading}
+                submitting={commentSubmitting}
+                onSubmit={handleCommentSubmit}
+                onDelete={handleCommentDelete}
+                ownerId={post.author?.id}
+                title="博客评论"
+              />
+            </div>
           </main>
 
           <aside className="space-y-6 xl:sticky xl:top-20 xl:self-start">
             {toc.length > 0 && (
               <section className="theme-panel-shell rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)]">
                 <div className="text-sm font-medium text-slate-900">目录导读</div>
-                <div className="mt-4 max-h-[42vh] overflow-y-auto pr-1">
-                  <TableOfContents toc={toc} />
+                <div className="mt-4 max-h-[42vh] overflow-y-auto overflow-x-hidden pr-1">
+                  <TableOfContents
+                    toc={toc}
+                    activeId={activeTocId}
+                    onActiveIdChange={setActiveTocId}
+                  />
                 </div>
               </section>
             )}
@@ -656,22 +888,108 @@ export default function BlogPost() {
                     style={{ width: `${readProgress}%` }}
                   />
                 </div>
-                <div className="text-xs text-slate-500">继续滚动，沉浸完成本篇阅读。</div>
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>预计剩余</span>
+                  <span>{remainingReadMinutes} 分钟</span>
+                </div>
+                <div className="rounded-xl bg-theme-soft/55 px-3 py-2 text-xs leading-5 text-slate-600">
+                  {scrollStatusTip}
+                </div>
               </div>
             </section>
-
-            <PostComments
-              comments={comments}
-              total={commentTotal}
-              loading={commentLoading}
-              submitting={commentSubmitting}
-              onSubmit={handleCommentSubmit}
-              onDelete={handleCommentDelete}
-              ownerId={post.author?.id}
-              title="博客评论"
-            />
+            <section className="theme-panel-shell rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)]">
+              <div className="text-sm font-medium text-slate-900">相关推荐</div>
+              {relatedLoading ? (
+                <div className="mt-4 space-y-2">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="h-14 animate-pulse rounded-xl bg-theme-soft/60" />
+                  ))}
+                </div>
+              ) : relatedPosts.length > 0 ? (
+                <div className="mt-4 space-y-2">
+                  {relatedPosts.map((item) => (
+                    <Link
+                      key={item.id}
+                      to={`/blog/${item.id}`}
+                      state={{ returnTo, returnLabel, source: 'blog-post' }}
+                      className="block rounded-xl border border-theme-soft-strong bg-theme-soft/30 px-3 py-2 transition hover:bg-theme-soft/65"
+                    >
+                      <div className="line-clamp-2 text-sm text-slate-700">{item.title}</div>
+                      <div className="mt-1 text-[11px] text-slate-500">
+                        {item.group?.name || '未分组'} ·{' '}
+                        {formatDate(item.publishedAt || item.createdAt)}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-xs text-slate-500">暂未获取到相关推荐。</p>
+              )}
+            </section>
           </aside>
         </div>
+
+        {toc.length > 0 && (
+          <>
+            <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 px-4 xl:hidden">
+              <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-2 rounded-full border border-theme-soft-strong bg-white/94 p-2 shadow-[0_18px_44px_rgba(100,77,38,0.18)] backdrop-blur">
+                <div className="min-w-0 flex-1 rounded-full bg-theme-soft/60 px-3 py-1.5 text-xs text-slate-600">
+                  <div className="truncate">
+                    {activeTocTitle ? `正在阅读：${activeTocTitle}` : '打开目录快速定位章节'}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-slate-500">
+                    进度 {Math.round(readProgress)}%
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="theme-btn-primary h-9 rounded-full px-4 text-xs"
+                  onClick={() => setMobileTocOpen(true)}
+                >
+                  <List className="mr-1.5 h-3.5 w-3.5" />
+                  目录
+                </Button>
+              </div>
+            </div>
+
+            {mobileTocOpen && (
+              <div className="fixed inset-0 z-50 xl:hidden">
+                <button
+                  type="button"
+                  className="absolute inset-0 bg-slate-900/28"
+                  aria-label="关闭目录面板"
+                  onClick={() => setMobileTocOpen(false)}
+                />
+                <section className="theme-panel-shell absolute bottom-0 left-0 right-0 rounded-t-[24px] border border-b-0 bg-white px-4 pb-6 pt-4 shadow-[0_-24px_60px_rgba(15,23,42,0.2)]">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-slate-900">目录导读</div>
+                      <div className="mt-1 text-xs text-slate-500">点击标题即可跳转到对应章节</div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 rounded-full px-3 text-xs"
+                      onClick={() => setMobileTocOpen(false)}
+                    >
+                      收起
+                    </Button>
+                  </div>
+                  <div className="max-h-[52vh] overflow-y-auto overflow-x-hidden pr-1">
+                    <TableOfContents
+                      toc={toc}
+                      activeId={activeTocId}
+                      onActiveIdChange={setActiveTocId}
+                      onItemSelect={() => setMobileTocOpen(false)}
+                    />
+                  </div>
+                </section>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
