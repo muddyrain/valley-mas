@@ -177,6 +177,38 @@ export interface BlogAICoverResponse {
   model?: string;
 }
 
+export interface BlogReaderGuideResponse {
+  guide: string;
+  highlights: string[];
+  path: string;
+  model?: string;
+}
+
+export interface BlogAskCitation {
+  heading: string;
+  quote: string;
+}
+
+export interface BlogAskResponse {
+  answer: string;
+  citations?: BlogAskCitation[];
+  model?: string;
+}
+
+export interface BlogRecommendItem {
+  postId: string;
+  title: string;
+  excerpt: string;
+  groupName?: string;
+  readMinutes: number;
+  reason: string;
+}
+
+export interface BlogRecommendResponse {
+  items: BlogRecommendItem[];
+  model?: string;
+}
+
 export function getPosts(params: PostListParams = {}) {
   return request.get<unknown, PostListData>('/public/blog/posts', { params });
 }
@@ -269,6 +301,26 @@ export function generateBlogExcerpt(data: { title?: string; content: string }) {
 
 export function generateBlogCover(data: { title?: string; excerpt?: string; content: string }) {
   return request.post<unknown, BlogAICoverResponse>('/admin/blog/ai/cover', data);
+}
+
+export function generateBlogReaderGuide(postId: string) {
+  return request.post<unknown, BlogReaderGuideResponse>(
+    `/public/blog/posts/id/${postId}/ai/guide`,
+    {},
+  );
+}
+
+export function askBlogPost(postId: string, data: { question: string }) {
+  return request.post<unknown, BlogAskResponse>(`/public/blog/posts/id/${postId}/ai/ask`, data);
+}
+
+export function recommendBlogPosts(data: {
+  prompt: string;
+  groupId?: string;
+  keyword?: string;
+  sort?: 'newest' | 'oldest';
+}) {
+  return request.post<unknown, BlogRecommendResponse>('/public/blog/ai/recommend', data);
 }
 
 export function updatePost(id: string, data: Partial<CreatePostData>) {

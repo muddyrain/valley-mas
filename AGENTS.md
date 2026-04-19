@@ -30,6 +30,7 @@
 - Go + Vercel 发布链路：`vercel-go-release`
 - Go 调用火山 ARK 的 AI 能力：`ai-capability-orchestration`
 - Web 持续迭代任务管理：`web-feature-iteration`
+- Web 更新日志发布（仅 commit/push 节点记录）：`web-update-log-guard`
 - Web 列表页 keyword/page URL 联动：`web-url-state-sync`
 - climber-game 持续迭代任务管理：`climber-game-iteration`
 - climber-game 关卡与目标职责改动：`climber-game-design-guard`

@@ -50,13 +50,15 @@ export const getAllResources = (
     type?: string;
     keyword?: string;
     tagId?: string;
+    sort?: 'newest' | 'oldest';
   } = {},
 ) => {
-  const { page = 1, pageSize = 20, type, keyword, tagId } = params;
+  const { page = 1, pageSize = 20, type, keyword, tagId, sort } = params;
   const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (type) query.set('type', type);
   if (keyword) query.set('keyword', keyword);
   if (tagId) query.set('tagId', tagId);
+  if (sort) query.set('sort', sort);
   return http.get<unknown, ListResponse<Resource>>(`/public/resources?${query.toString()}`);
 };
 

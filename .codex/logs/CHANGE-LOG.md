@@ -1854,3 +1854,266 @@
 - 风险与后续：
   - 当前风险：上一篇/下一篇仍基于列表窗口推断，极端情况下可能无相邻项。
   - 下一步动作：推进 BAI-1，先冻结博客 AI MVP 能力边界。
+
+## 2026-04-19 13:02 (Asia/Shanghai)
+
+- 任务：启动 BAI 任务并完成 BAI-1 能力边界文档。
+- 改动文件：
+  - docs/architecture/2026-04-19_blog_ai_mvp_capability_boundary.md
+  - .codex/skills/web-feature-iteration/WEB-TASKS.md
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 新增博客 AI MVP 能力边界文档，覆盖 AI 导读、章节速览、问文章 三项能力。
+  - 对每项能力明确输入/输出、页面入口、触发方式与失败兜底策略。
+  - WEB-TASKS 将 BAI-1 标记为已完成，并将下一步建议切换为 BAI-2/BAI-3。
+- 校验：
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py docs/architecture/2026-04-19_blog_ai_mvp_capability_boundary.md .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md：通过
+- 风险与后续：
+  - 当前风险：BAI-2 未冻结范围前，仍可能发生能力蔓延。
+  - 下一步动作：执行 BAI-2，确定首批上线能力与裁剪项。
+
+## 2026-04-19 13:10 (Asia/Shanghai)
+
+- 任务：继续推进 BAI，完成 BAI-2 能力冻结与 BAI-3 UI 接入方案。
+- 改动文件：
+  - docs/architecture/2026-04-19_blog_ai_mvp_freeze_and_ui_plan.md
+  - .codex/skills/web-feature-iteration/WEB-TASKS.md
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - BAI-2：冻结首批上线能力为 AI 导读 + 问文章，并将 章节速览 延后到后续版本。
+  - BAI-3：补齐博客详情页与列表页的 AI 入口位置、状态反馈与失败兜底策略。
+  - WEB-TASKS：将 BAI（BAI-1~BAI-3）转入已完成，并更新下一步建议为 CLD-1/CLD-2。
+- 校验：
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py docs/architecture/2026-04-19_blog_ai_mvp_freeze_and_ui_plan.md .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md：通过
+- 风险与后续：
+  - 当前风险：AI 能力已冻结，但未进入页面代码实现阶段。
+  - 下一步动作：按 BAI-3 方案进入前端接入实现与交互联调。
+
+## 2026-04-19 13:21 (Asia/Shanghai)
+
+- 任务：将 BAI 从方案阶段推进到真实开发，落地 BlogPost 的 AI 导读 + 问文章。
+- 改动文件：
+  - server/internal/handler/blog_reader_ai.go
+  - server/internal/router/router.go
+  - pps/web/src/api/blog.ts
+  - pps/web/src/pages/blog/BlogPost/index.tsx
+  - .codex/skills/web-feature-iteration/WEB-TASKS.md
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 新增公开 AI 接口：POST /public/blog/posts/id/:id/ai/guide 与 POST /public/blog/posts/id/:id/ai/ask。
+  - 复用 ARK 文本模型配置与共享客户端，按文内上下文生成导读与问答结果。
+  - BlogPost 页面接入真实交互：导读按钮、提问输入、加载态、失败态、结果与引用展示。
+  - API 层补齐 generateBlogReaderGuide 与 skBlogPost 调用方法。
+  - WEB-TASKS 补充“BAI-MVP 首批能力代码接入”已完成记录。
+- 校验：
+  - cd server && go test ./...：通过
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogPost/index.tsx apps/web/src/api/blog.ts server/internal/handler/blog_reader_ai.go server/internal/router/router.go .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md：通过
+- 风险与后续：
+  - 当前风险：导读/问答输出结构仍依赖模型 JSON 服从度，极端情况下会走降级文案。
+  - 下一步动作：按 BAI-3 继续补 BlogList 的“AI 推荐读哪篇”轻入口与接口。
+
+## 2026-04-19 13:41 (Asia/Shanghai)
+
+- 任务：继续推进 BAI 代码能力，完成 BlogList 的“AI 推荐读哪篇”接入。
+- 改动文件：
+  - server/internal/handler/blog_reader_ai.go
+  - server/internal/router/router.go
+  - pps/web/src/api/blog.ts
+  - pps/web/src/pages/blog/BlogList/index.tsx
+  - .codex/skills/web-feature-iteration/WEB-TASKS.md
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 新增推荐接口：POST /public/blog/ai/recommend，基于当前筛选候选 + AI 意图返回 1-3 篇推荐及理由。
+  - BlogList 搜索卡新增“AI 推荐读哪篇”入口与轻量面板（输入意图、加载态、失败态、推荐结果）。
+  - 推荐结果可直接跳转博客详情，并保留来源 source=blog-ai-recommend 的返回上下文。
+  - WEB-TASKS 新增“BAI-MVP 列表页推荐接入”已完成记录。
+- 校验：
+  - cd server && go test ./...：通过
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogList/index.tsx apps/web/src/api/blog.ts server/internal/handler/blog_reader_ai.go server/internal/router/router.go .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md：通过
+- 风险与后续：
+  - 当前风险：推荐结果依赖模型 JSON 服从度，异常时会回退候选兜底推荐。
+  - 下一步动作：补“章节速览”能力的正式接口与详情页目录区展示。
+
+## 2026-04-19 13:44 (Asia/Shanghai)
+
+- 任务：调整 BlogList 顶部主视觉标题与主题背景，去除偏蓝色调。
+- 改动文件：
+  - pps/web/src/pages/blog/BlogList/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 主标题由“博客分组阅读中心”改为“博客主题深读中心”。
+  - 背景渐变改为暖金/奶油方向，移除蓝色径向高光。
+  - 新增轻量图形元素与低频脉冲动效，增强识别度但不干扰阅读。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogList/index.tsx .codex/logs/CHANGE-LOG.md：通过
+- 风险与后续：
+  - 当前风险：极低，属于纯视觉层改动。
+  - 下一步动作：如需可继续统一 BlogList 其余卡片层级的动效节奏。
+
+## 2026-04-19 13:45 (Asia/Shanghai)
+
+- 任务：落地 Web 系统更新日志能力（后端存储 + Web 展示 + Admin 管理），并新增仅在 commit/push 节点写对外更新日志的 skill。
+- 改动文件：
+  - `server/internal/model/model.go`
+  - `server/internal/database/database.go`
+  - `server/internal/router/router.go`
+  - `server/internal/handler/system_update.go`
+  - `server/migrations/012_create_system_updates.sql`
+  - `apps/web/src/api/systemUpdate.ts`
+  - `apps/web/src/pages/SystemUpdates/index.tsx`
+  - `apps/web/src/App.tsx`
+  - `apps/web/src/layouts/Header.tsx`
+  - `apps/admin/src/api/system-update.ts`
+  - `apps/admin/src/pages/SystemUpdates.tsx`
+  - `apps/admin/src/App.tsx`
+  - `apps/admin/src/layouts/Layout.tsx`
+  - `.codex/skills/web-update-log-guard/SKILL.md`
+  - `.codex/skills/web-update-log-guard/agents/openai.yaml`
+  - `.codex/skills/INDEX.md`
+  - `AGENTS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 `SystemUpdate` 数据模型与自动迁移接线，平台固定 `web`，支持草稿/发布状态与发布时间。
+  - 新增公开接口 `GET /api/v1/public/system-updates`，后端强制仅返回 `web + published` 且已到发布时间的更新，并只返回用户可见字段（标题/内容/时间）。
+  - 新增管理接口 `GET/POST/PUT/DELETE /api/v1/admin/system-updates`，支持在 admin 手动创建、编辑、删除系统更新。
+  - Web 新增 `/updates` 页面与导航入口，用于展示“更新内容 + 更新时间”，不暴露文件名与内部实现信息。
+  - Admin 新增“系统更新日志”菜单与管理页，可按标题/内容检索并执行增删改。
+  - 新增 `web-update-log-guard` skill，明确“仅在 commit/push 节点记录对外 Web 更新日志”，并同步 AGENTS 与 skills 索引。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `pnpm --filter admin exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前风险：当前 admin 发布时间采用“发布时默认当前时间”的交互，若后续需要精确定时发布，可补充日期时间选择器。
+  - 下一步动作：在实际 commit/push 流程中启用 `web-update-log-guard`，将本次 Web 功能变更写入系统更新日志并再发布到线上。
+
+## 2026-04-19 13:49 (Asia/Shanghai)
+
+- 任务：修复“AI 推荐读哪篇”价值感不足问题，并升级交互表达。
+- 改动文件：
+  - server/internal/handler/blog_reader_ai.go
+  - pps/web/src/api/blog.ts
+  - pps/web/src/pages/blog/BlogList/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 推荐接口返回结构升级：新增 	itle/excerpt/groupName/readMinutes，前端不再依赖“当前分页数据匹配”。
+  - 修复“请求成功但看不到结果”的核心问题（跨页推荐也可直接展示）。
+  - 推荐面板升级为“AI 阅读路线”：加入快捷意图 chips、路线式卡片（序号、预计时长、分组、推荐理由）与更强视觉反馈。
+  - 交互收口：发起新推荐时清空旧结果，避免旧数据误导。
+- 校验：
+  - cd server && go test ./...：通过
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py server/internal/handler/blog_reader_ai.go apps/web/src/pages/blog/BlogList/index.tsx apps/web/src/api/blog.ts .codex/logs/CHANGE-LOG.md：通过
+- 风险与后续：
+  - 当前风险：推荐质量仍受模型输出稳定性影响。
+  - 下一步动作：可增加“推荐理由可信提示”和“换一批”机制，进一步提升可玩性与可控性。
+
+## 2026-04-19 13:53 (Asia/Shanghai)
+
+- 任务：将 BlogList AI 推荐提示词调整为技术博客语境。
+- 改动文件：
+  - pps/web/src/pages/blog/BlogList/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 快捷意图 chips 改为前端技术方向：JS/TS、HTML+CSS、Vue/React 工程化。
+  - 输入框占位文案改为技术问题示例（异步、布局、性能优化）。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogList/index.tsx .codex/logs/CHANGE-LOG.md：通过
+- 风险与后续：
+  - 当前风险：无功能风险，属于文案引导优化。
+  - 下一步动作：如需可继续细分为“框架 / 工程化 / 性能 / CSS”四类快捷入口。
+
+## 2026-04-19 13:59 (Asia/Shanghai)
+
+- 任务：按反馈修正 BlogList 页头主题表现与 AI 推荐布局。
+- 改动文件：
+  - pps/web/src/pages/blog/BlogList/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 页头背景收敛为主题变量驱动，不再出现红黄对冲感。
+  - AI 推荐从页头内联展开改为独立弹层面板，避免撑高页头导致左右布局失衡。
+  - 推荐结果区域加入最大高度与滚动，结果较多时不影响主布局。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogList/index.tsx .codex/logs/CHANGE-LOG.md：通过
+- 风险与后续：
+  - 当前风险：无功能风险，主要为布局与视觉优化。
+  - 下一步动作：可按需要继续微调弹层宽度与卡片密度。
+
+## 2026-04-19 14:02 (Asia/Shanghai)
+
+- 任务：按反馈优化 BlogList AI 推荐交互样式，避免弹框观感与页头布局冲突。
+- 改动文件：
+  - pps/web/src/pages/blog/BlogList/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 将 AI 推荐从全局 Dialog 改为按钮下方悬浮 Popover 面板（不遮全屏、不撑高页头）。
+  - 页头背景继续收敛到主题变量，不使用红黄对冲色块。
+  - 保留推荐结果滚动区与跳转链路，确保功能不回退。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogList/index.tsx .codex/logs/CHANGE-LOG.md：通过
+- 风险与后续：
+  - 当前风险：Popover 在极窄屏下宽度受限，已设置最大宽并跟随容器。
+  - 下一步动作：可按视觉稿继续微调阴影与边框对比度。
+
+## 2026-04-19 14:09 (Asia/Shanghai)
+
+- 任务：按反馈将 AI 推荐交互改为右侧滑出抽屉。
+- 改动文件：
+  - pps/web/src/pages/blog/BlogList/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 移除 Popover 方案，改为 fixed 右侧滑出抽屉（含遮罩与过渡动画）。
+  - 抽屉开启时锁定页面滚动，关闭后恢复，避免滚动穿透。
+  - 推荐输入、快捷意图、结果卡与跳转链路全部保留。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogList/index.tsx .codex/logs/CHANGE-LOG.md：通过
+- 风险与后续：
+  - 当前风险：抽屉在超小屏宽度下占比仍较高，但已限制为 92vw 上限。
+  - 下一步动作：可继续优化抽屉头部与卡片密度。
+
+## 2026-04-19 14:12 (Asia/Shanghai)
+
+- 任务：优化 BlogCreate 批量导入体验，支持追加上传并调整按钮文案。
+- 改动文件：
+  - pps/web/src/pages/BlogCreate/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 批量选择 MD 文件时由“覆盖模式”改为“追加模式”，第二次上传不会清空上次识别结果。
+  - 去掉单次导入文件数量截断逻辑（不再自动截取前 N 个）。
+  - 识别结果区按钮文案由“重新上传文件”统一为“上传文件”。
+  - 导入完成态也保留“上传文件”入口，便于继续追加文件。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/BlogCreate/index.tsx .codex/logs/CHANGE-LOG.md：通过
+- 风险与后续：
+  - 当前风险：一次性上传超大量文件会拉长前端解析时间。
+  - 下一步动作：如有需要可补“每批次分段解析进度提示”。
+
+## 2026-04-19 14:20 (Asia/Shanghai)
+
+- 任务：修复批量导入封面设置边界，并为“选择资源壁纸”补充排序筛选。
+- 改动文件：
+  - pps/web/src/pages/BlogCreate/index.tsx
+  - pps/web/src/components/blog/PublicWallpaperPickerDialog.tsx
+  - pps/web/src/api/resource.ts
+  - server/internal/handler/home.go
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 批量导入中，已创建成功（status=success）条目禁用“设置封面”开关与封面操作按钮。
+  - 壁纸选择弹框新增排序筛选：新到旧 / 旧到新。
+  - getAllResources 与后端 /public/resources 新增 sort 参数支持，并按 created_at 排序。
+- 校验：
+  - cd server && go test ./...：通过
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/BlogCreate/index.tsx apps/web/src/components/blog/PublicWallpaperPickerDialog.tsx apps/web/src/api/resource.ts server/internal/handler/home.go .codex/logs/CHANGE-LOG.md：通过
+- 风险与后续：
+  - 当前风险：无明显风险，改动集中在 UI 状态限制与列表排序参数。
+  - 下一步动作：如需可继续补“按下载量/热度排序”选项。

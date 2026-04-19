@@ -8,6 +8,7 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  NotificationOutlined,
   PictureOutlined,
   UserOutlined,
 } from '@ant-design/icons';
@@ -26,6 +27,7 @@ const adminMenuItems = [
   { key: '/creator-applications', icon: <AuditOutlined />, label: '创作者申请审核' },
   { key: '/resources', icon: <PictureOutlined />, label: '资源管理' },
   { key: '/records', icon: <FileTextOutlined />, label: '记录管理' },
+  { key: '/system-updates', icon: <NotificationOutlined />, label: '系统更新日志' },
   { key: '/blog-posts', icon: <BookOutlined />, label: '博客管理' },
 ];
 

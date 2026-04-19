@@ -446,6 +446,29 @@ func (n *UserNotification) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+// SystemUpdate 系统更新日志（对外仅展示用户可感知内容）
+type SystemUpdate struct {
+	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	Platform    string         `gorm:"size:20;index;not null;default:'web'" json:"platform"` // web
+	Title       string         `gorm:"size:120;not null" json:"title"`
+	Content     string         `gorm:"size:2000;not null" json:"content"`
+	Status      string         `gorm:"size:20;index;not null;default:'draft'" json:"status"` // draft/published
+	PublishedAt *time.Time     `gorm:"index" json:"publishedAt,omitempty"`
+	CreatedBy   *Int64String   `gorm:"index" json:"createdBy,omitempty"`
+	UpdatedBy   *Int64String   `gorm:"index" json:"updatedBy,omitempty"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
+func (u *SystemUpdate) BeforeCreate(tx *gorm.DB) error {
+	if u.ID == 0 {
+		u.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
 // GuestbookMessage 访客留言
 type GuestbookMessage struct {
 	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`

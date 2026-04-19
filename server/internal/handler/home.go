@@ -474,6 +474,7 @@ func GetAllResources(c *gin.Context) {
 	resourceType := c.Query("type")
 	keyword := c.Query("keyword")
 	tagID := strings.TrimSpace(c.Query("tagId"))
+	sort := strings.TrimSpace(c.Query("sort"))
 
 	if page < 1 {
 		page = 1
@@ -500,8 +501,13 @@ func GetAllResources(c *gin.Context) {
 	var total int64
 	query.Count(&total)
 
+	orderExpr := "created_at DESC"
+	if strings.EqualFold(sort, "oldest") {
+		orderExpr = "created_at ASC"
+	}
+
 	var resources []model.Resource
-	if err := query.Order("created_at DESC").Limit(pageSize).Offset(offset).Preload("Tags").Find(&resources).Error; err != nil {
+	if err := query.Order(orderExpr).Limit(pageSize).Offset(offset).Preload("Tags").Find(&resources).Error; err != nil {
 		Error(c, 500, "查询失败: "+err.Error())
 		return
 	}

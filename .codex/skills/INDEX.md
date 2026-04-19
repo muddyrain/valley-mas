@@ -229,6 +229,25 @@
 - "首次推这个分支"
 - "发布前别推错远端"
 
+### `web-update-log-guard`
+
+文件：
+- [web-update-log-guard](./web-update-log-guard/SKILL.md)
+
+什么时候触发：
+- 要发布 Web 更新日志给用户
+- 本轮 Web 改动准备执行 commit/push
+- 需要避免把临时改动或未发布内容写到对外日志
+
+不适合什么时候用：
+- 仅本地试改、尚未提交发布
+- 纯工程重构且用户无感知变化
+
+典型触发语：
+- "commit/push 的时候自动记录 Web 更新"
+- "更新日志只写功能变化和时间"
+- "不要暴露文件名和实现细节"
+
 ### `encoding-guard`
 
 文件：
