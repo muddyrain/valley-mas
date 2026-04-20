@@ -2450,3 +2450,139 @@
 - 风险与后续：
   - 当前风险：当前仅同步“章节被 AI 探索过”的布尔轨迹，尚未同步“问答文本历史”，跨端无法回看具体问答内容。
   - 下一步动作：推进“名著 AI 问章节历史跨设备同步”，补云端问答记录表与最近问答回放入口。
+
+## 2026-04-20 20:09 (Asia/Shanghai)
+
+- 任务：修复名著馆 recent/progress 接口在实际请求中的 400/500 异常，提升参数兼容性并去除对唯一约束完整性的硬依赖。
+- 改动文件：
+  - `server/internal/handler/classics_reading_common.go`（新增）
+  - `server/internal/handler/classics_progress.go`
+  - `server/internal/handler/classics_recent.go`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 抽出 `classics_reading_common` 公共逻辑，统一 recent/progress 的请求解析、书籍/版本校验、时间处理与响应字段组装，避免两处继续复制同类逻辑。
+  - `bookId/editionId/chapterIndex/savedAt` 改为可同时接收 JSON 字符串或数字（`model.Int64String`），减少因前端字段类型漂移导致的 `参数错误`。
+  - 去掉 `ON CONFLICT` 直写，改为“先按 `user_id + book_id` 更新，未命中再插入；并发重复时再回退更新”，避免历史库缺失唯一约束时触发 500。
+  - recent/progress 两个保存接口复用同一套 upsert 路径，保证行为一致。
+- 校验：
+  - `cd server && go test ./...`：通过
+- 风险与后续：
+  - 当前风险：`classics_user_shelves` 与 `classics_user_ai_explored` 仍使用 `ON CONFLICT`，若线上历史库同样缺失对应唯一约束，后续可能出现同类 500。
+  - 下一步动作：建议同样迁移这两个接口为“更新优先 + 插入兜底”写入策略，或补充一次幂等的唯一约束修复迁移。
+
+## 2026-04-20 20:15 (Asia/Shanghai)
+
+- 任务：修复名著列表“最近阅读”出现同一本书重复展示的问题。
+- 改动文件：
+  - `apps/web/src/hooks/useClassicsShelf.ts`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 调整最近阅读去重策略：在 `bookId` 去重基础上，新增按“书名 + 作者 + 朝代”二次去重，保留最新记录。
+  - 去重逻辑改为按 `savedAt` 降序先排再去重，避免旧记录覆盖新记录。
+  - 云端与本地合并后返回结果统一走去重流程，确保首次渲染也不会出现重复卡片。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/hooks/useClassicsShelf.ts`：通过
+- 风险与后续：
+  - 当前风险：若确实存在“同名同作者同朝代但不同作品”的极少场景，当前会合并展示为一条。
+  - 下一步动作：如后续出现该场景，可补充 `workId/sourceId` 后按稳定业务主键去重。
+
+## 2026-04-20 20:32 (Asia/Shanghai)
+
+- 任务：将名著馆默认内容调整为“更新一些、白话简体优先”，并补齐无封面时的可视化封面体验。
+- 改动文件：
+  - `server/internal/handler/classics_cover.go`（新增）
+  - `server/internal/handler/classics.go`
+  - `server/internal/handler/classics_recent.go`
+  - `server/scripts/seed_classics.go`
+  - `apps/web/src/pages/ClassicsList/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增后端封面兜底：当 `cover_url` 为空时，按书名/分类动态生成 SVG data URI 封面，列表/详情/最近阅读都能稳定显示封面。
+  - 调整名著列表默认策略：无关键词和筛选时，默认优先返回 `现代文学/外国文学` 与 `近现代/外国`，减少文言文内容干扰；古典内容仍可通过筛选查看。
+  - Web 端名著馆筛选项排序改为现代内容优先，并将页头文案明确为“默认优先展示近现代白话简体作品”。
+  - 重写 `seed_classics` 的默认种子书目为白话/现代向（鲁迅、老舍及多本外国文学简体译本向条目），降低初始数据古文占比。
+  - 已执行 `pnpm classics:seed` 完成一次迁移+seed，当前环境新增/更新了现代向书目与章节样本。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py server/internal/handler/classics_cover.go server/internal/handler/classics.go server/internal/handler/classics_recent.go server/scripts/seed_classics.go apps/web/src/pages/ClassicsList/index.tsx`：通过
+  - `pnpm classics:seed`：通过（迁移 + seed 完成）
+- 风险与后续：
+  - 当前风险：若后续继续导入古典全量正文，默认列表仍会优先现代内容，但古典仍可通过筛选进入，需持续保持产品预期一致。
+  - 下一步动作：可补一批“现代白话公版全文源”抓取规则（如鲁迅合集按篇导入），把当前种子样本文本升级为完整可读正文。
+## 2026-04-20 21:21 (Asia/Shanghai)
+
+- 任务：让“编辑资源信息”弹框左侧图片支持大图预览，并复用公共预览组件。
+- 改动文件：
+  - `apps/web/src/components/EditResourceDialog.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 `EditResourceDialog` 引入并接入公共 `ImagePreviewDialog`，不新增并行预览实现。
+  - 左侧图片预览区改为可点击区域，增加“点击预览”提示，点击后打开统一的大图预览弹层。
+  - 在资源切换/关闭时重置 `previewOpen`，避免弹层状态残留影响后续编辑。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/EditResourceDialog.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：预览展示仍以 `resource.url` 为主，若后端返回图链不可访问将显示加载失败（与现有预览行为一致）。
+  - 下一步动作：如需更强健，可在预览失败时自动回退到 `thumbnailUrl`。
+
+## 2026-04-20 21:51 (Asia/Shanghai)
+
+- 任务：响应“要全文 + 分页要在页面实际可用”，补全现代白话书目全文导入入口并修正名著列表分页可见性。
+- 改动文件：
+  - `server/scripts/import_classics_fulltext.go`
+  - `apps/web/src/pages/ClassicsList/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 全文导入脚本新增《呐喊》《彷徨》维基文库导入配置，抽取 `parseWikisourcePages` 公共逻辑复用，和《朝花夕拾》保持同一全文抓取路径。
+  - 名著列表分页大小由 `20` 调整为 `6`，确保当前数据量下页面也能直接出现并使用“上一页/下一页”。
+  - 触发一次定向全文导入命令：`CLASSICS_ONLY=朝花夕拾,呐喊,彷徨 pnpm classics:import-fulltext`，用于将样本章节替换为全文章节。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py server/scripts/import_classics_fulltext.go apps/web/src/pages/ClassicsList/index.tsx .codex/logs/CHANGE-LOG.md`：通过
+  - `CLASSICS_ONLY=朝花夕拾,呐喊,彷徨 pnpm classics:import-fulltext`：未通过（`zh.wikisource.org` TLS handshake timeout）
+- 风险与后续：
+  - 当前风险：全文导入依赖上游源站可达性，当前网络到维基文库握手超时导致本轮未能完成落库。
+  - 下一步动作：切换可达的镜像源或提升抓取容错（更长超时 + 退避重试 + 备用源），恢复后立即重跑定向导入。
+
+## 2026-04-20 21:54 (Asia/Shanghai)
+
+- 任务：修复名著列表分页接口“无筛选时查不到古典书目”的回归问题。
+- 改动文件：
+  - `server/internal/handler/classics.go`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 移除 `GetClassicsList` 中“无 keyword/category/dynasty 时仅返回现代/外国分类”的隐式过滤。
+  - 保留现代内容优先排序，但恢复分页查询的全量书目可见性（含《三国演义》等古典书）。
+- 校验：
+  - `cd server && go test ./...`：通过
+- 风险与后续：
+  - 当前风险：无筛选时古典书会回到分页结果中，若需要“首页更白话”可在前端增加可见的默认筛选开关，避免后端隐式改语义。
+  - 下一步动作：如你同意，可把“白话优先”做成前端可见的默认筛选 Tag（可一键清除），语义更直观。
+
+## 2026-04-20 23:01 (Asia/Shanghai)
+
+- 任务：修复“全文导入后出现繁体与特殊标记字符”的问题，并完成当前白话书单的全量章节导入。
+- 改动文件：
+  - `server/scripts/import_classics_fulltext.go`
+  - `server/scripts/seed_classics.go`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 对维基文库来源改为 `action=render&variant=zh-hans` 抓取，新增渲染文本清洗流程，去掉 `&emsp;`、`<p ...>` 等 HTML/实体残留，正文统一落为简体展示文本。
+  - 增加通用 Python 网络兜底抓取，解决 Go 原生请求在当前环境下对 wikisource/gutenberg 偶发 TLS/连接中断问题。
+  - 新增/修正现代书单的全文来源与解析：`呐喊/彷徨` 章节页、`简爱/傲慢与偏见/了不起的盖茨比/月亮与六便士/鲁滨逊漂流记/巴斯克维尔的猎犬`，并修正《了不起的盖茨比》罗马数字章节解析（过滤目录区）。
+  - 调整 seed 书单以对齐可稳定导入全文的书目（将无法稳定全量抓取的条目替换为可全量来源条目）。
+  - 已执行两轮定向全文导入并完成落库：
+    - `CLASSICS_ONLY=朝花夕拾,呐喊,彷徨 pnpm classics:import-fulltext`（成功，37 章）
+    - `CLASSICS_ONLY=简爱,傲慢与偏见,了不起的盖茨比,月亮与六便士,鲁滨逊漂流记,巴斯克维尔的猎犬 pnpm classics:import-fulltext`（成功，202 章）
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm classics:seed`：通过
+  - `CLASSICS_ONLY=朝花夕拾,呐喊,彷徨 pnpm classics:import-fulltext`：通过
+  - `CLASSICS_ONLY=简爱,傲慢与偏见,了不起的盖茨比,月亮与六便士,鲁滨逊漂流记,巴斯克维尔的猎犬 pnpm classics:import-fulltext`：通过
+- 风险与后续：
+  - 当前风险：维基文库渲染页顶部可能仍有少量来源元信息行，当前已做通用清洗但个别作品模板格式变化时仍需补规则。
+  - 下一步动作：可继续增加“导入后文本质量检查（首尾模板噪声探测）”脚本，导入后自动报警并回滚异常章节。

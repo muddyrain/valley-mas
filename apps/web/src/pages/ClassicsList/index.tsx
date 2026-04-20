@@ -15,19 +15,21 @@ import {
   useUrlQueryState,
 } from '@/hooks/useUrlPaginationQuery';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 6;
 
 const CATEGORY_OPTIONS = [
   { label: '全部', value: '' },
-  { label: '古典文学', value: '古典文学' },
-  { label: '外国文学', value: '外国文学' },
-  { label: '诗词歌赋', value: '诗词歌赋' },
   { label: '现代文学', value: '现代文学' },
+  { label: '外国文学', value: '外国文学' },
+  { label: '古典文学', value: '古典文学' },
+  { label: '诗词歌赋', value: '诗词歌赋' },
   { label: '历史传记', value: '历史传记' },
 ];
 
 const DYNASTY_OPTIONS = [
   { label: '全部', value: '' },
+  { label: '近现代', value: '近现代' },
+  { label: '外国', value: '外国' },
   { label: '先秦', value: '先秦' },
   { label: '汉', value: '汉' },
   { label: '魏晋南北朝', value: '魏晋南北朝' },
@@ -36,8 +38,6 @@ const DYNASTY_OPTIONS = [
   { label: '元', value: '元' },
   { label: '明', value: '明' },
   { label: '清', value: '清' },
-  { label: '近现代', value: '近现代' },
-  { label: '外国', value: '外国' },
 ];
 
 const CLASSICS_QUERY_SCHEMA = {
@@ -238,7 +238,9 @@ export default function ClassicsList() {
           <h1 className="text-4xl font-bold tracking-tight text-slate-800 sm:text-5xl">
             经典文学，随时阅读
           </h1>
-          <p className="mt-4 text-lg text-slate-500">收录中外名著，多版本章节阅读，感受文字之美</p>
+          <p className="mt-4 text-lg text-slate-500">
+            默认优先展示近现代白话简体作品，也可按分类查看古典原文
+          </p>
           <div className="mt-6 flex justify-center">
             <Button
               variant="outline"
