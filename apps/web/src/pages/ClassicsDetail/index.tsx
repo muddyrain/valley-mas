@@ -1,4 +1,5 @@
 import {
+  BookMarked,
   Bookmark,
   BookmarkCheck,
   BookOpen,
@@ -26,38 +27,16 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  addToShelf,
-  getAiExploredChapters,
-  isInShelf,
-  markChapterAiExplored,
-  pushRecentBook,
-  removeFromShelf,
+  addToShelfWithSync,
+  getAiExploredChaptersWithSync,
+  getProgressWithSync,
+  getShelfIdsWithSync,
+  markChapterAiExploredWithSync,
+  pushRecentBookWithSync,
+  type ReadProgress,
+  removeFromShelfWithSync,
+  saveProgressWithSync,
 } from '@/hooks/useClassicsShelf';
-
-// ---- 阅读进度持久化 ----
-const PROGRESS_KEY = (id: string) => `classics_progress_${id}`;
-
-interface ReadProgress {
-  editionId: string;
-  chapterIndex: number;
-  chapterTitle?: string;
-  savedAt: number;
-}
-
-function saveProgress(id: string, progress: ReadProgress) {
-  try {
-    localStorage.setItem(PROGRESS_KEY(id), JSON.stringify(progress));
-  } catch {}
-}
-
-function loadProgress(id: string): ReadProgress | null {
-  try {
-    const raw = localStorage.getItem(PROGRESS_KEY(id));
-    return raw ? (JSON.parse(raw) as ReadProgress) : null;
-  } catch {
-    return null;
-  }
-}
 
 export default function ClassicsDetail() {
   const { id } = useParams<{ id: string }>();
@@ -103,9 +82,22 @@ export default function ClassicsDetail() {
   // 页面挂载时读取已保存进度 + 书架状态 + AI 探索记录
   useEffect(() => {
     if (!id) return;
-    setSavedProgress(loadProgress(id));
-    setInShelf(isInShelf(id));
-    setAiExploredChapters(new Set(getAiExploredChapters(id)));
+    let disposed = false;
+
+    void Promise.all([
+      getShelfIdsWithSync(),
+      getProgressWithSync(id),
+      getAiExploredChaptersWithSync(id),
+    ]).then(([shelfIds, progress, exploredChapters]) => {
+      if (disposed) return;
+      setInShelf(shelfIds.includes(id));
+      setSavedProgress(progress);
+      setAiExploredChapters(new Set(exploredChapters));
+    });
+
+    return () => {
+      disposed = true;
+    };
   }, [id]);
 
   // 加载书籍详情
@@ -149,18 +141,19 @@ export default function ClassicsDetail() {
     getClassicsChapter(id, editionId, chapterIndex)
       .then((ch) => {
         setActiveChapter(ch);
-        // 保存进度
-        saveProgress(id, {
+        const nextProgress: ReadProgress = {
           editionId,
           chapterIndex,
           chapterTitle: ch.title,
           savedAt: Date.now(),
-        });
-        setSavedProgress({ editionId, chapterIndex, chapterTitle: ch.title, savedAt: Date.now() });
+        };
+        // 保存进度（登录态云端同步，游客本地兜底）
+        setSavedProgress(nextProgress);
+        void saveProgressWithSync(id, nextProgress);
         // 写入最近阅读（需要 book 信息）
         setBook((b) => {
           if (b) {
-            pushRecentBook({
+            void pushRecentBookWithSync({
               id: b.id,
               title: b.title,
               coverUrl: b.coverUrl,
@@ -204,7 +197,7 @@ export default function ClassicsDetail() {
       const data = await getClassicsChapterGuide(id, editionId, chapterIndex);
       setAiGuide(data);
       // CLAI-3：标记本章已 AI 探索
-      markChapterAiExplored(id, chapterIndex);
+      void markChapterAiExploredWithSync(id, chapterIndex);
       setAiExploredChapters((prev) => new Set([...prev, chapterIndex]));
     } catch {
       setAiGuideError('导读生成失败，请稍后重试。');
@@ -226,7 +219,7 @@ export default function ClassicsDetail() {
       const data = await askClassicsChapter(id, editionId, chapterIndex, q);
       setAskResult(data);
       // CLAI-3：标记本章已 AI 探索
-      markChapterAiExplored(id, chapterIndex);
+      void markChapterAiExploredWithSync(id, chapterIndex);
       setAiExploredChapters((prev) => new Set([...prev, chapterIndex]));
     } catch {
       setAskError('暂时无法回答，请换个问法或稍后再试。');
@@ -603,14 +596,14 @@ export default function ClassicsDetail() {
               size="sm"
               variant="outline"
               className={`gap-1.5 ${inShelf ? 'border-theme-soft-strong text-theme-primary' : ''}`}
-              onClick={() => {
+              onClick={async () => {
                 if (!id) return;
                 if (inShelf) {
-                  removeFromShelf(id);
                   setInShelf(false);
+                  await removeFromShelfWithSync(id);
                 } else {
-                  addToShelf(id);
                   setInShelf(true);
+                  await addToShelfWithSync(id);
                 }
               }}
             >
@@ -620,6 +613,15 @@ export default function ClassicsDetail() {
                 <Bookmark className="h-3.5 w-3.5" />
               )}
               {inShelf ? '已加入书架' : '加入书架'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => navigate('/classics/shelf')}
+            >
+              <BookMarked className="h-3.5 w-3.5" />
+              查看书架
             </Button>
           </div>
 

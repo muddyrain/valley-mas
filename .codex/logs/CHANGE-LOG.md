@@ -2,6 +2,115 @@
 
 > 说明：记录每次真实落地改动，按时间顺序追加，不覆盖历史。
 
+## 2026-04-20 16:34 (Asia/Shanghai)
+
+- 任务：继续名著增强，完成“最近阅读跨设备同步（登录态云端 + 游客本地兜底）”。
+- 改动文件：
+  - `server/migrations/016_create_classics_user_recent.sql`（新增）
+  - `server/internal/model/classics.go`
+  - `server/internal/database/database.go`
+  - `server/internal/handler/classics_recent.go`（新增）
+  - `server/internal/router/router.go`
+  - `apps/web/src/api/classics.ts`
+  - `apps/web/src/hooks/useClassicsShelf.ts`
+  - `apps/web/src/pages/ClassicsDetail/index.tsx`
+  - `apps/web/src/pages/ClassicsList/index.tsx`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 后端新增 `classics_user_recent` 表和 `GET/POST /api/v1/user/classics/recent`，按 `saved_at` 返回最近阅读并在返回中补齐书名/封面/作者信息。
+  - 前端新增最近阅读云端 API，`useClassicsShelf` 增加 `getRecentBooksWithSync/pushRecentBookWithSync`，统一处理“本地记录 + 云端合并/回写”。
+  - 详情页章节阅读成功后改为写入同步版最近阅读；列表页最近阅读横条改为初始化时同步拉取。
+  - Web 任务清单将“最近阅读跨设备同步”标记完成，并补充“AI 探索记录跨设备同步”为下一项。
+- 校验：
+  - `gofmt -w server/internal/model/classics.go server/internal/database/database.go server/internal/handler/classics_recent.go server/internal/router/router.go`：通过
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py server/internal/model/classics.go server/internal/database/database.go server/internal/handler/classics_recent.go server/internal/router/router.go apps/web/src/api/classics.ts apps/web/src/hooks/useClassicsShelf.ts apps/web/src/pages/ClassicsDetail/index.tsx apps/web/src/pages/ClassicsList/index.tsx .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：当前“最近阅读”仅在阅读成功后写入，若用户只打开详情未读章节不会进入最近阅读。
+  - 下一步动作：若继续增强，优先实现 AI 探索记录跨设备同步。
+
+## 2026-04-20 16:00 (Asia/Shanghai)
+
+- 任务：继续名著增强，完成“阅读进度跨设备同步（登录态云端 + 游客本地兜底）”。
+- 改动文件：
+  - `server/migrations/015_create_classics_user_progress.sql`（新增）
+  - `server/internal/model/classics.go`
+  - `server/internal/database/database.go`
+  - `server/internal/handler/classics_progress.go`（新增）
+  - `server/internal/router/router.go`
+  - `apps/web/src/api/classics.ts`
+  - `apps/web/src/hooks/useClassicsShelf.ts`
+  - `apps/web/src/pages/ClassicsDetail/index.tsx`
+  - `apps/web/src/pages/ClassicsShelf/index.tsx`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 后端新增 `classics_user_progress` 表和 `GET/POST /api/v1/user/classics/progress`，支持按 `bookId/bookIds` 查询与 upsert 保存进度。
+  - 前端进度逻辑收口到 `useClassicsShelf`：新增 `getProgressWithSync/getProgressMapWithSync/saveProgressWithSync`，统一处理“本地优先体验 + 登录态云端合并/回写”。
+  - 详情页阅读时改为同步保存进度，进入页面时同步拉取进度；书架页展示与跳转使用同步后的进度映射。
+  - 任务清单将“阅读进度跨设备同步”标记完成，并补充“最近阅读跨设备同步”为下一项。
+- 校验：
+  - `gofmt -w server/internal/model/classics.go server/internal/database/database.go server/internal/handler/classics_progress.go server/internal/router/router.go`：通过
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py server/internal/model/classics.go server/internal/database/database.go server/internal/handler/classics_progress.go server/internal/router/router.go apps/web/src/api/classics.ts apps/web/src/hooks/useClassicsShelf.ts apps/web/src/pages/ClassicsDetail/index.tsx apps/web/src/pages/ClassicsShelf/index.tsx .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：目前仅同步“单书最新进度”，未同步最近阅读列表排序。
+  - 下一步动作：如继续增强，优先做 `classics_recent` 云端同步。
+
+## 2026-04-20 15:48 (Asia/Shanghai)
+
+- 任务：推进名著下一批增强，完成“书架跨设备同步（登录态云端 + 游客本地兜底）”。
+- 改动文件：
+  - `server/migrations/014_create_classics_user_shelves.sql`（新增）
+  - `server/internal/model/classics.go`
+  - `server/internal/database/database.go`
+  - `server/internal/handler/classics_shelf.go`（新增）
+  - `server/internal/router/router.go`
+  - `apps/web/src/api/classics.ts`
+  - `apps/web/src/hooks/useClassicsShelf.ts`
+  - `apps/web/src/pages/ClassicsDetail/index.tsx`
+  - `apps/web/src/pages/ClassicsShelf/index.tsx`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 后端新增 `classics_user_shelves` 表与 `GET/POST/DELETE /api/v1/user/classics/shelf` 接口，支持用户维度书架持久化。
+  - 新增 `ClassicsUserShelf` 模型并接入启动迁移，`POST` 使用 upsert 刷新 `updated_at`，保证最近加入排序稳定。
+  - 前端书架能力升级：`useClassicsShelf` 新增云端同步函数（登录态优先云端、自动合并本地旧书架、失败回退本地）。
+  - 详情页与书架页改为调用同步函数，保持“加入/移除/展示”行为一致且兼容游客模式。
+  - Web 任务清单新增并勾选 `CLSYNC`，同时把“阅读进度跨设备同步”列为下一项候选。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py server/internal/model/classics.go server/internal/database/database.go server/internal/handler/classics_shelf.go server/internal/router/router.go apps/web/src/api/classics.ts apps/web/src/hooks/useClassicsShelf.ts apps/web/src/pages/ClassicsDetail/index.tsx apps/web/src/pages/ClassicsShelf/index.tsx .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：接口依赖登录态 token，未登录用户仍是本地书架，不会自动跨设备同步。
+  - 下一步动作：若继续做名著增强，优先实现“阅读进度跨设备同步”。
+
+## 2026-04-20 15:36 (Asia/Shanghai)
+
+- 任务：启动并完成名著馆书架页（`/classics/shelf`）闭环，补齐列表/详情入口与任务清单状态。
+- 改动文件：
+  - `apps/web/src/pages/ClassicsShelf/index.tsx`（新增）
+  - `apps/web/src/App.tsx`
+  - `apps/web/src/pages/ClassicsList/index.tsx`
+  - `apps/web/src/pages/ClassicsDetail/index.tsx`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增书架页：读取 `classics_shelf` 并拉取书籍详情，支持继续阅读/开始阅读、移出书架、空状态引导回名著馆。
+  - 全局路由与标题补齐：新增 `/classics/shelf` 路由与页面标题「名著书架 | Valley」。
+  - 阅读链路补齐入口：`ClassicsList` Hero 区新增「我的书架」按钮，`ClassicsDetail` 操作区新增「查看书架」按钮。
+  - 任务清单更新：标记名著书架页完成，并同步修正 CLD/CLR/CLAI 父任务完成状态。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/ClassicsShelf/index.tsx apps/web/src/App.tsx apps/web/src/pages/ClassicsList/index.tsx apps/web/src/pages/ClassicsDetail/index.tsx .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：书架页通过本地 localStorage 存储，跨设备不会自动同步。
+  - 下一步动作：若要跨设备同步，可在后端补用户书架表并提供登录态同步接口。
+
 ## 2026-04-19 CLR-3 + CLAI-1/2/3 名著阅读闭环与 AI 伴读全链路 (Asia/Shanghai)
 
 - 任务：完成 CLR-3 书签与最近阅读、CLAI-1 AI 伴读入口、CLAI-2 能力接入、CLAI-3 阅读记录联动。
@@ -2311,3 +2420,33 @@
 - 风险与后续：
   - 当前风险：上游公版源网络偶发重置（已做重试）；个别文本（如 `宋词三百首` 来源版本）章节总量受源站版本影响。
   - 下一步动作：补充导入结果审计表（来源 URL、许可证、导入时间、失败重试次数）并落库，便于持续运营和合规追溯。
+
+## 2026-04-20 16:48 (Asia/Shanghai)
+
+- 任务：完成名著馆「AI 探索记录」跨设备同步（云端读写 + 前端合并回写 + 页面接入）。
+- 改动文件：
+  - `server/migrations/017_create_classics_user_ai_explored.sql`（新增）
+  - `server/internal/model/classics.go`
+  - `server/internal/database/database.go`
+  - `server/internal/handler/classics_ai_explored.go`（新增）
+  - `server/internal/router/router.go`
+  - `apps/web/src/api/classics.ts`
+  - `apps/web/src/hooks/useClassicsShelf.ts`
+  - `apps/web/src/pages/ClassicsDetail/index.tsx`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增表 `classics_user_ai_explored`（`user_id + book_id + chapter_index` 唯一约束），并接入 Gorm 模型与 AutoMigrate。
+  - 新增用户接口 `GET/POST /api/v1/user/classics/ai-explored`，支持按 `bookId/bookIds` 查询与单章节 upsert 保存。
+  - 前端新增 `getMyClassicsAiExplored/saveMyClassicsAiExplored`，并在 `useClassicsShelf` 增加：
+    - `getAiExploredChaptersWithSync(bookId)`：本地与云端去重合并，缺失记录回写云端。
+    - `markChapterAiExploredWithSync(bookId, chapterIndex)`：本地立即写入，登录态异步回写云端。
+  - `ClassicsDetail` 初始化改为读取 `getAiExploredChaptersWithSync`；AI 导读/提问成功后改为 `markChapterAiExploredWithSync`。
+  - `WEB-TASKS` 已将“名著 AI 探索记录跨设备同步”标记完成，并新增下一项“名著 AI 问章节历史跨设备同步”。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py server/internal/handler/classics_ai_explored.go server/internal/model/classics.go server/internal/database/database.go server/internal/router/router.go apps/web/src/api/classics.ts apps/web/src/hooks/useClassicsShelf.ts apps/web/src/pages/ClassicsDetail/index.tsx .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：当前仅同步“章节被 AI 探索过”的布尔轨迹，尚未同步“问答文本历史”，跨端无法回看具体问答内容。
+  - 下一步动作：推进“名著 AI 问章节历史跨设备同步”，补云端问答记录表与最近问答回放入口。

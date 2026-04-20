@@ -13,15 +13,15 @@
 
 ## 活跃 Backlog（保持 3-5 项）
 
-- [ ] CLD（P0）名著数据源与版权策略：确认可持续公版来源、导入格式与元数据模型。
+- [x] CLD（P0）名著数据源与版权策略：确认可持续公版来源、导入格式与元数据模型。
   - [x] CLD-1 数据源白名单（来源 + 许可证 + 可用范围）。
   - [x] CLD-2 导入标准（epub/txt/html）与清洗流程定义。
   - [x] CLD-3 元数据模型定版（作者/译者/版本/章节）。
-- [ ] CLR（P1）名著在线阅读闭环：列表、详情、阅读器、进度/书签/最近阅读。
+- [x] CLR（P1）名著在线阅读闭环：列表、详情、阅读器、进度/书签/最近阅读。
   - [x] CLR-1 列表与详情页结构稿。
   - [x] CLR-2 阅读器 MVP（章节切换 + 进度恢复）。
   - [x] CLR-3 书签与最近阅读联动：详情页「加入书架」按钮（localStorage），列表页顶部最近阅读横条，自动记录最近 10 本。
-- [ ] CLAI（P1）名著 AI 伴读 MVP：`本章摘要`、`人物关系提示`、`段落问答`。
+- [x] CLAI（P1）名著 AI 伴读 MVP：`本章摘要`、`人物关系提示`、`段落问答`。
   - [x] CLAI-1 入口设计与触发条件：阅读模式右下角悬浮 ✨ 按钮，展开 AI 伴读面板。
   - [x] CLAI-2 能力接入与结果卡片展示：`本章导读`（guide+highlights）+ `问章节`（answer+citations）；后端 `classics_ai.go` 两条路由。
   - [x] CLAI-3 阅读记录与 AI 行为联动：AI 导读/提问成功后写入 `classics_ai_explored_{bookId}`，TOC 侧栏和详情页目录对已探索章节显示 ✨ 徽标，持久化跨会话。
@@ -61,10 +61,15 @@
   - [x] CLSEARCH-1 后端 `/public/classics` 接口补 `dynasty` / `category` 可选过滤参数。
   - [x] CLSEARCH-2 前端 ClassicsList 补筛选栏（Select 朝代 + Select 分类），与 keyword/page URL 联动。
 - [x] CLADMIN（P2）Admin 名著录入 UI：`apps/admin` 名著书目增删改查，含章节批量导入 Modal。
+- [x] CLSYNC（P2）名著书架跨设备同步：新增 `user/classics/shelf` 接口（GET/POST/DELETE）与 `classics_user_shelves` 表；前端登录态优先云端书架并保留游客 localStorage 兜底。
 
 ## 下一步建议
 
 - [x] 补全名著测试数据，验证分类/朝代筛选效果（seed 已扩展为覆盖朝代/分类的一组样本，并支持一键命令 `pnpm classics:seed`）。
 - [ ] 启动 ELP-2：先产出英语学习域后端 API 契约与数据库表结构草案（与 `ELP-1` 文档保持字段一致）。
 - [x] 增加白名单源抓取导入脚本：已新增完整正文导入命令 `pnpm classics:import-fulltext`，支持从 Project Gutenberg / 维基文库抓取并覆盖默认版本章节，含网络重试与单书补导入（`CLASSICS_ONLY`）。
-- [ ] 名著馆书架页：展示用户 localStorage 书架列表（`/classics/shelf`）。
+- [x] 名著馆书架页：展示用户 localStorage 书架列表（`/classics/shelf`）。
+- [x] 名著阅读进度跨设备同步：已新增 `user/classics/progress`（GET/POST）与 `classics_user_progress` 表；详情页/书架页改为登录态云端优先，游客保留 localStorage 兜底。
+- [x] 名著最近阅读跨设备同步：已新增 `user/classics/recent`（GET/POST）与 `classics_user_recent` 表；列表页最近阅读横条改为登录态云端优先，游客保留 localStorage 兜底。
+- [x] 名著 AI 探索记录跨设备同步：已新增 `user/classics/ai-explored`（GET/POST）与 `classics_user_ai_explored` 表；详情页改为登录态云端优先 + 本地合并回写，游客保留 localStorage 兜底。
+- [ ] 名著 AI 问章节历史跨设备同步：将每章问答记录从本地会话态升级为登录态云端历史（支持跨端回看最近问答）。

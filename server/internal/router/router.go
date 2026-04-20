@@ -104,6 +104,15 @@ func Setup(cfg *config.Config) *gin.Engine {
 			user.GET("/notifications/unread-count", handler.GetUnreadNotificationCount)
 			user.POST("/notifications/:id/read", handler.MarkNotificationRead)
 			user.POST("/notifications/read-all", handler.MarkAllNotificationsRead)
+			user.GET("/classics/shelf", handler.GetMyClassicsShelf)
+			user.POST("/classics/shelf", handler.AddMyClassicsShelf)
+			user.DELETE("/classics/shelf/:bookId", handler.RemoveMyClassicsShelf)
+			user.GET("/classics/progress", handler.GetMyClassicsProgress)
+			user.POST("/classics/progress", handler.SaveMyClassicsProgress)
+			user.GET("/classics/recent", handler.GetMyClassicsRecent)
+			user.POST("/classics/recent", handler.SaveMyClassicsRecent)
+			user.GET("/classics/ai-explored", handler.GetMyClassicsAIExplored)
+			user.POST("/classics/ai-explored", handler.SaveMyClassicsAIExplored)
 		}
 
 		auth := api.Group("")

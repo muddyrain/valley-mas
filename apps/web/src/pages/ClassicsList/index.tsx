@@ -1,4 +1,4 @@
-import { BookOpen, Clock, Search, X } from 'lucide-react';
+import { BookMarked, BookOpen, Clock, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { type ClassicsBook, getClassicsList } from '@/api/classics';
@@ -7,7 +7,7 @@ import TypeFilterBar from '@/components/TypeFilterBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getRecentBooks, type RecentBook } from '@/hooks/useClassicsShelf';
+import { getRecentBooksWithSync, type RecentBook } from '@/hooks/useClassicsShelf';
 import {
   enumParam,
   numberParam,
@@ -181,7 +181,13 @@ export default function ClassicsList() {
 
   // 初始化时读取最近阅读
   useEffect(() => {
-    setRecentBooks(getRecentBooks());
+    let disposed = false;
+    void getRecentBooksWithSync().then((books) => {
+      if (!disposed) setRecentBooks(books);
+    });
+    return () => {
+      disposed = true;
+    };
   }, []);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -233,6 +239,16 @@ export default function ClassicsList() {
             经典文学，随时阅读
           </h1>
           <p className="mt-4 text-lg text-slate-500">收录中外名著，多版本章节阅读，感受文字之美</p>
+          <div className="mt-6 flex justify-center">
+            <Button
+              variant="outline"
+              className="gap-1.5 border-theme-soft-strong bg-white/80 text-theme-primary hover:bg-theme-soft"
+              onClick={() => navigate('/classics/shelf')}
+            >
+              <BookMarked className="h-4 w-4" />
+              我的书架
+            </Button>
+          </div>
           {total > 0 && !loading && (
             <p className="mt-2 text-sm text-slate-400">共收录 {total} 部名著</p>
           )}

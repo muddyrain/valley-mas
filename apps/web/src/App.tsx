@@ -10,6 +10,7 @@ import BlogList from './pages/blog/BlogList';
 import BlogPost from './pages/blog/BlogPost';
 import ClassicsDetail from './pages/ClassicsDetail';
 import ClassicsList from './pages/ClassicsList';
+import ClassicsShelf from './pages/ClassicsShelf';
 import ClimberLab from './pages/ClimberLab';
 import Creator from './pages/Creator';
 import CreatorProfile from './pages/CreatorProfile';
@@ -57,6 +58,8 @@ function RouteTitle() {
       title = '资源整理 | Valley';
     } else if (pathname === '/classics') {
       title = '名著馆 | Valley';
+    } else if (pathname === '/classics/shelf') {
+      title = '名著书架 | Valley';
     } else if (pathname.startsWith('/classic/')) {
       title = '名著阅读 | Valley';
     } else if (pathname.startsWith('/resource/')) {
@@ -136,6 +139,7 @@ function App() {
           <Route path="resources" element={<Resources />} />
           <Route path="resource/:id" element={<ResourceDetail />} />
           <Route path="classics" element={<ClassicsList />} />
+          <Route path="classics/shelf" element={<ClassicsShelf />} />
           <Route path="classic/:id" element={<ClassicsDetail />} />
           <Route path="my-space" element={<MySpace />} />
           <Route path="my-space/image-text" element={<ImageTextCreate />} />
