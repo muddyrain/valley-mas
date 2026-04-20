@@ -2586,3 +2586,18 @@
 - 风险与后续：
   - 当前风险：维基文库渲染页顶部可能仍有少量来源元信息行，当前已做通用清洗但个别作品模板格式变化时仍需补规则。
   - 下一步动作：可继续增加“导入后文本质量检查（首尾模板噪声探测）”脚本，导入后自动报警并回滚异常章节。
+
+## 2026-04-20 23:32 (Asia/Shanghai)
+
+- 任务：修复 unity-dungeon 运行时报错 `PlayerVisual AnimationEvent has no function name specified`。
+- 改动文件：
+  - `apps/unity-dungeon/Assets/Animation/PlayerIdle.anim`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 删除 `PlayerIdle.anim` 中空的 AnimationEvent（`functionName` 为空），将 `m_Events` 收敛为 `[]`。
+  - 全量扫描 `apps/unity-dungeon/Assets/Animation` 与 `Assets/Resources`，确认不存在其他空 `functionName` 的动画事件。
+- 校验：
+  - `rg -n "functionName:\s*$|m_Events:" apps/unity-dungeon/Assets/Animation apps/unity-dungeon/Assets/Resources -S`：通过
+- 风险与后续：
+  - 当前风险：若后续在 Unity Editor 中再次手动添加空 AnimationEvent，运行时仍会复现同类报错。
+  - 下一步动作：在 Unity 的 Animation 窗口中新增事件时，必须填写有效函数名或直接删除该事件点。
