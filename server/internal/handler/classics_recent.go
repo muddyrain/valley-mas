@@ -9,16 +9,7 @@ import (
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm/clause"
 )
-
-type saveClassicsRecentReq struct {
-	BookID       string `json:"bookId"`
-	EditionID    string `json:"editionId"`
-	ChapterIndex int    `json:"chapterIndex"`
-	ChapterTitle string `json:"chapterTitle"`
-	SavedAt      int64  `json:"savedAt"`
-}
 
 type classicsRecentResp struct {
 	BookID       string `json:"bookId"`
@@ -99,7 +90,7 @@ func GetMyClassicsRecent(c *gin.Context) {
 		list = append(list, classicsRecentResp{
 			BookID:       strconv.FormatInt(item.BookID, 10),
 			Title:        item.Title,
-			CoverURL:     item.CoverURL,
+			CoverURL:     resolveClassicsCoverURL(item.CoverURL, item.Title, "", item.Dynasty),
 			AuthorNames:  strings.Join(authorMap[item.BookID], "、"),
 			Dynasty:      item.Dynasty,
 			EditionID:    strconv.FormatInt(item.EditionID, 10),
@@ -121,95 +112,25 @@ func SaveMyClassicsRecent(c *gin.Context) {
 		return
 	}
 
-	var req saveClassicsRecentReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		Error(c, http.StatusBadRequest, "参数错误")
-		return
-	}
-	req.BookID = strings.TrimSpace(req.BookID)
-	req.EditionID = strings.TrimSpace(req.EditionID)
-	req.ChapterTitle = strings.TrimSpace(req.ChapterTitle)
-
-	if req.BookID == "" || req.EditionID == "" {
-		Error(c, http.StatusBadRequest, "bookId 或 editionId 不能为空")
-		return
-	}
-	if req.ChapterIndex < 0 {
-		Error(c, http.StatusBadRequest, "chapterIndex 不能小于 0")
+	payload, ok := parseClassicsReadingPayload(c)
+	if !ok {
 		return
 	}
 
-	bookID, err := strconv.ParseInt(req.BookID, 10, 64)
-	if err != nil || bookID <= 0 {
-		Error(c, http.StatusBadRequest, "bookId 无效")
-		return
-	}
-	editionID, err := strconv.ParseInt(req.EditionID, 10, 64)
-	if err != nil || editionID <= 0 {
-		Error(c, http.StatusBadRequest, "editionId 无效")
+	if !validateClassicsBookAndEdition(c, db, payload.BookID, payload.EditionID) {
 		return
 	}
 
-	var bookExists int64
-	if err := db.Table("classics_books").
-		Where("id = ? AND deleted_at IS NULL AND is_published = ?", bookID, true).
-		Count(&bookExists).Error; err != nil {
-		Error(c, http.StatusInternalServerError, "查询书籍失败")
-		return
-	}
-	if bookExists == 0 {
-		Error(c, http.StatusNotFound, "书籍不存在")
-		return
-	}
-
-	var editionExists int64
-	if err := db.Table("classics_editions").
-		Where("id = ? AND book_id = ?", editionID, bookID).
-		Count(&editionExists).Error; err != nil {
-		Error(c, http.StatusInternalServerError, "查询版本失败")
-		return
-	}
-	if editionExists == 0 {
-		Error(c, http.StatusNotFound, "版本不存在")
-		return
-	}
-
-	savedAt := time.Now()
-	if req.SavedAt > 0 {
-		savedAt = time.UnixMilli(req.SavedAt)
-	}
-	now := time.Now()
-	item := model.ClassicsUserRecent{
-		UserID:       userID,
-		BookID:       bookID,
-		EditionID:    editionID,
-		ChapterIndex: req.ChapterIndex,
-		ChapterTitle: req.ChapterTitle,
-		SavedAt:      savedAt,
-	}
-
-	if err := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{
-			{Name: "user_id"},
-			{Name: "book_id"},
-		},
-		DoUpdates: clause.Assignments(map[string]interface{}{
-			"edition_id":    editionID,
-			"chapter_index": req.ChapterIndex,
-			"chapter_title": req.ChapterTitle,
-			"saved_at":      savedAt,
-			"updated_at":    now,
-		}),
-	}).Create(&item).Error; err != nil {
+	if err := upsertClassicsReadingRecord(db, "classics_user_recent", userID, payload); err != nil {
 		Error(c, http.StatusInternalServerError, "保存最近阅读失败")
 		return
 	}
 
 	Success(c, classicsRecentResp{
-		BookID:       req.BookID,
-		EditionID:    req.EditionID,
-		ChapterIndex: req.ChapterIndex,
-		ChapterTitle: req.ChapterTitle,
-		SavedAt:      savedAt.UnixMilli(),
+		BookID:       payload.BookIDStr,
+		EditionID:    payload.EditionIDStr,
+		ChapterIndex: payload.ChapterIndex,
+		ChapterTitle: payload.ChapterTitle,
+		SavedAt:      payload.SavedAt.UnixMilli(),
 	})
 }

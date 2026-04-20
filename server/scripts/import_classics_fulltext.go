@@ -6,10 +6,13 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net/http"
+	"os/exec"
 	"regexp"
 	"strings"
 	"time"
@@ -69,7 +72,14 @@ func main() {
 		{BookTitle: "宋词三百首", URL: "https://zh.wikisource.org/wiki/%E5%AE%8B%E8%A9%9E%E4%B8%89%E7%99%BE%E9%A6%96?action=raw", EditionLabel: "维基文库整理版", Parser: parseSongCiFromWikisource, NeedsTrimPG: false},
 		{BookTitle: "窦娥冤", URL: "https://www.gutenberg.org/cache/epub/52276/pg52276.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parseDouE, NeedsTrimPG: true},
 		{BookTitle: "朝花夕拾", URL: "https://zh.wikisource.org/wiki/%E6%9C%9D%E8%8A%B1%E5%A4%95%E6%8B%BE?action=raw", EditionLabel: "维基文库整理版", Parser: parseZhaohuaxishiFromWikisource, NeedsTrimPG: false},
-		{BookTitle: "傲慢与偏见", URL: "https://www.gutenberg.org/cache/epub/1342/pg1342.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parsePrideAndPrejudice, NeedsTrimPG: true},
+		{BookTitle: "呐喊", URL: "https://zh.wikisource.org/wiki/%E5%91%90%E5%96%8A?action=raw", EditionLabel: "维基文库整理版", Parser: parseNahanFromWikisource, NeedsTrimPG: false},
+		{BookTitle: "彷徨", URL: "https://zh.wikisource.org/wiki/%E5%BD%B7%E5%BE%A8?action=raw", EditionLabel: "维基文库整理版", Parser: parsePanghuangFromWikisource, NeedsTrimPG: false},
+		{BookTitle: "简爱", URL: "https://www.gutenberg.org/cache/epub/1260/pg1260.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parseEnglishChapterHeadings, NeedsTrimPG: true},
+		{BookTitle: "傲慢与偏见", URL: "https://www.gutenberg.org/cache/epub/1342/pg1342.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parseEnglishChapterHeadings, NeedsTrimPG: true},
+		{BookTitle: "了不起的盖茨比", URL: "https://www.gutenberg.org/cache/epub/64317/pg64317.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parseGatsbyChapters, NeedsTrimPG: true},
+		{BookTitle: "月亮与六便士", URL: "https://www.gutenberg.org/cache/epub/222/pg222.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parseEnglishChapterHeadings, NeedsTrimPG: true},
+		{BookTitle: "鲁滨逊漂流记", URL: "https://www.gutenberg.org/cache/epub/521/pg521.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parseEnglishChapterHeadings, NeedsTrimPG: true},
+		{BookTitle: "巴斯克维尔的猎犬", URL: "https://www.gutenberg.org/cache/epub/2852/pg2852.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parseEnglishChapterHeadings, NeedsTrimPG: true},
 	}
 
 	onlyRaw := strings.TrimSpace(os.Getenv("CLASSICS_ONLY"))
@@ -192,6 +202,10 @@ func fetchTextWithRetry(url string, attempts int) (string, error) {
 			return text, nil
 		}
 		lastErr = err
+		// 在当前 Windows 环境下，Go 原生网络偶发 TLS/连接中断；统一使用 Python 再兜底一次。
+		if fallbackText, fallbackErr := fetchTextViaPython(url); fallbackErr == nil {
+			return fallbackText, nil
+		}
 		if i < attempts {
 			time.Sleep(time.Duration(i) * time.Second)
 		}
@@ -216,6 +230,24 @@ func fetchText(url string) (string, error) {
 		return "", fmt.Errorf("http status %d", resp.StatusCode)
 	}
 	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func fetchTextViaPython(url string) (string, error) {
+	script := `import urllib.request,sys,base64
+req=urllib.request.Request(sys.argv[1],headers={'User-Agent':'Valley-MAS-Classics-Importer/1.0'})
+data=urllib.request.urlopen(req,timeout=60).read()
+sys.stdout.write(base64.b64encode(data).decode('ascii'))`
+	cmd := exec.Command("python", "-c", script, url)
+	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(out)))
 	if err != nil {
 		return "", err
 	}
@@ -344,8 +376,38 @@ func parseDouE(text string) ([]chapterItem, error) {
 	return parseByHeadingRegex(text, `(?m)^(楔子|第[一二三四五六七八九十]+折)\s*$`)
 }
 
-func parsePrideAndPrejudice(text string) ([]chapterItem, error) {
-	return parseByHeadingRegex(text, `(?mi)^CHAPTER\s+[IVXLCDM0-9]+\.?\]?\s*$`)
+func parseEnglishChapterHeadings(text string) ([]chapterItem, error) {
+	return parseByHeadingRegex(text, `(?mi)^\s*CHAPTER\s+[IVXLCDM0-9]+(?:[\s\.\-—:].*)?$`)
+}
+
+func parseGatsbyChapters(text string) ([]chapterItem, error) {
+	re, err := regexp.Compile(`(?m)^\s*([IVXLCDM]{1,8})\s*$`)
+	if err != nil {
+		return nil, err
+	}
+	locs := re.FindAllStringSubmatchIndex(text, -1)
+	if len(locs) == 0 {
+		return nil, fmt.Errorf("no roman numeral chapter headings found")
+	}
+	chapters := make([]chapterItem, 0, 12)
+	for i, loc := range locs {
+		title := strings.TrimSpace(text[loc[2]:loc[3]])
+		contentStart := loc[1]
+		contentEnd := len(text)
+		if i+1 < len(locs) {
+			contentEnd = locs[i+1][0]
+		}
+		content := strings.TrimSpace(text[contentStart:contentEnd])
+		// 过滤目录中相邻罗马数字行，保留正文段落。
+		if len([]rune(content)) < 600 {
+			continue
+		}
+		chapters = append(chapters, chapterItem{Title: title, Content: content})
+	}
+	if len(chapters) == 0 {
+		return nil, fmt.Errorf("no valid gatsby chapter content after filtering toc")
+	}
+	return chapters, nil
 }
 
 func parseTang300(text string) ([]chapterItem, error) {
@@ -455,14 +517,66 @@ func parseZhaohuaxishiFromWikisource(_ string) ([]chapterItem, error) {
 		{"范爱农", "https://zh.wikisource.org/wiki/%E8%8C%83%E6%84%9B%E8%BE%B2?action=raw"},
 		{"后记", "https://zh.wikisource.org/wiki/%E6%9C%9D%E8%8A%B1%E5%A4%95%E6%8B%BE/%E5%BE%8C%E8%A8%98?action=raw"},
 	}
+	return parseWikisourcePages(pages)
+}
+
+func parseNahanFromWikisource(_ string) ([]chapterItem, error) {
+	pages := []struct {
+		Title string
+		URL   string
+	}{
+		{"狂人日记", "https://zh.wikisource.org/wiki/%E7%8B%82%E4%BA%BA%E6%97%A5%E8%AE%B0?action=raw"},
+		{"孔乙己", "https://zh.wikisource.org/wiki/%E5%AD%94%E4%B9%99%E5%B7%B1?action=raw"},
+		{"药", "https://zh.wikisource.org/wiki/%E8%97%A5?action=raw"},
+		{"明天", "https://zh.wikisource.org/wiki/%E6%98%8E%E5%A4%A9?action=raw"},
+		{"一件小事", "https://zh.wikisource.org/wiki/%E4%B8%80%E4%BB%B6%E5%B0%8F%E4%BA%8B?action=raw"},
+		{"头发的故事", "https://zh.wikisource.org/wiki/%E9%A0%AD%E9%AB%AE%E7%9A%84%E6%95%85%E4%BA%8B?action=raw"},
+		{"风波", "https://zh.wikisource.org/wiki/%E9%A2%A8%E6%B3%A2?action=raw"},
+		{"故乡", "https://zh.wikisource.org/wiki/%E6%95%85%E9%84%89?action=raw"},
+		{"阿Q正传", "https://zh.wikisource.org/wiki/%E9%98%BF%EF%BC%B1%E6%AD%A3%E5%82%B3?action=raw"},
+		{"端午节", "https://zh.wikisource.org/wiki/%E7%AB%AF%E5%8D%88%E7%AF%80?action=raw"},
+		{"白光", "https://zh.wikisource.org/wiki/%E7%99%BD%E5%85%89?action=raw"},
+		{"兔和猫", "https://zh.wikisource.org/wiki/%E5%85%94%E5%92%8C%E8%B2%93?action=raw"},
+		{"鸭的喜剧", "https://zh.wikisource.org/wiki/%E9%B4%A8%E7%9A%84%E5%96%9C%E5%8A%87?action=raw"},
+		{"社戏", "https://zh.wikisource.org/wiki/%E7%A4%BE%E6%88%B2?action=raw"},
+	}
+	return parseWikisourcePages(pages)
+}
+
+func parsePanghuangFromWikisource(_ string) ([]chapterItem, error) {
+	pages := []struct {
+		Title string
+		URL   string
+	}{
+		{"祝福", "https://zh.wikisource.org/wiki/%E7%A5%9D%E7%A6%8F?action=raw"},
+		{"在酒楼上", "https://zh.wikisource.org/wiki/%E5%9C%A8%E9%85%92%E6%A8%93%E4%B8%8A?action=raw"},
+		{"幸福的家庭", "https://zh.wikisource.org/wiki/%E5%B9%B8%E7%A6%8F%E7%9A%84%E5%AE%B6%E5%BA%AD?action=raw"},
+		{"肥皂", "https://zh.wikisource.org/wiki/%E8%82%A5%E7%9A%82?action=raw"},
+		{"长明灯", "https://zh.wikisource.org/wiki/%E9%95%B7%E6%98%8E%E7%87%88?action=raw"},
+		{"示众", "https://zh.wikisource.org/wiki/%E7%A4%BA%E8%A1%86?action=raw"},
+		{"高老夫子", "https://zh.wikisource.org/wiki/%E9%AB%98%E8%80%81%E5%A4%AB%E5%AD%90?action=raw"},
+		{"孤独者", "https://zh.wikisource.org/wiki/%E5%AD%A4%E7%8D%A8%E8%80%85?action=raw"},
+		{"伤逝", "https://zh.wikisource.org/wiki/%E5%82%B7%E9%80%9D?action=raw"},
+		{"弟兄", "https://zh.wikisource.org/wiki/%E5%BC%9F%E5%85%84?action=raw"},
+		{"离婚", "https://zh.wikisource.org/wiki/%E9%9B%A2%E5%A9%9A?action=raw"},
+	}
+	return parseWikisourcePages(pages)
+}
+
+func parseWikisourcePages(pages []struct {
+	Title string
+	URL   string
+}) ([]chapterItem, error) {
+	if len(pages) == 0 {
+		return nil, fmt.Errorf("empty wikisource pages")
+	}
 
 	chapters := make([]chapterItem, 0, len(pages))
 	for _, page := range pages {
-		raw, err := fetchTextWithRetry(page.URL, 4)
+		content, err := fetchAndCleanWikisourcePage(page.URL)
 		if err != nil {
 			return nil, fmt.Errorf("fetch %s failed: %w", page.Title, err)
 		}
-		content := cleanWikiRawText(raw)
 		if content == "" {
 			return nil, fmt.Errorf("empty wiki content: %s", page.Title)
 		}
@@ -472,6 +586,80 @@ func parseZhaohuaxishiFromWikisource(_ string) ([]chapterItem, error) {
 		})
 	}
 	return chapters, nil
+}
+
+func fetchAndCleanWikisourcePage(rawURL string) (string, error) {
+	renderURL := toWikisourceRenderURL(rawURL)
+	rendered, err := fetchTextWithRetry(renderURL, 4)
+	if err == nil {
+		cleaned := cleanWikisourceRenderedText(rendered)
+		if cleaned != "" {
+			return cleaned, nil
+		}
+	}
+
+	raw, rawErr := fetchTextWithRetry(rawURL, 4)
+	if rawErr != nil {
+		if err != nil {
+			return "", err
+		}
+		return "", rawErr
+	}
+	return cleanWikiRawText(raw), nil
+}
+
+func toWikisourceRenderURL(rawURL string) string {
+	if !strings.Contains(rawURL, "wikisource.org") {
+		return rawURL
+	}
+	u := strings.Replace(rawURL, "action=raw", "action=render&variant=zh-hans", 1)
+	if strings.Contains(u, "action=render") && !strings.Contains(u, "variant=") {
+		u += "&variant=zh-hans"
+	}
+	return u
+}
+
+func cleanWikisourceRenderedText(input string) string {
+	s := strings.TrimSpace(input)
+	if s == "" {
+		return ""
+	}
+	s = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`).ReplaceAllString(s, "")
+	s = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`).ReplaceAllString(s, "")
+	s = regexp.MustCompile(`(?is)<!--.*?-->`).ReplaceAllString(s, "")
+
+	lineBreakReplacer := strings.NewReplacer(
+		"<br>", "\n", "<br/>", "\n", "<br />", "\n",
+		"</p>", "\n", "</div>", "\n", "</li>", "\n",
+		"</h1>", "\n", "</h2>", "\n", "</h3>", "\n",
+	)
+	s = lineBreakReplacer.Replace(s)
+	s = regexp.MustCompile(`(?is)<[^>]+>`).ReplaceAllString(s, "")
+	s = html.UnescapeString(s)
+	s = strings.ReplaceAll(s, "\u00a0", " ")
+	s = strings.ReplaceAll(s, "\u200b", "")
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+
+	lines := strings.Split(s, "\n")
+	filtered := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			filtered = append(filtered, "")
+			continue
+		}
+		if strings.Contains(line, "作者：") ||
+			strings.Contains(line, "版本信息") ||
+			strings.Contains(line, "姊妹计划") ||
+			strings.Contains(line, "本作品收录于") {
+			continue
+		}
+		filtered = append(filtered, line)
+	}
+	s = strings.Join(filtered, "\n")
+	s = regexp.MustCompile(`\n{3,}`).ReplaceAllString(s, "\n\n")
+	return strings.TrimSpace(s)
 }
 
 func cleanWikiRawText(raw string) string {

@@ -95,7 +95,7 @@ func GetClassicsList(c *gin.Context) {
 
 	var rows []BookRow
 	query.Select("id, title, cover_url, category, dynasty, brief, word_count, chapter_count, created_at").
-		Order("id DESC").
+		Order("CASE WHEN category = '现代文学' THEN 0 WHEN category = '外国文学' THEN 1 WHEN dynasty = '近现代' THEN 2 WHEN dynasty = '外国' THEN 3 ELSE 4 END ASC, id DESC").
 		Limit(pageSize).Offset(offset).
 		Find(&rows)
 
@@ -168,7 +168,7 @@ func GetClassicsList(c *gin.Context) {
 		list = append(list, ClassicsBookResp{
 			ID:           r.ID,
 			Title:        r.Title,
-			CoverURL:     r.CoverURL,
+			CoverURL:     resolveClassicsCoverURL(r.CoverURL, r.Title, r.Category, r.Dynasty),
 			Category:     r.Category,
 			Dynasty:      r.Dynasty,
 			Brief:        r.Brief,
@@ -270,7 +270,7 @@ func GetClassicsDetail(c *gin.Context) {
 	Success(c, ClassicsBookResp{
 		ID:           book.ID,
 		Title:        book.Title,
-		CoverURL:     book.CoverURL,
+		CoverURL:     resolveClassicsCoverURL(book.CoverURL, book.Title, book.Category, book.Dynasty),
 		Category:     book.Category,
 		Dynasty:      book.Dynasty,
 		Brief:        book.Brief,

@@ -85,11 +85,22 @@ function toReadProgress(item: ClassicsReadProgress): ReadProgress {
 }
 
 function dedupeRecentBooks(books: RecentBook[]): RecentBook[] {
-  const seen = new Set<string>();
+  const seenId = new Set<string>();
+  const seenIdentity = new Set<string>();
   const result: RecentBook[] = [];
-  for (const item of books) {
-    if (!item.id || seen.has(item.id)) continue;
-    seen.add(item.id);
+  const sorted = [...books].sort((a, b) => b.savedAt - a.savedAt);
+  for (const item of sorted) {
+    const idKey = item.id?.trim();
+    const titleKey = item.title?.trim().toLowerCase() ?? '';
+    const authorKey = item.authorNames?.trim().toLowerCase() ?? '';
+    const dynastyKey = item.dynasty?.trim().toLowerCase() ?? '';
+    const identityKey = `${titleKey}::${authorKey}::${dynastyKey}`;
+
+    if (idKey && seenId.has(idKey)) continue;
+    if (titleKey && seenIdentity.has(identityKey)) continue;
+
+    if (idKey) seenId.add(idKey);
+    if (titleKey) seenIdentity.add(identityKey);
     result.push(item);
   }
   return result;
@@ -188,9 +199,7 @@ export async function getRecentBooksWithSync(): Promise<RecentBook[]> {
       }
     }
 
-    const merged = Array.from(mergedMap.values())
-      .sort((a, b) => b.savedAt - a.savedAt)
-      .slice(0, RECENT_MAX);
+    const merged = dedupeRecentBooks(Array.from(mergedMap.values())).slice(0, RECENT_MAX);
     saveRecentBooks(merged);
     if (syncTasks.length > 0) await Promise.all(syncTasks);
     return merged;
