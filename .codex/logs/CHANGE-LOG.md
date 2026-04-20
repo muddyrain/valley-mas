@@ -258,6 +258,7 @@
 - 任务：排查“sp 步骤缺失”并清理无效关卡模型配置，同时核对缺失 glb 引用。
 - 改动文件：
   - `packages/climber-game/src/levels/togetherSkyAscent.ts`
+
   - `.codex/skills/web-feature-iteration/CLIMBER-GAME-TASKS.md`
   - `.codex/logs/CHANGE-LOG.md`
 - 关键改动：
@@ -2222,3 +2223,91 @@
 - 风险与后续：
   - 当前风险：中文来源中个别条目的授权口径仍可能存在差异，需要继续坚持“作品级”而非“站点级”判断。
   - 下一步动作：在 CLD-2 中把该优先级落实到导入器规则（中文源默认优先抓取与校验）。
+
+## 2026-04-20 11:29 (Asia/Shanghai)
+
+- 任务：补全名著测试数据并提供一键入库命令，降低本地验证分类/朝代筛选的门槛。
+- 改动文件：
+  - `server/scripts/seed_classics.go`
+  - `scripts/classics-seed.js`（新增）
+  - `package.json`
+  - `README.md`
+  - `QUICK_START.md`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 重写 `seed_classics.go` 为可重复执行的 upsert 逻辑，避免重复作者/书籍；seed 覆盖 `先秦/汉/魏晋南北朝/唐/宋/元/明/清/近现代/外国` 与多分类。
+  - 新增根目录脚本 `scripts/classics-seed.js`，自动读取 `DB_DSN` 并串行执行 classics 表迁移与 seed。
+  - 新增仓库命令 `pnpm classics:seed`，并在 README/QUICK_START 补充使用说明。
+  - 更新 Web 任务清单下一步建议：标记“补全测试数据”完成，并追加“白名单源抓取导入脚本”待办。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `node --check scripts/classics-seed.js`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py server/scripts/seed_classics.go scripts/classics-seed.js README.md QUICK_START.md .codex/skills/web-feature-iteration/WEB-TASKS.md`：通过
+- 风险与后续：
+  - 当前风险：本轮提供的是“可重复一键入库的测试数据”，尚未实现“按白名单自动抓取远端源并清洗导入”的生产级 pipeline。
+  - 下一步动作：新增白名单抓取 + 清洗 + 导入脚本（含导入日志与失败重试），并将来源与许可证信息落库。
+
+## 2026-04-20 14:26 (Asia/Shanghai)
+
+- 任务：修复 `pnpm classics:seed` 在根目录执行时 Go 模块路径错误，确保一键入库可直接成功。
+- 改动文件：
+  - `scripts/classics-seed.js`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将 `go run` 的执行目录从仓库根切换为 `server` 目录，避免 `go.mod file not found`。
+  - 保持脚本入口不变（仍用 `pnpm classics:seed`），仅修正内部执行上下文。
+- 校验：
+  - `node --check scripts/classics-seed.js`：通过
+  - `pnpm classics:seed`：通过（迁移 + seed 成功，10 本书 30 章）
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py scripts/classics-seed.js`：通过
+- 风险与后续：
+  - 当前风险：远程数据库网络波动时可能导致执行耗时增大。
+  - 下一步动作：可继续补“白名单源抓取导入脚本”，将真实来源文本自动导入而非仅测试 seed。
+
+## 2026-04-20 14:31 (Asia/Shanghai)
+
+- 任务：把“英语学习功能”方案加入 Web 活跃清单，并沉淀可执行的实施文档（数据来源、授权边界、落地步骤）。
+- 改动文件：
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `docs/architecture/2026-04-20_english_learning_elp1_data_and_delivery_plan.md`（新增）
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 `WEB-TASKS` 的活跃 backlog 新增 `ELP（P0）` 任务组，包含 `ELP-1 ~ ELP-4`，并将 `ELP-1` 标记为已完成（方案冻结）。
+  - 把已完成的 `CLSEARCH / CLADMIN` 从活跃 backlog 移至“已完成”区，保持活跃任务聚焦。
+  - 新增 ELP-1 架构文档，明确：
+    - 可用数据来源（Oxford/Cambridge/Merriam-Webster + WordNet/Wiktionary/Tatoeba/Common Voice/LibriSpeech）。
+    - 版权边界与导入策略（哪些可导入、哪些必须实时 API、哪些禁止抓取）。
+    - 在线学习产品闭环（词典/打字/阅读/口语/听力/学习计划）与 Valley MAS 对应技术落点。
+    - 听力配音（TTS/真人/混合）与口语评分（STT + 发音评估）实施路径。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前风险：ELP 仍是方案阶段，尚未进入数据库迁移与 API 实作，第三方词典缓存与展示限制仍需法务/协议逐条确认。
+  - 下一步动作：进入 `ELP-2`，先落库表结构与后端 API 契约草案，再做 Web 页面骨架联调。
+
+## 2026-04-20 15:05 (Asia/Shanghai)
+
+- 任务：将名著库从“示例片段”升级为“可阅读完整正文”，并提供稳定的一键抓取导入命令。
+- 改动文件：
+  - `server/scripts/import_classics_fulltext.go`（新增）
+  - `scripts/classics-import-fulltext.js`（新增）
+  - `package.json`
+  - `README.md`
+  - `QUICK_START.md`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增完整正文导入器：按书目抓取 Project Gutenberg / 维基文库文本，按章节规则切分并覆盖默认版本章节。
+  - 支持网络重试与单书补导入：`CLASSICS_ONLY='书名' pnpm classics:import-fulltext`。
+  - 为 `朝花夕拾` 增加维基文库子页面聚合导入，补齐为 12 篇（含小引、后记）。
+  - 文档补充 `pnpm classics:import-fulltext` 使用方式，并在 WEB-TASKS 标记“白名单源抓取导入脚本”完成。
+- 校验：
+  - `pnpm classics:import-fulltext`：通过（全量导入）
+  - `CLASSICS_ONLY='朝花夕拾' pnpm classics:import-fulltext`：通过（定点补导入）
+  - `cd server && go test ./...`：通过
+  - `node --check scripts/classics-import-fulltext.js && node --check scripts/classics-seed.js`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py server/scripts/import_classics_fulltext.go scripts/classics-import-fulltext.js README.md QUICK_START.md .codex/skills/web-feature-iteration/WEB-TASKS.md`：通过
+- 风险与后续：
+  - 当前风险：上游公版源网络偶发重置（已做重试）；个别文本（如 `宋词三百首` 来源版本）章节总量受源站版本影响。
+  - 下一步动作：补充导入结果审计表（来源 URL、许可证、导入时间、失败重试次数）并落库，便于持续运营和合规追溯。

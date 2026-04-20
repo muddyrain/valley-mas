@@ -52,3 +52,27 @@ go build .
 cd ../apps/web
 node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
 ```
+
+## 8. 名著测试数据初始化
+
+如果要本地验证名著馆分类/朝代筛选，可在仓库根目录执行：
+
+```bash
+pnpm classics:seed
+```
+
+前置条件：`server/.env` 已配置 `DB_DSN`。该命令会自动迁移 `classics_*` 表并导入测试数据。
+
+## 9. 名著完整正文导入
+
+如果要导入可阅读的完整正文（而非示例片段），在仓库根目录执行：
+
+```bash
+pnpm classics:import-fulltext
+```
+
+仅导入单本示例：
+
+```bash
+CLASSICS_ONLY='朝花夕拾' pnpm classics:import-fulltext
+```
