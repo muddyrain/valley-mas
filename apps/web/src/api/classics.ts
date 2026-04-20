@@ -1,4 +1,4 @@
-import http from '@/utils/request';
+import http, { type RequestConfig } from '@/utils/request';
 
 // ---- 类型定义 ----
 
@@ -119,5 +119,129 @@ export const askClassicsChapter = (
   return http.post<unknown, ClassicsAskResponse>(
     `/public/classics/${id}/editions/${editionId}/chapters/${index}/ai/ask`,
     { question },
+  );
+};
+
+// ---- 用户书架（登录态）----
+
+export interface ClassicsShelfResponse {
+  bookIds: string[];
+}
+
+export const getMyClassicsShelf = (config?: RequestConfig) => {
+  return http.get<unknown, ClassicsShelfResponse>('/user/classics/shelf', config);
+};
+
+export const addMyClassicsShelf = (bookId: string, config?: RequestConfig) => {
+  return http.post<unknown, { bookId: string }>('/user/classics/shelf', { bookId }, config);
+};
+
+export const removeMyClassicsShelf = (bookId: string, config?: RequestConfig) => {
+  return http.delete<unknown, { bookId: string }>(`/user/classics/shelf/${bookId}`, config);
+};
+
+// ---- 用户阅读进度（登录态）----
+
+export interface ClassicsReadProgress {
+  bookId: string;
+  editionId: string;
+  chapterIndex: number;
+  chapterTitle?: string;
+  savedAt: number;
+}
+
+export interface ClassicsProgressListResponse {
+  list: ClassicsReadProgress[];
+}
+
+export const getMyClassicsProgress = (
+  params: { bookId?: string; bookIds?: string[] } = {},
+  config?: RequestConfig,
+) => {
+  const q = new URLSearchParams();
+  if (params.bookId) q.set('bookId', params.bookId);
+  if (params.bookIds && params.bookIds.length > 0) q.set('bookIds', params.bookIds.join(','));
+  const query = q.toString();
+  return http.get<unknown, ClassicsProgressListResponse>(
+    `/user/classics/progress${query ? `?${query}` : ''}`,
+    config,
+  );
+};
+
+export const saveMyClassicsProgress = (
+  progress: Omit<ClassicsReadProgress, 'savedAt'> & { savedAt?: number },
+  config?: RequestConfig,
+) => {
+  return http.post<unknown, ClassicsReadProgress>('/user/classics/progress', progress, config);
+};
+
+// ---- 用户最近阅读（登录态）----
+
+export interface ClassicsRecentItem {
+  bookId: string;
+  title: string;
+  coverUrl?: string;
+  authorNames: string;
+  dynasty?: string;
+  editionId: string;
+  chapterIndex: number;
+  chapterTitle?: string;
+  savedAt: number;
+}
+
+export interface ClassicsRecentListResponse {
+  list: ClassicsRecentItem[];
+}
+
+export const getMyClassicsRecent = (params: { limit?: number } = {}, config?: RequestConfig) => {
+  const q = new URLSearchParams();
+  if (params.limit != null) q.set('limit', String(params.limit));
+  const query = q.toString();
+  return http.get<unknown, ClassicsRecentListResponse>(
+    `/user/classics/recent${query ? `?${query}` : ''}`,
+    config,
+  );
+};
+
+export const saveMyClassicsRecent = (
+  recent: Omit<ClassicsRecentItem, 'title' | 'coverUrl' | 'authorNames' | 'dynasty'>,
+  config?: RequestConfig,
+) => {
+  return http.post<unknown, ClassicsRecentItem>('/user/classics/recent', recent, config);
+};
+
+// ---- 用户 AI 探索记录（登录态）----
+
+export interface ClassicsAiExploredItem {
+  bookId: string;
+  chapterIndexes: number[];
+}
+
+export interface ClassicsAiExploredListResponse {
+  list: ClassicsAiExploredItem[];
+}
+
+export const getMyClassicsAiExplored = (
+  params: { bookId?: string; bookIds?: string[] } = {},
+  config?: RequestConfig,
+) => {
+  const q = new URLSearchParams();
+  if (params.bookId) q.set('bookId', params.bookId);
+  if (params.bookIds && params.bookIds.length > 0) q.set('bookIds', params.bookIds.join(','));
+  const query = q.toString();
+  return http.get<unknown, ClassicsAiExploredListResponse>(
+    `/user/classics/ai-explored${query ? `?${query}` : ''}`,
+    config,
+  );
+};
+
+export const saveMyClassicsAiExplored = (
+  payload: { bookId: string; chapterIndex: number; savedAt?: number },
+  config?: RequestConfig,
+) => {
+  return http.post<unknown, { bookId: string; chapterIndex: number; savedAt: number }>(
+    '/user/classics/ai-explored',
+    payload,
+    config,
   );
 };
