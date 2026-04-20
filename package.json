@@ -15,7 +15,9 @@
     "check:utf8": "powershell -ExecutionPolicy Bypass -File ./scripts/check-utf8.ps1",
     "clean": "turbo clean",
     "prepare": "lefthook install",
-    "hooks:test": "lefthook run pre-commit"
+    "hooks:test": "lefthook run pre-commit",
+    "classics:seed": "node ./scripts/classics-seed.js",
+    "classics:import-fulltext": "node ./scripts/classics-import-fulltext.js"
   },
   "keywords": [
     "react",

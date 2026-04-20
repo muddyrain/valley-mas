@@ -25,10 +25,11 @@
   - [x] CLAI-1 入口设计与触发条件：阅读模式右下角悬浮 ✨ 按钮，展开 AI 伴读面板。
   - [x] CLAI-2 能力接入与结果卡片展示：`本章导读`（guide+highlights）+ `问章节`（answer+citations）；后端 `classics_ai.go` 两条路由。
   - [x] CLAI-3 阅读记录与 AI 行为联动：AI 导读/提问成功后写入 `classics_ai_explored_{bookId}`，TOC 侧栏和详情页目录对已探索章节显示 ✨ 徽标，持久化跨会话。
-- [x] CLSEARCH（P2）名著馆搜索增强：列表页支持按`朝代`/`分类`筛选，参数写入 URL，联动分页重置。
-  - [x] CLSEARCH-1 后端 `/public/classics` 接口补 `dynasty` / `category` 可选过滤参数。
-  - [x] CLSEARCH-2 前端 ClassicsList 补筛选栏（Select 朝代 + Select 分类），与 keyword/page URL 联动。
-- [x] CLADMIN（P2）Admin 名著录入 UI：`apps/admin` 名著书目增删改查，含章节批量导入 Modal。
+- [ ] ELP（P0）英语学习功能方案与数据治理：词典接入、学习闭环、口语听力能力、版权边界。
+  - [x] ELP-1 方案冻结：完成数据来源、授权边界、导入策略、MVP 信息架构文档沉淀（文档：`docs/architecture/2026-04-20_english_learning_elp1_data_and_delivery_plan.md`）。
+  - [ ] ELP-2 API 与数据模型草图：定义 `dictionary_lookup / wordbook / study_plan / speaking_attempt / listening_attempt` 的接口与表结构。
+  - [ ] ELP-3 Web MVP 页面骨架：新增 `Learning Hub / Dictionary / Typing / Reading / Speaking / Listening / Plan` 路由与导航入口（先空实现 + mock 数据）。
+  - [ ] ELP-4 听力与口语链路 PoC：打通 TTS 生成 + STT 识别 + 口语评分回流到学习计划。
 
 ## 已完成（从活跃 Backlog 移除）
 
@@ -56,8 +57,14 @@
 - [x] 列表页 URL 状态统一：补齐 `Resources / CreatorProfile / ResourceAlbumManage / ResourceTagManage` 的 `keyword/page` URL 联动，并补齐 `Notifications / Favorites / Downloads / Follows / Guestbook / MyResources / MyPosts` 的 `page` URL 联动。
 - [x] URL 状态复用收敛：新增通用 hook `useUrlPaginationQuery`，并替换多页重复 `searchParams` 读写逻辑（含 `ResourceTagManage`），减少后续维护成本。
 - [x] CLD-1（P0）名著数据源白名单首版：已冻结首批来源、许可证信号、可用范围与导入门槛，并明确“中文来源优先、海外来源补充”策略（文档：`docs/architecture/2026-04-19_classic_literature_cld1_source_whitelist.md`）。
+- [x] CLSEARCH（P2）名著馆搜索增强：列表页支持按`朝代`/`分类`筛选，参数写入 URL，联动分页重置。
+  - [x] CLSEARCH-1 后端 `/public/classics` 接口补 `dynasty` / `category` 可选过滤参数。
+  - [x] CLSEARCH-2 前端 ClassicsList 补筛选栏（Select 朝代 + Select 分类），与 keyword/page URL 联动。
+- [x] CLADMIN（P2）Admin 名著录入 UI：`apps/admin` 名著书目增删改查，含章节批量导入 Modal。
 
 ## 下一步建议
 
-- 补全名著测试数据，验证分类/朝代筛选效果（目前仅有 seed 数据）。
-- 名著馆书架页：展示用户 localStorage 书架列表（`/classics/shelf`）。
+- [x] 补全名著测试数据，验证分类/朝代筛选效果（seed 已扩展为覆盖朝代/分类的一组样本，并支持一键命令 `pnpm classics:seed`）。
+- [ ] 启动 ELP-2：先产出英语学习域后端 API 契约与数据库表结构草案（与 `ELP-1` 文档保持字段一致）。
+- [x] 增加白名单源抓取导入脚本：已新增完整正文导入命令 `pnpm classics:import-fulltext`，支持从 Project Gutenberg / 维基文库抓取并覆盖默认版本章节，含网络重试与单书补导入（`CLASSICS_ONLY`）。
+- [ ] 名著馆书架页：展示用户 localStorage 书架列表（`/classics/shelf`）。
