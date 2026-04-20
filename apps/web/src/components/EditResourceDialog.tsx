@@ -14,6 +14,7 @@ import {
   updateResource,
 } from '@/api/resource';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
+import ImagePreviewDialog from '@/components/ImagePreviewDialog';
 import ResourceTagSelector from '@/components/ResourceTagSelector';
 import { Button } from '@/components/ui/button';
 import { openConfirmToast } from '@/components/ui/confirm-toast';
@@ -83,6 +84,7 @@ export default function EditResourceDialog({
   const [visibility, setVisibility] = useState<ResourceVisibility>('private');
   const [saving, setSaving] = useState(false);
   const [loadingTags, setLoadingTags] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const closeConfirmToastIdRef = useRef<string | number | null>(null);
   const closeConfirmTimeoutRef = useRef<number | null>(null);
 
@@ -101,6 +103,7 @@ export default function EditResourceDialog({
   useEffect(() => {
     if (!resource) {
       setLoadingTags(false);
+      setPreviewOpen(false);
       return;
     }
     setTitle(resource.title);
@@ -212,20 +215,30 @@ export default function EditResourceDialog({
             <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
               图片预览
             </p>
-            <div className="relative flex-1 min-h-0 rounded-2xl overflow-hidden border border-slate-200 bg-white flex items-center justify-center">
+            <button
+              type="button"
+              onClick={() => resource && setPreviewOpen(true)}
+              className="relative flex-1 min-h-0 rounded-2xl overflow-hidden border border-slate-200 bg-white flex items-center justify-center group disabled:cursor-default"
+              disabled={!resource}
+            >
               {resource && (
                 <img
                   src={resource.thumbnailUrl ?? resource.url}
                   alt={resource.title}
-                  className="h-full w-full object-contain"
+                  className="h-full w-full object-contain transition duration-200 group-hover:scale-[1.01]"
                 />
+              )}
+              {resource && (
+                <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[10px] font-medium text-white/90 backdrop-blur-sm opacity-90 group-hover:opacity-100">
+                  点击预览
+                </div>
               )}
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
                 <span className="rounded-full bg-black/40 px-3 py-1 text-[10px] text-white/80 backdrop-blur-sm whitespace-nowrap">
                   🔒 图片不可更换，如需替换请重新上传
                 </span>
               </div>
-            </div>
+            </button>
             {resource && (
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <ImageIcon className="h-3.5 w-3.5 shrink-0" />
@@ -384,6 +397,13 @@ export default function EditResourceDialog({
           </div>
         </div>
       </DialogContent>
+      <ImagePreviewDialog
+        open={previewOpen}
+        src={resource?.url}
+        resourceId={resource?.id}
+        title={resource?.title || '资源预览'}
+        onOpenChange={setPreviewOpen}
+      />
     </Dialog>
   );
 }
