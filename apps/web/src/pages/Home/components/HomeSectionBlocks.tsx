@@ -15,11 +15,11 @@ export function SectionHeading({
   return (
     <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
       <div className="space-y-3">
-        <div className="theme-eyebrow inline-flex items-center rounded-full border bg-white/88 px-4 py-1.5 text-[11px] tracking-[0.3em] uppercase shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur">
+        <div className="theme-eyebrow inline-flex items-center rounded-full border bg-white/88 px-4 py-1.5 text-[11px] tracking-[0.24em] uppercase shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur sm:tracking-[0.3em]">
           {eyebrow}
         </div>
         <div className="space-y-2">
-          <h2 className="text-[36px] font-semibold tracking-[-0.045em] text-slate-950 md:text-[46px]">
+          <h2 className="text-[30px] font-semibold tracking-[-0.045em] text-slate-950 sm:text-[34px] md:text-[46px]">
             {title}
           </h2>
           {description ? (
@@ -65,14 +65,14 @@ export function HeroRibbon({
   value: string;
 }) {
   return (
-    <div className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full border border-white/88 bg-[linear-gradient(135deg,rgba(255,255,255,0.88),rgba(255,255,255,0.72))] px-4 py-2 shadow-[0_14px_36px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-white hover:shadow-[0_18px_42px_rgba(var(--theme-primary-rgb),0.2)]">
+    <div className="group relative inline-flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-white/88 bg-[linear-gradient(135deg,rgba(255,255,255,0.88),rgba(255,255,255,0.72))] px-4 py-2.5 shadow-[0_14px_36px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-white hover:shadow-[0_18px_42px_rgba(var(--theme-primary-rgb),0.2)] sm:w-auto sm:rounded-full sm:py-2">
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,transparent_18%,rgba(255,255,255,0.46)_52%,transparent_82%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
       <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-theme-soft text-theme-primary shadow-[0_8px_20px_rgba(var(--theme-primary-rgb),0.18)]">
         {icon}
       </div>
-      <div className="relative leading-tight">
+      <div className="relative min-w-0 leading-tight">
         <div className="text-[11px] tracking-[0.16em] text-slate-400 uppercase">{label}</div>
-        <div className="text-sm font-medium text-slate-900">{value}</div>
+        <div className="line-clamp-1 text-sm font-medium text-slate-900">{value}</div>
       </div>
     </div>
   );
@@ -184,7 +184,7 @@ export function ResourceFavoriteButton({
           ? 'bg-rose-500 text-white shadow-[0_8px_20px_rgba(244,63,94,0.32)]'
           : 'bg-black/22 text-white hover:bg-black/34'
       }`}
-      aria-label={active ? '鍙栨秷鏀惰棌' : '鏀惰棌璧勬簮'}
+      aria-label={active ? '取消收藏' : '收藏资源'}
     >
       <Heart className={`${iconClass} ${active ? 'fill-current' : ''}`} />
     </button>

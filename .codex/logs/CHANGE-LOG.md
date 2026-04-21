@@ -2959,3 +2959,98 @@
 - 风险与后续：
   - 当前风险：这是单实例内存缓存；如果线上是多实例或冷启动实例，缓存命中会受实例切换影响。
   - 下一步动作：上线后观察同条件重复请求的耗时变化；若还需要更稳的命中率，再考虑迁移到 Redis / Upstash。
+
+## 2026-04-21 22:47 (Asia/Shanghai)
+
+- 任务：收口 Web 首轮移动端适配，优先修复首页、登录、注册和全局头部在小屏设备上的布局问题。
+- 改动文件：
+  - apps/web/src/components/AuthSplitLayout.tsx
+  - apps/web/src/pages/Login/index.tsx
+  - apps/web/src/pages/Register/index.tsx
+  - apps/web/src/layouts/Header.tsx
+  - apps/web/src/pages/Home/index.tsx
+  - apps/web/src/pages/Home/components/HomeSectionBlocks.tsx
+  - apps/web/src/pages/Home/components/HomeEnergyCore.tsx
+  - apps/web/src/pages/Home/components/HeroImmersiveShowcase.tsx
+  - .codex/skills/web-feature-iteration/WEB-TASKS.md
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 新增认证页共享壳子 `AuthSplitLayout`，统一登录/注册双栏布局，并补上移动端品牌卡、表单边距和验证码按钮换行策略。
+  - Header 改为移动端双层结构，上层承载品牌与用户操作，下层使用可横滑导航，减少多个页面的横向溢出风险。
+  - 首页收口 Hero、搜索条、资源焦点、统计块和展示舱在小屏下的字号、卡片圆角、按钮宽度与堆叠方式，并修复首页收藏按钮的乱码 `aria-label`。
+  - Web 活跃任务清单新增并完成 `WRESP` 首轮移动端适配任务，同时补充下一步 `WRESP-4` 页面范围。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/AuthSplitLayout.tsx apps/web/src/pages/Login/index.tsx apps/web/src/pages/Register/index.tsx apps/web/src/layouts/Header.tsx apps/web/src/pages/Home/index.tsx apps/web/src/pages/Home/components/HomeSectionBlocks.tsx apps/web/src/pages/Home/components/HomeEnergyCore.tsx apps/web/src/pages/Home/components/HeroImmersiveShowcase.tsx .codex/skills/web-feature-iteration/WEB-TASKS.md`：通过
+- 风险与后续：
+  - 当前风险：`Creator / CreatorProfile / MySpace / MyResources / BlogPost` 等复杂内容页仍有独立的移动端密度和 sticky 布局问题，尚未纳入这轮代码改动。
+  - 下一步动作：按 `WRESP-4` 继续逐页收口高复杂度页面，并结合真机或浏览器响应式模式补一轮视觉走查。
+
+## 2026-04-21 23:03 (Asia/Shanghai)
+
+- 任务：修正首轮移动端适配后的回归，恢复 PC 头部原有布局，并放宽首页移动端首屏宽度。
+- 改动文件：
+  - apps/web/src/layouts/Header.tsx
+  - apps/web/src/pages/Home/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - Header 调整为桌面端保持单行导航，移动端单独渲染第二行横滑导航，避免 PC 头部被两层结构污染。
+  - 首页在移动端取消过重的外层边距，Hero 与后续分区更接近满宽展示，同时保留桌面端原有容器节奏。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/layouts/Header.tsx apps/web/src/pages/Home/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：这次主要修正的是头部和首页容器节奏，其它复杂页面的移动端密度问题仍需继续逐页检查。
+  - 下一步动作：优先继续处理 `Creator / CreatorProfile / MySpace / MyResources / BlogPost` 的移动端宽度与侧栏策略。
+
+## 2026-04-21 23:10 (Asia/Shanghai)
+
+- 任务：继续修正移动端页面未占满视口的问题，收口 Web 根层宽度与滚动槽策略。
+- 改动文件：
+  - apps/web/src/index.css
+  - apps/web/src/layouts/Layout.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 取消移动端 `html` 上的 `scrollbar-gutter: stable both-edges`，仅保留桌面端滚动槽预留，避免窄屏出现两侧被强行吃掉的空白。
+  - 为 `body / #root / Layout` 补齐 `width: 100%` 与横向溢出约束，确保页面根容器按视口满宽展开。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/index.css apps/web/src/layouts/Layout.tsx`：通过
+- 风险与后续：
+  - 当前风险：如果后续还有某个具体页面仍显得偏窄，更可能是该页面自己的 `max-w / px / aside` 布局而不是根层问题。
+  - 下一步动作：重新查看首页在移动端的实际占宽；若还有剩余问题，逐页检查 `Creator / CreatorProfile / BlogPost` 的独立容器约束。
+
+## 2026-04-21 23:17 (Asia/Shanghai)
+
+- 任务：将移动端头部导航从横滑入口改为汉堡导航，收口小屏导航模式。
+- 改动文件：
+  - apps/web/src/layouts/Header.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 为移动端 Header 增加汉堡按钮，点击后展开两列导航面板，替换掉原先横向滚动的一排入口。
+  - 保持桌面端头部仍为单行导航，不影响 PC 现有导航节奏。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/layouts/Header.tsx`：通过
+- 风险与后续：
+  - 当前风险：当前汉堡菜单仍是轻量面板，如果后续导航项继续变多，可能需要升级为全屏抽屉式导航。
+  - 下一步动作：结合真机宽度再看一轮操作密度，必要时补导航分组和账号快捷入口。
+
+## 2026-04-21 22:22 (Asia/Shanghai)
+
+- 任务：修复博客详情页“继续阅读”的上一篇 / 下一篇长期为空问题。
+- 改动文件：
+  - server/internal/handler/blog.go
+  - apps/web/src/api/blog.ts
+  - apps/web/src/pages/blog/BlogPost/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 将上一篇 / 下一篇的计算从前端“只拉前 50 篇再找当前位置”改为后端详情接口直接返回相邻文章。
+  - 相邻文章优先按当前分组时间线查找，若当前文章不在分组时间线中，再回退到全站公开博客时间线。
+  - 博客详情页继续阅读区域改为直接消费详情接口中的 `prevPost` / `nextPost`，不再受老文章超出前 50 篇限制。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+- 风险与后续：
+  - 当前风险：后端当前通过读取同时间线文章列表来定位相邻项，若未来公开博客量显著增加，可进一步改为更精确的 SQL 邻居查询。
+  - 下一步动作：在几篇不同发布时间、不同分组的博客详情页手动验证上一篇 / 下一篇是否符合预期。

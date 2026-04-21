@@ -1,4 +1,4 @@
-﻿import {
+import {
   ArrowLeftRight,
   Bell,
   BookOpen,
@@ -8,6 +8,7 @@
   Home,
   ImageIcon,
   LogOut,
+  Menu,
   MessageCircleHeart,
   Mountain,
   Palette,
@@ -61,10 +62,57 @@ export default function Header() {
   } = useAuthStore();
   const currentTheme = useThemeStore((state) => state.theme);
   const setTheme = useThemeStore((state) => state.setTheme);
+  const navItems = [
+    { to: '/', label: '首页', icon: Home, active: location.pathname === '/' },
+    {
+      to: '/creators',
+      label: '创作者',
+      icon: Users,
+      active: location.pathname.startsWith('/creators') || location.pathname.startsWith('/creator'),
+    },
+    {
+      to: '/resources',
+      label: '资源',
+      icon: ImageIcon,
+      active:
+        location.pathname.startsWith('/resources') || location.pathname.startsWith('/resource'),
+    },
+    {
+      to: '/blog',
+      label: '博客',
+      icon: BookOpen,
+      active: location.pathname.startsWith('/blog'),
+    },
+    {
+      to: '/guestbook',
+      label: '留言墙',
+      icon: MessageCircleHeart,
+      active: location.pathname.startsWith('/guestbook'),
+    },
+    {
+      to: '/tools/format',
+      label: '格式转换',
+      icon: ArrowLeftRight,
+      active: location.pathname.startsWith('/tools/format'),
+    },
+    {
+      to: '/updates',
+      label: '更新日志',
+      icon: Sparkles,
+      active: location.pathname.startsWith('/updates'),
+    },
+    {
+      to: '/labs/climber',
+      label: '跳跳乐实验',
+      icon: Mountain,
+      active: location.pathname.startsWith('/labs/climber'),
+    },
+  ];
 
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifyLoading, setNotifyLoading] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     initAuth();
@@ -109,6 +157,10 @@ export default function Header() {
       window.removeEventListener(NOTIFICATION_STATE_CHANGED_EVENT, handleNotificationStateChanged);
     };
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   const loadNotifications = async () => {
     if (!isAuthenticated) return;
@@ -192,389 +244,349 @@ export default function Header() {
     toast.success(`已切换为${option?.label || '新主题'}`);
   };
 
+  const actionArea = (
+    <>
+      <button
+        type="button"
+        onClick={() => setMobileNavOpen((value) => !value)}
+        className={`relative flex h-10 w-10 items-center justify-center rounded-full transition-colors md:hidden ${
+          mobileNavOpen
+            ? 'bg-theme-soft text-theme-primary'
+            : 'hover:bg-theme-soft hover:text-theme-primary'
+        }`}
+        aria-label={mobileNavOpen ? '关闭导航菜单' : '打开导航菜单'}
+        aria-expanded={mobileNavOpen}
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-theme-soft hover:text-theme-primary">
+          <Palette className="h-5 w-5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          className="w-72 border-theme-border bg-white/95 p-2 shadow-xl backdrop-blur-xl"
+          align="end"
+        >
+          <div className="px-2 py-1.5">
+            <p className="text-sm font-semibold text-slate-900">主题切换</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              选择你更喜欢的页面色调，切换后会保留到下次打开。
+            </p>
+          </div>
+          <DropdownMenuSeparator className="bg-theme-border" />
+          <div className="grid gap-1 p-1">
+            {THEME_OPTIONS.map((option) => {
+              const active = option.value === currentTheme;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleThemeChange(option.value)}
+                  className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${
+                    active
+                      ? 'border-theme-soft-strong bg-theme-soft shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.12)]'
+                      : 'border-transparent hover:border-theme-border hover:bg-theme-soft'
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-2 shadow-sm">
+                    {option.preview.map((color) => (
+                      <span
+                        key={color}
+                        className="h-3 w-3 rounded-full border border-white/80 shadow-sm"
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-slate-900">{option.label}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                      {option.description}
+                    </span>
+                  </span>
+                  {active ? (
+                    <span className="rounded-full bg-theme-primary px-2.5 py-1 text-[11px] text-white">
+                      当前
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {isAuthenticated && (
+        <DropdownMenu onOpenChange={(open) => open && loadNotifications()}>
+          <DropdownMenuTrigger className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-theme-soft hover:text-theme-primary">
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-rose-500 px-1.5 text-center text-[10px] font-semibold leading-4 text-white">
+                {unreadLabel}
+              </span>
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-86 border-theme-border bg-white/95 p-2 shadow-xl backdrop-blur-xl"
+            align="end"
+          >
+            <div className="mb-1 flex items-center justify-between px-2 py-1">
+              <p className="text-sm font-semibold text-gray-900">通知</p>
+              <button
+                type="button"
+                onClick={handleMarkAllRead}
+                className="text-theme-primary inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-theme-soft"
+              >
+                <CheckCheck className="h-3.5 w-3.5" />
+                全部已读
+              </button>
+            </div>
+            <DropdownMenuSeparator className="bg-theme-border" />
+
+            <div className="max-h-88 overflow-auto">
+              {notifyLoading ? (
+                <div className="px-3 py-6 text-center text-sm text-gray-500">加载中...</div>
+              ) : notifications.length === 0 ? (
+                <div className="px-3 py-8 text-center text-sm text-gray-500">暂无通知</div>
+              ) : (
+                notifications.map((item) => (
+                  <DropdownMenuItem
+                    key={item.id}
+                    onClick={() => handleMarkOneRead(item)}
+                    className={`cursor-pointer rounded-xl border px-3 py-3 ${
+                      item.isRead
+                        ? 'border-slate-200 bg-slate-50/65'
+                        : 'border-theme-shell-border bg-theme-soft/70 shadow-[0_6px_16px_rgba(var(--theme-primary-rgb),0.12)]'
+                    }`}
+                  >
+                    {(() => {
+                      const visual = getNotificationVisual(item.type, item.content);
+                      const Icon = visual.icon;
+                      return (
+                        <div className="flex w-full items-start gap-2.5">
+                          <div
+                            className={`mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${visual.iconBgClass}`}
+                          >
+                            <Icon className={`h-4 w-4 ${visual.iconClass}`} />
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="line-clamp-1 text-sm font-medium text-slate-900">
+                                {item.title}
+                              </p>
+                              {item.isRead ? (
+                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600">
+                                  已读
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-theme-primary px-2 py-0.5 text-[10px] text-white">
+                                  未读
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600">
+                              {item.content}
+                            </p>
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              {formatNotificationTime(item.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </DropdownMenuItem>
+                ))
+              )}
+            </div>
+            <DropdownMenuSeparator className="bg-theme-border" />
+            <DropdownMenuItem
+              onClick={() => navigate('/notifications')}
+              className="hover:bg-theme-soft cursor-pointer justify-center rounded-xl py-2.5 text-sm font-medium text-theme-primary transition-colors"
+            >
+              查看全部通知
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
+      {isAuthenticated ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger className="relative h-10 w-10 rounded-full outline-none transition-all hover:ring-2 hover:ring-theme-soft-strong">
+            <Avatar className="h-10 w-10 border-2 shadow-sm border-theme-primary/50">
+              <AvatarImage src={user?.avatar} alt={user?.nickname || user?.username} />
+              <AvatarFallback className="theme-avatar-fallback font-semibold text-white">
+                {(user?.nickname?.[0] || user?.username?.[0] || 'U').toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-64 border-theme-border bg-white/95 p-2 shadow-xl backdrop-blur-xl"
+            align="end"
+          >
+            <div className="bg-theme-soft mb-2 rounded-lg px-3 py-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900">
+                    {user?.nickname || user?.username}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-600">@{user?.username}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRefreshUser}
+                  className="text-theme-primary inline-flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-white/70"
+                  title="刷新用户状态"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${profileLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+            <DropdownMenuSeparator className="bg-theme-border" />
+            <DropdownMenuItem
+              onClick={() => navigate('/profile')}
+              className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+            >
+              <User className="text-theme-primary h-4 w-4" />
+              <span className="font-medium">个人中心</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => navigate('/favorites')}
+              className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+            >
+              <Heart className="h-4 w-4 text-pink-500" />
+              <span className="font-medium">我的收藏</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => navigate('/follows')}
+              className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+            >
+              <Users className="text-theme-primary h-4 w-4" />
+              <span className="font-medium">我的关注</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => navigate('/downloads')}
+              className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+            >
+              <Download className="h-4 w-4 text-sky-500" />
+              <span className="font-medium">下载记录</span>
+            </DropdownMenuItem>
+            {user?.role === 'creator' && (
+              <DropdownMenuItem
+                onClick={() => navigate('/my-space')}
+                className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+              >
+                <Sparkles className="text-theme-primary h-4 w-4" />
+                <span className="font-medium">我的创作空间</span>
+              </DropdownMenuItem>
+            )}
+            {user?.role === 'admin' && (
+              <DropdownMenuItem
+                onClick={() => navigate('/my-space/resource-tags')}
+                className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
+              >
+                <Tag className="text-theme-primary h-4 w-4" />
+                <span className="font-medium">资源标签管理</span>
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator className="bg-theme-border" />
+            <DropdownMenuItem
+              onClick={handleLogout}
+              className="cursor-pointer gap-3 rounded-lg py-2.5 text-red-600 transition-colors hover:bg-red-50"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="font-medium">退出登录</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <Link to="/login">
+          <Button className="theme-btn-primary h-10 rounded-xl px-4 text-sm font-medium transition-all sm:px-6">
+            登录 / 注册
+          </Button>
+        </Link>
+      )}
+    </>
+  );
+
   return (
     <header
       data-global-header
       className="theme-header sticky top-0 z-50 w-full border-b bg-white/82 backdrop-blur-xl"
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center px-4 md:px-8">
-        <Link to="/" className="group mr-8">
-          <BrandLogo
-            className="transition-transform group-hover:scale-105"
-            iconClassName="h-10"
-            wordmarkClassName="hidden text-[1.28rem] sm:block"
-          />
-        </Link>
-
-        <nav className="flex flex-1 items-center gap-1">
-          <Link to="/">
-            <Button
-              variant="ghost"
-              className={`gap-2 transition-colors ${
-                location.pathname === '/'
-                  ? 'bg-theme-soft text-theme-primary-hover'
-                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
-              }`}
-            >
-              <Home className="h-4 w-4" />
-              <span className="hidden sm:inline">首页</span>
-            </Button>
+      <div className="mx-auto max-w-7xl px-3 py-3 sm:px-4 md:px-8 md:py-0">
+        <div className="flex items-center justify-between gap-4 md:h-16">
+          <Link to="/" className="group shrink-0 md:mr-8">
+            <BrandLogo
+              className="transition-transform group-hover:scale-105"
+              iconClassName="h-9 sm:h-10"
+              wordmarkClassName="text-[1.12rem] sm:text-[1.28rem]"
+            />
           </Link>
 
-          <Link to="/creators">
-            <Button
-              variant="ghost"
-              className={`gap-2 transition-colors ${
-                location.pathname.startsWith('/creators') ||
-                location.pathname.startsWith('/creator')
-                  ? 'bg-theme-soft text-theme-primary-hover'
-                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
-              }`}
-            >
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">创作者</span>
-            </Button>
-          </Link>
+          <nav className="hidden min-w-0 flex-1 items-center gap-1 md:flex">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link key={item.to} to={item.to} className="shrink-0">
+                  <Button
+                    variant="ghost"
+                    className={`gap-2 transition-colors ${
+                      item.active
+                        ? 'bg-theme-soft text-theme-primary-hover'
+                        : 'hover:bg-theme-soft hover:text-theme-primary-hover'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="whitespace-nowrap">{item.label}</span>
+                  </Button>
+                </Link>
+              );
+            })}
+          </nav>
 
-          <Link to="/resources">
-            <Button
-              variant="ghost"
-              className={`gap-2 transition-colors ${
-                location.pathname.startsWith('/resources') ||
-                location.pathname.startsWith('/resource')
-                  ? 'bg-theme-soft text-theme-primary-hover'
-                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
-              }`}
-            >
-              <ImageIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">资源</span>
-            </Button>
-          </Link>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">{actionArea}</div>
+        </div>
 
-          <Link to="/blog">
-            <Button
-              variant="ghost"
-              className={`gap-2 transition-colors ${
-                location.pathname.startsWith('/blog')
-                  ? 'bg-theme-soft text-theme-primary-hover'
-                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
-              }`}
-            >
-              <BookOpen className="h-4 w-4" />
-              <span className="hidden sm:inline">博客</span>
-            </Button>
-          </Link>
-
-          <Link to="/guestbook">
-            <Button
-              variant="ghost"
-              className={`gap-2 transition-colors ${
-                location.pathname.startsWith('/guestbook')
-                  ? 'bg-theme-soft text-theme-primary-hover'
-                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
-              }`}
-            >
-              <MessageCircleHeart className="h-4 w-4" />
-              <span className="hidden sm:inline">留言墙</span>
-            </Button>
-          </Link>
-
-          <Link to="/tools/format">
-            <Button
-              variant="ghost"
-              className={`gap-2 transition-colors ${
-                location.pathname.startsWith('/tools/format')
-                  ? 'bg-theme-soft text-theme-primary-hover'
-                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
-              }`}
-            >
-              <ArrowLeftRight className="h-4 w-4" />
-              <span className="hidden sm:inline">格式转换</span>
-            </Button>
-          </Link>
-
-          <Link to="/updates">
-            <Button
-              variant="ghost"
-              className={`gap-2 transition-colors ${
-                location.pathname.startsWith('/updates')
-                  ? 'bg-theme-soft text-theme-primary-hover'
-                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
-              }`}
-            >
-              <Sparkles className="h-4 w-4" />
-              <span className="hidden sm:inline">更新日志</span>
-            </Button>
-          </Link>
-
-          <Link to="/labs/climber">
-            <Button
-              variant="ghost"
-              className={`gap-2 transition-colors ${
-                location.pathname.startsWith('/labs/climber')
-                  ? 'bg-theme-soft text-theme-primary-hover'
-                  : 'hover:bg-theme-soft hover:text-theme-primary-hover'
-              }`}
-            >
-              <Mountain className="h-4 w-4" />
-              <span className="hidden sm:inline">跳跳乐实验</span>
-            </Button>
-          </Link>
-        </nav>
-
-        <div className="flex items-center gap-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-theme-soft hover:text-theme-primary">
-              <Palette className="h-5 w-5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              className="w-72 border-theme-border bg-white/95 p-2 shadow-xl backdrop-blur-xl"
-              align="end"
-            >
-              <div className="px-2 py-1.5">
-                <p className="text-sm font-semibold text-slate-900">主题切换</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  选择你更喜欢的页面色调，切换后会保留到下次打开。
-                </p>
+        {mobileNavOpen ? (
+          <div className="mt-3 rounded-[28px] border border-theme-shell-border bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(255,250,251,0.94))] p-3 shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.14)] md:hidden">
+            <div className="mb-2 flex items-center justify-between px-2">
+              <div className="text-xs tracking-[0.18em] text-theme-primary uppercase">
+                Navigation
               </div>
-              <DropdownMenuSeparator className="bg-theme-border" />
-              <div className="grid gap-1 p-1">
-                {THEME_OPTIONS.map((option) => {
-                  const active = option.value === currentTheme;
-                  return (
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(false)}
+                className="rounded-full px-2 py-1 text-xs text-slate-500 transition-colors hover:bg-theme-soft hover:text-theme-primary"
+              >
+                收起
+              </button>
+            </div>
+            <nav className="grid grid-cols-2 gap-2">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link key={item.to} to={item.to}>
                     <button
-                      key={option.value}
                       type="button"
-                      onClick={() => handleThemeChange(option.value)}
-                      className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${
-                        active
-                          ? 'border-theme-soft-strong bg-theme-soft shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.12)]'
-                          : 'border-transparent hover:border-theme-border hover:bg-theme-soft'
+                      className={`flex min-h-11 w-full items-center gap-2 rounded-2xl border px-3 py-3 text-left text-sm transition-colors ${
+                        item.active
+                          ? 'border-theme-soft-strong bg-theme-soft text-theme-primary shadow-[0_10px_24px_rgba(var(--theme-primary-rgb),0.12)]'
+                          : 'border-white/80 bg-white/88 text-slate-700 hover:border-theme-shell-border hover:bg-theme-soft/70'
                       }`}
                     >
-                      <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-2 shadow-sm">
-                        {option.preview.map((color) => (
-                          <span
-                            key={color}
-                            className="h-3 w-3 rounded-full border border-white/80 shadow-sm"
-                            style={{ backgroundColor: color }}
-                          />
-                        ))}
+                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/88 shadow-sm">
+                        <Icon className="h-4 w-4" />
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium text-slate-900">
-                          {option.label}
-                        </span>
-                        <span className="mt-0.5 block text-xs leading-5 text-slate-500">
-                          {option.description}
-                        </span>
-                      </span>
-                      {active ? (
-                        <span className="rounded-full bg-theme-primary px-2.5 py-1 text-[11px] text-white">
-                          当前
-                        </span>
-                      ) : null}
+                      <span className="leading-5">{item.label}</span>
                     </button>
-                  );
-                })}
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {isAuthenticated && (
-            <DropdownMenu onOpenChange={(open) => open && loadNotifications()}>
-              <DropdownMenuTrigger className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-theme-soft hover:text-theme-primary">
-                <Bell className="h-5 w-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-rose-500 px-1.5 text-center text-[10px] font-semibold leading-4 text-white">
-                    {unreadLabel}
-                  </span>
-                )}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-86 border-theme-border bg-white/95 p-2 shadow-xl backdrop-blur-xl"
-                align="end"
-              >
-                <div className="mb-1 flex items-center justify-between px-2 py-1">
-                  <p className="text-sm font-semibold text-gray-900">通知</p>
-                  <button
-                    type="button"
-                    onClick={handleMarkAllRead}
-                    className="text-theme-primary inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-theme-soft"
-                  >
-                    <CheckCheck className="h-3.5 w-3.5" />
-                    全部已读
-                  </button>
-                </div>
-                <DropdownMenuSeparator className="bg-theme-border" />
-
-                <div className="max-h-88 overflow-auto">
-                  {notifyLoading ? (
-                    <div className="px-3 py-6 text-center text-sm text-gray-500">加载中...</div>
-                  ) : notifications.length === 0 ? (
-                    <div className="px-3 py-8 text-center text-sm text-gray-500">暂无通知</div>
-                  ) : (
-                    notifications.map((item) => (
-                      <DropdownMenuItem
-                        key={item.id}
-                        onClick={() => handleMarkOneRead(item)}
-                        className={`cursor-pointer rounded-xl border px-3 py-3 ${
-                          item.isRead
-                            ? 'border-slate-200 bg-slate-50/65'
-                            : 'border-theme-shell-border bg-theme-soft/70 shadow-[0_6px_16px_rgba(var(--theme-primary-rgb),0.12)]'
-                        }`}
-                      >
-                        {(() => {
-                          const visual = getNotificationVisual(item.type, item.content);
-                          const Icon = visual.icon;
-                          return (
-                            <div className="flex w-full items-start gap-2.5">
-                              <div
-                                className={`mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${visual.iconBgClass}`}
-                              >
-                                <Icon className={`h-4 w-4 ${visual.iconClass}`} />
-                              </div>
-
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-start justify-between gap-2">
-                                  <p className="line-clamp-1 text-sm font-medium text-slate-900">
-                                    {item.title}
-                                  </p>
-                                  {item.isRead ? (
-                                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600">
-                                      已读
-                                    </span>
-                                  ) : (
-                                    <span className="rounded-full bg-theme-primary px-2 py-0.5 text-[10px] text-white">
-                                      未读
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600">
-                                  {item.content}
-                                </p>
-                                <p className="mt-1 text-[11px] text-slate-400">
-                                  {formatNotificationTime(item.createdAt)}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </div>
-                <DropdownMenuSeparator className="bg-theme-border" />
-                <DropdownMenuItem
-                  onClick={() => navigate('/notifications')}
-                  className="hover:bg-theme-soft cursor-pointer justify-center rounded-xl py-2.5 text-sm font-medium text-theme-primary transition-colors"
-                >
-                  查看全部通知
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-
-          {isAuthenticated ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger className="relative h-10 w-10 rounded-full outline-none transition-all hover:ring-2 hover:ring-theme-soft-strong">
-                <Avatar className="h-10 w-10 border-2 shadow-sm border-theme-primary/50">
-                  <AvatarImage src={user?.avatar} alt={user?.nickname || user?.username} />
-                  <AvatarFallback className="theme-avatar-fallback font-semibold text-white">
-                    {(user?.nickname?.[0] || user?.username?.[0] || 'U').toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-64 border-theme-border bg-white/95 p-2 shadow-xl backdrop-blur-xl"
-                align="end"
-              >
-                <div className="bg-theme-soft mb-2 rounded-lg px-3 py-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-gray-900">
-                        {user?.nickname || user?.username}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-600">@{user?.username}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleRefreshUser}
-                      className="text-theme-primary inline-flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-white/70"
-                      title="刷新用户状态"
-                    >
-                      <RefreshCw
-                        className={`h-3.5 w-3.5 ${profileLoading ? 'animate-spin' : ''}`}
-                      />
-                    </button>
-                  </div>
-                </div>
-                <DropdownMenuSeparator className="bg-theme-border" />
-                <DropdownMenuItem
-                  onClick={() => navigate('/profile')}
-                  className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
-                >
-                  <User className="text-theme-primary h-4 w-4" />
-                  <span className="font-medium">个人中心</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate('/favorites')}
-                  className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
-                >
-                  <Heart className="h-4 w-4 text-pink-500" />
-                  <span className="font-medium">我的收藏</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate('/follows')}
-                  className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
-                >
-                  <Users className="text-theme-primary h-4 w-4" />
-                  <span className="font-medium">我的关注</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate('/downloads')}
-                  className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
-                >
-                  <Download className="h-4 w-4 text-sky-500" />
-                  <span className="font-medium">下载记录</span>
-                </DropdownMenuItem>
-                {user?.role === 'creator' && (
-                  <DropdownMenuItem
-                    onClick={() => navigate('/my-space')}
-                    className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
-                  >
-                    <Sparkles className="text-theme-primary h-4 w-4" />
-                    <span className="font-medium">我的创作空间</span>
-                  </DropdownMenuItem>
-                )}
-                {user?.role === 'admin' && (
-                  <DropdownMenuItem
-                    onClick={() => navigate('/my-space/resource-tags')}
-                    className="hover:bg-theme-soft cursor-pointer gap-3 rounded-lg py-2.5 transition-colors"
-                  >
-                    <Tag className="text-theme-primary h-4 w-4" />
-                    <span className="font-medium">资源标签管理</span>
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator className="bg-theme-border" />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="cursor-pointer gap-3 rounded-lg py-2.5 text-red-600 transition-colors hover:bg-red-50"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span className="font-medium">退出登录</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Link to="/login">
-              <Button className="theme-btn-primary rounded-xl px-6 font-medium transition-all">
-                登录 / 注册
-              </Button>
-            </Link>
-          )}
-        </div>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        ) : null}
       </div>
     </header>
   );

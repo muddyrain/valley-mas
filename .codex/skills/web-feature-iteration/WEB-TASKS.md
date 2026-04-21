@@ -1,9 +1,10 @@
 ﻿# Web 任务清单（线程内持续维护）
 
 > 说明：本清单只用于 `apps/web` 产品功能迭代。- [x] CLD-1（P0）名著数据源白名单首版：已冻结首批来源、许可证信号、可用范围与导入门槛，并明确"中文来源优先、海外来源补充"策略（文档：`docs/architecture/2026-04-19_classic_literature_cld1_source_whitelist.md`）。
+
 - [x] CLD-2（P0）名著导入标准与清洗流程：已冻结 epub/txt/html 三种格式的章节切分、脚注处理、图片占位规则及质量校验门槛，输出章节数据契约对齐 CLD-3/CLR-2/CLAI-1（文档：`docs/architecture/2026-04-19_classic_literature_cld2_import_standard.md`）。
-- [x] CLD-3（P0）名著元数据模型定版：已定版 Book/Author/Translator/Edition/Chapter 五层模型，明确必填字段与校验规则，字段已对齐 CLD-1 白名单与 CLD-2 章节契约（文档：`docs/architecture/2026-04-19_classic_literature_cld3_metadata_model.md`）。 
-> 排除范围：`packages/climber-game` 与 `apps/unity-climber` 不在本清单内。
+- [x] CLD-3（P0）名著元数据模型定版：已定版 Book/Author/Translator/Edition/Chapter 五层模型，明确必填字段与校验规则，字段已对齐 CLD-1 白名单与 CLD-2 章节契约（文档：`docs/architecture/2026-04-19_classic_literature_cld3_metadata_model.md`）。
+  > 排除范围：`packages/climber-game` 与 `apps/unity-climber` 不在本清单内。
 
 ## 协作约定（新增）
 
@@ -43,6 +44,10 @@
 
 ## 已完成（从活跃 Backlog 移除）
 
+- [x] WRESP（P0）Web 首轮移动端适配收口：统一首页、登录/注册与全局头部在小屏设备上的布局节奏，减少横向溢出与按钮挤压。
+  - [x] WRESP-1 认证页共享壳子：抽出登录/注册共用双栏布局，并补齐移动端顶部品牌卡、表单间距与验证码按钮换行策略。
+  - [x] WRESP-2 全局头部导航收口：将 Header 改为移动端双层结构，上层品牌与操作、下层横向滑动导航，避免多个页面被头部先撑坏。
+  - [x] WRESP-3 首页首屏与资源区适配：收口 Hero、搜索区、资源焦点、统计区与 CTA 在小屏上的字号、卡片圆角和纵向堆叠行为。
 - [x] BAI（P0）博客 AI 能力定义与 MVP 完成（BAI-1 ~ BAI-3）。
   - [x] BAI-1 能力边界文档：明确每个能力输入/输出、入口位置、失败兜底。
   - [x] BAI-2 首批能力选型定版：冻结 `AI 导读 + 问文章`，`章节速览` 延后。
@@ -78,6 +83,7 @@
 ## 下一步建议
 
 - [x] 补全名著测试数据，验证分类/朝代筛选效果（seed 已扩展为覆盖朝代/分类的一组样本，并支持一键命令 `pnpm classics:seed`）。
+- [ ] 启动 WRESP-4：继续收口 `Creator / CreatorProfile / MySpace / MyResources / BlogPost` 的移动端卡片密度、侧栏与 sticky 区块策略。
 - [ ] 启动 ELP-2：先产出英语学习域后端 API 契约与数据库表结构草案（与 `ELP-1` 文档保持字段一致）。
 - [ ] RLIB-4 导入治理增强：为长任务增加并发上限/取消任务/历史归档策略，避免超大文本并发导入压垮数据库。
 - [x] 增加白名单源抓取导入脚本：已新增完整正文导入命令 `pnpm classics:import-fulltext`，支持从 Project Gutenberg / 维基文库抓取并覆盖默认版本章节，含网络重试与单书补导入（`CLASSICS_ONLY`）。

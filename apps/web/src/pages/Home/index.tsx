@@ -252,8 +252,8 @@ export default function Home() {
       <div className="pointer-events-none absolute -left-20 top-44 h-72 w-72 rounded-full border border-white/45 bg-white/20 blur-2xl animate-[pulse_10s_ease-in-out_infinite]" />
       <div className="pointer-events-none absolute -right-24 top-72 h-80 w-80 rounded-full border border-white/45 bg-white/16 blur-2xl animate-[pulse_12s_ease-in-out_infinite]" />
 
-      <div className="relative mx-auto max-w-7xl px-6 pb-20 pt-8 md:px-8 lg:px-10">
-        <section className="theme-hero-shell relative overflow-hidden rounded-[42px] border px-6 py-8 md:px-10 md:py-10">
+      <div className="relative mx-auto w-full max-w-7xl px-0 pb-16 pt-4 sm:px-6 md:px-8 md:pb-20 md:pt-8 lg:px-10">
+        <section className="theme-hero-shell relative overflow-hidden border-x-0 px-4 py-6 sm:rounded-[30px] sm:border sm:px-6 md:rounded-[42px] md:px-10 md:py-10">
           <div className="pointer-events-none absolute -right-20 top-8 h-72 w-72 rounded-full border border-white/45 bg-[conic-gradient(from_140deg,rgba(var(--theme-tertiary-rgb),0.28),rgba(var(--theme-secondary-rgb),0.18),rgba(var(--theme-primary-rgb),0.24),rgba(var(--theme-tertiary-rgb),0.28))] opacity-75 blur-[1px] animate-[spin_26s_linear_infinite]" />
           <div className="pointer-events-none absolute -bottom-14 -left-12 h-64 w-64 rounded-full border border-white/45 bg-[conic-gradient(from_20deg,rgba(var(--theme-primary-rgb),0.24),rgba(var(--theme-secondary-rgb),0.16),rgba(var(--theme-primary-rgb),0.24))] opacity-75 blur-[1px] animate-[spin_20s_linear_infinite_reverse]" />
           <div className="theme-hero-glow absolute inset-0" />
@@ -273,7 +273,7 @@ export default function Home() {
           />
           <div className="relative grid gap-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-start">
             <div className="space-y-8">
-              <div className="border-theme-soft-strong inline-flex items-center gap-2 rounded-full border bg-white/88 px-4 py-1.5 text-xs tracking-[0.24em] text-theme-primary uppercase shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur">
+              <div className="border-theme-soft-strong inline-flex items-center gap-2 rounded-full border bg-white/88 px-4 py-1.5 text-[11px] tracking-[0.18em] text-theme-primary uppercase shadow-[0_10px_26px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur sm:text-xs sm:tracking-[0.24em]">
                 <Sparkles className="h-3.5 w-3.5" />
                 Valley Project
               </div>
@@ -281,7 +281,7 @@ export default function Home() {
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Button
                   size="lg"
-                  className="theme-btn-primary rounded-full px-7 text-white"
+                  className="theme-btn-primary w-full rounded-full px-7 text-white sm:w-auto"
                   onClick={() => navigate('/blog')}
                 >
                   立即浏览内容
@@ -290,7 +290,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="border-theme-shell-border rounded-full border bg-white/78 px-7 text-slate-700 shadow-[0_12px_30px_rgba(var(--theme-primary-rgb),0.12)] backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-white hover:bg-white/92 hover:shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.18)]"
+                  className="border-theme-shell-border w-full rounded-full border bg-white/78 px-7 text-slate-700 shadow-[0_12px_30px_rgba(var(--theme-primary-rgb),0.12)] backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-white hover:bg-white/92 hover:shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.18)] sm:w-auto"
                   onClick={() => navigate('/resources')}
                 >
                   查看资源精选
@@ -299,7 +299,7 @@ export default function Home() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="border-theme-shell-border rounded-full border bg-white/78 px-7 text-slate-700 shadow-[0_12px_30px_rgba(var(--theme-primary-rgb),0.12)] backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-white hover:bg-white/92 hover:shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.18)]"
+                    className="border-theme-shell-border w-full rounded-full border bg-white/78 px-7 text-slate-700 shadow-[0_12px_30px_rgba(var(--theme-primary-rgb),0.12)] backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-white hover:bg-white/92 hover:shadow-[0_18px_40px_rgba(var(--theme-primary-rgb),0.18)] sm:w-auto"
                     onClick={() => navigate('/my-space')}
                   >
                     进入创作空间
@@ -340,7 +340,7 @@ export default function Home() {
                   </div>
                   <Button
                     size="lg"
-                    className="h-12 rounded-full bg-theme-primary px-6 text-white shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.28)] transition duration-300 hover:-translate-y-0.5 hover:bg-theme-primary-hover hover:shadow-[0_18px_38px_rgba(var(--theme-primary-rgb),0.34)]"
+                    className="h-12 w-full rounded-full bg-theme-primary px-6 text-white shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.28)] transition duration-300 hover:-translate-y-0.5 hover:bg-theme-primary-hover hover:shadow-[0_18px_38px_rgba(var(--theme-primary-rgb),0.34)] sm:w-auto"
                     onClick={handleSearchCreator}
                   >
                     查看创作者
@@ -436,7 +436,7 @@ export default function Home() {
               <div className="relative overflow-hidden rounded-[34px] border border-theme-shell-border bg-[linear-gradient(155deg,rgba(255,255,255,0.96),rgba(var(--theme-primary-rgb),0.10),rgba(var(--theme-secondary-rgb),0.08),rgba(255,255,255,0.92))] p-5 shadow-[0_24px_64px_rgba(var(--theme-primary-rgb),0.16)]">
                 <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-[rgba(var(--theme-secondary-rgb),0.20)] blur-3xl" />
                 <div className="pointer-events-none absolute -left-12 -bottom-14 h-40 w-40 rounded-full bg-[rgba(var(--theme-tertiary-rgb),0.16)] blur-3xl" />
-                <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/90 px-3 py-1 text-xs text-slate-600 shadow-[0_8px_20px_rgba(var(--theme-primary-rgb),0.1)]">
                     <Images className="h-3.5 w-3.5 text-theme-primary" />
                     快速通道
@@ -475,7 +475,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mt-24">
+        <section className="mt-20 px-4 sm:mt-24 sm:px-0">
           <SectionHeading
             eyebrow="CREATORS"
             title="创作者雷达"
@@ -490,16 +490,16 @@ export default function Home() {
               </Button>
             }
           />
-          <div className="theme-section-shell relative overflow-hidden rounded-[38px] border p-5 md:p-6">
+          <div className="theme-section-shell relative overflow-hidden rounded-[30px] border p-4 sm:rounded-[38px] sm:p-5 md:p-6">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_2%_6%,rgba(var(--theme-tertiary-rgb),0.14),transparent_32%),radial-gradient(circle_at_96%_20%,rgba(var(--theme-secondary-rgb),0.12),transparent_30%)]" />
-            <div className="relative mb-5 flex items-center justify-between rounded-[28px] border border-white/88 bg-white/76 px-4 py-4">
+            <div className="relative mb-5 flex flex-col gap-3 rounded-[28px] border border-white/88 bg-white/76 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="text-lg font-semibold text-slate-900">活跃创作者</div>
                 <div className="mt-1 text-sm text-slate-500">
                   优先显示近期有更新的创作者主页入口。
                 </div>
               </div>
-              <div className="bg-theme-soft text-theme-primary rounded-full px-4 py-2 text-sm">
+              <div className="bg-theme-soft text-theme-primary w-fit rounded-full px-4 py-2 text-sm">
                 {creators.length} 位创作者
               </div>
             </div>
@@ -551,7 +551,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mt-24">
+        <section className="mt-20 px-4 sm:mt-24 sm:px-0">
           <SectionHeading
             eyebrow="RESOURCES"
             title="资源风暴墙"
@@ -566,7 +566,7 @@ export default function Home() {
               </Button>
             }
           />
-          <div className="theme-section-shell rounded-[38px] border p-5 md:p-6">
+          <div className="theme-section-shell rounded-[30px] border p-4 sm:rounded-[38px] sm:p-5 md:p-6">
             <div className="mb-5 flex flex-col gap-3 rounded-[28px] border border-white/88 bg-white/76 px-4 py-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <div className="text-lg font-semibold text-slate-900">本期资源焦点</div>
@@ -597,7 +597,7 @@ export default function Home() {
                       onClick={() => navigate(`/resource/${featuredWallpaper.id}`)}
                       className="group block w-full overflow-hidden rounded-[32px] border border-theme-shell-border bg-white text-left shadow-[0_22px_58px_rgba(var(--theme-primary-rgb),0.14)] transition hover:-translate-y-1 hover:shadow-[0_28px_68px_rgba(var(--theme-primary-rgb),0.22)]"
                     >
-                      <div className="relative h-[336px] overflow-hidden bg-slate-100">
+                      <div className="relative h-[260px] overflow-hidden bg-slate-100 sm:h-[336px]">
                         <img
                           src={featuredWallpaper.thumbnailUrl ?? featuredWallpaper.url}
                           alt={featuredWallpaper.title}
@@ -615,7 +615,7 @@ export default function Home() {
                           />
                         </div>
                         <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-                          <div className="text-[30px] font-semibold leading-tight">
+                          <div className="text-2xl font-semibold leading-tight sm:text-[30px]">
                             {featuredWallpaper.title}
                           </div>
                           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-white/82">
@@ -664,12 +664,12 @@ export default function Home() {
                   ) : null}
                 </div>
                 <div className="rounded-[32px] border border-theme-shell-border bg-white/84 p-5 shadow-[0_20px_54px_rgba(var(--theme-primary-rgb),0.12)]">
-                  <div className="mb-5 flex items-center justify-between">
+                  <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-lg font-semibold text-slate-900">头像资源</div>
                       <div className="mt-1 text-sm text-slate-500">最近整理的头像内容。</div>
                     </div>
-                    <div className="bg-theme-soft text-theme-primary rounded-full px-3 py-1 text-xs">
+                    <div className="bg-theme-soft text-theme-primary w-fit rounded-full px-3 py-1 text-xs">
                       {avatarShelf.length} 项
                     </div>
                   </div>
@@ -747,7 +747,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mt-24">
+        <section className="mt-20 px-4 sm:mt-24 sm:px-0">
           <SectionHeading
             eyebrow="UPDATES"
             title="内容更新信号站"
@@ -762,13 +762,13 @@ export default function Home() {
               </Button>
             }
           />
-          <div className="theme-section-shell rounded-[38px] border p-5 md:p-6">
-            <div className="mb-5 flex items-center justify-between rounded-[28px] border border-white/88 bg-white/76 px-4 py-4">
+          <div className="theme-section-shell rounded-[30px] border p-4 sm:rounded-[38px] sm:p-5 md:p-6">
+            <div className="mb-5 flex flex-col gap-3 rounded-[28px] border border-white/88 bg-white/76 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="text-lg font-semibold text-slate-900">动态</div>
                 <div className="mt-1 text-sm text-slate-500">博客与图文的最新发布。</div>
               </div>
-              <div className="bg-theme-soft text-theme-primary rounded-full px-4 py-2 text-sm">
+              <div className="bg-theme-soft text-theme-primary w-fit rounded-full px-4 py-2 text-sm">
                 {posts.length} 条更新
               </div>
             </div>
@@ -820,8 +820,8 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mt-24">
-          <div className="theme-panel-shell relative overflow-hidden rounded-[40px] border p-8 md:p-10">
+        <section className="mt-20 px-4 sm:mt-24 sm:px-0">
+          <div className="theme-panel-shell relative overflow-hidden rounded-[30px] border p-4 sm:rounded-[32px] sm:p-6 md:rounded-[40px] md:p-10">
             <div className="pointer-events-none absolute -right-56 -top-44 hidden h-80 w-80 rounded-full border border-white/30 bg-[conic-gradient(from_0deg,rgba(var(--theme-secondary-rgb),0.18),rgba(var(--theme-tertiary-rgb),0.14),rgba(var(--theme-primary-rgb),0.18),rgba(var(--theme-secondary-rgb),0.18))] opacity-60 blur-[1px] xl:block" />
             <div className="pointer-events-none absolute -left-24 -bottom-24 hidden h-56 w-56 rounded-full border border-white/30 bg-[conic-gradient(from_0deg,rgba(var(--theme-primary-rgb),0.22),rgba(var(--theme-tertiary-rgb),0.16),rgba(var(--theme-primary-rgb),0.22))] opacity-60 blur-[1px] xl:block" />
             <div className="relative z-10 grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
@@ -830,7 +830,7 @@ export default function Home() {
                   <UserRound className="text-theme-primary h-3.5 w-3.5" />
                   下一步
                 </div>
-                <h3 className="text-3xl font-semibold tracking-tight text-slate-950 md:text-[40px]">
+                <h3 className="text-[28px] font-semibold tracking-tight text-slate-950 sm:text-3xl md:text-[40px]">
                   内容、资源与创作者入口
                   <br />
                   从这里继续展开。
