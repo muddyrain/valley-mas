@@ -208,6 +208,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.PUT("/classics/:id", handler.AdminUpdateBook)
 				adminOnly.DELETE("/classics/:id", handler.AdminDeleteBook)
 				adminOnly.POST("/classics/:id/editions/:editionId/chapters/import", handler.AdminImportChapters)
+				adminOnly.POST("/classics/import-jobs", handler.AdminCreateClassicsImportJob)
+				adminOnly.GET("/classics/import-jobs", handler.AdminGetClassicsImportJobs)
+				adminOnly.GET("/classics/import-jobs/:jobId", handler.AdminGetClassicsImportJob)
+				adminOnly.POST("/classics/import-jobs/:jobId/retry", handler.AdminRetryClassicsImportJob)
 			}
 
 			content := admin.Group("")

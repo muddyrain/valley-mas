@@ -2,6 +2,102 @@
 
 > 说明：记录每次真实落地改动，按时间顺序追加，不覆盖历史。
 
+## 2026-04-21 15:01 (Asia/Shanghai)
+
+- 任务：收口 `RLIB-2` / `RLIB-3` 执行状态，修正阅读库任务父项进度标记。
+- 改动文件：
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将 `RLIB（P1）阅读库在线导入链路增强` 父项由未完成改为已完成，和 `RLIB-1/2/3` 子项状态保持一致。
+  - 复核 `RLIB-2/3` 代码落地与路由、模型、迁移、Admin UI 任务追踪链路，确认当前实现可用。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter admin exec tsc --noEmit`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：导入任务仍是进程内异步执行，服务重启会中断任务。
+  - 下一步动作：按 `RLIB-4` 继续做并发上限、任务取消与重启恢复策略。
+
+## 2026-04-21 14:54 (Asia/Shanghai)
+
+- 任务：推进阅读库导入增强，完成 `RLIB-2`（TXT 自动建书）与 `RLIB-3`（导入任务追踪与重试）。
+- 改动文件：
+  - `server/internal/handler/admin_classics_import_jobs.go`（新增）
+  - `server/internal/handler/admin_classics.go`
+  - `server/internal/router/router.go`
+  - `server/internal/model/classics.go`
+  - `server/internal/database/database.go`
+  - `server/migrations/018_create_classics_import_jobs.sql`（新增）
+  - `apps/admin/src/api/classics.ts`
+  - `apps/admin/src/pages/ClassicsBooks.tsx`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 后端新增阅读库导入任务接口：创建任务、列表查询、单任务查询、失败重试（`/admin/classics/import-jobs*`）。
+  - 新增 `classics_import_jobs` 任务模型与迁移脚本，持久化记录状态、阶段、进度、错误信息、导入结果（book/edition/chapter/word 统计）。
+  - 实现 TXT 自动建书流程：解析章节标题后自动创建书目 + 默认版本 + 章节正文，并回写章节数/总字数。
+  - Admin 页面新增“TXT 自动建书”入口与任务状态轮询，支持查看最近任务、失败重试；同时保留“导入到已有书目”模式。
+  - 修复 Admin 书目列表缺少 `editions` 导致“导入到已有书目”无法稳定拿到版本 ID 的问题。
+  - 任务清单已将 `RLIB-2` / `RLIB-3` 标记完成，并新增 `RLIB-4` 作为后续治理项。
+- 校验：
+  - `gofmt -w server/internal/model/classics.go server/internal/database/database.go server/internal/handler/admin_classics.go server/internal/handler/admin_classics_import_jobs.go server/internal/router/router.go`：通过
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter admin exec tsc --noEmit`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py server/internal/model/classics.go server/internal/database/database.go server/internal/handler/admin_classics.go server/internal/handler/admin_classics_import_jobs.go server/internal/router/router.go apps/admin/src/api/classics.ts apps/admin/src/pages/ClassicsBooks.tsx .codex/skills/web-feature-iteration/WEB-TASKS.md`：通过
+- 风险与后续：
+  - 当前风险：当前任务执行在服务进程内异步 goroutine，若服务重启，进行中的任务不会自动恢复。
+  - 下一步动作：推进 `RLIB-4`，补任务恢复、取消与并发治理策略。
+
+## 2026-04-21 14:35 (Asia/Shanghai)
+
+- 任务：将名著模块统一命名为“阅读库”，并增强 Admin 在线导入能力（支持 TXT 自动拆章 + 长耗时进度提示）。
+- 改动文件：
+  - `apps/web/src/App.tsx`
+  - `apps/web/src/layouts/Header.tsx`
+  - `apps/web/src/pages/ClassicsList/index.tsx`
+  - `apps/web/src/pages/ClassicsShelf/index.tsx`
+  - `apps/web/src/pages/ClassicsDetail/index.tsx`
+  - `apps/admin/src/layouts/Layout.tsx`
+  - `apps/admin/src/api/classics.ts`
+  - `apps/admin/src/pages/ClassicsBooks.tsx`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 前台标题、导航与核心页面文案统一为“阅读库”（保留原 `/classics` 路由兼容）。
+  - Admin“导入章节”弹窗升级为“在线导入正文”：新增 `TXT 自动拆章` 与 `JSON 章节数组` 双模式。
+  - 增加 TXT 章节识别规则（支持“第X章/回”与 “Chapter X”），自动生成章节预估数。
+  - 增加导入过程 1/4~4/4 进度说明与实时状态文本，明确大文件导入可能耗时 10~90 秒。
+  - Web 任务清单新增 `RLIB`（阅读库在线导入链路增强）并标记 `RLIB-1` 已完成，补充 `RLIB-2/3` 后续任务。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `pnpm --filter admin exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/App.tsx apps/web/src/layouts/Header.tsx apps/web/src/pages/ClassicsList/index.tsx apps/web/src/pages/ClassicsShelf/index.tsx apps/web/src/pages/ClassicsDetail/index.tsx apps/admin/src/layouts/Layout.tsx apps/admin/src/pages/ClassicsBooks.tsx apps/admin/src/api/classics.ts .codex/skills/web-feature-iteration/WEB-TASKS.md`：通过
+- 风险与后续：
+  - 当前风险：TXT 自动拆章为规则识别，极端格式（无章节标题、目录噪声）可能仍需人工校对章节标题。
+  - 下一步动作：推进 `RLIB-2`，实现“上传 TXT 后自动创建书目 + 默认版本 + 章节”的一站式导入。
+
+## 2026-04-21 14:14 (Asia/Shanghai)
+
+- 任务：修复名著详情页与阅读页观感不友好问题，完成一轮视觉与排版体验重构。
+- 改动文件：
+  - `apps/web/src/pages/ClassicsDetail/index.tsx`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 章节阅读模式升级为沉浸式阅读布局：背景氛围层、卡片化正文容器、目录侧栏层级优化、上下章与 AI 面板视觉统一。
+  - 详情页重构为同风格阅读入口：头部信息卡片、封面与元信息层次重排、版本/语言切换区收敛、目录网格卡片可读性提升。
+  - 中英阅读排版区分：英文启用衬线英文阅读字体与更大行距，中文保持宋体阅读风格，降低长文阅读疲劳。
+  - Web 任务清单新增并勾选 `CLUI`，将本次视觉改造从活跃迭代中沉淀为已完成项。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/ClassicsDetail/index.tsx .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：本轮主要优化视觉与排版，未新增“字号/行宽/主题切换”等阅读个性化设置。
+  - 下一步动作：可继续补“阅读设置面板（字号、行高、段宽、背景）”与“AI 问章节历史跨设备同步”。
+
 ## 2026-04-20 16:34 (Asia/Shanghai)
 
 - 任务：继续名著增强，完成“最近阅读跨设备同步（登录态云端 + 游客本地兜底）”。
@@ -2450,6 +2546,59 @@
 - 风险与后续：
   - 当前风险：当前仅同步“章节被 AI 探索过”的布尔轨迹，尚未同步“问答文本历史”，跨端无法回看具体问答内容。
   - 下一步动作：推进“名著 AI 问章节历史跨设备同步”，补云端问答记录表与最近问答回放入口。
+
+## 2026-04-21 11:14 (Asia/Shanghai)
+
+- 任务：补齐“残书”问题，将《骆驼祥子》《老人与海》从摘要内容替换为完整正文。
+- 改动文件：
+  - `server/scripts/import_classics_fulltext.go`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - `import_classics_fulltext` 增加《骆驼祥子》维基文库完整章节源（`序 + 1~24`）并接入专用解析器。
+  - `import_classics_fulltext` 增加《老人与海》Project Gutenberg Canada 完整文本源，并新增正文裁剪解析器（去掉前后版权/书目附录）。
+  - 修复导入器对非 UTF-8 文本（ISO-8859-1）解码问题，避免 PostgreSQL 入库报 `invalid byte sequence for encoding "UTF8"`。
+  - 实际执行定向导入：`CLASSICS_ONLY='骆驼祥子,老人与海'`，两本均已完成完整正文覆盖。
+- 校验：
+  - `CLASSICS_ONLY='骆驼祥子,老人与海' go run ./scripts/import_classics_fulltext.go "$DB_DSN"`：通过（`骆驼祥子 25章/139574字`；`老人与海 1章/134489字`）
+  - `go run /tmp/classics_audit2.go`（按默认版本统计 `sum(chapters.word_count)`）：通过（`real_words < 5000` 的疑似残书为 `none`）
+  - `cd server && go test ./...`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py server/scripts/import_classics_fulltext.go .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：《老人与海》来源为 Project Gutenberg Canada，页面明确“仅加拿大公版，其他国家需自行核对版权”；跨地区分发需持续做权利边界提示。
+  - 下一步动作：在导入审计/来源说明里补充地域版权标记（如 `region_scope=CA`），避免后续误判为全球公版。
+
+## 2026-04-21 11:49 (Asia/Shanghai)
+
+- 任务：支持国外文学 `简体中文 / English` 双语切换，并补齐可切换的数据版本。
+- 改动文件：
+  - `apps/web/src/pages/ClassicsDetail/index.tsx`
+  - `server/internal/handler/classics.go`
+  - `server/scripts/import_classics_fulltext.go`
+  - `server/scripts/backfill_foreign_cn_editions.go`（新增）
+  - `scripts/classics-foreign-cn-guide.js`（新增）
+  - `package.json`
+  - `.codex/skills/web-feature-iteration/WEB-TASKS.md`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - Classics 详情页新增国外文学语言切换入口：`简体中文 / English`，并与 URL 参数 `lang`、`edition` 联动。
+  - 版本切换增强：国外文学切换版本时自动同步 `lang`，并支持“导读版”提示文案。
+  - 后端名著接口中 `classics_editions` 查询增加稳定排序（默认版本优先），避免切换时版本顺序抖动。
+  - 完整正文导入器新增：
+    - 《骆驼祥子》维基文库完整章节导入（序 + 1~24）。
+    - 《老人与海》Project Gutenberg Canada 完整文本导入。
+    - 非 UTF-8 文本（ISO-8859-1）解码兜底，修复入库 UTF-8 字节错误。
+  - 新增脚本 `backfill_foreign_cn_editions.go` + `pnpm classics:foreign-cn-guide`，为国外文学补齐 `简体中文导读版` 版本，支持和英文版切换。
+  - 实际执行数据补齐后，国外文学已具备双语版本（英文完整版 + 简体中文导读版）。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `node --check scripts/classics-foreign-cn-guide.js`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/ClassicsDetail/index.tsx server/internal/handler/classics.go server/scripts/import_classics_fulltext.go server/scripts/backfill_foreign_cn_editions.go scripts/classics-foreign-cn-guide.js package.json`：通过
+  - `CLASSICS_ONLY='骆驼祥子,老人与海' go run ./scripts/import_classics_fulltext.go "$DB_DSN"`：通过
+  - `go run ./scripts/backfill_foreign_cn_editions.go "$DB_DSN"`：通过（7 本书，21 章导读版）
+- 风险与后续：
+  - 当前风险：国外文学的简体侧当前为“导读版”，不是完整译文；若需双语都为完整正文，需继续补授权译本来源。
+  - 下一步动作：按授权边界补充“简体完整译本”来源，并升级导读版为完整正文版。
 
 ## 2026-04-20 20:09 (Asia/Shanghai)
 
