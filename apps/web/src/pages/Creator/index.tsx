@@ -1,6 +1,6 @@
 ﻿import { Download, Search, Sparkles, Users, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { toast } from 'sonner';
 import { type Creator as CreatorType, searchPublicCreators } from '@/api/creator';
 import CreatorCard from '@/components/CreatorCard';
@@ -13,6 +13,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { numberParam, stringParam, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
 
 const PAGE_SIZE = 12;
+const CREATOR_LIST_CACHE_TTL_MS = 30_000;
+const CREATOR_LIST_SCROLL_STORAGE_PREFIX = 'creator-scroll:v1';
+
+type CreatorListCacheEntry = {
+  creators: CreatorType[];
+  total: number;
+  updatedAt: number;
+};
+
+const creatorListCache = new Map<string, CreatorListCacheEntry>();
+
 const CREATOR_QUERY_SCHEMA = {
   page: numberParam(1, { min: 1 }),
   keyword: stringParam('', { resetPageOnChange: true }),
@@ -20,6 +31,8 @@ const CREATOR_QUERY_SCHEMA = {
 
 export default function Creator() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const navigationType = useNavigationType();
   const {
     values: { page: currentPage, keyword: currentKeyword },
     setValue,
@@ -30,6 +43,17 @@ export default function Creator() {
   const [retryTick, setRetryTick] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const firstLoadRef = useRef(true);
+  const forceReloadRef = useRef(false);
+  const scrollRestoredRef = useRef(false);
+  const listCacheKey = useMemo(
+    () => `${currentPage}|${currentKeyword || ''}`,
+    [currentKeyword, currentPage],
+  );
+  const scrollStorageKey = useMemo(
+    () => `${CREATOR_LIST_SCROLL_STORAGE_PREFIX}:${location.pathname}${location.search}`,
+    [location.pathname, location.search],
+  );
 
   useEffect(() => {
     setInputKeyword(currentKeyword);
@@ -37,8 +61,32 @@ export default function Creator() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    const bypassCache = forceReloadRef.current;
+    forceReloadRef.current = false;
     setError(false);
+    const cachedEntry = creatorListCache.get(listCacheKey);
+    const hasCachedEntry = !!cachedEntry;
+    const cacheFresh = hasCachedEntry
+      ? Date.now() - cachedEntry.updatedAt < CREATOR_LIST_CACHE_TTL_MS
+      : false;
+
+    if (cachedEntry) {
+      setCreators(cachedEntry.creators);
+      setTotal(cachedEntry.total);
+      if (firstLoadRef.current) {
+        firstLoadRef.current = false;
+        setLoading(false);
+      }
+    }
+
+    if (!bypassCache && cacheFresh) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const isFirstLoad = firstLoadRef.current && !hasCachedEntry;
+    if (isFirstLoad) setLoading(true);
 
     searchPublicCreators({
       page: currentPage,
@@ -47,22 +95,35 @@ export default function Creator() {
     })
       .then((data) => {
         if (cancelled) return;
-        setCreators(data.list ?? []);
-        setTotal(data.total ?? 0);
+        const nextCreators = data.list ?? [];
+        const nextTotal = data.total ?? 0;
+        creatorListCache.set(listCacheKey, {
+          creators: nextCreators,
+          total: nextTotal,
+          updatedAt: Date.now(),
+        });
+        setCreators(nextCreators);
+        setTotal(nextTotal);
       })
       .catch(() => {
         if (cancelled) return;
-        setError(true);
+        if (!hasCachedEntry) {
+          setError(true);
+        }
         toast.error('加载创作者失败');
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (cancelled) return;
+        if (isFirstLoad) {
+          firstLoadRef.current = false;
+          setLoading(false);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [currentKeyword, currentPage, retryTick]);
+  }, [currentKeyword, currentPage, listCacheKey, retryTick]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -73,6 +134,45 @@ export default function Creator() {
   const clearSearch = () => {
     setValue('keyword', '');
   };
+
+  useEffect(() => {
+    const saveScroll = () => {
+      sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
+    };
+    window.addEventListener('scroll', saveScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', saveScroll);
+      saveScroll();
+    };
+  }, [scrollStorageKey]);
+
+  useEffect(() => {
+    scrollRestoredRef.current = false;
+  }, [scrollStorageKey]);
+
+  useEffect(() => {
+    if (navigationType !== 'POP') return;
+    if (loading) return;
+    if (scrollRestoredRef.current) return;
+
+    const rawValue = sessionStorage.getItem(scrollStorageKey);
+    if (!rawValue) {
+      scrollRestoredRef.current = true;
+      return;
+    }
+
+    const nextScrollY = Number(rawValue);
+    if (!Number.isFinite(nextScrollY) || nextScrollY < 0) {
+      scrollRestoredRef.current = true;
+      return;
+    }
+
+    const rafId = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: nextScrollY, behavior: 'auto' });
+      scrollRestoredRef.current = true;
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [loading, navigationType, scrollStorageKey]);
 
   const totalResources = useMemo(
     () => creators.reduce((sum, creator) => sum + (creator.resourceCount || 0), 0),
@@ -206,7 +306,10 @@ export default function Creator() {
                   title="创作者暂时没有加载出来"
                   description="稍后再试一次，或者先去其他内容页继续浏览。"
                   actionLabel="重新加载"
-                  onAction={() => setRetryTick((prev) => prev + 1)}
+                  onAction={() => {
+                    forceReloadRef.current = true;
+                    setRetryTick((prev) => prev + 1);
+                  }}
                 />
               </div>
             ) : creators.length === 0 ? (

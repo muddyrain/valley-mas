@@ -2750,3 +2750,40 @@
 - 风险与后续：
   - 当前风险：若后续在 Unity Editor 中再次手动添加空 AnimationEvent，运行时仍会复现同类报错。
   - 下一步动作：在 Unity 的 Animation 窗口中新增事件时，必须填写有效函数名或直接删除该事件点。
+
+## 2026-04-21 16:09 (Asia/Shanghai)
+
+- 任务：优化博客列表“详情返回列表”体验，减少整页刷新感并恢复阅读位置。
+- 改动文件：
+  - `apps/web/src/pages/blog/BlogList/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增列表结果内存缓存（按 `page/groupId/keyword/sort` 维度分桶），命中缓存时优先渲染，降低返回列表时的白屏与骨架屏概率。
+  - 新增分组元数据缓存，避免短时间内重复请求分组数据。
+  - 新增滚动位置持久化与恢复：按 `pathname + search` 写入 `sessionStorage`，仅在历史回退（`POP`）时恢复，避免普通导航误跳滚动位置。
+  - 缓存策略为 30 秒 TTL：过期后继续后台拉新并以局部刷新方式更新。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogList/index.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：缓存仅在当前页面会话内生效，浏览器强刷（F5）后仍会重新请求。
+  - 下一步动作：如需跨页面刷新保留列表体验，可把该缓存下沉到 `sessionStorage` 或引入统一查询缓存层（例如 React Query）。
+
+## 2026-04-21 16:24 (Asia/Shanghai)
+
+- 任务：将“返回列表体验优化”扩展到资源页与创作者页，统一列表浏览回退体验。
+- 改动文件：
+  - `apps/web/src/pages/Resources/index.tsx`
+  - `apps/web/src/pages/Creator/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - `Resources` 新增按 `page/type/keyword/tagId` 分桶的内存缓存，命中缓存优先渲染，并在 30 秒 TTL 过期后执行静默拉新。
+  - `Resources` 的手动“刷新”动作会同步覆盖缓存，保证后续回退命中的是最新结果。
+  - `Creator` 新增按 `page/keyword` 分桶的内存缓存与 30 秒 TTL 策略；重试按钮会强制绕过缓存触发真实重拉。
+  - 两个列表页均新增滚动位置保存与恢复：按 `pathname + search` 存储 `scrollY`，仅在 `POP`（历史回退）时恢复，避免普通前进跳转误恢复。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Resources/index.tsx apps/web/src/pages/Creator/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：缓存为进程内内存缓存，浏览器强刷后仍会回到首轮请求路径。
+  - 下一步动作：若需要跨 F5 保留体验，可把缓存下沉到 `sessionStorage` 或统一接入查询层（如 React Query）并配置 staleTime。
