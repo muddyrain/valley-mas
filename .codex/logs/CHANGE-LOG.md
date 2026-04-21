@@ -2787,3 +2787,83 @@
 - 风险与后续：
   - 当前风险：缓存为进程内内存缓存，浏览器强刷后仍会回到首轮请求路径。
   - 下一步动作：若需要跨 F5 保留体验，可把缓存下沉到 `sessionStorage` 或统一接入查询层（如 React Query）并配置 staleTime。
+
+## 2026-04-21 20:36 (Asia/Shanghai)
+
+- 任务：修复 /api/v1/user/classics/shelf 加入书架返回 500 的问题。
+- 改动文件：
+  - server/internal/handler/classics_shelf.go
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 将书架写入逻辑从 ON CONFLICT 改为“先更新 updated_at，未命中再插入”的兼容流程，避免依赖数据库已存在复合唯一约束。
+  - 对并发插入场景补充唯一冲突兜底：当插入触发重复键时回退为更新，保证接口幂等。
+  - 保留原有参数校验与书籍可见性校验逻辑，避免行为回归。
+- 校验：
+  - cd server && go test ./...：通过
+- 风险与后续：
+  - 当前风险：若历史库中已存在同一用户同一书籍的重复脏数据，读接口仍可能返回重复 bookId。
+  - 下一步动作：可补一条数据清理 SQL（按 user_id + book_id 去重）并补充唯一索引巡检脚本。
+
+## 2026-04-21 20:58 (Asia/Shanghai)
+
+- 任务：优化阅读库详情页阅读模式视觉层次，降低布局杂乱感。
+- 改动文件：
+  - apps/web/src/pages/ClassicsDetail/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 阅读模式背景由多重径向渐变改为更克制的纵向奶油渐变，减少视觉噪声。
+  - 桌面端目录栏改为 sticky 卡片式侧栏（含固定高度与圆角边框），避免“抽屉感”导致的割裂。
+  - 正文区容器由 max-w-4xl 提升到 max-w-5xl，并收紧内外边距，减少页面中心留白。
+  - 顶部工具条与章节标题区做减法：增强书名截断表现、统一进度文案、优化正文卡片间距与标题尺度。
+  - 上下章按钮改为双列等宽布局，阅读动线更稳定。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/ClassicsDetail/index.tsx：通过
+- 风险与后续：
+  - 当前风险：AI 面板仍采用较高信息密度，若用户主要关注纯阅读，仍可能感到干扰。
+  - 下一步动作：可将 AI 伴读默认折叠为二级入口（例如抽屉或底部 sheet），进一步突出正文。
+
+## 2026-04-21 21:04 (Asia/Shanghai)
+
+- 任务：修复阅读库详情页阅读模式改版后出现的布局变形问题。
+- 改动文件：
+  - apps/web/src/pages/ClassicsDetail/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 为阅读模式恢复桌面端双栏容器：新增 max-w-[1180px] 的 lex 外层，目录栏与正文区回到同一布局流。
+  - 修正正文区容器为 min-w-0 flex-1，避免侧栏存在时正文区域挤压错位。
+  - 保留移动端目录抽屉逻辑，不影响小屏交互。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+- 风险与后续：
+  - 当前风险：阅读页其余视觉细节仍需按你口味继续打磨，但不会再出现本次结构性变形。
+  - 下一步动作：先确认这版结构恢复是否正常，再按你的方向逐项微调视觉。
+
+## 2026-04-21 21:21 (Asia/Shanghai)
+
+- 任务：彻底移除 classics / 阅读库模块。
+- 改动文件：
+  - apps/web/src/App.tsx
+  - apps/web/src/layouts/Header.tsx
+  - apps/admin/src/App.tsx
+  - apps/admin/src/layouts/Layout.tsx
+  - package.json
+  - README.md
+  - QUICK_START.md
+  - server/internal/router/router.go
+  - server/internal/database/database.go
+  - server/migrations/019_drop_classics_tables.sql
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 移除 web 端阅读库路由、导航入口，以及 classics 相关页面 / API / hook 文件。
+  - 移除 admin 端阅读库管理菜单、路由、页面与 API 文件。
+  - 移除 server 端所有 classics handler、model、路由注册、导入脚本与旧迁移文件。
+  - 删除根目录与文档中的 classics 命令说明，并新增一条 drop classics 表的迁移用于清理旧库。
+- 校验：
+  - pnpm --filter web exec tsc --noEmit：通过
+  - pnpm --filter admin exec tsc --noEmit：通过
+  - cd server && go test ./...：通过
+  - python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/App.tsx apps/web/src/layouts/Header.tsx apps/admin/src/App.tsx apps/admin/src/layouts/Layout.tsx README.md QUICK_START.md .codex/logs/CHANGE-LOG.md：通过
+- 风险与后续：
+  - 当前风险：仓库历史变更记录 CHANGELOG.md 里仍保留 classics 的历史条目，这是历史记录而非现行模块代码。
+  - 下一步动作：如需连历史数据库一起清掉，执行新增的 server/migrations/019_drop_classics_tables.sql。
