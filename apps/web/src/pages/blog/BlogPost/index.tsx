@@ -392,6 +392,10 @@ export default function BlogPost() {
   useEffect(() => {
     if (!post || post.postType !== 'blog') return;
     let cancelled = false;
+    setAdjacentPosts({
+      prev: post.prevPost || null,
+      next: post.nextPost || null,
+    });
 
     const loadRelated = async () => {
       try {
@@ -399,22 +403,13 @@ export default function BlogPost() {
         const groupId =
           post.group?.id || (post.groupId && post.groupId !== '0' ? post.groupId : '');
 
-        const [groupList, timelineList] = await Promise.all([
-          getPosts({
-            page: 1,
-            pageSize: 12,
-            postType: 'blog',
-            sort: 'newest',
-            groupId: groupId || undefined,
-          }),
-          getPosts({
-            page: 1,
-            pageSize: 50,
-            postType: 'blog',
-            sort: 'newest',
-            groupId: groupId || undefined,
-          }),
-        ]);
+        const groupList = await getPosts({
+          page: 1,
+          pageSize: 12,
+          postType: 'blog',
+          sort: 'newest',
+          groupId: groupId || undefined,
+        });
 
         if (cancelled) return;
 
@@ -422,33 +417,9 @@ export default function BlogPost() {
           .filter((item) => item.id !== post.id)
           .slice(0, 4);
         setRelatedPosts(filteredRelated);
-
-        let timeline = timelineList.list || [];
-        let currentIndex = timeline.findIndex((item) => item.id === post.id);
-        if (currentIndex < 0) {
-          const globalTimeline = await getPosts({
-            page: 1,
-            pageSize: 50,
-            postType: 'blog',
-            sort: 'newest',
-          });
-          if (cancelled) return;
-          timeline = globalTimeline.list || [];
-          currentIndex = timeline.findIndex((item) => item.id === post.id);
-        }
-
-        if (currentIndex >= 0) {
-          setAdjacentPosts({
-            prev: timeline[currentIndex - 1] || null,
-            next: timeline[currentIndex + 1] || null,
-          });
-        } else {
-          setAdjacentPosts({ prev: null, next: null });
-        }
       } catch {
         if (!cancelled) {
           setRelatedPosts([]);
-          setAdjacentPosts({ prev: null, next: null });
         }
       } finally {
         if (!cancelled) setRelatedLoading(false);

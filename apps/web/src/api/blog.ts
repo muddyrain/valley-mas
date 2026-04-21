@@ -86,6 +86,8 @@ export interface Post {
 export interface PostDetail extends Post {
   content: string;
   htmlContent: string;
+  prevPost?: Post;
+  nextPost?: Post;
 }
 
 export interface PostComment {
