@@ -116,7 +116,7 @@ export default function ClassicsShelf() {
             我的书架
           </div>
           <h1 className="text-4xl font-bold tracking-tight text-slate-800 sm:text-5xl">
-            收藏的名著都在这里
+            收藏的阅读都在这里
           </h1>
           <p className="mt-4 text-lg text-slate-500">继续上次阅读进度，或随时移除书架中的书目</p>
           {!loading && <p className="mt-2 text-sm text-slate-400">当前共 {books.length} 本</p>}
@@ -134,8 +134,8 @@ export default function ClassicsShelf() {
           <EmptyState
             icon={BookOpen}
             title="书架还是空的"
-            description="在名著馆里遇到想读的作品，点一下「加入书架」就会出现在这里。"
-            actionLabel="去名著馆挑书"
+            description="在阅读库里遇到想读的作品，点一下「加入书架」就会出现在这里。"
+            actionLabel="去阅读库挑书"
             onAction={() => navigate('/classics')}
           />
         ) : (

@@ -275,7 +275,7 @@ export default function Header() {
               }`}
             >
               <BookOpen className="h-4 w-4" />
-              <span className="hidden sm:inline">名著馆</span>
+              <span className="hidden sm:inline">阅读库</span>
             </Button>
           </Link>
 

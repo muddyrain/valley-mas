@@ -57,11 +57,11 @@ function RouteTitle() {
     } else if (pathname === '/resources') {
       title = '资源整理 | Valley';
     } else if (pathname === '/classics') {
-      title = '名著馆 | Valley';
+      title = '阅读库 | Valley';
     } else if (pathname === '/classics/shelf') {
-      title = '名著书架 | Valley';
+      title = '阅读库书架 | Valley';
     } else if (pathname.startsWith('/classic/')) {
-      title = '名著阅读 | Valley';
+      title = '阅读库阅读 | Valley';
     } else if (pathname.startsWith('/resource/')) {
       title = '资源详情 | Valley';
     } else if (pathname === '/my-space') {
