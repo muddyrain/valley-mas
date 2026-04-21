@@ -4,14 +4,100 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-const publicVisibilityWhere = "(visibility = 'public' OR visibility IS NULL OR visibility = '')"
+const publicVisibilityWhere = "visibility = 'public'"
+const publicResourceListCacheTTL = 30 * time.Second
+
+type publicResourceListCacheEntry struct {
+	response  []HotResourceResponse
+	total     int64
+	page      int
+	pageSize  int
+	expiresAt time.Time
+}
+
+var publicResourceListCache = struct {
+	mu      sync.RWMutex
+	entries map[string]publicResourceListCacheEntry
+}{
+	entries: make(map[string]publicResourceListCacheEntry),
+}
+
+func buildPublicResourceListCacheKey(
+	page int,
+	pageSize int,
+	resourceType string,
+	keyword string,
+	tagID string,
+	sort string,
+) string {
+	return strings.Join(
+		[]string{
+			strconv.Itoa(page),
+			strconv.Itoa(pageSize),
+			resourceType,
+			keyword,
+			tagID,
+			sort,
+		},
+		"|",
+	)
+}
+
+func cloneHotResourceResponseList(items []HotResourceResponse) []HotResourceResponse {
+	cloned := make([]HotResourceResponse, len(items))
+	copy(cloned, items)
+	return cloned
+}
+
+func getCachedPublicResourceList(key string) ([]HotResourceResponse, int64, int, int, bool) {
+	publicResourceListCache.mu.RLock()
+	entry, ok := publicResourceListCache.entries[key]
+	publicResourceListCache.mu.RUnlock()
+	if !ok {
+		return nil, 0, 0, 0, false
+	}
+	if time.Now().After(entry.expiresAt) {
+		publicResourceListCache.mu.Lock()
+		delete(publicResourceListCache.entries, key)
+		publicResourceListCache.mu.Unlock()
+		return nil, 0, 0, 0, false
+	}
+
+	return cloneHotResourceResponseList(entry.response), entry.total, entry.page, entry.pageSize, true
+}
+
+func setCachedPublicResourceList(
+	key string,
+	response []HotResourceResponse,
+	total int64,
+	page int,
+	pageSize int,
+) {
+	publicResourceListCache.mu.Lock()
+	publicResourceListCache.entries[key] = publicResourceListCacheEntry{
+		response:  cloneHotResourceResponseList(response),
+		total:     total,
+		page:      page,
+		pageSize:  pageSize,
+		expiresAt: time.Now().Add(publicResourceListCacheTTL),
+	}
+	publicResourceListCache.mu.Unlock()
+}
+
+func invalidatePublicResourceListCache() {
+	publicResourceListCache.mu.Lock()
+	publicResourceListCache.entries = make(map[string]publicResourceListCacheEntry)
+	publicResourceListCache.mu.Unlock()
+}
 
 // HomePage 服务入口页（浏览器访问友好）
 func HomePage(c *gin.Context) {
@@ -355,6 +441,76 @@ type HotResourceResponse struct {
 	Tags          []model.ResourceTag `json:"tags"`
 }
 
+func collectResourceIDs(resources []model.Resource) []model.Int64String {
+	ids := make([]model.Int64String, 0, len(resources))
+	for _, resource := range resources {
+		ids = append(ids, resource.ID)
+	}
+	return ids
+}
+
+func loadFavoritedSetForResources(db *gorm.DB, c *gin.Context, resourceIDs []model.Int64String) map[string]bool {
+	favoritedSet := map[string]bool{}
+	if len(resourceIDs) == 0 {
+		return favoritedSet
+	}
+
+	uid, exists := c.Get("userId")
+	if !exists {
+		return favoritedSet
+	}
+
+	userID, ok := uid.(int64)
+	if !ok {
+		return favoritedSet
+	}
+
+	var favs []model.UserFavorite
+	db.Where("user_id = ? AND resource_id IN ? AND deleted_at IS NULL", userID, resourceIDs).Find(&favs)
+	for _, fav := range favs {
+		favoritedSet[strconv.FormatInt(int64(fav.ResourceID), 10)] = true
+	}
+
+	return favoritedSet
+}
+
+func buildHotResourceResponseList(resources []model.Resource, favoritedSet map[string]bool) []HotResourceResponse {
+	response := make([]HotResourceResponse, 0, len(resources))
+	for _, resource := range resources {
+		rid := strconv.FormatInt(int64(resource.ID), 10)
+		resource.FillThumbnailURL()
+
+		creatorName := ""
+		creatorAvatar := ""
+		if resource.User != nil {
+			creatorName = resource.User.Nickname
+			creatorAvatar = resource.User.Avatar
+		}
+
+		response = append(response, HotResourceResponse{
+			ID:            rid,
+			Title:         resource.Title,
+			Type:          resource.Type,
+			URL:           resource.URL,
+			ThumbnailURL:  resource.ThumbnailURL,
+			Size:          resource.Size,
+			Width:         resource.Width,
+			Height:        resource.Height,
+			Extension:     resource.Extension,
+			DownloadCount: int64(resource.DownloadCount),
+			FavoriteCount: resource.FavoriteCount,
+			UserId:        fmt.Sprintf("%d", resource.UserID),
+			CreatorName:   creatorName,
+			CreatorAvatar: creatorAvatar,
+			CreatedAt:     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			IsFavorited:   favoritedSet[rid],
+			Tags:          resource.Tags,
+		})
+	}
+
+	return response
+}
+
 // GetHotResources 获取热门资源
 // @Summary 获取热门资源
 // @Description 获取热门资源列表，按下载量排序
@@ -397,6 +553,7 @@ func GetHotResources(c *gin.Context) {
 		Order("download_count DESC, created_at DESC").
 		Limit(pageSize).
 		Offset(offset).
+		Preload("User").
 		Preload("Tags").
 		Find(&resources).Error
 
@@ -409,49 +566,9 @@ func GetHotResources(c *gin.Context) {
 	}
 	fillResourceThumbnails(resources)
 
-	// 构建响应数据
-	// 如果当前请求携带了有效 token（OptionalAuth 已解析），则查询收藏状态
-	favoritedSet := map[string]bool{}
-	if uid, exists := c.Get("userId"); exists {
-		userID := uid.(int64)
-		var favs []model.UserFavorite
-		db.Where("user_id = ? AND deleted_at IS NULL", userID).Find(&favs)
-		for _, f := range favs {
-			favoritedSet[strconv.FormatInt(int64(f.ResourceID), 10)] = true
-		}
-	}
-
-	response := make([]HotResourceResponse, 0, len(resources))
-	for _, resource := range resources {
-		// 直接用 resource.UserID 查用户昵称和头像
-		var user model.User
-		if err := db.Where("id = ? AND deleted_at IS NULL", resource.UserID).
-			First(&user).Error; err != nil {
-			user = model.User{}
-		}
-
-		rid := strconv.FormatInt(int64(resource.ID), 10)
-		resource.FillThumbnailURL()
-		response = append(response, HotResourceResponse{
-			ID:            rid,
-			Title:         resource.Title,
-			Type:          resource.Type,
-			URL:           resource.URL,
-			ThumbnailURL:  resource.ThumbnailURL,
-			Size:          resource.Size,
-			Width:         resource.Width,
-			Height:        resource.Height,
-			Extension:     resource.Extension,
-			DownloadCount: int64(resource.DownloadCount),
-			FavoriteCount: resource.FavoriteCount,
-			UserId:        fmt.Sprintf("%d", resource.UserID),
-			CreatorName:   user.Nickname,
-			CreatorAvatar: user.Avatar,
-			CreatedAt:     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			IsFavorited:   favoritedSet[rid],
-			Tags:          resource.Tags,
-		})
-	}
+	resourceIDs := collectResourceIDs(resources)
+	favoritedSet := loadFavoritedSetForResources(db, c, resourceIDs)
+	response := buildHotResourceResponseList(resources, favoritedSet)
 
 	c.JSON(200, gin.H{
 		"code":    0,
@@ -483,6 +600,29 @@ func GetAllResources(c *gin.Context) {
 		pageSize = 20
 	}
 	offset := (page - 1) * pageSize
+	cacheKey := buildPublicResourceListCacheKey(page, pageSize, resourceType, keyword, tagID, sort)
+
+	if cachedResponse, cachedTotal, cachedPage, cachedPageSize, ok := getCachedPublicResourceList(cacheKey); ok {
+		resourceIDs := make([]model.Int64String, 0, len(cachedResponse))
+		for _, item := range cachedResponse {
+			var resourceID model.Int64String
+			if err := resourceID.Scan(item.ID); err == nil {
+				resourceIDs = append(resourceIDs, resourceID)
+			}
+		}
+		favoritedSet := loadFavoritedSetForResources(db, c, resourceIDs)
+		for i := range cachedResponse {
+			cachedResponse[i].IsFavorited = favoritedSet[cachedResponse[i].ID]
+		}
+
+		Success(c, gin.H{
+			"list":     cachedResponse,
+			"total":    cachedTotal,
+			"page":     cachedPage,
+			"pageSize": cachedPageSize,
+		})
+		return
+	}
 
 	query := db.Model(&model.Resource{}).Where("deleted_at IS NULL").Where(publicVisibilityWhere)
 	if resourceType != "" {
@@ -507,52 +647,25 @@ func GetAllResources(c *gin.Context) {
 	}
 
 	var resources []model.Resource
-	if err := query.Order(orderExpr).Limit(pageSize).Offset(offset).Preload("Tags").Find(&resources).Error; err != nil {
+	if err := query.Order(orderExpr).
+		Limit(pageSize).
+		Offset(offset).
+		Preload("User").
+		Preload("Tags").
+		Find(&resources).Error; err != nil {
 		Error(c, 500, "查询失败: "+err.Error())
 		return
 	}
 	fillResourceThumbnails(resources)
 
-	// 收藏状态（OptionalAuth）
-	favoritedSet := map[string]bool{}
-	if uid, exists := c.Get("userId"); exists {
-		userID := uid.(int64)
-		var favs []model.UserFavorite
-		db.Where("user_id = ? AND deleted_at IS NULL", userID).Find(&favs)
-		for _, f := range favs {
-			favoritedSet[strconv.FormatInt(int64(f.ResourceID), 10)] = true
-		}
+	resourceIDs := collectResourceIDs(resources)
+	favoritedSet := loadFavoritedSetForResources(db, c, resourceIDs)
+	response := buildHotResourceResponseList(resources, favoritedSet)
+	cacheableResponse := cloneHotResourceResponseList(response)
+	for i := range cacheableResponse {
+		cacheableResponse[i].IsFavorited = false
 	}
-
-	// 复用 HotResourceResponse 结构
-	response := make([]HotResourceResponse, 0, len(resources))
-	for _, resource := range resources {
-		var user model.User
-		if err := db.Where("id = ? AND deleted_at IS NULL", resource.UserID).First(&user).Error; err != nil {
-			user = model.User{}
-		}
-		rid := strconv.FormatInt(int64(resource.ID), 10)
-		resource.FillThumbnailURL()
-		response = append(response, HotResourceResponse{
-			ID:            rid,
-			Title:         resource.Title,
-			Type:          resource.Type,
-			URL:           resource.URL,
-			ThumbnailURL:  resource.ThumbnailURL,
-			Size:          resource.Size,
-			Width:         resource.Width,
-			Height:        resource.Height,
-			Extension:     resource.Extension,
-			DownloadCount: int64(resource.DownloadCount),
-			FavoriteCount: resource.FavoriteCount,
-			UserId:        fmt.Sprintf("%d", resource.UserID),
-			CreatorName:   user.Nickname,
-			CreatorAvatar: user.Avatar,
-			CreatedAt:     resource.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			IsFavorited:   favoritedSet[rid],
-			Tags:          resource.Tags,
-		})
-	}
+	setCachedPublicResourceList(cacheKey, cacheableResponse, total, page, pageSize)
 
 	Success(c, gin.H{
 		"list":     response,

@@ -319,6 +319,7 @@ func SetResourceTags(c *gin.Context) {
 		}
 		db.Where("id IN ?", newTagIDs).Find(&result)
 	}
+	invalidatePublicResourceListCache()
 	Success(c, result)
 }
 
