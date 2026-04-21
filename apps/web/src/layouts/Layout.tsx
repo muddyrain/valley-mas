@@ -5,7 +5,7 @@ import Header from './Header';
 
 export default function Layout() {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex min-h-screen w-full flex-col overflow-x-hidden">
       <Header />
       <main className="flex-1 pb-20">
         <Outlet />

@@ -51,7 +51,14 @@
 
 @layer base {
   html {
-    scrollbar-gutter: stable both-edges;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  @media (min-width: 768px) {
+    html {
+      scrollbar-gutter: stable both-edges;
+    }
   }
 
   * {
@@ -60,6 +67,9 @@
 
   body {
     @apply text-gray-900 antialiased min-h-screen;
+    width: 100%;
+    margin: 0;
+    overflow-x: hidden;
     background: linear-gradient(
       180deg,
       var(--theme-page-start) 0%,
@@ -67,6 +77,12 @@
       var(--theme-page-cool) 56%,
       var(--theme-page-end) 100%
     );
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+    overflow-x: clip;
   }
 
   /* 滚动条样式 */
@@ -331,7 +347,11 @@
 
 /* Logo 图标渐变 */
 .theme-logo-icon {
-  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-deep));
+  background: linear-gradient(
+    135deg,
+    var(--theme-primary),
+    var(--theme-primary-deep)
+  );
   box-shadow: 0 12px 24px rgba(var(--theme-primary-rgb), 0.22);
 }
 .theme-logo-icon:hover {
@@ -351,17 +371,29 @@
 
 /* Avatar fallback 渐变 */
 .theme-avatar-fallback {
-  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-deep));
+  background: linear-gradient(
+    135deg,
+    var(--theme-primary),
+    var(--theme-primary-deep)
+  );
 }
 
 /* ——— 主操作按钮 ——— */
 .theme-btn-primary {
   @apply text-white transition-all duration-200;
-  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-deep));
+  background: linear-gradient(
+    135deg,
+    var(--theme-primary),
+    var(--theme-primary-deep)
+  );
   box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.22);
 }
 .theme-btn-primary:hover {
-  background: linear-gradient(135deg, var(--theme-primary-hover), var(--theme-primary-deep));
+  background: linear-gradient(
+    135deg,
+    var(--theme-primary-hover),
+    var(--theme-primary-deep)
+  );
   box-shadow: 0 16px 30px rgba(var(--theme-primary-rgb), 0.28);
   transform: scale(1.05);
 }
@@ -383,10 +415,21 @@
 
 /* ——— Hero glow overlay ——— */
 .theme-hero-glow {
-  background:
-    radial-gradient(circle at 12% 18%, rgba(var(--theme-tertiary-rgb), 0.18), transparent 24%),
-    radial-gradient(circle at 88% 20%, rgba(var(--theme-secondary-rgb), 0.16), transparent 22%),
-    radial-gradient(circle at 80% 72%, rgba(var(--theme-primary-rgb), 0.12), transparent 28%);
+  background: radial-gradient(
+      circle at 12% 18%,
+      rgba(var(--theme-tertiary-rgb), 0.18),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at 88% 20%,
+      rgba(var(--theme-secondary-rgb), 0.16),
+      transparent 22%
+    ),
+    radial-gradient(
+      circle at 80% 72%,
+      rgba(var(--theme-primary-rgb), 0.12),
+      transparent 28%
+    );
 }
 
 /* ——— Panel shell ——— */

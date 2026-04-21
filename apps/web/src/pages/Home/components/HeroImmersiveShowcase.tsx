@@ -116,31 +116,34 @@ export default function HeroImmersiveShowcase() {
     const rect = event.currentTarget.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width - 0.5;
     const y = (event.clientY - rect.top) / rect.height - 0.5;
-    setTilt({ x: Math.max(-1, Math.min(1, x)), y: Math.max(-1, Math.min(1, y)) });
+    setTilt({
+      x: Math.max(-1, Math.min(1, x)),
+      y: Math.max(-1, Math.min(1, y)),
+    });
   };
 
   return (
     <div
       ref={stageRef}
-      className="group relative h-[300px] overflow-hidden rounded-[26px] border border-white/84 bg-[linear-gradient(145deg,rgba(255,255,255,0.92),rgba(255,246,236,0.84),rgba(255,255,255,0.9))] shadow-[0_22px_62px_rgba(var(--theme-primary-rgb),0.2)] md:h-[328px]"
+      className="group relative h-[260px] overflow-hidden rounded-[24px] border border-white/84 bg-[linear-gradient(145deg,rgba(255,255,255,0.92),rgba(255,246,236,0.84),rgba(255,255,255,0.9))] shadow-[0_22px_62px_rgba(var(--theme-primary-rgb),0.2)] sm:h-[300px] sm:rounded-[26px] md:h-[328px]"
       onMouseMove={handlePointerMove}
       onMouseLeave={() => setTilt({ x: 0, y: 0 })}
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_14%,rgba(var(--theme-tertiary-rgb),0.2),transparent_38%),radial-gradient(circle_at_86%_16%,rgba(var(--theme-secondary-rgb),0.2),transparent_36%),radial-gradient(circle_at_60%_88%,rgba(var(--theme-primary-rgb),0.16),transparent_44%)]" />
       <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
 
-      <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-theme-shell-border bg-white/90 px-3 py-1 text-[11px] tracking-[0.14em] text-theme-primary uppercase">
+      <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full border border-theme-shell-border bg-white/90 px-3 py-1 text-[10px] tracking-[0.1em] text-theme-primary uppercase sm:left-4 sm:top-4 sm:text-[11px] sm:tracking-[0.14em]">
         <Sparkles className="h-3.5 w-3.5" />
         首页展示舱
       </div>
 
-      <div className="absolute right-4 top-4 rounded-xl border border-theme-shell-border bg-white/84 px-3 py-1.5 text-[11px] tracking-[0.12em] text-slate-500 uppercase shadow-sm">
+      <div className="absolute right-3 top-3 rounded-xl border border-theme-shell-border bg-white/84 px-2.5 py-1 text-[10px] tracking-[0.08em] text-slate-500 uppercase shadow-sm sm:right-4 sm:top-4 sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.12em]">
         实时动态
       </div>
 
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center [perspective:1200px]">
         <div
-          className="relative h-[210px] w-[210px] transition duration-200"
+          className="relative h-[180px] w-[180px] transition duration-200 sm:h-[210px] sm:w-[210px]"
           style={{
             transform: `rotateX(${12 - tilt.y * 14}deg) rotateY(${tilt.x * 18}deg)`,
             transformStyle: 'preserve-3d',
@@ -148,8 +151,8 @@ export default function HeroImmersiveShowcase() {
         >
           <div className="absolute inset-0 rounded-[34px] border border-white/70 bg-[linear-gradient(140deg,rgba(255,255,255,0.7),rgba(var(--theme-secondary-rgb),0.18),rgba(var(--theme-primary-rgb),0.22))] shadow-[0_14px_40px_rgba(var(--theme-primary-rgb),0.22)] backdrop-blur-sm" />
           <div className="absolute inset-4 rounded-[28px] border border-theme-shell-border/80 bg-white/35 backdrop-blur-md" />
-          <div className="absolute left-1/2 top-1/2 h-[150px] w-[150px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-theme-shell-border/60 bg-[conic-gradient(from_0deg,rgba(var(--theme-primary-rgb),0.16),rgba(var(--theme-secondary-rgb),0.34),rgba(var(--theme-tertiary-rgb),0.3),rgba(var(--theme-primary-rgb),0.16))] animate-[spin_12s_linear_infinite]" />
-          <div className="absolute left-1/2 top-1/2 h-[108px] w-[108px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/85 bg-white/52 shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.24)]" />
+          <div className="absolute left-1/2 top-1/2 h-[126px] w-[126px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-theme-shell-border/60 bg-[conic-gradient(from_0deg,rgba(var(--theme-primary-rgb),0.16),rgba(var(--theme-secondary-rgb),0.34),rgba(var(--theme-tertiary-rgb),0.3),rgba(var(--theme-primary-rgb),0.16))] animate-[spin_12s_linear_infinite] sm:h-[150px] sm:w-[150px]" />
+          <div className="absolute left-1/2 top-1/2 h-[92px] w-[92px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/85 bg-white/52 shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.24)] sm:h-[108px] sm:w-[108px]" />
 
           <div className="absolute left-1/2 top-[45%] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border border-theme-shell-border bg-[linear-gradient(180deg,rgba(var(--theme-secondary-rgb),0.42),rgba(var(--theme-primary-rgb),0.36))] shadow-[0_0_20px_rgba(var(--theme-primary-rgb),0.36)]" />
           <div className="absolute left-1/2 top-[62%] h-[52px] w-[28px] -translate-x-1/2 -translate-y-1/2 rounded-[14px] border border-theme-shell-border/80 bg-[linear-gradient(180deg,rgba(var(--theme-primary-rgb),0.36),rgba(var(--theme-tertiary-rgb),0.24))] shadow-[0_0_16px_rgba(var(--theme-primary-rgb),0.28)]" />
@@ -158,7 +161,7 @@ export default function HeroImmersiveShowcase() {
         </div>
       </div>
 
-      <div className="absolute bottom-4 left-4 right-4 rounded-xl border border-theme-shell-border bg-white/82 px-3 py-2 shadow-sm">
+      <div className="absolute bottom-3 left-3 right-3 rounded-xl border border-theme-shell-border bg-white/82 px-3 py-2 shadow-sm sm:bottom-4 sm:left-4 sm:right-4">
         <div className="flex items-center justify-between gap-3">
           <div className="text-[10px] tracking-[0.12em] text-theme-primary uppercase">
             动态引擎运行中
