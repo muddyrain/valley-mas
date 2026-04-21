@@ -146,6 +146,7 @@ func autoMigrate() error {
 		&model.ClassicsUserProgress{},
 		&model.ClassicsUserRecent{},
 		&model.ClassicsUserAIExplored{},
+		&model.ClassicsImportJob{},
 		&model.PostGroup{},
 		&model.Post{},
 		&model.PostCategory{},

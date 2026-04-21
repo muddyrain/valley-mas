@@ -48,7 +48,9 @@ type AdminCreateChaptersReq struct {
 
 // ---- 辅助 ----
 
-func getOrCreateAuthor(db interface{ Raw(sql string, values ...interface{}) interface{ Scan(dest interface{}) error } }, name, dynasty string) (int64, error) {
+func getOrCreateAuthor(db interface {
+	Raw(sql string, values ...interface{}) interface{ Scan(dest interface{}) error }
+}, name, dynasty string) (int64, error) {
 	// 用 database.DB 直接操作
 	gdb := database.DB
 	type Row struct {
@@ -147,16 +149,51 @@ func AdminGetClassicsList(c *gin.Context) {
 		authorMap[a.BookID] = append(authorMap[a.BookID], a.Name)
 	}
 
+	type EditionRow struct {
+		ID          int64  `gorm:"column:id"`
+		BookID      int64  `gorm:"column:book_id"`
+		Label       string `gorm:"column:label"`
+		Translator  string `gorm:"column:translator"`
+		PublishYear int    `gorm:"column:publish_year"`
+		IsDefault   bool   `gorm:"column:is_default"`
+	}
+	var editionRows []EditionRow
+	if len(bookIDs) > 0 {
+		db.Table("classics_editions").
+			Where("book_id IN ?", bookIDs).
+			Select("id, book_id, label, translator, publish_year, is_default").
+			Order("book_id ASC, is_default DESC, id ASC").
+			Find(&editionRows)
+	}
+	type EditionItem struct {
+		ID          int64  `json:"id"`
+		BookID      int64  `json:"bookId"`
+		Label       string `json:"label"`
+		Translator  string `json:"translator"`
+		PublishYear int    `json:"publishYear"`
+	}
+	editionMap := map[int64][]EditionItem{}
+	for _, ed := range editionRows {
+		editionMap[ed.BookID] = append(editionMap[ed.BookID], EditionItem{
+			ID:          ed.ID,
+			BookID:      ed.BookID,
+			Label:       ed.Label,
+			Translator:  ed.Translator,
+			PublishYear: ed.PublishYear,
+		})
+	}
+
 	type Item struct {
-		ID           int64    `json:"id"`
-		Title        string   `json:"title"`
-		Category     string   `json:"category"`
-		Dynasty      string   `json:"dynasty"`
-		AuthorNames  []string `json:"authorNames"`
-		WordCount    int      `json:"wordCount"`
-		ChapterCount int      `json:"chapterCount"`
-		IsPublished  bool     `json:"isPublished"`
-		CreatedAt    string   `json:"createdAt"`
+		ID           int64         `json:"id"`
+		Title        string        `json:"title"`
+		Category     string        `json:"category"`
+		Dynasty      string        `json:"dynasty"`
+		AuthorNames  []string      `json:"authorNames"`
+		Editions     []EditionItem `json:"editions"`
+		WordCount    int           `json:"wordCount"`
+		ChapterCount int           `json:"chapterCount"`
+		IsPublished  bool          `json:"isPublished"`
+		CreatedAt    string        `json:"createdAt"`
 	}
 	list := make([]Item, 0, len(rows))
 	for _, r := range rows {
@@ -164,12 +201,17 @@ func AdminGetClassicsList(c *gin.Context) {
 		if names == nil {
 			names = []string{}
 		}
+		editions := editionMap[r.ID]
+		if editions == nil {
+			editions = []EditionItem{}
+		}
 		list = append(list, Item{
 			ID:           r.ID,
 			Title:        r.Title,
 			Category:     r.Category,
 			Dynasty:      r.Dynasty,
 			AuthorNames:  names,
+			Editions:     editions,
 			WordCount:    r.WordCount,
 			ChapterCount: r.ChapterCount,
 			IsPublished:  r.IsPublished,
