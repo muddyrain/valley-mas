@@ -10,7 +10,7 @@
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import type { BlogRecommendResponse, Group, Post } from '@/api/blog';
 import { getGroups, getPosts, recommendBlogPosts } from '@/api/blog';
 import BoxLoadingOverlay from '@/components/BoxLoadingOverlay';
@@ -27,6 +27,17 @@ import {
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_SIZE = 12;
+const BLOG_LIST_CACHE_TTL_MS = 30_000;
+const BLOG_LIST_SCROLL_STORAGE_PREFIX = 'blog-list-scroll:v1';
+
+type BlogListCacheEntry = {
+  posts: Post[];
+  total: number;
+  updatedAt: number;
+};
+
+const blogListCache = new Map<string, BlogListCacheEntry>();
+let blogGroupCache: { groups: Group[]; updatedAt: number } | null = null;
 const BLOG_LIST_QUERY_SCHEMA = {
   page: numberParam(1, { min: 1 }),
   keyword: stringParam('', { resetPageOnChange: true }),
@@ -68,6 +79,8 @@ function BlogFeedCardSkeleton() {
 
 export default function BlogList() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const navigationType = useNavigationType();
   const { user, profile, fetchProfile } = useAuthStore();
   const isCreator = user?.role === 'creator';
 
@@ -99,6 +112,16 @@ export default function BlogList() {
   const [aiRecommendError, setAIRecommendError] = useState('');
   const [aiRecommendResult, setAIRecommendResult] = useState<BlogRecommendResponse | null>(null);
   const firstLoadRef = useRef(true);
+  const scrollRestoredRef = useRef(false);
+
+  const listCacheKey = useMemo(
+    () => `${currentPage}|${selectedGroupId || ''}|${currentKeyword || ''}|${currentSort}`,
+    [currentKeyword, currentPage, currentSort, selectedGroupId],
+  );
+  const scrollStorageKey = useMemo(
+    () => `${BLOG_LIST_SCROLL_STORAGE_PREFIX}:${location.pathname}${location.search}`,
+    [location.pathname, location.search],
+  );
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -117,9 +140,26 @@ export default function BlogList() {
   }, [currentKeyword]);
 
   const loadTaxonomy = useCallback(async () => {
+    const cachedGroups = blogGroupCache?.groups || [];
+    const hasCachedGroups = cachedGroups.length > 0;
+    const groupsCacheFresh = hasCachedGroups
+      ? Date.now() - (blogGroupCache?.updatedAt || 0) < BLOG_LIST_CACHE_TTL_MS
+      : false;
+
+    if (hasCachedGroups) {
+      setGroups(cachedGroups);
+      setMetaLoading(false);
+      if (groupsCacheFresh) return;
+    }
+
     try {
       const groupsData = await getGroups();
-      setGroups(groupsData || []);
+      const normalizedGroups = groupsData || [];
+      blogGroupCache = {
+        groups: normalizedGroups,
+        updatedAt: Date.now(),
+      };
+      setGroups(normalizedGroups);
     } catch (error) {
       console.error('Failed to load blog groups:', error);
     } finally {
@@ -132,7 +172,27 @@ export default function BlogList() {
   }, [loadTaxonomy]);
 
   const loadPosts = useCallback(async () => {
-    const isFirstLoad = firstLoadRef.current;
+    const cachedEntry = blogListCache.get(listCacheKey);
+    const hasCachedEntry = !!cachedEntry;
+    const cacheFresh = hasCachedEntry
+      ? Date.now() - cachedEntry.updatedAt < BLOG_LIST_CACHE_TTL_MS
+      : false;
+
+    if (cachedEntry) {
+      setPosts(cachedEntry.posts);
+      setTotal(cachedEntry.total);
+      if (firstLoadRef.current) {
+        firstLoadRef.current = false;
+        setLoading(false);
+      }
+    }
+
+    if (cacheFresh) {
+      setRefreshing(false);
+      return;
+    }
+
+    const isFirstLoad = firstLoadRef.current && !hasCachedEntry;
     if (isFirstLoad) {
       setLoading(true);
     } else {
@@ -149,8 +209,15 @@ export default function BlogList() {
         sort: currentSort,
       });
 
-      setPosts(postsData.list || []);
-      setTotal(postsData.total || 0);
+      const nextPosts = postsData.list || [];
+      const nextTotal = postsData.total || 0;
+      blogListCache.set(listCacheKey, {
+        posts: nextPosts,
+        total: nextTotal,
+        updatedAt: Date.now(),
+      });
+      setPosts(nextPosts);
+      setTotal(nextTotal);
     } catch (error) {
       console.error('Failed to load posts:', error);
     } finally {
@@ -160,11 +227,50 @@ export default function BlogList() {
       }
       setRefreshing(false);
     }
-  }, [currentKeyword, currentPage, currentSort, selectedGroupId]);
+  }, [currentKeyword, currentPage, currentSort, listCacheKey, selectedGroupId]);
 
   useEffect(() => {
     void loadPosts();
   }, [loadPosts]);
+
+  useEffect(() => {
+    const saveScroll = () => {
+      sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
+    };
+    window.addEventListener('scroll', saveScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', saveScroll);
+      saveScroll();
+    };
+  }, [scrollStorageKey]);
+
+  useEffect(() => {
+    scrollRestoredRef.current = false;
+  }, [scrollStorageKey]);
+
+  useEffect(() => {
+    if (navigationType !== 'POP') return;
+    if (loading) return;
+    if (scrollRestoredRef.current) return;
+
+    const rawValue = sessionStorage.getItem(scrollStorageKey);
+    if (!rawValue) {
+      scrollRestoredRef.current = true;
+      return;
+    }
+
+    const nextScrollY = Number(rawValue);
+    if (!Number.isFinite(nextScrollY) || nextScrollY < 0) {
+      scrollRestoredRef.current = true;
+      return;
+    }
+
+    const rafId = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: nextScrollY, behavior: 'auto' });
+      scrollRestoredRef.current = true;
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [loading, navigationType, scrollStorageKey]);
 
   useEffect(() => {
     if (isCreator) void fetchProfile();

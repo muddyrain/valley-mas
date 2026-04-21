@@ -9,7 +9,7 @@
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   favoriteResource,
@@ -42,6 +42,17 @@ const RESOURCE_TYPES = [
 ];
 
 const PAGE_SIZE = 8;
+const RESOURCE_LIST_CACHE_TTL_MS = 30_000;
+const RESOURCE_LIST_SCROLL_STORAGE_PREFIX = 'resources-scroll:v1';
+
+type ResourceListCacheEntry = {
+  resources: Resource[];
+  total: number;
+  favoritedMap: Record<string, boolean>;
+  updatedAt: number;
+};
+
+const resourceListCache = new Map<string, ResourceListCacheEntry>();
 const RESOURCE_QUERY_SCHEMA = {
   page: numberParam(1, { min: 1 }),
   keyword: stringParam('', { resetPageOnChange: true }),
@@ -52,6 +63,8 @@ const RESOURCE_QUERY_SCHEMA = {
 
 export default function Resources() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const navigationType = useNavigationType();
   const { user, profile, fetchProfile } = useAuthStore();
   const isCreator = user?.role === 'creator';
   const {
@@ -72,9 +85,19 @@ export default function Resources() {
   const [tagSearching, setTagSearching] = useState(false);
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const firstLoadRef = useRef(true);
+  const scrollRestoredRef = useRef(false);
 
   // 刷新
   const [refreshing, setRefreshing] = useState(false);
+  const listCacheKey = useMemo(
+    () => `${currentPage}|${activeType || ''}|${currentKeyword || ''}|${tagId || ''}`,
+    [activeType, currentKeyword, currentPage, tagId],
+  );
+  const scrollStorageKey = useMemo(
+    () => `${RESOURCE_LIST_SCROLL_STORAGE_PREFIX}:${location.pathname}${location.search}`,
+    [location.pathname, location.search],
+  );
 
   // 若是创作者，预加载 profile 以获取 creatorCode
   useEffect(() => {
@@ -87,7 +110,36 @@ export default function Resources() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    const cachedEntry = resourceListCache.get(listCacheKey);
+    const hasCachedEntry = !!cachedEntry;
+    const cacheFresh = hasCachedEntry
+      ? Date.now() - cachedEntry.updatedAt < RESOURCE_LIST_CACHE_TTL_MS
+      : false;
+
+    if (cachedEntry) {
+      setResources(cachedEntry.resources);
+      setTotal(cachedEntry.total);
+      setFavoritedMap(cachedEntry.favoritedMap);
+      if (firstLoadRef.current) {
+        firstLoadRef.current = false;
+        setLoading(false);
+      }
+    }
+
+    if (cacheFresh) {
+      setRefreshing(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const isFirstLoad = firstLoadRef.current && !hasCachedEntry;
+    if (isFirstLoad) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+
     getAllResources({
       page: currentPage,
       pageSize: PAGE_SIZE,
@@ -98,24 +150,35 @@ export default function Resources() {
       .then((data) => {
         if (cancelled) return;
         const list = data.list ?? [];
-        setResources(list);
-        setTotal(data.total ?? 0);
         const map: Record<string, boolean> = {};
         list.forEach((r) => {
           map[r.id] = r.isFavorited ?? false;
         });
+        resourceListCache.set(listCacheKey, {
+          resources: list,
+          total: data.total ?? 0,
+          favoritedMap: map,
+          updatedAt: Date.now(),
+        });
+        setResources(list);
+        setTotal(data.total ?? 0);
         setFavoritedMap(map);
       })
       .catch(() => {
         if (!cancelled) toast.error('加载资源失败');
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (cancelled) return;
+        if (isFirstLoad) {
+          firstLoadRef.current = false;
+          setLoading(false);
+        }
+        setRefreshing(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [currentPage, activeType, currentKeyword, tagId]);
+  }, [currentPage, activeType, currentKeyword, listCacheKey, tagId]);
   const handleSearch = () => {
     setValue('keyword', inputValue);
   };
@@ -154,6 +217,12 @@ export default function Resources() {
       list.forEach((r) => {
         map[r.id] = r.isFavorited ?? false;
       });
+      resourceListCache.set(listCacheKey, {
+        resources: list,
+        total: data.total ?? 0,
+        favoritedMap: map,
+        updatedAt: Date.now(),
+      });
       setFavoritedMap(map);
       toast.success('已刷新');
     } catch {
@@ -162,6 +231,45 @@ export default function Resources() {
       setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    const saveScroll = () => {
+      sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
+    };
+    window.addEventListener('scroll', saveScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', saveScroll);
+      saveScroll();
+    };
+  }, [scrollStorageKey]);
+
+  useEffect(() => {
+    scrollRestoredRef.current = false;
+  }, [scrollStorageKey]);
+
+  useEffect(() => {
+    if (navigationType !== 'POP') return;
+    if (loading) return;
+    if (scrollRestoredRef.current) return;
+
+    const rawValue = sessionStorage.getItem(scrollStorageKey);
+    if (!rawValue) {
+      scrollRestoredRef.current = true;
+      return;
+    }
+
+    const nextScrollY = Number(rawValue);
+    if (!Number.isFinite(nextScrollY) || nextScrollY < 0) {
+      scrollRestoredRef.current = true;
+      return;
+    }
+
+    const rafId = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: nextScrollY, behavior: 'auto' });
+      scrollRestoredRef.current = true;
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [loading, navigationType, scrollStorageKey]);
 
   const handleFavorite = async (e: React.MouseEvent, resource: Resource) => {
     e.stopPropagation();
