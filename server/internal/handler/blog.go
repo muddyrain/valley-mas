@@ -102,6 +102,8 @@ type PostDetailResponse struct {
 	IsTop           bool              `json:"isTop"`
 	PublishedAt     *time.Time        `json:"publishedAt,omitempty"`
 	CreatedAt       time.Time         `json:"createdAt"`
+	PrevPost        *PostListResponse `json:"prevPost,omitempty"`
+	NextPost        *PostListResponse `json:"nextPost,omitempty"`
 }
 
 type AuthorInfo struct {
@@ -270,6 +272,55 @@ func GetPostDetailByID(c *gin.Context) {
 	go increasePostViewCount(post.ID)
 
 	Success(c, convertToPostDetailResponse(&post))
+}
+
+func loadAdjacentPosts(current *model.Post) (*model.Post, *model.Post) {
+	if current == nil {
+		return nil, nil
+	}
+
+	loadTimeline := func(groupID model.Int64String) []model.Post {
+		query := database.DB.
+			Model(&model.Post{}).
+			Where("status = ? AND visibility = ? AND deleted_at IS NULL AND post_type = ?", "published", visibilityPublic, normalizePostType(current.PostType))
+		if groupID != 0 {
+			query = query.Where("group_id = ?", groupID)
+		}
+
+		var posts []model.Post
+		query.
+			Select("id, title, slug, post_type, visibility, excerpt, cover, cover_storage_key, group_id, category_id, status, view_count, like_count, is_top, published_at, created_at").
+			Order("is_top DESC, COALESCE(published_at, created_at) DESC").
+			Find(&posts)
+		return posts
+	}
+
+	resolve := func(posts []model.Post) (*model.Post, *model.Post, bool) {
+		for index := range posts {
+			if posts[index].ID != current.ID {
+				continue
+			}
+			var prevPost *model.Post
+			var nextPost *model.Post
+			if index > 0 {
+				prevPost = &posts[index-1]
+			}
+			if index+1 < len(posts) {
+				nextPost = &posts[index+1]
+			}
+			return prevPost, nextPost, true
+		}
+		return nil, nil, false
+	}
+
+	if current.GroupID != 0 {
+		if prevPost, nextPost, ok := resolve(loadTimeline(current.GroupID)); ok {
+			return prevPost, nextPost
+		}
+	}
+
+	prevPost, nextPost, _ := resolve(loadTimeline(0))
+	return prevPost, nextPost
 }
 
 func GetPostComments(c *gin.Context) {
@@ -1161,6 +1212,16 @@ func convertToPostDetailResponse(post *model.Post) PostDetailResponse {
 		IsTop:           post.IsTop,
 		PublishedAt:     post.PublishedAt,
 		CreatedAt:       post.CreatedAt,
+	}
+
+	prevPost, nextPost := loadAdjacentPosts(post)
+	if prevPost != nil {
+		prevResp := convertToPostListResponse(prevPost)
+		resp.PrevPost = &prevResp
+	}
+	if nextPost != nil {
+		nextResp := convertToPostListResponse(nextPost)
+		resp.NextPost = &nextResp
 	}
 
 	if post.Author != nil {
