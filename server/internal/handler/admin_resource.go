@@ -196,6 +196,7 @@ func UploadResource(c *gin.Context) {
 	}
 
 	resource.FillThumbnailURL()
+	invalidatePublicResourceListCache()
 	Success(c, gin.H{
 		"resource":    resource,
 		"storagePath": result.Key, // 返回存储路径，便于调试
@@ -259,6 +260,7 @@ func DeleteResource(c *gin.Context) {
 		return
 	}
 
+	invalidatePublicResourceListCache()
 	Success(c, nil)
 }
 
@@ -332,6 +334,7 @@ func BatchDeleteResources(c *gin.Context) {
 		return
 	}
 
+	invalidatePublicResourceListCache()
 	Success(c, gin.H{"deleted": deletedCount})
 }
 
@@ -367,6 +370,7 @@ func BatchUpdateVisibility(c *gin.Context) {
 		return
 	}
 
+	invalidatePublicResourceListCache()
 	Success(c, gin.H{"updated": result.RowsAffected})
 }
 
@@ -429,6 +433,7 @@ func UpdateResourceCreator(c *gin.Context) {
 	// 重新加载资源并预加载用户信息
 	db.Preload("User").First(&resource, "id = ?", id)
 
+	invalidatePublicResourceListCache()
 	Success(c, resource)
 }
 
@@ -509,6 +514,7 @@ func UpdateResource(c *gin.Context) {
 	// 返回最新数据
 	db.Preload("Tags").First(&resource, "id = ?", id)
 	resource.FillThumbnailURL()
+	invalidatePublicResourceListCache()
 	Success(c, gin.H{
 		"id":          resource.ID,
 		"title":       resource.Title,

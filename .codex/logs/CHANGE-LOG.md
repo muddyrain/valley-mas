@@ -2867,3 +2867,95 @@
 - 风险与后续：
   - 当前风险：仓库历史变更记录 CHANGELOG.md 里仍保留 classics 的历史条目，这是历史记录而非现行模块代码。
   - 下一步动作：如需连历史数据库一起清掉，执行新增的 server/migrations/019_drop_classics_tables.sql。
+
+## 2026-04-21 21:55 (Asia/Shanghai)
+
+- 任务：排查并优化公开资源列表接口响应过慢的问题。
+- 改动文件：
+  - server/internal/handler/home.go
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 为公开资源列表与热门资源列表补充统一的批量响应组装逻辑，避免在循环里按资源逐条查询创作者用户信息。
+  - 将收藏状态查询改为仅按“当前页资源 ID 集合”批量查询，避免把当前用户全部收藏记录读出后再内存过滤。
+  - 复用 `Preload("User") + Preload("Tags")` 的一次性加载结果，减少远程数据库往返次数。
+- 校验：
+  - `cd server && go test ./...`：通过
+- 风险与后续：
+  - 当前风险：若数据库侧仍缺少适合公开列表排序的索引，后续数据量继续上涨时 `count + order by created_at` 仍可能成为下一阶段瓶颈。
+  - 下一步动作：上线后观察 `/api/v1/public/resources` 的实际耗时；若仍偏慢，再补数据库 `EXPLAIN ANALYZE` 与索引优化。
+
+## 2026-04-21 22:01 (Asia/Shanghai)
+
+- 任务：继续压缩公开资源列表接口的数据库查询耗时。
+- 改动文件：
+  - server/internal/handler/home.go
+  - server/migrations/020_optimize_public_resource_queries.sql
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 将公开资源筛选条件从包含 `NULL/空字符串` 的 `OR` 表达式收紧为 `visibility = 'public'`，让数据库更容易稳定命中索引。
+  - 新增资源公开列表复合索引 `visibility + deleted_at + created_at DESC`，优化公开列表的筛选与倒序分页。
+  - 新增用户收藏状态查询复合索引 `user_id + deleted_at + resource_id`，优化当前页收藏状态的批量查询。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py server/internal/handler/home.go server/migrations/020_optimize_public_resource_queries.sql .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：新增索引文件需要在目标数据库真正执行后才会生效；如果线上库还没跑迁移，接口耗时不会明显下降。
+  - 下一步动作：先在目标库执行 `server/migrations/020_optimize_public_resource_queries.sql`，再用同一个接口复测并对比日志耗时。
+
+## 2026-04-21 22:10 (Asia/Shanghai)
+
+- 任务：将公开资源列表改为更适合浏览场景的 `hasMore` 分页模式，降低首屏对 `total` 的依赖。
+- 改动文件：
+  - server/internal/handler/home.go
+  - apps/web/src/api/resource.ts
+  - apps/web/src/pages/Resources/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 公开资源接口改为取 `pageSize + 1` 条数据来计算 `hasMore`，首屏不再同步执行 `count(*)`。
+  - Web 端资源页分页逻辑由 `totalPages` 切换为 `hasMore` 驱动，保留上一页 / 下一页浏览体验。
+  - 顶部与列表状态文案调整为“当前页 / 本页条数”优先，只有服务端返回 `total` 时才展示总量。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Resources/index.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：公开资源接口若被其他页面直接依赖精确 `total`，这些调用方后续也应逐步切到 `hasMore` 或兼容 `total` 可选。
+  - 下一步动作：观察资源广场首屏耗时；若仍需进一步提速，可继续给首页热门流和标签页也统一改成 `hasMore`。
+
+## 2026-04-21 22:09 (Asia/Shanghai)
+
+- 任务：回退公开资源列表的 `hasMore` 分页改造，恢复为精确 `total` 分页。
+- 改动文件：
+  - server/internal/handler/home.go
+  - apps/web/src/api/resource.ts
+  - apps/web/src/pages/Resources/index.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 公开资源接口恢复 `count(*) + total` 返回结构，不再以 `pageSize + 1` 推导 `hasMore`。
+  - Web 端资源页恢复总数驱动的分页 UI 与顶部统计文案。
+  - 仅回退本轮产品行为调整，保留前面已经生效的查询批量化与索引优化。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Resources/index.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：恢复 `total` 后，公开资源首屏仍会承担 `count(*)` 的远程数据库成本。
+  - 下一步动作：若后续还要继续提速，更适合从缓存、区域、连接池或专门的统计缓存入手，而不是继续改分页交互。
+
+## 2026-04-21 22:14 (Asia/Shanghai)
+
+- 任务：为公开资源列表增加服务端短时内存缓存，并接上资源变更后的缓存失效。
+- 改动文件：
+  - server/internal/handler/home.go
+  - server/internal/handler/admin_resource.go
+  - server/internal/handler/resource_tag.go
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 为 `/api/v1/public/resources` 增加基于查询参数的 30 秒内存缓存，只缓存公共列表数据与总数。
+  - 登录用户请求继续实时查询当前页 `isFavorited`，避免把用户态字段缓存脏掉。
+  - 在资源上传、删除、批量删除、可见性修改、上传者修改、资源信息修改、标签修改后统一清空公开资源列表缓存。
+- 校验：
+  - `cd server && go test ./...`：通过
+- 风险与后续：
+  - 当前风险：这是单实例内存缓存；如果线上是多实例或冷启动实例，缓存命中会受实例切换影响。
+  - 下一步动作：上线后观察同条件重复请求的耗时变化；若还需要更稳的命中率，再考虑迁移到 Redis / Upstash。
