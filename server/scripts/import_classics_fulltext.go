@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"os"
 
@@ -74,9 +75,11 @@ func main() {
 		{BookTitle: "朝花夕拾", URL: "https://zh.wikisource.org/wiki/%E6%9C%9D%E8%8A%B1%E5%A4%95%E6%8B%BE?action=raw", EditionLabel: "维基文库整理版", Parser: parseZhaohuaxishiFromWikisource, NeedsTrimPG: false},
 		{BookTitle: "呐喊", URL: "https://zh.wikisource.org/wiki/%E5%91%90%E5%96%8A?action=raw", EditionLabel: "维基文库整理版", Parser: parseNahanFromWikisource, NeedsTrimPG: false},
 		{BookTitle: "彷徨", URL: "https://zh.wikisource.org/wiki/%E5%BD%B7%E5%BE%A8?action=raw", EditionLabel: "维基文库整理版", Parser: parsePanghuangFromWikisource, NeedsTrimPG: false},
+		{BookTitle: "骆驼祥子", URL: "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90?action=raw", EditionLabel: "维基文库校正本", Parser: parseLuotuoxiangziFromWikisource, NeedsTrimPG: false},
 		{BookTitle: "简爱", URL: "https://www.gutenberg.org/cache/epub/1260/pg1260.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parseEnglishChapterHeadings, NeedsTrimPG: true},
 		{BookTitle: "傲慢与偏见", URL: "https://www.gutenberg.org/cache/epub/1342/pg1342.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parseEnglishChapterHeadings, NeedsTrimPG: true},
 		{BookTitle: "了不起的盖茨比", URL: "https://www.gutenberg.org/cache/epub/64317/pg64317.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parseGatsbyChapters, NeedsTrimPG: true},
+		{BookTitle: "老人与海", URL: "https://gutenberg.ca/ebooks/hemingwaye-oldmanandthesea/hemingwaye-oldmanandthesea-00-t.txt", EditionLabel: "Project Gutenberg Canada 完整版（仅加拿大公版）", Parser: parseOldManAndSeaFromGutenbergCA, NeedsTrimPG: false},
 		{BookTitle: "月亮与六便士", URL: "https://www.gutenberg.org/cache/epub/222/pg222.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parseEnglishChapterHeadings, NeedsTrimPG: true},
 		{BookTitle: "鲁滨逊漂流记", URL: "https://www.gutenberg.org/cache/epub/521/pg521.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parseEnglishChapterHeadings, NeedsTrimPG: true},
 		{BookTitle: "巴斯克维尔的猎犬", URL: "https://www.gutenberg.org/cache/epub/2852/pg2852.txt", EditionLabel: "Project Gutenberg 完整版", Parser: parseEnglishChapterHeadings, NeedsTrimPG: true},
@@ -233,7 +236,7 @@ func fetchText(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(data), nil
+	return decodePossiblyLegacyText(data), nil
 }
 
 func fetchTextViaPython(url string) (string, error) {
@@ -251,7 +254,19 @@ sys.stdout.write(base64.b64encode(data).decode('ascii'))`
 	if err != nil {
 		return "", err
 	}
-	return string(data), nil
+	return decodePossiblyLegacyText(data), nil
+}
+
+func decodePossiblyLegacyText(data []byte) string {
+	if utf8.Valid(data) {
+		return string(data)
+	}
+	// Fallback for legacy single-byte encodings (for example ISO-8859-1 text from gutenberg.ca).
+	runes := make([]rune, len(data))
+	for i, b := range data {
+		runes[i] = rune(b)
+	}
+	return string(runes)
 }
 
 func normalizeText(text string) string {
@@ -561,6 +576,71 @@ func parsePanghuangFromWikisource(_ string) ([]chapterItem, error) {
 		{"离婚", "https://zh.wikisource.org/wiki/%E9%9B%A2%E5%A9%9A?action=raw"},
 	}
 	return parseWikisourcePages(pages)
+}
+
+func parseLuotuoxiangziFromWikisource(_ string) ([]chapterItem, error) {
+	pages := []struct {
+		Title string
+		URL   string
+	}{
+		{"序", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/%E5%BA%8F?action=raw"},
+		{"一", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/1?action=raw"},
+		{"二", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/2?action=raw"},
+		{"三", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/3?action=raw"},
+		{"四", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/4?action=raw"},
+		{"五", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/5?action=raw"},
+		{"六", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/6?action=raw"},
+		{"七", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/7?action=raw"},
+		{"八", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/8?action=raw"},
+		{"九", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/9?action=raw"},
+		{"十", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/10?action=raw"},
+		{"十一", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/11?action=raw"},
+		{"十二", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/12?action=raw"},
+		{"十三", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/13?action=raw"},
+		{"十四", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/14?action=raw"},
+		{"十五", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/15?action=raw"},
+		{"十六", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/16?action=raw"},
+		{"十七", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/17?action=raw"},
+		{"十八", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/18?action=raw"},
+		{"十九", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/19?action=raw"},
+		{"二十", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/20?action=raw"},
+		{"二十一", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/21?action=raw"},
+		{"二十二", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/22?action=raw"},
+		{"二十三", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/23?action=raw"},
+		{"二十四", "https://zh.wikisource.org/wiki/%E9%A7%B1%E9%A7%9D%E7%A5%A5%E5%AD%90/24?action=raw"},
+	}
+	return parseWikisourcePages(pages)
+}
+
+func parseOldManAndSeaFromGutenbergCA(text string) ([]chapterItem, error) {
+	text = normalizeText(text)
+	startMarker := "He was an old man who fished alone in a skiff in the Gulf Stream"
+	start := strings.Index(text, startMarker)
+	if start < 0 {
+		return nil, fmt.Errorf("old man and the sea start marker not found")
+	}
+
+	endCandidates := []string{
+		"\n\n_BOOKS BY_",
+		"\n\n[End of The Old Man and the Sea, by Ernest Hemingway]",
+	}
+	end := len(text)
+	for _, marker := range endCandidates {
+		if idx := strings.Index(text, marker); idx >= 0 && idx < end {
+			end = idx
+		}
+	}
+	content := strings.TrimSpace(text[start:end])
+	if content == "" {
+		return nil, fmt.Errorf("old man and the sea content is empty after trimming")
+	}
+
+	return []chapterItem{
+		{
+			Title:   "正文",
+			Content: content,
+		},
+	}, nil
 }
 
 func parseWikisourcePages(pages []struct {

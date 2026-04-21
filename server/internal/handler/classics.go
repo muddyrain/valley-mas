@@ -142,6 +142,7 @@ func GetClassicsList(c *gin.Context) {
 		db.Table("classics_editions").
 			Where("book_id IN ?", bookIDs).
 			Select("id, book_id, label, translator, publish_year, is_default").
+			Order("book_id ASC, is_default DESC, id ASC").
 			Find(&editionRows)
 	}
 	editionMap := map[int64][]ClassicsEditionResp{}
@@ -254,6 +255,7 @@ func GetClassicsDetail(c *gin.Context) {
 	db.Table("classics_editions").
 		Where("book_id = ?", bookID).
 		Select("id, label, translator, publish_year, is_default").
+		Order("is_default DESC, id ASC").
 		Find(&editionRows)
 
 	editions := make([]ClassicsEditionResp, 0, len(editionRows))

@@ -233,7 +233,7 @@ export default function ClassicsList() {
         <div className="relative mx-auto max-w-5xl px-6 text-center">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-theme-soft-strong bg-white/70 px-4 py-1.5 text-sm font-medium text-theme-primary shadow-[0_8px_24px_rgba(var(--theme-primary-rgb),0.12)]">
             <BookOpen className="h-4 w-4" />
-            名著馆
+            阅读库
           </div>
           <h1 className="text-4xl font-bold tracking-tight text-slate-800 sm:text-5xl">
             经典文学，随时阅读
@@ -252,7 +252,7 @@ export default function ClassicsList() {
             </Button>
           </div>
           {total > 0 && !loading && (
-            <p className="mt-2 text-sm text-slate-400">共收录 {total} 部名著</p>
+            <p className="mt-2 text-sm text-slate-400">共收录 {total} 部作品</p>
           )}
         </div>
       </div>
@@ -318,7 +318,7 @@ export default function ClassicsList() {
         ) : books.length === 0 ? (
           <EmptyState
             icon={BookOpen}
-            title="暂无相关名著"
+            title="暂无相关作品"
             description={
               currentKeyword ? `未找到与「${currentKeyword}」相关的书目` : '敬请期待更多收录'
             }

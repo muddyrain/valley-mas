@@ -30,7 +30,7 @@ const adminMenuItems = [
   { key: '/records', icon: <FileTextOutlined />, label: '记录管理' },
   { key: '/system-updates', icon: <NotificationOutlined />, label: '系统更新日志' },
   { key: '/blog-posts', icon: <BookOutlined />, label: '博客管理' },
-  { key: '/classics-books', icon: <ReadOutlined />, label: '名著管理' },
+  { key: '/classics-books', icon: <ReadOutlined />, label: '阅读库管理' },
 ];
 
 const creatorMenuItems = [
