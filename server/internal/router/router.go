@@ -61,14 +61,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 			public.POST("/guestbook/messages", middleware.OptionalAuth(cfg), handler.CreateGuestbookMessage)
 			public.GET("/system-updates", handler.ListPublicWebSystemUpdates)
 
-			// 名著馆
-			public.GET("/classics", handler.GetClassicsList)
-			public.GET("/classics/:id", handler.GetClassicsDetail)
-			public.GET("/classics/:id/editions/:editionId/chapters", handler.GetClassicsChapters)
-			public.GET("/classics/:id/editions/:editionId/chapters/:index", handler.GetClassicsChapter)
-			// 名著馆 AI
-			public.POST("/classics/:id/editions/:editionId/chapters/:index/ai/guide", handler.GetClassicsChapterGuide)
-			public.POST("/classics/:id/editions/:editionId/chapters/:index/ai/ask", handler.AskClassicsChapter)
 		}
 
 		api.POST("/login", handler.Login(cfg))
@@ -104,15 +96,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 			user.GET("/notifications/unread-count", handler.GetUnreadNotificationCount)
 			user.POST("/notifications/:id/read", handler.MarkNotificationRead)
 			user.POST("/notifications/read-all", handler.MarkAllNotificationsRead)
-			user.GET("/classics/shelf", handler.GetMyClassicsShelf)
-			user.POST("/classics/shelf", handler.AddMyClassicsShelf)
-			user.DELETE("/classics/shelf/:bookId", handler.RemoveMyClassicsShelf)
-			user.GET("/classics/progress", handler.GetMyClassicsProgress)
-			user.POST("/classics/progress", handler.SaveMyClassicsProgress)
-			user.GET("/classics/recent", handler.GetMyClassicsRecent)
-			user.POST("/classics/recent", handler.SaveMyClassicsRecent)
-			user.GET("/classics/ai-explored", handler.GetMyClassicsAIExplored)
-			user.POST("/classics/ai-explored", handler.SaveMyClassicsAIExplored)
 		}
 
 		auth := api.Group("")
@@ -202,16 +185,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.PATCH("/resource-tags/:id", handler.UpdateResourceTag)
 				adminOnly.DELETE("/resource-tags/:id", handler.DeleteResourceTag)
 
-				// 名著管理（仅管理员）
-				adminOnly.GET("/classics", handler.AdminGetClassicsList)
-				adminOnly.POST("/classics", handler.AdminCreateBook)
-				adminOnly.PUT("/classics/:id", handler.AdminUpdateBook)
-				adminOnly.DELETE("/classics/:id", handler.AdminDeleteBook)
-				adminOnly.POST("/classics/:id/editions/:editionId/chapters/import", handler.AdminImportChapters)
-				adminOnly.POST("/classics/import-jobs", handler.AdminCreateClassicsImportJob)
-				adminOnly.GET("/classics/import-jobs", handler.AdminGetClassicsImportJobs)
-				adminOnly.GET("/classics/import-jobs/:jobId", handler.AdminGetClassicsImportJob)
-				adminOnly.POST("/classics/import-jobs/:jobId/retry", handler.AdminRetryClassicsImportJob)
 			}
 
 			content := admin.Group("")

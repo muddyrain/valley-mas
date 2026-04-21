@@ -15,13 +15,12 @@ public class PlayerMovement : MonoBehaviour
     rb = GetComponent<Rigidbody2D>();
     // 精准获取子物体
     _visual = transform.Find("PlayerVisual").gameObject;
-    //_animator = GetComponentInChildren<Animator>();
-
-    //// Optional: safety check
-    //if (_animator == null)
-    //{
-    //  Debug.LogWarning("Animator not found in children of Player!");
-    //}
+    _animator = GetComponentInChildren<Animator>();
+    // Optional: safety check
+    if (_animator == null)
+    {
+      Debug.LogWarning("Animator not found in children of Player!");
+    }
   }
 
   // Update is called once per frame
@@ -33,14 +32,14 @@ public class PlayerMovement : MonoBehaviour
     // 防止对角线速度比直线快
     movement.Normalize();
 
-    //if (movement != Vector2.zero)
-    //{
-    //  _animator.SetBool("isWalk", true);
-    //}
-    //else
-    //{
-    //  _animator.SetBool("isWalk", false);
-    //}
+    if (movement != Vector2.zero)
+    {
+      _animator.SetBool("isWalk", true);
+    }
+    else
+    {
+      _animator.SetBool("isWalk", false);
+    }
   }
 
   private void FixedUpdate()

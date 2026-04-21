@@ -43,32 +43,6 @@ cd server
 go build ./cmd/server
 ```
 
-## 名著测试数据（一键入库）
-
-在 `server/.env` 配好 `DB_DSN` 后，可直接执行：
-
-```bash
-pnpm classics:seed
-```
-
-该命令会自动执行名著表迁移与测试数据导入，支持重复执行并避免重复书目。
-
-## 名著完整正文（一键抓取并入库）
-
-在 `server/.env` 配好 `DB_DSN` 后，可执行：
-
-```bash
-pnpm classics:import-fulltext
-```
-
-该命令会从公版来源抓取完整正文，并覆盖每本书默认版本的章节数据。
-
-若只想补导入单本，可用：
-
-```bash
-CLASSICS_ONLY='朝花夕拾' pnpm classics:import-fulltext
-```
-
 ## 文档
 
 - [QUICK_START.md](./QUICK_START.md)
