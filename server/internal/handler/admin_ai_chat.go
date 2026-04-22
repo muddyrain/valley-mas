@@ -1,16 +1,17 @@
 package handler
 
 import (
-	"bufio"
-	"bytes"
+	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
+	"io"
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
+	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 )
 
 type aiChatMessage struct {
@@ -24,23 +25,87 @@ type aiChatRequest struct {
 	Stream  bool            `json:"stream"`
 }
 
-type ollamaChatRequest struct {
-	Model    string          `json:"model"`
-	Messages []aiChatMessage `json:"messages"`
-	Stream   bool            `json:"stream"`
-	Options  struct {
-		Temperature float64 `json:"temperature,omitempty"`
-	} `json:"options,omitempty"`
+func normalizedAIChatSystemPrompt() string {
+	basePrompt := strings.Join([]string{
+		"你是 Valley 网站内的产品导航助手，不是泛泛而谈的通用平台客服。",
+		"请始终使用简体中文回答，并给出简洁、准确、可执行的建议。",
+		"已知 Valley 当前公开浏览主链路包括：首页、内容页、资源页、创作者页；首页首屏常见入口包括“立即浏览内容”“查看资源精选”“查看创作者/创作者口令”“进入创作空间”。",
+		"当用户问“首页最近有什么值得先点开”“先看什么”“帮我规划入口”这类问题时，优先基于这些已知入口给出 2-4 个具体点击建议，并说明各自适合什么场景。",
+		"如果你缺少实时数据，不要说自己无法访问平台或给出空泛的平台通用建议；应改为明确说明“我先按当前首页结构给你建议”，然后继续回答。",
+		"不要编造并未提供的实时标题、热度或数量；但可以根据当前已知页面结构、内容类型和用户目标来组织路线。",
+	}, " ")
+
+	systemPrompt := strings.TrimSpace(os.Getenv("AI_CHAT_SYSTEM_PROMPT"))
+	if systemPrompt == "" {
+		return basePrompt
+	}
+	if !strings.Contains(systemPrompt, "中文") {
+		systemPrompt += " 请始终使用简体中文回答。"
+	}
+	return basePrompt + " " + systemPrompt
 }
 
-type ollamaChatResponse struct {
-	Model   string        `json:"model,omitempty"`
-	Message aiChatMessage `json:"message"`
-	Done    bool          `json:"done,omitempty"`
-	Error   string        `json:"error,omitempty"`
+func buildARKChatMessages(req aiChatRequest) []*model.ChatCompletionMessage {
+	messages := make([]*model.ChatCompletionMessage, 0, len(req.History)+2)
+	appendMessage := func(role, content string) {
+		text := strings.TrimSpace(content)
+		if text == "" {
+			return
+		}
+		textCopy := text
+		messages = append(messages, &model.ChatCompletionMessage{
+			Role:    role,
+			Content: &model.ChatCompletionMessageContent{StringValue: &textCopy},
+		})
+	}
+
+	appendMessage(model.ChatMessageRoleSystem, normalizedAIChatSystemPrompt())
+
+	for _, item := range req.History {
+		role := strings.TrimSpace(item.Role)
+		if role != model.ChatMessageRoleUser && role != model.ChatMessageRoleAssistant {
+			continue
+		}
+		appendMessage(role, item.Content)
+	}
+
+	appendMessage(model.ChatMessageRoleUser, req.Message)
+	return messages
 }
 
-// ChatWithAI AI 对话（仅 Ollama）
+func extractARKMessageText(message *model.ChatCompletionMessage) string {
+	if message == nil || message.Content == nil {
+		return ""
+	}
+	if message.Content.StringValue != nil {
+		return strings.TrimSpace(*message.Content.StringValue)
+	}
+	if len(message.Content.ListValue) == 0 {
+		return ""
+	}
+
+	parts := make([]string, 0, len(message.Content.ListValue))
+	for _, item := range message.Content.ListValue {
+		if item == nil || strings.TrimSpace(item.Text) == "" {
+			continue
+		}
+		parts = append(parts, strings.TrimSpace(item.Text))
+	}
+	return strings.TrimSpace(strings.Join(parts, "\n"))
+}
+
+func arkChatRequest(modelID string, messages []*model.ChatCompletionMessage) model.CreateChatCompletionRequest {
+	maxTokens := 900
+	temperature := float32(0.7)
+	return model.CreateChatCompletionRequest{
+		Model:       modelID,
+		Messages:    messages,
+		MaxTokens:   &maxTokens,
+		Temperature: &temperature,
+	}
+}
+
+// ChatWithAI AI 对话（使用 ARK_TEXT_MODEL）
 func ChatWithAI(c *gin.Context) {
 	var req aiChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -48,41 +113,29 @@ func ChatWithAI(c *gin.Context) {
 		return
 	}
 
-	userMsg := strings.TrimSpace(req.Message)
-	if userMsg == "" {
+	req.Message = strings.TrimSpace(req.Message)
+	if req.Message == "" {
 		Error(c, 400, "message cannot be empty")
 		return
 	}
 
-	systemPrompt := strings.TrimSpace(os.Getenv("AI_CHAT_SYSTEM_PROMPT"))
-	if systemPrompt == "" {
-		systemPrompt = "你是 Valley 的 AI 助手。请始终使用简体中文回答，并给出简洁、准确、可执行的建议。"
-	} else if !strings.Contains(systemPrompt, "中文") {
-		systemPrompt += " 请始终使用简体中文回答。"
-	}
-
-	messages := []aiChatMessage{{Role: "system", Content: systemPrompt}}
-	for _, m := range req.History {
-		role := strings.TrimSpace(m.Role)
-		content := strings.TrimSpace(m.Content)
-		if content == "" {
-			continue
-		}
-		if role != "user" && role != "assistant" {
-			continue
-		}
-		messages = append(messages, aiChatMessage{Role: role, Content: content})
-	}
-	messages = append(messages, aiChatMessage{Role: "user", Content: userMsg})
-
-	if req.Stream {
-		streamChatWithOllama(c, messages)
+	apiKey, arkBaseURL, textModel, errMsg := readArkTextModelConfig()
+	if errMsg != "" {
+		Error(c, 503, errMsg)
 		return
 	}
 
-	reply, modelName, err := chatWithOllama(messages)
+	client := ensureSharedArkClient(apiKey, arkBaseURL)
+	messages := buildARKChatMessages(req)
+
+	if req.Stream {
+		streamChatWithARK(c, client, textModel, messages)
+		return
+	}
+
+	reply, modelName, err := chatWithARK(c.Request.Context(), client, textModel, messages)
 	if err != nil {
-		Error(c, 502, err.Error())
+		Error(c, 502, "AI upstream error: "+err.Error())
 		return
 	}
 	if strings.TrimSpace(reply) == "" {
@@ -93,101 +146,41 @@ func ChatWithAI(c *gin.Context) {
 	Success(c, gin.H{
 		"reply":    strings.TrimSpace(reply),
 		"model":    modelName,
-		"provider": "ollama",
+		"provider": "ark",
 	})
 }
 
-func ollamaConfig() (baseURL, modelName string) {
-	baseURL = strings.TrimSpace(os.Getenv("OLLAMA_BASE_URL"))
-	if baseURL == "" {
-		baseURL = "http://127.0.0.1:11434"
+func chatWithARK(
+	ctx context.Context,
+	client *arkruntime.Client,
+	modelID string,
+	messages []*model.ChatCompletionMessage,
+) (string, string, error) {
+	req := arkChatRequest(modelID, messages)
+	resp, err := client.CreateChatCompletion(ctx, req)
+	if err != nil {
+		return "", "", err
 	}
-	modelName = strings.TrimSpace(os.Getenv("OLLAMA_MODEL"))
-	if modelName == "" {
-		modelName = "llama3"
+	if len(resp.Choices) == 0 {
+		return "", resp.Model, errors.New("empty AI response")
 	}
-	return baseURL, modelName
+
+	reply := extractARKMessageText(&resp.Choices[0].Message)
+	return reply, resp.Model, nil
 }
 
-func chatWithOllama(messages []aiChatMessage) (string, string, error) {
-	baseURL, modelName := ollamaConfig()
-
-	reqBody := ollamaChatRequest{Model: modelName, Messages: messages, Stream: false}
-	reqBody.Options.Temperature = 0.7
-
-	body, err := json.Marshal(reqBody)
+func streamChatWithARK(
+	c *gin.Context,
+	client *arkruntime.Client,
+	modelID string,
+	messages []*model.ChatCompletionMessage,
+) {
+	stream, err := client.CreateChatCompletionStream(c.Request.Context(), arkChatRequest(modelID, messages))
 	if err != nil {
-		return "", "", fmt.Errorf("failed to build AI request")
-	}
-
-	httpReq, err := http.NewRequest(http.MethodPost, strings.TrimRight(baseURL, "/")+"/api/chat", bytes.NewReader(body))
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create upstream request")
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 120 * time.Second}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return "", "", fmt.Errorf("AI upstream request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	var parsed ollamaChatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
-		return "", "", fmt.Errorf("invalid AI upstream response")
-	}
-
-	if resp.StatusCode >= 400 {
-		if parsed.Error != "" {
-			return "", "", fmt.Errorf("AI upstream error: %s", parsed.Error)
-		}
-		return "", "", fmt.Errorf("AI upstream error")
-	}
-	if parsed.Error != "" {
-		return "", "", fmt.Errorf("AI upstream error: %s", parsed.Error)
-	}
-
-	return strings.TrimSpace(parsed.Message.Content), modelName, nil
-}
-
-func streamChatWithOllama(c *gin.Context, messages []aiChatMessage) {
-	baseURL, modelName := ollamaConfig()
-
-	reqBody := ollamaChatRequest{Model: modelName, Messages: messages, Stream: true}
-	reqBody.Options.Temperature = 0.7
-
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		Error(c, 500, "failed to build AI request")
+		Error(c, 502, "AI upstream error: "+err.Error())
 		return
 	}
-
-	httpReq, err := http.NewRequest(http.MethodPost, strings.TrimRight(baseURL, "/")+"/api/chat", bytes.NewReader(body))
-	if err != nil {
-		Error(c, 500, "failed to create upstream request")
-		return
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 0}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		Error(c, 502, fmt.Sprintf("AI upstream request failed: %v", err))
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		var parsed ollamaChatResponse
-		_ = json.NewDecoder(resp.Body).Decode(&parsed)
-		if parsed.Error != "" {
-			Error(c, 502, "AI upstream error: "+parsed.Error)
-			return
-		}
-		Error(c, 502, "AI upstream error")
-		return
-	}
+	defer stream.Close()
 
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -208,44 +201,44 @@ func streamChatWithOllama(c *gin.Context, messages []aiChatMessage) {
 		flusher.Flush()
 	}
 
-	send(gin.H{"model": modelName, "chunk": "", "done": false})
+	send(gin.H{"model": modelID, "chunk": "", "done": false})
 
-	scanner := bufio.NewScanner(resp.Body)
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 1024*1024)
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
+	for {
+		resp, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			send(gin.H{"model": modelID, "done": true})
+			return
 		}
-
-		var item ollamaChatResponse
-		if err := json.Unmarshal([]byte(line), &item); err != nil {
-			continue
-		}
-
-		if item.Error != "" {
-			send(gin.H{"error": item.Error, "done": true})
+		if err != nil {
+			send(gin.H{"error": "AI upstream error: " + err.Error(), "done": true})
 			return
 		}
 
-		chunk := item.Message.Content
-		send(gin.H{
-			"model": modelName,
-			"chunk": chunk,
-			"done":  item.Done,
-		})
+		currentModel := resp.Model
+		if strings.TrimSpace(currentModel) == "" {
+			currentModel = modelID
+		}
 
-		if item.Done {
+		done := false
+		for _, choice := range resp.Choices {
+			if choice == nil {
+				continue
+			}
+			if strings.TrimSpace(choice.Delta.Content) != "" {
+				send(gin.H{
+					"model": currentModel,
+					"chunk": choice.Delta.Content,
+					"done":  false,
+				})
+			}
+			if choice.FinishReason != model.FinishReasonNull && choice.FinishReason != "" {
+				done = true
+			}
+		}
+
+		if done {
+			send(gin.H{"model": currentModel, "done": true})
 			return
 		}
 	}
-
-	if err := scanner.Err(); err != nil {
-		send(gin.H{"error": fmt.Sprintf("stream read error: %v", err), "done": true})
-		return
-	}
-
-	send(gin.H{"done": true})
 }
