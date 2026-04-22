@@ -3054,3 +3054,59 @@
 - 风险与后续：
   - 当前风险：后端当前通过读取同时间线文章列表来定位相邻项，若未来公开博客量显著增加，可进一步改为更精确的 SQL 邻居查询。
   - 下一步动作：在几篇不同发布时间、不同分组的博客详情页手动验证上一篇 / 下一篇是否符合预期。
+
+## 2026-04-22 11:18 (Asia/Shanghai)
+
+- 任务：清理 Web 任务清单里已废弃的阅读库导入线（RLIB）残留项。
+- 改动文件：
+  - .codex/skills/web-feature-iteration/WEB-TASKS.md
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 从 Web 活跃 backlog 中移除整段 `RLIB` 主项及其 `RLIB-1 ~ RLIB-3` 子项，避免继续把已撤销方向保留在清单里。
+  - 从“下一步建议”中删除 `RLIB-4`，让后续 Web 迭代只保留当前仍有效的任务方向。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：这次仅清理清单记录，不会自动移除仓库中其他非清单文档里对 `RLIB` 的历史提及。
+  - 下一步动作：若后续还要做阅读库任务收口，可继续检查架构文档、注释或更新记录里是否还有已过期的 `RLIB` 语义残留。
+
+## 2026-04-22 11:22 (Asia/Shanghai)
+
+- 任务：清理 Web 任务清单里已撤销的名著/阅读库相关任务线。
+- 改动文件：
+  - .codex/skills/web-feature-iteration/WEB-TASKS.md
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 从活跃 backlog 中移除整段阅读库任务，以及顶部说明里遗留的名著任务编号说明。
+  - 从“已完成”和“下一步建议”中删除所有名著/阅读库相关事项，只保留当前仍有效的 Web 迭代方向。
+  - 顺手修正了 `WEB-TASKS.md` 顶部说明段落，把之前混入说明行的历史残留内容收回为正常文档结构。
+- 校验：
+  - `rg -n "名著|阅读库|CLD|CLR|CLAI|CLSEARCH|CLADMIN|CLSYNC|CLLANG|CLUI|classics|书架|双语" .codex/skills/web-feature-iteration/WEB-TASKS.md`：无结果
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/skills/web-feature-iteration/WEB-TASKS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：这次只清理了 Web 任务清单，不会自动同步删除架构文档、脚本或后端代码里的名著历史实现。
+  - 下一步动作：如果你希望整仓库继续做语义收口，可以再扫一轮 docs、脚本和界面入口里的名著/阅读库残留。
+
+## 2026-04-22 11:32 (Asia/Shanghai)
+
+- 任务：完成 `WRESP-4`，继续收口创作者链路与博客详情页的移动端布局密度。
+- 改动文件：
+  - apps/web/src/pages/Creator/index.tsx
+  - apps/web/src/pages/CreatorProfile/index.tsx
+  - apps/web/src/pages/MySpace/index.tsx
+  - apps/web/src/pages/MyResources/index.tsx
+  - apps/web/src/pages/blog/BlogPost/index.tsx
+  - .codex/skills/web-feature-iteration/WEB-TASKS.md
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 为 `Creator / MySpace` 收紧移动端外边距与 Hero 圆角，并把搜索区、操作按钮区改为小屏优先纵向排布，减少首屏按钮互相挤压。
+  - 为 `CreatorProfile` 调整顶部 badge/tabs/搜索框/分页在小屏下的换行策略，避免仍按桌面按钮宽度强撑。
+  - 为 `MyResources` 把桌面式固定侧栏改为移动端上置卡片布局，并让批量工具栏、分页和页头操作在手机上自动竖排。
+  - 为 `BlogPost` 收紧移动端卡片内边距、问文章输入区布局，并隐藏小屏下重复的侧栏阅读状态卡，降低信息堆叠感。
+  - 同步将 `WRESP-4` 从 Web 清单的“下一步建议”转为已完成记录。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Creator/index.tsx apps/web/src/pages/CreatorProfile/index.tsx apps/web/src/pages/MySpace/index.tsx apps/web/src/pages/MyResources/index.tsx apps/web/src/pages/blog/BlogPost/index.tsx .codex/skills/web-feature-iteration/WEB-TASKS.md`：通过
+- 风险与后续：
+  - 当前风险：这次主要收口的是布局密度与按钮换行，尚未做真机视觉回归，个别卡片在极窄宽度下仍可能需要继续微调字号或图片高度。
+  - 下一步动作：优先转入 `ELP-2`，先把英语学习域 API 契约和数据模型草图定下来。
