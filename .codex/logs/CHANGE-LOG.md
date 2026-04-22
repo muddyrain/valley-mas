@@ -3126,3 +3126,236 @@
 - 风险与后续：
   - 当前风险：这次是仓库协作约定层面的强约束，能约束后续 agent 行为，但不会改变已有 git hook 的校验逻辑。
   - 下一步动作：如果你还想把“提交/推送”进一步拆成更细的自动化约束，可以继续补充 `git-publish-guard` 的触发词与默认动作。
+
+## 2026-04-22 20:45 (Asia/Shanghai)
+
+- 任务：为首页 AI 中枢方向补一张可直接沟通视觉气质的暖金玻璃核心体草图。
+- 改动文件：
+  - apps/web/src/assets/concepts/valley-ai-core-sketch.svg
+  - apps/web/src/assets/concepts/valley-ai-core-sketch.png
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 新增一张本地 `SVG` 概念草图，表现暖金玻璃外壳、发光内核、环绕轨道、粒子和底部语音波纹平台，方便继续确定首页中心 AI 物体方向。
+  - 补生成一张同构图的 `PNG` 预览版本，便于在当前协作环境中直接查看整体气质，不受 `SVG` 预览限制影响。
+  - 草图整体配色控制在奶油白、香槟金、暖粉点缀范围内，避免偏蓝紫赛博球，保持 Valley MAS 当前首页更温润的品牌基调。
+- 校验：
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：这是一张概念草图，不等于最终前端实现稿；真正上首页时还需要再细化交互状态、动效层级和移动端占位比例。
+  - 下一步动作：若方向确认，可以继续把这张草图拆成前端实现版结构图，或者直接开始做首页中枢组件改造。
+
+## 2026-04-22 21:05 (Asia/Shanghai)
+
+- 任务：把首页展示舱升级成可唤醒的 Valley AI 中枢，并按暖金玻璃核心体方向落到页面。
+- 改动文件：
+  - apps/web/src/pages/Home/components/HomeAICoreDialog.tsx
+  - apps/web/src/pages/Home/components/HomeEnergyCore.tsx
+  - apps/web/src/pages/Home/components/HeroImmersiveShowcase.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 新增首页专用 `HomeAICoreDialog`，接入现有 `/ai/chat` 流式接口，让首页中枢不再只是装饰，而是可以直接发起对话的 AI 入口。
+  - 重写 `HomeEnergyCore` 的左侧信息区，改成更明确的 `VALLEY AI CORE` 叙事，并补上可一键触发的提问 chips 和唤醒按钮。
+  - 重构 `HeroImmersiveShowcase` 的中心视觉，从原来偏人形展示舱改为暖金玻璃核心体、环绕轨道和底部语音波纹，更贴合本轮确认的视觉方向。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Home/components/HomeAICoreDialog.tsx apps/web/src/pages/Home/components/HomeEnergyCore.tsx apps/web/src/pages/Home/components/HeroImmersiveShowcase.tsx .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：首页 AI 中枢目前依赖登录后的 `/ai/chat` 接口，未登录用户可以看到入口和对话层，但真正发起对话时会引导登录。
+  - 下一步动作：若这轮页面方向确认，可以继续补“AI 回答后给出站内跳转建议卡”或把中枢动效再往真实 3D 感推进一档。
+
+## 2026-04-22 21:14 (Asia/Shanghai)
+
+- 任务：修正首页 AI 中枢弹框被默认 `max-width` 压窄的问题。
+- 改动文件：
+  - apps/web/src/pages/Home/components/HomeAICoreDialog.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 为首页 AI 中枢弹框补上明确的 `max-w-[calc(100vw-1rem)]` 和 `sm:max-w-4xl`，覆盖共享 `DialogContent` 默认的 `sm:max-w-sm` 限制。
+  - 保留小屏边距约束，同时让中大屏可以恢复预期的宽弹框展示。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+- 风险与后续：
+  - 当前风险：这次只修了宽度约束，若你后面还想让弹框更像“横向工作台”，可以再继续调内部分栏比例和最小高度。
+  - 下一步动作：如果你确认宽度已经正常，我再帮你继续收口弹框内部排版密度。
+
+## 2026-04-22 21:23 (Asia/Shanghai)
+
+- 任务：继续拉开首页 AI 中枢弹框的工作台宽度，并把中枢视觉收口到 Web 主题变量。
+- 改动文件：
+  - apps/web/src/pages/Home/components/HomeAICoreDialog.tsx
+  - apps/web/src/pages/Home/components/HeroImmersiveShowcase.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 将首页 AI 中枢弹框从 `4xl` 级别继续放宽到更接近工作台的宽度，并把内部布局改成左侧说明更窄、右侧对话更宽的比例，同时提高最小高度，让对话区更舒展。
+  - 将弹框和中枢视觉里的偏金黄硬编码颜色改为尽量依赖 `--theme-primary-rgb`、`--theme-secondary-rgb`、`theme-soft` 等现有主题变量，避免 AI 中枢脱离当前站点主题单独发黄。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Home/components/HomeAICoreDialog.tsx apps/web/src/pages/Home/components/HeroImmersiveShowcase.tsx .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：`canvas` 绘制部分虽然已改为读取主题变量表达式，但真实视觉效果仍建议在不同主题下各看一眼，确认 `rose/ocean/forest/amber` 都不过亮或过灰。
+  - 下一步动作：若你还觉得不够开阔，可以继续把弹框做成接近全屏的 `90vw` 中枢工作台，并补站内跳转卡。
+
+## 2026-04-22 21:29 (Asia/Shanghai)
+
+- 任务：修复首页 AI 中枢 canvas 动效直接使用 CSS 变量导致的运行时报错。
+- 改动文件：
+  - apps/web/src/pages/Home/components/HeroImmersiveShowcase.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 将 `canvas` 渐变和粒子使用的 `rgba(var(--theme-xxx-rgb), alpha)` 字符串改为先从运行时主题里读取真实 RGB 值，再拼成 `rgba(r,g,b,a)`，避免 `addColorStop` 无法解析 CSS 变量表达式。
+  - 保留主题跟随能力，同时让 `canvas` API 能正确消费颜色值。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+- 风险与后续：
+  - 当前风险：这次修复的是颜色字符串解析问题；如果后续还想让切换主题时动效立即重绘得更细致，可以再补主题变化时的显式重绘策略。
+  - 下一步动作：确认页面恢复正常后，再继续看是否要把弹框做成更接近全屏的工作台。
+
+## 2026-04-22 21:36 (Asia/Shanghai)
+
+- 任务：降低首页 AI 中枢左侧信息区的拥挤感，让中枢视觉更透气。
+- 改动文件：
+  - apps/web/src/pages/Home/components/HomeEnergyCore.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 将左侧三条长句 prompt 气泡改为更短的快捷入口标签，减少红框区域内的文字堆叠和多行换行。
+  - 把说明性小字收回到主说明卡里，并增大左右区域的栅格比例与间距，让右侧核心视觉更突出、左侧留白更大。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Home/components/HomeEnergyCore.tsx .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：这次优先降了信息密度，未改变首页 AI 中枢的功能入口数量；如果你还想更极简，可以继续把左侧再收成“标题 + 一句说明 + 一个按钮”。
+  - 下一步动作：如果你确认这一版更舒展了，再继续看要不要把右侧核心本身放大一档。
+
+## 2026-04-22 21:43 (Asia/Shanghai)
+
+- 任务：修正首页 AI 中枢右侧核心卡在大屏下被夹在中间、上下留白过多的问题。
+- 改动文件：
+  - apps/web/src/pages/Home/components/HomeEnergyCore.tsx
+  - apps/web/src/pages/Home/components/HeroImmersiveShowcase.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 将首页 AI 中枢两栏布局从 `items-center` 调整为 `items-stretch`，避免右侧核心卡在左列更高时被垂直居中。
+  - 显著提高 `HeroImmersiveShowcase` 的高度和内部核心体尺寸，让右侧视觉更接近满列展示，直接吃掉顶部和底部的空白区域。
+  - 同步微调底部信息条位置与核心轨道尺寸，保证放大后比例仍然稳定。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Home/components/HomeEnergyCore.tsx apps/web/src/pages/Home/components/HeroImmersiveShowcase.tsx .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：这次主要针对大屏首屏比例做了放大，极小宽度设备上虽然仍有断点保护，但最好再实际看一眼移动端视觉是否需要同步收口。
+  - 下一步动作：如果你觉得这次已经不空了，再决定要不要把左侧也继续做成更精炼的标题型布局。
+
+## 2026-04-22 21:52 (Asia/Shanghai)
+
+- 任务：为首页 AI 中枢大圆球加入更明确的随鼠标“看向目标”的 3D 扭动感。
+- 改动文件：
+  - apps/web/src/pages/Home/components/HeroImmersiveShowcase.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 在现有整体卡片倾斜之外，额外给球壳、高光、内核、内层光点和轨道环分别加入基于鼠标位置的偏移与旋转，让圆球本体会朝鼠标方向“看过去”。
+  - 增加一层随视线轻微形变的内圈轮廓，强化这不是单纯平面位移，而是偏 3D 视差的感觉。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Home/components/HeroImmersiveShowcase.tsx .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：这次是纯前端视觉层的 3D 拟态，还不是真正 WebGL 模型；如果继续加太多位移，可能会显得像“眼球”而不是“能量核心”，需要你看一眼手感是否刚好。
+  - 下一步动作：如果这个方向对，可以继续补 hover 时的轻微呼吸和惯性回弹，让它更像有生命感的中枢。
+
+## 2026-04-22 22:02 (Asia/Shanghai)
+
+- 任务：按用户反馈撤回首页 AI 中枢的大圆球方案，恢复为更顺眼的展示舱造型。
+- 改动文件：
+  - apps/web/src/pages/Home/components/HeroImmersiveShowcase.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 移除大圆球和“看向鼠标”的 3D 拟态实现，恢复为之前那版更轻巧的展示舱造型与动态粒子布局。
+  - 保留首页 AI 中枢点击唤醒入口，不回退已接好的首页对话能力，只回退右侧视觉表现。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Home/components/HeroImmersiveShowcase.tsx .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：这次是定向回退视觉方案，若后续还想增强 3D 感，建议只做轻微壳体视差，不再回到大圆球主体。
+  - 下一步动作：确认这版恢复效果没问题后，再继续微调展示舱尺寸和与左侧文案区的比例。
+
+## 2026-04-22 22:09 (Asia/Shanghai)
+
+- 任务：继续降低首页 AI 中枢左侧内容密度，避免左侧信息量压住右侧展示舱。
+- 改动文件：
+  - apps/web/src/pages/Home/components/HomeEnergyCore.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 移除左侧快捷入口 chips 和厚说明卡，把左侧收成更轻的“标题 + 一句说明 + 一个主按钮”结构。
+  - 进一步放宽两栏比例，让右侧展示舱获得更大的视觉权重，不再被左列的多块内容分散注意力。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Home/components/HomeEnergyCore.tsx .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：这次左侧已经收得很轻，如果你还想更干净，下一步就不该继续减文字，而是该放大右侧展示舱本体或缩短整体容器高度。
+  - 下一步动作：确认这一版后，再决定是否继续放大右侧展示舱或收短外层容器高度。
+
+## 2026-04-22 22:15 (Asia/Shanghai)
+
+- 任务：修正首页 AI 中枢左侧文案和按钮被窄列挤压得过于拥挤的问题。
+- 改动文件：
+  - apps/web/src/pages/Home/components/HomeEnergyCore.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 将左右列比例从更极端的右重布局稍微拉回，给左侧文案留出更自然的换行宽度。
+  - 将左侧说明收短为一句更直接的引导语，并把主按钮文案从“唤醒 AI 中枢”缩短为“打开中枢”，同时略微收紧按钮内边距。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Home/components/HomeEnergyCore.tsx .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：这次主要修的是左列文字拥挤，不会改变右侧展示舱本身尺寸；如果还觉得整体不平衡，下一步应该调的是右侧卡片大小而不是继续压缩左侧文案。
+  - 下一步动作：确认这次换行是否自然后，再决定是否轻微放大右侧展示舱。
+
+## 2026-04-22 22:22 (Asia/Shanghai)
+
+- 任务：按用户要求恢复首页 AI 区块左侧为原本的首页说明内容，只保留右侧展示舱点击弹窗能力。
+- 改动文件：
+  - apps/web/src/pages/Home/components/HomeEnergyCore.tsx
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 将左侧内容恢复为原来的 `HOME ENERGY CORE / 首页中枢` 结构、说明卡和辅助说明，不再把这一区域改造成 AI 专属介绍区。
+  - 保留右侧 `HeroImmersiveShowcase` 的点击唤醒能力，让首页外部内容仍然照旧，只是在展示舱上新增 AI 弹窗入口。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Home/components/HomeEnergyCore.tsx .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：当前 AI 能力主要通过右侧展示舱触发，左侧已经不再显式强调 AI，如果后续想再强化可发现性，可以只在右侧展示舱里做更明显的 hover 提示。
+  - 下一步动作：确认这版布局没问题后，再看是否只需微调右侧展示舱尺寸或 hover 文案。
+
+## 2026-04-22 22:34 (Asia/Shanghai)
+
+- 任务：把 `/ai/chat` 从本地 Ollama 链路切换到项目当前主用的火山 ARK 文本模型链路。
+- 改动文件：
+  - server/internal/handler/admin_ai_chat.go
+  - server/.env.example
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 重写 `ChatWithAI`，改为复用现有 `readArkTextModelConfig` 与 `ensureSharedArkClient`，直接使用 `ARK_API_KEY / ARK_BASE_URL / ARK_TEXT_MODEL` 调用 ARK 文本模型。
+  - 保留前端当前使用的同步/流式返回协议，让首页 AI 弹窗无需改接口协议就能继续工作，但不再依赖本地 `127.0.0.1:11434` 的 Ollama。
+  - 更新 `server/.env.example` 的 AI Chat 配置说明，移除误导性的 Ollama 默认说明，并修正了 `AI_CHAT_SYSTEM_PROMPT` 的乱码示例值。
+- 校验：
+  - `cd server && go test ./...`：待执行
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py server/.env.example .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：这次切换后 `/ai/chat` 依赖 `ARK_API_KEY` 和 `ARK_TEXT_MODEL` 正确配置；若本地或部署环境没配，会返回明确 `503`，不再回退到本地 Ollama。
+  - 下一步动作：测试通过后，建议再做一次登录态首页 AI 弹窗的冒烟验证，确认流式响应在前端表现正常。
+
+## 2026-04-22 22:45 (Asia/Shanghai)
+
+- 任务：修正首页 AI 中枢弹框超出视口的问题，并提升首页入口类问题的回答贴合度。
+- 改动文件：
+  - apps/web/src/pages/Home/components/HomeAICoreDialog.tsx
+  - server/internal/handler/admin_ai_chat.go
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 为首页 AI 中枢弹框增加视口高度上限，并把主内容区改成固定工作区高度，让长对话只在左右内容区内部滚动，不再把整个弹框撑出视口。
+  - 强化 `/ai/chat` 的系统提示词：明确它是 Valley 的站内导航助手，已知首页存在内容页、资源页、创作者页、创作空间等主链路；当用户问“首页最近先点什么”时，不再优先回通用平台空话，也避免先说“我无法访问平台”。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+  - `cd server && go test ./...`：待执行
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Home/components/HomeAICoreDialog.tsx .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：这次主要是通过系统提示词提升首页入口类问题的回答质量，它仍然不是基于实时数据库检索的 RAG，因此不会凭空知道最新具体标题，只会更贴合当前站内结构地回答。
+  - 下一步动作：如果你还想继续提高“智能感”，下一步最有效的是把首页当前已加载的 featured 内容标题作为隐藏上下文一起传给 `/ai/chat`。

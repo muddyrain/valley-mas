@@ -16,8 +16,16 @@ interface Particle {
 
 const PARTICLE_COUNT = 56;
 
-export default function HeroImmersiveShowcase() {
-  const stageRef = useRef<HTMLDivElement | null>(null);
+interface HeroImmersiveShowcaseProps {
+  onActivate?: () => void;
+  isActive?: boolean;
+}
+
+export default function HeroImmersiveShowcase({
+  onActivate,
+  isActive = false,
+}: HeroImmersiveShowcaseProps) {
+  const stageRef = useRef<HTMLButtonElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [tilt, setTilt] = useState<TiltState>({ x: 0, y: 0 });
 
@@ -112,7 +120,7 @@ export default function HeroImmersiveShowcase() {
     };
   }, [particles]);
 
-  const handlePointerMove = (event: React.MouseEvent<HTMLDivElement>) => {
+  const handlePointerMove = (event: React.MouseEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width - 0.5;
     const y = (event.clientY - rect.top) / rect.height - 0.5;
@@ -123,11 +131,14 @@ export default function HeroImmersiveShowcase() {
   };
 
   return (
-    <div
+    <button
+      type="button"
       ref={stageRef}
-      className="group relative h-[260px] overflow-hidden rounded-[24px] border border-white/84 bg-[linear-gradient(145deg,rgba(255,255,255,0.92),rgba(255,246,236,0.84),rgba(255,255,255,0.9))] shadow-[0_22px_62px_rgba(var(--theme-primary-rgb),0.2)] sm:h-[300px] sm:rounded-[26px] md:h-[328px]"
+      onClick={onActivate}
+      className="group relative block h-[280px] w-full overflow-hidden rounded-[24px] border border-white/84 bg-[linear-gradient(145deg,rgba(255,255,255,0.92),rgba(255,246,236,0.84),rgba(255,255,255,0.9))] text-left shadow-[0_22px_62px_rgba(var(--theme-primary-rgb),0.2)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_72px_rgba(var(--theme-primary-rgb),0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary/40 sm:h-[320px] sm:rounded-[26px] md:h-[348px]"
       onMouseMove={handlePointerMove}
       onMouseLeave={() => setTilt({ x: 0, y: 0 })}
+      aria-label="打开 Valley AI 中枢"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_14%,rgba(var(--theme-tertiary-rgb),0.2),transparent_38%),radial-gradient(circle_at_86%_16%,rgba(var(--theme-secondary-rgb),0.2),transparent_36%),radial-gradient(circle_at_60%_88%,rgba(var(--theme-primary-rgb),0.16),transparent_44%)]" />
       <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
@@ -138,7 +149,7 @@ export default function HeroImmersiveShowcase() {
       </div>
 
       <div className="absolute right-3 top-3 rounded-xl border border-theme-shell-border bg-white/84 px-2.5 py-1 text-[10px] tracking-[0.08em] text-slate-500 uppercase shadow-sm sm:right-4 sm:top-4 sm:px-3 sm:py-1.5 sm:text-[11px] sm:tracking-[0.12em]">
-        实时动态
+        {isActive ? '已唤醒' : '实时动态'}
       </div>
 
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center [perspective:1200px]">
@@ -180,6 +191,6 @@ export default function HeroImmersiveShowcase() {
           </div>
         </div>
       </div>
-    </div>
+    </button>
   );
 }

@@ -1,0 +1,156 @@
+<svg width="1400" height="1100" viewBox="0 0 1400 1100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="182" y1="116" x2="1198" y2="1010" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF9F2"/>
+      <stop offset="0.52" stop-color="#FFF3E7"/>
+      <stop offset="1" stop-color="#F7E6D2"/>
+    </linearGradient>
+    <radialGradient id="haloGradient" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(700 484) rotate(90) scale(340 340)">
+      <stop stop-color="#F8D9A8" stop-opacity="0.92"/>
+      <stop offset="0.44" stop-color="#F3C98A" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#F3C98A" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="orbOuter" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(696 478) rotate(90) scale(190 190)">
+      <stop stop-color="#FFFFFF" stop-opacity="0.96"/>
+      <stop offset="0.52" stop-color="#FFF4E8" stop-opacity="0.7"/>
+      <stop offset="0.82" stop-color="#F2D6BA" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#E5B885" stop-opacity="0.32"/>
+    </radialGradient>
+    <radialGradient id="orbInner" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(696 492) rotate(90) scale(116 116)">
+      <stop stop-color="#FFF7CF"/>
+      <stop offset="0.42" stop-color="#F9D98A"/>
+      <stop offset="0.78" stop-color="#E9B05D"/>
+      <stop offset="1" stop-color="#C97847"/>
+    </radialGradient>
+    <linearGradient id="ringStroke" x1="497" y1="468" x2="903" y2="468" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F3D8B5" stop-opacity="0.2"/>
+      <stop offset="0.24" stop-color="#D89754" stop-opacity="0.86"/>
+      <stop offset="0.5" stop-color="#FFF6E9"/>
+      <stop offset="0.77" stop-color="#D28A4A" stop-opacity="0.84"/>
+      <stop offset="1" stop-color="#F3D8B5" stop-opacity="0.18"/>
+    </linearGradient>
+    <linearGradient id="innerRingStroke" x1="554" y1="503" x2="845" y2="503" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF4E2" stop-opacity="0.15"/>
+      <stop offset="0.25" stop-color="#E4A05B" stop-opacity="0.85"/>
+      <stop offset="0.5" stop-color="#FFFFFF"/>
+      <stop offset="0.75" stop-color="#E4A05B" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#FFF4E2" stop-opacity="0.12"/>
+    </linearGradient>
+    <linearGradient id="platformGradient" x1="442" y1="836" x2="956" y2="836" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF7EF" stop-opacity="0"/>
+      <stop offset="0.22" stop-color="#F4D4AE" stop-opacity="0.75"/>
+      <stop offset="0.5" stop-color="#EAB36B"/>
+      <stop offset="0.78" stop-color="#F4D4AE" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#FFF7EF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="softBlur" x="269" y="51" width="863" height="865" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur stdDeviation="52" result="effect1_foregroundBlur_1_1"/>
+    </filter>
+    <filter id="orbShadow" x="402" y="193" width="589" height="568" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="22"/>
+      <feGaussianBlur stdDeviation="36"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.69 0 0 0 0 0.45 0 0 0 0 0.2 0 0 0 0.28 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+    <filter id="panelShadow" x="109" y="67" width="1182" height="946" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="22"/>
+      <feGaussianBlur stdDeviation="36"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.61 0 0 0 0 0.45 0 0 0 0 0.29 0 0 0 0.15 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+    <filter id="tinyGlow" x="0" y="0" width="1400" height="1100" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur stdDeviation="8" result="effect1_foregroundBlur_1_1"/>
+    </filter>
+  </defs>
+
+  <rect width="1400" height="1100" fill="url(#bgGradient)"/>
+
+  <g filter="url(#panelShadow)">
+    <rect x="181" y="145" width="1038" height="780" rx="42" fill="white" fill-opacity="0.44"/>
+    <rect x="181.75" y="145.75" width="1036.5" height="778.5" rx="41.25" stroke="white" stroke-opacity="0.62" stroke-width="1.5"/>
+  </g>
+
+  <g filter="url(#softBlur)">
+    <ellipse cx="700" cy="480" rx="206" ry="205" fill="url(#haloGradient)"/>
+  </g>
+
+  <circle cx="316" cy="246" r="6" fill="#E4AF72"/>
+  <circle cx="1086" cy="258" r="7" fill="#E4AF72"/>
+  <circle cx="1040" cy="710" r="5" fill="#CF7A5C"/>
+  <circle cx="356" cy="742" r="4.5" fill="#F1D6B8"/>
+  <circle cx="922" cy="322" r="4" fill="#FFFFFF" fill-opacity="0.85"/>
+  <circle cx="502" cy="295" r="3.5" fill="#FFFFFF" fill-opacity="0.72"/>
+
+  <g opacity="0.96">
+    <ellipse cx="700" cy="490" rx="252" ry="91" stroke="url(#ringStroke)" stroke-width="2.6"/>
+    <ellipse cx="700" cy="490" rx="176" ry="61" stroke="url(#innerRingStroke)" stroke-width="1.8" stroke-dasharray="6 10"/>
+    <path d="M516 424C575 377 652 355 739 357C808 359 872 383 918 427" stroke="#E0A563" stroke-opacity="0.48" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M490 560C553 621 646 650 748 640C823 633 888 601 930 553" stroke="#F8E7D2" stroke-opacity="0.7" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="4 8"/>
+  </g>
+
+  <g filter="url(#orbShadow)">
+    <circle cx="696" cy="476" r="173" fill="url(#orbOuter)"/>
+    <circle cx="696" cy="476" r="172.2" stroke="white" stroke-opacity="0.75" stroke-width="1.6"/>
+    <ellipse cx="641" cy="412" rx="64" ry="39" fill="white" fill-opacity="0.42"/>
+    <path d="M606 575C640 598 683 610 726 608C769 607 807 593 834 571" stroke="#FFF4E6" stroke-opacity="0.7" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="698" cy="493" r="96" fill="url(#orbInner)"/>
+    <circle cx="698" cy="493" r="96" fill="#FFF4CC" fill-opacity="0.18"/>
+    <circle cx="698" cy="493" r="95.2" stroke="#FFE5B7" stroke-opacity="0.8" stroke-width="1.6"/>
+    <ellipse cx="700" cy="438" rx="58" ry="27" fill="#FFF3D5" fill-opacity="0.45"/>
+    <path d="M699 421C731 451 751 487 748 531C744 575 719 607 698 626C670 601 650 563 651 520C652 476 670 442 699 421Z" fill="#FFF4E6" fill-opacity="0.2"/>
+    <path d="M702 446C725 466 739 492 736 523C733 554 716 579 702 591C684 574 672 550 673 519C674 490 684 464 702 446Z" stroke="#FFF1D2" stroke-opacity="0.7" stroke-width="1.2"/>
+    <circle cx="698" cy="492" r="28" fill="#FFF9E9" fill-opacity="0.66"/>
+  </g>
+
+  <g opacity="0.88" filter="url(#tinyGlow)">
+    <circle cx="484" cy="447" r="4.5" fill="#F7E5D0"/>
+    <circle cx="460" cy="520" r="5" fill="#D78C58"/>
+    <circle cx="932" cy="431" r="5.5" fill="#F9E1BC"/>
+    <circle cx="955" cy="549" r="5" fill="#D88557"/>
+    <circle cx="560" cy="664" r="4.5" fill="#FAEBD9"/>
+    <circle cx="826" cy="669" r="5" fill="#E4A46A"/>
+    <circle cx="886" cy="368" r="4" fill="#FFFFFF"/>
+    <circle cx="531" cy="351" r="3.5" fill="#FFFFFF"/>
+  </g>
+
+  <g opacity="0.94">
+    <ellipse cx="700" cy="844" rx="258" ry="28" fill="url(#platformGradient)"/>
+    <ellipse cx="700" cy="844" rx="206" ry="16" fill="#F5D8B2" fill-opacity="0.35"/>
+    <path d="M516 842C540 836 561 830 582 832C604 834 626 846 649 847C674 848 691 834 717 831C745 828 764 842 791 844C821 846 845 836 873 834C899 832 919 838 947 844" stroke="#E2A766" stroke-width="3" stroke-linecap="round"/>
+    <path d="M553 862C575 856 591 851 611 852C632 853 646 863 665 864C684 865 695 857 714 854C736 851 751 861 771 863C793 865 809 856 829 854C849 852 865 856 883 861" stroke="#FFF3E2" stroke-opacity="0.9" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <g opacity="0.92">
+    <rect x="260" y="232" width="154" height="36" rx="18" fill="white" fill-opacity="0.7"/>
+    <rect x="260.8" y="232.8" width="152.4" height="34.4" rx="17.2" stroke="white" stroke-opacity="0.8" stroke-width="1.6"/>
+    <circle cx="286" cy="250" r="5" fill="#E0A463"/>
+    <rect x="301" y="246.5" width="90" height="7" rx="3.5" fill="#B68655" fill-opacity="0.72"/>
+
+    <rect x="981" y="234" width="156" height="36" rx="18" fill="white" fill-opacity="0.7"/>
+    <rect x="981.8" y="234.8" width="154.4" height="34.4" rx="17.2" stroke="white" stroke-opacity="0.8" stroke-width="1.6"/>
+    <circle cx="1007" cy="252" r="5" fill="#CF7C5D"/>
+    <rect x="1022" y="248.5" width="91" height="7" rx="3.5" fill="#B68655" fill-opacity="0.72"/>
+  </g>
+
+  <g opacity="0.78">
+    <rect x="248" y="792" width="198" height="72" rx="24" fill="white" fill-opacity="0.48"/>
+    <rect x="248.8" y="792.8" width="196.4" height="70.4" rx="23.2" stroke="white" stroke-opacity="0.78" stroke-width="1.6"/>
+    <rect x="273" y="815" width="102" height="8" rx="4" fill="#B68655" fill-opacity="0.72"/>
+    <rect x="273" y="831" width="142" height="6" rx="3" fill="#DDB58E" fill-opacity="0.78"/>
+
+    <rect x="956" y="792" width="198" height="72" rx="24" fill="white" fill-opacity="0.48"/>
+    <rect x="956.8" y="792.8" width="196.4" height="70.4" rx="23.2" stroke="white" stroke-opacity="0.78" stroke-width="1.6"/>
+    <rect x="981" y="815" width="94" height="8" rx="4" fill="#B68655" fill-opacity="0.72"/>
+    <rect x="981" y="831" width="135" height="6" rx="3" fill="#DDB58E" fill-opacity="0.78"/>
+  </g>
+</svg>
