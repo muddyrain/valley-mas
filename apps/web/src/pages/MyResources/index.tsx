@@ -270,9 +270,9 @@ export default function MyResources() {
 
   return (
     <div className="min-h-screen bg-transparent text-slate-900">
-      <div className="mx-auto max-w-7xl px-6 pb-20 pt-8 md:px-8 lg:px-10">
+      <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8 md:px-8 lg:px-10">
         {/* 页头 */}
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+        <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:flex-wrap sm:items-center">
           <div>
             <button
               type="button"
@@ -284,7 +284,7 @@ export default function MyResources() {
             <h1 className="text-3xl font-semibold tracking-tight text-slate-900">资源管理</h1>
             <p className="mt-1 text-sm text-slate-500">管理你上传的全部壁纸与头像资源</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             {!batchMode ? (
               <>
                 <Button
@@ -293,7 +293,7 @@ export default function MyResources() {
                     loadResource();
                   }}
                   disabled={refreshing || loading}
-                  className="gap-2 border-slate-200 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary"
+                  className="w-full gap-2 border-slate-200 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary sm:w-auto"
                 >
                   <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                   刷新
@@ -301,7 +301,7 @@ export default function MyResources() {
                 <Button
                   variant="outline"
                   onClick={() => setBatchMode(true)}
-                  className="gap-2 border-slate-200 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary"
+                  className="w-full gap-2 border-slate-200 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary sm:w-auto"
                   disabled={resources.length === 0}
                 >
                   <CheckSquare className="h-4 w-4" />
@@ -309,7 +309,7 @@ export default function MyResources() {
                 </Button>
                 <Button
                   onClick={() => setUploadOpen(true)}
-                  className="theme-btn-primary gap-2 font-semibold shadow-md"
+                  className="theme-btn-primary w-full gap-2 font-semibold shadow-md sm:w-auto"
                 >
                   <Plus className="h-4 w-4" />
                   上传新资源
@@ -317,7 +317,7 @@ export default function MyResources() {
                 <Button
                   variant="outline"
                   onClick={() => setBatchUploadOpen(true)}
-                  className="gap-2 border-slate-200 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary"
+                  className="w-full gap-2 border-slate-200 text-slate-600 hover:border-theme-soft-strong hover:text-theme-primary sm:w-auto"
                 >
                   <Layers className="h-4 w-4" />
                   批量上传
@@ -327,7 +327,7 @@ export default function MyResources() {
               <Button
                 variant="outline"
                 onClick={handleExitBatch}
-                className="gap-2 border-slate-200 text-slate-500"
+                className="w-full gap-2 border-slate-200 text-slate-500 sm:w-auto"
               >
                 <X className="h-4 w-4" />
                 退出批量
@@ -337,9 +337,9 @@ export default function MyResources() {
         </div>
 
         {/* ── 左右分栏 ── */}
-        <div className="flex gap-5 items-start">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
           {/* ── 左侧专辑侧边栏 ── */}
-          <aside className="w-52 shrink-0 sticky top-6">
+          <aside className="w-full xl:sticky xl:top-6 xl:w-52 xl:shrink-0">
             <div className="rounded-[28px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.98),rgba(255,255,255,0.92))] p-3 shadow-[0_18px_48px_rgba(148,163,184,0.10)]">
               {/* 侧边栏头 */}
               <div className="mb-2 flex items-center justify-between px-1 py-1">
@@ -434,7 +434,7 @@ export default function MyResources() {
             <div className="rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
               {/* 专辑标题提示 */}
               {activeAlbum && (
-                <div className="mb-4 flex items-center gap-3">
+                <div className="mb-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
                   <div className="flex items-center gap-2 rounded-2xl border border-theme-soft-strong bg-theme-soft/50 px-4 py-2">
                     <FolderOpen className="h-4 w-4 text-theme-primary" />
                     <span className="text-sm font-semibold text-theme-primary">
@@ -497,7 +497,7 @@ export default function MyResources() {
                   <>
                     {/* 批量操作工具栏 */}
                     {batchMode && (
-                      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-theme-soft-strong bg-theme-soft/40 px-4 py-3">
+                      <div className="mb-4 flex flex-col items-start gap-3 rounded-2xl border border-theme-soft-strong bg-theme-soft/40 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center">
                         <button
                           type="button"
                           onClick={handleSelectAll}
@@ -515,7 +515,7 @@ export default function MyResources() {
                           <span className="font-semibold text-theme-primary">{selectedCount}</span>{' '}
                           个
                         </span>
-                        <div className="ml-auto flex flex-wrap items-center gap-2">
+                        <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
                           <Button
                             size="sm"
                             variant="outline"
@@ -562,7 +562,7 @@ export default function MyResources() {
                       ))}
                     </div>
                     {totalPages > 1 && (
-                      <div className="mt-6 flex items-center justify-center gap-3">
+                      <div className="mt-6 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                         <Button
                           variant="outline"
                           size="sm"

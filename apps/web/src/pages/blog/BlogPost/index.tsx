@@ -733,9 +733,9 @@ export default function BlogPost() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1440px] px-4 pb-24 pt-8 sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-[1440px] px-4 pb-20 pt-6 sm:px-6 sm:pb-24 sm:pt-8 lg:px-10">
         <header className="grid gap-6 xl:grid-cols-[minmax(0,1.24fr)_360px]">
-          <section className="theme-panel-shell relative overflow-hidden rounded-[38px] border bg-white/92 p-6 shadow-[0_28px_72px_rgba(85,64,34,0.14)] sm:p-8">
+          <section className="theme-panel-shell relative overflow-hidden rounded-[32px] border bg-white/92 p-5 shadow-[0_28px_72px_rgba(85,64,34,0.14)] sm:rounded-[38px] sm:p-8">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_6%,rgba(var(--theme-primary-rgb),0.16),transparent_32%),radial-gradient(circle_at_88%_0%,rgba(77,160,255,0.14),transparent_28%)]" />
             <div className="relative">
               <div className="flex flex-wrap items-center gap-2">
@@ -752,7 +752,7 @@ export default function BlogPost() {
                 </span>
               </div>
 
-              <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-tight tracking-[-0.04em] text-slate-950 sm:text-5xl">
+              <h1 className="mt-5 max-w-4xl text-[2rem] font-semibold leading-tight tracking-[-0.04em] text-slate-950 sm:text-5xl">
                 {post.title}
               </h1>
 
@@ -794,7 +794,7 @@ export default function BlogPost() {
           </section>
 
           <aside className="space-y-6">
-            <section className="theme-hero-shell overflow-hidden rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)]">
+            <section className="theme-hero-shell overflow-hidden rounded-[28px] border p-5 shadow-[0_20px_52px_rgba(148,163,184,0.12)] sm:rounded-[30px] sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-medium text-slate-900">阅读导览</div>
                 <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-slate-500">
@@ -885,11 +885,11 @@ export default function BlogPost() {
           </aside>
         </header>
 
-        <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:gap-8">
           <main className="space-y-6">
             <section
               ref={articleSectionRef}
-              className="theme-panel-shell rounded-[36px] border bg-white/95 p-6 shadow-[0_26px_70px_rgba(99,75,42,0.12)] sm:p-10"
+              className="theme-panel-shell rounded-[30px] border bg-white/95 p-5 shadow-[0_26px_70px_rgba(99,75,42,0.12)] sm:rounded-[36px] sm:p-10"
             >
               <MarkdownContent
                 content={processedContent}
@@ -954,7 +954,7 @@ export default function BlogPost() {
               <p className="mt-2 text-xs leading-6 text-slate-500">
                 基于当前文章内容回答，不会跨文章扩展。
               </p>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <input
                   value={askQuestion}
                   onChange={(event) => setAskQuestion(event.target.value)}
@@ -969,7 +969,7 @@ export default function BlogPost() {
                 />
                 <Button
                   type="button"
-                  className="theme-btn-primary h-10 rounded-xl px-4"
+                  className="theme-btn-primary h-10 rounded-xl px-4 sm:w-auto"
                   onClick={() => void handleAskPost()}
                   disabled={askLoading}
                 >
@@ -1022,7 +1022,7 @@ export default function BlogPost() {
 
           <aside className="space-y-6 xl:sticky xl:top-20 xl:self-start">
             {toc.length > 0 && (
-              <section className="theme-panel-shell rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)]">
+              <section className="theme-panel-shell rounded-[28px] border p-5 shadow-[0_20px_52px_rgba(148,163,184,0.12)] sm:rounded-[30px] sm:p-6">
                 <div className="text-sm font-medium text-slate-900">目录导读</div>
                 <div className="mt-4 max-h-[42vh] overflow-y-auto overflow-x-hidden pr-1">
                   <TableOfContents
@@ -1034,7 +1034,7 @@ export default function BlogPost() {
               </section>
             )}
 
-            <section className="theme-panel-shell rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)]">
+            <section className="theme-panel-shell hidden rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)] xl:block">
               <div className="text-sm font-medium text-slate-900">阅读状态</div>
               <div className="mt-4 space-y-3 text-sm text-slate-600">
                 <div className="flex items-center justify-between">
@@ -1058,7 +1058,7 @@ export default function BlogPost() {
                 </div>
               </div>
             </section>
-            <section className="theme-panel-shell rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)]">
+            <section className="theme-panel-shell rounded-[28px] border p-5 shadow-[0_20px_52px_rgba(148,163,184,0.12)] sm:rounded-[30px] sm:p-6">
               <div className="text-sm font-medium text-slate-900">相关推荐</div>
               {relatedLoading ? (
                 <div className="mt-4 space-y-2">

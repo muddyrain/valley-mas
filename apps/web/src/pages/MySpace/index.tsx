@@ -127,9 +127,9 @@ export default function MySpace() {
 
   return (
     <div className="min-h-screen bg-transparent text-slate-900">
-      <div className="mx-auto max-w-7xl px-6 pb-20 pt-8 md:px-8 lg:px-10">
+      <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8 md:px-8 lg:px-10">
         {/* ===== Hero ===== */}
-        <section className="theme-hero-shell relative overflow-hidden rounded-[40px] border px-6 py-8 md:px-10 md:py-10">
+        <section className="theme-hero-shell relative overflow-hidden rounded-[32px] border px-4 py-6 sm:px-6 sm:py-8 md:rounded-[40px] md:px-10 md:py-10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(251,191,36,0.16),transparent_24%),radial-gradient(circle_at_88%_20%,rgba(96,165,250,0.18),transparent_22%),radial-gradient(circle_at_80%_72%,rgba(251,191,36,0.1),transparent_28%)]" />
           <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
             <div className="space-y-6">
@@ -152,7 +152,7 @@ export default function MySpace() {
                 </HeroStatChip>
               </div>
               <div className="rounded-[28px] border border-white/80 bg-white/82 p-4 shadow-[0_16px_40px_rgba(148,163,184,0.08)] backdrop-blur">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
                   <Avatar className="h-18 w-18 border-4 border-white shadow-[0_10px_24px_rgba(148,163,184,0.12)]">
                     <AvatarImage src={user?.avatar} className="object-cover" />
                     <AvatarFallback className="bg-[linear-gradient(135deg,#f59e0b,#7c3aed)] text-xl font-bold text-white">
@@ -251,7 +251,7 @@ export default function MySpace() {
         </section>
 
         {/* ===== 资源预览 ===== */}
-        <section className="mt-24">
+        <section className="mt-16 sm:mt-20 md:mt-24">
           <div className="relative rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -263,10 +263,10 @@ export default function MySpace() {
                   descriptionClassName="max-w-xl"
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                 <Button
                   variant="outline"
-                  className="rounded-xl gap-1.5"
+                  className="rounded-xl gap-1.5 sm:w-auto"
                   onClick={() => setUploadOpen(true)}
                 >
                   <Plus className="h-4 w-4" />
@@ -274,7 +274,7 @@ export default function MySpace() {
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-xl gap-1.5"
+                  className="rounded-xl gap-1.5 sm:w-auto"
                   onClick={() => navigate('/my-space/resources')}
                 >
                   管理全部
@@ -341,7 +341,7 @@ export default function MySpace() {
         </section>
 
         {/* ===== 内容预览 ===== */}
-        <section className="mt-24">
+        <section className="mt-16 sm:mt-20 md:mt-24">
           <div className="relative space-y-8 rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <HeroSectionTitle
@@ -351,11 +351,11 @@ export default function MySpace() {
                 titleClassName="text-[30px] md:text-[34px]"
                 descriptionClassName="max-w-xl"
               />
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                 <Button
                   variant="outline"
                   onClick={() => navigate('/my-space/blog-create')}
-                  className="rounded-xl"
+                  className="rounded-xl sm:w-auto"
                 >
                   <FileText className="mr-1.5 h-4 w-4" />
                   新建博客
@@ -363,14 +363,14 @@ export default function MySpace() {
                 <Button
                   variant="outline"
                   onClick={() => navigate('/my-space/image-text')}
-                  className="rounded-xl"
+                  className="rounded-xl sm:w-auto"
                 >
                   <ImageIcon className="mr-1.5 h-4 w-4" />
                   新建图文
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-xl gap-1.5"
+                  className="rounded-xl gap-1.5 sm:w-auto"
                   onClick={() => navigate('/my-space/posts')}
                 >
                   管理全部
@@ -462,7 +462,7 @@ export default function MySpace() {
             <div className="flex justify-center pt-2">
               <Button
                 variant="outline"
-                className="rounded-xl gap-1.5 px-8"
+                className="w-full rounded-xl gap-1.5 px-8 sm:w-auto"
                 onClick={() => navigate('/my-space/posts')}
               >
                 进入内容管理
@@ -480,7 +480,7 @@ export default function MySpace() {
         </section>
 
         {/* ===== 工具入口 ===== */}
-        <section className="mt-24">
+        <section className="mt-16 sm:mt-20 md:mt-24">
           <div className="rounded-[36px] border border-[#d9e7f3] bg-[linear-gradient(180deg,rgba(248,252,255,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_22px_56px_rgba(148,163,184,0.1)] md:p-6">
             <div className="mb-5">
               <HeroSectionTitle
@@ -491,7 +491,7 @@ export default function MySpace() {
                 descriptionClassName="max-w-xl"
               />
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
               <button
                 type="button"
                 onClick={() => navigate('/my-space/resource-albums')}

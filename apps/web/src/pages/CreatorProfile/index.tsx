@@ -60,19 +60,19 @@ const glassStatClass =
   'group relative overflow-hidden rounded-2xl border border-white/78 bg-white/62 p-3.5 backdrop-blur-2xl shadow-[0_14px_30px_rgba(var(--theme-primary-rgb),0.10)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/82 hover:shadow-[0_20px_40px_rgba(var(--theme-primary-rgb),0.14)]';
 
 const creatorHeroInnerClass =
-  'relative overflow-hidden rounded-[30px] border border-white/76 bg-white/62 p-4 shadow-[0_24px_62px_rgba(var(--theme-primary-rgb),0.13)] backdrop-blur-2xl md:p-6';
+  'relative overflow-hidden rounded-[26px] border border-white/76 bg-white/62 p-4 shadow-[0_24px_62px_rgba(var(--theme-primary-rgb),0.13)] backdrop-blur-2xl sm:rounded-[30px] md:p-6';
 
 const creatorHeroActionCardClass =
   'rounded-2xl border border-white/78 bg-white/72 p-3.5 shadow-[0_14px_34px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-2xl';
 
 const sectionCardClass =
-  'rounded-3xl border border-theme-shell-border bg-white/88 p-5 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-xl md:p-6';
+  'rounded-[28px] border border-theme-shell-border bg-white/88 p-4 shadow-[0_18px_44px_rgba(var(--theme-primary-rgb),0.10)] backdrop-blur-xl sm:rounded-3xl sm:p-5 md:p-6';
 
 const sectionSubCardClass =
-  'rounded-2xl border border-theme-shell-border bg-white/84 p-4 shadow-[0_10px_24px_rgba(148,163,184,0.09)] backdrop-blur-sm';
+  'rounded-2xl border border-theme-shell-border bg-white/84 p-3.5 shadow-[0_10px_24px_rgba(148,163,184,0.09)] backdrop-blur-sm sm:p-4';
 
 const triggerClassName =
-  'rounded-xl px-5 py-2.5 font-semibold transition-all hover:bg-theme-soft data-[state=active]:bg-[var(--theme-primary)] data-[state=active]:text-white data-[state=active]:shadow-[0_14px_26px_rgba(var(--theme-primary-rgb),0.22)]';
+  'flex min-w-[140px] flex-1 items-center justify-center rounded-xl px-4 py-2.5 font-semibold transition-all hover:bg-theme-soft data-[state=active]:bg-[var(--theme-primary)] data-[state=active]:text-white data-[state=active]:shadow-[0_14px_26px_rgba(var(--theme-primary-rgb),0.22)] sm:flex-none sm:px-5';
 
 const WORKS_PAGE_SIZE = 20;
 const CREATOR_PROFILE_QUERY_SCHEMA = {
@@ -382,7 +382,7 @@ export default function CreatorProfile() {
               <ArrowLeft className="h-4 w-4" />
               返回
             </Button>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge className="h-8 border border-white/84 bg-white/72 px-3 text-theme-primary shadow-[0_10px_20px_rgba(var(--theme-primary-rgb),0.10)]">
                 <Sparkles className="mr-1 h-3.5 w-3.5" />
                 创作者主页
@@ -542,7 +542,7 @@ export default function CreatorProfile() {
           className="flex-col gap-4"
         >
           <div className={sectionCardClass}>
-            <TabsList className="h-auto gap-3 bg-transparent p-0">
+            <TabsList className="flex h-auto flex-wrap gap-3 bg-transparent p-0">
               <TabsTrigger value="works" className={triggerClassName}>
                 <ImageIcon className="mr-2 h-5 w-5" />
                 作品集
@@ -591,18 +591,18 @@ export default function CreatorProfile() {
                       <Search className="h-4 w-4 text-theme-primary" />
                       <h3 className="text-base font-semibold text-slate-900">搜索作品</h3>
                     </div>
-                    <div className="relative">
+                    <div className="relative flex flex-col gap-2 sm:block">
                       <Input
                         type="text"
                         placeholder="输入关键词搜索作品..."
                         value={searchKeyword}
                         onChange={(e) => setSearchKeyword(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && void handleSearch()}
-                        className="theme-input-border h-12 rounded-xl border-2 bg-white pr-24 text-base focus-visible:border-theme-primary focus-visible:ring-theme-primary/20"
+                        className="theme-input-border h-12 rounded-xl border-2 bg-white pr-4 text-base focus-visible:border-theme-primary focus-visible:ring-theme-primary/20 sm:pr-24"
                       />
                       <Button
                         onClick={() => void handleSearch()}
-                        className="theme-btn-primary absolute right-1.5 top-1/2 h-9 -translate-y-1/2 rounded-lg px-5 text-sm"
+                        className="theme-btn-primary h-10 rounded-lg px-5 text-sm sm:absolute sm:right-1.5 sm:top-1/2 sm:h-9 sm:-translate-y-1/2"
                       >
                         搜索
                       </Button>
@@ -640,23 +640,23 @@ export default function CreatorProfile() {
                 )}
 
                 {worksTotalPages > 1 ? (
-                  <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+                  <div className="mt-7 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <Button
                       variant="outline"
                       onClick={() => void handleWorksPageChange(currentPage - 1)}
                       disabled={currentPage <= 1 || worksLoading}
-                      className="rounded-xl border-theme-shell-border bg-white/84 px-6 text-slate-700 hover:bg-theme-soft"
+                      className="rounded-xl border-theme-shell-border bg-white/84 px-6 text-slate-700 hover:bg-theme-soft sm:w-auto"
                     >
                       上一页
                     </Button>
-                    <div className="rounded-xl border border-theme-shell-border bg-white/84 px-5 py-2 text-sm text-slate-600">
+                    <div className="rounded-xl border border-theme-shell-border bg-white/84 px-5 py-2 text-center text-sm text-slate-600">
                       第 {currentPage} / {worksTotalPages} 页，共 {worksTotal} 个作品
                     </div>
                     <Button
                       variant="outline"
                       onClick={() => void handleWorksPageChange(currentPage + 1)}
                       disabled={currentPage >= worksTotalPages || worksLoading}
-                      className="rounded-xl border-theme-shell-border bg-white/84 px-6 text-slate-700 hover:bg-theme-soft"
+                      className="rounded-xl border-theme-shell-border bg-white/84 px-6 text-slate-700 hover:bg-theme-soft sm:w-auto"
                     >
                       下一页
                     </Button>

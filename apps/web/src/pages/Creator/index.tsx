@@ -186,10 +186,10 @@ export default function Creator() {
 
   return (
     <div className="min-h-screen bg-transparent text-slate-900">
-      <div className="mx-auto max-w-7xl px-6 pb-20 pt-8 md:px-8 lg:px-10">
-        <section className="theme-hero-shell relative overflow-hidden rounded-[40px] border px-6 py-8 md:px-10 md:py-10">
+      <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8 md:px-8 lg:px-10">
+        <section className="theme-hero-shell relative overflow-hidden rounded-[32px] border px-4 py-6 sm:px-6 sm:py-8 md:rounded-[40px] md:px-10 md:py-10">
           <div className="theme-hero-glow absolute inset-0" />
-          <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
+          <div className="relative grid gap-5 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
             <div className="space-y-6">
               <HeroSectionTitle
                 eyebrow="CREATORS"
@@ -210,7 +210,7 @@ export default function Creator() {
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-white/80 bg-white/82 p-5 shadow-[0_20px_48px_rgba(148,163,184,0.08)] backdrop-blur">
+            <div className="rounded-[28px] border border-white/80 bg-white/82 p-4 shadow-[0_20px_48px_rgba(148,163,184,0.08)] backdrop-blur sm:rounded-[32px] sm:p-5">
               <div className="bg-theme-soft text-theme-primary mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
                 <Users className="h-3.5 w-3.5" />
                 创作者入口
@@ -249,7 +249,7 @@ export default function Creator() {
 
                 <div className="rounded-[22px] border border-white/80 bg-white/80 p-4">
                   <div className="mb-3 text-xs text-slate-500">创作者检索</div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <div className="relative min-w-[220px] grow">
                       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <Input
@@ -264,7 +264,7 @@ export default function Creator() {
                     </div>
                     <Button
                       onClick={handleSearch}
-                      className="rounded-full bg-theme-primary px-4 text-white hover:bg-theme-primary-hover"
+                      className="w-full rounded-full bg-theme-primary px-4 text-white hover:bg-theme-primary-hover sm:w-auto"
                     >
                       搜索
                     </Button>
@@ -272,7 +272,7 @@ export default function Creator() {
                       <Button
                         variant="ghost"
                         onClick={clearSearch}
-                        className="rounded-full px-4 text-slate-500 hover:bg-white hover:text-slate-900"
+                        className="w-full rounded-full px-4 text-slate-500 hover:bg-white hover:text-slate-900 sm:w-auto"
                       >
                         <X className="mr-1 h-4 w-4" />
                         清除
@@ -285,11 +285,11 @@ export default function Creator() {
           </div>
         </section>
 
-        <section className="mt-24">
-          <div className="theme-panel-shell rounded-[36px] border p-5 md:p-6">
+        <section className="mt-16 sm:mt-20 md:mt-24">
+          <div className="theme-panel-shell rounded-[32px] border p-4 sm:p-5 md:rounded-[36px] md:p-6">
             {loading ? (
               <>
-                <div className="mb-6 flex items-center justify-between gap-4">
+                <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
                   <div className="h-8 w-40 rounded-full bg-white/75" />
                   <div className="h-10 w-28 rounded-full bg-white/75" />
                 </div>
@@ -328,7 +328,7 @@ export default function Creator() {
               </div>
             ) : (
               <>
-                <div className="mb-6 flex items-center justify-between gap-4">
+                <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
                   <div className="text-sm text-slate-500">
                     {currentKeyword
                       ? `当前按关键词“${currentKeyword}”筛选创作者。`
@@ -352,10 +352,10 @@ export default function Creator() {
 
                 <div className="mt-10 flex justify-center">
                   {total > PAGE_SIZE ? (
-                    <div className="flex flex-wrap items-center justify-center gap-3">
+                    <div className="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                       <Button
                         variant="outline"
-                        className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
+                        className="border-theme-soft-strong rounded-full border bg-white/82 px-5 sm:w-auto"
                         disabled={currentPage <= 1}
                         onClick={() => setValue('page', Math.max(1, currentPage - 1))}
                       >
@@ -366,7 +366,7 @@ export default function Creator() {
                       </span>
                       <Button
                         variant="outline"
-                        className="border-theme-soft-strong rounded-full border bg-white/82 px-5"
+                        className="border-theme-soft-strong rounded-full border bg-white/82 px-5 sm:w-auto"
                         disabled={currentPage >= totalPages}
                         onClick={() => setValue('page', Math.min(totalPages, currentPage + 1))}
                       >
