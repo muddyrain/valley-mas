@@ -3110,3 +3110,19 @@
 - 风险与后续：
   - 当前风险：这次主要收口的是布局密度与按钮换行，尚未做真机视觉回归，个别卡片在极窄宽度下仍可能需要继续微调字号或图片高度。
   - 下一步动作：优先转入 `ELP-2`，先把英语学习域 API 契约和数据模型草图定下来。
+
+## 2026-04-22 11:43 (Asia/Shanghai)
+
+- 任务：把提交阶段默认启用 `conventional-commit-guard` 的规则升级为仓库级强约束。
+- 改动文件：
+  - AGENTS.md
+  - .codex/logs/CHANGE-LOG.md
+- 关键改动：
+  - 在项目 `场景强制 Skills` 中新增提交场景规则，明确只要生成 commit message、执行 `git commit`，或用户说“提交/提交吧/提交代码/帮我提交”，都必须启用 `conventional-commit-guard`。
+  - 在 `变更约束` 中补充默认提交行为：先看最近 5 条提交风格，再生成提交信息；若用户未要求详细版，默认只允许一行简短中文 Conventional Commit。
+  - 补充 Web 提交联动规则：Web 改动进入 `commit/push` 时，除 `conventional-commit-guard` 外还需联动 `web-update-log-guard`。
+- 校验：
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py AGENTS.md .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：这次是仓库协作约定层面的强约束，能约束后续 agent 行为，但不会改变已有 git hook 的校验逻辑。
+  - 下一步动作：如果你还想把“提交/推送”进一步拆成更细的自动化约束，可以继续补充 `git-publish-guard` 的触发词与默认动作。

@@ -27,6 +27,7 @@
 - 卡片结构与参数区改动：`card-system-consistency`
 - 组件复用与重复逻辑收敛：`component-reuse-guard`
 - 中文产品文案：`product-copy-cn`、`public-copy-boundary`
+- 任何生成 commit message、执行 `git commit`、或用户说“提交”“提交吧”“提交代码”“帮我提交”：`conventional-commit-guard`
 - Go + Vercel 发布链路：`vercel-go-release`
 - Go 调用火山 ARK 的 AI 能力：`ai-capability-orchestration`
 - Web 持续迭代任务管理：`web-feature-iteration`
@@ -50,6 +51,9 @@
 - 不在源码、文档、示例配置中写入真实密钥。
 - 涉及新环境变量时，同步更新示例配置与说明。
 - 发现现有逻辑可复用时，优先抽取共享实现，避免继续复制粘贴。
+- 只要进入提交阶段，必须先启用 `conventional-commit-guard`，先查看最近 5 条提交风格，再生成提交信息。
+- 若用户只说“提交/提交吧/提交代码”，默认提交信息必须使用一行简短中文 Conventional Commit，不得自动扩写长正文。
+- 若本轮是 Web 改动且准备 `commit/push`，除 `conventional-commit-guard` 外还需联动 `web-update-log-guard`。
 
 ## 对外文案边界（新增）
 
