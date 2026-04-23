@@ -3376,3 +3376,19 @@
 - 风险与后续：
   - 当前风险：本次只补了单条移除入口，尚未增加“批量移除失败项”或“去重提示”等更进一步的导入整理能力。
   - 下一步动作：如果后续批量导入使用频率继续升高，可以再补“按状态筛掉失败项/重复项”的快捷操作。
+
+## 2026-04-23 22:05 (Asia/Shanghai)
+
+- 任务：让博客内容详情页的浏览器标签标题跟随文章标题显示。
+- 改动文件：
+  - `apps/web/src/pages/blog/BlogPost/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在博客详情页补充标题同步逻辑，文章加载完成后将浏览器标签更新为“文章标题 | Valley”。
+  - 在标题尚未加载出来时继续保留“内容详情 | Valley”兜底，避免详情页初始状态出现空标题。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogPost/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：这次只收口了博客详情页，资源详情和其他内容详情页仍然沿用各自的静态标题规则。
+  - 下一步动作：如果你也希望资源详情或图文详情标签页更好区分，可以继续按同样方式补动态标题。
