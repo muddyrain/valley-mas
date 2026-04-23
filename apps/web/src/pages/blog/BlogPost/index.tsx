@@ -176,6 +176,11 @@ export default function BlogPost() {
   }, [id, loadPost]);
 
   useEffect(() => {
+    const resolvedTitle = post?.title?.trim();
+    document.title = resolvedTitle ? `${resolvedTitle} | Valley` : '内容详情 | Valley';
+  }, [post?.title]);
+
+  useEffect(() => {
     setMobileTocOpen(false);
     setActiveTocId('');
     setStatusTocId('');
