@@ -659,23 +659,45 @@ export default function BlogCreate() {
         results[index] = { ...item, status: 'running', error: undefined };
         setBatchItems([...results]);
         try {
+          let resolvedItem = results[index];
+          if (
+            resolvedItem.applyCover &&
+            resolvedItem.cover &&
+            !resolvedItem.coverStorageKey &&
+            !resolvedItem.coverUploading
+          ) {
+            results[index] = { ...resolvedItem, coverUploading: true, error: undefined };
+            setBatchItems([...results]);
+
+            const coverResult = await uploadBlogCoverByUrl({ url: resolvedItem.cover });
+            resolvedItem = {
+              ...resolvedItem,
+              cover: coverResult.url,
+              coverStorageKey: coverResult.storageKey,
+              coverUploading: false,
+            };
+            results[index] = resolvedItem;
+            setBatchItems([...results]);
+          }
+
           await createPost({
-            title: item.title.trim(),
+            title: resolvedItem.title.trim(),
             postType: 'blog',
-            content: item.content,
-            excerpt: createAutoExcerpt('', item.content),
+            content: resolvedItem.content,
+            excerpt: createAutoExcerpt('', resolvedItem.content),
             groupId: batchGroupId || undefined,
             visibility: batchVisibility,
-            cover: item.applyCover ? item.cover : undefined,
-            coverStorageKey: item.applyCover ? item.coverStorageKey : undefined,
+            cover: resolvedItem.applyCover ? resolvedItem.cover : undefined,
+            coverStorageKey: resolvedItem.applyCover ? resolvedItem.coverStorageKey : undefined,
             status: 'published',
             publishNow: true,
           });
-          results[index] = { ...item, status: 'success', error: undefined };
+          results[index] = { ...resolvedItem, status: 'success', error: undefined };
         } catch (error) {
           results[index] = {
-            ...item,
+            ...results[index],
             status: 'error',
+            coverUploading: false,
             error: getErrorText(error, '创建失败，请稍后重试'),
           };
         }

@@ -127,6 +127,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			creator.POST("/resource-tags", handler.CreateResourceTag)
 			creator.GET("/resources", handler.ListResources)
 			creator.POST("/resources/upload", handler.UploadResource)
+			creator.GET("/resources/upload-status", handler.GetUploadResourceStatus)
 			creator.DELETE("/resources/batch", handler.BatchDeleteResources)
 			creator.POST("/resources/batch-visibility", handler.BatchUpdateVisibility)
 			creator.PATCH("/resources/:id", handler.UpdateResource)
@@ -220,6 +221,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 				content.GET("/resources", handler.ListResources)
 				content.POST("/resources/upload", handler.UploadResource)
+				content.GET("/resources/upload-status", handler.GetUploadResourceStatus)
 				content.PATCH("/resources/:id", handler.UpdateResource)
 				content.PUT("/resources/:id/creator", handler.UpdateResourceCreator)
 				content.DELETE("/resources/:id", handler.DeleteResource)

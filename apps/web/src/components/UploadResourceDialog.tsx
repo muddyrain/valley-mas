@@ -23,6 +23,12 @@ import ResourceTagSelector from '@/components/ResourceTagSelector';
 import { Button } from '@/components/ui/button';
 import { openConfirmToast } from '@/components/ui/confirm-toast';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import {
+  confirmUploadResult,
+  createUploadKey,
+  shouldConfirmUploadResult,
+  uploadConfirmingMessage,
+} from '@/utils/resourceUpload';
 
 // ─── 常量 ────────────────────────────────────────────────────────────────────
 
@@ -88,12 +94,14 @@ export default function UploadResourceDialog({
   const [uploadDesc, setUploadDesc] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadConfirming, setUploadConfirming] = useState(false);
   const [aiNaming, setAiNaming] = useState(false);
   const [aiTitles, setAiTitles] = useState<string[]>([]);
   // 标签预选（上传前选好，上传成功后立即绑定）
   const [selectedTags, setSelectedTags] = useState<ResourceTag[]>([]);
   // 压缩后的 base64（AI 起名和 AI 标签共用）
   const [previewBase64, setPreviewBase64] = useState<string>('');
+  const [uploadKey, setUploadKey] = useState(() => createUploadKey());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const closeConfirmToastIdRef = useRef<string | number | null>(null);
   const closeConfirmTimeoutRef = useRef<number | null>(null);
@@ -118,6 +126,8 @@ export default function UploadResourceDialog({
     setAiTitles([]);
     setSelectedTags([]);
     setPreviewBase64('');
+    setUploadConfirming(false);
+    setUploadKey(createUploadKey());
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -132,6 +142,8 @@ export default function UploadResourceDialog({
       return;
     }
     setUploadFile(file);
+    setUploadConfirming(false);
+    setUploadKey(createUploadKey());
     setPreviewUrl(URL.createObjectURL(file));
     setUploadTitle(file.name.replace(/\.[^/.]+$/, ''));
     // 同步生成压缩 base64，供 AI 起名和 AI 标签复用
@@ -180,6 +192,24 @@ export default function UploadResourceDialog({
   };
 
   // ── 提交 ────────────────────────────────────────────────────────────────────
+  // 统一收口成功后的资源绑定、提示与重置逻辑。
+  const finishUploadSuccess = async (resource?: { id?: string }) => {
+    if (selectedTags.length > 0 && resource?.id) {
+      setResourceTags(
+        resource.id,
+        selectedTags.map((t) => t.id),
+      ).catch(() => {
+        /* 静默 */
+      });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    onOpenChange(false);
+    toast.success('上传成功');
+    onSuccess?.();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    reset();
+  };
+
   const handleUpload = async () => {
     if (!uploadFile) {
       toast.error('请先选择文件');
@@ -187,29 +217,32 @@ export default function UploadResourceDialog({
     }
     try {
       setUploading(true);
+      setUploadConfirming(false);
       const formData = new FormData();
       formData.append('file', uploadFile);
       formData.append('type', uploadType);
       formData.append('visibility', uploadVisibility);
       formData.append('title', uploadTitle.trim());
       formData.append('description', uploadDesc.trim());
+      formData.append('uploadKey', uploadKey);
       const { resource } = await uploadResource(formData);
-      // 上传完成后若有预选标签，立即绑定（静默处理失败，不影响上传成功提示）
-      if (selectedTags.length > 0 && resource?.id) {
-        setResourceTags(
-          resource.id,
-          selectedTags.map((t) => t.id),
-        ).catch(() => {
-          /* 静默 */
+      await finishUploadSuccess(resource);
+    } catch (error) {
+      if (shouldConfirmUploadResult(error)) {
+        // 超时或断网时先按 uploadKey 回查，避免用户误以为失败后重复上传。
+        setUploadConfirming(true);
+        const confirmation = await confirmUploadResult(uploadKey);
+        if (confirmation.status === 'success') {
+          await finishUploadSuccess(confirmation.resource);
+          return;
+        }
+
+        toast.info(uploadConfirmingMessage, {
+          duration: 6000,
         });
+        return;
       }
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      onOpenChange(false);
-      toast.success('上传成功');
-      onSuccess?.();
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      reset();
-    } catch {
+
       // 错误已在 request.ts 中通过 toast 显示
     } finally {
       setUploading(false);
@@ -303,6 +336,8 @@ export default function UploadResourceDialog({
                       onClick={(e) => {
                         e.stopPropagation();
                         setUploadFile(null);
+                        setUploadConfirming(false);
+                        setUploadKey(createUploadKey());
                         if (previewUrl) URL.revokeObjectURL(previewUrl);
                         setPreviewUrl(null);
                         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -501,35 +536,47 @@ export default function UploadResourceDialog({
             </div>
 
             {/* 底部操作栏 */}
-            <div className="shrink-0 flex items-center gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  reset();
-                  onOpenChange(false);
-                }}
-                className="flex-1 rounded-xl"
-                disabled={uploading}
-              >
-                取消
-              </Button>
-              <Button
-                onClick={handleUpload}
-                disabled={!uploadFile || uploading}
-                className="flex-2 rounded-xl theme-btn-primary font-semibold shadow-[0_4px_16px_rgba(var(--theme-primary-rgb),0.28)] disabled:shadow-none transition-all"
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    上传中…
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    确认上传
-                  </>
-                )}
-              </Button>
+            <div className="shrink-0 border-t border-slate-100 bg-slate-50/60 px-6 py-4">
+              {uploadConfirming && (
+                <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  {uploadConfirmingMessage}
+                </div>
+              )}
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    reset();
+                    onOpenChange(false);
+                  }}
+                  className="flex-1 rounded-xl"
+                  disabled={uploading}
+                >
+                  取消
+                </Button>
+                <Button
+                  onClick={handleUpload}
+                  disabled={!uploadFile || uploading || uploadConfirming}
+                  className="flex-2 rounded-xl theme-btn-primary font-semibold shadow-[0_4px_16px_rgba(var(--theme-primary-rgb),0.28)] disabled:shadow-none transition-all"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      上传中…
+                    </>
+                  ) : uploadConfirming ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      结果确认中…
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      确认上传
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

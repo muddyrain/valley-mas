@@ -175,6 +175,8 @@ interface MyResourcesResponse {
   total: number;
 }
 
+export const RESOURCE_UPLOAD_TIMEOUT = 5 * 60 * 1000;
+
 // 获取我上传的资源列表（需要创作者/管理员权限）
 export const getMyResources = (
   params: {
@@ -198,7 +200,16 @@ export const getMyResources = (
 export const uploadResource = (formData: FormData) => {
   return http.post<unknown, { resource: MyResource }>('/creator/resources/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: RESOURCE_UPLOAD_TIMEOUT,
   });
+};
+
+export const getUploadResourceStatus = (uploadKey: string, config?: RequestConfig) => {
+  const query = new URLSearchParams({ uploadKey });
+  return http.get<unknown, { found: boolean; resource?: MyResource }>(
+    `/creator/resources/upload-status?${query.toString()}`,
+    config,
+  );
 };
 
 // 删除资源（需要创作者/管理员权限）
