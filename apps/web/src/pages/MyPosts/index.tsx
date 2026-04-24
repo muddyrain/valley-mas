@@ -19,7 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   type Group as BlogGroup,
@@ -70,6 +70,7 @@ type BatchCoverItem = {
 
 export default function MyPosts() {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     values: {
       blogPage,
@@ -171,6 +172,14 @@ export default function MyPosts() {
     if (!canAccess) return;
     void loadPostsPage();
   }, [canAccess, loadPostsPage]);
+
+  useEffect(() => {
+    const refreshPostsAt = (location.state as { refreshPostsAt?: number } | null)?.refreshPostsAt;
+    if (!refreshPostsAt || !canAccess) return;
+
+    void loadPostsPage();
+    navigate(location.pathname + location.search, { replace: true, state: {} });
+  }, [canAccess, loadPostsPage, location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
     if (blogPage <= blogTotalPages) return;

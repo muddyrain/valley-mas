@@ -27,17 +27,7 @@ import {
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const PAGE_SIZE = 12;
-const BLOG_LIST_CACHE_TTL_MS = 30_000;
 const BLOG_LIST_SCROLL_STORAGE_PREFIX = 'blog-list-scroll:v1';
-
-type BlogListCacheEntry = {
-  posts: Post[];
-  total: number;
-  updatedAt: number;
-};
-
-const blogListCache = new Map<string, BlogListCacheEntry>();
-let blogGroupCache: { groups: Group[]; updatedAt: number } | null = null;
 const BLOG_LIST_QUERY_SCHEMA = {
   page: numberParam(1, { min: 1 }),
   keyword: stringParam('', { resetPageOnChange: true }),
@@ -113,11 +103,6 @@ export default function BlogList() {
   const [aiRecommendResult, setAIRecommendResult] = useState<BlogRecommendResponse | null>(null);
   const firstLoadRef = useRef(true);
   const scrollRestoredRef = useRef(false);
-
-  const listCacheKey = useMemo(
-    () => `${currentPage}|${selectedGroupId || ''}|${currentKeyword || ''}|${currentSort}`,
-    [currentKeyword, currentPage, currentSort, selectedGroupId],
-  );
   const scrollStorageKey = useMemo(
     () => `${BLOG_LIST_SCROLL_STORAGE_PREFIX}:${location.pathname}${location.search}`,
     [location.pathname, location.search],
@@ -140,26 +125,9 @@ export default function BlogList() {
   }, [currentKeyword]);
 
   const loadTaxonomy = useCallback(async () => {
-    const cachedGroups = blogGroupCache?.groups || [];
-    const hasCachedGroups = cachedGroups.length > 0;
-    const groupsCacheFresh = hasCachedGroups
-      ? Date.now() - (blogGroupCache?.updatedAt || 0) < BLOG_LIST_CACHE_TTL_MS
-      : false;
-
-    if (hasCachedGroups) {
-      setGroups(cachedGroups);
-      setMetaLoading(false);
-      if (groupsCacheFresh) return;
-    }
-
     try {
       const groupsData = await getGroups();
-      const normalizedGroups = groupsData || [];
-      blogGroupCache = {
-        groups: normalizedGroups,
-        updatedAt: Date.now(),
-      };
-      setGroups(normalizedGroups);
+      setGroups(groupsData || []);
     } catch (error) {
       console.error('Failed to load blog groups:', error);
     } finally {
@@ -172,27 +140,7 @@ export default function BlogList() {
   }, [loadTaxonomy]);
 
   const loadPosts = useCallback(async () => {
-    const cachedEntry = blogListCache.get(listCacheKey);
-    const hasCachedEntry = !!cachedEntry;
-    const cacheFresh = hasCachedEntry
-      ? Date.now() - cachedEntry.updatedAt < BLOG_LIST_CACHE_TTL_MS
-      : false;
-
-    if (cachedEntry) {
-      setPosts(cachedEntry.posts);
-      setTotal(cachedEntry.total);
-      if (firstLoadRef.current) {
-        firstLoadRef.current = false;
-        setLoading(false);
-      }
-    }
-
-    if (cacheFresh) {
-      setRefreshing(false);
-      return;
-    }
-
-    const isFirstLoad = firstLoadRef.current && !hasCachedEntry;
+    const isFirstLoad = firstLoadRef.current;
     if (isFirstLoad) {
       setLoading(true);
     } else {
@@ -211,11 +159,6 @@ export default function BlogList() {
 
       const nextPosts = postsData.list || [];
       const nextTotal = postsData.total || 0;
-      blogListCache.set(listCacheKey, {
-        posts: nextPosts,
-        total: nextTotal,
-        updatedAt: Date.now(),
-      });
       setPosts(nextPosts);
       setTotal(nextTotal);
     } catch (error) {
@@ -227,7 +170,7 @@ export default function BlogList() {
       }
       setRefreshing(false);
     }
-  }, [currentKeyword, currentPage, currentSort, listCacheKey, selectedGroupId]);
+  }, [currentKeyword, currentPage, currentSort, selectedGroupId]);
 
   useEffect(() => {
     void loadPosts();
