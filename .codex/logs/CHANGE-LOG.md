@@ -3392,3 +3392,20 @@
 - 风险与后续：
   - 当前风险：这次只收口了博客详情页，资源详情和其他内容详情页仍然沿用各自的静态标题规则。
   - 下一步动作：如果你也希望资源详情或图文详情标签页更好区分，可以继续按同样方式补动态标题。
+
+## 2026-04-24 17:28 (Asia/Shanghai)
+
+- 任务：修复 web 图片预览器不能拖拽，并补上鼠标滚轮缩放交互。
+- 改动文件：
+  - `apps/web/src/components/ImagePreviewDialog.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将图片预览的拖拽事件从 `<img>` 本身切换到外层预览舞台，复用 pointer capture 方式，避免浏览器原生图片拖拽打断交互。
+  - 修复鼠标松开后立即把位移重置为初始值的问题，让图片拖拽结束后保留当前位置。
+  - 为预览舞台新增鼠标滚轮缩放，并阻止滚轮事件继续冒泡到弹窗外层。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/ImagePreviewDialog.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：本次拖拽位移仍未做边界约束，用户可以把图片拖到视口外较远位置，但可通过“复位”快速回到初始状态。
+  - 下一步动作：如果你希望体验继续向专业图片查看器靠拢，可以再补“按缩放比例自动限制拖拽边界”和“按鼠标指针位置缩放”。

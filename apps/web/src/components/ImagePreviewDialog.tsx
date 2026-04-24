@@ -62,6 +62,7 @@ export default function ImagePreviewDialog({
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [imageLoading, setImageLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const previewStageRef = useRef<HTMLDivElement | null>(null);
   const dragStartRef = useRef({ x: 0, y: 0, baseX: 0, baseY: 0, pointerId: -1 });
 
   const canPreview = useMemo(() => Boolean(src), [src]);
@@ -88,9 +89,10 @@ export default function ImagePreviewDialog({
     setOffset({ x: 0, y: 0 });
   };
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLImageElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!canPreview) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    if (e.button !== 0) return;
+    previewStageRef.current?.setPointerCapture(e.pointerId);
     dragStartRef.current = {
       x: e.clientX,
       y: e.clientY,
@@ -101,22 +103,30 @@ export default function ImagePreviewDialog({
     setDragging(true);
   };
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLImageElement>) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragging || dragStartRef.current.pointerId !== e.pointerId) return;
     const dx = e.clientX - dragStartRef.current.x;
     const dy = e.clientY - dragStartRef.current.y;
     setOffset({ x: dragStartRef.current.baseX + dx, y: dragStartRef.current.baseY + dy });
   };
 
-  const handlePointerUp = (e: React.PointerEvent<HTMLImageElement>) => {
-    if (dragStartRef.current.pointerId !== e.pointerId) return;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      // ignore
+  const endDragging = (pointerId?: number) => {
+    if (pointerId !== undefined) {
+      try {
+        previewStageRef.current?.releasePointerCapture(pointerId);
+      } catch {
+        // ignore
+      }
     }
     setDragging(false);
-    setOffset({ x: 0, y: 0 });
+    dragStartRef.current.pointerId = -1;
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (!canPreview) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setScale((value) => clamp(value - Math.sign(e.deltaY || 0) * SCALE_STEP, MIN_SCALE, MAX_SCALE));
   };
 
   return (
@@ -156,22 +166,27 @@ export default function ImagePreviewDialog({
 
           {/* 图片区域 */}
           <div
-            className="relative flex flex-1 items-center justify-center overflow-hidden px-6 pb-4"
-            onClick={() => onOpenChange(false)}
+            ref={previewStageRef}
+            className={`relative flex flex-1 items-center justify-center overflow-hidden px-6 pb-4 select-none ${
+              canPreview ? (dragging ? 'cursor-grabbing' : 'cursor-grab') : ''
+            }`}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={(e) => endDragging(e.pointerId)}
+            onPointerCancel={(e) => endDragging(e.pointerId)}
+            onWheel={handleWheel}
           >
             {canPreview ? (
               <>
                 <img
                   src={inlineSrc}
                   alt={displayTitle}
-                  className={`select-none rounded-xl shadow-[0_32px_80px_rgba(0,0,0,0.7)] cursor-grab active:cursor-grabbing transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
+                  draggable={false}
+                  className={`pointer-events-none select-none rounded-xl shadow-[0_32px_80px_rgba(0,0,0,0.7)] transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
                   onLoad={() => setImageLoading(false)}
                   onError={() => setImageLoading(false)}
-                  onPointerDown={handlePointerDown}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp}
-                  onPointerCancel={handlePointerUp}
-                  onClick={(e) => e.stopPropagation()}
+                  onDragStart={(e) => e.preventDefault()}
                   style={{
                     maxWidth: '84vw',
                     maxHeight: '72vh',
