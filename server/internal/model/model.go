@@ -179,22 +179,22 @@ func (s *CreatorSpace) BeforeCreate(tx *gorm.DB) error {
 // Resource 资源模型
 type Resource struct {
 	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID        Int64String    `gorm:"column:user_id;index;uniqueIndex:idx_resources_user_upload_key;index:idx_resources_user_file_hash_created_at" json:"userId"` // 上传者的 User.ID
+	UserID        Int64String    `gorm:"column:user_id;index" json:"userId"` // 上传者的 User.ID
 	Type          string         `gorm:"size:20" json:"type"`                                                                                                        // avatar, wallpaper
 	Visibility    string         `gorm:"size:20;default:'private';index" json:"visibility"`
 	Title         string         `gorm:"size:100" json:"title"`
 	Description   string         `gorm:"size:255" json:"description"`
 	URL           string         `gorm:"size:500" json:"url"`
 	StorageKey    string         `gorm:"size:500" json:"storageKey"`
-	UploadKey     string         `gorm:"size:80;default:'';uniqueIndex:idx_resources_user_upload_key" json:"uploadKey,omitempty"`
-	FileHash      string         `gorm:"size:64;default:'';index:idx_resources_user_file_hash_created_at" json:"fileHash,omitempty"`
+	UploadKey     string         `gorm:"size:80;default:''" json:"uploadKey,omitempty"`
+	FileHash      string         `gorm:"size:64;default:''" json:"fileHash,omitempty"`
 	Width         int            `json:"width"`
 	Height        int            `json:"height"`
 	Size          int64          `json:"size"`
 	Extension     string         `gorm:"size:20" json:"extension"` // 文件扩展名，如 jpg/png/gif
 	DownloadCount int            `gorm:"default:0" json:"downloadCount"`
 	FavoriteCount int            `gorm:"default:0" json:"favoriteCount"`
-	CreatedAt     time.Time      `gorm:"index:idx_resources_user_file_hash_created_at" json:"createdAt"`
+	CreatedAt     time.Time      `json:"createdAt"`
 	UpdatedAt     time.Time      `json:"updatedAt"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 

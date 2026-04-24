@@ -787,7 +787,13 @@ export default function BlogCreate() {
       }
 
       if (!options?.stayOnPage) {
-        navigate(-1);
+        if (isEditMode) {
+          navigate('/my-space/posts', {
+            state: { refreshPostsAt: Date.now() },
+          });
+        } else {
+          navigate(-1);
+        }
       }
     } catch {
       toast.error(status === 'published' ? '提交失败，请稍后重试' : '保存失败，请稍后重试');

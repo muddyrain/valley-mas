@@ -3487,3 +3487,38 @@
 - 风险与后续：
   - 当前风险：`021_add_resource_upload_idempotency.sql` 已补齐，但线上要真正生效仍需要执行迁移；未执行迁移前，后端代码里的幂等和去重只能部分依赖运行时逻辑，无法获得数据库唯一约束兜底。
   - 下一步动作：上线前先执行迁移并验证现网数据库版本；如果后面还想进一步压缩上传等待感，可以继续把上传改成异步任务或分片上传。
+
+## 2026-04-25 00:25 (Asia/Shanghai)
+
+- 任务：修复资源上传幂等字段引入后，`AutoMigrate` 在旧数据回填前提前创建唯一索引导致启动失败的问题。
+- 改动文件：
+  - `server/internal/model/model.go`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 移除 `Resource.UploadKey`、`Resource.FileHash` 以及相关复合索引的 GORM 自动索引标签，避免 `AutoMigrate` 在旧数据仍为默认空值时抢先创建唯一索引。
+  - 将上传幂等相关唯一约束继续收口到 `021_add_resource_upload_idempotency.sql`，保证执行顺序保持为“先补列与回填，再建索引”。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py server/internal/model/model.go .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：如果数据库已经被 `AutoMigrate` 补过列但还没执行 SQL 迁移，`upload_key` 仍可能保留为空字符串，需要继续执行 `021_add_resource_upload_idempotency.sql` 完成回填和索引创建。
+  - 下一步动作：重启前先跑这条 SQL 迁移，再验证资源公开列表接口与上传接口都恢复正常。
+
+## 2026-04-25 00:36 (Asia/Shanghai)
+
+- 任务：修复博客编辑后返回列表仍显示旧内容、列表没有及时刷新的问题。
+- 改动文件：
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `apps/web/src/pages/blog/BlogList/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 博客编辑成功后不再依赖 `navigate(-1)` 回退历史页，而是明确跳回内容管理页并携带刷新标记，避免返回到旧页面状态时仍沿用旧列表数据。
+  - 内容管理页新增对刷新标记的消费逻辑，接收到编辑页返回信号后会主动重新请求博客与图文列表，再清掉路由 state。
+  - 移除公开博客列表页的内存缓存与分组缓存，保证从详情或编辑链路返回 `/blog` 时直接请求最新数据，不再复用 30 秒内的旧结果。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/BlogCreate/index.tsx apps/web/src/pages/MyPosts/index.tsx apps/web/src/pages/blog/BlogList/index.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：关闭博客列表页缓存后，频繁切换筛选或来回进入列表时会多发一些请求，但优先保证了编辑后的内容正确性。
+  - 下一步动作：如果后面还想兼顾性能，可以再把博客列表缓存改成“仅前进浏览使用，编辑/发布后显式失效”的可控失效方案。
