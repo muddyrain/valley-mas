@@ -38,6 +38,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  confirmUploadResult,
+  createUploadKey,
+  shouldConfirmUploadResult,
+  uploadConfirmingMessage,
+} from '@/utils/resourceUpload';
 
 // ─── 常量 ────────────────────────────────────────────────────────────────────
 
@@ -58,9 +64,10 @@ type BatchResourceItem = {
   file: File;
   previewUrl: string;
   base64: string;
+  uploadKey: string;
   title: string;
   tags: ResourceTag[];
-  status: 'pending' | 'running' | 'success' | 'error';
+  status: 'pending' | 'running' | 'confirming' | 'success' | 'error';
   error?: string;
   aiNaming?: boolean;
   aiTagging?: boolean;
@@ -177,6 +184,7 @@ export default function BatchUploadResourceDialog({
             file,
             previewUrl,
             base64,
+            uploadKey: createUploadKey(),
             title: file.name.replace(/\.[^/.]+$/, ''),
             tags: [],
             status: 'pending',
@@ -226,7 +234,18 @@ export default function BatchUploadResourceDialog({
 
   const uploadSingleItem = async (index: number) => {
     const item = items[index];
-    if (!item) return false;
+    if (!item) return 'error' as const;
+
+    const bindResourceTags = async (resourceId?: string) => {
+      if (item.tags.length > 0 && resourceId) {
+        await setResourceTags(
+          resourceId,
+          item.tags.map((tag) => tag.id),
+        ).catch(() => {
+          /* 静默 */
+        });
+      }
+    };
 
     try {
       updateItem(index, { status: 'running', error: undefined });
@@ -235,20 +254,25 @@ export default function BatchUploadResourceDialog({
       formData.append('type', uploadType);
       formData.append('visibility', visibility);
       formData.append('title', resolveItemTitle(item));
+      formData.append('uploadKey', item.uploadKey);
       const { resource } = await uploadResource(formData);
-      if (item.tags.length > 0 && resource?.id) {
-        await setResourceTags(
-          resource.id,
-          item.tags.map((tag) => tag.id),
-        ).catch(() => {
-          /* 静默 */
-        });
-      }
+      await bindResourceTags(resource?.id);
       updateItem(index, { status: 'success', error: undefined });
-      return true;
+      return 'success' as const;
     } catch (error) {
+      if (shouldConfirmUploadResult(error)) {
+        updateItem(index, { status: 'confirming', error: uploadConfirmingMessage });
+        const confirmation = await confirmUploadResult(item.uploadKey);
+        if (confirmation.status === 'success') {
+          await bindResourceTags(confirmation.resource.id);
+          updateItem(index, { status: 'success', error: undefined });
+          return 'success' as const;
+        }
+        return 'confirming' as const;
+      }
+
       updateItem(index, { status: 'error', error: getErrorText(error, '上传失败') });
-      return false;
+      return 'error' as const;
     }
   };
 
@@ -390,10 +414,12 @@ export default function BatchUploadResourceDialog({
     setDone(false);
     let successCount = 0;
     let errorCount = 0;
+    let confirmingCount = 0;
 
     for (const index of targetIndexes) {
-      const success = await uploadSingleItem(index);
-      if (success) successCount += 1;
+      const result = await uploadSingleItem(index);
+      if (result === 'success') successCount += 1;
+      else if (result === 'confirming') confirmingCount += 1;
       else errorCount += 1;
     }
 
@@ -403,8 +429,10 @@ export default function BatchUploadResourceDialog({
 
     if (successCount > 0) {
       toast.success(
-        `批量上传完成：成功 ${successCount} 项${errorCount ? `，失败 ${errorCount} 项` : ''}`,
+        `批量上传完成：成功 ${successCount} 项${errorCount ? `，失败 ${errorCount} 项` : ''}${confirmingCount ? `，确认中 ${confirmingCount} 项` : ''}`,
       );
+    } else if (confirmingCount > 0) {
+      toast.info(`有 ${confirmingCount} 项上传结果确认中，请稍后刷新资源列表确认`);
     } else {
       toast.error(
         retryFailedOnly ? '重试失败，请检查错误后再试' : '批量上传失败，请检查结果后重试',
@@ -418,13 +446,15 @@ export default function BatchUploadResourceDialog({
 
     setUploading(true);
     const displayTitle = resolveItemTitle(item);
-    const success = await uploadSingleItem(index);
+    const result = await uploadSingleItem(index);
     setUploading(false);
     setDone(true);
 
-    if (success) {
+    if (result === 'success') {
       onSuccess?.();
       toast.success(`已重新上传「${displayTitle}」`);
+    } else if (result === 'confirming') {
+      toast.info(`「${displayTitle}」${uploadConfirmingMessage}`);
     } else {
       toast.error(`「${displayTitle}」重新上传失败`);
     }
@@ -433,6 +463,7 @@ export default function BatchUploadResourceDialog({
   const isBusy = uploading || batchAiNaming || batchAiTagging || preparing;
   const pendingCount = items.filter((item) => item.status === 'pending').length;
   const successCount = items.filter((item) => item.status === 'success').length;
+  const confirmingCount = items.filter((item) => item.status === 'confirming').length;
   const errorCount = items.filter((item) => item.status === 'error').length;
 
   // ── 渲染 ─────────────────────────────────────────────────────────────────────
@@ -596,15 +627,17 @@ export default function BatchUploadResourceDialog({
               <div className="space-y-2">
                 {items.map((item, index) => (
                   <div
-                    key={`${item.file.name}-${index}`}
+                    key={item.uploadKey}
                     className={`flex gap-3 rounded-xl border px-3 py-2.5 transition-all ${
                       item.status === 'success'
                         ? 'border-emerald-100 bg-emerald-50'
                         : item.status === 'error'
                           ? 'border-rose-100 bg-rose-50'
-                          : item.status === 'running'
-                            ? 'border-theme-primary/30 bg-theme-soft/50'
-                            : 'border-slate-100 bg-white'
+                          : item.status === 'confirming'
+                            ? 'border-amber-200 bg-amber-50'
+                            : item.status === 'running'
+                              ? 'border-theme-primary/30 bg-theme-soft/50'
+                              : 'border-slate-100 bg-white'
                     }`}
                   >
                     {/* 缩略图 */}
@@ -628,6 +661,11 @@ export default function BatchUploadResourceDialog({
                       {item.status === 'error' && (
                         <div className="absolute inset-0 flex items-center justify-center bg-rose-500/20">
                           <span className="text-lg">✗</span>
+                        </div>
+                      )}
+                      {item.status === 'confirming' && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-amber-500/20">
+                          <Loader2 className="h-5 w-5 animate-spin text-amber-700" />
                         </div>
                       )}
                     </div>
@@ -737,6 +775,11 @@ export default function BatchUploadResourceDialog({
                             ✗ {item.error || '上传失败'}
                           </span>
                         )}
+                        {item.status === 'confirming' && (
+                          <span className="text-[10px] font-medium text-amber-600">
+                            ⏳ {item.error || uploadConfirmingMessage}
+                          </span>
+                        )}
                         {item.status === 'running' && (
                           <span className="text-[10px] text-theme-primary">上传中…</span>
                         )}
@@ -772,6 +815,9 @@ export default function BatchUploadResourceDialog({
                   {successCount > 0 && (
                     <span className="text-emerald-600">✓ 成功 {successCount} 项</span>
                   )}
+                  {confirmingCount > 0 && (
+                    <span className="text-amber-600">⏳ 确认中 {confirmingCount} 项</span>
+                  )}
                   {errorCount > 0 && <span className="text-rose-500">✗ 失败 {errorCount} 项</span>}
                 </div>
               )}
@@ -783,7 +829,7 @@ export default function BatchUploadResourceDialog({
         <div className="shrink-0 flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-4">
           <div className="text-xs text-slate-400">
             {items.length > 0
-              ? `${items.length} 张图片 · ${uploadType === 'wallpaper' ? '壁纸' : '头像'} · ${visibility === 'private' ? '私密' : visibility === 'shared' ? '共享' : '公开'}`
+              ? `${items.length} 张图片 · ${uploadType === 'wallpaper' ? '壁纸' : '头像'} · ${visibility === 'private' ? '私密' : visibility === 'shared' ? '共享' : '公开'}${confirmingCount > 0 ? ` · ${confirmingCount} 项确认中` : ''}`
               : '选择图片后即可批量上传'}
           </div>
           <div className="flex items-center gap-3">

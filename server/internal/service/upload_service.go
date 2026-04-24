@@ -1,6 +1,10 @@
 package service
 
 import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"image"
 	_ "image/jpeg"
@@ -41,6 +45,7 @@ type UploadResult struct {
 	Ext      string `json:"ext"`      // 文件扩展名
 	Width    int    `json:"width"`    // 图片宽度（px）
 	Height   int    `json:"height"`   // 图片高度（px）
+	FileHash string `json:"fileHash"` // 文件内容哈希（sha256）
 }
 
 // UploadService 上传服务
@@ -158,6 +163,15 @@ func (s *UploadService) ValidateFile(file *multipart.FileHeader, config UploadCo
 
 // Upload 上传文件
 func (s *UploadService) Upload(file *multipart.FileHeader, config UploadConfig) (*UploadResult, error) {
+	return s.UploadWithContext(context.Background(), file, config)
+}
+
+// UploadWithContext 上传文件，并把请求取消信号传递到底层上传 SDK。
+func (s *UploadService) UploadWithContext(
+	ctx context.Context,
+	file *multipart.FileHeader,
+	config UploadConfig,
+) (*UploadResult, error) {
 	if s.uploader == nil {
 		return nil, fmt.Errorf("文件上传服务未配置")
 	}
@@ -167,24 +181,34 @@ func (s *UploadService) Upload(file *multipart.FileHeader, config UploadConfig) 
 		return nil, err
 	}
 
+	src, err := file.Open()
+	if err != nil {
+		return nil, fmt.Errorf("打开文件失败: %w", err)
+	}
+	defer src.Close()
+
+	fileBytes, err := utils.ReadAllWithContext(ctx, src)
+	if err != nil {
+		return nil, err
+	}
+
 	// 尝试读取图片尺寸（仅对 jpg/png 有效）
 	width, height := 0, 0
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 	if ext == ".jpg" || ext == ".jpeg" || ext == ".png" {
-		if f, err := file.Open(); err == nil {
-			if cfg, _, err := image.DecodeConfig(f); err == nil {
-				width = cfg.Width
-				height = cfg.Height
-			}
-			f.Close()
+		if cfg, _, err := image.DecodeConfig(bytes.NewReader(fileBytes)); err == nil {
+			width = cfg.Width
+			height = cfg.Height
 		}
 	}
+
+	fileHash := sha256.Sum256(fileBytes)
 
 	// 生成存储路径
 	storagePath := s.GenerateStoragePath(config, file.Filename)
 
 	// 上传到 TOS（使用自定义路径）
-	url, err := s.uploader.UploadFileWithPath(storagePath, file)
+	url, err := s.uploader.UploadBytesWithPathContext(ctx, storagePath, fileBytes)
 	if err != nil {
 		return nil, fmt.Errorf("文件上传失败: %w", err)
 	}
@@ -197,6 +221,7 @@ func (s *UploadService) Upload(file *multipart.FileHeader, config UploadConfig) 
 		Ext:      filepath.Ext(file.Filename),
 		Width:    width,
 		Height:   height,
+		FileHash: hex.EncodeToString(fileHash[:]),
 	}, nil
 }
 

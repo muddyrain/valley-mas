@@ -1,7 +1,11 @@
 package handler
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"strings"
+	"time"
 
 	"valley-server/internal/database"
 	"valley-server/internal/model"
@@ -10,7 +14,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
+
+const resourceUploadHashDedupWindow = 10 * time.Minute
 
 func truncateRunes(s string, max int) string {
 	if max <= 0 || s == "" {
@@ -32,6 +39,84 @@ func normalizeResourceVisibility(value string) string {
 	default:
 		return "private"
 	}
+}
+
+func normalizeUploadKey(value string) string {
+	key := truncateRunes(strings.TrimSpace(value), 80)
+	if key != "" {
+		return key
+	}
+	return truncateRunes(fmt.Sprintf("legacy-%d", utils.GenerateID()), 80)
+}
+
+func findExistingResourceByUploadKey(
+	db *gorm.DB,
+	userID int64,
+	uploadKey string,
+) (*model.Resource, error) {
+	if uploadKey == "" {
+		return nil, nil
+	}
+
+	var resource model.Resource
+	err := db.Where("user_id = ? AND upload_key = ? AND deleted_at IS NULL", userID, uploadKey).
+		First(&resource).Error
+	if err == nil {
+		return &resource, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return nil, err
+}
+
+func findRecentResourceByFileHash(
+	db *gorm.DB,
+	userID int64,
+	fileHash string,
+) (*model.Resource, error) {
+	if strings.TrimSpace(fileHash) == "" {
+		return nil, nil
+	}
+
+	var resource model.Resource
+	err := db.Where(
+		"user_id = ? AND file_hash = ? AND deleted_at IS NULL AND created_at >= ?",
+		userID,
+		fileHash,
+		time.Now().Add(-resourceUploadHashDedupWindow),
+	).
+		Order("created_at DESC").
+		First(&resource).Error
+	if err == nil {
+		return &resource, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return nil, err
+}
+
+func respondResourceUploadSuccess(c *gin.Context, resource *model.Resource) {
+	resource.FillThumbnailURL()
+	Success(c, gin.H{
+		"resource":    resource,
+		"storagePath": resource.StorageKey,
+	})
+}
+
+func isDuplicateResourceUploadError(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "duplicate entry") ||
+		strings.Contains(lower, "duplicate key value") ||
+		strings.Contains(lower, "duplicated key")
+}
+
+func isRequestCanceledError(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 // fillResourceThumbnails 批量填充缩略图 URL（就地修改）
@@ -141,6 +226,23 @@ func UploadResource(c *gin.Context) {
 		Error(c, 401, "未授权")
 		return
 	}
+	userIDInt64 := userID.(int64)
+	uploadKey := normalizeUploadKey(c.PostForm("uploadKey"))
+	db := database.GetDB()
+
+	existingByUploadKey, err := findExistingResourceByUploadKey(db, userIDInt64, uploadKey)
+	if err != nil {
+		ErrorWithDetail(c, 500, "查询上传状态失败", err, logrus.Fields{
+			"user_id":    userIDInt64,
+			"upload_key": uploadKey,
+			"file_name":  file.Filename,
+		})
+		return
+	}
+	if existingByUploadKey != nil {
+		respondResourceUploadSuccess(c, existingByUploadKey)
+		return
+	}
 
 	// 创建上传服务
 	uploadService := service.NewUploadService()
@@ -148,12 +250,31 @@ func UploadResource(c *gin.Context) {
 	// 获取上传配置
 	uploadType := service.UploadType(resourceType)
 	config := service.GetDefaultConfig(uploadType)
-	config.UserID = userID.(int64) // 设置用户ID，用于生成用户专属目录
+	config.UserID = userIDInt64 // 设置用户ID，用于生成用户专属目录
 
 	// 上传文件
-	result, err := uploadService.Upload(file, config)
+	requestCtx := c.Request.Context()
+	result, err := uploadService.UploadWithContext(requestCtx, file, config)
 	if err != nil {
+		if isRequestCanceledError(err) {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"user_id":    userIDInt64,
+				"upload_key": uploadKey,
+				"file_name":  file.Filename,
+			}).Warn("resource upload canceled before completion")
+			return
+		}
 		Error(c, 400, err.Error())
+		return
+	}
+	if err := requestCtx.Err(); err != nil {
+		_ = uploadService.DeleteByKey(result.Key)
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"user_id":     userIDInt64,
+			"upload_key":  uploadKey,
+			"file_name":   file.Filename,
+			"storage_key": result.Key,
+		}).Warn("resource upload canceled after object upload")
 		return
 	}
 
@@ -170,21 +291,48 @@ func UploadResource(c *gin.Context) {
 		Visibility:  normalizeResourceVisibility(c.PostForm("visibility")),
 		URL:         result.URL,
 		StorageKey:  result.Key,
+		UploadKey:   uploadKey,
+		FileHash:    result.FileHash,
 		Title:       truncateRunes(title, 100),
 		Description: truncateRunes(description, 255),
 		Size:        file.Size,
 		Width:       result.Width,
 		Height:      result.Height,
 		Extension:   truncateRunes(strings.TrimPrefix(result.Ext, "."), 20), // 去掉前导点，并限制长度
-		UserID:      model.Int64String(userID.(int64)),
+		UserID:      model.Int64String(userIDInt64),
 	}
 
-	db := database.GetDB()
+	existingByHash, err := findRecentResourceByFileHash(db, userIDInt64, result.FileHash)
+	if err != nil {
+		_ = uploadService.DeleteByKey(result.Key)
+		ErrorWithDetail(c, 500, "查询重复资源失败", err, logrus.Fields{
+			"user_id":     userIDInt64,
+			"upload_key":  uploadKey,
+			"file_hash":   result.FileHash,
+			"storage_key": result.Key,
+		})
+		return
+	}
+	if existingByHash != nil {
+		_ = uploadService.DeleteByKey(result.Key)
+		respondResourceUploadSuccess(c, existingByHash)
+		return
+	}
+
 	if err := db.Create(&resource).Error; err != nil {
 		// 如果数据库保存失败，删除已上传的文件
 		_ = uploadService.DeleteByKey(result.Key)
+		if isDuplicateResourceUploadError(err) {
+			existing, lookupErr := findExistingResourceByUploadKey(db, userIDInt64, uploadKey)
+			if lookupErr == nil && existing != nil {
+				respondResourceUploadSuccess(c, existing)
+				return
+			}
+		}
 		ErrorWithDetail(c, 500, "保存资源信息失败", err, logrus.Fields{
-			"user_id":     userID.(int64),
+			"user_id":     userIDInt64,
+			"upload_key":  uploadKey,
+			"file_hash":   result.FileHash,
 			"title":       resource.Title,
 			"description": resource.Description,
 			"extension":   resource.Extension,
@@ -195,11 +343,43 @@ func UploadResource(c *gin.Context) {
 		return
 	}
 
-	resource.FillThumbnailURL()
 	invalidatePublicResourceListCache()
+	respondResourceUploadSuccess(c, &resource)
+}
+
+// GetUploadResourceStatus 查询上传幂等键对应的资源状态。
+func GetUploadResourceStatus(c *gin.Context) {
+	userID := GetCurrentUserID(c)
+	if userID == 0 {
+		Error(c, 401, "未授权")
+		return
+	}
+
+	uploadKey := normalizeUploadKey(c.Query("uploadKey"))
+	if strings.TrimSpace(c.Query("uploadKey")) == "" {
+		Error(c, 400, "uploadKey 不能为空")
+		return
+	}
+
+	db := database.GetDB()
+	resource, err := findExistingResourceByUploadKey(db, userID, uploadKey)
+	if err != nil {
+		ErrorWithDetail(c, 500, "查询上传状态失败", err, logrus.Fields{
+			"user_id":    userID,
+			"upload_key": uploadKey,
+		})
+		return
+	}
+
+	if resource == nil {
+		Success(c, gin.H{"found": false})
+		return
+	}
+
+	resource.FillThumbnailURL()
 	Success(c, gin.H{
-		"resource":    resource,
-		"storagePath": result.Key, // 返回存储路径，便于调试
+		"found":    true,
+		"resource": resource,
 	})
 }
 

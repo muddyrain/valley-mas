@@ -3443,3 +3443,47 @@
 - 风险与后续：
   - 当前风险：单项重传仍会沿用当前批量弹窗上方统一设置的资源类型与可见范围，如果用户在失败后改了全局选项，重传会按最新设置重新上传。
   - 下一步动作：如果你希望失败项完全锁定初次上传时的配置，可以再把类型和可见范围固化到每个资源项自身。
+
+## 2026-04-24 23:41 (Asia/Shanghai)
+
+- 任务：修复博客批量创建时公用壁纸封面未转存，导致后续编辑重复上传的问题。
+- 改动文件：
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在批量创建博客时，为“已设置封面但尚无 coverStorageKey”的条目补上按 URL 转存博客封面的步骤，再携带转存后的 `cover` 与 `coverStorageKey` 创建博客。
+  - 批量条目在转存成功后会立即回写新的封面地址与存储键，避免同一条博客创建失败重试或后续进入编辑页时再次重复上传同一张公用壁纸。
+  - 批量创建失败时同步收口封面上传中的临时状态，避免列表项停留在假性 `coverUploading`。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/BlogCreate/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：这次只修了批量博客创建入口，单篇创建与编辑仍沿用各自已有的封面转存逻辑，但它们当前路径本身是正常的。
+  - 下一步动作：如果你希望继续降低封面上传耗时，可以再把“同一资源壁纸多次转存”收口成带幂等或复用缓存的封面上传机制。
+
+## 2026-04-25 00:03 (Asia/Shanghai)
+
+- 任务：修复资源上传慢、超时后重复创建，以及断网/关页后后台仍继续建资源的问题。
+- 改动文件：
+  - `server/internal/handler/admin_resource.go`
+  - `server/internal/service/upload_service.go`
+  - `server/internal/utils/tos.go`
+  - `server/internal/model/model.go`
+  - `server/internal/router/router.go`
+  - `server/migrations/021_add_resource_upload_idempotency.sql`
+  - `apps/web/src/api/resource.ts`
+  - `apps/web/src/utils/resourceUpload.ts`
+  - `apps/web/src/components/UploadResourceDialog.tsx`
+  - `apps/web/src/components/BatchUploadResourceDialog.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 后端资源上传改为透传 `c.Request.Context()` 到上传服务和 TOS SDK，请求取消后会停止上传，并在对象已上传但请求已取消时先清理存储对象，再终止后续 `db.Create`。
+  - 为资源表补上 `upload_key` 与 `file_hash` 字段，并在上传接口中加入“同用户 + uploadKey”幂等返回、“同用户 + file_hash + 短时间窗口”去重回收，避免超时重试或重复点击后生成多条重复资源。
+  - Web 端为资源上传单独放宽到 5 分钟超时，并给单传/批量上传统一接入 `uploadKey`、上传状态回查接口和“上传结果确认中”状态，减少超时后误判失败导致的重复重试。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/UploadResourceDialog.tsx apps/web/src/components/BatchUploadResourceDialog.tsx apps/web/src/api/resource.ts apps/web/src/utils/resourceUpload.ts server/internal/handler/admin_resource.go server/migrations/021_add_resource_upload_idempotency.sql .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：`021_add_resource_upload_idempotency.sql` 已补齐，但线上要真正生效仍需要执行迁移；未执行迁移前，后端代码里的幂等和去重只能部分依赖运行时逻辑，无法获得数据库唯一约束兜底。
+  - 下一步动作：上线前先执行迁移并验证现网数据库版本；如果后面还想进一步压缩上传等待感，可以继续把上传改成异步任务或分片上传。
