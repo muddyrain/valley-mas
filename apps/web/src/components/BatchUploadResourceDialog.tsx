@@ -9,7 +9,17 @@
  *   4. 可对每项单独 AI 识别标签，也可点「AI 批量识别标签」批量处理
  *   5. 点「开始批量上传」逐项上传，实时展示进度
  */
-import { FileStack, FileUp, Hash, Loader2, Sparkles, Trash2, Upload, X } from 'lucide-react';
+import {
+  FileStack,
+  FileUp,
+  Hash,
+  Loader2,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -91,6 +101,18 @@ function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function resolveItemTitle(item: BatchResourceItem) {
+  return item.title.trim() || item.file.name.replace(/\.[^/.]+$/, '');
+}
+
+function getErrorText(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    const message = error.message.trim();
+    if (message) return message;
+  }
+  return fallback;
 }
 
 // ─── 组件 ─────────────────────────────────────────────────────────────────────
@@ -192,9 +214,42 @@ export default function BatchUploadResourceDialog({
   // ── 删除单项 ────────────────────────────────────────────────────────────────
   const removeItem = (index: number) => {
     setItems((prev) => {
+      if (!prev[index]) return prev;
       URL.revokeObjectURL(prev[index].previewUrl);
-      return prev.filter((_, i) => i !== index);
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) {
+        setDone(false);
+      }
+      return next;
     });
+  };
+
+  const uploadSingleItem = async (index: number) => {
+    const item = items[index];
+    if (!item) return false;
+
+    try {
+      updateItem(index, { status: 'running', error: undefined });
+      const formData = new FormData();
+      formData.append('file', item.file);
+      formData.append('type', uploadType);
+      formData.append('visibility', visibility);
+      formData.append('title', resolveItemTitle(item));
+      const { resource } = await uploadResource(formData);
+      if (item.tags.length > 0 && resource?.id) {
+        await setResourceTags(
+          resource.id,
+          item.tags.map((tag) => tag.id),
+        ).catch(() => {
+          /* 静默 */
+        });
+      }
+      updateItem(index, { status: 'success', error: undefined });
+      return true;
+    } catch (error) {
+      updateItem(index, { status: 'error', error: getErrorText(error, '上传失败') });
+      return false;
+    }
   };
 
   // ── 单项 AI 起名 ─────────────────────────────────────────────────────────────
@@ -327,44 +382,52 @@ export default function BatchUploadResourceDialog({
       .map(({ i }) => i);
 
     if (!targetIndexes.length) {
-      toast.info('没有待上传的文件');
+      toast.info(retryFailedOnly ? '没有可重试的失败项' : '没有待上传的文件');
       return;
     }
 
     setUploading(true);
     setDone(false);
+    let successCount = 0;
+    let errorCount = 0;
 
     for (const index of targetIndexes) {
-      const item = items[index];
-      try {
-        updateItem(index, { status: 'running', error: undefined });
-        const formData = new FormData();
-        formData.append('file', item.file);
-        formData.append('type', uploadType);
-        formData.append('visibility', visibility);
-        formData.append('title', item.title.trim() || item.file.name.replace(/\.[^/.]+$/, ''));
-        const { resource } = await uploadResource(formData);
-        // 绑定标签
-        if (item.tags.length > 0 && resource?.id) {
-          await setResourceTags(
-            resource.id,
-            item.tags.map((t) => t.id),
-          ).catch(() => {
-            /* 静默 */
-          });
-        }
-        updateItem(index, { status: 'success' });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : '上传失败';
-        updateItem(index, { status: 'error', error: msg });
-      }
+      const success = await uploadSingleItem(index);
+      if (success) successCount += 1;
+      else errorCount += 1;
     }
 
     setUploading(false);
     setDone(true);
-    onSuccess?.();
+    if (successCount > 0) onSuccess?.();
 
-    toast.success('批量上传完成');
+    if (successCount > 0) {
+      toast.success(
+        `批量上传完成：成功 ${successCount} 项${errorCount ? `，失败 ${errorCount} 项` : ''}`,
+      );
+    } else {
+      toast.error(
+        retryFailedOnly ? '重试失败，请检查错误后再试' : '批量上传失败，请检查结果后重试',
+      );
+    }
+  };
+
+  const handleRetryItem = async (index: number) => {
+    const item = items[index];
+    if (!item || item.status !== 'error' || uploading) return;
+
+    setUploading(true);
+    const displayTitle = resolveItemTitle(item);
+    const success = await uploadSingleItem(index);
+    setUploading(false);
+    setDone(true);
+
+    if (success) {
+      onSuccess?.();
+      toast.success(`已重新上传「${displayTitle}」`);
+    } else {
+      toast.error(`「${displayTitle}」重新上传失败`);
+    }
   };
 
   const isBusy = uploading || batchAiNaming || batchAiTagging || preparing;
@@ -619,17 +682,6 @@ export default function BatchUploadResourceDialog({
                             <Hash className="h-3 w-3" />
                           )}
                         </button>
-                        {/* 删除 */}
-                        {item.status !== 'running' && item.status !== 'success' && !uploading && (
-                          <button
-                            type="button"
-                            onClick={() => removeItem(index)}
-                            className="shrink-0 inline-flex items-center rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-400 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
-                            title="移除"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        )}
                       </div>
 
                       {/* 标签行 */}
@@ -671,7 +723,7 @@ export default function BatchUploadResourceDialog({
                       </div>
 
                       {/* 状态/错误信息 */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[10px] text-slate-400">
                           {formatSize(item.file.size)}
                         </span>
@@ -687,6 +739,26 @@ export default function BatchUploadResourceDialog({
                         )}
                         {item.status === 'running' && (
                           <span className="text-[10px] text-theme-primary">上传中…</span>
+                        )}
+                        {item.status === 'error' && !uploading && (
+                          <button
+                            type="button"
+                            onClick={() => void handleRetryItem(index)}
+                            className="inline-flex items-center gap-1 rounded-md border border-theme-primary/20 bg-theme-soft/70 px-2 py-0.5 text-[10px] font-medium text-theme-primary transition-all hover:border-theme-primary hover:bg-theme-primary hover:text-white"
+                          >
+                            <RefreshCw className="h-2.5 w-2.5" />
+                            重新上传
+                          </button>
+                        )}
+                        {item.status !== 'running' && item.status !== 'success' && !uploading && (
+                          <button
+                            type="button"
+                            onClick={() => removeItem(index)}
+                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
+                          >
+                            <Trash2 className="h-2.5 w-2.5" />
+                            移除
+                          </button>
                         )}
                       </div>
                     </div>
