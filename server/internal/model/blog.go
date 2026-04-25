@@ -20,6 +20,7 @@ type Post struct {
 	ImageTextData   string         `gorm:"type:json" json:"imageTextData,omitempty"`
 	Content         string         `gorm:"type:text;not null" json:"content"`
 	HTMLContent     string         `gorm:"type:text" json:"htmlContent,omitempty"`
+	DraftData       string         `gorm:"type:text" json:"draftData,omitempty"`
 	Excerpt         string         `gorm:"size:500" json:"excerpt"`
 	Cover           string         `gorm:"size:500" json:"cover,omitempty"`
 	CoverStorageKey string         `gorm:"size:500" json:"coverStorageKey,omitempty"`
@@ -31,6 +32,7 @@ type Post struct {
 	LikeCount       int            `gorm:"default:0" json:"likeCount"`
 	IsTop           bool           `gorm:"default:false" json:"isTop"`
 	PublishedAt     *time.Time     `json:"publishedAt,omitempty"`
+	DraftUpdatedAt  *time.Time     `json:"draftUpdatedAt,omitempty"`
 	CreatedAt       time.Time      `json:"createdAt"`
 	UpdatedAt       time.Time      `json:"updatedAt"`
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
