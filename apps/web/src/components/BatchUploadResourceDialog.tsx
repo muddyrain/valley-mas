@@ -20,7 +20,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   aiSuggestResourceTags,
@@ -138,6 +138,11 @@ export default function BatchUploadResourceDialog({
   const [batchAiNaming, setBatchAiNaming] = useState(false);
   const [batchAiTagging, setBatchAiTagging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const itemsRef = useRef<BatchResourceItem[]>([]);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   // ── 重置 ────────────────────────────────────────────────────────────────────
   const reset = () => {
@@ -219,6 +224,15 @@ export default function BatchUploadResourceDialog({
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   };
 
+  const updateItemByKey = (uploadKey: string, patch: Partial<BatchResourceItem>) => {
+    setItems((prev) =>
+      prev.map((item) => (item.uploadKey === uploadKey ? { ...item, ...patch } : item)),
+    );
+  };
+
+  const findItemByKey = (uploadKey: string) =>
+    itemsRef.current.find((item) => item.uploadKey === uploadKey);
+
   // ── 删除单项 ────────────────────────────────────────────────────────────────
   const removeItem = (index: number) => {
     setItems((prev) => {
@@ -279,22 +293,26 @@ export default function BatchUploadResourceDialog({
   // ── 单项 AI 起名 ─────────────────────────────────────────────────────────────
   const handleAiNameItem = async (index: number) => {
     const item = items[index];
+    if (!item) return;
     if (!item.base64) {
       toast.error('图片未准备好，请稍后重试');
       return;
     }
+    const itemKey = item.uploadKey;
     try {
-      updateItem(index, { aiNaming: true });
+      updateItemByKey(itemKey, { aiNaming: true });
       const result = await suggestResourceTitle(item.base64, uploadType);
+      if (!findItemByKey(itemKey)) return;
       if (result.titles?.length) {
-        updateItem(index, { title: result.titles[0], aiNaming: false });
+        updateItemByKey(itemKey, { title: result.titles[0], aiNaming: false });
         toast.success(`「${result.titles[0]}」已应用`);
       } else {
-        updateItem(index, { aiNaming: false });
+        updateItemByKey(itemKey, { aiNaming: false });
         toast.error('AI 未返回有效名称');
       }
     } catch {
-      updateItem(index, { aiNaming: false });
+      if (!findItemByKey(itemKey)) return;
+      updateItemByKey(itemKey, { aiNaming: false });
       toast.error('AI 起名失败');
     }
   };
@@ -302,34 +320,38 @@ export default function BatchUploadResourceDialog({
   // ── 单项 AI 识别标签 ─────────────────────────────────────────────────────────
   const handleAiTagItem = async (index: number) => {
     const item = items[index];
+    if (!item) return;
+    const itemKey = item?.uploadKey;
+    if (!itemKey) return;
     try {
-      updateItem(index, { aiTagging: true });
+      updateItemByKey(itemKey, { aiTagging: true });
       const result = await aiSuggestResourceTags({
         imageBase64: item.base64,
         type: uploadType,
         title: item.title,
       });
+      if (!findItemByKey(itemKey)) return;
       if (result.tags?.length) {
-        updateItem(index, { tags: result.tags, aiTagging: false });
+        updateItemByKey(itemKey, { tags: result.tags, aiTagging: false });
         toast.success(`已识别 ${result.tags.length} 个标签`);
       } else {
-        updateItem(index, { aiTagging: false });
+        updateItemByKey(itemKey, { aiTagging: false });
         toast.error('AI 未识别到标签');
       }
     } catch {
-      updateItem(index, { aiTagging: false });
+      if (!findItemByKey(itemKey)) return;
+      updateItemByKey(itemKey, { aiTagging: false });
       toast.error('AI 标签识别失败');
     }
   };
 
   // ── 批量 AI 起名 ─────────────────────────────────────────────────────────────
   const handleBatchAiName = async () => {
-    const pendingIndexes = items
-      .map((item, i) => ({ item, i }))
-      .filter(({ item }) => item.status === 'pending' && item.base64)
-      .map(({ i }) => i);
+    const pendingKeys = items
+      .filter((item) => item.status === 'pending' && item.base64)
+      .map((item) => item.uploadKey);
 
-    if (!pendingIndexes.length) {
+    if (!pendingKeys.length) {
       toast.info('没有待处理的图片');
       return;
     }
@@ -337,18 +359,21 @@ export default function BatchUploadResourceDialog({
     setBatchAiNaming(true);
     try {
       // 逐个处理，避免并发过多
-      for (const index of pendingIndexes) {
-        const item = items[index];
+      for (const itemKey of pendingKeys) {
+        const item = findItemByKey(itemKey);
+        if (!item || item.status !== 'pending' || !item.base64) continue;
         try {
-          updateItem(index, { aiNaming: true });
+          updateItemByKey(itemKey, { aiNaming: true });
           const result = await suggestResourceTitle(item.base64, uploadType);
+          if (!findItemByKey(itemKey)) continue;
           if (result.titles?.length) {
-            updateItem(index, { title: result.titles[0], aiNaming: false });
+            updateItemByKey(itemKey, { title: result.titles[0], aiNaming: false });
           } else {
-            updateItem(index, { aiNaming: false });
+            updateItemByKey(itemKey, { aiNaming: false });
           }
         } catch {
-          updateItem(index, { aiNaming: false });
+          if (!findItemByKey(itemKey)) continue;
+          updateItemByKey(itemKey, { aiNaming: false });
         }
         // 小延迟，避免接口过载
         await new Promise((r) => setTimeout(r, 300));
@@ -358,37 +383,38 @@ export default function BatchUploadResourceDialog({
       setBatchAiNaming(false);
     }
   };
-
   // ── 批量 AI 识别标签 ─────────────────────────────────────────────────────────
   const handleBatchAiTag = async () => {
-    const pendingIndexes = items
-      .map((item, i) => ({ item, i }))
-      .filter(({ item }) => item.status === 'pending' && item.base64)
-      .map(({ i }) => i);
+    const pendingKeys = items
+      .filter((item) => item.status === 'pending' && item.base64)
+      .map((item) => item.uploadKey);
 
-    if (!pendingIndexes.length) {
+    if (!pendingKeys.length) {
       toast.info('没有待处理的图片');
       return;
     }
 
     setBatchAiTagging(true);
     try {
-      for (const index of pendingIndexes) {
-        const item = items[index];
+      for (const itemKey of pendingKeys) {
+        const item = findItemByKey(itemKey);
+        if (!item || item.status !== 'pending' || !item.base64) continue;
         try {
-          updateItem(index, { aiTagging: true });
+          updateItemByKey(itemKey, { aiTagging: true });
           const result = await aiSuggestResourceTags({
             imageBase64: item.base64,
             type: uploadType,
             title: item.title,
           });
+          if (!findItemByKey(itemKey)) continue;
           if (result.tags?.length) {
-            updateItem(index, { tags: result.tags, aiTagging: false });
+            updateItemByKey(itemKey, { tags: result.tags, aiTagging: false });
           } else {
-            updateItem(index, { aiTagging: false });
+            updateItemByKey(itemKey, { aiTagging: false });
           }
         } catch {
-          updateItem(index, { aiTagging: false });
+          if (!findItemByKey(itemKey)) continue;
+          updateItemByKey(itemKey, { aiTagging: false });
         }
         await new Promise((r) => setTimeout(r, 300));
       }
@@ -465,7 +491,6 @@ export default function BatchUploadResourceDialog({
   const successCount = items.filter((item) => item.status === 'success').length;
   const confirmingCount = items.filter((item) => item.status === 'confirming').length;
   const errorCount = items.filter((item) => item.status === 'error').length;
-
   // ── 渲染 ─────────────────────────────────────────────────────────────────────
   return (
     <Dialog
@@ -729,30 +754,28 @@ export default function BatchUploadResourceDialog({
                             <Loader2 className="h-3 w-3 animate-spin" /> 识别标签中…
                           </span>
                         ) : item.tags.length > 0 ? (
-                          <>
-                            {item.tags.map((tag) => (
-                              <span
-                                key={tag.id}
-                                className="group inline-flex items-center gap-1 rounded-full border border-theme-primary/20 bg-theme-soft/60 px-2 py-0.5 text-xs font-medium text-theme-primary"
-                              >
-                                <Hash className="h-2.5 w-2.5 opacity-60" />
-                                {tag.name}
-                                {item.status === 'pending' && !uploading && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      updateItem(index, {
-                                        tags: item.tags.filter((t) => t.id !== tag.id),
-                                      })
-                                    }
-                                    className="ml-0.5 rounded-full opacity-50 hover:opacity-100 transition"
-                                  >
-                                    <X className="h-2.5 w-2.5" />
-                                  </button>
-                                )}
-                              </span>
-                            ))}
-                          </>
+                          item.tags.map((tag) => (
+                            <span
+                              key={tag.id}
+                              className="group inline-flex items-center gap-1 rounded-full border border-theme-primary/20 bg-theme-soft/60 px-2 py-0.5 text-xs font-medium text-theme-primary"
+                            >
+                              <Hash className="h-2.5 w-2.5 opacity-60" />
+                              {tag.name}
+                              {item.status === 'pending' && !uploading && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateItem(index, {
+                                      tags: item.tags.filter((t) => t.id !== tag.id),
+                                    })
+                                  }
+                                  className="ml-0.5 rounded-full opacity-50 hover:opacity-100 transition"
+                                >
+                                  <X className="h-2.5 w-2.5" />
+                                </button>
+                              )}
+                            </span>
+                          ))
                         ) : (
                           <span className="text-xs text-slate-300">
                             暂无标签，点击 <Hash className="inline h-2.5 w-2.5" /> 按钮识别
@@ -797,7 +820,8 @@ export default function BatchUploadResourceDialog({
                           <button
                             type="button"
                             onClick={() => removeItem(index)}
-                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
+                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500 disabled:bg-zinc-100 disabled:cursor-not-allowed!"
+                            disabled={isBusy || item.aiNaming || item.aiTagging}
                           >
                             <Trash2 className="h-2.5 w-2.5" />
                             移除

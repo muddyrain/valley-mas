@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ExternalLink,
   FileText,
+  FileUp,
   FolderTree,
   Globe,
   Image as ImageIcon,
@@ -34,6 +35,7 @@ import {
 } from '@/api/blog';
 import type { Resource } from '@/api/resource';
 import { BlogPostCard, ImageTextPostCard } from '@/components/blog';
+import { BatchMarkdownImportDialog } from '@/components/blog/BatchMarkdownImportDialog';
 import { PublicWallpaperPickerDialog } from '@/components/blog/PublicWallpaperPickerDialog';
 import PanelLoadingOverlay from '@/components/PanelLoadingOverlay';
 import { Button } from '@/components/ui/button';
@@ -107,6 +109,7 @@ export default function MyPosts() {
   const [batchCoverTargetIndex, setBatchCoverTargetIndex] = useState<number | null>(null);
   const [batchWallpaperPickerOpen, setBatchWallpaperPickerOpen] = useState(false);
   const [batchSettingsOpen, setBatchSettingsOpen] = useState(false);
+  const [batchImportDialogOpen, setBatchImportDialogOpen] = useState(false);
   const batchCoverUploadInputRef = useRef<HTMLInputElement | null>(null);
 
   const blogTotalPages = Math.max(1, Math.ceil(blogTotal / BLOG_PAGE_SIZE));
@@ -608,6 +611,14 @@ export default function MyPosts() {
                 </Button>
                 <Button
                   variant="outline"
+                  onClick={() => setBatchImportDialogOpen(true)}
+                  className="rounded-xl"
+                >
+                  <FileUp className="mr-1.5 h-4 w-4" />
+                  批量导入 MD
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={() => navigate('/my-space/image-text')}
                   className="rounded-xl"
                 >
@@ -884,6 +895,16 @@ export default function MyPosts() {
           batchCoverTargetIndex !== null ? batchCoverItems[batchCoverTargetIndex]?.cover || '' : ''
         }
         onSelect={handleSelectBatchCoverWallpaper}
+      />
+      <BatchMarkdownImportDialog
+        open={batchImportDialogOpen}
+        onOpenChange={setBatchImportDialogOpen}
+        groups={blogGroups}
+        defaultGroupId={blogGroupFilter}
+        defaultVisibility="private"
+        onCreated={async () => {
+          await loadPostsPage();
+        }}
       />
 
       <Dialog
