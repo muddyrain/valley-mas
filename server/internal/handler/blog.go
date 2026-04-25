@@ -28,6 +28,14 @@ const (
 	visibilityPublic  = "public"
 )
 
+func buildPostTimelineOrderExpr(sort string) string {
+	orderExpr := "is_top DESC, COALESCE(published_at, created_at) DESC"
+	if strings.EqualFold(strings.TrimSpace(sort), "oldest") {
+		orderExpr = "is_top DESC, COALESCE(published_at, created_at) ASC"
+	}
+	return orderExpr
+}
+
 type PostListResponse struct {
 	ID              model.Int64String `json:"id"`
 	Title           string            `json:"title"`
@@ -214,13 +222,8 @@ func GetPosts(c *gin.Context) {
 	var total int64
 	query.Count(&total)
 
-	orderExpr := "is_top DESC, COALESCE(published_at, created_at) DESC"
-	if strings.EqualFold(sort, "oldest") {
-		orderExpr = "is_top DESC, COALESCE(published_at, created_at) ASC"
-	}
-
 	var posts []model.Post
-	query.Order(orderExpr).
+	query.Order(buildPostTimelineOrderExpr(sort)).
 		Limit(pageSize).
 		Offset(offset).
 		Find(&posts)
@@ -308,7 +311,7 @@ func loadAdjacentPosts(current *model.Post) (*model.Post, *model.Post) {
 		var posts []model.Post
 		query.
 			Select("id, title, slug, post_type, visibility, excerpt, cover, cover_storage_key, group_id, category_id, status, view_count, like_count, is_top, published_at, created_at").
-			Order("is_top DESC, COALESCE(published_at, created_at) DESC").
+			Order(buildPostTimelineOrderExpr("")).
 			Find(&posts)
 		return posts
 	}
@@ -1243,7 +1246,7 @@ func AdminGetPosts(c *gin.Context) {
 	query.Count(&total)
 
 	var posts []model.Post
-	query.Order("created_at DESC").
+	query.Order(buildPostTimelineOrderExpr("")).
 		Limit(pageSize).
 		Offset(offset).
 		Find(&posts)
