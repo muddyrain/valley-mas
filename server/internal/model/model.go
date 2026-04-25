@@ -180,7 +180,7 @@ func (s *CreatorSpace) BeforeCreate(tx *gorm.DB) error {
 type Resource struct {
 	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID        Int64String    `gorm:"column:user_id;index" json:"userId"` // 上传者的 User.ID
-	Type          string         `gorm:"size:20" json:"type"`                                                                                                        // avatar, wallpaper
+	Type          string         `gorm:"size:20" json:"type"`                // avatar, wallpaper
 	Visibility    string         `gorm:"size:20;default:'private';index" json:"visibility"`
 	Title         string         `gorm:"size:100" json:"title"`
 	Description   string         `gorm:"size:255" json:"description"`
@@ -444,29 +444,6 @@ type UserNotification struct {
 func (n *UserNotification) BeforeCreate(tx *gorm.DB) error {
 	if n.ID == 0 {
 		n.ID = Int64String(utils.GenerateID())
-	}
-	return nil
-}
-
-// SystemUpdate 系统更新日志（对外仅展示用户可感知内容）
-type SystemUpdate struct {
-	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	Platform    string         `gorm:"size:20;index;not null;default:'web'" json:"platform"` // web
-	Title       string         `gorm:"size:120;not null" json:"title"`
-	Content     string         `gorm:"size:2000;not null" json:"content"`
-	Status      string         `gorm:"size:20;index;not null;default:'draft'" json:"status"` // draft/published
-	PublishedAt *time.Time     `gorm:"index" json:"publishedAt,omitempty"`
-	CreatedBy   *Int64String   `gorm:"index" json:"createdBy,omitempty"`
-	UpdatedBy   *Int64String   `gorm:"index" json:"updatedBy,omitempty"`
-	CreatedAt   time.Time      `json:"createdAt"`
-	UpdatedAt   time.Time      `json:"updatedAt"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
-}
-
-// BeforeCreate GORM 钩子：创建前自动生成 Snowflake ID
-func (u *SystemUpdate) BeforeCreate(tx *gorm.DB) error {
-	if u.ID == 0 {
-		u.ID = Int64String(utils.GenerateID())
 	}
 	return nil
 }

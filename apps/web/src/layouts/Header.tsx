@@ -96,12 +96,6 @@ export default function Header() {
       active: location.pathname.startsWith('/tools/format'),
     },
     {
-      to: '/updates',
-      label: '更新日志',
-      icon: Sparkles,
-      active: location.pathname.startsWith('/updates'),
-    },
-    {
       to: '/labs/climber',
       label: '跳跳乐实验',
       icon: Mountain,

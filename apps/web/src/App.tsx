@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { applyThemeToDocument, useThemeStore } from '@/stores/useThemeStore';
 import Layout from './layouts/Layout';
@@ -30,7 +30,6 @@ import ResourceAlbumManage from './pages/ResourceAlbumManage';
 import ResourceDetail from './pages/ResourceDetail';
 import Resources from './pages/Resources';
 import ResourceTagManage from './pages/ResourceTagManage';
-import SystemUpdates from './pages/SystemUpdates';
 
 function RouteTitle() {
   const location = useLocation();
@@ -87,8 +86,6 @@ function RouteTitle() {
       title = '下载记录 | Valley';
     } else if (pathname === '/notifications') {
       title = '通知中心 | Valley';
-    } else if (pathname === '/updates') {
-      title = '系统更新日志 | Valley';
     } else if (pathname === '/profile') {
       title = '个人资料 | Valley';
     } else if (pathname === '/apply-creator') {
@@ -144,7 +141,7 @@ function App() {
           <Route path="follows" element={<Follows />} />
           <Route path="downloads" element={<Downloads />} />
           <Route path="notifications" element={<Notifications />} />
-          <Route path="updates" element={<SystemUpdates />} />
+          <Route path="updates" element={<Navigate to="/" replace />} />
           <Route path="apply-creator" element={<ApplyCreator />} />
           <Route path="blog" element={<BlogList />} />
           <Route path="guestbook" element={<Guestbook />} />

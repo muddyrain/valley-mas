@@ -138,7 +138,6 @@ func autoMigrate() error {
 		&model.UserFollow{},
 		&model.UserAvatarHistory{},
 		&model.UserNotification{},
-		&model.SystemUpdate{},
 		&model.GuestbookMessage{},
 		&model.CreatorAlbum{},
 		&model.PostGroup{},
