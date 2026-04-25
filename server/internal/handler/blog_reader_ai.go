@@ -364,13 +364,8 @@ func RecommendBlogPosts(c *gin.Context) {
 		query = query.Where("title LIKE ? OR excerpt LIKE ?", like, like)
 	}
 
-	orderExpr := "is_top DESC, COALESCE(published_at, created_at) DESC"
-	if strings.EqualFold(strings.TrimSpace(req.Sort), "oldest") {
-		orderExpr = "is_top DESC, COALESCE(published_at, created_at) ASC"
-	}
-
 	var posts []model.Post
-	if err := query.Order(orderExpr).Limit(36).Find(&posts).Error; err != nil {
+	if err := query.Order(buildPostTimelineOrderExpr(req.Sort)).Limit(36).Find(&posts).Error; err != nil {
 		Error(c, http.StatusInternalServerError, "获取候选博客失败")
 		return
 	}

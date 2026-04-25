@@ -3876,3 +3876,22 @@
 - 风险与后续：
   - 当前风险：这次增强的是统一选中态视觉，如果你后面觉得某一类块元素还要再“更重”一点，可以继续按元素单独微调。
   - 下一步动作：优先看正文拖选、整块代码块选中、列表项选中这三种是否已经足够明显。
+
+## 2026-04-25 23:33 (Asia/Shanghai)
+
+- 任务：统一公共博客列表与创作空间博客列表的默认排序顺序。
+- 改动文件：
+  - `server/internal/handler/blog.go`
+  - `server/internal/handler/blog_reader_ai.go`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 `buildPostTimelineOrderExpr(...)`，统一收口博客时间线默认排序规则，避免多个接口各自维护一份排序表达式。
+  - 将公共博客列表、详情页前后篇时间线、创作空间 `AdminGetPosts` 默认排序统一为“置顶优先，再按 `published_at` 回退 `created_at`”。
+  - 让博客 AI 推荐候选池同步复用同一排序 helper，保证推荐输入顺序与博客列表页时间线一致。
+- 校验：
+  - `gofmt -w server/internal/handler/blog.go server/internal/handler/blog_reader_ai.go`：通过
+  - `go test ./...`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前风险：创作空间中的草稿内容仍然会按 `created_at` 参与回退排序，而不是按 `draft_updated_at`，这是本次为对齐公共列表顺序而保留的行为。
+  - 下一步动作：如果你希望“内容管理”页更偏编辑视角，我可以继续把草稿列表单独切成“最近编辑优先”模式，同时不影响公共博客列表时间线。
