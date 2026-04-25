@@ -14,7 +14,6 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Records from './pages/Records';
 import Resources from './pages/Resources';
-import SystemUpdates from './pages/SystemUpdates';
 import Users from './pages/Users';
 
 // 路由守卫：检查是否已登录
@@ -104,7 +103,7 @@ function App() {
           <Route path="apply-creator" element={<ApplyCreator />} />
           <Route path="resources" element={<Resources />} />
           <Route path="records" element={<Records />} />
-          <Route path="system-updates" element={<SystemUpdates />} />
+          <Route path="system-updates" element={<Navigate to="/dashboard" replace />} />
           <Route path="blog-posts" element={<BlogPosts />} />
           <Route path="blog-posts/create" element={<BlogPostEdit />} />
           <Route path="blog-posts/edit/:id" element={<BlogPostEdit />} />

@@ -59,8 +59,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 			public.GET("/resource-tags/:slug/resources", handler.GetResourcesByTag)
 			public.GET("/guestbook/messages", handler.ListGuestbookMessages)
 			public.POST("/guestbook/messages", middleware.OptionalAuth(cfg), handler.CreateGuestbookMessage)
-			public.GET("/system-updates", handler.ListPublicWebSystemUpdates)
-
 		}
 
 		api.POST("/login", handler.Login(cfg))
@@ -176,11 +174,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 				adminOnly.GET("/records/downloads", handler.ListDownloadRecords)
 				adminOnly.GET("/records/downloads/export", handler.ExportDownloadRecords)
-				adminOnly.GET("/system-updates", handler.AdminListSystemUpdates)
-				adminOnly.POST("/system-updates", handler.AdminCreateSystemUpdate)
-				adminOnly.PUT("/system-updates/:id", handler.AdminUpdateSystemUpdate)
-				adminOnly.DELETE("/system-updates/:id", handler.AdminDeleteSystemUpdate)
-
 				// 资源标签增删改（仅管理员）
 				adminOnly.POST("/resource-tags", handler.CreateResourceTag)
 				adminOnly.PATCH("/resource-tags/:id", handler.UpdateResourceTag)
