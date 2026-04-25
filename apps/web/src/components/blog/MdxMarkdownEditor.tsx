@@ -1,10 +1,13 @@
 import {
+  $createCodeBlockNode,
   BlockTypeSelect,
   BoldItalicUnderlineToggles,
+  type CodeBlockLanguage,
   CodeMirrorEditor,
   CreateLink,
   codeBlockPlugin,
   codeMirrorPlugin,
+  createActiveEditorSubscription$,
   DiffSourceToggleWrapper,
   diffSourcePlugin,
   headingsPlugin,
@@ -13,6 +16,7 @@ import {
   InsertThematicBreak,
   imagePlugin,
   ListsToggle,
+  lexical,
   linkDialogPlugin,
   linkPlugin,
   listsPlugin,
@@ -20,6 +24,7 @@ import {
   type MDXEditorMethods,
   markdownShortcutPlugin,
   quotePlugin,
+  realmPlugin,
   Separator,
   tablePlugin,
   thematicBreakPlugin,
@@ -34,6 +39,35 @@ interface MdxMarkdownEditorProps {
   onChange: (value: string) => void;
   className?: string;
 }
+
+const CODE_BLOCK_LANGUAGES: CodeBlockLanguage[] = [
+  { name: 'Plain Text', alias: ['txt', 'text', 'plaintext', 'plain'], extensions: ['txt'] },
+  { name: 'Markdown', alias: ['md', 'markdown'], extensions: ['md'] },
+  { name: 'JavaScript', alias: ['js', 'javascript', 'node'], extensions: ['js', 'mjs', 'cjs'] },
+  { name: 'TypeScript', alias: ['ts', 'typescript'], extensions: ['ts', 'mts', 'cts'] },
+  { name: 'JavaScript (React)', alias: ['jsx'], extensions: ['jsx'] },
+  { name: 'TypeScript (React)', alias: ['tsx'], extensions: ['tsx'] },
+  { name: 'JSON', alias: ['json'], extensions: ['json'] },
+  { name: 'Bash', alias: ['bash', 'sh', 'shell', 'zsh'], extensions: ['sh', 'bash', 'zsh'] },
+  { name: 'Python', alias: ['py', 'python'], extensions: ['py'] },
+  { name: 'YAML', alias: ['yaml', 'yml'], extensions: ['yaml', 'yml'] },
+  { name: 'SQL', alias: ['sql'], extensions: ['sql'] },
+  { name: 'CSS', alias: ['css'], extensions: ['css'] },
+  { name: 'HTML', alias: ['html'], extensions: ['html', 'htm'] },
+];
+
+const LANGUAGE_ALIAS_MAP = new Map<string, string>(
+  CODE_BLOCK_LANGUAGES.flatMap((language) => {
+    const canonical = language.alias?.[0] ?? language.name.toLowerCase();
+    const candidates = new Set([
+      canonical,
+      language.name.toLowerCase(),
+      ...(language.alias ?? []).map((alias) => alias.toLowerCase()),
+      ...(language.extensions ?? []).map((extension) => extension.toLowerCase()),
+    ]);
+    return Array.from(candidates).map((candidate) => [candidate, canonical] as const);
+  }),
+);
 
 const ZH_CN_EDITOR_TEXT: Record<string, string> = {
   'contentArea.editableMarkdown': '可编辑 Markdown 内容',
@@ -72,8 +106,258 @@ function applyTemplate(text: string, values?: Record<string, string | number>) {
 
 function shouldHandleMarkdownPaste(text: string) {
   const normalized = text.replace(/\r\n?/g, '\n');
-  return /(^|\n)(```|~~~)/.test(normalized) || /(^|\n) {4,}\S/.test(normalized);
+  const trimmed = normalized.trim();
+  if (!trimmed) return false;
+
+  const markdownSignals = [
+    /(^|\n)\s{0,3}(?:> ?)*(```+|~~~+)/,
+    /(^|\n)\s{4,}\S/,
+    /(^|\n)\s{0,3}#{1,6}\s+\S/,
+    /(^|\n)\s*(?:[-*+]\s+\S|\d+\.\s+\S)/,
+    /(^|\n)\s*>+\s+\S/,
+    /(^|\n)\|.+\|/,
+    /(^|\n)\s{0,3}(?:[-*_]\s*){3,}(?:\n|$)/,
+    /!\[[^\]]*]\([^)]+\)/,
+    /\[[^\]]+]\([^)]+\)/,
+    /(^|[^`])`[^`\n]+`(?=[^`]|$)/,
+    /(?:\*\*|__)[^*\n_]+(?:\*\*|__)/,
+    /(?:^|[^*])\*[^*\n]+\*(?:[^*]|$)/,
+  ];
+
+  return markdownSignals.some((pattern) => pattern.test(normalized));
 }
+
+function normalizeMarkdownPaste(text: string) {
+  return text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+}
+
+function normalizeCodeBlockCode(code: string) {
+  const normalized = normalizeMarkdownPaste(code).replace(/[\u200B-\u200D\u2060\uFEFF]/g, '');
+  return normalized
+    .split('\n')
+    .map((line) => {
+      const visibleContent = line.replace(/[\s\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, '');
+      return visibleContent ? line : '';
+    })
+    .join('\n');
+}
+
+function normalizeCodeBlockLanguage(language: string) {
+  const normalized = language.trim().toLowerCase();
+  if (!normalized) return '';
+  return LANGUAGE_ALIAS_MAP.get(normalized) ?? normalized;
+}
+
+function inferCodeBlockLanguage(code: string) {
+  const trimmed = code.trim();
+  if (!trimmed) return '';
+
+  if (
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+  ) {
+    try {
+      JSON.parse(trimmed);
+      return 'json';
+    } catch {
+      // ignore invalid JSON guesses
+    }
+  }
+
+  if (
+    /^\s*<(!DOCTYPE|html|div|span|section|main|article|header|footer|script|style)\b/i.test(trimmed)
+  ) {
+    return 'html';
+  }
+
+  if (
+    /^\s*(interface|type)\b/m.test(trimmed) ||
+    /:\s*[A-Z][A-Za-z0-9_<>,[\]? ]*(?=[=;,)])/m.test(trimmed)
+  ) {
+    return 'ts';
+  }
+
+  if (/^\s*(const|let|var|import|export|function)\b/m.test(trimmed) || /=>/.test(trimmed)) {
+    return 'js';
+  }
+
+  if (/^\s*(def|class|import|from)\b/m.test(trimmed) && /:\s*(#.*)?$/m.test(trimmed)) {
+    return 'py';
+  }
+
+  if (/^\s*(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|WITH)\b/im.test(trimmed)) {
+    return 'sql';
+  }
+
+  if (/^\s*[-\w"']+\s*:\s*.+/m.test(trimmed) && !/[{};]/.test(trimmed)) {
+    return 'yaml';
+  }
+
+  if (/^\s*(npm|pnpm|yarn|git|cd|ls|cp|mv|rm)\b/m.test(trimmed) || /^#!/.test(trimmed)) {
+    return 'bash';
+  }
+
+  return '';
+}
+
+function hasMarkdownCodeBlock(text: string) {
+  const normalized = normalizeMarkdownPaste(text);
+  return /(^|\n)\s{0,3}(?:```+|~~~+)/.test(normalized) || /(^|\n)(?: {4}|\t)\S/.test(normalized);
+}
+
+function getCodeBlockLanguage(className: string) {
+  const matched = className.match(/(?:^|\s)(?:language|lang)-([A-Za-z0-9_+-]+)/);
+  return matched?.[1] || '';
+}
+
+function restoreMarkdownFromHtml(html: string) {
+  if (!html || !/<pre[\s>]/i.test(html)) return '';
+
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const body = doc.body;
+  if (!body) return '';
+
+  body.querySelectorAll('br').forEach((element) => {
+    element.replaceWith(doc.createTextNode('\n'));
+  });
+
+  body.querySelectorAll('pre').forEach((pre) => {
+    const code = pre.querySelector('code');
+    const rawCode = code?.textContent ?? pre.textContent ?? '';
+    const normalizedCode = normalizeMarkdownPaste(rawCode).replace(/\n+$/g, '');
+    const language = getCodeBlockLanguage(code?.className ?? pre.className);
+    const fencedBlock = `\n\n\`\`\`${language}\n${normalizedCode}\n\`\`\`\n\n`;
+    pre.replaceWith(doc.createTextNode(fencedBlock));
+  });
+
+  return normalizeMarkdownPaste(body.innerText || body.textContent || '');
+}
+
+function getClipboardMarkdownText(clipboardData?: DataTransfer | null) {
+  const html = clipboardData?.getData('text/html') || '';
+  const htmlMarkdown = restoreMarkdownFromHtml(html);
+  if (htmlMarkdown.trim()) return htmlMarkdown;
+  return normalizeMarkdownPaste(clipboardData?.getData('text/plain') || '');
+}
+
+type MarkdownPasteSegment =
+  | { type: 'markdown'; text: string }
+  | { type: 'code'; code: string; language: string };
+
+function splitMarkdownPasteSegments(markdown: string): MarkdownPasteSegment[] {
+  const normalized = normalizeMarkdownPaste(markdown);
+  const segments: MarkdownPasteSegment[] = [];
+  const codeBlockPattern =
+    /(^|\n)(?<fence>`{3,}|~{3,})(?<language>[^\n`]*)\n(?<code>[\s\S]*?)\n\k<fence>(?=\n|$)/g;
+  let cursor = 0;
+
+  for (const match of normalized.matchAll(codeBlockPattern)) {
+    const matchIndex = match.index ?? 0;
+    const blockStart = match[1] ? matchIndex + match[1].length : matchIndex;
+    const leadingMarkdown = normalized.slice(cursor, blockStart);
+    if (leadingMarkdown.trim()) {
+      segments.push({ type: 'markdown', text: leadingMarkdown });
+    }
+
+    segments.push({
+      type: 'code',
+      code: normalizeCodeBlockCode(match.groups?.code ?? '').replace(/\n+$/g, ''),
+      language: normalizeCodeBlockLanguage(match.groups?.language ?? ''),
+    });
+    cursor = blockStart + match[0].length - (match[1]?.length ?? 0);
+  }
+
+  const trailingMarkdown = normalized.slice(cursor);
+  if (trailingMarkdown.trim()) {
+    segments.push({ type: 'markdown', text: trailingMarkdown });
+  }
+
+  return segments;
+}
+
+function createParagraphNodesFromMarkdown(text: string) {
+  const normalized = normalizeMarkdownPaste(text).trim();
+  if (!normalized) return [];
+
+  return normalized.split(/\n{2,}/).map((block) => {
+    const paragraph = lexical.$createParagraphNode();
+    const lines = block.split('\n');
+    lines.forEach((line, index) => {
+      if (index > 0) {
+        paragraph.append(lexical.$createLineBreakNode());
+      }
+      if (line) {
+        paragraph.append(lexical.$createTextNode(line));
+      }
+    });
+    return paragraph;
+  });
+}
+
+function insertMarkdownCodeBlockNodes(
+  editor: { update: (fn: () => void) => void },
+  markdown: string,
+) {
+  const segments = splitMarkdownPasteSegments(markdown);
+  if (segments.length === 0) return false;
+
+  editor.update(() => {
+    const selection = lexical.$getSelection();
+    if (!selection) return;
+
+    const nodes = segments.flatMap((segment, index) => {
+      if (segment.type === 'markdown') {
+        return createParagraphNodesFromMarkdown(segment.text);
+      }
+
+      const nextSegment = segments[index + 1];
+      const resolvedLanguage = segment.language || inferCodeBlockLanguage(segment.code) || 'txt';
+      const codeBlock = $createCodeBlockNode({
+        code: segment.code,
+        language: resolvedLanguage,
+      });
+      if (nextSegment) {
+        return [codeBlock];
+      }
+      return [codeBlock, lexical.$createParagraphNode()];
+    });
+
+    if (nodes.length > 0) {
+      lexical.$insertNodes(nodes);
+    }
+  });
+
+  return true;
+}
+
+const markdownCodeBlockPastePlugin = realmPlugin({
+  init(realm) {
+    realm.pub(createActiveEditorSubscription$, (editor) => {
+      return editor.registerCommand(
+        lexical.PASTE_COMMAND,
+        (event: ClipboardEvent | null) => {
+          if (!event || event.defaultPrevented) {
+            return false;
+          }
+
+          const clipboardData = event.clipboardData;
+          const items = Array.from(clipboardData?.items || []);
+          const hasFiles = items.some((item) => item.kind === 'file');
+          if (hasFiles) return false;
+
+          const normalizedText = getClipboardMarkdownText(clipboardData);
+          if (!normalizedText || !hasMarkdownCodeBlock(normalizedText)) {
+            return false;
+          }
+
+          event.preventDefault();
+          return insertMarkdownCodeBlockNodes(editor, normalizedText);
+        },
+        lexical.COMMAND_PRIORITY_CRITICAL,
+      );
+    });
+  },
+});
 
 export function MdxMarkdownEditor({ value, onChange, className }: MdxMarkdownEditorProps) {
   const editorRef = useRef<MDXEditorMethods>(null);
@@ -92,13 +376,24 @@ export function MdxMarkdownEditor({ value, onChange, className }: MdxMarkdownEdi
     if (!root) return;
 
     const handlePaste = (event: ClipboardEvent) => {
-      const text = event.clipboardData?.getData('text/plain') || '';
-      if (!text || !shouldHandleMarkdownPaste(text) || !editorRef.current) return;
-      const target = event.target as HTMLElement | null;
-      if (!target?.closest('[contenteditable="true"]')) return;
+      if (event.defaultPrevented) return;
+
+      const clipboardData = event.clipboardData;
+      const items = Array.from(clipboardData?.items || []);
+      const hasFiles = items.some((item) => item.kind === 'file');
+      if (hasFiles) return;
+
+      const normalizedText = getClipboardMarkdownText(clipboardData);
+      if (!normalizedText || !shouldHandleMarkdownPaste(normalizedText) || !editorRef.current) {
+        return;
+      }
+      const target = (event.target as HTMLElement | null)?.closest(
+        '[contenteditable="true"]',
+      ) as HTMLElement | null;
+      if (!target) return;
 
       event.preventDefault();
-      editorRef.current.insertMarkdown(text);
+      editorRef.current.insertMarkdown(normalizedText);
     };
 
     root.addEventListener('paste', handlePaste);
@@ -118,30 +413,7 @@ export function MdxMarkdownEditor({ value, onChange, className }: MdxMarkdownEdi
         ],
       }),
       codeMirrorPlugin({
-        codeBlockLanguages: {
-          '': '纯文本',
-          txt: '纯文本',
-          text: '纯文本',
-          plaintext: '纯文本',
-          'N/A': '纯文本',
-          'n/a': '纯文本',
-          markdown: 'Markdown',
-          md: 'Markdown',
-          js: 'JavaScript',
-          ts: 'TypeScript',
-          jsx: 'JavaScript (React)',
-          tsx: 'TypeScript (React)',
-          json: 'JSON',
-          bash: 'Bash',
-          sh: 'Shell',
-          python: 'Python',
-          py: 'Python',
-          yaml: 'YAML',
-          yml: 'YAML',
-          sql: 'SQL',
-          css: 'CSS',
-          html: 'HTML',
-        },
+        codeBlockLanguages: CODE_BLOCK_LANGUAGES,
       }),
       headingsPlugin({ allowedHeadingLevels: [1, 2, 3, 4] }),
       imagePlugin(),
@@ -152,6 +424,7 @@ export function MdxMarkdownEditor({ value, onChange, className }: MdxMarkdownEdi
       tablePlugin(),
       thematicBreakPlugin(),
       markdownShortcutPlugin(),
+      markdownCodeBlockPastePlugin(),
       diffSourcePlugin(),
       toolbarPlugin({
         toolbarContents: () => (

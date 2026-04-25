@@ -3522,3 +3522,223 @@
 - 风险与后续：
   - 当前风险：关闭博客列表页缓存后，频繁切换筛选或来回进入列表时会多发一些请求，但优先保证了编辑后的内容正确性。
   - 下一步动作：如果后面还想兼顾性能，可以再把博客列表缓存改成“仅前进浏览使用，编辑/发布后显式失效”的可控失效方案。
+
+## 2026-04-25 11:18 (Asia/Shanghai)
+
+- 任务：修复博客编辑页手动粘贴 Markdown 时代码块等语法没有被正确识别的问题。
+- 改动文件：
+  - `apps/web/src/components/blog/MdxMarkdownEditor.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将编辑器粘贴时的 Markdown 判定从“只识别少量代码块语法”扩展为同时识别围栏代码块、标题、列表、引用、表格、分隔线、链接、图片和常见行内格式，避免整段 Markdown 手动粘贴时退回默认富文本粘贴。
+  - 为粘贴接管增加文件类剪贴板保护，图片或文件粘贴继续沿用编辑器默认行为，避免误拦截非文本输入。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/MdxMarkdownEditor.tsx`：通过
+- 风险与后续：
+  - 当前风险：这次采用的是启发式 Markdown 识别，极少数恰好命中 Markdown 特征的普通纯文本粘贴，也会被按 Markdown 片段插入。
+  - 下一步动作：如果后面还观察到误判，可以继续把判定收口成“多特征组合”或补一个“按原文粘贴”入口。
+
+## 2026-04-25 11:27 (Asia/Shanghai)
+
+- 任务：在内容管理页补一个“批量导入 MD”入口，并复用现有博客批量导入流程。
+- 改动文件：
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 `/my-space/posts` 顶部操作区新增“批量导入 MD”按钮，让创作者可以从内容管理页直接进入批量导入博客流程。
+  - 通过路由 state 给博客创建页补上“进入页面后自动打开批量导入弹窗”的轻量接线，继续复用 `BlogCreate` 里已有的批量识别、封面处理和批量创建逻辑，避免复制一套新实现。
+  - 从内容管理页跳转时会把当前博客分组筛选作为批量导入弹窗的初始分组，减少创作者重复切换分组的操作。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/MyPosts/index.tsx apps/web/src/pages/BlogCreate/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：这次入口仍然是“跳到博客创作页后自动打开弹窗”，还不是在内容管理页内原地弹出；但导入逻辑只有一份，后续维护成本更低。
+  - 下一步动作：如果你后面想要更顺滑，可以再把批量导入对话框抽成共享组件，直接挂到 `/my-space/posts` 原地打开。
+
+## 2026-04-25 11:42 (Asia/Shanghai)
+
+- 任务：把博客批量导入能力抽成共享组件，并让内容管理页原地复用同一套弹框。
+- 改动文件：
+  - `apps/web/src/components/blog/BatchMarkdownImportDialog.tsx`
+  - `apps/web/src/utils/blogImport.ts`
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `apps/web/src/pages/BlogCreate/utils.ts`
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 `BatchMarkdownImportDialog` 共享组件，把批量导入 MD、正文识别、封面选择、批量创建博客的整条流程统一收口，避免 `BlogCreate` 和内容管理页各维护一套实现。
+  - 将 `createAutoExcerpt`、`parseMarkdownImport` 提取到 `apps/web/src/utils/blogImport.ts`，让博客创建页和批量导入组件共用同一份 Markdown 解析与摘要生成逻辑。
+  - `/my-space/posts` 顶部“批量导入 MD”按钮改为在当前页直接打开共享弹框；新建博客页也切回复用这个组件，不再通过跳转页面再间接打开弹框。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/BatchMarkdownImportDialog.tsx apps/web/src/pages/BlogCreate/index.tsx apps/web/src/pages/MyPosts/index.tsx apps/web/src/pages/BlogCreate/utils.ts apps/web/src/utils/blogImport.ts .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：共享组件目前仍然只覆盖“博客”批量导入，如果后面图文也要引入类似导入能力，还需要再评估是否继续抽象通用内容导入框架。
+  - 下一步动作：如果你希望继续顺手优化，可以再把“批量导入成功后自动高亮新创建博客”也补到内容管理页里。
+
+## 2026-04-25 11:48 (Asia/Shanghai)
+
+- 任务：优化博客批量导入弹框顶部设置区，缓解分组选择区域过于拥挤的问题。
+- 改动文件：
+  - `apps/web/src/components/blog/BatchMarkdownImportDialog.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将“批量发布设置”区域调整为更宽松的响应式布局，常见窗口宽度下优先避免等宽双列硬挤，超宽时再恢复左右分栏。
+  - 为“目标分组”和“可见范围”各自补上独立的卡片容器、更多内边距与更高的内容区，让标签换行和滚动区更自然。
+  - 将当前发布目标摘要独立为单独一行的信息条，避免和分组标签争抢顶部空间。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/BatchMarkdownImportDialog.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：当分组数量继续明显增长时，弹框顶部仍会依赖滚动容器承载全部标签，只是当前密度已经比之前舒展很多。
+  - 下一步动作：如果后面分组越来越多，可以再把这里升级成“可搜索分组选择器”而不是纯标签墙。
+
+## 2026-04-25 11:49 (Asia/Shanghai)
+
+- 任务：修复批量上传资源时，单项 AI 标题/标签分析在条目被移除后仍按旧索引回写，导致结果串到其他资源上的问题。
+- 改动文件：
+  - `apps/web/src/components/BatchUploadResourceDialog.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 为批量上传资源弹框新增基于 `uploadKey` 的稳定条目定位与查询方法，单项 AI 起名、单项 AI 标签、批量 AI 起名、批量 AI 标签都不再依赖数组索引回写结果。
+  - 当 AI 请求返回时，会先确认目标条目是否仍存在；如果用户已经把该资源移除，则直接忽略迟到结果，不再修改当前列表里其他资源的标题或标签。
+  - 顺手为单项 AI 操作补了空条目保护，避免极端情况下点击事件滞后导致的空引用。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/BatchUploadResourceDialog.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：这次修的是前端回写错位问题，后台 AI 请求本身仍会继续执行，尚未做到真正的请求取消。
+  - 下一步动作：如果后面想进一步节省后端资源，可以再把资源上传弹框的 AI 请求接入 `AbortController` 或请求级取消能力。
+
+## 2026-04-25 11:58 (Asia/Shanghai)
+
+- 任务：修复博客编辑器手动粘贴 Markdown 时，Windows 剪贴板换行符导致代码块语言和换行格式异常的问题。
+- 改动文件：
+  - `apps/web/src/components/blog/MdxMarkdownEditor.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 `normalizeMarkdownPaste`，在实际调用 `insertMarkdown(...)` 前先移除 BOM 并将 `CRLF/CR` 统一规范为 `LF`。
+  - 让 Markdown 粘贴识别和真正插入都基于同一份规范化文本，避免 fenced code block 在 Windows 复制场景下出现语言丢失、换行被压成一行的问题。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/MdxMarkdownEditor.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：这次主要针对换行符链路做修复；如果后面还存在某些特定 Markdown 片段在富文本光标位置插入异常，需要继续看 `insertMarkdown` 本身的上下文插入行为。
+  - 下一步动作：如果你复测后仍有个别片段异常，我下一步会继续把“代码块粘贴”单独改成更强的插入策略，而不只依赖当前通用插入接口。
+
+## 2026-04-25 12:07 (Asia/Shanghai)
+
+- 任务：继续修复从聊天/网页复制 Markdown 到博客编辑器时，代码块仍未按预期格式化的问题。
+- 改动文件：
+  - `apps/web/src/components/blog/MdxMarkdownEditor.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增基于 `text/html` 的剪贴板恢复逻辑，当复制内容里包含 `<pre><code>` 时，会优先把 HTML 结构重建成 fenced markdown，再交给编辑器插入。
+  - 从代码块节点的 `language-* / lang-*` class 中恢复代码语言标识，避免“复制的是网页渲染结果，但粘贴时语言信息丢失”的情况。
+  - `text/html` 不可用时仍会回退到原有 `text/plain` 规范化链路，保持普通 Markdown 粘贴兼容。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/MdxMarkdownEditor.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：这次主要覆盖 HTML 剪贴板里带 `<pre><code>` 的场景；如果某些来源既不给规范的 `text/plain`，也不给可恢复的 `text/html`，仍可能落到编辑器默认粘贴行为。
+  - 下一步动作：如果你复测后依然失败，我下一步会直接在本地加粘贴调试日志，精确看你当前剪贴板源到底给了什么 MIME 内容。
+
+## 2026-04-25 11:17 (Asia/Shanghai)
+
+- 任务：下线 Web 端公共“更新日志”板块，移除不再需要的入口与页面实现。
+- 改动文件：
+  - `apps/web/src/layouts/Header.tsx`
+  - `apps/web/src/App.tsx`
+  - `apps/web/src/pages/SystemUpdates/index.tsx`
+  - `apps/web/src/api/systemUpdate.ts`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 移除公共站点头部导航中的“更新日志”入口，避免继续向用户暴露低价值页面。
+  - 将旧的 `/updates` 路由改为直接回到首页，兼容历史书签或外部旧链接，不让用户落到孤立空页。
+  - 删除 Web 端更新日志页面与其专用接口封装，清理已经失去入口的死代码。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py`：通过
+- 风险与后续：
+  - 当前风险：后台系统更新日志管理与服务端接口仍保留，当前只是公共 Web 展示下线；如果后续决定彻底废弃，还可以再清理 admin 与 server 侧实现。
+  - 下一步动作：观察一段时间是否还需要把“版本动态”合并进首页公告、通知或别的更轻量入口。
+
+## 2026-04-25 11:21 (Asia/Shanghai)
+
+- 任务：彻底下线系统更新日志功能，移除 admin 与 server 侧残留实现。
+- 改动文件：
+  - `apps/admin/src/App.tsx`
+  - `apps/admin/src/layouts/Layout.tsx`
+  - `apps/admin/src/pages/SystemUpdates.tsx`
+  - `apps/admin/src/api/system-update.ts`
+  - `server/internal/router/router.go`
+  - `server/internal/database/database.go`
+  - `server/internal/model/model.go`
+  - `server/internal/handler/system_update.go`
+  - `server/migrations/022_drop_system_updates.sql`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 移除 admin 端“系统更新日志”菜单、页面和接口封装，并将旧的 `/system-updates` 后台地址改为回到 `/dashboard`，避免历史入口落到空白页。
+  - 删除 server 侧公开与后台的系统更新日志接口、模型定义以及自动迁移注册，彻底清掉这条已废弃功能链路。
+  - 新增 `022_drop_system_updates.sql`，用于在数据库侧删除不再需要的 `system_updates` 表。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter admin exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/admin/src/App.tsx apps/admin/src/layouts/Layout.tsx server/internal/router/router.go server/internal/database/database.go server/internal/model/model.go .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：`022_drop_system_updates.sql` 需要在线上数据库执行后，`system_updates` 表才会真正删除；在执行前，库里旧数据仍会保留但已无代码路径使用。
+  - 下一步动作：如果准备发布这轮清理，记得把 `022_drop_system_updates.sql` 一起纳入部署迁移流程。
+
+## 2026-04-25 12:16 (Asia/Shanghai)
+
+- 任务：继续修复博客编辑器手动粘贴 Markdown 时，fenced code block 被插成单行且语言退回纯文本的问题。
+- 改动文件：
+  - `apps/web/src/components/blog/MdxMarkdownEditor.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 确认 `@mdxeditor/editor` 的 `insertMarkdown(...)` 属于基于当前选区节点的上下文导入，不适合稳定插入整段 fenced code block。
+  - 为“包含代码块的 Markdown 粘贴”新增合成 HTML paste 通道：先用 `marked` 把 Markdown 转成 HTML，再通过带 `text/html` 的合成粘贴事件交还给编辑器原生 DOM 导入链路处理。
+  - 保留普通 Markdown 场景的 `insertMarkdown(...)` 回退逻辑，并用内部 MIME 标记避免合成粘贴被本地 paste 监听器重复拦截。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/MdxMarkdownEditor.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：这次修复依赖浏览器支持 `DataTransfer` 与合成 paste 事件；现代桌面浏览器通常可用，但仍建议你在实际博客编辑页再复测一次目标样例。
+  - 下一步动作：如果你那边复测仍异常，我下一步会直接把 paste 时拿到的 MIME 类型和重建后的 HTML 临时打到控制台，继续精确定位浏览器兼容差异。
+
+## 2026-04-25 12:30 (Asia/Shanghai)
+
+- 任务：继续修复博客编辑器手动粘贴 Markdown 时，代码块内容被压成单行的问题。
+- 改动文件：
+  - `apps/web/src/components/blog/MdxMarkdownEditor.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 放弃继续依赖 `insertMarkdown(...)` 处理含代码块的 Markdown 粘贴，改为在 MDXEditor 内部注册 `PASTE_COMMAND`，优先拦截包含 fenced code block 的粘贴内容。
+  - 新增基于 fenced code block 的分段解析，将普通文本段落拆成段落节点，将代码段直接创建为真正的 `CodeBlockNode`，保留原始多行代码内容与语言标记。
+  - 外层原有 paste 监听保留给普通 Markdown 场景，且在事件已被内部命令处理时直接跳过，避免双重插入。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/MdxMarkdownEditor.tsx`：通过
+- 风险与后续：
+  - 当前风险：当前“含代码块”的专用插入会把代码块外的普通文本按段落文本插入，优先保证代码多行结构正确；复杂列表、表格等高级 Markdown 结构在这条专用链路里还没有完全恢复富文本语义。
+  - 下一步动作：如果你复测确认代码块换行已经正常，但还希望同一段粘贴里的列表/标题也完整保留，我下一步再把这条专用导入升级成更完整的 Markdown 节点映射。
+
+## 2026-04-25 12:38 (Asia/Shanghai)
+
+- 任务：继续优化博客编辑器代码块粘贴体验，修复空白行显示红点并补上语言归一化/推断。
+- 改动文件：
+  - `apps/web/src/components/blog/MdxMarkdownEditor.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 `normalizeCodeBlockCode`，在代码块写入节点前清理零宽字符，并把“只包含空格/不可见空白”的空白行还原成真正空行，避免 CodeMirror 把这些行显示成 `cm-specialChar` 小红点。
+  - 新增 `normalizeCodeBlockLanguage` 和 alias 语言表，把 `javascript/typescript/shell/plaintext` 等写法统一归一到 `js/ts/bash/txt` 等 canonical key。
+  - 新增 `inferCodeBlockLanguage`，当 fenced code block 没有显式语言时，会按 JSON / HTML / TypeScript / JavaScript / Python / SQL / YAML / Bash 做轻量推断；显式 fence 语言存在时仍以 fence 为准。
+  - 将 `codeMirrorPlugin` 的语言配置改成带 alias 的 `CodeBlockLanguage[]`，让语言下拉和自动加载语法高亮能识别更多等价写法。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：当前语言推断是轻量启发式，优先解决常见博客代码片段；极少数跨语言或语法非常接近的片段，仍可能需要用户手动切换语言。
+  - 下一步动作：如果你后面还希望进一步增强准确率，我可以继续补 `go/rust/java/vue` 等更多语言规则，或者把语言选择器直接放进博客编辑器工具栏里。
