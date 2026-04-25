@@ -1,12 +1,10 @@
 import {
   ArrowLeft,
   Clock3,
-  Eye,
   FileStack,
   FileUp,
   ImagePlus,
   Loader2,
-  PenSquare,
   Plus,
   Save,
   Send,
@@ -33,7 +31,6 @@ import {
   BLOG_COVER_ASPECT_CLASS,
   BLOG_COVER_OUTPUT_HEIGHT,
   BLOG_COVER_OUTPUT_WIDTH,
-  MarkdownPreview,
 } from '@/components/blog';
 import { BatchMarkdownImportDialog } from '@/components/blog/BatchMarkdownImportDialog';
 import { CoverCropDialog } from '@/components/blog/CoverCropDialog';
@@ -57,6 +54,9 @@ export default function BlogCreate() {
   const { id: editingId } = useParams<{ id?: string }>();
   const { user, isAuthenticated } = useAuthStore();
   const isEditMode = Boolean(editingId);
+  const [loadedPostStatus, setLoadedPostStatus] = useState<'draft' | 'published' | 'archived'>(
+    'draft',
+  );
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupId, setGroupId] = useState('');
@@ -82,7 +82,6 @@ export default function BlogCreate() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
-  const [previewMode, setPreviewMode] = useState<'editor' | 'split' | 'preview'>('split');
   const [loadingPost, setLoadingPost] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
@@ -129,6 +128,7 @@ export default function BlogCreate() {
       setContent(detail.content || '');
       setGroupId(detail.groupId || '');
       setVisibility(detail.visibility || 'private');
+      setLoadedPostStatus(detail.status || 'draft');
     } catch {
       toast.error('加载博客内容失败');
       navigate('/my-space');
@@ -261,6 +261,7 @@ export default function BlogCreate() {
     setVisibility('private');
     setGroupId('');
     setLoadingPost(false);
+    setLoadedPostStatus('draft');
     resetLocalCoverEditing();
   };
 
@@ -550,7 +551,10 @@ export default function BlogCreate() {
           status,
         });
         if (status === 'published') {
+          setLoadedPostStatus('published');
           toast.success('博客更新并发布成功');
+        } else if (loadedPostStatus === 'published') {
+          toast.success('草稿已保存，当前线上正文未受影响');
         } else if (options?.fromShortcut) {
           toast.success('草稿已快捷保存（未离开当前页面）');
         } else {
@@ -569,6 +573,7 @@ export default function BlogCreate() {
           status,
           publishNow: status === 'published',
         });
+        setLoadedPostStatus(status);
         toast.success(status === 'published' ? '博客发布成功' : '草稿保存成功');
       }
 
@@ -688,15 +693,12 @@ export default function BlogCreate() {
   const isContentEmpty = !content.trim();
   const actionBusy =
     submitting || coverUploading || aiExcerptLoading || aiCoverLoading || importingMarkdown;
-  const previewMarkdown = useMemo(() => {
-    return `# ${title.trim() || '未命名标题'}\n\n${content.trim() || '开始输入正文内容吧。'}`;
-  }, [title, content]);
   const isEditBootLoading = isEditMode && loadingPost && !title && !content;
 
   if (isEditBootLoading) {
     return (
       <div className="min-h-[calc(100vh-4rem)] px-4 py-6 md:px-8">
-        <div className="mx-auto max-w-350 space-y-5">
+        <div className="mx-auto max-w-360 space-y-5">
           <div className="theme-panel-shell flex items-center gap-3 rounded-2xl border bg-white/85 px-4 py-3 shadow-sm backdrop-blur">
             <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-theme-primary/20 bg-theme-soft/80">
               <Loader2 className="text-theme-primary h-4 w-4 animate-spin" />
@@ -737,7 +739,7 @@ export default function BlogCreate() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] px-4 py-6 md:px-8">
-      <div className="mx-auto max-w-350">
+      <div className="mx-auto max-w-360">
         <div className="theme-panel-shell mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white/75 px-4 py-3 shadow-sm backdrop-blur">
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="rounded-xl">
@@ -752,43 +754,6 @@ export default function BlogCreate() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="border-theme-panel-border bg-theme-soft/65 hidden items-center rounded-lg border p-1 md:inline-flex">
-              <button
-                type="button"
-                className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition ${
-                  previewMode === 'editor'
-                    ? 'bg-theme-soft text-theme-primary shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-                onClick={() => setPreviewMode('editor')}
-              >
-                <PenSquare className="h-3.5 w-3.5" />
-                编辑
-              </button>
-              <button
-                type="button"
-                className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition ${
-                  previewMode === 'split'
-                    ? 'bg-theme-soft text-theme-primary shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-                onClick={() => setPreviewMode('split')}
-              >
-                分屏
-              </button>
-              <button
-                type="button"
-                className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition ${
-                  previewMode === 'preview'
-                    ? 'bg-theme-soft text-theme-primary shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-                onClick={() => setPreviewMode('preview')}
-              >
-                <Eye className="h-3.5 w-3.5" />
-                预览
-              </button>
-            </div>
             <span className="hidden items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs text-slate-500 md:inline-flex">
               <Clock3 className="h-3.5 w-3.5" />
               Ctrl/Cmd + S 草稿保存
@@ -846,313 +811,294 @@ export default function BlogCreate() {
           </div>
         </div>
 
-        <div
-          className={
-            previewMode === 'split' ? 'grid gap-5 lg:grid-cols-[1.2fr_0.8fr]' : 'grid gap-5'
-          }
-        >
-          {previewMode !== 'preview' && (
-            <section className="theme-panel-shell w-full min-w-0 rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm text-slate-500">写作区</div>
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <span>字数：{wordCount}</span>
-                  <span>预计阅读：{readMinutes} 分钟</span>
-                </div>
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.46fr)_minmax(340px,0.72fr)]">
+          <section className="theme-panel-shell w-full min-w-0 rounded-2xl border bg-white/95 p-4 shadow-sm md:p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm text-slate-500">写作区</div>
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <span>字数：{wordCount}</span>
+                <span>预计阅读：{readMinutes} 分钟</span>
+              </div>
+            </div>
+
+            {loadingPost ? (
+              <div className="mb-2 h-12 animate-pulse rounded-xl bg-slate-100" />
+            ) : (
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="输入标题，抓住读者注意力"
+                maxLength={200}
+                className="theme-input-border mb-2 h-12 rounded-lg text-base"
+              />
+            )}
+
+            <MdxMarkdownEditor value={content} onChange={setContent} />
+          </section>
+
+          <section className="min-w-0 space-y-4 lg:sticky lg:top-20 lg:self-start">
+            <div className="theme-panel-shell rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
+              <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-800">
+                <Sparkles className="text-theme-primary h-4 w-4" />
+                发布设置
               </div>
 
-              {loadingPost ? (
-                <div className="mb-2 h-12 animate-pulse rounded-xl bg-slate-100" />
-              ) : (
-                <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="输入标题，抓住读者注意力"
-                  maxLength={200}
-                  className="theme-input-border mb-2 h-12 rounded-xl text-base"
-                />
-              )}
-
-              <MdxMarkdownEditor value={content} onChange={setContent} />
-            </section>
-          )}
-
-          {(previewMode === 'split' || previewMode === 'preview') && (
-            <section className="min-w-0 space-y-4 lg:sticky lg:top-20 lg:self-start">
-              <div className="theme-panel-shell rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-800">
-                  <Sparkles className="text-theme-primary h-4 w-4" />
-                  发布设置
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-slate-500">摘要（可选）</span>
+                    <button
+                      type="button"
+                      onClick={() => void handleAIGenerateExcerpt()}
+                      disabled={isContentEmpty || aiExcerptLoading || submitting}
+                      className="inline-flex h-6 items-center gap-1 rounded-lg border border-theme-primary/30 bg-theme-soft px-1.5 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/75 disabled:cursor-not-allowed disabled:opacity-45"
+                      title={isContentEmpty ? '请先输入正文内容' : 'AI 自动提取摘要'}
+                    >
+                      {aiExcerptLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5" />
+                      )}
+                      {aiExcerptLoading ? '提取中' : 'AI截取摘要'}
+                    </button>
+                  </div>
+                  <Input
+                    value={excerpt}
+                    onChange={(e) => setExcerpt(e.target.value)}
+                    placeholder="留空则自动截取正文"
+                    maxLength={500}
+                    className="rounded-xl"
+                  />
                 </div>
 
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-slate-500">摘要（可选）</span>
-                      <button
-                        type="button"
-                        onClick={() => void handleAIGenerateExcerpt()}
-                        disabled={isContentEmpty || aiExcerptLoading || submitting}
-                        className="inline-flex h-6 items-center gap-1 rounded-lg border border-theme-primary/30 bg-theme-soft px-1.5 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/75 disabled:cursor-not-allowed disabled:opacity-45"
-                        title={isContentEmpty ? '请先输入正文内容' : 'AI 自动提取摘要'}
-                      >
-                        {aiExcerptLoading ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Sparkles className="h-3.5 w-3.5" />
-                        )}
-                        {aiExcerptLoading ? '提取中' : 'AI截取摘要'}
-                      </button>
-                    </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-slate-500">封面 URL（可选）</span>
+                    <button
+                      type="button"
+                      onClick={() => void handleAIGenerateCover()}
+                      disabled={isContentEmpty || aiCoverLoading || coverUploading || submitting}
+                      className="inline-flex h-6 items-center gap-1 rounded-lg border border-theme-primary/30 bg-theme-soft px-1.5 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/75 disabled:cursor-not-allowed disabled:opacity-45"
+                      title={isContentEmpty ? '请先输入正文内容' : 'AI 自动配图为封面'}
+                    >
+                      {aiCoverLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <ImagePlus className="h-3.5 w-3.5" />
+                      )}
+                      {aiCoverLoading ? '配图中' : 'AI配图封面'}
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
                     <Input
-                      value={excerpt}
-                      onChange={(e) => setExcerpt(e.target.value)}
-                      placeholder="留空则自动截取正文"
+                      value={cover}
+                      onChange={(e) => {
+                        if (coverFile || coverObjectUrl) resetLocalCoverEditing();
+                        setCover(e.target.value);
+                        setCoverStorageKey('');
+                        setPendingCoverRemoteUrl('');
+                      }}
+                      placeholder="https://..."
                       maxLength={500}
                       className="rounded-xl"
                     />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-slate-500">封面 URL（可选）</span>
-                      <button
-                        type="button"
-                        onClick={() => void handleAIGenerateCover()}
-                        disabled={isContentEmpty || aiCoverLoading || coverUploading || submitting}
-                        className="inline-flex h-6 items-center gap-1 rounded-lg border border-theme-primary/30 bg-theme-soft px-1.5 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/75 disabled:cursor-not-allowed disabled:opacity-45"
-                        title={isContentEmpty ? '请先输入正文内容' : 'AI 自动配图为封面'}
-                      >
-                        {aiCoverLoading ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <ImagePlus className="h-3.5 w-3.5" />
-                        )}
-                        {aiCoverLoading ? '配图中' : 'AI配图封面'}
-                      </button>
-                    </div>
-                    <div className="flex gap-2">
-                      <Input
-                        value={cover}
-                        onChange={(e) => {
-                          if (coverFile || coverObjectUrl) resetLocalCoverEditing();
-                          setCover(e.target.value);
-                          setCoverStorageKey('');
-                          setPendingCoverRemoteUrl('');
-                        }}
-                        placeholder="https://..."
-                        maxLength={500}
-                        className="rounded-xl"
+                    <label className="border-theme-shell-border bg-theme-soft text-theme-primary hover:bg-theme-soft/75 inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl border px-2.5 text-sm whitespace-nowrap">
+                      <ImagePlus className="mr-1 h-4 w-4" />
+                      {coverUploading ? '上传中' : coverObjectUrl ? '重新选图' : '选择图片'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={coverUploading}
+                        onChange={handleSelectLocalCover}
                       />
-                      <label className="border-theme-shell-border bg-theme-soft text-theme-primary hover:bg-theme-soft/75 inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl border px-2.5 text-sm whitespace-nowrap">
-                        <ImagePlus className="mr-1 h-4 w-4" />
-                        {coverUploading ? '上传中' : coverObjectUrl ? '重新选图' : '选择图片'}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          disabled={coverUploading}
-                          onChange={handleSelectLocalCover}
-                        />
-                      </label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-8 rounded-xl whitespace-nowrap"
-                        disabled={actionBusy || loadingPost}
-                        onClick={() => setWallpaperPickerOpen(true)}
+                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-8 rounded-xl whitespace-nowrap"
+                      disabled={actionBusy || loadingPost}
+                      onClick={() => setWallpaperPickerOpen(true)}
+                    >
+                      <ImagePlus className="mr-1 h-4 w-4" />
+                      选择壁纸
+                    </Button>
+                  </div>
+                  {aiCoverLoading && (
+                    <div className="border-theme-panel-border bg-theme-soft/55 relative mt-3 overflow-hidden rounded-xl border p-3">
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/20 via-transparent to-white/20 animate-pulse" />
+                      <div className="relative flex items-center gap-3">
+                        <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-theme-primary/25 bg-white/80">
+                          <div className="absolute inset-0 animate-ping rounded-xl bg-theme-primary/12" />
+                          <Sparkles className="text-theme-primary relative h-5 w-5" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-slate-700">
+                            {aiCoverSource === 'import'
+                              ? '正在根据导入内容生成封面图...'
+                              : 'AI 正在生成封面图...'}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            你可以继续编辑正文，完成后会自动更新封面预览。
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {[0, 1, 2].map((item) => (
+                          <span
+                            key={`ai-cover-loading-${item}`}
+                            className="bg-theme-primary/20 h-1.5 rounded-full animate-pulse"
+                            style={{ animationDelay: `${item * 180}ms` }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {(!!cover || !!coverObjectUrl) && (
+                    <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                      <div
+                        ref={coverViewportRef}
+                        className={`relative w-full overflow-hidden ${BLOG_COVER_ASPECT_CLASS}`}
                       >
-                        <ImagePlus className="mr-1 h-4 w-4" />
-                        选择壁纸
-                      </Button>
+                        <img
+                          src={coverObjectUrl || cover}
+                          alt=""
+                          aria-hidden
+                          className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-55 blur-3xl"
+                        />
+                        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,rgba(255,255,255,0.34),rgba(255,255,255,0.06)_48%,transparent_78%)]" />
+                        <img
+                          src={coverObjectUrl || cover}
+                          alt="博客封面预览"
+                          className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
+                          draggable={false}
+                        />
+                      </div>
+                      {/* 可见范围标签 */}
+                      <div className="px-3 py-1 text-xs text-slate-500">
+                        当前可见范围：
+                        {visibility === 'public'
+                          ? '公开'
+                          : visibility === 'shared'
+                            ? '共享'
+                            : '私密'}
+                      </div>
                     </div>
-                    {aiCoverLoading && (
-                      <div className="border-theme-panel-border bg-theme-soft/55 relative mt-3 overflow-hidden rounded-xl border p-3">
-                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/20 via-transparent to-white/20 animate-pulse" />
-                        <div className="relative flex items-center gap-3">
-                          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-theme-primary/25 bg-white/80">
-                            <div className="absolute inset-0 animate-ping rounded-xl bg-theme-primary/12" />
-                            <Sparkles className="text-theme-primary relative h-5 w-5" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium text-slate-700">
-                              {aiCoverSource === 'import'
-                                ? '正在根据导入内容生成封面图...'
-                                : 'AI 正在生成封面图...'}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              你可以继续编辑正文，完成后会自动更新封面预览。
-                            </p>
-                          </div>
-                        </div>
-                        <div className="mt-3 grid grid-cols-3 gap-2">
-                          {[0, 1, 2].map((item) => (
-                            <span
-                              key={`ai-cover-loading-${item}`}
-                              className="bg-theme-primary/20 h-1.5 rounded-full animate-pulse"
-                              style={{ animationDelay: `${item * 180}ms` }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {(!!cover || !!coverObjectUrl) && (
-                      <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-                        <div
-                          ref={coverViewportRef}
-                          className={`relative w-full overflow-hidden ${BLOG_COVER_ASPECT_CLASS}`}
-                        >
-                          <img
-                            src={coverObjectUrl || cover}
-                            alt=""
-                            aria-hidden
-                            className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-55 blur-3xl"
-                          />
-                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,rgba(255,255,255,0.34),rgba(255,255,255,0.06)_48%,transparent_78%)]" />
-                          <img
-                            src={coverObjectUrl || cover}
-                            alt="博客封面预览"
-                            className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
-                            draggable={false}
-                          />
-                        </div>
-                        {/* 可见范围标签 */}
-                        <div className="px-3 py-1 text-xs text-slate-500">
-                          当前可见范围：
-                          {visibility === 'public'
-                            ? '公开'
-                            : visibility === 'shared'
-                              ? '共享'
-                              : '私密'}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  )}
+                </div>
 
-                  <div>
-                    <div className="mb-2 text-xs text-slate-500">可见范围</div>
-                    <div className="border-theme-panel-border bg-theme-soft/45 flex flex-wrap gap-2 rounded-xl border p-2">
-                      {[
-                        { label: '私密', value: 'private' as const },
-                        { label: '共享', value: 'shared' as const },
-                        { label: '公开', value: 'public' as const },
-                      ].map((item) => (
-                        <button
-                          type="button"
-                          key={item.value}
-                          onClick={() => setVisibility(item.value)}
-                          className={`rounded-full px-3 py-1.5 text-sm transition ${
-                            visibility === item.value
-                              ? 'bg-theme-primary text-white shadow-sm'
-                              : 'bg-white text-slate-600 hover:bg-slate-100'
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
-                      <span>文章分组</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700"
-                          onClick={() => navigate('/my-space/blog-groups?type=blog')}
-                        >
-                          管理分组
-                        </button>
-                        <button
-                          type="button"
-                          className="text-theme-primary hover:text-theme-primary-hover inline-flex items-center gap-1"
-                          onClick={() => setShowCreateGroup((v) => !v)}
-                        >
-                          <Plus className="h-3 w-3" />
-                          新建分组
-                        </button>
-                      </div>
-                    </div>
-                    <div className="border-theme-panel-border bg-theme-soft/45 flex flex-wrap gap-2 rounded-xl border p-2">
+                <div>
+                  <div className="mb-2 text-xs text-slate-500">可见范围</div>
+                  <div className="border-theme-panel-border bg-theme-soft/45 flex flex-wrap gap-2 rounded-xl border p-2">
+                    {[
+                      { label: '私密', value: 'private' as const },
+                      { label: '共享', value: 'shared' as const },
+                      { label: '公开', value: 'public' as const },
+                    ].map((item) => (
                       <button
                         type="button"
-                        onClick={() => setGroupId('')}
+                        key={item.value}
+                        onClick={() => setVisibility(item.value)}
                         className={`rounded-full px-3 py-1.5 text-sm transition ${
-                          !groupId
+                          visibility === item.value
                             ? 'bg-theme-primary text-white shadow-sm'
                             : 'bg-white text-slate-600 hover:bg-slate-100'
                         }`}
                       >
-                        未分组
+                        {item.label}
                       </button>
-                      {groups.map((item) => (
-                        <button
-                          type="button"
-                          key={item.id}
-                          onClick={() => setGroupId(item.id)}
-                          className={`rounded-full px-3 py-1.5 text-sm transition ${
-                            groupId === item.id
-                              ? 'bg-theme-primary text-white shadow-sm'
-                              : 'bg-white text-slate-600 hover:bg-slate-100'
-                          }`}
-                        >
-                          {item.name}
-                        </button>
-                      ))}
-                    </div>
-
-                    {showCreateGroup && (
-                      <div className="border-theme-shell-border bg-theme-soft/65 mt-3 rounded-xl border p-3">
-                        <Input
-                          value={newGroupName}
-                          onChange={(e) => setNewGroupName(e.target.value)}
-                          placeholder="分组名称，例如：前端思考"
-                          className="mb-2 rounded-lg bg-white"
-                        />
-                        <Input
-                          value={newGroupDesc}
-                          onChange={(e) => setNewGroupDesc(e.target.value)}
-                          placeholder="分组描述（可选）"
-                          className="mb-2 rounded-lg bg-white"
-                        />
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="rounded-lg"
-                            onClick={() => setShowCreateGroup(false)}
-                            disabled={creatingGroup}
-                          >
-                            取消
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="rounded-lg"
-                            onClick={() => void handleCreateGroup()}
-                            disabled={creatingGroup}
-                          >
-                            创建
-                          </Button>
-                        </div>
-                      </div>
-                    )}
+                    ))}
                   </div>
                 </div>
-              </div>
 
-              <div className="theme-panel-shell rounded-2xl border bg-white/95 p-4 shadow-sm md:p-5">
-                <div className="mb-2 text-sm font-medium text-slate-800">实时预览</div>
-                <div
-                  className={`border-theme-panel-border bg-theme-soft/20 min-w-0 overflow-auto rounded-xl border p-4 ${
-                    previewMode === 'preview' ? 'max-h-[760px]' : 'max-h-[520px]'
-                  }`}
-                >
-                  <MarkdownPreview markdown={previewMarkdown} />
+                <div>
+                  <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
+                    <span>文章分组</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700"
+                        onClick={() => navigate('/my-space/blog-groups?type=blog')}
+                      >
+                        管理分组
+                      </button>
+                      <button
+                        type="button"
+                        className="text-theme-primary hover:text-theme-primary-hover inline-flex items-center gap-1"
+                        onClick={() => setShowCreateGroup((v) => !v)}
+                      >
+                        <Plus className="h-3 w-3" />
+                        新建分组
+                      </button>
+                    </div>
+                  </div>
+                  <div className="border-theme-panel-border bg-theme-soft/45 flex flex-wrap gap-2 rounded-xl border p-2">
+                    <button
+                      type="button"
+                      onClick={() => setGroupId('')}
+                      className={`rounded-full px-3 py-1.5 text-sm transition ${
+                        !groupId
+                          ? 'bg-theme-primary text-white shadow-sm'
+                          : 'bg-white text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      未分组
+                    </button>
+                    {groups.map((item) => (
+                      <button
+                        type="button"
+                        key={item.id}
+                        onClick={() => setGroupId(item.id)}
+                        className={`rounded-full px-3 py-1.5 text-sm transition ${
+                          groupId === item.id
+                            ? 'bg-theme-primary text-white shadow-sm'
+                            : 'bg-white text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {item.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  {showCreateGroup && (
+                    <div className="border-theme-shell-border bg-theme-soft/65 mt-3 rounded-xl border p-3">
+                      <Input
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        placeholder="分组名称，例如：前端思考"
+                        className="mb-2 rounded-lg bg-white"
+                      />
+                      <Input
+                        value={newGroupDesc}
+                        onChange={(e) => setNewGroupDesc(e.target.value)}
+                        placeholder="分组描述（可选）"
+                        className="mb-2 rounded-lg bg-white"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-lg"
+                          onClick={() => setShowCreateGroup(false)}
+                          disabled={creatingGroup}
+                        >
+                          取消
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="rounded-lg"
+                          onClick={() => void handleCreateGroup()}
+                          disabled={creatingGroup}
+                        >
+                          创建
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            </section>
-          )}
+            </div>
+          </section>
         </div>
       </div>
 

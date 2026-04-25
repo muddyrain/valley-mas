@@ -90,9 +90,35 @@ marked.setOptions({
 
 marked.use({ renderer });
 
+export function normalizeOrderedListStarts(content: string): string {
+  if (!content) return '';
+
+  const lines = String(content).split('\n');
+  let activeFence = '';
+
+  return lines
+    .map((line) => {
+      const fenceMatch = line.match(/^\s*(```+|~~~+)/);
+      if (fenceMatch) {
+        const fence = fenceMatch[1];
+        if (!activeFence) {
+          activeFence = fence[0];
+        } else if (activeFence === fence[0]) {
+          activeFence = '';
+        }
+        return line;
+      }
+
+      if (activeFence) return line;
+
+      return line.replace(/^(\s*(?:>\s*)*)(0+)([.)])(\s+)/, '$11$3$4');
+    })
+    .join('\n');
+}
+
 // 渲染 Markdown 为 HTML
 export function renderMarkdown(content: string): string {
-  return marked.parse(content) as string;
+  return marked.parse(normalizeOrderedListStarts(content)) as string;
 }
 
 export function createHeadingId(text: string): string {

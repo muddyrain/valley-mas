@@ -3742,3 +3742,137 @@
 - 风险与后续：
   - 当前风险：当前语言推断是轻量启发式，优先解决常见博客代码片段；极少数跨语言或语法非常接近的片段，仍可能需要用户手动切换语言。
   - 下一步动作：如果你后面还希望进一步增强准确率，我可以继续补 `go/rust/java/vue` 等更多语言规则，或者把语言选择器直接放进博客编辑器工具栏里。
+
+## 2026-04-25 22:10 (Asia/Shanghai)
+
+- 任务：修复博客编辑器在代码块粘贴修复后，标题、列表等其他 Markdown 粘贴不再生效的问题。
+- 改动文件：
+  - `apps/web/src/components/blog/MdxMarkdownEditor.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 放弃“代码块走手动节点、其他 Markdown 走外层 DOM `insertMarkdown(...)`”的分叉方案，改为统一在编辑器内部 `PASTE_COMMAND` 中接管所有 Markdown 粘贴。
+  - 新增 `normalizeMarkdownCodeBlocks`，在整段 Markdown 导入前统一净化 fenced code block 的空白行与语言标记，同时保留标题、列表、引用等其他 Markdown 结构原文。
+  - 改为使用 MDXEditor 运行时暴露的 `importMarkdownToLexical(...)`，以 root 级上下文导入 Markdown 后再插入节点，避免 selection 上下文导致的代码块挤压，也恢复普通 Markdown 结构的正确导入。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/MdxMarkdownEditor.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：这次方案依赖 `@mdxeditor/editor` 当前版本对运行时导入接口的暴露；后续若库版本大改，需要再看这一层兼容性。
+  - 下一步动作：如果你后面还遇到某一类特殊 Markdown 来源粘贴异常，我优先继续补这条导入链路；只有在这类基础行为长期不稳定时，再考虑整体替换编辑器。
+
+## 2026-04-25 22:39 (Asia/Shanghai)
+
+- 任务：将博客创作页 Markdown 编辑器从 `@mdxeditor/editor` 替换为 `Milkdown/Crepe`，恢复稳定的 Markdown 粘贴与代码块编辑体验。
+- 改动文件：
+  - `apps/web/src/components/blog/MdxMarkdownEditor.tsx`
+  - `apps/web/src/components/blog/mdx-editor.css`
+  - `apps/web/src/main.tsx`
+  - `apps/web/package.json`
+  - `pnpm-lock.yaml`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 保留 `MdxMarkdownEditor` 组件入口不变，内部改为基于 `Crepe` 初始化编辑器，并通过 `replaceAll(...)` 补齐外部 `value` 到编辑器内容的双向同步。
+  - 启用 `Milkdown` 自带的 `TopBar` 与 `clipboard` Markdown 解析链路，让标题、列表、引用、代码块等复制粘贴时统一按 Markdown 结构落入编辑器。
+  - 重写博客编辑器样式入口，接入 `@milkdown/crepe` 官方主题 CSS，再用本地主题 token 覆盖顶部工具栏、正文排版、代码块和语言选择器，保持当前站点风格一致。
+  - 显式增加 `@milkdown/kit` 依赖，并移除不再使用的 `@mdxeditor/editor` 样式接线。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/MdxMarkdownEditor.tsx apps/web/src/components/blog/mdx-editor.css apps/web/src/main.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：这次完成的是编辑器内核替换与样式接入，实际交互观感仍建议你在博客创作页再手动复测几组典型 Markdown 样例，重点看长文、表格和多代码块混排场景。
+  - 下一步动作：如果你复测后还想进一步收紧工具栏布局或补更贴近产品的快捷操作，我可以基于 `Milkdown` 继续精调顶部工具栏项和代码块表现。
+
+## 2026-04-25 22:54 (Asia/Shanghai)
+
+- 任务：修复 Milkdown 编辑器样式冲突与悬浮菜单裁切，并让“已发布文章保存草稿”不再影响公开博客列表。
+- 改动文件：
+  - `apps/web/src/components/blog/mdx-editor.css`
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `server/internal/handler/blog.go`
+  - `server/internal/model/blog.go`
+  - `server/migrations/023_add_post_draft_data.sql`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 去掉博客编辑器外层对 Milkdown 的 `overflow: hidden` 裁切，并把列表样式从全局 `li/marker` 覆盖收回到 `milkdown-list-item-block`，避免左侧悬浮菜单被截断、列表序号与项目符号错位。
+  - 为 `posts` 增加 `draft_data` / `draft_updated_at`，当已发布文章执行“保存草稿”时，不再把正式文章状态改成 `draft`，而是把编辑中的标题、正文、摘要、封面、分组等内容存入草稿快照。
+  - 管理端文章详情读取时优先回填草稿快照；真正点击发布时再把当前编辑内容写回正式字段并清空草稿快照，保证公开博客列表继续使用已发布版本。
+  - 补上草稿资源清理逻辑，避免删除文章或发布时遗留只存在于草稿里的封面/图文资源。
+  - 调整博客编辑页提示语，已发布文章保存草稿时明确提示“当前线上正文未受影响”。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `cd server && go test ./...`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/mdx-editor.css apps/web/src/pages/BlogCreate/index.tsx server/internal/handler/blog.go server/internal/model/blog.go server/migrations/023_add_post_draft_data.sql .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：`draft_data` 依赖新增数据库字段，部署前需要执行本次新增的迁移；未迁移时保存草稿会缺列失败。
+  - 下一步动作：建议你在博客编辑页重点回归三组场景：列表排版、左侧悬浮菜单、已发布文章“保存草稿后公开页仍保持旧版本，点击发布后才切新版本”。
+
+## 2026-04-25 23:05 (Asia/Shanghai)
+
+- 任务：继续收敛博客编辑页的所见即所得样式，并为 Milkdown 左侧悬浮操作留出更合理的写作区空间。
+- 改动文件：
+  - `apps/web/src/components/blog/mdx-editor.css`
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将编辑页 split 布局调整为更偏向写作区的列比例，并增加写作区容器内边距，缓解正文区域过窄导致的拥挤感。
+  - 为 Milkdown 的 `ProseMirror` 内容区增加左侧 gutter padding，同时提高 slash menu 层级并微调 block handle 外侧间距，让左侧悬浮加号/拖拽按钮有实际落位空间。
+  - 为博客编辑页预览区新增 `valley-md-preview-body` 局部样式，和编辑区统一标题层级、段落、列表、引用、行内代码、代码块、链接与表格观感，避免预览和编辑两边像两套主题。
+  - 保持这次样式收敛只作用于博客编辑页预览，不直接影响站内其他公共 Markdown 展示页。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/mdx-editor.css apps/web/src/pages/BlogCreate/index.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：这次主要解决的是编辑页视觉一致性与左侧操作空间，若后续还要进一步做到“预览像最终博客详情页”，可能需要再抽一层真正共享的 Markdown typography token。
+  - 下一步动作：建议你继续在编辑页重点看两类内容是否满意：多级标题/列表，以及左侧 block handle 在普通段落、代码块前的停靠位置。
+
+## 2026-04-25 23:14 (Asia/Shanghai)
+
+- 任务：移除博客创建页的实时预览区域，只保留编辑区与发布设置。
+- 改动文件：
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 删除博客创建页顶部的编辑/分屏/预览切换按钮，不再保留预览模式状态。
+  - 移除实时预览面板与对应的 `MarkdownPreview` / `previewMarkdown` 链路，页面聚焦为“左侧写作 + 右侧发布设置”。
+  - 将主布局固定为更偏向写作区的双栏结构，避免去掉预览后页面仍保留旧的模式切换判断。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/BlogCreate/index.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：本次只移除了博客创建页的实时预览，编辑器样式文件里上一轮为预览区准备的局部样式仍可后续再清理。
+  - 下一步动作：如果你希望页面更纯粹，我下一步可以继续把右侧发布设置也压缩一下，让写作区再宽一点。
+
+## 2026-04-25 23:17 (Asia/Shanghai)
+
+- 任务：修复博客编辑器里有序列表从 `0.` 开始显示的问题，统一从 `1.` 起始。
+- 改动文件：
+  - `apps/web/src/components/blog/MdxMarkdownEditor.tsx`
+  - `apps/web/src/utils/blog.ts`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增 `normalizeOrderedListStarts(...)`，按行处理 Markdown，在非 fenced code block 场景下把行首的 `0.` / `0)` 有序列表标记归一为 `1.` / `1)`。
+  - 编辑器初始化、外部 `value` 回填和编辑器 `markdownUpdated` 回调都接入这层规范化，保证你在写作区里看到和最终保存出去的内容一致。
+  - Markdown HTML 渲染链路也同步接入同一规则，避免编辑器里改好了但后续渲染时又把 `start="0"` 带出来。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/MdxMarkdownEditor.tsx apps/web/src/utils/blog.ts .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：当前规则是产品层面的统一收口，因此会把 Markdown 中显式写的 `0.` 起始有序列表也自动改成 `1.`。
+  - 下一步动作：如果你后面希望把 `2.`、`3.` 这类手写起始编号也统一收成规范序号，我可以继续把整段有序列表做更完整的归一化。
+
+## 2026-04-25 23:31 (Asia/Shanghai)
+
+- 任务：修复博客编辑器里正文与块级内容选中时高亮不明显的问题。
+- 改动文件：
+  - `apps/web/src/components/blog/mdx-editor.css`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将 `Milkdown` 的 `--crepe-color-selected` 从偏奶油白的浅色改成基于当前主题主色的半透明高亮色，恢复普通正文文本选区的可见度。
+  - 为 `ProseMirror` 的块级选中态补充统一的描边、外发光和圆角高亮，覆盖段落块、列表项、图片、表格单元格以及代码块选中场景。
+  - 把编辑器外层容器从 `overflow: hidden` 改回 `overflow: visible`，避免左侧浮动菜单再次被外层裁切。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/mdx-editor.css .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：这次增强的是统一选中态视觉，如果你后面觉得某一类块元素还要再“更重”一点，可以继续按元素单独微调。
+  - 下一步动作：优先看正文拖选、整块代码块选中、列表项选中这三种是否已经足够明显。

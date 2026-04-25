@@ -128,6 +128,24 @@ type PostCommentResponse struct {
 	Author    *PostCommentAuthorInfo `json:"author,omitempty"`
 }
 
+type postDraftPayload struct {
+	Title           string              `json:"title"`
+	PostType        string              `json:"postType"`
+	Visibility      string              `json:"visibility"`
+	TemplateKey     string              `json:"templateKey,omitempty"`
+	TemplateData    string              `json:"templateData,omitempty"`
+	ImageTextData   string              `json:"imageTextData,omitempty"`
+	Content         string              `json:"content"`
+	HTMLContent     string              `json:"htmlContent"`
+	Excerpt         string              `json:"excerpt,omitempty"`
+	Cover           string              `json:"cover,omitempty"`
+	CoverStorageKey string              `json:"coverStorageKey,omitempty"`
+	GroupID         model.Int64String   `json:"groupId"`
+	CategoryID      model.Int64String   `json:"categoryId"`
+	TagIDs          []model.Int64String `json:"tagIds,omitempty"`
+	IsTop           bool                `json:"isTop"`
+}
+
 func GetPosts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
@@ -696,6 +714,10 @@ func AdminGetPostDetail(c *gin.Context) {
 		return
 	}
 
+	if draft := parsePostDraftPayload(post.DraftData); draft != nil {
+		applyPostDraftPayload(&post, draft)
+	}
+
 	Success(c, convertToPostDetailResponse(&post))
 }
 
@@ -895,15 +917,18 @@ func AdminUpdatePost(c *gin.Context) {
 		return
 	}
 	imageTextData = normalizeJSONColumnValue(imageTextData)
+	existingDraft := parsePostDraftPayload(post.DraftData)
 
+	normalizedType := normalizePostType(req.PostType)
+	normalizedVisibility := normalizeVisibility(req.Visibility)
 	updates := make(map[string]interface{})
 	if req.Title != "" {
 		updates["title"] = req.Title
 	}
-	if normalizedType := normalizePostType(req.PostType); normalizedType != "" {
+	if normalizedType != "" {
 		updates["post_type"] = normalizedType
 	}
-	if normalizedVisibility := normalizeVisibility(req.Visibility); normalizedVisibility != "" {
+	if normalizedVisibility != "" {
 		updates["visibility"] = normalizedVisibility
 	}
 	if req.TemplateKey != "" {
@@ -963,7 +988,7 @@ func AdminUpdatePost(c *gin.Context) {
 			updates["group_id"] = 0
 		} else {
 			finalType := post.PostType
-			if normalizedType := normalizePostType(req.PostType); normalizedType != "" {
+			if normalizedType != "" {
 				finalType = normalizedType
 			}
 			if _, err := loadWritableGroupForPostType(c, *req.GroupID, finalType, currentUserIDForPost(c, post.AuthorID), currentUserRole(c)); err != nil {
@@ -976,11 +1001,93 @@ func AdminUpdatePost(c *gin.Context) {
 	if req.CategoryID != 0 {
 		updates["category_id"] = int64(req.CategoryID)
 	}
+
+	if req.Status == "draft" && post.Status == "published" {
+		draftPayload := newPostDraftPayloadFromPost(&post)
+		if existingDraft != nil {
+			draftPayload = *existingDraft
+		}
+
+		if req.Title != "" {
+			draftPayload.Title = req.Title
+		}
+		if normalizedType != "" {
+			draftPayload.PostType = normalizedType
+		}
+		if normalizedVisibility != "" {
+			draftPayload.Visibility = normalizedVisibility
+		}
+		if req.TemplateKey != "" {
+			draftPayload.TemplateKey = strings.TrimSpace(req.TemplateKey)
+		}
+		if req.TemplateData != "" {
+			draftPayload.TemplateData = normalizeJSONColumnValue(strings.TrimSpace(req.TemplateData))
+		}
+		if hasImageTextData || strings.TrimSpace(req.TemplateData) != "" {
+			draftPayload.ImageTextData = imageTextData
+			draftPayload.TemplateData = imageTextData
+		}
+		if req.Content != "" {
+			draftPayload.Content = req.Content
+			draftPayload.HTMLContent = renderMarkdown(req.Content)
+		} else {
+			finalType := draftPayload.PostType
+			if finalType == postTypeImageText {
+				autoContent := buildImageTextContent(draftPayload.TemplateKey, draftPayload.TemplateData)
+				if autoContent != "" {
+					draftPayload.Content = autoContent
+					draftPayload.HTMLContent = renderMarkdown(autoContent)
+				}
+			}
+		}
+		if req.Excerpt != "" {
+			draftPayload.Excerpt = req.Excerpt
+		}
+		draftPayload.Cover = newCoverURL
+		draftPayload.CoverStorageKey = newCoverKey
+		if req.GroupID != nil {
+			draftPayload.GroupID = *req.GroupID
+		}
+		if req.CategoryID != 0 {
+			draftPayload.CategoryID = req.CategoryID
+		}
+		if req.TagIDs != nil {
+			draftPayload.TagIDs = req.TagIDs
+		}
+		draftPayload.IsTop = req.IsTop
+
+		now := time.Now()
+		if err := database.DB.Model(&post).Updates(map[string]any{
+			"draft_data":       encodePostDraftPayload(draftPayload),
+			"draft_updated_at": &now,
+		}).Error; err != nil {
+			Error(c, http.StatusInternalServerError, "update failed")
+			return
+		}
+
+		if existingDraft != nil {
+			if oldKey := strings.TrimSpace(existingDraft.CoverStorageKey); oldKey != "" && oldKey != draftPayload.CoverStorageKey {
+				deletePostCoverAsync(oldKey, strings.TrimSpace(existingDraft.Cover))
+			}
+			deleteObsoleteImageTextAssets(
+				extractImageTextStorageKeys(normalizeImageTextData(existingDraft.ImageTextData, existingDraft.TemplateData)),
+				extractImageTextStorageKeys(normalizeImageTextData(draftPayload.ImageTextData, draftPayload.TemplateData)),
+			)
+		}
+
+		Success(c, nil)
+		return
+	}
+
 	if req.Status != "" {
 		updates["status"] = req.Status
 		if req.Status == "published" && post.Status != "published" {
 			now := time.Now()
 			updates["published_at"] = &now
+		}
+		if req.Status == "published" {
+			updates["draft_data"] = ""
+			updates["draft_updated_at"] = nil
 		}
 	}
 	updates["is_top"] = req.IsTop
@@ -1000,6 +1107,24 @@ func AdminUpdatePost(c *gin.Context) {
 	if hasImageTextData || strings.TrimSpace(req.TemplateData) != "" {
 		newImageTextKeys := extractImageTextStorageKeys(imageTextData)
 		deleteObsoleteImageTextAssets(oldImageTextKeys, newImageTextKeys)
+	}
+	if req.Status == "published" && existingDraft != nil {
+		finalCoverKey := newCoverKey
+		if finalCoverKey == "" {
+			finalCoverKey = strings.TrimSpace(post.CoverStorageKey)
+		}
+		if oldDraftCoverKey := strings.TrimSpace(existingDraft.CoverStorageKey); oldDraftCoverKey != "" && oldDraftCoverKey != finalCoverKey {
+			deletePostCoverAsync(oldDraftCoverKey, strings.TrimSpace(existingDraft.Cover))
+		}
+
+		finalImageTextData := normalizeImageTextData(post.ImageTextData, post.TemplateData)
+		if hasImageTextData || strings.TrimSpace(req.TemplateData) != "" {
+			finalImageTextData = imageTextData
+		}
+		deleteObsoleteImageTextAssets(
+			extractImageTextStorageKeys(normalizeImageTextData(existingDraft.ImageTextData, existingDraft.TemplateData)),
+			extractImageTextStorageKeys(finalImageTextData),
+		)
 	}
 	if req.GroupID != nil && oldGroupID != newGroupID {
 		if oldGroupID != 0 {
@@ -1041,9 +1166,21 @@ func AdminDeletePost(c *gin.Context) {
 	coverKey := strings.TrimSpace(post.CoverStorageKey)
 	coverURL := strings.TrimSpace(post.Cover)
 	imageTextKeys := extractImageTextStorageKeys(normalizeImageTextData(post.ImageTextData, post.TemplateData))
+	draftCoverKey := ""
+	draftCoverURL := ""
+	draftImageTextKeys := []string(nil)
+	if draft := parsePostDraftPayload(post.DraftData); draft != nil {
+		draftCoverKey = strings.TrimSpace(draft.CoverStorageKey)
+		draftCoverURL = strings.TrimSpace(draft.Cover)
+		draftImageTextKeys = extractImageTextStorageKeys(normalizeImageTextData(draft.ImageTextData, draft.TemplateData))
+	}
 	database.DB.Delete(&post)
 	deletePostCoverAsync(coverKey, coverURL)
+	if draftCoverKey != "" && draftCoverKey != coverKey {
+		deletePostCoverAsync(draftCoverKey, draftCoverURL)
+	}
 	deleteImageTextAssetsAsync(imageTextKeys)
+	deleteObsoleteImageTextAssets(draftImageTextKeys, imageTextKeys)
 
 	if post.GroupID != 0 {
 		database.DB.Model(&model.PostGroup{}).
@@ -1264,6 +1401,86 @@ func convertToPostDetailResponse(post *model.Post) PostDetailResponse {
 	}
 
 	return resp
+}
+
+func parsePostDraftPayload(raw string) *postDraftPayload {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil
+	}
+	var payload postDraftPayload
+	if err := json.Unmarshal([]byte(trimmed), &payload); err != nil {
+		return nil
+	}
+	if normalizedType := normalizePostType(payload.PostType); normalizedType != "" {
+		payload.PostType = normalizedType
+	}
+	if normalizedVisibility := normalizeVisibility(payload.Visibility); normalizedVisibility != "" {
+		payload.Visibility = normalizedVisibility
+	}
+	payload.TemplateKey = strings.TrimSpace(payload.TemplateKey)
+	payload.TemplateData = normalizeJSONColumnValue(payload.TemplateData)
+	payload.ImageTextData = normalizeImageTextData(payload.ImageTextData, payload.TemplateData)
+	payload.Cover = strings.TrimSpace(payload.Cover)
+	payload.CoverStorageKey = strings.TrimSpace(payload.CoverStorageKey)
+	return &payload
+}
+
+func encodePostDraftPayload(payload postDraftPayload) string {
+	bytes, err := json.Marshal(payload)
+	if err != nil {
+		return "{}"
+	}
+	return normalizeJSONColumnValue(string(bytes))
+}
+
+func newPostDraftPayloadFromPost(post *model.Post) postDraftPayload {
+	return postDraftPayload{
+		Title:           post.Title,
+		PostType:        normalizePostType(post.PostType),
+		Visibility:      normalizeVisibility(post.Visibility),
+		TemplateKey:     strings.TrimSpace(post.TemplateKey),
+		TemplateData:    normalizeJSONColumnValue(post.TemplateData),
+		ImageTextData:   normalizeImageTextData(post.ImageTextData, post.TemplateData),
+		Content:         post.Content,
+		HTMLContent:     post.HTMLContent,
+		Excerpt:         post.Excerpt,
+		Cover:           strings.TrimSpace(post.Cover),
+		CoverStorageKey: strings.TrimSpace(post.CoverStorageKey),
+		GroupID:         post.GroupID,
+		CategoryID:      post.CategoryID,
+		IsTop:           post.IsTop,
+	}
+}
+
+func applyPostDraftPayload(post *model.Post, payload *postDraftPayload) {
+	if payload == nil {
+		return
+	}
+	if strings.TrimSpace(payload.Title) != "" {
+		post.Title = payload.Title
+	}
+	if normalizedType := normalizePostType(payload.PostType); normalizedType != "" {
+		post.PostType = normalizedType
+	}
+	if normalizedVisibility := normalizeVisibility(payload.Visibility); normalizedVisibility != "" {
+		post.Visibility = normalizedVisibility
+	}
+	post.TemplateKey = strings.TrimSpace(payload.TemplateKey)
+	post.TemplateData = normalizeJSONColumnValue(payload.TemplateData)
+	post.ImageTextData = normalizeImageTextData(payload.ImageTextData, payload.TemplateData)
+	if strings.TrimSpace(payload.Content) != "" {
+		post.Content = payload.Content
+		post.HTMLContent = payload.HTMLContent
+	}
+	post.Excerpt = payload.Excerpt
+	post.Cover = strings.TrimSpace(payload.Cover)
+	post.CoverStorageKey = strings.TrimSpace(payload.CoverStorageKey)
+	post.GroupID = payload.GroupID
+	if payload.CategoryID != 0 {
+		post.CategoryID = payload.CategoryID
+	}
+	post.IsTop = payload.IsTop
 }
 
 func convertToPostCommentResponse(comment *model.PostComment) PostCommentResponse {
