@@ -353,15 +353,17 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
                   <Eye className="mr-1 h-3 w-3" />
                   预览
                 </span>
-                <span
+                <button
+                  type="button"
                   className="hidden rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-[10px] text-white/76 backdrop-blur-sm sm:inline-flex hover:bg-theme-primary duration-300"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     navigate(`/resource/${resource.id}`);
                   }}
                 >
                   <Link className="mr-1 h-3 w-3" />
                   详情
-                </span>
+                </button>
               </div>
 
               <div
