@@ -43,6 +43,7 @@ export function PublicWallpaperPickerDialog({
           type: 'wallpaper',
           keyword: keyword || undefined,
           sort,
+          includeTags: true,
         });
         if (cancelled) return;
         setResources(result.list || []);

@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 // GetCreatorSpace 获取创作者空间信息（公开接口，用户端）
@@ -248,6 +249,9 @@ func GetMyDownloads(c *gin.Context) {
 // @Failure      404  {object}  map[string]interface{}  "创作者不存在"
 // @Router       /public/creators/{id}/resources [get]
 func GetCreatorResourcesList(c *gin.Context) {
+	logger.SkipOperationLog(c)
+	setPublicListCacheHeaders(c)
+
 	creatorID := c.Param("id")
 	page := GetIntQuery(c, "page", 1)
 	pageSize := GetIntQuery(c, "pageSize", 20)
@@ -265,6 +269,9 @@ func GetCreatorResourcesList(c *gin.Context) {
 	// 验证创作者是否存在
 	var creator model.Creator
 	if err := db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", creatorID, true).
+		Preload("User", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, nickname, avatar")
+		}).
 		First(&creator).Error; err != nil {
 		Error(c, 404, "创作者不存在或未激活")
 		return
@@ -305,40 +312,31 @@ func GetCreatorResourcesList(c *gin.Context) {
 
 	// 查询资源列表
 	var resources []model.Resource
-	err := query.Order("resources.created_at DESC").
+	err := applyResourceListQueryShape(query, true).
+		Order("resources.created_at DESC").
 		Limit(pageSize).
 		Offset(offset).
-		Preload("Tags").
 		Find(&resources).Error
 
 	if err != nil {
 		Error(c, 500, "查询失败: "+err.Error())
 		return
 	}
-	fillResourceThumbnails(resources)
 
-	// 获取创作者名称和头像（统一从 User 读取）
-	var creatorName, creatorAvatar string
-	var user model.User
-	if err := db.Where("id = ?", creator.UserID).First(&user).Error; err == nil {
-		creatorName = user.Nickname
-		creatorAvatar = user.Avatar
+	creatorName := ""
+	creatorAvatar := ""
+	if creator.User != nil {
+		creatorName = creator.User.Nickname
+		creatorAvatar = creator.User.Avatar
 	}
 
-	// 如果当前请求携带了有效 token（OptionalAuth 已解析），则查询收藏状态
-	favoritedSet := map[string]bool{}
-	if uid, exists := c.Get("userId"); exists {
-		userID := uid.(int64)
-		var favs []model.UserFavorite
-		db.Where("user_id = ? AND deleted_at IS NULL", userID).Find(&favs)
-		for _, f := range favs {
-			favoritedSet[strconv.FormatInt(int64(f.ResourceID), 10)] = true
-		}
-	}
+	resourceIDs := collectResourceIDs(resources)
+	favoritedSet := loadFavoritedSetForResources(db, c, resourceIDs)
 
 	// 构建响应
 	resourceList := make([]gin.H, 0, len(resources))
 	for _, resource := range resources {
+		resource.FillThumbnailURL()
 		rid := strconv.FormatInt(int64(resource.ID), 10)
 		resourceList = append(resourceList, gin.H{
 			"id":            resource.ID,

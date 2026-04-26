@@ -19,7 +19,7 @@ export interface Resource {
   creatorName: string;
   creatorAvatar: string;
   creatorCode?: string; // 创作者页跳转 code
-  tags: Array<{ id: string; name: string }>;
+  tags?: Array<{ id: string; name: string }>;
   createdAt: string;
   size?: number;
   width?: number; // 图片宽度（px）
@@ -51,14 +51,16 @@ export const getAllResources = (
     keyword?: string;
     tagId?: string;
     sort?: 'newest' | 'oldest';
+    includeTags?: boolean;
   } = {},
 ) => {
-  const { page = 1, pageSize = 20, type, keyword, tagId, sort } = params;
+  const { page = 1, pageSize = 20, type, keyword, tagId, sort, includeTags = false } = params;
   const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (type) query.set('type', type);
   if (keyword) query.set('keyword', keyword);
   if (tagId) query.set('tagId', tagId);
   if (sort) query.set('sort', sort);
+  if (includeTags) query.set('includeTags', 'true');
   return http.get<unknown, ListResponse<Resource>>(`/public/resources?${query.toString()}`);
 };
 

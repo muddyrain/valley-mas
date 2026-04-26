@@ -18,6 +18,8 @@ import (
 
 var Log *logrus.Logger
 
+const skipOperationLogKey = "skip_operation_log"
+
 // InitLogger 初始化日志系统
 func InitLogger() {
 	Log = logrus.New()
@@ -169,8 +171,29 @@ func RequestLogger() gin.HandlerFunc {
 			Log.WithFields(responseFields).Info(message)
 		}
 
-		saveOperationLog(c, logID, statusCode, latency, level, message)
+		if ShouldPersistOperationLog(c) {
+			saveOperationLog(c, logID, statusCode, latency, level, message)
+		}
 	}
+}
+
+func SkipOperationLog(c *gin.Context) {
+	if c == nil {
+		return
+	}
+	c.Set(skipOperationLogKey, true)
+}
+
+func ShouldPersistOperationLog(c *gin.Context) bool {
+	if c == nil {
+		return true
+	}
+	if skip, exists := c.Get(skipOperationLogKey); exists {
+		if skipValue, ok := skip.(bool); ok && skipValue {
+			return false
+		}
+	}
+	return true
 }
 
 func saveOperationLog(

@@ -3995,3 +3995,50 @@
 - 风险与后续：
   - 当前风险：这次修的是 overlay 的定位坐标系问题，如果后续还出现拖拽手感上的细微抖动，更可能是排序动画参数而不是定位基准出错。
   - 下一步动作：如果你再测时还觉得 preview 有轻微漂移，我下一轮会直接调 `dropAnimation` 和排序项位移动画，不再改 portal 结构。
+
+## 2026-04-26 14:18 (Asia/Shanghai)
+
+- 任务：为资源与博客列表接口收紧查询字段和关联加载，减少无关数据带来的响应开销。
+- 改动文件：
+  - `server/internal/handler/list_query_helpers.go`
+  - `server/internal/handler/home.go`
+  - `server/internal/handler/user_public.go`
+  - `server/internal/handler/blog.go`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 抽出列表态查询 helper，统一为资源列表和博客列表限定 `Select` 字段，并把关联 `Preload` 收敛到作者昵称头像、标签基础信息、分组分类摘要等最小集合。
+  - 将公开资源列表、热门资源列表、创作者资源列表切到轻量查询形态，避免再把整行资源字段和无关关联一并加载。
+  - 创作者资源列表改为复用当前页资源 ID 查询收藏状态，并直接复用预加载的创作者用户信息，去掉原先“查全量收藏 + 额外再查一次作者”的开销。
+  - 公开博客列表与后台博客列表保留现有响应结构，但查询阶段只读取列表卡片真正需要的字段，不再顺带加载正文、草稿等详情态大字段。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py server/internal/handler/list_query_helpers.go server/internal/handler/home.go server/internal/handler/user_public.go server/internal/handler/blog.go`：通过
+- 风险与后续：
+  - 当前风险：这轮保留了现有列表返回结构，优先压缩查询成本；如果后续还要继续提速，可以再逐个核对前端真实依赖后继续裁掉列表响应里的历史冗余字段。
+  - 下一步动作：建议下一轮用慢查询日志或接口耗时对比重点观察 `GetPosts`、`GetAllResources`、`GetCreatorResourcesList` 三个入口的实际收益，再决定是否继续把详情接口和管理端列表也拆成更细的 DTO。
+
+## 2026-04-26 15:12 (Asia/Shanghai)
+
+- 任务：继续优化公开资源列表链路，减少 Vercel + Supabase 免费版下的无效数据库往返和公开响应体积。
+- 改动文件：
+  - `server/internal/handler/home.go`
+  - `server/internal/handler/user_public.go`
+  - `server/internal/handler/list_query_helpers.go`
+  - `server/internal/logger/logger.go`
+  - `apps/web/src/api/resource.ts`
+  - `apps/web/src/pages/Resources/index.tsx`
+  - `apps/web/src/components/blog/PublicWallpaperPickerDialog.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 为公开资源列表新增 `includeTags` 查询开关，默认不加载标签，仅资源广场和公共壁纸选择器这类确实展示标签的页面显式开启。
+  - 将公开资源列表与热门资源列表的标签响应改为轻量 `{ id, name }` 结构，避免继续返回标签对象里的零值字段和无关元信息。
+  - 为公开资源列表、热门资源列表、创作者公开资源列表补上面向匿名访问的缓存头；登录态请求则显式改为 `private, no-store`，避免带收藏态的结果被共享缓存污染。
+  - 为上述公开读列表接口跳过 `operation_logs` 数据库写入，仅保留 stdout 请求日志，减少每次请求结束后的额外写库开销。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `cd server && go build ./cmd/server`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py server/internal/handler/list_query_helpers.go server/internal/logger/logger.go server/internal/handler/home.go server/internal/handler/user_public.go apps/web/src/api/resource.ts apps/web/src/pages/Resources/index.tsx apps/web/src/components/blog/PublicWallpaperPickerDialog.tsx`：通过
+- 风险与后续：
+  - 当前风险：资源广场和公共壁纸选择器已显式开启 `includeTags`，但其他未来新增的 `getAllResources` 调用如果也要展示标签，记得同步传 `includeTags: true`。
+  - 下一步动作：发布后优先复测匿名访问的 `/api/v1/public/resources?page=1&pageSize=8`，重点观察 TTFB 和响应头是否命中缓存策略，再决定是否继续把 `total count` 也做缓存或延迟化。
