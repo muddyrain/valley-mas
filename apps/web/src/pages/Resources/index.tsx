@@ -146,6 +146,7 @@ export default function Resources() {
       type: activeType || undefined,
       keyword: currentKeyword || undefined,
       tagId: tagId || undefined,
+      includeTags: true,
     })
       .then((data) => {
         if (cancelled) return;
@@ -209,6 +210,7 @@ export default function Resources() {
         type: activeType || undefined,
         keyword: currentKeyword || undefined,
         tagId: tagId || undefined,
+        includeTags: true,
       });
       const list = data.list ?? [];
       setResources(list);

@@ -213,13 +213,7 @@ func GetPosts(c *gin.Context) {
 	offset := (page - 1) * pageSize
 
 	query := database.DB.Model(&model.Post{}).
-		Where("status = ? AND visibility = ? AND deleted_at IS NULL", "published", visibilityPublic).
-		Preload("Group").
-		Preload("Category").
-		Preload("Tags").
-		Preload("Author", func(db *gorm.DB) *gorm.DB {
-			return db.Select("id, nickname, avatar")
-		})
+		Where("status = ? AND visibility = ? AND deleted_at IS NULL", "published", visibilityPublic)
 
 	if groupIDRaw != "" {
 		if groupID, err := strconv.ParseInt(groupIDRaw, 10, 64); err == nil {
@@ -259,7 +253,7 @@ func GetPosts(c *gin.Context) {
 
 	var posts []model.Post
 	query = applyPostListOrder(query, groupIDRaw != "" || groupSlug != "", sort)
-	query.
+	applyPostListQueryShape(query).
 		Limit(pageSize).
 		Offset(offset).
 		Find(&posts)
@@ -1282,13 +1276,7 @@ func AdminGetPosts(c *gin.Context) {
 
 	offset := (page - 1) * pageSize
 
-	query := database.DB.Model(&model.Post{}).
-		Preload("Group").
-		Preload("Category").
-		Preload("Tags").
-		Preload("Author", func(db *gorm.DB) *gorm.DB {
-			return db.Select("id, nickname, avatar")
-		})
+	query := database.DB.Model(&model.Post{})
 
 	if role == "creator" {
 		query = query.Where("author_id = ?", userID)
@@ -1310,7 +1298,7 @@ func AdminGetPosts(c *gin.Context) {
 
 	var posts []model.Post
 	query = applyPostListOrder(query, groupIDRaw != "", "")
-	query.
+	applyPostListQueryShape(query).
 		Limit(pageSize).
 		Offset(offset).
 		Find(&posts)
