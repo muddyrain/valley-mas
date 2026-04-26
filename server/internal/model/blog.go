@@ -31,6 +31,8 @@ type Post struct {
 	ViewCount       int            `gorm:"default:0" json:"viewCount"`
 	LikeCount       int            `gorm:"default:0" json:"likeCount"`
 	IsTop           bool           `gorm:"default:false" json:"isTop"`
+	SortOrder       int            `gorm:"default:0;index" json:"sortOrder"`
+	GroupSortOrder  int            `gorm:"default:0;index" json:"groupSortOrder"`
 	PublishedAt     *time.Time     `json:"publishedAt,omitempty"`
 	DraftUpdatedAt  *time.Time     `json:"draftUpdatedAt,omitempty"`
 	CreatedAt       time.Time      `json:"createdAt"`
