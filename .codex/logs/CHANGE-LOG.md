@@ -2,6 +2,57 @@
 
 > 说明：记录每次真实落地改动，按时间顺序追加，不覆盖历史。
 
+## 2026-04-26 17:48 (Asia/Shanghai)
+
+- 任务：继续修复资源图片预览在点击弹框外遮罩层时仍会串触发底层资源卡片点击的问题。
+- 改动文件：
+  - `apps/web/src/components/ImagePreviewDialog.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将图片预览的 `DialogContent` 改为整屏 popup，由预览组件自身接管整层遮罩区域，而不是依赖外部 backdrop 处理“点击外部关闭”。
+  - 对该预览弹层启用 `disablePointerDismissal`，禁用 Base UI 默认的 outside press 关闭，避免关闭时把同一次点击漏到底层资源卡片。
+  - 在整屏 popup 根节点补充鼠标按下捕获拦截，进一步收紧遮罩点击事件，不让点击穿透到页面下层。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/ImagePreviewDialog.tsx apps/web/src/components/ResourceCard.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：本次主要修复资源卡片打开的图片预览链路，其他未来新增的全屏预览/灯箱若沿用默认 outside press 关闭，仍要注意同类穿透问题。
+  - 下一步动作：可继续补一轮博客正文图片预览、资源详情页图片预览的实际点击回归。
+
+## 2026-04-26 18:07 (Asia/Shanghai)
+
+- 任务：修复图片预览弹层 close 按钮无法关闭的问题。
+- 改动文件：
+  - `apps/web/src/components/ImagePreviewDialog.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将预览弹层根节点的事件拦截从 capture 阶段改为普通冒泡阶段，避免祖先节点过早拦截导致内部 close 按钮的 `onClick` 无法触发。
+  - 保留整屏 popup 的事件隔离能力，只阻断事件继续冒泡到页面下层，不影响弹层内部交互。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/ImagePreviewDialog.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：当前修复基于 React 冒泡链路隔离，若后续把关闭按钮改成依赖原生事件代理的第三方控件，需要再次检查事件阶段设置。
+  - 下一步动作：继续做一次实际页面点击回归，确认遮罩关闭与 close 按钮关闭都同时正常。
+
+## 2026-04-26 17:04 (Asia/Shanghai)
+
+- 任务：修复资源图片预览弹层点击空白区会误跳转资源详情的问题。
+- 改动文件：
+  - `apps/web/src/components/ImagePreviewDialog.tsx`
+  - `apps/web/src/components/ResourceCard.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在 `ImagePreviewDialog` 的弹层内容根节点增加点击与指针事件拦截，避免 portal 内部点击继续冒泡到下层 `ResourceCard`。
+  - 为预览弹层里的暗色背景关闭层补上事件拦截，关闭预览时不再串触发资源卡片的详情跳转。
+  - 将资源卡片里的“详情”入口改为语义化 `button`，并显式 `stopPropagation`，避免与父层预览/整卡跳转手势互相串扰。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/ImagePreviewDialog.tsx apps/web/src/components/ResourceCard.tsx`：通过
+- 风险与后续：
+  - 当前风险：这次修的是资源卡片发起的图片预览链路，若后续有新的预览触发容器复用了相同交互模式，仍应沿用同样的事件隔离规则。
+  - 下一步动作：如你愿意，我可以再顺手补一轮本地交互回归，把博客正文图片预览、资源详情页预览也一起检查一遍。
+
 ## 2026-04-21 15:01 (Asia/Shanghai)
 
 - 任务：收口 `RLIB-2` / `RLIB-3` 执行状态，修正阅读库任务父项进度标记。

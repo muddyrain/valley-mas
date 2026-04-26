@@ -41,7 +41,7 @@ const RESOURCE_TYPES = [
   { label: '头像', value: 'avatar' },
 ];
 
-const PAGE_SIZE = 9;
+const PAGE_SIZE = 12;
 const RESOURCE_LIST_CACHE_TTL_MS = 30_000;
 const RESOURCE_LIST_SCROLL_STORAGE_PREFIX = 'resources-scroll:v1';
 

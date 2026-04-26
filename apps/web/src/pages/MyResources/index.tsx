@@ -49,7 +49,7 @@ const RESOURCE_TYPES = [
   { label: '壁纸', value: 'wallpaper' },
   { label: '头像', value: 'avatar' },
 ];
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 24;
 const MY_RESOURCES_QUERY_SCHEMA = {
   page: numberParam(1, { min: 1 }),
   type: enumParam(['', 'wallpaper', 'avatar'] as const, '', { resetPageOnChange: true }),
@@ -470,7 +470,7 @@ export default function MyResources() {
 
               <div className="relative min-h-[320px]">
                 {loading ? (
-                  <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-5 sm:grid-cols-2 md:grid-cols-3">
                     {Array.from({ length: 10 }).map((_, i) => (
                       <ResourceCardSkeleton key={i} />
                     ))}
@@ -543,7 +543,7 @@ export default function MyResources() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-5 sm:grid-cols-2 md:grid-cols-3">
                       {resources.map((resource, i) => (
                         <ResourceCard
                           key={resource.id}

@@ -397,12 +397,21 @@ export default function ImagePreviewDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[96vw] max-w-[96vw] sm:w-[90vw] sm:max-w-[90vw] h-[92vh] max-h-[92vh] p-0 border-none bg-transparent shadow-none overflow-hidden [&>button]:hidden">
+    <Dialog open={open} onOpenChange={onOpenChange} disablePointerDismissal>
+      <DialogContent
+        className="!top-0 !left-0 !h-screen !max-h-screen !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-none bg-transparent p-0 shadow-none [&>button]:hidden"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerUp={(e) => e.stopPropagation()}
+      >
         {/* 毛玻璃背景遮罩 */}
         <div
           className="absolute inset-0 bg-black/80 backdrop-blur-xl"
-          onClick={() => onOpenChange(false)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenChange(false);
+          }}
         />
 
         {/* 主容器 */}
