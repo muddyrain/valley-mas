@@ -36,6 +36,25 @@ func buildPostTimelineOrderExpr(sort string) string {
 	return orderExpr
 }
 
+func buildScopedPostOrderExpr(groupScoped bool) string {
+	orderField := "sort_order"
+	if groupScoped {
+		orderField = "group_sort_order"
+	}
+	return fmt.Sprintf(
+		"is_top DESC, CASE WHEN %s > 0 THEN 0 ELSE 1 END ASC, %s ASC, COALESCE(published_at, created_at) DESC",
+		orderField,
+		orderField,
+	)
+}
+
+func applyPostListOrder(query *gorm.DB, groupScoped bool, sort string) *gorm.DB {
+	if !groupScoped || strings.EqualFold(strings.TrimSpace(sort), "oldest") {
+		return query.Order(buildPostTimelineOrderExpr(sort))
+	}
+	return query.Order(buildScopedPostOrderExpr(groupScoped))
+}
+
 type PostListResponse struct {
 	ID              model.Int64String `json:"id"`
 	Title           string            `json:"title"`
@@ -58,6 +77,8 @@ type PostListResponse struct {
 	ViewCount       int               `json:"viewCount"`
 	LikeCount       int               `json:"likeCount"`
 	IsTop           bool              `json:"isTop"`
+	SortOrder       int               `json:"sortOrder"`
+	GroupSortOrder  int               `json:"groupSortOrder"`
 	PublishedAt     *time.Time        `json:"publishedAt,omitempty"`
 	CreatedAt       time.Time         `json:"createdAt"`
 }
@@ -108,10 +129,24 @@ type PostDetailResponse struct {
 	ViewCount       int               `json:"viewCount"`
 	LikeCount       int               `json:"likeCount"`
 	IsTop           bool              `json:"isTop"`
+	SortOrder       int               `json:"sortOrder"`
+	GroupSortOrder  int               `json:"groupSortOrder"`
 	PublishedAt     *time.Time        `json:"publishedAt,omitempty"`
 	CreatedAt       time.Time         `json:"createdAt"`
 	PrevPost        *PostListResponse `json:"prevPost,omitempty"`
 	NextPost        *PostListResponse `json:"nextPost,omitempty"`
+}
+
+type PostSortItemResponse struct {
+	ID             model.Int64String `json:"id"`
+	Title          string            `json:"title"`
+	GroupID        model.Int64String `json:"groupId"`
+	Group          *PostGroupInfo    `json:"group,omitempty"`
+	SortOrder      int               `json:"sortOrder"`
+	GroupSortOrder int               `json:"groupSortOrder"`
+	Status         string            `json:"status,omitempty"`
+	PublishedAt    *time.Time        `json:"publishedAt,omitempty"`
+	CreatedAt      time.Time         `json:"createdAt"`
 }
 
 type AuthorInfo struct {
@@ -223,7 +258,8 @@ func GetPosts(c *gin.Context) {
 	query.Count(&total)
 
 	var posts []model.Post
-	query.Order(buildPostTimelineOrderExpr(sort)).
+	query = applyPostListOrder(query, groupIDRaw != "" || groupSlug != "", sort)
+	query.
 		Limit(pageSize).
 		Offset(offset).
 		Find(&posts)
@@ -309,10 +345,13 @@ func loadAdjacentPosts(current *model.Post) (*model.Post, *model.Post) {
 		}
 
 		var posts []model.Post
-		query.
-			Select("id, title, slug, post_type, visibility, excerpt, cover, cover_storage_key, group_id, category_id, status, view_count, like_count, is_top, published_at, created_at").
-			Order(buildPostTimelineOrderExpr("")).
-			Find(&posts)
+		query = query.Select("id, title, slug, post_type, visibility, excerpt, cover, cover_storage_key, group_id, category_id, status, view_count, like_count, is_top, sort_order, group_sort_order, published_at, created_at")
+		if groupID != 0 {
+			query = query.Order(buildScopedPostOrderExpr(true))
+		} else {
+			query = query.Order(buildPostTimelineOrderExpr(""))
+		}
+		query.Find(&posts)
 		return posts
 	}
 
@@ -837,6 +876,21 @@ func AdminCreatePost(c *gin.Context) {
 		post.Visibility = visibilityPrivate
 	}
 
+	nextSortOrder, err := getNextPostSortOrder(post.PostType)
+	if err != nil {
+		Error(c, http.StatusInternalServerError, "create failed")
+		return
+	}
+	post.SortOrder = nextSortOrder
+	if post.GroupID != 0 {
+		nextGroupSortOrder, err := getNextPostGroupSortOrder(post.PostType, post.GroupID)
+		if err != nil {
+			Error(c, http.StatusInternalServerError, "create failed")
+			return
+		}
+		post.GroupSortOrder = nextGroupSortOrder
+	}
+
 	if req.PublishNow && post.Status == "published" {
 		now := time.Now()
 		post.PublishedAt = &now
@@ -989,6 +1043,7 @@ func AdminUpdatePost(c *gin.Context) {
 	if req.GroupID != nil {
 		if *req.GroupID == 0 {
 			updates["group_id"] = 0
+			updates["group_sort_order"] = 0
 		} else {
 			finalType := post.PostType
 			if normalizedType != "" {
@@ -999,6 +1054,14 @@ func AdminUpdatePost(c *gin.Context) {
 				return
 			}
 			updates["group_id"] = int64(*req.GroupID)
+			if post.GroupID != *req.GroupID {
+				nextGroupSortOrder, err := getNextPostGroupSortOrder(finalType, *req.GroupID)
+				if err != nil {
+					Error(c, http.StatusInternalServerError, "update failed")
+					return
+				}
+				updates["group_sort_order"] = nextGroupSortOrder
+			}
 		}
 	}
 	if req.CategoryID != 0 {
@@ -1246,7 +1309,8 @@ func AdminGetPosts(c *gin.Context) {
 	query.Count(&total)
 
 	var posts []model.Post
-	query.Order(buildPostTimelineOrderExpr("")).
+	query = applyPostListOrder(query, groupIDRaw != "", "")
+	query.
 		Limit(pageSize).
 		Offset(offset).
 		Find(&posts)
@@ -1262,6 +1326,190 @@ func AdminGetPosts(c *gin.Context) {
 		"page":     page,
 		"pageSize": pageSize,
 	})
+}
+
+func AdminListPostSortItems(c *gin.Context) {
+	userID, role, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	postType := normalizePostType(c.DefaultQuery("postType", postTypeBlog))
+	if postType == "" {
+		postType = postTypeBlog
+	}
+
+	scope := normalizePostSortScope(c.Query("scope"))
+	if scope == "" {
+		Error(c, http.StatusBadRequest, "invalid scope")
+		return
+	}
+
+	query := database.DB.Model(&model.Post{}).
+		Where("post_type = ?", postType).
+		Preload("Group")
+
+	if role == "creator" {
+		query = query.Where("author_id = ?", userID)
+	}
+
+	groupID := model.Int64String(0)
+	if scope == "group" {
+		groupIDRaw := strings.TrimSpace(c.Query("groupId"))
+		parsedGroupID, err := strconv.ParseInt(groupIDRaw, 10, 64)
+		if err != nil || parsedGroupID <= 0 {
+			Error(c, http.StatusBadRequest, "invalid group id")
+			return
+		}
+		groupID = model.Int64String(parsedGroupID)
+		if _, err := loadWritableGroupForPostType(c, groupID, postType, userID, role); err != nil {
+			Error(c, http.StatusForbidden, "group no permission")
+			return
+		}
+		query = query.Where("group_id = ?", groupID)
+	}
+
+	var posts []model.Post
+	if err := query.Order(buildScopedPostOrderExpr(scope == "group")).Find(&posts).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "load sort items failed")
+		return
+	}
+
+	response := make([]PostSortItemResponse, len(posts))
+	for i := range posts {
+		response[i] = PostSortItemResponse{
+			ID:             posts[i].ID,
+			Title:          posts[i].Title,
+			GroupID:        posts[i].GroupID,
+			SortOrder:      posts[i].SortOrder,
+			GroupSortOrder: posts[i].GroupSortOrder,
+			Status:         posts[i].Status,
+			PublishedAt:    posts[i].PublishedAt,
+			CreatedAt:      posts[i].CreatedAt,
+		}
+		if posts[i].Group != nil {
+			response[i].Group = &PostGroupInfo{
+				ID:          posts[i].Group.ID,
+				Name:        posts[i].Group.Name,
+				Slug:        posts[i].Group.Slug,
+				GroupType:   normalizeGroupType(posts[i].Group.GroupType),
+				Description: posts[i].Group.Description,
+				AuthorID:    posts[i].Group.AuthorID,
+				ParentID:    posts[i].Group.ParentID,
+			}
+		}
+	}
+
+	Success(c, response)
+}
+
+func AdminSortPosts(c *gin.Context) {
+	userID, role, ok := currentUser(c)
+	if !ok {
+		Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req struct {
+		PostType   string              `json:"postType"`
+		Scope      string              `json:"scope"`
+		GroupID    model.Int64String   `json:"groupId"`
+		OrderedIDs []model.Int64String `json:"orderedIds"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Error(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	postType := normalizePostType(req.PostType)
+	if postType == "" {
+		postType = postTypeBlog
+	}
+
+	scope := normalizePostSortScope(req.Scope)
+	if scope == "" {
+		Error(c, http.StatusBadRequest, "invalid scope")
+		return
+	}
+	if len(req.OrderedIDs) == 0 {
+		Error(c, http.StatusBadRequest, "orderedIds required")
+		return
+	}
+
+	scopeQuery := database.DB.Model(&model.Post{}).Where("post_type = ?", postType)
+	if role == "creator" {
+		scopeQuery = scopeQuery.Where("author_id = ?", userID)
+	}
+
+	if scope == "group" {
+		if req.GroupID == 0 {
+			Error(c, http.StatusBadRequest, "groupId required")
+			return
+		}
+		if _, err := loadWritableGroupForPostType(c, req.GroupID, postType, userID, role); err != nil {
+			Error(c, http.StatusForbidden, "group no permission")
+			return
+		}
+		scopeQuery = scopeQuery.Where("group_id = ?", req.GroupID)
+	}
+
+	var total int64
+	if err := scopeQuery.Count(&total).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "sort failed")
+		return
+	}
+	if total != int64(len(req.OrderedIDs)) {
+		Error(c, http.StatusBadRequest, "orderedIds count mismatch")
+		return
+	}
+
+	verifyQuery := database.DB.Model(&model.Post{}).
+		Where("post_type = ? AND id IN ?", postType, req.OrderedIDs)
+	if role == "creator" {
+		verifyQuery = verifyQuery.Where("author_id = ?", userID)
+	}
+	if scope == "group" {
+		verifyQuery = verifyQuery.Where("group_id = ?", req.GroupID)
+	}
+
+	var matchedCount int64
+	if err := verifyQuery.Count(&matchedCount).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "sort failed")
+		return
+	}
+	if matchedCount != int64(len(req.OrderedIDs)) {
+		Error(c, http.StatusBadRequest, "contains invalid post ids")
+		return
+	}
+
+	tx := database.DB.Begin()
+	if tx.Error != nil {
+		Error(c, http.StatusInternalServerError, "sort failed")
+		return
+	}
+
+	orderColumn := "sort_order"
+	if scope == "group" {
+		orderColumn = "group_sort_order"
+	}
+
+	for index, postID := range req.OrderedIDs {
+		if err := tx.Model(&model.Post{}).
+			Where("id = ?", postID).
+			Update(orderColumn, index+1).Error; err != nil {
+			tx.Rollback()
+			Error(c, http.StatusInternalServerError, "sort failed")
+			return
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		Error(c, http.StatusInternalServerError, "sort failed")
+		return
+	}
+
+	Success(c, gin.H{"updated": len(req.OrderedIDs)})
 }
 
 func convertToPostListResponse(post *model.Post) PostListResponse {
@@ -1283,6 +1531,8 @@ func convertToPostListResponse(post *model.Post) PostListResponse {
 		ViewCount:       post.ViewCount,
 		LikeCount:       post.LikeCount,
 		IsTop:           post.IsTop,
+		SortOrder:       post.SortOrder,
+		GroupSortOrder:  post.GroupSortOrder,
 		PublishedAt:     post.PublishedAt,
 		CreatedAt:       post.CreatedAt,
 	}
@@ -1350,6 +1600,8 @@ func convertToPostDetailResponse(post *model.Post) PostDetailResponse {
 		ViewCount:       post.ViewCount,
 		LikeCount:       post.LikeCount,
 		IsTop:           post.IsTop,
+		SortOrder:       post.SortOrder,
+		GroupSortOrder:  post.GroupSortOrder,
 		PublishedAt:     post.PublishedAt,
 		CreatedAt:       post.CreatedAt,
 	}
@@ -1572,6 +1824,44 @@ func currentUserIDForPost(c *gin.Context, fallbackAuthorID model.Int64String) in
 		return userID
 	}
 	return int64(fallbackAuthorID)
+}
+
+func normalizePostSortScope(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "global", "all":
+		return "global"
+	case "group":
+		return "group"
+	default:
+		return ""
+	}
+}
+
+func getNextPostSortOrder(postType string) (int, error) {
+	var maxOrder int
+	if err := database.DB.
+		Model(&model.Post{}).
+		Where("post_type = ?", normalizePostType(postType)).
+		Select("COALESCE(MAX(sort_order), 0)").
+		Scan(&maxOrder).Error; err != nil {
+		return 0, err
+	}
+	return maxOrder + 1, nil
+}
+
+func getNextPostGroupSortOrder(postType string, groupID model.Int64String) (int, error) {
+	if groupID == 0 {
+		return 0, nil
+	}
+	var maxOrder int
+	if err := database.DB.
+		Model(&model.Post{}).
+		Where("post_type = ? AND group_id = ?", normalizePostType(postType), groupID).
+		Select("COALESCE(MAX(group_sort_order), 0)").
+		Scan(&maxOrder).Error; err != nil {
+		return 0, err
+	}
+	return maxOrder + 1, nil
 }
 
 func loadWritableGroupForPostType(

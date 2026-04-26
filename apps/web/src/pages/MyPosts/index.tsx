@@ -1,6 +1,6 @@
 import {
+  ArrowUpDown,
   CheckSquare,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -36,16 +36,12 @@ import {
 import type { Resource } from '@/api/resource';
 import { BlogPostCard, ImageTextPostCard } from '@/components/blog';
 import { BatchMarkdownImportDialog } from '@/components/blog/BatchMarkdownImportDialog';
+import BlogSortDialog from '@/components/blog/BlogSortDialog';
+import PostGroupDropdown from '@/components/blog/PostGroupDropdown';
 import { PublicWallpaperPickerDialog } from '@/components/blog/PublicWallpaperPickerDialog';
 import PanelLoadingOverlay from '@/components/PanelLoadingOverlay';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
 import { numberParam, stringParam, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
 
@@ -110,6 +106,7 @@ export default function MyPosts() {
   const [batchWallpaperPickerOpen, setBatchWallpaperPickerOpen] = useState(false);
   const [batchSettingsOpen, setBatchSettingsOpen] = useState(false);
   const [batchImportDialogOpen, setBatchImportDialogOpen] = useState(false);
+  const [blogSortDialogOpen, setBlogSortDialogOpen] = useState(false);
   const batchCoverUploadInputRef = useRef<HTMLInputElement | null>(null);
 
   const blogTotalPages = Math.max(1, Math.ceil(blogTotal / BLOG_PAGE_SIZE));
@@ -627,6 +624,15 @@ export default function MyPosts() {
                 </Button>
                 <Button
                   variant="outline"
+                  onClick={() => setBlogSortDialogOpen(true)}
+                  disabled={loadingPosts || blogTotal === 0}
+                  className="rounded-xl"
+                >
+                  <ArrowUpDown className="mr-1.5 h-4 w-4" />
+                  排序博客
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={() => navigate('/my-space/blog-groups?type=blog')}
                   className="rounded-xl"
                 >
@@ -706,27 +712,13 @@ export default function MyPosts() {
                   {blogTotal} 篇
                 </span>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-700 transition hover:border-theme-shell-border hover:text-theme-primary">
-                  {blogGroupFilter
-                    ? blogGroups.find((g) => g.id === blogGroupFilter)?.name || '博客分组'
-                    : '全部博客分组'}
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-48 rounded-xl">
-                  <DropdownMenuItem onClick={() => setValue('blogGroupId', '')}>
-                    全部博客分组
-                  </DropdownMenuItem>
-                  {blogGroups.map((group) => (
-                    <DropdownMenuItem
-                      key={group.id}
-                      onClick={() => setValue('blogGroupId', group.id)}
-                    >
-                      {group.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <PostGroupDropdown
+                groups={blogGroups}
+                value={blogGroupFilter}
+                onChange={(value) => setValue('blogGroupId', value)}
+                allLabel="全部博客分组"
+                triggerClassName="h-9 max-w-[min(18rem,100%)] px-3"
+              />
             </div>
 
             {loadingPosts && !hasLoadedPosts ? (
@@ -795,27 +787,13 @@ export default function MyPosts() {
                   {imageTextTotal} 篇
                 </span>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1 rounded-full border border-slate-300 bg-white px-3 text-sm text-slate-700 transition hover:border-theme-shell-border hover:text-theme-primary">
-                  {imageTextGroupFilter
-                    ? imageTextGroups.find((g) => g.id === imageTextGroupFilter)?.name || '图文分组'
-                    : '全部图文分组'}
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-48 rounded-xl">
-                  <DropdownMenuItem onClick={() => setValue('imageTextGroupId', '')}>
-                    全部图文分组
-                  </DropdownMenuItem>
-                  {imageTextGroups.map((group) => (
-                    <DropdownMenuItem
-                      key={group.id}
-                      onClick={() => setValue('imageTextGroupId', group.id)}
-                    >
-                      {group.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <PostGroupDropdown
+                groups={imageTextGroups}
+                value={imageTextGroupFilter}
+                onChange={(value) => setValue('imageTextGroupId', value)}
+                allLabel="全部图文分组"
+                triggerClassName="h-9 max-w-[min(18rem,100%)] px-3"
+              />
             </div>
 
             {loadingPosts && !hasLoadedPosts ? (
@@ -903,6 +881,14 @@ export default function MyPosts() {
         defaultGroupId={blogGroupFilter}
         defaultVisibility="private"
         onCreated={async () => {
+          await loadPostsPage();
+        }}
+      />
+      <BlogSortDialog
+        open={blogSortDialogOpen}
+        onOpenChange={setBlogSortDialogOpen}
+        groups={blogGroups}
+        onSorted={async () => {
           await loadPostsPage();
         }}
       />

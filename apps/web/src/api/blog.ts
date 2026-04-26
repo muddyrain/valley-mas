@@ -74,6 +74,8 @@ export interface Post {
   viewCount: number;
   likeCount: number;
   isTop: boolean;
+  sortOrder: number;
+  groupSortOrder: number;
   publishedAt?: string;
   createdAt: string;
   author?: {
@@ -144,6 +146,18 @@ export interface PostListData {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface PostSortItem {
+  id: string;
+  title: string;
+  groupId: string;
+  group?: PostGroup;
+  sortOrder: number;
+  groupSortOrder: number;
+  status?: 'draft' | 'published' | 'archived';
+  publishedAt?: string;
+  createdAt: string;
 }
 
 export interface CreatePostData {
@@ -343,6 +357,21 @@ export function getAdminPosts(
   } = {},
 ) {
   return request.get<unknown, PostListData>('/admin/blog/posts', { params });
+}
+
+export function getAdminPostSortItems(
+  params: { postType?: PostType; scope?: 'global' | 'group'; groupId?: string } = {},
+) {
+  return request.get<unknown, PostSortItem[]>('/admin/blog/posts/sort-items', { params });
+}
+
+export function sortAdminPosts(data: {
+  postType?: PostType;
+  scope: 'global' | 'group';
+  groupId?: string;
+  orderedIds: string[];
+}) {
+  return request.put<unknown, { updated: number }>('/admin/blog/posts/sort', data);
 }
 
 export function getAdminGroups(params: { groupType?: GroupType } = {}) {

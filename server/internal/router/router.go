@@ -187,6 +187,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 				content.GET("/creator/stats", handler.GetCreatorStats)
 
 				content.GET("/blog/posts", handler.AdminGetPosts)
+				content.GET("/blog/posts/sort-items", handler.AdminListPostSortItems)
+				content.PUT("/blog/posts/sort", handler.AdminSortPosts)
 				content.GET("/blog/posts/:id", handler.AdminGetPostDetail)
 				content.POST("/blog/cover/upload", handler.AdminUploadBlogCover)
 				content.POST("/blog/cover/upload-by-url", handler.AdminUploadBlogCoverByURL)

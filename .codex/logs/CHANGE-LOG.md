@@ -3895,3 +3895,103 @@
 - 风险与后续：
   - 当前风险：创作空间中的草稿内容仍然会按 `created_at` 参与回退排序，而不是按 `draft_updated_at`，这是本次为对齐公共列表顺序而保留的行为。
   - 下一步动作：如果你希望“内容管理”页更偏编辑视角，我可以继续把草稿列表单独切成“最近编辑优先”模式，同时不影响公共博客列表时间线。
+
+## 2026-04-26 12:05 (Asia/Shanghai)
+
+- 任务：为 `/my-space/posts` 增加博客排序弹框，支持全局排序和指定分组内排序。
+- 改动文件：
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `apps/web/src/components/blog/BlogSortDialog.tsx`
+  - `apps/web/src/api/blog.ts`
+  - `server/internal/model/blog.go`
+  - `server/internal/handler/blog.go`
+  - `server/internal/router/router.go`
+  - `server/migrations/024_add_post_sort_orders.sql`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在博客模型中新增 `sortOrder` 和 `groupSortOrder`，把“全部博客排序”和“分组内排序”拆成两套可持久化顺序，并让公共/管理端列表与详情页前后篇统一吃到新排序规则。
+  - 新增博客排序读取与保存接口，支持按全部博客或指定分组拉取完整标题列表并一次性提交拖拽后的新顺序。
+  - 在 `/my-space/posts` 博客区接入“排序博客”入口，新增独立弹框组件，弹框内只显示标题，支持“不分组的 / 指定分组”切换和长按拖拽排序。
+- 校验：
+  - `gofmt -w server/internal/model/blog.go server/internal/handler/blog.go server/internal/router/router.go`：通过
+  - `go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/MyPosts/index.tsx apps/web/src/components/blog/BlogSortDialog.tsx`：通过
+- 风险与后续：
+  - 当前风险：`server/migrations/024_add_post_sort_orders.sql` 是一次性迁移脚本，如果线上库已经靠 AutoMigrate 先建好了同名列，再手动重复执行这份 SQL 会报重复列错误。
+  - 下一步动作：如果你后面还想把图文列表也纳入同一套拖拽排序弹框，我可以直接复用当前组件和接口把 `image_text` 也接进去。
+
+## 2026-04-26 12:24 (Asia/Shanghai)
+
+- 任务：调整内容管理页博客排序交互，修复弹框宽度、连续拖拽和分组下拉体验问题。
+- 改动文件：
+  - `apps/web/src/components/ui/dialog.tsx`
+  - `apps/web/src/components/blog/PostGroupDropdown.tsx`
+  - `apps/web/src/components/blog/BlogSortDialog.tsx`
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `server/internal/handler/blog.go`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将 `DialogContent` 的默认桌面端 `sm:max-w-sm` 限制移除，改成单一默认宽度上限，让业务侧传入的 `max-w-*` 可以稳定覆盖，避免后续弹框继续被默认小宽度卡住。
+  - 将博客排序弹框改为“只支持指定分组排序”，并把不分组列表恢复为默认时间线排序，避免全量博客排序请求过重。
+  - 重写排序弹框拖拽为长按后接管全局 `pointermove/pointerup`，支持连续跨多个位置拖拽，直到松手才结束。
+  - 抽出统一的 `PostGroupDropdown` 组件，替换内容管理页顶部筛选和排序弹框内分组选择，统一更宽的弹层和选中态样式。
+- 校验：
+  - `go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/MyPosts/index.tsx apps/web/src/components/blog/BlogSortDialog.tsx apps/web/src/components/blog/PostGroupDropdown.tsx apps/web/src/components/ui/dialog.tsx`：通过
+- 风险与后续：
+  - 当前风险：这次只把内容管理页用到的分组下拉切到新组件，仓库里其他旧的普通下拉若也有同类视觉问题，还需要逐步迁移。
+  - 下一步动作：如果你希望，我下一轮可以继续把其他常用管理页下拉也统一收口到这套组件上。
+
+## 2026-04-26 12:42 (Asia/Shanghai)
+
+- 任务：将博客排序弹框从手搓拖拽切换为标准排序库，提升拖拽流畅度与稳定性。
+- 改动文件：
+  - `apps/web/package.json`
+  - `pnpm-lock.yaml`
+  - `apps/web/src/components/blog/BlogSortDialog.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 为 `apps/web` 正式声明 `@dnd-kit/core`、`@dnd-kit/sortable`、`@dnd-kit/utilities`、`@dnd-kit/modifiers` 依赖，避免继续依赖锁文件里的间接安装结果。
+  - 将博客排序弹框改为 `DndContext + SortableContext` 的标准排序实现，统一鼠标、触屏与键盘排序能力。
+  - 为桌面端和触屏分别配置更合适的激活约束，并加入拖拽中的 `DragOverlay` 预览，减少之前手搓拖拽时的卡顿和定位不稳。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/BlogSortDialog.tsx apps/web/src/components/blog/PostGroupDropdown.tsx apps/web/src/pages/MyPosts/index.tsx apps/web/package.json .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：这次主要是把拖拽底层替换为标准库，具体的激活距离、触屏延迟和拖拽动画参数仍然可以继续按你的手感微调。
+  - 下一步动作：如果你体验后还觉得“偏灵敏”或“偏重”，我可以继续把鼠标拖拽阈值、触屏长按时长、Overlay 尺寸和行间位移动画再细调一轮。
+
+## 2026-04-26 12:48 (Asia/Shanghai)
+
+- 任务：修复 `dnd-kit` 排序预览层被拉伸成整屏横条的样式问题。
+- 改动文件：
+  - `apps/web/src/components/blog/BlogSortDialog.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 为排序行补充 `data-sort-item-id` 标记，在拖拽开始时读取原始行宽度并保存到状态里。
+  - 将 `DragOverlay` 里的预览行改成 `inline-flex`，并显式套用原始行宽度，避免 overlay 容器把预览块撑成整屏宽度。
+  - 同步在拖拽结束、取消和弹框关闭时清理预览宽度状态，避免残留样式影响下一次拖拽。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/BlogSortDialog.tsx`：通过
+- 风险与后续：
+  - 当前风险：这次修的是 overlay 宽度继承问题，若后续还想让拖拽预览在不同分辨率下更贴近原行阴影和偏移感，还可以继续微调 `DragOverlay` 的视觉参数。
+  - 下一步动作：如果你再测时发现预览位置仍有轻微偏差，我可以继续把 overlay 的 `dropAnimation` 和偏移量也一起调掉。
+
+## 2026-04-26 12:52 (Asia/Shanghai)
+
+- 任务：修复博客排序弹框内 `DragOverlay` 与原条目位置不重合的问题。
+- 改动文件：
+  - `apps/web/src/components/blog/BlogSortDialog.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 定位到根因是排序弹框容器自身用了 `transform` 居中，导致渲染在弹框内部的 `DragOverlay` 继承了错误坐标系。
+  - 将 `DragOverlay` 通过 `createPortal(...)` 挂到 `document.body`，让拖拽预览脱离弹框 transform 上下文，恢复基于视口的正确定位。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/BlogSortDialog.tsx`：通过
+- 风险与后续：
+  - 当前风险：这次修的是 overlay 的定位坐标系问题，如果后续还出现拖拽手感上的细微抖动，更可能是排序动画参数而不是定位基准出错。
+  - 下一步动作：如果你再测时还觉得 preview 有轻微漂移，我下一轮会直接调 `dropAnimation` 和排序项位移动画，不再改 portal 结构。
