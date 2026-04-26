@@ -41,7 +41,7 @@ const RESOURCE_TYPES = [
   { label: '头像', value: 'avatar' },
 ];
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 9;
 const RESOURCE_LIST_CACHE_TTL_MS = 30_000;
 const RESOURCE_LIST_SCROLL_STORAGE_PREFIX = 'resources-scroll:v1';
 
@@ -501,9 +501,13 @@ export default function Resources() {
 
             <div className="relative min-h-[280px]">
               {loading && resources.length === 0 ? (
-                <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-5 sm:grid-cols-2 md:grid-cols-3">
                   {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-                    <ResourceCardSkeleton key={i} />
+                    <ResourceCardSkeleton
+                      key={i}
+                      type={activeType || undefined}
+                      wideWallpaperOnDesktop
+                    />
                   ))}
                 </div>
               ) : resources.length === 0 ? (
@@ -541,7 +545,7 @@ export default function Resources() {
                       已显示 {resources.length} / {total}
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-5 sm:grid-cols-2 md:grid-cols-3">
                     {resources.map((resource, index) => (
                       <ResourceCard
                         key={resource.id}
@@ -553,6 +557,7 @@ export default function Resources() {
                         showEngagement
                         showTags
                         animationDelay={index * 30}
+                        wideWallpaperOnDesktop
                       />
                     ))}
                   </div>

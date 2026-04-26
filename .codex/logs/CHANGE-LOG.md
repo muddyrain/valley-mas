@@ -4042,3 +4042,53 @@
 - 风险与后续：
   - 当前风险：资源广场和公共壁纸选择器已显式开启 `includeTags`，但其他未来新增的 `getAllResources` 调用如果也要展示标签，记得同步传 `includeTags: true`。
   - 下一步动作：发布后优先复测匿名访问的 `/api/v1/public/resources?page=1&pageSize=8`，重点观察 TTFB 和响应头是否命中缓存策略，再决定是否继续把 `total count` 也做缓存或延迟化。
+
+## 2026-04-26 16:28 (Asia/Shanghai)
+
+- 任务：重做 Web 端资源卡片，让图片成为主视觉，桌面悬浮展示标签与信息，移动端保留窄标题兜底。
+- 改动文件：
+  - `apps/web/src/components/ResourceCard.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将资源卡片改成图片主导的画廊式结构，弱化原先“图片上方 + 下方文字区”的分段感，让卡片默认更像一整张作品封面。
+  - 桌面端改为 hover 时在底部浮出信息层，展示标题、作者、时间、互动信息与标签；移动端则保留标题与基础下载信息，不依赖 hover 才能识别内容。
+  - 标签展示改成轻量云团样式，最多直出 3 个标签并用 `+N` 收纳剩余，视觉上收口到主题色与磨砂层，不再使用原先偏功能条的常驻标签排布。
+  - 保留收藏、编辑、删除、批量选择、可见性状态、图片预览等原有交互能力，避免重做视觉时损伤现有资源页、我的资源、创作空间和壁纸选择器的复用能力。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/ResourceCard.tsx`：未通过（重构导致 CJK 数量下降触发 text-loss 误报，已人工核对用户可见中文文案未损坏）
+- 风险与后续：
+  - 当前风险：这次主要重做了卡片信息层层次，真实观感仍建议在资源广场、我的资源、创作者页各抽查一遍，确认不同页面下信息密度都舒服。
+  - 下一步动作：如果你体验后还想更“纯图片”，我下一轮可以继续把桌面端默认底部窄标题条再压薄一点，或者把 hover 标签做成更轻的漂浮式布局。
+
+## 2026-04-26 16:41 (Asia/Shanghai)
+
+- 任务：收窄 `/resources` 页面里壁纸卡片的高度，让横向壁纸在列表中更符合内容比例。
+- 改动文件：
+  - `apps/web/src/components/ResourceCard.tsx`
+  - `apps/web/src/pages/Resources/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 为资源卡片补充仅页面按需启用的 `wideWallpaperOnDesktop` 开关，让桌面端壁纸卡片可切到更横向的 `16:10 / 16:9` 比例，而不影响其他页面的资源卡片布局。
+  - 在 `/resources` 页面和对应 skeleton 上启用该开关，使资源广场里的壁纸卡片更矮、更像横向画廊条目。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+- 风险与后续：
+  - 当前风险：这次只收窄了资源广场里的壁纸比例，头像和其他页面仍沿用原比例，后续如果你觉得创作者页也该统一成更横向，可以再按页面逐步放开。
+  - 下一步动作：建议你重点看 `/resources` 里“全部 / 壁纸 / 头像”三个筛选切换下的视觉密度，确认壁纸更矮后和头像卡片混排时是否正是你想要的节奏。
+
+## 2026-04-26 16:37 (Asia/Shanghai)
+
+- 任务：继续压低资源卡片高度，并去掉卡片底部信息层的上下内边距。
+- 改动文件：
+  - `apps/web/src/components/ResourceCard.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 将资源卡片和对应 skeleton 的固定高度从 `h-96` 收窄到 `h-80`，让资源广场中的壁纸卡片整体更紧凑。
+  - 移除卡片底部信息层外层的上下 padding，只保留左右留白，让图片与底部信息层贴合得更紧。
+  - 同步将卡片默认内容 padding 收口到 `px-4 py-3`，避免再出现整卡上下留白过重的问题。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+- 风险与后续：
+  - 当前风险：这次高度是全局 ResourceCard 级别收窄，如果你后续觉得“我的资源”一类后台管理场景也需要更高的信息密度，可以再单独给那类卡片放宽高度。
+  - 下一步动作：建议你重点看 `/resources` 的壁纸列表和头像列表切换时，确认新高度下标题与 hover 信息层都还够呼吸感；如果还偏高，我可以继续压到 `h-72` 级别。
