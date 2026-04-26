@@ -1,4 +1,4 @@
-﻿import {
+import {
   Calendar,
   Check,
   Download,
@@ -6,19 +6,20 @@
   Globe,
   Hash,
   Heart,
+  Link,
   Lock,
   Pencil,
   Trash2,
   Users,
 } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ImagePreviewDialog from '@/components/ImagePreviewDialog';
 import MediaLoadingOverlay from '@/components/MediaLoadingOverlay';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/utils/blog';
 
@@ -26,7 +27,7 @@ export interface ResourceCardItem {
   id: string;
   title: string;
   url: string;
-  thumbnailUrl?: string; // 缩略图（800px WebP），未定义时回退到 url
+  thumbnailUrl?: string;
   type: string;
   visibility?: 'private' | 'shared' | 'public';
   downloadCount: number;
@@ -52,15 +53,15 @@ interface ResourceCardProps<T extends ResourceCardItem = ResourceCardItem> {
   showDate?: boolean;
   showEngagement?: boolean;
   showVisibilityTag?: boolean;
-  showTags?: boolean; // 是否在卡片底部展示标签（按剩余宽度自适应）
+  showTags?: boolean;
   onClick?: (resource: T) => void;
   animationDelay?: number;
   contentPadding?: string;
   enablePreview?: boolean;
-  // 批量选择
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (resource: T, selected: boolean) => void;
+  wideWallpaperOnDesktop?: boolean;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -76,17 +77,17 @@ const VISIBILITY_META = {
   },
   shared: {
     label: '口令访问',
-    className: 'bg-sky-500/85 text-white',
+    className: 'bg-theme-soft text-theme-primary',
     icon: Users,
   },
   private: {
     label: '仅自己可见',
-    className: 'bg-slate-900/75 text-white',
+    className: 'bg-slate-900/78 text-white',
     icon: Lock,
   },
 } as const;
 
-export function getAspectClass(_type: string) {
+export function getAspectClass(_type: string, _wideWallpaperOnDesktop = false) {
   return 'aspect-[4/3]';
 }
 
@@ -97,117 +98,26 @@ function formatSize(bytes?: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function AdaptiveTagRow({ tags }: { tags: Array<{ id: string; name: string }> }) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const measureMoreRef = useRef<HTMLSpanElement | null>(null);
-  const measureTagRefs = useRef<Array<HTMLSpanElement | null>>([]);
-  const [visibleCount, setVisibleCount] = useState(tags.length);
-
-  const recalcVisibleCount = useCallback(() => {
-    const containerWidth = containerRef.current?.clientWidth ?? 0;
-    if (containerWidth <= 0 || tags.length === 0) {
-      setVisibleCount(tags.length);
-      return;
-    }
-
-    const GAP = 4;
-    const MAX_ROWS = 2;
-    const moreWidth = measureMoreRef.current?.offsetWidth ?? 28;
-    const widths = tags.map((_, idx) => measureTagRefs.current[idx]?.offsetWidth ?? 0);
-
-    const canLayout = (count: number, withMore: boolean) => {
-      let row = 1;
-      let rowWidth = 0;
-
-      const place = (itemWidth: number) => {
-        const nextWidth = rowWidth === 0 ? itemWidth : rowWidth + GAP + itemWidth;
-        if (nextWidth <= containerWidth) {
-          rowWidth = nextWidth;
-          return true;
-        }
-        if (row < MAX_ROWS && itemWidth <= containerWidth) {
-          row += 1;
-          rowWidth = itemWidth;
-          return true;
-        }
-        return false;
-      };
-
-      for (let i = 0; i < count; i += 1) {
-        if (!place(widths[i])) return false;
-      }
-      if (withMore && !place(moreWidth)) return false;
-      return true;
-    };
-
-    if (canLayout(tags.length, false)) {
-      setVisibleCount(tags.length);
-      return;
-    }
-
-    let count = tags.length;
-    while (count > 0 && !canLayout(count, true)) {
-      count -= 1;
-    }
-    setVisibleCount(count);
-  }, [tags]);
-
-  useLayoutEffect(() => {
-    recalcVisibleCount();
-  }, [recalcVisibleCount]);
-
-  useEffect(() => {
-    const node = containerRef.current;
-    if (!node) return;
-    const observer = new ResizeObserver(() => recalcVisibleCount());
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [recalcVisibleCount]);
-
-  const hiddenTags = tags.slice(visibleCount);
+function ResourceTagCloud({ tags }: { tags: Array<{ id: string; name: string }> }) {
+  const visibleTags = tags.slice(0, 3);
+  const hiddenCount = Math.max(tags.length - visibleTags.length, 0);
 
   return (
-    <div className="relative mt-2">
-      <div ref={containerRef} className="flex min-w-0 flex-wrap items-center gap-1">
-        {tags.slice(0, visibleCount).map((tag) => (
-          <span
-            key={tag.id}
-            className="inline-flex items-center gap-0.5 rounded-full border border-purple-100 bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-600"
-          >
-            <Hash className="h-2.5 w-2.5" />
-            {tag.name}
-          </span>
-        ))}
-        {hiddenTags.length > 0 && (
-          <span className="group/tag-more relative inline-flex shrink-0 cursor-default items-center self-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-500">
-            +{hiddenTags.length}
-            <span className="pointer-events-none absolute bottom-[calc(100%+6px)] right-0 z-20 min-w-36 max-w-56 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] leading-4 text-slate-600 opacity-0 shadow-lg transition-opacity group-hover/tag-more:opacity-100">
-              {hiddenTags.map((tag) => `#${tag.name}`).join(' · ')}
-            </span>
-          </span>
-        )}
-      </div>
-
-      <div className="pointer-events-none absolute -left-[9999px] -top-[9999px] flex items-center gap-1 whitespace-nowrap opacity-0">
-        {tags.map((tag, idx) => (
-          <span
-            key={`measure-${tag.id}`}
-            ref={(el) => {
-              measureTagRefs.current[idx] = el;
-            }}
-            className="inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border border-purple-100 bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-600"
-          >
-            <Hash className="h-2.5 w-2.5" />
-            {tag.name}
-          </span>
-        ))}
+    <div className="flex flex-wrap items-center gap-1.5">
+      {visibleTags.map((tag) => (
         <span
-          ref={measureMoreRef}
-          className="inline-flex whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-500"
+          key={tag.id}
+          className="inline-flex items-center gap-1 rounded-full border border-white/18 bg-white/14 px-2.5 py-1 text-[11px] font-medium text-white/92 backdrop-blur-md"
         >
-          +99
+          <Hash className="h-3 w-3 opacity-80" />
+          {tag.name}
         </span>
-      </div>
+      ))}
+      {hiddenCount > 0 ? (
+        <span className="inline-flex items-center rounded-full border border-white/14 bg-black/18 px-2.5 py-1 text-[11px] text-white/78 backdrop-blur-md">
+          +{hiddenCount}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -226,11 +136,12 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
   showTags = false,
   onClick,
   animationDelay,
-  contentPadding = 'p-3',
+  contentPadding = 'px-4 py-3',
   enablePreview = true,
   selectable = false,
   selected = false,
   onSelect,
+  wideWallpaperOnDesktop = false,
 }: ResourceCardProps<T>) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -268,7 +179,6 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // 批量选择模式：点击卡片即切换选中
     if (selectable) {
       onSelect?.(resource, !selected);
       return;
@@ -286,20 +196,31 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
     }
   };
 
+  const footerMetaVisible =
+    showSize || showDate || showEngagement || showCreator || showVisibilityTag || selectable;
+
+  const infoLayerVisible =
+    showCreator || showDate || showEngagement || showTags || showVisibilityTag;
+
+  const mediaAspectClass =
+    wideWallpaperOnDesktop && resource.type === 'wallpaper'
+      ? 'aspect-[16/10] md:aspect-[16/9]'
+      : getAspectClass(resource.type, wideWallpaperOnDesktop);
+
   return (
     <Card
-      className={`h-96 group cursor-pointer overflow-hidden rounded-2xl border-2 bg-white transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_44px_rgba(var(--theme-primary-rgb),0.16)] ${
+      className={`group h-60 py-0 cursor-pointer overflow-hidden rounded-[26px] border bg-white/84 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_26px_54px_rgba(var(--theme-primary-rgb),0.18)] ${
         selected
-          ? 'border-theme-primary shadow-[0_0_0_2px_rgba(var(--theme-primary-rgb),0.18)]'
-          : 'border-transparent hover:border-theme-soft-strong'
+          ? 'border-theme-primary shadow-[0_0_0_2px_rgba(var(--theme-primary-rgb),0.16)]'
+          : 'border-theme-shell-border hover:border-theme-soft-strong'
       }`}
       onClick={handleCardClick}
       style={animationDelay !== undefined ? { animationDelay: `${animationDelay}ms` } : undefined}
     >
       <div
-        className={`relative ${getAspectClass(resource.type)} overflow-hidden bg-black`}
+        className={`relative h-full ${mediaAspectClass} overflow-hidden bg-slate-950`}
         onClick={(e) => {
-          if (selectable) return; // 选择模式下不触发预览
+          if (selectable) return;
           if (!enablePreview) return;
           e.stopPropagation();
           setPreviewOpen(true);
@@ -309,20 +230,21 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
           src={imageSrc}
           alt=""
           aria-hidden
-          className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover scale-110 blur-xl opacity-40"
+          className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover scale-110 blur-2xl opacity-45"
         />
         <MediaLoadingOverlay show={!imageReady} />
         <img
           src={imageSrc}
           alt={resource.title}
-          className={`relative h-full w-full object-cover transition-[transform,opacity] duration-500 group-hover:scale-105 ${imageReady ? 'opacity-100' : 'opacity-0'}`}
+          className={`relative h-full w-full object-cover transition-[transform,opacity] duration-500 ${imageReady ? 'opacity-100' : 'opacity-0'} group-hover:scale-[1.035]`}
           onLoad={() => setLoadedSrc(imageSrc)}
           onError={() => setLoadedSrc(imageSrc)}
           loading="lazy"
         />
 
-        <div className="absolute left-2.5 right-2.5 top-2.5 flex items-start justify-between gap-2">
-          {/* 批量选择 checkbox */}
+        <div className="absolute inset-0 bg-linear-to-t from-black/72 via-black/14 to-black/8 opacity-88 transition-opacity duration-300 group-hover:opacity-100" />
+
+        <div className="absolute left-3 top-3 flex items-start gap-2">
           {selectable ? (
             <button
               type="button"
@@ -330,22 +252,23 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
                 e.stopPropagation();
                 onSelect?.(resource, !selected);
               }}
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 shadow-md transition-all ${
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border shadow-sm transition-all ${
                 selected
-                  ? 'border-theme-primary bg-theme-primary'
-                  : 'border-white/80 bg-black/30 backdrop-blur-sm hover:border-white'
+                  ? 'border-theme-primary bg-theme-primary text-white'
+                  : 'border-white/72 bg-black/28 text-white/90 backdrop-blur-md hover:border-white'
               }`}
             >
-              {selected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+              {selected ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
             </button>
           ) : (
-            <span className="rounded-lg bg-black/65 px-2.5 py-1 text-xs font-medium text-white shadow-lg backdrop-blur-sm">
+            <span className="inline-flex items-center rounded-full border border-white/14 bg-black/26 px-3 py-1 text-[11px] font-medium text-white/92 backdrop-blur-md">
               {TYPE_LABEL[resource.type] ?? resource.type}
             </span>
           )}
+
           {showVisibilityTag && visibilityMeta ? (
             <span
-              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-medium shadow-lg backdrop-blur-sm ${visibilityMeta.className}`}
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-medium shadow-sm backdrop-blur-md ${visibilityMeta.className}`}
             >
               <visibilityMeta.icon className="h-3 w-3" />
               {visibilityMeta.label}
@@ -353,130 +276,179 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
           ) : null}
         </div>
 
-        <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-          <div className="absolute bottom-0 left-0 right-0 translate-y-2 p-3 text-white transition-transform duration-300 group-hover:translate-y-0">
-            <div className="flex items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="flex items-center gap-1 rounded-lg bg-white/20 px-2 py-1 backdrop-blur-sm">
-                  <Eye className="h-3 w-3" />
-                  <span className="text-nowrap">预览</span>
+        <div className="absolute right-3 top-3 flex items-center gap-2">
+          {onFavorite ? (
+            <Button
+              size="xs"
+              className={`h-8 rounded-full border px-2.5 backdrop-blur-md transition-all ${
+                favored
+                  ? 'border-rose-300/40 bg-rose-500/82 text-white hover:bg-rose-500'
+                  : 'border-white/18 bg-black/24 text-white hover:bg-black/34'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onFavorite(e, resource);
+              }}
+            >
+              <Heart className={`h-3.5 w-3.5 ${favored ? 'fill-white' : ''}`} />
+            </Button>
+          ) : null}
+          {onEdit ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(resource);
+              }}
+              className="rounded-full border border-white/18 bg-white/16 p-2 text-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:bg-white/24"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(resource);
+              }}
+              className="rounded-full border border-white/18 bg-black/32 p-2 text-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:bg-red-500/82"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
+
+        <div className="absolute inset-x-0 bottom-2 px-3">
+          <div
+            className={`overflow-hidden rounded-[22px] border border-white/12 bg-linear-to-b from-black/6 to-black/12 backdrop-blur-xs transition-all duration-300 ${
+              infoLayerVisible ? 'translate-y-0 group-hover:translate-y-0' : 'translate-y-0'
+            }`}
+          >
+            <div className={contentPadding}>
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h3
+                    ref={titleRef}
+                    title={titleOverflow ? resource.title : undefined}
+                    onMouseEnter={refreshTitleOverflow}
+                    className="truncate text-sm font-semibold text-white sm:text-[15px]"
+                  >
+                    {resource.title}
+                  </h3>
+                  <div className="mt-1 flex items-center gap-3 text-[11px] text-white/74 sm:hidden">
+                    <span className="inline-flex items-center gap-1">
+                      <Download className="h-3 w-3" />
+                      {resource.downloadCount}
+                    </span>
+                    {showDate && resource.createdAt ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {formatDate(resource.createdAt)}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <span className="hidden rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-[10px] text-white/76 backdrop-blur-sm sm:inline-flex hover:bg-theme-primary duration-300">
+                  <Eye className="mr-1 h-3 w-3" />
+                  预览
+                </span>
+                <span
+                  className="hidden rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-[10px] text-white/76 backdrop-blur-sm sm:inline-flex hover:bg-theme-primary duration-300"
+                  onClick={() => {
+                    navigate(`/resource/${resource.id}`);
+                  }}
+                >
+                  <Link className="mr-1 h-3 w-3" />
+                  详情
                 </span>
               </div>
 
-              <div className="flex items-center gap-1.5">
-                {onFavorite && (
-                  <Button
-                    size="xs"
-                    className={`h-7 border-0 px-2 backdrop-blur-sm transition-colors ${
-                      favored
-                        ? 'bg-pink-500/80 text-white hover:bg-pink-600/80'
-                        : 'bg-white/20 text-white hover:bg-white/30'
-                    }`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onFavorite(e, resource);
-                    }}
-                  >
-                    <Heart className={`h-3.5 w-3.5 ${favored ? 'fill-white' : ''}`} />
-                  </Button>
-                )}
-                {onEdit && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(resource);
-                    }}
-                    className="rounded-full bg-theme-primary/80 p-1.5 text-white shadow transition-all hover:scale-110 hover:bg-theme-primary"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                {onDelete && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(resource);
-                    }}
-                    className="rounded-full bg-red-500/80 p-1.5 text-white shadow transition-all hover:scale-110 hover:bg-red-600"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
+              <div
+                className={`overflow-hidden transition-all duration-300 ${
+                  infoLayerVisible
+                    ? 'max-h-0 opacity-0 sm:mt-0 sm:max-h-0 sm:translate-y-2 sm:group-hover:mt-3 sm:group-hover:max-h-44 sm:group-hover:translate-y-0 sm:group-hover:opacity-100'
+                    : 'max-h-0 opacity-0'
+                }`}
+              >
+                {showCreator ? (
+                  <div className="flex items-center gap-2 text-xs text-white/82">
+                    <Avatar className="h-5 w-5 shrink-0 border border-white/14">
+                      <AvatarImage src={resource.creatorAvatar} />
+                      <AvatarFallback className="bg-white/16 text-[10px] text-white">
+                        {resource.creatorName?.[0] || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate">{resource.creatorName || '未知创作者'}</span>
+                  </div>
+                ) : null}
+
+                {(showDate && resource.createdAt) ||
+                (showEngagement && (resource.viewCount || resource.likeCount)) ||
+                showSize ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-white/72">
+                    {showDate && resource.createdAt ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {formatDate(resource.createdAt)}
+                      </span>
+                    ) : null}
+                    <span className="inline-flex items-center gap-1">
+                      <Download className="h-3 w-3" />
+                      {resource.downloadCount}
+                    </span>
+                    {showEngagement && typeof resource.viewCount === 'number' ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Eye className="h-3 w-3" />
+                        {resource.viewCount}
+                      </span>
+                    ) : null}
+                    {showEngagement && typeof resource.likeCount === 'number' ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Heart className="h-3 w-3" />
+                        {resource.likeCount}
+                      </span>
+                    ) : null}
+                    {showSize && resource.size ? <span>{formatSize(resource.size)}</span> : null}
+                  </div>
+                ) : null}
+
+                {showTags && resource.tags && resource.tags.length > 0 ? (
+                  <div className="mt-3">
+                    <ResourceTagCloud tags={resource.tags} />
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
+
+          {footerMetaVisible ? (
+            <div className="mt-2 hidden items-center justify-between px-1 text-[11px] text-white/72 sm:flex">
+              <div className="flex min-w-0 items-center gap-3">
+                {showCreator ? (
+                  <span className="truncate">{resource.creatorName || '未知创作者'}</span>
+                ) : null}
+                {!showCreator ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Download className="h-3 w-3" />
+                    {resource.downloadCount}
+                  </span>
+                ) : null}
+              </div>
+              {showSize && resource.size ? (
+                <span>{formatSize(resource.size)}</span>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="border-white/14 bg-white/10 px-2 py-0 text-[10px] text-white/78 backdrop-blur-sm"
+                >
+                  {resource.type === 'wallpaper' ? '壁纸' : '头像'}
+                </Badge>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
-
-      <CardContent className={contentPadding}>
-        <h3
-          ref={titleRef}
-          title={titleOverflow ? resource.title : undefined}
-          onMouseEnter={refreshTitleOverflow}
-          className="mb-1.5 truncate text-sm font-medium text-gray-900 transition-colors group-hover:text-theme-primary"
-        >
-          {resource.title}
-        </h3>
-
-        {showCreator && (
-          <div className="mb-1.5 flex items-center gap-1.5 text-xs text-gray-500">
-            <Avatar className="h-4 w-4 shrink-0 border border-gray-200">
-              <AvatarImage src={resource.creatorAvatar} />
-              <AvatarFallback className="bg-theme-soft text-[9px] text-theme-primary">
-                {resource.creatorName?.[0] || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <span className="truncate">{resource.creatorName || '未知创作者'}</span>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between text-xs text-gray-400">
-          <span className="flex items-center gap-1">
-            <Download className="h-3 w-3 text-theme-primary" />
-            {resource.downloadCount}
-          </span>
-          {showSize && resource.size ? (
-            <span>{formatSize(resource.size)}</span>
-          ) : (
-            <Badge
-              variant="outline"
-              className="border-theme-soft-strong bg-theme-soft px-1.5 py-0 text-[10px] text-theme-primary"
-            >
-              {resource.type === 'wallpaper' ? '壁纸' : '头像'}
-            </Badge>
-          )}
-        </div>
-
-        {(showDate && resource.createdAt) ||
-        (showEngagement && (resource.viewCount || resource.likeCount)) ? (
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-400">
-            {showDate && resource.createdAt ? (
-              <span className="inline-flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {formatDate(resource.createdAt)}
-              </span>
-            ) : null}
-            {showEngagement && typeof resource.viewCount === 'number' ? (
-              <span className="inline-flex items-center gap-1">
-                <Eye className="h-3 w-3" />
-                {resource.viewCount}
-              </span>
-            ) : null}
-            {showEngagement && typeof resource.likeCount === 'number' ? (
-              <span className="inline-flex items-center gap-1">
-                <Heart className="h-3 w-3" />
-                {resource.likeCount}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-
-        {showTags && resource.tags && resource.tags.length > 0 && (
-          <AdaptiveTagRow tags={resource.tags} />
-        )}
-      </CardContent>
 
       <ImagePreviewDialog
         open={previewOpen}
@@ -490,18 +462,29 @@ export default function ResourceCard<T extends ResourceCardItem = ResourceCardIt
 }
 
 export function ResourceCardSkeleton({
-  contentPadding = 'p-3',
+  contentPadding = 'px-4 py-3',
   type,
+  wideWallpaperOnDesktop = false,
 }: {
   contentPadding?: string;
   type?: string;
+  wideWallpaperOnDesktop?: boolean;
 }) {
+  const mediaAspectClass =
+    wideWallpaperOnDesktop && type === 'wallpaper'
+      ? 'aspect-[16/10] md:aspect-[16/9]'
+      : getAspectClass(type ?? '', wideWallpaperOnDesktop);
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm h-96">
-      <Skeleton className={`${getAspectClass(type ?? '')} w-full`} />
-      <div className={`${contentPadding} space-y-2`}>
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-3 w-1/2" />
+    <div className="h-80 overflow-hidden rounded-[26px] border border-theme-shell-border bg-white/86 shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.08)]">
+      <Skeleton className={`${mediaAspectClass} h-full w-full`} />
+      <div
+        className={`-mt-20 px-4 ${contentPadding.includes('px-') || contentPadding.includes('py-') ? contentPadding : ''}`}
+      >
+        <div className="rounded-[20px] border border-white/40 bg-white/55 p-4 backdrop-blur-md">
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="mt-2 h-3 w-1/2" />
+        </div>
       </div>
     </div>
   );
