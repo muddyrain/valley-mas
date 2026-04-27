@@ -45,7 +45,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { usePageRoleGuard } from '@/hooks/usePageRoleGuard';
 import { numberParam, stringParam, useUrlQueryState } from '@/hooks/useUrlPaginationQuery';
 
-const BLOG_PAGE_SIZE = 6;
+const BLOG_PAGE_SIZE = 12;
 const IMAGE_TEXT_PAGE_SIZE = 4;
 const MY_POSTS_QUERY_SCHEMA = {
   blogPage: numberParam(1, { min: 1 }),
@@ -89,7 +89,8 @@ export default function MyPosts() {
   const [imageTextTotal, setImageTextTotal] = useState(0);
   const [blogGroups, setBlogGroups] = useState<BlogGroup[]>([]);
   const [imageTextGroups, setImageTextGroups] = useState<BlogGroup[]>([]);
-  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [loadingBlogPosts, setLoadingBlogPosts] = useState(true);
+  const [loadingImageTextPosts, setLoadingImageTextPosts] = useState(true);
 
   const [deletePostTarget, setDeletePostTarget] = useState<BlogPost | null>(null);
   const [deletingPost, setDeletingPost] = useState(false);
@@ -111,6 +112,7 @@ export default function MyPosts() {
 
   const blogTotalPages = Math.max(1, Math.ceil(blogTotal / BLOG_PAGE_SIZE));
   const imageTextTotalPages = Math.max(1, Math.ceil(imageTextTotal / IMAGE_TEXT_PAGE_SIZE));
+  const loadingPosts = loadingBlogPosts || loadingImageTextPosts;
 
   const visiblePosts = useMemo(
     () => [...blogPosts, ...imageTextPosts],
@@ -135,33 +137,45 @@ export default function MyPosts() {
     }
   }, []);
 
-  const loadPostsPage = useCallback(async () => {
+  const loadBlogPostsPage = useCallback(async () => {
     try {
-      setLoadingPosts(true);
-      const [blogData, imageTextData] = await Promise.all([
-        getAdminPosts({
-          page: blogPage,
-          pageSize: BLOG_PAGE_SIZE,
-          postType: 'blog',
-          groupId: blogGroupFilter || undefined,
-        }),
-        getAdminPosts({
-          page: imageTextPage,
-          pageSize: IMAGE_TEXT_PAGE_SIZE,
-          postType: 'image_text',
-          groupId: imageTextGroupFilter || undefined,
-        }),
-      ]);
+      setLoadingBlogPosts(true);
+      const blogData = await getAdminPosts({
+        page: blogPage,
+        pageSize: BLOG_PAGE_SIZE,
+        postType: 'blog',
+        groupId: blogGroupFilter || undefined,
+      });
       setBlogPosts(blogData.list || []);
       setBlogTotal(blogData.total || 0);
+    } catch {
+      toast.error('加载博客失败');
+    } finally {
+      setLoadingBlogPosts(false);
+    }
+  }, [blogGroupFilter, blogPage]);
+
+  const loadImageTextPostsPage = useCallback(async () => {
+    try {
+      setLoadingImageTextPosts(true);
+      const imageTextData = await getAdminPosts({
+        page: imageTextPage,
+        pageSize: IMAGE_TEXT_PAGE_SIZE,
+        postType: 'image_text',
+        groupId: imageTextGroupFilter || undefined,
+      });
       setImageTextPosts(imageTextData.list || []);
       setImageTextTotal(imageTextData.total || 0);
     } catch {
-      toast.error('加载内容失败');
+      toast.error('加载图文失败');
     } finally {
-      setLoadingPosts(false);
+      setLoadingImageTextPosts(false);
     }
-  }, [blogGroupFilter, blogPage, imageTextGroupFilter, imageTextPage]);
+  }, [imageTextGroupFilter, imageTextPage]);
+
+  const loadAllPostsPage = useCallback(async () => {
+    await Promise.all([loadBlogPostsPage(), loadImageTextPostsPage()]);
+  }, [loadBlogPostsPage, loadImageTextPostsPage]);
 
   useEffect(() => {
     if (!canAccess) return;
@@ -170,16 +184,21 @@ export default function MyPosts() {
 
   useEffect(() => {
     if (!canAccess) return;
-    void loadPostsPage();
-  }, [canAccess, loadPostsPage]);
+    void loadBlogPostsPage();
+  }, [canAccess, loadBlogPostsPage]);
+
+  useEffect(() => {
+    if (!canAccess) return;
+    void loadImageTextPostsPage();
+  }, [canAccess, loadImageTextPostsPage]);
 
   useEffect(() => {
     const refreshPostsAt = (location.state as { refreshPostsAt?: number } | null)?.refreshPostsAt;
     if (!refreshPostsAt || !canAccess) return;
 
-    void loadPostsPage();
+    void loadAllPostsPage();
     navigate(location.pathname + location.search, { replace: true, state: {} });
-  }, [canAccess, loadPostsPage, location.pathname, location.search, location.state, navigate]);
+  }, [canAccess, loadAllPostsPage, location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
     if (blogPage <= blogTotalPages) return;
@@ -200,18 +219,23 @@ export default function MyPosts() {
     });
   }, [batchMode, visiblePosts]);
 
-  const handleDeletePost = async () => {
+  const handleDeletePost = useCallback(async () => {
     if (!deletePostTarget) return;
     try {
       setDeletingPost(true);
       await deletePost(deletePostTarget.id);
       toast.success('删除成功');
+      const targetPostType = deletePostTarget.postType;
       setDeletePostTarget(null);
-      await loadPostsPage();
+      if (targetPostType === 'image_text') {
+        await loadImageTextPostsPage();
+      } else {
+        await loadBlogPostsPage();
+      }
     } finally {
       setDeletingPost(false);
     }
-  };
+  }, [deletePostTarget, loadBlogPostsPage, loadImageTextPostsPage]);
 
   const handleToggleSelect = (postId: string) => {
     setSelectedIds((prev) => {
@@ -721,7 +745,7 @@ export default function MyPosts() {
               />
             </div>
 
-            {loadingPosts && !hasLoadedPosts ? (
+            {loadingBlogPosts && blogPosts.length === 0 ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: BLOG_PAGE_SIZE }).map((_, i) => (
                   <div key={i} className="h-44 animate-pulse rounded-2xl bg-theme-soft" />
@@ -796,7 +820,7 @@ export default function MyPosts() {
               />
             </div>
 
-            {loadingPosts && !hasLoadedPosts ? (
+            {loadingImageTextPosts && imageTextPosts.length === 0 ? (
               <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                 {Array.from({ length: IMAGE_TEXT_PAGE_SIZE }).map((_, i) => (
                   <div key={i} className="h-44 animate-pulse rounded-2xl bg-theme-soft" />
@@ -881,7 +905,7 @@ export default function MyPosts() {
         defaultGroupId={blogGroupFilter}
         defaultVisibility="private"
         onCreated={async () => {
-          await loadPostsPage();
+          await loadBlogPostsPage();
         }}
       />
       <BlogSortDialog
@@ -889,7 +913,7 @@ export default function MyPosts() {
         onOpenChange={setBlogSortDialogOpen}
         groups={blogGroups}
         onSorted={async () => {
-          await loadPostsPage();
+          await loadBlogPostsPage();
         }}
       />
 

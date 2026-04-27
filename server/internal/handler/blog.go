@@ -509,7 +509,21 @@ func GetCategories(c *gin.Context) {
 func GetGroups(c *gin.Context) {
 	authorIDRaw := strings.TrimSpace(c.Query("authorId"))
 	groupType := normalizeGroupType(c.Query("groupType"))
-	query := database.DB.Model(&model.PostGroup{}).Where("deleted_at IS NULL")
+	query := database.DB.Model(&model.PostGroup{}).
+		Where("post_groups.deleted_at IS NULL").
+		Select(
+			`post_groups.*, COALESCE((
+				SELECT COUNT(1)
+				FROM posts
+				WHERE posts.group_id = post_groups.id
+					AND posts.post_type = post_groups.group_type
+					AND posts.status = ?
+					AND posts.visibility = ?
+					AND posts.deleted_at IS NULL
+			), 0) AS post_count`,
+			"published",
+			visibilityPublic,
+		)
 	if authorIDRaw != "" {
 		if authorID, err := strconv.ParseInt(authorIDRaw, 10, 64); err == nil {
 			query = query.Where("author_id = ?", authorID)

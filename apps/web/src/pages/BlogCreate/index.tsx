@@ -49,6 +49,14 @@ type CoverImageMeta = {
   height: number;
 };
 
+const BLOG_EDITOR_HEADING_OPTIONS = [
+  { label: '正文', level: null },
+  { label: '标题 1', level: 1 },
+  { label: '标题 2', level: 2 },
+  { label: '标题 3', level: 3 },
+  { label: '标题 4', level: 4 },
+];
+
 export default function BlogCreate() {
   const navigate = useNavigate();
   const { id: editingId } = useParams<{ id?: string }>();
@@ -74,6 +82,7 @@ export default function BlogCreate() {
   const [coverOffsetY, setCoverOffsetY] = useState(0);
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [submitIntent, setSubmitIntent] = useState<'draft' | 'published' | null>(null);
   const [aiExcerptLoading, setAiExcerptLoading] = useState(false);
   const [aiCoverLoading, setAiCoverLoading] = useState(false);
   const [aiCoverSource, setAiCoverSource] = useState<'manual' | 'import'>('manual');
@@ -534,6 +543,7 @@ export default function BlogCreate() {
     }
 
     try {
+      setSubmitIntent(status);
       setSubmitting(true);
       const resolvedCover = await uploadCoverIfNeeded(status === 'published');
       const resolvedExcerpt =
@@ -590,6 +600,7 @@ export default function BlogCreate() {
       toast.error(status === 'published' ? '提交失败，请稍后重试' : '保存失败，请稍后重试');
     } finally {
       setSubmitting(false);
+      setSubmitIntent(null);
     }
   };
 
@@ -798,8 +809,18 @@ export default function BlogCreate() {
               onClick={() => void handleSubmit('published')}
               className="rounded-xl"
             >
-              <Send className="mr-2 h-4 w-4" />
-              {isEditMode ? '更新并发布' : '发布博客'}
+              {submitIntent === 'published' && submitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              {submitIntent === 'published' && submitting
+                ? isEditMode
+                  ? '更新发布中'
+                  : '发布中'
+                : isEditMode
+                  ? '更新并发布'
+                  : '发布博客'}
             </Button>
             <input
               ref={markdownImportInputRef}
@@ -833,7 +854,11 @@ export default function BlogCreate() {
               />
             )}
 
-            <MdxMarkdownEditor value={content} onChange={setContent} />
+            <MdxMarkdownEditor
+              value={content}
+              onChange={setContent}
+              selectionHeadingOptions={BLOG_EDITOR_HEADING_OPTIONS}
+            />
           </section>
 
           <section className="min-w-0 space-y-4 lg:sticky lg:top-20 lg:self-start">

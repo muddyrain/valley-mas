@@ -93,6 +93,7 @@ export default function BlogList() {
   const [refreshing, setRefreshing] = useState(false);
   const [metaLoading, setMetaLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [allPostsTotal, setAllPostsTotal] = useState(0);
   const [groupKeyword, setGroupKeyword] = useState('');
   const [postKeywordInput, setPostKeywordInput] = useState('');
   const [showAllGroups, setShowAllGroups] = useState(false);
@@ -126,7 +127,7 @@ export default function BlogList() {
 
   const loadTaxonomy = useCallback(async () => {
     try {
-      const groupsData = await getGroups();
+      const groupsData = await getGroups({ groupType: 'blog' });
       setGroups(groupsData || []);
     } catch (error) {
       console.error('Failed to load blog groups:', error);
@@ -138,6 +139,24 @@ export default function BlogList() {
   useEffect(() => {
     void loadTaxonomy();
   }, [loadTaxonomy]);
+
+  const loadAllPostsTotal = useCallback(async () => {
+    try {
+      const postsData = await getPosts({
+        page: 1,
+        pageSize: 1,
+        postType: 'blog',
+        keyword: currentKeyword || undefined,
+      });
+      setAllPostsTotal(postsData.total || 0);
+    } catch (error) {
+      console.error('Failed to load total blog count:', error);
+    }
+  }, [currentKeyword]);
+
+  useEffect(() => {
+    void loadAllPostsTotal();
+  }, [loadAllPostsTotal]);
 
   const loadPosts = useCallback(async () => {
     const isFirstLoad = firstLoadRef.current;
@@ -310,6 +329,7 @@ export default function BlogList() {
   }, [filteredGroupData, showAllGroups]);
 
   const hiddenGroupCount = Math.max(filteredGroupData.length - visibleGroupData.length, 0);
+  const showEmptyRefreshingState = refreshing && posts.length === 0;
 
   useEffect(() => {
     setShowAllGroups(false);
@@ -481,7 +501,7 @@ export default function BlogList() {
               }`}
             >
               全部分组
-              <span className="ml-1.5 text-xs opacity-70">{total}</span>
+              <span className="ml-1.5 text-xs opacity-70">{allPostsTotal}</span>
             </button>
             {topGroups.map((group) => (
               <button
@@ -583,6 +603,20 @@ export default function BlogList() {
                 {Array.from({ length: 6 }).map((_, index) => (
                   <BlogFeedCardSkeleton key={index} />
                 ))}
+              </div>
+            ) : showEmptyRefreshingState ? (
+              <div className="rounded-[34px] border border-dashed border-theme-soft-strong bg-white/82 px-8 py-16 text-center shadow-[0_24px_56px_rgba(148,163,184,0.1)]">
+                <div className="mx-auto flex max-w-xl flex-col items-center gap-3 text-slate-500">
+                  <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-theme-soft text-theme-primary shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.18)]">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </span>
+                  <h3 className="text-2xl font-semibold text-slate-900">正在切换分组结果</h3>
+                  <p className="text-sm leading-8 text-slate-500">
+                    {selectedGroupName
+                      ? `正在读取分组「${selectedGroupName}」的博客内容，请稍候。`
+                      : '正在刷新当前筛选结果，请稍候。'}
+                  </p>
+                </div>
               </div>
             ) : posts.length === 0 ? (
               <div className="rounded-[34px] border border-dashed border-theme-soft-strong bg-white/76 px-8 py-16 text-center shadow-[0_24px_56px_rgba(148,163,184,0.1)]">
