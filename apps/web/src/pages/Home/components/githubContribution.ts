@@ -41,10 +41,10 @@ function toDateKey(date: Date) {
 
 function getContributionTone(count: number, maxDayCount: number) {
   if (count <= 0 || maxDayCount <= 0) return 0;
-  const ratio = count / maxDayCount;
-  if (ratio < 0.22) return 1;
-  if (ratio < 0.46) return 2;
-  if (ratio < 0.72) return 3;
+  const ratio = Math.log1p(count) / Math.log1p(maxDayCount);
+  if (ratio < 0.24) return 1;
+  if (ratio < 0.42) return 2;
+  if (ratio < 0.68) return 3;
   return 4;
 }
 

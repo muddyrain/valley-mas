@@ -49,6 +49,9 @@ export default function Home() {
   const [wallpaperResources, setWallpaperResources] = useState<Resource[]>([]);
   const [avatarResources, setAvatarResources] = useState<Resource[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [creatorTotal, setCreatorTotal] = useState(0);
+  const [resourceTotal, setResourceTotal] = useState(0);
+  const [postTotal, setPostTotal] = useState(0);
   const [creatorCode, setCreatorCode] = useState('');
   const [loadingCreators, setLoadingCreators] = useState(true);
   const [loadingResources, setLoadingResources] = useState(true);
@@ -68,9 +71,13 @@ export default function Home() {
       .then((data) => {
         if (cancelled) return;
         setCreators(data.list ?? []);
+        setCreatorTotal(data.total ?? data.list?.length ?? 0);
       })
       .catch(() => {
-        if (!cancelled) setCreators([]);
+        if (!cancelled) {
+          setCreators([]);
+          setCreatorTotal(0);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingCreators(false);
@@ -92,8 +99,12 @@ export default function Home() {
         list: [] as Resource[],
         total: 0,
       })),
+      getAllResources({ page: 1, pageSize: 1 }).catch(() => ({
+        list: [] as Resource[],
+        total: 0,
+      })),
     ])
-      .then(([wallpaperData, avatarData]) => {
+      .then(([wallpaperData, avatarData, allResourceData]) => {
         if (cancelled) return;
         const wallpaperPool = [...(wallpaperData.list ?? [])];
         const seenWallpaperIds = new Set<string>();
@@ -105,9 +116,13 @@ export default function Home() {
           })
           .slice(0, 3);
         const avatars = (avatarData.list ?? []).slice(0, 6);
+        const fallbackResourceTotal =
+          (wallpaperData.total ?? 0) + (avatarData.total ?? 0) ||
+          mergedWallpaper.length + avatars.length;
 
         setWallpaperResources(mergedWallpaper);
         setAvatarResources(avatars);
+        setResourceTotal(allResourceData.total > 0 ? allResourceData.total : fallbackResourceTotal);
 
         const nextFavoritedMap: Record<string, boolean> = {};
         [...mergedWallpaper, ...avatars].forEach((item) => {
@@ -119,6 +134,7 @@ export default function Home() {
         if (!cancelled) {
           setWallpaperResources([]);
           setAvatarResources([]);
+          setResourceTotal(0);
         }
       })
       .finally(() => {
@@ -136,9 +152,13 @@ export default function Home() {
       .then((data) => {
         if (cancelled) return;
         setPosts(data.list ?? []);
+        setPostTotal(data.total ?? data.list?.length ?? 0);
       })
       .catch(() => {
-        if (!cancelled) setPosts([]);
+        if (!cancelled) {
+          setPosts([]);
+          setPostTotal(0);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingPosts(false);
@@ -320,7 +340,7 @@ export default function Home() {
                 <HeroRibbon
                   icon={<UserRound className="h-4 w-4" />}
                   label="创作者"
-                  value={loadingCreators ? '内容持续更新中' : `${creators.length}+ 位展示中`}
+                  value={loadingCreators ? '内容持续更新中' : `${creatorTotal}+ 位展示中`}
                 />
               </div>
               <div className="group relative overflow-hidden rounded-[28px] border border-white/82 bg-[linear-gradient(140deg,rgba(255,255,255,0.88),rgba(255,255,255,0.76))] p-3 shadow-[0_16px_40px_rgba(var(--theme-primary-rgb),0.14)] backdrop-blur-md">
@@ -350,17 +370,17 @@ export default function Home() {
               <div className="grid gap-3 md:grid-cols-3">
                 <HeroStat
                   label="内容入口持续更新"
-                  value={loadingPosts ? '...' : `${posts.length}+`}
+                  value={loadingPosts ? '...' : `${postTotal}+`}
                   accent="bg-[rgba(var(--theme-tertiary-rgb),0.72)]"
                 />
                 <HeroStat
                   label="可浏览资源数量"
-                  value={loadingResources ? '...' : `${resources.length}+`}
+                  value={loadingResources ? '...' : `${resourceTotal}+`}
                   accent="bg-[rgba(var(--theme-secondary-rgb),0.72)]"
                 />
                 <HeroStat
                   label="展示中的创作者"
-                  value={loadingCreators ? '...' : `${creators.length}+`}
+                  value={loadingCreators ? '...' : `${creatorTotal}+`}
                   accent="bg-theme-primary"
                 />
               </div>
