@@ -50,6 +50,12 @@ function getContributionTileStyle(tone: number, inRange: boolean): CSSProperties
   };
 }
 
+function getWeeklyBarHeight(value: number, maxWeekTotal: number) {
+  if (value <= 0 || maxWeekTotal <= 0) return '8%';
+  const ratio = Math.log1p(value) / Math.log1p(maxWeekTotal);
+  return `${Math.round(16 + ratio * 84)}%`;
+}
+
 function ContributionStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[14px] border border-theme-shell-border bg-white/86 px-3 py-2 shadow-[0_8px_20px_rgba(var(--theme-primary-rgb),0.1)]">
@@ -238,11 +244,7 @@ export default function HomeAuthorProfileCard({
                     </div>
                     <div className="flex h-14 items-end gap-1">
                       {contributionOverview.weeklyTotals.slice(-24).map((value, index) => {
-                        const ratio =
-                          contributionOverview.maxWeekTotal > 0
-                            ? value / contributionOverview.maxWeekTotal
-                            : 0;
-                        const height = `${Math.max(12, Math.round(ratio * 100))}%`;
+                        const height = getWeeklyBarHeight(value, contributionOverview.maxWeekTotal);
                         return (
                           <div
                             key={index}

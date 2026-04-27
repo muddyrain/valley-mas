@@ -4143,3 +4143,24 @@
 - 风险与后续：
   - 当前风险：这次高度是全局 ResourceCard 级别收窄，如果你后续觉得“我的资源”一类后台管理场景也需要更高的信息密度，可以再单独给那类卡片放宽高度。
   - 下一步动作：建议你重点看 `/resources` 的壁纸列表和头像列表切换时，确认新高度下标题与 hover 信息层都还够呼吸感；如果还偏高，我可以继续压到 `h-72` 级别。
+
+## 2026-04-27 17:24 (Asia/Shanghai)
+
+- 任务：首页统计改用接口返回的数据库总数，并优化作者 GitHub 活跃图的峰值压缩展示。
+- 改动文件：
+  - `apps/web/src/pages/Home/index.tsx`
+  - `apps/web/src/pages/Home/components/HomeAuthorProfileCard.tsx`
+  - `apps/web/src/pages/Home/components/githubContribution.ts`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 首页内容、资源、创作者统计卡改为使用 `getPosts`、`getAllResources`、`getHotCreators` 响应中的 `total`，不再拿当前分页列表长度当总数。
+  - 首页顶部创作者概览同步使用创作者接口 `total`，避免展示数量与数据库实际公开创作者总数不一致。
+  - GitHub 贡献热力色阶和周活跃柱图改为 `log1p` 压缩比例，让 1、2、3 次贡献在 24 次峰值旁仍有可见差异。
+- 校验：
+  - `pnpm --filter web exec biome check src/pages/Home/index.tsx src/pages/Home/components/HomeAuthorProfileCard.tsx src/pages/Home/components/githubContribution.ts`：通过
+  - `python3 .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/Home/index.tsx apps/web/src/pages/Home/components/HomeAuthorProfileCard.tsx apps/web/src/pages/Home/components/githubContribution.ts`：通过
+  - `git diff --check`：通过
+  - `pnpm --filter web exec tsc --noEmit`：未通过（现有 `src/components/blog/MdxMarkdownEditor.tsx` 缺少 `@milkdown/crepe`、`@milkdown/kit/utils` 类型解析并有隐式 any，非本轮改动文件）
+- 风险与后续：
+  - 当前风险：资源统计现在按全部公开资源总数展示，而首页资源展示区仍只取壁纸与头像作为精选预览，这是统计口径和展示样本的有意分离。
+  - 下一步动作：建议在首页实机看一次 GitHub 图表高度变化；如果还想更强调小提交量，可以继续把 `log1p` 阈值调得更敏感。
