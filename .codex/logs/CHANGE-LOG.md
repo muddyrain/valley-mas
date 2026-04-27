@@ -4236,3 +4236,54 @@
 - 风险与后续：
   - 当前风险：这次只补了“空状态切换分组”场景的过渡态，非空列表切换仍然沿用原来的 `BoxLoadingOverlay`。
   - 下一步动作：建议手点一次“工程 0 篇”这类空分组，再切到有内容分组，确认视觉节奏和文案都符合预期。
+
+## 2026-04-27 21:46 (Asia/Shanghai)
+
+- 任务：让创作者内容管理页进入博客编辑后，更新发布返回时保留原分页与筛选参数。
+- 改动文件：
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 内容管理页点击“编辑博客”时，把当前 `/my-space/posts` 的完整 `pathname + search` 作为 `returnTo` 一起带到编辑页。
+  - 博客编辑页顶部返回按钮和“更新并发布”成功后的跳转，统一优先回到 `returnTo`，没有上下文时再兜底到 `/my-space/posts`。
+  - 这样可以保留 `blogPage`、分组筛选等 URL 状态，同时继续沿用 `refreshPostsAt` 刷新列表数据。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/MyPosts/index.tsx apps/web/src/pages/BlogCreate/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：这次只覆盖了博客编辑页回内容管理页的链路，图文编辑页若也要同样体验，可以按同一模式补 `returnTo`。
+  - 下一步动作：建议在 `/my-space/posts?blogPage=2` 这类分页下点进博客编辑，执行一次“更新并发布”，确认回跳后分页与筛选都保持不变。
+
+## 2026-04-27 21:53 (Asia/Shanghai)
+
+- 任务：让创作者内容管理页进入博客详情后，右上角返回也保留原分页与筛选参数。
+- 改动文件：
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `apps/web/src/pages/blog/BlogPost/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 内容管理页点击“查看”进入博客详情时，改为携带当前 `/my-space/posts` 的完整 `pathname + search` 作为 `returnTo`。
+  - 博客详情页返回逻辑改为优先直接跳转到显式 `returnTo`，不再优先依赖浏览器 `navigate(-1)`，避免从第 5 页进入详情后返回被带回第 1 页。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/MyPosts/index.tsx apps/web/src/pages/blog/BlogPost/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：这次只修正了“内容管理 -> 博客详情”的返回稳定性，若后续图文详情也需要完全一致的返回策略，可以同步补同样的 `returnTo` 口径。
+  - 下一步动作：建议在 `/my-space/posts?blogPage=5` 实测一次“查看 -> 详情 -> 返回内容管理”，确认分页和筛选都保持不变。
+
+## 2026-04-27 22:01 (Asia/Shanghai)
+
+- 任务：修复内容管理页从高页码进入详情后返回时，被初始化副作用提前重置到第一页的问题。
+- 改动文件：
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 定位到问题根因是 `blogTotal` / `imageTextTotal` 初始为 `0` 时，`blogTotalPages` / `imageTextTotalPages` 会先被算成 `1`，页码纠正副作用在列表真实数据返回前就把高页码重置回第一页。
+  - 给博客和图文的页码纠正副作用都增加了“对应列表加载完成后再执行”的保护，避免从详情页返回时 URL 里原有的高页码被过早覆盖。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/MyPosts/index.tsx .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：如果列表请求失败，当前页码会先保留 URL 值，不会像之前那样立刻被压回 1；这更符合返回场景，但真正的越界修正仍依赖成功拿到列表总数。
+  - 下一步动作：建议重点回测 `/my-space/posts?blogPage=5` 与图文分页都大于 1 的场景，确认进入详情/编辑后返回时不再被初始化过程重置。

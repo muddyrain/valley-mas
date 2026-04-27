@@ -11,7 +11,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   createGroup,
@@ -59,9 +59,17 @@ const BLOG_EDITOR_HEADING_OPTIONS = [
 
 export default function BlogCreate() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id: editingId } = useParams<{ id?: string }>();
   const { user, isAuthenticated } = useAuthStore();
   const isEditMode = Boolean(editingId);
+  const navigationState = (location.state as {
+    returnTo?: string;
+    returnLabel?: string;
+    refreshPostsAt?: number;
+  } | null) ?? { returnTo: '', returnLabel: '' };
+  const returnTo = navigationState.returnTo || '/my-space/posts';
+  const returnLabel = navigationState.returnLabel || '返回';
   const [loadedPostStatus, setLoadedPostStatus] = useState<'draft' | 'published' | 'archived'>(
     'draft',
   );
@@ -589,7 +597,7 @@ export default function BlogCreate() {
 
       if (!options?.stayOnPage) {
         if (isEditMode) {
-          navigate('/my-space/posts', {
+          navigate(returnTo, {
             state: { refreshPostsAt: Date.now() },
           });
         } else {
@@ -753,9 +761,14 @@ export default function BlogCreate() {
       <div className="mx-auto max-w-360">
         <div className="theme-panel-shell mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white/75 px-4 py-3 shadow-sm backdrop-blur">
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="rounded-xl">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(returnTo)}
+              className="rounded-xl"
+            >
               <ArrowLeft className="mr-1 h-4 w-4" />
-              返回
+              {returnLabel}
             </Button>
             <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">
               {isEditMode ? '编辑博客' : '博客创作'}

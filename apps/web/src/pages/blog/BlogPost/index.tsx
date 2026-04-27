@@ -117,10 +117,6 @@ export default function BlogPost() {
     (location.state as { returnLabel?: string } | null)?.returnLabel || '返回内容列表';
 
   const handleReturn = useCallback(() => {
-    if (window.history.state?.idx > 0) {
-      navigate(-1);
-      return;
-    }
     navigate(returnTo);
   }, [navigate, returnTo]);
 
