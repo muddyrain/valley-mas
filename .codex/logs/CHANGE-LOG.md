@@ -4164,3 +4164,75 @@
 - 风险与后续：
   - 当前风险：资源统计现在按全部公开资源总数展示，而首页资源展示区仍只取壁纸与头像作为精选预览，这是统计口径和展示样本的有意分离。
   - 下一步动作：建议在首页实机看一次 GitHub 图表高度变化；如果还想更强调小提交量，可以继续把 `log1p` 阈值调得更敏感。
+
+## 2026-04-27 19:59 (Asia/Shanghai)
+
+- 任务：修复博客封面公用壁纸弹窗里点击卡片会误触发预览而不是选择的问题。
+- 改动文件：
+  - `apps/web/src/components/blog/PublicWallpaperPickerDialog.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 在“选择公用壁纸作为封面”共用弹窗里关闭 `ResourceCard` 的图片预览能力，避免图片区先截获点击并打开预览弹窗。
+  - 保留卡片选择回调，让点击壁纸时直接走封面选择逻辑，同时覆盖博客创建、批量导入、批量设置封面三处共用入口。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/PublicWallpaperPickerDialog.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：该弹窗内资源卡片不再支持整卡点击预览；如果后续需要“预览”和“选择”并存，建议补一个明确的独立预览入口，而不是复用整卡点击。
+  - 下一步动作：建议在博客创建、批量导入、批量设封面这三处共用入口各点一遍，确认点击壁纸后都会直接选中并关闭弹窗。
+
+## 2026-04-27 21:05 (Asia/Shanghai)
+
+- 任务：修复公开博客列表页分组数量把私密/非公开内容算进去的问题。
+- 改动文件：
+  - `server/internal/handler/blog.go`
+  - `apps/web/src/pages/blog/BlogList/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 公开分组接口 `GetGroups` 不再直接返回表里的缓存 `post_count`，改为按当前可见口径实时统计：仅计算 `published + public` 且未删除的内容。
+  - 统计时额外约束 `posts.post_type = post_groups.group_type`，避免博客页分组数量混入其他内容类型。
+  - 博客列表页拉取分组时显式传 `groupType: 'blog'`，把公开博客页和分组接口的查询口径进一步收紧到博客分组。
+- 校验：
+  - `cd server && go test ./...`：通过
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py server/internal/handler/blog.go apps/web/src/pages/blog/BlogList/index.tsx .codex/logs/CHANGE-LOG.md`：通过
+- 风险与后续：
+  - 当前风险：数据库里原有 `post_groups.post_count` 缓存字段仍可能保留历史口径，但公开博客页已不再依赖它展示数量。
+  - 下一步动作：建议再检查创作者后台分组管理页是否仍应显示“全部内容数”还是也切到“公开可见数”，避免前后台数字看起来不一致。
+
+## 2026-04-27 21:28 (Asia/Shanghai)
+
+- 任务：调整创作者内容管理分页、博客编辑器标题浮层与公开博客页全部分组计数口径。
+- 改动文件：
+  - `apps/web/src/pages/MyPosts/index.tsx`
+  - `apps/web/src/components/blog/MdxMarkdownEditor.tsx`
+  - `apps/web/src/pages/BlogCreate/index.tsx`
+  - `apps/web/src/pages/blog/BlogList/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 创作者内容管理页把博客列表每页数量从 6 调整为 12，并把博客列表与图文列表拆成独立请求和独立 loading，切博客分页时不再顺带请求图文列表。
+  - 博客编辑页的 Milkdown 编辑器新增选区悬浮“标题”菜单，支持按配置切换正文、标题 1 到标题 4，并同步把顶部标题选项统一成中文配置。
+  - 博客编辑页点击“更新并发布/发布博客”时增加加载动画与进行中文案，避免发布过程缺少反馈。
+  - 公开博客页新增独立的“全部分组总数”查询，修复选中某个分组后“全部分组”角标跟着变成当前分组数量的问题。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：通过
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/components/blog/MdxMarkdownEditor.tsx apps/web/src/pages/BlogCreate/index.tsx apps/web/src/pages/MyPosts/index.tsx apps/web/src/pages/blog/BlogList/index.tsx`：通过
+- 风险与后续：
+  - 当前风险：编辑器新增的是轻量悬浮标题菜单，主要覆盖选区切标题场景；如果后续还要在悬浮工具栏里扩展更多块级能力，建议继续复用这套命令接线而不是再造第二套编辑器。
+  - 下一步动作：建议重点手点一次 `/my-space/posts` 的博客分页、`/my-space/blog-edit/:id` 的选区标题切换与发布按钮，以及 `/blog` 的“全部分组”角标，确认实际交互和你预期一致。
+
+## 2026-04-27 21:34 (Asia/Shanghai)
+
+- 任务：补齐公开博客页在空状态切换分组时的过渡 loading。
+- 改动文件：
+  - `apps/web/src/pages/blog/BlogList/index.tsx`
+  - `.codex/logs/CHANGE-LOG.md`
+- 关键改动：
+  - 新增空结果列表专用的 `showEmptyRefreshingState` 判定。
+  - 当 `/blog` 当前处于“当前筛选下暂无博客”且用户切换到其他分组、筛选结果仍在请求中时，页面会展示加载态卡片，而不再继续停留在旧空状态文案。
+- 校验：
+  - `pnpm --filter web exec tsc --noEmit`：待执行
+  - `python .codex/skills/encoding-guard/scripts/check_mojibake.py apps/web/src/pages/blog/BlogList/index.tsx .codex/logs/CHANGE-LOG.md`：待执行
+- 风险与后续：
+  - 当前风险：这次只补了“空状态切换分组”场景的过渡态，非空列表切换仍然沿用原来的 `BoxLoadingOverlay`。
+  - 下一步动作：建议手点一次“工程 0 篇”这类空分组，再切到有内容分组，确认视觉节奏和文案都符合预期。

@@ -153,6 +153,7 @@ export function PublicWallpaperPickerDialog({
                       resource={resource}
                       selected={selected}
                       onClick={onSelect}
+                      enablePreview={false}
                       showCreator
                       showTags
                       contentPadding="px-3 py-2.5"
