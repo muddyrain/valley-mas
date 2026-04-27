@@ -69,6 +69,7 @@ type BatchCoverItem = {
 export default function MyPosts() {
   const navigate = useNavigate();
   const location = useLocation();
+  const currentListReturnTo = `${location.pathname}${location.search}`;
   const {
     values: {
       blogPage,
@@ -201,14 +202,16 @@ export default function MyPosts() {
   }, [canAccess, loadAllPostsPage, location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
+    if (loadingBlogPosts) return;
     if (blogPage <= blogTotalPages) return;
     setValue('blogPage', blogTotalPages);
-  }, [blogPage, blogTotalPages, setValue]);
+  }, [blogPage, blogTotalPages, loadingBlogPosts, setValue]);
 
   useEffect(() => {
+    if (loadingImageTextPosts) return;
     if (imageTextPage <= imageTextTotalPages) return;
     setValue('imageTextPage', imageTextTotalPages);
-  }, [imageTextPage, imageTextTotalPages, setValue]);
+  }, [imageTextPage, imageTextTotalPages, loadingImageTextPosts, setValue]);
 
   useEffect(() => {
     if (!batchMode) return;
@@ -562,7 +565,10 @@ export default function MyPosts() {
           className="h-8 rounded-lg"
           onClick={() =>
             navigate(`/blog/${post.id}`, {
-              state: { returnTo: '/my-space/posts', returnLabel: '返回内容管理' },
+              state: {
+                returnTo: currentListReturnTo,
+                returnLabel: '返回内容管理',
+              },
             })
           }
         >
@@ -573,7 +579,14 @@ export default function MyPosts() {
           <Button
             size="sm"
             className="h-8 rounded-lg"
-            onClick={() => navigate(`/my-space/blog-edit/${post.id}`)}
+            onClick={() =>
+              navigate(`/my-space/blog-edit/${post.id}`, {
+                state: {
+                  returnTo: currentListReturnTo,
+                  returnLabel: '返回内容管理',
+                },
+              })
+            }
           >
             <Pencil className="mr-1 h-3.5 w-3.5" />
             编辑博客
