@@ -11,8 +11,6 @@
 
 ## 项目必读 Skills（默认优先）
 
-- `valley-mas-guide`
-- `task-completion-guard`
 - `encoding-guard`
 - `skill-usage-disclosure`
 - `component-reuse-guard`
@@ -20,22 +18,12 @@
 
 ## 场景强制 Skills
 
-- 产品行为与用户链路改动：`valley-mas-product-guard`
-- 博客/资源访问控制改动：`blog-resource-access-guard`
 - 创作空间与工作台改动：`creator-space-ux`
 - Web 主题与视觉一致性：`web-theme-consistency`、`brand-theme-guard`
-- 卡片结构与参数区改动：`card-system-consistency`
 - 组件复用与重复逻辑收敛：`component-reuse-guard`
-- 中文产品文案：`product-copy-cn`、`public-copy-boundary`
 - 任何生成 commit message、执行 `git commit`、或用户说“提交”“提交吧”“提交代码”“帮我提交”：`conventional-commit-guard`
-- Go + Vercel 发布链路：`vercel-go-release`
 - Go 调用火山 ARK 的 AI 能力：`ai-capability-orchestration`
-- Web 持续迭代任务管理：`web-feature-iteration`
-- Web 更新日志发布（仅 commit/push 节点记录）：`web-update-log-guard`
 - Web 列表页 keyword/page URL 联动：`web-url-state-sync`
-- climber-game 持续迭代任务管理：`climber-game-iteration`
-- climber-game 关卡与目标职责改动：`climber-game-design-guard`
-- Unity Climber 项目迭代与 Three.js 过渡：`unity-climber-iteration`
 - 任何真实文件改动后的日志沉淀：`change-log-guard`
 - 技能沉淀与更新：`skill-opportunity-scout`、`skill-sync-guard`、`skill-category-guard`
 
