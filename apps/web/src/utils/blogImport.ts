@@ -17,15 +17,19 @@ export function createAutoExcerpt(excerpt: string, content: string) {
   return createPlainTextExcerpt(content.trim(), 180);
 }
 
+function getImportedFileTitle(fileName: string) {
+  return fileName.replace(/\.[^.]+$/, '').trim();
+}
+
 export function parseMarkdownImport(fileName: string, rawText: string) {
   const normalized = rawText.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
-  let body = normalized.trim();
+  const fileTitle = getImportedFileTitle(fileName);
+  const body = normalized;
   let frontMatterTitle = '';
 
   const frontMatterMatch = body.match(/^---\n([\s\S]*?)\n---\n*/);
   if (frontMatterMatch) {
     const frontMatter = frontMatterMatch[1];
-    body = body.slice(frontMatterMatch[0].length).trim();
     const titleMatch = frontMatter.match(/^\s*title\s*:\s*(.+)\s*$/im);
     if (titleMatch) {
       frontMatterTitle = normalizeImportedTitle(titleMatch[1]);
@@ -34,18 +38,9 @@ export function parseMarkdownImport(fileName: string, rawText: string) {
 
   const headingMatch = body.match(/^(?:\s*\n)*#\s+(.+?)\s*(?:\n|$)/);
   const headingTitle = headingMatch ? normalizeImportedTitle(headingMatch[1]) : '';
-  const fileTitle = fileName
-    .replace(/\.[^.]+$/, '')
-    .replace(/[_-]+/g, ' ')
-    .trim();
-  const parsedTitle = frontMatterTitle || headingTitle || fileTitle || '未命名博客';
-
-  if (!frontMatterTitle && headingMatch) {
-    body = body.slice(headingMatch[0].length).trim();
-  }
 
   return {
-    title: parsedTitle,
+    title: fileTitle || frontMatterTitle || headingTitle || '未命名博客',
     content: body,
   };
 }

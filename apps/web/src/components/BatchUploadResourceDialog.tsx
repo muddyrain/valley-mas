@@ -496,11 +496,13 @@ export default function BatchUploadResourceDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!isBusy) {
-          onOpenChange(next);
-          if (!next) reset();
+        if (isBusy) return;
+        onOpenChange(next);
+        if (!next) {
+          reset();
         }
       }}
+      disablePointerDismissal
     >
       <DialogContent className="max-w-3xl! max-h-[90vh] flex flex-col gap-0 overflow-hidden p-0">
         {/* 标题栏 */}

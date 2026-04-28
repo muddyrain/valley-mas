@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { createAutoExcerpt, parseMarkdownImport } from '@/utils/blogImport';
 import { PublicWallpaperPickerDialog } from './PublicWallpaperPickerDialog';
 
@@ -111,8 +112,7 @@ export function BatchMarkdownImportDialog({
           try {
             const rawText = await file.text();
             const parsed = parseMarkdownImport(file.name, rawText);
-            const parsedContent = parsed.content.trim();
-            if (!parsedContent) {
+            if (!parsed.content.trim()) {
               return {
                 fileName: file.name,
                 title: parsed.title,
@@ -124,7 +124,7 @@ export function BatchMarkdownImportDialog({
             return {
               fileName: file.name,
               title: parsed.title.trim() || '未命名博客',
-              content: parsedContent,
+              content: parsed.content,
               status: 'pending',
             };
           } catch {
@@ -155,6 +155,26 @@ export function BatchMarkdownImportDialog({
     }
   };
 
+  const handleBatchTitleChange = (index: number, value: string) => {
+    setBatchItems((prev) =>
+      prev.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              title: value,
+              status:
+                item.status === 'success'
+                  ? item.status
+                  : item.content.trim()
+                    ? 'pending'
+                    : item.status,
+              error: item.status === 'success' || !item.content.trim() ? item.error : undefined,
+            }
+          : item,
+      ),
+    );
+  };
+
   const handleBatchImport = async (options?: { retryFailedOnly?: boolean }) => {
     const retryFailedOnly = options?.retryFailedOnly ?? false;
     const results = [...batchItems];
@@ -165,6 +185,11 @@ export function BatchMarkdownImportDialog({
 
     if (!runnableIndexes.length) {
       toast.error(retryFailedOnly ? '没有可重试的失败项' : '没有可创建的博客，请检查导入结果');
+      return;
+    }
+    const invalidTitleIndex = runnableIndexes.find((index) => !results[index].title.trim());
+    if (invalidTitleIndex !== undefined) {
+      toast.error(`请先填写标题：${results[invalidTitleIndex].fileName}`);
       return;
     }
     const missingCoverIndexes = runnableIndexes.filter((index) => {
@@ -346,6 +371,12 @@ export function BatchMarkdownImportDialog({
     }
   };
 
+  const handleDirectClose = () => {
+    if (batchRunning) return;
+    onOpenChange(false);
+    resetDialogState();
+  };
+
   return (
     <>
       <PublicWallpaperPickerDialog
@@ -363,15 +394,15 @@ export function BatchMarkdownImportDialog({
         onSelect={handleSelectPublicWallpaperCover}
       />
 
-      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="max-w-160!">
+      <Dialog open={open} onOpenChange={handleDialogOpenChange} disablePointerDismissal>
+        <DialogContent className="w-[96vw] max-w-[96vw] overflow-hidden lg:max-w-[1320px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileStack className="text-theme-primary h-4 w-4" />
               批量导入博客 MD
             </DialogTitle>
             <DialogDescription>
-              先上传 Markdown 文件，再确认识别结果并批量创建博客。
+              默认使用文件名作为标题，正文会完整保留；你也可以在创建前自由修改每篇标题。
             </DialogDescription>
           </DialogHeader>
 
@@ -448,7 +479,7 @@ export function BatchMarkdownImportDialog({
                 <FileUp className="text-theme-primary mb-3 h-10 w-10" />
                 <p className="mb-1 text-sm font-medium text-slate-700">上传 Markdown 文件</p>
                 <p className="mb-4 text-xs text-slate-500">
-                  支持一次导入多个 `.md` 文件并自动识别标题与正文。
+                  支持一次导入多个 `.md` 文件，默认用文件名作标题并完整保留正文。
                 </p>
                 <Button
                   type="button"
@@ -515,13 +546,20 @@ export function BatchMarkdownImportDialog({
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
-                            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                              <span className="rounded-full border border-theme-primary/20 bg-theme-soft px-2 py-0.5 text-xs font-semibold text-theme-primary">
-                                {item.title}
-                              </span>
-                              <span className="truncate text-xs text-slate-400">
-                                {item.fileName}
-                              </span>
+                            <div className="min-w-0 flex-1">
+                              <Input
+                                value={item.title}
+                                onChange={(event) =>
+                                  handleBatchTitleChange(index, event.target.value)
+                                }
+                                placeholder="请输入博客标题"
+                                disabled={batchRunning || item.status === 'running'}
+                                className="h-9 rounded-xl border-theme-primary/20 bg-white"
+                              />
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                                <span className="truncate">文件名：{item.fileName}</span>
+                                <span>正文 {item.content.trim().length} 字符</span>
+                              </div>
                             </div>
                             {!batchRunning && item.status !== 'success' && (
                               <button
@@ -625,7 +663,7 @@ export function BatchMarkdownImportDialog({
                 type="button"
                 variant="outline"
                 disabled={batchRunning}
-                onClick={() => handleDialogOpenChange(false)}
+                onClick={handleDirectClose}
               >
                 {batchDone ? '关闭' : '取消'}
               </Button>

@@ -494,8 +494,7 @@ export default function BlogCreate() {
       setImportingMarkdown(true);
       const rawText = await file.text();
       const parsed = parseMarkdownImport(file.name, rawText);
-      const parsedContent = parsed.content.trim();
-      if (!parsedContent) {
+      if (!parsed.content.trim()) {
         toast.error('导入失败，文件正文为空');
         return;
       }
@@ -504,7 +503,7 @@ export default function BlogCreate() {
         resetLocalCoverEditing();
       }
       setTitle(parsed.title);
-      setContent(parsedContent);
+      setContent(parsed.content);
       setExcerpt('');
       setCover('');
       setCoverStorageKey('');
@@ -523,7 +522,7 @@ export default function BlogCreate() {
           handleAIGenerateCover({
             title: parsed.title,
             excerpt: '',
-            content: parsedContent,
+            content: parsed.content,
             source: 'import',
           }),
       });
