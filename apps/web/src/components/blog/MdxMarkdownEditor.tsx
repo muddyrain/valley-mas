@@ -1,11 +1,22 @@
 import { Crepe } from '@milkdown/crepe';
+import { toggleLinkCommand } from '@milkdown/kit/component/link-tooltip';
 import { commandsCtx, editorViewCtx } from '@milkdown/kit/core';
+import type { Ctx } from '@milkdown/kit/ctx';
 import {
+  emphasisSchema,
   headingSchema,
+  inlineCodeSchema,
+  isMarkSelectedCommand,
+  linkSchema,
   paragraphSchema,
   setBlockTypeCommand,
+  strongSchema,
+  toggleEmphasisCommand,
+  toggleInlineCodeCommand,
+  toggleStrongCommand,
 } from '@milkdown/kit/preset/commonmark';
 import { replaceAll } from '@milkdown/kit/utils';
+import { Bold, ChevronDown, Code2, Italic, Link2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { normalizeOrderedListStarts } from '@/utils/blog';
@@ -19,6 +30,10 @@ type FloatingToolbarState = {
   top: number;
   left: number;
   activeLabel: string;
+  isBold: boolean;
+  isItalic: boolean;
+  isInlineCode: boolean;
+  hasLink: boolean;
 };
 
 interface MdxMarkdownEditorProps {
@@ -108,9 +123,14 @@ export function MdxMarkdownEditor({
 
       const shellRect = shell.getBoundingClientRect();
       const rawLeft = rect.left + rect.width / 2 - shellRect.left;
-      const left = Math.min(Math.max(rawLeft, 88), Math.max(shellRect.width - 88, 88));
+      const toolbarHalfWidth = 176;
+      const left = Math.min(
+        Math.max(rawLeft, toolbarHalfWidth),
+        Math.max(shellRect.width - toolbarHalfWidth, toolbarHalfWidth),
+      );
       const top = Math.max(rect.top - shellRect.top - 14, 18);
 
+      const commands = ctx.get(commandsCtx);
       const currentNode = selection.$from.parent;
       const currentLevel =
         currentNode.type === headingSchema.type(ctx) ? Number(currentNode.attrs.level || 0) : null;
@@ -121,6 +141,10 @@ export function MdxMarkdownEditor({
         top,
         left,
         activeLabel: activeOption?.label || '正文',
+        isBold: commands.call(isMarkSelectedCommand.key, strongSchema.type(ctx)),
+        isItalic: commands.call(isMarkSelectedCommand.key, emphasisSchema.type(ctx)),
+        isInlineCode: commands.call(isMarkSelectedCommand.key, inlineCodeSchema.type(ctx)),
+        hasLink: commands.call(isMarkSelectedCommand.key, linkSchema.type(ctx)),
       };
     });
 
@@ -135,13 +159,32 @@ export function MdxMarkdownEditor({
         prev &&
         prev.top === resolvedState.top &&
         prev.left === resolvedState.left &&
-        prev.activeLabel === resolvedState.activeLabel
+        prev.activeLabel === resolvedState.activeLabel &&
+        prev.isBold === resolvedState.isBold &&
+        prev.isItalic === resolvedState.isItalic &&
+        prev.isInlineCode === resolvedState.isInlineCode &&
+        prev.hasLink === resolvedState.hasLink
       ) {
         return prev;
       }
       return resolvedState;
     });
   }, [headingOptions, hideFloatingToolbar]);
+
+  const runToolbarCommand = useCallback(
+    (commandRunner: (ctx: Ctx) => void) => {
+      const crepe = crepeRef.current;
+      if (!crepe) return;
+
+      crepe.editor.action((ctx) => {
+        commandRunner(ctx);
+        ctx.get(editorViewCtx).focus();
+      });
+
+      requestAnimationFrame(() => updateFloatingToolbar());
+    },
+    [updateFloatingToolbar],
+  );
 
   const applyHeading = useCallback(
     (level: number | null) => {
@@ -169,6 +212,30 @@ export function MdxMarkdownEditor({
     [updateFloatingToolbar],
   );
 
+  const toggleBold = useCallback(() => {
+    runToolbarCommand((ctx) => {
+      ctx.get(commandsCtx).call(toggleStrongCommand.key);
+    });
+  }, [runToolbarCommand]);
+
+  const toggleItalic = useCallback(() => {
+    runToolbarCommand((ctx) => {
+      ctx.get(commandsCtx).call(toggleEmphasisCommand.key);
+    });
+  }, [runToolbarCommand]);
+
+  const toggleInlineCode = useCallback(() => {
+    runToolbarCommand((ctx) => {
+      ctx.get(commandsCtx).call(toggleInlineCodeCommand.key);
+    });
+  }, [runToolbarCommand]);
+
+  const toggleLink = useCallback(() => {
+    runToolbarCommand((ctx) => {
+      ctx.get(commandsCtx).call(toggleLinkCommand.key);
+    });
+  }, [runToolbarCommand]);
+
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -179,6 +246,7 @@ export function MdxMarkdownEditor({
       defaultValue: valueRef.current,
       features: {
         [Crepe.Feature.TopBar]: true,
+        [Crepe.Feature.Toolbar]: false,
       },
       featureConfigs: {
         [Crepe.Feature.TopBar]: {
@@ -329,17 +397,78 @@ export function MdxMarkdownEditor({
             left: floatingToolbarState.left,
           }}
         >
-          <div className="relative flex items-center gap-2 rounded-2xl border border-theme-soft-strong bg-white/96 px-2 py-2 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur">
+          <div className="relative flex items-center gap-1.5 rounded-2xl border border-theme-soft-strong bg-white/96 px-2 py-2 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur">
+            <button
+              type="button"
+              title="加粗"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={toggleBold}
+              className={cn(
+                'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
+                floatingToolbarState.isBold
+                  ? 'bg-theme-soft text-theme-primary shadow-[inset_0_0_0_1px_rgba(var(--theme-primary-rgb),0.22)]'
+                  : 'text-slate-500 hover:bg-theme-soft/70 hover:text-slate-900',
+              )}
+            >
+              <Bold className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              title="斜体"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={toggleItalic}
+              className={cn(
+                'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
+                floatingToolbarState.isItalic
+                  ? 'bg-theme-soft text-theme-primary shadow-[inset_0_0_0_1px_rgba(var(--theme-primary-rgb),0.22)]'
+                  : 'text-slate-500 hover:bg-theme-soft/70 hover:text-slate-900',
+              )}
+            >
+              <Italic className="h-4 w-4" />
+            </button>
+            <span className="h-6 w-px bg-theme-soft-strong/80" />
             <button
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => setHeadingMenuOpen((prev) => !prev)}
-              className="inline-flex items-center gap-2 rounded-xl bg-theme-soft px-3 py-1.5 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/80"
+              className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-theme-soft px-3 text-xs font-medium text-theme-primary transition hover:bg-theme-soft/80"
             >
               <span>{floatingToolbarState.activeLabel}</span>
-              <span className="text-[10px] text-theme-primary/70">
-                {headingMenuOpen ? '▲' : '▼'}
-              </span>
+              <ChevronDown
+                className={cn(
+                  'h-3.5 w-3.5 text-theme-primary/70 transition-transform',
+                  headingMenuOpen && 'rotate-180',
+                )}
+              />
+            </button>
+            <span className="h-6 w-px bg-theme-soft-strong/80" />
+            <button
+              type="button"
+              title="行内代码"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={toggleInlineCode}
+              className={cn(
+                'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
+                floatingToolbarState.isInlineCode
+                  ? 'bg-theme-soft text-theme-primary shadow-[inset_0_0_0_1px_rgba(var(--theme-primary-rgb),0.22)]'
+                  : 'text-slate-500 hover:bg-theme-soft/70 hover:text-slate-900',
+              )}
+            >
+              <Code2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              title="链接"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={toggleLink}
+              className={cn(
+                'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
+                floatingToolbarState.hasLink
+                  ? 'bg-theme-soft text-theme-primary shadow-[inset_0_0_0_1px_rgba(var(--theme-primary-rgb),0.22)]'
+                  : 'text-slate-500 hover:bg-theme-soft/70 hover:text-slate-900',
+              )}
+            >
+              <Link2 className="h-4 w-4" />
             </button>
 
             {headingMenuOpen ? (
