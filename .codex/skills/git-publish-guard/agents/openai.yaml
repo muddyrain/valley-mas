@@ -1,4 +1,0 @@
-interface:
-  display_name: "Git 发布护栏"
-  short_description: "约束 push 时显式指定 remote，默认发布到 origin"
-  default_prompt: "当 Valley MAS 任务涉及 git push、设置 upstream、发布分支或配合 yeet/github:yeet 执行远端发布时，显式指定 push remote，默认使用 origin；首次推送新分支优先 git push --set-upstream origin <branch>，普通推送优先 git push origin <branch>，除非用户明确要求其他 remote。"

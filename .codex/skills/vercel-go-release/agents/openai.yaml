@@ -1,4 +1,0 @@
-interface:
-  display_name: "Vercel-Go 发布检查"
-  short_description: "按 Vercel 与 Go 一体部署方式思考交付风险"
-  default_prompt: "当任务可能影响 Vercel 发布、Go 服务路由、环境变量或前后端联动时，使用 Vercel-Go 发布检查。"

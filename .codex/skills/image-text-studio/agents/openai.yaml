@@ -1,4 +1,0 @@
-interface:
-  display_name: "图文创作工作台"
-  short_description: "处理图文编辑、预览、导出和图文卡片相关改动"
-  default_prompt: "当任务涉及图文编辑器、手动分页、局部字号、高亮、预览一致性、生成图或图文卡片时，使用图文创作工作台。"

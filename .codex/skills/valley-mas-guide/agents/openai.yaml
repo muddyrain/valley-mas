@@ -1,4 +1,0 @@
-interface:
-  display_name: "Valley MAS 引导"
-  short_description: "为 Valley MAS 仓库提供结构导航、入口判断和常用校验指引。"
-  default_prompt: "Use $valley-mas-guide to navigate the Valley MAS monorepo before making changes."
