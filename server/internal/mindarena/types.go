@@ -111,8 +111,8 @@ func normalizePersonaCount(count int) int {
 	if count < 3 {
 		return 5
 	}
-	if count > 6 {
-		return 6
+	if count > 5 {
+		return 5
 	}
 	return count
 }

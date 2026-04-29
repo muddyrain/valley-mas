@@ -165,6 +165,7 @@ AI_MODEL=xxx
 
 - AI_PROVIDER=mock
 - 或未配置 AI_API_KEY
+- 或真实模型配置不完整 / 上游调用失败
 
 👉 自动使用 MockAIService
 
@@ -178,6 +179,15 @@ AI_MODEL=xxx
 ---
 
 # 🤖 真实模型模式
+
+```bash
+AI_PROVIDER=doubao
+AI_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
+AI_API_KEY=your-api-key
+AI_MODEL=ep-xxxxxxxxxx
+```
+
+或使用任意 OpenAI-compatible 服务：
 
 ```bash
 AI_PROVIDER=openai-compatible

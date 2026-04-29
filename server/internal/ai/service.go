@@ -7,6 +7,12 @@ import (
 	"valley-server/internal/mindarena"
 )
 
+const (
+	AIProviderMock             = "mock"
+	AIProviderOpenAICompatible = "openai-compatible"
+	AIProviderDoubao           = "doubao"
+)
+
 type AIService interface {
 	GeneratePersonas(ctx context.Context, topic string, mode string, count int) ([]mindarena.Persona, error)
 	GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error)
@@ -14,13 +20,31 @@ type AIService interface {
 }
 
 func NewServiceFromEnv() AIService {
-	provider := strings.ToLower(strings.TrimSpace(os.Getenv("AI_PROVIDER")))
-	if provider == "openai-compatible" && strings.TrimSpace(os.Getenv("AI_API_KEY")) != "" {
-		return NewOpenAICompatibleService(OpenAICompatibleConfig{
-			BaseURL: os.Getenv("AI_BASE_URL"),
-			APIKey:  os.Getenv("AI_API_KEY"),
-			Model:   os.Getenv("AI_MODEL"),
+	mock := NewMockAIService()
+	provider := normalizeAIProvider(os.Getenv("AI_PROVIDER"))
+	if isOpenAICompatibleProvider(provider) && strings.TrimSpace(os.Getenv("AI_API_KEY")) != "" {
+		primary := NewOpenAICompatibleService(OpenAICompatibleConfig{
+			Provider: provider,
+			BaseURL:  os.Getenv("AI_BASE_URL"),
+			APIKey:   os.Getenv("AI_API_KEY"),
+			Model:    os.Getenv("AI_MODEL"),
 		})
+		return NewFallbackService(primary, mock)
 	}
-	return NewMockAIService()
+	return mock
+}
+
+func normalizeAIProvider(provider string) string {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "openai", "openai_compatible", AIProviderOpenAICompatible:
+		return AIProviderOpenAICompatible
+	case AIProviderDoubao:
+		return AIProviderDoubao
+	default:
+		return AIProviderMock
+	}
+}
+
+func isOpenAICompatibleProvider(provider string) bool {
+	return provider == AIProviderOpenAICompatible || provider == AIProviderDoubao
 }
