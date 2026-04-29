@@ -24,8 +24,7 @@ category: general
 
 ## 推荐表达
 
-- “这次我会用 `image-text-studio` 和 `encoding-guard`，前者处理图文编辑逻辑，后者确保中文文案不会出编码问题。”
-- “这次会带上 `vercel-go-release`，因为改动可能影响 Vercel + Go server 的发布行为。”
+- “这次我会用 `creator-space-ux` 和 `encoding-guard`，前者处理图文编辑逻辑，后者确保中文文案不会出编码问题。”
 
 ## 注意
 
