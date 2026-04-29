@@ -1,0 +1,254 @@
+'use client';
+
+import { ArrowLeft, Loader2, Megaphone, Sparkles } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { getDebate, getDebateStreamURL } from '@/lib/api';
+import type { DebateMessage, DebateResult, DebateSession, DebateSSEEvent } from '@/lib/types';
+import { DebateBubble } from './DebateBubble';
+import { PersonaCard } from './PersonaCard';
+import { ResultCard } from './ResultCard';
+import { ScorePanel } from './ScorePanel';
+
+interface DebateRoomProps {
+  initialSession: DebateSession;
+}
+
+const roundLabels = ['立场表达', '交叉质询', '最终陈词'];
+
+const modeLabels: Record<DebateSession['mode'], string> = {
+  serious: '理性裁决',
+  funny: '整活模式',
+  sharp: '锋芒对线',
+  wild: '脑洞失控',
+  workplace: '职场会诊',
+  emotion: '情绪会诊',
+};
+
+export function DebateRoom({ initialSession }: DebateRoomProps) {
+  const [session, setSession] = useState(initialSession);
+  const [messages, setMessages] = useState<DebateMessage[]>(initialSession.messages || []);
+  const [result, setResult] = useState<DebateResult | undefined>(initialSession.result);
+  const [statusText, setStatusText] = useState('脑内评委团正在入场...');
+  const [activePersonaId, setActivePersonaId] = useState<string | undefined>();
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  const currentRound = messages.at(-1)?.round || (session.status === 'created' ? 1 : 3);
+
+  const scoreMap = useMemo(() => {
+    const base = new Map<string, number>();
+    session.personas.map((persona, index) => base.set(persona.name, Math.max(10, 30 - index * 5)));
+    result?.scores.map((score) => base.set(score.persona, score.score));
+    return base;
+  }, [result?.scores, session.personas]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+  }, [messages.length, result]);
+
+  useEffect(() => {
+    if (initialSession.status === 'done') return;
+
+    const source = new EventSource(getDebateStreamURL(initialSession.id));
+
+    source.addEventListener('message', (event) => {
+      const payload = JSON.parse((event as MessageEvent).data) as DebateSSEEvent;
+      if (!payload.personaId || !payload.personaName || !payload.content) return;
+      const personaId = payload.personaId;
+      const personaName = payload.personaName;
+      const content = payload.content;
+      setActivePersonaId(personaId);
+      setStatusText(`${personaName} 正在发言...`);
+      setMessages((prev) => {
+        const exists = prev.some(
+          (message) =>
+            message.round === payload.round &&
+            message.personaId === personaId &&
+            message.content === content,
+        );
+        if (exists) return prev;
+        return [
+          ...prev,
+          {
+            id: `${personaId}-${payload.round}-${prev.length}`,
+            round: payload.round || 1,
+            roundTitle: payload.roundTitle || '立场表达',
+            personaId,
+            personaName,
+            content,
+            createdAt: new Date().toISOString(),
+          },
+        ];
+      });
+    });
+
+    source.addEventListener('judge', (event) => {
+      const payload = JSON.parse((event as MessageEvent).data) as DebateSSEEvent;
+      setResult(payload.result);
+      setActivePersonaId(undefined);
+      setStatusText('裁判团正在亮牌');
+    });
+
+    source.addEventListener('done', async () => {
+      source.close();
+      setStatusText('辩论结束，金句已出炉');
+      const latest = await getDebate(initialSession.id);
+      setSession(latest);
+      setMessages(latest.messages || []);
+      setResult(latest.result);
+    });
+
+    source.addEventListener('error', (event) => {
+      const messageEvent = event as MessageEvent<string>;
+      if (typeof messageEvent.data === 'string' && messageEvent.data) {
+        const payload = JSON.parse(messageEvent.data) as DebateSSEEvent;
+        setStatusText(payload.message || '流式连接中断');
+      } else {
+        setStatusText('连接评委席失败，请刷新重试');
+      }
+      source.close();
+    });
+
+    return () => source.close();
+  }, [initialSession.id, initialSession.status]);
+
+  const groupedMessages = useMemo(() => {
+    return messages.reduce<Record<number, DebateMessage[]>>((acc, message) => {
+      acc[message.round] = acc[message.round] || [];
+      acc[message.round].push(message);
+      return acc;
+    }, {});
+  }, [messages]);
+
+  return (
+    <main className="arena-shell h-screen overflow-hidden px-4 py-4">
+      <div className="relative z-10 mx-auto flex h-full max-w-[1880px] flex-col gap-4">
+        <header className="arena-panel flex h-[72px] items-center justify-between gap-4 border-purple-400/20 px-5 py-4 shadow-[0_0_30px_rgba(123,92,255,0.2)]">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(168,85,247,0.28),rgba(99,102,241,0.14),rgba(236,72,153,0.22))] shadow-[0_0_30px_rgba(123,92,255,0.2)]">
+              <Image src="/logo.svg" width={44} height={44} alt="Brain Circuit" />
+            </div>
+            <div className="flex items-center">
+              <div className="truncate text-xl font-semibold leading-none text-white">
+                脑内会议室
+              </div>
+              <div className="ml-3 text-md leading-none text-zinc-400">AI人格对战场</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="arena-chip hidden text-md sm:inline-flex py-2">
+              <span className="h-2 w-2 rounded-full bg-fuchsia-300" />
+              {result ? '裁判已出结果' : '直播中'}
+            </span>
+            <Link href="/" className="arena-ghost-button text-md py-2">
+              <ArrowLeft className="h-4 w-4" />
+              <span>返回开场</span>
+            </Link>
+          </div>
+        </header>
+
+        <div className="grid min-h-0 flex-1 gap-4 grid-cols-[360px_minmax(0,1fr)_400px]">
+          <aside className="arena-panel flex min-h-0 flex-col border-purple-400/20 px-4 py-4 shadow-[0_0_30px_rgba(123,92,255,0.2)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-[18px] font-semibold text-white">本场嘉宾</h2>
+                <p className="mt-1 text-[12px] leading-5 text-white/50">观点阵营与发言状态</p>
+              </div>
+              <span className="arena-chip">{session.personas.length} 位</span>
+            </div>
+            <div className="thin-scrollbar mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+              {session.personas.map((persona) => (
+                <PersonaCard
+                  key={persona.id}
+                  persona={persona}
+                  active={activePersonaId === persona.id}
+                  score={scoreMap.get(persona.name)}
+                />
+              ))}
+            </div>
+          </aside>
+
+          <section className="arena-panel flex min-h-0 flex-col overflow-hidden border-purple-400/20 shadow-[0_0_30px_rgba(123,92,255,0.2)]">
+            <header className="border-b border-white/8 px-4 pb-4 pt-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-[14px] font-medium text-fuchsia-100">
+                  <Megaphone className="h-4 w-4" />
+                  本次议题
+                </div>
+                <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/70 transition hover:bg-white/20">
+                  {modeLabels[session.mode]}
+                </span>
+              </div>
+              <h1 className="mb-4 mt-4 max-w-full rounded-xl border border-purple-400/30 bg-gradient-to-r from-purple-500/30 to-pink-500/30 px-4 py-3 text-base tracking-wide text-white font-bold drop-shadow-[0_0_8px_rgba(255,255,255,0.16)] shadow-[0_0_30px_rgba(255,77,157,0.6)] backdrop-blur-lg">
+                {session.topic}
+              </h1>
+            </header>
+
+            <div className="px-4 pt-4">
+              <div className="arena-subpanel flex items-center justify-between gap-3 border-purple-400/30 bg-gradient-to-r from-purple-500/20 to-pink-500/20 px-4 py-3 shadow-[0_0_20px_rgba(123,92,255,0.24)]">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-[12px] text-white/48">
+                    <Sparkles className="h-3.5 w-3.5 text-fuchsia-300" />
+                    当前阶段
+                  </div>
+                  <div className="mt-1 text-[15px] font-semibold text-white">
+                    Round {Math.max(currentRound, 1)} · {roundLabels[Math.max(currentRound - 1, 0)]}
+                  </div>
+                </div>
+                <div className="max-w-[48%] text-right text-[12px] leading-5 text-white/55">
+                  {statusText}
+                </div>
+              </div>
+            </div>
+
+            <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-4 pr-2 pt-4">
+              <div className="space-y-5">
+                {[1, 2, 3].map((round) => {
+                  const roundMessages = groupedMessages[round] || [];
+                  if (roundMessages.length === 0 && round > currentRound) return null;
+                  return (
+                    <section key={round} className="space-y-3">
+                      <div className="sticky top-0 z-10 -mx-1 bg-[linear-gradient(180deg,rgba(15,12,34,0.96),rgba(15,12,34,0.78),transparent)] px-1 pb-2 pt-1 backdrop-blur-sm">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/24 bg-fuchsia-500/12 px-3 py-1.5 text-[12px] font-medium text-fuchsia-50 shadow-[0_0_12px_rgba(255,77,157,0.18)]">
+                          <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-300" />
+                          Round {round}
+                          <span className="text-white/48">
+                            {roundMessages[0]?.roundTitle || roundLabels[round - 1]}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        {roundMessages.map((message) => (
+                          <DebateBubble
+                            key={message.id}
+                            message={message}
+                            persona={session.personas.find(
+                              (persona) => persona.id === message.personaId,
+                            )}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+
+                {!result ? (
+                  <div className="arena-subpanel mx-auto flex w-fit items-center gap-2 border-purple-400/20 bg-white/5 px-4 py-3 text-[13px] font-medium text-white/72 shadow-[0_0_20px_rgba(123,92,255,0.18)]">
+                    <Loader2 className="h-4 w-4 animate-spin text-fuchsia-300" />
+                    {statusText}
+                  </div>
+                ) : (
+                  <ResultCard result={result} />
+                )}
+                <div ref={bottomRef} />
+              </div>
+            </div>
+          </section>
+
+          <ScorePanel session={session} result={result} currentRound={currentRound} />
+        </div>
+      </div>
+    </main>
+  );
+}

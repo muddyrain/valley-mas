@@ -1,60 +1,80 @@
-import { Brain } from 'lucide-react';
-import { TopicForm } from '@/components/TopicForm';
+import { Brain, Info, Share2, Sparkles, Volume2 } from 'lucide-react';
+import type { ComponentType } from 'react';
+import { Personas } from '@/components/home/Personas';
+import { TopicForm } from '@/components/home/TopicForm';
+
+const toolbarActions: Array<{
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+}> = [
+  { icon: Info, label: '规则说明' },
+  { icon: Volume2, label: '音效开' },
+  { icon: Share2, label: '分享战况' },
+];
 
 export default function HomePage() {
   return (
-    <main className="arena-shell px-6 pb-20 pt-12">
-      <section className="relative z-10 mx-auto max-w-6xl text-center">
-        <div className="mx-auto flex w-fit items-center gap-5">
-          <span className="animate-floaty text-6xl">🧠</span>
-          <h1 className="bg-gradient-to-r from-orange-300 via-pink-400 to-violet-400 bg-clip-text text-7xl font-black text-transparent drop-shadow-lg md:text-8xl">
-            脑内会议室
-          </h1>
-        </div>
-        <div className="mx-auto mt-4 h-3 w-44 rounded-full bg-gradient-to-r from-cyan-300 via-pink-400 to-arena-yellow" />
+    <main className="arena-shell min-h-screen overflow-x-hidden overflow-y-auto px-6 pb-8 pt-5">
+      <div className="pointer-events-none absolute left-[3.5%] top-[28%] text-violet-500/28 drop-shadow-[0_0_30px_rgba(123,92,255,0.28)]">
+        <Brain className="h-24 w-24" strokeWidth={1.2} />
+      </div>
+      <div className="pointer-events-none absolute right-[9%] top-[16%] text-violet-400/55 drop-shadow-[0_0_30px_rgba(123,92,255,0.32)]">
+        <Sparkles className="h-11 w-11" strokeWidth={1.5} />
+      </div>
+      <div className="pointer-events-none absolute bottom-[10%] right-[5%] text-fuchsia-400/35 drop-shadow-[0_0_30px_rgba(255,77,157,0.28)]">
+        <Brain className="h-16 w-16" strokeWidth={1.25} />
+      </div>
 
-        <h2 className="mt-10 text-5xl font-black leading-tight text-white drop-shadow md:text-6xl">
-          让 5 个 AI 人格替你吵一架
-        </h2>
-        <p className="mt-6 text-2xl font-black text-white/82">把你的纠结丢进去，交给脑内评委团。</p>
-
-        <div className="pointer-events-none absolute left-0 top-28 hidden animate-floaty rounded-full bg-white/10 p-5 text-5xl blur-[0.2px] md:block">
-          💭
-        </div>
-        <div className="pointer-events-none absolute right-3 top-40 hidden animate-floaty text-6xl opacity-55 md:block">
-          💥
-        </div>
-      </section>
-
-      <TopicForm />
-
-      <section className="relative z-10 mx-auto mt-24 max-w-4xl text-center">
-        <h2 className="text-2xl font-black text-white">⭐ 本场嘉宾预告 ⭐</h2>
-        <div className="mt-8 grid grid-cols-5 gap-8">
-          {[
-            ['👨‍💼', '理性派', '冷静分析师', 'bg-blue-500'],
-            ['😼', '毒舌派', '吐槽达人', 'bg-violet-500'],
-            ['🦸', '赌徒派', '冒险家', 'bg-red-500'],
-            ['👵', '父母派', '保守长者', 'bg-green-500'],
-            ['😴', '摆烂派', '躺平大师', 'bg-yellow-500'],
-          ].map(([emoji, name, desc, color]) => (
-            <div key={name} className="text-center">
-              <div
-                className={`mx-auto grid h-28 w-28 place-items-center rounded-3xl border-4 border-white text-5xl shadow-lg ${color}`}
-              >
-                {emoji}
+      <div className="relative z-10 mx-auto max-w-[1200px]">
+        <header className="flex items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-2xl border border-fuchsia-400/45 bg-[linear-gradient(135deg,rgba(236,72,153,0.3),rgba(124,58,237,0.24))] shadow-[0_0_30px_rgba(123,92,255,0.2)]">
+                <Brain className="h-5 w-5 text-fuchsia-100" strokeWidth={2.1} />
+              </span>
+              <div className="text-[21px] font-semibold tracking-[0.04em] text-white">
+                脑内会议室
               </div>
-              <div className="mx-auto mt-4 rounded-full border-2 border-white bg-arena-yellow px-4 py-2 text-base font-black text-purple-800">
-                {name}
-              </div>
-              <p className="mt-2 text-sm font-bold text-white/85">{desc}</p>
             </div>
-          ))}
-        </div>
-      </section>
+            <span className="arena-chip border-violet-400/34 bg-violet-500/14 px-4 py-2 text-[13px] text-violet-100 shadow-[0_0_30px_rgba(123,92,255,0.2)]">
+              AI人格对战场
+            </span>
+          </div>
 
-      <div className="pointer-events-none fixed bottom-8 right-9 text-arena-yellow/40">
-        <Brain className="h-16 w-16" />
+          <div className="flex items-center gap-3">
+            {toolbarActions.map(({ icon: Icon, label }) => (
+              <button key={label} type="button" className="arena-toolbar-button">
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </header>
+
+        <section className="relative mx-auto mt-8 max-w-[1200px] text-center">
+          <div className="mx-auto flex w-fit items-center gap-5">
+            <span className="text-[64px] leading-none drop-shadow-[0_0_36px_rgba(255,77,157,0.44)]">
+              🧠
+            </span>
+            <h1 className="bg-gradient-to-r from-purple-400 via-fuchsia-400 to-pink-400 bg-clip-text text-[68px] font-black leading-none tracking-[0.03em] text-transparent drop-shadow-[0_0_30px_rgba(123,92,255,0.26)]">
+              脑内会议室
+            </h1>
+          </div>
+
+          <div className="mt-4 flex items-center justify-center gap-5">
+            <span className="h-px w-16 bg-gradient-to-r from-transparent to-violet-400/80 shadow-[0_0_20px_rgba(123,92,255,0.34)]" />
+            <h2 className="text-[24px] font-semibold tracking-[0.16em] text-white">
+              让 5 个 AI 人格替你吵一架
+            </h2>
+            <span className="h-px w-16 bg-gradient-to-l from-transparent to-fuchsia-400/80 shadow-[0_0_20px_rgba(255,77,157,0.34)]" />
+          </div>
+          <p className="mt-3 text-[14px] leading-7 text-white/64">
+            把你的纠结丢进去，交给脑内评委团。
+          </p>
+        </section>
+
+        <TopicForm />
+        <Personas />
       </div>
     </main>
   );

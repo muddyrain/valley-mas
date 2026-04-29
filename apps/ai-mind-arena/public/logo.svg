@@ -1,0 +1,47 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="88" y1="64" x2="424" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A0F3C"/>
+      <stop offset="0.55" stop-color="#120A2A"/>
+      <stop offset="1" stop-color="#0B0B2B"/>
+    </linearGradient>
+    <linearGradient id="brain" x1="132" y1="98" x2="386" y2="404" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A855F7"/>
+      <stop offset="0.45" stop-color="#FF4D9D"/>
+      <stop offset="1" stop-color="#FF9A5A"/>
+    </linearGradient>
+    <linearGradient id="spark" x1="340" y1="102" x2="416" y2="178" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#FF4D9D"/>
+    </linearGradient>
+    <filter id="glow" x="44" y="44" width="424" height="424" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="16" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0.62 0 1 0 0 0.22 0 0 1 0 1 0 0 0 0.65 0"/>
+      <feBlend in="SourceGraphic"/>
+    </filter>
+  </defs>
+
+  <rect x="40" y="40" width="432" height="432" rx="112" fill="url(#bg)"/>
+  <rect x="40" y="40" width="432" height="432" rx="112" stroke="#A855F7" stroke-opacity="0.28" stroke-width="4"/>
+
+  <g filter="url(#glow)">
+    <!-- left brain -->
+    <path d="M235 116C194 116 167 139 164 174C138 180 119 202 119 232C119 247 124 260 133 271C120 282 112 299 112 318C112 351 137 378 170 380C182 402 205 416 235 416C249 416 260 405 260 391V141C260 127 249 116 235 116Z" stroke="url(#brain)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M177 178C199 178 216 193 216 215" stroke="url(#brain)" stroke-width="18" stroke-linecap="round"/>
+    <path d="M170 279C191 279 206 294 206 315" stroke="url(#brain)" stroke-width="18" stroke-linecap="round"/>
+    <path d="M215 246C197 246 183 258 183 276" stroke="url(#brain)" stroke-width="18" stroke-linecap="round"/>
+    <path d="M235 347C213 347 196 332 196 310" stroke="url(#brain)" stroke-width="18" stroke-linecap="round"/>
+
+    <!-- right brain -->
+    <path d="M277 116C318 116 345 139 348 174C374 180 393 202 393 232C393 247 388 260 379 271C392 282 400 299 400 318C400 351 375 378 342 380C330 402 307 416 277 416C263 416 252 405 252 391V141C252 127 263 116 277 116Z" stroke="url(#brain)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M335 178C313 178 296 193 296 215" stroke="url(#brain)" stroke-width="18" stroke-linecap="round"/>
+    <path d="M342 279C321 279 306 294 306 315" stroke="url(#brain)" stroke-width="18" stroke-linecap="round"/>
+    <path d="M297 246C315 246 329 258 329 276" stroke="url(#brain)" stroke-width="18" stroke-linecap="round"/>
+    <path d="M277 347C299 347 316 332 316 310" stroke="url(#brain)" stroke-width="18" stroke-linecap="round"/>
+  </g>
+
+  <!-- arena sparks -->
+  <path d="M385 94L397 126L429 138L397 150L385 182L373 150L341 138L373 126L385 94Z" fill="url(#spark)" opacity="0.9"/>
+  <circle cx="112" cy="115" r="8" fill="#FF4D9D" opacity="0.9"/>
+  <circle cx="405" cy="397" r="10" fill="#7B5CFF" opacity="0.8"/>
+</svg>
