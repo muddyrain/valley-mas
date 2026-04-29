@@ -33,12 +33,7 @@ category: general
 
 ## 建议检查范围
 
-- `.codex/skills/image-text-studio/`
 - `.codex/skills/creator-space-ux/`
-- `.codex/skills/card-system-consistency/`
-- `.codex/skills/blog-resource-access-guard/`
-- `.codex/skills/vercel-go-release/`
-- `.codex/skills/product-copy-cn/`
 - 以及任何和当前任务直接相关的 skill
 
 ## 校验
