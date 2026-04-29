@@ -19,7 +19,7 @@ export function ResultCard({ result }: ResultCardProps) {
         <Trophy className="h-4 w-4 text-fuchsia-300" />
         裁判亮牌
       </div>
-      <div className="mt-4 grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="mt-4 grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)] xl:col-span-full">
         <div className="arena-subpanel border-white/10 bg-white/5 p-4 backdrop-blur-md">
           <div className="text-[12px] font-medium text-white/55">本场胜者</div>
           <div className="mt-2 text-[20px] font-semibold text-white">{result.winner}</div>

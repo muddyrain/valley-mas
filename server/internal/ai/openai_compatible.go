@@ -1,7 +1,6 @@
 package ai
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,32 +13,33 @@ import (
 )
 
 type OpenAICompatibleConfig struct {
-	BaseURL string
-	APIKey  string
-	Model   string
+	Provider string
+	BaseURL  string
+	APIKey   string
+	Model    string
 }
 
 type OpenAICompatibleService struct {
-	baseURL string
-	apiKey  string
-	model   string
-	client  *http.Client
+	provider string
+	baseURL  string
+	apiKey   string
+	model    string
+	client   *http.Client
 }
 
 func NewOpenAICompatibleService(cfg OpenAICompatibleConfig) *OpenAICompatibleService {
-	baseURL := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
-	if baseURL == "" {
-		baseURL = "https://api.openai.com/v1"
-	}
+	provider := normalizeAIProvider(cfg.Provider)
+	baseURL := defaultAIBaseURL(provider, cfg.BaseURL)
 	model := strings.TrimSpace(cfg.Model)
-	if model == "" {
+	if model == "" && provider != AIProviderDoubao {
 		model = "gpt-4o-mini"
 	}
 	return &OpenAICompatibleService{
-		baseURL: baseURL,
-		apiKey:  strings.TrimSpace(cfg.APIKey),
-		model:   model,
-		client:  &http.Client{Timeout: 45 * time.Second},
+		provider: provider,
+		baseURL:  baseURL,
+		apiKey:   strings.TrimSpace(cfg.APIKey),
+		model:    model,
+		client:   &http.Client{Timeout: 45 * time.Second},
 	}
 }
 
@@ -54,12 +54,7 @@ func (s *OpenAICompatibleService) GeneratePersonas(ctx context.Context, topic st
 	if len(out.Personas) == 0 {
 		return nil, errors.New("model returned empty personas")
 	}
-	for i := range out.Personas {
-		if strings.TrimSpace(out.Personas[i].ID) == "" {
-			out.Personas[i].ID = fmt.Sprintf("p%d", i+1)
-		}
-	}
-	return out.Personas, nil
+	return normalizeGeneratedPersonas(out.Personas), nil
 }
 
 func (s *OpenAICompatibleService) GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
@@ -106,6 +101,12 @@ func (s *OpenAICompatibleService) chatJSON(ctx context.Context, systemPrompt str
 	if s.apiKey == "" {
 		return errors.New("AI_API_KEY is empty")
 	}
+	if s.model == "" {
+		if s.provider == AIProviderDoubao {
+			return errors.New("AI_MODEL is empty for doubao provider")
+		}
+		return errors.New("AI_MODEL is empty")
+	}
 
 	reqBody := chatCompletionRequest{
 		Model: s.model,
@@ -118,32 +119,53 @@ func (s *OpenAICompatibleService) chatJSON(ctx context.Context, systemPrompt str
 			Type: "json_object",
 		},
 	}
-	body, err := json.Marshal(reqBody)
+	respBody, statusCode, err := s.sendChatCompletionRequest(ctx, reqBody)
 	if err != nil {
 		return err
 	}
+	if statusCode >= 200 && statusCode < 300 {
+		return decodeChatCompletion(respBody, out)
+	}
+	if shouldRetryWithoutResponseFormat(statusCode, respBody) {
+		reqBody.ResponseFormat = nil
+		respBody, statusCode, err = s.sendChatCompletionRequest(ctx, reqBody)
+		if err != nil {
+			return err
+		}
+		if statusCode >= 200 && statusCode < 300 {
+			return decodeChatCompletion(respBody, out)
+		}
+	}
+	return fmt.Errorf("AI upstream returned %d: %s", statusCode, strings.TrimSpace(string(respBody)))
+}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.baseURL+"/chat/completions", bytes.NewReader(body))
+func (s *OpenAICompatibleService) sendChatCompletionRequest(ctx context.Context, reqBody chatCompletionRequest) ([]byte, int, error) {
+	body, err := json.Marshal(reqBody)
 	if err != nil {
-		return err
+		return nil, 0, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.baseURL+"/chat/completions", strings.NewReader(string(body)))
+	if err != nil {
+		return nil, 0, err
 	}
 	req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("AI upstream request failed: %w", err)
+		return nil, 0, fmt.Errorf("AI upstream request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("AI upstream returned %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
-	}
+	return respBody, resp.StatusCode, nil
+}
 
+func decodeChatCompletion(respBody []byte, out any) error {
 	var completion chatCompletionResponse
 	if err := json.Unmarshal(respBody, &completion); err != nil {
 		return fmt.Errorf("decode AI response failed: %w", err)
@@ -160,6 +182,14 @@ func (s *OpenAICompatibleService) chatJSON(ctx context.Context, systemPrompt str
 		return fmt.Errorf("parse AI JSON failed: %w; content=%s", err, content)
 	}
 	return nil
+}
+
+func shouldRetryWithoutResponseFormat(statusCode int, respBody []byte) bool {
+	if statusCode != http.StatusBadRequest {
+		return false
+	}
+	body := strings.ToLower(string(respBody))
+	return strings.Contains(body, "response_format.type") && strings.Contains(body, "not supported")
 }
 
 type chatCompletionRequest struct {
@@ -203,4 +233,15 @@ func extractJSONObject(content string) string {
 		}
 	}
 	return ""
+}
+
+func defaultAIBaseURL(provider string, baseURL string) string {
+	trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if trimmed != "" {
+		return trimmed
+	}
+	if provider == AIProviderDoubao {
+		return "https://ark.cn-beijing.volces.com/api/v3"
+	}
+	return "https://api.openai.com/v1"
 }
