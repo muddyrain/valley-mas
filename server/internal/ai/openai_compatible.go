@@ -58,25 +58,16 @@ func (s *OpenAICompatibleService) GeneratePersonas(ctx context.Context, topic st
 }
 
 func (s *OpenAICompatibleService) GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
-	payload := struct {
-		Topic    string                    `json:"topic"`
-		Mode     string                    `json:"mode"`
-		Round    int                       `json:"round"`
-		Personas []mindarena.Persona       `json:"personas"`
-		History  []mindarena.DebateMessage `json:"history"`
-	}{Topic: topic, Mode: mode, Round: round, Personas: personas, History: history}
-	raw, _ := json.Marshal(payload)
-
 	var out struct {
 		Messages []mindarena.DebateMessage `json:"messages"`
 	}
-	if err := s.chatJSON(ctx, DEBATE_ROUND_PROMPT, string(raw), &out); err != nil {
+	if err := s.chatJSON(ctx, DEBATE_ROUND_PROMPT, buildDebateRoundPromptInput(topic, mode, personas, round, history), &out); err != nil {
 		return nil, err
 	}
 	if len(out.Messages) == 0 {
 		return nil, errors.New("model returned empty debate messages")
 	}
-	return out.Messages, nil
+	return normalizeGeneratedDebateMessages(out.Messages, personas, round), nil
 }
 
 func (s *OpenAICompatibleService) JudgeDebate(ctx context.Context, topic string, personas []mindarena.Persona, messages []mindarena.DebateMessage) (*mindarena.DebateResult, error) {
