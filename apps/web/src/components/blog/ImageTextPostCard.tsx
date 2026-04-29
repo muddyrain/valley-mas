@@ -131,6 +131,8 @@ export function ImageTextPostCard({
   const statusMeta = getStatusMeta(post.status);
   const returnTo = `${location.pathname}${location.search}`;
   const returnLabel = mode === 'creator' ? '返回创作空间' : '返回博客列表';
+  const authorName = post.author?.nickname || '创作者';
+  const groupName = post.group?.name || (mode === 'creator' ? '未分组' : '灵感图文');
 
   return (
     <article
@@ -200,28 +202,24 @@ export function ImageTextPostCard({
         </div>
 
         <div className="space-y-3 p-4">
-          <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
-            <div className="inline-flex min-w-0 items-center gap-1.5">
+          <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+            <div className="inline-flex min-w-0 flex-1 items-center gap-1.5">
               {post.author?.avatar ? (
                 <img
                   src={post.author.avatar}
                   alt={post.author.nickname || 'author'}
-                  className="h-5 w-5 rounded-full object-cover"
+                  className="h-5 w-5 shrink-0 rounded-full object-cover"
                 />
               ) : (
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-100">
+                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100">
                   <User className="h-3 w-3 text-slate-500" />
                 </span>
               )}
-              <span className="truncate">
-                {mode === 'creator'
-                  ? post.group?.name || '未分组'
-                  : post.author?.nickname || '创作者'}
-              </span>
+              <span className="truncate font-medium text-slate-600">{authorName}</span>
             </div>
 
-            <span className="rounded-full bg-theme-soft px-2.5 py-1 text-theme-primary">
-              {mode === 'creator' ? '图文卡片' : post.group?.name || '灵感图文'}
+            <span className="inline-flex max-w-[46%] shrink-0 items-center rounded-full bg-theme-soft px-2.5 py-1 text-theme-primary">
+              <span className="truncate">{groupName}</span>
             </span>
           </div>
 
