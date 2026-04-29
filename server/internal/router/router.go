@@ -1,10 +1,12 @@
 package router
 
 import (
+	"valley-server/internal/ai"
 	"valley-server/internal/config"
 	"valley-server/internal/handler"
 	"valley-server/internal/logger"
 	"valley-server/internal/middleware"
+	"valley-server/internal/mindarena"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -26,6 +28,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 	api := r.Group("/api/v1")
 	{
+		mindArenaStore := mindarena.NewMemoryStore()
+		mindArenaService := mindarena.NewService(mindArenaStore, ai.NewServiceFromEnv())
+		mindarena.RegisterMindArenaRoutes(api, mindarena.NewHandler(mindArenaService))
+
 		public := api.Group("/public")
 		{
 			public.GET("/space/:code", handler.GetCreatorSpace)
