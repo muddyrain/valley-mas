@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Arial Rounded MT Bold", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: #23116b;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: #fff;
+  background:
+    radial-gradient(circle at 78% 86%, rgba(255, 122, 50, 0.5), transparent 30%),
+    radial-gradient(circle at 24% 6%, rgba(153, 66, 255, 0.42), transparent 34%),
+    linear-gradient(145deg, #551d91 0%, #2f257f 48%, #8b382d 100%);
+  font-family: var(--font-sans);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  color: #17082e;
+  background: #ffd21f;
+}
+
+.arena-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.arena-shell::before,
+.arena-shell::after {
+  position: fixed;
+  z-index: 0;
+  color: rgba(255, 255, 255, 0.18);
+  font-size: 84px;
+  pointer-events: none;
+}
+
+.arena-shell::before {
+  content: "✦";
+  top: 12%;
+  right: 7%;
+}
+
+.arena-shell::after {
+  content: "🎪";
+  left: 7%;
+  bottom: 10%;
+  font-size: 72px;
+  opacity: 0.35;
+}
+
+.sticker-panel {
+  border: 5px solid #ffd21f;
+  border-radius: 28px;
+  background: rgba(255, 250, 255, 0.96);
+  box-shadow: 0 18px 40px rgba(21, 4, 45, 0.35);
+}
+
+.comic-bubble {
+  position: relative;
+}
+
+.comic-bubble::before {
+  position: absolute;
+  top: 10px;
+  left: -2px;
+  width: 18px;
+  height: 18px;
+  border-left: 4px solid currentColor;
+  border-top: 4px solid currentColor;
+  content: "";
+  transform: rotate(-45deg);
+}
+
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+}
