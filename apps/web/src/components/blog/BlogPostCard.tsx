@@ -76,12 +76,14 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
   const location = useLocation();
   const previewText = getPostPreviewText(post);
   const isImageText = post.postType === 'image_text';
-  const typeLabel = isImageText ? '\u56fe\u6587\u521b\u4f5c' : '\u535a\u5ba2';
+  const typeLabel = isImageText ? '图文创作' : '博客';
   const TypeIcon = isImageText ? ImageIcon : FileText;
   const visibilityMeta = getVisibilityMeta(post.visibility);
   const statusMeta = getPostStatusMeta(post.status);
   const returnTo = `${location.pathname}${location.search}`;
   const returnLabel = mode === 'creator' ? '返回创作空间' : '返回博客列表';
+  const authorName = post.author?.nickname || '创作者';
+  const groupName = post.group?.name || '未分组';
 
   return (
     <article
@@ -141,32 +143,27 @@ export function BlogPostCard({ post, mode = 'public', footer, className = '' }: 
           </h3>
 
           <p className="line-clamp-3 min-h-[66px] text-sm leading-6 text-slate-600">
-            {previewText ||
-              '\u8fd9\u7bc7\u5185\u5bb9\u6682\u65f6\u6ca1\u6709\u6458\u8981\uff0c\u70b9\u51fb\u67e5\u770b\u5b8c\u6574\u6b63\u6587\u3002'}
+            {previewText || '这篇内容暂时没有摘要，点击查看完整正文。'}
           </p>
 
-          <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
-            <div className="inline-flex min-w-0 items-center gap-1.5">
+          <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+            <div className="inline-flex min-w-0 flex-1 items-center gap-1.5">
               {post.author?.avatar ? (
                 <img
                   src={post.author.avatar}
                   alt={post.author.nickname || 'author'}
-                  className="h-5 w-5 rounded-full object-cover"
+                  className="h-5 w-5 shrink-0 rounded-full object-cover"
                 />
               ) : (
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-100">
+                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100">
                   <User className="h-3 w-3 text-slate-500" />
                 </span>
               )}
-              <span className="truncate">
-                {mode === 'creator'
-                  ? post.group?.name || '\u672a\u5206\u7ec4'
-                  : post.author?.nickname || '\u521b\u4f5c\u8005'}
-              </span>
+              <span className="truncate font-medium text-slate-600">{authorName}</span>
             </div>
 
-            <span className="rounded-full bg-theme-soft px-2 py-0.5 text-theme-primary">
-              {mode === 'creator' ? typeLabel : post.group?.name || '\u672a\u5206\u7ec4'}
+            <span className="inline-flex max-w-[46%] shrink-0 items-center rounded-full bg-theme-soft px-2 py-0.5 text-theme-primary">
+              <span className="truncate">{groupName}</span>
             </span>
           </div>
 

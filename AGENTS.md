@@ -13,7 +13,7 @@
 
 每次进入任务时优先判断以下 skills 是否适用：
 
-- `encoding-guard`：改中文文案、Markdown、skill 或任何非 ASCII 文本前后使用，防止乱码与文本丢失。
+- `encoding-guard`：改中文文案、Markdown、skill 或任何非 ASCII 文本前后必须严格执行，防止乱码、文本丢失和异常转义写法。
 - `skill-usage-disclosure`：只要启用任何 skill，就在开始或最终回复中简短披露。
 - `component-reuse-guard`：发现重复 JSX、重复 handler、重复列表/弹窗/上传逻辑时，先复用或抽取。
 
@@ -36,6 +36,7 @@
 - 改 Go 接口时先看 `server/internal/router/router.go`、对应 `handler/model/service`，保持 API 分组、鉴权中间件与错误返回风格一致。
 - 改列表页时同步考虑 `keyword/page` 与 URL 状态，刷新、清除、重试、翻页不能丢状态。
 - 涉及用户可见文案时，只写面向终端用户的产品表达，不把用户提示词、内部指令、实现思路、推理过程原文展示到 UI。
+- 涉及中文或其他非 ASCII 文本时，必须遵从编码格式原则：源码、Markdown、配置示例中直接保留可读原文，不要把中文生成或改写成 Unicode escape、HTML 实体、拼音替代、问号占位等转义或降级写法。
 - 不在源码、文档、示例配置中写入真实密钥；新增环境变量必须同步 `.env.example` 与说明。
 - 不主动创建临时总结文档；只有用户明确要求沉淀长期文档时，才在 `docs/` 中新增或更新文档。
 - 不维护文件型 changelog；变更追溯使用 git commit log、diff、PR 描述和必要正式文档。
