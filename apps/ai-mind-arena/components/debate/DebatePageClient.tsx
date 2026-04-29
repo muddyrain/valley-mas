@@ -31,14 +31,11 @@ export function DebatePageClient({ debateId }: DebatePageClientProps) {
 
   if (error) {
     return (
-      <main className="arena-shell grid min-h-screen place-items-center p-6">
-        <section className="relative z-10 rounded-3xl border-4 border-arena-yellow bg-white p-10 text-center text-arena-purple shadow-glow">
-          <h1 className="text-4xl font-black">评委席空了</h1>
-          <p className="mt-4 text-lg font-bold">{error}</p>
-          <Link
-            href="/"
-            className="mt-8 inline-flex rounded-full bg-purple-700 px-6 py-3 font-black text-white"
-          >
+      <main className="arena-shell grid h-screen place-items-center p-6">
+        <section className="arena-panel relative z-10 max-w-md p-8 text-center text-white">
+          <h1 className="text-[20px] font-semibold">评委席空了</h1>
+          <p className="mt-3 text-[14px] leading-6 text-white/70">{error}</p>
+          <Link href="/" className="arena-ghost-button mt-6">
             重新开场
           </Link>
         </section>
@@ -48,9 +45,9 @@ export function DebatePageClient({ debateId }: DebatePageClientProps) {
 
   if (!session) {
     return (
-      <main className="arena-shell grid min-h-screen place-items-center">
-        <div className="relative z-10 inline-flex items-center gap-4 rounded-full bg-white/15 px-8 py-5 text-2xl font-black text-white">
-          <Loader2 className="h-8 w-8 animate-spin" />
+      <main className="arena-shell grid h-screen place-items-center p-6">
+        <div className="arena-panel relative z-10 inline-flex items-center gap-3 px-5 py-4 text-[14px] font-medium text-white/82">
+          <Loader2 className="h-4 w-4 animate-spin text-fuchsia-300" />
           正在搭建脑内舞台...
         </div>
       </main>

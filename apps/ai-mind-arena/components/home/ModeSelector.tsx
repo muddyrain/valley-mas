@@ -24,9 +24,12 @@ interface ModeSelectorProps {
 
 export function ModeSelector({ value, onChange }: ModeSelectorProps) {
   return (
-    <section className="mx-auto mt-9 max-w-4xl text-center">
-      <div className="mb-5 text-2xl font-black text-white drop-shadow">🎨 选择辩论风格 🎨</div>
-      <div className="flex flex-wrap items-center justify-center gap-4">
+    <section className="mx-auto mt-5 max-w-[1200px]">
+      <div className="mb-4 flex items-center gap-2 text-[14px] font-semibold text-white">
+        <span className="text-[15px]">🎨</span>
+        选择辩论风格
+      </div>
+      <div className="flex flex-wrap items-center gap-4">
         {modes.map((mode) => {
           const Icon = mode.icon;
           const active = mode.value === value;
@@ -36,16 +39,15 @@ export function ModeSelector({ value, onChange }: ModeSelectorProps) {
               type="button"
               onClick={() => onChange(mode.value)}
               className={[
-                'group inline-flex h-16 min-w-36 items-center justify-center gap-3 rounded-full border-4 px-7 text-xl font-black text-white transition duration-200',
+                'group inline-flex h-16 items-center justify-center gap-2 rounded-full border px-7 text-[14px] font-semibold text-white transition duration-200',
                 active
-                  ? 'scale-105 border-white bg-blue-500 shadow-[0_0_0_8px_rgba(255,255,255,.28),0_10px_0_rgba(21,4,45,.35)]'
-                  : 'border-white/35 bg-white/14 hover:-translate-y-1 hover:border-white/70 hover:bg-white/22',
+                  ? 'border-fuchsia-300/80 bg-gradient-to-r from-purple-500 to-pink-500 shadow-[0_0_20px_rgba(255,77,157,0.5)]'
+                  : 'border-purple-400/40 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] text-white/86 hover:-translate-y-0.5 hover:border-purple-300 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(123,92,255,0.3)]',
               ].join(' ')}
               aria-pressed={active}
             >
-              <Icon className="h-6 w-6" />
-              {mode.label}
-              {active ? <span className="text-3xl leading-none text-arena-yellow">✓</span> : null}
+              <Icon className={`h-5 w-5 ${active ? 'text-white' : 'text-violet-100'}`} />
+              <span className="text-base">{mode.label}</span>
             </button>
           );
         })}

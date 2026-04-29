@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
+      <link rel="icon" type="image/svg+xml" href="/logo.svg" />
       <body>{children}</body>
     </html>
   );

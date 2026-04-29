@@ -1,4 +1,4 @@
-import { DebatePageClient } from '@/components/DebatePageClient';
+import { DebatePageClient } from '@/components/debate/DebatePageClient';
 
 interface DebatePageProps {
   params: Promise<{ id: string }>;
