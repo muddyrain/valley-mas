@@ -1,7 +1,6 @@
 ---
 name: conventional-commit-guard
 description: 在 Valley MAS 中编写符合 Conventional Commits 规范的提交信息。适用于需要生成、整理或检查 git commit message 的任务。
-category: general
 ---
 
 # Conventional Commit 护栏（强约束版）

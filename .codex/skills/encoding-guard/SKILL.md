@@ -1,7 +1,6 @@
 ---
 name: encoding-guard
 description: Prevent text encoding corruption and suspicious text-loss regressions during code edits.
-category: general
 ---
 
 # Encoding Guard

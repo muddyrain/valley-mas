@@ -1,7 +1,6 @@
 ---
 name: task-completion-guard
 description: 在 Valley MAS 执行任务时强制检查“是否真的已经开始做、是否真的已经落地、是否真的已经完成”。适用于先计划后实施的任务、连续多步修改、需要验证的改动，或任何容易出现“已经在做/已经完成”与实际执行状态不一致的场景。
-category: general
 ---
 
 # 任务完成度护栏
@@ -71,13 +70,7 @@ category: general
 2. 哪些只完成了部分，或者还没开始。
 3. 这次有没有做验证；如果没做，要明确说没做。
 
-## 与其他技能的关系
-
-- 如果这次只是发现“现有技能不够”，再联动 [skill-opportunity-scout](/D:/my-code/valley-mas/.codex/skills/skill-opportunity-scout/SKILL.md)。
-- 如果这次功能规则已经变化，也要联动 [skill-sync-guard](/D:/my-code/valley-mas/.codex/skills/skill-sync-guard/SKILL.md)。
-- 如果本回合用了技能，仍按 [skill-usage-disclosure](/D:/my-code/valley-mas/.codex/skills/skill-usage-disclosure/SKILL.md) 主动告知用户。
-
 ## 校验
 
-- 改完这个技能后，运行 [$encoding-guard](/D:/my-code/valley-mas/.codex/skills/encoding-guard/SKILL.md) 检查中文文案。
+- 改完这个技能后，运行 [$encoding-guard](../encoding-guard/SKILL.md) 检查中文文案。
 - 如果这次任务本身就是新增或修改 skill，再补跑 `quick_validate.py`。

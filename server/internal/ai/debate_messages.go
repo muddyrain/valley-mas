@@ -12,6 +12,22 @@ const (
 	maxRoundOneFallbackRuneSize = 46
 )
 
+type roundTwoRebuttalTarget struct {
+	PersonaID         string `json:"personaId"`
+	PersonaName       string `json:"personaName"`
+	TargetPersonaID   string `json:"targetPersonaId"`
+	TargetPersonaName string `json:"targetPersonaName"`
+	TargetContent     string `json:"targetContent"`
+}
+
+type roundThreeSummaryBrief struct {
+	PersonaID       string `json:"personaId"`
+	PersonaName     string `json:"personaName"`
+	OpeningContent  string `json:"openingContent,omitempty"`
+	RebuttalContent string `json:"rebuttalContent,omitempty"`
+	AdviceFocus     string `json:"adviceFocus"`
+}
+
 func normalizeGeneratedDebateMessages(generated []mindarena.DebateMessage, personas []mindarena.Persona, round int) []mindarena.DebateMessage {
 	if len(personas) == 0 {
 		return nil
@@ -143,6 +159,8 @@ func buildDebateRoundPromptInput(topic string, mode string, personas []mindarena
 		Round       int                       `json:"round"`
 		RoundGoal   string                    `json:"roundGoal"`
 		Constraints []string                  `json:"constraints"`
+		Rebuttals   []roundTwoRebuttalTarget  `json:"rebuttalTargets,omitempty"`
+		Summaries   []roundThreeSummaryBrief  `json:"summaryBriefs,omitempty"`
 		Personas    []mindarena.Persona       `json:"personas"`
 		History     []mindarena.DebateMessage `json:"history"`
 	}{
@@ -151,6 +169,8 @@ func buildDebateRoundPromptInput(topic string, mode string, personas []mindarena
 		Round:       round,
 		RoundGoal:   debateRoundGoal(round),
 		Constraints: debateRoundConstraints(round),
+		Rebuttals:   buildRoundTwoRebuttalTargets(round, personas, history),
+		Summaries:   buildRoundThreeSummaryBriefs(round, personas, history),
 		Personas:    personas,
 		History:     history,
 	}
@@ -158,14 +178,128 @@ func buildDebateRoundPromptInput(topic string, mode string, personas []mindarena
 	return raw
 }
 
+func buildRoundTwoRebuttalTargets(round int, personas []mindarena.Persona, history []mindarena.DebateMessage) []roundTwoRebuttalTarget {
+	if round != 2 || len(personas) < 2 || len(history) == 0 {
+		return nil
+	}
+
+	targets := make([]roundTwoRebuttalTarget, 0, len(personas))
+	for i, persona := range personas {
+		target := findRebuttalTargetMessage(persona, i, personas, history)
+		if target == nil {
+			continue
+		}
+
+		content := sanitizeDebateMessageContent(target.Content)
+		if content == "" {
+			continue
+		}
+
+		targets = append(targets, roundTwoRebuttalTarget{
+			PersonaID:         persona.ID,
+			PersonaName:       persona.Name,
+			TargetPersonaID:   target.PersonaID,
+			TargetPersonaName: target.PersonaName,
+			TargetContent:     truncateRunes(content, maxDebateMessageRunes),
+		})
+	}
+	return targets
+}
+
+func findRebuttalTargetMessage(persona mindarena.Persona, personaIndex int, personas []mindarena.Persona, history []mindarena.DebateMessage) *mindarena.DebateMessage {
+	for offset := 1; offset < len(personas); offset++ {
+		targetPersona := personas[(personaIndex+offset)%len(personas)]
+		if target := findRoundOneHistoryMessage(targetPersona, history); target != nil {
+			return target
+		}
+	}
+
+	for i := range history {
+		if history[i].Round != 1 || isMessageFromPersona(history[i], persona) {
+			continue
+		}
+		if sanitizeDebateMessageContent(history[i].Content) != "" {
+			return &history[i]
+		}
+	}
+	return nil
+}
+
+func findRoundOneHistoryMessage(persona mindarena.Persona, history []mindarena.DebateMessage) *mindarena.DebateMessage {
+	for i := range history {
+		if history[i].Round != 1 || !isMessageFromPersona(history[i], persona) {
+			continue
+		}
+		if sanitizeDebateMessageContent(history[i].Content) != "" {
+			return &history[i]
+		}
+	}
+	return nil
+}
+
+func isMessageFromPersona(message mindarena.DebateMessage, persona mindarena.Persona) bool {
+	if persona.ID != "" && message.PersonaID == persona.ID {
+		return true
+	}
+	return persona.Name != "" && message.PersonaName == persona.Name
+}
+
+func buildRoundThreeSummaryBriefs(round int, personas []mindarena.Persona, history []mindarena.DebateMessage) []roundThreeSummaryBrief {
+	if round != 3 || len(personas) == 0 || len(history) == 0 {
+		return nil
+	}
+
+	briefs := make([]roundThreeSummaryBrief, 0, len(personas))
+	for _, persona := range personas {
+		briefs = append(briefs, roundThreeSummaryBrief{
+			PersonaID:       persona.ID,
+			PersonaName:     persona.Name,
+			OpeningContent:  historyContentForPersonaRound(persona, history, 1),
+			RebuttalContent: historyContentForPersonaRound(persona, history, 2),
+			AdviceFocus:     finalAdviceFocus(persona),
+		})
+	}
+	return briefs
+}
+
+func historyContentForPersonaRound(persona mindarena.Persona, history []mindarena.DebateMessage, round int) string {
+	for i := range history {
+		if history[i].Round != round || !isMessageFromPersona(history[i], persona) {
+			continue
+		}
+		content := sanitizeDebateMessageContent(history[i].Content)
+		if content != "" {
+			return truncateRunes(content, maxDebateMessageRunes)
+		}
+	}
+	return ""
+}
+
+func finalAdviceFocus(persona mindarena.Persona) string {
+	switch persona.Name {
+	case "理性派":
+		return "把前两轮争论收束成可执行条件、风险边界和下一步验证。"
+	case "毒舌派":
+		return "拆掉自我欺骗，只留下一个清醒但不伤人的提醒。"
+	case "赌徒派":
+		return "把冲劲落到具体行动窗口，别让热血无限空转。"
+	case "父母派":
+		return "给出保底方案、现实账本和能安心出发的前提。"
+	case "摆烂派":
+		return "提醒用户先恢复状态，再做决定，语气松弛但有结论。"
+	default:
+		return "结合自己的立场给出最终建议，必须收束成可行动判断。"
+	}
+}
+
 func debateRoundGoal(round int) string {
 	switch round {
 	case 1:
 		return "开场亮立场：每个人格先亮明自己的倾向和核心理由。"
 	case 2:
-		return "互相反驳：针对其他人格刚才的观点开火。"
+		return "互相反驳：根据 history 和 rebuttalTargets，针对其他人格刚才的观点开火。"
 	case 3:
-		return "最终陈词：给出最后建议和态度收束。"
+		return "最终陈词：根据 history 和 summaryBriefs，把前两轮冲突收束成最后建议。"
 	default:
 		return "继续围绕议题辩论。"
 	}
@@ -189,11 +323,16 @@ func debateRoundConstraints(round int) []string {
 	case 2:
 		return append(base,
 			"Round 2 必须点到别人的漏洞，不能重复 Round 1 原话。",
+			"优先使用 rebuttalTargets 中对应自己的一条目标，明确回应 targetPersonaName 的 Round 1 观点。",
+			"每句必须形成反驳关系：先指出对方漏洞，再给自己的反向判断。",
 			"可以犀利，但不要辱骂用户。",
 		)
 	case 3:
 		return append(base,
 			"Round 3 要收束，不要再展开新论点。",
+			"必须参考 summaryBriefs 中自己的 openingContent、rebuttalContent 和 adviceFocus。",
+			"每句话要给出明确建议或决策条件，不能只喊口号。",
+			"不要宣布最终胜者，裁判结果由下一步 judge 单独生成。",
 			"像综艺最后发言，态度明确、节奏利落。",
 		)
 	default:

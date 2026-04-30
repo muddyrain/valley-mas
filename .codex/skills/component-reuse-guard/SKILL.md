@@ -1,7 +1,6 @@
 ---
 name: component-reuse-guard
 description: 自动判断当前改动是否存在可提取的公用组件或可复用逻辑，避免在多处重复写相同 JSX 和 handler，降低维护成本。
-category: general
 ---
 
 # component-reuse-guard
@@ -71,8 +70,6 @@ export interface UploadResourceDialogProps {
 
 ## 和其他 skill 的协作
 
-- [`web-feature-iteration`](../web-feature-iteration/SKILL.md)：新功能落地时同步检查是否引入了重复代码
-- [`valley-mas-product-guard`](../valley-mas-product-guard/SKILL.md)：提取组件时确保行为不退化
 - [`task-completion-guard`](../task-completion-guard/SKILL.md)：提取完成后核查所有使用方都已切换到新组件、无编译错误
 
 ## 输出要求

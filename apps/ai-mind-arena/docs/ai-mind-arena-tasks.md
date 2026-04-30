@@ -4,7 +4,7 @@
 Phase 1：AI 接入与基础辩论流程
 
 ## 当前正在做
-Task 5：实现 Round 2（互相反驳）
+Task 7：生成裁判结果与分数
 
 ---
 
@@ -30,8 +30,8 @@ Task 5：实现 Round 2（互相反驳）
 
 ### [x] Task 3：定义 5 个 AI 人格
 ### [x] Task 4：实现 Round 1（立场表达）
-### [ ] Task 5：实现 Round 2（互相反驳）
-### [ ] Task 6：实现 Round 3（总结建议）
+### [x] Task 5：实现 Round 2（互相反驳）
+### [x] Task 6：实现 Round 3（总结建议）
 ### [ ] Task 7：生成裁判结果与分数
 
 ---
