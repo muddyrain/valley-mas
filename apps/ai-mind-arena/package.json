@@ -7,7 +7,9 @@
     "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start --port 3001",
-    "lint": "next lint",
+    "lint": "biome lint app components lib",
+    "format": "biome format --write app components lib",
+    "check": "biome check app components lib",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf .next"
   },
