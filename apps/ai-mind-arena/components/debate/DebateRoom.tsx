@@ -50,10 +50,25 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
   const [activePersonaId, setActivePersonaId] = useState<string | undefined>();
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const currentRound = messages.at(-1)?.round || (session.status === 'created' ? 1 : 3);
+  const personas = useMemo(
+    () => (Array.isArray(session.personas) ? session.personas : []),
+    [session.personas],
+  );
+  const safeSession = useMemo(
+    () => ({
+      ...session,
+      personaCount: session.personaCount ?? Math.max(personas.length, 5),
+      personas,
+      messages,
+    }),
+    [messages, personas, session],
+  );
+  const personaTargetCount = Math.max(safeSession.personaCount || 5, personas.length, 1);
+  const isPreparingPersonas = messages.length === 0 && !result && !streamError;
+  const currentRound = messages.at(-1)?.round || 1;
   const liveScores = useMemo<DebateScore[]>(
-    () => buildDebateScores(session.personas, messages, result),
-    [messages, result, session.personas],
+    () => buildDebateScores(personas, messages, result),
+    [messages, personas, result],
   );
 
   const scoreMap = useMemo(() => {
@@ -73,6 +88,25 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     if (initialSession.status === 'done') return;
 
     const source = new EventSource(getDebateStreamURL(initialSession.id));
+
+    source.addEventListener('personas', (event) => {
+      const payload = parseDebateSSEEvent(event as MessageEvent<string>);
+      if (!payload) return;
+      const nextPersonas = Array.isArray(payload?.personas) ? payload.personas : [];
+      if (nextPersonas.length === 0) return;
+      const latestPersona = nextPersonas.at(-1);
+      const targetCount = payload.personaCount || initialSession.personaCount || 5;
+      setStreamError('');
+      setActivePersonaId(latestPersona?.id);
+      setSession((prev) => ({
+        ...prev,
+        personaCount: targetCount,
+        personas: nextPersonas,
+      }));
+      setStatusText(
+        latestPersona ? `${latestPersona.name} 已入场，正在校准口头禅...` : '人格设定同步中...',
+      );
+    });
 
     source.addEventListener('message', (event) => {
       const payload = parseDebateSSEEvent(event as MessageEvent<string>);
@@ -116,7 +150,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     });
 
     return () => source.close();
-  }, [initialSession.id, initialSession.status]);
+  }, [initialSession.id, initialSession.personaCount, initialSession.status]);
 
   const groupedMessages = useMemo(() => {
     return messages.reduce<Record<number, DebateMessage[]>>((acc, message) => {
@@ -160,17 +194,31 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
                 <h2 className="text-[18px] font-semibold text-white">本场嘉宾</h2>
                 <p className="mt-1 text-[12px] leading-5 text-white/50">观点阵营与发言状态</p>
               </div>
-              <span className="arena-chip">{session.personas.length} 位</span>
+              <span className="arena-chip">
+                {personas.length}/{personaTargetCount} 位
+              </span>
             </div>
             <div className="thin-scrollbar mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-              {session.personas.map((persona) => (
-                <PersonaCard
-                  key={persona.id}
-                  persona={persona}
-                  active={activePersonaId === persona.id}
-                  score={scoreMap.get(persona.name)}
-                />
-              ))}
+              {personas.length === 0 ? (
+                <div className="arena-subpanel flex h-full min-h-[220px] flex-col items-center justify-center border-purple-400/20 bg-white/[0.03] px-5 text-center">
+                  <div className="grid h-12 w-12 place-items-center rounded-full border border-fuchsia-300/24 bg-fuchsia-500/12 text-fuchsia-100 shadow-[0_0_20px_rgba(255,77,157,0.24)]">
+                    <Sparkles className="h-5 w-5 animate-pulse" />
+                  </div>
+                  <p className="mt-4 text-[14px] font-semibold text-white">人格设定中</p>
+                  <p className="mt-2 text-[12px] leading-5 text-white/50">
+                    嘉宾会按生成顺序逐个入场。
+                  </p>
+                </div>
+              ) : (
+                personas.map((persona) => (
+                  <PersonaCard
+                    key={persona.id}
+                    persona={persona}
+                    active={activePersonaId === persona.id}
+                    score={scoreMap.get(persona.name)}
+                  />
+                ))
+              )}
             </div>
           </aside>
 
@@ -228,9 +276,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
                           <DebateBubble
                             key={message.id}
                             message={message}
-                            persona={session.personas.find(
-                              (persona) => persona.id === message.personaId,
-                            )}
+                            persona={personas.find((persona) => persona.id === message.personaId)}
                           />
                         ))}
                       </div>
@@ -262,15 +308,15 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
                         <Loader2 className="h-5 w-5 animate-spin" />
                       )
                     }
-                    title={messages.length === 0 ? '等待第一位人格开麦' : statusText}
+                    title={isPreparingPersonas ? '正在定义本场人格' : statusText}
                     description={
-                      messages.length === 0
-                        ? '连接建立后，5 位人格会按轮次依次发言。'
+                      isPreparingPersonas
+                        ? `已入场 ${personas.length}/${personaTargetCount} 位，全部到齐后自动开始第一轮。`
                         : '支持率会随着每次发言持续刷新。'
                     }
                   />
                 ) : (
-                  <ResultCard session={session} result={result} />
+                  <ResultCard session={safeSession} result={result} />
                 )}
                 <div ref={bottomRef} />
               </div>
@@ -278,7 +324,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
           </section>
 
           <ScorePanel
-            session={session}
+            session={safeSession}
             result={result}
             currentRound={currentRound}
             scores={liveScores}

@@ -73,7 +73,8 @@ func findGeneratedMessageForPersona(persona mindarena.Persona, generated []minda
 		if used[i] {
 			continue
 		}
-		if i < len(canonicalMindArenaPersonas) && canonicalMindArenaPersonas[i].ID == persona.ID {
+		defaults := defaultMindArenaPersonas()
+		if i < len(defaults) && defaults[i].ID == persona.ID {
 			return &generated[i], i
 		}
 	}
@@ -178,6 +179,35 @@ func buildDebateRoundPromptInput(topic string, mode string, personas []mindarena
 	return raw
 }
 
+func buildDebateMessagePromptInput(topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage) string {
+	personaIndex := findPersonaIndex(persona, personas)
+	payload := struct {
+		Topic          string                    `json:"topic"`
+		Mode           string                    `json:"mode"`
+		Round          int                       `json:"round"`
+		RoundGoal      string                    `json:"roundGoal"`
+		Constraints    []string                  `json:"constraints"`
+		CurrentPersona mindarena.Persona         `json:"currentPersona"`
+		RebuttalTarget *roundTwoRebuttalTarget   `json:"rebuttalTarget,omitempty"`
+		SummaryBrief   *roundThreeSummaryBrief   `json:"summaryBrief,omitempty"`
+		Personas       []mindarena.Persona       `json:"personas"`
+		History        []mindarena.DebateMessage `json:"history"`
+	}{
+		Topic:          topic,
+		Mode:           mode,
+		Round:          round,
+		RoundGoal:      debateRoundGoal(round),
+		Constraints:    append(debateRoundConstraints(round), "只输出 currentPersona 的一条 messages JSON。"),
+		CurrentPersona: persona,
+		RebuttalTarget: buildSingleRoundTwoRebuttalTarget(round, persona, personaIndex, personas, history),
+		SummaryBrief:   buildSingleRoundThreeSummaryBrief(round, persona, history),
+		Personas:       personas,
+		History:        history,
+	}
+	raw, _ := jsonMarshal(payload)
+	return raw
+}
+
 func buildRoundTwoRebuttalTargets(round int, personas []mindarena.Persona, history []mindarena.DebateMessage) []roundTwoRebuttalTarget {
 	if round != 2 || len(personas) < 2 || len(history) == 0 {
 		return nil
@@ -204,6 +234,27 @@ func buildRoundTwoRebuttalTargets(round int, personas []mindarena.Persona, histo
 		})
 	}
 	return targets
+}
+
+func buildSingleRoundTwoRebuttalTarget(round int, persona mindarena.Persona, personaIndex int, personas []mindarena.Persona, history []mindarena.DebateMessage) *roundTwoRebuttalTarget {
+	if round != 2 || personaIndex < 0 {
+		return nil
+	}
+	target := findRebuttalTargetMessage(persona, personaIndex, personas, history)
+	if target == nil {
+		return nil
+	}
+	content := sanitizeDebateMessageContent(target.Content)
+	if content == "" {
+		return nil
+	}
+	return &roundTwoRebuttalTarget{
+		PersonaID:         persona.ID,
+		PersonaName:       persona.Name,
+		TargetPersonaID:   target.PersonaID,
+		TargetPersonaName: target.PersonaName,
+		TargetContent:     truncateRunes(content, maxDebateMessageRunes),
+	}
 }
 
 func findRebuttalTargetMessage(persona mindarena.Persona, personaIndex int, personas []mindarena.Persona, history []mindarena.DebateMessage) *mindarena.DebateMessage {
@@ -260,6 +311,29 @@ func buildRoundThreeSummaryBriefs(round int, personas []mindarena.Persona, histo
 		})
 	}
 	return briefs
+}
+
+func buildSingleRoundThreeSummaryBrief(round int, persona mindarena.Persona, history []mindarena.DebateMessage) *roundThreeSummaryBrief {
+	if round != 3 {
+		return nil
+	}
+	brief := roundThreeSummaryBrief{
+		PersonaID:       persona.ID,
+		PersonaName:     persona.Name,
+		OpeningContent:  historyContentForPersonaRound(persona, history, 1),
+		RebuttalContent: historyContentForPersonaRound(persona, history, 2),
+		AdviceFocus:     finalAdviceFocus(persona),
+	}
+	return &brief
+}
+
+func findPersonaIndex(persona mindarena.Persona, personas []mindarena.Persona) int {
+	for i, candidate := range personas {
+		if candidate.ID == persona.ID || candidate.Name == persona.Name {
+			return i
+		}
+	}
+	return -1
 }
 
 func historyContentForPersonaRound(persona mindarena.Persona, history []mindarena.DebateMessage, round int) string {
