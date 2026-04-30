@@ -177,8 +177,21 @@ func TestStreamDebateEmitsMessageJudgeAndDoneEvents(t *testing.T) {
 	if err := assertMessageRounds(roundThreeEvents, 3, len(personas)); err != nil {
 		t.Fatal(err)
 	}
-	if roundThreeEvents[len(roundThreeEvents)-2].Type != "judge" || roundThreeEvents[len(roundThreeEvents)-2].Result == nil || roundThreeEvents[len(roundThreeEvents)-2].Result.Winner != "理性派" {
+	if roundThreeEvents[len(roundThreeEvents)-2].Type != "judge" || roundThreeEvents[len(roundThreeEvents)-2].Result == nil {
 		t.Fatalf("expected judge event with result, got %+v", roundThreeEvents[len(roundThreeEvents)-2])
+	}
+	judgeResult := roundThreeEvents[len(roundThreeEvents)-2].Result
+	if judgeResult.Winner == "" {
+		t.Fatalf("expected winner in judge result, got %+v", judgeResult)
+	}
+	bestScore := judgeResult.Scores[0]
+	for _, score := range judgeResult.Scores[1:] {
+		if score.Score > bestScore.Score {
+			bestScore = score
+		}
+	}
+	if judgeResult.Winner != bestScore.Persona {
+		t.Fatalf("expected winner to align with highest score, got winner=%s scores=%+v", judgeResult.Winner, judgeResult.Scores)
 	}
 	if roundThreeEvents[len(roundThreeEvents)-1].Type != "done" || roundThreeEvents[len(roundThreeEvents)-1].SessionID != "deb_stream_ok" {
 		t.Fatalf("expected done event with session id, got %+v", roundThreeEvents[len(roundThreeEvents)-1])
@@ -571,6 +584,125 @@ func TestStreamDebateEmitsErrorAndMarksFailedWhenMessageGenerationFails(t *testi
 	}
 	if session.Status != DebateStatusFailed || session.Error == "" {
 		t.Fatalf("expected failed session with error, got %+v", session)
+	}
+}
+
+func TestMergeFinalResultWithLiveScoresKeepsWinnerConsistent(t *testing.T) {
+	result := mergeFinalResultWithLiveScores(&DebateResult{
+		Winner:      "理性派",
+		FinalAdvice: "先别上头。",
+		Quote:       "先稳住。",
+		Scores: []DebateScore{
+			{Persona: "理性派", Score: 82},
+			{Persona: "父母派", Score: 83},
+		},
+	}, []DebateScore{
+		{Persona: "理性派", Score: 82, JudgeScore: 82},
+		{Persona: "父母派", Score: 83, JudgeScore: 67, AudienceScore: 16},
+	})
+
+	if result.Winner != "父母派" {
+		t.Fatalf("expected winner to align with highest live score, got %+v", result)
+	}
+	if len(result.Scores) != 2 || result.Scores[1].AudienceScore != 16 {
+		t.Fatalf("expected live scores to replace final scores, got %+v", result.Scores)
+	}
+}
+
+func TestStreamDebateStartsOvertimeWhenRoundThreeIsTied(t *testing.T) {
+	restore := disableStreamDelays(t)
+	defer restore()
+
+	personas := testPersonas()
+	store := NewMemoryStore()
+	session := testSession("deb_overtime", personas)
+	session.PersonaCount = len(personas)
+	if err := store.Create(session); err != nil {
+		t.Fatalf("create session failed: %v", err)
+	}
+
+	service := NewService(store, streamStubAI{
+		generatePersonas: func(ctx context.Context, topic string, mode string, count int) ([]Persona, error) {
+			return personas, nil
+		},
+		generatePersona: func(ctx context.Context, topic string, mode string, persona Persona, index int, count int) (*Persona, error) {
+			t.Fatal("overtime test should use existing personas")
+			return nil, nil
+		},
+		generateRound: func(ctx context.Context, topic string, mode string, personas []Persona, round int, history []DebateMessage, supportHistory []RoundSupportChoice) ([]DebateMessage, error) {
+			t.Fatal("overtime test should generate messages one by one")
+			return nil, nil
+		},
+		generateMessage: func(ctx context.Context, topic string, mode string, personas []Persona, persona Persona, round int, history []DebateMessage, supportHistory []RoundSupportChoice) (*DebateMessage, error) {
+			content := "两边都先把话说明白，再看谁更能说服人。"
+			if round == 4 {
+				if persona.ID == "p1" {
+					content = "加时我只补一句：把风险、成本和执行顺序讲清的人，才配拿最后这一票。"
+				} else {
+					content = "加时我也补一句：别让自己因为怕输就一直算到不敢动。"
+				}
+			}
+			return &DebateMessage{
+				PersonaID:   persona.ID,
+				PersonaName: persona.Name,
+				Content:     content,
+			}, nil
+		},
+		judgeDebate: func(ctx context.Context, topic string, personas []Persona, messages []DebateMessage) (*DebateResult, error) {
+			return &DebateResult{
+				Winner:      "毒舌派",
+				FinalAdvice: "先打平，再加时。",
+				Quote:       "最后一票看加时。",
+			}, nil
+		},
+	})
+
+	roundOneEvents := collectStreamEvents(t, service.StreamDebate(context.Background(), "deb_overtime"))
+	if roundOneEvents[len(roundOneEvents)-1].Type != "support_prompt" {
+		t.Fatalf("expected round 1 support prompt, got %+v", roundOneEvents)
+	}
+	if _, err := service.SubmitRoundSupport(context.Background(), "deb_overtime", SubmitRoundSupportRequest{
+		Round: 1,
+		Skip:  true,
+	}); err != nil {
+		t.Fatalf("submit round 1 support failed: %v", err)
+	}
+
+	roundTwoEvents := collectStreamEvents(t, service.StreamDebate(context.Background(), "deb_overtime"))
+	if roundTwoEvents[len(roundTwoEvents)-1].Type != "support_prompt" {
+		t.Fatalf("expected round 2 support prompt, got %+v", roundTwoEvents)
+	}
+	if _, err := service.SubmitRoundSupport(context.Background(), "deb_overtime", SubmitRoundSupportRequest{
+		Round: 2,
+		Skip:  true,
+	}); err != nil {
+		t.Fatalf("submit round 2 support failed: %v", err)
+	}
+
+	finalEvents := collectStreamEvents(t, service.StreamDebate(context.Background(), "deb_overtime"))
+	roundFourMessages := 0
+	var judgeEvent *SSEEvent
+	for i := range finalEvents {
+		if finalEvents[i].Type == "message" && finalEvents[i].Round == 4 {
+			roundFourMessages++
+		}
+		if finalEvents[i].Type == "judge" {
+			judgeEvent = &finalEvents[i]
+		}
+	}
+	if roundFourMessages != 2 {
+		t.Fatalf("expected overtime round 4 messages for both tied personas, got %+v", finalEvents)
+	}
+	if judgeEvent == nil || judgeEvent.Result == nil || judgeEvent.Result.Winner != "理性派" {
+		t.Fatalf("expected overtime to resolve with highest live score winner, got %+v", judgeEvent)
+	}
+
+	updated, err := store.Get("deb_overtime")
+	if err != nil {
+		t.Fatalf("get session failed: %v", err)
+	}
+	if updated.Result == nil || updated.LastCompletedRound != 4 || len(updated.OvertimePersonaIDs) != 0 {
+		t.Fatalf("expected overtime session to complete and clear overtime ids, got %+v", updated)
 	}
 }
 

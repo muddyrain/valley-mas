@@ -84,3 +84,22 @@ func TestNormalizeGeneratedDebateResult(t *testing.T) {
 		t.Fatalf("expected missing score to use fallback, got %+v", result.Scores[2])
 	}
 }
+
+func TestNormalizeGeneratedDebateResultForcesWinnerToHighestScore(t *testing.T) {
+	t.Parallel()
+
+	personas := defaultMindArenaPersonas()[:2]
+	result := normalizeGeneratedDebateResult(mindarena.DebateResult{
+		Winner:      "理性派",
+		FinalAdvice: "先看结果。",
+		Quote:       "先看结果。",
+		Scores: []mindarena.DebateScore{
+			{Persona: "理性派", Score: 70},
+			{Persona: "毒舌派", Score: 91},
+		},
+	}, personas, nil)
+
+	if result.Winner != "毒舌派" {
+		t.Fatalf("expected winner to align with highest score persona, got %+v", result)
+	}
+}

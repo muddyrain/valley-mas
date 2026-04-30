@@ -23,8 +23,8 @@ func TestNormalizeGeneratedDebateMessagesRoundOne(t *testing.T) {
 	if messages[0].PersonaName != "理性派" || messages[0].PersonaID != "p1" {
 		t.Fatalf("expected persona order to follow canonical list, got %+v", messages[0])
 	}
-	if messages[1].Content != "别把一时上头误认成天命召唤。" {
-		t.Fatalf("expected trimmed content, got %q", messages[1].Content)
+	if !strings.Contains(messages[1].Content, "逃跑") {
+		t.Fatalf("expected weak short output to fall back to richer persona line, got %q", messages[1].Content)
 	}
 	if messages[4].PersonaName != "摆烂派" || messages[4].Content == "" {
 		t.Fatalf("expected missing round one persona to use fallback line, got %+v", messages[4])
@@ -53,6 +53,7 @@ func TestBuildDebateRoundPromptInput(t *testing.T) {
 
 	var payload struct {
 		Round       int                 `json:"round"`
+		ModeGuide   string              `json:"modeGuide"`
 		RoundGoal   string              `json:"roundGoal"`
 		Constraints []string            `json:"constraints"`
 		VoiceHints  []personaVoiceHint  `json:"personaVoiceHints"`
@@ -71,13 +72,16 @@ func TestBuildDebateRoundPromptInput(t *testing.T) {
 	if len(payload.Constraints) == 0 || !strings.Contains(joinedConstraints, "Round 1 只做立场表达") {
 		t.Fatalf("expected round one constraints, got %+v", payload.Constraints)
 	}
-	if !strings.Contains(joinedConstraints, "不超过 60 个中文字符") || !strings.Contains(joinedConstraints, "personality、style、catchphrase") {
+	if !strings.Contains(joinedConstraints, "35 到 70 个中文字符") || !strings.Contains(joinedConstraints, "catchphrase 只是出场口号") {
 		t.Fatalf("expected stronger length and voice constraints, got %+v", payload.Constraints)
+	}
+	if !strings.Contains(payload.ModeGuide, "严肃理性风") {
+		t.Fatalf("expected mode guide in prompt payload, got %q", payload.ModeGuide)
 	}
 	if len(payload.Personas) != 5 {
 		t.Fatalf("expected 5 personas in prompt payload, got %d", len(payload.Personas))
 	}
-	if len(payload.VoiceHints) != len(payload.Personas) || !strings.Contains(payload.VoiceHints[0].Voice, "口头禅气场") {
+	if len(payload.VoiceHints) != len(payload.Personas) || !strings.Contains(payload.VoiceHints[0].Voice, "出场口号") {
 		t.Fatalf("expected persona voice hints in payload, got %+v", payload.VoiceHints)
 	}
 }
@@ -188,6 +192,7 @@ func TestBuildDebateMessagePromptInputRoundTwoIncludesCurrentPersonaAndRebuttalT
 
 	var payload struct {
 		Round          int                       `json:"round"`
+		ModeGuide      string                    `json:"modeGuide"`
 		Constraints    []string                  `json:"constraints"`
 		CurrentPersona mindarena.Persona         `json:"currentPersona"`
 		CurrentVoice   string                    `json:"currentPersonaVoice"`
@@ -205,6 +210,9 @@ func TestBuildDebateMessagePromptInputRoundTwoIncludesCurrentPersonaAndRebuttalT
 	}
 	if !strings.Contains(strings.Join(payload.Constraints, "\n"), "只输出 currentPersona 的一条 messages JSON") {
 		t.Fatalf("expected single-message constraint, got %+v", payload.Constraints)
+	}
+	if !strings.Contains(payload.ModeGuide, "锋利对线风") {
+		t.Fatalf("expected sharp mode guide, got %q", payload.ModeGuide)
 	}
 	if !strings.Contains(payload.CurrentVoice, payload.CurrentPersona.Catchphrase) {
 		t.Fatalf("expected current persona voice guide to include catchphrase, got %q", payload.CurrentVoice)

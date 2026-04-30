@@ -63,6 +63,7 @@ function normalizeDebateSession(session: DebateSession): DebateSession {
   const personas = Array.isArray(session.personas) ? session.personas : [];
   const messages = Array.isArray(session.messages) ? session.messages : [];
   const supportHistory = Array.isArray(session.supportHistory) ? session.supportHistory : [];
+  const liveScores = Array.isArray(session.liveScores) ? session.liveScores : [];
   return {
     ...session,
     personaCount: session.personaCount ?? normalizedPersonaCount(personas),
@@ -72,6 +73,8 @@ function normalizeDebateSession(session: DebateSession): DebateSession {
     awaitingSupportRound: session.awaitingSupportRound ?? 0,
     personas,
     messages,
+    liveScores,
+    overtimePersonaIds: Array.isArray(session.overtimePersonaIds) ? session.overtimePersonaIds : [],
     supportHistory,
     result: session.result ? normalizeDebateResult(session.result) : undefined,
   };

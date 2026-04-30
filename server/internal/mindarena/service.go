@@ -36,6 +36,8 @@ var (
 	streamDoneDelay    = 350 * time.Millisecond
 )
 
+const maxOvertimeRounds = 8
+
 func NewService(store Store, ai DebateAI) *Service {
 	return &Service{store: store, ai: ai}
 }
@@ -99,9 +101,10 @@ func (s *Service) SubmitRoundSupport(ctx context.Context, id string, req SubmitR
 	}
 
 	choice := RoundSupportChoice{
-		Round:     req.Round,
-		Skipped:   req.Skip,
-		CreatedAt: nowString(),
+		Round:        req.Round,
+		Skipped:      req.Skip,
+		SupportScore: 0,
+		CreatedAt:    nowString(),
 	}
 	if !req.Skip {
 		persona, ok := findSessionPersonaByID(session.Personas, req.SupportedPersonaID)
@@ -110,6 +113,7 @@ func (s *Service) SubmitRoundSupport(ctx context.Context, id string, req SubmitR
 		}
 		choice.PersonaID = persona.ID
 		choice.PersonaName = persona.Name
+		choice.SupportScore = supportScoreForRound(req.Round)
 	}
 
 	updated, err := s.store.SubmitRoundSupport(id, choice)
@@ -149,14 +153,15 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 		if startRound <= 0 {
 			startRound = 1
 		}
-		for round := startRound; round <= 3; round++ {
-			for i := range session.Personas {
-				persona := session.Personas[i]
+		for round := startRound; round <= maxOvertimeRounds; round++ {
+			activePersonas := activePersonasForRound(session, round)
+			for i := range activePersonas {
+				persona := activePersonas[i]
 				if hasRoundMessageForPersona(history, round, persona) {
 					continue
 				}
 
-				message, err := s.ai.GenerateDebateMessage(ctx, session.Topic, string(session.Mode), session.Personas, persona, round, history, session.SupportHistory)
+				message, err := s.ai.GenerateDebateMessage(ctx, session.Topic, string(session.Mode), activePersonas, persona, round, history, session.SupportHistory)
 				if err != nil {
 					s.failAndSend(events, id, fmt.Sprintf("生成第 %d 轮 %s 发言失败: %v", round, persona.Name, err))
 					return
@@ -174,21 +179,68 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 					s.failAndSend(events, id, err.Error())
 					return
 				}
+				session = updated
 				history = append([]DebateMessage(nil), updated.Messages...)
 
 				if !sendEvent(ctx, events, SSEEvent{
-					Type:        "message",
-					Round:       prepared.Round,
-					RoundTitle:  prepared.RoundTitle,
-					PersonaID:   prepared.PersonaID,
-					PersonaName: prepared.PersonaName,
-					Content:     prepared.Content,
+					Type:               "message",
+					Round:              prepared.Round,
+					RoundTitle:         prepared.RoundTitle,
+					PersonaID:          prepared.PersonaID,
+					PersonaName:        prepared.PersonaName,
+					Content:            prepared.Content,
+					Scores:             append([]DebateScore(nil), updated.LiveScores...),
+					NeutralJudge:       cloneNeutralJudge(updated.NeutralJudge),
+					OvertimePersonaIDs: append([]string(nil), updated.OvertimePersonaIDs...),
 				}) {
 					return
 				}
 				if !sleepWithContext(ctx, streamMessageDelay) {
 					return
 				}
+			}
+
+			session, err = s.store.Get(id)
+			if err != nil {
+				s.failAndSend(events, id, err.Error())
+				return
+			}
+
+			if round >= 3 {
+				tiedLeaders := leadingPersonaIDs(session.LiveScores, activePersonaIDs(activePersonas))
+				if len(tiedLeaders) > 1 {
+					if round >= maxOvertimeRounds {
+						session.OvertimePersonaIDs = append([]string(nil), tiedLeaders...)
+						break
+					}
+					session, err = s.store.SetOvertimeParticipants(id, tiedLeaders, round+1)
+					if err != nil {
+						s.failAndSend(events, id, err.Error())
+						return
+					}
+					if shouldPauseAfterRound(round) {
+						session, err = s.store.PauseAfterRound(id, round)
+						if err != nil {
+							s.failAndSend(events, id, err.Error())
+							return
+						}
+						sendEvent(ctx, events, SSEEvent{
+							Type:                 "support_prompt",
+							Round:                round,
+							CurrentRound:         session.CurrentRound,
+							AwaitingSupport:      session.AwaitingSupport,
+							AwaitingSupportRound: session.AwaitingSupportRound,
+							Scores:               append([]DebateScore(nil), session.LiveScores...),
+							NeutralJudge:         cloneNeutralJudge(session.NeutralJudge),
+							OvertimePersonaIDs:   append([]string(nil), session.OvertimePersonaIDs...),
+							SupportHistory:       append([]RoundSupportChoice(nil), session.SupportHistory...),
+							Personas:             append([]Persona(nil), session.Personas...),
+						})
+						return
+					}
+					continue
+				}
+				break
 			}
 
 			if shouldPauseAfterRound(round) {
@@ -203,6 +255,9 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 					CurrentRound:         session.CurrentRound,
 					AwaitingSupport:      session.AwaitingSupport,
 					AwaitingSupportRound: session.AwaitingSupportRound,
+					Scores:               append([]DebateScore(nil), session.LiveScores...),
+					NeutralJudge:         cloneNeutralJudge(session.NeutralJudge),
+					OvertimePersonaIDs:   append([]string(nil), session.OvertimePersonaIDs...),
 					SupportHistory:       append([]RoundSupportChoice(nil), session.SupportHistory...),
 					Personas:             append([]Persona(nil), session.Personas...),
 				})
@@ -215,6 +270,7 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 			s.failAndSend(events, id, fmt.Sprintf("裁判团掉线了: %v", err))
 			return
 		}
+		result = mergeFinalResultWithLiveScores(result, session.LiveScores)
 		if _, err := s.store.Complete(id, result); err != nil {
 			s.failAndSend(events, id, err.Error())
 			return
@@ -381,12 +437,13 @@ func (s *Service) replaySession(ctx context.Context, session *DebateSession, eve
 	}
 	for _, message := range session.Messages {
 		if !sendEvent(ctx, events, SSEEvent{
-			Type:        "message",
-			Round:       message.Round,
-			RoundTitle:  message.RoundTitle,
-			PersonaID:   message.PersonaID,
-			PersonaName: message.PersonaName,
-			Content:     message.Content,
+			Type:               "message",
+			Round:              message.Round,
+			RoundTitle:         message.RoundTitle,
+			PersonaID:          message.PersonaID,
+			PersonaName:        message.PersonaName,
+			Content:            message.Content,
+			OvertimePersonaIDs: append([]string(nil), session.OvertimePersonaIDs...),
 		}) {
 			return
 		}
@@ -401,6 +458,9 @@ func (s *Service) replaySession(ctx context.Context, session *DebateSession, eve
 			CurrentRound:         session.CurrentRound,
 			AwaitingSupport:      session.AwaitingSupport,
 			AwaitingSupportRound: session.AwaitingSupportRound,
+			Scores:               append([]DebateScore(nil), session.LiveScores...),
+			NeutralJudge:         cloneNeutralJudge(session.NeutralJudge),
+			OvertimePersonaIDs:   append([]string(nil), session.OvertimePersonaIDs...),
 			SupportHistory:       append([]RoundSupportChoice(nil), session.SupportHistory...),
 			Personas:             append([]Persona(nil), session.Personas...),
 		})
@@ -472,4 +532,121 @@ func hasRoundMessageForPersona(history []DebateMessage, round int, persona Perso
 		}
 	}
 	return false
+}
+
+func cloneNeutralJudge(judge *NeutralJudgeState) *NeutralJudgeState {
+	if judge == nil {
+		return nil
+	}
+	cloned := *judge
+	return &cloned
+}
+
+func activePersonasForRound(session *DebateSession, round int) []Persona {
+	if session == nil {
+		return nil
+	}
+	if round <= 3 || len(session.OvertimePersonaIDs) < 2 {
+		return append([]Persona(nil), session.Personas...)
+	}
+	idSet := make(map[string]struct{}, len(session.OvertimePersonaIDs))
+	for _, id := range session.OvertimePersonaIDs {
+		idSet[id] = struct{}{}
+	}
+	active := make([]Persona, 0, len(session.OvertimePersonaIDs))
+	for _, persona := range session.Personas {
+		if _, ok := idSet[persona.ID]; ok {
+			active = append(active, persona)
+		}
+	}
+	if len(active) >= 2 {
+		return active
+	}
+	return append([]Persona(nil), session.Personas...)
+}
+
+func activePersonaIDs(personas []Persona) []string {
+	ids := make([]string, 0, len(personas))
+	for _, persona := range personas {
+		if strings.TrimSpace(persona.ID) != "" {
+			ids = append(ids, persona.ID)
+		}
+	}
+	return ids
+}
+
+func leadingPersonaIDs(scores []DebateScore, onlyPersonaIDs []string) []string {
+	if len(scores) == 0 {
+		return nil
+	}
+
+	filter := make(map[string]struct{}, len(onlyPersonaIDs))
+	for _, id := range onlyPersonaIDs {
+		if strings.TrimSpace(id) != "" {
+			filter[id] = struct{}{}
+		}
+	}
+
+	bestScore := -1
+	leaders := make([]string, 0, len(scores))
+	for _, score := range scores {
+		if len(filter) > 0 {
+			if _, ok := filter[score.PersonaID]; !ok {
+				continue
+			}
+		}
+		if score.Score > bestScore {
+			bestScore = score.Score
+			leaders = leaders[:0]
+			if strings.TrimSpace(score.PersonaID) != "" {
+				leaders = append(leaders, score.PersonaID)
+			}
+			continue
+		}
+		if score.Score == bestScore && strings.TrimSpace(score.PersonaID) != "" {
+			leaders = append(leaders, score.PersonaID)
+		}
+	}
+	return leaders
+}
+
+func mergeFinalResultWithLiveScores(result *DebateResult, liveScores []DebateScore) *DebateResult {
+	if result == nil {
+		result = &DebateResult{}
+	}
+
+	merged := *result
+	if len(liveScores) > 0 {
+		merged.Scores = append([]DebateScore(nil), liveScores...)
+	}
+	merged.Winner = resolveFinalWinner(merged.Winner, merged.Scores)
+	return &merged
+}
+
+func resolveFinalWinner(preferred string, scores []DebateScore) string {
+	if len(scores) == 0 {
+		return strings.TrimSpace(preferred)
+	}
+
+	best := scores[0]
+	for _, score := range scores[1:] {
+		if score.Score > best.Score {
+			best = score
+		}
+	}
+	bestName := strings.TrimSpace(best.Persona)
+	if bestName == "" {
+		return strings.TrimSpace(preferred)
+	}
+	if strings.TrimSpace(preferred) == "" {
+		return bestName
+	}
+
+	bestScore := best.Score
+	for _, score := range scores {
+		if strings.TrimSpace(score.Persona) == strings.TrimSpace(preferred) && score.Score == bestScore {
+			return strings.TrimSpace(preferred)
+		}
+	}
+	return bestName
 }

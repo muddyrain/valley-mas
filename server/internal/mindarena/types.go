@@ -44,8 +44,12 @@ type DebateMessage struct {
 }
 
 type DebateScore struct {
-	Persona string `json:"persona"`
-	Score   int    `json:"score"`
+	Persona       string `json:"persona"`
+	PersonaID     string `json:"personaId,omitempty"`
+	Score         int    `json:"score"`
+	JudgeScore    int    `json:"judgeScore,omitempty"`
+	AudienceScore int    `json:"audienceScore,omitempty"`
+	JudgeNote     string `json:"judgeNote,omitempty"`
 }
 
 type DebateResult struct {
@@ -55,12 +59,22 @@ type DebateResult struct {
 	Scores      []DebateScore `json:"scores"`
 }
 
+type NeutralJudgeState struct {
+	Name           string `json:"name"`
+	CurrentRound   int    `json:"currentRound"`
+	Focus          string `json:"focus"`
+	Summary        string `json:"summary"`
+	LeadingPersona string `json:"leadingPersona,omitempty"`
+	UpdatedAt      string `json:"updatedAt"`
+}
+
 type RoundSupportChoice struct {
-	Round       int    `json:"round"`
-	PersonaID   string `json:"personaId,omitempty"`
-	PersonaName string `json:"personaName,omitempty"`
-	Skipped     bool   `json:"skipped"`
-	CreatedAt   string `json:"createdAt"`
+	Round        int    `json:"round"`
+	PersonaID    string `json:"personaId,omitempty"`
+	PersonaName  string `json:"personaName,omitempty"`
+	Skipped      bool   `json:"skipped"`
+	SupportScore int    `json:"supportScore,omitempty"`
+	CreatedAt    string `json:"createdAt"`
 }
 
 type DebateSession struct {
@@ -75,6 +89,9 @@ type DebateSession struct {
 	AwaitingSupportRound int                  `json:"awaitingSupportRound"`
 	Personas             []Persona            `json:"personas"`
 	Messages             []DebateMessage      `json:"messages"`
+	LiveScores           []DebateScore        `json:"liveScores"`
+	NeutralJudge         *NeutralJudgeState   `json:"neutralJudge,omitempty"`
+	OvertimePersonaIDs   []string             `json:"overtimePersonaIds,omitempty"`
 	SupportHistory       []RoundSupportChoice `json:"supportHistory"`
 	Result               *DebateResult        `json:"result,omitempty"`
 	Error                string               `json:"error,omitempty"`
@@ -120,6 +137,8 @@ type SSEEvent struct {
 	Session              *DebateSession       `json:"session,omitempty"`
 	Personas             []Persona            `json:"personas,omitempty"`
 	Messages             []DebateMessage      `json:"messages,omitempty"`
+	NeutralJudge         *NeutralJudgeState   `json:"neutralJudge,omitempty"`
+	OvertimePersonaIDs   []string             `json:"overtimePersonaIds,omitempty"`
 	CurrentRound         int                  `json:"currentRound,omitempty"`
 	AwaitingSupport      bool                 `json:"awaitingSupport,omitempty"`
 	AwaitingSupportRound int                  `json:"awaitingSupportRound,omitempty"`
@@ -154,14 +173,14 @@ func roundTitle(round int) string {
 	case 1:
 		return "立场表达"
 	case 2:
-		return "互相反驳"
+		return "交锋与结盟"
 	case 3:
 		return "最终陈词"
 	default:
-		return "加时讨论"
+		return "加时对决"
 	}
 }
 
 func shouldPauseAfterRound(round int) bool {
-	return round >= 1 && round < 3
+	return round == 1 || round == 2 || round > 3
 }

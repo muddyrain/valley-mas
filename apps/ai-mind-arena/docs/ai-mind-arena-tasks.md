@@ -1,10 +1,10 @@
 # AI Mind Arena - 开发任务清单
 
 ## 当前阶段
-Phase 8：支持率与裁判评分重构
+Phase 9：动态裁判与加时赛机制
 
 ## 当前正在做
-Task 1：引入中立裁判评分，并让用户站队真实影响支持热度
+Phase 9 已完成，等待下一项任务
 
 ---
 
@@ -76,7 +76,7 @@ Task 1：引入中立裁判评分，并让用户站队真实影响支持热度
 
 ## Phase 8：支持率与裁判评分重构
 
-### [ ] Task 1：引入中立裁判评分，并让用户站队真实影响支持热度
+### [x] Task 1：引入中立裁判评分，并让用户站队真实影响支持热度
 - 目标：解决当前“支持热度像假的、谁先发言谁更占优、理性派经常莫名第一”的问题。把右侧“当前战况”从单纯内容测算改成“双来源计分”：
   一部分来自中立裁判根据每条发言实时打分，另一部分来自用户每轮站队给出的真实支持分，让用户点击站队不只是交互，而是真能改变战况。
 - 涉及文件：`apps/ai-mind-arena/components/debate/ScorePanel.tsx`、`apps/ai-mind-arena/components/debate/DebateRoom.tsx`、`apps/ai-mind-arena/lib/debateScores.ts`、`apps/ai-mind-arena/lib/types.ts`、`server/internal/mindarena/types.go`、`server/internal/mindarena/service.go`、`server/internal/ai/debate_messages.go`、`server/internal/ai/prompts.go`、`server/internal/ai/mock.go`、`server/internal/mindarena/service_test.go`
@@ -94,7 +94,7 @@ Task 1：引入中立裁判评分，并让用户站队真实影响支持热度
   - 用户在 Round 1 / Round 2 的站队会实际影响后续热度数值，且影响可在 session 或 score 数据结构中追踪。
   - mock / 测试覆盖裁判评分与用户加分叠加后的排序变化。
 
-### [ ] Task 2：把口头禅改成出场口号，不再绑死后续发言风格
+### [x] Task 2：把口头禅改成出场口号，不再绑死后续发言风格
 - 目标：修正当前人格发言“总像在反复念口头禅”的问题。`catchphrase` 不再被当成后续每轮发言都要强行复现的表达约束，而是改成“出场口号 / 开场标语”，只在角色卡、嘉宾登场或人格介绍时使用；后续辩论发言应主要根据当轮场上局势、历史内容、用户站队和对手观点动态生成。
 - 涉及文件：`server/internal/ai/prompts.go`、`server/internal/ai/debate_messages.go`、`server/internal/mindarena/personas.go`、`server/internal/ai/mock.go`、`apps/ai-mind-arena/components/debate/PersonaCard.tsx`、`apps/ai-mind-arena/lib/types.ts`
 - 输入：人格基础设定、出场口号、历史发言、当前轮次、用户偏好、对手观点。
@@ -107,7 +107,36 @@ Task 1：引入中立裁判评分，并让用户站队真实影响支持热度
   - 角色卡、嘉宾介绍等静态展示仍可保留出场口号。
   - Round 2 / Round 3 发言不再强制重复或贴近口号原句。
   - prompt 约束改成“保留人格性格与表达方式”，而不是“必须带出口号句式”。
-  - mock / fallback 文案同步调整，避免所有人格发言都像自我介绍。
+- mock / fallback 文案同步调整，避免所有人格发言都像自我介绍。
+
+---
+
+## Phase 9：动态裁判与加时赛机制
+
+### [x] Task 1：Round 2 支持“拆招”也支持“结盟借力”
+- 目标：避免第二轮所有人格都只会互怼。Round 2 除了直接反驳，也允许人格承认对手某一点合理，再顺势把优势拉回自己这边，让讨论更像真实辩论而不是纯吵架。
+- 涉及文件：`server/internal/ai/debate_messages.go`、`server/internal/ai/prompts.go`、`server/internal/ai/mock.go`、`server/internal/mindarena/scoring.go`
+- 验收：
+  - Round 2 prompt 明确允许“部分赞同 + 转向自己结论”的打法。
+  - mock / fallback 文案里能看到不只一种交锋方式。
+  - 裁判评分会识别“借力打力”的发言，而不只奖励纯反驳。
+
+### [x] Task 2：让中立裁判按辩论风格动态打分
+- 目标：解决裁判长期偏向理性派或父母派的问题。裁判不再只按固定关键词打分，而是结合当前 `mode` 评估：严肃模式更看重条件与落地，锋芒模式更看重拆解，情绪模式更看重情绪识别与承接。
+- 涉及文件：`server/internal/mindarena/scoring.go`、`apps/ai-mind-arena/components/debate/ScorePanel.tsx`
+- 验收：
+  - 裁判焦点文案能看出当前辩论风格。
+  - 不同 `mode` 的发言会因为风格差异得到不同加权。
+  - 右侧裁判区的文案能解释“为什么这轮这么判”。
+
+### [x] Task 3：Round 3 同分后进入加时赛，直到分出领先者
+- 目标：如果 Round 3 结束后出现并列最高分，不要直接硬判胜者，而是进入加时赛。只有并列领先的人格继续对决；若加时后仍然同分，就继续下一轮，直到分出唯一领先者。
+- 涉及文件：`server/internal/mindarena/types.go`、`server/internal/mindarena/store.go`、`server/internal/mindarena/service.go`、`server/internal/mindarena/service_test.go`、`apps/ai-mind-arena/components/debate/DebateRoom.tsx`、`apps/ai-mind-arena/components/debate/ScorePanel.tsx`、`apps/ai-mind-arena/lib/types.ts`、`apps/ai-mind-arena/lib/api.ts`
+- 验收：
+  - Round 3 打平后自动进入加时赛，而不是直接亮最终结果。
+  - 加时赛只展示并列领先人格继续辩论，用户站队也只在这些人格里选。
+  - 右侧和中间主舞台都能正确显示加时赛轮次。
+  - 一旦加时赛分出唯一领先者，再进入最终裁判结果。
 
 ---
 
