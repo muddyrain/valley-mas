@@ -84,11 +84,11 @@ func (s *OpenAICompatibleService) GeneratePersona(ctx context.Context, topic str
 	return nil, errors.New("model returned empty persona")
 }
 
-func (s *OpenAICompatibleService) GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
+func (s *OpenAICompatibleService) GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) ([]mindarena.DebateMessage, error) {
 	var out struct {
 		Messages []mindarena.DebateMessage `json:"messages"`
 	}
-	if err := s.chatJSON(ctx, DEBATE_ROUND_PROMPT, buildDebateRoundPromptInput(topic, mode, personas, round, history), &out); err != nil {
+	if err := s.chatJSON(ctx, DEBATE_ROUND_PROMPT, buildDebateRoundPromptInput(topic, mode, personas, round, history, supportHistory), &out); err != nil {
 		return nil, err
 	}
 	if len(out.Messages) == 0 {
@@ -97,11 +97,11 @@ func (s *OpenAICompatibleService) GenerateDebateRound(ctx context.Context, topic
 	return normalizeGeneratedDebateMessages(out.Messages, personas, round), nil
 }
 
-func (s *OpenAICompatibleService) GenerateDebateMessage(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage) (*mindarena.DebateMessage, error) {
+func (s *OpenAICompatibleService) GenerateDebateMessage(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) (*mindarena.DebateMessage, error) {
 	var out struct {
 		Messages []mindarena.DebateMessage `json:"messages"`
 	}
-	if err := s.chatJSON(ctx, DEBATE_ROUND_PROMPT, buildDebateMessagePromptInput(topic, mode, personas, persona, round, history), &out); err != nil {
+	if err := s.chatJSON(ctx, DEBATE_ROUND_PROMPT, buildDebateMessagePromptInput(topic, mode, personas, persona, round, history, supportHistory), &out); err != nil {
 		return nil, err
 	}
 	normalized := normalizeGeneratedDebateMessages(out.Messages, []mindarena.Persona{persona}, round)

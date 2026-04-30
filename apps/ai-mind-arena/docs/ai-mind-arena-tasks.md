@@ -1,10 +1,10 @@
 # AI Mind Arena - 开发任务清单
 
 ## 当前阶段
-Phase 7：回合互动与争宠机制
+Phase 8：支持率与裁判评分重构
 
 ## 当前正在做
-Task 1：每轮结束加入用户站队，并把结果带入下一轮争论
+Task 1：引入中立裁判评分，并让用户站队真实影响支持热度
 
 ---
 
@@ -52,7 +52,7 @@ Task 1：每轮结束加入用户站队，并把结果带入下一轮争论
 
 ## Phase 7：回合互动与争宠机制
 
-### [ ] Task 1：每轮结束加入用户站队，并把结果带入下一轮争论
+### [x] Task 1：每轮结束加入用户站队，并把结果带入下一轮争论
 - 目标：每轮发言结束后，不直接无缝进入下一轮，而是弹出一个“这一轮你更支持谁”的交互，让用户临时站队；下一轮生成时，把“用户刚支持了 xxx 派”作为额外上下文喂给各人格，让他们围绕用户偏好继续争论、争宠、拉票。
 - 涉及文件：`apps/ai-mind-arena/components/debate/DebateRoom.tsx`、`apps/ai-mind-arena/components/debate/ScorePanel.tsx`、`apps/ai-mind-arena/lib/types.ts`、`apps/ai-mind-arena/lib/debateEvents.ts`、`server/internal/mindarena/service.go`、`server/internal/mindarena/types.go`、`server/internal/ai/debate_messages.go`、`server/internal/ai/prompts.go`、`server/internal/ai/mock.go`、`server/internal/mindarena/service_test.go`
 - 输入：当前轮次 `round`、本轮已完成的发言、用户本轮选择支持的人格 `supportedPersonaId`、历史用户站队记录。
@@ -71,6 +71,43 @@ Task 1：每轮结束加入用户站队，并把结果带入下一轮争论
   - 不能破坏现有 SSE 主链路，也不能让页面刷新后丢失已完成的用户站队结果。
   - `server/internal/mindarena` 与前端交互相关测试覆盖：
     回合暂停、用户选择后恢复、下一轮提示词已带上用户支持信息。
+
+---
+
+## Phase 8：支持率与裁判评分重构
+
+### [ ] Task 1：引入中立裁判评分，并让用户站队真实影响支持热度
+- 目标：解决当前“支持热度像假的、谁先发言谁更占优、理性派经常莫名第一”的问题。把右侧“当前战况”从单纯内容测算改成“双来源计分”：
+  一部分来自中立裁判根据每条发言实时打分，另一部分来自用户每轮站队给出的真实支持分，让用户点击站队不只是交互，而是真能改变战况。
+- 涉及文件：`apps/ai-mind-arena/components/debate/ScorePanel.tsx`、`apps/ai-mind-arena/components/debate/DebateRoom.tsx`、`apps/ai-mind-arena/lib/debateScores.ts`、`apps/ai-mind-arena/lib/types.ts`、`server/internal/mindarena/types.go`、`server/internal/mindarena/service.go`、`server/internal/ai/debate_messages.go`、`server/internal/ai/prompts.go`、`server/internal/ai/mock.go`、`server/internal/mindarena/service_test.go`
+- 输入：人格发言内容、当前轮次 `round`、中立裁判对每条发言的评分结果、用户每轮站队记录 `supportHistory`。
+- 输出：
+  - 右侧战况面板新增“中立裁判”角色或裁判区块，明确展示这轮是谁在打分；
+  - 每条发言生成后，中立裁判会基于内容给出分数判断，而不是只按先后顺序推高热度；
+  - 用户站队会给对应人格注入明确分数支持，真实影响总热度；
+  - 支持率结果可解释，至少能区分“裁判评分”和“用户加分”两部分来源。
+- 依赖：Phase 7 的回合站队机制已经存在，支持历史可复用。
+- 验收：
+  - 同一轮内，支持热度不再因为发言先后顺序天然偏向前面的人格。
+  - 理性派不应因为默认权重而稳定第一；最终高低必须由“当轮发言质量 + 用户站队”共同决定。
+  - 右侧 UI 能看出中立裁判这一评分来源，而不是只有五个人格的支持条。
+  - 用户在 Round 1 / Round 2 的站队会实际影响后续热度数值，且影响可在 session 或 score 数据结构中追踪。
+  - mock / 测试覆盖裁判评分与用户加分叠加后的排序变化。
+
+### [ ] Task 2：把口头禅改成出场口号，不再绑死后续发言风格
+- 目标：修正当前人格发言“总像在反复念口头禅”的问题。`catchphrase` 不再被当成后续每轮发言都要强行复现的表达约束，而是改成“出场口号 / 开场标语”，只在角色卡、嘉宾登场或人格介绍时使用；后续辩论发言应主要根据当轮场上局势、历史内容、用户站队和对手观点动态生成。
+- 涉及文件：`server/internal/ai/prompts.go`、`server/internal/ai/debate_messages.go`、`server/internal/mindarena/personas.go`、`server/internal/ai/mock.go`、`apps/ai-mind-arena/components/debate/PersonaCard.tsx`、`apps/ai-mind-arena/lib/types.ts`
+- 输入：人格基础设定、出场口号、历史发言、当前轮次、用户偏好、对手观点。
+- 输出：
+  - 文档和类型层面把 `catchphrase` 的产品语义调整成“出场口号”；
+  - prompt 不再要求模型每轮都把口号气场硬塞进发言；
+  - 人格后续发言更强调临场反应，而不是围绕固定口号复读。
+- 依赖：当前人格卡和人格生成链路。
+- 验收：
+  - 角色卡、嘉宾介绍等静态展示仍可保留出场口号。
+  - Round 2 / Round 3 发言不再强制重复或贴近口号原句。
+  - prompt 约束改成“保留人格性格与表达方式”，而不是“必须带出口号句式”。
+  - mock / fallback 文案同步调整，避免所有人格发言都像自我介绍。
 
 ---
 

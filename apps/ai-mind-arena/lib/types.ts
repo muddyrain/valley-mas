@@ -35,14 +35,27 @@ export interface DebateResult {
   scores?: DebateScore[] | null;
 }
 
+export interface RoundSupportChoice {
+  round: number;
+  personaId?: string;
+  personaName?: string;
+  skipped: boolean;
+  createdAt: string;
+}
+
 export interface DebateSession {
   id: string;
   topic: string;
   mode: DebateMode;
   status: DebateStatus;
   personaCount?: number | null;
+  currentRound?: number | null;
+  lastCompletedRound?: number | null;
+  awaitingSupport?: boolean;
+  awaitingSupportRound?: number | null;
   personas?: Persona[] | null;
   messages?: DebateMessage[] | null;
+  supportHistory?: RoundSupportChoice[] | null;
   result?: DebateResult;
   error?: string;
   createdAt: string;
@@ -61,11 +74,18 @@ export interface CreateDebateResponse {
   mode: DebateMode;
   status: DebateStatus;
   personaCount?: number | null;
+  currentRound?: number | null;
   personas?: Persona[] | null;
 }
 
+export interface SubmitRoundSupportRequest {
+  round: number;
+  supportedPersonaId?: string;
+  skip?: boolean;
+}
+
 export interface DebateSSEEvent {
-  type: 'personas' | 'message' | 'judge' | 'done' | 'error';
+  type: 'personas' | 'message' | 'judge' | 'done' | 'error' | 'support_prompt';
   round?: number;
   roundTitle?: string;
   personaCount?: number;
@@ -76,4 +96,8 @@ export interface DebateSSEEvent {
   sessionId?: string;
   message?: string;
   personas?: Persona[] | null;
+  currentRound?: number;
+  awaitingSupport?: boolean;
+  awaitingSupportRound?: number;
+  supportHistory?: RoundSupportChoice[] | null;
 }

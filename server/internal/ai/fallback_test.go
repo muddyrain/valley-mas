@@ -10,8 +10,8 @@ import (
 type stubAIService struct {
 	generatePersonas func(ctx context.Context, topic string, mode string, count int) ([]mindarena.Persona, error)
 	generatePersona  func(ctx context.Context, topic string, mode string, persona mindarena.Persona, index int, count int) (*mindarena.Persona, error)
-	generateRound    func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error)
-	generateMessage  func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage) (*mindarena.DebateMessage, error)
+	generateRound    func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) ([]mindarena.DebateMessage, error)
+	generateMessage  func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) (*mindarena.DebateMessage, error)
 	judgeDebate      func(ctx context.Context, topic string, personas []mindarena.Persona, messages []mindarena.DebateMessage) (*mindarena.DebateResult, error)
 }
 
@@ -26,15 +26,15 @@ func (s stubAIService) GeneratePersona(ctx context.Context, topic string, mode s
 	return &persona, nil
 }
 
-func (s stubAIService) GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
-	return s.generateRound(ctx, topic, mode, personas, round, history)
+func (s stubAIService) GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) ([]mindarena.DebateMessage, error) {
+	return s.generateRound(ctx, topic, mode, personas, round, history, supportHistory)
 }
 
-func (s stubAIService) GenerateDebateMessage(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage) (*mindarena.DebateMessage, error) {
+func (s stubAIService) GenerateDebateMessage(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) (*mindarena.DebateMessage, error) {
 	if s.generateMessage != nil {
-		return s.generateMessage(ctx, topic, mode, personas, persona, round, history)
+		return s.generateMessage(ctx, topic, mode, personas, persona, round, history, supportHistory)
 	}
-	messages, err := s.GenerateDebateRound(ctx, topic, mode, personas, round, history)
+	messages, err := s.GenerateDebateRound(ctx, topic, mode, personas, round, history, supportHistory)
 	if err != nil || len(messages) == 0 {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func TestFallbackServiceGeneratePersonas(t *testing.T) {
 			generatePersonas: func(ctx context.Context, topic string, mode string, count int) ([]mindarena.Persona, error) {
 				return nil, errors.New("AI upstream returned 502")
 			},
-			generateRound: func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
+			generateRound: func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) ([]mindarena.DebateMessage, error) {
 				return nil, nil
 			},
 			judgeDebate: func(ctx context.Context, topic string, personas []mindarena.Persona, messages []mindarena.DebateMessage) (*mindarena.DebateResult, error) {
@@ -84,7 +84,7 @@ func TestFallbackServiceGeneratePersona(t *testing.T) {
 			generatePersona: func(ctx context.Context, topic string, mode string, persona mindarena.Persona, index int, count int) (*mindarena.Persona, error) {
 				return nil, errors.New("AI upstream returned 502")
 			},
-			generateRound: func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
+			generateRound: func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) ([]mindarena.DebateMessage, error) {
 				return nil, nil
 			},
 			judgeDebate: func(ctx context.Context, topic string, personas []mindarena.Persona, messages []mindarena.DebateMessage) (*mindarena.DebateResult, error) {
@@ -115,7 +115,7 @@ func TestFallbackServiceGenerateDebateRound(t *testing.T) {
 			generatePersonas: func(ctx context.Context, topic string, mode string, count int) ([]mindarena.Persona, error) {
 				return personas, nil
 			},
-			generateRound: func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
+			generateRound: func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) ([]mindarena.DebateMessage, error) {
 				return nil, errors.New("parse AI JSON failed")
 			},
 			judgeDebate: func(ctx context.Context, topic string, personas []mindarena.Persona, messages []mindarena.DebateMessage) (*mindarena.DebateResult, error) {
@@ -125,7 +125,7 @@ func TestFallbackServiceGenerateDebateRound(t *testing.T) {
 		NewMockAIService(),
 	)
 
-	messages, err := service.GenerateDebateRound(context.Background(), "要不要创业", "funny", personas, 2, nil)
+	messages, err := service.GenerateDebateRound(context.Background(), "要不要创业", "funny", personas, 2, nil, nil)
 	if err != nil {
 		t.Fatalf("expected fallback messages, got error: %v", err)
 	}
@@ -146,10 +146,10 @@ func TestFallbackServiceGenerateDebateMessage(t *testing.T) {
 			generatePersonas: func(ctx context.Context, topic string, mode string, count int) ([]mindarena.Persona, error) {
 				return personas, nil
 			},
-			generateRound: func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
+			generateRound: func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) ([]mindarena.DebateMessage, error) {
 				return nil, nil
 			},
-			generateMessage: func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage) (*mindarena.DebateMessage, error) {
+			generateMessage: func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) (*mindarena.DebateMessage, error) {
 				return nil, errors.New("AI upstream failed")
 			},
 			judgeDebate: func(ctx context.Context, topic string, personas []mindarena.Persona, messages []mindarena.DebateMessage) (*mindarena.DebateResult, error) {
@@ -159,7 +159,7 @@ func TestFallbackServiceGenerateDebateMessage(t *testing.T) {
 		NewMockAIService(),
 	)
 
-	message, err := service.GenerateDebateMessage(context.Background(), "要不要创业", "funny", personas, personas[0], 1, nil)
+	message, err := service.GenerateDebateMessage(context.Background(), "要不要创业", "funny", personas, personas[0], 1, nil, nil)
 	if err != nil {
 		t.Fatalf("expected fallback message, got error: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestFallbackServiceJudgeDebate(t *testing.T) {
 			generatePersonas: func(ctx context.Context, topic string, mode string, count int) ([]mindarena.Persona, error) {
 				return personas, nil
 			},
-			generateRound: func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
+			generateRound: func(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) ([]mindarena.DebateMessage, error) {
 				return nil, nil
 			},
 			judgeDebate: func(ctx context.Context, topic string, personas []mindarena.Persona, messages []mindarena.DebateMessage) (*mindarena.DebateResult, error) {
