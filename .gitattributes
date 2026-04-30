@@ -30,6 +30,9 @@
 *.unitypackage filter=lfs diff=lfs merge=lfs -text
 *.bytes        filter=lfs diff=lfs merge=lfs -text
 
+# AI Mind Arena 前端头像资源需要直接随 Git 下发，避免部署端缺少 LFS 实体文件
+apps/ai-mind-arena/assets/*.png -filter -diff -merge -text
+
 # ========================================
 # Unity 文本序列化文件（推荐不进 LFS，便于 diff）
 # ========================================
