@@ -11,6 +11,7 @@ type Store interface {
 	Create(session *DebateSession) error
 	Get(id string) (*DebateSession, error)
 	Update(session *DebateSession) error
+	UpdatePersonas(id string, personas []Persona) (*DebateSession, error)
 	TryMarkRunning(id string) (*DebateSession, bool, error)
 	AppendMessages(id string, messages []DebateMessage) (*DebateSession, error)
 	Complete(id string, result *DebateResult) (*DebateSession, error)
@@ -54,6 +55,18 @@ func (s *MemoryStore) Update(session *DebateSession) error {
 	copied.UpdatedAt = nowString()
 	s.sessions[copied.ID] = copied
 	return nil
+}
+
+func (s *MemoryStore) UpdatePersonas(id string, personas []Persona) (*DebateSession, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.sessions[id]
+	if !ok {
+		return nil, ErrDebateNotFound
+	}
+	session.Personas = append([]Persona(nil), personas...)
+	session.UpdatedAt = nowString()
+	return cloneSession(session), nil
 }
 
 func (s *MemoryStore) TryMarkRunning(id string) (*DebateSession, bool, error) {

@@ -26,6 +26,16 @@ func (s *FallbackService) GeneratePersonas(ctx context.Context, topic string, mo
 	return s.fallback.GeneratePersonas(ctx, topic, mode, count)
 }
 
+func (s *FallbackService) GeneratePersona(ctx context.Context, topic string, mode string, persona mindarena.Persona, index int, count int) (*mindarena.Persona, error) {
+	generated, err := s.primary.GeneratePersona(ctx, topic, mode, persona, index, count)
+	if err == nil || !shouldFallbackToMock(err) {
+		return generated, err
+	}
+
+	log.Printf("ai-mind-arena: fallback to mock persona %s because primary AI failed: %v", persona.Name, err)
+	return s.fallback.GeneratePersona(ctx, topic, mode, persona, index, count)
+}
+
 func (s *FallbackService) GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
 	messages, err := s.primary.GenerateDebateRound(ctx, topic, mode, personas, round, history)
 	if err == nil || !shouldFallbackToMock(err) {
@@ -34,6 +44,16 @@ func (s *FallbackService) GenerateDebateRound(ctx context.Context, topic string,
 
 	log.Printf("ai-mind-arena: fallback to mock round %d because primary AI failed: %v", round, err)
 	return s.fallback.GenerateDebateRound(ctx, topic, mode, personas, round, history)
+}
+
+func (s *FallbackService) GenerateDebateMessage(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage) (*mindarena.DebateMessage, error) {
+	message, err := s.primary.GenerateDebateMessage(ctx, topic, mode, personas, persona, round, history)
+	if err == nil || !shouldFallbackToMock(err) {
+		return message, err
+	}
+
+	log.Printf("ai-mind-arena: fallback to mock persona %s round %d because primary AI failed: %v", persona.Name, round, err)
+	return s.fallback.GenerateDebateMessage(ctx, topic, mode, personas, persona, round, history)
 }
 
 func (s *FallbackService) JudgeDebate(ctx context.Context, topic string, personas []mindarena.Persona, messages []mindarena.DebateMessage) (*mindarena.DebateResult, error) {

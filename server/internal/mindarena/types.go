@@ -56,16 +56,17 @@ type DebateResult struct {
 }
 
 type DebateSession struct {
-	ID        string          `json:"id"`
-	Topic     string          `json:"topic"`
-	Mode      DebateMode      `json:"mode"`
-	Status    DebateStatus    `json:"status"`
-	Personas  []Persona       `json:"personas"`
-	Messages  []DebateMessage `json:"messages"`
-	Result    *DebateResult   `json:"result,omitempty"`
-	Error     string          `json:"error,omitempty"`
-	CreatedAt string          `json:"createdAt"`
-	UpdatedAt string          `json:"updatedAt"`
+	ID           string          `json:"id"`
+	Topic        string          `json:"topic"`
+	Mode         DebateMode      `json:"mode"`
+	Status       DebateStatus    `json:"status"`
+	PersonaCount int             `json:"personaCount"`
+	Personas     []Persona       `json:"personas"`
+	Messages     []DebateMessage `json:"messages"`
+	Result       *DebateResult   `json:"result,omitempty"`
+	Error        string          `json:"error,omitempty"`
+	CreatedAt    string          `json:"createdAt"`
+	UpdatedAt    string          `json:"updatedAt"`
 }
 
 type CreateDebateRequest struct {
@@ -75,27 +76,29 @@ type CreateDebateRequest struct {
 }
 
 type CreateDebateResponse struct {
-	SessionID string       `json:"sessionId"`
-	Topic     string       `json:"topic"`
-	Mode      DebateMode   `json:"mode"`
-	Status    DebateStatus `json:"status"`
-	Personas  []Persona    `json:"personas"`
+	SessionID    string       `json:"sessionId"`
+	Topic        string       `json:"topic"`
+	Mode         DebateMode   `json:"mode"`
+	Status       DebateStatus `json:"status"`
+	PersonaCount int          `json:"personaCount"`
+	Personas     []Persona    `json:"personas"`
 }
 
 type SSEEvent struct {
-	Type        string          `json:"type"`
-	Round       int             `json:"round,omitempty"`
-	RoundTitle  string          `json:"roundTitle,omitempty"`
-	PersonaID   string          `json:"personaId,omitempty"`
-	PersonaName string          `json:"personaName,omitempty"`
-	Content     string          `json:"content,omitempty"`
-	Result      *DebateResult   `json:"result,omitempty"`
-	SessionID   string          `json:"sessionId,omitempty"`
-	Message     string          `json:"message,omitempty"`
-	Scores      []DebateScore   `json:"scores,omitempty"`
-	Session     *DebateSession  `json:"session,omitempty"`
-	Personas    []Persona       `json:"personas,omitempty"`
-	Messages    []DebateMessage `json:"messages,omitempty"`
+	Type         string          `json:"type"`
+	Round        int             `json:"round,omitempty"`
+	RoundTitle   string          `json:"roundTitle,omitempty"`
+	PersonaCount int             `json:"personaCount,omitempty"`
+	PersonaID    string          `json:"personaId,omitempty"`
+	PersonaName  string          `json:"personaName,omitempty"`
+	Content      string          `json:"content,omitempty"`
+	Result       *DebateResult   `json:"result,omitempty"`
+	SessionID    string          `json:"sessionId,omitempty"`
+	Message      string          `json:"message,omitempty"`
+	Scores       []DebateScore   `json:"scores,omitempty"`
+	Session      *DebateSession  `json:"session,omitempty"`
+	Personas     []Persona       `json:"personas,omitempty"`
+	Messages     []DebateMessage `json:"messages,omitempty"`
 }
 
 func normalizeMode(mode string) DebateMode {

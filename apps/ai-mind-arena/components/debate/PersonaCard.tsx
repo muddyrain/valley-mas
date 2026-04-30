@@ -14,7 +14,7 @@ export function PersonaCard({ persona, score = 10, active = false }: PersonaCard
   return (
     <article
       className={[
-        'relative overflow-hidden rounded-2xl border bg-white/5 p-4 text-white backdrop-blur-md transition duration-200',
+        'animate-persona-reveal relative overflow-hidden rounded-2xl border bg-white/5 p-4 text-white backdrop-blur-md transition duration-200',
         active
           ? 'border-purple-400 bg-purple-500/10 shadow-[0_0_20px_rgba(123,92,255,0.6)]'
           : 'border-purple-400/20 hover:border-purple-400/40 hover:shadow-[0_0_16px_rgba(123,92,255,0.18)]',
@@ -37,9 +37,12 @@ export function PersonaCard({ persona, score = 10, active = false }: PersonaCard
           />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="text-md font-bold text-white">{persona.name}</h3>
-            <span className={`rounded-full border px-2 py-1 text-[11px] leading-none ${tone.chip}`}>
+          <div className="flex min-w-0 items-center gap-2">
+            <h3 className="shrink-0 text-md font-bold text-white">{persona.name}</h3>
+            <span
+              className={`max-w-[120px] truncate whitespace-nowrap rounded-full border px-2 py-1 text-[11px] leading-none ${tone.chip}`}
+              title={persona.stance}
+            >
               {persona.stance}
             </span>
           </div>

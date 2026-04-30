@@ -29,7 +29,7 @@ func TestNormalizeGeneratedPersonas(t *testing.T) {
 	t.Parallel()
 
 	generated := []mindarena.Persona{
-		{ID: "p1", Name: "理性派", Stance: "先做现金流测算再决定"},
+		{ID: "p1", Name: "理性派", Stance: "先做现金流测算再决定", Catchphrase: "先试小步再下注"},
 		{ID: "p2", Name: "毒舌派", Stance: "别把情绪高潮误当成梦想召唤"},
 		{ID: "p3", Name: "赌徒派", Stance: "窗口来了就该上桌，不然只会后悔"},
 	}
@@ -41,11 +41,43 @@ func TestNormalizeGeneratedPersonas(t *testing.T) {
 	if personas[0].Stance != "先做现金流测算再决定" {
 		t.Fatalf("expected generated stance to be preserved, got %q", personas[0].Stance)
 	}
+	if personas[0].Catchphrase != "先试小步再下注" {
+		t.Fatalf("expected generated catchphrase to be preserved, got %q", personas[0].Catchphrase)
+	}
 	if personas[3].Name != "父母派" || personas[4].Name != "摆烂派" {
 		t.Fatalf("expected missing personas to fallback to canonical personas, got %+v", personas)
 	}
 	if personas[4].Catchphrase != "先睡一觉，明天再燃" {
 		t.Fatalf("expected canonical catchphrase, got %q", personas[4].Catchphrase)
+	}
+}
+
+func TestNormalizeGeneratedPersonaKeepsCanonicalIdentity(t *testing.T) {
+	t.Parallel()
+
+	target := mindarena.Persona{
+		ID:          "p1",
+		Name:        "理性派",
+		Stance:      "先算风险",
+		Personality: "冷静",
+		Style:       "短句",
+		Catchphrase: "先算账",
+		Color:       "blue",
+	}
+	generated := mindarena.Persona{
+		ID:          "bad",
+		Name:        "新角色",
+		Stance:      "先做现金流测算再决定",
+		Catchphrase: "先试小步再下注",
+		Color:       "red",
+	}
+
+	persona := normalizeGeneratedPersona(generated, target)
+	if persona.ID != target.ID || persona.Name != target.Name || persona.Color != target.Color {
+		t.Fatalf("expected canonical identity to be preserved, got %+v", persona)
+	}
+	if persona.Stance != "先做现金流测算再决定" || persona.Catchphrase != "先试小步再下注" {
+		t.Fatalf("expected generated stance and catchphrase, got %+v", persona)
 	}
 }
 

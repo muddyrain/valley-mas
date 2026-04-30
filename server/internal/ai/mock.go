@@ -28,6 +28,16 @@ func (s *MockAIService) GeneratePersonas(ctx context.Context, topic string, mode
 	return personas, nil
 }
 
+func (s *MockAIService) GeneratePersona(ctx context.Context, topic string, mode string, persona mindarena.Persona, index int, count int) (*mindarena.Persona, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	return &persona, nil
+}
+
 func (s *MockAIService) GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
 	select {
 	case <-ctx.Done():
@@ -70,7 +80,7 @@ func (s *MockAIService) GenerateDebateRound(ctx context.Context, topic string, m
 
 	messages := make([]mindarena.DebateMessage, 0, len(personas))
 	for i, persona := range personas {
-		content := lines[round][i%len(lines[round])]
+		content := mockDebateLine(lines, round, i)
 		messages = append(messages, mindarena.DebateMessage{
 			ID:          fmt.Sprintf("mock_%d_%d_%d", round, i+1, time.Now().UnixNano()),
 			Round:       round,
@@ -82,6 +92,35 @@ func (s *MockAIService) GenerateDebateRound(ctx context.Context, topic string, m
 		})
 	}
 	return messages, nil
+}
+
+func (s *MockAIService) GenerateDebateMessage(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage) (*mindarena.DebateMessage, error) {
+	messages, err := s.GenerateDebateRound(ctx, topic, mode, personas, round, history)
+	if err != nil {
+		return nil, err
+	}
+	for i := range messages {
+		if messages[i].PersonaID == persona.ID || messages[i].PersonaName == persona.Name {
+			return &messages[i], nil
+		}
+	}
+	return &mindarena.DebateMessage{
+		ID:          fmt.Sprintf("mock_%d_%s_%d", round, persona.ID, time.Now().UnixNano()),
+		Round:       round,
+		RoundTitle:  roundTitle(round),
+		PersonaID:   persona.ID,
+		PersonaName: persona.Name,
+		Content:     fallbackDebateMessageContent(persona, round),
+		CreatedAt:   time.Now().Format(time.RFC3339),
+	}, nil
+}
+
+func mockDebateLine(lines map[int][]string, round int, personaIndex int) string {
+	roundLines := lines[round]
+	if len(roundLines) == 0 {
+		return ""
+	}
+	return roundLines[personaIndex%len(roundLines)]
 }
 
 func (s *MockAIService) JudgeDebate(ctx context.Context, topic string, personas []mindarena.Persona, messages []mindarena.DebateMessage) (*mindarena.DebateResult, error) {

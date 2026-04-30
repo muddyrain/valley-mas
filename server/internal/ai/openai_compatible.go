@@ -57,6 +57,25 @@ func (s *OpenAICompatibleService) GeneratePersonas(ctx context.Context, topic st
 	return normalizeGeneratedPersonas(out.Personas), nil
 }
 
+func (s *OpenAICompatibleService) GeneratePersona(ctx context.Context, topic string, mode string, persona mindarena.Persona, index int, count int) (*mindarena.Persona, error) {
+	var out struct {
+		Persona  *mindarena.Persona  `json:"persona"`
+		Personas []mindarena.Persona `json:"personas"`
+	}
+	if err := s.chatJSON(ctx, PERSONA_SINGLE_GENERATOR_PROMPT, buildSinglePersonaPromptInput(topic, mode, persona, index, count), &out); err != nil {
+		return nil, err
+	}
+	if out.Persona != nil {
+		normalized := normalizeGeneratedPersona(*out.Persona, persona)
+		return &normalized, nil
+	}
+	if len(out.Personas) > 0 {
+		normalized := normalizeGeneratedPersona(out.Personas[0], persona)
+		return &normalized, nil
+	}
+	return nil, errors.New("model returned empty persona")
+}
+
 func (s *OpenAICompatibleService) GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
 	var out struct {
 		Messages []mindarena.DebateMessage `json:"messages"`
@@ -68,6 +87,20 @@ func (s *OpenAICompatibleService) GenerateDebateRound(ctx context.Context, topic
 		return nil, errors.New("model returned empty debate messages")
 	}
 	return normalizeGeneratedDebateMessages(out.Messages, personas, round), nil
+}
+
+func (s *OpenAICompatibleService) GenerateDebateMessage(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage) (*mindarena.DebateMessage, error) {
+	var out struct {
+		Messages []mindarena.DebateMessage `json:"messages"`
+	}
+	if err := s.chatJSON(ctx, DEBATE_ROUND_PROMPT, buildDebateMessagePromptInput(topic, mode, personas, persona, round, history), &out); err != nil {
+		return nil, err
+	}
+	normalized := normalizeGeneratedDebateMessages(out.Messages, []mindarena.Persona{persona}, round)
+	if len(normalized) == 0 {
+		return nil, errors.New("model returned empty debate message")
+	}
+	return &normalized[0], nil
 }
 
 func (s *OpenAICompatibleService) JudgeDebate(ctx context.Context, topic string, personas []mindarena.Persona, messages []mindarena.DebateMessage) (*mindarena.DebateResult, error) {

@@ -32,7 +32,7 @@ export interface DebateResult {
   winner: string;
   finalAdvice: string;
   quote: string;
-  scores: DebateScore[];
+  scores?: DebateScore[] | null;
 }
 
 export interface DebateSession {
@@ -40,8 +40,9 @@ export interface DebateSession {
   topic: string;
   mode: DebateMode;
   status: DebateStatus;
-  personas: Persona[];
-  messages: DebateMessage[];
+  personaCount?: number | null;
+  personas?: Persona[] | null;
+  messages?: DebateMessage[] | null;
   result?: DebateResult;
   error?: string;
   createdAt: string;
@@ -59,17 +60,20 @@ export interface CreateDebateResponse {
   topic: string;
   mode: DebateMode;
   status: DebateStatus;
-  personas: Persona[];
+  personaCount?: number | null;
+  personas?: Persona[] | null;
 }
 
 export interface DebateSSEEvent {
-  type: 'message' | 'judge' | 'done' | 'error';
+  type: 'personas' | 'message' | 'judge' | 'done' | 'error';
   round?: number;
   roundTitle?: string;
+  personaCount?: number;
   personaId?: string;
   personaName?: string;
   content?: string;
   result?: DebateResult;
   sessionId?: string;
   message?: string;
+  personas?: Persona[] | null;
 }
