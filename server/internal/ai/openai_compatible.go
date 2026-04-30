@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -58,21 +59,28 @@ func (s *OpenAICompatibleService) GeneratePersonas(ctx context.Context, topic st
 }
 
 func (s *OpenAICompatibleService) GeneratePersona(ctx context.Context, topic string, mode string, persona mindarena.Persona, index int, count int) (*mindarena.Persona, error) {
+	startedAt := time.Now()
+	log.Printf("ai-mind-arena: upstream persona request start provider=%s model=%s index=%d/%d persona=%s", s.provider, s.model, index+1, count, persona.Name)
+
 	var out struct {
 		Persona  *mindarena.Persona  `json:"persona"`
 		Personas []mindarena.Persona `json:"personas"`
 	}
 	if err := s.chatJSON(ctx, PERSONA_SINGLE_GENERATOR_PROMPT, buildSinglePersonaPromptInput(topic, mode, persona, index, count), &out); err != nil {
+		log.Printf("ai-mind-arena: upstream persona request failed provider=%s model=%s index=%d/%d persona=%s elapsed=%s err=%v", s.provider, s.model, index+1, count, persona.Name, time.Since(startedAt).Round(time.Millisecond), err)
 		return nil, err
 	}
 	if out.Persona != nil {
 		normalized := normalizeGeneratedPersona(*out.Persona, persona)
+		log.Printf("ai-mind-arena: upstream persona request done provider=%s model=%s index=%d/%d persona=%s elapsed=%s", s.provider, s.model, index+1, count, normalized.Name, time.Since(startedAt).Round(time.Millisecond))
 		return &normalized, nil
 	}
 	if len(out.Personas) > 0 {
 		normalized := normalizeGeneratedPersona(out.Personas[0], persona)
+		log.Printf("ai-mind-arena: upstream persona request done provider=%s model=%s index=%d/%d persona=%s elapsed=%s", s.provider, s.model, index+1, count, normalized.Name, time.Since(startedAt).Round(time.Millisecond))
 		return &normalized, nil
 	}
+	log.Printf("ai-mind-arena: upstream persona request empty provider=%s model=%s index=%d/%d persona=%s elapsed=%s", s.provider, s.model, index+1, count, persona.Name, time.Since(startedAt).Round(time.Millisecond))
 	return nil, errors.New("model returned empty persona")
 }
 

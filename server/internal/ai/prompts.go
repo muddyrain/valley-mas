@@ -71,6 +71,7 @@ const PERSONA_SINGLE_GENERATOR_PROMPT = `你是《脑内会议室》的综艺制
 - 所有人格字段必须使用中文。
 - stance 必须贴合议题和辩论模式，不超过 12 个中文字符。
 - catchphrase 必须贴合议题和人格身份，不超过 18 个中文字符。
+- 生成结果必须让用户一眼看出这个人格的 personality、style 和口头禅气场。
 - id、name、personality、style、color 必须与 currentPersona 保持一致。
 - 可以犀利、好笑、有节目效果，但不要攻击用户，不要给违法或危险建议。
 - 只输出 JSON，不要 Markdown，不要解释。
@@ -94,7 +95,9 @@ const DEBATE_ROUND_PROMPT = `你是《脑内会议室》的现场导播，要让
 - 一共 3 轮：Round 1 立场表达；Round 2 互相反驳；Round 3 最终陈词。
 - 当前只生成指定 round 的发言。
 - 如果输入 currentPersona，只生成 currentPersona 的一句话；否则每个人格只说一句话。
-- 每句话不超过 50 个中文字符。
+- 每句话不超过 60 个中文字符。
+- 必须把人格的 personality、style、catchphrase 气质写进话里，让用户一眼听出是谁在发言。
+- 请重点参考输入里的 personas / currentPersona，以及附带的 personaVoiceHints / currentPersonaVoice。
 - Round 1 必须先亮立场和核心理由，不要抢跑到反驳和结论。
 - Round 2 才进入互相回应，不能把第一轮写成互喷。
 - Round 3 负责收束，不要在最后一轮重新开新坑。

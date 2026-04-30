@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -20,6 +21,14 @@ type DebateAI interface {
 type Service struct {
 	store Store
 	ai    DebateAI
+}
+
+type personaGenerationResult struct {
+	index   int
+	target  Persona
+	persona *Persona
+	err     error
+	elapsed time.Duration
 }
 
 var (
@@ -94,22 +103,22 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 
 		history := append([]DebateMessage(nil), session.Messages...)
 		for round := 1; round <= 3; round++ {
-			roundMessages, err := s.ai.GenerateDebateRound(ctx, session.Topic, string(session.Mode), session.Personas, round, history)
-			if err != nil {
-				s.failAndSend(events, id, fmt.Sprintf("生成第 %d 轮失败: %v", round, err))
-				return
-			}
-			if len(roundMessages) == 0 {
-				s.failAndSend(events, id, fmt.Sprintf("生成第 %d 轮失败: 返回为空", round))
-				return
-			}
+			for i := range session.Personas {
+				persona := session.Personas[i]
+				message, err := s.ai.GenerateDebateMessage(ctx, session.Topic, string(session.Mode), session.Personas, persona, round, history)
+				if err != nil {
+					s.failAndSend(events, id, fmt.Sprintf("生成第 %d 轮 %s 发言失败: %v", round, persona.Name, err))
+					return
+				}
+				if message == nil {
+					s.failAndSend(events, id, fmt.Sprintf("生成第 %d 轮 %s 发言失败: 返回为空", round, persona.Name))
+					return
+				}
 
-			for i := range roundMessages {
-				message := roundMessages[i]
-				persona := personaForRoundMessage(session.Personas, message, i)
-				prepareStreamMessage(&message, persona, round)
+				prepared := *message
+				prepareStreamMessage(&prepared, persona, round)
 
-				updated, err := s.store.AppendMessages(id, []DebateMessage{message})
+				updated, err := s.store.AppendMessages(id, []DebateMessage{prepared})
 				if err != nil {
 					s.failAndSend(events, id, err.Error())
 					return
@@ -118,11 +127,11 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 
 				if !sendEvent(ctx, events, SSEEvent{
 					Type:        "message",
-					Round:       message.Round,
-					RoundTitle:  message.RoundTitle,
-					PersonaID:   message.PersonaID,
-					PersonaName: message.PersonaName,
-					Content:     message.Content,
+					Round:       prepared.Round,
+					RoundTitle:  prepared.RoundTitle,
+					PersonaID:   prepared.PersonaID,
+					PersonaName: prepared.PersonaName,
+					Content:     prepared.Content,
 				}) {
 					return
 				}
@@ -164,32 +173,81 @@ func (s *Service) revealPersonas(ctx context.Context, events chan<- SSEEvent, se
 	}
 
 	count := targetPersonaCount(session)
-	personas, err := s.ai.GeneratePersonas(ctx, session.Topic, string(session.Mode), count)
-	if err != nil {
-		s.failAndSend(events, session.ID, fmt.Sprintf("生成人格失败: %v", err))
-		return session, false
-	}
-	if len(personas) == 0 {
-		s.failAndSend(events, session.ID, "生成人格失败: 返回为空")
+	targets := PersonaTargets(count)
+	if len(targets) == 0 {
+		s.failAndSend(events, session.ID, "生成人格失败: 没有可用的人格模板")
 		return session, false
 	}
 
-	if len(personas) > count {
-		personas = personas[:count]
+	personaBatchStart := time.Now()
+	log.Printf("ai-mind-arena: session=%s 开始并发生成人格 persona_count=%d mode=%s topic=%q", session.ID, count, session.Mode, session.Topic)
+
+	personaCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	results := make(chan personaGenerationResult, len(targets))
+	for i, target := range targets {
+		go func(index int, target Persona) {
+			personaStart := time.Now()
+			log.Printf("ai-mind-arena: session=%s 开始生成人格 index=%d/%d persona=%s", session.ID, index+1, count, target.Name)
+
+			generated, err := s.ai.GeneratePersona(personaCtx, session.Topic, string(session.Mode), target, index, count)
+			result := personaGenerationResult{
+				index:   index,
+				target:  target,
+				persona: generated,
+				err:     err,
+				elapsed: time.Since(personaStart),
+			}
+
+			select {
+			case results <- result:
+			case <-personaCtx.Done():
+			}
+		}(i, target)
 	}
-	updated, err := s.store.UpdatePersonas(session.ID, personas)
-	if err != nil {
-		s.failAndSend(events, session.ID, err.Error())
-		return session, false
+
+	personas := make([]Persona, 0, len(targets))
+	for len(personas) < len(targets) {
+		var result personaGenerationResult
+		select {
+		case <-personaCtx.Done():
+			return session, false
+		case result = <-results:
+		}
+
+		if result.err != nil {
+			cancel()
+			log.Printf("ai-mind-arena: session=%s 生成人格失败 index=%d/%d persona=%s elapsed=%s err=%v", session.ID, result.index+1, count, result.target.Name, result.elapsed.Round(time.Millisecond), result.err)
+			s.failAndSend(events, session.ID, fmt.Sprintf("生成人格失败（第 %d 位 %s）: %v", result.index+1, result.target.Name, result.err))
+			return session, false
+		}
+		if result.persona == nil {
+			cancel()
+			log.Printf("ai-mind-arena: session=%s 生成人格失败 index=%d/%d persona=%s elapsed=%s err=nil persona", session.ID, result.index+1, count, result.target.Name, result.elapsed.Round(time.Millisecond))
+			s.failAndSend(events, session.ID, fmt.Sprintf("生成人格失败（第 %d 位 %s）: 返回为空", result.index+1, result.target.Name))
+			return session, false
+		}
+
+		personas = append(personas, *result.persona)
+		updated, err := s.store.UpdatePersonas(session.ID, personas)
+		if err != nil {
+			cancel()
+			s.failAndSend(events, session.ID, err.Error())
+			return session, false
+		}
+		session = updated
+		log.Printf("ai-mind-arena: session=%s 生成人格完成 index=%d/%d persona=%s elapsed=%s generated_count=%d", session.ID, result.index+1, count, result.persona.Name, result.elapsed.Round(time.Millisecond), len(session.Personas))
+
+		if !sendEvent(ctx, events, SSEEvent{
+			Type:         "personas",
+			PersonaCount: count,
+			Personas:     append([]Persona(nil), session.Personas...),
+		}) {
+			return session, false
+		}
 	}
-	session = updated
-	if !sendEvent(ctx, events, SSEEvent{
-		Type:         "personas",
-		PersonaCount: count,
-		Personas:     personas,
-	}) {
-		return session, false
-	}
+	log.Printf("ai-mind-arena: session=%s 全部人格生成完成 total_elapsed=%s persona_count=%d", session.ID, time.Since(personaBatchStart).Round(time.Millisecond), len(personas))
 	return session, true
 }
 
