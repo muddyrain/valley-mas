@@ -1,22 +1,16 @@
 import { TrendingUp } from 'lucide-react';
 import Image from 'next/image';
 import { getPersonaAsset, getPersonaTone } from '@/lib/personaTheme';
-import type { DebateResult, DebateSession } from '@/lib/types';
+import type { DebateResult, DebateScore, DebateSession } from '@/lib/types';
 
 interface ScorePanelProps {
   session: DebateSession;
   result?: DebateResult;
   currentRound: number;
+  scores: DebateScore[];
 }
 
-export function ScorePanel({ session, result, currentRound }: ScorePanelProps) {
-  const scores =
-    result?.scores ||
-    session.personas.map((persona, index) => ({
-      persona: persona.name,
-      score: Math.max(12, 30 - index * 4),
-    }));
-
+export function ScorePanel({ session, result, currentRound, scores }: ScorePanelProps) {
   const sortedScores = [...scores].sort((a, b) => b.score - a.score);
 
   return (
@@ -54,7 +48,7 @@ export function ScorePanel({ session, result, currentRound }: ScorePanelProps) {
       <section className="arena-subpanel border-white/10 bg-white/5 p-4 backdrop-blur-md shadow-[0_0_20px_rgba(123,92,255,0.18)] flex min-h-0 flex-1 flex-col">
         <div className="flex items-center justify-between gap-3">
           <div className="text-[15px] font-semibold text-white">实时支持率</div>
-          <span className="text-[12px] text-white/42">动态排名</span>
+          <span className="text-[12px] text-white/42">{result ? '最终排名' : '动态排名'}</span>
         </div>
         <div className="thin-scrollbar mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {sortedScores.map((score, index) => {

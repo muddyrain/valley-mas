@@ -71,21 +71,11 @@ func (s *OpenAICompatibleService) GenerateDebateRound(ctx context.Context, topic
 }
 
 func (s *OpenAICompatibleService) JudgeDebate(ctx context.Context, topic string, personas []mindarena.Persona, messages []mindarena.DebateMessage) (*mindarena.DebateResult, error) {
-	payload := struct {
-		Topic    string                    `json:"topic"`
-		Personas []mindarena.Persona       `json:"personas"`
-		Messages []mindarena.DebateMessage `json:"messages"`
-	}{Topic: topic, Personas: personas, Messages: messages}
-	raw, _ := json.Marshal(payload)
-
 	var result mindarena.DebateResult
-	if err := s.chatJSON(ctx, JUDGE_PROMPT, string(raw), &result); err != nil {
+	if err := s.chatJSON(ctx, JUDGE_PROMPT, buildJudgePromptInput(topic, personas, messages), &result); err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(result.Winner) == "" {
-		return nil, errors.New("model returned empty judge result")
-	}
-	return &result, nil
+	return normalizeGeneratedDebateResult(result, personas, messages), nil
 }
 
 func (s *OpenAICompatibleService) chatJSON(ctx context.Context, systemPrompt string, userPrompt string, out any) error {
