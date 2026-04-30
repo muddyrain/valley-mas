@@ -46,6 +46,26 @@ func (h *Handler) GetDebate(c *gin.Context) {
 	c.JSON(http.StatusOK, session)
 }
 
+func (h *Handler) SubmitRoundSupport(c *gin.Context) {
+	var req SubmitRoundSupportRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "请先选择你这一轮更支持谁"})
+		return
+	}
+
+	session, err := h.service.SubmitRoundSupport(c.Request.Context(), c.Param("id"), req)
+	if err != nil {
+		if errors.Is(err, ErrDebateNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"message": "没有找到这场脑内会议"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, session)
+}
+
 func (h *Handler) StreamDebate(c *gin.Context) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")

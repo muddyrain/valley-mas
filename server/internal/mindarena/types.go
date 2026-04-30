@@ -55,18 +55,32 @@ type DebateResult struct {
 	Scores      []DebateScore `json:"scores"`
 }
 
+type RoundSupportChoice struct {
+	Round       int    `json:"round"`
+	PersonaID   string `json:"personaId,omitempty"`
+	PersonaName string `json:"personaName,omitempty"`
+	Skipped     bool   `json:"skipped"`
+	CreatedAt   string `json:"createdAt"`
+}
+
 type DebateSession struct {
-	ID           string          `json:"id"`
-	Topic        string          `json:"topic"`
-	Mode         DebateMode      `json:"mode"`
-	Status       DebateStatus    `json:"status"`
-	PersonaCount int             `json:"personaCount"`
-	Personas     []Persona       `json:"personas"`
-	Messages     []DebateMessage `json:"messages"`
-	Result       *DebateResult   `json:"result,omitempty"`
-	Error        string          `json:"error,omitempty"`
-	CreatedAt    string          `json:"createdAt"`
-	UpdatedAt    string          `json:"updatedAt"`
+	ID                   string               `json:"id"`
+	Topic                string               `json:"topic"`
+	Mode                 DebateMode           `json:"mode"`
+	Status               DebateStatus         `json:"status"`
+	PersonaCount         int                  `json:"personaCount"`
+	CurrentRound         int                  `json:"currentRound"`
+	LastCompletedRound   int                  `json:"lastCompletedRound"`
+	AwaitingSupport      bool                 `json:"awaitingSupport"`
+	AwaitingSupportRound int                  `json:"awaitingSupportRound"`
+	Personas             []Persona            `json:"personas"`
+	Messages             []DebateMessage      `json:"messages"`
+	SupportHistory       []RoundSupportChoice `json:"supportHistory"`
+	Result               *DebateResult        `json:"result,omitempty"`
+	Error                string               `json:"error,omitempty"`
+	CreatedAt            string               `json:"createdAt"`
+	UpdatedAt            string               `json:"updatedAt"`
+	StreamActive         bool                 `json:"-"`
 }
 
 type CreateDebateRequest struct {
@@ -81,24 +95,35 @@ type CreateDebateResponse struct {
 	Mode         DebateMode   `json:"mode"`
 	Status       DebateStatus `json:"status"`
 	PersonaCount int          `json:"personaCount"`
+	CurrentRound int          `json:"currentRound"`
 	Personas     []Persona    `json:"personas"`
 }
 
+type SubmitRoundSupportRequest struct {
+	Round              int    `json:"round" binding:"required"`
+	SupportedPersonaID string `json:"supportedPersonaId"`
+	Skip               bool   `json:"skip"`
+}
+
 type SSEEvent struct {
-	Type         string          `json:"type"`
-	Round        int             `json:"round,omitempty"`
-	RoundTitle   string          `json:"roundTitle,omitempty"`
-	PersonaCount int             `json:"personaCount,omitempty"`
-	PersonaID    string          `json:"personaId,omitempty"`
-	PersonaName  string          `json:"personaName,omitempty"`
-	Content      string          `json:"content,omitempty"`
-	Result       *DebateResult   `json:"result,omitempty"`
-	SessionID    string          `json:"sessionId,omitempty"`
-	Message      string          `json:"message,omitempty"`
-	Scores       []DebateScore   `json:"scores,omitempty"`
-	Session      *DebateSession  `json:"session,omitempty"`
-	Personas     []Persona       `json:"personas,omitempty"`
-	Messages     []DebateMessage `json:"messages,omitempty"`
+	Type                 string               `json:"type"`
+	Round                int                  `json:"round,omitempty"`
+	RoundTitle           string               `json:"roundTitle,omitempty"`
+	PersonaCount         int                  `json:"personaCount,omitempty"`
+	PersonaID            string               `json:"personaId,omitempty"`
+	PersonaName          string               `json:"personaName,omitempty"`
+	Content              string               `json:"content,omitempty"`
+	Result               *DebateResult        `json:"result,omitempty"`
+	SessionID            string               `json:"sessionId,omitempty"`
+	Message              string               `json:"message,omitempty"`
+	Scores               []DebateScore        `json:"scores,omitempty"`
+	Session              *DebateSession       `json:"session,omitempty"`
+	Personas             []Persona            `json:"personas,omitempty"`
+	Messages             []DebateMessage      `json:"messages,omitempty"`
+	CurrentRound         int                  `json:"currentRound,omitempty"`
+	AwaitingSupport      bool                 `json:"awaitingSupport,omitempty"`
+	AwaitingSupportRound int                  `json:"awaitingSupportRound,omitempty"`
+	SupportHistory       []RoundSupportChoice `json:"supportHistory,omitempty"`
 }
 
 func normalizeMode(mode string) DebateMode {
@@ -135,4 +160,8 @@ func roundTitle(round int) string {
 	default:
 		return "加时讨论"
 	}
+}
+
+func shouldPauseAfterRound(round int) bool {
+	return round >= 1 && round < 3
 }

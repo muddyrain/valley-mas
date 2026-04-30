@@ -38,7 +38,7 @@ func (s *MockAIService) GeneratePersona(ctx context.Context, topic string, mode 
 	return &persona, nil
 }
 
-func (s *MockAIService) GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
+func (s *MockAIService) GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) ([]mindarena.DebateMessage, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -80,7 +80,7 @@ func (s *MockAIService) GenerateDebateRound(ctx context.Context, topic string, m
 
 	messages := make([]mindarena.DebateMessage, 0, len(personas))
 	for i, persona := range personas {
-		content := truncateRunes(mockDebateLine(lines, round, i), maxDebateMessageRunes)
+		content := truncateRunes(mockDebateLine(lines, round, i, persona, supportHistory), maxDebateMessageRunes)
 		messages = append(messages, mindarena.DebateMessage{
 			ID:          fmt.Sprintf("mock_%d_%d_%d", round, i+1, time.Now().UnixNano()),
 			Round:       round,
@@ -94,8 +94,8 @@ func (s *MockAIService) GenerateDebateRound(ctx context.Context, topic string, m
 	return messages, nil
 }
 
-func (s *MockAIService) GenerateDebateMessage(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage) (*mindarena.DebateMessage, error) {
-	messages, err := s.GenerateDebateRound(ctx, topic, mode, personas, round, history)
+func (s *MockAIService) GenerateDebateMessage(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) (*mindarena.DebateMessage, error) {
+	messages, err := s.GenerateDebateRound(ctx, topic, mode, personas, round, history, supportHistory)
 	if err != nil {
 		return nil, err
 	}
@@ -115,12 +115,46 @@ func (s *MockAIService) GenerateDebateMessage(ctx context.Context, topic string,
 	}, nil
 }
 
-func mockDebateLine(lines map[int][]string, round int, personaIndex int) string {
+func mockDebateLine(lines map[int][]string, round int, personaIndex int, persona mindarena.Persona, supportHistory []mindarena.RoundSupportChoice) string {
+	if line := audienceSupportMockLine(round, persona, supportHistory); line != "" {
+		return line
+	}
 	roundLines := lines[round]
 	if len(roundLines) == 0 {
 		return ""
 	}
 	return roundLines[personaIndex%len(roundLines)]
+}
+
+func audienceSupportMockLine(round int, persona mindarena.Persona, supportHistory []mindarena.RoundSupportChoice) string {
+	latest := latestSupportChoiceForRound(round, supportHistory)
+	if latest == nil || latest.Skipped || latest.PersonaName == "" {
+		return ""
+	}
+	if persona.ID == latest.PersonaID || persona.Name == latest.PersonaName {
+		if round == 2 {
+			return fmt.Sprintf("上一轮你都站我了，那我继续说透：%s这次别被别人的噪音带跑。", persona.Name)
+		}
+		return fmt.Sprintf("你前一轮已经押我，这一轮我给你落地版：%s别只听热闹，照我这套执行。", persona.Name)
+	}
+	if round == 2 {
+		return fmt.Sprintf("你上一轮站%s？我不服，这恰好说明你还没听懂我的关键牌。", latest.PersonaName)
+	}
+	return fmt.Sprintf("你前一轮偏向%s没关系，我最后再拉你一把，听完再定输赢。", latest.PersonaName)
+}
+
+func latestSupportChoiceForRound(round int, supportHistory []mindarena.RoundSupportChoice) *mindarena.RoundSupportChoice {
+	targetRound := round - 1
+	if targetRound < 1 {
+		return nil
+	}
+	for i := len(supportHistory) - 1; i >= 0; i-- {
+		if supportHistory[i].Round == targetRound {
+			choice := supportHistory[i]
+			return &choice
+		}
+	}
+	return nil
 }
 
 func (s *MockAIService) JudgeDebate(ctx context.Context, topic string, personas []mindarena.Persona, messages []mindarena.DebateMessage) (*mindarena.DebateResult, error) {

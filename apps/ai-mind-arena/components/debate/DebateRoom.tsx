@@ -3,6 +3,7 @@
 import {
   AlertTriangle,
   ArrowLeft,
+  CheckCircle2,
   Loader2,
   Megaphone,
   Radio,
@@ -12,14 +13,21 @@ import {
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getDebate, getDebateStreamURL } from '@/lib/api';
+import { getDebate, getDebateStreamURL, submitRoundSupport } from '@/lib/api';
 import {
   appendUniqueDebateMessage,
   buildMessageFromSSEEvent,
   parseDebateSSEEvent,
 } from '@/lib/debateEvents';
 import { buildDebateScores } from '@/lib/debateScores';
-import type { DebateMessage, DebateResult, DebateScore, DebateSession, Persona } from '@/lib/types';
+import type {
+  DebateMessage,
+  DebateResult,
+  DebateScore,
+  DebateSession,
+  Persona,
+  RoundSupportChoice,
+} from '@/lib/types';
 import { DebateBubble } from './DebateBubble';
 import { DebateStatePanel } from './DebateStatePanel';
 import { PersonaCard } from './PersonaCard';
@@ -41,12 +49,25 @@ const modeLabels: Record<DebateSession['mode'], string> = {
   emotion: '情绪会诊',
 };
 
+function normalizeSupportHistory(history: DebateSession['supportHistory']): RoundSupportChoice[] {
+  return Array.isArray(history) ? history : [];
+}
+
 function getNextSpeaker(personas: Persona[], personaId: string, round: number) {
   const currentIndex = personas.findIndex((persona) => persona.id === personaId);
   if (currentIndex < 0 || personas.length === 0) return undefined;
   if (currentIndex < personas.length - 1) return personas[currentIndex + 1];
   if (round < 3) return personas[0];
   return undefined;
+}
+
+function getRoundStageLabel(session: DebateSession, fallbackRound: number) {
+  if (session.awaitingSupport) {
+    const supportRound = session.awaitingSupportRound || fallbackRound || 1;
+    return `Round ${supportRound} · 站队时刻`;
+  }
+  const round = session.currentRound || fallbackRound || 1;
+  return `Round ${Math.max(round, 1)} · ${roundLabels[Math.max(round - 1, 0)]}`;
 }
 
 export function DebateRoom({ initialSession }: DebateRoomProps) {
@@ -56,6 +77,8 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
   const [statusText, setStatusText] = useState('脑内评委团正在入场...');
   const [streamError, setStreamError] = useState('');
   const [activePersonaId, setActivePersonaId] = useState<string | undefined>();
+  const [selectedSupportPersonaId, setSelectedSupportPersonaId] = useState<string>('');
+  const [isSubmittingSupport, setIsSubmittingSupport] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const personasRef = useRef<Persona[]>([]);
 
@@ -67,8 +90,13 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     () => ({
       ...session,
       personaCount: session.personaCount ?? Math.max(personas.length, 5),
+      currentRound: session.currentRound ?? (messages.at(-1)?.round || 1),
+      lastCompletedRound: session.lastCompletedRound ?? messages.at(-1)?.round ?? 0,
+      awaitingSupport: Boolean(session.awaitingSupport),
+      awaitingSupportRound: session.awaitingSupportRound ?? 0,
       personas,
       messages,
+      supportHistory: normalizeSupportHistory(session.supportHistory),
     }),
     [messages, personas, session],
   );
@@ -77,7 +105,11 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
   const isPreparingPersonas = !hasAllPersonas && messages.length === 0 && !result && !streamError;
   const isPreparingFirstMessage =
     hasAllPersonas && messages.length === 0 && !result && !streamError;
-  const currentRound = messages.at(-1)?.round || 1;
+  const currentRound = messages.at(-1)?.round || safeSession.currentRound || 1;
+  const supportHistory = normalizeSupportHistory(safeSession.supportHistory);
+  const latestSupport = supportHistory.at(-1);
+  const supportPromptRound = safeSession.awaitingSupportRound || 0;
+  const isAwaitingSupport = Boolean(safeSession.awaitingSupport && supportPromptRound > 0);
   const liveScores = useMemo<DebateScore[]>(
     () => buildDebateScores(personas, messages, result),
     [messages, personas, result],
@@ -94,6 +126,17 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
   }, [personas]);
 
   useEffect(() => {
+    if (result) {
+      setStatusText('辩论结束，金句已出炉');
+      return;
+    }
+    if (isAwaitingSupport) {
+      setStatusText(`Round ${supportPromptRound} 结束，轮到你选这一轮更支持谁。`);
+      setActivePersonaId(undefined);
+    }
+  }, [isAwaitingSupport, result, supportPromptRound]);
+
+  useEffect(() => {
     const shouldScroll = messages.length > 0 || Boolean(result);
     if (!shouldScroll) return;
 
@@ -101,14 +144,15 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
   }, [messages.length, result]);
 
   useEffect(() => {
-    if (initialSession.status === 'done') return;
+    if (safeSession.status === 'done' || safeSession.status === 'failed') return;
+    if (safeSession.awaitingSupport || result) return;
 
     const source = new EventSource(getDebateStreamURL(initialSession.id));
 
     source.addEventListener('personas', (event) => {
       const payload = parseDebateSSEEvent(event as MessageEvent<string>);
       if (!payload) return;
-      const nextPersonas = Array.isArray(payload?.personas) ? payload.personas : [];
+      const nextPersonas = Array.isArray(payload.personas) ? payload.personas : [];
       if (nextPersonas.length === 0) return;
       const latestPersona = nextPersonas.at(-1);
       const targetCount = payload.personaCount || initialSession.personaCount || 5;
@@ -144,13 +188,40 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
       setStatusText(
         nextSpeaker
           ? `${payload.personaName} 已发言，${nextSpeaker.name} 接棒中...`
-          : `${payload.personaName} 已发言，裁判团正在整理结论...`,
+          : `${payload.personaName} 已发言，本轮总结后轮到你站队...`,
       );
+      setSession((prev) => ({
+        ...prev,
+        currentRound: payload.round ?? prev.currentRound ?? 1,
+      }));
       setMessages((prev) => {
         const message = buildMessageFromSSEEvent(payload, prev.length);
         if (!message) return prev;
         return appendUniqueDebateMessage(prev, message);
       });
+    });
+
+    source.addEventListener('support_prompt', (event) => {
+      const payload = parseDebateSSEEvent(event as MessageEvent<string>);
+      if (!payload) return;
+      setStreamError('');
+      setActivePersonaId(undefined);
+      setSelectedSupportPersonaId('');
+      setSession((prev) => ({
+        ...prev,
+        currentRound: payload.currentRound ?? prev.currentRound ?? 1,
+        awaitingSupport: payload.awaitingSupport ?? true,
+        awaitingSupportRound: payload.awaitingSupportRound ?? payload.round ?? 0,
+        supportHistory: Array.isArray(payload.supportHistory)
+          ? payload.supportHistory
+          : prev.supportHistory,
+        personas:
+          Array.isArray(payload.personas) && payload.personas.length > 0
+            ? payload.personas
+            : prev.personas,
+      }));
+      setStatusText(`Round ${payload.round || 1} 结束，轮到你站队了。`);
+      source.close();
     });
 
     source.addEventListener('judge', (event) => {
@@ -172,6 +243,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     });
 
     source.addEventListener('error', (event) => {
+      if (source.readyState === EventSource.CLOSED) return;
       const payload = parseDebateSSEEvent(event as MessageEvent<string>);
       const statusMessage = payload ? payload.message : '';
       const nextError = statusMessage || '流式连接中断，请刷新重试';
@@ -181,7 +253,13 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     });
 
     return () => source.close();
-  }, [initialSession.id, initialSession.personaCount, initialSession.status]);
+  }, [
+    initialSession.id,
+    initialSession.personaCount,
+    result,
+    safeSession.awaitingSupport,
+    safeSession.status,
+  ]);
 
   const groupedMessages = useMemo(() => {
     return messages.reduce<Record<number, DebateMessage[]>>((acc, message) => {
@@ -190,6 +268,34 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
       return acc;
     }, {});
   }, [messages]);
+
+  async function handleSubmitSupport(skip = false) {
+    if (!skip && !selectedSupportPersonaId) return;
+    if (!supportPromptRound) return;
+
+    setIsSubmittingSupport(true);
+    setStreamError('');
+    try {
+      const latest = await submitRoundSupport(initialSession.id, {
+        round: supportPromptRound,
+        supportedPersonaId: skip ? undefined : selectedSupportPersonaId,
+        skip,
+      });
+      setSession(latest);
+      setMessages(latest.messages || []);
+      setResult(latest.result);
+      setSelectedSupportPersonaId('');
+      setStatusText(
+        skip ? '你先按下保留态度，下一轮人格马上继续争宠。' : '收到你的站队，下一轮正在重开麦...',
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '站队提交失败，请重试';
+      setStreamError(message);
+      setStatusText(message);
+    } finally {
+      setIsSubmittingSupport(false);
+    }
+  }
 
   return (
     <main className="arena-shell h-screen overflow-hidden px-4 py-4">
@@ -275,7 +381,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
                     当前阶段
                   </div>
                   <div className="mt-1 text-[15px] font-semibold text-white">
-                    Round {Math.max(currentRound, 1)} · {roundLabels[Math.max(currentRound - 1, 0)]}
+                    {getRoundStageLabel(safeSession, currentRound)}
                   </div>
                 </div>
                 <div className="max-w-[48%] text-right text-[12px] leading-5 text-white/55">
@@ -342,19 +448,97 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
                         ? '正在定义本场人格'
                         : isPreparingFirstMessage
                           ? '第一轮发言准备中'
-                          : statusText
+                          : isAwaitingSupport
+                            ? `Round ${supportPromptRound} 已结束`
+                            : statusText
                     }
                     description={
                       isPreparingPersonas
                         ? `已入场 ${personas.length}/${personaTargetCount} 位，全部到齐后自动开始第一轮。`
                         : isPreparingFirstMessage
                           ? '五位人格已到齐，理性派正在组织第一句开场。'
-                          : '支持率会随着每次发言持续刷新。'
+                          : isAwaitingSupport
+                            ? '选一个你这一轮更支持的人格，或先跳过，下一轮才会继续。'
+                            : '支持率会随着每次发言持续刷新。'
                     }
                   />
                 ) : (
                   <ResultCard session={safeSession} result={result} />
                 )}
+                {isAwaitingSupport ? (
+                  <div className="sticky bottom-3 z-20 mt-5">
+                    <div className="arena-subpanel border-fuchsia-400/20 bg-[linear-gradient(135deg,rgba(22,18,49,0.96),rgba(59,21,84,0.82))] px-4 py-4 shadow-[0_0_30px_rgba(255,77,157,0.18)] backdrop-blur-xl">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2 text-[13px] font-semibold text-fuchsia-100">
+                            <CheckCircle2 className="h-4 w-4 text-fuchsia-300" />
+                            这一轮你更支持谁？
+                          </div>
+                          <p className="mt-1 text-[12px] leading-5 text-white/58">
+                            你选完后，下一轮他们会围着你的偏好继续争宠。
+                          </p>
+                          {latestSupport ? (
+                            <p className="mt-2 text-[12px] leading-5 text-white/48">
+                              {latestSupport.skipped
+                                ? '上一轮你暂时没有站队。'
+                                : `上一轮你支持了 ${latestSupport.personaName}。`}
+                            </p>
+                          ) : null}
+                        </div>
+                        <span className="arena-chip">Round {supportPromptRound}</span>
+                      </div>
+                      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {personas.map((persona) => {
+                          const active = selectedSupportPersonaId === persona.id;
+                          return (
+                            <button
+                              key={persona.id}
+                              type="button"
+                              disabled={isSubmittingSupport}
+                              onClick={() => setSelectedSupportPersonaId(persona.id)}
+                              className={`rounded-2xl border px-4 py-3 text-left transition ${
+                                active
+                                  ? 'border-fuchsia-300/60 bg-fuchsia-500/18 shadow-[0_0_20px_rgba(255,77,157,0.2)]'
+                                  : 'border-white/10 bg-white/[0.04] hover:border-fuchsia-300/30 hover:bg-white/[0.06]'
+                              } disabled:cursor-not-allowed disabled:opacity-70`}
+                            >
+                              <div className="text-[14px] font-semibold text-white">
+                                {persona.name}
+                              </div>
+                              <div className="mt-1 text-[12px] leading-5 text-white/55">
+                                {persona.stance}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+                        <button
+                          type="button"
+                          disabled={isSubmittingSupport}
+                          onClick={() => handleSubmitSupport(true)}
+                          className="arena-ghost-button disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {isSubmittingSupport ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : null}
+                          先跳过本站队
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSubmittingSupport || !selectedSupportPersonaId}
+                          onClick={() => handleSubmitSupport(false)}
+                          className="arena-chip border-fuchsia-300/30 bg-[linear-gradient(135deg,rgba(217,70,239,0.22),rgba(168,85,247,0.2))] px-4 py-2 text-[13px] text-white disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isSubmittingSupport ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : null}
+                          锁定这一票，继续下一轮
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
                 <div ref={bottomRef} />
               </div>
             </div>
@@ -363,7 +547,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
           <ScorePanel
             session={safeSession}
             result={result}
-            currentRound={currentRound}
+            currentRound={isAwaitingSupport ? supportPromptRound : currentRound}
             scores={liveScores}
           />
         </div>

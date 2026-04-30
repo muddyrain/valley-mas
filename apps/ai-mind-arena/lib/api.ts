@@ -3,6 +3,7 @@ import type {
   CreateDebateResponse,
   DebateResult,
   DebateSession,
+  SubmitRoundSupportRequest,
 } from './types';
 
 export const API_BASE_URL =
@@ -42,10 +43,18 @@ export function getDebateStreamURL(id: string) {
   return `${API_BASE_URL}/api/v1/mind-arena/debates/${id}/stream`;
 }
 
+export function submitRoundSupport(id: string, data: SubmitRoundSupportRequest) {
+  return requestJSON<DebateSession>(`/api/v1/mind-arena/debates/${id}/support`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }).then(normalizeDebateSession);
+}
+
 function normalizeCreateDebateResponse(response: CreateDebateResponse): CreateDebateResponse {
   return {
     ...response,
     personaCount: response.personaCount ?? normalizedPersonaCount(response.personas),
+    currentRound: response.currentRound ?? 1,
     personas: Array.isArray(response.personas) ? response.personas : [],
   };
 }
@@ -53,11 +62,17 @@ function normalizeCreateDebateResponse(response: CreateDebateResponse): CreateDe
 function normalizeDebateSession(session: DebateSession): DebateSession {
   const personas = Array.isArray(session.personas) ? session.personas : [];
   const messages = Array.isArray(session.messages) ? session.messages : [];
+  const supportHistory = Array.isArray(session.supportHistory) ? session.supportHistory : [];
   return {
     ...session,
     personaCount: session.personaCount ?? normalizedPersonaCount(personas),
+    currentRound: session.currentRound ?? (messages.at(-1)?.round || 1),
+    lastCompletedRound: session.lastCompletedRound ?? messages.at(-1)?.round ?? 0,
+    awaitingSupport: Boolean(session.awaitingSupport),
+    awaitingSupportRound: session.awaitingSupportRound ?? 0,
     personas,
     messages,
+    supportHistory,
     result: session.result ? normalizeDebateResult(session.result) : undefined,
   };
 }

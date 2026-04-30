@@ -12,8 +12,11 @@ type Store interface {
 	Get(id string) (*DebateSession, error)
 	Update(session *DebateSession) error
 	UpdatePersonas(id string, personas []Persona) (*DebateSession, error)
-	TryMarkRunning(id string) (*DebateSession, bool, error)
+	TryStartStreaming(id string) (*DebateSession, bool, error)
+	FinishStreaming(id string) (*DebateSession, error)
 	AppendMessages(id string, messages []DebateMessage) (*DebateSession, error)
+	PauseAfterRound(id string, round int) (*DebateSession, error)
+	SubmitRoundSupport(id string, choice RoundSupportChoice) (*DebateSession, error)
 	Complete(id string, result *DebateResult) (*DebateSession, error)
 	Fail(id string, message string) (*DebateSession, error)
 }
@@ -69,19 +72,40 @@ func (s *MemoryStore) UpdatePersonas(id string, personas []Persona) (*DebateSess
 	return cloneSession(session), nil
 }
 
-func (s *MemoryStore) TryMarkRunning(id string) (*DebateSession, bool, error) {
+func (s *MemoryStore) TryStartStreaming(id string) (*DebateSession, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	session, ok := s.sessions[id]
 	if !ok {
 		return nil, false, ErrDebateNotFound
 	}
-	if session.Status != DebateStatusCreated {
+	if session.Status == DebateStatusDone || session.Status == DebateStatusFailed {
 		return cloneSession(session), false, nil
 	}
-	session.Status = DebateStatusRunning
+	if session.AwaitingSupport || session.StreamActive {
+		return cloneSession(session), false, nil
+	}
+	if session.Status == DebateStatusCreated {
+		session.Status = DebateStatusRunning
+	}
+	if session.CurrentRound <= 0 {
+		session.CurrentRound = 1
+	}
+	session.StreamActive = true
 	session.UpdatedAt = nowString()
 	return cloneSession(session), true, nil
+}
+
+func (s *MemoryStore) FinishStreaming(id string) (*DebateSession, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.sessions[id]
+	if !ok {
+		return nil, ErrDebateNotFound
+	}
+	session.StreamActive = false
+	session.UpdatedAt = nowString()
+	return cloneSession(session), nil
 }
 
 func (s *MemoryStore) AppendMessages(id string, messages []DebateMessage) (*DebateSession, error) {
@@ -96,6 +120,51 @@ func (s *MemoryStore) AppendMessages(id string, messages []DebateMessage) (*Deba
 	return cloneSession(session), nil
 }
 
+func (s *MemoryStore) PauseAfterRound(id string, round int) (*DebateSession, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.sessions[id]
+	if !ok {
+		return nil, ErrDebateNotFound
+	}
+	session.LastCompletedRound = round
+	session.CurrentRound = round + 1
+	session.AwaitingSupport = true
+	session.AwaitingSupportRound = round
+	session.StreamActive = false
+	session.UpdatedAt = nowString()
+	return cloneSession(session), nil
+}
+
+func (s *MemoryStore) SubmitRoundSupport(id string, choice RoundSupportChoice) (*DebateSession, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.sessions[id]
+	if !ok {
+		return nil, ErrDebateNotFound
+	}
+
+	replaced := false
+	for i := range session.SupportHistory {
+		if session.SupportHistory[i].Round == choice.Round {
+			session.SupportHistory[i] = choice
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		session.SupportHistory = append(session.SupportHistory, choice)
+	}
+	session.AwaitingSupport = false
+	session.AwaitingSupportRound = 0
+	if session.CurrentRound <= choice.Round {
+		session.CurrentRound = choice.Round + 1
+	}
+	session.StreamActive = false
+	session.UpdatedAt = nowString()
+	return cloneSession(session), nil
+}
+
 func (s *MemoryStore) Complete(id string, result *DebateResult) (*DebateSession, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -105,6 +174,15 @@ func (s *MemoryStore) Complete(id string, result *DebateResult) (*DebateSession,
 	}
 	session.Result = result
 	session.Status = DebateStatusDone
+	session.StreamActive = false
+	session.AwaitingSupport = false
+	session.AwaitingSupportRound = 0
+	if len(session.Messages) > 0 {
+		session.LastCompletedRound = session.Messages[len(session.Messages)-1].Round
+		if session.LastCompletedRound > 0 {
+			session.CurrentRound = session.LastCompletedRound
+		}
+	}
 	session.UpdatedAt = nowString()
 	return cloneSession(session), nil
 }
@@ -118,6 +196,9 @@ func (s *MemoryStore) Fail(id string, message string) (*DebateSession, error) {
 	}
 	session.Error = message
 	session.Status = DebateStatusFailed
+	session.StreamActive = false
+	session.AwaitingSupport = false
+	session.AwaitingSupportRound = 0
 	session.UpdatedAt = nowString()
 	return cloneSession(session), nil
 }
@@ -129,6 +210,7 @@ func cloneSession(session *DebateSession) *DebateSession {
 	copied := *session
 	copied.Personas = append([]Persona(nil), session.Personas...)
 	copied.Messages = append([]DebateMessage(nil), session.Messages...)
+	copied.SupportHistory = append([]RoundSupportChoice(nil), session.SupportHistory...)
 	if session.Result != nil {
 		result := *session.Result
 		result.Scores = append([]DebateScore(nil), session.Result.Scores...)

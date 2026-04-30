@@ -12,6 +12,8 @@ interface ScorePanelProps {
 
 export function ScorePanel({ session, result, currentRound, scores }: ScorePanelProps) {
   const personas = Array.isArray(session.personas) ? session.personas : [];
+  const supportHistory = Array.isArray(session.supportHistory) ? session.supportHistory : [];
+  const latestSupport = supportHistory.at(-1);
   const sortedScores = [...(scores || [])].sort((a, b) => b.score - a.score);
   const quoteCandidates = result?.quote
     ? [result.quote]
@@ -102,6 +104,37 @@ export function ScorePanel({ session, result, currentRound, scores }: ScorePanel
               );
             })
           )}
+        </div>
+      </section>
+
+      <section className="arena-subpanel border-white/10 bg-white/5 p-4 backdrop-blur-md shadow-[0_0_20px_rgba(123,92,255,0.18)]">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-[15px] font-semibold text-white">你的站队</h3>
+          <span className="text-[12px] text-white/42">
+            {supportHistory.length > 0 ? `${supportHistory.length} 次表态` : '尚未表态'}
+          </span>
+        </div>
+        <div className="mt-3 space-y-2.5">
+          {latestSupport ? (
+            <div className="rounded-2xl border border-fuchsia-400/18 bg-[linear-gradient(135deg,rgba(168,85,247,0.14),rgba(236,72,153,0.08))] px-3 py-3 text-[12px] leading-5 text-white/78 shadow-[0_0_16px_rgba(255,77,157,0.12)]">
+              {latestSupport.skipped
+                ? `上一轮你先跳过了站队，所有人格还在抢你的票。`
+                : `上一轮你更支持 ${latestSupport.personaName}，下一轮他们会围着这个偏好继续开火。`}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/8 bg-black/10 px-3 py-3 text-[12px] leading-5 text-white/48">
+              每轮结束后，你都可以临时站队一次，看看谁最会说服你。
+            </div>
+          )}
+          {supportHistory.map((choice) => (
+            <div
+              key={`${choice.round}-${choice.personaId || 'skip'}`}
+              className="rounded-2xl border border-white/8 bg-black/10 px-3 py-2.5 text-[12px] leading-5 text-white/66"
+            >
+              Round {choice.round}
+              {choice.skipped ? ' · 你先保留态度' : ` · 你支持了 ${choice.personaName}`}
+            </div>
+          ))}
         </div>
       </section>
 

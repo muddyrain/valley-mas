@@ -13,8 +13,8 @@ import (
 type DebateAI interface {
 	GeneratePersonas(ctx context.Context, topic string, mode string, count int) ([]Persona, error)
 	GeneratePersona(ctx context.Context, topic string, mode string, persona Persona, index int, count int) (*Persona, error)
-	GenerateDebateRound(ctx context.Context, topic string, mode string, personas []Persona, round int, history []DebateMessage) ([]DebateMessage, error)
-	GenerateDebateMessage(ctx context.Context, topic string, mode string, personas []Persona, persona Persona, round int, history []DebateMessage) (*DebateMessage, error)
+	GenerateDebateRound(ctx context.Context, topic string, mode string, personas []Persona, round int, history []DebateMessage, supportHistory []RoundSupportChoice) ([]DebateMessage, error)
+	GenerateDebateMessage(ctx context.Context, topic string, mode string, personas []Persona, persona Persona, round int, history []DebateMessage, supportHistory []RoundSupportChoice) (*DebateMessage, error)
 	JudgeDebate(ctx context.Context, topic string, personas []Persona, messages []DebateMessage) (*DebateResult, error)
 }
 
@@ -51,15 +51,18 @@ func (s *Service) CreateDebate(ctx context.Context, req CreateDebateRequest) (*C
 
 	now := nowString()
 	session := &DebateSession{
-		ID:           newID("deb"),
-		Topic:        topic,
-		Mode:         mode,
-		Status:       DebateStatusCreated,
-		PersonaCount: count,
-		Personas:     []Persona{},
-		Messages:     []DebateMessage{},
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:                 newID("deb"),
+		Topic:              topic,
+		Mode:               mode,
+		Status:             DebateStatusCreated,
+		PersonaCount:       count,
+		CurrentRound:       1,
+		LastCompletedRound: 0,
+		Personas:           []Persona{},
+		Messages:           []DebateMessage{},
+		SupportHistory:     []RoundSupportChoice{},
+		CreatedAt:          now,
+		UpdatedAt:          now,
 	}
 	if err := s.store.Create(session); err != nil {
 		return nil, err
@@ -71,6 +74,7 @@ func (s *Service) CreateDebate(ctx context.Context, req CreateDebateRequest) (*C
 		Mode:         session.Mode,
 		Status:       session.Status,
 		PersonaCount: session.PersonaCount,
+		CurrentRound: session.CurrentRound,
 		Personas:     session.Personas,
 	}, nil
 }
@@ -79,13 +83,52 @@ func (s *Service) GetDebate(id string) (*DebateSession, error) {
 	return s.store.Get(id)
 }
 
+func (s *Service) SubmitRoundSupport(ctx context.Context, id string, req SubmitRoundSupportRequest) (*DebateSession, error) {
+	session, err := s.store.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	if session.Status == DebateStatusDone || session.Status == DebateStatusFailed {
+		return nil, fmt.Errorf("这场脑内会议已经结束，不能再站队")
+	}
+	if !session.AwaitingSupport || session.AwaitingSupportRound <= 0 {
+		return nil, fmt.Errorf("当前回合还不需要站队")
+	}
+	if req.Round != session.AwaitingSupportRound {
+		return nil, fmt.Errorf("站队回合不匹配，当前等待第 %d 轮", session.AwaitingSupportRound)
+	}
+
+	choice := RoundSupportChoice{
+		Round:     req.Round,
+		Skipped:   req.Skip,
+		CreatedAt: nowString(),
+	}
+	if !req.Skip {
+		persona, ok := findSessionPersonaByID(session.Personas, req.SupportedPersonaID)
+		if !ok {
+			return nil, fmt.Errorf("没有找到你支持的人格")
+		}
+		choice.PersonaID = persona.ID
+		choice.PersonaName = persona.Name
+	}
+
+	updated, err := s.store.SubmitRoundSupport(id, choice)
+	if err != nil {
+		return nil, err
+	}
+	return updated, nil
+}
+
 func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 	events := make(chan SSEEvent)
 
 	go func() {
 		defer close(events)
+		defer func() {
+			_, _ = s.store.FinishStreaming(id)
+		}()
 
-		session, shouldRun, err := s.store.TryMarkRunning(id)
+		session, shouldRun, err := s.store.TryStartStreaming(id)
 		if err != nil {
 			events <- SSEEvent{Type: "error", Message: "没有找到这场脑内会议"}
 			return
@@ -102,10 +145,18 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 		}
 
 		history := append([]DebateMessage(nil), session.Messages...)
-		for round := 1; round <= 3; round++ {
+		startRound := session.CurrentRound
+		if startRound <= 0 {
+			startRound = 1
+		}
+		for round := startRound; round <= 3; round++ {
 			for i := range session.Personas {
 				persona := session.Personas[i]
-				message, err := s.ai.GenerateDebateMessage(ctx, session.Topic, string(session.Mode), session.Personas, persona, round, history)
+				if hasRoundMessageForPersona(history, round, persona) {
+					continue
+				}
+
+				message, err := s.ai.GenerateDebateMessage(ctx, session.Topic, string(session.Mode), session.Personas, persona, round, history, session.SupportHistory)
 				if err != nil {
 					s.failAndSend(events, id, fmt.Sprintf("生成第 %d 轮 %s 发言失败: %v", round, persona.Name, err))
 					return
@@ -138,6 +189,24 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 				if !sleepWithContext(ctx, streamMessageDelay) {
 					return
 				}
+			}
+
+			if shouldPauseAfterRound(round) {
+				session, err = s.store.PauseAfterRound(id, round)
+				if err != nil {
+					s.failAndSend(events, id, err.Error())
+					return
+				}
+				sendEvent(ctx, events, SSEEvent{
+					Type:                 "support_prompt",
+					Round:                round,
+					CurrentRound:         session.CurrentRound,
+					AwaitingSupport:      session.AwaitingSupport,
+					AwaitingSupportRound: session.AwaitingSupportRound,
+					SupportHistory:       append([]RoundSupportChoice(nil), session.SupportHistory...),
+					Personas:             append([]Persona(nil), session.Personas...),
+				})
+				return
 			}
 		}
 
@@ -322,6 +391,21 @@ func (s *Service) replaySession(ctx context.Context, session *DebateSession, eve
 			return
 		}
 	}
+	if session.StreamActive {
+		return
+	}
+	if session.AwaitingSupport {
+		sendEvent(ctx, events, SSEEvent{
+			Type:                 "support_prompt",
+			Round:                session.AwaitingSupportRound,
+			CurrentRound:         session.CurrentRound,
+			AwaitingSupport:      session.AwaitingSupport,
+			AwaitingSupportRound: session.AwaitingSupportRound,
+			SupportHistory:       append([]RoundSupportChoice(nil), session.SupportHistory...),
+			Personas:             append([]Persona(nil), session.Personas...),
+		})
+		return
+	}
 	if session.Result != nil {
 		if !sendEvent(ctx, events, SSEEvent{Type: "judge", Result: session.Result}) {
 			return
@@ -364,4 +448,28 @@ func sendEvent(ctx context.Context, events chan<- SSEEvent, event SSEEvent) bool
 	case events <- event:
 		return true
 	}
+}
+
+func findSessionPersonaByID(personas []Persona, id string) (Persona, bool) {
+	for _, persona := range personas {
+		if persona.ID == id {
+			return persona, true
+		}
+	}
+	return Persona{}, false
+}
+
+func hasRoundMessageForPersona(history []DebateMessage, round int, persona Persona) bool {
+	for _, message := range history {
+		if message.Round != round {
+			continue
+		}
+		if persona.ID != "" && message.PersonaID == persona.ID {
+			return true
+		}
+		if persona.Name != "" && message.PersonaName == persona.Name {
+			return true
+		}
+	}
+	return false
 }

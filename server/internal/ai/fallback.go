@@ -36,24 +36,24 @@ func (s *FallbackService) GeneratePersona(ctx context.Context, topic string, mod
 	return s.fallback.GeneratePersona(ctx, topic, mode, persona, index, count)
 }
 
-func (s *FallbackService) GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) ([]mindarena.DebateMessage, error) {
-	messages, err := s.primary.GenerateDebateRound(ctx, topic, mode, personas, round, history)
+func (s *FallbackService) GenerateDebateRound(ctx context.Context, topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) ([]mindarena.DebateMessage, error) {
+	messages, err := s.primary.GenerateDebateRound(ctx, topic, mode, personas, round, history, supportHistory)
 	if err == nil || !shouldFallbackToMock(err) {
 		return messages, err
 	}
 
 	log.Printf("ai-mind-arena: fallback to mock round %d because primary AI failed: %v", round, err)
-	return s.fallback.GenerateDebateRound(ctx, topic, mode, personas, round, history)
+	return s.fallback.GenerateDebateRound(ctx, topic, mode, personas, round, history, supportHistory)
 }
 
-func (s *FallbackService) GenerateDebateMessage(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage) (*mindarena.DebateMessage, error) {
-	message, err := s.primary.GenerateDebateMessage(ctx, topic, mode, personas, persona, round, history)
+func (s *FallbackService) GenerateDebateMessage(ctx context.Context, topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) (*mindarena.DebateMessage, error) {
+	message, err := s.primary.GenerateDebateMessage(ctx, topic, mode, personas, persona, round, history, supportHistory)
 	if err == nil || !shouldFallbackToMock(err) {
 		return message, err
 	}
 
 	log.Printf("ai-mind-arena: fallback to mock persona %s round %d because primary AI failed: %v", persona.Name, round, err)
-	return s.fallback.GenerateDebateMessage(ctx, topic, mode, personas, persona, round, history)
+	return s.fallback.GenerateDebateMessage(ctx, topic, mode, personas, persona, round, history, supportHistory)
 }
 
 func (s *FallbackService) JudgeDebate(ctx context.Context, topic string, personas []mindarena.Persona, messages []mindarena.DebateMessage) (*mindarena.DebateResult, error) {

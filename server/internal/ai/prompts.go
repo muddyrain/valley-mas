@@ -98,6 +98,7 @@ const DEBATE_ROUND_PROMPT = `你是《脑内会议室》的现场导播，要让
 - 每句话不超过 60 个中文字符。
 - 必须把人格的 personality、style、catchphrase 气质写进话里，让用户一眼听出是谁在发言。
 - 请重点参考输入里的 personas / currentPersona，以及附带的 personaVoiceHints / currentPersonaVoice。
+- 如果输入里带有 latestAudienceSupport / supportHistory，说明用户上一轮已经更支持某一派或暂时跳过站队；Round 2 和 Round 3 必须显式回应这股偏好，表现出争宠、拉票、稳住支持或不服气。
 - Round 1 必须先亮立场和核心理由，不要抢跑到反驳和结论。
 - Round 2 才进入互相回应，不能把第一轮写成互喷。
 - Round 3 负责收束，不要在最后一轮重新开新坑。

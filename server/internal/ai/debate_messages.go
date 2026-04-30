@@ -35,6 +35,16 @@ type personaVoiceHint struct {
 	Voice       string `json:"voice"`
 }
 
+type audienceSupportContext struct {
+	PreviousRound           int    `json:"previousRound"`
+	SupportedPersonaID      string `json:"supportedPersonaId,omitempty"`
+	SupportedPersonaName    string `json:"supportedPersonaName,omitempty"`
+	Skipped                 bool   `json:"skipped"`
+	CurrentPersonaSupported bool   `json:"currentPersonaSupported,omitempty"`
+	ResponseGoal            string `json:"responseGoal"`
+	AudienceSignal          string `json:"audienceSignal"`
+}
+
 func normalizeGeneratedDebateMessages(generated []mindarena.DebateMessage, personas []mindarena.Persona, round int) []mindarena.DebateMessage {
 	if len(personas) == 0 {
 		return nil
@@ -160,63 +170,114 @@ func fallbackRoundThreeMessage(persona mindarena.Persona) string {
 	}
 }
 
-func buildDebateRoundPromptInput(topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage) string {
+func buildDebateRoundPromptInput(topic string, mode string, personas []mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) string {
 	payload := struct {
-		Topic       string                    `json:"topic"`
-		Mode        string                    `json:"mode"`
-		Round       int                       `json:"round"`
-		RoundGoal   string                    `json:"roundGoal"`
-		Constraints []string                  `json:"constraints"`
-		VoiceHints  []personaVoiceHint        `json:"personaVoiceHints"`
-		Rebuttals   []roundTwoRebuttalTarget  `json:"rebuttalTargets,omitempty"`
-		Summaries   []roundThreeSummaryBrief  `json:"summaryBriefs,omitempty"`
-		Personas    []mindarena.Persona       `json:"personas"`
-		History     []mindarena.DebateMessage `json:"history"`
+		Topic                 string                         `json:"topic"`
+		Mode                  string                         `json:"mode"`
+		Round                 int                            `json:"round"`
+		RoundGoal             string                         `json:"roundGoal"`
+		Constraints           []string                       `json:"constraints"`
+		VoiceHints            []personaVoiceHint             `json:"personaVoiceHints"`
+		LatestAudienceSupport *audienceSupportContext        `json:"latestAudienceSupport,omitempty"`
+		SupportHistory        []mindarena.RoundSupportChoice `json:"supportHistory,omitempty"`
+		Rebuttals             []roundTwoRebuttalTarget       `json:"rebuttalTargets,omitempty"`
+		Summaries             []roundThreeSummaryBrief       `json:"summaryBriefs,omitempty"`
+		Personas              []mindarena.Persona            `json:"personas"`
+		History               []mindarena.DebateMessage      `json:"history"`
 	}{
-		Topic:       topic,
-		Mode:        mode,
-		Round:       round,
-		RoundGoal:   debateRoundGoal(round),
-		Constraints: debateRoundConstraints(round),
-		VoiceHints:  buildPersonaVoiceHints(personas),
-		Rebuttals:   buildRoundTwoRebuttalTargets(round, personas, history),
-		Summaries:   buildRoundThreeSummaryBriefs(round, personas, history),
-		Personas:    personas,
-		History:     history,
+		Topic:                 topic,
+		Mode:                  mode,
+		Round:                 round,
+		RoundGoal:             debateRoundGoal(round),
+		Constraints:           debateRoundConstraints(round),
+		VoiceHints:            buildPersonaVoiceHints(personas),
+		LatestAudienceSupport: buildAudienceSupportContext(round, mindarena.Persona{}, supportHistory),
+		SupportHistory:        supportHistory,
+		Rebuttals:             buildRoundTwoRebuttalTargets(round, personas, history),
+		Summaries:             buildRoundThreeSummaryBriefs(round, personas, history),
+		Personas:              personas,
+		History:               history,
 	}
 	raw, _ := jsonMarshal(payload)
 	return raw
 }
 
-func buildDebateMessagePromptInput(topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage) string {
+func buildDebateMessagePromptInput(topic string, mode string, personas []mindarena.Persona, persona mindarena.Persona, round int, history []mindarena.DebateMessage, supportHistory []mindarena.RoundSupportChoice) string {
 	personaIndex := findPersonaIndex(persona, personas)
 	payload := struct {
-		Topic          string                    `json:"topic"`
-		Mode           string                    `json:"mode"`
-		Round          int                       `json:"round"`
-		RoundGoal      string                    `json:"roundGoal"`
-		Constraints    []string                  `json:"constraints"`
-		CurrentPersona mindarena.Persona         `json:"currentPersona"`
-		CurrentVoice   string                    `json:"currentPersonaVoice"`
-		RebuttalTarget *roundTwoRebuttalTarget   `json:"rebuttalTarget,omitempty"`
-		SummaryBrief   *roundThreeSummaryBrief   `json:"summaryBrief,omitempty"`
-		Personas       []mindarena.Persona       `json:"personas"`
-		History        []mindarena.DebateMessage `json:"history"`
+		Topic                 string                         `json:"topic"`
+		Mode                  string                         `json:"mode"`
+		Round                 int                            `json:"round"`
+		RoundGoal             string                         `json:"roundGoal"`
+		Constraints           []string                       `json:"constraints"`
+		CurrentPersona        mindarena.Persona              `json:"currentPersona"`
+		CurrentVoice          string                         `json:"currentPersonaVoice"`
+		LatestAudienceSupport *audienceSupportContext        `json:"latestAudienceSupport,omitempty"`
+		SupportHistory        []mindarena.RoundSupportChoice `json:"supportHistory,omitempty"`
+		RebuttalTarget        *roundTwoRebuttalTarget        `json:"rebuttalTarget,omitempty"`
+		SummaryBrief          *roundThreeSummaryBrief        `json:"summaryBrief,omitempty"`
+		Personas              []mindarena.Persona            `json:"personas"`
+		History               []mindarena.DebateMessage      `json:"history"`
 	}{
-		Topic:          topic,
-		Mode:           mode,
-		Round:          round,
-		RoundGoal:      debateRoundGoal(round),
-		Constraints:    append(debateRoundConstraints(round), "只输出 currentPersona 的一条 messages JSON。"),
-		CurrentPersona: persona,
-		CurrentVoice:   personaVoiceGuide(persona),
-		RebuttalTarget: buildSingleRoundTwoRebuttalTarget(round, persona, personaIndex, personas, history),
-		SummaryBrief:   buildSingleRoundThreeSummaryBrief(round, persona, history),
-		Personas:       personas,
-		History:        history,
+		Topic:                 topic,
+		Mode:                  mode,
+		Round:                 round,
+		RoundGoal:             debateRoundGoal(round),
+		Constraints:           append(debateRoundConstraints(round), "只输出 currentPersona 的一条 messages JSON。"),
+		CurrentPersona:        persona,
+		CurrentVoice:          personaVoiceGuide(persona),
+		LatestAudienceSupport: buildAudienceSupportContext(round, persona, supportHistory),
+		SupportHistory:        supportHistory,
+		RebuttalTarget:        buildSingleRoundTwoRebuttalTarget(round, persona, personaIndex, personas, history),
+		SummaryBrief:          buildSingleRoundThreeSummaryBrief(round, persona, history),
+		Personas:              personas,
+		History:               history,
 	}
 	raw, _ := jsonMarshal(payload)
 	return raw
+}
+
+func buildAudienceSupportContext(round int, persona mindarena.Persona, supportHistory []mindarena.RoundSupportChoice) *audienceSupportContext {
+	if round <= 1 {
+		return nil
+	}
+	latest := findLatestSupportChoice(round-1, supportHistory)
+	if latest == nil {
+		return nil
+	}
+
+	context := &audienceSupportContext{
+		PreviousRound:        latest.Round,
+		SupportedPersonaID:   latest.PersonaID,
+		SupportedPersonaName: latest.PersonaName,
+		Skipped:              latest.Skipped,
+	}
+	if latest.Skipped {
+		context.ResponseGoal = "上一轮用户没有明确站队，这一轮也要继续争取他，但别把注意力拉离议题。"
+		context.AudienceSignal = "用户上一轮跳过站队，说明所有人格都还有争宠空间。"
+		return context
+	}
+
+	if persona.ID != "" && (persona.ID == latest.PersonaID || persona.Name == latest.PersonaName) {
+		context.CurrentPersonaSupported = true
+		context.ResponseGoal = fmt.Sprintf("用户上一轮支持了你（%s），这一轮要稳住好感、继续给出更强论据。", latest.PersonaName)
+		context.AudienceSignal = fmt.Sprintf("用户上一轮明显偏向 %s。", latest.PersonaName)
+		return context
+	}
+
+	context.ResponseGoal = fmt.Sprintf("用户上一轮支持了 %s，这一轮你要正面回应这股偏好，争宠、拉票或表示不服。", latest.PersonaName)
+	context.AudienceSignal = fmt.Sprintf("用户上一轮更支持 %s。", latest.PersonaName)
+	return context
+}
+
+func findLatestSupportChoice(round int, supportHistory []mindarena.RoundSupportChoice) *mindarena.RoundSupportChoice {
+	for i := len(supportHistory) - 1; i >= 0; i-- {
+		if supportHistory[i].Round == round {
+			choice := supportHistory[i]
+			return &choice
+		}
+	}
+	return nil
 }
 
 func buildRoundTwoRebuttalTargets(round int, personas []mindarena.Persona, history []mindarena.DebateMessage) []roundTwoRebuttalTarget {
@@ -398,9 +459,9 @@ func debateRoundGoal(round int) string {
 	case 1:
 		return "开场亮立场：每个人格先亮明自己的倾向和核心理由。"
 	case 2:
-		return "互相反驳：根据 history 和 rebuttalTargets，针对其他人格刚才的观点开火。"
+		return "互相反驳：根据 history、rebuttalTargets 和 latestAudienceSupport，针对其他人格刚才的观点开火并争取用户站队。"
 	case 3:
-		return "最终陈词：根据 history 和 summaryBriefs，把前两轮冲突收束成最后建议。"
+		return "最终陈词：根据 history、summaryBriefs 和 latestAudienceSupport，把前两轮冲突收束成最后建议并做最后拉票。"
 	default:
 		return "继续围绕议题辩论。"
 	}
@@ -427,6 +488,7 @@ func debateRoundConstraints(round int) []string {
 		return append(base,
 			"Round 2 必须点到别人的漏洞，不能重复 Round 1 原话。",
 			"优先使用 rebuttalTargets 中对应自己的一条目标，明确回应 targetPersonaName 的 Round 1 观点。",
+			"如果 latestAudienceSupport 不为空，必须回应用户上一轮支持了谁，表现出争宠、拉票或不服气。",
 			"每句必须形成反驳关系：先指出对方漏洞，再给自己的反向判断。",
 			"反驳要直接，但火力只能对观点，不能辱骂用户。",
 			"可以犀利，但不要辱骂用户。",
@@ -435,6 +497,7 @@ func debateRoundConstraints(round int) []string {
 		return append(base,
 			"Round 3 要收束，不要再展开新论点。",
 			"必须参考 summaryBriefs 中自己的 openingContent、rebuttalContent 和 adviceFocus。",
+			"如果 latestAudienceSupport 不为空，要知道用户上一轮支持了谁，并在收尾里争取最终认同。",
 			"每句话要给出明确建议或决策条件，不能只喊口号。",
 			"不要宣布最终胜者，裁判结果由下一步 judge 单独生成。",
 			"像综艺最后发言，态度明确、节奏利落，而且要给出能执行的收尾动作。",

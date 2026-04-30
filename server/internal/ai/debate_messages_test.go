@@ -49,7 +49,7 @@ func TestBuildDebateRoundPromptInput(t *testing.T) {
 	t.Parallel()
 
 	personas := defaultMindArenaPersonas()
-	raw := buildDebateRoundPromptInput("要不要辞职", "serious", personas, 1, nil)
+	raw := buildDebateRoundPromptInput("要不要辞职", "serious", personas, 1, nil, nil)
 
 	var payload struct {
 		Round       int                 `json:"round"`
@@ -93,7 +93,7 @@ func TestBuildDebateRoundPromptInputRoundTwoIncludesRebuttalTargets(t *testing.T
 		{Round: 1, PersonaID: "p4", PersonaName: "父母派", Content: "房租和保险先安排好。"},
 		{Round: 1, PersonaID: "p5", PersonaName: "摆烂派", Content: "崩溃时别替人生拍板。"},
 	}
-	raw := buildDebateRoundPromptInput("要不要裸辞创业", "sharp", personas, 2, history)
+	raw := buildDebateRoundPromptInput("要不要裸辞创业", "sharp", personas, 2, history, nil)
 
 	var payload struct {
 		Round     int                       `json:"round"`
@@ -136,7 +136,7 @@ func TestBuildDebateRoundPromptInputRoundThreeIncludesSummaryBriefs(t *testing.T
 		{Round: 2, PersonaID: "p1", PersonaName: "理性派", Content: "赌徒派别只喊冲，风险不是背景音乐。"},
 		{Round: 2, PersonaID: "p2", PersonaName: "毒舌派", Content: "理性派也别把人生算成表格。"},
 	}
-	raw := buildDebateRoundPromptInput("要不要裸辞创业", "serious", personas[:2], 3, history)
+	raw := buildDebateRoundPromptInput("要不要裸辞创业", "serious", personas[:2], 3, history, nil)
 
 	var payload struct {
 		Round       int                      `json:"round"`
@@ -184,7 +184,7 @@ func TestBuildDebateMessagePromptInputRoundTwoIncludesCurrentPersonaAndRebuttalT
 		{Round: 1, PersonaID: "p3", PersonaName: "赌徒派", Content: "机会来了就要先上车。"},
 	}
 
-	raw := buildDebateMessagePromptInput("要不要裸辞创业", "sharp", personas[:3], personas[0], 2, history)
+	raw := buildDebateMessagePromptInput("要不要裸辞创业", "sharp", personas[:3], personas[0], 2, history, nil)
 
 	var payload struct {
 		Round          int                       `json:"round"`
@@ -231,7 +231,7 @@ func TestBuildDebateMessagePromptInputRoundThreeIncludesSummaryBrief(t *testing.
 		{Round: 2, PersonaID: "p2", PersonaName: "毒舌派", Content: "理性派也别把人生算成表格。"},
 	}
 
-	raw := buildDebateMessagePromptInput("要不要裸辞创业", "serious", personas, personas[1], 3, history)
+	raw := buildDebateMessagePromptInput("要不要裸辞创业", "serious", personas, personas[1], 3, history, nil)
 
 	var payload struct {
 		Round          int                     `json:"round"`
@@ -265,5 +265,67 @@ func TestBuildDebateMessagePromptInputRoundThreeIncludesSummaryBrief(t *testing.
 	}
 	if strings.TrimSpace(payload.SummaryBrief.AdviceFocus) == "" {
 		t.Fatalf("expected advice focus, got %+v", payload.SummaryBrief)
+	}
+}
+
+func TestBuildDebateMessagePromptInputIncludesAudienceSupportContext(t *testing.T) {
+	t.Parallel()
+
+	personas := defaultMindArenaPersonas()[:2]
+	history := []mindarena.DebateMessage{
+		{Round: 1, PersonaID: "p1", PersonaName: "理性派", Content: "先把风险和现金流算清。"},
+		{Round: 1, PersonaID: "p2", PersonaName: "毒舌派", Content: "别把逃避包装成理想。"},
+	}
+	supportHistory := []mindarena.RoundSupportChoice{
+		{Round: 1, PersonaID: "p2", PersonaName: "毒舌派", CreatedAt: "2026-04-30T20:20:20Z"},
+	}
+
+	raw := buildDebateMessagePromptInput("要不要裸辞创业", "sharp", personas, personas[0], 2, history, supportHistory)
+
+	var payload struct {
+		LatestAudienceSupport *audienceSupportContext        `json:"latestAudienceSupport"`
+		SupportHistory        []mindarena.RoundSupportChoice `json:"supportHistory"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("unmarshal prompt payload failed: %v", err)
+	}
+	if payload.LatestAudienceSupport == nil {
+		t.Fatal("expected latestAudienceSupport in payload")
+	}
+	if payload.LatestAudienceSupport.SupportedPersonaName != "毒舌派" {
+		t.Fatalf("expected supported persona name, got %+v", payload.LatestAudienceSupport)
+	}
+	if payload.LatestAudienceSupport.CurrentPersonaSupported {
+		t.Fatalf("expected 理性派 to know it was not supported, got %+v", payload.LatestAudienceSupport)
+	}
+	if !strings.Contains(payload.LatestAudienceSupport.ResponseGoal, "争宠") && !strings.Contains(payload.LatestAudienceSupport.ResponseGoal, "拉票") {
+		t.Fatalf("expected support context to mention争宠/拉票, got %+v", payload.LatestAudienceSupport)
+	}
+	if len(payload.SupportHistory) != 1 {
+		t.Fatalf("expected support history to be preserved, got %+v", payload.SupportHistory)
+	}
+}
+
+func TestBuildDebateMessagePromptInputIncludesSkippedAudienceSupportContext(t *testing.T) {
+	t.Parallel()
+
+	personas := defaultMindArenaPersonas()[:1]
+	supportHistory := []mindarena.RoundSupportChoice{
+		{Round: 2, Skipped: true, CreatedAt: "2026-04-30T20:21:20Z"},
+	}
+
+	raw := buildDebateMessagePromptInput("要不要裸辞创业", "serious", personas, personas[0], 3, nil, supportHistory)
+
+	var payload struct {
+		LatestAudienceSupport *audienceSupportContext `json:"latestAudienceSupport"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("unmarshal prompt payload failed: %v", err)
+	}
+	if payload.LatestAudienceSupport == nil || !payload.LatestAudienceSupport.Skipped {
+		t.Fatalf("expected skipped audience support context, got %+v", payload.LatestAudienceSupport)
+	}
+	if !strings.Contains(payload.LatestAudienceSupport.ResponseGoal, "没有明确站队") {
+		t.Fatalf("expected skipped response goal, got %+v", payload.LatestAudienceSupport)
 	}
 }
