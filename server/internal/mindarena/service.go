@@ -23,9 +23,8 @@ type Service struct {
 }
 
 var (
-	streamPersonaRevealDelay = 260 * time.Millisecond
-	streamMessageDelay       = 650 * time.Millisecond
-	streamDoneDelay          = 350 * time.Millisecond
+	streamMessageDelay = 650 * time.Millisecond
+	streamDoneDelay    = 350 * time.Millisecond
 )
 
 func NewService(store Store, ai DebateAI) *Service {
@@ -95,19 +94,22 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 
 		history := append([]DebateMessage(nil), session.Messages...)
 		for round := 1; round <= 3; round++ {
-			for _, persona := range session.Personas {
-				message, err := s.ai.GenerateDebateMessage(ctx, session.Topic, string(session.Mode), session.Personas, persona, round, history)
-				if err != nil {
-					s.failAndSend(events, id, fmt.Sprintf("生成第 %d 轮失败: %v", round, err))
-					return
-				}
-				if message == nil {
-					s.failAndSend(events, id, fmt.Sprintf("生成第 %d 轮失败: 返回为空", round))
-					return
-				}
-				prepareStreamMessage(message, persona, round)
+			roundMessages, err := s.ai.GenerateDebateRound(ctx, session.Topic, string(session.Mode), session.Personas, round, history)
+			if err != nil {
+				s.failAndSend(events, id, fmt.Sprintf("生成第 %d 轮失败: %v", round, err))
+				return
+			}
+			if len(roundMessages) == 0 {
+				s.failAndSend(events, id, fmt.Sprintf("生成第 %d 轮失败: 返回为空", round))
+				return
+			}
 
-				updated, err := s.store.AppendMessages(id, []DebateMessage{*message})
+			for i := range roundMessages {
+				message := roundMessages[i]
+				persona := personaForRoundMessage(session.Personas, message, i)
+				prepareStreamMessage(&message, persona, round)
+
+				updated, err := s.store.AppendMessages(id, []DebateMessage{message})
 				if err != nil {
 					s.failAndSend(events, id, err.Error())
 					return
@@ -162,39 +164,32 @@ func (s *Service) revealPersonas(ctx context.Context, events chan<- SSEEvent, se
 	}
 
 	count := targetPersonaCount(session)
-	personaTargets := PersonaTargets(count)
-	visiblePersonas := make([]Persona, 0, len(personaTargets))
-
-	for i, target := range personaTargets {
-		persona, err := s.ai.GeneratePersona(ctx, session.Topic, string(session.Mode), target, i, count)
-		if err != nil {
-			s.failAndSend(events, session.ID, fmt.Sprintf("生成%s失败: %v", target.Name, err))
-			return session, false
-		}
-		if persona == nil {
-			s.failAndSend(events, session.ID, fmt.Sprintf("生成%s失败: 返回为空", target.Name))
-			return session, false
-		}
-
-		visiblePersonas = append(visiblePersonas, *persona)
-		updated, err := s.store.UpdatePersonas(session.ID, visiblePersonas)
-		if err != nil {
-			s.failAndSend(events, session.ID, err.Error())
-			return session, false
-		}
-		session = updated
-		if !sendEvent(ctx, events, SSEEvent{
-			Type:         "personas",
-			PersonaCount: count,
-			Personas:     visiblePersonas,
-		}) {
-			return session, false
-		}
-		if i < len(personaTargets)-1 && !sleepWithContext(ctx, streamPersonaRevealDelay) {
-			return session, false
-		}
+	personas, err := s.ai.GeneratePersonas(ctx, session.Topic, string(session.Mode), count)
+	if err != nil {
+		s.failAndSend(events, session.ID, fmt.Sprintf("生成人格失败: %v", err))
+		return session, false
+	}
+	if len(personas) == 0 {
+		s.failAndSend(events, session.ID, "生成人格失败: 返回为空")
+		return session, false
 	}
 
+	if len(personas) > count {
+		personas = personas[:count]
+	}
+	updated, err := s.store.UpdatePersonas(session.ID, personas)
+	if err != nil {
+		s.failAndSend(events, session.ID, err.Error())
+		return session, false
+	}
+	session = updated
+	if !sendEvent(ctx, events, SSEEvent{
+		Type:         "personas",
+		PersonaCount: count,
+		Personas:     personas,
+	}) {
+		return session, false
+	}
 	return session, true
 }
 
@@ -213,6 +208,21 @@ func prepareStreamMessage(message *DebateMessage, persona Persona, round int) {
 	if message.CreatedAt == "" {
 		message.CreatedAt = nowString()
 	}
+}
+
+func personaForRoundMessage(personas []Persona, message DebateMessage, fallbackIndex int) Persona {
+	for _, persona := range personas {
+		if message.PersonaID != "" && message.PersonaID == persona.ID {
+			return persona
+		}
+		if message.PersonaName != "" && message.PersonaName == persona.Name {
+			return persona
+		}
+	}
+	if fallbackIndex >= 0 && fallbackIndex < len(personas) {
+		return personas[fallbackIndex]
+	}
+	return Persona{}
 }
 
 func targetPersonaCount(session *DebateSession) int {

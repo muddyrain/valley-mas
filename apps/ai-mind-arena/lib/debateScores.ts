@@ -19,18 +19,32 @@ export function buildDebateScores(
     });
   }
 
-  const totalMessages = Math.max(safeMessages.length, 1);
+  if (safeMessages.length === 0) {
+    return safePersonas.map((persona) => ({
+      persona: persona.name,
+      score: 0,
+    }));
+  }
+
+  const totalMessages = safeMessages.length;
   return safePersonas.map((persona, index) => {
     const personaMessages = safeMessages.filter((message) => message.personaId === persona.id);
+    if (personaMessages.length === 0) {
+      return {
+        persona: persona.name,
+        score: 0,
+      };
+    }
+
     const latestRound = personaMessages.at(-1)?.round || 0;
     const messageShare = personaMessages.length / totalMessages;
-    const baseline = 24 - index * 2;
-    const activity = Math.round(messageShare * 36);
-    const progress = latestRound * 7;
+    const orderMomentum = Math.max(0, 8 - index * 2);
+    const activity = Math.round(messageShare * 58);
+    const progress = latestRound * 10;
 
     return {
       persona: persona.name,
-      score: clampScore(baseline + activity + progress),
+      score: clampScore(orderMomentum + activity + progress),
     };
   });
 }

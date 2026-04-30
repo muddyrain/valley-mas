@@ -19,7 +19,7 @@ import {
   parseDebateSSEEvent,
 } from '@/lib/debateEvents';
 import { buildDebateScores } from '@/lib/debateScores';
-import type { DebateMessage, DebateResult, DebateScore, DebateSession } from '@/lib/types';
+import type { DebateMessage, DebateResult, DebateScore, DebateSession, Persona } from '@/lib/types';
 import { DebateBubble } from './DebateBubble';
 import { DebateStatePanel } from './DebateStatePanel';
 import { PersonaCard } from './PersonaCard';
@@ -41,6 +41,14 @@ const modeLabels: Record<DebateSession['mode'], string> = {
   emotion: '情绪会诊',
 };
 
+function getNextSpeaker(personas: Persona[], personaId: string, round: number) {
+  const currentIndex = personas.findIndex((persona) => persona.id === personaId);
+  if (currentIndex < 0 || personas.length === 0) return undefined;
+  if (currentIndex < personas.length - 1) return personas[currentIndex + 1];
+  if (round < 3) return personas[0];
+  return undefined;
+}
+
 export function DebateRoom({ initialSession }: DebateRoomProps) {
   const [session, setSession] = useState(initialSession);
   const [messages, setMessages] = useState<DebateMessage[]>(initialSession.messages || []);
@@ -49,6 +57,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
   const [streamError, setStreamError] = useState('');
   const [activePersonaId, setActivePersonaId] = useState<string | undefined>();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const personasRef = useRef<Persona[]>([]);
 
   const personas = useMemo(
     () => (Array.isArray(session.personas) ? session.personas : []),
@@ -64,7 +73,10 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     [messages, personas, session],
   );
   const personaTargetCount = Math.max(safeSession.personaCount || 5, personas.length, 1);
-  const isPreparingPersonas = messages.length === 0 && !result && !streamError;
+  const hasAllPersonas = personas.length >= personaTargetCount;
+  const isPreparingPersonas = !hasAllPersonas && messages.length === 0 && !result && !streamError;
+  const isPreparingFirstMessage =
+    hasAllPersonas && messages.length === 0 && !result && !streamError;
   const currentRound = messages.at(-1)?.round || 1;
   const liveScores = useMemo<DebateScore[]>(
     () => buildDebateScores(personas, messages, result),
@@ -76,6 +88,10 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     liveScores.map((score) => base.set(score.persona, score.score));
     return base;
   }, [liveScores]);
+
+  useEffect(() => {
+    personasRef.current = personas;
+  }, [personas]);
 
   useEffect(() => {
     const shouldScroll = messages.length > 0 || Boolean(result);
@@ -97,14 +113,20 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
       const latestPersona = nextPersonas.at(-1);
       const targetCount = payload.personaCount || initialSession.personaCount || 5;
       setStreamError('');
-      setActivePersonaId(latestPersona?.id);
+      setActivePersonaId(
+        nextPersonas.length >= targetCount ? nextPersonas[0]?.id : latestPersona?.id,
+      );
       setSession((prev) => ({
         ...prev,
         personaCount: targetCount,
         personas: nextPersonas,
       }));
       setStatusText(
-        latestPersona ? `${latestPersona.name} 已入场，正在校准口头禅...` : '人格设定同步中...',
+        nextPersonas.length >= targetCount
+          ? '五位人格已入场，第一位正在组织发言...'
+          : latestPersona
+            ? `${latestPersona.name} 已入场，正在校准口头禅...`
+            : '人格设定同步中...',
       );
     });
 
@@ -113,8 +135,17 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
       if (!payload || !payload.personaId || !payload.personaName || !payload.content) return;
 
       setStreamError('');
-      setActivePersonaId(payload.personaId);
-      setStatusText(`${payload.personaName} 正在发言...`);
+      const nextSpeaker = getNextSpeaker(
+        personasRef.current,
+        payload.personaId,
+        payload.round || 1,
+      );
+      setActivePersonaId(nextSpeaker?.id);
+      setStatusText(
+        nextSpeaker
+          ? `${payload.personaName} 已发言，${nextSpeaker.name} 接棒中...`
+          : `${payload.personaName} 已发言，裁判团正在整理结论...`,
+      );
       setMessages((prev) => {
         const message = buildMessageFromSSEEvent(payload, prev.length);
         if (!message) return prev;
@@ -205,9 +236,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
                     <Sparkles className="h-5 w-5 animate-pulse" />
                   </div>
                   <p className="mt-4 text-[14px] font-semibold text-white">人格设定中</p>
-                  <p className="mt-2 text-[12px] leading-5 text-white/50">
-                    嘉宾会按生成顺序逐个入场。
-                  </p>
+                  <p className="mt-2 text-[12px] leading-5 text-white/50">嘉宾生成后会一起入场。</p>
                 </div>
               ) : (
                 personas.map((persona) => (
@@ -308,11 +337,19 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
                         <Loader2 className="h-5 w-5 animate-spin" />
                       )
                     }
-                    title={isPreparingPersonas ? '正在定义本场人格' : statusText}
+                    title={
+                      isPreparingPersonas
+                        ? '正在定义本场人格'
+                        : isPreparingFirstMessage
+                          ? '第一轮发言准备中'
+                          : statusText
+                    }
                     description={
                       isPreparingPersonas
                         ? `已入场 ${personas.length}/${personaTargetCount} 位，全部到齐后自动开始第一轮。`
-                        : '支持率会随着每次发言持续刷新。'
+                        : isPreparingFirstMessage
+                          ? '五位人格已到齐，理性派正在组织第一句开场。'
+                          : '支持率会随着每次发言持续刷新。'
                     }
                   />
                 ) : (
