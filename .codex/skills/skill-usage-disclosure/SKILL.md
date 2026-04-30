@@ -1,7 +1,6 @@
 ---
 name: skill-usage-disclosure
 description: 在 Valley MAS 开发协作时，要求 AI 主动说明本次用了哪些 skills，以及为什么使用它们。适用于任何希望提升协作透明度、减少隐式规则感的任务。
-category: general
 ---
 
 # 技能使用透明化
@@ -24,7 +23,7 @@ category: general
 
 ## 推荐表达
 
-- “这次我会用 `creator-space-ux` 和 `encoding-guard`，前者处理图文编辑逻辑，后者确保中文文案不会出编码问题。”
+- “这次我会用 `xxxx` 和 `encoding-guard`，前者处理图文编辑逻辑，后者确保中文文案不会出编码问题。”
 
 ## 注意
 

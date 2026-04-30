@@ -1,0 +1,4 @@
+interface:
+  display_name: "Web UI 一致性护栏"
+  short_description: "统一检查 Web 页面主题 token、品牌色、loading 态、URL query 与列表刷新回退一致性"
+  default_prompt: "Web 页面改动时使用 $web-ui-consistency-guard，统一检查主题 token、品牌色、loading 态、URL query 状态同步、列表刷新/回退一致性。"

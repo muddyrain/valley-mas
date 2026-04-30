@@ -1,4 +1,0 @@
-interface:
-  display_name: "技能同步护栏"
-  short_description: "改功能时同步检查相关 skills 是否已经过期"
-  default_prompt: "当功能规则、交互方式、发布方式或产品定位发生变化时，使用技能同步护栏，确保相关 skills 也同步更新。"
