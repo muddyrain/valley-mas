@@ -98,6 +98,18 @@ func findGeneratedScoreForPersona(persona mindarena.Persona, generated []mindare
 
 func normalizeDebateWinner(winner string, personas []mindarena.Persona, scores []mindarena.DebateScore) string {
 	trimmedWinner := strings.TrimSpace(winner)
+	bestWinner := highestScoringPersona(scores)
+	if bestWinner != "" {
+		for _, persona := range personas {
+			if trimmedWinner == persona.Name {
+				if winnerScore(trimmedWinner, scores) == winnerScore(bestWinner, scores) {
+					return persona.Name
+				}
+				return bestWinner
+			}
+		}
+		return bestWinner
+	}
 	for _, persona := range personas {
 		if trimmedWinner == persona.Name {
 			return persona.Name
@@ -117,6 +129,28 @@ func normalizeDebateWinner(winner string, personas []mindarena.Persona, scores [
 		return personas[0].Name
 	}
 	return ""
+}
+
+func highestScoringPersona(scores []mindarena.DebateScore) string {
+	if len(scores) == 0 {
+		return ""
+	}
+	best := scores[0]
+	for _, score := range scores[1:] {
+		if score.Score > best.Score {
+			best = score
+		}
+	}
+	return strings.TrimSpace(best.Persona)
+}
+
+func winnerScore(name string, scores []mindarena.DebateScore) int {
+	for _, score := range scores {
+		if strings.TrimSpace(score.Persona) == name {
+			return score.Score
+		}
+	}
+	return -1
 }
 
 func clampScore(score int) int {

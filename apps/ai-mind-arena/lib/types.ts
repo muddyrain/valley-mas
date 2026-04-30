@@ -25,7 +25,11 @@ export interface DebateMessage {
 
 export interface DebateScore {
   persona: string;
+  personaId?: string;
   score: number;
+  judgeScore?: number;
+  audienceScore?: number;
+  judgeNote?: string;
 }
 
 export interface DebateResult {
@@ -40,7 +44,17 @@ export interface RoundSupportChoice {
   personaId?: string;
   personaName?: string;
   skipped: boolean;
+  supportScore?: number;
   createdAt: string;
+}
+
+export interface NeutralJudgeState {
+  name: string;
+  currentRound: number;
+  focus: string;
+  summary: string;
+  leadingPersona?: string;
+  updatedAt: string;
 }
 
 export interface DebateSession {
@@ -55,6 +69,9 @@ export interface DebateSession {
   awaitingSupportRound?: number | null;
   personas?: Persona[] | null;
   messages?: DebateMessage[] | null;
+  liveScores?: DebateScore[] | null;
+  neutralJudge?: NeutralJudgeState;
+  overtimePersonaIds?: string[] | null;
   supportHistory?: RoundSupportChoice[] | null;
   result?: DebateResult;
   error?: string;
@@ -95,7 +112,10 @@ export interface DebateSSEEvent {
   result?: DebateResult;
   sessionId?: string;
   message?: string;
+  scores?: DebateScore[] | null;
   personas?: Persona[] | null;
+  neutralJudge?: NeutralJudgeState;
+  overtimePersonaIds?: string[] | null;
   currentRound?: number;
   awaitingSupport?: boolean;
   awaitingSupportRound?: number;

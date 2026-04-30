@@ -38,7 +38,7 @@ interface DebateRoomProps {
   initialSession: DebateSession;
 }
 
-const roundLabels = ['立场表达', '交叉质询', '最终陈词'];
+const baseRoundLabels = ['立场表达', '交锋与结盟', '最终陈词'];
 
 const modeLabels: Record<DebateSession['mode'], string> = {
   serious: '理性裁决',
@@ -53,21 +53,46 @@ function normalizeSupportHistory(history: DebateSession['supportHistory']): Roun
   return Array.isArray(history) ? history : [];
 }
 
+function roundLabel(round: number) {
+  if (round <= baseRoundLabels.length) {
+    return baseRoundLabels[Math.max(round - 1, 0)];
+  }
+  return `加时赛 ${round - 3}`;
+}
+
 function getNextSpeaker(personas: Persona[], personaId: string, round: number) {
   const currentIndex = personas.findIndex((persona) => persona.id === personaId);
   if (currentIndex < 0 || personas.length === 0) return undefined;
   if (currentIndex < personas.length - 1) return personas[currentIndex + 1];
-  if (round < 3) return personas[0];
+  if (round !== 3) return personas[0];
   return undefined;
 }
 
 function getRoundStageLabel(session: DebateSession, fallbackRound: number) {
   if (session.awaitingSupport) {
     const supportRound = session.awaitingSupportRound || fallbackRound || 1;
-    return `Round ${supportRound} · 站队时刻`;
+    return supportRound > 3
+      ? `加时赛 ${supportRound - 3} · 站队时刻`
+      : `Round ${supportRound} · 站队时刻`;
   }
   const round = session.currentRound || fallbackRound || 1;
-  return `Round ${Math.max(round, 1)} · ${roundLabels[Math.max(round - 1, 0)]}`;
+  if (round > 3) {
+    return `加时赛 ${round - 3} · ${roundLabel(round)}`;
+  }
+  return `Round ${Math.max(round, 1)} · ${roundLabel(round)}`;
+}
+
+function resolveActiveRoundPersonas(
+  personas: Persona[],
+  round: number,
+  overtimePersonaIds?: string[] | null,
+) {
+  if (round <= 3 || !Array.isArray(overtimePersonaIds) || overtimePersonaIds.length < 2) {
+    return personas;
+  }
+  const idSet = new Set(overtimePersonaIds);
+  const active = personas.filter((persona) => idSet.has(persona.id));
+  return active.length >= 2 ? active : personas;
 }
 
 export function DebateRoom({ initialSession }: DebateRoomProps) {
@@ -96,6 +121,10 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
       awaitingSupportRound: session.awaitingSupportRound ?? 0,
       personas,
       messages,
+      liveScores: Array.isArray(session.liveScores) ? session.liveScores : [],
+      overtimePersonaIds: Array.isArray(session.overtimePersonaIds)
+        ? session.overtimePersonaIds
+        : [],
       supportHistory: normalizeSupportHistory(session.supportHistory),
     }),
     [messages, personas, session],
@@ -110,9 +139,18 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
   const latestSupport = supportHistory.at(-1);
   const supportPromptRound = safeSession.awaitingSupportRound || 0;
   const isAwaitingSupport = Boolean(safeSession.awaitingSupport && supportPromptRound > 0);
+  const supportCandidates = useMemo(
+    () =>
+      resolveActiveRoundPersonas(
+        personas,
+        supportPromptRound || currentRound,
+        safeSession.overtimePersonaIds,
+      ),
+    [currentRound, personas, safeSession.overtimePersonaIds, supportPromptRound],
+  );
   const liveScores = useMemo<DebateScore[]>(
-    () => buildDebateScores(personas, messages, result),
-    [messages, personas, result],
+    () => buildDebateScores(personas, safeSession.liveScores, result),
+    [personas, result, safeSession.liveScores],
   );
 
   const scoreMap = useMemo(() => {
@@ -131,7 +169,11 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
       return;
     }
     if (isAwaitingSupport) {
-      setStatusText(`Round ${supportPromptRound} 结束，轮到你选这一轮更支持谁。`);
+      setStatusText(
+        supportPromptRound > 3
+          ? `加时赛 ${supportPromptRound - 3} 结束，轮到你选这一轮更支持谁。`
+          : `Round ${supportPromptRound} 结束，轮到你选这一轮更支持谁。`,
+      );
       setActivePersonaId(undefined);
     }
   }, [isAwaitingSupport, result, supportPromptRound]);
@@ -169,7 +211,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
         nextPersonas.length >= targetCount
           ? '五位人格已入场，第一位正在组织发言...'
           : latestPersona
-            ? `${latestPersona.name} 已入场，正在校准口头禅...`
+            ? `${latestPersona.name} 已入场，正在准备出场口号...`
             : '人格设定同步中...',
       );
     });
@@ -180,7 +222,11 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
 
       setStreamError('');
       const nextSpeaker = getNextSpeaker(
-        personasRef.current,
+        resolveActiveRoundPersonas(
+          personasRef.current,
+          payload.round || 1,
+          payload.overtimePersonaIds || safeSession.overtimePersonaIds,
+        ),
         payload.personaId,
         payload.round || 1,
       );
@@ -193,6 +239,11 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
       setSession((prev) => ({
         ...prev,
         currentRound: payload.round ?? prev.currentRound ?? 1,
+        liveScores: Array.isArray(payload.scores) ? payload.scores : prev.liveScores,
+        neutralJudge: payload.neutralJudge ?? prev.neutralJudge,
+        overtimePersonaIds: Array.isArray(payload.overtimePersonaIds)
+          ? payload.overtimePersonaIds
+          : prev.overtimePersonaIds,
       }));
       setMessages((prev) => {
         const message = buildMessageFromSSEEvent(payload, prev.length);
@@ -212,6 +263,11 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
         currentRound: payload.currentRound ?? prev.currentRound ?? 1,
         awaitingSupport: payload.awaitingSupport ?? true,
         awaitingSupportRound: payload.awaitingSupportRound ?? payload.round ?? 0,
+        liveScores: Array.isArray(payload.scores) ? payload.scores : prev.liveScores,
+        neutralJudge: payload.neutralJudge ?? prev.neutralJudge,
+        overtimePersonaIds: Array.isArray(payload.overtimePersonaIds)
+          ? payload.overtimePersonaIds
+          : prev.overtimePersonaIds,
         supportHistory: Array.isArray(payload.supportHistory)
           ? payload.supportHistory
           : prev.supportHistory,
@@ -220,7 +276,11 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
             ? payload.personas
             : prev.personas,
       }));
-      setStatusText(`Round ${payload.round || 1} 结束，轮到你站队了。`);
+      setStatusText(
+        (payload.round || 1) > 3
+          ? `加时赛 ${(payload.round || 1) - 3} 结束，轮到你站队了。`
+          : `Round ${payload.round || 1} 结束，轮到你站队了。`,
+      );
       source.close();
     });
 
@@ -258,6 +318,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     initialSession.personaCount,
     result,
     safeSession.awaitingSupport,
+    safeSession.overtimePersonaIds,
     safeSession.status,
   ]);
 
@@ -342,7 +403,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
                     <Sparkles className="h-5 w-5 animate-pulse" />
                   </div>
                   <p className="mt-4 text-[14px] font-semibold text-white">人格设定中</p>
-                  <p className="mt-2 text-[12px] leading-5 text-white/50">嘉宾生成后会一起入场。</p>
+                  <p className="mt-2 text-[12px] leading-5 text-white/50">嘉宾生成后会陆续入场。</p>
                 </div>
               ) : (
                 personas.map((persona) => (
@@ -359,18 +420,19 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
 
           <section className="arena-panel flex min-h-0 flex-col overflow-hidden border-purple-400/20 shadow-[0_0_30px_rgba(123,92,255,0.2)]">
             <header className="border-b border-white/8 px-4 pb-4 pt-5">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-[14px] font-medium text-fuchsia-100">
-                  <Megaphone className="h-4 w-4" />
-                  本次议题
-                </div>
-                <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/70 transition hover:bg-white/20">
-                  {modeLabels[session.mode]}
+              <div className="flex items-center gap-2 text-[14px] font-medium text-fuchsia-100">
+                <Megaphone className="h-4 w-4" />
+                本次议题
+              </div>
+              <div className="mb-4 mt-4 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-purple-400/30 bg-gradient-to-r from-purple-500/30 to-pink-500/30 px-4 py-3 shadow-[0_0_30px_rgba(255,77,157,0.6)] backdrop-blur-lg">
+                <h1 className="min-w-0 flex-1 text-base font-bold tracking-wide text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.16)]">
+                  {session.topic}
+                </h1>
+                <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-fuchsia-300/26 bg-black/15 px-3 py-1.5 text-[12px] font-medium text-fuchsia-50 shadow-[0_0_12px_rgba(255,77,157,0.18)]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-300" />
+                  辩论风格：{modeLabels[session.mode]}
                 </span>
               </div>
-              <h1 className="mb-4 mt-4 max-w-full rounded-xl border border-purple-400/30 bg-gradient-to-r from-purple-500/30 to-pink-500/30 px-4 py-3 text-base tracking-wide text-white font-bold drop-shadow-[0_0_8px_rgba(255,255,255,0.16)] shadow-[0_0_30px_rgba(255,77,157,0.6)] backdrop-blur-lg">
-                {session.topic}
-              </h1>
             </header>
 
             <div className="px-4 pt-4">
@@ -392,32 +454,40 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
 
             <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-4 pr-2 pt-4">
               <div className="space-y-5">
-                {[1, 2, 3].map((round) => {
-                  const roundMessages = groupedMessages[round] || [];
-                  if (roundMessages.length === 0 && round > currentRound) return null;
-                  return (
-                    <section key={round} className="space-y-3">
-                      <div className="sticky top-0 z-10 -mx-1 bg-[linear-gradient(180deg,rgba(15,12,34,0.96),rgba(15,12,34,0.78),transparent)] px-1 pb-2 pt-1 backdrop-blur-sm">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/24 bg-fuchsia-500/12 px-3 py-1.5 text-[12px] font-medium text-fuchsia-50 shadow-[0_0_12px_rgba(255,77,157,0.18)]">
-                          <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-300" />
-                          Round {round}
-                          <span className="text-white/48">
-                            {roundMessages[0]?.roundTitle || roundLabels[round - 1]}
-                          </span>
+                {Array.from(
+                  new Set([
+                    ...Object.keys(groupedMessages).map((key) => Number(key)),
+                    ...(currentRound > 0 ? [currentRound] : []),
+                  ]),
+                )
+                  .filter((round) => round > 0)
+                  .sort((a, b) => a - b)
+                  .map((round) => {
+                    const roundMessages = groupedMessages[round] || [];
+                    if (roundMessages.length === 0 && round > currentRound) return null;
+                    return (
+                      <section key={round} className="space-y-3">
+                        <div className="sticky top-0 z-10 -mx-1 bg-[linear-gradient(180deg,rgba(15,12,34,0.96),rgba(15,12,34,0.78),transparent)] px-1 pb-2 pt-1 backdrop-blur-sm">
+                          <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/24 bg-fuchsia-500/12 px-3 py-1.5 text-[12px] font-medium text-fuchsia-50 shadow-[0_0_12px_rgba(255,77,157,0.18)]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-300" />
+                            {round > 3 ? `加时赛 ${round - 3}` : `Round ${round}`}
+                            <span className="text-white/48">
+                              {roundMessages[0]?.roundTitle || roundLabel(round)}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="space-y-4">
-                        {roundMessages.map((message) => (
-                          <DebateBubble
-                            key={message.id}
-                            message={message}
-                            persona={personas.find((persona) => persona.id === message.personaId)}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  );
-                })}
+                        <div className="space-y-4">
+                          {roundMessages.map((message) => (
+                            <DebateBubble
+                              key={message.id}
+                              message={message}
+                              persona={personas.find((persona) => persona.id === message.personaId)}
+                            />
+                          ))}
+                        </div>
+                      </section>
+                    );
+                  })}
 
                 {streamError ? (
                   <DebateStatePanel
@@ -449,7 +519,9 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
                         : isPreparingFirstMessage
                           ? '第一轮发言准备中'
                           : isAwaitingSupport
-                            ? `Round ${supportPromptRound} 已结束`
+                            ? supportPromptRound > 3
+                              ? `加时赛 ${supportPromptRound - 3} 已结束`
+                              : `Round ${supportPromptRound} 已结束`
                             : statusText
                     }
                     description={
@@ -485,10 +557,14 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
                             </p>
                           ) : null}
                         </div>
-                        <span className="arena-chip">Round {supportPromptRound}</span>
+                        <span className="arena-chip">
+                          {supportPromptRound > 3
+                            ? `加时赛 ${supportPromptRound - 3}`
+                            : `Round ${supportPromptRound}`}
+                        </span>
                       </div>
                       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        {personas.map((persona) => {
+                        {supportCandidates.map((persona) => {
                           const active = selectedSupportPersonaId === persona.id;
                           return (
                             <button

@@ -62,9 +62,12 @@ export function PersonaCard({ persona, score = 10, active = false }: PersonaCard
           <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-white/70">{persona.style}</p>
         </div>
       </div>
-      <p className="mt-3 rounded-2xl border border-white/8 bg-black/10 px-3 py-2 text-[12px] leading-5 text-white/72">
-        “{persona.catchphrase}”
-      </p>
+      <div className="mt-3 rounded-2xl border border-white/8 bg-black/10 px-3 py-2">
+        <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/36">
+          出场口号
+        </div>
+        <p className="mt-1 text-[12px] leading-5 text-white/72">“{persona.catchphrase}”</p>
+      </div>
       <div className="mt-3 flex items-center gap-3">
         <span className="text-[12px] font-medium text-white/56">支持热度</span>
         <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
