@@ -199,6 +199,63 @@ func TestStreamDebateEmitsMessageJudgeAndDoneEvents(t *testing.T) {
 	}
 }
 
+func TestStreamDebateEmitsFirstPersonaBeforeSecondPersonaCompletes(t *testing.T) {
+	restore := disableStreamDelays(t)
+	defer restore()
+
+	personas := testPersonas()
+	store := NewMemoryStore()
+	session := testSession("deb_first_persona_fast", nil)
+	session.PersonaCount = len(personas)
+	if err := store.Create(session); err != nil {
+		t.Fatalf("create session failed: %v", err)
+	}
+
+	secondPersonaStarted := make(chan struct{})
+	releaseSecondPersona := make(chan struct{})
+	service := NewService(store, streamStubAI{
+		generatePersonas: func(ctx context.Context, topic string, mode string, count int) ([]Persona, error) {
+			t.Fatal("StreamDebate should not wait for batch persona generation")
+			return nil, nil
+		},
+		generatePersona: func(ctx context.Context, topic string, mode string, persona Persona, index int, count int) (*Persona, error) {
+			if index == 1 {
+				close(secondPersonaStarted)
+				select {
+				case <-releaseSecondPersona:
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+			}
+			generated := personas[index]
+			return &generated, nil
+		},
+		generateRound: func(ctx context.Context, topic string, mode string, personas []Persona, round int, history []DebateMessage) ([]DebateMessage, error) {
+			return nil, nil
+		},
+		generateMessage: func(ctx context.Context, topic string, mode string, personas []Persona, persona Persona, round int, history []DebateMessage) (*DebateMessage, error) {
+			return &DebateMessage{PersonaID: persona.ID, PersonaName: persona.Name, Content: "发言"}, nil
+		},
+		judgeDebate: func(ctx context.Context, topic string, personas []Persona, messages []DebateMessage) (*DebateResult, error) {
+			return &DebateResult{Winner: personas[0].Name, FinalAdvice: "先看第一位。", Quote: "先有人入场。"}, nil
+		},
+	})
+
+	stream := service.StreamDebate(context.Background(), "deb_first_persona_fast")
+	firstEvent := waitForStreamEvent(t, stream)
+	if firstEvent.Type != "personas" || len(firstEvent.Personas) != 1 || firstEvent.Personas[0].ID != personas[0].ID {
+		t.Fatalf("expected first persona to stream before second completes, got %+v", firstEvent)
+	}
+
+	select {
+	case <-secondPersonaStarted:
+	case <-time.After(time.Second):
+		t.Fatal("expected second persona generation to start after first persona event")
+	}
+	close(releaseSecondPersona)
+	_ = collectRemainingStreamEvents(t, stream)
+}
+
 func TestStreamDebateEmitsErrorWhenDebateIsMissing(t *testing.T) {
 	restore := disableStreamDelays(t)
 	defer restore()
@@ -311,6 +368,39 @@ func collectStreamEvents(t *testing.T, stream <-chan SSEEvent) []SSEEvent {
 			events = append(events, event)
 		case <-timeout:
 			t.Fatalf("timed out waiting for stream events: %+v", events)
+		}
+	}
+}
+
+func waitForStreamEvent(t *testing.T, stream <-chan SSEEvent) SSEEvent {
+	t.Helper()
+
+	select {
+	case event, ok := <-stream:
+		if !ok {
+			t.Fatal("stream closed before first event")
+		}
+		return event
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for stream event")
+	}
+	return SSEEvent{}
+}
+
+func collectRemainingStreamEvents(t *testing.T, stream <-chan SSEEvent) []SSEEvent {
+	t.Helper()
+
+	var events []SSEEvent
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case event, ok := <-stream:
+			if !ok {
+				return events
+			}
+			events = append(events, event)
+		case <-timeout:
+			t.Fatalf("timed out waiting for remaining stream events: %+v", events)
 		}
 	}
 }
