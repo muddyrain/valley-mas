@@ -17,6 +17,17 @@
 3. 读取当前任务相关目录下的 `README.md`、`.env.example`、package scripts、Go 路由或 handler。
 4. 以当前代码和当前文档为准，不凭旧记忆推断路径、命令或业务规则。
 
+## 子项目 AGENTS 路由
+
+进入下列子项目时，先读取对应目录的 `AGENTS.md`，再读取本目录内的 README、环境变量示例、路由入口或 package scripts。子项目 `AGENTS.md` 只补充局部功能、规范和路由引导；全局规则、skill 选择、Git 规则和完成标准仍以根目录本文档为准。
+
+| 子项目 | 局部协作入口 | 适用范围 |
+|---|---|---|
+| Web 前台 | `apps/web/AGENTS.md` | 用户侧页面、创作者空间、资源、博客、我的空间、个人状态与 Web API 封装。 |
+| Admin 后台 | `apps/admin/AGENTS.md` | 管理后台页面、审核与管理流程、Ant Design 管理端组件和 Admin API 封装。 |
+| AI Mind Arena | `apps/ai-mind-arena/AGENTS.md` | 脑内会议室 Next.js 前端、多人格辩论 UI、SSE 对战流和分享体验。 |
+| Go 服务端 | `server/AGENTS.md` | Gin/GORM API、认证中间件、业务 handler、数据模型、AI 与 Mind Arena 服务端能力。 |
+
 ## Skills 使用流程
 
 1. 开始任务前读取 `.codex/skills/INDEX.md`。
