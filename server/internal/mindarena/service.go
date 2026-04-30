@@ -20,6 +20,11 @@ type Service struct {
 	ai    DebateAI
 }
 
+var (
+	streamMessageDelay = 650 * time.Millisecond
+	streamDoneDelay    = 350 * time.Millisecond
+)
+
 func NewService(store Store, ai DebateAI) *Service {
 	return &Service{store: store, ai: ai}
 }
@@ -122,7 +127,7 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 				}) {
 					return
 				}
-				if !sleepWithContext(ctx, 650*time.Millisecond) {
+				if !sleepWithContext(ctx, streamMessageDelay) {
 					return
 				}
 			}
@@ -140,7 +145,7 @@ func (s *Service) StreamDebate(ctx context.Context, id string) <-chan SSEEvent {
 		if !sendEvent(ctx, events, SSEEvent{Type: "judge", Result: result}) {
 			return
 		}
-		_ = sleepWithContext(ctx, 350*time.Millisecond)
+		_ = sleepWithContext(ctx, streamDoneDelay)
 		sendEvent(ctx, events, SSEEvent{Type: "done", SessionID: id})
 	}()
 
@@ -186,6 +191,9 @@ func newID(prefix string) string {
 }
 
 func sleepWithContext(ctx context.Context, delay time.Duration) bool {
+	if delay <= 0 {
+		return true
+	}
 	timer := time.NewTimer(delay)
 	defer timer.Stop()
 	select {

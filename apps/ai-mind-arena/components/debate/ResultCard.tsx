@@ -1,16 +1,35 @@
 'use client';
 
-import { Copy, RefreshCcw, Trophy } from 'lucide-react';
+import { Check, Copy, RefreshCcw, Share2, Trophy } from 'lucide-react';
 import Link from 'next/link';
-import type { DebateResult } from '@/lib/types';
+import { useState } from 'react';
+import { shareDebateResult } from '@/lib/share';
+import type { DebateResult, DebateSession } from '@/lib/types';
 
 interface ResultCardProps {
+  session: DebateSession;
   result: DebateResult;
 }
 
-export function ResultCard({ result }: ResultCardProps) {
+export function ResultCard({ session, result }: ResultCardProps) {
+  const [actionText, setActionText] = useState('');
+
   async function copyQuote() {
-    await navigator.clipboard?.writeText(result.quote);
+    try {
+      await navigator.clipboard?.writeText(result.quote);
+      setActionText('金句已复制');
+    } catch {
+      setActionText('复制失败，请手动选中金句');
+    }
+  }
+
+  async function shareResult() {
+    try {
+      const outcome = await shareDebateResult(session, result);
+      setActionText(outcome === 'shared' ? '已打开分享' : '战况已复制');
+    } catch {
+      setActionText('分享取消或复制失败');
+    }
   }
 
   return (
@@ -35,11 +54,21 @@ export function ResultCard({ result }: ResultCardProps) {
               <Copy className="h-4 w-4" />
               复制金句
             </button>
+            <button type="button" onClick={shareResult} className="arena-ghost-button">
+              <Share2 className="h-4 w-4" />
+              分享战况
+            </button>
             <Link href="/" className="arena-ghost-button">
               <RefreshCcw className="h-4 w-4" />
               再开一局
             </Link>
           </div>
+          {actionText ? (
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-300/24 bg-emerald-400/10 px-3 py-1.5 text-[12px] font-medium text-emerald-100">
+              <Check className="h-3.5 w-3.5" />
+              {actionText}
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

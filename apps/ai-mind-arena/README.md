@@ -135,7 +135,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8080 pnpm dev
 
 前端默认运行在：
 ```bash
-http://localhost:3001
+http://localhost:5175
 ```
 
 ---

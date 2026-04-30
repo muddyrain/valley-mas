@@ -4,7 +4,7 @@
 Phase 1：AI 接入与基础辩论流程
 
 ## 当前正在做
-Task 7：生成裁判结果与分数
+全部任务已完成
 
 ---
 
@@ -32,31 +32,31 @@ Task 7：生成裁判结果与分数
 ### [x] Task 4：实现 Round 1（立场表达）
 ### [x] Task 5：实现 Round 2（互相反驳）
 ### [x] Task 6：实现 Round 3（总结建议）
-### [ ] Task 7：生成裁判结果与分数
+### [x] Task 7：生成裁判结果与分数
 
 ---
 
 ## Phase 3：SSE 流式输出
 
-### [ ] Task 8：实现 message 流式推送
-### [ ] Task 9：实现 judge / done / error 事件
+### [x] Task 8：实现 message 流式推送
+### [x] Task 9：实现 judge / done / error 事件
 
 ---
 
 ## Phase 4：前端对接
 
-### [ ] Task 10：前端创建辩论
-### [ ] Task 11：前端监听 SSE
-### [ ] Task 12：渲染多角色对话流
-### [ ] Task 13：渲染裁判结果和分数面板
+### [x] Task 10：前端创建辩论
+### [x] Task 11：前端监听 SSE
+### [x] Task 12：渲染多角色对话流
+### [x] Task 13：渲染裁判结果和分数面板
 
 ---
 
 ## Phase 5：体验优化
 
-### [ ] Task 14：loading / empty / error 状态
-### [ ] Task 15：支持率动态变化
-### [ ] Task 16：分享能力
+### [x] Task 14：loading / empty / error 状态
+### [x] Task 15：支持率动态变化
+### [x] Task 16：分享能力
 
 ---
 

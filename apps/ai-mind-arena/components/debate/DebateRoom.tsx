@@ -1,12 +1,27 @@
 'use client';
 
-import { ArrowLeft, Loader2, Megaphone, Sparkles } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Loader2,
+  Megaphone,
+  Radio,
+  RefreshCcw,
+  Sparkles,
+} from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getDebate, getDebateStreamURL } from '@/lib/api';
-import type { DebateMessage, DebateResult, DebateSession, DebateSSEEvent } from '@/lib/types';
+import {
+  appendUniqueDebateMessage,
+  buildMessageFromSSEEvent,
+  parseDebateSSEEvent,
+} from '@/lib/debateEvents';
+import { buildDebateScores } from '@/lib/debateScores';
+import type { DebateMessage, DebateResult, DebateScore, DebateSession } from '@/lib/types';
 import { DebateBubble } from './DebateBubble';
+import { DebateStatePanel } from './DebateStatePanel';
 import { PersonaCard } from './PersonaCard';
 import { ResultCard } from './ResultCard';
 import { ScorePanel } from './ScorePanel';
@@ -31,19 +46,26 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
   const [messages, setMessages] = useState<DebateMessage[]>(initialSession.messages || []);
   const [result, setResult] = useState<DebateResult | undefined>(initialSession.result);
   const [statusText, setStatusText] = useState('脑内评委团正在入场...');
+  const [streamError, setStreamError] = useState('');
   const [activePersonaId, setActivePersonaId] = useState<string | undefined>();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const currentRound = messages.at(-1)?.round || (session.status === 'created' ? 1 : 3);
+  const liveScores = useMemo<DebateScore[]>(
+    () => buildDebateScores(session.personas, messages, result),
+    [messages, result, session.personas],
+  );
 
   const scoreMap = useMemo(() => {
     const base = new Map<string, number>();
-    session.personas.map((persona, index) => base.set(persona.name, Math.max(10, 30 - index * 5)));
-    result?.scores.map((score) => base.set(score.persona, score.score));
+    liveScores.map((score) => base.set(score.persona, score.score));
     return base;
-  }, [result?.scores, session.personas]);
+  }, [liveScores]);
 
   useEffect(() => {
+    const shouldScroll = messages.length > 0 || Boolean(result);
+    if (!shouldScroll) return;
+
     bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [messages.length, result]);
 
@@ -53,38 +75,23 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     const source = new EventSource(getDebateStreamURL(initialSession.id));
 
     source.addEventListener('message', (event) => {
-      const payload = JSON.parse((event as MessageEvent).data) as DebateSSEEvent;
-      if (!payload.personaId || !payload.personaName || !payload.content) return;
-      const personaId = payload.personaId;
-      const personaName = payload.personaName;
-      const content = payload.content;
-      setActivePersonaId(personaId);
-      setStatusText(`${personaName} 正在发言...`);
+      const payload = parseDebateSSEEvent(event as MessageEvent<string>);
+      if (!payload || !payload.personaId || !payload.personaName || !payload.content) return;
+
+      setStreamError('');
+      setActivePersonaId(payload.personaId);
+      setStatusText(`${payload.personaName} 正在发言...`);
       setMessages((prev) => {
-        const exists = prev.some(
-          (message) =>
-            message.round === payload.round &&
-            message.personaId === personaId &&
-            message.content === content,
-        );
-        if (exists) return prev;
-        return [
-          ...prev,
-          {
-            id: `${personaId}-${payload.round}-${prev.length}`,
-            round: payload.round || 1,
-            roundTitle: payload.roundTitle || '立场表达',
-            personaId,
-            personaName,
-            content,
-            createdAt: new Date().toISOString(),
-          },
-        ];
+        const message = buildMessageFromSSEEvent(payload, prev.length);
+        if (!message) return prev;
+        return appendUniqueDebateMessage(prev, message);
       });
     });
 
     source.addEventListener('judge', (event) => {
-      const payload = JSON.parse((event as MessageEvent).data) as DebateSSEEvent;
+      const payload = parseDebateSSEEvent(event as MessageEvent<string>);
+      if (!payload || !payload.result) return;
+      setStreamError('');
       setResult(payload.result);
       setActivePersonaId(undefined);
       setStatusText('裁判团正在亮牌');
@@ -100,13 +107,11 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     });
 
     source.addEventListener('error', (event) => {
-      const messageEvent = event as MessageEvent<string>;
-      if (typeof messageEvent.data === 'string' && messageEvent.data) {
-        const payload = JSON.parse(messageEvent.data) as DebateSSEEvent;
-        setStatusText(payload.message || '流式连接中断');
-      } else {
-        setStatusText('连接评委席失败，请刷新重试');
-      }
+      const payload = parseDebateSSEEvent(event as MessageEvent<string>);
+      const statusMessage = payload ? payload.message : '';
+      const nextError = statusMessage || '流式连接中断，请刷新重试';
+      setStreamError(nextError);
+      setStatusText(nextError);
       source.close();
     });
 
@@ -233,20 +238,51 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
                   );
                 })}
 
-                {!result ? (
-                  <div className="arena-subpanel mx-auto flex w-fit items-center gap-2 border-purple-400/20 bg-white/5 px-4 py-3 text-[13px] font-medium text-white/72 shadow-[0_0_20px_rgba(123,92,255,0.18)]">
-                    <Loader2 className="h-4 w-4 animate-spin text-fuchsia-300" />
-                    {statusText}
-                  </div>
+                {streamError ? (
+                  <DebateStatePanel
+                    icon={<AlertTriangle className="h-5 w-5" />}
+                    title="流式连接中断"
+                    description={streamError}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => window.location.reload()}
+                      className="arena-ghost-button"
+                    >
+                      <RefreshCcw className="h-4 w-4" />
+                      刷新重试
+                    </button>
+                  </DebateStatePanel>
+                ) : !result ? (
+                  <DebateStatePanel
+                    icon={
+                      messages.length === 0 ? (
+                        <Radio className="h-5 w-5" />
+                      ) : (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      )
+                    }
+                    title={messages.length === 0 ? '等待第一位人格开麦' : statusText}
+                    description={
+                      messages.length === 0
+                        ? '连接建立后，5 位人格会按轮次依次发言。'
+                        : '支持率会随着每次发言持续刷新。'
+                    }
+                  />
                 ) : (
-                  <ResultCard result={result} />
+                  <ResultCard session={session} result={result} />
                 )}
                 <div ref={bottomRef} />
               </div>
             </div>
           </section>
 
-          <ScorePanel session={session} result={result} currentRound={currentRound} />
+          <ScorePanel
+            session={session}
+            result={result}
+            currentRound={currentRound}
+            scores={liveScores}
+          />
         </div>
       </div>
     </main>
