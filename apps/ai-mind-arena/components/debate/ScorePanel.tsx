@@ -25,7 +25,7 @@ export function ScorePanel({ session, result, currentRound, scores }: ScorePanel
             <TrendingUp className="h-4 w-4 text-fuchsia-300" />
             当前战况
           </div>
-          <p className="mt-1 text-[12px] leading-5 text-white/50">实时支持率与阶段状态</p>
+          <p className="mt-1 text-[12px] leading-5 text-white/50">按发言内容实时测算支持率</p>
         </div>
         <span className="arena-chip">Round {Math.max(currentRound, 1)}</span>
       </div>
@@ -51,13 +51,13 @@ export function ScorePanel({ session, result, currentRound, scores }: ScorePanel
 
       <section className="arena-subpanel border-white/10 bg-white/5 p-4 backdrop-blur-md shadow-[0_0_20px_rgba(123,92,255,0.18)] flex min-h-0 flex-1 flex-col">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-[15px] font-semibold text-white">实时支持率</div>
-          <span className="text-[12px] text-white/42">{result ? '最终排名' : '动态排名'}</span>
+          <div className="text-[15px] font-semibold text-white">支持率走势</div>
+          <span className="text-[12px] text-white/42">{result ? '最终结果' : '内容测算中'}</span>
         </div>
         <div className="thin-scrollbar mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {sortedScores.length === 0 ? (
             <div className="rounded-lg border border-white/8 bg-white/[0.04] px-3 py-4 text-[12px] leading-5 text-white/48">
-              人格入场后开始统计支持率。
+              人格发言后开始按内容测算支持率。
             </div>
           ) : (
             sortedScores.map((score, index) => {

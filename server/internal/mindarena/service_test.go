@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
@@ -104,28 +105,29 @@ func TestStreamDebateEmitsMessageJudgeAndDoneEvents(t *testing.T) {
 
 	service := NewService(store, streamStubAI{
 		generatePersonas: func(ctx context.Context, topic string, mode string, count int) ([]Persona, error) {
-			generated := append([]Persona(nil), personas...)
-			generated[0].Catchphrase = "先试小步"
-			return generated, nil
+			t.Fatal("StreamDebate should reveal personas one by one")
+			return nil, nil
 		},
 		generatePersona: func(ctx context.Context, topic string, mode string, persona Persona, index int, count int) (*Persona, error) {
-			t.Fatal("StreamDebate should batch persona generation")
-			return nil, nil
+			if index == 0 {
+				time.Sleep(20 * time.Millisecond)
+			}
+			generated := persona
+			if index == 0 {
+				generated.Catchphrase = "先试小步"
+			}
+			return &generated, nil
 		},
 		generateRound: func(ctx context.Context, topic string, mode string, personas []Persona, round int, history []DebateMessage) ([]DebateMessage, error) {
-			messages := make([]DebateMessage, 0, len(personas))
-			for _, persona := range personas {
-				messages = append(messages, DebateMessage{
-					PersonaID:   persona.ID,
-					PersonaName: persona.Name,
-					Content:     fmt.Sprintf("%s 第 %d 轮发言", persona.Name, round),
-				})
-			}
-			return messages, nil
+			t.Fatal("StreamDebate should generate debate messages one by one")
+			return nil, nil
 		},
 		generateMessage: func(ctx context.Context, topic string, mode string, personas []Persona, persona Persona, round int, history []DebateMessage) (*DebateMessage, error) {
-			t.Fatal("StreamDebate should batch each debate round")
-			return nil, nil
+			return &DebateMessage{
+				PersonaID:   persona.ID,
+				PersonaName: persona.Name,
+				Content:     fmt.Sprintf("%s 第 %d 轮发言", persona.Name, round),
+			}, nil
 		},
 		judgeDebate: func(ctx context.Context, topic string, personas []Persona, messages []DebateMessage) (*DebateResult, error) {
 			if len(messages) != 6 {
@@ -144,8 +146,8 @@ func TestStreamDebateEmitsMessageJudgeAndDoneEvents(t *testing.T) {
 	})
 
 	events := collectStreamEvents(t, service.StreamDebate(context.Background(), "deb_stream_ok"))
-	if len(events) != 9 {
-		t.Fatalf("expected personas, 6 message events, judge and done, got %+v", events)
+	if len(events) != 10 {
+		t.Fatalf("expected 2 personas events, 6 message events, judge and done, got %+v", events)
 	}
 	personaEvents := make([]SSEEvent, 0, len(personas))
 	messageEvents := make([]SSEEvent, 0, 6)
@@ -157,11 +159,22 @@ func TestStreamDebateEmitsMessageJudgeAndDoneEvents(t *testing.T) {
 			messageEvents = append(messageEvents, events[i])
 		}
 	}
-	if len(personaEvents) != 1 {
-		t.Fatalf("expected one batch persona reveal event, got %+v", personaEvents)
+	if len(personaEvents) != len(personas) {
+		t.Fatalf("expected one personas event per generated persona, got %+v", personaEvents)
 	}
-	if personaEvents[0].PersonaCount != len(personas) || len(personaEvents[0].Personas) != len(personas) || personaEvents[0].Personas[0].Catchphrase != "先试小步" {
-		t.Fatalf("expected batch personas event with updated catchphrase, got %+v", personaEvents[0])
+	for i := range personaEvents {
+		if personaEvents[i].PersonaCount != len(personas) {
+			t.Fatalf("expected personas event %d to carry total persona count, got %+v", i, personaEvents[i])
+		}
+		if len(personaEvents[i].Personas) != i+1 {
+			t.Fatalf("expected personas event %d to reveal %d personas, got %+v", i, i+1, personaEvents[i])
+		}
+	}
+	if len(personaEvents[0].Personas) != 1 || personaEvents[0].Personas[0].Name != "毒舌派" {
+		t.Fatalf("expected first personas event to reveal the fastest persona, got %+v", personaEvents[0])
+	}
+	if len(personaEvents[1].Personas) != len(personas) {
+		t.Fatalf("expected final personas event to include accumulated personas, got %+v", personaEvents[1])
 	}
 	if len(messageEvents) != 6 {
 		t.Fatalf("expected 6 message events, got %+v", messageEvents)
@@ -194,12 +207,13 @@ func TestStreamDebateEmitsMessageJudgeAndDoneEvents(t *testing.T) {
 	if session.Status != DebateStatusDone || len(session.Messages) != 6 || session.Result == nil {
 		t.Fatalf("expected completed persisted session, got %+v", session)
 	}
-	if session.Personas[0].Catchphrase != "先试小步" {
-		t.Fatalf("expected updated personas to be persisted, got %+v", session.Personas)
+	firstPersona, ok := findPersonaByID(session.Personas, "p1")
+	if !ok || firstPersona.Catchphrase != "先试小步" {
+		t.Fatalf("expected updated first persona to be persisted, got %+v", session.Personas)
 	}
 }
 
-func TestStreamDebateBatchesPersonaGenerationBeforeDebateStarts(t *testing.T) {
+func TestStreamDebateEmitsPersonasAsSoonAsTheyAreReady(t *testing.T) {
 	restore := disableStreamDelays(t)
 	defer restore()
 
@@ -213,22 +227,21 @@ func TestStreamDebateBatchesPersonaGenerationBeforeDebateStarts(t *testing.T) {
 
 	service := NewService(store, streamStubAI{
 		generatePersonas: func(ctx context.Context, topic string, mode string, count int) ([]Persona, error) {
-			return personas, nil
+			t.Fatal("StreamDebate should not use batch persona generation")
+			return nil, nil
 		},
 		generatePersona: func(ctx context.Context, topic string, mode string, persona Persona, index int, count int) (*Persona, error) {
-			t.Fatal("StreamDebate should not use per-persona generation")
-			return nil, nil
+			if index == 0 {
+				time.Sleep(30 * time.Millisecond)
+			}
+			return &persona, nil
 		},
 		generateRound: func(ctx context.Context, topic string, mode string, personas []Persona, round int, history []DebateMessage) ([]DebateMessage, error) {
-			messages := make([]DebateMessage, 0, len(personas))
-			for _, persona := range personas {
-				messages = append(messages, DebateMessage{PersonaID: persona.ID, PersonaName: persona.Name, Content: "发言"})
-			}
-			return messages, nil
+			t.Fatal("StreamDebate should not use batch round generation")
+			return nil, nil
 		},
 		generateMessage: func(ctx context.Context, topic string, mode string, personas []Persona, persona Persona, round int, history []DebateMessage) (*DebateMessage, error) {
-			t.Fatal("StreamDebate should not use per-persona message generation")
-			return nil, nil
+			return &DebateMessage{PersonaID: persona.ID, PersonaName: persona.Name, Content: "发言"}, nil
 		},
 		judgeDebate: func(ctx context.Context, topic string, personas []Persona, messages []DebateMessage) (*DebateResult, error) {
 			return &DebateResult{Winner: personas[0].Name, FinalAdvice: "先看第一位。", Quote: "先有人入场。"}, nil
@@ -237,10 +250,89 @@ func TestStreamDebateBatchesPersonaGenerationBeforeDebateStarts(t *testing.T) {
 
 	stream := service.StreamDebate(context.Background(), "deb_first_persona_fast")
 	firstEvent := waitForStreamEvent(t, stream)
-	if firstEvent.Type != "personas" || len(firstEvent.Personas) != len(personas) {
-		t.Fatalf("expected batch personas before messages, got %+v", firstEvent)
+	if firstEvent.Type != "personas" || len(firstEvent.Personas) != 1 || firstEvent.PersonaCount != len(personas) {
+		t.Fatalf("expected first personas event to reveal one persona, got %+v", firstEvent)
+	}
+	if firstEvent.Personas[0].ID != "p2" {
+		t.Fatalf("expected the faster persona to be pushed first, got %+v", firstEvent)
+	}
+	secondEvent := waitForStreamEvent(t, stream)
+	if secondEvent.Type != "personas" || len(secondEvent.Personas) != len(personas) {
+		t.Fatalf("expected second personas event to reveal all personas, got %+v", secondEvent)
+	}
+	thirdEvent := waitForStreamEvent(t, stream)
+	if thirdEvent.Type != "message" {
+		t.Fatalf("expected debate messages after persona reveal, got %+v", thirdEvent)
 	}
 	_ = collectRemainingStreamEvents(t, stream)
+}
+
+func TestStreamDebateStartsPersonaGenerationConcurrently(t *testing.T) {
+	restore := disableStreamDelays(t)
+	defer restore()
+
+	personas := testPersonas()
+	store := NewMemoryStore()
+	session := testSession("deb_persona_concurrent", nil)
+	session.PersonaCount = len(personas)
+	if err := store.Create(session); err != nil {
+		t.Fatalf("create session failed: %v", err)
+	}
+
+	releaseFirst := make(chan struct{})
+	secondStarted := make(chan struct{}, 1)
+	var mu sync.Mutex
+	startedIndexes := make([]int, 0, len(personas))
+
+	service := NewService(store, streamStubAI{
+		generatePersonas: func(ctx context.Context, topic string, mode string, count int) ([]Persona, error) {
+			t.Fatal("StreamDebate should not use batch persona generation")
+			return nil, nil
+		},
+		generatePersona: func(ctx context.Context, topic string, mode string, persona Persona, index int, count int) (*Persona, error) {
+			mu.Lock()
+			startedIndexes = append(startedIndexes, index)
+			startedCount := len(startedIndexes)
+			mu.Unlock()
+
+			if startedCount == len(personas) {
+				select {
+				case secondStarted <- struct{}{}:
+				default:
+				}
+			}
+
+			if index == 0 {
+				select {
+				case <-releaseFirst:
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+			}
+			return &persona, nil
+		},
+		generateRound: func(ctx context.Context, topic string, mode string, personas []Persona, round int, history []DebateMessage) ([]DebateMessage, error) {
+			t.Fatal("StreamDebate should not use batch round generation")
+			return nil, nil
+		},
+		generateMessage: func(ctx context.Context, topic string, mode string, personas []Persona, persona Persona, round int, history []DebateMessage) (*DebateMessage, error) {
+			return &DebateMessage{PersonaID: persona.ID, PersonaName: persona.Name, Content: "发言"}, nil
+		},
+		judgeDebate: func(ctx context.Context, topic string, personas []Persona, messages []DebateMessage) (*DebateResult, error) {
+			return &DebateResult{Winner: personas[0].Name, FinalAdvice: "先并发。", Quote: "一起开跑。"}, nil
+		},
+	})
+
+	stream := service.StreamDebate(context.Background(), "deb_persona_concurrent")
+
+	select {
+	case <-secondStarted:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("expected all persona generation requests to start before first one finishes")
+	}
+
+	close(releaseFirst)
+	_ = collectStreamEvents(t, stream)
 }
 
 func TestStreamDebateEmitsErrorWhenDebateIsMissing(t *testing.T) {
@@ -257,7 +349,149 @@ func TestStreamDebateEmitsErrorWhenDebateIsMissing(t *testing.T) {
 	}
 }
 
-func TestStreamDebateEmitsErrorAndMarksFailedWhenRoundGenerationFails(t *testing.T) {
+func TestStreamDebateGeneratesMessagesOneByOneAndUpdatesHistory(t *testing.T) {
+	restore := disableStreamDelays(t)
+	defer restore()
+
+	personas := testPersonas()
+	store := NewMemoryStore()
+	session := testSession("deb_history_incremental", personas)
+	session.PersonaCount = len(personas)
+	if err := store.Create(session); err != nil {
+		t.Fatalf("create session failed: %v", err)
+	}
+
+	type historySnapshot struct {
+		round       int
+		personaName string
+		historyLen  int
+		lastContent string
+	}
+
+	var snapshots []historySnapshot
+	service := NewService(store, streamStubAI{
+		generatePersonas: func(ctx context.Context, topic string, mode string, count int) ([]Persona, error) {
+			t.Fatal("StreamDebate should not regenerate personas when session already has personas")
+			return nil, nil
+		},
+		generatePersona: func(ctx context.Context, topic string, mode string, persona Persona, index int, count int) (*Persona, error) {
+			t.Fatal("StreamDebate should not regenerate personas when session already has personas")
+			return nil, nil
+		},
+		generateRound: func(ctx context.Context, topic string, mode string, personas []Persona, round int, history []DebateMessage) ([]DebateMessage, error) {
+			t.Fatal("StreamDebate should not use batch round generation")
+			return nil, nil
+		},
+		generateMessage: func(ctx context.Context, topic string, mode string, personas []Persona, persona Persona, round int, history []DebateMessage) (*DebateMessage, error) {
+			snapshot := historySnapshot{
+				round:       round,
+				personaName: persona.Name,
+				historyLen:  len(history),
+			}
+			if len(history) > 0 {
+				snapshot.lastContent = history[len(history)-1].Content
+			}
+			snapshots = append(snapshots, snapshot)
+			return &DebateMessage{
+				PersonaID:   persona.ID,
+				PersonaName: persona.Name,
+				Content:     fmt.Sprintf("%s 第 %d 轮发言", persona.Name, round),
+			}, nil
+		},
+		judgeDebate: func(ctx context.Context, topic string, personas []Persona, messages []DebateMessage) (*DebateResult, error) {
+			return &DebateResult{Winner: personas[0].Name, FinalAdvice: "继续推进。", Quote: "先说，再接。"}, nil
+		},
+	})
+
+	events := collectStreamEvents(t, service.StreamDebate(context.Background(), "deb_history_incremental"))
+	if len(events) != 9 {
+		t.Fatalf("expected personas, 6 message events, judge and done, got %+v", events)
+	}
+
+	expected := []historySnapshot{
+		{round: 1, personaName: "理性派", historyLen: 0, lastContent: ""},
+		{round: 1, personaName: "毒舌派", historyLen: 1, lastContent: "理性派 第 1 轮发言"},
+		{round: 2, personaName: "理性派", historyLen: 2, lastContent: "毒舌派 第 1 轮发言"},
+		{round: 2, personaName: "毒舌派", historyLen: 3, lastContent: "理性派 第 2 轮发言"},
+		{round: 3, personaName: "理性派", historyLen: 4, lastContent: "毒舌派 第 2 轮发言"},
+		{round: 3, personaName: "毒舌派", historyLen: 5, lastContent: "理性派 第 3 轮发言"},
+	}
+	if len(snapshots) != len(expected) {
+		t.Fatalf("expected %d message generations, got %+v", len(expected), snapshots)
+	}
+	for i := range expected {
+		if snapshots[i] != expected[i] {
+			t.Fatalf("snapshot %d = %+v, want %+v", i, snapshots[i], expected[i])
+		}
+	}
+}
+
+func TestStreamDebateEmitsErrorAndMarksFailedWhenPersonaGenerationFails(t *testing.T) {
+	restore := disableStreamDelays(t)
+	defer restore()
+
+	personas := testPersonas()
+	store := NewMemoryStore()
+	session := testSession("deb_persona_failed", nil)
+	session.PersonaCount = len(personas)
+	if err := store.Create(session); err != nil {
+		t.Fatalf("create session failed: %v", err)
+	}
+
+	service := NewService(store, streamStubAI{
+		generatePersonas: func(ctx context.Context, topic string, mode string, count int) ([]Persona, error) {
+			t.Fatal("StreamDebate should not batch persona generation")
+			return nil, nil
+		},
+		generatePersona: func(ctx context.Context, topic string, mode string, persona Persona, index int, count int) (*Persona, error) {
+			if index == 1 {
+				time.Sleep(10 * time.Millisecond)
+			}
+			if index == 1 {
+				return nil, errors.New("persona model offline")
+			}
+			generated := persona
+			generated.Catchphrase = "先试小步"
+			return &generated, nil
+		},
+		generateRound: func(ctx context.Context, topic string, mode string, personas []Persona, round int, history []DebateMessage) ([]DebateMessage, error) {
+			t.Fatal("round generation should not run when persona generation fails")
+			return nil, nil
+		},
+		generateMessage: func(ctx context.Context, topic string, mode string, personas []Persona, persona Persona, round int, history []DebateMessage) (*DebateMessage, error) {
+			t.Fatal("message generation should not run when persona generation fails")
+			return nil, nil
+		},
+		judgeDebate: func(ctx context.Context, topic string, personas []Persona, messages []DebateMessage) (*DebateResult, error) {
+			t.Fatal("judge should not run when persona generation fails")
+			return nil, nil
+		},
+	})
+
+	events := collectStreamEvents(t, service.StreamDebate(context.Background(), "deb_persona_failed"))
+	if len(events) != 2 {
+		t.Fatalf("expected first personas event and one error, got %+v", events)
+	}
+	if events[0].Type != "personas" || len(events[0].Personas) != 1 || events[0].PersonaCount != len(personas) {
+		t.Fatalf("expected first personas event to persist one generated persona, got %+v", events[0])
+	}
+	if events[1].Type != "error" || events[1].Message == "" {
+		t.Fatalf("expected error event after persona generation failure, got %+v", events[1])
+	}
+
+	sessionAfter, err := store.Get("deb_persona_failed")
+	if err != nil {
+		t.Fatalf("get session failed: %v", err)
+	}
+	if sessionAfter.Status != DebateStatusFailed || sessionAfter.Error == "" {
+		t.Fatalf("expected failed session with error, got %+v", sessionAfter)
+	}
+	if len(sessionAfter.Personas) != 1 || sessionAfter.Personas[0].Catchphrase != "先试小步" {
+		t.Fatalf("expected first generated persona to remain persisted, got %+v", sessionAfter.Personas)
+	}
+}
+
+func TestStreamDebateEmitsErrorAndMarksFailedWhenMessageGenerationFails(t *testing.T) {
 	restore := disableStreamDelays(t)
 	defer restore()
 
@@ -276,21 +510,17 @@ func TestStreamDebateEmitsErrorAndMarksFailedWhenRoundGenerationFails(t *testing
 			return nil, nil
 		},
 		generateRound: func(ctx context.Context, topic string, mode string, personas []Persona, round int, history []DebateMessage) ([]DebateMessage, error) {
-			if round == 2 {
-				return nil, errors.New("model offline")
-			}
-			messages := make([]DebateMessage, 0, len(personas))
-			for _, persona := range personas {
-				messages = append(messages, DebateMessage{PersonaID: persona.ID, PersonaName: persona.Name, Content: "第一轮先开场。"})
-			}
-			return messages, nil
-		},
-		generateMessage: func(ctx context.Context, topic string, mode string, personas []Persona, persona Persona, round int, history []DebateMessage) (*DebateMessage, error) {
-			t.Fatal("StreamDebate should not use per-persona message generation")
+			t.Fatal("StreamDebate should not use batch round generation")
 			return nil, nil
 		},
+		generateMessage: func(ctx context.Context, topic string, mode string, personas []Persona, persona Persona, round int, history []DebateMessage) (*DebateMessage, error) {
+			if round == 2 && persona.ID == "p2" {
+				return nil, errors.New("model offline")
+			}
+			return &DebateMessage{PersonaID: persona.ID, PersonaName: persona.Name, Content: fmt.Sprintf("第 %d 轮先开场。", round)}, nil
+		},
 		judgeDebate: func(ctx context.Context, topic string, personas []Persona, messages []DebateMessage) (*DebateResult, error) {
-			t.Fatal("judge should not run when round generation fails")
+			t.Fatal("judge should not run when message generation fails")
 			return nil, nil
 		},
 	})
@@ -315,8 +545,8 @@ func TestStreamDebateEmitsErrorAndMarksFailedWhenRoundGenerationFails(t *testing
 	if hasPersonas && len(events) < 4 {
 		t.Fatalf("expected personas event to be accompanied by messages and error, got %+v", events)
 	}
-	if messageCount != 2 {
-		t.Fatalf("expected first-round message events, got %+v", events)
+	if messageCount != 3 {
+		t.Fatalf("expected three message events before failure, got %+v", events)
 	}
 	if errorCount != 1 || events[len(events)-1].Type != "error" || events[len(events)-1].Message == "" {
 		t.Fatalf("expected final error event, got %+v", events)
@@ -414,4 +644,13 @@ func testPersonas() []Persona {
 		{ID: "p1", Name: "理性派"},
 		{ID: "p2", Name: "毒舌派"},
 	}
+}
+
+func findPersonaByID(personas []Persona, id string) (Persona, bool) {
+	for _, persona := range personas {
+		if persona.ID == id {
+			return persona, true
+		}
+	}
+	return Persona{}, false
 }

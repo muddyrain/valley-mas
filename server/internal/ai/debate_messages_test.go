@@ -55,6 +55,7 @@ func TestBuildDebateRoundPromptInput(t *testing.T) {
 		Round       int                 `json:"round"`
 		RoundGoal   string              `json:"roundGoal"`
 		Constraints []string            `json:"constraints"`
+		VoiceHints  []personaVoiceHint  `json:"personaVoiceHints"`
 		Personas    []mindarena.Persona `json:"personas"`
 	}
 	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
@@ -66,11 +67,18 @@ func TestBuildDebateRoundPromptInput(t *testing.T) {
 	if !strings.Contains(payload.RoundGoal, "开场亮立场") {
 		t.Fatalf("expected round goal to describe stance opening, got %q", payload.RoundGoal)
 	}
-	if len(payload.Constraints) == 0 || !strings.Contains(strings.Join(payload.Constraints, "\n"), "Round 1 只做立场表达") {
+	joinedConstraints := strings.Join(payload.Constraints, "\n")
+	if len(payload.Constraints) == 0 || !strings.Contains(joinedConstraints, "Round 1 只做立场表达") {
 		t.Fatalf("expected round one constraints, got %+v", payload.Constraints)
+	}
+	if !strings.Contains(joinedConstraints, "不超过 60 个中文字符") || !strings.Contains(joinedConstraints, "personality、style、catchphrase") {
+		t.Fatalf("expected stronger length and voice constraints, got %+v", payload.Constraints)
 	}
 	if len(payload.Personas) != 5 {
 		t.Fatalf("expected 5 personas in prompt payload, got %d", len(payload.Personas))
+	}
+	if len(payload.VoiceHints) != len(payload.Personas) || !strings.Contains(payload.VoiceHints[0].Voice, "口头禅气场") {
+		t.Fatalf("expected persona voice hints in payload, got %+v", payload.VoiceHints)
 	}
 }
 
@@ -163,5 +171,99 @@ func TestBuildDebateRoundPromptInputRoundThreeIncludesSummaryBriefs(t *testing.T
 	}
 	if strings.TrimSpace(first.AdviceFocus) == "" {
 		t.Fatalf("expected advice focus, got %+v", first)
+	}
+}
+
+func TestBuildDebateMessagePromptInputRoundTwoIncludesCurrentPersonaAndRebuttalTarget(t *testing.T) {
+	t.Parallel()
+
+	personas := defaultMindArenaPersonas()
+	history := []mindarena.DebateMessage{
+		{Round: 1, PersonaID: "p1", PersonaName: "理性派", Content: "先把风险和现金流算清。"},
+		{Round: 1, PersonaID: "p2", PersonaName: "毒舌派", Content: "别把逃避包装成理想。"},
+		{Round: 1, PersonaID: "p3", PersonaName: "赌徒派", Content: "机会来了就要先上车。"},
+	}
+
+	raw := buildDebateMessagePromptInput("要不要裸辞创业", "sharp", personas[:3], personas[0], 2, history)
+
+	var payload struct {
+		Round          int                       `json:"round"`
+		Constraints    []string                  `json:"constraints"`
+		CurrentPersona mindarena.Persona         `json:"currentPersona"`
+		CurrentVoice   string                    `json:"currentPersonaVoice"`
+		RebuttalTarget *roundTwoRebuttalTarget   `json:"rebuttalTarget"`
+		History        []mindarena.DebateMessage `json:"history"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("unmarshal prompt payload failed: %v", err)
+	}
+	if payload.Round != 2 {
+		t.Fatalf("expected round 2, got %d", payload.Round)
+	}
+	if payload.CurrentPersona.Name != "理性派" {
+		t.Fatalf("expected current persona to be 理性派, got %+v", payload.CurrentPersona)
+	}
+	if !strings.Contains(strings.Join(payload.Constraints, "\n"), "只输出 currentPersona 的一条 messages JSON") {
+		t.Fatalf("expected single-message constraint, got %+v", payload.Constraints)
+	}
+	if !strings.Contains(payload.CurrentVoice, payload.CurrentPersona.Catchphrase) {
+		t.Fatalf("expected current persona voice guide to include catchphrase, got %q", payload.CurrentVoice)
+	}
+	if payload.RebuttalTarget == nil || payload.RebuttalTarget.PersonaName != "理性派" {
+		t.Fatalf("expected rebuttal target for current persona, got %+v", payload.RebuttalTarget)
+	}
+	if payload.RebuttalTarget.TargetPersonaName == payload.CurrentPersona.Name {
+		t.Fatalf("expected rebuttal target to point to another persona, got %+v", payload.RebuttalTarget)
+	}
+	if len(payload.History) != len(history) {
+		t.Fatalf("expected history to be included, got %+v", payload.History)
+	}
+}
+
+func TestBuildDebateMessagePromptInputRoundThreeIncludesSummaryBrief(t *testing.T) {
+	t.Parallel()
+
+	personas := defaultMindArenaPersonas()[:2]
+	history := []mindarena.DebateMessage{
+		{Round: 1, PersonaID: "p1", PersonaName: "理性派", Content: "先把风险和现金流算清。"},
+		{Round: 1, PersonaID: "p2", PersonaName: "毒舌派", Content: "别把逃避包装成理想。"},
+		{Round: 2, PersonaID: "p1", PersonaName: "理性派", Content: "赌徒派别只喊冲，风险不是背景音乐。"},
+		{Round: 2, PersonaID: "p2", PersonaName: "毒舌派", Content: "理性派也别把人生算成表格。"},
+	}
+
+	raw := buildDebateMessagePromptInput("要不要裸辞创业", "serious", personas, personas[1], 3, history)
+
+	var payload struct {
+		Round          int                     `json:"round"`
+		CurrentPersona mindarena.Persona       `json:"currentPersona"`
+		CurrentVoice   string                  `json:"currentPersonaVoice"`
+		SummaryBrief   *roundThreeSummaryBrief `json:"summaryBrief"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("unmarshal prompt payload failed: %v", err)
+	}
+	if payload.Round != 3 {
+		t.Fatalf("expected round 3, got %d", payload.Round)
+	}
+	if payload.CurrentPersona.Name != "毒舌派" {
+		t.Fatalf("expected current persona to be 毒舌派, got %+v", payload.CurrentPersona)
+	}
+	if !strings.Contains(payload.CurrentVoice, payload.CurrentPersona.Style) {
+		t.Fatalf("expected current voice to include persona style, got %q", payload.CurrentVoice)
+	}
+	if payload.SummaryBrief == nil {
+		t.Fatal("expected summary brief for current persona")
+	}
+	if payload.SummaryBrief.PersonaName != "毒舌派" {
+		t.Fatalf("expected summary brief to follow current persona, got %+v", payload.SummaryBrief)
+	}
+	if payload.SummaryBrief.OpeningContent != "别把逃避包装成理想。" {
+		t.Fatalf("expected opening content to be included, got %q", payload.SummaryBrief.OpeningContent)
+	}
+	if payload.SummaryBrief.RebuttalContent != "理性派也别把人生算成表格。" {
+		t.Fatalf("expected rebuttal content to be included, got %q", payload.SummaryBrief.RebuttalContent)
+	}
+	if strings.TrimSpace(payload.SummaryBrief.AdviceFocus) == "" {
+		t.Fatalf("expected advice focus, got %+v", payload.SummaryBrief)
 	}
 }

@@ -2,14 +2,15 @@ package ai
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"unicode/utf8"
 	"valley-server/internal/mindarena"
 )
 
 const (
-	maxDebateMessageRunes       = 50
-	maxRoundOneFallbackRuneSize = 46
+	maxDebateMessageRunes       = 60
+	maxRoundOneFallbackRuneSize = 56
 )
 
 type roundTwoRebuttalTarget struct {
@@ -26,6 +27,12 @@ type roundThreeSummaryBrief struct {
 	OpeningContent  string `json:"openingContent,omitempty"`
 	RebuttalContent string `json:"rebuttalContent,omitempty"`
 	AdviceFocus     string `json:"adviceFocus"`
+}
+
+type personaVoiceHint struct {
+	PersonaID   string `json:"personaId"`
+	PersonaName string `json:"personaName"`
+	Voice       string `json:"voice"`
 }
 
 func normalizeGeneratedDebateMessages(generated []mindarena.DebateMessage, personas []mindarena.Persona, round int) []mindarena.DebateMessage {
@@ -105,15 +112,15 @@ func fallbackDebateMessageContent(persona mindarena.Persona, round int) string {
 func fallbackRoundOneMessage(persona mindarena.Persona) string {
 	switch persona.Name {
 	case "理性派":
-		return "我支持先算清风险和回报，再决定要不要上桌。"
+		return "先别被热血带节奏，我要先把风险、现金流和退路算清。"
 	case "毒舌派":
-		return "我先泼冷水，别把一时上头误认成天命召唤。"
+		return "我先拆台，这更像逃离眼下，不像深思熟虑的理想。"
 	case "赌徒派":
-		return "我支持先冲一次，机会错过了可不会自己回头。"
+		return "机会来了还捂着口袋，等于亲手把翻盘按钮关掉。"
 	case "父母派":
-		return "我先站稳字当头，基本盘没护住就别急着变。"
+		return "先把房租、社保和家里交代想明白，再谈潇洒转身。"
 	case "摆烂派":
-		return "我建议先缓一口气，别在崩溃时替人生签字。"
+		return "你现在像在情绪高压下拍板，我建议先缓口气再说。"
 	default:
 		return truncateRunes(persona.Stance, maxRoundOneFallbackRuneSize)
 	}
@@ -122,15 +129,15 @@ func fallbackRoundOneMessage(persona mindarena.Persona) string {
 func fallbackRoundTwoMessage(persona mindarena.Persona) string {
 	switch persona.Name {
 	case "理性派":
-		return "热血可以有，但别把风险当背景音乐。"
+		return "赌徒派别拿热血装答案，现金流断了谁替你续命。"
 	case "毒舌派":
-		return "你们说得再燃，账算不平照样翻车。"
+		return "理性派算得再细，也别把怂包装成稳健策略。"
 	case "赌徒派":
-		return "犹豫太久的人，往往输在还没上场。"
+		return "父母派老想先保全一切，机会可不会等你批完流程。"
 	case "父母派":
-		return "先把现实问题答完，再谈理想多闪亮。"
+		return "毒舌派只会点火不管后果，真扛账单的是现实。"
 	case "摆烂派":
-		return "先别吵赢，先别把自己累坏。"
+		return "你们都想赢辩论，我只想提醒别把自己先吵崩。"
 	default:
 		return truncateRunes(persona.Stance, maxDebateMessageRunes)
 	}
@@ -139,15 +146,15 @@ func fallbackRoundTwoMessage(persona mindarena.Persona) string {
 func fallbackRoundThreeMessage(persona mindarena.Persona) string {
 	switch persona.Name {
 	case "理性派":
-		return "结论很简单，算清代价后再决定值不值得做。"
+		return "结论：先用副业验证市场，再决定值不值得正式离场。"
 	case "毒舌派":
-		return "真要冲就别骗自己，别把冲动包装成热爱。"
+		return "真要冲就别演热爱，先证明你不是在逃避当前生活。"
 	case "赌徒派":
-		return "想做就定个启动日，别把一生耗在预热里。"
+		return "给自己定启动日和止损线，别把野心耗成长期预热。"
 	case "父母派":
-		return "先留退路，再谈出发，稳住才走得远。"
+		return "先备足安全垫和 Plan B，再出发才不会把家底押光。"
 	case "摆烂派":
-		return "先睡够再决定，清醒的人生比硬撑体面。"
+		return "先睡够、先复原，再用清醒脑子决定要不要翻桌重来。"
 	default:
 		return truncateRunes(persona.Stance, maxDebateMessageRunes)
 	}
@@ -160,6 +167,7 @@ func buildDebateRoundPromptInput(topic string, mode string, personas []mindarena
 		Round       int                       `json:"round"`
 		RoundGoal   string                    `json:"roundGoal"`
 		Constraints []string                  `json:"constraints"`
+		VoiceHints  []personaVoiceHint        `json:"personaVoiceHints"`
 		Rebuttals   []roundTwoRebuttalTarget  `json:"rebuttalTargets,omitempty"`
 		Summaries   []roundThreeSummaryBrief  `json:"summaryBriefs,omitempty"`
 		Personas    []mindarena.Persona       `json:"personas"`
@@ -170,6 +178,7 @@ func buildDebateRoundPromptInput(topic string, mode string, personas []mindarena
 		Round:       round,
 		RoundGoal:   debateRoundGoal(round),
 		Constraints: debateRoundConstraints(round),
+		VoiceHints:  buildPersonaVoiceHints(personas),
 		Rebuttals:   buildRoundTwoRebuttalTargets(round, personas, history),
 		Summaries:   buildRoundThreeSummaryBriefs(round, personas, history),
 		Personas:    personas,
@@ -188,6 +197,7 @@ func buildDebateMessagePromptInput(topic string, mode string, personas []mindare
 		RoundGoal      string                    `json:"roundGoal"`
 		Constraints    []string                  `json:"constraints"`
 		CurrentPersona mindarena.Persona         `json:"currentPersona"`
+		CurrentVoice   string                    `json:"currentPersonaVoice"`
 		RebuttalTarget *roundTwoRebuttalTarget   `json:"rebuttalTarget,omitempty"`
 		SummaryBrief   *roundThreeSummaryBrief   `json:"summaryBrief,omitempty"`
 		Personas       []mindarena.Persona       `json:"personas"`
@@ -199,6 +209,7 @@ func buildDebateMessagePromptInput(topic string, mode string, personas []mindare
 		RoundGoal:      debateRoundGoal(round),
 		Constraints:    append(debateRoundConstraints(round), "只输出 currentPersona 的一条 messages JSON。"),
 		CurrentPersona: persona,
+		CurrentVoice:   personaVoiceGuide(persona),
 		RebuttalTarget: buildSingleRoundTwoRebuttalTarget(round, persona, personaIndex, personas, history),
 		SummaryBrief:   buildSingleRoundThreeSummaryBrief(round, persona, history),
 		Personas:       personas,
@@ -366,6 +377,22 @@ func finalAdviceFocus(persona mindarena.Persona) string {
 	}
 }
 
+func buildPersonaVoiceHints(personas []mindarena.Persona) []personaVoiceHint {
+	hints := make([]personaVoiceHint, 0, len(personas))
+	for _, persona := range personas {
+		hints = append(hints, personaVoiceHint{
+			PersonaID:   persona.ID,
+			PersonaName: persona.Name,
+			Voice:       personaVoiceGuide(persona),
+		})
+	}
+	return hints
+}
+
+func personaVoiceGuide(persona mindarena.Persona) string {
+	return fmt.Sprintf("人格气质：%s；表达方式：%s；口头禅气场：%s。", persona.Personality, persona.Style, persona.Catchphrase)
+}
+
 func debateRoundGoal(round int) string {
 	switch round {
 	case 1:
@@ -382,7 +409,8 @@ func debateRoundGoal(round int) string {
 func debateRoundConstraints(round int) []string {
 	base := []string{
 		"每个人格只说一句话。",
-		"每句话不超过 50 个中文字符。",
+		"每句话不超过 60 个中文字符。",
+		"必须把人格的 personality、style、catchphrase 气质写进话里，让人一眼听出是谁。",
 		"输出顺序必须与 personas 数组顺序一致。",
 		"只能输出 messages JSON，不要解释。",
 	}
@@ -392,6 +420,7 @@ func debateRoundConstraints(round int) []string {
 		return append(base,
 			"Round 1 只做立场表达，不要反驳其他人格，不要下最终结论。",
 			"每句话要先亮态度，再补一个最核心的理由。",
+			"句子可以更完整，但不要堆砌空话或连续口号。",
 			"不要连续提问，不要把一句话写成清单。",
 		)
 	case 2:
@@ -399,6 +428,7 @@ func debateRoundConstraints(round int) []string {
 			"Round 2 必须点到别人的漏洞，不能重复 Round 1 原话。",
 			"优先使用 rebuttalTargets 中对应自己的一条目标，明确回应 targetPersonaName 的 Round 1 观点。",
 			"每句必须形成反驳关系：先指出对方漏洞，再给自己的反向判断。",
+			"反驳要直接，但火力只能对观点，不能辱骂用户。",
 			"可以犀利，但不要辱骂用户。",
 		)
 	case 3:
@@ -407,7 +437,7 @@ func debateRoundConstraints(round int) []string {
 			"必须参考 summaryBriefs 中自己的 openingContent、rebuttalContent 和 adviceFocus。",
 			"每句话要给出明确建议或决策条件，不能只喊口号。",
 			"不要宣布最终胜者，裁判结果由下一步 judge 单独生成。",
-			"像综艺最后发言，态度明确、节奏利落。",
+			"像综艺最后发言，态度明确、节奏利落，而且要给出能执行的收尾动作。",
 		)
 	default:
 		return base
