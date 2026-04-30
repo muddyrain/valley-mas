@@ -359,9 +359,9 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
   }
 
   return (
-    <main className="arena-shell h-screen overflow-hidden px-4 py-4">
-      <div className="relative z-10 mx-auto flex h-full max-w-[1880px] flex-col gap-4">
-        <header className="arena-panel flex h-[72px] items-center justify-between gap-4 border-purple-400/20 px-5 py-4 shadow-[0_0_30px_rgba(123,92,255,0.2)]">
+    <main className="arena-shell arena-debate-page h-screen overflow-hidden px-3 py-3 xl:px-4 xl:py-4">
+      <div className="arena-debate-frame relative z-10 mx-auto flex h-full max-w-[1880px] flex-col gap-3 xl:gap-4">
+        <header className="arena-panel arena-debate-header flex items-center justify-between gap-4 border-purple-400/20 px-4 py-3 shadow-[0_0_30px_rgba(123,92,255,0.2)] xl:px-5 xl:py-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-fuchsia-400/35 bg-[linear-gradient(135deg,rgba(168,85,247,0.28),rgba(99,102,241,0.14),rgba(236,72,153,0.22))] shadow-[0_0_30px_rgba(123,92,255,0.2)]">
               <Image src="/logo.svg" width={44} height={44} alt="Brain Circuit" />
@@ -385,8 +385,8 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
           </div>
         </header>
 
-        <div className="grid min-h-0 flex-1 gap-4 grid-cols-[360px_minmax(0,1fr)_400px]">
-          <aside className="arena-panel flex min-h-0 flex-col border-purple-400/20 px-4 py-4 shadow-[0_0_30px_rgba(123,92,255,0.2)]">
+        <div className="arena-debate-grid grid min-h-0 flex-1 gap-3 xl:gap-4">
+          <aside className="arena-panel flex min-h-0 flex-col border-purple-400/20 px-3 py-3 shadow-[0_0_30px_rgba(123,92,255,0.2)] xl:px-4 xl:py-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-[18px] font-semibold text-white">本场嘉宾</h2>
@@ -419,12 +419,12 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
           </aside>
 
           <section className="arena-panel flex min-h-0 flex-col overflow-hidden border-purple-400/20 shadow-[0_0_30px_rgba(123,92,255,0.2)]">
-            <header className="border-b border-white/8 px-4 pb-4 pt-5">
+            <header className="border-b border-white/8 px-4 pb-3 pt-4 xl:pb-4 xl:pt-5">
               <div className="flex items-center gap-2 text-[14px] font-medium text-fuchsia-100">
                 <Megaphone className="h-4 w-4" />
                 本次议题
               </div>
-              <div className="mb-4 mt-4 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-purple-400/30 bg-gradient-to-r from-purple-500/30 to-pink-500/30 px-4 py-3 shadow-[0_0_30px_rgba(255,77,157,0.6)] backdrop-blur-lg">
+              <div className="mb-3 mt-3 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-purple-400/30 bg-gradient-to-r from-purple-500/30 to-pink-500/30 px-4 py-3 shadow-[0_0_30px_rgba(255,77,157,0.6)] backdrop-blur-lg xl:mb-4 xl:mt-4">
                 <h1 className="min-w-0 flex-1 text-base font-bold tracking-wide text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.16)]">
                   {session.topic}
                 </h1>
@@ -435,7 +435,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
               </div>
             </header>
 
-            <div className="px-4 pt-4">
+            <div className="px-4 pt-3 xl:pt-4">
               <div className="arena-subpanel flex items-center justify-between gap-3 border-purple-400/30 bg-gradient-to-r from-purple-500/20 to-pink-500/20 px-4 py-3 shadow-[0_0_20px_rgba(123,92,255,0.24)]">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-[12px] text-white/48">
@@ -452,8 +452,8 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
               </div>
             </div>
 
-            <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-4 pr-2 pt-4">
-              <div className="space-y-5">
+            <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-3 pr-2 pt-3 xl:pb-4 xl:pt-4">
+              <div className="space-y-4 xl:space-y-5">
                 {Array.from(
                   new Set([
                     ...Object.keys(groupedMessages).map((key) => Number(key)),
@@ -538,8 +538,8 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
                   <ResultCard session={safeSession} result={result} />
                 )}
                 {isAwaitingSupport ? (
-                  <div className="sticky bottom-3 z-20 mt-5">
-                    <div className="arena-subpanel border-fuchsia-400/20 bg-[linear-gradient(135deg,rgba(22,18,49,0.96),rgba(59,21,84,0.82))] px-4 py-4 shadow-[0_0_30px_rgba(255,77,157,0.18)] backdrop-blur-xl">
+                  <div className="sticky bottom-3 z-20 mt-4 xl:mt-5">
+                    <div className="arena-subpanel border-fuchsia-400/20 bg-[linear-gradient(135deg,rgba(22,18,49,0.96),rgba(59,21,84,0.82))] px-4 py-3 shadow-[0_0_30px_rgba(255,77,157,0.18)] backdrop-blur-xl xl:py-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-2 text-[13px] font-semibold text-fuchsia-100">
