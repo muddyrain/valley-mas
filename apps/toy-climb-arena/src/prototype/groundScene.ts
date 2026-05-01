@@ -236,5 +236,86 @@ export function createGroundScene(scene: Scene, opts: GroundSceneOptions): Groun
     scene.add(mesh);
   }
 
+  // ── 背景远景积木塔（墙面前方的玩具城市天际线剪影）────────────────────────
+  // 紧贴后墙摆放一排高低错落的积木柱，营造景深和玩具房间纵深感
+  const cityColors = [
+    '#EF4444',
+    '#3B82F6',
+    '#22C55E',
+    '#FBBF24',
+    '#A855F7',
+    '#F97316',
+    '#EC4899',
+    '#14B8A6',
+    '#60A5FA',
+    '#FCD34D',
+    '#86EFAC',
+    '#F9A8D4',
+  ];
+  const cityBlockGeo = new BoxGeometry(1, 1, 1);
+  geometries.push(cityBlockGeo);
+
+  // 每组积木塔：[x偏移, 宽, 高, 颜色索引]
+  // 深度固定 0.8m，贴紧后墙，不向房间内突出
+  type TowerDef = [number, number, number, number];
+  const TOWER_DEPTH = 0.8;
+  const towers: TowerDef[] = [
+    [-48, 4.5, 14, 0],
+    [-42, 3.2, 9, 1],
+    [-38, 5.0, 17, 2],
+    [-34, 2.8, 7, 3],
+    [-30, 4.0, 12, 4],
+    [-26, 3.5, 10, 5],
+    [-22, 2.5, 6, 6],
+    [-18, 4.8, 16, 7],
+    [-10, 3.0, 8, 8],
+    [-5, 5.5, 18, 9],
+    [0, 3.8, 11, 10],
+    [5, 2.6, 7, 11],
+    [10, 4.2, 14, 0],
+    [16, 3.0, 10, 1],
+    [20, 5.2, 17, 2],
+    [25, 2.8, 6, 3],
+    [30, 4.0, 13, 4],
+    [35, 3.6, 10, 5],
+    [40, 5.0, 18, 6],
+    [46, 3.2, 8, 7],
+  ];
+
+  // 后面紧贴后墙：back face 在 z=-WALL_HALF+0.05，front face 在 z=-WALL_HALF+TOWER_DEPTH+0.05
+  const WALL_HALF_BG = 55;
+  const towerBaseZ = -(WALL_HALF_BG - TOWER_DEPTH / 2 - 0.05);
+
+  for (const [tx, tw, th, ci] of towers) {
+    const mat = new MeshStandardMaterial({
+      color: new Color(cityColors[ci % cityColors.length]),
+      roughness: 0.8,
+      metalness: 0.04,
+    });
+    materials.push(mat);
+
+    const block = new Mesh(cityBlockGeo, mat);
+    block.scale.set(tw, th, TOWER_DEPTH);
+    block.position.set(tx, floorSurfaceY + th / 2, towerBaseZ);
+    block.castShadow = false;
+    block.receiveShadow = false;
+    scene.add(block);
+
+    // 顶部帽块（更小更亮，颜色错开）
+    const capH = tw * 0.25;
+    const capMat = new MeshStandardMaterial({
+      color: new Color(cityColors[(ci + 4) % cityColors.length]),
+      roughness: 0.65,
+      metalness: 0.06,
+    });
+    materials.push(capMat);
+    const cap = new Mesh(cityBlockGeo, capMat);
+    cap.scale.set(tw * 0.65, capH, TOWER_DEPTH * 0.8);
+    cap.position.set(tx, floorSurfaceY + th + capH / 2, towerBaseZ);
+    cap.castShadow = false;
+    cap.receiveShadow = false;
+    scene.add(cap);
+  }
+
   return { geometries, materials, pendingDecoColliders };
 }
