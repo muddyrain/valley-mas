@@ -15,6 +15,7 @@
 | --- | --- | --- |
 | Web 前台 | `apps/web` | React 19 + Vite 6 + React Router 7 + Tailwind 4，包含首页、创作者、资源、博客、我的空间等用户侧页面。 |
 | Admin 后台 | `apps/admin` | React 19 + Vite 6 + Ant Design 6 + Pro Components，包含用户、创作者、资源、博客、记录与审核管理。 |
+| Toy Climb Arena | `apps/toy-climb-arena` | Vite 6 + TypeScript + Three.js，玩具世界攀爬跳跃游戏，开发端口 5175。详见 `apps/toy-climb-arena/AGENTS.md`。 |
 | Go 服务端 | `server` | Gin + GORM，入口在 `server/cmd/server`，路由集中在 `server/internal/router/router.go`。 |
 | 共享包 | `packages/*` | `shared`、`shared-request`、`shared-router`、`shared-format`、`format-tools`、`climber-game` 等 workspace 包。 |
 | 文档 | `docs` | 沉淀长期有价值文档；普通问答、临时总结不要自动写入。 |
@@ -43,6 +44,11 @@ cd apps/web && pnpm dev
 
 # 启动 Admin
 cd apps/admin && pnpm dev
+
+# 启动 Toy Climb Arena（玩具世界攀爬游戏）
+cd apps/toy-climb-arena && pnpm dev
+# 或：pnpm --filter @valley/toy-climb-arena dev
+# 访问 http://localhost:5175
 
 # 启动 Go 服务
 cd server && go run ./cmd/server
