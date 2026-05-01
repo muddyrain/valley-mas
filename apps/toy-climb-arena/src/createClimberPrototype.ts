@@ -6,14 +6,11 @@ import {
   CanvasTexture,
   Clock,
   Color,
-  ConeGeometry,
   CylinderGeometry,
   DirectionalLight,
-  DodecahedronGeometry,
   EdgesGeometry,
   Float32BufferAttribute,
   FogExp2,
-  GridHelper,
   Group,
   HemisphereLight,
   Line,
@@ -225,14 +222,6 @@ function createRampDebugGeometry(width: number, height: number, depth: number): 
   return geometry;
 }
 
-function disposeMaterial(material: Material | Material[]): void {
-  if (Array.isArray(material)) {
-    for (const item of material) item.dispose();
-    return;
-  }
-  material.dispose();
-}
-
 export function createClimberPrototype(
   options: CreateClimberPrototypeOptions,
 ): ClimberPrototypeController {
@@ -316,9 +305,6 @@ export function createClimberPrototype(
 
   const scene = new Scene();
   const skyColor = level.theme?.skyColor ?? '#f8fbff';
-  const floorColor = level.theme?.floorColor ?? '#f8fafc';
-  const gridPrimaryColor = level.theme?.gridPrimaryColor ?? '#cbd5e1';
-  const gridSecondaryColor = level.theme?.gridSecondaryColor ?? '#e2e8f0';
   const sunColor = level.theme?.sunColor ?? '#fff9e6';
   scene.background = new Color(skyColor);
 
@@ -364,89 +350,93 @@ export function createClimberPrototype(
   // 轻雾：增加景深，营造玩具世界感
   scene.fog = new FogExp2('#FFF9F0', 0.012);
 
-  const floor = new Mesh(
-    new PlaneGeometry(FLOOR_VISUAL_SIZE, FLOOR_VISUAL_SIZE),
-    new MeshStandardMaterial({ color: floorColor, roughness: 0.9, metalness: 0.02 }),
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = FLOOR_SURFACE_Y;
-  floor.receiveShadow = true;
-  scene.add(floor);
-
-  const grid = new GridHelper(FLOOR_VISUAL_SIZE, 110, gridPrimaryColor, gridSecondaryColor);
-  grid.position.y = FLOOR_SURFACE_Y + 0.01;
-  const gridMaterial = grid.material as Material | Material[];
-  if (Array.isArray(gridMaterial)) {
-    gridMaterial.forEach((material) => {
-      const anyMaterial = material as Material & { opacity?: number; transparent?: boolean };
-      anyMaterial.transparent = true;
-      anyMaterial.opacity = 0.12;
-    });
-  }
-  grid.visible = false;
-  scene.add(grid);
-
   const sceneryMaterials: MeshStandardMaterial[] = [];
   const sceneryGeometries: BufferGeometry[] = [];
 
-  const groundBaseOverlayGeometry = new PlaneGeometry(1, 1);
-  const groundBaseOverlayMaterial = new MeshStandardMaterial({
-    color: '#C8934A', // 暖木色桌面底色
-    roughness: 0.82,
+  // -- 妗岄潰搴曞骇锛氱粰鍦伴潰涓€涓湁鍘氬害鐨勫疄浣撴劅 -----------------------------------
+  const tableBaseGeo = new BoxGeometry(1, 1, 1);
+  const tableBaseMat = new MeshStandardMaterial({
+    color: '#C8844A',
+    roughness: 0.85,
     metalness: 0.0,
-    polygonOffset: true,
-    polygonOffsetFactor: -1,
-    polygonOffsetUnits: -1,
   });
-  sceneryGeometries.push(groundBaseOverlayGeometry);
-  sceneryMaterials.push(groundBaseOverlayMaterial);
-  const groundBaseOverlay = new Mesh(groundBaseOverlayGeometry, groundBaseOverlayMaterial);
-  groundBaseOverlay.rotation.x = -Math.PI / 2;
-  groundBaseOverlay.position.set(0, FLOOR_SURFACE_Y, 0);
-  groundBaseOverlay.scale.set(FLOOR_VISUAL_SIZE, FLOOR_VISUAL_SIZE, 1);
-  groundBaseOverlay.receiveShadow = true;
-  groundBaseOverlay.castShadow = false;
-  scene.add(groundBaseOverlay);
+  sceneryGeometries.push(tableBaseGeo);
+  sceneryMaterials.push(tableBaseMat);
+  const tableBase = new Mesh(tableBaseGeo, tableBaseMat);
+  tableBase.scale.set(FLOOR_VISUAL_SIZE, 3.0, FLOOR_VISUAL_SIZE);
+  tableBase.position.set(0, FLOOR_SURFACE_Y - 1.5, 0);
+  tableBase.receiveShadow = true;
+  tableBase.castShadow = false;
+  scene.add(tableBase);
 
-  // 地面采用“整面基础覆盖 + 土地区薄层贴面”，确保全图有地表模型且不发生层间冲突。
-  const soilOverlayGeometry = new PlaneGeometry(1, 1);
-  const soilOverlayMaterial = new MeshStandardMaterial({
-    color: '#B07D3A', // 深木色木板条纹
-    roughness: 0.92,
-    metalness: 0.0,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-  });
-  sceneryGeometries.push(soilOverlayGeometry);
-  sceneryMaterials.push(soilOverlayMaterial);
-  const soilOverlayConfigs: Array<{
-    size: [number, number];
-    position: [number, number, number];
-    yaw?: number;
-  }> = [
-    { size: [112, 58], position: [0, FLOOR_SURFACE_Y, -56], yaw: 0.01 },
-    { size: [112, 58], position: [0, FLOOR_SURFACE_Y, 56], yaw: -0.01 },
-    { size: [58, 112], position: [-56, FLOOR_SURFACE_Y, 0], yaw: -0.02 },
-    { size: [58, 112], position: [56, FLOOR_SURFACE_Y, 0], yaw: 0.02 },
-    { size: [64, 64], position: [0, FLOOR_SURFACE_Y, 0], yaw: 0 },
-  ];
-  soilOverlayConfigs.forEach((item) => {
-    const mesh = new Mesh(soilOverlayGeometry, soilOverlayMaterial);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(item.position[0], item.position[1], item.position[2]);
-    mesh.scale.set(item.size[0], item.size[1], 1);
-    if (item.yaw) {
-      mesh.rotation.y = item.yaw;
+  // -- 妫嬬洏鏍煎湴鐮栵紙鐜╁叿娓告垙鍨鏍硷級------------------------------------------
+  const tileMatA = new MeshStandardMaterial({ color: '#FFF3DC', roughness: 0.72, metalness: 0.0 });
+  const tileMatB = new MeshStandardMaterial({ color: '#FBBF24', roughness: 0.72, metalness: 0.0 });
+  sceneryMaterials.push(tileMatA, tileMatB);
+  const tileSingleGeo = new PlaneGeometry(1, 1);
+  sceneryGeometries.push(tileSingleGeo);
+  const TILE_SIZE = 4;
+  const TILE_RANGE = 9;
+  for (let ix = -TILE_RANGE; ix <= TILE_RANGE; ix++) {
+    for (let iz = -TILE_RANGE; iz <= TILE_RANGE; iz++) {
+      const mat = (ix + iz) % 2 === 0 ? tileMatA : tileMatB;
+      const tile = new Mesh(tileSingleGeo, mat);
+      tile.rotation.x = -Math.PI / 2;
+      tile.position.set(ix * TILE_SIZE, FLOOR_SURFACE_Y + 0.005, iz * TILE_SIZE);
+      tile.scale.set(TILE_SIZE - 0.06, TILE_SIZE - 0.06, 1);
+      tile.receiveShadow = true;
+      scene.add(tile);
     }
-    mesh.receiveShadow = true;
-    mesh.castShadow = false;
-    scene.add(mesh);
-  });
+  }
 
-  // ── 地面散落小积木装饰（纯视觉，不加碰撞）────────────────────────────────
-  // 模拟玩具桌面上随意摆放的积木，增加世界感
-  const floorDecoColors = [
+  // -- 鑳屾櫙鎴块棿澧欏锛堣惀閫犵帺鍏锋埧闂存劅锛?---------------------------------------
+  const wallMat = new MeshStandardMaterial({ color: '#FEF6EC', roughness: 0.95, metalness: 0.0 });
+  sceneryMaterials.push(wallMat);
+  const wallGeo = new PlaneGeometry(1, 1);
+  sceneryGeometries.push(wallGeo);
+  const WALL_HALF = 55;
+  const WALL_HEIGHT = 28;
+  const WALL_Y = FLOOR_SURFACE_Y + WALL_HEIGHT / 2 - 1;
+  const backWall = new Mesh(wallGeo, wallMat);
+  backWall.scale.set(WALL_HALF * 2, WALL_HEIGHT, 1);
+  backWall.position.set(0, WALL_Y, -WALL_HALF);
+  backWall.receiveShadow = true;
+  scene.add(backWall);
+  const leftWall = new Mesh(wallGeo, wallMat);
+  leftWall.scale.set(WALL_HALF * 2, WALL_HEIGHT, 1);
+  leftWall.position.set(-WALL_HALF, WALL_Y, 0);
+  leftWall.rotation.y = Math.PI / 2;
+  leftWall.receiveShadow = true;
+  scene.add(leftWall);
+  const rightWall = new Mesh(wallGeo, wallMat);
+  rightWall.scale.set(WALL_HALF * 2, WALL_HEIGHT, 1);
+  rightWall.position.set(WALL_HALF, WALL_Y, 0);
+  rightWall.rotation.y = -Math.PI / 2;
+  rightWall.receiveShadow = true;
+  scene.add(rightWall);
+
+  // -- 澧欓潰瑁呴グ锛氬僵鑹茬珫鏉＄汗 --------------------------------------------------
+  const wallStripeColors = ['#FECACA', '#FDE68A', '#BBF7D0', '#BAE6FD', '#E9D5FF', '#FBCFE8'];
+  const stripeGeo = new PlaneGeometry(1, 1);
+  sceneryGeometries.push(stripeGeo);
+  const STRIPE_WIDTH = 4.5;
+  const STRIPE_HEIGHT = WALL_HEIGHT * 0.65;
+  for (let i = 0; i < wallStripeColors.length; i++) {
+    const stripeMat = new MeshStandardMaterial({
+      color: wallStripeColors[i],
+      roughness: 0.98,
+      metalness: 0.0,
+    });
+    sceneryMaterials.push(stripeMat);
+    const ox = (i - wallStripeColors.length / 2 + 0.5) * (STRIPE_WIDTH + 1.5);
+    const s1 = new Mesh(stripeGeo, stripeMat);
+    s1.scale.set(STRIPE_WIDTH, STRIPE_HEIGHT, 1);
+    s1.position.set(ox, FLOOR_SURFACE_Y + STRIPE_HEIGHT / 2 + 0.5, -WALL_HALF + 0.04);
+    scene.add(s1);
+  }
+
+  // -- 鍦伴潰鏁ｈ惤绉湪瑁呴グ锛坆ox + 鍦嗘煴 + 鍫嗗彔锛?--------------------------------
+  const decoColors = [
     '#EF4444',
     '#3B82F6',
     '#22C55E',
@@ -454,42 +444,103 @@ export function createClimberPrototype(
     '#A855F7',
     '#F97316',
     '#EC4899',
+    '#14B8A6',
+    '#F59E0B',
   ];
-  const floorDecoConfigs: Array<{
+  const decoBoxGeo = new BoxGeometry(1, 1, 1);
+  const decoCylGeo = new CylinderGeometry(0.5, 0.5, 1, 12);
+  sceneryGeometries.push(decoBoxGeo, decoCylGeo);
+
+  type DecoItem = {
     pos: [number, number, number];
     size: [number, number, number];
     yaw: number;
-    colorIdx: number;
-  }> = [
-    { pos: [-12, FLOOR_SURFACE_Y + 0.2, 8], size: [1.2, 0.4, 0.8], yaw: 0.3, colorIdx: 0 },
-    { pos: [14, FLOOR_SURFACE_Y + 0.15, 5], size: [0.8, 0.3, 1.6], yaw: -0.5, colorIdx: 1 },
-    { pos: [-8, FLOOR_SURFACE_Y + 0.2, 16], size: [1.0, 0.4, 1.0], yaw: 0.8, colorIdx: 2 },
-    { pos: [18, FLOOR_SURFACE_Y + 0.2, -6], size: [1.4, 0.4, 0.6], yaw: 1.1, colorIdx: 3 },
-    { pos: [-16, FLOOR_SURFACE_Y + 0.15, -4], size: [0.8, 0.3, 1.2], yaw: -0.2, colorIdx: 4 },
-    { pos: [6, FLOOR_SURFACE_Y + 0.2, -12], size: [1.0, 0.4, 0.8], yaw: 0.6, colorIdx: 5 },
-    { pos: [-14, FLOOR_SURFACE_Y + 0.2, -14], size: [1.2, 0.4, 1.2], yaw: -0.9, colorIdx: 6 },
-    { pos: [10, FLOOR_SURFACE_Y + 0.15, 18], size: [0.6, 0.3, 1.0], yaw: 0.4, colorIdx: 0 },
-    { pos: [-20, FLOOR_SURFACE_Y + 0.2, 2], size: [1.0, 0.4, 0.6], yaw: -0.7, colorIdx: 1 },
-    { pos: [16, FLOOR_SURFACE_Y + 0.2, -16], size: [0.8, 0.3, 0.8], yaw: 1.3, colorIdx: 2 },
-    { pos: [-4, FLOOR_SURFACE_Y + 0.2, 22], size: [1.6, 0.4, 0.6], yaw: 0.15, colorIdx: 3 },
-    { pos: [22, FLOOR_SURFACE_Y + 0.15, 10], size: [0.8, 0.3, 1.4], yaw: -0.4, colorIdx: 5 },
+    ci: number;
+    shape?: 'box' | 'cyl';
+  };
+  const decoItems: DecoItem[] = [
+    { pos: [-12, FLOOR_SURFACE_Y + 0.22, 8], size: [1.4, 0.44, 0.9], yaw: 0.3, ci: 0 },
+    { pos: [14, FLOOR_SURFACE_Y + 0.18, 5], size: [0.9, 0.36, 1.8], yaw: -0.5, ci: 1 },
+    { pos: [-8, FLOOR_SURFACE_Y + 0.22, 16], size: [1.1, 0.44, 1.1], yaw: 0.8, ci: 2 },
+    { pos: [18, FLOOR_SURFACE_Y + 0.22, -6], size: [1.6, 0.44, 0.7], yaw: 1.1, ci: 3 },
+    { pos: [-16, FLOOR_SURFACE_Y + 0.18, -4], size: [0.9, 0.36, 1.4], yaw: -0.2, ci: 4 },
+    { pos: [6, FLOOR_SURFACE_Y + 0.22, -12], size: [1.1, 0.44, 0.9], yaw: 0.6, ci: 5 },
+    { pos: [-14, FLOOR_SURFACE_Y + 0.22, -14], size: [1.4, 0.44, 1.4], yaw: -0.9, ci: 6 },
+    { pos: [10, FLOOR_SURFACE_Y + 0.18, 18], size: [0.7, 0.36, 1.1], yaw: 0.4, ci: 7 },
+    { pos: [-20, FLOOR_SURFACE_Y + 0.22, 2], size: [1.1, 0.44, 0.7], yaw: -0.7, ci: 8 },
+    { pos: [16, FLOOR_SURFACE_Y + 0.22, -16], size: [0.9, 0.36, 0.9], yaw: 1.3, ci: 0 },
+    { pos: [-4, FLOOR_SURFACE_Y + 0.22, 22], size: [1.8, 0.44, 0.7], yaw: 0.15, ci: 1 },
+    { pos: [22, FLOOR_SURFACE_Y + 0.18, 10], size: [0.9, 0.36, 1.6], yaw: -0.4, ci: 2 },
+    { pos: [-28, FLOOR_SURFACE_Y + 0.22, 12], size: [1.6, 0.44, 1.0], yaw: 0.7, ci: 3 },
+    { pos: [26, FLOOR_SURFACE_Y + 0.22, -20], size: [1.2, 0.44, 1.2], yaw: -1.2, ci: 4 },
+    { pos: [-24, FLOOR_SURFACE_Y + 0.22, -22], size: [2.0, 0.44, 0.8], yaw: 0.5, ci: 5 },
+    { pos: [30, FLOOR_SURFACE_Y + 0.22, 18], size: [0.8, 0.44, 1.6], yaw: 1.0, ci: 6 },
+    { pos: [8, FLOOR_SURFACE_Y + 0.22, -28], size: [1.4, 0.44, 1.0], yaw: -0.3, ci: 7 },
+    { pos: [-30, FLOOR_SURFACE_Y + 0.22, 28], size: [1.0, 0.44, 1.8], yaw: 0.9, ci: 8 },
+    {
+      pos: [-10, FLOOR_SURFACE_Y + 0.35, 24],
+      size: [0.7, 0.7, 3.2],
+      yaw: -0.4,
+      ci: 0,
+      shape: 'cyl',
+    },
+    {
+      pos: [20, FLOOR_SURFACE_Y + 0.28, -10],
+      size: [0.6, 0.6, 2.6],
+      yaw: 1.1,
+      ci: 3,
+      shape: 'cyl',
+    },
+    { pos: [-22, FLOOR_SURFACE_Y + 0.3, 18], size: [0.8, 0.8, 2.0], yaw: 0.6, ci: 5, shape: 'cyl' },
+    {
+      pos: [28, FLOOR_SURFACE_Y + 0.28, 8],
+      size: [0.65, 0.65, 2.8],
+      yaw: -0.8,
+      ci: 2,
+      shape: 'cyl',
+    },
+    { pos: [-12, FLOOR_SURFACE_Y + 0.64, 8], size: [1.0, 0.44, 0.7], yaw: 0.6, ci: 2 },
+    { pos: [14, FLOOR_SURFACE_Y + 0.54, 5], size: [0.7, 0.36, 1.2], yaw: -0.2, ci: 5 },
+    { pos: [18, FLOOR_SURFACE_Y + 0.64, -6], size: [1.0, 0.44, 0.5], yaw: 0.3, ci: 6 },
   ];
-  const floorDecoGeo = new BoxGeometry(1, 1, 1);
-  sceneryGeometries.push(floorDecoGeo);
-  for (const cfg of floorDecoConfigs) {
+
+  // 暂存待注册的装饰物碰撞体（pushCollider 在后面定义，先收集）
+  const pendingDecoColliders: Array<{
+    center: [number, number, number];
+    size: [number, number, number];
+  }> = [];
+
+  for (const item of decoItems) {
+    const ci = item.ci % decoColors.length;
     const mat = new MeshStandardMaterial({
-      color: floorDecoColors[cfg.colorIdx],
+      color: decoColors[ci],
       roughness: 0.6,
       metalness: 0.05,
     });
     sceneryMaterials.push(mat);
-    const deco = new Mesh(floorDecoGeo, mat);
-    deco.position.set(cfg.pos[0], cfg.pos[1], cfg.pos[2]);
-    deco.scale.set(cfg.size[0], cfg.size[1], cfg.size[2]);
-    deco.rotation.y = cfg.yaw;
-    deco.castShadow = true;
-    deco.receiveShadow = true;
-    scene.add(deco);
+    const geo = item.shape === 'cyl' ? decoCylGeo : decoBoxGeo;
+    const mesh = new Mesh(geo, mat);
+    mesh.position.set(item.pos[0], item.pos[1], item.pos[2]);
+    if (item.shape === 'cyl') {
+      mesh.rotation.set(0, item.yaw, Math.PI / 2);
+      mesh.scale.set(item.size[0], item.size[2], item.size[1]);
+      // 圆柱躺倒：碰撞体用包围盒（沿 X 轴伸展）
+      pendingDecoColliders.push({
+        center: [item.pos[0], item.pos[1], item.pos[2]],
+        size: [item.size[2], item.size[0], item.size[1]],
+      });
+    } else {
+      mesh.rotation.y = item.yaw;
+      mesh.scale.set(item.size[0], item.size[1], item.size[2]);
+      // box：直接用 size（忽略 yaw 旋转，用 AABB 近似）
+      pendingDecoColliders.push({
+        center: [item.pos[0], item.pos[1], item.pos[2]],
+        size: [item.size[0], item.size[1], item.size[2]],
+      });
+    }
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
   }
 
   const platformColliders: PlatformCollisionData[] = [];
@@ -1162,418 +1213,6 @@ export function createClimberPrototype(
 
   const dynamicObstacleUpdaters: Array<(elapsed: number) => void> = [];
 
-  const pushColliderFromObjectBounds = (
-    object: Group | Mesh,
-    debugMeta: PlatformCollisionDebugMeta,
-    options?: {
-      insetXZ?: number;
-      insetY?: number;
-      minSize?: [number, number, number];
-    },
-  ) => {
-    object.updateWorldMatrix(true, true);
-    const worldBounds = new Box3().setFromObject(object);
-    if (worldBounds.isEmpty()) return null;
-    const center = new Vector3();
-    const size = new Vector3();
-    worldBounds.getCenter(center);
-    worldBounds.getSize(size);
-    const insetXZ = MathUtils.clamp(options?.insetXZ ?? 1, 0.45, 1);
-    const insetY = MathUtils.clamp(options?.insetY ?? 1, 0.45, 1);
-    const minSize = options?.minSize ?? [0.25, 0.2, 0.25];
-    return pushCollider({
-      center: [center.x, center.y, center.z],
-      size: [
-        Math.max(minSize[0], size.x * insetXZ),
-        Math.max(minSize[1], size.y * insetY),
-        Math.max(minSize[2], size.z * insetXZ),
-      ],
-      debugMeta,
-    });
-  };
-
-  const createGroundScenery = () => {
-    const treeTrunkGeometry = new CylinderGeometry(0.9, 1.15, 15.5, 10);
-    const treeLeafLargeGeometry = new ConeGeometry(4.9, 8.6, 9);
-    const treeLeafMediumGeometry = new ConeGeometry(3.9, 7.2, 9);
-    const treeLeafTopGeometry = new ConeGeometry(2.8, 5.2, 8);
-    const rockLargeGeometry = new DodecahedronGeometry(3.3, 0);
-    const rockMediumGeometry = new DodecahedronGeometry(2.2, 0);
-    const grassBladeGeometry = new ConeGeometry(0.44, 1.95, 6);
-    const flowerCoreGeometry = new SphereGeometry(0.22, 10, 8);
-    const flowerPetalGeometry = new SphereGeometry(0.16, 8, 6);
-    sceneryGeometries.push(
-      treeTrunkGeometry,
-      treeLeafLargeGeometry,
-      treeLeafMediumGeometry,
-      treeLeafTopGeometry,
-      rockLargeGeometry,
-      rockMediumGeometry,
-      grassBladeGeometry,
-      flowerCoreGeometry,
-      flowerPetalGeometry,
-    );
-
-    const treeTrunkMaterial = new MeshStandardMaterial({
-      color: '#6b4a2d',
-      roughness: 0.88,
-      metalness: 0.02,
-    });
-    const treeLeafMaterial = new MeshStandardMaterial({
-      color: '#3f8a45',
-      roughness: 0.9,
-      metalness: 0.01,
-    });
-    const rockMaterial = new MeshStandardMaterial({
-      color: '#707a84',
-      roughness: 0.94,
-      metalness: 0.03,
-    });
-    const grassMaterial = new MeshStandardMaterial({
-      color: '#57a85c',
-      roughness: 0.9,
-      metalness: 0.01,
-    });
-    const flowerCoreMaterial = new MeshStandardMaterial({
-      color: '#fcd34d',
-      roughness: 0.75,
-      metalness: 0.05,
-    });
-    const flowerPetalMaterial = new MeshStandardMaterial({
-      color: '#f472b6',
-      roughness: 0.82,
-      metalness: 0.03,
-    });
-    sceneryMaterials.push(
-      treeTrunkMaterial,
-      treeLeafMaterial,
-      rockMaterial,
-      grassMaterial,
-      flowerCoreMaterial,
-      flowerPetalMaterial,
-    );
-
-    const treeConfigs: Array<{
-      id: string;
-      position: [number, number, number];
-      scale: number;
-      yaw: number;
-    }> = [
-      { id: 'ground-tree-01', position: [-52, 0, -42], scale: 1.24, yaw: 0.22 },
-      { id: 'ground-tree-02', position: [54, 0, -38], scale: 1.18, yaw: -0.16 },
-      { id: 'ground-tree-03', position: [-56, 0, 28], scale: 1.34, yaw: 0.38 },
-      { id: 'ground-tree-04', position: [52, 0, 34], scale: 1.28, yaw: -0.28 },
-      { id: 'ground-tree-05', position: [-42, 0, 50], scale: 1.16, yaw: 0.14 },
-      { id: 'ground-tree-06', position: [40, 0, -52], scale: 1.12, yaw: -0.32 },
-      { id: 'ground-tree-07', position: [-58, 0, -8], scale: 1.22, yaw: 0.3 },
-      { id: 'ground-tree-08', position: [58, 0, 8], scale: 1.18, yaw: -0.26 },
-      { id: 'ground-tree-09', position: [-20, 0, 56], scale: 1.2, yaw: 0.18 },
-      { id: 'ground-tree-10', position: [22, 0, -56], scale: 1.18, yaw: -0.2 },
-      { id: 'ground-tree-11', position: [-6, 0, 58], scale: 1.14, yaw: 0.1 },
-      { id: 'ground-tree-12', position: [6, 0, -58], scale: 1.14, yaw: -0.1 },
-    ];
-
-    treeConfigs.forEach((treeConfig) => {
-      const tree = new Group();
-      tree.position.set(treeConfig.position[0], treeConfig.position[1], treeConfig.position[2]);
-      tree.rotation.y = treeConfig.yaw;
-      tree.scale.setScalar(treeConfig.scale);
-
-      const trunk = new Mesh(treeTrunkGeometry, treeTrunkMaterial);
-      trunk.position.y = 7.75;
-      trunk.castShadow = true;
-      trunk.receiveShadow = true;
-      tree.add(trunk);
-
-      const leafBottom = new Mesh(treeLeafLargeGeometry, treeLeafMaterial);
-      leafBottom.position.y = 13.4;
-      leafBottom.castShadow = true;
-      leafBottom.receiveShadow = true;
-      tree.add(leafBottom);
-
-      const leafMiddle = new Mesh(treeLeafMediumGeometry, treeLeafMaterial);
-      leafMiddle.position.y = 17.2;
-      leafMiddle.castShadow = true;
-      leafMiddle.receiveShadow = true;
-      tree.add(leafMiddle);
-
-      const leafTop = new Mesh(treeLeafTopGeometry, treeLeafMaterial);
-      leafTop.position.y = 20.6;
-      leafTop.castShadow = true;
-      leafTop.receiveShadow = true;
-      tree.add(leafTop);
-
-      scene.add(tree);
-      pushColliderFromObjectBounds(
-        trunk,
-        {
-          category: 'system',
-          instanceId: `${treeConfig.id}-trunk`,
-        },
-        { insetXZ: 0.92, insetY: 0.98, minSize: [0.6, 1.4, 0.6] },
-      );
-      pushColliderFromObjectBounds(
-        leafBottom,
-        {
-          category: 'system',
-          instanceId: `${treeConfig.id}-leaf-bottom`,
-        },
-        { insetXZ: 0.84, insetY: 0.82, minSize: [0.9, 0.9, 0.9] },
-      );
-      pushColliderFromObjectBounds(
-        leafMiddle,
-        {
-          category: 'system',
-          instanceId: `${treeConfig.id}-leaf-middle`,
-        },
-        { insetXZ: 0.82, insetY: 0.8, minSize: [0.8, 0.8, 0.8] },
-      );
-      pushColliderFromObjectBounds(
-        leafTop,
-        {
-          category: 'system',
-          instanceId: `${treeConfig.id}-leaf-top`,
-        },
-        { insetXZ: 0.8, insetY: 0.78, minSize: [0.7, 0.7, 0.7] },
-      );
-    });
-
-    const rockConfigs: Array<{
-      id: string;
-      position: [number, number, number];
-      scale: [number, number, number];
-      yaw: number;
-      large?: boolean;
-    }> = [
-      {
-        id: 'ground-rock-01',
-        position: [-46, 1.7, -22],
-        scale: [1.3, 1.05, 1.15],
-        yaw: 0.2,
-        large: true,
-      },
-      {
-        id: 'ground-rock-02',
-        position: [44, 1.6, -20],
-        scale: [1.2, 0.98, 1.1],
-        yaw: -0.3,
-        large: true,
-      },
-      { id: 'ground-rock-03', position: [-34, 1.4, 40], scale: [1.05, 0.9, 0.98], yaw: 0.4 },
-      { id: 'ground-rock-04', position: [38, 1.3, 42], scale: [1.12, 0.86, 1], yaw: -0.24 },
-      { id: 'ground-rock-05', position: [50, 1.2, 10], scale: [0.92, 0.84, 0.9], yaw: 0.18 },
-      { id: 'ground-rock-06', position: [-50, 1.2, 8], scale: [0.9, 0.8, 0.86], yaw: -0.18 },
-      { id: 'ground-rock-07', position: [-57, 1.4, -26], scale: [1.06, 0.9, 0.96], yaw: 0.28 },
-      { id: 'ground-rock-08', position: [56, 1.45, 26], scale: [1.08, 0.9, 0.98], yaw: -0.22 },
-      { id: 'ground-rock-09', position: [-22, 1.3, 54], scale: [0.96, 0.82, 0.92], yaw: 0.36 },
-      { id: 'ground-rock-10', position: [24, 1.3, -54], scale: [0.98, 0.84, 0.94], yaw: -0.3 },
-      { id: 'ground-rock-11', position: [58, 1.2, -8], scale: [0.9, 0.78, 0.86], yaw: 0.14 },
-      { id: 'ground-rock-12', position: [-58, 1.2, 8], scale: [0.92, 0.8, 0.88], yaw: -0.16 },
-    ];
-
-    rockConfigs.forEach((rockConfig) => {
-      const geometry = rockConfig.large ? rockLargeGeometry : rockMediumGeometry;
-      const mesh = new Mesh(geometry, rockMaterial);
-      mesh.position.set(rockConfig.position[0], rockConfig.position[1], rockConfig.position[2]);
-      mesh.rotation.set(0.08, rockConfig.yaw, -0.03);
-      mesh.scale.set(rockConfig.scale[0], rockConfig.scale[1], rockConfig.scale[2]);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      scene.add(mesh);
-      pushColliderFromObjectBounds(
-        mesh,
-        {
-          category: 'system',
-          instanceId: rockConfig.id,
-        },
-        { insetXZ: 0.9, insetY: 0.9, minSize: [0.8, 0.6, 0.8] },
-      );
-    });
-
-    const grassClusterCenters: Array<[number, number, number]> = [
-      [-30, -0.04, -44],
-      [34, -0.04, -46],
-      [-44, -0.04, 36],
-      [42, -0.04, 38],
-      [54, -0.04, 2],
-      [-54, -0.04, -2],
-      [-58, -0.04, -30],
-      [58, -0.04, 30],
-      [-18, -0.04, 54],
-      [20, -0.04, -54],
-      [0, -0.04, 58],
-      [0, -0.04, -58],
-    ];
-    grassClusterCenters.forEach((center, clusterIndex) => {
-      for (let bladeIndex = 0; bladeIndex < 9; bladeIndex += 1) {
-        const angle = (Math.PI * 2 * bladeIndex) / 9;
-        const radius = 1 + ((bladeIndex + clusterIndex) % 3) * 0.42;
-        const blade = new Mesh(grassBladeGeometry, grassMaterial);
-        blade.position.set(
-          center[0] + Math.cos(angle) * radius,
-          center[1] + 0.98,
-          center[2] + Math.sin(angle) * radius,
-        );
-        blade.rotation.y = angle * 0.6;
-        blade.scale.set(
-          0.9 + ((bladeIndex + 2) % 4) * 0.12,
-          1.02 + ((bladeIndex + 1) % 3) * 0.16,
-          0.9 + (bladeIndex % 2) * 0.18,
-        );
-        blade.castShadow = true;
-        blade.receiveShadow = true;
-        scene.add(blade);
-      }
-
-      const flowerCore = new Mesh(flowerCoreGeometry, flowerCoreMaterial);
-      flowerCore.position.set(center[0], center[1] + 1.82, center[2]);
-      flowerCore.castShadow = true;
-      flowerCore.receiveShadow = true;
-      scene.add(flowerCore);
-      for (let petalIndex = 0; petalIndex < 5; petalIndex += 1) {
-        const petalAngle = (Math.PI * 2 * petalIndex) / 5;
-        const petal = new Mesh(flowerPetalGeometry, flowerPetalMaterial);
-        petal.position.set(
-          center[0] + Math.cos(petalAngle) * 0.36,
-          center[1] + 1.82,
-          center[2] + Math.sin(petalAngle) * 0.36,
-        );
-        petal.castShadow = true;
-        petal.receiveShadow = true;
-        scene.add(petal);
-      }
-      pushCollider({
-        center: [center[0], 0.4, center[2]],
-        size: [2.2, 0.8, 2.2],
-        debugMeta: {
-          category: 'system',
-          instanceId: `ground-grass-cluster-${(clusterIndex + 1).toString().padStart(2, '0')}`,
-        },
-      });
-    });
-
-    const themeZoneBaseGeometry = new PlaneGeometry(1, 1);
-    const containerZoneMaterial = new MeshStandardMaterial({
-      color: '#c9733b',
-      roughness: 0.9,
-      metalness: 0.04,
-      polygonOffset: true,
-      polygonOffsetFactor: -3,
-      polygonOffsetUnits: -3,
-    });
-    const woodZoneMaterial = new MeshStandardMaterial({
-      color: '#8b5a3c',
-      roughness: 0.92,
-      metalness: 0.02,
-      polygonOffset: true,
-      polygonOffsetFactor: -3,
-      polygonOffsetUnits: -3,
-    });
-    const pipeZoneMaterial = new MeshStandardMaterial({
-      color: '#5b7288',
-      roughness: 0.84,
-      metalness: 0.08,
-      polygonOffset: true,
-      polygonOffsetFactor: -3,
-      polygonOffsetUnits: -3,
-    });
-    const farmZoneMaterial = new MeshStandardMaterial({
-      color: '#6a8f4d',
-      roughness: 0.9,
-      metalness: 0.02,
-      polygonOffset: true,
-      polygonOffsetFactor: -3,
-      polygonOffsetUnits: -3,
-    });
-    sceneryGeometries.push(themeZoneBaseGeometry);
-    sceneryMaterials.push(
-      containerZoneMaterial,
-      woodZoneMaterial,
-      pipeZoneMaterial,
-      farmZoneMaterial,
-    );
-    const themeZoneConfigs: Array<{
-      zoneId: 'container' | 'wood' | 'pipe' | 'farm';
-      center: [number, number, number];
-      size: [number, number];
-      yaw?: number;
-      material: MeshStandardMaterial;
-    }> = [
-      {
-        zoneId: 'container',
-        center: [-42, FLOOR_SURFACE_Y, -8],
-        size: [26, 20],
-        yaw: 0.08,
-        material: containerZoneMaterial,
-      },
-      {
-        zoneId: 'wood',
-        center: [42, FLOOR_SURFACE_Y, -8],
-        size: [24, 18],
-        yaw: -0.06,
-        material: woodZoneMaterial,
-      },
-      {
-        zoneId: 'pipe',
-        center: [-42, FLOOR_SURFACE_Y, 34],
-        size: [24, 18],
-        yaw: 0.04,
-        material: pipeZoneMaterial,
-      },
-      {
-        zoneId: 'farm',
-        center: [42, FLOOR_SURFACE_Y, 34],
-        size: [26, 20],
-        yaw: -0.05,
-        material: farmZoneMaterial,
-      },
-    ];
-    themeZoneConfigs.forEach((zone) => {
-      const mesh = new Mesh(themeZoneBaseGeometry, zone.material);
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.position.set(zone.center[0], zone.center[1], zone.center[2]);
-      mesh.scale.set(zone.size[0], zone.size[1], 1);
-      if (zone.yaw) mesh.rotation.y = zone.yaw;
-      mesh.receiveShadow = true;
-      mesh.castShadow = false;
-      scene.add(mesh);
-    });
-
-    const themedPropGeometry = new BoxGeometry(1, 1, 1);
-    const themedPipeGeometry = new CylinderGeometry(0.48, 0.48, 4.6, 12);
-    sceneryGeometries.push(themedPropGeometry, themedPipeGeometry);
-    themeZoneConfigs.forEach((zone, zoneIndex) => {
-      for (let i = 0; i < 4; i += 1) {
-        const offsetX = (i - 1.5) * 4.2;
-        const offsetZ = zone.zoneId === 'container' || zone.zoneId === 'wood' ? 3.2 : -3.2;
-        const x = zone.center[0] + offsetX;
-        const z = zone.center[2] + offsetZ + (i % 2 === 0 ? 1.2 : -1.2);
-        if (zone.zoneId === 'pipe') {
-          const pipe = new Mesh(themedPipeGeometry, pipeZoneMaterial);
-          pipe.position.set(x, -0.08, z);
-          pipe.rotation.z = Math.PI * 0.5;
-          pipe.rotation.y = zone.yaw ?? 0;
-          pipe.castShadow = true;
-          pipe.receiveShadow = true;
-          scene.add(pipe);
-        } else {
-          const prop = new Mesh(themedPropGeometry, zone.material);
-          const height = zone.zoneId === 'container' ? 2.2 : zone.zoneId === 'wood' ? 0.5 : 1.1;
-          prop.position.set(x, FLOOR_SURFACE_Y + height * 0.5, z);
-          prop.scale.set(
-            zone.zoneId === 'farm' ? 1.1 : zone.zoneId === 'wood' ? 3.2 : 2.4,
-            height,
-            zone.zoneId === 'wood' ? 0.55 : 1.2,
-          );
-          prop.rotation.y = (zone.yaw ?? 0) + (zoneIndex % 2 === 0 ? 0.1 : -0.08);
-          prop.castShadow = true;
-          prop.receiveShadow = true;
-          scene.add(prop);
-        }
-      }
-    });
-  };
-
   const createDynamicHazards = () => {
     const ropeGeometry = new CylinderGeometry(0.08, 0.08, 1, 10);
     const bobGeometry = new SphereGeometry(0.74, 12, 10);
@@ -1861,6 +1500,18 @@ export function createClimberPrototype(
     },
   });
 
+  // 注册地面散落装饰物的碰撞体（AABB 近似）
+  for (let di = 0; di < pendingDecoColliders.length; di++) {
+    const dc = pendingDecoColliders[di];
+    if (dc) {
+      pushCollider({
+        center: dc.center,
+        size: dc.size,
+        debugMeta: { category: 'system', instanceId: `deco_${di}` },
+      });
+    }
+  }
+
   const wallY = BOUNDARY_WALL_HEIGHT / 2 - 0.5;
   const boundaryWallConfigs: Array<{
     center: [number, number, number];
@@ -1919,7 +1570,6 @@ export function createClimberPrototype(
     });
   }
 
-  createGroundScenery();
   createDynamicHazards();
   const setPieceRuntime = createSetPieceRuntime({
     scene,
@@ -2299,7 +1949,7 @@ export function createClimberPrototype(
           grounded = false;
           landingAnimationLockMs = 0;
           bp.squishTimer = bp.squishDuration;
-          audio.playJump();
+          audio.playBounce();
           break;
         }
       }
@@ -2337,6 +1987,7 @@ export function createClimberPrototype(
             }
             // 存档点激活粒子：从平台顶面中央爆发
             emitCheckpointParticles((cp.minX + cp.maxX) / 2, cp.top + 0.2, (cp.minZ + cp.maxZ) / 2);
+            audio.playCheckpoint();
           }
           break;
         }
@@ -2593,6 +2244,7 @@ export function createClimberPrototype(
           if (up.timer <= 0) {
             up.mesh.rotation.z = 0;
             up.state = 'falling';
+            audio.playUnstableFall();
           }
         } else if (up.state === 'falling') {
           up.mesh.position.y -= up.fallSpeed * delta;
@@ -2798,9 +2450,6 @@ export function createClimberPrototype(
         mount.removeChild(renderer.domElement);
       }
 
-      floor.geometry.dispose();
-      disposeMaterial(floor.material);
-
       platformGeometry.dispose();
       bumpGeometry.dispose();
       for (const m of platformMaterials) m.dispose();
@@ -2817,8 +2466,6 @@ export function createClimberPrototype(
       cpParticleGeo.dispose();
       cpParticleMat.dispose();
 
-      grid.geometry.dispose();
-      disposeMaterial(grid.material);
       for (const g of sceneryGeometries) g.dispose();
       for (const m of sceneryMaterials) m.dispose();
       clearColliderDebugMeshes();
