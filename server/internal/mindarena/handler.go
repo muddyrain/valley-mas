@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -78,11 +79,29 @@ func (h *Handler) StreamDebate(c *gin.Context) {
 		return
 	}
 
-	for event := range h.service.StreamDebate(c.Request.Context(), c.Param("id")) {
-		if err := writeSSE(c, event); err != nil {
+	eventCh := h.service.StreamDebate(c.Request.Context(), c.Param("id"))
+	// 每 15s 发一次 ping 事件，防止 AI 生成慢时客户端误判连接超时
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case event, ok := <-eventCh:
+			if !ok {
+				return
+			}
+			if err := writeSSE(c, event); err != nil {
+				return
+			}
+			flusher.Flush()
+		case <-ticker.C:
+			if err := writeSSE(c, SSEEvent{Type: "ping"}); err != nil {
+				return
+			}
+			flusher.Flush()
+		case <-c.Request.Context().Done():
 			return
 		}
-		flusher.Flush()
 	}
 }
 

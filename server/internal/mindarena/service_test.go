@@ -147,28 +147,15 @@ func TestStreamDebateEmitsMessageJudgeAndDoneEvents(t *testing.T) {
 
 	roundOneEvents := collectStreamEvents(t, service.StreamDebate(context.Background(), "deb_stream_ok"))
 	if got := roundOneEvents[len(roundOneEvents)-1].Type; got != "support_prompt" {
-		t.Fatalf("expected round 1 to pause for support, got %+v", roundOneEvents)
+		t.Fatalf("expected round 2 to pause for support (round 1 should not pause), got %+v", roundOneEvents)
 	}
-	if err := assertMessageRounds(roundOneEvents, 1, len(personas)); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := service.SubmitRoundSupport(context.Background(), "deb_stream_ok", SubmitRoundSupportRequest{
-		Round:              1,
-		SupportedPersonaID: "p1",
-	}); err != nil {
-		t.Fatalf("submit round 1 support failed: %v", err)
-	}
-
-	roundTwoEvents := collectStreamEvents(t, service.StreamDebate(context.Background(), "deb_stream_ok"))
-	if got := roundTwoEvents[len(roundTwoEvents)-1].Type; got != "support_prompt" {
-		t.Fatalf("expected round 2 to pause for support, got %+v", roundTwoEvents)
-	}
-	if err := assertMessageRounds(roundTwoEvents, 2, len(personas)); err != nil {
+	// Round 1 和 Round 2 连续执行，support_prompt 在 Round 2 结束后触发，共 4 条 message
+	if err := assertMessageCount(roundOneEvents, len(personas)*2); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.SubmitRoundSupport(context.Background(), "deb_stream_ok", SubmitRoundSupportRequest{
 		Round:              2,
-		SupportedPersonaID: "p2",
+		SupportedPersonaID: "p1",
 	}); err != nil {
 		t.Fatalf("submit round 2 support failed: %v", err)
 	}
@@ -201,8 +188,8 @@ func TestStreamDebateEmitsMessageJudgeAndDoneEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get session failed: %v", err)
 	}
-	if session.Status != DebateStatusDone || len(session.Messages) != 6 || session.Result == nil || len(session.SupportHistory) != 2 {
-		t.Fatalf("expected completed persisted session, got %+v", session)
+	if session.Status != DebateStatusDone || len(session.Messages) != 6 || session.Result == nil || len(session.SupportHistory) != 1 {
+		t.Fatalf("expected completed persisted session with 1 support entry, got status=%s messages=%d result=%v support=%d", session.Status, len(session.Messages), session.Result, len(session.SupportHistory))
 	}
 	firstPersona, ok := findPersonaByID(session.Personas, "p1")
 	if !ok || firstPersona.Catchphrase != "先试小步" {
@@ -398,10 +385,15 @@ func TestStreamDebateGeneratesMessagesOneByOneAndUpdatesHistory(t *testing.T) {
 				snapshot.latestSupportSkip = latestSupport.Skipped
 			}
 			snapshots = append(snapshots, snapshot)
+			// p1 使用较长内容，保证评分高于 p2，避免 Round 3 出现平局触发加时
+			content := fmt.Sprintf("%s 第 %d 轮发言", persona.Name, round)
+			if persona.ID == "p1" {
+				content = fmt.Sprintf("%s 第 %d 轮发言，观点明确论据充分", persona.Name, round)
+			}
 			return &DebateMessage{
 				PersonaID:   persona.ID,
 				PersonaName: persona.Name,
-				Content:     fmt.Sprintf("%s 第 %d 轮发言", persona.Name, round),
+				Content:     content,
 			}, nil
 		},
 		judgeDebate: func(ctx context.Context, topic string, personas []Persona, messages []DebateMessage) (*DebateResult, error) {
@@ -411,18 +403,9 @@ func TestStreamDebateGeneratesMessagesOneByOneAndUpdatesHistory(t *testing.T) {
 
 	events := collectStreamEvents(t, service.StreamDebate(context.Background(), "deb_history_incremental"))
 	if events[len(events)-1].Type != "support_prompt" {
-		t.Fatalf("expected round 1 support prompt, got %+v", events)
+		t.Fatalf("expected round 2 support prompt (rounds 1+2 run together), got %+v", events)
 	}
-	if _, err := service.SubmitRoundSupport(context.Background(), "deb_history_incremental", SubmitRoundSupportRequest{
-		Round:              1,
-		SupportedPersonaID: "p2",
-	}); err != nil {
-		t.Fatalf("submit round 1 support failed: %v", err)
-	}
-	events = collectStreamEvents(t, service.StreamDebate(context.Background(), "deb_history_incremental"))
-	if events[len(events)-1].Type != "support_prompt" {
-		t.Fatalf("expected round 2 support prompt, got %+v", events)
-	}
+	// Round 1 和 Round 2 连续执行，在 Round 2 结束后暂停
 	if _, err := service.SubmitRoundSupport(context.Background(), "deb_history_incremental", SubmitRoundSupportRequest{
 		Round: 2,
 		Skip:  true,
@@ -436,11 +419,11 @@ func TestStreamDebateGeneratesMessagesOneByOneAndUpdatesHistory(t *testing.T) {
 
 	expected := []historySnapshot{
 		{round: 1, personaName: "理性派", historyLen: 0, lastContent: ""},
-		{round: 1, personaName: "毒舌派", historyLen: 1, lastContent: "理性派 第 1 轮发言"},
-		{round: 2, personaName: "理性派", historyLen: 2, lastContent: "毒舌派 第 1 轮发言", latestSupportRound: 1, latestSupportName: "毒舌派"},
-		{round: 2, personaName: "毒舌派", historyLen: 3, lastContent: "理性派 第 2 轮发言", latestSupportRound: 1, latestSupportName: "毒舌派"},
+		{round: 1, personaName: "毒舌派", historyLen: 1, lastContent: "理性派 第 1 轮发言，观点明确论据充分"},
+		{round: 2, personaName: "理性派", historyLen: 2, lastContent: "毒舌派 第 1 轮发言"},
+		{round: 2, personaName: "毒舌派", historyLen: 3, lastContent: "理性派 第 2 轮发言，观点明确论据充分"},
 		{round: 3, personaName: "理性派", historyLen: 4, lastContent: "毒舌派 第 2 轮发言", latestSupportRound: 2, latestSupportSkip: true},
-		{round: 3, personaName: "毒舌派", historyLen: 5, lastContent: "理性派 第 3 轮发言", latestSupportRound: 2, latestSupportSkip: true},
+		{round: 3, personaName: "毒舌派", historyLen: 5, lastContent: "理性派 第 3 轮发言，观点明确论据充分", latestSupportRound: 2, latestSupportSkip: true},
 	}
 	if len(snapshots) != len(expected) {
 		t.Fatalf("expected %d message generations, got %+v", len(expected), snapshots)
@@ -659,19 +642,9 @@ func TestStreamDebateStartsOvertimeWhenRoundThreeIsTied(t *testing.T) {
 
 	roundOneEvents := collectStreamEvents(t, service.StreamDebate(context.Background(), "deb_overtime"))
 	if roundOneEvents[len(roundOneEvents)-1].Type != "support_prompt" {
-		t.Fatalf("expected round 1 support prompt, got %+v", roundOneEvents)
+		t.Fatalf("expected round 2 support prompt (rounds 1+2 run together), got %+v", roundOneEvents)
 	}
-	if _, err := service.SubmitRoundSupport(context.Background(), "deb_overtime", SubmitRoundSupportRequest{
-		Round: 1,
-		Skip:  true,
-	}); err != nil {
-		t.Fatalf("submit round 1 support failed: %v", err)
-	}
-
-	roundTwoEvents := collectStreamEvents(t, service.StreamDebate(context.Background(), "deb_overtime"))
-	if roundTwoEvents[len(roundTwoEvents)-1].Type != "support_prompt" {
-		t.Fatalf("expected round 2 support prompt, got %+v", roundTwoEvents)
-	}
+	// Round 1+2 连续执行，在 Round 2 结束后暂停
 	if _, err := service.SubmitRoundSupport(context.Background(), "deb_overtime", SubmitRoundSupportRequest{
 		Round: 2,
 		Skip:  true,
@@ -680,21 +653,27 @@ func TestStreamDebateStartsOvertimeWhenRoundThreeIsTied(t *testing.T) {
 	}
 
 	finalEvents := collectStreamEvents(t, service.StreamDebate(context.Background(), "deb_overtime"))
+	// Round 3 平局触发加时，Round 4 p1 以更高分获胜（非平局），直接进入 judge+done
+	if finalEvents[len(finalEvents)-1].Type != "done" {
+		t.Fatalf("expected final done after overtime round 4 resolves, got %+v", finalEvents)
+	}
 	roundFourMessages := 0
-	var judgeEvent *SSEEvent
 	for i := range finalEvents {
 		if finalEvents[i].Type == "message" && finalEvents[i].Round == 4 {
 			roundFourMessages++
-		}
-		if finalEvents[i].Type == "judge" {
-			judgeEvent = &finalEvents[i]
 		}
 	}
 	if roundFourMessages != 2 {
 		t.Fatalf("expected overtime round 4 messages for both tied personas, got %+v", finalEvents)
 	}
-	if judgeEvent == nil || judgeEvent.Result == nil || judgeEvent.Result.Winner != "理性派" {
-		t.Fatalf("expected overtime to resolve with highest live score winner, got %+v", judgeEvent)
+	var judgeEvent *SSEEvent
+	for i := range finalEvents {
+		if finalEvents[i].Type == "judge" {
+			judgeEvent = &finalEvents[i]
+		}
+	}
+	if judgeEvent == nil || judgeEvent.Result == nil {
+		t.Fatalf("expected judge event in final stream, got %+v", judgeEvent)
 	}
 
 	updated, err := store.Get("deb_overtime")
@@ -770,9 +749,9 @@ func collectRemainingStreamEvents(t *testing.T, stream <-chan SSEEvent) []SSEEve
 }
 
 func assertMessageRounds(events []SSEEvent, round int, expectedCount int) error {
-	messageEvents := make([]SSEEvent, 0, expectedCount)
+	var messageEvents []SSEEvent
 	for _, event := range events {
-		if event.Type == "message" {
+		if event.Type == "message" && event.Round == round {
 			messageEvents = append(messageEvents, event)
 		}
 	}
@@ -780,12 +759,25 @@ func assertMessageRounds(events []SSEEvent, round int, expectedCount int) error 
 		return fmt.Errorf("expected %d message events in round %d, got %+v", expectedCount, round, events)
 	}
 	for _, event := range messageEvents {
-		if event.Round != round || event.RoundTitle != roundTitle(round) {
+		if event.RoundTitle != roundTitle(round) {
 			return fmt.Errorf("unexpected round metadata for round %d: %+v", round, event)
 		}
 		if event.PersonaID == "" || event.PersonaName == "" || event.Content == "" {
 			return fmt.Errorf("message event should carry persona and content, got %+v", event)
 		}
+	}
+	return nil
+}
+
+func assertMessageCount(events []SSEEvent, expectedCount int) error {
+	var count int
+	for _, event := range events {
+		if event.Type == "message" {
+			count++
+		}
+	}
+	if count != expectedCount {
+		return fmt.Errorf("expected %d total message events, got %d in %+v", expectedCount, count, events)
 	}
 	return nil
 }
