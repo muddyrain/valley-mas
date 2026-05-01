@@ -13,7 +13,9 @@ import {
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { HomeToolbar } from '@/components/home/HomeToolbar';
 import { getDebate, getDebateStreamURL, submitRoundSupport } from '@/lib/api';
+import { useAudio } from '@/lib/audioProvider';
 import {
   appendUniqueDebateMessage,
   buildMessageFromSSEEvent,
@@ -96,6 +98,7 @@ function resolveActiveRoundPersonas(
 }
 
 export function DebateRoom({ initialSession }: DebateRoomProps) {
+  const { playEntrance, playSpeak } = useAudio();
   const [session, setSession] = useState(initialSession);
   const [messages, setMessages] = useState<DebateMessage[]>(initialSession.messages || []);
   const [result, setResult] = useState<DebateResult | undefined>(initialSession.result);
@@ -104,8 +107,16 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
   const [activePersonaId, setActivePersonaId] = useState<string | undefined>();
   const [selectedSupportPersonaId, setSelectedSupportPersonaId] = useState<string>('');
   const [isSubmittingSupport, setIsSubmittingSupport] = useState(false);
+  // 连接状态：connecting | connected | stale | disconnected
+  const [connState, setConnState] = useState<'connecting' | 'connected' | 'stale' | 'disconnected'>(
+    'connecting',
+  );
+  const [reconnectKey, setReconnectKey] = useState(0);
+  // 不可恢复的错误（status=failed），重连无意义，引导用户重开话题
+  const [isFatalError, setIsFatalError] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const personasRef = useRef<Persona[]>([]);
+  const lastEventAtRef = useRef<number>(Date.now());
 
   const personas = useMemo(
     () => (Array.isArray(session.personas) ? session.personas : []),
@@ -186,12 +197,50 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
   }, [messages.length, result]);
 
   useEffect(() => {
-    if (safeSession.status === 'done' || safeSession.status === 'failed') return;
-    if (safeSession.awaitingSupport || result) return;
+    if (safeSession.status === 'done' || result) return;
+    if (safeSession.awaitingSupport) return;
 
+    // failed：直接展示错误，不创建 EventSource
+    if (safeSession.status === 'failed') {
+      const errMsg = session.error || '辩论因错误中止，请重新开场';
+      setIsFatalError(true);
+      setConnState('disconnected');
+      setStreamError(errMsg);
+      setStatusText(errMsg);
+      return;
+    }
+
+    setConnState('connecting');
+    lastEventAtRef.current = Date.now();
+    // reconnectKey 变化时会触发 effect 重新执行，实现手动重连
+    void reconnectKey;
     const source = new EventSource(getDebateStreamURL(initialSession.id));
 
+    // ── 心跳检测：每 8s 检查一次是否超过 20s 没收到任何事件 ──
+    const STALE_MS = 20_000;
+    const DEAD_MS = 45_000;
+    const heartbeatTimer = setInterval(() => {
+      const silent = Date.now() - lastEventAtRef.current;
+      if (silent > DEAD_MS) {
+        setIsFatalError(false);
+        setConnState('disconnected');
+        setStreamError('连接超时，可以试试重新连接');
+        setStatusText('连接超时，可以试试重新连接');
+        source.close();
+        clearInterval(heartbeatTimer);
+      } else if (silent > STALE_MS) {
+        setConnState('stale');
+      }
+    }, 8_000);
+
+    function markAlive() {
+      lastEventAtRef.current = Date.now();
+      setConnState('connected');
+      setStreamError('');
+    }
+
     source.addEventListener('personas', (event) => {
+      markAlive();
       const payload = parseDebateSSEEvent(event as MessageEvent<string>);
       if (!payload) return;
       const nextPersonas = Array.isArray(payload.personas) ? payload.personas : [];
@@ -214,9 +263,11 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
             ? `${latestPersona.name} 已入场，正在准备出场口号...`
             : '人格设定同步中...',
       );
+      playEntrance();
     });
 
     source.addEventListener('message', (event) => {
+      markAlive();
       const payload = parseDebateSSEEvent(event as MessageEvent<string>);
       if (!payload || !payload.personaId || !payload.personaName || !payload.content) return;
 
@@ -250,9 +301,11 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
         if (!message) return prev;
         return appendUniqueDebateMessage(prev, message);
       });
+      playSpeak();
     });
 
     source.addEventListener('support_prompt', (event) => {
+      markAlive();
       const payload = parseDebateSSEEvent(event as MessageEvent<string>);
       if (!payload) return;
       setStreamError('');
@@ -285,6 +338,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     });
 
     source.addEventListener('judge', (event) => {
+      markAlive();
       const payload = parseDebateSSEEvent(event as MessageEvent<string>);
       if (!payload || !payload.result) return;
       setStreamError('');
@@ -294,7 +348,9 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     });
 
     source.addEventListener('done', async () => {
+      markAlive();
       source.close();
+      clearInterval(heartbeatTimer);
       setStatusText('辩论结束，金句已出炉');
       const latest = await getDebate(initialSession.id);
       setSession(latest);
@@ -305,21 +361,38 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     source.addEventListener('error', (event) => {
       if (source.readyState === EventSource.CLOSED) return;
       const payload = parseDebateSSEEvent(event as MessageEvent<string>);
-      const statusMessage = payload ? payload.message : '';
-      const nextError = statusMessage || '流式连接中断，请刷新重试';
+      const rawMessage = payload ? payload.message : '';
+      // 过滤掉后端技术报错（含 http 地址、Go 错误格式等），只展示用户友好文案
+      const isTechnical =
+        !rawMessage ||
+        /https?:\/\//i.test(rawMessage) ||
+        /context canceled|EOF|dial tcp|connection refused|upstream request failed/i.test(
+          rawMessage,
+        );
+      const nextError = isTechnical ? '连接出了点问题，可以试试重新连接' : rawMessage;
+      setIsFatalError(false);
+      setConnState('disconnected');
       setStreamError(nextError);
       setStatusText(nextError);
       source.close();
+      clearInterval(heartbeatTimer);
     });
 
-    return () => source.close();
+    return () => {
+      source.close();
+      clearInterval(heartbeatTimer);
+    };
   }, [
     initialSession.id,
     initialSession.personaCount,
     result,
+    reconnectKey,
     safeSession.awaitingSupport,
     safeSession.overtimePersonaIds,
     safeSession.status,
+    session.error,
+    playEntrance,
+    playSpeak,
   ]);
 
   const groupedMessages = useMemo(() => {
@@ -374,10 +447,53 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="arena-chip hidden text-md sm:inline-flex py-2">
-              <span className="h-2 w-2 rounded-full bg-fuchsia-300" />
-              {result ? '裁判已出结果' : '直播中'}
-            </span>
+            {/* 连接状态指示器 */}
+            {!result &&
+              !safeSession.awaitingSupport &&
+              (connState === 'disconnected' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStreamError('');
+                    setConnState('connecting');
+                    setReconnectKey((k) => k + 1);
+                  }}
+                  className="arena-chip border-red-400/50 bg-red-500/14 px-3 py-2 text-[12px] text-red-300 shadow-[0_0_12px_rgba(239,68,68,0.2)] hover:border-red-400/80 transition-colors cursor-pointer"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" />
+                  已断开 · 点击重连
+                </button>
+              ) : connState === 'stale' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStreamError('');
+                    setConnState('connecting');
+                    setReconnectKey((k) => k + 1);
+                  }}
+                  className="arena-chip border-amber-400/50 bg-amber-500/14 px-3 py-2 text-[12px] text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)] hover:border-amber-400/80 transition-colors cursor-pointer"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  响应迟缓 · 点击重连
+                </button>
+              ) : connState === 'connecting' ? (
+                <span className="arena-chip border-violet-400/34 bg-violet-500/14 px-3 py-2 text-[12px] text-violet-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
+                  连接中...
+                </span>
+              ) : (
+                <span className="arena-chip hidden text-md sm:inline-flex py-2">
+                  <span className="h-2 w-2 rounded-full bg-fuchsia-300" />
+                  {result ? '裁判已出结果' : '直播中'}
+                </span>
+              ))}
+            {(result || safeSession.awaitingSupport) && (
+              <span className="arena-chip hidden text-md sm:inline-flex py-2">
+                <span className="h-2 w-2 rounded-full bg-fuchsia-300" />
+                {result ? '裁判已出结果' : '直播中'}
+              </span>
+            )}
+            <HomeToolbar />
             <Link href="/" className="arena-ghost-button text-md py-2">
               <ArrowLeft className="h-4 w-4" />
               <span>返回开场</span>
@@ -492,17 +608,31 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
                 {streamError ? (
                   <DebateStatePanel
                     icon={<AlertTriangle className="h-5 w-5" />}
-                    title="流式连接中断"
-                    description={streamError}
+                    title={isFatalError ? '这场会议已无法继续' : '连接出了点问题'}
+                    description={
+                      isFatalError
+                        ? 'AI 评委团在准备阶段遭遇了技术故障，这场会议无法恢复。换个新话题重新开一场吧！'
+                        : '与后台的连接意外中断，可以先试试重新连接，若还是不行就换个新话题。'
+                    }
                   >
-                    <button
-                      type="button"
-                      onClick={() => window.location.reload()}
-                      className="arena-ghost-button"
-                    >
-                      <RefreshCcw className="h-4 w-4" />
-                      刷新重试
-                    </button>
+                    {!isFatalError && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStreamError('');
+                          setConnState('connecting');
+                          setReconnectKey((k) => k + 1);
+                        }}
+                        className="arena-ghost-button"
+                      >
+                        <RefreshCcw className="h-4 w-4" />
+                        重新连接
+                      </button>
+                    )}
+                    <Link href="/" className="arena-ghost-button">
+                      <Sparkles className="h-4 w-4" />
+                      换个新话题
+                    </Link>
                   </DebateStatePanel>
                 ) : !result ? (
                   <DebateStatePanel

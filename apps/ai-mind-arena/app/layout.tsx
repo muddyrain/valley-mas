@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AudioProvider } from '@/lib/audioProvider';
 
 export const metadata: Metadata = {
   title: '脑内会议室',
@@ -10,7 +11,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="zh-CN">
       <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-      <body>{children}</body>
+      <body>
+        <AudioProvider>{children}</AudioProvider>
+      </body>
     </html>
   );
 }
