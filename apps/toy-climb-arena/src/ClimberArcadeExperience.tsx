@@ -13,9 +13,7 @@ import type { ClimberCharacterId, ClimberPrototypeController } from './types';
 const SHELL_STYLE: CSSProperties = {
   position: 'relative',
   width: '100%',
-  height: 'min(72vh, 620px)',
-  minHeight: 420,
-  borderRadius: 22,
+  height: '100%',
   overflow: 'hidden',
   background: '#1a0f00',
 };

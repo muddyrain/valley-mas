@@ -70,16 +70,6 @@ export const TOY_BLOCK_TOWER_LEVEL: ClimberLevelDefinition = {
       color: '#F6D365',
     },
 
-    // ── 弹跳板 A：出发台旁边，踩到可弹射到 p02 ────────────────────────────
-    // top=0.55  与 start 齐平，hDist(to p02)≈7.6m（需借力）
-    {
-      id: 'bounce_a',
-      size: [2, 0.3, 2],
-      position: [-3, 0.25, 3.5],
-      color: '#F472B6', // 粉色弹跳垫
-      bouncy: { boostVelocity: 13.5, squishDuration: 90 },
-    },
-
     // ── 段 1：向 +X / +Z 爬升，~6 步到存档点 A ──────────────────────────────
     // p01: top=1.45  Δtop=+1.05  hDist(center)=4.0  → 边缘≈4.0-1.5-1.25=1.25m ✓
     {
