@@ -14,7 +14,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { HomeToolbar } from '@/components/home/HomeToolbar';
-import { getDebate, getDebateStreamURL, submitRoundSupport } from '@/lib/api';
+import { ApiError, getDebate, getDebateStreamURL, submitRoundSupport } from '@/lib/api';
 import { useAudio } from '@/lib/audioProvider';
 import {
   appendUniqueDebateMessage,
@@ -114,9 +114,16 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
   const [reconnectKey, setReconnectKey] = useState(0);
   // 不可恢复的错误（status=failed），重连无意义，引导用户重开话题
   const [isFatalError, setIsFatalError] = useState(false);
+  // 会话已不存在（服务重启/会话过期），全屏遮罩提示
+  const [isSessionGone, setIsSessionGone] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const personasRef = useRef<Persona[]>([]);
   const lastEventAtRef = useRef<number>(Date.now());
+  // 用 ref 持有音频回调，避免 audioEnabled 变化时 useEffect 重建 SSE 连接
+  const playEntranceRef = useRef(playEntrance);
+  const playSpeakRef = useRef(playSpeak);
+  // 用 ref 持有 overtimePersonaIds，避免每次 message 事件时数组新引用触发 effect 重建
+  const overtimePersonaIdsRef = useRef<string[]>([]);
 
   const personas = useMemo(
     () => (Array.isArray(session.personas) ? session.personas : []),
@@ -174,6 +181,17 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     personasRef.current = personas;
   }, [personas]);
 
+  // 同步音频回调和 overtimePersonaIds 到 ref，防止 SSE effect 因引用变化重建连接
+  useEffect(() => {
+    playEntranceRef.current = playEntrance;
+  }, [playEntrance]);
+  useEffect(() => {
+    playSpeakRef.current = playSpeak;
+  }, [playSpeak]);
+  useEffect(() => {
+    overtimePersonaIdsRef.current = safeSession.overtimePersonaIds;
+  }, [safeSession.overtimePersonaIds]);
+
   useEffect(() => {
     if (result) {
       setStatusText('辩论结束，金句已出炉');
@@ -216,9 +234,9 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     void reconnectKey;
     const source = new EventSource(getDebateStreamURL(initialSession.id));
 
-    // ── 心跳检测：每 8s 检查一次是否超过 20s 没收到任何事件 ──
-    const STALE_MS = 20_000;
-    const DEAD_MS = 45_000;
+    // ── 心跳检测：每 8s 检查一次是否超过 30s 没收到任何事件 ──
+    const STALE_MS = 30_000;
+    const DEAD_MS = 90_000;
     const heartbeatTimer = setInterval(() => {
       const silent = Date.now() - lastEventAtRef.current;
       if (silent > DEAD_MS) {
@@ -238,6 +256,11 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
       setConnState('connected');
       setStreamError('');
     }
+
+    // 服务端每 15s 发一次 ping 保活，客户端刷新存活时间戳
+    source.addEventListener('ping', () => {
+      markAlive();
+    });
 
     source.addEventListener('personas', (event) => {
       markAlive();
@@ -263,7 +286,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
             ? `${latestPersona.name} 已入场，正在准备出场口号...`
             : '人格设定同步中...',
       );
-      playEntrance();
+      playEntranceRef.current();
     });
 
     source.addEventListener('message', (event) => {
@@ -276,7 +299,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
         resolveActiveRoundPersonas(
           personasRef.current,
           payload.round || 1,
-          payload.overtimePersonaIds || safeSession.overtimePersonaIds,
+          payload.overtimePersonaIds ?? overtimePersonaIdsRef.current,
         ),
         payload.personaId,
         payload.round || 1,
@@ -301,7 +324,7 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
         if (!message) return prev;
         return appendUniqueDebateMessage(prev, message);
       });
-      playSpeak();
+      playSpeakRef.current();
     });
 
     source.addEventListener('support_prompt', (event) => {
@@ -388,20 +411,19 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
     result,
     reconnectKey,
     safeSession.awaitingSupport,
-    safeSession.overtimePersonaIds,
     safeSession.status,
     session.error,
-    playEntrance,
-    playSpeak,
   ]);
 
   const groupedMessages = useMemo(() => {
-    return messages.reduce<Record<number, DebateMessage[]>>((acc, message) => {
+    // 全部人格入场前不展示消息，避免视觉上出现"只有3个人就开始游戏"的错觉
+    const visibleMessages = hasAllPersonas ? messages : [];
+    return visibleMessages.reduce<Record<number, DebateMessage[]>>((acc, message) => {
       acc[message.round] = acc[message.round] || [];
       acc[message.round].push(message);
       return acc;
     }, {});
-  }, [messages]);
+  }, [hasAllPersonas, messages]);
 
   async function handleSubmitSupport(skip = false) {
     if (!skip && !selectedSupportPersonaId) return;
@@ -423,6 +445,11 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
         skip ? '你先按下保留态度，下一轮人格马上继续争宠。' : '收到你的站队，下一轮正在重开麦...',
       );
     } catch (error) {
+      // 404 → 会议不存在（服务重启/会话过期），展示全屏遮罩
+      if (error instanceof ApiError && error.status === 404) {
+        setIsSessionGone(true);
+        return;
+      }
       const message = error instanceof Error ? error.message : '站队提交失败，请重试';
       setStreamError(message);
       setStatusText(message);
@@ -433,6 +460,29 @@ export function DebateRoom({ initialSession }: DebateRoomProps) {
 
   return (
     <main className="arena-shell arena-debate-page h-screen overflow-hidden px-3 py-3 xl:px-4 xl:py-4">
+      {/* 会话不存在遮罩：服务重启/会话过期时展示 */}
+      {isSessionGone && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
+          <div className="arena-panel max-w-sm w-full mx-4 flex flex-col items-center border-red-400/30 px-8 py-10 text-center shadow-[0_0_60px_rgba(239,68,68,0.15)]">
+            <div className="mb-5 grid h-16 w-16 place-items-center rounded-full border border-red-400/24 bg-red-500/12 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+              <AlertTriangle className="h-8 w-8 text-red-400" />
+            </div>
+            <h2 className="text-xl font-bold text-white">这场会议已经散场了</h2>
+            <p className="mt-3 text-sm leading-6 text-white/55">
+              这场脑内会议已经不在了，可能因为服务重启而丢失。
+              <br />
+              别再等了，去开一场新的吧！
+            </p>
+            <Link
+              href="/"
+              className="arena-chip mt-7 border-fuchsia-300/30 bg-[linear-gradient(135deg,rgba(217,70,239,0.18),rgba(168,85,247,0.16))] px-5 py-2.5 text-sm text-white"
+            >
+              <Sparkles className="h-4 w-4" />
+              开一场新的
+            </Link>
+          </div>
+        </div>
+      )}
       <div className="arena-debate-frame relative z-10 mx-auto flex h-full max-w-[1880px] flex-col gap-3 xl:gap-4">
         <header className="arena-panel arena-debate-header flex items-center justify-between gap-4 border-purple-400/20 px-4 py-3 shadow-[0_0_30px_rgba(123,92,255,0.2)] xl:px-5 xl:py-4">
           <div className="flex min-w-0 items-center gap-3">

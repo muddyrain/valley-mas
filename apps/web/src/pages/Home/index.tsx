@@ -33,6 +33,7 @@ import {
 } from './components/githubContribution';
 import HomeAuthorProfileCard, { type GithubProfile } from './components/HomeAuthorProfileCard';
 import HomeEnergyCore from './components/HomeEnergyCore';
+import HomeLabSection from './components/HomeLabSection';
 import {
   EmptyPanel,
   HeroRibbon,
@@ -766,6 +767,8 @@ export default function Home() {
             )}
           </div>
         </section>
+
+        <HomeLabSection />
 
         <section className="mt-20 px-4 sm:mt-24 sm:px-0">
           <SectionHeading

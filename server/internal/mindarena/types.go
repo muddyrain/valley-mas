@@ -182,5 +182,7 @@ func roundTitle(round int) string {
 }
 
 func shouldPauseAfterRound(round int) bool {
-	return round == 1 || round == 2 || round > 3
+	// Round 1（立场表达）结束后不打断，让用户先看完交锋与结盟（Round 2）再站队；
+	// Round 2 结束后暂停一次；最终陈词（Round 3）之后如有加时赛也每轮暂停。
+	return round == 2 || round > 3
 }

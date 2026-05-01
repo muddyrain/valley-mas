@@ -9,6 +9,16 @@ import type {
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:8080';
 
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 async function requestJSON<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -21,7 +31,7 @@ async function requestJSON<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const payload = await res.json().catch(() => null);
-    throw new Error(payload?.message || `请求失败：${res.status}`);
+    throw new ApiError(res.status, payload?.message || `请求失败：${res.status}`);
   }
   return res.json() as Promise<T>;
 }
