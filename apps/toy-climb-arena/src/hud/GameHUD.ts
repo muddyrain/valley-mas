@@ -24,11 +24,31 @@ interface MenuEntry {
   primary?: boolean;
 }
 
-const FONT_BODY = '600 13px "Segoe UI", system-ui, sans-serif';
-const FONT_LABEL = 'bold 15px "Segoe UI", system-ui, sans-serif';
-const FONT_TITLE = 'bold 26px "Segoe UI", system-ui, sans-serif';
-const FONT_SUBTITLE = '600 12px "Segoe UI", system-ui, sans-serif';
-const FONT_HINT = '12px "Segoe UI", system-ui, sans-serif';
+const FONT_FAMILY = '"Nunito", "Fredoka One", "Segoe UI", system-ui, sans-serif';
+const FONT_BODY = `600 13px ${FONT_FAMILY}`;
+const FONT_LABEL = `bold 16px ${FONT_FAMILY}`;
+const FONT_TITLE = `bold 28px ${FONT_FAMILY}`;
+const FONT_SUBTITLE = `600 12px ${FONT_FAMILY}`;
+const FONT_HINT = `12px ${FONT_FAMILY}`;
+
+/** 调色板 */
+const C = {
+  orange: '#F97316',
+  orangeD: '#EA580C',
+  yellow: '#FBBF24',
+  blue: '#60A5FA',
+  blueD: '#3B82F6',
+  purple: '#A78BFA',
+  green: '#4ADE80',
+  white: 'rgba(255,255,255,0.96)',
+  whiteM: 'rgba(255,252,245,0.97)',
+  glass: 'rgba(255,255,255,0.22)',
+  shadow: 'rgba(0,0,0,0.13)',
+  text: '#1E293B',
+  textMid: '#475569',
+  textHint: '#94A3B8',
+  border: 'rgba(203,213,225,0.6)',
+} as const;
 
 export class GameHUD {
   /** 覆盖在 WebGL canvas 上的 2D 画布 */
@@ -221,76 +241,130 @@ export class GameHUD {
     const W = this.W;
     const H = this.H;
 
-    // 左上：高度 + 计时
-    this.chip(14, 14, 152, 44);
-    ctx.fillStyle = '#f97316';
-    ctx.font = FONT_LABEL;
-    ctx.fillText(`🧱 ${this.fmtHeight(s.currentHeight)}`, 26, 33);
-    ctx.fillStyle = '#64748b';
+    // ── 左上：高度卡片 ──
+    const LW = 168,
+      LH = 58;
+    this.chip(14, 14, LW, LH, C.orange);
+    // 高度大字
+    ctx.fillStyle = C.orange;
+    ctx.font = FONT_TITLE;
+    ctx.fillText(this.fmtHeight(s.currentHeight), 48, 38);
+    // 小图标背景圆
+    ctx.save();
+    ctx.fillStyle = 'rgba(249,115,22,0.15)';
+    ctx.beginPath();
+    ctx.arc(32, 30, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.font = '15px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🧱', 32, 35);
+    ctx.textAlign = 'left';
+    // 计时 + 最高
+    ctx.fillStyle = C.textMid;
     ctx.font = FONT_HINT;
-    ctx.fillText(`⏱ ${this.fmtTime(s.elapsedMs)}  最高 ${this.fmtHeight(s.bestHeight)}`, 26, 50);
+    ctx.fillText(`⏱ ${this.fmtTime(s.elapsedMs)}`, 22, 56);
+    ctx.fillStyle = C.purple;
+    const bestTxt = `▲${this.fmtHeight(s.bestHeight)}`;
+    ctx.fillText(bestTxt, LW - ctx.measureText(bestTxt).width - 8, 56);
 
-    // 右上：进度
-    const pw = 188;
+    // ── 右上：进度卡片 ──
+    const pw = 200,
+      ph = 58;
     const px = W - pw - 14;
-    this.chip(px, 14, pw, 44);
-    ctx.fillStyle = '#0f172a';
+    this.chip(px, 14, pw, ph, C.blueD);
+    // 进度百分比
+    const pct = Math.round(s.progress * 100);
+    ctx.fillStyle = C.blueD;
+    ctx.font = FONT_LABEL;
+    ctx.textAlign = 'right';
+    ctx.fillText(`${pct}%`, px + pw - 12, 37);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = C.textMid;
     ctx.font = FONT_SUBTITLE;
-    ctx.fillText('🎯 进度', px + 12, 30);
-    ctx.fillStyle = '#f97316';
-    ctx.font = 'bold 13px "Segoe UI", system-ui, sans-serif';
-    const pctTxt = `${Math.round(s.progress * 100)}%`;
-    ctx.fillText(pctTxt, px + pw - ctx.measureText(pctTxt).width - 12, 30);
-
-    // 进度条
-    const tx = px + 12;
-    const ty = 36;
-    const tw = pw - 24;
-    ctx.fillStyle = 'rgba(203,213,225,0.5)';
-    this.rrect(tx, ty, tw, 10, 5);
+    ctx.fillText('🎯 进度', px + 12, 34);
+    // 进度条（14px 高，彩虹渐变）
+    const tx = px + 12,
+      ty = 42,
+      tw = pw - 24;
+    ctx.fillStyle = 'rgba(148,163,184,0.28)';
+    this.rrect(tx, ty, tw, 11, 5.5);
     ctx.fill();
     const fw = tw * Math.max(0, Math.min(1, s.progress));
     if (fw > 0) {
-      const g = ctx.createLinearGradient(tx, 0, tx + fw, 0);
-      g.addColorStop(0, '#fb923c');
-      g.addColorStop(1, '#facc15');
-      ctx.fillStyle = g;
-      this.rrect(tx, ty, fw, 10, 5);
+      const gBar = ctx.createLinearGradient(tx, 0, tx + tw, 0);
+      gBar.addColorStop(0, '#60A5FA');
+      gBar.addColorStop(0.5, '#A78BFA');
+      gBar.addColorStop(1, '#F97316');
+      ctx.fillStyle = gBar;
+      this.rrect(tx, ty, fw, 11, 5.5);
       ctx.fill();
     }
 
-    // 通关 banner
+    // ── 通关 banner ──
     if (s.goalReached) {
-      const bw = 300;
-      const bh = 70;
+      const bw = 340,
+        bh = 90;
       const bx = (W - bw) / 2;
-      const by = H / 2 - bh / 2 - 36;
+      const by = H / 2 - bh / 2 - 40;
       ctx.save();
-      ctx.shadowColor = 'rgba(217,119,6,0.35)';
-      ctx.shadowBlur = 20;
-      ctx.shadowOffsetY = 6;
-      ctx.fillStyle = 'rgba(255,251,235,0.97)';
-      this.rrect(bx, by, bw, bh, 18);
+      ctx.shadowColor = 'rgba(217,119,6,0.5)';
+      ctx.shadowBlur = 32;
+      ctx.shadowOffsetY = 8;
+      // 金色渐变背景
+      const gBan = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
+      gBan.addColorStop(0, 'rgba(255,251,235,0.98)');
+      gBan.addColorStop(0.5, 'rgba(254,243,199,0.99)');
+      gBan.addColorStop(1, 'rgba(255,237,213,0.98)');
+      ctx.fillStyle = gBan;
+      this.rrect(bx, by, bw, bh, 22);
       ctx.fill();
       ctx.restore();
-      ctx.strokeStyle = 'rgba(251,191,36,0.85)';
+      // 金色边框
+      ctx.strokeStyle = '#FBBF24';
       ctx.lineWidth = 3;
-      this.rrect(bx, by, bw, bh, 18);
+      this.rrect(bx, by, bw, bh, 22);
       ctx.stroke();
-      ctx.fillStyle = '#d97706';
-      ctx.font = 'bold 20px "Segoe UI", system-ui, sans-serif';
+      // 顶部彩带
+      const gTop = ctx.createLinearGradient(bx, by, bx + bw, by);
+      gTop.addColorStop(0, '#F97316');
+      gTop.addColorStop(0.5, '#FBBF24');
+      gTop.addColorStop(1, '#4ADE80');
+      ctx.save();
+      ctx.fillStyle = gTop;
+      this.rrect(bx, by, bw, 5, 22);
+      ctx.fill();
+      ctx.restore();
+      // 主文字
+      ctx.fillStyle = '#D97706';
+      ctx.font = `bold 26px ${FONT_FAMILY}`;
       ctx.textAlign = 'center';
-      ctx.fillText('🎉 登顶成功！', W / 2, by + 28);
+      ctx.fillText('🎉 登顶成功！🎊', W / 2, by + 42);
       ctx.fillStyle = '#92400e';
-      ctx.font = FONT_HINT;
-      ctx.fillText(`按 P 查看结算`, W / 2, by + 52);
+      ctx.font = `600 13px ${FONT_FAMILY}`;
+      ctx.fillText('太厉害了！按 P 查看战绩', W / 2, by + 66);
+      // 星星装饰
+      const stars = ['⭐', '✨', '🌟'];
+      ctx.font = '18px sans-serif';
+      ctx.fillText(stars[0]!, bx + 24, by + 38);
+      ctx.fillText(stars[1]!, bx + bw - 28, by + 38);
+      ctx.fillText(stars[2]!, W / 2, by + 18);
       ctx.textAlign = 'left';
     }
 
-    // 底部提示
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.font = '11px "Segoe UI", system-ui, sans-serif';
-    ctx.fillText('WASD 移动 · 空格 跳跃 · Shift 冲刺 · P 菜单', 14, H - 12);
+    // ── 底部提示条 ──
+    const hintTxt = 'WASD 移动 · 空格 跳跃 · Shift 冲刺 · P 菜单';
+    ctx.font = `11px ${FONT_FAMILY}`;
+    const hintW = ctx.measureText(hintTxt).width + 24;
+    const hintX = (W - hintW) / 2;
+    const hintY = H - 28;
+    ctx.fillStyle = 'rgba(15,23,42,0.38)';
+    this.rrect(hintX, hintY, hintW, 20, 10);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.textAlign = 'center';
+    ctx.fillText(hintTxt, W / 2, hintY + 14);
+    ctx.textAlign = 'left';
   }
 
   // ── 菜单层（暂停/开始时）────────────────────────────────────────────────
@@ -300,61 +374,77 @@ export class GameHUD {
     const H = this.H;
     const s = this._stats;
 
-    // 背景遮罩
-    ctx.fillStyle = 'rgba(10, 15, 30, 0.52)';
+    // 背景遮罩（带径向亮斑）
+    ctx.fillStyle = 'rgba(10, 15, 30, 0.58)';
     ctx.fillRect(0, 0, W, H);
 
     // 面板尺寸
-    const ITEM_H = 44;
-    const ITEM_GAP = 8;
-    const HEADER_H = 96;
-    const FOOTER_H = 40;
+    const ITEM_H = 48;
+    const ITEM_GAP = 9;
+    const HEADER_H = 102;
+    const FOOTER_H = 48;
     const PAD_V = 18;
-    const pw = Math.min(300, W - 40);
+    const pw = Math.min(308, W - 40);
     const ph = HEADER_H + this.entries.length * (ITEM_H + ITEM_GAP) - ITEM_GAP + PAD_V + FOOTER_H;
     const px = (W - pw) / 2;
     const py = Math.max(16, (H - ph) / 2);
 
-    // 面板阴影 + 背景
+    // 积木底部阴影（立体感）
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.45)';
-    ctx.shadowBlur = 48;
-    ctx.shadowOffsetY = 16;
-    ctx.fillStyle = 'rgba(255,252,245,0.98)';
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    this.rrect(px + 4, py + 6, pw - 8, ph, 22);
+    ctx.fill();
+    ctx.restore();
+
+    // 面板主体
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.36)';
+    ctx.shadowBlur = 36;
+    ctx.shadowOffsetY = 12;
+    ctx.fillStyle = C.whiteM;
     this.rrect(px, py, pw, ph, 22);
     ctx.fill();
     ctx.restore();
 
+    // 顶部彩带（橙→黄→绿）
+    ctx.save();
+    const gStripe = ctx.createLinearGradient(px, py, px + pw, py);
+    gStripe.addColorStop(0, '#F97316');
+    gStripe.addColorStop(0.45, '#FBBF24');
+    gStripe.addColorStop(1, '#4ADE80');
+    ctx.fillStyle = gStripe;
+    this.rrect(px, py, pw, 10, 22);
+    ctx.fill();
+    ctx.restore();
+
     // 面板边框
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = C.border;
+    ctx.lineWidth = 1.5;
     this.rrect(px, py, pw, ph, 22);
     ctx.stroke();
 
-    // 底部立体线（积木感）
-    ctx.strokeStyle = 'rgba(0,0,0,0.10)';
-    ctx.lineWidth = 5;
-    this.rrect(px + 3, py + 5, pw - 6, ph, 22);
-    ctx.stroke();
-
-    // 标题
-    ctx.fillStyle = '#f97316';
-    ctx.font = FONT_TITLE;
+    // 标题 emoji
+    ctx.font = '28px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('🧱 积木攀登', px + pw / 2, py + 38);
+    ctx.fillText('🧱', px + pw / 2, py + 52);
+
+    // 标题文字（橙色）
+    ctx.fillStyle = C.orange;
+    ctx.font = FONT_TITLE;
+    ctx.fillText('积木攀登', px + pw / 2, py + 80);
 
     // 副标题
-    ctx.fillStyle = '#64748b';
+    ctx.fillStyle = C.textHint;
     ctx.font = FONT_SUBTITLE;
-    ctx.fillText(this._hasEntered ? '游戏已暂停' : '选择角色，点击开始', px + pw / 2, py + 62);
+    ctx.fillText(this._hasEntered ? '⏸ 游戏已暂停' : '选择角色，准备出发！', px + pw / 2, py + 98);
     ctx.textAlign = 'left';
 
     // 分隔线
-    ctx.strokeStyle = 'rgba(203,213,225,0.55)';
+    ctx.strokeStyle = 'rgba(203,213,225,0.5)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(px + 18, py + HEADER_H - 6);
-    ctx.lineTo(px + pw - 18, py + HEADER_H - 6);
+    ctx.moveTo(px + 20, py + HEADER_H);
+    ctx.lineTo(px + pw - 20, py + HEADER_H);
     ctx.stroke();
 
     // 菜单项
@@ -369,68 +459,82 @@ export class GameHUD {
       const hot = this.hoveredIdx === i;
 
       if (entry.primary) {
-        // 主按钮：橙色渐变
+        // 主按钮：橙→黄渐变 + 发光阴影
         ctx.save();
-        ctx.shadowColor = hot ? 'rgba(249,115,22,0.55)' : 'rgba(249,115,22,0.28)';
-        ctx.shadowBlur = hot ? 16 : 8;
-        ctx.shadowOffsetY = hot ? 4 : 2;
-        const g = ctx.createLinearGradient(ix, iy, ix + iw, iy);
-        g.addColorStop(0, hot ? '#ea580c' : '#f97316');
-        g.addColorStop(1, hot ? '#ca8a04' : '#fb923c');
-        ctx.fillStyle = g;
-        this.rrect(ix, iy, iw, ITEM_H, 12);
+        ctx.shadowColor = hot ? 'rgba(249,115,22,0.6)' : 'rgba(249,115,22,0.3)';
+        ctx.shadowBlur = hot ? 20 : 10;
+        ctx.shadowOffsetY = hot ? 5 : 3;
+        const gBtn = ctx.createLinearGradient(ix, iy, ix, iy + ITEM_H);
+        gBtn.addColorStop(0, hot ? '#FB923C' : '#F97316');
+        gBtn.addColorStop(1, hot ? '#FBBF24' : '#FB923C');
+        ctx.fillStyle = gBtn;
+        this.rrect(ix, iy, iw, ITEM_H, 16);
         ctx.fill();
         ctx.restore();
+        // 底部立体边（积木感）
+        ctx.strokeStyle = 'rgba(180,83,9,0.45)';
+        ctx.lineWidth = 2;
+        this.rrect(ix, iy + 2, iw, ITEM_H, 16);
+        ctx.stroke();
         ctx.fillStyle = '#fff';
-        ctx.font = FONT_BODY;
+        ctx.font = `bold 15px ${FONT_FAMILY}`;
         ctx.textAlign = 'center';
-        ctx.fillText(entry.label(), ix + iw / 2, iy + ITEM_H / 2 + 5);
+        ctx.fillText(entry.label(), ix + iw / 2, iy + ITEM_H / 2 + 6);
         ctx.textAlign = 'left';
       } else {
-        // 次级按钮：白底带边框
-        ctx.fillStyle = hot ? 'rgba(255,237,213,0.95)' : 'rgba(248,250,252,0.95)';
-        ctx.strokeStyle = hot ? 'rgba(249,115,22,0.55)' : 'rgba(203,213,225,0.75)';
+        // 次级按钮
+        ctx.fillStyle = hot ? 'rgba(255,237,213,0.9)' : 'rgba(248,250,252,0.9)';
+        ctx.strokeStyle = hot ? C.orange : C.border;
         ctx.lineWidth = hot ? 2 : 1.5;
-        this.rrect(ix, iy, iw, ITEM_H, 12);
+        this.rrect(ix, iy, iw, ITEM_H, 16);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = hot ? '#f97316' : '#334155';
-        ctx.font = FONT_BODY;
+        ctx.fillStyle = hot ? C.orange : C.text;
+        ctx.font = `600 14px ${FONT_FAMILY}`;
         ctx.textAlign = 'center';
-        ctx.fillText(entry.label(), ix + iw / 2, iy + ITEM_H / 2 + 5);
+        ctx.fillText(entry.label(), ix + iw / 2, iy + ITEM_H / 2 + 6);
         ctx.textAlign = 'left';
       }
     }
 
-    // 页脚：最高记录
-    const footY = py + HEADER_H + this.entries.length * (ITEM_H + ITEM_GAP) + PAD_V / 2;
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '11px "Segoe UI", system-ui, sans-serif';
+    // 页脚：战绩徽章
+    const footY = py + HEADER_H + this.entries.length * (ITEM_H + ITEM_GAP) + PAD_V / 2 + 4;
+    const footTxt = `🏆 ${this.fmtHeight(s.bestHeight)}  ·  ⏱ ${this.fmtTime(s.elapsedMs)}`;
+    ctx.font = `600 11px ${FONT_FAMILY}`;
+    const ftw = ctx.measureText(footTxt).width + 24;
+    const ftx = px + (pw - ftw) / 2;
+    ctx.fillStyle = 'rgba(203,213,225,0.35)';
+    this.rrect(ftx, footY, ftw, 24, 12);
+    ctx.fill();
+    ctx.fillStyle = C.textMid;
     ctx.textAlign = 'center';
-    ctx.fillText(
-      `🏆 最高 ${this.fmtHeight(s.bestHeight)}  ·  ⏱ ${this.fmtTime(s.elapsedMs)}`,
-      px + pw / 2,
-      footY + 20,
-    );
+    ctx.fillText(footTxt, px + pw / 2, footY + 16);
     ctx.textAlign = 'left';
   }
 
   // ── 绘图工具 ─────────────────────────────────────────────────────────────
-  /** 白色磨砂 chip */
-  private chip(x: number, y: number, w: number, h: number): void {
+  /** 玩具感 chip 卡片，accent 为左侧彩色竖条颜色（可选） */
+  private chip(x: number, y: number, w: number, h: number, accent?: string): void {
     const ctx = this.ctx;
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.12)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 3;
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    this.rrect(x, y, w, h, 12);
+    ctx.shadowColor = 'rgba(0,0,0,0.14)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = C.whiteM;
+    this.rrect(x, y, w, h, 14);
     ctx.fill();
     ctx.restore();
-    ctx.strokeStyle = 'rgba(255,255,255,0.72)';
-    ctx.lineWidth = 2;
-    this.rrect(x, y, w, h, 12);
+    ctx.strokeStyle = C.border;
+    ctx.lineWidth = 1.5;
+    this.rrect(x, y, w, h, 14);
     ctx.stroke();
+    if (accent) {
+      ctx.save();
+      ctx.fillStyle = accent;
+      this.rrect(x + 1, y + 8, 4, h - 16, 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   /** 圆角矩形路径（不 fill/stroke，由调用方决定） */

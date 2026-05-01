@@ -183,15 +183,6 @@ export const TOY_BLOCK_TOWER_LEVEL: ClimberLevelDefinition = {
       color: '#EC4899', // 粉色橡皮
     },
 
-    // ── 弹跳板 B：段3中段悬空小垫，可弹跳跳过 p15 直接到 p16 ───────────────
-    // top=14.35  与 p14 同高，hDist(to p16)≈3.6m（正常不可直接跳，借力可到）
-    {
-      id: 'bounce_b',
-      size: [1.8, 0.3, 1.8],
-      position: [3.5, 14.1, 1.2],
-      color: '#F472B6',
-      bouncy: { boostVelocity: 12.0, squishDuration: 80 },
-    },
     // p15: top=14.75  Δtop=+1.0   hDist≈2.8
     {
       id: 'p15',

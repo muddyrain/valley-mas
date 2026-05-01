@@ -50,9 +50,9 @@
 
 ## 里程碑 0.4 — 音效与氛围
 
-- [ ] BGM 背景音乐循环（轻松玩具风格，Web Audio API 或 .mp3）
-- [ ] 补充/替换音效：弹跳板弹起、不稳定平台晃动、平台消失
-- [ ] 存档点激活专属音效（叮声 / 积木碰撞声）
+- [x] BGM 背景音乐循环（C大调合成循环，triangle 波，Web Audio API）
+- [x] 补充音效：弹跳板弹起（playBounce）、不稳定平台坠落（playUnstableFall）
+- [x] 存档点激活专属音效（playCheckpoint）
 - [ ] 通关庆典音效强化
 
 ---
@@ -87,7 +87,7 @@
 
 ## 已知技术债务
 
-- [ ] createClimberPrototype.ts 超过 2800 行，需拆分（粒子系统/平台系统/相机系统独立模块）
+- [x] createClimberPrototype.ts 拆分：particleSystem.ts + groundScene.ts（2485→2156 行）
 - [ ] setpieceCatalog.ts 硬编码资源路径，需改为动态注册
 - [ ] characterAssets.ts 中 fallback URL 列表需清理
-- [ ] 音频系统（prototypeAudio.ts）已接入但音效内容待丰富
+- [ ] 音频系统（prototypeAudio.ts）音效内容待丰富（不稳定平台晃动音效）
