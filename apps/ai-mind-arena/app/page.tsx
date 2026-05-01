@@ -1,16 +1,7 @@
-import { Brain, Info, Share2, Sparkles, Volume2 } from 'lucide-react';
-import type { ComponentType } from 'react';
+import { Brain, Sparkles } from 'lucide-react';
+import { HomeToolbar } from '@/components/home/HomeToolbar';
 import { Personas } from '@/components/home/Personas';
 import { TopicForm } from '@/components/home/TopicForm';
-
-const toolbarActions: Array<{
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-}> = [
-  { icon: Info, label: '规则说明' },
-  { icon: Volume2, label: '音效开' },
-  { icon: Share2, label: '分享战况' },
-];
 
 export default function HomePage() {
   return (
@@ -42,12 +33,7 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {toolbarActions.map(({ icon: Icon, label }) => (
-              <button key={label} type="button" className="arena-toolbar-button">
-                <Icon className="h-4 w-4" />
-                {label}
-              </button>
-            ))}
+            <HomeToolbar />
           </div>
         </header>
 
