@@ -30,6 +30,8 @@ export interface PlatformCollisionData {
   maxZ: number;
   planes: ColliderPlane[];
   debugMeta?: PlatformCollisionDebugMeta;
+  /** 设为 true 时该碰撞体被跳过（用于 blink/crumble 等隐藏平台） */
+  disabled?: boolean;
 }
 
 const WORLD_POINT = new Vector3();
@@ -401,6 +403,7 @@ export function tryLandOnTop(params: {
   let candidateTop = Number.NEGATIVE_INFINITY;
 
   for (const collider of colliders) {
+    if (collider.disabled) continue;
     if (
       playerPosition.x < collider.minX - landingAssist ||
       playerPosition.x > collider.maxX + landingAssist ||
@@ -457,6 +460,7 @@ export function solveSolidCollisions(params: {
     let corrected = false;
 
     for (const collider of colliders) {
+      if (collider.disabled) continue;
       if (
         playerPosition.x <= collider.minX - playerRadius ||
         playerPosition.x >= collider.maxX + playerRadius ||

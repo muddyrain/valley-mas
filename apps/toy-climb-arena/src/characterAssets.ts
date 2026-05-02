@@ -10,6 +10,21 @@ export const CLIMBER_CHARACTER_OPTIONS: ClimberCharacterOption[] = [
     description: '程序化木制玩偶角色，圆润关节，暖木纹配色。',
   },
   {
+    id: 'panda',
+    name: '熊猫',
+    description: '圆滚滚的黑白大熊猫，憨态可掬，程序化模型。',
+  },
+  {
+    id: 'frog',
+    name: '青蛙',
+    description: '扁宽绿色身体，突出大眼球，后腿弹跳有力，程序化模型。',
+  },
+  {
+    id: 'cat',
+    name: '猫咪',
+    description: '三角尖耳橘猫，懒洋洋摆尾，程序化模型。',
+  },
+  {
     id: 'peach',
     name: '碧姬',
     description: '加载 peach.glb；若资源异常会自动回退占位角色。',

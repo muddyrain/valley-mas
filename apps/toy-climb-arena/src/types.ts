@@ -35,7 +35,14 @@ export interface ClimberJumpClearanceReport {
   issues: ClimberJumpClearanceIssue[];
 }
 
-export type ClimberCharacterId = 'orb' | 'peach' | 'daisy' | 'woodendoll';
+export type ClimberCharacterId =
+  | 'orb'
+  | 'peach'
+  | 'daisy'
+  | 'woodendoll'
+  | 'panda'
+  | 'frog'
+  | 'cat';
 
 export type ClimberCharacterAnimationState = 'idle' | 'run' | 'stop' | 'jump' | 'fall' | 'land';
 
@@ -111,6 +118,46 @@ export interface ClimberPlatformDefinition {
     fallSpeed?: number;
     resetDelay?: number;
   };
+  /**
+   * 旋转平台配置。平台绕 Y 轴匀速旋转，站在上面的玩家会被带动旋转。
+   * - speed: 旋转角速度（rad/s，正数顺时针，默认 0.8）
+   */
+  rotating?: {
+    speed?: number;
+  };
+  /**
+   * 传送带平台配置。站在上面的玩家被持续施加水平推力。
+   * - axis:  推进方向 'x' | 'z'
+   * - speed: 推进速度（m/s，正负决定方向，默认 3.0）
+   */
+  conveyor?: {
+    axis: 'x' | 'z';
+    speed: number;
+  };
+  /**
+   * 消失重现平台配置。定时在可见+可踩 / 不可见+穿透 之间切换。
+   * - visibleMs:   可见持续时间（ms，默认 2000）
+   * - hiddenMs:    隐藏持续时间（ms，默认 1500）
+   * - phaseOffset: 初始相位偏移（ms，默认 0，用于错开多个平台节奏）
+   */
+  blink?: {
+    visibleMs?: number;
+    hiddenMs?: number;
+    phaseOffset?: number;
+  };
+  /**
+   * 碎裂平台配置。玩家踩上后延迟碎裂消失，等待一段时间后复原。
+   * - standMs:    踩上后多久开始碎裂（ms，默认 800）
+   * - crumbleMs: 碎裂动画持续时间（ms，默认 400）
+   * - resetMs:   消失后多久复原（ms，默认 3000）
+   */
+  crumble?: {
+    standMs?: number;
+    crumbleMs?: number;
+    resetMs?: number;
+  };
+  /** 冰面平台：摩擦力极低，玩家制动极慢，会持续滑行。 */
+  icy?: boolean;
 }
 
 export type ClimberSetPieceAssetId =

@@ -1,11 +1,7 @@
-import { TOGETHER_SKY_ASCENT_LEVEL } from './levels/togetherSkyAscent';
-import { TOY_BLOCK_TOWER_LEVEL } from './levels/toyBlockTower';
+import { GRAND_CLIMB_WORLD_LEVEL } from './levels/grandClimbWorld';
 import type { ClimberLevelDefinition } from './types';
 
-export const CLIMBER_LEVELS: ClimberLevelDefinition[] = [
-  TOY_BLOCK_TOWER_LEVEL,
-  TOGETHER_SKY_ASCENT_LEVEL,
-];
+export const CLIMBER_LEVELS: ClimberLevelDefinition[] = [GRAND_CLIMB_WORLD_LEVEL];
 
 export function getClimberLevelById(levelId: string): ClimberLevelDefinition | undefined {
   return CLIMBER_LEVELS.find((level) => level.id === levelId);

@@ -82,6 +82,8 @@ export class PlayerController {
   private _elapsedMs = 0;
   private _lastJumpAtMs = -10_000;
   private _lastGroundedAtMs = -10_000;
+  /** 冰面模式：制动力大幅降低 */
+  private _icy = false;
 
   /** 由外部（碰撞系统）写入当前站立平台 ID，供 Debug UI 读取 */
   currentPlatformId: string | null = null;
@@ -117,6 +119,12 @@ export class PlayerController {
     this._lastJumpAtMs = -10_000;
     this._lastGroundedAtMs = -10_000;
     this.currentPlatformId = null;
+    this._icy = false;
+  }
+
+  /** 由外部每帧调用，设置当前是否处于冰面（影响地面制动力） */
+  setIcy(icy: boolean): void {
+    this._icy = icy;
   }
 
   // ── 主更新（每帧调用） ────────────────────────────────────────────────────
@@ -154,8 +162,12 @@ export class PlayerController {
     const targetVX = (fwdX * nf + rgtX * ns) * speed;
     const targetVZ = (fwdZ * nf + rgtZ * ns) * speed;
 
-    // ── 2. 阻尼平滑（空中控制变弱）────────────────────────────────────────
-    const resp = this._grounded ? PLAYER_PHYSICS.groundControl : PLAYER_PHYSICS.airControl;
+    // ── 2. 阻尼平滑（空中控制变弱；冰面制动力极低）──────────────────────
+    const resp = this._grounded
+      ? this._icy
+        ? PLAYER_PHYSICS.groundControl * 0.08
+        : PLAYER_PHYSICS.groundControl
+      : PLAYER_PHYSICS.airControl;
     this.velocity.x = MathUtils.damp(this.velocity.x, mag === 0 ? 0 : targetVX, resp, delta);
     this.velocity.z = MathUtils.damp(this.velocity.z, mag === 0 ? 0 : targetVZ, resp, delta);
 
