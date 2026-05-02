@@ -1,6 +1,10 @@
 import toyBarnHayBaleUrl from '../assets/models/platforms/toy_barn_hay_bale.glb';
 import toyBarrelRoundTopUrl from '../assets/models/platforms/toy_barrel_round_top.glb';
 import toyBrokenPuzzlePieceUrl from '../assets/models/platforms/toy_broken_puzzle_piece.glb';
+import toyCastleBrickBlockUrl from '../assets/models/platforms/toy_castle_brick_block.glb';
+import toyCastleDrawbridgeUrl from '../assets/models/platforms/toy_castle_drawbridge.glb';
+import toyCastleGearDiscUrl from '../assets/models/platforms/toy_castle_gear_disc.glb';
+import toyCastleTowerCapUrl from '../assets/models/platforms/toy_castle_tower_cap.glb';
 import toyCrumbleCookieTileUrl from '../assets/models/platforms/toy_crumble_cookie_tile.glb';
 import toyNarrowPlankS3Url from '../assets/models/platforms/toy_narrow_plank_s3.glb';
 import toyRopePlankBridgeUrl from '../assets/models/platforms/toy_rope_plank_bridge.glb';
@@ -22,7 +26,11 @@ export type ToyPlatformModelAssetId =
   | 'toy_rope_plank_bridge'
   | 'toy_broken_puzzle_piece'
   | 'toy_crumble_cookie_tile'
-  | 'toy_trampoline_pad';
+  | 'toy_trampoline_pad'
+  | 'toy_castle_brick_block'
+  | 'toy_castle_gear_disc'
+  | 'toy_castle_drawbridge'
+  | 'toy_castle_tower_cap';
 
 export interface ToyPlatformModelAssetDefinition {
   id: ToyPlatformModelAssetId;
@@ -106,6 +114,34 @@ export const TOY_PLATFORM_MODEL_ASSETS: Record<
     platformKind: 'trampoline',
     source: 'generated-glb',
   },
+  toy_castle_brick_block: {
+    id: 'toy_castle_brick_block',
+    name: '城堡石砖积木平台',
+    url: toRuntimeAssetUrl(toyCastleBrickBlockUrl, import.meta.url),
+    platformKind: 'square_plate',
+    source: 'generated-glb',
+  },
+  toy_castle_gear_disc: {
+    id: 'toy_castle_gear_disc',
+    name: '城堡齿轮旋转圆盘',
+    url: toRuntimeAssetUrl(toyCastleGearDiscUrl, import.meta.url),
+    platformKind: 'rotating_gear',
+    source: 'generated-glb',
+  },
+  toy_castle_drawbridge: {
+    id: 'toy_castle_drawbridge',
+    name: '城堡伸缩吊桥踏板',
+    url: toRuntimeAssetUrl(toyCastleDrawbridgeUrl, import.meta.url),
+    platformKind: 'moving_lift',
+    source: 'generated-glb',
+  },
+  toy_castle_tower_cap: {
+    id: 'toy_castle_tower_cap',
+    name: '城堡塔顶圆形落点',
+    url: toRuntimeAssetUrl(toyCastleTowerCapUrl, import.meta.url),
+    platformKind: 'round_disc',
+    source: 'generated-glb',
+  },
 };
 
 export function getToyPlatformModelAsset(
@@ -129,14 +165,28 @@ export function resolveToyPlatformModelAsset(
 
   switch (profile.kind) {
     case 'square_plate':
-      return TOY_PLATFORM_MODEL_ASSETS.toy_barn_hay_bale;
+      return profile.themeZone === 'castle'
+        ? TOY_PLATFORM_MODEL_ASSETS.toy_castle_brick_block
+        : TOY_PLATFORM_MODEL_ASSETS.toy_barn_hay_bale;
     case 'stacked_steps':
-      return TOY_PLATFORM_MODEL_ASSETS.toy_wood_crate_step;
+      return profile.themeZone === 'castle'
+        ? TOY_PLATFORM_MODEL_ASSETS.toy_castle_brick_block
+        : TOY_PLATFORM_MODEL_ASSETS.toy_wood_crate_step;
     case 'round_disc':
     case 'balance_pole':
-      return TOY_PLATFORM_MODEL_ASSETS.toy_barrel_round_top;
+      return profile.themeZone === 'castle'
+        ? TOY_PLATFORM_MODEL_ASSETS.toy_castle_tower_cap
+        : TOY_PLATFORM_MODEL_ASSETS.toy_barrel_round_top;
     case 'narrow_plank':
-      return TOY_PLATFORM_MODEL_ASSETS.toy_rope_plank_bridge;
+      return profile.themeZone === 'castle'
+        ? TOY_PLATFORM_MODEL_ASSETS.toy_castle_drawbridge
+        : TOY_PLATFORM_MODEL_ASSETS.toy_rope_plank_bridge;
+    case 'moving_lift':
+      return profile.themeZone === 'castle'
+        ? TOY_PLATFORM_MODEL_ASSETS.toy_castle_drawbridge
+        : TOY_PLATFORM_MODEL_ASSETS.toy_rope_plank_bridge;
+    case 'rotating_gear':
+      return TOY_PLATFORM_MODEL_ASSETS.toy_castle_gear_disc;
     case 'irregular_fragment':
     case 'blink_panel':
       return TOY_PLATFORM_MODEL_ASSETS.toy_broken_puzzle_piece;

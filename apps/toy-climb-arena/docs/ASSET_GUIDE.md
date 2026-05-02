@@ -56,6 +56,10 @@
 | `assets/models/platforms/toy_broken_puzzle_piece.glb` | `toy_broken_puzzle_piece` | 破碎拼图落点模块，含错位碎片和中心安全色块 | 不规则碎片、崩塌平台 |
 | `assets/models/platforms/toy_crumble_cookie_tile.glb` | `toy_crumble_cookie_tile` | 酥饼碎裂倒计时平台，含饼干主体、警示裂纹和巧克力碎片 | 延迟下沉/消失平台 |
 | `assets/models/platforms/toy_trampoline_pad.glb` | `toy_trampoline_pad` | 弹力垫跳跃模块，含软垫面、框架和角部弹簧 | 蹦床、弱弹跳垫 |
+| `assets/models/platforms/toy_castle_brick_block.glb` | `toy_castle_brick_block` | 城堡石砖积木平台，含分层石砖、护边和可读顶面 | 城堡区主路径、喘息台 |
+| `assets/models/platforms/toy_castle_gear_disc.glb` | `toy_castle_gear_disc` | 城堡齿轮旋转圆盘，含圆盘主体、齿牙和中心帽 | 旋转平台、精准落点 |
+| `assets/models/platforms/toy_castle_drawbridge.glb` | `toy_castle_drawbridge` | 城堡吊桥踏板，含长木板、边条、横档和铆钉 | 窄桥、移动平台、节奏跳 |
+| `assets/models/platforms/toy_castle_tower_cap.glb` | `toy_castle_tower_cap` | 城堡塔顶圆台，含圆形塔身、垛口和中心标记 | 圆形落点、高空过渡 |
 
 生成命令：`pnpm --filter @valley/toy-climb-arena generate:platform-assets`。
 
