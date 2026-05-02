@@ -1141,8 +1141,10 @@ export function createClimberPrototype(
   // ── 旋转平台运行时 ─────────────────────────────────────────────────────
   interface RotatingEntry {
     originX: number;
+    originY: number;
     originZ: number;
     halfW: number;
+    halfH: number;
     halfD: number;
     speed: number;
   }
@@ -1469,8 +1471,10 @@ export function createClimberPrototype(
       }
       rotatingPlatforms.set(platform.id, {
         originX: x,
+        originY: y,
         originZ: z,
         halfW: width / 2,
+        halfH: height / 2,
         halfD: depth / 2,
         speed,
       });
@@ -2340,7 +2344,6 @@ export function createClimberPrototype(
 
     // ── 旋转平台携带：站在旋转平台上时跟着旋转位移 ──────────────────────
     {
-      const elapsed = clock.getElapsedTime();
       const feetY = playerPosition.y - PLAYER_RADIUS;
       for (const [, rp] of rotatingPlatforms) {
         // 当前角和上一帧角之差用 delta 和 speed 近似
@@ -2353,7 +2356,7 @@ export function createClimberPrototype(
         if (
           grounded &&
           distXZ <= maxRadius + PLAYER_RADIUS * 0.5 &&
-          Math.abs(feetY - rp.halfW) < 0.3
+          Math.abs(feetY - (rp.originY + rp.halfH)) < 0.3
         ) {
           // 以平台中心为轴旋转玩家位置
           const cos = Math.cos(angleDelta);
@@ -2366,7 +2369,6 @@ export function createClimberPrototype(
           cameraYaw += angleDelta;
           targetCameraYaw += angleDelta;
         }
-        void elapsed; // suppress unused
       }
     }
 

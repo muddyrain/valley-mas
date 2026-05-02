@@ -107,3 +107,17 @@ Original prompt: 目前所有的平台模型都是简易的模型，我们可以
   - `tmp/final-polish-verify/trampoline-start.png`
   - `tmp/final-polish-verify/char-woodendoll.png`, `char-panda.png`, `char-frog.png`, `char-cat.png`
 - Validation rerun: `generate:platform-assets`, `typecheck`, `check`, and `build` passed. `check` still reports existing warnings; targeted encoding guard still flags `createClimberPrototype.ts` because the file-level heuristic sees fewer CJK chars and more TypeScript `?`, with no mojibake observed in the actual edited text.
+
+## 2026-05-02 · Castle slice 26-60m
+
+- Extended `toyAnimalClimbWorld` from the barn 0-26m slice to a 60m route with a castle block section.
+- Added generated GLB platform modules:
+  - `toy_castle_brick_block.glb`
+  - `toy_castle_gear_disc.glb`
+  - `toy_castle_drawbridge.glb`
+  - `toy_castle_tower_cap.glb`
+- Registered the castle models in `platformModelAssets.ts`; castle square/stack/round/narrow/rotating/moving platform profiles now resolve to castle-specific models.
+- Added castle platforms using brick blocks, tower caps, rotating gears, moving drawbridges, a crumble cookie tile, and a trampoline node before the 60m goal.
+- Fixed a pre-existing rotating-platform carry bug: the carry test now compares player feet to `originY + halfH`, not platform half width.
+- Collision principle preserved: generated castle models expose mesh-level `box`/`cylinder` collision metadata, and `platformModelRuntime.ts` creates compound colliders from the visible model parts.
+- Validation: `generate:platform-assets`, `typecheck`, `check`, `build`, and targeted encoding guard passed. Browser screenshots captured under `tmp/castle-slice-verify-clean/`; castle GLB requests returned 200. `check` still reports existing warnings unrelated to this slice.

@@ -356,6 +356,114 @@ function createTrampolinePad() {
   return group;
 }
 
+function createCastleBrickBlock() {
+  const group = new Group();
+  group.name = 'toy_castle_brick_block';
+  const stone = material('#94A3B8', 0.54, 0.05);
+  const dark = material('#475569', 0.58, 0.06);
+  const top = material('#CBD5E1', 0.42, 0.04);
+  const flag = material('#60A5FA', 0.38, 0.04);
+
+  addBox(group, [3.95, 0.52, 3.55], stone, [0, 0.26, 0]);
+  addBox(group, [3.52, 0.1, 3.12], top, [0, 0.57, 0]);
+  addBox(group, [3.96, 0.08, 0.12], dark, [0, 0.44, -1.8]);
+  addBox(group, [3.96, 0.08, 0.12], dark, [0, 0.44, 1.8]);
+  addBox(group, [0.12, 0.08, 3.36], dark, [-1.98, 0.44, 0]);
+  addBox(group, [0.12, 0.08, 3.36], dark, [1.98, 0.44, 0]);
+
+  for (let row = 0; row < 2; row += 1) {
+    for (let col = 0; col < 3; col += 1) {
+      addBox(group, [0.72, 0.055, 0.08], dark, [-1.05 + col * 1.05, 0.66, -1.2 + row * 2.4], [
+        0,
+        MathUtils.degToRad(row === 0 ? 0 : 180),
+        0,
+      ], { collisionShape: 'none' });
+    }
+  }
+
+  for (const x of [-1.25, 1.25]) {
+    for (const z of [-1.05, 1.05]) {
+      addCylinder(group, 0.11, 0.12, 12, flag, [x, 0.74, z], [0, 0, 0], {
+        collisionShape: 'none',
+      });
+    }
+  }
+  return group;
+}
+
+function createCastleGearDisc() {
+  const group = new Group();
+  group.name = 'toy_castle_gear_disc';
+  const gear = material('#7C3AED', 0.45, 0.06);
+  const top = material('#DDD6FE', 0.38, 0.03);
+  const hub = material('#FBBF24', 0.42, 0.04);
+
+  addCylinder(group, 1.28, 0.34, 28, gear, [0, 0.22, 0]);
+  for (let i = 0; i < 10; i += 1) {
+    const angle = (Math.PI * 2 * i) / 10;
+    const tooth = addBox(group, [0.34, 0.28, 0.5], gear, [
+      Math.cos(angle) * 1.42,
+      0.22,
+      Math.sin(angle) * 1.42,
+    ]);
+    tooth.rotation.y = -angle;
+  }
+  addCylinder(group, 0.92, 0.1, 28, top, [0, 0.46, 0]);
+  addCylinder(group, 0.23, 0.16, 18, hub, [0, 0.59, 0]);
+  return group;
+}
+
+function createCastleDrawbridge() {
+  const group = new Group();
+  group.name = 'toy_castle_drawbridge';
+  const plank = material('#B45309', 0.58, 0.04);
+  const edge = material('#78350F', 0.62, 0.04);
+  const metal = material('#CBD5E1', 0.36, 0.2);
+
+  addBox(group, [5.85, 0.24, 1.34], plank, [0, 0.16, 0]);
+  addBox(group, [5.9, 0.09, 0.1], edge, [0, 0.34, -0.68]);
+  addBox(group, [5.9, 0.09, 0.1], edge, [0, 0.34, 0.68]);
+  for (let i = 0; i < 5; i += 1) {
+    const x = -2.25 + i * 1.12;
+    addBox(group, [0.09, 0.075, 1.12], edge, [x, 0.41, 0], [0, 0, 0], {
+      collisionShape: 'none',
+    });
+  }
+  for (const x of [-2.65, 2.65]) {
+    addCylinder(group, 0.08, 0.42, 12, metal, [x, 0.44, -0.48], [Math.PI / 2, 0, 0], {
+      collisionShape: 'none',
+    });
+    addCylinder(group, 0.08, 0.42, 12, metal, [x, 0.44, 0.48], [Math.PI / 2, 0, 0], {
+      collisionShape: 'none',
+    });
+  }
+  return group;
+}
+
+function createCastleTowerCap() {
+  const group = new Group();
+  group.name = 'toy_castle_tower_cap';
+  const base = material('#64748B', 0.5, 0.06);
+  const top = material('#E2E8F0', 0.36, 0.03);
+  const gold = material('#FBBF24', 0.42, 0.04);
+
+  addCylinder(group, 1.28, 0.72, 24, base, [0, 0.36, 0]);
+  addCylinder(group, 1.08, 0.12, 24, top, [0, 0.78, 0]);
+  for (let i = 0; i < 6; i += 1) {
+    const angle = (Math.PI * 2 * i) / 6;
+    const merlon = addBox(group, [0.36, 0.26, 0.28], base, [
+      Math.cos(angle) * 1.02,
+      0.98,
+      Math.sin(angle) * 1.02,
+    ]);
+    merlon.rotation.y = -angle;
+  }
+  addCylinder(group, 0.16, 0.14, 16, gold, [0, 1.17, 0], [0, 0, 0], {
+    collisionShape: 'none',
+  });
+  return group;
+}
+
 async function exportGlb(group, fileName) {
   const exporter = new GLTFExporter();
   const arrayBuffer = await exporter.parseAsync(group, {
@@ -379,3 +487,7 @@ await exportGlb(createRopePlankBridge(), 'toy_rope_plank_bridge.glb');
 await exportGlb(createPuzzleFragment(), 'toy_broken_puzzle_piece.glb');
 await exportGlb(createCrumbleCookieTile(), 'toy_crumble_cookie_tile.glb');
 await exportGlb(createTrampolinePad(), 'toy_trampoline_pad.glb');
+await exportGlb(createCastleBrickBlock(), 'toy_castle_brick_block.glb');
+await exportGlb(createCastleGearDisc(), 'toy_castle_gear_disc.glb');
+await exportGlb(createCastleDrawbridge(), 'toy_castle_drawbridge.glb');
+await exportGlb(createCastleTowerCap(), 'toy_castle_tower_cap.glb');
