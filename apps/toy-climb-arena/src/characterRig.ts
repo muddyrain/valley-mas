@@ -1323,6 +1323,158 @@ function createRunnerFallbackParts(): CharacterPartSet {
 }
 
 // ── 木制玩偶角色（程序化，无 GLB）──────────────────────────────────────────────
+// ─── 🐼 熊猫角色（程序化） ───────────────────────────────────────────────────
+function createPandaParts(): CharacterPartSet {
+  const root = new Group();
+
+  const whiteMat = new MeshStandardMaterial({ color: '#F5F5F0', roughness: 0.65, metalness: 0.0 });
+  const blackMat = new MeshStandardMaterial({ color: '#1A1A1A', roughness: 0.72, metalness: 0.0 });
+  const noseMat = new MeshStandardMaterial({ color: '#3D2B1F', roughness: 0.8, metalness: 0.0 });
+  const eyeWMat = new MeshStandardMaterial({ color: '#F0EEE8', roughness: 0.5, metalness: 0.0 });
+  const pupilMat = new MeshStandardMaterial({ color: '#0A0A0A', roughness: 0.5, metalness: 0.0 });
+
+  // ── 躯干（椭球感：XZ 宽，Y 矮）──────────────────────────────────────────
+  const torso = new Mesh(new SphereGeometry(0.24, 16, 12), whiteMat);
+  torso.scale.set(1, 0.88, 0.9);
+  torso.position.y = 0.28;
+  torso.castShadow = true;
+
+  // ── 头（大圆）────────────────────────────────────────────────────────────
+  const head = new Mesh(new SphereGeometry(0.25, 20, 16), whiteMat);
+  head.position.y = 0.74;
+  head.castShadow = true;
+
+  // ── 圆耳（黑色）─────────────────────────────────────────────────────────
+  const earGeo = new SphereGeometry(0.085, 10, 8);
+  const leftEar = new Mesh(earGeo, blackMat);
+  leftEar.position.set(-0.2, 0.96, 0.0);
+  const rightEar = new Mesh(earGeo, blackMat);
+  rightEar.position.set(0.2, 0.96, 0.0);
+
+  // ── 黑眼圈（椭圆形黑斑）──────────────────────────────────────────────────
+  const eyePatchGeo = new SphereGeometry(0.085, 10, 8);
+  const leftPatch = new Mesh(eyePatchGeo, blackMat);
+  leftPatch.scale.set(0.9, 0.7, 0.5);
+  leftPatch.position.set(-0.1, 0.77, 0.22);
+  const rightPatch = new Mesh(eyePatchGeo, blackMat);
+  rightPatch.scale.set(0.9, 0.7, 0.5);
+  rightPatch.position.set(0.1, 0.77, 0.22);
+
+  // ── 眼白 + 瞳孔 ──────────────────────────────────────────────────────────
+  const eyeWGeo = new SphereGeometry(0.045, 8, 6);
+  const leftEyeW = new Mesh(eyeWGeo, eyeWMat);
+  leftEyeW.position.set(-0.1, 0.78, 0.27);
+  const rightEyeW = new Mesh(eyeWGeo, eyeWMat);
+  rightEyeW.position.set(0.1, 0.78, 0.27);
+  const pupilGeo = new SphereGeometry(0.025, 6, 4);
+  const leftPupil = new Mesh(pupilGeo, pupilMat);
+  leftPupil.position.set(-0.1, 0.78, 0.31);
+  const rightPupil = new Mesh(pupilGeo, pupilMat);
+  rightPupil.position.set(0.1, 0.78, 0.31);
+
+  // ── 鼻子 ─────────────────────────────────────────────────────────────────
+  const nose = new Mesh(new SphereGeometry(0.04, 8, 6), noseMat);
+  nose.scale.set(1.1, 0.7, 0.8);
+  nose.position.set(0, 0.71, 0.3);
+
+  // ── 黑色手臂（前肢）─────────────────────────────────────────────────────
+  const armGeo = new CylinderGeometry(0.07, 0.06, 0.32, 10);
+  const leftArm = new Mesh(armGeo, blackMat);
+  leftArm.position.set(-0.28, 0.28, 0.04);
+  leftArm.rotation.z = 0.5;
+  leftArm.castShadow = true;
+  const rightArm = new Mesh(armGeo, blackMat);
+  rightArm.position.set(0.28, 0.28, 0.04);
+  rightArm.rotation.z = -0.5;
+  rightArm.castShadow = true;
+
+  // ── 黑色腿（后肢）───────────────────────────────────────────────────────
+  const legGeo = new CylinderGeometry(0.09, 0.08, 0.3, 12);
+  const leftLeg = new Mesh(legGeo, blackMat);
+  leftLeg.position.set(-0.13, -0.04, 0.0);
+  leftLeg.castShadow = true;
+  const rightLeg = new Mesh(legGeo, blackMat);
+  rightLeg.position.set(0.13, -0.04, 0.0);
+  rightLeg.castShadow = true;
+
+  // ── 小尾巴（白色圆球）────────────────────────────────────────────────────
+  const tail = new Mesh(new SphereGeometry(0.07, 8, 6), whiteMat);
+  tail.position.set(0, 0.24, -0.26);
+
+  root.add(
+    torso,
+    head,
+    leftEar,
+    rightEar,
+    leftPatch,
+    rightPatch,
+    leftEyeW,
+    rightEyeW,
+    leftPupil,
+    rightPupil,
+    nose,
+    leftArm,
+    rightArm,
+    leftLeg,
+    rightLeg,
+    tail,
+  );
+
+  const allMaterials: Material[] = [whiteMat, blackMat, noseMat, eyeWMat, pupilMat];
+
+  // ── 动画更新（与木偶相似的跑步/跳跃动画）────────────────────────────────
+  function update(ctx: CharacterUpdateContext, st: ClimberCharacterAnimationState): void {
+    const { elapsed, horizontalSpeed, verticalSpeed } = ctx;
+    const runT = Math.min(1, horizontalSpeed / 5.4);
+
+    // 腿部交替摆动
+    const legSwing = Math.sin(elapsed * 9.0) * 0.55 * runT;
+    leftLeg.rotation.x = legSwing;
+    rightLeg.rotation.x = -legSwing;
+
+    // 手臂对向摆动
+    const armSwing = Math.sin(elapsed * 9.0) * 0.4 * runT;
+    leftArm.rotation.x = -armSwing;
+    rightArm.rotation.x = armSwing;
+
+    // 躯干轻微左右倾斜
+    torso.rotation.z = Math.sin(elapsed * 9.0) * 0.05 * runT;
+
+    // 头部小幅晃动
+    head.position.y = 0.74 + Math.sin(elapsed * 9.0 * 2) * 0.015 * runT;
+
+    if (st === 'jump' || st === 'fall') {
+      // 跳跃时腿收起，耳朵略向后
+      leftLeg.rotation.x = 0.6;
+      rightLeg.rotation.x = 0.6;
+      leftArm.rotation.z = 0.8;
+      rightArm.rotation.z = -0.8;
+      // Squash & stretch
+      const stretch = verticalSpeed > 0 ? 1.12 : 0.92;
+      torso.scale.set(1 / Math.sqrt(stretch), stretch, 1 / Math.sqrt(stretch));
+      head.scale.setScalar(verticalSpeed > 0 ? 1.05 : 0.96);
+    } else if (st === 'land') {
+      torso.scale.set(1.14, 0.82, 1.14);
+      head.scale.setScalar(0.94);
+    } else {
+      torso.scale.set(1, 0.88, 0.9);
+      head.scale.setScalar(1);
+      // 平时手臂自然下垂
+      if (runT < 0.05) {
+        leftArm.rotation.z = 0.5;
+        rightArm.rotation.z = -0.5;
+        leftArm.rotation.x = 0;
+        rightArm.rotation.x = 0;
+      }
+    }
+
+    // 尾巴小幅摆动
+    tail.rotation.x = Math.sin(elapsed * 3.5) * 0.12;
+  }
+
+  return { root, materials: allMaterials, update };
+}
+
 function createWoodenDollParts(): CharacterPartSet {
   const root = new Group();
 
@@ -1674,6 +1826,296 @@ function createModelRuntime(
   };
 }
 
+// ─── 🐸 青蛙角色（程序化） ───────────────────────────────────────────────────
+function createFrogParts(): CharacterPartSet {
+  const root = new Group();
+
+  const bodyMat = new MeshStandardMaterial({ color: '#4CAF50', roughness: 0.7, metalness: 0.0 });
+  const bellMat = new MeshStandardMaterial({ color: '#A5D6A7', roughness: 0.7, metalness: 0.0 });
+  const eyeWhiteMat = new MeshStandardMaterial({
+    color: '#FFFFFF',
+    roughness: 0.5,
+    metalness: 0.0,
+  });
+  const eyeGoldMat = new MeshStandardMaterial({ color: '#FFD600', roughness: 0.4, metalness: 0.1 });
+  const pupilMatF = new MeshStandardMaterial({ color: '#1A1A1A', roughness: 0.5, metalness: 0.0 });
+  const limbMat = new MeshStandardMaterial({ color: '#388E3C', roughness: 0.75, metalness: 0.0 });
+
+  // 躯干（扁宽椭球：scaleX/Z > scaleY）
+  const bodyGeo = new SphereGeometry(0.38, 12, 8);
+  const body = new Mesh(bodyGeo, bodyMat);
+  body.scale.set(1.2, 0.85, 1.1);
+  body.position.y = 0.32;
+  root.add(body);
+
+  // 腹部浅色
+  const bellyGeo = new SphereGeometry(0.26, 12, 8);
+  const belly = new Mesh(bellyGeo, bellMat);
+  belly.scale.set(0.9, 0.7, 0.5);
+  belly.position.set(0, 0.28, 0.22);
+  root.add(belly);
+
+  // 眼睛（左右对称，突出大眼球）
+  const makeEye = (side: 1 | -1) => {
+    const eyeGroup = new Group();
+    const sclera = new Mesh(new SphereGeometry(0.12, 10, 8), eyeWhiteMat);
+    eyeGroup.add(sclera);
+    const iris = new Mesh(new SphereGeometry(0.085, 10, 8), eyeGoldMat);
+    iris.position.z = 0.07;
+    eyeGroup.add(iris);
+    const pupil = new Mesh(new SphereGeometry(0.045, 8, 6), pupilMatF);
+    pupil.position.z = 0.13;
+    eyeGroup.add(pupil);
+    eyeGroup.position.set(side * 0.22, 0.62, 0.26);
+    return eyeGroup;
+  };
+  const leftEye = makeEye(1);
+  const rightEye = makeEye(-1);
+  root.add(leftEye, rightEye);
+
+  // 前腿（左右）
+  const makeFrontLeg = (side: 1 | -1) => {
+    const g = new Group();
+    const upper = new Mesh(new CylinderGeometry(0.07, 0.06, 0.22, 8), limbMat);
+    upper.position.y = -0.11;
+    const lower = new Mesh(new CylinderGeometry(0.06, 0.05, 0.18, 8), limbMat);
+    lower.position.y = -0.22 - 0.09;
+    g.add(upper, lower);
+    g.position.set(side * 0.38, 0.26, 0.1);
+    g.rotation.z = side * 0.3;
+    return g;
+  };
+  const frontLegL = makeFrontLeg(1);
+  const frontLegR = makeFrontLeg(-1);
+  root.add(frontLegL, frontLegR);
+
+  // 后腿（左右，更长更有力）
+  const makeBackLeg = (side: 1 | -1) => {
+    const g = new Group();
+    const thigh = new Mesh(new CylinderGeometry(0.09, 0.07, 0.28, 8), limbMat);
+    thigh.position.y = -0.14;
+    const calf = new Mesh(new CylinderGeometry(0.07, 0.05, 0.26, 8), limbMat);
+    calf.position.y = -0.28 - 0.13;
+    g.add(thigh, calf);
+    g.position.set(side * 0.3, 0.18, -0.2);
+    return g;
+  };
+  const backLegL = makeBackLeg(1);
+  const backLegR = makeBackLeg(-1);
+  root.add(backLegL, backLegR);
+
+  const allMaterials: Material[] = [bodyMat, bellMat, eyeWhiteMat, eyeGoldMat, pupilMatF, limbMat];
+
+  function update(ctx: CharacterUpdateContext, st: ClimberCharacterAnimationState): void {
+    const { elapsed, horizontalSpeed, verticalSpeed } = ctx;
+
+    // 躯干：跳跃时纵向拉伸，落地时压扁
+    if (st === 'jump' || st === 'fall') {
+      const stretch = verticalSpeed > 0 ? 1.15 : 0.9;
+      body.scale.set(1.2 / Math.sqrt(stretch), 0.85 * stretch, 1.1 / Math.sqrt(stretch));
+    } else if (st === 'land') {
+      body.scale.set(1.4, 0.65, 1.3);
+    } else {
+      const breathe = Math.sin(elapsed * 1.8) * 0.04;
+      body.scale.set(1.2 + breathe, 0.85 - breathe * 0.5, 1.1 + breathe * 0.5);
+    }
+
+    // 后腿：跑步时交替摆动，跳跃时猛力伸直
+    const runT = Math.min(1, horizontalSpeed / 5.4);
+    if (st === 'jump' || st === 'fall') {
+      backLegL.rotation.x = -0.7;
+      backLegR.rotation.x = -0.7;
+      frontLegL.rotation.x = 0.4;
+      frontLegR.rotation.x = 0.4;
+    } else if (runT > 0.05) {
+      const phase = elapsed * 8;
+      backLegL.rotation.x = Math.sin(phase) * 0.6 * runT;
+      backLegR.rotation.x = Math.sin(phase + Math.PI) * 0.6 * runT;
+      frontLegL.rotation.x = Math.sin(phase + Math.PI) * 0.4 * runT;
+      frontLegR.rotation.x = Math.sin(phase) * 0.4 * runT;
+    } else {
+      backLegL.rotation.x = 0;
+      backLegR.rotation.x = 0;
+      frontLegL.rotation.x = 0;
+      frontLegR.rotation.x = 0;
+    }
+
+    // 眼睛：随机眨眼（周期约每 2.5s 眨一次）
+    const blinkCycle = Math.floor(elapsed * 0.4) % 7;
+    const eyeScaleY = blinkCycle === 0 ? Math.max(0.1, 1 - ((elapsed * 0.4) % 1) * 6) : 1;
+    leftEye.scale.y = eyeScaleY;
+    rightEye.scale.y = eyeScaleY;
+  }
+
+  return { root, materials: allMaterials, update };
+}
+
+// ─── 🐱 猫咪角色（程序化） ───────────────────────────────────────────────────
+function createCatParts(): CharacterPartSet {
+  const root = new Group();
+
+  const furMat = new MeshStandardMaterial({ color: '#FF8F00', roughness: 0.75, metalness: 0.0 });
+  const innerMat = new MeshStandardMaterial({ color: '#FFCCBC', roughness: 0.7, metalness: 0.0 });
+  const whiteCatMat = new MeshStandardMaterial({
+    color: '#FAFAFA',
+    roughness: 0.65,
+    metalness: 0.0,
+  });
+  const eyeIrisMat = new MeshStandardMaterial({ color: '#00BFA5', roughness: 0.4, metalness: 0.1 });
+  const eyeWhiteCatMat = new MeshStandardMaterial({
+    color: '#FFFFFF',
+    roughness: 0.5,
+    metalness: 0.0,
+  });
+  const pupilCatMat = new MeshStandardMaterial({
+    color: '#1A1A1A',
+    roughness: 0.5,
+    metalness: 0.0,
+  });
+  const noseCatMat = new MeshStandardMaterial({ color: '#F48FB1', roughness: 0.6, metalness: 0.0 });
+  const tailMat = new MeshStandardMaterial({ color: '#E65100', roughness: 0.75, metalness: 0.0 });
+
+  // 躯干（略扁）
+  const bodyGeo = new SphereGeometry(0.34, 12, 8);
+  const body = new Mesh(bodyGeo, furMat);
+  body.scale.set(1.0, 0.9, 1.05);
+  body.position.y = 0.3;
+  root.add(body);
+
+  // 头部
+  const headGroup = new Group();
+  const head = new Mesh(new SphereGeometry(0.29, 12, 10), furMat);
+  headGroup.add(head);
+
+  // 三角耳（左右）
+  const makeEar = (side: 1 | -1) => {
+    const g = new CylinderGeometry(0, 0.11, 0.18, 3);
+    const ear = new Mesh(g, furMat);
+    ear.position.set(side * 0.18, 0.26, 0.0);
+    ear.rotation.z = side * 0.15;
+    const inner = new Mesh(new CylinderGeometry(0, 0.07, 0.13, 3), innerMat);
+    inner.position.set(side * 0.18, 0.26, 0.01);
+    inner.rotation.z = side * 0.15;
+    headGroup.add(ear, inner);
+  };
+  makeEar(1);
+  makeEar(-1);
+
+  // 眼睛
+  const makeCatEye = (side: 1 | -1) => {
+    const g = new Group();
+    const white = new Mesh(new SphereGeometry(0.085, 10, 8), eyeWhiteCatMat);
+    g.add(white);
+    const iris = new Mesh(new SphereGeometry(0.065, 10, 8), eyeIrisMat);
+    iris.position.z = 0.04;
+    g.add(iris);
+    const pupil = new Mesh(new SphereGeometry(0.035, 8, 6), pupilCatMat);
+    pupil.position.z = 0.09;
+    g.add(pupil);
+    g.position.set(side * 0.13, 0.07, 0.24);
+    return g;
+  };
+  const leftEyeCat = makeCatEye(1);
+  const rightEyeCat = makeCatEye(-1);
+  headGroup.add(leftEyeCat, rightEyeCat);
+
+  // 鼻子
+  const noseMesh = new Mesh(new SphereGeometry(0.035, 8, 6), noseCatMat);
+  noseMesh.scale.set(1.2, 0.7, 0.8);
+  noseMesh.position.set(0, -0.04, 0.27);
+  headGroup.add(noseMesh);
+
+  headGroup.position.y = 0.68;
+  root.add(headGroup);
+
+  // 四肢
+  const makeCatLeg = (side: 1 | -1, isFront: boolean) => {
+    const g = new Group();
+    const upper = new Mesh(new CylinderGeometry(0.075, 0.065, 0.22, 8), furMat);
+    upper.position.y = -0.11;
+    const lower = new Mesh(new CylinderGeometry(0.065, 0.055, 0.18, 8), furMat);
+    lower.position.y = -0.3;
+    g.add(upper, lower);
+    g.position.set(side * 0.28, 0.22, isFront ? 0.12 : -0.16);
+    return g;
+  };
+  const legFL = makeCatLeg(1, true);
+  const legFR = makeCatLeg(-1, true);
+  const legBL = makeCatLeg(1, false);
+  const legBR = makeCatLeg(-1, false);
+  root.add(legFL, legFR, legBL, legBR);
+
+  // 尾巴（Group 绕根部摆动）
+  const tailGroup = new Group();
+  const tailSeg1 = new Mesh(new CylinderGeometry(0.055, 0.04, 0.3, 8), tailMat);
+  tailSeg1.position.y = 0.15;
+  const tailSeg2 = new Mesh(new CylinderGeometry(0.04, 0.03, 0.28, 8), tailMat);
+  tailSeg2.position.y = 0.44;
+  tailSeg2.rotation.x = 0.5;
+  const tailTip = new Mesh(new SphereGeometry(0.06, 8, 6), whiteCatMat);
+  tailTip.position.y = 0.62;
+  tailGroup.add(tailSeg1, tailSeg2, tailTip);
+  tailGroup.position.set(0, 0.28, -0.36);
+  root.add(tailGroup);
+
+  const allMaterials: Material[] = [
+    furMat,
+    innerMat,
+    whiteCatMat,
+    eyeIrisMat,
+    eyeWhiteCatMat,
+    pupilCatMat,
+    noseCatMat,
+    tailMat,
+  ];
+
+  function update(ctx: CharacterUpdateContext, st: ClimberCharacterAnimationState): void {
+    const { elapsed, horizontalSpeed, verticalSpeed } = ctx;
+    const runT = Math.min(1, horizontalSpeed / 5.4);
+
+    // 头部随速度方向轻微点头
+    headGroup.rotation.x = runT * -0.12;
+
+    // 四肢
+    if (st === 'jump' || st === 'fall') {
+      legBL.rotation.x = -0.6;
+      legBR.rotation.x = -0.6;
+      legFL.rotation.x = 0.4;
+      legFR.rotation.x = 0.4;
+      const stretch = verticalSpeed > 0 ? 1.1 : 0.92;
+      body.scale.set(1.0 / Math.sqrt(stretch), 0.9 * stretch, 1.05 / Math.sqrt(stretch));
+    } else if (runT > 0.05) {
+      const phase = elapsed * 9;
+      legFL.rotation.x = Math.sin(phase) * 0.55 * runT;
+      legFR.rotation.x = Math.sin(phase + Math.PI) * 0.55 * runT;
+      legBL.rotation.x = Math.sin(phase + Math.PI) * 0.55 * runT;
+      legBR.rotation.x = Math.sin(phase) * 0.55 * runT;
+      body.scale.set(1.0, 0.9, 1.05);
+    } else {
+      legFL.rotation.x = 0;
+      legFR.rotation.x = 0;
+      legBL.rotation.x = 0;
+      legBR.rotation.x = 0;
+      const breathe = Math.sin(elapsed * 2) * 0.03;
+      body.scale.set(1.0 + breathe, 0.9 - breathe * 0.5, 1.05 + breathe * 0.3);
+    }
+
+    // 尾巴：idle 懒洋洋左右摆，跑步向后伸直，跳跃时翘起
+    if (st === 'jump' || st === 'fall') {
+      tailGroup.rotation.x = -0.9;
+      tailGroup.rotation.z = 0;
+    } else if (runT > 0.05) {
+      tailGroup.rotation.x = 0.3;
+      tailGroup.rotation.z = Math.sin(elapsed * 9) * 0.12 * runT;
+    } else {
+      tailGroup.rotation.x = Math.sin(elapsed * 1.5) * 0.15;
+      tailGroup.rotation.z = Math.sin(elapsed * 1.2) * 0.25;
+    }
+  }
+
+  return { root, materials: allMaterials, update };
+}
+
 function loadCharacterModel(
   characterId: 'peach' | 'daisy',
   onLoaded: (runtime: ModelRuntime) => void,
@@ -1758,13 +2200,19 @@ export function createCharacterRig(
   const usesModelCharacter = isModelCharacter(characterId);
   const root = new Group();
 
-  // 选择程序化回退角色：woodendoll 用木偶，orb 用圆球，其余 GLB 加载前用 runner
+  // 选择程序化回退角色：woodendoll 用木偶，panda 用熊猫，frog 用青蛙，cat 用猫咪，orb 用圆球，其余 GLB 加载前用 runner
   const fallback =
     characterId === 'woodendoll'
       ? createWoodenDollParts()
-      : usesModelCharacter
-        ? createRunnerFallbackParts()
-        : createOrbParts();
+      : characterId === 'panda'
+        ? createPandaParts()
+        : characterId === 'frog'
+          ? createFrogParts()
+          : characterId === 'cat'
+            ? createCatParts()
+            : usesModelCharacter
+              ? createRunnerFallbackParts()
+              : createOrbParts();
   root.add(fallback.root);
 
   let state: ClimberCharacterAnimationState = 'idle';
@@ -1978,7 +2426,9 @@ export function createCharacterRig(
         if (!mesh.isMesh) return;
         mesh.geometry.dispose();
         if (Array.isArray(mesh.material)) {
-          mesh.material.forEach((material) => material.dispose());
+          mesh.material.forEach((material) => {
+            material.dispose();
+          });
         } else {
           mesh.material.dispose();
         }

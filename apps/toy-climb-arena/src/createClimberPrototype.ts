@@ -82,7 +82,7 @@ interface CreateClimberPrototypeOptions {
 }
 
 const PLAYER_RADIUS = 0.42;
-const RESPAWN_Y = -20;
+const RESPAWN_Y = -5;
 const LANDING_ASSIST = PLAYER_RADIUS * 0.95;
 const DEFAULT_CAMERA_OFFSET = new Vector3(0, 4.8, 9.4);
 const FLOOR_COLLIDER_SIZE = 220;
@@ -1127,6 +1127,61 @@ export function createClimberPrototype(
   }
   const bouncyPlatforms = new Map<string, BouncyEntry>();
 
+  // ── 旋转平台运行时 ─────────────────────────────────────────────────────
+  interface RotatingEntry {
+    originX: number;
+    originZ: number;
+    halfW: number;
+    halfD: number;
+    speed: number;
+  }
+  const rotatingPlatforms = new Map<string, RotatingEntry>();
+
+  // ── 传送带平台运行时 ───────────────────────────────────────────────────
+  interface ConveyorEntry {
+    axis: 'x' | 'z';
+    speed: number;
+    top: number;
+    minX: number;
+    maxX: number;
+    minZ: number;
+    maxZ: number;
+  }
+  const conveyorPlatforms = new Map<string, ConveyorEntry>();
+
+  // ── 消失重现平台（blink）运行时 ───────────────────────────────────────
+  interface BlinkEntry {
+    mesh: Mesh;
+    bumps: Mesh[];
+    collider: PlatformCollisionData | null;
+    visMs: number;
+    hidMs: number;
+  }
+  const blinkPlatforms = new Map<string, BlinkEntry>();
+
+  // ── 碎裂平台（crumble）运行时 ─────────────────────────────────────────
+  type CrumbleState = 'idle' | 'standing' | 'crumbling' | 'gone' | 'resetting';
+  interface CrumbleEntry {
+    mesh: Mesh;
+    bumps: Mesh[];
+    collider: PlatformCollisionData;
+    originY: number;
+    top: number;
+    minX: number;
+    maxX: number;
+    minZ: number;
+    maxZ: number;
+    state: CrumbleState;
+    timer: number; // ms
+    standMs: number;
+    crumbleMs: number;
+    resetMs: number;
+  }
+  const crumblePlatforms = new Map<string, CrumbleEntry>();
+
+  // ── 冰面平台 ID 集合 ───────────────────────────────────────────────────
+  const icyPlatformIds = new Set<string>();
+
   /**
    * 不稳定平台运行时数据：
    * 状态机：idle → shaking（玩家站上后延迟晃动）→ falling（落下）→ resetting（不可见，倒计时后复原）→ idle
@@ -1155,14 +1210,33 @@ export function createClimberPrototype(
     const [width, height, depth] = platform.size;
     const [x, y, z] = platform.position;
     const isGoal = platform.isGoal === true;
+    const isIcy = platform.icy === true;
+    const isCrumble = !!platform.crumble;
+    const isConveyor = !!platform.conveyor;
+    const isCheckpointPlatform = platform.isCheckpoint === true && !isGoal;
     // 终点用金色，其余用关卡定义颜色
     const resolvedColor = isGoal ? '#FCD34D' : platform.color;
+
+    // 按机制差异化材质参数，增强视觉辨识度
+    const matRoughness = isIcy ? 0.08 : isCrumble ? 0.88 : 0.55;
+    const matMetalness = isIcy ? 0.5 : isConveyor ? 0.22 : 0.08;
+    const matEmissiveColor = isGoal
+      ? new Color('#f59e0b')
+      : isCheckpointPlatform
+        ? new Color('#84cc16')
+        : new Color(0);
+    const matEmissiveIntensity = isGoal ? 0.28 : isCheckpointPlatform ? 0.1 : 0;
+    // icy 台颜色偏蓝
+    const resolvedMeshColor = isIcy
+      ? new Color(resolvedColor).lerp(new Color('#bfdbfe'), 0.28)
+      : new Color(resolvedColor);
+
     const material = new MeshStandardMaterial({
-      color: new Color(resolvedColor),
-      roughness: 0.55,
-      metalness: 0.08,
-      emissive: isGoal ? new Color('#f59e0b') : new Color(0),
-      emissiveIntensity: isGoal ? 0.28 : 0,
+      color: resolvedMeshColor,
+      roughness: matRoughness,
+      metalness: matMetalness,
+      emissive: matEmissiveColor,
+      emissiveIntensity: matEmissiveIntensity,
     });
     const mesh = new Mesh(platformGeometry, material);
     mesh.position.set(x, y, z);
@@ -1303,6 +1377,116 @@ export function createClimberPrototype(
       dynamicObstacleUpdaters.push(() => {
         syncAxisAlignedColliderWithObjectBounds(colliderEntry, mesh);
       });
+    }
+
+    // ── 旋转平台：绕 Y 轴匀速旋转 ──────────────────────────────────────────
+    if (platform.rotating) {
+      const speed = platform.rotating.speed ?? 0.8;
+      if (colliderEntry) {
+        dynamicObstacleUpdaters.push((elapsed) => {
+          mesh.rotation.y = elapsed * speed;
+          for (const bm of bumpMeshesForPlatform) {
+            bm.rotation.y = elapsed * speed;
+            // 凸点也要跟着转：围绕平台中心旋转
+            const ud = bm.userData as { bumpOriginX: number; bumpOriginZ: number };
+            const cos = Math.cos(elapsed * speed);
+            const sin = Math.sin(elapsed * speed);
+            const lx = ud.bumpOriginX - x;
+            const lz = ud.bumpOriginZ - z;
+            bm.position.x = x + lx * cos - lz * sin;
+            bm.position.z = z + lx * sin + lz * cos;
+          }
+        });
+      }
+      rotatingPlatforms.set(platform.id, {
+        originX: x,
+        originZ: z,
+        halfW: width / 2,
+        halfD: depth / 2,
+        speed,
+      });
+    }
+
+    // ── 传送带平台：站上时持续推动玩家 ───────────────────────────────────
+    if (platform.conveyor) {
+      conveyorPlatforms.set(platform.id, {
+        axis: platform.conveyor.axis,
+        speed: platform.conveyor.speed,
+        top: y + height / 2,
+        minX: x - width / 2,
+        maxX: x + width / 2,
+        minZ: z - depth / 2,
+        maxZ: z + depth / 2,
+      });
+      // 传送带视觉纹理动画（箭头偏移）通过 material.map offset 驱动
+      if (material.map) {
+        const cv = platform.conveyor;
+        dynamicObstacleUpdaters.push((elapsed) => {
+          if (material.map) {
+            if (cv.axis === 'x') material.map.offset.x = (elapsed * cv.speed * 0.15) % 1;
+            else material.map.offset.y = (elapsed * cv.speed * 0.15) % 1;
+          }
+        });
+      }
+    }
+
+    // ── 消失重现平台（blink） ───────────────────────────────────────────
+    if (platform.blink) {
+      const bk = platform.blink;
+      const visMs = bk.visibleMs ?? 2000;
+      const hidMs = bk.hiddenMs ?? 1500;
+      const phase = bk.phaseOffset ?? 0;
+      const cycle = visMs + hidMs;
+      blinkPlatforms.set(platform.id, {
+        mesh,
+        bumps: bumpMeshesForPlatform.slice(),
+        collider: colliderEntry,
+        visMs,
+        hidMs,
+      });
+      dynamicObstacleUpdaters.push((elapsed) => {
+        const t = (((elapsed * 1000 + phase) % cycle) + cycle) % cycle;
+        const visible = t < visMs;
+        mesh.visible = visible;
+        for (const bm of bumpMeshesForPlatform) bm.visible = visible;
+        if (colliderEntry) colliderEntry.disabled = !visible;
+        // 淡入淡出透明度
+        if (material) {
+          material.transparent = true;
+          material.opacity = visible
+            ? Math.min(1, (t / Math.max(visMs * 0.15, 1)) * 1.0)
+            : Math.max(0, 1 - (t - visMs) / Math.max(hidMs * 0.2, 1));
+        }
+      });
+    }
+
+    // ── 碎裂平台（crumble） ────────────────────────────────────────────
+    if (platform.crumble && colliderEntry) {
+      const cr = platform.crumble;
+      crumblePlatforms.set(platform.id, {
+        mesh,
+        bumps: bumpMeshesForPlatform.slice(),
+        collider: colliderEntry,
+        originY: y,
+        top: y + height / 2,
+        minX: x - width / 2,
+        maxX: x + width / 2,
+        minZ: z - depth / 2,
+        maxZ: z + depth / 2,
+        state: 'idle',
+        timer: 0,
+        standMs: cr.standMs ?? 800,
+        crumbleMs: cr.crumbleMs ?? 400,
+        resetMs: cr.resetMs ?? 3000,
+      });
+      dynamicObstacleUpdaters.push(() => {
+        syncAxisAlignedColliderWithObjectBounds(colliderEntry, mesh);
+      });
+    }
+
+    // ── 冰面平台：仅标记，物理层在 updatePlayer 中判断 ─────────────────
+    if (platform.icy) {
+      icyPlatformIds.add(platform.id);
     }
   });
 
@@ -1557,6 +1741,23 @@ export function createClimberPrototype(
       up.timer = 0;
       syncAxisAlignedColliderWithObjectBounds(up.collider, up.mesh);
     }
+    // 重置碎裂平台
+    for (const [, cp] of crumblePlatforms) {
+      cp.mesh.visible = true;
+      cp.mesh.scale.y = 1;
+      cp.mesh.position.y = cp.originY;
+      cp.mesh.rotation.z = 0;
+      for (const bm of cp.bumps) {
+        const ud = bm.userData as { bumpOriginY: number };
+        bm.position.y = ud.bumpOriginY;
+        bm.visible = true;
+      }
+      cp.collider.disabled = false;
+      cp.top = cp.originY + cp.mesh.scale.y / 2;
+      cp.state = 'idle';
+      cp.timer = 0;
+      syncAxisAlignedColliderWithObjectBounds(cp.collider, cp.mesh);
+    }
     goalBurst.visible = false;
     goalBurst.scale.setScalar(1);
     goalBurstMaterial.opacity = 0;
@@ -1665,7 +1866,7 @@ export function createClimberPrototype(
       }
     }
 
-    // 掉落归零：低于 RESPAWN_Y 时重置回起点（无存档点，从头开始）
+    // 掉落归零：低于 RESPAWN_Y 时重置回起点
     if (playerPosition.y < RESPAWN_Y) {
       playerPosition.copy(startPosition);
       velocity.set(0, 0, 0);
@@ -1941,6 +2142,146 @@ export function createClimberPrototype(
           }
         }
       }
+    }
+
+    // ── 碎裂平台状态机 ────────────────────────────────────────────────────
+    {
+      const deltaMs = delta * 1000;
+      const feetY = playerPosition.y - PLAYER_RADIUS;
+      for (const [, cp] of crumblePlatforms) {
+        if (cp.state === 'idle') {
+          const playerOnThis =
+            grounded &&
+            Math.abs(feetY - cp.top) < 0.25 &&
+            playerPosition.x >= cp.minX - 0.12 &&
+            playerPosition.x <= cp.maxX + 0.12 &&
+            playerPosition.z >= cp.minZ - 0.12 &&
+            playerPosition.z <= cp.maxZ + 0.12;
+          if (playerOnThis) {
+            cp.state = 'standing';
+            cp.timer = cp.standMs;
+          }
+        } else if (cp.state === 'standing') {
+          cp.timer -= deltaMs;
+          // 轻微抖动预示碎裂
+          const shake = (1 - cp.timer / cp.standMs) * 0.06;
+          cp.mesh.rotation.z = Math.sin(timestamp * 0.05) * shake;
+          if (cp.timer <= 0) {
+            cp.state = 'crumbling';
+            cp.timer = cp.crumbleMs;
+          }
+        } else if (cp.state === 'crumbling') {
+          cp.timer -= deltaMs;
+          // 碎裂：快速缩小并向下落
+          const t = Math.max(0, cp.timer / cp.crumbleMs);
+          cp.mesh.scale.y = t;
+          cp.mesh.position.y = cp.originY - (1 - t) * 1.5;
+          for (const bm of cp.bumps) {
+            const ud = bm.userData as { bumpOriginY: number };
+            bm.position.y = ud.bumpOriginY - (1 - t) * 1.5;
+            bm.visible = t > 0.2;
+          }
+          syncAxisAlignedColliderWithObjectBounds(cp.collider, cp.mesh);
+          if (cp.timer <= 0) {
+            cp.state = 'gone';
+            cp.timer = cp.resetMs;
+            cp.mesh.visible = false;
+            for (const bm of cp.bumps) bm.visible = false;
+            cp.collider.disabled = true;
+          }
+        } else if (cp.state === 'gone') {
+          cp.timer -= deltaMs;
+          if (cp.timer <= 0) {
+            // 复原
+            cp.mesh.visible = true;
+            cp.mesh.scale.y = 1;
+            cp.mesh.position.y = cp.originY;
+            cp.mesh.rotation.z = 0;
+            for (const bm of cp.bumps) {
+              const ud = bm.userData as { bumpOriginY: number };
+              bm.position.y = ud.bumpOriginY;
+              bm.visible = true;
+            }
+            cp.collider.disabled = false;
+            cp.top = cp.originY + cp.mesh.scale.y / 2;
+            cp.state = 'idle';
+            syncAxisAlignedColliderWithObjectBounds(cp.collider, cp.mesh);
+          }
+        }
+      }
+    }
+
+    // ── 传送带推力：站在传送带上时施加水平速度分量 ──────────────────────
+    {
+      const feetY = playerPosition.y - PLAYER_RADIUS;
+      for (const [, cv] of conveyorPlatforms) {
+        if (
+          grounded &&
+          Math.abs(feetY - cv.top) < 0.2 &&
+          playerPosition.x >= cv.minX - 0.05 &&
+          playerPosition.x <= cv.maxX + 0.05 &&
+          playerPosition.z >= cv.minZ - 0.05 &&
+          playerPosition.z <= cv.maxZ + 0.05
+        ) {
+          if (cv.axis === 'x') velocity.x += cv.speed * delta * 4.5;
+          else velocity.z += cv.speed * delta * 4.5;
+          break;
+        }
+      }
+    }
+
+    // ── 旋转平台携带：站在旋转平台上时跟着旋转位移 ──────────────────────
+    {
+      const elapsed = clock.getElapsedTime();
+      const feetY = playerPosition.y - PLAYER_RADIUS;
+      for (const [, rp] of rotatingPlatforms) {
+        // 当前角和上一帧角之差用 delta 和 speed 近似
+        const angleDelta = rp.speed * delta;
+        // 判断玩家是否在旋转台顶面（用台面最大半径估算 XZ 范围）
+        const maxRadius = Math.hypot(rp.halfW, rp.halfD);
+        const dx = playerPosition.x - rp.originX;
+        const dz = playerPosition.z - rp.originZ;
+        const distXZ = Math.hypot(dx, dz);
+        if (
+          grounded &&
+          distXZ <= maxRadius + PLAYER_RADIUS * 0.5 &&
+          Math.abs(feetY - rp.halfW) < 0.3
+        ) {
+          // 以平台中心为轴旋转玩家位置
+          const cos = Math.cos(angleDelta);
+          const sin = Math.sin(angleDelta);
+          const newDx = dx * cos - dz * sin;
+          const newDz = dx * sin + dz * cos;
+          playerPosition.x = rp.originX + newDx;
+          playerPosition.z = rp.originZ + newDz;
+          // 也同步旋转摄像头朝向
+          cameraYaw += angleDelta;
+          targetCameraYaw += angleDelta;
+        }
+        void elapsed; // suppress unused
+      }
+    }
+
+    // ── 冰面：站在冰面平台上时大幅降低制动力 ──────────────────────────
+    {
+      const feetY = playerPosition.y - PLAYER_RADIUS;
+      let onIce = false;
+      for (const col of platformColliders) {
+        if (
+          col.debugMeta?.instanceId &&
+          icyPlatformIds.has(col.debugMeta.instanceId) &&
+          grounded &&
+          Math.abs(feetY - col.top) < 0.2 &&
+          playerPosition.x >= col.minX - 0.05 &&
+          playerPosition.x <= col.maxX + 0.05 &&
+          playerPosition.z >= col.minZ - 0.05 &&
+          playerPosition.z <= col.maxZ + 0.05
+        ) {
+          onIce = true;
+          break;
+        }
+      }
+      pc.setIcy(onIce);
     }
 
     renderer.render(scene, camera);
