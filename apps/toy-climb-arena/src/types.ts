@@ -35,7 +35,7 @@ export interface ClimberJumpClearanceReport {
   issues: ClimberJumpClearanceIssue[];
 }
 
-export type ClimberCharacterId = 'orb' | 'peach' | 'daisy';
+export type ClimberCharacterId = 'orb' | 'peach' | 'daisy' | 'woodendoll';
 
 export type ClimberCharacterAnimationState = 'idle' | 'run' | 'stop' | 'jump' | 'fall' | 'land';
 

@@ -13,9 +13,16 @@ import type { ClimberRunStats } from '../types';
 export interface GameHUDCallbacks {
   onResume: () => void;
   onReset: () => void;
-  onCycleCharacter: () => void;
+  /** 点击某个角色卡时调用，传入角色索引 */
+  onSelectCharacter: (idx: number) => void;
   onAudioToggle: () => void;
   onFullscreen: () => void;
+}
+
+export interface CharacterOption {
+  id: string;
+  name: string;
+  description?: string;
 }
 
 interface MenuEntry {
@@ -26,7 +33,6 @@ interface MenuEntry {
 
 const FONT_FAMILY = '"Nunito", "Fredoka One", "Segoe UI", system-ui, sans-serif';
 const FONT_BODY = `600 13px ${FONT_FAMILY}`;
-const FONT_LABEL = `bold 16px ${FONT_FAMILY}`;
 const FONT_TITLE = `bold 28px ${FONT_FAMILY}`;
 const FONT_SUBTITLE = `600 12px ${FONT_FAMILY}`;
 const FONT_HINT = `12px ${FONT_FAMILY}`;
@@ -64,7 +70,8 @@ export class GameHUD {
   private _hasEntered = false;
   private _audioEnabled = true;
   private _fullscreen = false;
-  private _characterLabel = '';
+  private _charOptions: CharacterOption[] = [];
+  private _charIdx = 0;
   private _stats: ClimberRunStats = {
     elapsedMs: 0,
     currentHeight: 0,
@@ -76,14 +83,16 @@ export class GameHUD {
 
   // ── 菜单交互 ──────────────────────────────────────────────────────────────
   private hoveredIdx = -1;
+  private hoveredCharIdx = -1;
   private menuRects: Array<{ x: number; y: number; w: number; h: number }> = [];
+  private charCardRects: Array<{ x: number; y: number; w: number; h: number }> = [];
   private entries: MenuEntry[] = [];
 
   constructor(
     private readonly cbs: GameHUDCallbacks,
-    init: { characterLabel: string; audioEnabled: boolean },
+    init: { audioEnabled: boolean },
   ) {
-    this._characterLabel = init.characterLabel;
+    this._audioEnabled = init.audioEnabled;
     this._audioEnabled = init.audioEnabled;
 
     this.canvas = document.createElement('canvas');
@@ -120,8 +129,9 @@ export class GameHUD {
   setFullscreen(v: boolean): void {
     this._fullscreen = v;
   }
-  setCharacterLabel(v: string): void {
-    this._characterLabel = v;
+  setCharOptions(opts: CharacterOption[], idx: number): void {
+    this._charOptions = opts;
+    this._charIdx = idx;
   }
   updateStats(s: ClimberRunStats): void {
     this._stats = s;
@@ -138,10 +148,6 @@ export class GameHUD {
       {
         label: () => '↺  重新开始',
         action: () => this.cbs.onReset(),
-      },
-      {
-        label: () => `👤  角色: ${this._characterLabel}  ›`,
-        action: () => this.cbs.onCycleCharacter(),
       },
       {
         label: () => `♪  音效: ${this._audioEnabled ? '开' : '关'}`,
@@ -166,6 +172,15 @@ export class GameHUD {
   private handleClick(e: MouseEvent): void {
     if (this._locked) return;
     const { offsetX: x, offsetY: y } = e;
+    // 角色卡点击
+    for (let i = 0; i < this.charCardRects.length; i++) {
+      const r = this.charCardRects[i];
+      if (r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+        this._charIdx = i;
+        this.cbs.onSelectCharacter(i);
+        return;
+      }
+    }
     for (let i = 0; i < this.menuRects.length; i++) {
       const r = this.menuRects[i];
       if (r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
@@ -178,6 +193,17 @@ export class GameHUD {
   private handleMouseMove(e: MouseEvent): void {
     if (this._locked) return;
     const { offsetX: x, offsetY: y } = e;
+    // 角色卡悬停
+    let foundChar = -1;
+    for (let i = 0; i < this.charCardRects.length; i++) {
+      const r = this.charCardRects[i];
+      if (r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+        foundChar = i;
+        break;
+      }
+    }
+    this.hoveredCharIdx = foundChar;
+
     let found = -1;
     for (let i = 0; i < this.menuRects.length; i++) {
       const r = this.menuRects[i];
@@ -186,9 +212,9 @@ export class GameHUD {
         break;
       }
     }
-    if (found !== this.hoveredIdx) {
+    if (found !== this.hoveredIdx || foundChar >= 0) {
       this.hoveredIdx = found;
-      this.canvas.style.cursor = found >= 0 ? 'pointer' : 'default';
+      this.canvas.style.cursor = found >= 0 || foundChar >= 0 ? 'pointer' : 'default';
     }
   }
 
@@ -242,64 +268,31 @@ export class GameHUD {
     const H = this.H;
 
     // ── 左上：高度卡片 ──
-    const LW = 168,
-      LH = 58;
+    const LW = 176,
+      LH = 64;
     this.chip(14, 14, LW, LH, C.orange);
-    // 高度大字
-    ctx.fillStyle = C.orange;
-    ctx.font = FONT_TITLE;
-    ctx.fillText(this.fmtHeight(s.currentHeight), 48, 38);
     // 小图标背景圆
     ctx.save();
     ctx.fillStyle = 'rgba(249,115,22,0.15)';
     ctx.beginPath();
-    ctx.arc(32, 30, 13, 0, Math.PI * 2);
+    ctx.arc(36, 37, 15, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-    ctx.font = '15px sans-serif';
+    ctx.font = '16px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('🧱', 32, 35);
+    ctx.fillText('🧱', 36, 43);
     ctx.textAlign = 'left';
-    // 计时 + 最高
+    // 高度大字
+    ctx.fillStyle = C.orange;
+    ctx.font = FONT_TITLE;
+    ctx.fillText(this.fmtHeight(s.currentHeight), 60, 45);
+    // 计时 + 最高（第二行）
     ctx.fillStyle = C.textMid;
     ctx.font = FONT_HINT;
-    ctx.fillText(`⏱ ${this.fmtTime(s.elapsedMs)}`, 22, 56);
+    ctx.fillText(`⏱ ${this.fmtTime(s.elapsedMs)}`, 22, 65);
     ctx.fillStyle = C.purple;
     const bestTxt = `▲${this.fmtHeight(s.bestHeight)}`;
-    ctx.fillText(bestTxt, LW - ctx.measureText(bestTxt).width - 8, 56);
-
-    // ── 右上：进度卡片 ──
-    const pw = 200,
-      ph = 58;
-    const px = W - pw - 14;
-    this.chip(px, 14, pw, ph, C.blueD);
-    // 进度百分比
-    const pct = Math.round(s.progress * 100);
-    ctx.fillStyle = C.blueD;
-    ctx.font = FONT_LABEL;
-    ctx.textAlign = 'right';
-    ctx.fillText(`${pct}%`, px + pw - 12, 37);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = C.textMid;
-    ctx.font = FONT_SUBTITLE;
-    ctx.fillText('🎯 进度', px + 12, 34);
-    // 进度条（14px 高，彩虹渐变）
-    const tx = px + 12,
-      ty = 42,
-      tw = pw - 24;
-    ctx.fillStyle = 'rgba(148,163,184,0.28)';
-    this.rrect(tx, ty, tw, 11, 5.5);
-    ctx.fill();
-    const fw = tw * Math.max(0, Math.min(1, s.progress));
-    if (fw > 0) {
-      const gBar = ctx.createLinearGradient(tx, 0, tx + tw, 0);
-      gBar.addColorStop(0, '#60A5FA');
-      gBar.addColorStop(0.5, '#A78BFA');
-      gBar.addColorStop(1, '#F97316');
-      ctx.fillStyle = gBar;
-      this.rrect(tx, ty, fw, 11, 5.5);
-      ctx.fill();
-    }
+    ctx.fillText(bestTxt, LW - ctx.measureText(bestTxt).width - 10, 65);
 
     // ── 通关 banner ──
     if (s.goalReached) {
@@ -344,11 +337,10 @@ export class GameHUD {
       ctx.font = `600 13px ${FONT_FAMILY}`;
       ctx.fillText('太厉害了！按 P 查看战绩', W / 2, by + 66);
       // 星星装饰
-      const stars = ['⭐', '✨', '🌟'];
       ctx.font = '18px sans-serif';
-      ctx.fillText(stars[0]!, bx + 24, by + 38);
-      ctx.fillText(stars[1]!, bx + bw - 28, by + 38);
-      ctx.fillText(stars[2]!, W / 2, by + 18);
+      ctx.fillText('⭐', bx + 24, by + 38);
+      ctx.fillText('✨', bx + bw - 28, by + 38);
+      ctx.fillText('🌟', W / 2, by + 18);
       ctx.textAlign = 'left';
     }
 
@@ -382,10 +374,18 @@ export class GameHUD {
     const ITEM_H = 48;
     const ITEM_GAP = 9;
     const HEADER_H = 102;
+    const CARD_AREA_H = this._charOptions.length > 0 ? 96 : 0;
     const FOOTER_H = 48;
     const PAD_V = 18;
     const pw = Math.min(308, W - 40);
-    const ph = HEADER_H + this.entries.length * (ITEM_H + ITEM_GAP) - ITEM_GAP + PAD_V + FOOTER_H;
+    const ph =
+      HEADER_H +
+      CARD_AREA_H +
+      (CARD_AREA_H > 0 ? 10 : 0) +
+      this.entries.length * (ITEM_H + ITEM_GAP) -
+      ITEM_GAP +
+      PAD_V +
+      FOOTER_H;
     const px = (W - pw) / 2;
     const py = Math.max(16, (H - ph) / 2);
 
@@ -447,13 +447,74 @@ export class GameHUD {
     ctx.lineTo(px + pw - 20, py + HEADER_H);
     ctx.stroke();
 
+    // 角色选择卡片区
+    this.charCardRects = [];
+    if (this._charOptions.length > 0) {
+      const cardPad = 10;
+      const cardGap = 8;
+      const cardCount = this._charOptions.length;
+      const cardW = (pw - cardPad * 2 - cardGap * (cardCount - 1)) / cardCount;
+      const cardH = 76;
+      const cardY = py + HEADER_H + 10;
+      const EMOJIS = ['🪆', '👸', '🌼', '🔮'];
+      for (let i = 0; i < cardCount; i++) {
+        const opt = this._charOptions[i];
+        if (!opt) continue;
+        const cx = px + cardPad + i * (cardW + cardGap);
+        this.charCardRects.push({ x: cx, y: cardY, w: cardW, h: cardH });
+        const selected = this._charIdx === i;
+        const hovered = this.hoveredCharIdx === i;
+
+        // 卡片背景
+        ctx.save();
+        ctx.shadowColor = selected ? 'rgba(249,115,22,0.4)' : 'rgba(0,0,0,0.08)';
+        ctx.shadowBlur = selected ? 16 : 8;
+        ctx.fillStyle = selected
+          ? 'rgba(255,237,213,0.95)'
+          : hovered
+            ? 'rgba(254,249,195,0.9)'
+            : 'rgba(248,250,252,0.92)';
+        this.rrect(cx, cardY, cardW, cardH, 14);
+        ctx.fill();
+        ctx.restore();
+
+        // 边框
+        ctx.strokeStyle = selected ? C.orange : hovered ? '#FCD34D' : C.border;
+        ctx.lineWidth = selected ? 2.5 : 1.5;
+        this.rrect(cx, cardY, cardW, cardH, 14);
+        ctx.stroke();
+
+        // Emoji 头像
+        const emoji = EMOJIS[i] ?? '🎮';
+        ctx.font = '24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(emoji, cx + cardW / 2, cardY + 34);
+
+        // 角色名字
+        ctx.fillStyle = selected ? C.orange : C.text;
+        ctx.font = `600 11px ${FONT_FAMILY}`;
+        ctx.fillText(opt.name, cx + cardW / 2, cardY + 56);
+
+        // 选中打勾
+        if (selected) {
+          ctx.fillStyle = C.orange;
+          ctx.font = `bold 11px ${FONT_FAMILY}`;
+          ctx.fillText('✓', cx + cardW / 2, cardY + 70);
+        }
+        ctx.textAlign = 'left';
+      }
+    }
+
+    // 菜单项起始 y（角色卡之后留间距）
+    const menuStartY = py + HEADER_H + CARD_AREA_H + (CARD_AREA_H > 0 ? 10 : 0);
+
     // 菜单项
     this.menuRects = [];
     for (let i = 0; i < this.entries.length; i++) {
       const entry = this.entries[i];
       if (!entry) continue;
       const ix = px + 14;
-      const iy = py + HEADER_H + i * (ITEM_H + ITEM_GAP);
+      const iy = menuStartY + i * (ITEM_H + ITEM_GAP);
       const iw = pw - 28;
       this.menuRects.push({ x: ix, y: iy, w: iw, h: ITEM_H });
       const hot = this.hoveredIdx === i;
@@ -498,7 +559,7 @@ export class GameHUD {
     }
 
     // 页脚：战绩徽章
-    const footY = py + HEADER_H + this.entries.length * (ITEM_H + ITEM_GAP) + PAD_V / 2 + 4;
+    const footY = menuStartY + this.entries.length * (ITEM_H + ITEM_GAP) + PAD_V / 2 + 4;
     const footTxt = `🏆 ${this.fmtHeight(s.bestHeight)}  ·  ⏱ ${this.fmtTime(s.elapsedMs)}`;
     ctx.font = `600 11px ${FONT_FAMILY}`;
     const ftw = ctx.measureText(footTxt).width + 24;

@@ -6,6 +6,7 @@ import {
   Box3,
   BoxGeometry,
   Color,
+  CylinderGeometry,
   Group,
   LoopOnce,
   LoopRepeat,
@@ -1321,8 +1322,171 @@ function createRunnerFallbackParts(): CharacterPartSet {
   };
 }
 
+// ── 木制玩偶角色（程序化，无 GLB）──────────────────────────────────────────────
+function createWoodenDollParts(): CharacterPartSet {
+  const root = new Group();
+
+  // 木纹暖棕色
+  const woodMat = new MeshStandardMaterial({ color: '#C8874A', roughness: 0.78, metalness: 0.0 });
+  // 深色关节
+  const jointMat = new MeshStandardMaterial({ color: '#8B5E3C', roughness: 0.88, metalness: 0.0 });
+  // 脸部象牙白
+  const faceMat = new MeshStandardMaterial({ color: '#F5DEB3', roughness: 0.6, metalness: 0.0 });
+  // 眼睛黑
+  const eyeMat = new MeshStandardMaterial({ color: '#1a1008', roughness: 0.5, metalness: 0.0 });
+  // 衣服（蓝色小围兜感）
+  const clothMat = new MeshStandardMaterial({ color: '#4A90D9', roughness: 0.7, metalness: 0.0 });
+
+  // ── 身体各部分 ──────────────────────────────────────────────────────────
+  // 躯干：圆柱，稍宽
+  const torso = new Mesh(new CylinderGeometry(0.2, 0.22, 0.5, 16), woodMat);
+  torso.position.y = 0.25;
+  torso.castShadow = true;
+
+  // 胸前小围兜
+  const bib = new Mesh(new CylinderGeometry(0.14, 0.15, 0.2, 12), clothMat);
+  bib.position.set(0, 0.35, 0.08);
+  bib.rotation.x = 0.25;
+
+  // 头：大圆球
+  const head = new Mesh(new SphereGeometry(0.22, 20, 16), faceMat);
+  head.position.y = 0.68;
+  head.castShadow = true;
+
+  // 左眼
+  const leftEye = new Mesh(new SphereGeometry(0.04, 10, 8), eyeMat);
+  leftEye.position.set(-0.08, 0.73, 0.19);
+  // 右眼
+  const rightEye = new Mesh(new SphereGeometry(0.04, 10, 8), eyeMat);
+  rightEye.position.set(0.08, 0.73, 0.19);
+
+  // 颈部关节球
+  const neck = new Mesh(new SphereGeometry(0.1, 12, 10), jointMat);
+  neck.position.y = 0.52;
+
+  // 左大腿
+  const leftThigh = new Mesh(new CylinderGeometry(0.09, 0.08, 0.26, 12), woodMat);
+  leftThigh.position.set(-0.14, -0.02, 0);
+  leftThigh.castShadow = true;
+  // 左小腿
+  const leftShin = new Mesh(new CylinderGeometry(0.07, 0.07, 0.22, 12), woodMat);
+  leftShin.position.set(-0.14, -0.29, 0);
+  leftShin.castShadow = true;
+  // 左膝关节
+  const leftKnee = new Mesh(new SphereGeometry(0.075, 10, 8), jointMat);
+  leftKnee.position.set(-0.14, -0.16, 0);
+
+  // 右大腿
+  const rightThigh = new Mesh(new CylinderGeometry(0.09, 0.08, 0.26, 12), woodMat);
+  rightThigh.position.set(0.14, -0.02, 0);
+  rightThigh.castShadow = true;
+  // 右小腿
+  const rightShin = new Mesh(new CylinderGeometry(0.07, 0.07, 0.22, 12), woodMat);
+  rightShin.position.set(0.14, -0.29, 0);
+  rightShin.castShadow = true;
+  // 右膝关节
+  const rightKnee = new Mesh(new SphereGeometry(0.075, 10, 8), jointMat);
+  rightKnee.position.set(0.14, -0.16, 0);
+
+  // 左臂
+  const leftArm = new Mesh(new CylinderGeometry(0.06, 0.055, 0.32, 10), woodMat);
+  leftArm.position.set(-0.29, 0.22, 0);
+  leftArm.rotation.z = 0.3;
+  leftArm.castShadow = true;
+  const leftShoulder = new Mesh(new SphereGeometry(0.075, 10, 8), jointMat);
+  leftShoulder.position.set(-0.23, 0.38, 0);
+
+  // 右臂
+  const rightArm = new Mesh(new CylinderGeometry(0.06, 0.055, 0.32, 10), woodMat);
+  rightArm.position.set(0.29, 0.22, 0);
+  rightArm.rotation.z = -0.3;
+  rightArm.castShadow = true;
+  const rightShoulder = new Mesh(new SphereGeometry(0.075, 10, 8), jointMat);
+  rightShoulder.position.set(0.23, 0.38, 0);
+
+  // 脚（小圆柱）
+  const leftFoot = new Mesh(new CylinderGeometry(0.08, 0.07, 0.1, 10), woodMat);
+  leftFoot.position.set(-0.14, -0.44, 0.02);
+  leftFoot.rotation.x = 0.15;
+  const rightFoot = new Mesh(new CylinderGeometry(0.08, 0.07, 0.1, 10), woodMat);
+  rightFoot.position.set(0.14, -0.44, 0.02);
+  rightFoot.rotation.x = 0.15;
+
+  root.add(
+    torso,
+    bib,
+    head,
+    leftEye,
+    rightEye,
+    neck,
+    leftThigh,
+    leftShin,
+    leftKnee,
+    rightThigh,
+    rightShin,
+    rightKnee,
+    leftArm,
+    leftShoulder,
+    rightArm,
+    rightShoulder,
+    leftFoot,
+    rightFoot,
+  );
+
+  return {
+    root,
+    materials: [woodMat, jointMat, faceMat, eyeMat, clothMat],
+    update: (context, state) => {
+      const { elapsed, delta, horizontalSpeed, verticalSpeed } = context;
+      const running = state === 'run';
+      const speed = Math.min(1, horizontalSpeed / 6);
+
+      // 腿部摆动
+      const legSwing = running
+        ? Math.sin(elapsed * 14) * (0.3 + speed * 0.35)
+        : Math.sin(elapsed * 4) * 0.04;
+      leftThigh.rotation.x = legSwing;
+      leftShin.rotation.x = legSwing * 0.5 + (running ? 0.1 : 0);
+      rightThigh.rotation.x = -legSwing;
+      rightShin.rotation.x = -legSwing * 0.5 + (running ? 0.1 : 0);
+
+      // 手臂对向摆动
+      const armSwing = running ? -legSwing * 0.6 : Math.sin(elapsed * 3.5) * 0.05;
+      leftArm.rotation.x = armSwing;
+      rightArm.rotation.x = -armSwing;
+
+      // 头部左右轻晃（idle 时更明显）
+      head.rotation.z = Math.sin(elapsed * 2.2) * (running ? 0.02 : 0.06);
+      head.rotation.y = Math.sin(elapsed * 1.4) * 0.04;
+
+      // 躯干随跑步微扭
+      torso.rotation.y = running ? Math.sin(elapsed * 14) * 0.04 : 0;
+
+      // 跳跃/落地 squash-stretch
+      if (state === 'jump') {
+        root.scale.set(0.93, 1.1, 0.93);
+      } else if (state === 'land') {
+        root.scale.set(1.1, 0.88, 1.1);
+      } else {
+        const s = root.scale.x;
+        root.scale.set(
+          MathUtils.damp(s, 1, 12, delta),
+          MathUtils.damp(root.scale.y, 1, 12, delta),
+          MathUtils.damp(s, 1, 12, delta),
+        );
+      }
+
+      // bob（呼吸感）
+      const bobAmp = running ? 0.045 : 0.012;
+      const bobFreq = running ? 14 : 5;
+      root.position.y = Math.sin(elapsed * bobFreq) * bobAmp;
+      if (verticalSpeed > 0.2) root.position.y += 0.04;
+    },
+  };
+}
+
 function createModelRuntime(
-  characterId: Exclude<ClimberCharacterId, 'orb'>,
+  characterId: 'peach' | 'daisy',
   gltfScene: Group,
   clips: AnimationClip[],
 ): ModelRuntime | null {
@@ -1511,7 +1675,7 @@ function createModelRuntime(
 }
 
 function loadCharacterModel(
-  characterId: Exclude<ClimberCharacterId, 'orb'>,
+  characterId: 'peach' | 'daisy',
   onLoaded: (runtime: ModelRuntime) => void,
   onFailed: () => void,
 ): { dispose: () => void } {
@@ -1593,7 +1757,14 @@ export function createCharacterRig(
   const { onRuntimeStatusChange } = options;
   const usesModelCharacter = isModelCharacter(characterId);
   const root = new Group();
-  const fallback = usesModelCharacter ? createRunnerFallbackParts() : createOrbParts();
+
+  // 选择程序化回退角色：woodendoll 用木偶，orb 用圆球，其余 GLB 加载前用 runner
+  const fallback =
+    characterId === 'woodendoll'
+      ? createWoodenDollParts()
+      : usesModelCharacter
+        ? createRunnerFallbackParts()
+        : createOrbParts();
   root.add(fallback.root);
 
   let state: ClimberCharacterAnimationState = 'idle';
