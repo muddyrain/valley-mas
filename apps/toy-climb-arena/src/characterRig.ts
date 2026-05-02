@@ -214,6 +214,9 @@ const LEFT_HAND_KEYWORDS = ['hand_l', 'handl', 'lhand', 'wrist_l'];
 const RIGHT_HAND_KEYWORDS = ['hand_r', 'handr', 'rhand', 'wrist_r'];
 const ARM_RELAX_DOWN_Z = 0.94;
 const ARM_RELAX_YAW = 0.08;
+const CHARACTER_VISUAL_FOOT_TARGET_Y = -0.42;
+const PROCEDURAL_FOOT_BOUNDS = new Box3();
+const PROCEDURAL_PARENT_WORLD = new Vector3();
 
 function normalizeNodeName(name: string): string {
   return name.replace(/[\s_.-]/g, '').toLowerCase();
@@ -258,6 +261,14 @@ function normalizeModelHeight(root: Group, targetHeight: number) {
   root.position.y -= minY + 0.42;
 }
 
+function alignProceduralCharacterFooting(root: Group): void {
+  root.updateWorldMatrix(true, true);
+  PROCEDURAL_FOOT_BOUNDS.setFromObject(root);
+  if (!Number.isFinite(PROCEDURAL_FOOT_BOUNDS.min.y)) return;
+  const parentY = root.parent ? root.parent.getWorldPosition(PROCEDURAL_PARENT_WORLD).y : 0;
+  root.position.y += parentY + CHARACTER_VISUAL_FOOT_TARGET_Y - PROCEDURAL_FOOT_BOUNDS.min.y;
+}
+
 function resolveAutoFootCalibrationOffsetY(root: Group): number {
   const bounds = new Box3().setFromObject(root);
   const fallbackMinY = Number.isFinite(bounds.min.y) ? bounds.min.y : -0.42;
@@ -281,7 +292,7 @@ function resolveAutoFootCalibrationOffsetY(root: Group): number {
   });
 
   const referenceMinY = Number.isFinite(minFootY) ? minFootY : fallbackMinY;
-  const desiredMinY = -0.42;
+  const desiredMinY = CHARACTER_VISUAL_FOOT_TARGET_Y;
   return desiredMinY - referenceMinY;
 }
 
@@ -2415,6 +2426,9 @@ export function createCharacterRig(
       }
 
       fallback.update(context, state);
+      if (grounded) {
+        alignProceduralCharacterFooting(fallback.root);
+      }
     },
     dispose() {
       disposed = true;

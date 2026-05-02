@@ -81,3 +81,6 @@ Recordings/
 # Crash and local diagnostics
 sysinfo.txt
 *.stacktrace
+
+# cache
+tmp/
