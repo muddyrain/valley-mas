@@ -1197,6 +1197,8 @@ export function createClimberPrototype(
 
   // ── 冰面平台 ID 集合 ───────────────────────────────────────────────────
   const icyPlatformIds = new Set<string>();
+  // ── 粘性平台 ID 集合 ───────────────────────────────────────────────────
+  const stickyPlatformIds = new Set<string>();
 
   const enableRuntimePlatformColliders = (colliders: PlatformCollisionData[]) => {
     for (let index = 0; index < colliders.length; index += 1) {
@@ -1250,6 +1252,7 @@ export function createClimberPrototype(
     const [x, y, z] = platform.position;
     const isGoal = platform.isGoal === true;
     const isIcy = platform.icy === true;
+    const isSticky = platform.sticky === true;
     const isCrumble = !!platform.crumble;
     const isConveyor = !!platform.conveyor;
     const isCheckpointPlatform = platform.isCheckpoint === true && !isGoal;
@@ -1402,6 +1405,66 @@ export function createClimberPrototype(
           );
         }
         syncAxisAlignedColliderWithObjectBounds(colliderEntry, mesh);
+      });
+    }
+
+    // ── 伸缩桥：视觉实体和模型级碰撞体同步缩放 ─────────────────────────
+    if (platform.extendable && colliderEntry) {
+      const ex = platform.extendable;
+      const omega = (2 * Math.PI) / ex.period;
+      const phase = ex.phaseOffset ?? 0;
+      const minScale = clamp(ex.minScale ?? 0.35, 0.18, 1);
+      const capturedVisuals = visualObjectsForPlatform;
+      dynamicObstacleUpdaters.push((elapsed) => {
+        const wave = (Math.sin(omega * elapsed + phase) + 1) / 2;
+        const axisScale = MathUtils.lerp(minScale, 1, wave);
+        mesh.scale.set(
+          ex.axis === 'x' ? width * axisScale : width,
+          height,
+          ex.axis === 'z' ? depth * axisScale : depth,
+        );
+        syncAxisAlignedColliderWithObjectBounds(colliderEntry, mesh);
+        for (const visual of capturedVisuals) {
+          const ud = visual.userData as {
+            bumpOriginScaleX?: number;
+            bumpOriginScaleY?: number;
+            bumpOriginScaleZ?: number;
+          };
+          const sx = ud.bumpOriginScaleX ?? visual.scale.x;
+          const sy = ud.bumpOriginScaleY ?? visual.scale.y;
+          const sz = ud.bumpOriginScaleZ ?? visual.scale.z;
+          visual.scale.set(
+            ex.axis === 'x' ? sx * axisScale : sx,
+            sy,
+            ex.axis === 'z' ? sz * axisScale : sz,
+          );
+        }
+      });
+    }
+
+    // ── 倾斜板：按可见模型角度同步旋转碰撞体，避免空气墙 ───────────────
+    if (platform.tilting && colliderEntry) {
+      const tl = platform.tilting;
+      const omega = (2 * Math.PI) / tl.period;
+      const phase = tl.phaseOffset ?? 0;
+      const maxAngle = MathUtils.degToRad(tl.angleDeg);
+      const capturedVisuals = visualObjectsForPlatform;
+      dynamicObstacleUpdaters.push((elapsed) => {
+        const angle = Math.sin(omega * elapsed + phase) * maxAngle;
+        if (tl.axis === 'x') mesh.rotation.x = angle;
+        else mesh.rotation.z = angle;
+        syncAxisAlignedColliderWithObjectBounds(colliderEntry, mesh);
+        for (const visual of capturedVisuals) {
+          const ud = visual.userData as {
+            bumpOriginRotationX?: number;
+            bumpOriginRotationZ?: number;
+          };
+          if (tl.axis === 'x') {
+            visual.rotation.x = (ud.bumpOriginRotationX ?? 0) + angle;
+          } else {
+            visual.rotation.z = (ud.bumpOriginRotationZ ?? 0) + angle;
+          }
+        }
       });
     }
 
@@ -1563,6 +1626,9 @@ export function createClimberPrototype(
     // ── 冰面平台：仅标记，物理层在 updatePlayer 中判断 ─────────────────
     if (platform.icy) {
       icyPlatformIds.add(platform.id);
+    }
+    if (isSticky) {
+      stickyPlatformIds.add(platform.id);
     }
   });
 
@@ -1810,6 +1876,7 @@ export function createClimberPrototype(
       for (const bm of up.bumps) {
         const ud = bm.userData as { bumpOriginY: number };
         bm.position.y = ud.bumpOriginY;
+        bm.rotation.z = (bm.userData as { bumpOriginRotationZ?: number }).bumpOriginRotationZ ?? 0;
         bm.visible = true;
       }
       up.top = up.originY + up.mesh.scale.y / 2;
@@ -2204,9 +2271,18 @@ export function createClimberPrototype(
           // 晃动幅度随剩余时间逐渐增大（timer 从 shakeDelay→0）
           const progress = 1 - Math.max(0, up.timer) / up.shakeDelay;
           const shakeAmp = progress * 0.22;
-          up.mesh.rotation.z = Math.sin(timestamp * 0.03) * shakeAmp;
+          const wobble = Math.sin(timestamp * 0.03) * shakeAmp;
+          up.mesh.rotation.z = wobble;
+          for (const bm of up.bumps) {
+            const ud = bm.userData as { bumpOriginRotationZ?: number };
+            bm.rotation.z = (ud.bumpOriginRotationZ ?? 0) + wobble;
+          }
           if (up.timer <= 0) {
             up.mesh.rotation.z = 0;
+            for (const bm of up.bumps) {
+              const ud = bm.userData as { bumpOriginRotationZ?: number };
+              bm.rotation.z = ud.bumpOriginRotationZ ?? 0;
+            }
             up.state = 'falling';
             audio.playUnstableFall();
           }
@@ -2235,6 +2311,8 @@ export function createClimberPrototype(
             for (const bm of up.bumps) {
               const ud = bm.userData as { bumpOriginY: number };
               bm.position.y = ud.bumpOriginY;
+              bm.rotation.z =
+                (bm.userData as { bumpOriginRotationZ?: number }).bumpOriginRotationZ ?? 0;
               bm.visible = true;
             }
             up.top = up.originY + up.mesh.scale.y / 2;
@@ -2376,22 +2454,29 @@ export function createClimberPrototype(
     {
       const feetY = playerPosition.y - PLAYER_RADIUS;
       let onIce = false;
+      let onSticky = false;
       for (const col of platformColliders) {
-        if (
-          col.debugMeta?.instanceId &&
-          icyPlatformIds.has(col.debugMeta.instanceId) &&
-          grounded &&
+        const instanceId = col.debugMeta?.instanceId;
+        if (!instanceId || !grounded) continue;
+        const playerOnCollider =
           Math.abs(feetY - col.top) < 0.2 &&
           playerPosition.x >= col.minX - 0.05 &&
           playerPosition.x <= col.maxX + 0.05 &&
           playerPosition.z >= col.minZ - 0.05 &&
-          playerPosition.z <= col.maxZ + 0.05
-        ) {
+          playerPosition.z <= col.maxZ + 0.05;
+        if (!playerOnCollider) continue;
+        if (icyPlatformIds.has(instanceId)) {
           onIce = true;
+        }
+        if (stickyPlatformIds.has(instanceId)) {
+          onSticky = true;
+        }
+        if (onIce || onSticky) {
           break;
         }
       }
       pc.setIcy(onIce);
+      pc.setSticky(onSticky);
     }
 
     renderer.render(scene, camera);

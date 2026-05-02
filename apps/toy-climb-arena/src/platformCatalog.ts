@@ -279,8 +279,11 @@ function inferKind(platform: ClimberPlatformDefinition): ToyPlatformKind {
   }
   if (platform.crumble) return 'crumble_tile';
   if (platform.icy) return 'ice_block';
+  if (platform.sticky) return 'sticky_pad';
   if (platform.conveyor) return 'conveyor_belt';
   if (platform.blink) return 'blink_panel';
+  if (platform.extendable) return 'extendable_bridge';
+  if (platform.tilting) return 'tilting_board';
   if (platform.rotating) return 'rotating_gear';
   if (platform.moving) return 'moving_lift';
   if (platform.unstable) return 'wobble_board';

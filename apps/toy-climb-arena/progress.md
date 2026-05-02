@@ -2,6 +2,23 @@ Original prompt: 目前所有的平台模型都是简易的模型，我们可以
 
 ## 2026-05-02
 
+## 2026-05-02 · Dynamic platform first batch
+
+- Added first-batch dynamic toy-platform GLB models: `toy_barn_seesaw_board`, `toy_castle_extendable_ruler_bridge`, `toy_castle_tilt_balance_board`, and `toy_blink_acrylic_panel`.
+- Added `extendable` and `tilting` platform configs, keeping dynamic model transforms on the same model-derived collider path so visible solid parts and collision stay aligned.
+- Replaced selected route modules in `toyAnimalClimbWorld.ts` with a seesaw/wobble board, extendable ruler bridge, tilting balance board, and acrylic blink panel.
+- Updated `ASSET_GUIDE.md`, `TASKS.md`, and `TOY_CLIMB_PLATFORM_REMAKE_TASKS.md`.
+- Validation passed: generated platform assets, typecheck, check, build, and encoding guard. `check` still reports the existing 12 warnings.
+- Browser screenshot smoke was blocked because Playwright Chromium was not installed and `npx playwright install chromium` timed out; fallback HTTP smoke passed for the app entry and all 4 new GLB URLs on the local Vite server.
+
+## 2026-05-02 · Functional platforms and model library batch
+
+- Added first-batch functional platform GLB models: `toy_conveyor_track_belt`, `toy_plastic_ice_block`, `toy_gummy_sticky_pad`, `toy_cloud_bounce_pad`, and `toy_cracked_puzzle_crumble`.
+- Added `sticky` platform support plus player-side sticky handling, so sticky pads now slow grounded movement and soften jump strength.
+- Updated the map to use conveyor, sticky, bounce-pad, ice, and crumble variants in the barn/castle route.
+- Updated `ASSET_GUIDE.md`, `TASKS.md`, and `TOY_CLIMB_PLATFORM_REMAKE_TASKS.md` to reflect the new platform batch.
+- Validation passed: generate platform assets, typecheck, encoding guard, build, and HTTP smoke for all new GLBs. `check` still shows the same pre-existing 12 warnings.
+
 - Read project task/index docs, toy-climb AGENTS, GAME_DESIGN, LEVEL_DESIGN_RULES, TASKS, ASSET_GUIDE.
 - Finding: the active grand map renders most climbable surfaces from `level.platforms` as simple runtime boxes. Replacing only `assets/models/setpieces/*.glb` would not materially improve the current main map.
 - Current plan: add an original procedural toy-platform visual builder for all runtime platforms while preserving existing collider dimensions and gameplay data.
@@ -121,3 +138,42 @@ Original prompt: 目前所有的平台模型都是简易的模型，我们可以
 - Fixed a pre-existing rotating-platform carry bug: the carry test now compares player feet to `originY + halfH`, not platform half width.
 - Collision principle preserved: generated castle models expose mesh-level `box`/`cylinder` collision metadata, and `platformModelRuntime.ts` creates compound colliders from the visible model parts.
 - Validation: `generate:platform-assets`, `typecheck`, `check`, `build`, and targeted encoding guard passed. Browser screenshots captured under `tmp/castle-slice-verify-clean/`; castle GLB requests returned 200. `check` still reports existing warnings unrelated to this slice.
+
+## 2026-05-02 · Wide catch-layer route pass
+
+- Started Phase 9 implementation for the 0-60m route.
+- Added lateral barn island groups, roof catch layers, and return steps around roughly 11-22m.
+- Added castle wall/balcony/container catch layers and return routes around roughly 31-52m.
+- Kept the original main climb route intact and did not add checkpoints; the new platforms are physical recovery/catch surfaces only.
+- `pnpm --filter @valley/toy-climb-arena typecheck` passed after the first route-data change.
+- Next TODO: run encoding guard, full `check`/`build`, and browser screenshots with normal + debug collider views.
+
+## 2026-05-02 · First model variety expansion
+
+- User feedback: the wider map is fine, but the model library still repeats too many geometric box-like modules; the crumble cookie platform is a better target style.
+- Added generator definitions for 8 more object-identity platform GLBs:
+  - `toy_barn_cookie_stack`
+  - `toy_barn_abc_block_pile`
+  - `toy_barn_pudding_cup`
+  - `toy_barn_button_cushion`
+  - `toy_castle_book_stack`
+  - `toy_castle_coin_stack`
+  - `toy_castle_key_bridge`
+  - `toy_castle_crown_platform`
+- Wired the new asset IDs into `platformModelAssets.ts` and replaced several repeated barn/castle route variants in `toyAnimalClimbWorld.ts`.
+- Collision rule preserved: visible solid mesh parts use generated model colliders; decorative labels, gems, seams, chips, and trim opt out with `collisionShape: none`.
+- Next TODO: run `generate:platform-assets`, typecheck/check/build, encoding guard, and visual smoke screenshots for at least one barn and one castle replacement.
+
+## 2026-05-02 · Second model variety expansion
+
+- Added 7 more object-identity platform GLBs to reduce remaining box-like repetition:
+  - `toy_barn_picnic_basket`
+  - `toy_barn_yarn_ball`
+  - `toy_barn_xylophone_bridge`
+  - `toy_castle_shield_tile`
+  - `toy_castle_hourglass_tower`
+  - `toy_castle_ribbon_bridge`
+  - `toy_castle_treasure_chest`
+- Registered them in `platformModelAssets.ts` and replaced additional repeated `hay_bale`, `castle_brick_block`, `castle_tower_cap`, and `castle_drawbridge` instances in `toyAnimalClimbWorld.ts`.
+- Collision rule preserved: solid mesh parts remain model-derived colliders; small trim, handles, labels, rivets, strands, sand and gems opt out via `collisionShape: none`.
+- Next TODO: run asset generation, typecheck/check/build, encoding guard, and targeted browser smoke for the new basket/yarn/xylophone/shield/hourglass/ribbon/chest models.

@@ -153,6 +153,32 @@ export interface ClimberPlatformDefinition {
     phaseOffset?: number;
   };
   /**
+   * 伸缩平台配置。平台沿水平轴周期性缩短/恢复，碰撞体跟随可见模型缩放。
+   * - axis: 伸缩轴 'x' | 'z'
+   * - minScale: 缩回后的轴向比例（0.25~1，默认 0.35）
+   * - period: 完整伸缩周期（秒）
+   * - phaseOffset: 相位偏移（弧度，默认 0）
+   */
+  extendable?: {
+    axis: 'x' | 'z';
+    minScale?: number;
+    period: number;
+    phaseOffset?: number;
+  };
+  /**
+   * 倾斜平台配置。平台绕水平轴周期性倾斜，模型级碰撞体跟随旋转。
+   * - axis: 绕 'x' 或 'z' 轴倾斜
+   * - angleDeg: 最大倾斜角度（度，建议 6~14）
+   * - period: 往复周期（秒）
+   * - phaseOffset: 相位偏移（弧度，默认 0）
+   */
+  tilting?: {
+    axis: 'x' | 'z';
+    angleDeg: number;
+    period: number;
+    phaseOffset?: number;
+  };
+  /**
    * 弹跳板配置。玩家落地时给予额外向上速度，并触发视觉压缩-弹出动画。
    * - boostVelocity: 起跳速度（m/s），叠加在正常跳跃基础上（建议 10~16）
    * - squishDuration: 压缩动画时长（ms，默认 80）
@@ -214,6 +240,8 @@ export interface ClimberPlatformDefinition {
   };
   /** 冰面平台：摩擦力极低，玩家制动极慢，会持续滑行。 */
   icy?: boolean;
+  /** 粘性平台：降低地面移动速度和起跳力度，用于制造软糖/橡皮泥阻滞感。 */
+  sticky?: boolean;
 }
 
 export type ClimberSetPieceAssetId =

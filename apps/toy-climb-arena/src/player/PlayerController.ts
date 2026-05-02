@@ -84,6 +84,8 @@ export class PlayerController {
   private _lastGroundedAtMs = -10_000;
   /** 冰面模式：制动力大幅降低 */
   private _icy = false;
+  /** 粘性模式：移动和起跳被软垫拖慢 */
+  private _sticky = false;
 
   /** 由外部（碰撞系统）写入当前站立平台 ID，供 Debug UI 读取 */
   currentPlatformId: string | null = null;
@@ -120,11 +122,17 @@ export class PlayerController {
     this._lastGroundedAtMs = -10_000;
     this.currentPlatformId = null;
     this._icy = false;
+    this._sticky = false;
   }
 
   /** 由外部每帧调用，设置当前是否处于冰面（影响地面制动力） */
   setIcy(icy: boolean): void {
     this._icy = icy;
+  }
+
+  /** 由外部每帧调用，设置当前是否处于粘性平台（影响地面速度和跳跃力度） */
+  setSticky(sticky: boolean): void {
+    this._sticky = sticky;
   }
 
   // ── 主更新（每帧调用） ────────────────────────────────────────────────────
@@ -147,7 +155,9 @@ export class PlayerController {
     const wasGrounded = this._grounded;
 
     // ── 1. 水平速度目标 ──────────────────────────────────────────────────────
-    const speed = input.sprint ? PLAYER_PHYSICS.sprintSpeed : PLAYER_PHYSICS.moveSpeed;
+    const speed =
+      (input.sprint ? PLAYER_PHYSICS.sprintSpeed : PLAYER_PHYSICS.moveSpeed) *
+      (this._sticky && this._grounded ? 0.58 : 1);
     const rawForward = Number(input.forward) - Number(input.backward);
     const rawStrafe = Number(input.right) - Number(input.left);
     const mag = Math.hypot(rawForward, rawStrafe);
@@ -187,7 +197,7 @@ export class PlayerController {
       canJumpAfterGrounded &&
       this.velocity.y <= 0.18
     ) {
-      this.velocity.y = PLAYER_PHYSICS.jumpVelocity;
+      this.velocity.y = PLAYER_PHYSICS.jumpVelocity * (this._sticky ? 0.82 : 1);
       this._grounded = false;
       this._lastJumpAtMs = this._elapsedMs;
       jumped = true;
