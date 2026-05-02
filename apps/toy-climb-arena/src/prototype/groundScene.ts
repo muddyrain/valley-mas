@@ -133,12 +133,16 @@ export function createGroundScene(scene: Scene, opts: GroundSceneOptions): Groun
   rightWall.receiveShadow = true;
   scene.add(rightWall);
 
-  // ── 后墙彩色竖条纹 ────────────────────────────────────────────────────────
+  // ── 四面墙彩色竖条纹 ────────────────────────────────────────────────────────
   const wallStripeColors = ['#FECACA', '#FDE68A', '#BBF7D0', '#BAE6FD', '#E9D5FF', '#FBCFE8'];
   const stripeGeo = new PlaneGeometry(1, 1);
   geometries.push(stripeGeo);
   const STRIPE_WIDTH = 4.5;
   const STRIPE_HEIGHT = WALL_HEIGHT * 0.65;
+  const STRIPE_GAP = 1.5;
+  const STRIPE_OFFSET_Y = floorSurfaceY + STRIPE_HEIGHT / 2 + 0.5;
+
+  // 后墙（z = -WALL_HALF，面朝 +z）
   for (let i = 0; i < wallStripeColors.length; i++) {
     const stripeMat = new MeshStandardMaterial({
       color: wallStripeColors[i],
@@ -146,11 +150,56 @@ export function createGroundScene(scene: Scene, opts: GroundSceneOptions): Groun
       metalness: 0,
     });
     materials.push(stripeMat);
-    const ox = (i - wallStripeColors.length / 2 + 0.5) * (STRIPE_WIDTH + 1.5);
-    const stripe = new Mesh(stripeGeo, stripeMat);
-    stripe.scale.set(STRIPE_WIDTH, STRIPE_HEIGHT, 1);
-    stripe.position.set(ox, floorSurfaceY + STRIPE_HEIGHT / 2 + 0.5, -WALL_HALF + 0.04);
-    scene.add(stripe);
+    const ox = (i - wallStripeColors.length / 2 + 0.5) * (STRIPE_WIDTH + STRIPE_GAP);
+    const s = new Mesh(stripeGeo, stripeMat);
+    s.scale.set(STRIPE_WIDTH, STRIPE_HEIGHT, 1);
+    s.position.set(ox, STRIPE_OFFSET_Y, -WALL_HALF + 0.04);
+    scene.add(s);
+  }
+  // 前墙（z = +WALL_HALF，面朝 -z）
+  for (let i = 0; i < wallStripeColors.length; i++) {
+    const stripeMat = new MeshStandardMaterial({
+      color: wallStripeColors[i],
+      roughness: 0.98,
+      metalness: 0,
+    });
+    materials.push(stripeMat);
+    const ox = (i - wallStripeColors.length / 2 + 0.5) * (STRIPE_WIDTH + STRIPE_GAP);
+    const s = new Mesh(stripeGeo, stripeMat);
+    s.scale.set(STRIPE_WIDTH, STRIPE_HEIGHT, 1);
+    s.position.set(ox, STRIPE_OFFSET_Y, WALL_HALF - 0.04);
+    s.rotation.y = Math.PI;
+    scene.add(s);
+  }
+  // 左墙（x = -WALL_HALF，面朝 +x）
+  for (let i = 0; i < wallStripeColors.length; i++) {
+    const stripeMat = new MeshStandardMaterial({
+      color: wallStripeColors[i],
+      roughness: 0.98,
+      metalness: 0,
+    });
+    materials.push(stripeMat);
+    const oz = (i - wallStripeColors.length / 2 + 0.5) * (STRIPE_WIDTH + STRIPE_GAP);
+    const s = new Mesh(stripeGeo, stripeMat);
+    s.scale.set(STRIPE_WIDTH, STRIPE_HEIGHT, 1);
+    s.position.set(-WALL_HALF + 0.04, STRIPE_OFFSET_Y, oz);
+    s.rotation.y = Math.PI / 2;
+    scene.add(s);
+  }
+  // 右墙（x = +WALL_HALF，面朝 -x）
+  for (let i = 0; i < wallStripeColors.length; i++) {
+    const stripeMat = new MeshStandardMaterial({
+      color: wallStripeColors[i],
+      roughness: 0.98,
+      metalness: 0,
+    });
+    materials.push(stripeMat);
+    const oz = (i - wallStripeColors.length / 2 + 0.5) * (STRIPE_WIDTH + STRIPE_GAP);
+    const s = new Mesh(stripeGeo, stripeMat);
+    s.scale.set(STRIPE_WIDTH, STRIPE_HEIGHT, 1);
+    s.position.set(WALL_HALF - 0.04, STRIPE_OFFSET_Y, oz);
+    s.rotation.y = -Math.PI / 2;
+    scene.add(s);
   }
 
   // ── 散落积木装饰（box + 圆柱躺倒 + 堆叠层）──────────────────────────────

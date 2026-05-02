@@ -104,12 +104,6 @@ const CAMERA_PITCH_SPEED_LIMIT = 5.2;
 const LAND_SOUND_COOLDOWN_MS = 180;
 const GROUND_STICK_VELOCITY_MAX = 1.35;
 const LANDING_ANIMATION_LOCK_MS = 140;
-/** 存档点未激活时静止自发光强度 */
-const CHECKPOINT_IDLE_INTENSITY = 0.12;
-/** 存档点激活后常亮自发光强度 */
-const CHECKPOINT_ACTIVATED_INTENSITY = 0.45;
-/** 存档点首次触达时的闪烁峰值强度 */
-const CHECKPOINT_FLASH_PEAK = 2.2;
 const RAMP_TOP_FLAT_RATIO = 0.36;
 const DEFAULT_MIN_PLAYABLE_SURFACE_SIZE = 1.36;
 const DEFAULT_SMALL_PIECE_CLUSTER_RADIUS = 2.8;
@@ -301,7 +295,6 @@ export function createClimberPrototype(
       `速度Y   : ${velocity.y.toFixed(2)} m/s`,
       `状态    : ${animState}`,
       `平台ID  : ${platformIdText}`,
-      `存档Y   : ${respawnPosition.y.toFixed(2)} m`,
     ].join('\n');
   }
 
@@ -1010,6 +1003,24 @@ export function createClimberPrototype(
 
   const dynamicObstacleUpdaters: Array<(elapsed: number) => void> = [];
 
+  // ── 移动平台携带玩家：记录每个移动平台的位移 delta，每步同步给站在上面的玩家 ──
+  interface MovingPlatformCarrier {
+    axis: 'x' | 'y' | 'z';
+    /** 平台中心（静止原点） */
+    originX: number;
+    originY: number;
+    originZ: number;
+    /** 半尺寸，用于判断玩家是否在台面上 */
+    halfW: number; // x 半宽
+    halfH: number; // y 半高
+    halfD: number; // z 半深
+    /** 上一帧 sin 偏移量 */
+    prevOffset: number;
+    /** 当前帧 sin 偏移量（由 updater 写入） */
+    currentOffset: number;
+  }
+  const movingPlatformCarriers: MovingPlatformCarrier[] = [];
+
   const createDynamicHazards = () => {
     const ropeGeometry = new CylinderGeometry(0.08, 0.08, 1, 10);
     const bobGeometry = new SphereGeometry(0.74, 12, 10);
@@ -1098,13 +1109,6 @@ export function createClimberPrototype(
     });
   };
 
-  /** 已激活（首次踩到）的存档点 ID 集合 */
-  const activatedCheckpoints = new Set<string>();
-  /** 存档点 platformId → 材质引用（首次触达时做闪烁动画） */
-  const checkpointMaterialMap = new Map<string, MeshStandardMaterial>();
-  /** 存档点闪烁动画队列，每帧 damp 降回静止亮度 */
-  const checkpointFlashQueue = new Map<string, { intensity: number }>();
-
   /**
    * 弹跳板运行时数据：
    * - platformId → { mesh, boostVelocity, squishDuration, top, minX/maxX/minZ/maxZ, squishTimer }
@@ -1130,6 +1134,7 @@ export function createClimberPrototype(
   type UnstableState = 'idle' | 'shaking' | 'falling' | 'resetting';
   interface UnstableEntry {
     mesh: Mesh;
+    bumps: Mesh[]; // 凸点装饰，跟随主体同步 Y
     collider: PlatformCollisionData;
     originY: number;
     top: number;
@@ -1149,16 +1154,15 @@ export function createClimberPrototype(
   level.platforms.forEach((platform) => {
     const [width, height, depth] = platform.size;
     const [x, y, z] = platform.position;
-    const isCheckpoint = platform.isCheckpoint === true;
     const isGoal = platform.isGoal === true;
-    // 存档点用脉冲蓝色，终点用金色，其余用关卡定义颜色
-    const resolvedColor = isGoal ? '#FCD34D' : isCheckpoint ? '#60A5FA' : platform.color;
+    // 终点用金色，其余用关卡定义颜色
+    const resolvedColor = isGoal ? '#FCD34D' : platform.color;
     const material = new MeshStandardMaterial({
       color: new Color(resolvedColor),
-      roughness: isCheckpoint ? 0.42 : 0.55,
-      metalness: isCheckpoint ? 0.18 : 0.08,
-      emissive: isCheckpoint ? new Color('#3b82f6') : isGoal ? new Color('#f59e0b') : new Color(0),
-      emissiveIntensity: isCheckpoint ? 0.12 : isGoal ? 0.28 : 0,
+      roughness: 0.55,
+      metalness: 0.08,
+      emissive: isGoal ? new Color('#f59e0b') : new Color(0),
+      emissiveIntensity: isGoal ? 0.28 : 0,
     });
     const mesh = new Mesh(platformGeometry, material);
     mesh.position.set(x, y, z);
@@ -1201,9 +1205,6 @@ export function createClimberPrototype(
     }
 
     platformMaterials.push(material);
-    if (isCheckpoint) {
-      checkpointMaterialMap.set(platform.id, material);
-    }
     const colliderEntry = pushCollider({
       center: [x, y, z],
       size: [width, height, depth],
@@ -1223,8 +1224,24 @@ export function createClimberPrototype(
       const originZ = z;
       const capturedBumps = bumpMeshesForPlatform.slice();
 
+      // 建立携带记录，供 renderFrame 用来把玩家随平台一起移动
+      const carrier: MovingPlatformCarrier = {
+        axis: mv.axis,
+        originX,
+        originY,
+        originZ,
+        halfW: width / 2,
+        halfH: height / 2,
+        halfD: depth / 2,
+        prevOffset: Math.sin(phase) * mv.amplitude,
+        currentOffset: Math.sin(phase) * mv.amplitude,
+      };
+      movingPlatformCarriers.push(carrier);
+
       dynamicObstacleUpdaters.push((elapsed) => {
+        carrier.prevOffset = carrier.currentOffset;
         const offset = Math.sin(omega * elapsed + phase) * mv.amplitude;
+        carrier.currentOffset = offset;
         mesh.position.set(
           mv.axis === 'x' ? originX + offset : originX,
           mv.axis === 'y' ? originY + offset : originY,
@@ -1267,6 +1284,7 @@ export function createClimberPrototype(
       const us = platform.unstable;
       unstablePlatforms.set(platform.id, {
         mesh,
+        bumps: bumpMeshesForPlatform.slice(),
         collider: colliderEntry,
         originY: y,
         top: y + height / 2,
@@ -1427,7 +1445,7 @@ export function createClimberPrototype(
 
   // ── 粒子系统 ─────────────────────────────────────────────────────────────
   const particles = createParticleSystem(scene);
-  const { emitLandParticles, emitCheckpointParticles } = particles;
+  const { emitLandParticles } = particles;
 
   const characterRig = createCharacterRig(characterId, {
     onRuntimeStatusChange: onCharacterStatusChange,
@@ -1468,20 +1486,6 @@ export function createClimberPrototype(
   let rafId = 0;
   let disposed = false;
   let lastStatsAt = 0;
-  /** 当前存档重生位置（接触存档点平台时更新，默认=出生点） */
-  const respawnPosition = startPosition.clone();
-  /** 预先构建存档点平台列表（包含顶面 Y 坐标） */
-  const checkpointPlatforms = level.platforms
-    .filter((p) => p.isCheckpoint)
-    .map((p) => ({
-      id: p.id,
-      top: p.position[1] + p.size[1] / 2,
-      minX: p.position[0] - p.size[0] / 2,
-      maxX: p.position[0] + p.size[0] / 2,
-      minZ: p.position[2] - p.size[2] / 2,
-      maxZ: p.position[2] + p.size[2] / 2,
-      spawnY: p.position[1] + p.size[1] / 2 + PLAYER_RADIUS + 0.05,
-    }));
   const clock = new Clock();
   const progressDenominator = Math.max(0.001, maxPlatformTop - startPosition.y);
 
@@ -1538,18 +1542,16 @@ export function createClimberPrototype(
     landingAnimationLockMs = 0;
     lastLandAudioAtMs = -10000;
     pc.reset();
-    respawnPosition.copy(startPosition);
-    // 重置存档点激活状态，材质恢复静止亮度
-    activatedCheckpoints.clear();
-    checkpointFlashQueue.clear();
-    for (const [, mat] of checkpointMaterialMap) {
-      mat.emissiveIntensity = CHECKPOINT_IDLE_INTENSITY;
-    }
     // 重置不稳定平台到 idle 状态
     for (const [, up] of unstablePlatforms) {
       up.mesh.position.y = up.originY;
       up.mesh.rotation.z = 0;
       up.mesh.visible = true;
+      for (const bm of up.bumps) {
+        const ud = bm.userData as { bumpOriginY: number };
+        bm.position.y = ud.bumpOriginY;
+        bm.visible = true;
+      }
       up.top = up.originY + up.mesh.scale.y / 2;
       up.state = 'idle';
       up.timer = 0;
@@ -1663,43 +1665,13 @@ export function createClimberPrototype(
       }
     }
 
-    // 外部重生覆盖（存档点感知，优先于控制器内部的 respawnY 逻辑）
+    // 掉落归零：低于 RESPAWN_Y 时重置回起点（无存档点，从头开始）
     if (playerPosition.y < RESPAWN_Y) {
-      playerPosition.copy(respawnPosition);
+      playerPosition.copy(startPosition);
       velocity.set(0, 0, 0);
       grounded = false;
       landingAnimationLockMs = 0;
-    }
-
-    // ── 存档点检测：站在 isCheckpoint 平台上时更新重生点 ──────────────────────
-    if (grounded) {
-      const feetY = playerPosition.y - PLAYER_RADIUS;
-      for (const cp of checkpointPlatforms) {
-        if (
-          Math.abs(feetY - cp.top) < 0.18 &&
-          playerPosition.x >= cp.minX - 0.1 &&
-          playerPosition.x <= cp.maxX + 0.1 &&
-          playerPosition.z >= cp.minZ - 0.1 &&
-          playerPosition.z <= cp.maxZ + 0.1
-        ) {
-          if (respawnPosition.y < cp.spawnY) {
-            respawnPosition.set(playerPosition.x, cp.spawnY, playerPosition.z);
-          }
-          // ── 首次触达：触发闪烁，更新材质到激活态 ──────────────────────────
-          if (!activatedCheckpoints.has(cp.id)) {
-            activatedCheckpoints.add(cp.id);
-            const mat = checkpointMaterialMap.get(cp.id);
-            if (mat) {
-              mat.emissiveIntensity = CHECKPOINT_FLASH_PEAK;
-              checkpointFlashQueue.set(cp.id, { intensity: CHECKPOINT_FLASH_PEAK });
-            }
-            // 存档点激活粒子：从平台顶面中央爆发
-            emitCheckpointParticles((cp.minX + cp.maxX) / 2, cp.top + 0.2, (cp.minZ + cp.maxZ) / 2);
-            audio.playCheckpoint();
-          }
-          break;
-        }
-      }
+      audio.playFall();
     }
 
     if (playerPosition.y > bestHeight) {
@@ -1814,6 +1786,35 @@ export function createClimberPrototype(
     for (let step = 0; step < simulationSteps; step += 1) {
       const stepElapsed = frameElapsed + simulationDelta * step;
       for (const update of dynamicObstacleUpdaters) update(stepElapsed);
+
+      // ── 移动平台携带玩家 ─────────────────────────────────────────────────
+      // 在物理更新前，把玩家随站立平台一起平移
+      if (grounded) {
+        const feetY = playerPosition.y - PLAYER_RADIUS;
+        for (const c of movingPlatformCarriers) {
+          const platformTopY =
+            c.axis === 'y' ? c.originY + c.currentOffset + c.halfH : c.originY + c.halfH;
+          // 脚底在平台顶面 ±0.15m 内
+          if (Math.abs(feetY - platformTopY) > 0.15) continue;
+          // 水平范围判断（以平台当前中心为基准）
+          const cx = c.axis === 'x' ? c.originX + c.currentOffset : c.originX;
+          const cz = c.axis === 'z' ? c.originZ + c.currentOffset : c.originZ;
+          if (
+            playerPosition.x < cx - c.halfW - PLAYER_RADIUS ||
+            playerPosition.x > cx + c.halfW + PLAYER_RADIUS ||
+            playerPosition.z < cz - c.halfD - PLAYER_RADIUS ||
+            playerPosition.z > cz + c.halfD + PLAYER_RADIUS
+          )
+            continue;
+          // 命中：把平台 delta 加到玩家坐标
+          const delta_offset = c.currentOffset - c.prevOffset;
+          if (c.axis === 'x') playerPosition.x += delta_offset;
+          else if (c.axis === 'y') playerPosition.y += delta_offset;
+          else playerPosition.z += delta_offset;
+          break; // 同时只能站一块移动平台
+        }
+      }
+
       updatePlayer(simulationDelta);
     }
     playerAxisLabelGroup.position.copy(playerPosition);
@@ -1852,21 +1853,6 @@ export function createClimberPrototype(
       goalBurst.visible = false;
       goalBurstMaterial.opacity = 0;
       goalBurst.scale.setScalar(1);
-    }
-
-    // ── 存档点闪烁动画：每帧 damp 降回激活态常亮强度 ──────────────────────────
-    for (const [id, flash] of checkpointFlashQueue) {
-      const mat = checkpointMaterialMap.get(id);
-      if (!mat) {
-        checkpointFlashQueue.delete(id);
-        continue;
-      }
-      flash.intensity = MathUtils.damp(flash.intensity, CHECKPOINT_ACTIVATED_INTENSITY, 3.5, delta);
-      mat.emissiveIntensity = flash.intensity;
-      if (Math.abs(flash.intensity - CHECKPOINT_ACTIVATED_INTENSITY) < 0.005) {
-        mat.emissiveIntensity = CHECKPOINT_ACTIVATED_INTENSITY;
-        checkpointFlashQueue.delete(id);
-      }
     }
 
     // ── 弹跳板压缩-弹出动画 ──────────────────────────────────────────────────
@@ -1909,6 +1895,7 @@ export function createClimberPrototype(
           if (playerOnThis) {
             up.state = 'shaking';
             up.timer = up.shakeDelay;
+            audio.playUnstableShake();
           }
         } else if (up.state === 'shaking') {
           up.timer -= deltaMs;
@@ -1923,11 +1910,18 @@ export function createClimberPrototype(
           }
         } else if (up.state === 'falling') {
           up.mesh.position.y -= up.fallSpeed * delta;
+          // 凸点跟随主体下落
+          const dyFall = up.mesh.position.y - up.originY;
+          for (const bm of up.bumps) {
+            const ud = bm.userData as { bumpOriginY: number };
+            bm.position.y = ud.bumpOriginY + dyFall;
+          }
           // 落到原始 Y - 10m 后进入重置阶段
           if (up.mesh.position.y < up.originY - 10) {
             up.state = 'resetting';
             up.timer = up.resetDelay;
             up.mesh.visible = false;
+            for (const bm of up.bumps) bm.visible = false;
           }
         } else if (up.state === 'resetting') {
           up.timer -= deltaMs;
@@ -1936,6 +1930,11 @@ export function createClimberPrototype(
             up.mesh.position.y = up.originY;
             up.mesh.rotation.z = 0;
             up.mesh.visible = true;
+            for (const bm of up.bumps) {
+              const ud = bm.userData as { bumpOriginY: number };
+              bm.position.y = ud.bumpOriginY;
+              bm.visible = true;
+            }
             up.top = up.originY + up.mesh.scale.y / 2;
             up.state = 'idle';
             syncAxisAlignedColliderWithObjectBounds(up.collider, up.mesh);

@@ -32,7 +32,7 @@ export function ClimberArcadeExperience(_props: ClimberArcadeExperienceProps) {
   const [charIdx, setCharIdx] = useState(0);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
-  const activeCharId = (charOptions[charIdx]?.id ?? 'peach') as ClimberCharacterId;
+  const activeCharId = (charOptions[charIdx]?.id ?? 'woodendoll') as ClimberCharacterId;
 
   const toggleFullscreen = useCallback(async () => {
     const host = shellRef.current;
@@ -75,8 +75,6 @@ export function ClimberArcadeExperience(_props: ClimberArcadeExperienceProps) {
     const level = CLIMBER_LEVELS[0];
     if (!shell || !level) return;
 
-    const charLabel = charOptions[charIdx]?.name ?? '';
-
     const hud = new GameHUD(
       {
         onResume: () => controllerRef.current?.requestPointerLock(),
@@ -84,7 +82,7 @@ export function ClimberArcadeExperience(_props: ClimberArcadeExperienceProps) {
           controllerRef.current?.reset();
           controllerRef.current?.requestPointerLock();
         },
-        onCycleCharacter: () => setCharIdx((prev) => (prev + 1) % charOptions.length),
+        onSelectCharacter: (idx) => setCharIdx(idx),
         onAudioToggle: () => {
           setAudioEnabled((prev) => {
             const next = !prev;
@@ -97,8 +95,9 @@ export function ClimberArcadeExperience(_props: ClimberArcadeExperienceProps) {
           void toggleFullscreen();
         },
       },
-      { characterLabel: charLabel, audioEnabled },
+      { audioEnabled },
     );
+    hud.setCharOptions(charOptions, charIdx);
     hud.setFullscreen(fullscreen);
     shell.appendChild(hud.canvas);
     hudRef.current = hud;

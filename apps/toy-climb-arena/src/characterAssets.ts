@@ -5,6 +5,11 @@ import type { ClimberCharacterId, ClimberCharacterOption } from './types';
 
 export const CLIMBER_CHARACTER_OPTIONS: ClimberCharacterOption[] = [
   {
+    id: 'woodendoll',
+    name: '木偶',
+    description: '程序化木制玩偶角色，圆润关节，暖木纹配色。',
+  },
+  {
     id: 'peach',
     name: '碧姬',
     description: '加载 peach.glb；若资源异常会自动回退占位角色。',
@@ -16,7 +21,7 @@ export const CLIMBER_CHARACTER_OPTIONS: ClimberCharacterOption[] = [
   },
 ];
 
-export const CHARACTER_MODEL_URLS: Record<Exclude<ClimberCharacterId, 'orb'>, string[]> = {
+export const CHARACTER_MODEL_URLS: Record<'peach' | 'daisy', string[]> = {
   peach: [
     toRuntimeAssetUrl(peachModelUrl, import.meta.url),
     '/game/models/peach.glb?v=20260412-peach',
@@ -31,6 +36,6 @@ export const CHARACTER_MODEL_URLS: Record<Exclude<ClimberCharacterId, 'orb'>, st
 
 export function isModelCharacter(
   characterId: ClimberCharacterId,
-): characterId is Exclude<ClimberCharacterId, 'orb'> {
-  return characterId !== 'orb';
+): characterId is 'peach' | 'daisy' {
+  return characterId === 'peach' || characterId === 'daisy';
 }

@@ -1,33 +1,38 @@
 /**
  * toyBlockTower.ts
- * 关卡：玩具积木塔（Toy Block Tower）
+ * 关卡：玩具积木塔（Toy Block Tower）v2
  *
- * 主题：桌面玩具世界 — 积木、书本、铅笔、橡皮
+ * 核心设计：玩具世界风格的《攀爬动物》——无存档，掉落归零，技术积累
+ *
  * 规格：
- *   - 26 个平台（≤ 30）
- *   - 纯 Box 几何，无任何 GLB / FBX 模型
- *   - 3 个安全存档点（每 6~8 步一个）
- *   - 全程经过可达性验证（最大跳高 ≈1.84m，步行最大水平距离 ≈4.5m）
+ *   - 29 个平台（start + 27 + goal）
+ *   - 目标高度 ~32m（较 v1 的 24m 提升 35%）
+ *   - 无存档点，任意掉落重置到起点
  *
- * 路径概要（每段行进方向交替，整体螺旋向上）：
- *   出发 → 段1（向+X+Z 方向爬升）→ 存档点A
- *       → 段2（向-X+Z 方向折返）  → 存档点B
- *       → 段3（向-X-Z 方向爬升）  → 存档点C
- *       → 段4（向+X-Z 折返最终）  → 终点
+ * 难度分区（越高越难）：
+ *   Zone 1 "初学者坡道" (0-7m):   平台 2-2.5m，间距适中，1个移动平台
+ *   Zone 2 "窄道"       (7-14m):  平台 1.5-1.8m，1个快速移动+1个不稳定
+ *   Zone 3 "移动迷宫"   (14-21m): 2个快速移动平台，1个不稳定，宽平台缓冲
+ *   Zone 4 "高空挑战"   (21-27m): 极窄(1.4m)，超快移动(≤2.0s)，极快不稳定(≤220ms)
+ *   Zone 5 "最终冲顶"   (27-32m): 最小平台+最快机制，需精准时机
+ *
+ * 可达性参数：
+ *   MAX_JUMP_HEIGHT ≈ 1.84m | MAX_JUMP_DIST_WALK ≈ 4.5m
+ *   设计约束：Δtop ≤ 1.4m | 边缘间距 ≤ 3.5m
  */
 
 import type { ClimberLevelDefinition } from '../types';
 
-// ─── 平台顶面高度快速参考（中心 y + 高度/2）────────────────────────────────────
-//   start:       top = 0 + 0.4 = 0.4
-//   p01..p05:    顶面每步 +0.8 ~ +1.0
-//   cp_a:        存档点，顶面更宽（高度 0.8）
-//   ...以此类推
+// ─── 平台顶面高度快速参考 ─────────────────────────────────────────────────────
+//   start:   top=0.4    Zone1: 1.25→7.0   Zone2: 8.15→13.65
+//   Zone3:   14.75→21.3  Zone4: 21.85→26.55  Zone5: 27.75→32.5
 
 export const TOY_BLOCK_TOWER_LEVEL: ClimberLevelDefinition = {
   id: 'toy-block-tower',
   name: '玩具积木塔',
-  description: '积木、书本、铅笔搭建的桌面玩具世界。26 块平台，螺旋向上，纯白盒，无模型加载。',
+  description:
+    '积木搭建的玩具高塔。32m 登顶，无存档，掉落归零。' +
+    '越往上越难——窄台、快速移动平台、瞬间坠落的不稳定积木，考验你的耐心与精准。',
 
   startPosition: [0, 1.2, 0],
   cameraOffset: [0, 5.5, 11],
@@ -41,28 +46,16 @@ export const TOY_BLOCK_TOWER_LEVEL: ClimberLevelDefinition = {
   },
 
   designRules: {
-    minPlayableSurfaceSize: 1.8,
+    minPlayableSurfaceSize: 1.4,
     smallPieceClusterRadius: 2.5,
     maxNearbySmallPieces: 2,
     minJumpHeadroom: 1.0,
   },
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // 平台数据（按路径顺序）
-  //
-  // 可达性关键参数（步行）：
-  //   PLAYER_PHYSICS.gravity     = 21
-  //   PLAYER_PHYSICS.jumpVelocity = 8.8
-  //   MAX_JUMP_HEIGHT            ≈ 1.84 m
-  //   MAX_JUMP_DISTANCE_WALK     ≈ 4.53 m（同高）
-  //
-  // 每步设计约束：
-  //   高差（platform top 差）≤ 1.5 m（含余量）
-  //   边缘水平距离（center-to-center - 两半宽之和）≤ 3.8 m
-  // ──────────────────────────────────────────────────────────────────────────
   platforms: [
-    // ── 出发大块（黄色积木地基）─────────────────────────────────────────────
-    // top = 0 + 0.4 = 0.4
+    // ──────────────────────────────────────────────────────────────────────
+    // 出发大块（宽 8m，给玩家足够起跳空间）
+    // ──────────────────────────────────────────────────────────────────────
     {
       id: 'start',
       size: [8, 0.8, 8],
@@ -70,205 +63,156 @@ export const TOY_BLOCK_TOWER_LEVEL: ClimberLevelDefinition = {
       color: '#F6D365',
     },
 
-    // ── 段 1：向 +X / +Z 爬升，~6 步到存档点 A ──────────────────────────────
-    // p01: top=1.45  Δtop=+1.05  hDist(center)=4.0  → 边缘≈4.0-1.5-1.25=1.25m ✓
-    {
-      id: 'p01',
-      size: [3, 0.5, 2.5],
-      position: [4, 1.2, 0],
-      color: '#EF4444', // 红色积木
-    },
-    // p02: top=2.25  Δtop=+0.8   hDist=3.6  边缘≈3.6-1.25-1.25=1.1m ✓
-    {
-      id: 'p02',
-      size: [2.5, 0.5, 2.5],
-      position: [7, 2.0, 1.5],
-      color: '#3B82F6', // 蓝色书本
-    },
-    // p03: top=3.05  Δtop=+0.8   hDist≈3.2
+    // ══════════════════════════════════════════════════════════════════════
+    // Zone 1 "初学者坡道"  0→7m  宽台热身，1个慢速移动平台
+    // ══════════════════════════════════════════════════════════════════════
+
+    { id: 'p01', size: [3, 0.5, 3], position: [6, 1.0, 1], color: '#EF4444' },
+    { id: 'p02', size: [2.5, 0.5, 2.5], position: [9, 2.1, 3.5], color: '#3B82F6' },
+    // 移动平台：慢速 period=4.0s，振幅小 ±1.2
     {
       id: 'p03',
-      size: [2.5, 0.5, 2],
-      position: [9, 2.8, 3.5],
-      color: '#22C55E', // 绿色橡皮
-      moving: { axis: 'x', amplitude: 1.2, period: 3.0, phaseOffset: 0 },
-    },
-    // p04: top=3.75  Δtop=+0.7   hDist≈2.7
-    {
-      id: 'p04',
-      size: [2, 0.5, 2.5],
-      position: [10, 3.5, 6],
-      color: '#FBBF24', // 黄色积木
-    },
-    // p05: top=4.45  Δtop=+0.7   hDist≈2.7
-    {
-      id: 'p05',
-      size: [2.5, 0.5, 2],
-      position: [9.5, 4.2, 8.5],
-      color: '#F97316', // 橙色积木
-    },
-
-    // ── 存档点 A（蓝色宽书本）──────────────────────────────────────────────
-    // top=5.9  Δtop=+1.45  hDist≈2.95  边缘≈2.95-1.25-2.0=−0.3m（重叠）✓
-    {
-      id: 'cp_a',
-      size: [4, 0.8, 4],
-      position: [8, 5.5, 11],
-      color: '#60A5FA',
-      isCheckpoint: true,
-    },
-
-    // ── 段 2：向 -X / +Z 折返，~6 步到存档点 B ──────────────────────────────
-    // p07: top=6.75  Δtop=+0.85  hDist≈2.8
-    {
-      id: 'p07',
-      size: [2.5, 0.5, 2],
-      position: [6, 6.5, 13],
-      color: '#A855F7', // 紫色积木
-    },
-    // p08: top=7.75  Δtop=+1.0   hDist≈2.7
-    {
-      id: 'p08',
       size: [2.5, 0.5, 2.5],
-      position: [4, 7.5, 14.5],
-      color: '#EF4444',
+      position: [10.5, 3.2, 6.5],
+      color: '#22C55E',
+      moving: { axis: 'x', amplitude: 1.2, period: 4.0, phaseOffset: 0 },
     },
-    // p09: top=8.75  Δtop=+1.0   hDist≈2.8
+    { id: 'p04', size: [3, 0.5, 2.5], position: [9.5, 4.2, 9.5], color: '#FBBF24' },
+    { id: 'p05', size: [2.5, 0.5, 3], position: [7.5, 5.3, 12], color: '#F97316' },
+    // Zone1 末尾宽平台，喘息
+    { id: 'wide_a', size: [4.5, 0.8, 4.5], position: [6, 6.6, 14.5], color: '#818CF8' },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Zone 2 "窄道入门"  7→14m  平台 2m 左右，1个中速移动，1个不稳定（宽容时间长）
+    // ══════════════════════════════════════════════════════════════════════
+
+    { id: 'p07', size: [2.5, 0.5, 3], position: [3.5, 7.9, 17], color: '#A855F7' },
+    { id: 'p08', size: [2, 0.5, 2], position: [1, 9.0, 18.5], color: '#EF4444' },
+    // 移动平台：period=3.2s，振幅 ±1.8（可观察节拍再跳）
     {
       id: 'p09',
-      size: [2.5, 0.5, 2],
-      position: [2, 8.5, 13],
-      color: '#3B82F6',
-      moving: { axis: 'z', amplitude: 1.4, period: 2.6, phaseOffset: 1.0 },
+      size: [3, 0.5, 2],
+      position: [-1.5, 10.1, 17],
+      color: '#14B8A6',
+      moving: { axis: 'z', amplitude: 1.8, period: 3.2, phaseOffset: 1.0 },
     },
-    // p10: top=9.75  Δtop=+1.0   hDist≈2.8
+    { id: 'p10', size: [2, 0.5, 2], position: [-4, 11.2, 14.5], color: '#EC4899' },
+    { id: 'p11', size: [2.5, 0.5, 2.5], position: [-5.5, 12.3, 12], color: '#22C55E' },
+    // 不稳定：shakeDelay=900ms（给玩家1秒缓冲），fallSpeed=4（下落慢）
     {
-      id: 'p10',
-      size: [2, 0.5, 2.5],
-      position: [0, 9.5, 11],
-      color: '#22C55E',
-      unstable: { shakeDelay: 500, shakeDuration: 1000, fallSpeed: 5, resetDelay: 2200 },
-    },
-    // p11: top=10.75  Δtop=+1.0  hDist≈2.7
-    {
-      id: 'p11',
-      size: [2.5, 0.5, 2],
-      position: [-1.5, 10.5, 9],
-      color: '#FBBF24',
-    },
-
-    // ── 存档点 B（绿色宽积木）──────────────────────────────────────────────
-    // 修正：top=11.9  Δtop=+1.15  hDist≈2.55 ✓
-    {
-      id: 'cp_b',
-      size: [4, 0.8, 4],
-      position: [-2, 11.5, 6.5],
-      color: '#60A5FA',
-      isCheckpoint: true,
-    },
-
-    // ── 段 3：向 -X / -Z 爬升，~6 步到存档点 C ──────────────────────────────
-    // p13: top=12.75  Δtop=+0.85  hDist≈2.7
-    {
-      id: 'p13',
-      size: [2.5, 0.5, 2],
-      position: [-1, 12.5, 4],
+      id: 'p12',
+      size: [2, 0.5, 2],
+      position: [-6.5, 13.4, 9.5],
       color: '#F97316',
+      unstable: { shakeDelay: 900, shakeDuration: 800, fallSpeed: 4, resetDelay: 2500 },
     },
-    // p14: top=13.75  Δtop=+1.0   hDist≈2.8
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Zone 3 "移动练习"  14→21m  2个移动平台（中速），1个不稳定，宽台缓冲
+    // ══════════════════════════════════════════════════════════════════════
+
+    { id: 'p13', size: [2.5, 0.5, 2.5], position: [-6, 14.5, 7], color: '#A855F7' },
+    // 移动：period=3.0s，振幅 ±2.0
     {
       id: 'p14',
-      size: [2.5, 0.5, 2.5],
-      position: [1, 13.5, 2],
-      color: '#EC4899', // 粉色橡皮
+      size: [2, 0.5, 2],
+      position: [-4, 15.6, 5],
+      color: '#EF4444',
+      moving: { axis: 'x', amplitude: 2.0, period: 3.0, phaseOffset: 0.5 },
     },
-
-    // p15: top=14.75  Δtop=+1.0   hDist≈2.8
+    // 移动：period=2.8s，振幅 ±1.6
     {
       id: 'p15',
-      size: [2.5, 0.5, 2],
-      position: [3, 14.5, 0],
-      color: '#14B8A6', // 青色积木
-      moving: { axis: 'x', amplitude: 1.5, period: 3.4, phaseOffset: 2.1 },
+      size: [2, 0.5, 2],
+      position: [-2, 16.7, 3],
+      color: '#60A5FA',
+      moving: { axis: 'z', amplitude: 1.6, period: 2.8, phaseOffset: 2.0 },
     },
-    // p16: top=15.75  Δtop=+1.0   hDist≈2.7
+    // Zone3 宽台喘息
+    { id: 'wide_b', size: [4, 0.8, 4], position: [-0.5, 17.9, 1], color: '#34D399' },
+    // 不稳定：shakeDelay=700ms，fallSpeed=5
     {
       id: 'p16',
       size: [2, 0.5, 2.5],
-      position: [4.5, 15.5, -2],
-      color: '#EF4444',
+      position: [1.5, 19.3, -1.5],
+      color: '#FB923C',
+      unstable: { shakeDelay: 700, shakeDuration: 800, fallSpeed: 5, resetDelay: 2200 },
     },
-    // p17: top=16.75  Δtop=+1.0   hDist≈2.5
-    {
-      id: 'p17',
-      size: [2.5, 0.5, 2],
-      position: [5, 16.5, -4.5],
-      color: '#3B82F6',
-    },
+    { id: 'p17', size: [2.5, 0.5, 2.5], position: [3, 20.4, -3.5], color: '#FBBF24' },
 
-    // ── 存档点 C（黄色宽积木）──────────────────────────────────────────────
-    // 修正：top=17.9  Δtop=+1.15  hDist≈2.7 ✓
-    {
-      id: 'cp_c',
-      size: [4, 0.8, 4],
-      position: [4, 17.5, -7],
-      color: '#60A5FA',
-      isCheckpoint: true,
-    },
+    // ══════════════════════════════════════════════════════════════════════
+    // Zone 4 "高空挑战"  21→27m  平台 1.8m，移动加速，不稳定变快
+    // ══════════════════════════════════════════════════════════════════════
 
-    // ── 段 4：向 +X / -Z 折返冲顶，~6 步到终点 ──────────────────────────────
-    // p19: top=18.75  Δtop=+0.85  hDist≈2.9
+    { id: 'p18', size: [2, 0.5, 3.5], position: [1.5, 21.6, -6], color: '#C084FC' },
+    // 移动：period=2.6s，振幅 ±2.5
     {
       id: 'p19',
-      size: [2.5, 0.5, 2],
-      position: [2.5, 18.5, -9.5],
-      color: '#22C55E',
+      size: [2, 0.5, 2],
+      position: [-0.5, 22.8, -8.5],
+      color: '#3B82F6',
+      moving: { axis: 'x', amplitude: 2.5, period: 2.6, phaseOffset: 0 },
     },
-    // p20: top=19.75  Δtop=+1.0   hDist≈2.8
+    // 不稳定：shakeDelay=500ms，fallSpeed=6
     {
       id: 'p20',
-      size: [2.5, 0.5, 2.5],
-      position: [0.5, 19.5, -11.5],
-      color: '#FBBF24',
+      size: [1.8, 0.5, 1.8],
+      position: [-2.5, 24.0, -10.5],
+      color: '#F472B6',
+      unstable: { shakeDelay: 500, shakeDuration: 700, fallSpeed: 6, resetDelay: 2000 },
     },
-    // p21: top=20.75  Δtop=+1.0   hDist≈2.8
+    // 移动：period=2.4s，振幅 ±2.0
     {
       id: 'p21',
-      size: [2.5, 0.5, 2],
-      position: [-1.5, 20.5, -13],
+      size: [1.8, 0.5, 2],
+      position: [-1, 25.2, -12.5],
       color: '#F97316',
-      unstable: { shakeDelay: 400, shakeDuration: 900, fallSpeed: 6, resetDelay: 2000 },
+      moving: { axis: 'z', amplitude: 2.0, period: 2.4, phaseOffset: 1.2 },
     },
-    // p22: top=21.75  Δtop=+1.0   hDist≈3.0
-    {
-      id: 'p22',
-      size: [2, 0.5, 2.5],
-      position: [-3, 21.5, -11],
-      color: '#A855F7',
-      moving: { axis: 'z', amplitude: 1.3, period: 2.2, phaseOffset: 3.5 },
-    },
-    // p23: top=22.75  Δtop=+1.0   hDist≈2.3
+    { id: 'p22', size: [2.5, 0.5, 2.5], position: [1, 26.3, -10.5], color: '#22C55E' },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Zone 5 "最终冲顶"  27→32m  移动+不稳定组合，节奏感强但有规律可循
+    // ══════════════════════════════════════════════════════════════════════
+
+    // 不稳定：shakeDelay=600ms，fallSpeed=6
     {
       id: 'p23',
-      size: [2.5, 0.5, 2],
-      position: [-4, 22.5, -9],
-      color: '#EC4899',
-      unstable: { shakeDelay: 350, shakeDuration: 800, fallSpeed: 7, resetDelay: 1800 },
+      size: [2, 0.5, 2],
+      position: [2.5, 27.5, -8],
+      color: '#EF4444',
+      unstable: { shakeDelay: 600, shakeDuration: 700, fallSpeed: 6, resetDelay: 2000 },
     },
-    // p24: top=23.75  Δtop=+1.0   hDist=2.5
+    // 移动：period=2.5s，振幅 ±2.0
     {
       id: 'p24',
-      size: [2.5, 0.5, 2],
-      position: [-4, 23.5, -6.5],
-      color: '#14B8A6',
+      size: [2, 0.5, 2],
+      position: [4, 28.7, -10],
+      color: '#60A5FA',
+      moving: { axis: 'x', amplitude: 2.0, period: 2.5, phaseOffset: 0.8 },
+    },
+    // 不稳定：shakeDelay=500ms，fallSpeed=7
+    {
+      id: 'p25',
+      size: [2, 0.5, 2],
+      position: [2, 29.7, -12],
+      color: '#C084FC',
+      unstable: { shakeDelay: 500, shakeDuration: 650, fallSpeed: 7, resetDelay: 2000 },
+    },
+    // 移动：period=2.2s，振幅 ±2.0
+    {
+      id: 'p26',
+      size: [1.8, 0.5, 1.8],
+      position: [0.5, 30.9, -10],
+      color: '#FBBF24',
+      moving: { axis: 'z', amplitude: 2.0, period: 2.2, phaseOffset: 2.5 },
     },
 
-    // ── 终点（金色奖章台）──────────────────────────────────────────────────
-    // top=24.9  Δtop=+1.15  hDist≈2.7 ✓
+    // ── 终点（金色宽台面）── 5×5，历经磨难终于登顶！
     {
       id: 'goal',
-      size: [3.5, 0.8, 3.5],
-      position: [-3, 24.5, -4],
+      size: [5, 0.8, 5],
+      position: [-2, 32.1, -8],
       color: '#FCD34D',
       isGoal: true,
     },
