@@ -61,6 +61,7 @@ function rememberVisualOrigin(object: Object3D): void {
     bumpOriginX: object.position.x,
     bumpOriginY: object.position.y,
     bumpOriginZ: object.position.z,
+    bumpOriginRotationX: object.rotation.x,
     bumpOriginRotationY: object.rotation.y,
     bumpOriginRotationZ: object.rotation.z,
     bumpOriginScaleX: object.scale.x,

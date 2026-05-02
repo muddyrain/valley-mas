@@ -60,6 +60,30 @@
 | `assets/models/platforms/toy_castle_gear_disc.glb` | `toy_castle_gear_disc` | 城堡齿轮旋转圆盘，含圆盘主体、齿牙和中心帽 | 旋转平台、精准落点 |
 | `assets/models/platforms/toy_castle_drawbridge.glb` | `toy_castle_drawbridge` | 城堡吊桥踏板，含长木板、边条、横档和铆钉 | 窄桥、移动平台、节奏跳 |
 | `assets/models/platforms/toy_castle_tower_cap.glb` | `toy_castle_tower_cap` | 城堡塔顶圆台，含圆形塔身、垛口和中心标记 | 圆形落点、高空过渡 |
+| `assets/models/platforms/toy_barn_cookie_stack.glb` | `toy_barn_cookie_stack` | 谷仓夹心饼干叠平台，含威化层、奶油层、糖霜和巧克力碎 | 大平台、接落层、缓冲台 |
+| `assets/models/platforms/toy_barn_abc_block_pile.glb` | `toy_barn_abc_block_pile` | 谷仓 ABC 积木堆平台，含错位彩色方块和字母符号 | 堆叠阶梯、回爬路线 |
+| `assets/models/platforms/toy_barn_pudding_cup.glb` | `toy_barn_pudding_cup` | 谷仓布丁杯圆形落点，含杯身、奶油顶、装饰樱桃和环形条纹 | 圆形精准落点 |
+| `assets/models/platforms/toy_barn_button_cushion.glb` | `toy_barn_button_cushion` | 谷仓软垫按钮平台，含软垫面、十字缝线和按钮装饰 | 喘息台、接落层 |
+| `assets/models/platforms/toy_barn_picnic_basket.glb` | `toy_barn_picnic_basket` | 谷仓野餐篮平台，含篮筐主体、格纹餐布和提手 | 主路径平台、接落层 |
+| `assets/models/platforms/toy_barn_yarn_ball.glb` | `toy_barn_yarn_ball` | 谷仓毛线球圆形落点，含扁圆毛线主体、绕线和贴布 | 圆形精准落点 |
+| `assets/models/platforms/toy_barn_xylophone_bridge.glb` | `toy_barn_xylophone_bridge` | 谷仓木琴踏板桥，含彩色琴键、木轨和固定钉 | 窄桥、节奏跳 |
+| `assets/models/platforms/toy_barn_seesaw_board.glb` | `toy_barn_seesaw_board` | 谷仓弹簧跷跷板机关，含长板、软胶端块、中心弹簧轴和底座 | 摇晃/不稳定平台、第一批动态机关 |
+| `assets/models/platforms/toy_castle_book_stack.glb` | `toy_castle_book_stack` | 城堡童话书叠平台，含多层书本、页边和书签带 | 城堡大平台、侧向接落层 |
+| `assets/models/platforms/toy_castle_coin_stack.glb` | `toy_castle_coin_stack` | 城堡金币叠圆形落点，含多层金币、顶部印记和错位堆叠 | 圆形精准落点、塔顶过渡 |
+| `assets/models/platforms/toy_castle_key_bridge.glb` | `toy_castle_key_bridge` | 城堡金钥匙踏板，含钥匙柄、钥匙齿、边线和蓝色宝石 | 窄桥、移动平台、回爬路线 |
+| `assets/models/platforms/toy_castle_crown_platform.glb` | `toy_castle_crown_platform` | 城堡皇冠终点平台，含皇冠齿、彩色宝石和圆形奖台 | 终点台、终局高亮平台 |
+| `assets/models/platforms/toy_castle_shield_tile.glb` | `toy_castle_shield_tile` | 城堡盾牌纹章平台，含金属底、蓝色盾面、十字纹章和铆钉 | 城堡主路径、喘息台 |
+| `assets/models/platforms/toy_castle_hourglass_tower.glb` | `toy_castle_hourglass_tower` | 城堡沙漏塔圆形落点，含玻璃筒、金色边框和沙粒层 | 圆形精准落点、高空过渡 |
+| `assets/models/platforms/toy_castle_ribbon_bridge.glb` | `toy_castle_ribbon_bridge` | 城堡缎带踏板桥，含紫色缎带、金色压片和边线 | 窄桥、移动平台、回爬路线 |
+| `assets/models/platforms/toy_castle_treasure_chest.glb` | `toy_castle_treasure_chest` | 城堡宝箱平台，含圆弧箱盖、金属包边、锁扣和宝石 | 城堡大平台、接落层 |
+| `assets/models/platforms/toy_castle_extendable_ruler_bridge.glb` | `toy_castle_extendable_ruler_bridge` | 城堡伸缩尺玩具桥，含双层滑尺、刻度、端部宝石和可缩放实体桥面 | 伸缩桥、计时平台 |
+| `assets/models/platforms/toy_castle_tilt_balance_board.glb` | `toy_castle_tilt_balance_board` | 城堡半球底座倾斜板，含紫色平衡板、软垫顶面、半球底座和中心帽 | 倾斜平台、重心控制挑战 |
+| `assets/models/platforms/toy_blink_acrylic_panel.glb` | `toy_blink_acrylic_panel` | 发光亚克力忽隐忽现板，含透明蓝主体、实体边框、中心芯板和灯点 | 忽隐忽现平台、节奏记忆 |
+| `assets/models/platforms/toy_conveyor_track_belt.glb` | `toy_conveyor_track_belt` | 玩具履带传送带平台，含蓝色框架、黑色履带、滚轮和方向箭头 | 传送带平台、反向平衡 |
+| `assets/models/platforms/toy_plastic_ice_block.glb` | `toy_plastic_ice_block` | 透明塑料冰块平台，含蓝色冰体、加厚顶面和低矮高光 | 冰面平台、低摩擦滑行 |
+| `assets/models/platforms/toy_gummy_sticky_pad.glb` | `toy_gummy_sticky_pad` | 软糖粘性平台，含粉色软糖主体、椭圆顶面和糖霜贴片 | 粘性平台、低速低跳挑战 |
+| `assets/models/platforms/toy_cloud_bounce_pad.glb` | `toy_cloud_bounce_pad` | 玩具云朵小弹跳垫，含多段云朵垫面、蓝色底座和短弹簧 | 小弹跳垫、温和补高 |
+| `assets/models/platforms/toy_cracked_puzzle_crumble.glb` | `toy_cracked_puzzle_crumble` | 裂纹拼图崩塌平台，含双色拼图块、圆形拼接头和低矮裂纹 | 崩塌平台、倒计时落点 |
 
 生成命令：`pnpm --filter @valley/toy-climb-arena generate:platform-assets`。
 
