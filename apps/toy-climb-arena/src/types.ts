@@ -74,11 +74,67 @@ export interface ClimberCharacterOption {
   description: string;
 }
 
+export type ToyPlatformKind =
+  | 'square_plate'
+  | 'round_disc'
+  | 'narrow_plank'
+  | 'irregular_fragment'
+  | 'stacked_steps'
+  | 'wobble_board'
+  | 'moving_lift'
+  | 'rotating_gear'
+  | 'extendable_bridge'
+  | 'tilting_board'
+  | 'blink_panel'
+  | 'trampoline'
+  | 'bounce_pad'
+  | 'conveyor_belt'
+  | 'ice_block'
+  | 'sticky_pad'
+  | 'crumble_tile'
+  | 'climb_wall'
+  | 'swing_rope'
+  | 'ladder'
+  | 'balance_pole'
+  | 'goal_crown';
+
+export type ToyPlatformThemeZone = 'barn' | 'castle' | 'sky_island' | 'olympus' | 'workshop';
+
+export type ToyPlatformDifficultyTier = 'tutorial' | 'easy' | 'medium' | 'hard' | 'finale';
+
+export type ToyPlatformMechanicTag =
+  | 'static'
+  | 'precision'
+  | 'narrow'
+  | 'unstable'
+  | 'moving'
+  | 'rotating'
+  | 'timing'
+  | 'bounce'
+  | 'conveyor'
+  | 'slippery'
+  | 'sticky'
+  | 'crumble'
+  | 'vertical'
+  | 'swing'
+  | 'goal'
+  | 'rest';
+
+export interface ToyPlatformProfile {
+  kind: ToyPlatformKind;
+  themeZone?: ToyPlatformThemeZone;
+  difficultyTier?: ToyPlatformDifficultyTier;
+  mechanicTags?: ToyPlatformMechanicTag[];
+  visualVariant?: string;
+}
+
 export interface ClimberPlatformDefinition {
   id: string;
   size: [number, number, number];
   position: [number, number, number];
   color: string;
+  /** 玩具风重制的平台语义，用于统一模型、机关、音效和区域难度。 */
+  toyProfile?: ToyPlatformProfile;
   /** 标记为安全存档点，接地时自动更新重生位置 */
   isCheckpoint?: boolean;
   /** 标记为终点平台 */

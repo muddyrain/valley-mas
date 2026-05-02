@@ -32,7 +32,6 @@ export function ClimberArcadeExperience(_props: ClimberArcadeExperienceProps) {
   const [charIdx, setCharIdx] = useState(0);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
-  const activeCharId = (charOptions[charIdx]?.id ?? 'woodendoll') as ClimberCharacterId;
 
   const toggleFullscreen = useCallback(async () => {
     const host = shellRef.current;
@@ -74,6 +73,13 @@ export function ClimberArcadeExperience(_props: ClimberArcadeExperienceProps) {
     const shell = shellRef.current;
     const level = CLIMBER_LEVELS[0];
     if (!shell || !level) return;
+    const debugParams = new URLSearchParams(window.location.search);
+    const debugCharacterId = debugParams.get('character') as ClimberCharacterId | null;
+    const debugCharIdx = debugCharacterId
+      ? charOptions.findIndex((option) => option.id === debugCharacterId)
+      : -1;
+    const resolvedCharIdx = debugCharIdx >= 0 ? debugCharIdx : charIdx;
+    const resolvedCharId = (charOptions[resolvedCharIdx]?.id ?? 'woodendoll') as ClimberCharacterId;
 
     const hud = new GameHUD(
       {
@@ -97,7 +103,7 @@ export function ClimberArcadeExperience(_props: ClimberArcadeExperienceProps) {
       },
       { audioEnabled },
     );
-    hud.setCharOptions(charOptions, charIdx);
+    hud.setCharOptions(charOptions, resolvedCharIdx);
     hud.setFullscreen(fullscreen);
     shell.appendChild(hud.canvas);
     hudRef.current = hud;
@@ -105,8 +111,12 @@ export function ClimberArcadeExperience(_props: ClimberArcadeExperienceProps) {
     const controller = createClimberPrototype({
       mount: shell,
       level,
-      characterId: activeCharId,
+      characterId: resolvedCharId,
       audioEnabled,
+      debugCollidersVisible: debugParams.has('debugColliders'),
+      debugInstanceLabelsVisible: debugParams.has('debugLabels'),
+      debugPlayerStateVisible: debugParams.has('debugPlayerState'),
+      debugStartPlatformId: debugParams.get('debugStartPlatform'),
       onStats: (s) => hud.updateStats(s),
       onPointerLockChange: (locked) => {
         hud.setPointerLocked(locked);

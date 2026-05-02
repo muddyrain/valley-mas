@@ -1,6 +1,6 @@
 import { Quaternion, Vector3, type Vector3 as Vector3Type } from 'three';
 
-export type PlatformColliderShape = 'box' | 'ramp';
+export type PlatformColliderShape = 'box' | 'ramp' | 'cylinder';
 
 interface ColliderPlane {
   nx: number;
@@ -47,6 +47,7 @@ const LOCAL_Z = new Vector3(0, 0, 1);
 const STEP_ASSIST_MAX_HEIGHT = 0.62;
 const STEP_ASSIST_MIN_HEIGHT = 0.03;
 const RAMP_TOP_FLAT_RATIO = 0.36;
+const CYLINDER_BOUNDS_SEGMENTS = 16;
 
 function safeSize(value: number): number {
   return Math.max(0.001, Math.abs(value));
@@ -118,6 +119,13 @@ function computeWorldBounds(params: {
       new Vector3(-halfX, halfY, topFlatEndZ),
       new Vector3(halfX, halfY, topFlatEndZ),
     );
+  } else if (shape === 'cylinder') {
+    for (let segment = 0; segment < CYLINDER_BOUNDS_SEGMENTS; segment += 1) {
+      const angle = (Math.PI * 2 * segment) / CYLINDER_BOUNDS_SEGMENTS;
+      const x = Math.cos(angle) * halfX;
+      const z = Math.sin(angle) * halfZ;
+      vertices.push(new Vector3(x, -halfY, z), new Vector3(x, halfY, z));
+    }
   } else {
     for (const sx of [-1, 1]) {
       for (const sy of [-1, 1]) {
@@ -193,6 +201,83 @@ function pointInsideExpandedCollider(
   };
 }
 
+function isLocalPointInsideCylinderFootprint(params: {
+  x: number;
+  z: number;
+  halfX: number;
+  halfZ: number;
+  padding?: number;
+}): boolean {
+  const { x, z, halfX, halfZ, padding = 0 } = params;
+  const radiusX = Math.max(0.001, halfX + padding);
+  const radiusZ = Math.max(0.001, halfZ + padding);
+  return (x * x) / (radiusX * radiusX) + (z * z) / (radiusZ * radiusZ) <= 1;
+}
+
+function resolveCylinderOverlap(
+  collider: PlatformCollisionData,
+  localPoint: Vector3,
+  radius: number,
+): { collided: boolean; localCorrection: Vector3; localNormal: Vector3 } {
+  const halfX = collider.size[0] * 0.5;
+  const halfY = collider.size[1] * 0.5;
+  const halfZ = collider.size[2] * 0.5;
+  const expandedX = Math.max(0.001, halfX + radius);
+  const expandedY = halfY + radius;
+  const expandedZ = Math.max(0.001, halfZ + radius);
+  const yAbs = Math.abs(localPoint.y);
+  const radial =
+    (localPoint.x * localPoint.x) / (expandedX * expandedX) +
+    (localPoint.z * localPoint.z) / (expandedZ * expandedZ);
+
+  if (yAbs > expandedY || radial > 1) {
+    return {
+      collided: false,
+      localCorrection: CORRECTION.set(0, 0, 0),
+      localNormal: LOCAL_NORMAL.set(0, 1, 0),
+    };
+  }
+
+  const topPenetration = expandedY - localPoint.y;
+  const bottomPenetration = expandedY + localPoint.y;
+  const radialDistance = Math.sqrt(Math.max(0, radial));
+  const radialPenetration = (1 - radialDistance) * Math.min(expandedX, expandedZ);
+  const epsilon = 0.001;
+
+  if (topPenetration <= bottomPenetration && topPenetration <= radialPenetration) {
+    return {
+      collided: true,
+      localCorrection: CORRECTION.set(0, topPenetration + epsilon, 0),
+      localNormal: LOCAL_NORMAL.set(0, 1, 0),
+    };
+  }
+
+  if (bottomPenetration <= radialPenetration) {
+    return {
+      collided: true,
+      localCorrection: CORRECTION.set(0, -(bottomPenetration + epsilon), 0),
+      localNormal: LOCAL_NORMAL.set(0, -1, 0),
+    };
+  }
+
+  LOCAL_NORMAL.set(
+    localPoint.x / (expandedX * expandedX),
+    0,
+    localPoint.z / (expandedZ * expandedZ),
+  );
+  if (LOCAL_NORMAL.lengthSq() < 0.000001) {
+    LOCAL_NORMAL.set(1, 0, 0);
+  } else {
+    LOCAL_NORMAL.normalize();
+  }
+
+  return {
+    collided: true,
+    localCorrection: CORRECTION.copy(LOCAL_NORMAL).multiplyScalar(radialPenetration + epsilon),
+    localNormal: LOCAL_NORMAL,
+  };
+}
+
 function solveLandingHeightOnFace(params: {
   collider: PlatformCollisionData;
   plane: ColliderPlane;
@@ -245,6 +330,29 @@ function findHighestWalkableSurfaceAt(
   worldX: number,
   worldZ: number,
 ): number | null {
+  if (collider.shape === 'cylinder') {
+    INVERSE_ROTATION.set(
+      collider.inverseRotation[0],
+      collider.inverseRotation[1],
+      collider.inverseRotation[2],
+      collider.inverseRotation[3],
+    );
+    LOCAL_POINT.set(worldX - collider.center[0], 0, worldZ - collider.center[2]).applyQuaternion(
+      INVERSE_ROTATION,
+    );
+    if (
+      !isLocalPointInsideCylinderFootprint({
+        x: LOCAL_POINT.x,
+        z: LOCAL_POINT.z,
+        halfX: collider.size[0] * 0.5,
+        halfZ: collider.size[2] * 0.5,
+      })
+    ) {
+      return null;
+    }
+    return collider.maxY;
+  }
+
   let topY = Number.NEGATIVE_INFINITY;
   ROTATION.set(
     collider.rotation[0],
@@ -301,6 +409,10 @@ function isSphereIntersectingCollider(
     centerZ - collider.center[2],
   ).applyQuaternion(INVERSE_ROTATION);
 
+  if (collider.shape === 'cylinder') {
+    return resolveCylinderOverlap(collider, LOCAL_POINT, radius).collided;
+  }
+
   return pointInsideExpandedCollider(collider, LOCAL_POINT, radius).collided;
 }
 
@@ -330,6 +442,18 @@ export function appendBoxCollider(
     debugMeta?: PlatformCollisionDebugMeta;
   },
 ): PlatformCollisionData {
+  const collider = createColliderData(params);
+  colliders.push(collider);
+  return collider;
+}
+
+function createColliderData(params: {
+  center: [number, number, number];
+  size: [number, number, number];
+  rotation?: [number, number, number, number];
+  shape?: PlatformColliderShape;
+  debugMeta?: PlatformCollisionDebugMeta;
+}): PlatformCollisionData {
   const size: [number, number, number] = [
     safeSize(params.size[0]),
     safeSize(params.size[1]),
@@ -357,7 +481,7 @@ export function appendBoxCollider(
     halfZ,
   });
 
-  const collider: PlatformCollisionData = {
+  return {
     shape,
     center: [params.center[0], params.center[1], params.center[2]],
     size,
@@ -373,9 +497,34 @@ export function appendBoxCollider(
     planes,
     debugMeta: params.debugMeta,
   };
+}
 
-  colliders.push(collider);
-  return collider;
+export function syncColliderData(
+  collider: PlatformCollisionData,
+  params: {
+    center: [number, number, number];
+    size: [number, number, number];
+    rotation?: [number, number, number, number];
+    shape?: PlatformColliderShape;
+  },
+): void {
+  const next = createColliderData({
+    ...params,
+    debugMeta: collider.debugMeta,
+  });
+  collider.shape = next.shape;
+  collider.center = next.center;
+  collider.size = next.size;
+  collider.rotation = next.rotation;
+  collider.inverseRotation = next.inverseRotation;
+  collider.top = next.top;
+  collider.minX = next.minX;
+  collider.maxX = next.maxX;
+  collider.minY = next.minY;
+  collider.maxY = next.maxY;
+  collider.minZ = next.minZ;
+  collider.maxZ = next.maxZ;
+  collider.planes = next.planes;
 }
 
 export function tryLandOnTop(params: {
@@ -483,6 +632,38 @@ export function solveSolidCollisions(params: {
         playerPosition.y - collider.center[1],
         playerPosition.z - collider.center[2],
       ).applyQuaternion(INVERSE_ROTATION);
+
+      if (collider.shape === 'cylinder') {
+        const overlap = resolveCylinderOverlap(collider, LOCAL_POINT, playerRadius);
+        if (!overlap.collided) {
+          continue;
+        }
+
+        ROTATION.set(
+          collider.rotation[0],
+          collider.rotation[1],
+          collider.rotation[2],
+          collider.rotation[3],
+        );
+        CORRECTION.copy(overlap.localCorrection).applyQuaternion(ROTATION);
+        playerPosition.add(CORRECTION);
+        WORLD_NORMAL.copy(overlap.localNormal).applyQuaternion(ROTATION).normalize();
+
+        const normalDotVelocity =
+          velocity.x * WORLD_NORMAL.x + velocity.y * WORLD_NORMAL.y + velocity.z * WORLD_NORMAL.z;
+        if (normalDotVelocity < 0) {
+          velocity.x -= WORLD_NORMAL.x * normalDotVelocity;
+          velocity.y -= WORLD_NORMAL.y * normalDotVelocity;
+          velocity.z -= WORLD_NORMAL.z * normalDotVelocity;
+        }
+
+        if (WORLD_NORMAL.y > 0.45 && velocity.y <= 0.25) {
+          landed = true;
+          velocity.y = Math.max(velocity.y, 0);
+        }
+        corrected = true;
+        continue;
+      }
 
       const overlap = pointInsideExpandedCollider(collider, LOCAL_POINT, playerRadius);
       if (!overlap.collided) {

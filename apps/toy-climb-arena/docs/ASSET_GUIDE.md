@@ -31,6 +31,38 @@
 
 ## 场景 Setpieces（障碍物单元）
 
+### 运行时平台模型
+
+| 生成器 | 适用对象 | 描述 | 版权状态 |
+|---|---|---|---|
+| `src/prototype/toyPlatformVisuals.ts` | `level.platforms` | 原创程序化玩具平台模型：积木凸点、边框、拼接缝、机关标识、冰面高光、终点装饰 | 项目内部原创 |
+| `src/platformCatalog.ts` | `level.platforms[].toyProfile` | 平台资产与机制字典：类型、主题区域、难度层级、机制标签、视觉变体 | 项目内部原创 |
+| `src/platformModelAssets.ts` | `assets/models/platforms/*.glb` | 第一批可复用平台实体模型登记：S1 方形板、S2 圆盘、S3 窄踏板 | 项目内部原创 |
+| `src/prototype/platformModelRuntime.ts` | `level.platforms` | 按平台类型加载 GLB 实体模型，并从模型部件生成复合碰撞体，避免空气墙和穿模 | 项目内部原创 |
+
+> 当前主地图多数可攀爬平台来自 `level.platforms`，不是 GLB setpiece。GLB 平台会先使用原 `level.platforms` 盒体作为加载期 fallback，模型加载完成后切换到模型部件级复合碰撞体。
+
+### 平台实体模型（GLB）
+
+| 文件 | ID | 描述 | 推荐用途 |
+|---|---|---|---|
+| `assets/models/platforms/toy_square_plate_s1.glb` | `toy_square_plate_s1` | 谷仓玩具箱跳跃模块实体模型，含木箱侧板、稻草/软垫顶面、一体化边框和角钉 | 主路径平台、缓冲台 |
+| `assets/models/platforms/toy_round_disc_s2.glb` | `toy_round_disc_s2` | 圆形纽扣盘实体模型，含圆柱主体、环形边、中心帽和径向凸点 | 精准落点、圆盘过渡 |
+| `assets/models/platforms/toy_narrow_plank_s3.glb` | `toy_narrow_plank_s3` | 窄长踏板实体模型，含长条主体、护边、横档和节奏标记 | 连续窄桥、节奏跳 |
+| `assets/models/platforms/toy_barn_hay_bale.glb` | `toy_barn_hay_bale` | 草垛跳跃模块，含捆绳、稻草纹路和柔软顶面 | 谷仓热身主路径 |
+| `assets/models/platforms/toy_wood_crate_step.glb` | `toy_wood_crate_step` | 木箱阶梯跳跃模块，含双层箱体和木条边框 | 开局高度递进、喘息台 |
+| `assets/models/platforms/toy_barrel_round_top.glb` | `toy_barrel_round_top` | 木桶圆顶落点模块，含桶箍、圆顶和侧向板条 | 精准圆形落点 |
+| `assets/models/platforms/toy_rope_plank_bridge.glb` | `toy_rope_plank_bridge` | 绳索木桥踏板模块，含分段木板和两侧绳索 | 窄桥、移动平台、节奏跳 |
+| `assets/models/platforms/toy_broken_puzzle_piece.glb` | `toy_broken_puzzle_piece` | 破碎拼图落点模块，含错位碎片和中心安全色块 | 不规则碎片、崩塌平台 |
+| `assets/models/platforms/toy_crumble_cookie_tile.glb` | `toy_crumble_cookie_tile` | 酥饼碎裂倒计时平台，含饼干主体、警示裂纹和巧克力碎片 | 延迟下沉/消失平台 |
+| `assets/models/platforms/toy_trampoline_pad.glb` | `toy_trampoline_pad` | 弹力垫跳跃模块，含软垫面、框架和角部弹簧 | 蹦床、弱弹跳垫 |
+
+生成命令：`pnpm --filter @valley/toy-climb-arena generate:platform-assets`。
+
+> 说明：这批 GLB 是文件级实体资产，已经通过 `platformModelRuntime.ts` 接入 S1-S3 静态平台渲染。后续新增 S4+ 或动态机关 GLB 时，应继续走同一登记与加载路径。
+
+### GLB Setpieces
+
 | 文件 | ID | 描述 | 推荐使用阶段 |
 |---|---|---|---|
 | `assets/models/setpieces/stepping_stone.glb` | `stepping_stone` | 小型踏石 | 热身段 |

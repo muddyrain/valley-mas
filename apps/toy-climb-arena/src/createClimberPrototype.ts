@@ -22,6 +22,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  type Object3D,
   PerspectiveCamera,
   PlaneGeometry,
   Points,
@@ -36,17 +37,23 @@ import {
   WebGLRenderer,
 } from 'three';
 import { createCharacterRig } from './characterRig';
+import { resolveToyPlatformProfile } from './platformCatalog';
+import { resolveToyPlatformModelAsset } from './platformModelAssets';
 import { PlayerController, type PlayerInputSnapshot } from './player/PlayerController';
 import {
   appendBoxCollider,
+  type PlatformColliderShape,
   type PlatformCollisionData,
   type PlatformCollisionDebugMeta,
   solveSolidCollisions,
+  syncColliderData,
   tryLandOnTop,
 } from './prototype/collision';
 import { createGroundScene } from './prototype/groundScene';
 import { createParticleSystem } from './prototype/particleSystem';
+import { createPlatformModelRuntime } from './prototype/platformModelRuntime';
 import { createSetPieceRuntime } from './prototype/setPieceRuntime';
+import { createToyPlatformVisuals } from './prototype/toyPlatformVisuals';
 import { createPrototypeAudio } from './prototypeAudio';
 import type {
   ClimberCharacterAnimationDebugSnapshot,
@@ -72,6 +79,7 @@ interface CreateClimberPrototypeOptions {
   debugCharacterAnimationVisible?: boolean;
   characterAutoFootCalibrationEnabled?: boolean;
   debugColliderFocusAssetId?: ClimberSetPieceAssetId | null;
+  debugStartPlatformId?: string | null;
   onStats: (stats: ClimberRunStats) => void;
   onJumpClearanceReport?: (report: ClimberJumpClearanceReport) => void;
   onCharacterAnimationDebug?: (snapshot: ClimberCharacterAnimationDebugSnapshot) => void;
@@ -233,6 +241,7 @@ export function createClimberPrototype(
     debugCharacterAnimationVisible = false,
     characterAutoFootCalibrationEnabled = true,
     debugColliderFocusAssetId = null,
+    debugStartPlatformId = null,
     onPointerLockChange,
     onCharacterStatusChange,
     onJumpClearanceReport,
@@ -303,7 +312,17 @@ export function createClimberPrototype(
   const sunColor = level.theme?.sunColor ?? '#fff9e6';
   scene.background = new Color(skyColor);
 
-  const startPosition = toVector3(level.startPosition);
+  const debugStartPlatform =
+    debugStartPlatformId != null
+      ? level.platforms.find((platform) => platform.id === debugStartPlatformId)
+      : null;
+  const startPosition = debugStartPlatform
+    ? new Vector3(
+        debugStartPlatform.position[0],
+        debugStartPlatform.position[1] + debugStartPlatform.size[1] * 0.5 + 0.9,
+        debugStartPlatform.position[2],
+      )
+    : toVector3(level.startPosition);
   const cameraOffset = level.cameraOffset
     ? toVector3(level.cameraOffset)
     : DEFAULT_CAMERA_OFFSET.clone();
@@ -330,6 +349,7 @@ export function createClimberPrototype(
     skyColor,
     sunColor,
   });
+  const platformModelRuntime = createPlatformModelRuntime({ scene });
   const sceneryGeometries: BufferGeometry[] = [...groundScene.geometries];
   const sceneryMaterials: MeshStandardMaterial[] = [...groundScene.materials];
   const pendingDecoColliders = groundScene.pendingDecoColliders;
@@ -338,8 +358,7 @@ export function createClimberPrototype(
   const boundaryWallMaterials: MeshStandardMaterial[] = [];
   const boundaryWallGeometries: BoxGeometry[] = [];
   const platformGeometry = new BoxGeometry(1, 1, 1);
-  /** 乐高凸点共享几何体（纯视觉装饰） */
-  const bumpGeometry = new CylinderGeometry(0.18, 0.18, 0.14, 10);
+  const platformDetailGeometries: BufferGeometry[] = [];
   const colliderDebugGroup = new Group();
   const colliderDebugGeometries: BufferGeometry[] = [];
   const colliderDebugEdgeGeometries: EdgesGeometry[] = [];
@@ -507,9 +526,10 @@ export function createClimberPrototype(
     clearColliderDebugMeshes();
     const focusedColliders =
       colliderDebugFocusAssetId == null
-        ? platformColliders
+        ? platformColliders.filter((collider) => !collider.disabled)
         : platformColliders.filter(
             (collider) =>
+              !collider.disabled &&
               collider.debugMeta?.category === 'setpiece' &&
               collider.debugMeta.assetId === colliderDebugFocusAssetId,
           );
@@ -533,7 +553,12 @@ export function createClimberPrototype(
       const geometry =
         collider.shape === 'ramp'
           ? createRampDebugGeometry(width, height, depth)
-          : new BoxGeometry(width, height, depth);
+          : collider.shape === 'cylinder'
+            ? new CylinderGeometry(width * 0.5, width * 0.5, height, 24)
+            : new BoxGeometry(width, height, depth);
+      if (collider.shape === 'cylinder' && Math.abs(depth - width) > 0.001) {
+        geometry.scale(1, 1, depth / Math.max(width, 0.001));
+      }
       const fillColor = new Color('#64748b');
       const edgeColor = new Color('#94a3b8');
       const inFocusedMode = colliderDebugFocusAssetId != null;
@@ -953,7 +978,7 @@ export function createClimberPrototype(
     center: [number, number, number];
     size: [number, number, number];
     rotation?: [number, number, number, number];
-    shape?: 'box' | 'ramp';
+    shape?: PlatformColliderShape;
     debugMeta?: PlatformCollisionDebugMeta;
   }) => {
     const appended = appendBoxCollider(platformColliders, params);
@@ -979,26 +1004,10 @@ export function createClimberPrototype(
     const halfX = Math.max(DYNAMIC_HAZARD_COLLIDER_MIN_SIZE * 0.5, size.x * 0.5);
     const halfY = Math.max(DYNAMIC_HAZARD_COLLIDER_MIN_SIZE * 0.5, size.y * 0.5);
     const halfZ = Math.max(DYNAMIC_HAZARD_COLLIDER_MIN_SIZE * 0.5, size.z * 0.5);
-    collider.shape = 'box';
-    collider.center = [center.x, center.y, center.z];
-    collider.size = [halfX * 2, halfY * 2, halfZ * 2];
-    collider.rotation = [0, 0, 0, 1];
-    collider.inverseRotation = [0, 0, 0, 1];
-    collider.top = center.y + halfY;
-    collider.minX = center.x - halfX;
-    collider.maxX = center.x + halfX;
-    collider.minY = center.y - halfY;
-    collider.maxY = center.y + halfY;
-    collider.minZ = center.z - halfZ;
-    collider.maxZ = center.z + halfZ;
-    collider.planes = [
-      { nx: 1, ny: 0, nz: 0, constant: -halfX },
-      { nx: -1, ny: 0, nz: 0, constant: -halfX },
-      { nx: 0, ny: 1, nz: 0, constant: -halfY },
-      { nx: 0, ny: -1, nz: 0, constant: -halfY },
-      { nx: 0, ny: 0, nz: 1, constant: -halfZ },
-      { nx: 0, ny: 0, nz: -1, constant: -halfZ },
-    ];
+    syncColliderData(collider, {
+      center: [center.x, center.y, center.z],
+      size: [halfX * 2, halfY * 2, halfZ * 2],
+    });
   };
 
   const dynamicObstacleUpdaters: Array<(elapsed: number) => void> = [];
@@ -1116,6 +1125,8 @@ export function createClimberPrototype(
    */
   interface BouncyEntry {
     mesh: Mesh;
+    visualObjects: Object3D[];
+    colliders: PlatformCollisionData[];
     boostVelocity: number;
     squishDuration: number;
     top: number;
@@ -1152,8 +1163,9 @@ export function createClimberPrototype(
   // ── 消失重现平台（blink）运行时 ───────────────────────────────────────
   interface BlinkEntry {
     mesh: Mesh;
-    bumps: Mesh[];
-    collider: PlatformCollisionData | null;
+    bumps: Object3D[];
+    colliders: PlatformCollisionData[];
+    meshVisibleOnReset: boolean;
     visMs: number;
     hidMs: number;
   }
@@ -1163,9 +1175,11 @@ export function createClimberPrototype(
   type CrumbleState = 'idle' | 'standing' | 'crumbling' | 'gone' | 'resetting';
   interface CrumbleEntry {
     mesh: Mesh;
-    bumps: Mesh[];
-    collider: PlatformCollisionData;
+    bumps: Object3D[];
+    colliders: PlatformCollisionData[];
+    meshVisibleOnReset: boolean;
     originY: number;
+    originScaleY: number;
     top: number;
     minX: number;
     maxX: number;
@@ -1182,6 +1196,28 @@ export function createClimberPrototype(
   // ── 冰面平台 ID 集合 ───────────────────────────────────────────────────
   const icyPlatformIds = new Set<string>();
 
+  const enableRuntimePlatformColliders = (colliders: PlatformCollisionData[]) => {
+    for (let index = 0; index < colliders.length; index += 1) {
+      colliders[index].disabled = colliders.length > 1 && index === 0;
+    }
+  };
+
+  const isPlayerOnAnyCollider = (
+    colliders: PlatformCollisionData[],
+    feetY: number,
+    verticalTolerance = 0.25,
+    horizontalPadding = 0.12,
+  ): boolean =>
+    colliders.some(
+      (collider) =>
+        !collider.disabled &&
+        Math.abs(feetY - collider.top) < verticalTolerance &&
+        playerPosition.x >= collider.minX - horizontalPadding &&
+        playerPosition.x <= collider.maxX + horizontalPadding &&
+        playerPosition.z >= collider.minZ - horizontalPadding &&
+        playerPosition.z <= collider.maxZ + horizontalPadding,
+    );
+
   /**
    * 不稳定平台运行时数据：
    * 状态机：idle → shaking（玩家站上后延迟晃动）→ falling（落下）→ resetting（不可见，倒计时后复原）→ idle
@@ -1189,8 +1225,9 @@ export function createClimberPrototype(
   type UnstableState = 'idle' | 'shaking' | 'falling' | 'resetting';
   interface UnstableEntry {
     mesh: Mesh;
-    bumps: Mesh[]; // 凸点装饰，跟随主体同步 Y
-    collider: PlatformCollisionData;
+    bumps: Object3D[]; // 平台视觉对象，跟随主体同步 Y
+    colliders: PlatformCollisionData[];
+    meshVisibleOnReset: boolean;
     originY: number;
     top: number;
     minX: number;
@@ -1214,6 +1251,9 @@ export function createClimberPrototype(
     const isCrumble = !!platform.crumble;
     const isConveyor = !!platform.conveyor;
     const isCheckpointPlatform = platform.isCheckpoint === true && !isGoal;
+    const toyProfile = resolveToyPlatformProfile(platform);
+    const platformModelAsset = resolveToyPlatformModelAsset(toyProfile);
+    const baseMeshVisible = platformModelAsset == null;
     // 终点用金色，其余用关卡定义颜色
     const resolvedColor = isGoal ? '#FCD34D' : platform.color;
 
@@ -1243,50 +1283,75 @@ export function createClimberPrototype(
     mesh.scale.set(width, height, depth);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+    mesh.visible = baseMeshVisible;
     scene.add(mesh);
 
-    // ── 乐高凸点装饰（纯视觉，不影响碰撞）──────────────────────────────────
-    // 凸点数量按平台表面格子数决定（每 1.4m 一个），最多 3×3=9 个
-    const bumpMeshesForPlatform: Mesh[] = [];
-    if (!isGoal) {
-      const bumpMat = new MeshStandardMaterial({
-        color: new Color(resolvedColor).multiplyScalar(0.88),
-        roughness: 0.5,
-        metalness: 0.1,
-      });
-      platformMaterials.push(bumpMat);
-      const topY = y + height / 2 + 0.14 / 2;
-      const cols = Math.min(3, Math.max(1, Math.floor(width / 1.4)));
-      const rows = Math.min(3, Math.max(1, Math.floor(depth / 1.4)));
-      const stepX = cols > 1 ? (width - 0.7) / (cols - 1) : 0;
-      const stepZ = rows > 1 ? (depth - 0.7) / (rows - 1) : 0;
-      const startX = x - (width - 0.7) / 2;
-      const startZ = z - (depth - 0.7) / 2;
-      for (let ci = 0; ci < cols; ci++) {
-        for (let ri = 0; ri < rows; ri++) {
-          const bx = cols > 1 ? startX + ci * stepX : x;
-          const bz = rows > 1 ? startZ + ri * stepZ : z;
-          const bump = new Mesh(bumpGeometry, bumpMat);
-          bump.position.set(bx, topY, bz);
-          bump.castShadow = false;
-          bump.receiveShadow = true;
-          // 记录原始坐标，供移动平台逻辑读取
-          bump.userData = { bumpOriginX: bx, bumpOriginY: topY, bumpOriginZ: bz };
-          scene.add(bump);
-          bumpMeshesForPlatform.push(bump);
-        }
-      }
-    }
-
-    platformMaterials.push(material);
+    const visualObjectsForPlatform: Object3D[] = [];
+    const platformDebugMeta: PlatformCollisionDebugMeta = {
+      category: 'platform',
+      assetId: platformModelAsset?.id,
+      instanceId: platform.id,
+    };
+    const collidersForPlatform: PlatformCollisionData[] = [];
     const colliderEntry = pushCollider({
       center: [x, y, z],
       size: [width, height, depth],
-      debugMeta: {
-        category: 'platform',
-        instanceId: platform.id,
-      },
+      debugMeta: platformDebugMeta,
     });
+    collidersForPlatform.push(colliderEntry);
+    let modelCollidersReady = false;
+    const setPlatformCollidersDisabled = (disabled: boolean) => {
+      for (const collider of collidersForPlatform) {
+        collider.disabled = disabled || (modelCollidersReady && collider === colliderEntry);
+      }
+    };
+
+    if (platformModelAsset) {
+      platformModelRuntime.attachPlatformModel({
+        asset: platformModelAsset,
+        size: platform.size,
+        position: platform.position,
+        visualObjects: visualObjectsForPlatform,
+        appendCollider: (params) => {
+          const collider = pushCollider(params);
+          collidersForPlatform.push(collider);
+          return collider;
+        },
+        debugMeta: platformDebugMeta,
+        onCollidersReady: () => {
+          modelCollidersReady = true;
+          colliderEntry.disabled = true;
+          colliderDebugDirty = true;
+          scheduleJumpClearanceRebuild();
+          if (colliderDebugGroup.visible) {
+            rebuildColliderDebugMeshes();
+          }
+        },
+      });
+    } else {
+      // ── 原创玩具平台模型细节（纯视觉，不影响碰撞）───────────────────────────
+      const toyVisuals = createToyPlatformVisuals({
+        scene,
+        platformId: platform.id,
+        size: platform.size,
+        position: platform.position,
+        color: resolvedColor,
+        profile: toyProfile,
+        isGoal,
+        isIcy,
+        isCrumble,
+        isConveyor,
+        isBouncy: !!platform.bouncy,
+        isUnstable: !!platform.unstable,
+        isBlink: !!platform.blink,
+        isRotating: !!platform.rotating,
+      });
+      visualObjectsForPlatform.push(...toyVisuals.detailMeshes);
+      platformMaterials.push(...toyVisuals.materials);
+      platformDetailGeometries.push(...toyVisuals.geometries);
+    }
+
+    platformMaterials.push(material);
 
     // ── 移动平台：注册 sin 往复动画 + 碰撞体同步 ──────────────────────────
     if (platform.moving && colliderEntry) {
@@ -1296,7 +1361,7 @@ export function createClimberPrototype(
       const originX = x;
       const originY = y;
       const originZ = z;
-      const capturedBumps = bumpMeshesForPlatform.slice();
+      const capturedBumps = visualObjectsForPlatform;
 
       // 建立携带记录，供 renderFrame 用来把玩家随平台一起移动
       const carrier: MovingPlatformCarrier = {
@@ -1342,6 +1407,8 @@ export function createClimberPrototype(
     if (platform.bouncy) {
       bouncyPlatforms.set(platform.id, {
         mesh,
+        visualObjects: visualObjectsForPlatform,
+        colliders: collidersForPlatform,
         boostVelocity: platform.bouncy.boostVelocity,
         squishDuration: platform.bouncy.squishDuration ?? 80,
         top: y + height / 2,
@@ -1358,8 +1425,9 @@ export function createClimberPrototype(
       const us = platform.unstable;
       unstablePlatforms.set(platform.id, {
         mesh,
-        bumps: bumpMeshesForPlatform.slice(),
-        collider: colliderEntry,
+        bumps: visualObjectsForPlatform,
+        colliders: collidersForPlatform,
+        meshVisibleOnReset: baseMeshVisible,
         originY: y,
         top: y + height / 2,
         minX: x - width / 2,
@@ -1385,8 +1453,9 @@ export function createClimberPrototype(
       if (colliderEntry) {
         dynamicObstacleUpdaters.push((elapsed) => {
           mesh.rotation.y = elapsed * speed;
-          for (const bm of bumpMeshesForPlatform) {
-            bm.rotation.y = elapsed * speed;
+          for (const bm of visualObjectsForPlatform) {
+            const rotationOrigin = bm.userData as { bumpOriginRotationY?: number };
+            bm.rotation.y = (rotationOrigin.bumpOriginRotationY ?? 0) + elapsed * speed;
             // 凸点也要跟着转：围绕平台中心旋转
             const ud = bm.userData as { bumpOriginX: number; bumpOriginZ: number };
             const cos = Math.cos(elapsed * speed);
@@ -1439,17 +1508,18 @@ export function createClimberPrototype(
       const cycle = visMs + hidMs;
       blinkPlatforms.set(platform.id, {
         mesh,
-        bumps: bumpMeshesForPlatform.slice(),
-        collider: colliderEntry,
+        bumps: visualObjectsForPlatform,
+        colliders: collidersForPlatform,
+        meshVisibleOnReset: baseMeshVisible,
         visMs,
         hidMs,
       });
       dynamicObstacleUpdaters.push((elapsed) => {
         const t = (((elapsed * 1000 + phase) % cycle) + cycle) % cycle;
         const visible = t < visMs;
-        mesh.visible = visible;
-        for (const bm of bumpMeshesForPlatform) bm.visible = visible;
-        if (colliderEntry) colliderEntry.disabled = !visible;
+        mesh.visible = visible && baseMeshVisible;
+        for (const bm of visualObjectsForPlatform) bm.visible = visible;
+        setPlatformCollidersDisabled(!visible);
         // 淡入淡出透明度
         if (material) {
           material.transparent = true;
@@ -1465,9 +1535,11 @@ export function createClimberPrototype(
       const cr = platform.crumble;
       crumblePlatforms.set(platform.id, {
         mesh,
-        bumps: bumpMeshesForPlatform.slice(),
-        collider: colliderEntry,
+        bumps: visualObjectsForPlatform,
+        colliders: collidersForPlatform,
+        meshVisibleOnReset: baseMeshVisible,
         originY: y,
+        originScaleY: height,
         top: y + height / 2,
         minX: x - width / 2,
         maxX: x + width / 2,
@@ -1730,7 +1802,7 @@ export function createClimberPrototype(
     for (const [, up] of unstablePlatforms) {
       up.mesh.position.y = up.originY;
       up.mesh.rotation.z = 0;
-      up.mesh.visible = true;
+      up.mesh.visible = up.meshVisibleOnReset;
       for (const bm of up.bumps) {
         const ud = bm.userData as { bumpOriginY: number };
         bm.position.y = ud.bumpOriginY;
@@ -1739,12 +1811,13 @@ export function createClimberPrototype(
       up.top = up.originY + up.mesh.scale.y / 2;
       up.state = 'idle';
       up.timer = 0;
-      syncAxisAlignedColliderWithObjectBounds(up.collider, up.mesh);
+      enableRuntimePlatformColliders(up.colliders);
+      syncAxisAlignedColliderWithObjectBounds(up.colliders[0], up.mesh);
     }
     // 重置碎裂平台
     for (const [, cp] of crumblePlatforms) {
-      cp.mesh.visible = true;
-      cp.mesh.scale.y = 1;
+      cp.mesh.visible = cp.meshVisibleOnReset;
+      cp.mesh.scale.y = cp.originScaleY;
       cp.mesh.position.y = cp.originY;
       cp.mesh.rotation.z = 0;
       for (const bm of cp.bumps) {
@@ -1752,11 +1825,11 @@ export function createClimberPrototype(
         bm.position.y = ud.bumpOriginY;
         bm.visible = true;
       }
-      cp.collider.disabled = false;
-      cp.top = cp.originY + cp.mesh.scale.y / 2;
+      enableRuntimePlatformColliders(cp.colliders);
+      cp.top = cp.originY + cp.originScaleY / 2;
       cp.state = 'idle';
       cp.timer = 0;
-      syncAxisAlignedColliderWithObjectBounds(cp.collider, cp.mesh);
+      syncAxisAlignedColliderWithObjectBounds(cp.colliders[0], cp.mesh);
     }
     goalBurst.visible = false;
     goalBurst.scale.setScalar(1);
@@ -1849,8 +1922,18 @@ export function createClimberPrototype(
       // ── 弹跳板检测：落地时检查是否踩在弹跳板上 ───────────────────────────
       const feetYLand = playerPosition.y - PLAYER_RADIUS;
       for (const [, bp] of bouncyPlatforms) {
+        const landedOnBouncyCollider = bp.colliders.some((collider) => {
+          if (collider.disabled) return false;
+          return (
+            Math.abs(feetYLand - collider.top) < 0.24 &&
+            playerPosition.x >= collider.minX - 0.08 &&
+            playerPosition.x <= collider.maxX + 0.08 &&
+            playerPosition.z >= collider.minZ - 0.08 &&
+            playerPosition.z <= collider.maxZ + 0.08
+          );
+        });
         if (
-          Math.abs(feetYLand - bp.top) < 0.22 &&
+          (landedOnBouncyCollider || Math.abs(feetYLand - bp.top) < 0.22) &&
           playerPosition.x >= bp.minX - 0.05 &&
           playerPosition.x <= bp.maxX + 0.05 &&
           playerPosition.z >= bp.minZ - 0.05 &&
@@ -1903,6 +1986,7 @@ export function createClimberPrototype(
   function updateCharacter(delta: number, elapsed: number) {
     const horizontalSpeed = Math.hypot(velocity.x, velocity.z);
     const state = resolveAnimationState(horizontalSpeed);
+    characterRig.group.position.copy(playerPosition);
     characterRig.setState(state);
     characterRig.setGrounded(grounded);
     characterRig.setLandingLockMs(landingAnimationLockMs);
@@ -1913,7 +1997,6 @@ export function createClimberPrototype(
       verticalSpeed: velocity.y,
     });
 
-    characterRig.group.position.copy(playerPosition);
     if (horizontalSpeed > 0.02) {
       characterRig.group.rotation.y = Math.atan2(velocity.x, velocity.z);
     }
@@ -1987,6 +2070,7 @@ export function createClimberPrototype(
     for (let step = 0; step < simulationSteps; step += 1) {
       const stepElapsed = frameElapsed + simulationDelta * step;
       for (const update of dynamicObstacleUpdaters) update(stepElapsed);
+      platformModelRuntime.syncColliders();
 
       // ── 移动平台携带玩家 ─────────────────────────────────────────────────
       // 在物理更新前，把玩家随站立平台一起平移
@@ -2058,11 +2142,12 @@ export function createClimberPrototype(
 
     // ── 弹跳板压缩-弹出动画 ──────────────────────────────────────────────────
     for (const [, bp] of bouncyPlatforms) {
+      let squishY = 1;
       if (bp.squishTimer > 0) {
         bp.squishTimer = Math.max(0, bp.squishTimer - delta * 1000);
         const t = bp.squishTimer / bp.squishDuration; // 1→0
         // 前半程压缩（scaleY 0.45），后半程弹回（scaleY 1.0）
-        const squishY =
+        squishY =
           t > 0.5
             ? MathUtils.lerp(0.45, 1.0, 1 - (t - 0.5) * 2) // 弹回
             : MathUtils.lerp(1.0, 0.45, 1 - t * 2); // 压缩
@@ -2071,8 +2156,20 @@ export function createClimberPrototype(
         // 恢复原始比例（height 在 scale 中体现）
         const origHeight = bp.mesh.scale.y;
         if (Math.abs(origHeight - 1) > 0.01) {
-          bp.mesh.scale.y = MathUtils.damp(origHeight, 1, 18, delta);
+          squishY = MathUtils.damp(origHeight, 1, 18, delta);
+          bp.mesh.scale.y = squishY;
         }
+      }
+      for (const visual of bp.visualObjects) {
+        const ud = visual.userData as {
+          bumpOriginScaleX?: number;
+          bumpOriginScaleY?: number;
+          bumpOriginScaleZ?: number;
+        };
+        const originX = ud.bumpOriginScaleX ?? visual.scale.x;
+        const originY = ud.bumpOriginScaleY ?? visual.scale.y;
+        const originZ = ud.bumpOriginScaleZ ?? visual.scale.z;
+        visual.scale.set(originX, originY * squishY, originZ);
       }
     }
 
@@ -2130,7 +2227,7 @@ export function createClimberPrototype(
             // 复原：恢复位置、可见性、top，重置为 idle
             up.mesh.position.y = up.originY;
             up.mesh.rotation.z = 0;
-            up.mesh.visible = true;
+            up.mesh.visible = up.meshVisibleOnReset;
             for (const bm of up.bumps) {
               const ud = bm.userData as { bumpOriginY: number };
               bm.position.y = ud.bumpOriginY;
@@ -2138,7 +2235,7 @@ export function createClimberPrototype(
             }
             up.top = up.originY + up.mesh.scale.y / 2;
             up.state = 'idle';
-            syncAxisAlignedColliderWithObjectBounds(up.collider, up.mesh);
+            syncAxisAlignedColliderWithObjectBounds(up.colliders[0], up.mesh);
           }
         }
       }
@@ -2152,11 +2249,12 @@ export function createClimberPrototype(
         if (cp.state === 'idle') {
           const playerOnThis =
             grounded &&
-            Math.abs(feetY - cp.top) < 0.25 &&
-            playerPosition.x >= cp.minX - 0.12 &&
-            playerPosition.x <= cp.maxX + 0.12 &&
-            playerPosition.z >= cp.minZ - 0.12 &&
-            playerPosition.z <= cp.maxZ + 0.12;
+            (isPlayerOnAnyCollider(cp.colliders, feetY) ||
+              (Math.abs(feetY - cp.top) < 0.25 &&
+                playerPosition.x >= cp.minX - 0.12 &&
+                playerPosition.x <= cp.maxX + 0.12 &&
+                playerPosition.z >= cp.minZ - 0.12 &&
+                playerPosition.z <= cp.maxZ + 0.12));
           if (playerOnThis) {
             cp.state = 'standing';
             cp.timer = cp.standMs;
@@ -2166,35 +2264,45 @@ export function createClimberPrototype(
           // 轻微抖动预示碎裂
           const shake = (1 - cp.timer / cp.standMs) * 0.06;
           cp.mesh.rotation.z = Math.sin(timestamp * 0.05) * shake;
+          for (const bm of cp.bumps) {
+            const ud = bm.userData as { bumpOriginRotationZ?: number };
+            bm.rotation.z = (ud.bumpOriginRotationZ ?? 0) + Math.sin(timestamp * 0.05) * shake;
+          }
           if (cp.timer <= 0) {
             cp.state = 'crumbling';
             cp.timer = cp.crumbleMs;
+            for (const collider of cp.colliders) collider.disabled = true;
           }
         } else if (cp.state === 'crumbling') {
           cp.timer -= deltaMs;
-          // 碎裂：快速缩小并向下落
+          // 碎裂：整体下沉离开路线，不在原地缩放穿模。
           const t = Math.max(0, cp.timer / cp.crumbleMs);
-          cp.mesh.scale.y = t;
-          cp.mesh.position.y = cp.originY - (1 - t) * 1.5;
+          const sink = (1 - t) * 3.4;
+          const wobble = Math.sin(timestamp * 0.045) * 0.08 * t;
+          cp.mesh.scale.y = cp.originScaleY;
+          cp.mesh.position.y = cp.originY - sink;
+          cp.mesh.rotation.z = wobble;
           for (const bm of cp.bumps) {
-            const ud = bm.userData as { bumpOriginY: number };
-            bm.position.y = ud.bumpOriginY - (1 - t) * 1.5;
-            bm.visible = t > 0.2;
+            const ud = bm.userData as {
+              bumpOriginY: number;
+              bumpOriginRotationZ?: number;
+            };
+            bm.position.y = ud.bumpOriginY - sink;
+            bm.rotation.z = (ud.bumpOriginRotationZ ?? 0) + wobble;
+            bm.visible = true;
           }
-          syncAxisAlignedColliderWithObjectBounds(cp.collider, cp.mesh);
           if (cp.timer <= 0) {
             cp.state = 'gone';
             cp.timer = cp.resetMs;
             cp.mesh.visible = false;
             for (const bm of cp.bumps) bm.visible = false;
-            cp.collider.disabled = true;
           }
         } else if (cp.state === 'gone') {
           cp.timer -= deltaMs;
           if (cp.timer <= 0) {
             // 复原
-            cp.mesh.visible = true;
-            cp.mesh.scale.y = 1;
+            cp.mesh.visible = cp.meshVisibleOnReset;
+            cp.mesh.scale.y = cp.originScaleY;
             cp.mesh.position.y = cp.originY;
             cp.mesh.rotation.z = 0;
             for (const bm of cp.bumps) {
@@ -2202,10 +2310,10 @@ export function createClimberPrototype(
               bm.position.y = ud.bumpOriginY;
               bm.visible = true;
             }
-            cp.collider.disabled = false;
-            cp.top = cp.originY + cp.mesh.scale.y / 2;
+            enableRuntimePlatformColliders(cp.colliders);
+            cp.top = cp.originY + cp.originScaleY / 2;
             cp.state = 'idle';
-            syncAxisAlignedColliderWithObjectBounds(cp.collider, cp.mesh);
+            syncAxisAlignedColliderWithObjectBounds(cp.colliders[0], cp.mesh);
           }
         }
       }
@@ -2466,10 +2574,11 @@ export function createClimberPrototype(
       }
 
       platformGeometry.dispose();
-      bumpGeometry.dispose();
+      for (const g of platformDetailGeometries) g.dispose();
       for (const m of platformMaterials) m.dispose();
       for (const g of boundaryWallGeometries) g.dispose();
       for (const m of boundaryWallMaterials) m.dispose();
+      platformModelRuntime.dispose();
       setPieceRuntime.dispose();
 
       goalPulse.geometry.dispose();
