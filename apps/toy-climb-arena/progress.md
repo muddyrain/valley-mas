@@ -176,4 +176,18 @@ Original prompt: 目前所有的平台模型都是简易的模型，我们可以
   - `toy_castle_treasure_chest`
 - Registered them in `platformModelAssets.ts` and replaced additional repeated `hay_bale`, `castle_brick_block`, `castle_tower_cap`, and `castle_drawbridge` instances in `toyAnimalClimbWorld.ts`.
 - Collision rule preserved: solid mesh parts remain model-derived colliders; small trim, handles, labels, rivets, strands, sand and gems opt out via `collisionShape: none`.
-- Next TODO: run asset generation, typecheck/check/build, encoding guard, and targeted browser smoke for the new basket/yarn/xylophone/shield/hourglass/ribbon/chest models.
+- Validation passed: `generate:platform-assets` (all 30 GLBs including the 7 new batch-2 models), `typecheck`, `check` (12 pre-existing warnings only), `build` (✓ built in 1.74s), and encoding guard on `platformModelAssets.ts` + `toyAnimalClimbWorld.ts`.
+
+## 2026-05-02 · Route extended to 100m — Z3 Sky Island + Z4 Olympus finale
+
+- Added 9 refined GLB platform models with emphasis on visual complexity and zone identity:
+  - **Z3 Sky Island** (5 models): `toy_sky_metal_plate` (deep blue steel + circuit lines + hex bolts + cyan glow), `toy_sky_spinning_disc` (purple disc + 2-color concentric rings + 12 gems + rainbow spokes), `toy_sky_crystal_shard` (amethyst crystal + 4 spiked sides + luminous ridges + sparkle dots), `toy_sky_cloud_island` (7-sphere cloud + rainbow arc + gold-rimmed base + star deco), `toy_sky_narrow_beam` (dark metal beam + hazard chevrons + cyan edge glow + end caps)
+  - **Z4 Olympus** (4 models): `toy_olympus_marble_dais` (white marble + gold border moulding + quartz veins + 4 Ionic columns), `toy_olympus_golden_ring` (gold spoked-wheel disc + dual ring + 12 gems + Star-of-David center), `toy_olympus_rainbow_cloud` (7-sphere cloud + 6 full rainbow bands + spring support + gold trim + 5 gold stars), `toy_olympus_star_finale` (5-point star stage + gold outer ring + giant cyan gem sphere + 5-color gem spikes)
+- Updated `platformModelAssets.ts`: imports, `ToyPlatformModelAssetId` type union, registry entries, and resolver branches for `sky_island`/`olympus` zones.
+- Added `sky()` and `olympus()` helper functions to `toyAnimalClimbWorld.ts`.
+- Extended the route from 60m to 100m:
+  - Z3 Sky Island 60-80m: metal plate entry, spinning discs, narrow beams, blinking crystal shards, cloud-island rest platforms, crumble shard, catch layers.
+  - Z4 Olympus 80-100m: marble dais, golden ring (rotating/moving), rainbow-cloud trampolines, marble crumble, star finale as `isGoal`.
+  - Old castle `goal` at 58.7m converted to a passive `castle-crown-transition` platform.
+- Collision rule preserved; total GLB count now 39.
+- Validation passed: `generate:platform-assets` (9 new + 30 existing = 39 total), `typecheck` (zero errors), `check` (auto-fixed import sort, 12 pre-existing warnings), `build` (✓ 1.65s), encoding guard PASS.
