@@ -1,5 +1,4 @@
 import {
-  AmbientLight,
   Box3,
   BoxGeometry,
   BufferGeometry,
@@ -7,12 +6,9 @@ import {
   Clock,
   Color,
   CylinderGeometry,
-  DirectionalLight,
   EdgesGeometry,
   Float32BufferAttribute,
-  FogExp2,
   Group,
-  HemisphereLight,
   Line,
   LinearFilter,
   LineBasicMaterial,
@@ -24,12 +20,9 @@ import {
   MeshStandardMaterial,
   type Object3D,
   PerspectiveCamera,
-  PlaneGeometry,
-  Points,
-  PointsMaterial,
   Quaternion,
+  RepeatWrapping,
   Scene,
-  SphereGeometry,
   Sprite,
   SpriteMaterial,
   TorusGeometry,
@@ -99,7 +92,7 @@ const FLOOR_SURFACE_Y = -0.5;
 const FLOOR_COLLIDER_CENTER_Y = FLOOR_SURFACE_Y - FLOOR_COLLIDER_HEIGHT * 0.5;
 const BOUNDARY_HALF_RANGE = 70;
 const FLOOR_VISUAL_SIZE = FLOOR_COLLIDER_SIZE;
-const BOUNDARY_WALL_HEIGHT = 16;
+const BOUNDARY_WALL_HEIGHT = 28;
 const BOUNDARY_WALL_THICKNESS = 2;
 const GOAL_REACH_Y_TOLERANCE = 0.18;
 const GOAL_REACH_XZ_MARGIN = 0.16;
@@ -366,7 +359,7 @@ export function createClimberPrototype(
   function consoleWrite(msg: string, color = '#94a3b8'): void {
     const line = document.createElement('span');
     line.style.color = color;
-    line.textContent = msg + '\n';
+    line.textContent = `${msg}\n`;
     consoleLog.appendChild(line);
     consoleLog.scrollTop = consoleLog.scrollHeight;
   }
@@ -388,7 +381,7 @@ export function createClimberPrototype(
   function execConsoleCommand(raw: string): void {
     const cmd = raw.trim().toLowerCase();
     if (!cmd) return;
-    consoleWrite('> ' + raw, '#818cf8');
+    consoleWrite(`> ${raw}`, '#818cf8');
 
     // fly — 切换飞行模式
     if (cmd === 'fly' || cmd === 'fly on') {
@@ -447,7 +440,7 @@ export function createClimberPrototype(
           .filter((p) => p.id.includes(pid.toLowerCase()))
           .slice(0, 4)
           .map((p) => p.id);
-        if (fuzzy.length) consoleWrite('  候选: ' + fuzzy.join(', '), '#fbbf24');
+        if (fuzzy.length) consoleWrite(`  候选: ${fuzzy.join(', ')}`, '#fbbf24');
         return;
       }
       playerPosition.set(
@@ -579,8 +572,9 @@ export function createClimberPrototype(
   const pendingDecoColliders = groundScene.pendingDecoColliders;
   const platformColliders: PlatformCollisionData[] = [];
   const platformMaterials: MeshStandardMaterial[] = [];
-  const boundaryWallMaterials: MeshStandardMaterial[] = [];
+  const boundaryWallMaterials: Material[] = [];
   const boundaryWallGeometries: BoxGeometry[] = [];
+  const boundaryWallTextures: CanvasTexture[] = [];
   const platformGeometry = new BoxGeometry(1, 1, 1);
   const platformDetailGeometries: BufferGeometry[] = [];
   const colliderDebugGroup = new Group();
@@ -1255,91 +1249,7 @@ export function createClimberPrototype(
   const movingPlatformCarriers: MovingPlatformCarrier[] = [];
 
   const createDynamicHazards = () => {
-    const ropeGeometry = new CylinderGeometry(0.08, 0.08, 1, 10);
-    const bobGeometry = new SphereGeometry(0.74, 12, 10);
-    const anchorGeometry = new SphereGeometry(0.18, 8, 6);
-    const ropeMaterial = new MeshStandardMaterial({
-      color: '#5a6570',
-      roughness: 0.86,
-      metalness: 0.16,
-    });
-    const bobMaterial = new MeshStandardMaterial({
-      color: '#f59e0b',
-      roughness: 0.74,
-      metalness: 0.12,
-    });
-    const anchorMaterial = new MeshStandardMaterial({
-      color: '#9aa6b2',
-      roughness: 0.8,
-      metalness: 0.08,
-    });
-    sceneryGeometries.push(ropeGeometry, bobGeometry, anchorGeometry);
-    sceneryMaterials.push(ropeMaterial, bobMaterial, anchorMaterial);
-
-    const pendulumConfigs: Array<{
-      id: string;
-      pivot: [number, number, number];
-      length: number;
-      amplitude: number;
-      speed: number;
-      phase: number;
-    }> = [
-      {
-        id: 'hazard-pendulum-01',
-        pivot: [19.2, 34.6, -0.8],
-        length: 6.2,
-        amplitude: 0.48,
-        speed: 1.45,
-        phase: 0,
-      },
-      {
-        id: 'hazard-pendulum-02',
-        pivot: [33.8, 56.8, -14.4],
-        length: 5.7,
-        amplitude: 0.52,
-        speed: 1.68,
-        phase: 1.3,
-      },
-    ];
-
-    pendulumConfigs.forEach((config) => {
-      const pivotGroup = new Group();
-      pivotGroup.position.set(config.pivot[0], config.pivot[1], config.pivot[2]);
-      scene.add(pivotGroup);
-
-      const anchor = new Mesh(anchorGeometry, anchorMaterial);
-      anchor.castShadow = true;
-      anchor.receiveShadow = true;
-      pivotGroup.add(anchor);
-
-      const rope = new Mesh(ropeGeometry, ropeMaterial);
-      rope.position.y = -config.length * 0.5;
-      rope.scale.set(1, config.length, 1);
-      rope.castShadow = true;
-      rope.receiveShadow = true;
-      pivotGroup.add(rope);
-
-      const bob = new Mesh(bobGeometry, bobMaterial);
-      bob.position.y = -config.length;
-      bob.castShadow = true;
-      bob.receiveShadow = true;
-      pivotGroup.add(bob);
-
-      const hazardCollider = pushCollider({
-        center: [config.pivot[0], config.pivot[1] - config.length, config.pivot[2]],
-        size: [1.5, 1.5, 1.5],
-        debugMeta: {
-          category: 'system',
-          instanceId: config.id,
-        },
-      });
-
-      dynamicObstacleUpdaters.push((elapsed) => {
-        const angle = Math.sin(elapsed * config.speed + config.phase) * config.amplitude;
-        pivotGroup.rotation.z = angle;
-        syncAxisAlignedColliderWithObjectBounds(hazardCollider, bob);
-      });
-    });
+    // 已移除不在当前路线内的悬挂摆锤机关。
   };
 
   /**
@@ -1922,14 +1832,99 @@ export function createClimberPrototype(
     },
   ];
 
+  const createToyRoomWallTexture = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('无法创建玩具房间墙面贴图。');
+    }
+
+    const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    bg.addColorStop(0, '#9FE7FF');
+    bg.addColorStop(0.46, '#FFC7E2');
+    bg.addColorStop(1, '#FFE68A');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.48)';
+    for (let y = 82; y < canvas.height; y += 112) {
+      ctx.fillRect(0, y, canvas.width, 12);
+    }
+    for (let x = 88; x < canvas.width; x += 146) {
+      ctx.fillRect(x, 0, 10, canvas.height);
+    }
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+    for (let x = -80; x < canvas.width; x += 220) {
+      ctx.beginPath();
+      ctx.ellipse(x + 90, 170, 92, 52, -0.18, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const drawStar = (cx: number, cy: number, r: number, color: string) => {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const angle = -Math.PI / 2 + (i * Math.PI) / 5;
+        const radius = i % 2 === 0 ? r : r * 0.48;
+        ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+      }
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.restore();
+    };
+
+    const drawCloud = (x: number, y: number, scale: number) => {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
+      ctx.beginPath();
+      ctx.arc(x, y, 22 * scale, 0, Math.PI * 2);
+      ctx.arc(x + 25 * scale, y - 10 * scale, 28 * scale, 0, Math.PI * 2);
+      ctx.arc(x + 58 * scale, y, 22 * scale, 0, Math.PI * 2);
+      ctx.rect(x - 4 * scale, y, 70 * scale, 24 * scale);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(77, 144, 210, 0.28)';
+      ctx.lineWidth = 4 * scale;
+      ctx.stroke();
+    };
+
+    const motifs = [
+      { x: 110, y: 115, size: 44, color: '#F43F5E' },
+      { x: 300, y: 260, size: 38, color: '#FACC15' },
+      { x: 520, y: 136, size: 42, color: '#8B5CF6' },
+      { x: 735, y: 292, size: 40, color: '#06B6D4' },
+      { x: 900, y: 176, size: 42, color: '#22C55E' },
+    ];
+    for (const motif of motifs) {
+      drawStar(motif.x, motif.y, motif.size, motif.color);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.66)';
+      ctx.beginPath();
+      ctx.arc(motif.x + 64, motif.y + 34, 13, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    drawCloud(132, 345, 1.25);
+    drawCloud(590, 380, 1.05);
+    drawCloud(820, 80, 0.9);
+
+    const texture = new CanvasTexture(canvas);
+    texture.minFilter = LinearFilter;
+    texture.magFilter = LinearFilter;
+    texture.wrapS = RepeatWrapping;
+    texture.wrapT = RepeatWrapping;
+    texture.repeat.set(1.25, 1);
+    return texture;
+  };
+
   for (const wallConfig of boundaryWallConfigs) {
-    const wallMaterial = new MeshStandardMaterial({
-      color: '#93c5fd',
-      roughness: 0.45,
-      metalness: 0.06,
-      transparent: true,
-      opacity: 0.2,
+    const wallTexture = createToyRoomWallTexture();
+    const wallMaterial = new MeshBasicMaterial({
+      color: '#ffffff',
+      map: wallTexture,
     });
+    wallMaterial.fog = false;
     const wallGeometry = new BoxGeometry(1, 1, 1);
     const wallMesh = new Mesh(wallGeometry, wallMaterial);
     wallMesh.position.set(wallConfig.center[0], wallConfig.center[1], wallConfig.center[2]);
@@ -1940,6 +1935,7 @@ export function createClimberPrototype(
 
     boundaryWallMaterials.push(wallMaterial);
     boundaryWallGeometries.push(wallGeometry);
+    boundaryWallTextures.push(wallTexture);
     pushCollider({
       ...wallConfig,
       debugMeta: {
@@ -2957,6 +2953,7 @@ export function createClimberPrototype(
       for (const g of platformDetailGeometries) g.dispose();
       for (const m of platformMaterials) m.dispose();
       for (const g of boundaryWallGeometries) g.dispose();
+      for (const t of boundaryWallTextures) t.dispose();
       for (const m of boundaryWallMaterials) m.dispose();
       platformModelRuntime.dispose();
       setPieceRuntime.dispose();
