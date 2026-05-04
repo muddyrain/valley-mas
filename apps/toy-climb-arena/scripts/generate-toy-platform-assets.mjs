@@ -166,6 +166,158 @@ function createNarrowPlank() {
   return group;
 }
 
+function createIrregularFragmentS4() {
+  const group = new Group();
+  group.name = 'toy_irregular_fragment_s4';
+  const foamA = material('#A78BFA', 0.5, 0.04);
+  const foamB = material('#38BDF8', 0.46, 0.05);
+  const warning = material('#FACC15', 0.42, 0.04);
+  const edge = material('#6D28D9', 0.48, 0.06);
+  const safe = material('#ECFEFF', 0.38, 0.03);
+
+  const shardA = addBox(group, [2.35, 0.36, 1.62], foamA, [-0.55, 0.2, -0.25], [
+    0,
+    MathUtils.degToRad(-12),
+    MathUtils.degToRad(1.5),
+  ]);
+  shardA.name = 'solid_center_left';
+  const shardB = addBox(group, [1.82, 0.34, 1.5], foamB, [0.86, 0.22, 0.34], [
+    0,
+    MathUtils.degToRad(18),
+    MathUtils.degToRad(-1.2),
+  ]);
+  shardB.name = 'solid_center_right';
+  addBox(group, [1.55, 0.09, 0.72], safe, [0.08, 0.46, 0.02], [0, MathUtils.degToRad(5), 0]);
+  addBox(group, [2.0, 0.06, 0.08], warning, [-0.58, 0.52, -0.98], [0, MathUtils.degToRad(-12), 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [1.52, 0.06, 0.08], warning, [0.9, 0.5, 1.02], [0, MathUtils.degToRad(18), 0], {
+    collisionShape: 'none',
+  });
+  for (const [x, z, r] of [
+    [-1.3, 0.55, 0.12],
+    [1.38, -0.34, 0.1],
+    [0.36, -0.72, 0.09],
+  ]) {
+    addCylinder(group, r, 0.08, 10, edge, [x, 0.55, z], [0, 0, 0], {
+      collisionShape: 'none',
+    });
+  }
+  return group;
+}
+
+function createStackedStepsS5() {
+  const group = new Group();
+  group.name = 'toy_stacked_steps_s5';
+  const red = material('#EF4444', 0.46, 0.04);
+  const blue = material('#38BDF8', 0.42, 0.06);
+  const yellow = material('#FACC15', 0.5, 0.03);
+  const green = material('#22C55E', 0.48, 0.04);
+  const cork = material('#D97706', 0.62, 0.03);
+  const ink = material('#1E293B', 0.52, 0.04);
+
+  addBox(group, [2.35, 0.62, 2.15], cork, [-0.95, 0.31, 0.35], [0, MathUtils.degToRad(-4), 0]);
+  addBox(group, [2.18, 0.78, 2.08], blue, [0.72, 0.39, -0.28], [0, MathUtils.degToRad(7), 0]);
+  addBox(group, [1.68, 0.74, 1.7], red, [1.65, 1.08, 0.8], [0, MathUtils.degToRad(-12), 0]);
+  addBox(group, [1.48, 0.7, 1.48], green, [-0.18, 1.02, -0.05], [0, MathUtils.degToRad(10), 0]);
+  addBox(group, [1.14, 0.16, 1.14], yellow, [-0.22, 1.45, -0.08], [0, MathUtils.degToRad(10), 0]);
+
+  for (const [x, y, z, letter] of [
+    [-0.96, 0.65, -0.75, 'A'],
+    [0.72, 0.82, -1.33, 'B'],
+    [1.65, 1.47, 0.0, 'C'],
+  ]) {
+    addBox(group, [0.5, 0.055, 0.08], ink, [x, y, z], [0, 0, 0], { collisionShape: 'none' });
+    if (letter !== 'B') {
+      addBox(group, [0.08, 0.055, 0.42], ink, [x - 0.21, y, z], [0, 0, 0], {
+        collisionShape: 'none',
+      });
+    }
+    addBox(group, [0.08, 0.055, 0.42], ink, [x + 0.21, y, z], [0, 0, 0], {
+      collisionShape: 'none',
+    });
+  }
+  return group;
+}
+
+function createSquarePlateS6Confetti() {
+  const group = new Group();
+  group.name = 'toy_square_plate_s6_confetti';
+  const body = material('#22C55E', 0.48, 0.05);
+  const top = material('#BBF7D0', 0.42, 0.03);
+  const rim = material('#F97316', 0.4, 0.05);
+  const colors = ['#EF4444', '#38BDF8', '#FACC15', '#A78BFA'];
+
+  addBox(group, [4.2, 0.5, 3.6], body, [0, 0.25, 0]);
+  addBox(group, [3.72, 0.1, 3.1], top, [0, 0.56, 0]);
+  addBox(group, [4.32, 0.1, 0.16], rim, [0, 0.66, -1.8]);
+  addBox(group, [4.32, 0.1, 0.16], rim, [0, 0.66, 1.8]);
+  addBox(group, [0.16, 0.1, 3.72], rim, [-2.1, 0.66, 0]);
+  addBox(group, [0.16, 0.1, 3.72], rim, [2.1, 0.66, 0]);
+  for (let i = 0; i < 8; i += 1) {
+    const x = -1.45 + (i % 4) * 0.96;
+    const z = i < 4 ? -0.86 : 0.86;
+    addCylinder(group, 0.1, 0.11, 10, material(colors[i % colors.length], 0.36, 0.06), [x, 0.77, z], [
+      0,
+      0,
+      0,
+    ]);
+  }
+  return group;
+}
+
+function createRoundDiscS6Candy() {
+  const group = new Group();
+  group.name = 'toy_round_disc_s6_candy';
+  const base = material('#F9A8D4', 0.36, 0.05);
+  const cream = material('#FEF3C7', 0.32, 0.04);
+  const stripeA = material('#38BDF8', 0.34, 0.06);
+  const stripeB = material('#F97316', 0.38, 0.05);
+  const pearl = material('#FFFFFF', 0.28, 0.04);
+
+  addCylinder(group, 1.62, 0.36, 32, base, [0, 0.2, 0]);
+  addCylinder(group, 1.36, 0.1, 32, cream, [0, 0.45, 0]);
+  addMesh(group, new TorusGeometry(1.58, 0.08, 8, 34), stripeA, [0, 0.48, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
+  addMesh(group, new TorusGeometry(0.82, 0.065, 8, 28), stripeB, [0, 0.54, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
+  for (let i = 0; i < 10; i += 1) {
+    const angle = (Math.PI * 2 * i) / 10;
+    addCylinder(group, 0.07, 0.08, 8, pearl, [Math.cos(angle) * 1.08, 0.63, Math.sin(angle) * 1.08], [
+      0,
+      0,
+      0,
+    ]);
+  }
+  return group;
+}
+
+function createNarrowPlankS6Stripes() {
+  const group = new Group();
+  group.name = 'toy_narrow_plank_s6_stripes';
+  const body = material('#60A5FA', 0.42, 0.08);
+  const top = material('#DBEAFE', 0.34, 0.05);
+  const rail = material('#1D4ED8', 0.38, 0.12);
+  const stripe = material('#FACC15', 0.38, 0.08);
+
+  addBox(group, [6.3, 0.3, 1.05], body, [0, 0.16, 0]);
+  addBox(group, [5.9, 0.08, 0.68], top, [0, 0.38, 0]);
+  addBox(group, [6.36, 0.1, 0.08], rail, [0, 0.47, -0.5]);
+  addBox(group, [6.36, 0.1, 0.08], rail, [0, 0.47, 0.5]);
+  for (let i = 0; i < 6; i += 1) {
+    const x = -2.55 + i * 1.02;
+    addBox(group, [0.48, 0.055, 0.62], stripe, [x, 0.52, 0], [0, MathUtils.degToRad(22), 0], {
+      collisionShape: 'none',
+    });
+  }
+  for (const x of [-3.0, 3.0]) {
+    addBox(group, [0.18, 0.32, 1.12], rail, [x, 0.18, 0]);
+  }
+  return group;
+}
+
 function createHayBaleBlock() {
   const group = new Group();
   group.name = 'toy_barn_hay_bale';
@@ -1596,6 +1748,11 @@ async function exportGlb(group, fileName) {
 await exportGlb(createSquarePlate(), 'toy_square_plate_s1.glb');
 await exportGlb(createRoundDisc(), 'toy_round_disc_s2.glb');
 await exportGlb(createNarrowPlank(), 'toy_narrow_plank_s3.glb');
+await exportGlb(createIrregularFragmentS4(), 'toy_irregular_fragment_s4.glb');
+await exportGlb(createStackedStepsS5(), 'toy_stacked_steps_s5.glb');
+await exportGlb(createSquarePlateS6Confetti(), 'toy_square_plate_s6_confetti.glb');
+await exportGlb(createRoundDiscS6Candy(), 'toy_round_disc_s6_candy.glb');
+await exportGlb(createNarrowPlankS6Stripes(), 'toy_narrow_plank_s6_stripes.glb');
 await exportGlb(createHayBaleBlock(), 'toy_barn_hay_bale.glb');
 await exportGlb(createCrateStep(), 'toy_wood_crate_step.glb');
 await exportGlb(createBarrelRoundTop(), 'toy_barrel_round_top.glb');

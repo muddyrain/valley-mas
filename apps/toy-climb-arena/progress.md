@@ -202,3 +202,20 @@ Original prompt: 目前所有的平台模型都是简易的模型，我们可以
 - Validation passed: `pnpm --filter @valley/toy-climb-arena typecheck` and `pnpm --filter @valley/toy-climb-arena build`. Build still reports the existing large chunk warning.
 - Also ran `pnpm --filter @valley/toy-climb-arena check`; it still fails on existing Biome lint/format diagnostics across `src/` and was not fixed in this performance pass.
 - Browser smoke via `develop-web-game` Playwright client was attempted against `http://localhost:5175`, but Chromium is not installed in the local Playwright cache, so no gameplay screenshot was captured.
+
+## 2026-05-05 · Static platform S4-S6 completion
+
+- Completed the Phase 2 static platform gap for S4-S6.
+- Added generator definitions and GLB exports for:
+  - `toy_irregular_fragment_s4`
+  - `toy_stacked_steps_s5`
+  - `toy_square_plate_s6_confetti`
+  - `toy_round_disc_s6_candy`
+  - `toy_narrow_plank_s6_stripes`
+- Generated the five new GLB files under `assets/models/platforms/`.
+- Registered the new asset IDs in `platformModelAssets.ts`; default `irregular_fragment` now resolves to S4 and barn `stacked_steps` resolves to S5.
+- Replaced several early barn route visual variants in `toyAnimalClimbWorld.ts` so S4/S5/S6 are visible on the main path without changing platform positions.
+- Updated `docs/ASSET_GUIDE.md`, `docs/TASKS.md`, and `docs/TOY_CLIMB_PLATFORM_REMAKE_TASKS.md` to reflect S1-S6 completion.
+- Validation passed: `generate:platform-assets`, targeted encoding guard, targeted Biome check for the two touched `src` files, `typecheck`, and `build`.
+- Full `pnpm --filter @valley/toy-climb-arena check` still fails on existing Biome diagnostics outside this S4-S6 change.
+- Browser smoke was attempted against the local Vite server, but the Playwright Chromium executable is still missing from `C:\Users\A\AppData\Local\ms-playwright\chromium_headless_shell-1217\...`, so no screenshot was captured.
