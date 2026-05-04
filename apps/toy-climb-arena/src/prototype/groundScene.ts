@@ -1,6 +1,6 @@
 /**
  * groundScene.ts
- * 玩具房间地面场景：灯光、棋盘格地砖、背景墙、彩色条纹、散落积木装饰。
+ * 玩具房间地面场景：灯光、棋盘格地砖、房间内装、散落积木装饰。
  * 通过 createGroundScene(scene, opts) 工厂函数创建，返回需要 dispose 的资源及待注册碰撞体。
  */
 import {
@@ -91,7 +91,8 @@ export function createGroundScene(scene: Scene, opts: GroundSceneOptions): Groun
   const tileSingleGeo = new PlaneGeometry(1, 1);
   geometries.push(tileSingleGeo);
   const TILE_SIZE = 4;
-  const TILE_RANGE = 9;
+  const WALL_HALF = 70;
+  const TILE_RANGE = Math.ceil(WALL_HALF / TILE_SIZE) + 1;
   for (let ix = -TILE_RANGE; ix <= TILE_RANGE; ix++) {
     for (let iz = -TILE_RANGE; iz <= TILE_RANGE; iz++) {
       const mat = (ix + iz) % 2 === 0 ? tileMatA : tileMatB;
@@ -104,103 +105,58 @@ export function createGroundScene(scene: Scene, opts: GroundSceneOptions): Groun
     }
   }
 
-  // ── 背景墙（后墙 + 左墙 + 右墙）─────────────────────────────────────────
-  const wallMat = new MeshStandardMaterial({ color: '#FEF6EC', roughness: 0.95, metalness: 0 });
-  materials.push(wallMat);
-  const wallGeo = new PlaneGeometry(1, 1);
-  geometries.push(wallGeo);
-  const WALL_HALF = 55;
+  // ── 房间边界尺寸：实际墙体由 createClimberPrototype 的 boundary wall 承担 ──
   const WALL_HEIGHT = 28;
-  const WALL_Y = floorSurfaceY + WALL_HEIGHT / 2 - 1;
 
-  const backWall = new Mesh(wallGeo, wallMat);
-  backWall.scale.set(WALL_HALF * 2, WALL_HEIGHT, 1);
-  backWall.position.set(0, WALL_Y, -WALL_HALF);
-  backWall.receiveShadow = true;
-  scene.add(backWall);
+  // ── 巨型玩具房间内装（踢脚线 / 墙板 / 窗框 / 收纳柜）────────────────────────
+  const roomFrameGeo = new BoxGeometry(1, 1, 1);
+  geometries.push(roomFrameGeo);
+  const roomTrimMat = new MeshStandardMaterial({
+    color: '#E7B271',
+    roughness: 0.82,
+    metalness: 0.02,
+  });
+  materials.push(roomTrimMat);
 
-  const leftWall = new Mesh(wallGeo, wallMat);
-  leftWall.scale.set(WALL_HALF * 2, WALL_HEIGHT, 1);
-  leftWall.position.set(-WALL_HALF, WALL_Y, 0);
-  leftWall.rotation.y = Math.PI / 2;
-  leftWall.receiveShadow = true;
-  scene.add(leftWall);
+  const placeRoomPiece = (
+    mat: MeshStandardMaterial,
+    position: [number, number, number],
+    size: [number, number, number],
+    rotation: [number, number, number] = [0, 0, 0],
+  ) => {
+    const mesh = new Mesh(roomFrameGeo, mat);
+    mesh.position.set(position[0], position[1], position[2]);
+    mesh.scale.set(size[0], size[1], size[2]);
+    mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    scene.add(mesh);
+    return mesh;
+  };
 
-  const rightWall = new Mesh(wallGeo, wallMat);
-  rightWall.scale.set(WALL_HALF * 2, WALL_HEIGHT, 1);
-  rightWall.position.set(WALL_HALF, WALL_Y, 0);
-  rightWall.rotation.y = -Math.PI / 2;
-  rightWall.receiveShadow = true;
-  scene.add(rightWall);
+  const addRoomCollider = (center: [number, number, number], size: [number, number, number]) => {
+    pendingDecoColliders.push({ center, size });
+  };
 
-  // ── 四面墙彩色竖条纹 ────────────────────────────────────────────────────────
-  const wallStripeColors = ['#FECACA', '#FDE68A', '#BBF7D0', '#BAE6FD', '#E9D5FF', '#FBCFE8'];
-  const stripeGeo = new PlaneGeometry(1, 1);
-  geometries.push(stripeGeo);
-  const STRIPE_WIDTH = 4.5;
-  const STRIPE_HEIGHT = WALL_HEIGHT * 0.65;
-  const STRIPE_GAP = 1.5;
-  const STRIPE_OFFSET_Y = floorSurfaceY + STRIPE_HEIGHT / 2 + 0.5;
+  const roomInset = 0.42;
+  const roomLength = WALL_HALF * 2;
+  const roomBaseY = floorSurfaceY + 0.42;
+  const roomTopY = floorSurfaceY + WALL_HEIGHT - 1.0;
 
-  // 后墙（z = -WALL_HALF，面朝 +z）
-  for (let i = 0; i < wallStripeColors.length; i++) {
-    const stripeMat = new MeshStandardMaterial({
-      color: wallStripeColors[i],
-      roughness: 0.98,
-      metalness: 0,
-    });
-    materials.push(stripeMat);
-    const ox = (i - wallStripeColors.length / 2 + 0.5) * (STRIPE_WIDTH + STRIPE_GAP);
-    const s = new Mesh(stripeGeo, stripeMat);
-    s.scale.set(STRIPE_WIDTH, STRIPE_HEIGHT, 1);
-    s.position.set(ox, STRIPE_OFFSET_Y, -WALL_HALF + 0.04);
-    scene.add(s);
-  }
-  // 前墙（z = +WALL_HALF，面朝 -z）
-  for (let i = 0; i < wallStripeColors.length; i++) {
-    const stripeMat = new MeshStandardMaterial({
-      color: wallStripeColors[i],
-      roughness: 0.98,
-      metalness: 0,
-    });
-    materials.push(stripeMat);
-    const ox = (i - wallStripeColors.length / 2 + 0.5) * (STRIPE_WIDTH + STRIPE_GAP);
-    const s = new Mesh(stripeGeo, stripeMat);
-    s.scale.set(STRIPE_WIDTH, STRIPE_HEIGHT, 1);
-    s.position.set(ox, STRIPE_OFFSET_Y, WALL_HALF - 0.04);
-    s.rotation.y = Math.PI;
-    scene.add(s);
-  }
-  // 左墙（x = -WALL_HALF，面朝 +x）
-  for (let i = 0; i < wallStripeColors.length; i++) {
-    const stripeMat = new MeshStandardMaterial({
-      color: wallStripeColors[i],
-      roughness: 0.98,
-      metalness: 0,
-    });
-    materials.push(stripeMat);
-    const oz = (i - wallStripeColors.length / 2 + 0.5) * (STRIPE_WIDTH + STRIPE_GAP);
-    const s = new Mesh(stripeGeo, stripeMat);
-    s.scale.set(STRIPE_WIDTH, STRIPE_HEIGHT, 1);
-    s.position.set(-WALL_HALF + 0.04, STRIPE_OFFSET_Y, oz);
-    s.rotation.y = Math.PI / 2;
-    scene.add(s);
-  }
-  // 右墙（x = +WALL_HALF，面朝 -x）
-  for (let i = 0; i < wallStripeColors.length; i++) {
-    const stripeMat = new MeshStandardMaterial({
-      color: wallStripeColors[i],
-      roughness: 0.98,
-      metalness: 0,
-    });
-    materials.push(stripeMat);
-    const oz = (i - wallStripeColors.length / 2 + 0.5) * (STRIPE_WIDTH + STRIPE_GAP);
-    const s = new Mesh(stripeGeo, stripeMat);
-    s.scale.set(STRIPE_WIDTH, STRIPE_HEIGHT, 1);
-    s.position.set(WALL_HALF - 0.04, STRIPE_OFFSET_Y, oz);
-    s.rotation.y = -Math.PI / 2;
-    scene.add(s);
-  }
+  // 踢脚线与顶梁，让墙面看起来像房间内装而不是一张单独贴图。
+  placeRoomPiece(roomTrimMat, [0, roomBaseY, -WALL_HALF + roomInset], [roomLength - 5, 0.95, 0.62]);
+  addRoomCollider([0, roomBaseY, -WALL_HALF + roomInset], [roomLength - 5, 0.95, 0.62]);
+  placeRoomPiece(roomTrimMat, [0, roomBaseY, WALL_HALF - roomInset], [roomLength - 5, 0.95, 0.62]);
+  addRoomCollider([0, roomBaseY, WALL_HALF - roomInset], [roomLength - 5, 0.95, 0.62]);
+  placeRoomPiece(roomTrimMat, [-WALL_HALF + roomInset, roomBaseY, 0], [0.62, 0.95, roomLength - 5]);
+  addRoomCollider([-WALL_HALF + roomInset, roomBaseY, 0], [0.62, 0.95, roomLength - 5]);
+  placeRoomPiece(roomTrimMat, [WALL_HALF - roomInset, roomBaseY, 0], [0.62, 0.95, roomLength - 5]);
+  addRoomCollider([WALL_HALF - roomInset, roomBaseY, 0], [0.62, 0.95, roomLength - 5]);
+
+  placeRoomPiece(roomTrimMat, [0, roomTopY, -WALL_HALF + roomInset], [roomLength - 5, 0.72, 0.5]);
+  placeRoomPiece(roomTrimMat, [0, roomTopY, WALL_HALF - roomInset], [roomLength - 5, 0.72, 0.5]);
+  placeRoomPiece(roomTrimMat, [-WALL_HALF + roomInset, roomTopY, 0], [0.5, 0.72, roomLength - 5]);
+  placeRoomPiece(roomTrimMat, [WALL_HALF - roomInset, roomTopY, 0], [0.5, 0.72, roomLength - 5]);
 
   // ── 散落积木装饰（box + 圆柱躺倒 + 堆叠层）──────────────────────────────
   const decoColors = [
@@ -283,87 +239,6 @@ export function createGroundScene(scene: Scene, opts: GroundSceneOptions): Groun
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     scene.add(mesh);
-  }
-
-  // ── 背景远景积木塔（墙面前方的玩具城市天际线剪影）────────────────────────
-  // 紧贴后墙摆放一排高低错落的积木柱，营造景深和玩具房间纵深感
-  const cityColors = [
-    '#EF4444',
-    '#3B82F6',
-    '#22C55E',
-    '#FBBF24',
-    '#A855F7',
-    '#F97316',
-    '#EC4899',
-    '#14B8A6',
-    '#60A5FA',
-    '#FCD34D',
-    '#86EFAC',
-    '#F9A8D4',
-  ];
-  const cityBlockGeo = new BoxGeometry(1, 1, 1);
-  geometries.push(cityBlockGeo);
-
-  // 每组积木塔：[x偏移, 宽, 高, 颜色索引]
-  // 深度固定 0.8m，贴紧后墙，不向房间内突出
-  type TowerDef = [number, number, number, number];
-  const TOWER_DEPTH = 0.8;
-  const towers: TowerDef[] = [
-    [-48, 4.5, 14, 0],
-    [-42, 3.2, 9, 1],
-    [-38, 5.0, 17, 2],
-    [-34, 2.8, 7, 3],
-    [-30, 4.0, 12, 4],
-    [-26, 3.5, 10, 5],
-    [-22, 2.5, 6, 6],
-    [-18, 4.8, 16, 7],
-    [-10, 3.0, 8, 8],
-    [-5, 5.5, 18, 9],
-    [0, 3.8, 11, 10],
-    [5, 2.6, 7, 11],
-    [10, 4.2, 14, 0],
-    [16, 3.0, 10, 1],
-    [20, 5.2, 17, 2],
-    [25, 2.8, 6, 3],
-    [30, 4.0, 13, 4],
-    [35, 3.6, 10, 5],
-    [40, 5.0, 18, 6],
-    [46, 3.2, 8, 7],
-  ];
-
-  // 后面紧贴后墙：back face 在 z=-WALL_HALF+0.05，front face 在 z=-WALL_HALF+TOWER_DEPTH+0.05
-  const WALL_HALF_BG = 55;
-  const towerBaseZ = -(WALL_HALF_BG - TOWER_DEPTH / 2 - 0.05);
-
-  for (const [tx, tw, th, ci] of towers) {
-    const mat = new MeshStandardMaterial({
-      color: new Color(cityColors[ci % cityColors.length]),
-      roughness: 0.8,
-      metalness: 0.04,
-    });
-    materials.push(mat);
-
-    const block = new Mesh(cityBlockGeo, mat);
-    block.scale.set(tw, th, TOWER_DEPTH);
-    block.position.set(tx, floorSurfaceY + th / 2, towerBaseZ);
-    block.castShadow = false;
-    block.receiveShadow = false;
-    scene.add(block);
-
-    // 顶部帽块（更小更亮，颜色错开）
-    const capH = tw * 0.25;
-    const capMat = new MeshStandardMaterial({
-      color: new Color(cityColors[(ci + 4) % cityColors.length]),
-      roughness: 0.65,
-      metalness: 0.06,
-    });
-    materials.push(capMat);
-    const cap = new Mesh(cityBlockGeo, capMat);
-    cap.scale.set(tw * 0.65, capH, TOWER_DEPTH * 0.8);
-    cap.position.set(tx, floorSurfaceY + th + capH / 2, towerBaseZ);
-    cap.castShadow = false;
-    cap.receiveShadow = false;
-    scene.add(cap);
   }
 
   return { geometries, materials, pendingDecoColliders };
