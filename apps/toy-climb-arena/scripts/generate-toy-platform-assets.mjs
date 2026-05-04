@@ -50,14 +50,7 @@ function material(color, roughness = 0.46, metalness = 0.06) {
   });
 }
 
-function addMesh(
-  group,
-  geometry,
-  mat,
-  position,
-  rotation = [0, 0, 0],
-  options = {},
-) {
+function addMesh(group, geometry, mat, position, rotation = [0, 0, 0], options = {}) {
   const mesh = new Mesh(geometry, mat);
   mesh.name = options.name ?? `solid_${group.children.length + 1}`;
   mesh.userData = {
@@ -136,20 +129,14 @@ function createRoundDisc() {
 
   addCylinder(group, 1.7, 0.38, 32, body, [0, 0.19, 0]);
   addCylinder(group, 1.44, 0.1, 32, top, [0, 0.46, 0]);
-  addMesh(group, new TorusGeometry(1.24, 0.08, 10, 32), accent, [0, 0.56, 0], [
-    Math.PI / 2,
-    0,
-    0,
-  ], { collisionShape: 'none' });
+  addMesh(group, new TorusGeometry(1.24, 0.08, 10, 32), accent, [0, 0.56, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
   addCylinder(group, 0.25, 0.14, 18, accent, [0, 0.66, 0]);
 
   for (let i = 0; i < 6; i += 1) {
     const angle = (Math.PI * 2 * i) / 6;
-    addCylinder(group, 0.08, 0.1, 10, stud, [
-      Math.cos(angle) * 0.86,
-      0.7,
-      Math.sin(angle) * 0.86,
-    ]);
+    addCylinder(group, 0.08, 0.1, 10, stud, [Math.cos(angle) * 0.86, 0.7, Math.sin(angle) * 0.86]);
   }
   return group;
 }
@@ -220,16 +207,12 @@ function createBarrelRoundTop() {
 
   addCylinder(group, 1.35, 0.72, 24, barrel, [0, 0.36, 0]);
   addCylinder(group, 1.26, 0.08, 24, top, [0, 0.76, 0]);
-  addMesh(group, new TorusGeometry(1.33, 0.045, 8, 28), band, [0, 0.22, 0], [
-    Math.PI / 2,
-    0,
-    0,
-  ], { collisionShape: 'none' });
-  addMesh(group, new TorusGeometry(1.33, 0.045, 8, 28), band, [0, 0.55, 0], [
-    Math.PI / 2,
-    0,
-    0,
-  ], { collisionShape: 'none' });
+  addMesh(group, new TorusGeometry(1.33, 0.045, 8, 28), band, [0, 0.22, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
+  addMesh(group, new TorusGeometry(1.33, 0.045, 8, 28), band, [0, 0.55, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
   for (let i = 0; i < 8; i += 1) {
     const angle = (Math.PI * 2 * i) / 8;
     const slat = addBox(group, [0.045, 0.5, 0.08], band, [
@@ -291,32 +274,18 @@ function createCrumbleCookieTile() {
   addCylinder(group, 0.72, 0.28, 24, cookie, [1.12, 0.32, 0.7]);
   addBox(group, [3.15, 0.18, 1.74], cookieSide, [0, 0.12, 0]);
 
-  addBox(group, [1.76, 0.045, 0.42], icing, [-0.38, 0.485, -0.28], [
-    0,
-    MathUtils.degToRad(8),
-    0,
-  ]);
-  addBox(group, [1.42, 0.045, 0.34], icing, [0.46, 0.49, 0.35], [
-    0,
-    MathUtils.degToRad(-10),
-    0,
-  ]);
+  addBox(group, [1.76, 0.045, 0.42], icing, [-0.38, 0.485, -0.28], [0, MathUtils.degToRad(8), 0]);
+  addBox(group, [1.42, 0.045, 0.34], icing, [0.46, 0.49, 0.35], [0, MathUtils.degToRad(-10), 0]);
 
-  addBox(group, [2.68, 0.05, 0.045], crack, [0.08, 0.535, -0.02], [
-    0,
-    MathUtils.degToRad(14),
-    0,
-  ], { collisionShape: 'none' });
-  addBox(group, [1.1, 0.05, 0.04], crack, [-0.65, 0.54, 0.45], [
-    0,
-    MathUtils.degToRad(-28),
-    0,
-  ], { collisionShape: 'none' });
-  addBox(group, [0.86, 0.05, 0.04], crack, [0.95, 0.54, -0.48], [
-    0,
-    MathUtils.degToRad(-34),
-    0,
-  ], { collisionShape: 'none' });
+  addBox(group, [2.68, 0.05, 0.045], crack, [0.08, 0.535, -0.02], [0, MathUtils.degToRad(14), 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [1.1, 0.05, 0.04], crack, [-0.65, 0.54, 0.45], [0, MathUtils.degToRad(-28), 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [0.86, 0.05, 0.04], crack, [0.95, 0.54, -0.48], [0, MathUtils.degToRad(-34), 0], {
+    collisionShape: 'none',
+  });
 
   for (const [x, z, scale] of [
     [-1.12, -0.48, 1],
@@ -373,11 +342,14 @@ function createCastleBrickBlock() {
 
   for (let row = 0; row < 2; row += 1) {
     for (let col = 0; col < 3; col += 1) {
-      addBox(group, [0.72, 0.055, 0.08], dark, [-1.05 + col * 1.05, 0.66, -1.2 + row * 2.4], [
-        0,
-        MathUtils.degToRad(row === 0 ? 0 : 180),
-        0,
-      ], { collisionShape: 'none' });
+      addBox(
+        group,
+        [0.72, 0.055, 0.08],
+        dark,
+        [-1.05 + col * 1.05, 0.66, -1.2 + row * 2.4],
+        [0, MathUtils.degToRad(row === 0 ? 0 : 180), 0],
+        { collisionShape: 'none' },
+      );
     }
   }
 
@@ -473,21 +445,11 @@ function createBarnCookieStack() {
   const sugar = material('#F9A8D4', 0.48, 0.02);
 
   addBox(group, [4.1, 0.22, 3.1], wafer, [0, 0.14, 0], [0, MathUtils.degToRad(-2), 0]);
-  addBox(group, [3.78, 0.12, 2.78], cream, [0.08, 0.34, -0.02], [
-    0,
-    MathUtils.degToRad(3),
-    0,
-  ]);
-  addBox(group, [3.72, 0.22, 2.72], wafer, [-0.08, 0.52, 0.04], [
-    0,
-    MathUtils.degToRad(5),
-    0,
-  ]);
-  addBox(group, [3.32, 0.1, 2.32], sugar, [0.04, 0.7, -0.02], [
-    0,
-    MathUtils.degToRad(-4),
-    0,
-  ], { collisionShape: 'none' });
+  addBox(group, [3.78, 0.12, 2.78], cream, [0.08, 0.34, -0.02], [0, MathUtils.degToRad(3), 0]);
+  addBox(group, [3.72, 0.22, 2.72], wafer, [-0.08, 0.52, 0.04], [0, MathUtils.degToRad(5), 0]);
+  addBox(group, [3.32, 0.1, 2.32], sugar, [0.04, 0.7, -0.02], [0, MathUtils.degToRad(-4), 0], {
+    collisionShape: 'none',
+  });
 
   for (const [x, z, s] of [
     [-1.35, -0.8, 1],
@@ -495,11 +457,14 @@ function createBarnCookieStack() {
     [0.75, -0.55, 0.82],
     [1.35, 0.7, 0.58],
   ]) {
-    const chip = addMesh(group, new SphereGeometry(0.13 * s, 8, 6), chocolate, [x, 0.8, z], [
-      0,
-      0,
-      0,
-    ], { collisionShape: 'none' });
+    const chip = addMesh(
+      group,
+      new SphereGeometry(0.13 * s, 8, 6),
+      chocolate,
+      [x, 0.8, z],
+      [0, 0, 0],
+      { collisionShape: 'none' },
+    );
     chip.scale.y = 0.28;
   }
   return group;
@@ -515,21 +480,9 @@ function createBarnAbcBlockPile() {
   const ink = material('#1E293B', 0.52, 0.04);
 
   addBox(group, [1.55, 1.0, 1.55], red, [-0.98, 0.5, 0.48], [0, MathUtils.degToRad(-7), 0]);
-  addBox(group, [1.65, 1.08, 1.65], blue, [0.62, 0.54, -0.35], [
-    0,
-    MathUtils.degToRad(8),
-    0,
-  ]);
-  addBox(group, [1.45, 0.86, 1.45], yellow, [1.72, 0.43, 0.92], [
-    0,
-    MathUtils.degToRad(-13),
-    0,
-  ]);
-  addBox(group, [1.42, 0.82, 1.42], green, [-0.25, 1.45, 0.18], [
-    0,
-    MathUtils.degToRad(10),
-    0,
-  ]);
+  addBox(group, [1.65, 1.08, 1.65], blue, [0.62, 0.54, -0.35], [0, MathUtils.degToRad(8), 0]);
+  addBox(group, [1.45, 0.86, 1.45], yellow, [1.72, 0.43, 0.92], [0, MathUtils.degToRad(-13), 0]);
+  addBox(group, [1.42, 0.82, 1.42], green, [-0.25, 1.45, 0.18], [0, MathUtils.degToRad(10), 0]);
 
   addBox(group, [0.62, 0.055, 0.1], ink, [-0.98, 1.035, -0.32], [0, 0, 0], {
     collisionShape: 'none',
@@ -559,16 +512,17 @@ function createBarnPuddingCup() {
 
   addCylinder(group, 1.24, 0.68, 28, cup, [0, 0.34, 0]);
   addCylinder(group, 1.38, 0.12, 28, cream, [0, 0.76, 0]);
-  addMesh(group, new TorusGeometry(1.18, 0.055, 8, 28), stripe, [0, 0.48, 0], [
-    Math.PI / 2,
-    0,
-    0,
-  ], { collisionShape: 'none' });
-  const cherryMesh = addMesh(group, new SphereGeometry(0.2, 12, 8), cherry, [0.22, 0.94, -0.1], [
-    0,
-    0,
-    0,
-  ], { collisionShape: 'none' });
+  addMesh(group, new TorusGeometry(1.18, 0.055, 8, 28), stripe, [0, 0.48, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
+  const cherryMesh = addMesh(
+    group,
+    new SphereGeometry(0.2, 12, 8),
+    cherry,
+    [0.22, 0.94, -0.1],
+    [0, 0, 0],
+    { collisionShape: 'none' },
+  );
   cherryMesh.scale.y = 0.72;
   return group;
 }
@@ -581,11 +535,7 @@ function createBarnButtonCushion() {
   const button = material('#FDE68A', 0.46, 0.03);
 
   addBox(group, [4.2, 0.5, 3.15], cushion, [0, 0.28, 0]);
-  addBox(group, [3.72, 0.08, 2.66], material('#BAE6FD', 0.42, 0.02), [0, 0.58, 0], [
-    0,
-    0,
-    0,
-  ]);
+  addBox(group, [3.72, 0.08, 2.66], material('#BAE6FD', 0.42, 0.02), [0, 0.58, 0], [0, 0, 0]);
   addBox(group, [3.78, 0.055, 0.06], seam, [0, 0.65, 0], [0, 0, 0], {
     collisionShape: 'none',
   });
@@ -612,26 +562,10 @@ function createCastleBookStack() {
   const band = material('#FACC15', 0.38, 0.04);
 
   addBox(group, [4.5, 0.3, 3.45], coverA, [0, 0.18, 0], [0, MathUtils.degToRad(2), 0]);
-  addBox(group, [4.15, 0.1, 3.1], pages, [0.04, 0.4, -0.03], [
-    0,
-    MathUtils.degToRad(2),
-    0,
-  ]);
-  addBox(group, [4.1, 0.28, 3.05], coverB, [-0.1, 0.6, 0.08], [
-    0,
-    MathUtils.degToRad(-4),
-    0,
-  ]);
-  addBox(group, [3.62, 0.1, 2.64], pages, [-0.08, 0.8, 0.05], [
-    0,
-    MathUtils.degToRad(-4),
-    0,
-  ]);
-  addBox(group, [3.5, 0.28, 2.55], coverC, [0.12, 1.0, -0.05], [
-    0,
-    MathUtils.degToRad(6),
-    0,
-  ]);
+  addBox(group, [4.15, 0.1, 3.1], pages, [0.04, 0.4, -0.03], [0, MathUtils.degToRad(2), 0]);
+  addBox(group, [4.1, 0.28, 3.05], coverB, [-0.1, 0.6, 0.08], [0, MathUtils.degToRad(-4), 0]);
+  addBox(group, [3.62, 0.1, 2.64], pages, [-0.08, 0.8, 0.05], [0, MathUtils.degToRad(-4), 0]);
+  addBox(group, [3.5, 0.28, 2.55], coverC, [0.12, 1.0, -0.05], [0, MathUtils.degToRad(6), 0]);
   addBox(group, [0.18, 0.08, 3.2], band, [-1.7, 1.2, -0.05], [0, MathUtils.degToRad(6), 0], {
     collisionShape: 'none',
   });
@@ -670,11 +604,7 @@ function createCastleKeyBridge() {
   const blue = material('#60A5FA', 0.36, 0.04);
 
   addBox(group, [5.1, 0.24, 0.72], gold, [0.25, 0.18, 0]);
-  addMesh(group, new TorusGeometry(0.52, 0.1, 10, 24), gold, [-2.65, 0.18, 0], [
-    Math.PI / 2,
-    0,
-    0,
-  ]);
+  addMesh(group, new TorusGeometry(0.52, 0.1, 10, 24), gold, [-2.65, 0.18, 0], [Math.PI / 2, 0, 0]);
   addBox(group, [0.32, 0.24, 0.56], gold, [2.88, 0.18, -0.28]);
   addBox(group, [0.32, 0.24, 0.56], gold, [3.28, 0.18, 0.28]);
   addBox(group, [4.95, 0.06, 0.08], dark, [0.35, 0.36, -0.38], [0, 0, 0], {
@@ -713,11 +643,16 @@ function createCastleCrownPlatform() {
       Math.sin(angle) * 1.42,
     ]);
     spike.rotation.y = -angle;
-    addCylinder(group, 0.12, 0.1, 12, i % 2 ? blue : red, [
-      Math.cos(angle) * 1.42,
-      1.04,
-      Math.sin(angle) * 1.42,
-    ], [0, 0, 0], { collisionShape: 'none' });
+    addCylinder(
+      group,
+      0.12,
+      0.1,
+      12,
+      i % 2 ? blue : red,
+      [Math.cos(angle) * 1.42, 1.04, Math.sin(angle) * 1.42],
+      [0, 0, 0],
+      { collisionShape: 'none' },
+    );
   }
   addCylinder(group, 0.22, 0.11, 16, purple, [0, 0.73, 0], [0, 0, 0], {
     collisionShape: 'none',
@@ -767,16 +702,22 @@ function createBarnYarnBall() {
   const body = addMesh(group, new SphereGeometry(1.25, 20, 12), yarn, [0, 0.64, 0]);
   body.scale.y = 0.58;
   body.userData.collisionShape = 'cylinder';
-  addMesh(group, new TorusGeometry(0.94, 0.045, 8, 28), strand, [0, 0.74, 0], [
-    Math.PI / 2,
-    MathUtils.degToRad(22),
-    0,
-  ], { collisionShape: 'none' });
-  addMesh(group, new TorusGeometry(0.72, 0.04, 8, 24), strand, [0, 0.78, 0], [
-    Math.PI / 2,
-    MathUtils.degToRad(-30),
-    0,
-  ], { collisionShape: 'none' });
+  addMesh(
+    group,
+    new TorusGeometry(0.94, 0.045, 8, 28),
+    strand,
+    [0, 0.74, 0],
+    [Math.PI / 2, MathUtils.degToRad(22), 0],
+    { collisionShape: 'none' },
+  );
+  addMesh(
+    group,
+    new TorusGeometry(0.72, 0.04, 8, 24),
+    strand,
+    [0, 0.78, 0],
+    [Math.PI / 2, MathUtils.degToRad(-30), 0],
+    { collisionShape: 'none' },
+  );
   addBox(group, [0.7, 0.05, 0.28], patch, [0.22, 1.18, -0.08], [0, MathUtils.degToRad(15), 0], {
     collisionShape: 'none',
   });
@@ -794,11 +735,7 @@ function createBarnXylophoneBridge() {
   addBox(group, [5.9, 0.16, 0.16], rail, [0, 0.18, 0.48]);
   colors.forEach((color, index) => {
     const x = -2.45 + index * 0.98;
-    addBox(group, [0.72, 0.16, 1.02 - index * 0.055], material(color, 0.42, 0.04), [
-      x,
-      0.36,
-      0,
-    ]);
+    addBox(group, [0.72, 0.16, 1.02 - index * 0.055], material(color, 0.42, 0.04), [x, 0.36, 0]);
     addCylinder(group, 0.055, 0.08, 8, peg, [x - 0.2, 0.49, -0.3], [0, 0, 0], {
       collisionShape: 'none',
     });
@@ -849,11 +786,16 @@ function createCastleHourglassTower() {
   addCylinder(group, 0.86, 0.18, 24, gold, [0, 0.82, 0]);
   for (let i = 0; i < 4; i += 1) {
     const angle = (Math.PI * 2 * i) / 4;
-    addCylinder(group, 0.055, 0.66, 8, gold, [Math.cos(angle) * 0.92, 0.48, Math.sin(angle) * 0.92], [
-      0,
-      0,
-      0,
-    ], { collisionShape: 'none' });
+    addCylinder(
+      group,
+      0.055,
+      0.66,
+      8,
+      gold,
+      [Math.cos(angle) * 0.92, 0.48, Math.sin(angle) * 0.92],
+      [0, 0, 0],
+      { collisionShape: 'none' },
+    );
   }
   return group;
 }
@@ -941,11 +883,9 @@ function createCastleExtendableRulerBridge() {
   addBox(group, [3.05, 0.1, 0.86], slide, [1.05, 0.54, 0]);
   for (let i = 0; i < 9; i += 1) {
     const x = -2.55 + i * 0.64;
-    addBox(group, [0.045, 0.06, i % 2 === 0 ? 0.78 : 0.48], mark, [x, 0.64, 0], [
-      0,
-      0,
-      0,
-    ], { collisionShape: 'none' });
+    addBox(group, [0.045, 0.06, i % 2 === 0 ? 0.78 : 0.48], mark, [x, 0.64, 0], [0, 0, 0], {
+      collisionShape: 'none',
+    });
   }
   addCylinder(group, 0.14, 0.08, 14, jewel, [-2.8, 0.69, 0], [0, 0, 0], {
     collisionShape: 'none',
@@ -1021,11 +961,14 @@ function createConveyorTrackBelt() {
     addBox(group, [0.52, 0.035, 0.12], arrow, [x, 0.48, 0], [0, 0, 0], {
       collisionShape: 'none',
     });
-    addBox(group, [0.22, 0.035, 0.22], arrow, [x + 0.28, 0.485, 0], [
-      0,
-      MathUtils.degToRad(45),
-      0,
-    ], { collisionShape: 'none' });
+    addBox(
+      group,
+      [0.22, 0.035, 0.22],
+      arrow,
+      [x + 0.28, 0.485, 0],
+      [0, MathUtils.degToRad(45), 0],
+      { collisionShape: 'none' },
+    );
   }
   return group;
 }
@@ -1039,16 +982,12 @@ function createPlasticIceBlock() {
 
   addBox(group, [3.42, 0.58, 2.72], ice, [0, 0.29, 0]);
   addBox(group, [3.14, 0.12, 2.42], side, [0, 0.64, 0]);
-  addBox(group, [1.15, 0.035, 0.12], shine, [-0.7, 0.72, -0.58], [
-    0,
-    MathUtils.degToRad(-18),
-    0,
-  ], { collisionShape: 'none' });
-  addBox(group, [0.82, 0.035, 0.1], shine, [0.82, 0.725, 0.55], [
-    0,
-    MathUtils.degToRad(21),
-    0,
-  ], { collisionShape: 'none' });
+  addBox(group, [1.15, 0.035, 0.12], shine, [-0.7, 0.72, -0.58], [0, MathUtils.degToRad(-18), 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [0.82, 0.035, 0.1], shine, [0.82, 0.725, 0.55], [0, MathUtils.degToRad(21), 0], {
+    collisionShape: 'none',
+  });
   return group;
 }
 
@@ -1065,11 +1004,9 @@ function createGummyStickyPad() {
   addBox(group, [2.25, 0.05, 0.18], sugar, [0, 0.56, 0], [0, MathUtils.degToRad(12), 0], {
     collisionShape: 'none',
   });
-  addBox(group, [1.4, 0.05, 0.14], sugar, [-0.15, 0.565, 0.46], [
-    0,
-    MathUtils.degToRad(-18),
-    0,
-  ], { collisionShape: 'none' });
+  addBox(group, [1.4, 0.05, 0.14], sugar, [-0.15, 0.565, 0.46], [0, MathUtils.degToRad(-18), 0], {
+    collisionShape: 'none',
+  });
   for (const [x, z] of [
     [-0.85, -0.45],
     [0.72, -0.28],
@@ -1108,34 +1045,538 @@ function createCrackedPuzzleCrumble() {
   const blue = material('#38BDF8', 0.42, 0.05);
   const crack = material('#7C2D12', 0.76, 0.02);
 
-  const left = addBox(group, [1.55, 0.3, 2.1], red, [-0.74, 0.24, 0], [
-    0,
-    MathUtils.degToRad(-4),
-    0,
-  ]);
+  const left = addBox(
+    group,
+    [1.55, 0.3, 2.1],
+    red,
+    [-0.74, 0.24, 0],
+    [0, MathUtils.degToRad(-4), 0],
+  );
   left.name = 'solid_left_puzzle_piece';
-  const right = addBox(group, [1.55, 0.3, 2.1], yellow, [0.74, 0.24, 0], [
-    0,
-    MathUtils.degToRad(4),
-    0,
-  ]);
+  const right = addBox(
+    group,
+    [1.55, 0.3, 2.1],
+    yellow,
+    [0.74, 0.24, 0],
+    [0, MathUtils.degToRad(4), 0],
+  );
   right.name = 'solid_right_puzzle_piece';
   addCylinder(group, 0.32, 0.3, 18, blue, [0, 0.24, -1.0]);
-  addBox(group, [2.75, 0.05, 0.045], crack, [0, 0.43, 0], [
-    0,
-    MathUtils.degToRad(16),
-    0,
-  ], { collisionShape: 'none' });
-  addBox(group, [1.05, 0.05, 0.045], crack, [-0.45, 0.435, 0.46], [
-    0,
-    MathUtils.degToRad(-28),
-    0,
-  ], { collisionShape: 'none' });
-  addBox(group, [0.85, 0.05, 0.045], crack, [0.7, 0.435, -0.44], [
-    0,
-    MathUtils.degToRad(-35),
-    0,
-  ], { collisionShape: 'none' });
+  addBox(group, [2.75, 0.05, 0.045], crack, [0, 0.43, 0], [0, MathUtils.degToRad(16), 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [1.05, 0.05, 0.045], crack, [-0.45, 0.435, 0.46], [0, MathUtils.degToRad(-28), 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [0.85, 0.05, 0.045], crack, [0.7, 0.435, -0.44], [0, MathUtils.degToRad(-35), 0], {
+    collisionShape: 'none',
+  });
+  return group;
+}
+
+// ─── Z3 Sky Island models ────────────────────────────────────────────────────
+
+function createSkyMetalPlate() {
+  const group = new Group();
+  group.name = 'toy_sky_metal_plate';
+  const steel = material('#1E293B', 0.34, 0.28);
+  const silver = material('#94A3B8', 0.28, 0.24);
+  const topPanel = material('#CBD5E1', 0.24, 0.18);
+  const glow = material('#67E8F9', 0.18, 0.14);
+  const bolt = material('#FBBF24', 0.3, 0.18);
+  const circuit = material('#3B82F6', 0.26, 0.12);
+
+  // Main body
+  addBox(group, [4.0, 0.46, 3.4], steel, [0, 0.23, 0]);
+  // Inset silver face
+  addBox(group, [3.52, 0.1, 2.94], silver, [0, 0.52, 0]);
+  // Bright top landing panel
+  addBox(group, [2.96, 0.05, 2.42], topPanel, [0, 0.62, 0]);
+
+  // Glow edge strips (4 sides)
+  addBox(group, [4.06, 0.06, 0.1], glow, [0, 0.5, -1.7], [0, 0, 0], { collisionShape: 'none' });
+  addBox(group, [4.06, 0.06, 0.1], glow, [0, 0.5, 1.7], [0, 0, 0], { collisionShape: 'none' });
+  addBox(group, [0.1, 0.06, 3.46], glow, [-2.0, 0.5, 0], [0, 0, 0], { collisionShape: 'none' });
+  addBox(group, [0.1, 0.06, 3.46], glow, [2.0, 0.5, 0], [0, 0, 0], { collisionShape: 'none' });
+
+  // Corner hex bolts with cross mark
+  for (const [x, z] of [
+    [-1.52, -1.18],
+    [1.52, -1.18],
+    [-1.52, 1.18],
+    [1.52, 1.18],
+  ]) {
+    addCylinder(group, 0.13, 0.1, 6, bolt, [x, 0.68, z], [0, 0, 0], { collisionShape: 'none' });
+    addBox(group, [0.2, 0.04, 0.04], bolt, [x, 0.74, z], [0, 0, 0], { collisionShape: 'none' });
+    addBox(group, [0.04, 0.04, 0.2], bolt, [x, 0.74, z], [0, 0, 0], { collisionShape: 'none' });
+  }
+
+  // Circuit line pattern on top surface
+  addBox(group, [2.2, 0.035, 0.06], circuit, [0, 0.67, -0.62], [0, 0, 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [2.2, 0.035, 0.06], circuit, [0, 0.67, 0.62], [0, 0, 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [0.06, 0.035, 1.24], circuit, [-0.82, 0.67, 0], [0, 0, 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [0.06, 0.035, 1.24], circuit, [0.82, 0.67, 0], [0, 0, 0], {
+    collisionShape: 'none',
+  });
+  // Center status indicator
+  addCylinder(group, 0.16, 0.07, 12, glow, [0, 0.7, 0], [0, 0, 0], { collisionShape: 'none' });
+  addCylinder(group, 0.07, 0.05, 8, bolt, [0, 0.78, 0], [0, 0, 0], { collisionShape: 'none' });
+
+  return group;
+}
+
+function createSkySpinningDisc() {
+  const group = new Group();
+  group.name = 'toy_sky_spinning_disc';
+  const base = material('#6D28D9', 0.36, 0.1);
+  const band1 = material('#EC4899', 0.32, 0.08);
+  const band2 = material('#F59E0B', 0.38, 0.06);
+  const topSurf = material('#DDD6FE', 0.28, 0.08);
+  const hub = material('#FBBF24', 0.28, 0.18);
+  const rim = material('#C4B5FD', 0.26, 0.12);
+  const gem1 = material('#67E8F9', 0.16, 0.24);
+  const gem2 = material('#F9A8D4', 0.16, 0.22);
+  const gem3 = material('#86EFAC', 0.16, 0.24);
+
+  // Main disc body
+  addCylinder(group, 1.62, 0.36, 32, base, [0, 0.22, 0]);
+  // Outer metallic rim
+  addMesh(group, new TorusGeometry(1.6, 0.1, 10, 40), rim, [0, 0.3, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
+  // Color band rings (decorative)
+  addMesh(group, new TorusGeometry(1.28, 0.08, 8, 36), band1, [0, 0.25, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
+  addMesh(group, new TorusGeometry(0.92, 0.07, 8, 32), band2, [0, 0.27, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
+  // Top landing surface
+  addCylinder(group, 1.42, 0.1, 32, topSurf, [0, 0.46, 0]);
+  // Inner ring
+  addMesh(group, new TorusGeometry(1.36, 0.07, 8, 36), rim, [0, 0.52, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
+  // Center hub tower
+  addCylinder(group, 0.3, 0.22, 16, hub, [0, 0.58, 0]);
+  addCylinder(group, 0.18, 0.1, 14, material('#FEF3C7', 0.24, 0.1), [0, 0.76, 0], [0, 0, 0], {
+    collisionShape: 'none',
+  });
+  // 8 radial spokes alternating pink/amber
+  for (let i = 0; i < 8; i++) {
+    const ang = (Math.PI * 2 * i) / 8;
+    addBox(
+      group,
+      [1.1, 0.04, 0.07],
+      i % 2 ? band1 : band2,
+      [Math.cos(ang) * 0.64, 0.58, Math.sin(ang) * 0.64],
+      [0, -ang, 0],
+      { collisionShape: 'none' },
+    );
+  }
+  // 12 gem dots on outer rim
+  const gemCycle = [gem1, gem2, gem3];
+  for (let i = 0; i < 12; i++) {
+    const ang = (Math.PI * 2 * i) / 12;
+    addCylinder(
+      group,
+      0.09,
+      0.1,
+      8,
+      gemCycle[i % 3],
+      [Math.cos(ang) * 1.6, 0.44, Math.sin(ang) * 1.6],
+      [0, 0, 0],
+      { collisionShape: 'none' },
+    );
+  }
+
+  return group;
+}
+
+function createSkyCrystalShard() {
+  const group = new Group();
+  group.name = 'toy_sky_crystal_shard';
+  const crystal = material('#A78BFA', 0.16, 0.26);
+  const deep = material('#6D28D9', 0.2, 0.3);
+  const surface = material('#DDD6FE', 0.12, 0.2);
+  const edgeGlow = material('#67E8F9', 0.16, 0.18);
+  const spark = material('#FEF3C7', 0.14, 0.1);
+
+  // Main landing crystal slab
+  addBox(group, [2.9, 0.34, 2.1], crystal, [0, 0.22, 0]);
+  // Elevated inner surface
+  addBox(group, [2.34, 0.09, 1.54], surface, [0, 0.44, 0]);
+
+  // Side angled crystal spikes (decorative, no collision)
+  for (const [px, py, pz, rx, ry, rz] of [
+    [-1.52, 0.58, -0.52, 0, MathUtils.degToRad(-14), MathUtils.degToRad(22)],
+    [1.42, 0.52, 0.62, 0, MathUtils.degToRad(11), MathUtils.degToRad(-18)],
+    [0.46, 0.6, -1.04, 0, MathUtils.degToRad(7), MathUtils.degToRad(16)],
+    [-0.52, 0.54, 0.92, 0, MathUtils.degToRad(-9), MathUtils.degToRad(-14)],
+  ]) {
+    addBox(group, [0.44, 0.66, 0.3], px < 0 ? deep : crystal, [px, py, pz], [rx, ry, rz], {
+      collisionShape: 'none',
+    });
+  }
+
+  // Glow edge facets on landing slab
+  addBox(group, [2.94, 0.06, 0.09], edgeGlow, [0, 0.44, -1.06], [0, 0, 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [2.94, 0.06, 0.09], edgeGlow, [0, 0.44, 1.06], [0, 0, 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [0.09, 0.06, 2.14], edgeGlow, [-1.46, 0.44, 0], [0, 0, 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [0.09, 0.06, 2.14], edgeGlow, [1.46, 0.44, 0], [0, 0, 0], {
+    collisionShape: 'none',
+  });
+
+  // Sparkle dot ornaments on top
+  for (const [x, z] of [
+    [-0.74, -0.42],
+    [0.62, -0.52],
+    [-0.22, 0.52],
+    [0.82, 0.32],
+    [-0.92, 0.22],
+  ]) {
+    addCylinder(group, 0.07, 0.06, 6, spark, [x, 0.56, z], [0, 0, 0], { collisionShape: 'none' });
+  }
+
+  return group;
+}
+
+function createSkyCloudIsland() {
+  const group = new Group();
+  group.name = 'toy_sky_cloud_island';
+  const cloud = material('#F8FAFC', 0.5, 0.02);
+  const flat = material('#E0F2FE', 0.56, 0.02);
+  const gold = material('#FBBF24', 0.34, 0.1);
+  const starM = material('#FDE68A', 0.42, 0.06);
+  const rainbowColors = ['#EF4444', '#F97316', '#FACC15', '#22C55E', '#38BDF8'];
+
+  // Large fluffy cloud body — 7 overlapping bumps
+  addCylinder(group, 2.0, 0.44, 28, cloud, [0, 0.5, 0]);
+  addCylinder(group, 1.5, 0.48, 24, cloud, [-1.6, 0.52, 0.2]);
+  addCylinder(group, 1.5, 0.48, 24, cloud, [1.6, 0.52, 0.2]);
+  addCylinder(group, 1.3, 0.44, 22, cloud, [0, 0.5, -1.24]);
+  addCylinder(group, 1.22, 0.4, 20, cloud, [0, 0.52, 1.22]);
+  addCylinder(group, 1.08, 0.38, 18, cloud, [-0.88, 0.54, -0.82]);
+  addCylinder(group, 1.08, 0.38, 18, cloud, [0.88, 0.54, -0.82]);
+
+  // Flat walkable top layer
+  addCylinder(group, 2.12, 0.2, 28, flat, [0, 0.82, 0]);
+
+  // Gold rim torus on landing top
+  addMesh(group, new TorusGeometry(2.1, 0.08, 8, 32), gold, [0, 0.84, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
+
+  // Rainbow arcs below cloud (5 half-torus bands)
+  rainbowColors.forEach((color, i) => {
+    const r = 2.82 - i * 0.22;
+    addMesh(
+      group,
+      new TorusGeometry(r, 0.072 - i * 0.005, 8, 32, Math.PI),
+      material(color, 0.38, 0.04),
+      [0, 0.26 - i * 0.04, 0],
+      [0, Math.PI, 0],
+      { collisionShape: 'none' },
+    );
+  });
+
+  // Star ornaments on top surface
+  for (const [x, z] of [
+    [-0.82, -0.3],
+    [0.9, 0.22],
+    [-0.24, 0.72],
+    [0.42, -0.72],
+  ]) {
+    addCylinder(group, 0.12, 0.06, 6, starM, [x, 0.96, z], [0, 0, 0], { collisionShape: 'none' });
+  }
+
+  return group;
+}
+
+function createSkyNarrowBeam() {
+  const group = new Group();
+  group.name = 'toy_sky_narrow_beam';
+  const metal = material('#334155', 0.34, 0.24);
+  const top = material('#94A3B8', 0.26, 0.2);
+  const glow = material('#67E8F9', 0.18, 0.16);
+  const hazard = material('#FBBF24', 0.36, 0.12);
+  const cap = material('#475569', 0.38, 0.2);
+
+  // Main beam body
+  addBox(group, [6.2, 0.28, 1.0], metal, [0, 0.18, 0]);
+  // Top landing strip
+  addBox(group, [5.9, 0.08, 0.72], top, [0, 0.38, 0]);
+  // Glow strips on long edges
+  addBox(group, [6.24, 0.05, 0.08], glow, [0, 0.38, -0.5], [0, 0, 0], { collisionShape: 'none' });
+  addBox(group, [6.24, 0.05, 0.08], glow, [0, 0.38, 0.5], [0, 0, 0], { collisionShape: 'none' });
+  // Hazard diamond markings (5 evenly spaced)
+  for (let i = 0; i < 5; i++) {
+    const x = -2.4 + i * 1.2;
+    addBox(group, [0.58, 0.04, 0.52], hazard, [x, 0.45, 0], [0, MathUtils.degToRad(45), 0], {
+      collisionShape: 'none',
+    });
+  }
+  // End caps
+  addBox(group, [0.18, 0.3, 1.04], cap, [-3.1, 0.2, 0]);
+  addBox(group, [0.18, 0.3, 1.04], cap, [3.1, 0.2, 0]);
+
+  return group;
+}
+
+// ─── Z4 Olympus Cloud models ─────────────────────────────────────────────────
+
+function createOlympusMarbleDais() {
+  const group = new Group();
+  group.name = 'toy_olympus_marble_dais';
+  const marble = material('#F8FAFC', 0.36, 0.08);
+  const inlay = material('#E2E8F0', 0.42, 0.06);
+  const gold = material('#FBBF24', 0.28, 0.16);
+  const vein = material('#CBD5E1', 0.48, 0.04);
+  const col = material('#F1F5F9', 0.34, 0.06);
+  const gem = material('#67E8F9', 0.14, 0.24);
+
+  // Main marble block
+  addBox(group, [4.2, 0.52, 3.6], marble, [0, 0.26, 0]);
+  // Inset landing surface
+  addBox(group, [3.72, 0.1, 3.12], inlay, [0, 0.58, 0]);
+  // Gold border molding (4 sides)
+  addBox(group, [4.34, 0.1, 0.15], gold, [0, 0.73, -1.8]);
+  addBox(group, [4.34, 0.1, 0.15], gold, [0, 0.73, 1.8]);
+  addBox(group, [0.15, 0.1, 3.76], gold, [-2.16, 0.73, 0]);
+  addBox(group, [0.15, 0.1, 3.76], gold, [2.16, 0.73, 0]);
+  // Marble vein streaks
+  addBox(group, [3.52, 0.04, 0.06], vein, [0.18, 0.66, -0.62], [0, MathUtils.degToRad(-12), 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [2.24, 0.04, 0.06], vein, [-0.42, 0.66, 0.52], [0, MathUtils.degToRad(8), 0], {
+    collisionShape: 'none',
+  });
+  addBox(group, [1.52, 0.04, 0.06], vein, [1.02, 0.66, -0.12], [0, MathUtils.degToRad(22), 0], {
+    collisionShape: 'none',
+  });
+  // 4 mini ionic columns at corners (decorative)
+  for (const [x, z] of [
+    [-1.62, -1.32],
+    [1.62, -1.32],
+    [-1.62, 1.32],
+    [1.62, 1.32],
+  ]) {
+    addCylinder(group, 0.2, 0.72, 8, col, [x, 1.1, z], [0, 0, 0], { collisionShape: 'none' });
+    addBox(group, [0.54, 0.1, 0.54], gold, [x, 1.52, z], [0, MathUtils.degToRad(45), 0], {
+      collisionShape: 'none',
+    });
+    addBox(group, [0.46, 0.08, 0.46], marble, [x, 1.62, z], [0, 0, 0], { collisionShape: 'none' });
+  }
+  // Center gem
+  addCylinder(group, 0.19, 0.1, 12, gem, [0, 0.78, 0], [0, 0, 0], { collisionShape: 'none' });
+
+  return group;
+}
+
+function createOlympusGoldenRing() {
+  const group = new Group();
+  group.name = 'toy_olympus_golden_ring';
+  const gold = material('#FBBF24', 0.26, 0.18);
+  const hub = material('#F8FAFC', 0.26, 0.12);
+  const inner = material('#FEF3C7', 0.32, 0.08);
+  const gem1 = material('#67E8F9', 0.14, 0.26);
+  const gem2 = material('#F9A8D4', 0.14, 0.24);
+  const gem3 = material('#86EFAC', 0.14, 0.26);
+  const center = material('#FBBF24', 0.28, 0.2);
+
+  // Center disc — landing area
+  addCylinder(group, 1.12, 0.28, 24, hub, [0, 0.2, 0]);
+  addCylinder(group, 0.9, 0.1, 22, inner, [0, 0.38, 0]);
+  // Outer golden ring
+  addMesh(group, new TorusGeometry(2.04, 0.24, 12, 44), gold, [0, 0.28, 0], [Math.PI / 2, 0, 0]);
+  // Inner ring
+  addMesh(group, new TorusGeometry(1.44, 0.1, 10, 36), gold, [0, 0.3, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
+  // 8 spoke connectors (hub → outer ring)
+  for (let i = 0; i < 8; i++) {
+    const ang = (Math.PI * 2 * i) / 8;
+    addBox(
+      group,
+      [0.92, 0.12, 0.1],
+      gold,
+      [Math.cos(ang) * 1.52, 0.28, Math.sin(ang) * 1.52],
+      [0, -ang, 0],
+    );
+  }
+  // 12 gem dots embedded on outer ring
+  const gemCycle = [gem1, gem2, gem3];
+  for (let i = 0; i < 12; i++) {
+    const ang = (Math.PI * 2 * i) / 12;
+    addCylinder(
+      group,
+      0.1,
+      0.11,
+      8,
+      gemCycle[i % 3],
+      [Math.cos(ang) * 2.04, 0.4, Math.sin(ang) * 2.04],
+      [0, 0, 0],
+      { collisionShape: 'none' },
+    );
+  }
+  // Center hex star ornament
+  addCylinder(group, 0.24, 0.12, 6, center, [0, 0.5, 0], [0, MathUtils.degToRad(30), 0], {
+    collisionShape: 'none',
+  });
+  addCylinder(group, 0.1, 0.08, 8, inner, [0, 0.66, 0], [0, 0, 0], { collisionShape: 'none' });
+
+  return group;
+}
+
+function createOlympusRainbowCloud() {
+  const group = new Group();
+  group.name = 'toy_olympus_rainbow_cloud';
+  const cloud = material('#F8FAFC', 0.42, 0.02);
+  const flat = material('#E0F2FE', 0.46, 0.02);
+  const gold = material('#FBBF24', 0.3, 0.1);
+  const spring = material('#E5E7EB', 0.26, 0.22);
+  const starM = material('#FDE68A', 0.38, 0.08);
+  const rainbowColors = ['#EF4444', '#F97316', '#FACC15', '#22C55E', '#38BDF8', '#A78BFA'];
+
+  // Large fluffy cloud body (7 overlapping bumps, bigger than sky version)
+  addCylinder(group, 2.0, 0.38, 28, cloud, [0, 0.62, 0]);
+  addCylinder(group, 1.5, 0.42, 24, cloud, [-1.58, 0.64, 0]);
+  addCylinder(group, 1.5, 0.42, 24, cloud, [1.58, 0.64, 0]);
+  addCylinder(group, 1.28, 0.4, 22, cloud, [0, 0.62, -1.14]);
+  addCylinder(group, 1.18, 0.38, 20, cloud, [0, 0.64, 1.14]);
+  addCylinder(group, 1.04, 0.36, 18, cloud, [-0.88, 0.66, -0.8]);
+  addCylinder(group, 1.04, 0.36, 18, cloud, [0.88, 0.66, -0.8]);
+
+  // Flat landing top
+  addCylinder(group, 2.12, 0.22, 28, flat, [0, 0.96, 0]);
+  // Gold rim torus
+  addMesh(group, new TorusGeometry(2.1, 0.1, 8, 34), gold, [0, 0.88, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
+
+  // Full rainbow ring halos (6 rings stacked below)
+  rainbowColors.forEach((color, i) => {
+    const r = 2.72 - i * 0.12;
+    addMesh(
+      group,
+      new TorusGeometry(r, 0.07 - i * 0.004, 7, 36),
+      material(color, 0.38, 0.05),
+      [0, 0.28 - i * 0.04, 0],
+      [Math.PI / 2, MathUtils.degToRad(i * 6), 0],
+      { collisionShape: 'none' },
+    );
+  });
+
+  // Spring coil supports underneath
+  for (const [x, z] of [
+    [-0.8, -0.52],
+    [0.8, -0.52],
+    [-0.8, 0.52],
+    [0.8, 0.52],
+  ]) {
+    addCylinder(group, 0.1, 0.44, 10, spring, [x, 0.22, z]);
+  }
+
+  // 5 gold star ornaments on top
+  for (let i = 0; i < 5; i++) {
+    const ang = (Math.PI * 2 * i) / 5;
+    addCylinder(
+      group,
+      0.11,
+      0.07,
+      6,
+      starM,
+      [Math.cos(ang) * 0.92, 1.11, Math.sin(ang) * 0.92],
+      [0, MathUtils.degToRad(i * 36), 0],
+      { collisionShape: 'none' },
+    );
+  }
+
+  return group;
+}
+
+function createOlympusStarFinale() {
+  const group = new Group();
+  group.name = 'toy_olympus_star_finale';
+  const gold = material('#FBBF24', 0.24, 0.2);
+  const white = material('#FEF3C7', 0.3, 0.12);
+  const gem = material('#67E8F9', 0.12, 0.28);
+  const glow = material('#FDE68A', 0.22, 0.1);
+  const tipGems = [
+    material('#EF4444', 0.32, 0.08),
+    material('#38BDF8', 0.26, 0.12),
+    material('#A78BFA', 0.28, 0.1),
+    material('#22C55E', 0.26, 0.1),
+    material('#F97316', 0.3, 0.08),
+  ];
+
+  // Center disc
+  addCylinder(group, 1.84, 0.36, 32, gold, [0, 0.22, 0]);
+  // 5 golden star-point arms
+  for (let i = 0; i < 5; i++) {
+    const ang = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+    addBox(
+      group,
+      [1.04, 0.32, 0.56],
+      gold,
+      [Math.cos(ang) * 2.04, 0.2, Math.sin(ang) * 2.04],
+      [0, -ang, 0],
+    );
+  }
+  // White top landing surface
+  addCylinder(group, 1.56, 0.1, 32, white, [0, 0.46, 0]);
+  // Inner gold torus ring
+  addMesh(group, new TorusGeometry(1.64, 0.09, 8, 36), gold, [0, 0.44, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
+  // Wide outer torus decoration
+  addMesh(group, new TorusGeometry(2.72, 0.15, 10, 44), gold, [0, 0.36, 0], [Math.PI / 2, 0, 0], {
+    collisionShape: 'none',
+  });
+  // Large cyan gem orb at center
+  addCylinder(group, 0.4, 0.3, 20, gem, [0, 0.6, 0], [0, 0, 0], { collisionShape: 'none' });
+  addCylinder(group, 0.3, 0.14, 16, glow, [0, 0.86, 0], [0, 0, 0], { collisionShape: 'none' });
+  // Colored gems at 5 star tips
+  for (let i = 0; i < 5; i++) {
+    const ang = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+    addCylinder(
+      group,
+      0.15,
+      0.13,
+      10,
+      tipGems[i],
+      [Math.cos(ang) * 2.04, 0.54, Math.sin(ang) * 2.04],
+      [0, 0, 0],
+      { collisionShape: 'none' },
+    );
+  }
+  // 8 gold sparkle ornaments orbiting outer torus
+  for (let i = 0; i < 8; i++) {
+    const ang = (Math.PI * 2 * i) / 8;
+    addCylinder(
+      group,
+      0.09,
+      0.07,
+      6,
+      glow,
+      [Math.cos(ang) * 2.72, 0.52, Math.sin(ang) * 2.72],
+      [0, 0, 0],
+      { collisionShape: 'none' },
+    );
+  }
+
   return group;
 }
 
@@ -1190,3 +1631,14 @@ await exportGlb(createPlasticIceBlock(), 'toy_plastic_ice_block.glb');
 await exportGlb(createGummyStickyPad(), 'toy_gummy_sticky_pad.glb');
 await exportGlb(createCloudBouncePad(), 'toy_cloud_bounce_pad.glb');
 await exportGlb(createCrackedPuzzleCrumble(), 'toy_cracked_puzzle_crumble.glb');
+// Z3 Sky Island
+await exportGlb(createSkyMetalPlate(), 'toy_sky_metal_plate.glb');
+await exportGlb(createSkySpinningDisc(), 'toy_sky_spinning_disc.glb');
+await exportGlb(createSkyCrystalShard(), 'toy_sky_crystal_shard.glb');
+await exportGlb(createSkyCloudIsland(), 'toy_sky_cloud_island.glb');
+await exportGlb(createSkyNarrowBeam(), 'toy_sky_narrow_beam.glb');
+// Z4 Olympus
+await exportGlb(createOlympusMarbleDais(), 'toy_olympus_marble_dais.glb');
+await exportGlb(createOlympusGoldenRing(), 'toy_olympus_golden_ring.glb');
+await exportGlb(createOlympusRainbowCloud(), 'toy_olympus_rainbow_cloud.glb');
+await exportGlb(createOlympusStarFinale(), 'toy_olympus_star_finale.glb');

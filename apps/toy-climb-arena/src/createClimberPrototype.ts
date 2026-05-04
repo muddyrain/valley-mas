@@ -277,6 +277,230 @@ export function createClimberPrototype(
   if (mountStyle === 'static') mount.style.position = 'relative';
   mount.appendChild(debugOverlay);
 
+  // ─── 飞行模式徽章 ────────────────────────────────────────────────────────────
+  const flyBadge = document.createElement('div');
+  flyBadge.style.cssText = [
+    'position:absolute',
+    'top:14px',
+    'left:50%',
+    'transform:translateX(-50%)',
+    'padding:5px 14px',
+    'border-radius:20px',
+    'background:rgba(99,102,241,0.88)',
+    'color:#fff',
+    'font:bold 13px/1.4 monospace',
+    'pointer-events:none',
+    'z-index:20',
+    'border:1px solid rgba(255,255,255,0.3)',
+    'backdrop-filter:blur(4px)',
+    'letter-spacing:0.05em',
+    'display:none',
+  ].join(';');
+  flyBadge.textContent = '🪂  FLY MODE  ·  Space↑  Ctrl↓  ` 控制台';
+  mount.appendChild(flyBadge);
+
+  // ─── 调试控制台 ──────────────────────────────────────────────────────────────
+  const consoleOverlay = document.createElement('div');
+  consoleOverlay.style.cssText = [
+    'position:absolute',
+    'bottom:54px',
+    'left:50%',
+    'transform:translateX(-50%)',
+    'width:420px',
+    'max-width:90vw',
+    'background:rgba(15,23,42,0.92)',
+    'border-radius:12px',
+    'border:1px solid rgba(99,102,241,0.55)',
+    'backdrop-filter:blur(8px)',
+    'z-index:30',
+    'display:none',
+    'flex-direction:column',
+    'overflow:hidden',
+  ].join(';');
+
+  const consoleLog = document.createElement('div');
+  consoleLog.style.cssText = [
+    'padding:8px 12px 4px',
+    'max-height:140px',
+    'overflow-y:auto',
+    'font:11px/1.6 monospace',
+    'color:#94a3b8',
+    'white-space:pre-wrap',
+    'word-break:break-all',
+  ].join(';');
+
+  const consoleInputRow = document.createElement('div');
+  consoleInputRow.style.cssText = [
+    'display:flex',
+    'align-items:center',
+    'padding:6px 10px',
+    'border-top:1px solid rgba(255,255,255,0.08)',
+    'gap:6px',
+  ].join(';');
+
+  const consolePrompt = document.createElement('span');
+  consolePrompt.style.cssText = 'color:#818cf8;font:bold 13px monospace;user-select:none';
+  consolePrompt.textContent = '>';
+
+  const consoleInput = document.createElement('input');
+  consoleInput.type = 'text';
+  consoleInput.style.cssText = [
+    'flex:1',
+    'background:transparent',
+    'border:none',
+    'outline:none',
+    'color:#e2e8f0',
+    'font:13px monospace',
+    'caret-color:#818cf8',
+  ].join(';');
+  consoleInput.placeholder = 'fly  /  goto <高度>  /  tp <platformId>';
+
+  consoleInputRow.appendChild(consolePrompt);
+  consoleInputRow.appendChild(consoleInput);
+  consoleOverlay.appendChild(consoleLog);
+  consoleOverlay.appendChild(consoleInputRow);
+  mount.appendChild(consoleOverlay);
+
+  let consoleOpen = false;
+
+  function consoleWrite(msg: string, color = '#94a3b8'): void {
+    const line = document.createElement('span');
+    line.style.color = color;
+    line.textContent = msg + '\n';
+    consoleLog.appendChild(line);
+    consoleLog.scrollTop = consoleLog.scrollHeight;
+  }
+
+  function openConsole(): void {
+    consoleOpen = true;
+    consoleOverlay.style.display = 'flex';
+    // 暂时退出指针锁以允许文字输入
+    document.exitPointerLock();
+    setTimeout(() => consoleInput.focus(), 30);
+  }
+
+  function closeConsole(): void {
+    consoleOpen = false;
+    consoleOverlay.style.display = 'none';
+    consoleInput.value = '';
+  }
+
+  function execConsoleCommand(raw: string): void {
+    const cmd = raw.trim().toLowerCase();
+    if (!cmd) return;
+    consoleWrite('> ' + raw, '#818cf8');
+
+    // fly — 切换飞行模式
+    if (cmd === 'fly' || cmd === 'fly on') {
+      flyMode = true;
+      velocity.set(0, 0, 0);
+      grounded = false;
+      flyBadge.style.display = 'block';
+      consoleWrite('✅ 飞行模式已开启  Space↑  Ctrl↓', '#6ee7b7');
+      return;
+    }
+    if (cmd === 'fly off') {
+      flyMode = false;
+      velocity.set(0, 0, 0);
+      flyBadge.style.display = 'none';
+      consoleWrite('✅ 飞行模式已关闭', '#6ee7b7');
+      return;
+    }
+
+    // goto <y> — 传送到指定高度（保持 X/Z）
+    const gotoMatch = cmd.match(/^goto\s+([\d.+-]+)$/);
+    if (gotoMatch) {
+      const targetY = parseFloat(gotoMatch[1]);
+      if (!Number.isFinite(targetY)) {
+        consoleWrite('❌ 无效高度值', '#fca5a5');
+        return;
+      }
+      playerPosition.y = targetY + PLAYER_RADIUS + 0.5;
+      velocity.set(0, 0, 0);
+      grounded = false;
+      consoleWrite(`✅ 已传送到高度 ${targetY.toFixed(1)} m`, '#6ee7b7');
+      return;
+    }
+
+    // tp <x> <y> <z> — 传送到指定坐标
+    const tpXYZ = cmd.match(/^tp\s+([\d.+-]+)\s+([\d.+-]+)\s+([\d.+-]+)$/);
+    if (tpXYZ) {
+      playerPosition.set(
+        parseFloat(tpXYZ[1]),
+        parseFloat(tpXYZ[2]) + PLAYER_RADIUS,
+        parseFloat(tpXYZ[3]),
+      );
+      velocity.set(0, 0, 0);
+      grounded = false;
+      consoleWrite(`✅ 传送至 (${tpXYZ[1]}, ${tpXYZ[2]}, ${tpXYZ[3]})`, '#6ee7b7');
+      return;
+    }
+
+    // tp <platformId> — 传送到平台
+    const tpId = raw.trim().match(/^tp\s+(.+)$/i);
+    if (tpId) {
+      const pid = tpId[1].trim();
+      const platform = level.platforms.find((p) => p.id === pid);
+      if (!platform) {
+        consoleWrite(`❌ 未找到平台: ${pid}`, '#fca5a5');
+        const fuzzy = level.platforms
+          .filter((p) => p.id.includes(pid.toLowerCase()))
+          .slice(0, 4)
+          .map((p) => p.id);
+        if (fuzzy.length) consoleWrite('  候选: ' + fuzzy.join(', '), '#fbbf24');
+        return;
+      }
+      playerPosition.set(
+        platform.position[0],
+        platform.position[1] + platform.size[1] * 0.5 + PLAYER_RADIUS + 0.5,
+        platform.position[2],
+      );
+      velocity.set(0, 0, 0);
+      grounded = false;
+      consoleWrite(`✅ 传送至平台 "${pid}"  高度 ${platform.position[1].toFixed(1)} m`, '#6ee7b7');
+      return;
+    }
+
+    // list — 列出所有平台 ID
+    if (cmd === 'list') {
+      const ids = level.platforms.map((p) => `${p.id}  (y=${p.position[1].toFixed(1)})`).join('\n');
+      consoleWrite(ids, '#e2e8f0');
+      return;
+    }
+
+    // help
+    if (cmd === 'help') {
+      consoleWrite(
+        [
+          'fly          — 开启飞行模式（Space↑ Ctrl↓ Shift快速）',
+          'fly off      — 关闭飞行模式',
+          'goto <y>     — 传送到指定高度 (e.g. goto 80)',
+          'tp <x> <y> <z> — 传送到坐标',
+          'tp <id>      — 传送到平台 (模糊匹配)',
+          'list         — 列出所有平台 ID 和高度',
+          '`  或  Esc   — 关闭控制台',
+        ].join('\n'),
+        '#fbbf24',
+      );
+      return;
+    }
+
+    consoleWrite(`❓ 未知命令 "${cmd}"，输入 help 查看帮助`, '#fca5a5');
+  }
+
+  consoleInput.addEventListener('keydown', (e) => {
+    if (e.code === 'Enter') {
+      execConsoleCommand(consoleInput.value);
+      consoleInput.value = '';
+      e.stopPropagation();
+    }
+    if (e.code === 'Escape' || e.code === 'Backquote') {
+      closeConsole();
+      e.stopPropagation();
+    }
+    e.stopPropagation(); // 防止游戏键盘事件穿透
+  });
+
   function updateDebugOverlay(): void {
     if (!debugPlayerStateVisibleInternal) return;
     const vXZ = Math.hypot(velocity.x, velocity.z);
@@ -1789,7 +2013,14 @@ export function createClimberPrototype(
     sprint: false,
     jumpQueued: false,
     jumpHeld: false,
+    /** 飞行模式下降（ControlLeft/ControlRight） */
+    flyDown: false,
   };
+
+  // ─── 调试飞行模式 ────────────────────────────────────────────────────────────
+  let flyMode = false;
+  const FLY_SPEED = 10; // m/s
+  const FLY_SPEED_SPRINT = 22; // m/s（按住 Shift 快速飞）
 
   const pc = new PlayerController({ startPosition, respawnY: -Infinity });
   /** 别名：与控制器内部共享同一 Vector3，无需手动同步 */
@@ -1846,6 +2077,7 @@ export function createClimberPrototype(
     keyState.sprint = false;
     keyState.jumpQueued = false;
     keyState.jumpHeld = false;
+    keyState.flyDown = false;
   };
 
   function resetPlayer() {
@@ -1933,6 +2165,32 @@ export function createClimberPrototype(
   }
 
   function updatePlayer(delta: number) {
+    // ─── 飞行模式：直接控制位置，跳过正常物理 ──────────────────────────────
+    if (flyMode) {
+      if (landingAnimationLockMs > 0) {
+        landingAnimationLockMs = Math.max(0, landingAnimationLockMs - delta * 1000);
+      }
+      const speed = keyState.sprint ? FLY_SPEED_SPRINT : FLY_SPEED;
+      const fwdX = -Math.sin(cameraYaw);
+      const fwdZ = -Math.cos(cameraYaw);
+      const rgtX = Math.cos(cameraYaw);
+      const rgtZ = -Math.sin(cameraYaw);
+      const nf = (keyState.forward ? 1 : 0) - (keyState.backward ? 1 : 0);
+      const ns = (keyState.right ? 1 : 0) - (keyState.left ? 1 : 0);
+      const mag = Math.hypot(nf, ns);
+      const nfn = mag > 0 ? nf / mag : 0;
+      const nsn = mag > 0 ? ns / mag : 0;
+      playerPosition.x += (fwdX * nfn + rgtX * nsn) * speed * delta;
+      playerPosition.z += (fwdZ * nfn + rgtZ * nsn) * speed * delta;
+      const upDown = (keyState.jumpHeld ? 1 : 0) - (keyState.flyDown ? 1 : 0);
+      playerPosition.y += upDown * speed * delta;
+      velocity.set(0, 0, 0);
+      grounded = false;
+      keyState.jumpQueued = false;
+      if (playerPosition.y > bestHeight) bestHeight = playerPosition.y;
+      return;
+    }
+
     if (landingAnimationLockMs > 0) {
       landingAnimationLockMs = Math.max(0, landingAnimationLockMs - delta * 1000);
     }
@@ -2518,10 +2776,26 @@ export function createClimberPrototype(
   };
 
   const handleKeyDown = (event: KeyboardEvent) => {
+    // 反引号 `` ` `` — 无论是否锁定，均可打开控制台
+    if (event.code === 'Backquote') {
+      event.preventDefault();
+      if (consoleOpen) {
+        closeConsole();
+      } else {
+        openConsole();
+      }
+      return;
+    }
     if (!pointerLocked) return;
     if (event.code === 'KeyP') {
       event.preventDefault();
       document.exitPointerLock();
+      return;
+    }
+    // Ctrl — 飞行模式下降
+    if (event.code === 'ControlLeft' || event.code === 'ControlRight') {
+      keyState.flyDown = true;
+      event.preventDefault();
       return;
     }
     const mapped = keyMap[event.code];
@@ -2544,6 +2818,9 @@ export function createClimberPrototype(
     if (mapped) keyState[mapped] = false;
     if (event.code === 'Space') {
       keyState.jumpHeld = false;
+    }
+    if (event.code === 'ControlLeft' || event.code === 'ControlRight') {
+      keyState.flyDown = false;
     }
   };
 

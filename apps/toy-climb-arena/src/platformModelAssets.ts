@@ -30,9 +30,20 @@ import toyCrackedPuzzleCrumbleUrl from '../assets/models/platforms/toy_cracked_p
 import toyCrumbleCookieTileUrl from '../assets/models/platforms/toy_crumble_cookie_tile.glb';
 import toyGummyStickyPadUrl from '../assets/models/platforms/toy_gummy_sticky_pad.glb';
 import toyNarrowPlankS3Url from '../assets/models/platforms/toy_narrow_plank_s3.glb';
+import toyOlympusGoldenRingUrl from '../assets/models/platforms/toy_olympus_golden_ring.glb';
+// Z4 Olympus
+import toyOlympusMarbleDaisUrl from '../assets/models/platforms/toy_olympus_marble_dais.glb';
+import toyOlympusRainbowCloudUrl from '../assets/models/platforms/toy_olympus_rainbow_cloud.glb';
+import toyOlympusStarFinaleUrl from '../assets/models/platforms/toy_olympus_star_finale.glb';
 import toyPlasticIceBlockUrl from '../assets/models/platforms/toy_plastic_ice_block.glb';
 import toyRopePlankBridgeUrl from '../assets/models/platforms/toy_rope_plank_bridge.glb';
 import toyRoundDiscS2Url from '../assets/models/platforms/toy_round_disc_s2.glb';
+import toySkyCloudIslandUrl from '../assets/models/platforms/toy_sky_cloud_island.glb';
+import toySkyCrystalShardUrl from '../assets/models/platforms/toy_sky_crystal_shard.glb';
+// Z3 Sky Island
+import toySkyMetalPlateUrl from '../assets/models/platforms/toy_sky_metal_plate.glb';
+import toySkyNarrowBeamUrl from '../assets/models/platforms/toy_sky_narrow_beam.glb';
+import toySkySpinningDiscUrl from '../assets/models/platforms/toy_sky_spinning_disc.glb';
 import toySquarePlateS1Url from '../assets/models/platforms/toy_square_plate_s1.glb';
 import toyTrampolinePadUrl from '../assets/models/platforms/toy_trampoline_pad.glb';
 import toyWoodCrateStepUrl from '../assets/models/platforms/toy_wood_crate_step.glb';
@@ -78,7 +89,18 @@ export type ToyPlatformModelAssetId =
   | 'toy_castle_drawbridge'
   | 'toy_castle_extendable_ruler_bridge'
   | 'toy_castle_tilt_balance_board'
-  | 'toy_castle_tower_cap';
+  | 'toy_castle_tower_cap'
+  // Z3 Sky Island
+  | 'toy_sky_metal_plate'
+  | 'toy_sky_spinning_disc'
+  | 'toy_sky_crystal_shard'
+  | 'toy_sky_cloud_island'
+  | 'toy_sky_narrow_beam'
+  // Z4 Olympus
+  | 'toy_olympus_marble_dais'
+  | 'toy_olympus_golden_ring'
+  | 'toy_olympus_rainbow_cloud'
+  | 'toy_olympus_star_finale';
 
 export interface ToyPlatformModelAssetDefinition {
   id: ToyPlatformModelAssetId;
@@ -358,6 +380,71 @@ export const TOY_PLATFORM_MODEL_ASSETS: Record<
     platformKind: 'round_disc',
     source: 'generated-glb',
   },
+  // Z3 Sky Island
+  toy_sky_metal_plate: {
+    id: 'toy_sky_metal_plate',
+    name: '高空金属科技落点板',
+    url: toRuntimeAssetUrl(toySkyMetalPlateUrl, import.meta.url),
+    platformKind: 'square_plate',
+    source: 'generated-glb',
+  },
+  toy_sky_spinning_disc: {
+    id: 'toy_sky_spinning_disc',
+    name: '高空彩虹旋转圆盘',
+    url: toRuntimeAssetUrl(toySkySpinningDiscUrl, import.meta.url),
+    platformKind: 'rotating_gear',
+    source: 'generated-glb',
+  },
+  toy_sky_crystal_shard: {
+    id: 'toy_sky_crystal_shard',
+    name: '高空水晶碎片忽隐忽现台',
+    url: toRuntimeAssetUrl(toySkyCrystalShardUrl, import.meta.url),
+    platformKind: 'blink_panel',
+    source: 'generated-glb',
+  },
+  toy_sky_cloud_island: {
+    id: 'toy_sky_cloud_island',
+    name: '高空彩虹云岛休息平台',
+    url: toRuntimeAssetUrl(toySkyCloudIslandUrl, import.meta.url),
+    platformKind: 'square_plate',
+    source: 'generated-glb',
+  },
+  toy_sky_narrow_beam: {
+    id: 'toy_sky_narrow_beam',
+    name: '高空科技窄梁踏板',
+    url: toRuntimeAssetUrl(toySkyNarrowBeamUrl, import.meta.url),
+    platformKind: 'narrow_plank',
+    source: 'generated-glb',
+  },
+  // Z4 Olympus
+  toy_olympus_marble_dais: {
+    id: 'toy_olympus_marble_dais',
+    name: '奥林匹斯大理石廊台',
+    url: toRuntimeAssetUrl(toyOlympusMarbleDaisUrl, import.meta.url),
+    platformKind: 'square_plate',
+    source: 'generated-glb',
+  },
+  toy_olympus_golden_ring: {
+    id: 'toy_olympus_golden_ring',
+    name: '奥林匹斯黄金宝石环台',
+    url: toRuntimeAssetUrl(toyOlympusGoldenRingUrl, import.meta.url),
+    platformKind: 'rotating_gear',
+    source: 'generated-glb',
+  },
+  toy_olympus_rainbow_cloud: {
+    id: 'toy_olympus_rainbow_cloud',
+    name: '奥林匹斯彩虹弹跳云',
+    url: toRuntimeAssetUrl(toyOlympusRainbowCloudUrl, import.meta.url),
+    platformKind: 'trampoline',
+    source: 'generated-glb',
+  },
+  toy_olympus_star_finale: {
+    id: 'toy_olympus_star_finale',
+    name: '奥林匹斯星光终点台',
+    url: toRuntimeAssetUrl(toyOlympusStarFinaleUrl, import.meta.url),
+    platformKind: 'goal_crown',
+    source: 'generated-glb',
+  },
 };
 
 export function getToyPlatformModelAsset(
@@ -381,6 +468,8 @@ export function resolveToyPlatformModelAsset(
 
   switch (profile.kind) {
     case 'square_plate':
+      if (profile.themeZone === 'olympus') return TOY_PLATFORM_MODEL_ASSETS.toy_olympus_marble_dais;
+      if (profile.themeZone === 'sky_island') return TOY_PLATFORM_MODEL_ASSETS.toy_sky_metal_plate;
       return profile.themeZone === 'castle'
         ? TOY_PLATFORM_MODEL_ASSETS.toy_castle_brick_block
         : TOY_PLATFORM_MODEL_ASSETS.toy_barn_hay_bale;
@@ -390,14 +479,18 @@ export function resolveToyPlatformModelAsset(
         : TOY_PLATFORM_MODEL_ASSETS.toy_wood_crate_step;
     case 'round_disc':
     case 'balance_pole':
+      if (profile.themeZone === 'sky_island')
+        return TOY_PLATFORM_MODEL_ASSETS.toy_sky_spinning_disc;
       return profile.themeZone === 'castle'
         ? TOY_PLATFORM_MODEL_ASSETS.toy_castle_tower_cap
         : TOY_PLATFORM_MODEL_ASSETS.toy_barrel_round_top;
     case 'narrow_plank':
+      if (profile.themeZone === 'sky_island') return TOY_PLATFORM_MODEL_ASSETS.toy_sky_narrow_beam;
       return profile.themeZone === 'castle'
         ? TOY_PLATFORM_MODEL_ASSETS.toy_castle_drawbridge
         : TOY_PLATFORM_MODEL_ASSETS.toy_rope_plank_bridge;
     case 'moving_lift':
+      if (profile.themeZone === 'sky_island') return TOY_PLATFORM_MODEL_ASSETS.toy_sky_narrow_beam;
       return profile.themeZone === 'castle'
         ? TOY_PLATFORM_MODEL_ASSETS.toy_castle_drawbridge
         : TOY_PLATFORM_MODEL_ASSETS.toy_rope_plank_bridge;
@@ -427,6 +520,10 @@ export function resolveToyPlatformModelAsset(
       return TOY_PLATFORM_MODEL_ASSETS.toy_plastic_ice_block;
     case 'sticky_pad':
       return TOY_PLATFORM_MODEL_ASSETS.toy_gummy_sticky_pad;
+    case 'goal_crown':
+      return profile.themeZone === 'olympus'
+        ? TOY_PLATFORM_MODEL_ASSETS.toy_olympus_star_finale
+        : TOY_PLATFORM_MODEL_ASSETS.toy_castle_crown_platform;
     default:
       return null;
   }
