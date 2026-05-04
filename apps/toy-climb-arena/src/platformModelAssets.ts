@@ -29,7 +29,9 @@ import toyConveyorTrackBeltUrl from '../assets/models/platforms/toy_conveyor_tra
 import toyCrackedPuzzleCrumbleUrl from '../assets/models/platforms/toy_cracked_puzzle_crumble.glb';
 import toyCrumbleCookieTileUrl from '../assets/models/platforms/toy_crumble_cookie_tile.glb';
 import toyGummyStickyPadUrl from '../assets/models/platforms/toy_gummy_sticky_pad.glb';
+import toyIrregularFragmentS4Url from '../assets/models/platforms/toy_irregular_fragment_s4.glb';
 import toyNarrowPlankS3Url from '../assets/models/platforms/toy_narrow_plank_s3.glb';
+import toyNarrowPlankS6StripesUrl from '../assets/models/platforms/toy_narrow_plank_s6_stripes.glb';
 import toyOlympusGoldenRingUrl from '../assets/models/platforms/toy_olympus_golden_ring.glb';
 // Z4 Olympus
 import toyOlympusMarbleDaisUrl from '../assets/models/platforms/toy_olympus_marble_dais.glb';
@@ -38,6 +40,7 @@ import toyOlympusStarFinaleUrl from '../assets/models/platforms/toy_olympus_star
 import toyPlasticIceBlockUrl from '../assets/models/platforms/toy_plastic_ice_block.glb';
 import toyRopePlankBridgeUrl from '../assets/models/platforms/toy_rope_plank_bridge.glb';
 import toyRoundDiscS2Url from '../assets/models/platforms/toy_round_disc_s2.glb';
+import toyRoundDiscS6CandyUrl from '../assets/models/platforms/toy_round_disc_s6_candy.glb';
 import toySkyCloudIslandUrl from '../assets/models/platforms/toy_sky_cloud_island.glb';
 import toySkyCrystalShardUrl from '../assets/models/platforms/toy_sky_crystal_shard.glb';
 // Z3 Sky Island
@@ -45,6 +48,8 @@ import toySkyMetalPlateUrl from '../assets/models/platforms/toy_sky_metal_plate.
 import toySkyNarrowBeamUrl from '../assets/models/platforms/toy_sky_narrow_beam.glb';
 import toySkySpinningDiscUrl from '../assets/models/platforms/toy_sky_spinning_disc.glb';
 import toySquarePlateS1Url from '../assets/models/platforms/toy_square_plate_s1.glb';
+import toySquarePlateS6ConfettiUrl from '../assets/models/platforms/toy_square_plate_s6_confetti.glb';
+import toyStackedStepsS5Url from '../assets/models/platforms/toy_stacked_steps_s5.glb';
 import toyTrampolinePadUrl from '../assets/models/platforms/toy_trampoline_pad.glb';
 import toyWoodCrateStepUrl from '../assets/models/platforms/toy_wood_crate_step.glb';
 import { toRuntimeAssetUrl } from './assetUrl';
@@ -55,6 +60,11 @@ export type ToyPlatformModelAssetId =
   | 'toy_square_plate_s1'
   | 'toy_round_disc_s2'
   | 'toy_narrow_plank_s3'
+  | 'toy_irregular_fragment_s4'
+  | 'toy_stacked_steps_s5'
+  | 'toy_square_plate_s6_confetti'
+  | 'toy_round_disc_s6_candy'
+  | 'toy_narrow_plank_s6_stripes'
   | 'toy_barn_hay_bale'
   | 'toy_barn_cookie_stack'
   | 'toy_barn_abc_block_pile'
@@ -132,6 +142,41 @@ export const TOY_PLATFORM_MODEL_ASSETS: Record<
     id: 'toy_narrow_plank_s3',
     name: 'S3 窄长踏板实体模型',
     url: toRuntimeAssetUrl(toyNarrowPlankS3Url, import.meta.url),
+    platformKind: 'narrow_plank',
+    source: 'generated-glb',
+  },
+  toy_irregular_fragment_s4: {
+    id: 'toy_irregular_fragment_s4',
+    name: 'S4 不规则碎片实体模型',
+    url: toRuntimeAssetUrl(toyIrregularFragmentS4Url, import.meta.url),
+    platformKind: 'irregular_fragment',
+    source: 'generated-glb',
+  },
+  toy_stacked_steps_s5: {
+    id: 'toy_stacked_steps_s5',
+    name: 'S5 堆叠积木阶梯实体模型',
+    url: toRuntimeAssetUrl(toyStackedStepsS5Url, import.meta.url),
+    platformKind: 'stacked_steps',
+    source: 'generated-glb',
+  },
+  toy_square_plate_s6_confetti: {
+    id: 'toy_square_plate_s6_confetti',
+    name: 'S6 彩纸凸点方形板变体',
+    url: toRuntimeAssetUrl(toySquarePlateS6ConfettiUrl, import.meta.url),
+    platformKind: 'square_plate',
+    source: 'generated-glb',
+  },
+  toy_round_disc_s6_candy: {
+    id: 'toy_round_disc_s6_candy',
+    name: 'S6 糖果圆盘变体',
+    url: toRuntimeAssetUrl(toyRoundDiscS6CandyUrl, import.meta.url),
+    platformKind: 'round_disc',
+    source: 'generated-glb',
+  },
+  toy_narrow_plank_s6_stripes: {
+    id: 'toy_narrow_plank_s6_stripes',
+    name: 'S6 条纹窄踏板变体',
+    url: toRuntimeAssetUrl(toyNarrowPlankS6StripesUrl, import.meta.url),
     platformKind: 'narrow_plank',
     source: 'generated-glb',
   },
@@ -476,7 +521,7 @@ export function resolveToyPlatformModelAsset(
     case 'stacked_steps':
       return profile.themeZone === 'castle'
         ? TOY_PLATFORM_MODEL_ASSETS.toy_castle_brick_block
-        : TOY_PLATFORM_MODEL_ASSETS.toy_wood_crate_step;
+        : TOY_PLATFORM_MODEL_ASSETS.toy_stacked_steps_s5;
     case 'round_disc':
     case 'balance_pole':
       if (profile.themeZone === 'sky_island')
@@ -503,7 +548,7 @@ export function resolveToyPlatformModelAsset(
     case 'tilting_board':
       return TOY_PLATFORM_MODEL_ASSETS.toy_castle_tilt_balance_board;
     case 'irregular_fragment':
-      return TOY_PLATFORM_MODEL_ASSETS.toy_broken_puzzle_piece;
+      return TOY_PLATFORM_MODEL_ASSETS.toy_irregular_fragment_s4;
     case 'blink_panel':
       return TOY_PLATFORM_MODEL_ASSETS.toy_blink_acrylic_panel;
     case 'crumble_tile':

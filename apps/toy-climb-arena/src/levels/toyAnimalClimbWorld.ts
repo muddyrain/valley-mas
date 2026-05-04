@@ -130,7 +130,7 @@ export const TOY_ANIMAL_CLIMB_WORLD_LEVEL: ClimberLevelDefinition = {
       [9.8, 2.0, 7.2],
       '#B45309',
       'stacked_steps',
-      'toy_barn_abc_block_pile',
+      'toy_stacked_steps_s5',
     ),
     barn(
       'barn-barrel-01',
@@ -197,7 +197,7 @@ export const TOY_ANIMAL_CLIMB_WORLD_LEVEL: ClimberLevelDefinition = {
       [1.4, 10.35, 4.1],
       '#FDE68A',
       'square_plate',
-      'toy_barn_picnic_basket',
+      'toy_square_plate_s6_confetti',
     ),
 
     // Zone 2: first timing lane. Movement and narrow bridges create the same readable risk pattern.
@@ -218,7 +218,7 @@ export const TOY_ANIMAL_CLIMB_WORLD_LEVEL: ClimberLevelDefinition = {
       [11.2, 12.45, 6.5],
       '#D97706',
       'round_disc',
-      'toy_barn_yarn_ball',
+      'toy_round_disc_s6_candy',
     ),
     barn(
       'barn-puzzle-01',
@@ -226,7 +226,7 @@ export const TOY_ANIMAL_CLIMB_WORLD_LEVEL: ClimberLevelDefinition = {
       [14.2, 13.4, 10.4],
       '#A78BFA',
       'irregular_fragment',
-      'toy_broken_puzzle_piece',
+      'toy_irregular_fragment_s4',
     ),
     barn(
       'barn-crate-03',
@@ -332,7 +332,7 @@ export const TOY_ANIMAL_CLIMB_WORLD_LEVEL: ClimberLevelDefinition = {
       [0.6, 25.2, 13.4],
       '#D97706',
       'narrow_plank',
-      'toy_rope_plank_bridge',
+      'toy_narrow_plank_s6_stripes',
     ),
 
     // Wide barn catch-and-recover islands. These are not checkpoints: they only make falls
