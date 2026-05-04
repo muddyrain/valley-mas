@@ -191,3 +191,14 @@ Original prompt: 目前所有的平台模型都是简易的模型，我们可以
   - Old castle `goal` at 58.7m converted to a passive `castle-crown-transition` platform.
 - Collision rule preserved; total GLB count now 39.
 - Validation passed: `generate:platform-assets` (9 new + 30 existing = 39 total), `typecheck` (zero errors), `check` (auto-fixed import sort, 12 pre-existing warnings), `build` (✓ 1.65s), encoding guard PASS.
+
+## 2026-05-05 · Runtime collider sync performance pass
+
+- Investigated 100m route stutter after the map expanded to 104 platform entries and many GLB-backed compound model colliders.
+- Changed `platformModelRuntime.attachPlatformModel()` to return a per-instance sync handle instead of relying on a global runtime collider sync loop.
+- Removed the per-physics-substep full-scene model collider sync from `createClimberPrototype.ts`.
+- Dynamic mechanisms now sync only their own model colliders when they actually move/scale/rotate: moving, extendable, tilting, rotating, unstable, crumble, and bouncy platforms.
+- Static GLB platform colliders are created once when the model loads and no longer get recomputed every simulation substep.
+- Validation passed: `pnpm --filter @valley/toy-climb-arena typecheck` and `pnpm --filter @valley/toy-climb-arena build`. Build still reports the existing large chunk warning.
+- Also ran `pnpm --filter @valley/toy-climb-arena check`; it still fails on existing Biome lint/format diagnostics across `src/` and was not fixed in this performance pass.
+- Browser smoke via `develop-web-game` Playwright client was attempted against `http://localhost:5175`, but Chromium is not installed in the local Playwright cache, so no gameplay screenshot was captured.

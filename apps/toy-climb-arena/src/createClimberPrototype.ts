@@ -1351,6 +1351,7 @@ export function createClimberPrototype(
     mesh: Mesh;
     visualObjects: Object3D[];
     colliders: PlatformCollisionData[];
+    syncModelColliders?: () => void;
     boostVelocity: number;
     squishDuration: number;
     top: number;
@@ -1403,6 +1404,7 @@ export function createClimberPrototype(
     mesh: Mesh;
     bumps: Object3D[];
     colliders: PlatformCollisionData[];
+    syncModelColliders?: () => void;
     meshVisibleOnReset: boolean;
     originY: number;
     originScaleY: number;
@@ -1455,6 +1457,7 @@ export function createClimberPrototype(
     mesh: Mesh;
     bumps: Object3D[]; // 平台视觉对象，跟随主体同步 Y
     colliders: PlatformCollisionData[];
+    syncModelColliders?: () => void;
     meshVisibleOnReset: boolean;
     originY: number;
     top: number;
@@ -1534,9 +1537,10 @@ export function createClimberPrototype(
         collider.disabled = disabled || (modelCollidersReady && collider === colliderEntry);
       }
     };
+    let syncModelColliders: (() => void) | undefined;
 
     if (platformModelAsset) {
-      platformModelRuntime.attachPlatformModel({
+      const platformModelHandle = platformModelRuntime.attachPlatformModel({
         asset: platformModelAsset,
         size: platform.size,
         position: platform.position,
@@ -1557,6 +1561,7 @@ export function createClimberPrototype(
           }
         },
       });
+      syncModelColliders = platformModelHandle.syncColliders;
     } else {
       // ── 原创玩具平台模型细节（纯视觉，不影响碰撞）───────────────────────────
       const toyVisuals = createToyPlatformVisuals({
@@ -1629,6 +1634,7 @@ export function createClimberPrototype(
           );
         }
         syncAxisAlignedColliderWithObjectBounds(colliderEntry, mesh);
+        syncModelColliders?.();
       });
     }
 
@@ -1663,6 +1669,7 @@ export function createClimberPrototype(
             ex.axis === 'z' ? sz * axisScale : sz,
           );
         }
+        syncModelColliders?.();
       });
     }
 
@@ -1689,6 +1696,7 @@ export function createClimberPrototype(
             visual.rotation.z = (ud.bumpOriginRotationZ ?? 0) + angle;
           }
         }
+        syncModelColliders?.();
       });
     }
 
@@ -1698,6 +1706,7 @@ export function createClimberPrototype(
         mesh,
         visualObjects: visualObjectsForPlatform,
         colliders: collidersForPlatform,
+        syncModelColliders,
         boostVelocity: platform.bouncy.boostVelocity,
         squishDuration: platform.bouncy.squishDuration ?? 80,
         top: y + height / 2,
@@ -1716,6 +1725,7 @@ export function createClimberPrototype(
         mesh,
         bumps: visualObjectsForPlatform,
         colliders: collidersForPlatform,
+        syncModelColliders,
         meshVisibleOnReset: baseMeshVisible,
         originY: y,
         top: y + height / 2,
@@ -1733,6 +1743,7 @@ export function createClimberPrototype(
       // 每物理子步同步碰撞体到 mesh 实际位置（falling 时精度保证）
       dynamicObstacleUpdaters.push(() => {
         syncAxisAlignedColliderWithObjectBounds(colliderEntry, mesh);
+        syncModelColliders?.();
       });
     }
 
@@ -1754,6 +1765,7 @@ export function createClimberPrototype(
             bm.position.x = x + lx * cos - lz * sin;
             bm.position.z = z + lx * sin + lz * cos;
           }
+          syncModelColliders?.();
         });
       }
       rotatingPlatforms.set(platform.id, {
@@ -1828,6 +1840,7 @@ export function createClimberPrototype(
         mesh,
         bumps: visualObjectsForPlatform,
         colliders: collidersForPlatform,
+        syncModelColliders,
         meshVisibleOnReset: baseMeshVisible,
         originY: y,
         originScaleY: height,
@@ -1844,6 +1857,7 @@ export function createClimberPrototype(
       });
       dynamicObstacleUpdaters.push(() => {
         syncAxisAlignedColliderWithObjectBounds(colliderEntry, mesh);
+        syncModelColliders?.();
       });
     }
 
@@ -2399,7 +2413,6 @@ export function createClimberPrototype(
     for (let step = 0; step < simulationSteps; step += 1) {
       const stepElapsed = frameElapsed + simulationDelta * step;
       for (const update of dynamicObstacleUpdaters) update(stepElapsed);
-      platformModelRuntime.syncColliders();
 
       // ── 移动平台携带玩家 ─────────────────────────────────────────────────
       // 在物理更新前，把玩家随站立平台一起平移
@@ -2500,6 +2513,7 @@ export function createClimberPrototype(
         const originZ = ud.bumpOriginScaleZ ?? visual.scale.z;
         visual.scale.set(originX, originY * squishY, originZ);
       }
+      bp.syncModelColliders?.();
     }
 
     // ── 粒子更新（位置积分 + 透明度淡出）───────────────────────────────────
@@ -2578,6 +2592,7 @@ export function createClimberPrototype(
             syncAxisAlignedColliderWithObjectBounds(up.colliders[0], up.mesh);
           }
         }
+        up.syncModelColliders?.();
       }
     }
 
@@ -2656,6 +2671,7 @@ export function createClimberPrototype(
             syncAxisAlignedColliderWithObjectBounds(cp.colliders[0], cp.mesh);
           }
         }
+        cp.syncModelColliders?.();
       }
     }
 
