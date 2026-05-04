@@ -38,6 +38,10 @@ interface AttachPlatformModelOptions {
   onCollidersReady?: (colliders: PlatformCollisionData[], bounds: Box3) => void;
 }
 
+interface PlatformModelInstanceHandle {
+  syncColliders: () => void;
+}
+
 interface TemplateRecord {
   root: Group;
   bounds: Box3;
@@ -174,9 +178,9 @@ function createModelColliders(params: {
   root: Group;
   debugMeta: PlatformCollisionDebugMeta;
   appendCollider: AttachPlatformModelOptions['appendCollider'];
+  bindings: ColliderBinding[];
 }): PlatformCollisionData[] {
   const colliders: PlatformCollisionData[] = [];
-  const bindings: ColliderBinding[] = [];
 
   params.root.updateWorldMatrix(true, true);
   params.root.traverse((node) => {
@@ -193,23 +197,21 @@ function createModelColliders(params: {
     });
     const binding = { mesh, collider, shape };
     syncColliderWithMesh(binding);
-    bindings.push(binding);
+    params.bindings.push(binding);
     colliders.push(collider);
   });
 
-  params.root.userData.platformColliderBindings = bindings;
+  params.root.userData.platformColliderBindings = params.bindings;
   return colliders;
 }
 
 export function createPlatformModelRuntime(options: PlatformModelRuntimeOptions): {
-  attachPlatformModel: (attachOptions: AttachPlatformModelOptions) => void;
-  syncColliders: () => void;
+  attachPlatformModel: (attachOptions: AttachPlatformModelOptions) => PlatformModelInstanceHandle;
   dispose: () => void;
 } {
   const loader = new GLTFLoader();
   const templates = new Map<string, Promise<TemplateRecord>>();
   const attachedRoots = new Set<Group>();
-  const colliderBindings = new Set<ColliderBinding>();
   let disposed = false;
 
   const loadTemplate = (asset: ToyPlatformModelAssetDefinition): Promise<TemplateRecord> => {
@@ -230,7 +232,18 @@ export function createPlatformModelRuntime(options: PlatformModelRuntimeOptions)
     return promise;
   };
 
-  const attachPlatformModel = (attachOptions: AttachPlatformModelOptions): void => {
+  const attachPlatformModel = (
+    attachOptions: AttachPlatformModelOptions,
+  ): PlatformModelInstanceHandle => {
+    const bindings: ColliderBinding[] = [];
+    const handle: PlatformModelInstanceHandle = {
+      syncColliders: () => {
+        for (const binding of bindings) {
+          syncColliderWithMesh(binding);
+        }
+      },
+    };
+
     void loadTemplate(attachOptions.asset)
       .then((template) => {
         if (disposed) return;
@@ -243,31 +256,26 @@ export function createPlatformModelRuntime(options: PlatformModelRuntimeOptions)
           root,
           debugMeta: attachOptions.debugMeta,
           appendCollider: attachOptions.appendCollider,
+          bindings,
         });
-        const bindings = (root.userData.platformColliderBindings ?? []) as ColliderBinding[];
-        for (const binding of bindings) colliderBindings.add(binding);
         root.updateWorldMatrix(true, true);
         attachOptions.onCollidersReady?.(colliders, new Box3().setFromObject(root));
       })
       .catch((error) => {
         console.warn('[toy-climb] platform model load failed', attachOptions.asset.id, error);
       });
+
+    return handle;
   };
 
   return {
     attachPlatformModel,
-    syncColliders: () => {
-      for (const binding of colliderBindings) {
-        syncColliderWithMesh(binding);
-      }
-    },
     dispose: () => {
       disposed = true;
       for (const root of attachedRoots) {
         root.parent?.remove(root);
       }
       attachedRoots.clear();
-      colliderBindings.clear();
       for (const promise of templates.values()) {
         void promise.then((template) => disposeRootResources(template.root));
       }
