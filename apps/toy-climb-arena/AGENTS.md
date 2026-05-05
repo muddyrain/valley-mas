@@ -28,7 +28,7 @@
 
 ```
 apps/toy-climb-arena/
-├── src/                        # 游戏源码（迁移自 packages/climber-game）
+├── src/                        # 游戏源码（由旧游戏包迁移而来）
 │   ├── main.tsx                # Vite 入口
 │   ├── ClimberArcadeExperience.tsx  # 主游戏组件（Three.js + React）
 │   ├── characterAssets.ts      # 角色模型 URL 注册

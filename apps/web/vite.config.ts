@@ -9,7 +9,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@valley/climber-game': path.resolve(__dirname, '../../packages/climber-game/src/index.ts'),
     },
   },
   server: {

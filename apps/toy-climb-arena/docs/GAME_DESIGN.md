@@ -82,7 +82,7 @@
 ## 阶段规划
 
 ### v0.1（已完成）：工程迁移
-- [x] 从 `packages/climber-game` 迁移到 `apps/toy-climb-arena`
+- [x] 从旧游戏包迁移到 `apps/toy-climb-arena`
 - [x] Vite + TypeScript 独立运行
 - [x] 保留现有角色模型、动作、物理和控制逻辑
 
@@ -164,7 +164,7 @@
 ## 阶段规划
 
 ### v0.1（当前）：工程迁移
-- [x] 从 `packages/climber-game` 迁移到 `apps/toy-climb-arena`
+- [x] 从旧游戏包迁移到 `apps/toy-climb-arena`
 - [x] Vite + TypeScript 独立运行
 - [x] 保留现有角色模型、动作、物理和控制逻辑
 - [x] 初始化文档

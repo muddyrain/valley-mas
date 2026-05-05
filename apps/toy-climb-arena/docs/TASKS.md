@@ -9,7 +9,7 @@
 
 ## 里程碑 0.1 — 工程迁移（当前）
 
-- [x] 从 `packages/climber-game` 迁移源码到 `apps/toy-climb-arena`
+- [x] 从旧游戏包迁移源码到 `apps/toy-climb-arena`
 - [x] 配置 Vite + TypeScript 独立工程
 - [x] 保留角色模型（peach.glb / daisy.glb）
 - [x] 保留 Mixamo idle/run/jump 动画逻辑（在 characterRig.ts 中）
