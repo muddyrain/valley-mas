@@ -22,17 +22,16 @@ export interface GameHUDCallbacks {
 export interface CharacterOption {
   id: string;
   name: string;
-  description?: string;
+  description: string;
 }
 
 interface MenuEntry {
   label: () => string;
   action: () => void;
-  primary?: boolean;
+  primary: boolean;
 }
 
 const FONT_FAMILY = '"Nunito", "Fredoka One", "Segoe UI", system-ui, sans-serif';
-const FONT_BODY = `600 13px ${FONT_FAMILY}`;
 const FONT_TITLE = `bold 28px ${FONT_FAMILY}`;
 const FONT_SUBTITLE = `600 12px ${FONT_FAMILY}`;
 const FONT_HINT = `12px ${FONT_FAMILY}`;
@@ -93,7 +92,6 @@ export class GameHUD {
     init: { audioEnabled: boolean },
   ) {
     this._audioEnabled = init.audioEnabled;
-    this._audioEnabled = init.audioEnabled;
 
     this.canvas = document.createElement('canvas');
     this.canvas.style.cssText = [
@@ -118,7 +116,11 @@ export class GameHUD {
   // ── 状态 setter ─────────────────────────────────────────────────────────
   setPointerLocked(v: boolean): void {
     this._locked = v;
-    this.canvas.style.pointerEvents = v ? 'none' : 'auto';
+    if (v) {
+      this.canvas.style.pointerEvents = 'none';
+    } else {
+      this.canvas.style.pointerEvents = 'auto';
+    }
   }
   setHasEntered(v: boolean): void {
     this._hasEntered = v;
@@ -141,23 +143,41 @@ export class GameHUD {
   private buildEntries(): void {
     this.entries = [
       {
-        label: () => (this._hasEntered ? '▶  继续游戏' : '▶  开始游戏'),
+        label: () => this.startLabel(),
         action: () => this.cbs.onResume(),
         primary: true,
       },
       {
         label: () => '↺  重新开始',
         action: () => this.cbs.onReset(),
+        primary: false,
       },
       {
-        label: () => `♪  音效: ${this._audioEnabled ? '开' : '关'}`,
+        label: () => this.audioLabel(),
         action: () => this.cbs.onAudioToggle(),
+        primary: false,
       },
       {
-        label: () => `⛶  全屏: ${this._fullscreen ? '开' : '关'}`,
+        label: () => this.fullscreenLabel(),
         action: () => this.cbs.onFullscreen(),
+        primary: false,
       },
     ];
+  }
+
+  private startLabel(): string {
+    if (this._hasEntered) return '▶  继续游戏';
+    return '▶  开始游戏';
+  }
+
+  private audioLabel(): string {
+    if (this._audioEnabled) return '♪  音效: 开';
+    return '♪  音效: 关';
+  }
+
+  private fullscreenLabel(): string {
+    if (this._fullscreen) return '⛶  全屏: 开';
+    return '⛶  全屏: 关';
   }
 
   // ── 事件监听 ────────────────────────────────────────────────────────────
@@ -184,7 +204,8 @@ export class GameHUD {
     for (let i = 0; i < this.menuRects.length; i++) {
       const r = this.menuRects[i];
       if (r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
-        this.entries[i]?.action();
+        const entry = this.entries[i];
+        if (entry) entry.action();
         return;
       }
     }
@@ -214,7 +235,11 @@ export class GameHUD {
     }
     if (found !== this.hoveredIdx || foundChar >= 0) {
       this.hoveredIdx = found;
-      this.canvas.style.cursor = found >= 0 || foundChar >= 0 ? 'pointer' : 'default';
+      if (found >= 0 || foundChar >= 0) {
+        this.canvas.style.cursor = 'pointer';
+      } else {
+        this.canvas.style.cursor = 'default';
+      }
     }
   }
 
@@ -251,6 +276,11 @@ export class GameHUD {
 
   draw(): void {
     this.syncSize();
+    if (this.W < 64 || this.H < 64) {
+      this.menuRects = [];
+      this.charCardRects = [];
+      return;
+    }
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.W, this.H);
     if (this._locked) {
@@ -365,216 +395,504 @@ export class GameHUD {
     const W = this.W;
     const H = this.H;
     const s = this._stats;
-
-    // 背景遮罩（带径向亮斑）
     ctx.fillStyle = 'rgba(10, 15, 30, 0.58)';
     ctx.fillRect(0, 0, W, H);
 
-    // 面板尺寸
-    const ITEM_H = 48;
-    const ITEM_GAP = 9;
-    const HEADER_H = 102;
-    const CARD_AREA_H = this._charOptions.length > 0 ? 96 : 0;
-    const FOOTER_H = 48;
-    const PAD_V = 18;
-    const pw = Math.min(308, W - 40);
-    const ph =
-      HEADER_H +
-      CARD_AREA_H +
-      (CARD_AREA_H > 0 ? 10 : 0) +
-      this.entries.length * (ITEM_H + ITEM_GAP) -
-      ITEM_GAP +
-      PAD_V +
-      FOOTER_H;
-    const px = (W - pw) / 2;
-    const py = Math.max(16, (H - ph) / 2);
+    let selected: CharacterOption | null = null;
+    if (this._charOptions.length > 0) {
+      const indexedOption = this._charOptions[this._charIdx];
+      const firstOption = this._charOptions[0];
+      if (indexedOption) {
+        selected = indexedOption;
+      } else if (firstOption) {
+        selected = firstOption;
+      }
+    }
 
-    // 积木底部阴影（立体感）
+    let panelMaxWidth = 660;
+    let ph = 680;
+    if (W >= 1040) {
+      panelMaxWidth = 940;
+      ph = 600;
+    }
+    const pw = Math.min(panelMaxWidth, W - 24);
+    const px = (W - pw) / 2;
+    const py = Math.max(12, (H - ph) / 2);
+    const headerH = 96;
+    const contentY = py + headerH + 12;
+    const isWide = W >= 1040;
+    const leftX = px + 16;
+    let leftW = pw - 32;
+    let rightW = pw - 32;
+    let rightX = leftX;
+    if (isWide) {
+      leftW = 340;
+      rightW = pw - leftW - 28;
+      rightX = leftX + leftW + 12;
+    }
+
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.22)';
-    this.rrect(px + 4, py + 6, pw - 8, ph, 22);
+    this.rrect(px + 5, py + 7, pw - 10, ph, 24);
     ctx.fill();
     ctx.restore();
 
-    // 面板主体
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.36)';
-    ctx.shadowBlur = 36;
-    ctx.shadowOffsetY = 12;
+    ctx.shadowBlur = 34;
+    ctx.shadowOffsetY = 10;
     ctx.fillStyle = C.whiteM;
-    this.rrect(px, py, pw, ph, 22);
+    this.rrect(px, py, pw, ph, 24);
     ctx.fill();
     ctx.restore();
 
-    // 顶部彩带（橙→黄→绿）
-    ctx.save();
-    const gStripe = ctx.createLinearGradient(px, py, px + pw, py);
-    gStripe.addColorStop(0, '#F97316');
-    gStripe.addColorStop(0.45, '#FBBF24');
-    gStripe.addColorStop(1, '#4ADE80');
-    ctx.fillStyle = gStripe;
-    this.rrect(px, py, pw, 10, 22);
+    const banner = ctx.createLinearGradient(px, py, px + pw, py);
+    banner.addColorStop(0, '#F97316');
+    banner.addColorStop(0.5, '#FBBF24');
+    banner.addColorStop(1, '#4ADE80');
+    ctx.fillStyle = banner;
+    this.rrect(px, py, pw, 10, 24);
     ctx.fill();
-    ctx.restore();
-
-    // 面板边框
     ctx.strokeStyle = C.border;
     ctx.lineWidth = 1.5;
-    this.rrect(px, py, pw, ph, 22);
+    this.rrect(px, py, pw, ph, 24);
     ctx.stroke();
 
-    // 标题 emoji
-    ctx.font = '28px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('🧱', px + pw / 2, py + 52);
-
-    // 标题文字（橙色）
+    ctx.textAlign = 'left';
     ctx.fillStyle = C.orange;
     ctx.font = FONT_TITLE;
-    ctx.fillText('积木攀登', px + pw / 2, py + 80);
-
-    // 副标题
+    ctx.fillText('角色选择台', px + 22, py + 44);
     ctx.fillStyle = C.textHint;
     ctx.font = FONT_SUBTITLE;
-    ctx.fillText(this._hasEntered ? '⏸ 游戏已暂停' : '选择角色，准备出发！', px + pw / 2, py + 98);
+    let subtitle = '先选一个玩具人偶，再开始攀爬';
+    if (this._hasEntered) {
+      subtitle = '暂停中，先换一个更顺手的主角';
+    }
+    ctx.fillText(subtitle, px + 22, py + 66);
+
+    const bestTxt = `🏆 ${this.fmtHeight(s.bestHeight)}  ·  ⏱ ${this.fmtTime(s.elapsedMs)}`;
+    ctx.fillStyle = C.textMid;
+    ctx.font = FONT_HINT;
+    ctx.textAlign = 'right';
+    ctx.fillText(bestTxt, px + pw - 22, py + 44);
     ctx.textAlign = 'left';
 
-    // 分隔线
-    ctx.strokeStyle = 'rgba(203,213,225,0.5)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(px + 20, py + HEADER_H);
-    ctx.lineTo(px + pw - 20, py + HEADER_H);
-    ctx.stroke();
+    let selectedId = 'toyhero';
+    let selectedName = '未选择';
+    let selectedDesc = '暂无角色信息';
+    if (selected) {
+      selectedId = selected.id;
+      selectedName = selected.name;
+      selectedDesc = selected.description;
+    }
+    const accent = this.getCharacterPalette(selectedId);
 
-    // 角色选择卡片区
+    // 左侧角色展示
+    const previewH = isWide ? 176 : 150;
+    if (isWide) {
+      this.rrect(leftX, contentY, leftW, previewH, 22);
+      ctx.fillStyle = 'rgba(255,251,245,0.96)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(251,146,60,0.26)';
+      ctx.stroke();
+      this.drawCharacterPortrait(ctx, leftX + 16, contentY + 14, leftW - 32, 104, selectedId);
+      ctx.fillStyle = C.orange;
+      ctx.font = 'bold 26px "Nunito", sans-serif';
+      ctx.fillText(selectedName, leftX + 16, contentY + 134);
+      ctx.fillStyle = C.textMid;
+      ctx.font = `600 12px ${FONT_FAMILY}`;
+      this.drawWrappedText(ctx, selectedDesc, leftX + 16, contentY + 156, leftW - 32, 16, 1);
+      const statY = contentY + previewH + 14;
+      const statW = (leftW - 12) / 2;
+      const statH = 64;
+      this.chip(leftX, statY, statW, statH, accent.primary);
+      this.chip(leftX + statW + 12, statY, statW, statH, accent.secondary);
+      ctx.fillStyle = C.textMid;
+      ctx.font = `600 11px ${FONT_FAMILY}`;
+      ctx.fillText('默认主角', leftX + 18, statY + 24);
+      ctx.fillText('角色数量', leftX + statW + 30, statY + 24);
+      ctx.fillStyle = accent.primary;
+      ctx.font = `bold 20px ${FONT_FAMILY}`;
+      ctx.fillText(selectedName, leftX + 18, statY + 48);
+      ctx.fillText(`${this._charOptions.length}`, leftX + statW + 30, statY + 48);
+    } else {
+      this.rrect(leftX, contentY, rightW, previewH, 22);
+      ctx.fillStyle = 'rgba(255,251,245,0.96)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(251,146,60,0.26)';
+      ctx.stroke();
+      this.drawCharacterPortrait(ctx, leftX + 12, contentY + 12, rightW - 24, 90, selectedId);
+      ctx.fillStyle = C.orange;
+      ctx.font = 'bold 22px "Nunito", sans-serif';
+      ctx.fillText(selectedName, leftX + 14, contentY + 108);
+      ctx.fillStyle = C.textMid;
+      ctx.font = `600 11px ${FONT_FAMILY}`;
+      this.drawWrappedText(ctx, selectedDesc, leftX + 14, contentY + 128, rightW - 28, 15, 1);
+    }
+
+    // 角色卡片与按钮区布局
     this.charCardRects = [];
-    if (this._charOptions.length > 0) {
-      const cardPad = 10;
-      const cardGap = 8;
-      const cardCount = this._charOptions.length;
-      const cardW = (pw - cardPad * 2 - cardGap * (cardCount - 1)) / cardCount;
-      const cardH = 76;
-      const cardY = py + HEADER_H + 10;
-      const EMOJIS = ['🪆', '👸', '🌼', '🔮'];
-      for (let i = 0; i < cardCount; i++) {
-        const opt = this._charOptions[i];
-        if (!opt) continue;
-        const cx = px + cardPad + i * (cardW + cardGap);
-        this.charCardRects.push({ x: cx, y: cardY, w: cardW, h: cardH });
-        const selected = this._charIdx === i;
-        const hovered = this.hoveredCharIdx === i;
+    const cardRows = Math.ceil(this._charOptions.length / 2);
+    const buttonRows = Math.ceil(this.entries.length / 2);
+    const cardGap = isWide ? 10 : 8;
+    const columns = 2;
+    const cardsW = rightW;
+    const cardW = Math.floor((cardsW - cardGap * (columns - 1)) / columns);
+    const cardH = isWide ? 60 : 54;
+    const buttonItemH = isWide ? 44 : 40;
+    const buttonItemGap = isWide ? 10 : 8;
+    const buttonGap = 10;
+    let cardAreaY = contentY + previewH + 18;
+    let buttonGridX = leftX;
+    let buttonGridY = cardAreaY + cardRows * (cardH + cardGap) + 16;
+    if (isWide) {
+      buttonGridX = rightX;
+      buttonGridY = contentY + 8;
+      cardAreaY = buttonGridY + buttonRows * (buttonItemH + buttonItemGap) + 16;
+    }
+    for (let i = 0; i < this._charOptions.length; i += 1) {
+      const opt = this._charOptions[i];
+      if (!opt) continue;
+      const column = i % columns;
+      const row = Math.floor(i / columns);
+      const cx = rightX + column * (cardW + cardGap);
+      const cy = cardAreaY + row * (cardH + cardGap);
+      this.charCardRects.push({ x: cx, y: cy, w: cardW, h: cardH });
+      const selectedCard = this._charIdx === i;
+      const hovered = this.hoveredCharIdx === i;
+      const palette = this.getCharacterPalette(opt.id);
 
-        // 卡片背景
-        ctx.save();
-        ctx.shadowColor = selected ? 'rgba(249,115,22,0.4)' : 'rgba(0,0,0,0.08)';
-        ctx.shadowBlur = selected ? 16 : 8;
-        ctx.fillStyle = selected
-          ? 'rgba(255,237,213,0.95)'
-          : hovered
-            ? 'rgba(254,249,195,0.9)'
-            : 'rgba(248,250,252,0.92)';
-        this.rrect(cx, cardY, cardW, cardH, 14);
+      ctx.save();
+      if (selectedCard) {
+        ctx.shadowColor = 'rgba(249,115,22,0.38)';
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = 'rgba(255,237,213,0.96)';
+      } else if (hovered) {
+        ctx.shadowColor = 'rgba(0,0,0,0.08)';
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = 'rgba(255,251,235,0.94)';
+      } else {
+        ctx.shadowColor = 'rgba(0,0,0,0.08)';
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = 'rgba(249,250,251,0.93)';
+      }
+      this.rrect(cx, cy, cardW, cardH, 16);
+      ctx.fill();
+      ctx.restore();
+      if (selectedCard) {
+        ctx.strokeStyle = palette.primary;
+        ctx.lineWidth = 2.4;
+      } else if (hovered) {
+        ctx.strokeStyle = palette.secondary;
+        ctx.lineWidth = 1.4;
+      } else {
+        ctx.strokeStyle = C.border;
+        ctx.lineWidth = 1.4;
+      }
+      this.rrect(cx, cy, cardW, cardH, 16);
+      ctx.stroke();
+      this.drawMiniAvatar(ctx, cx + 10, cy + 9, 50, 50, opt.id, selectedCard);
+      if (selectedCard) {
+        ctx.fillStyle = C.orange;
+      } else {
+        ctx.fillStyle = C.text;
+      }
+      ctx.font = `700 13px ${FONT_FAMILY}`;
+      ctx.fillText(opt.name, cx + 68, cy + 24);
+      ctx.fillStyle = C.textMid;
+      ctx.font = `600 10px ${FONT_FAMILY}`;
+      this.drawWrappedText(ctx, opt.description, cx + 68, cy + 40, cardW - 78, 14, 2);
+      if (selectedCard) {
+        ctx.fillStyle = palette.primary;
+        ctx.font = `bold 12px ${FONT_FAMILY}`;
+        ctx.fillText('当前选择', cx + cardW - 66, cy + 24);
+      }
+      if (hovered) {
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        this.rrect(cx + cardW - 16, cy + 10, 6, 6, 3);
         ctx.fill();
-        ctx.restore();
-
-        // 边框
-        ctx.strokeStyle = selected ? C.orange : hovered ? '#FCD34D' : C.border;
-        ctx.lineWidth = selected ? 2.5 : 1.5;
-        this.rrect(cx, cardY, cardW, cardH, 14);
-        ctx.stroke();
-
-        // Emoji 头像
-        const emoji = EMOJIS[i] ?? '🎮';
-        ctx.font = '24px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(emoji, cx + cardW / 2, cardY + 34);
-
-        // 角色名字
-        ctx.fillStyle = selected ? C.orange : C.text;
-        ctx.font = `600 11px ${FONT_FAMILY}`;
-        ctx.fillText(opt.name, cx + cardW / 2, cardY + 56);
-
-        // 选中打勾
-        if (selected) {
-          ctx.fillStyle = C.orange;
-          ctx.font = `bold 11px ${FONT_FAMILY}`;
-          ctx.fillText('✓', cx + cardW / 2, cardY + 70);
-        }
-        ctx.textAlign = 'left';
       }
     }
 
-    // 菜单项起始 y（角色卡之后留间距）
-    const menuStartY = py + HEADER_H + CARD_AREA_H + (CARD_AREA_H > 0 ? 10 : 0);
-
-    // 菜单项
+    // 控制按钮
     this.menuRects = [];
-    for (let i = 0; i < this.entries.length; i++) {
+    let buttonW = Math.floor((pw - 40 - buttonGap) / 2);
+    if (isWide) {
+      buttonW = Math.floor((rightW - buttonGap) / 2);
+    }
+    for (let i = 0; i < this.entries.length; i += 1) {
       const entry = this.entries[i];
       if (!entry) continue;
-      const ix = px + 14;
-      const iy = menuStartY + i * (ITEM_H + ITEM_GAP);
-      const iw = pw - 28;
-      this.menuRects.push({ x: ix, y: iy, w: iw, h: ITEM_H });
+      const column = i % 2;
+      const row = Math.floor(i / 2);
+      const ix = buttonGridX + column * (buttonW + buttonGap);
+      const iw = buttonW;
+      const iy = buttonGridY + row * (buttonItemH + buttonItemGap);
+      this.menuRects.push({ x: ix, y: iy, w: iw, h: buttonItemH });
       const hot = this.hoveredIdx === i;
 
+      ctx.save();
       if (entry.primary) {
-        // 主按钮：橙→黄渐变 + 发光阴影
-        ctx.save();
-        ctx.shadowColor = hot ? 'rgba(249,115,22,0.6)' : 'rgba(249,115,22,0.3)';
-        ctx.shadowBlur = hot ? 20 : 10;
-        ctx.shadowOffsetY = hot ? 5 : 3;
-        const gBtn = ctx.createLinearGradient(ix, iy, ix, iy + ITEM_H);
-        gBtn.addColorStop(0, hot ? '#FB923C' : '#F97316');
-        gBtn.addColorStop(1, hot ? '#FBBF24' : '#FB923C');
+        if (hot) {
+          ctx.shadowColor = 'rgba(249,115,22,0.55)';
+          ctx.shadowBlur = isWide ? 18 : 16;
+        } else {
+          ctx.shadowColor = 'rgba(249,115,22,0.28)';
+          ctx.shadowBlur = isWide ? 10 : 8;
+        }
+        ctx.shadowOffsetY = 4;
+        const gBtn = ctx.createLinearGradient(ix, iy, ix, iy + buttonItemH);
+        if (hot) {
+          gBtn.addColorStop(0, '#FB923C');
+          gBtn.addColorStop(1, '#FBBF24');
+        } else {
+          gBtn.addColorStop(0, '#F97316');
+          gBtn.addColorStop(1, '#FB923C');
+        }
         ctx.fillStyle = gBtn;
-        this.rrect(ix, iy, iw, ITEM_H, 16);
-        ctx.fill();
-        ctx.restore();
-        // 底部立体边（积木感）
-        ctx.strokeStyle = 'rgba(180,83,9,0.45)';
-        ctx.lineWidth = 2;
-        this.rrect(ix, iy + 2, iw, ITEM_H, 16);
-        ctx.stroke();
-        ctx.fillStyle = '#fff';
-        ctx.font = `bold 15px ${FONT_FAMILY}`;
-        ctx.textAlign = 'center';
-        ctx.fillText(entry.label(), ix + iw / 2, iy + ITEM_H / 2 + 6);
-        ctx.textAlign = 'left';
       } else {
-        // 次级按钮
-        ctx.fillStyle = hot ? 'rgba(255,237,213,0.9)' : 'rgba(248,250,252,0.9)';
-        ctx.strokeStyle = hot ? C.orange : C.border;
-        ctx.lineWidth = hot ? 2 : 1.5;
-        this.rrect(ix, iy, iw, ITEM_H, 16);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = hot ? C.orange : C.text;
-        ctx.font = `600 14px ${FONT_FAMILY}`;
-        ctx.textAlign = 'center';
-        ctx.fillText(entry.label(), ix + iw / 2, iy + ITEM_H / 2 + 6);
-        ctx.textAlign = 'left';
+        ctx.shadowColor = 'rgba(0,0,0,0.06)';
+        ctx.shadowBlur = 8;
+        if (hot) {
+          ctx.fillStyle = 'rgba(255,237,213,0.92)';
+        } else {
+          ctx.fillStyle = 'rgba(248,250,252,0.95)';
+        }
       }
+      this.rrect(ix, iy, iw, buttonItemH, 16);
+      ctx.fill();
+      ctx.restore();
+
+      if (entry.primary) {
+        ctx.strokeStyle = 'rgba(180,83,9,0.42)';
+        ctx.lineWidth = 2;
+      } else if (hot) {
+        ctx.strokeStyle = C.orange;
+        ctx.lineWidth = 1.4;
+      } else {
+        ctx.strokeStyle = C.border;
+        ctx.lineWidth = 1.4;
+      }
+      this.rrect(ix, iy + 1, iw, buttonItemH, 16);
+      ctx.stroke();
+      if (entry.primary) {
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${isWide ? 15 : 13}px ${FONT_FAMILY}`;
+      } else if (hot) {
+        ctx.fillStyle = C.orange;
+        ctx.font = `600 ${isWide ? 14 : 12}px ${FONT_FAMILY}`;
+      } else {
+        ctx.fillStyle = C.text;
+        ctx.font = `600 ${isWide ? 14 : 12}px ${FONT_FAMILY}`;
+      }
+      ctx.textAlign = 'center';
+      ctx.fillText(entry.label(), ix + iw / 2, iy + buttonItemH / 2 + 5);
+      ctx.textAlign = 'left';
     }
 
-    // 页脚：战绩徽章
-    const footY = menuStartY + this.entries.length * (ITEM_H + ITEM_GAP) + PAD_V / 2 + 4;
     const footTxt = `🏆 ${this.fmtHeight(s.bestHeight)}  ·  ⏱ ${this.fmtTime(s.elapsedMs)}`;
     ctx.font = `600 11px ${FONT_FAMILY}`;
     const ftw = ctx.measureText(footTxt).width + 24;
     const ftx = px + (pw - ftw) / 2;
     ctx.fillStyle = 'rgba(203,213,225,0.35)';
-    this.rrect(ftx, footY, ftw, 24, 12);
+    this.rrect(ftx, py + ph - 34, ftw, 24, 12);
     ctx.fill();
     ctx.fillStyle = C.textMid;
     ctx.textAlign = 'center';
-    ctx.fillText(footTxt, px + pw / 2, footY + 16);
+    ctx.fillText(footTxt, px + pw / 2, py + ph - 18);
     ctx.textAlign = 'left';
   }
 
   // ── 绘图工具 ─────────────────────────────────────────────────────────────
   /** 玩具感 chip 卡片，accent 为左侧彩色竖条颜色（可选） */
+  private getCharacterPalette(characterId: string): {
+    primary: string;
+    secondary: string;
+    accent: string;
+  } {
+    switch (characterId) {
+      case 'toyhero':
+        return { primary: '#F97316', secondary: '#FBBF24', accent: '#4ADE80' };
+      case 'woodendoll':
+        return { primary: '#B45309', secondary: '#F59E0B', accent: '#60A5FA' };
+      case 'panda':
+        return { primary: '#111827', secondary: '#F8FAFC', accent: '#22C55E' };
+      case 'frog':
+        return { primary: '#22C55E', secondary: '#A3E635', accent: '#0EA5E9' };
+      case 'cat':
+        return { primary: '#FB923C', secondary: '#FCD34D', accent: '#A78BFA' };
+      case 'peach':
+        return { primary: '#F472B6', secondary: '#FDE68A', accent: '#60A5FA' };
+      case 'daisy':
+        return { primary: '#F59E0B', secondary: '#86EFAC', accent: '#A78BFA' };
+      default:
+        return { primary: C.orange, secondary: C.yellow, accent: C.green };
+    }
+  }
+
+  private drawCharacterPortrait(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    characterId: string,
+  ): void {
+    const p = this.getCharacterPalette(characterId);
+    ctx.save();
+    const glow = ctx.createLinearGradient(x, y, x + w, y + h);
+    glow.addColorStop(0, 'rgba(255,255,255,0.96)');
+    glow.addColorStop(1, 'rgba(255,248,231,0.96)');
+    ctx.fillStyle = glow;
+    this.rrect(x, y, w, h, 20);
+    ctx.fill();
+
+    ctx.translate(x + w / 2, y + h / 2 + 2);
+    ctx.fillStyle = 'rgba(251,146,60,0.12)';
+    ctx.beginPath();
+    ctx.arc(0, 36, w * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (characterId === 'toyhero') {
+      ctx.fillStyle = p.secondary;
+      ctx.beginPath();
+      ctx.ellipse(0, 22, 74, 28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#2563EB';
+      ctx.beginPath();
+      ctx.arc(0, -6, 34, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#F7D6A5';
+      ctx.beginPath();
+      ctx.arc(0, -16, 23, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#7C2D12';
+      ctx.beginPath();
+      ctx.arc(0, -31, 28, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = '#FACC15';
+      ctx.fillRect(-50, -18, 100, 8);
+      ctx.fillStyle = '#22D3EE';
+      ctx.beginPath();
+      ctx.arc(-18, -28, 7, 0, Math.PI * 2);
+      ctx.arc(18, -28, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#EF4444';
+      ctx.fillRect(-8, 8, 16, 40);
+      ctx.fillStyle = '#7C3F1D';
+      ctx.fillRect(-42, 32, 20, 34);
+      ctx.fillRect(22, 32, 20, 34);
+      ctx.fillStyle = '#FEF3C7';
+      ctx.fillRect(-55, 1, 18, 28);
+      ctx.fillRect(37, 1, 18, 28);
+      ctx.fillStyle = '#0F172A';
+      ctx.beginPath();
+      ctx.arc(-10, -14, 3, 0, Math.PI * 2);
+      ctx.arc(10, -14, 3, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = p.primary;
+      ctx.beginPath();
+      ctx.arc(0, 8, 38, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = p.accent;
+      ctx.beginPath();
+      ctx.arc(0, -20, 26, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#F8FAFC';
+      ctx.beginPath();
+      ctx.arc(-12, -20, 6, 0, Math.PI * 2);
+      ctx.arc(12, -20, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private drawMiniAvatar(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    characterId: string,
+    selected: boolean,
+  ): void {
+    const p = this.getCharacterPalette(characterId);
+    ctx.save();
+    const bg = ctx.createLinearGradient(x, y, x + w, y + h);
+    bg.addColorStop(0, selected ? 'rgba(255,237,213,0.96)' : 'rgba(255,255,255,0.9)');
+    bg.addColorStop(1, selected ? 'rgba(254,215,170,0.9)' : 'rgba(255,251,235,0.86)');
+    ctx.fillStyle = bg;
+    this.rrect(x, y, w, h, 14);
+    ctx.fill();
+    ctx.strokeStyle = selected ? p.primary : 'rgba(203,213,225,0.85)';
+    ctx.lineWidth = 1.2;
+    this.rrect(x, y, w, h, 14);
+    ctx.stroke();
+    ctx.translate(x + w / 2, y + h / 2);
+    if (characterId === 'toyhero') {
+      ctx.fillStyle = '#2563EB';
+      ctx.beginPath();
+      ctx.arc(0, 0, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#F7D6A5';
+      ctx.beginPath();
+      ctx.arc(0, -7, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#7C2D12';
+      ctx.fillRect(-11, -12, 22, 4);
+      ctx.fillStyle = '#22D3EE';
+      ctx.fillRect(-11, -7, 4, 4);
+      ctx.fillRect(7, -7, 4, 4);
+    } else {
+      ctx.fillStyle = p.primary;
+      ctx.beginPath();
+      ctx.arc(0, 0, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = p.accent;
+      ctx.beginPath();
+      ctx.arc(0, -7, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private drawWrappedText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    maxWidth: number,
+    lineHeight: number,
+    maxLines: number,
+  ): void {
+    if (!text) return;
+    const words = text.split('');
+    let line = '';
+    const lines: string[] = [];
+    for (const ch of words) {
+      const candidate = line + ch;
+      if (ctx.measureText(candidate).width > maxWidth && line) {
+        lines.push(line);
+        line = ch;
+      } else {
+        line = candidate;
+      }
+    }
+    if (line) lines.push(line);
+    const clipped = lines.slice(0, maxLines);
+    clipped.forEach((row, index) => {
+      let output = row;
+      if (index === maxLines - 1 && lines.length > maxLines) {
+        while (ctx.measureText(`${output}…`).width > maxWidth && output.length > 0) {
+          output = output.slice(0, -1);
+        }
+        output = `${output}…`;
+      }
+      ctx.fillText(output, x, y + index * lineHeight);
+    });
+  }
+
   private chip(x: number, y: number, w: number, h: number, accent?: string): void {
     const ctx = this.ctx;
     ctx.save();

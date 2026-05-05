@@ -9,6 +9,7 @@
 
 | 文件 | 角色ID | 显示名 | 来源 | 版权状态 |
 |---|---|---|---|---|
+| `assets/models/characters/toy_hero.glb` | `toyhero` | 玩具队长 | 原创制作 | 项目内部 |
 | `assets/models/characters/peach.glb` | `peach` | 碧姬 | 原创制作 | 项目内部 |
 | `assets/models/characters/daisy.glb` | `daisy` | 黛西 | 原创制作 | 项目内部 |
 
@@ -39,6 +40,7 @@
 | `src/platformCatalog.ts` | `level.platforms[].toyProfile` | 平台资产与机制字典：类型、主题区域、难度层级、机制标签、视觉变体 | 项目内部原创 |
 | `src/platformModelAssets.ts` | `assets/models/platforms/*.glb` | 可复用平台实体模型登记：S1 方形板、S2 圆盘、S3 窄踏板、S4 不规则碎片、S5 堆叠阶梯、S6 静态变体 | 项目内部原创 |
 | `src/prototype/platformModelRuntime.ts` | `level.platforms` | 按平台类型加载 GLB 实体模型，并从模型部件生成复合碰撞体，避免空气墙和穿模 | 项目内部原创 |
+| `scripts/platform-asset-kit.mjs` + `scripts/generate-toy-platform-assets.mjs` | `assets/models/platforms/*.glb` | 程序化平台模型生成器拆分后的共享构造工具与导出脚本 | 项目内部原创 |
 
 > 当前主地图多数可攀爬平台来自 `level.platforms`，不是 GLB setpiece。GLB 平台会先使用原 `level.platforms` 盒体作为加载期 fallback，模型加载完成后切换到模型部件级复合碰撞体。
 
@@ -81,6 +83,9 @@
 | `assets/models/platforms/toy_castle_hourglass_tower.glb` | `toy_castle_hourglass_tower` | 城堡沙漏塔圆形落点，含玻璃筒、金色边框和沙粒层 | 圆形精准落点、高空过渡 |
 | `assets/models/platforms/toy_castle_ribbon_bridge.glb` | `toy_castle_ribbon_bridge` | 城堡缎带踏板桥，含紫色缎带、金色压片和边线 | 窄桥、移动平台、回爬路线 |
 | `assets/models/platforms/toy_castle_treasure_chest.glb` | `toy_castle_treasure_chest` | 城堡宝箱平台，含圆弧箱盖、金属包边、锁扣和宝石 | 城堡大平台、接落层 |
+| `assets/models/platforms/toy_barn_rooftop_hayloft.glb` | `toy_barn_rooftop_hayloft` | 谷仓屋顶草垛接落层，含屋顶木板、草垛顶面、边条和软着陆装饰 | 谷仓接落层、回爬路线 |
+| `assets/models/platforms/toy_castle_wall_walkway.glb` | `toy_castle_wall_walkway` | 城堡外墙宽幅接落层，含石墙、平顶通路、旗帜和墙垛 | 城堡接落层、主路径平台 |
+| `assets/models/platforms/toy_castle_tower_scaffold.glb` | `toy_castle_tower_scaffold` | 城堡塔楼木架横梁，含木梁、软走道和脚钉装饰 | 城堡回爬路线、窄桥衔接 |
 | `assets/models/platforms/toy_castle_extendable_ruler_bridge.glb` | `toy_castle_extendable_ruler_bridge` | 城堡伸缩尺玩具桥，含双层滑尺、刻度、端部宝石和可缩放实体桥面 | 伸缩桥、计时平台 |
 | `assets/models/platforms/toy_castle_tilt_balance_board.glb` | `toy_castle_tilt_balance_board` | 城堡半球底座倾斜板，含紫色平衡板、软垫顶面、半球底座和中心帽 | 倾斜平台、重心控制挑战 |
 | `assets/models/platforms/toy_blink_acrylic_panel.glb` | `toy_blink_acrylic_panel` | 发光亚克力忽隐忽现板，含透明蓝主体、实体边框、中心芯板和灯点 | 忽隐忽现平台、节奏记忆 |

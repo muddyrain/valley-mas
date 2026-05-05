@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "generate:character-assets": "node scripts/generate-toy-character-assets.mjs",
     "generate:platform-assets": "node scripts/generate-toy-platform-assets.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

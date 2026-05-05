@@ -1,99 +1,20 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   BoxGeometry,
-  Color,
   CylinderGeometry,
   Group,
   MathUtils,
-  Mesh,
-  MeshStandardMaterial,
   SphereGeometry,
   TorusGeometry,
 } from 'three';
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const appRoot = resolve(__dirname, '..');
-const outputDir = resolve(appRoot, 'assets/models/platforms');
-
-class NodeFileReader {
-  result = null;
-  onloadend = null;
-
-  readAsArrayBuffer(blob) {
-    blob.arrayBuffer().then((buffer) => {
-      this.result = buffer;
-      this.onloadend?.();
-    });
-  }
-
-  readAsDataURL(blob) {
-    blob.arrayBuffer().then((buffer) => {
-      const base64 = Buffer.from(buffer).toString('base64');
-      this.result = `data:${blob.type || 'application/octet-stream'};base64,${base64}`;
-      this.onloadend?.();
-    });
-  }
-}
-
-if (!globalThis.FileReader) {
-  globalThis.FileReader = NodeFileReader;
-}
-
-function material(color, roughness = 0.46, metalness = 0.06) {
-  return new MeshStandardMaterial({
-    color: new Color(color),
-    roughness,
-    metalness,
-  });
-}
-
-function addMesh(group, geometry, mat, position, rotation = [0, 0, 0], options = {}) {
-  const mesh = new Mesh(geometry, mat);
-  mesh.name = options.name ?? `solid_${group.children.length + 1}`;
-  mesh.userData = {
-    collisionShape: options.collisionShape ?? 'box',
-  };
-  mesh.position.set(position[0], position[1], position[2]);
-  mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  group.add(mesh);
-  return mesh;
-}
-
-function addBox(group, size, mat, position, rotation = [0, 0, 0], options = {}) {
-  return addMesh(
-    group,
-    new BoxGeometry(size[0], size[1], size[2]),
-    mat,
-    position,
-    rotation,
-    options,
-  );
-}
-
-function addCylinder(
-  group,
-  radius,
-  height,
-  segments,
-  mat,
-  position,
-  rotation = [0, 0, 0],
-  options = {},
-) {
-  return addMesh(
-    group,
-    new CylinderGeometry(radius, radius, height, segments),
-    mat,
-    position,
-    rotation,
-    { collisionShape: 'cylinder', ...options },
-  );
-}
+import {
+  addBox,
+  addCylinder,
+  addDecorBox,
+  addDecorCylinder,
+  addMesh,
+  exportGlb,
+  material,
+} from './platform-asset-kit.mjs';
 
 function createSquarePlate() {
   const group = new Group();
@@ -599,9 +520,8 @@ function createBarnCookieStack() {
   addBox(group, [4.1, 0.22, 3.1], wafer, [0, 0.14, 0], [0, MathUtils.degToRad(-2), 0]);
   addBox(group, [3.78, 0.12, 2.78], cream, [0.08, 0.34, -0.02], [0, MathUtils.degToRad(3), 0]);
   addBox(group, [3.72, 0.22, 2.72], wafer, [-0.08, 0.52, 0.04], [0, MathUtils.degToRad(5), 0]);
-  addBox(group, [3.32, 0.1, 2.32], sugar, [0.04, 0.7, -0.02], [0, MathUtils.degToRad(-4), 0], {
-    collisionShape: 'none',
-  });
+  // Pink frosting layer is part of the walkable top surface, so keep it collidable.
+  addBox(group, [3.32, 0.1, 2.32], sugar, [0.04, 0.7, -0.02], [0, MathUtils.degToRad(-4), 0]);
 
   for (const [x, z, s] of [
     [-1.35, -0.8, 1],
@@ -1732,17 +1652,86 @@ function createOlympusStarFinale() {
   return group;
 }
 
-async function exportGlb(group, fileName) {
-  const exporter = new GLTFExporter();
-  const arrayBuffer = await exporter.parseAsync(group, {
-    binary: true,
-    trs: false,
-    onlyVisible: true,
+function createBarnRooftopHayloft() {
+  const group = new Group();
+  group.name = 'toy_barn_rooftop_hayloft';
+  const roof = material('#B45309', 0.56, 0.04);
+  const straw = material('#FDE68A', 0.7, 0.02);
+  const trim = material('#78350F', 0.52, 0.04);
+  const cloth = material('#EF4444', 0.46, 0.04);
+  const peg = material('#FACC15', 0.42, 0.04);
+
+  addBox(group, [7.6, 0.46, 5.4], roof, [0, 0.23, 0], [0, MathUtils.degToRad(-2), 0], {
+    name: 'solid_rooftop_deck',
   });
-  const outputPath = resolve(outputDir, fileName);
-  await mkdir(dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, Buffer.from(arrayBuffer));
-  console.log(`generated ${outputPath}`);
+  addBox(group, [6.7, 0.14, 4.55], straw, [0, 0.58, 0], [0, MathUtils.degToRad(-2), 0], {
+    name: 'solid_soft_hay_top',
+  });
+  addDecorBox(group, [7.9, 0.18, 0.22], trim, [0, 0.72, -2.78], [0, MathUtils.degToRad(-2), 0]);
+  addDecorBox(group, [7.9, 0.18, 0.22], trim, [0, 0.72, 2.78], [0, MathUtils.degToRad(-2), 0]);
+  addDecorBox(group, [0.22, 0.18, 5.4], trim, [-3.95, 0.72, 0], [0, MathUtils.degToRad(-2), 0]);
+  addDecorBox(group, [0.22, 0.18, 5.4], trim, [3.95, 0.72, 0], [0, MathUtils.degToRad(-2), 0]);
+  addDecorBox(group, [2.4, 0.08, 4.3], cloth, [-1.15, 0.78, 0], [0, MathUtils.degToRad(-2), 0]);
+  addDecorBox(group, [0.16, 0.1, 4.3], straw, [-0.24, 0.86, 0], [0, MathUtils.degToRad(-2), 0]);
+
+  for (const x of [-2.8, -1.4, 0, 1.4, 2.8]) {
+    addDecorCylinder(group, 0.1, 0.12, 10, peg, [x, 0.93, -1.72]);
+    addDecorCylinder(group, 0.1, 0.12, 10, peg, [x, 0.93, 1.72]);
+  }
+  return group;
+}
+
+function createCastleWallWalkway() {
+  const group = new Group();
+  group.name = 'toy_castle_wall_walkway';
+  const stone = material('#94A3B8', 0.5, 0.08);
+  const top = material('#E0F2FE', 0.36, 0.05);
+  const trim = material('#334155', 0.48, 0.08);
+  const flagRed = material('#EF4444', 0.38, 0.04);
+  const flagBlue = material('#38BDF8', 0.34, 0.06);
+
+  addBox(group, [9.2, 0.58, 3.8], stone, [0, 0.29, 0], [0, MathUtils.degToRad(1.5), 0], {
+    name: 'solid_wall_body',
+  });
+  addBox(group, [8.4, 0.12, 3.08], top, [0, 0.72, 0], [0, MathUtils.degToRad(1.5), 0], {
+    name: 'solid_clear_walkway_top',
+  });
+  for (const x of [-3.7, -1.85, 0, 1.85, 3.7]) {
+    addDecorBox(group, [0.72, 0.42, 0.36], trim, [x, 0.98, -1.82], [0, MathUtils.degToRad(1.5), 0]);
+    addDecorBox(group, [0.72, 0.42, 0.36], trim, [x, 0.98, 1.82], [0, MathUtils.degToRad(1.5), 0]);
+  }
+  for (const [x, z, mat] of [
+    [-4.2, -1.46, flagRed],
+    [4.2, 1.46, flagBlue],
+  ]) {
+    addDecorCylinder(group, 0.05, 0.9, 8, trim, [x, 1.32, z]);
+    addDecorBox(group, [0.64, 0.36, 0.04], mat, [x + 0.28, 1.58, z]);
+  }
+  return group;
+}
+
+function createCastleTowerScaffold() {
+  const group = new Group();
+  group.name = 'toy_castle_tower_scaffold';
+  const wood = material('#92400E', 0.58, 0.04);
+  const rope = material('#78350F', 0.64, 0.03);
+  const cloth = material('#C084FC', 0.4, 0.05);
+  const nail = material('#FBBF24', 0.36, 0.1);
+
+  addBox(group, [6.6, 0.34, 1.72], wood, [0, 0.17, 0], [0, MathUtils.degToRad(-4), 0], {
+    name: 'solid_scaffold_plank',
+  });
+  addBox(group, [5.82, 0.08, 1.08], cloth, [0, 0.42, 0], [0, MathUtils.degToRad(-4), 0], {
+    name: 'solid_soft_runner',
+  });
+  addDecorBox(group, [6.5, 0.08, 0.08], rope, [0, 0.54, -0.82], [0, MathUtils.degToRad(-4), 0]);
+  addDecorBox(group, [6.5, 0.08, 0.08], rope, [0, 0.54, 0.82], [0, MathUtils.degToRad(-4), 0]);
+  for (const x of [-2.7, -1.35, 0, 1.35, 2.7]) {
+    addDecorBox(group, [0.12, 0.1, 1.5], rope, [x, 0.59, 0], [0, MathUtils.degToRad(-4), 0]);
+    addDecorCylinder(group, 0.07, 0.1, 8, nail, [x, 0.68, -0.48]);
+    addDecorCylinder(group, 0.07, 0.1, 8, nail, [x, 0.68, 0.48]);
+  }
+  return group;
 }
 
 await exportGlb(createSquarePlate(), 'toy_square_plate_s1.glb');
@@ -1779,6 +1768,9 @@ await exportGlb(createCastleShieldTile(), 'toy_castle_shield_tile.glb');
 await exportGlb(createCastleHourglassTower(), 'toy_castle_hourglass_tower.glb');
 await exportGlb(createCastleRibbonBridge(), 'toy_castle_ribbon_bridge.glb');
 await exportGlb(createCastleTreasureChest(), 'toy_castle_treasure_chest.glb');
+await exportGlb(createBarnRooftopHayloft(), 'toy_barn_rooftop_hayloft.glb');
+await exportGlb(createCastleWallWalkway(), 'toy_castle_wall_walkway.glb');
+await exportGlb(createCastleTowerScaffold(), 'toy_castle_tower_scaffold.glb');
 await exportGlb(createBarnSeesawBoard(), 'toy_barn_seesaw_board.glb');
 await exportGlb(createCastleExtendableRulerBridge(), 'toy_castle_extendable_ruler_bridge.glb');
 await exportGlb(createCastleTiltBalanceBoard(), 'toy_castle_tilt_balance_board.glb');

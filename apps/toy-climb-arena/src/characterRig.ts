@@ -20,11 +20,7 @@ import {
   Vector3,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import {
-  CHARACTER_MODEL_URLS,
-  CLIMBER_CHARACTER_OPTIONS,
-  isModelCharacter,
-} from './characterAssets';
+import { CHARACTER_MODEL_URLS, isModelCharacter, type ModelCharacterId } from './characterAssets';
 import type {
   ClimberCharacterAnimationDebugSnapshot,
   ClimberCharacterAnimationState,
@@ -238,7 +234,9 @@ function shouldIgnoreBone(name: string): boolean {
 }
 
 function disposeMaterials(materials: Material[]) {
-  materials.forEach((material) => material.dispose());
+  materials.forEach((material) => {
+    material.dispose();
+  });
 }
 
 function setCastShadowDeep(node: Object3D) {
@@ -730,6 +728,7 @@ function createProceduralBoneAnimator(
   root: Group,
   characterId: Exclude<ClimberCharacterId, 'orb'>,
 ): ProceduralBoneAnimator | null {
+  const isToyHero = characterId === 'toyhero';
   const hips: BoneEntry[] = [];
   const spines: BoneEntry[] = [];
   const chests: BoneEntry[] = [];
@@ -908,12 +907,12 @@ function createProceduralBoneAnimator(
       let legMaxBackward = -0.52;
 
       if (state === 'run') {
-        legAmplitude = 0.66 * runningBlend;
-        armAmplitude = 1.02 * runningBlend;
+        legAmplitude = isToyHero ? 0.82 * runningBlend : 0.66 * runningBlend;
+        armAmplitude = isToyHero ? 1.08 * runningBlend : 1.02 * runningBlend;
         shinBendBase = 0.22;
-        shinBendGain = 0.3 * runningBlend;
+        shinBendGain = (isToyHero ? 0.42 : 0.3) * runningBlend;
         footPitchBase = -0.14;
-        footPitchGain = 0.24 * runningBlend;
+        footPitchGain = (isToyHero ? 0.34 : 0.24) * runningBlend;
         elbowBendBias = -0.46;
         elbowRunGain = 0.26 * runningBlend;
         hipPitch = -0.04;
@@ -926,7 +925,7 @@ function createProceduralBoneAnimator(
         handPitch = -0.1;
         handSwingGain = 0.22;
         forearmCounterSwing = 0.18;
-        legMaxForward = 0.64;
+        legMaxForward = isToyHero ? 0.7 : 0.64;
         legMaxBackward = -0.46;
       } else if (state === 'jump') {
         legPoseBias = -0.2;
@@ -1649,7 +1648,7 @@ function createWoodenDollParts(): CharacterPartSet {
 }
 
 function createModelRuntime(
-  characterId: 'peach' | 'daisy',
+  characterId: ModelCharacterId,
   gltfScene: Group,
   clips: AnimationClip[],
 ): ModelRuntime | null {
@@ -1730,7 +1729,7 @@ function createModelRuntime(
     Boolean(actions.jump) ||
     Boolean(actions.fall) ||
     Boolean(actions.land);
-  const usesProceduralOverlay = !hasSkeleton || !hasPlayableAnimation;
+  const usesProceduralOverlay = !hasSkeleton || !hasPlayableAnimation || characterId === 'toyhero';
 
   if (!hasPlayableAnimation) {
     return {
@@ -2128,7 +2127,7 @@ function createCatParts(): CharacterPartSet {
 }
 
 function loadCharacterModel(
-  characterId: 'peach' | 'daisy',
+  characterId: ModelCharacterId,
   onLoaded: (runtime: ModelRuntime) => void,
   onFailed: () => void,
 ): { dispose: () => void } {

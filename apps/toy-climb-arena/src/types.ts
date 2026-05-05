@@ -37,6 +37,7 @@ export interface ClimberJumpClearanceReport {
 
 export type ClimberCharacterId =
   | 'orb'
+  | 'toyhero'
   | 'peach'
   | 'daisy'
   | 'woodendoll'
