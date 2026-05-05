@@ -17,7 +17,7 @@
 | Admin 后台 | `apps/admin` | React 19 + Vite 6 + Ant Design 6 + Pro Components，包含用户、创作者、资源、博客、记录与审核管理。 |
 | Toy Climb Arena | `apps/toy-climb-arena` | Vite 6 + TypeScript + Three.js，玩具世界攀爬跳跃游戏，开发端口 5175。详见 `apps/toy-climb-arena/AGENTS.md`。 |
 | Go 服务端 | `server` | Gin + GORM，入口在 `server/cmd/server`，路由集中在 `server/internal/router/router.go`。 |
-| 共享包 | `packages/*` | `shared`、`shared-request`、`shared-router`、`shared-format`、`format-tools`、`climber-game` 等 workspace 包。 |
+| 共享包 | `packages/*` | `shared`、`shared-request`、`shared-router`、`shared-format`、`format-tools` 等 workspace 包。 |
 | 文档 | `docs` | 沉淀长期有价值文档；普通问答、临时总结不要自动写入。 |
 | Unity 实验 | `apps/unity-dungeon` | Unity 相关实验资产，除非任务明确涉及，不主动改动。 |
 

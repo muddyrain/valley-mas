@@ -22,7 +22,6 @@
     "@milkdown/crepe": "^7.20.0",
     "@milkdown/kit": "7.20.0",
     "@tanstack/react-query": "^5.62.0",
-    "@valley/climber-game": "workspace:*",
     "@valley/format-tools": "workspace:*",
     "@valley/shared": "workspace:*",
     "@valley/shared-format": "workspace:*",

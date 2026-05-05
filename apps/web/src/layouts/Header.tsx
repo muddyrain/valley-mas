@@ -97,7 +97,7 @@ export default function Header() {
     },
     {
       to: '/labs/climber',
-      label: '跳跳乐实验',
+      label: '玩具攀爬',
       icon: Mountain,
       active: location.pathname.startsWith('/labs/climber'),
     },
@@ -152,6 +152,7 @@ export default function Header() {
     };
   }, [isAuthenticated]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 路由切换时需要重置移动端菜单状态。
   useEffect(() => {
     setMobileNavOpen(false);
   }, [location.pathname]);

@@ -215,9 +215,6 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.62.0
         version: 5.90.21(react@19.2.4)
-      '@valley/climber-game':
-        specifier: workspace:*
-        version: link:../../packages/climber-game
       '@valley/format-tools':
         specifier: workspace:*
         version: link:../../packages/format-tools
@@ -309,34 +306,6 @@ importers:
       vite:
         specifier: catalog:vite-6
         version: 6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
-
-  packages/climber-game:
-    dependencies:
-      react:
-        specifier: ^19.0.0
-        version: 19.2.4
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.2.4(react@19.2.4)
-      three:
-        specifier: ^0.180.0
-        version: 0.180.0
-    devDependencies:
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.14
-      '@types/react-dom':
-        specifier: ^19.0.0
-        version: 19.2.3(@types/react@19.2.14)
-      '@types/three':
-        specifier: ^0.180.0
-        version: 0.180.0
-      tsup:
-        specifier: ^8.3.0
-        version: 8.5.1(@swc/core@1.15.17)(jiti@2.6.1)(postcss@8.5.10)(typescript@5.9.3)(yaml@2.8.2)
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
 
   packages/format-tools:
     devDependencies:

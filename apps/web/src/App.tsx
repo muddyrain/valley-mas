@@ -47,7 +47,7 @@ function RouteTitle() {
     } else if (pathname === '/tools/format') {
       title = '格式转换工具 | Valley';
     } else if (pathname === '/labs/climber') {
-      title = '3D 跳跳乐实验场 | Valley';
+      title = '玩具攀爬实验场 | Valley';
     } else if (pathname.startsWith('/blog/')) {
       title = '内容详情 | Valley';
     } else if (pathname === '/resources') {
