@@ -1,3 +1,4 @@
+import { useAuthStore } from '@/stores/useAuthStore';
 import request, { type RequestConfig } from '@/utils/request';
 
 export type PostType = 'blog' | 'image_text';
@@ -211,6 +212,13 @@ export interface BlogAskResponse {
   model?: string;
 }
 
+export interface BlogAskStreamChunk {
+  chunk?: string;
+  done?: boolean;
+  model?: string;
+  error?: string;
+}
+
 export interface BlogRecommendItem {
   postId: string;
   title: string;
@@ -328,6 +336,69 @@ export function generateBlogReaderGuide(postId: string) {
 
 export function askBlogPost(postId: string, data: { question: string }) {
   return request.post<unknown, BlogAskResponse>(`/public/blog/posts/id/${postId}/ai/ask`, data);
+}
+
+export async function askBlogPostStream(
+  postId: string,
+  data: { question: string; signal?: AbortSignal },
+  handlers: {
+    onChunk: (payload: BlogAskStreamChunk) => void;
+    onError?: (message: string) => void;
+  },
+) {
+  const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+  const token = useAuthStore.getState().token;
+
+  const res = await fetch(`${baseURL}/public/blog/posts/id/${postId}/ai/ask`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ question: data.question, stream: true }),
+    credentials: 'include',
+    signal: data.signal,
+  });
+
+  if (!res.ok || !res.body) {
+    const text = await res.text().catch(() => '');
+    throw new Error(text || `stream request failed: ${res.status}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const events = buffer.split('\n\n');
+    buffer = events.pop() || '';
+
+    for (const evt of events) {
+      const line = evt
+        .split('\n')
+        .map((item) => item.trim())
+        .find((item) => item.startsWith('data:'));
+      if (!line) continue;
+
+      const raw = line.slice(5).trim();
+      if (!raw) continue;
+
+      try {
+        const payload = JSON.parse(raw) as BlogAskStreamChunk;
+        if (payload.error) {
+          handlers.onError?.(payload.error);
+          return;
+        }
+        handlers.onChunk(payload);
+      } catch {
+        // ignore invalid stream chunks
+      }
+    }
+  }
 }
 
 export function recommendBlogPosts(data: {
