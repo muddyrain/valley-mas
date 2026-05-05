@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { GlobalScrollButton } from '@/components/GlobalScrollButton';
 import { Toaster } from '@/components/ui/sonner';
 import { applyThemeToDocument, useThemeStore } from '@/stores/useThemeStore';
 import Layout from './layouts/Layout';
@@ -153,6 +154,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
       </Routes>
+      <GlobalScrollButton />
       <Toaster />
     </>
   );
