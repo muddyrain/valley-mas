@@ -4,6 +4,7 @@ import toyBarnCookieStackUrl from '../assets/models/platforms/toy_barn_cookie_st
 import toyBarnHayBaleUrl from '../assets/models/platforms/toy_barn_hay_bale.glb';
 import toyBarnPicnicBasketUrl from '../assets/models/platforms/toy_barn_picnic_basket.glb';
 import toyBarnPuddingCupUrl from '../assets/models/platforms/toy_barn_pudding_cup.glb';
+import toyBarnRooftopHayloftUrl from '../assets/models/platforms/toy_barn_rooftop_hayloft.glb';
 import toyBarnSeesawBoardUrl from '../assets/models/platforms/toy_barn_seesaw_board.glb';
 import toyBarnXylophoneBridgeUrl from '../assets/models/platforms/toy_barn_xylophone_bridge.glb';
 import toyBarnYarnBallUrl from '../assets/models/platforms/toy_barn_yarn_ball.glb';
@@ -23,7 +24,9 @@ import toyCastleRibbonBridgeUrl from '../assets/models/platforms/toy_castle_ribb
 import toyCastleShieldTileUrl from '../assets/models/platforms/toy_castle_shield_tile.glb';
 import toyCastleTiltBalanceBoardUrl from '../assets/models/platforms/toy_castle_tilt_balance_board.glb';
 import toyCastleTowerCapUrl from '../assets/models/platforms/toy_castle_tower_cap.glb';
+import toyCastleTowerScaffoldUrl from '../assets/models/platforms/toy_castle_tower_scaffold.glb';
 import toyCastleTreasureChestUrl from '../assets/models/platforms/toy_castle_treasure_chest.glb';
+import toyCastleWallWalkwayUrl from '../assets/models/platforms/toy_castle_wall_walkway.glb';
 import toyCloudBouncePadUrl from '../assets/models/platforms/toy_cloud_bounce_pad.glb';
 import toyConveyorTrackBeltUrl from '../assets/models/platforms/toy_conveyor_track_belt.glb';
 import toyCrackedPuzzleCrumbleUrl from '../assets/models/platforms/toy_cracked_puzzle_crumble.glb';
@@ -71,6 +74,7 @@ export type ToyPlatformModelAssetId =
   | 'toy_barn_pudding_cup'
   | 'toy_barn_button_cushion'
   | 'toy_barn_picnic_basket'
+  | 'toy_barn_rooftop_hayloft'
   | 'toy_barn_yarn_ball'
   | 'toy_barn_xylophone_bridge'
   | 'toy_barn_seesaw_board'
@@ -95,6 +99,8 @@ export type ToyPlatformModelAssetId =
   | 'toy_castle_hourglass_tower'
   | 'toy_castle_ribbon_bridge'
   | 'toy_castle_treasure_chest'
+  | 'toy_castle_wall_walkway'
+  | 'toy_castle_tower_scaffold'
   | 'toy_castle_gear_disc'
   | 'toy_castle_drawbridge'
   | 'toy_castle_extendable_ruler_bridge'
@@ -219,6 +225,13 @@ export const TOY_PLATFORM_MODEL_ASSETS: Record<
     id: 'toy_barn_picnic_basket',
     name: '谷仓野餐篮平台',
     url: toRuntimeAssetUrl(toyBarnPicnicBasketUrl, import.meta.url),
+    platformKind: 'square_plate',
+    source: 'generated-glb',
+  },
+  toy_barn_rooftop_hayloft: {
+    id: 'toy_barn_rooftop_hayloft',
+    name: '谷仓屋顶草垛接落层',
+    url: toRuntimeAssetUrl(toyBarnRooftopHayloftUrl, import.meta.url),
     platformKind: 'square_plate',
     source: 'generated-glb',
   },
@@ -388,6 +401,20 @@ export const TOY_PLATFORM_MODEL_ASSETS: Record<
     name: '城堡宝箱平台',
     url: toRuntimeAssetUrl(toyCastleTreasureChestUrl, import.meta.url),
     platformKind: 'square_plate',
+    source: 'generated-glb',
+  },
+  toy_castle_wall_walkway: {
+    id: 'toy_castle_wall_walkway',
+    name: '城堡外墙宽幅接落层',
+    url: toRuntimeAssetUrl(toyCastleWallWalkwayUrl, import.meta.url),
+    platformKind: 'square_plate',
+    source: 'generated-glb',
+  },
+  toy_castle_tower_scaffold: {
+    id: 'toy_castle_tower_scaffold',
+    name: '城堡塔楼木架横梁',
+    url: toRuntimeAssetUrl(toyCastleTowerScaffoldUrl, import.meta.url),
+    platformKind: 'narrow_plank',
     source: 'generated-glb',
   },
   toy_castle_gear_disc: {

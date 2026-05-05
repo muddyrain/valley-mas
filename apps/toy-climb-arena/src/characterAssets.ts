@@ -1,9 +1,17 @@
 import daisyModelUrl from '../assets/models/characters/daisy.glb';
 import peachModelUrl from '../assets/models/characters/peach.glb';
+import toyHeroModelUrl from '../assets/models/characters/toy_hero.glb';
 import { toRuntimeAssetUrl } from './assetUrl';
 import type { ClimberCharacterId, ClimberCharacterOption } from './types';
 
+export type ModelCharacterId = 'toyhero' | 'peach' | 'daisy';
+
 export const CLIMBER_CHARACTER_OPTIONS: ClimberCharacterOption[] = [
+  {
+    id: 'toyhero',
+    name: '玩具队长',
+    description: '原创精细玩具人偶 GLB：护目镜、围巾、背包、手套和靴子，适合作为默认主角。',
+  },
   {
     id: 'woodendoll',
     name: '木偶',
@@ -27,16 +35,17 @@ export const CLIMBER_CHARACTER_OPTIONS: ClimberCharacterOption[] = [
   {
     id: 'peach',
     name: '碧姬',
-    description: '加载 peach.glb；若资源异常会自动回退占位角色。',
+    description: '旧版 peach.glb；保留作对照，资源异常会自动回退占位角色。',
   },
   {
     id: 'daisy',
     name: '黛西',
-    description: '加载 daisy.glb；若资源异常会自动回退占位角色。',
+    description: '旧版 daisy.glb；保留作对照，资源异常会自动回退占位角色。',
   },
 ];
 
-export const CHARACTER_MODEL_URLS: Record<'peach' | 'daisy', string[]> = {
+export const CHARACTER_MODEL_URLS: Record<ModelCharacterId, string[]> = {
+  toyhero: [toRuntimeAssetUrl(toyHeroModelUrl, import.meta.url)],
   peach: [
     toRuntimeAssetUrl(peachModelUrl, import.meta.url),
     '/game/models/peach.glb?v=20260412-peach',
@@ -49,8 +58,6 @@ export const CHARACTER_MODEL_URLS: Record<'peach' | 'daisy', string[]> = {
   ],
 };
 
-export function isModelCharacter(
-  characterId: ClimberCharacterId,
-): characterId is 'peach' | 'daisy' {
-  return characterId === 'peach' || characterId === 'daisy';
+export function isModelCharacter(characterId: ClimberCharacterId): characterId is ModelCharacterId {
+  return characterId === 'toyhero' || characterId === 'peach' || characterId === 'daisy';
 }

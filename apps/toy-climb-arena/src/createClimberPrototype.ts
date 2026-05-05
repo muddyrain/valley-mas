@@ -102,6 +102,9 @@ const POINTER_LOCK_INPUT_COOLDOWN_MS = 120;
 const MOUSE_FILTER_ALPHA = 0.42;
 const CAMERA_YAW_SPEED_LIMIT = 8.4;
 const CAMERA_PITCH_SPEED_LIMIT = 5.2;
+const CAMERA_MIN_PITCH = -1.35;
+const CAMERA_MAX_PITCH = 1.28;
+const CAMERA_GROUND_CLEARANCE = 0.36;
 const LAND_SOUND_COOLDOWN_MS = 180;
 const GROUND_STICK_VELOCITY_MAX = 1.35;
 const LANDING_ANIMATION_LOCK_MS = 140;
@@ -158,6 +161,14 @@ function toVector3(value: [number, number, number]): Vector3 {
 
 function lerpNumber(from: number, to: number, ratio: number): number {
   return from + (to - from) * ratio;
+}
+
+function resolveInitialCameraPitch(offset: Vector3, distance: number): number {
+  return clamp(
+    Math.asin(clamp(offset.y / Math.max(distance, 0.001), -1, 1)),
+    CAMERA_MIN_PITCH,
+    CAMERA_MAX_PITCH,
+  );
 }
 
 function intersectsExpandedAabb(params: {
@@ -2005,7 +2016,7 @@ export function createClimberPrototype(
 
   // ── 粒子系统 ─────────────────────────────────────────────────────────────
   const particles = createParticleSystem(scene);
-  const { emitLandParticles } = particles;
+  const { emitJumpTrail, emitLandParticles, emitGoalParticles } = particles;
 
   const characterRig = createCharacterRig(characterId, {
     onRuntimeStatusChange: onCharacterStatusChange,
@@ -2058,7 +2069,7 @@ export function createClimberPrototype(
 
   const cameraBaseDistance = cameraOffset.length();
   let cameraYaw = Math.atan2(cameraOffset.x, cameraOffset.z);
-  let cameraPitch = Math.asin(clamp(cameraOffset.y / cameraBaseDistance, -0.98, 0.98));
+  let cameraPitch = resolveInitialCameraPitch(cameraOffset, cameraBaseDistance);
   let targetCameraYaw = cameraYaw;
   let targetCameraPitch = cameraPitch;
   let cameraZoomOffset = 0;
@@ -2095,7 +2106,7 @@ export function createClimberPrototype(
     velocity.set(0, 0, 0);
     camera.position.copy(startPosition).add(cameraOffset);
     cameraYaw = Math.atan2(cameraOffset.x, cameraOffset.z);
-    cameraPitch = Math.asin(clamp(cameraOffset.y / cameraBaseDistance, -0.98, 0.98));
+    cameraPitch = resolveInitialCameraPitch(cameraOffset, cameraBaseDistance);
     targetCameraYaw = cameraYaw;
     targetCameraPitch = cameraPitch;
     filteredMouseDeltaX = 0;
@@ -2207,6 +2218,7 @@ export function createClimberPrototype(
 
     // previousBottom 必须在 pc.update()（内部做位移积分）之前捕获
     const previousBottom = playerPosition.y - PLAYER_RADIUS;
+    const preStepVerticalVelocity = velocity.y;
 
     const input: PlayerInputSnapshot = {
       forward: keyState.forward,
@@ -2243,6 +2255,15 @@ export function createClimberPrototype(
 
     if (jumped) {
       audio.playJump();
+      emitJumpTrail(
+        playerPosition.x,
+        playerPosition.y - PLAYER_RADIUS * 0.45,
+        playerPosition.z,
+        velocity.x,
+        Math.max(velocity.y, 0.36),
+        velocity.z,
+        delta * 1.1,
+      );
     }
     if (landed) {
       landingAnimationLockMs = LANDING_ANIMATION_LOCK_MS;
@@ -2256,6 +2277,8 @@ export function createClimberPrototype(
         playerPosition.x,
         playerPosition.y - PLAYER_RADIUS + 0.05,
         playerPosition.z,
+        preStepVerticalVelocity,
+        Math.hypot(velocity.x, velocity.z),
       );
 
       // ── 弹跳板检测：落地时检查是否踩在弹跳板上 ───────────────────────────
@@ -2288,6 +2311,18 @@ export function createClimberPrototype(
       }
     }
 
+    if (!grounded) {
+      emitJumpTrail(
+        playerPosition.x,
+        playerPosition.y - PLAYER_RADIUS * 0.44,
+        playerPosition.z,
+        velocity.x,
+        velocity.y,
+        velocity.z,
+        delta,
+      );
+    }
+
     // 掉落归零：低于 RESPAWN_Y 时重置回起点
     if (playerPosition.y < RESPAWN_Y) {
       playerPosition.copy(startPosition);
@@ -2306,6 +2341,7 @@ export function createClimberPrototype(
       goalReachedAtMs = clock.getElapsedTime() * 1000;
       goalCelebrationTimer = GOAL_CELEBRATION_DURATION;
       audio.playGoal();
+      emitGoalParticles(goalPulse.position.x, goalPulse.position.y + 0.08, goalPulse.position.z);
     }
   }
 
@@ -2348,7 +2384,7 @@ export function createClimberPrototype(
   function updateCamera(delta: number) {
     if (!Number.isFinite(cameraYaw) || !Number.isFinite(cameraPitch)) {
       cameraYaw = Math.atan2(cameraOffset.x, cameraOffset.z);
-      cameraPitch = Math.asin(clamp(cameraOffset.y / cameraBaseDistance, -0.98, 0.98));
+      cameraPitch = resolveInitialCameraPitch(cameraOffset, cameraBaseDistance);
       targetCameraYaw = cameraYaw;
       targetCameraPitch = cameraPitch;
     }
@@ -2371,7 +2407,7 @@ export function createClimberPrototype(
     const approach = clamp((24 - distanceToGoal) / 24, 0, 1);
 
     const adjustedDistance = clamp(cameraBaseDistance + cameraZoomOffset - approach * 1.2, 4.8, 18);
-    const adjustedPitch = clamp(cameraPitch + approach * 0.03, -0.1, 1.2);
+    const adjustedPitch = clamp(cameraPitch + approach * 0.03, CAMERA_MIN_PITCH, CAMERA_MAX_PITCH);
     const horizontalDistance = Math.cos(adjustedPitch) * adjustedDistance;
 
     tempFollowOffset.set(
@@ -2381,7 +2417,14 @@ export function createClimberPrototype(
     );
     tempDesiredCameraPosition.copy(cameraTarget).add(tempFollowOffset);
 
+    const minCameraY = FLOOR_SURFACE_Y + CAMERA_GROUND_CLEARANCE;
+    if (tempDesiredCameraPosition.y < minCameraY) {
+      tempDesiredCameraPosition.y = minCameraY;
+    }
     camera.position.lerp(tempDesiredCameraPosition, 1 - Math.exp(-8 * delta));
+    if (camera.position.y < minCameraY) {
+      camera.position.y = minCameraY;
+    }
     camera.lookAt(cameraTarget.x, cameraTarget.y + 0.45, cameraTarget.z);
   }
 
@@ -2848,7 +2891,11 @@ export function createClimberPrototype(
     filteredMouseDeltaX = MathUtils.lerp(filteredMouseDeltaX, rawDeltaX, MOUSE_FILTER_ALPHA);
     filteredMouseDeltaY = MathUtils.lerp(filteredMouseDeltaY, rawDeltaY, MOUSE_FILTER_ALPHA);
     targetCameraYaw -= filteredMouseDeltaX * 0.00255;
-    targetCameraPitch = clamp(targetCameraPitch + filteredMouseDeltaY * 0.0022, -0.25, 1.2);
+    targetCameraPitch = clamp(
+      targetCameraPitch + filteredMouseDeltaY * 0.0022,
+      CAMERA_MIN_PITCH,
+      CAMERA_MAX_PITCH,
+    );
   };
 
   const handleWheel = (event: WheelEvent) => {
