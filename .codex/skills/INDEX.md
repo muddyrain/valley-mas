@@ -17,6 +17,4 @@
 | `encoding-guard` | 修改中文、Markdown、skill、配置示例或任何非 ASCII 文本前后必须使用，防止乱码和文本丢失。 |
 | `task-completion-guard` | 多步骤任务、计划后实施、需要验证或容易停在口头承诺的任务。 |
 | `component-reuse-guard` | 发现重复 JSX、重复 handler、重复弹窗/表单/上传/列表逻辑时，先复用或抽取。 |
-| `web-ui-consistency-guard` | Web 页面改动时统一检查主题 token、品牌色、loading 态、URL query 状态同步、列表刷新/回退一致性。 |
-| `ai-capability-orchestration` | Go 服务端新增、重构或排查火山 ARK AI 能力，包括模型配置、多模态、降级、响应解析和错误码映射。 |
 | `conventional-commit-guard` | 生成 commit message、执行 `git commit`，或用户说“提交/提交吧/提交代码/帮我提交”。 |
