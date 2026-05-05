@@ -1,5 +1,6 @@
 ﻿import {
   ArrowLeft,
+  Bot,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -10,6 +11,7 @@
   Loader2,
   MessageCircle,
   PencilLine,
+  SendHorizontal,
   Sparkles,
   User,
 } from 'lucide-react';
@@ -17,7 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  askBlogPost,
+  askBlogPostStream,
   type BlogAskResponse,
   type BlogReaderGuideResponse,
   createPostComment,
@@ -77,6 +79,69 @@ function getReadingMinutes(content: string) {
   return Math.max(1, Math.ceil((content || '').length / 500));
 }
 
+function renderAskAnswer(answer: string) {
+  const normalized = answer
+    .replace(/\r\n/g, '\n')
+    .replace(/([。！？])(?=(?:\d+[.、)]|[-•]))/g, '$1\n')
+    .trim();
+  if (!normalized) return null;
+
+  const lines = normalized
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const blocks: Array<{ type: 'list'; items: string[] } | { type: 'paragraph'; text: string }> = [];
+  let listItems: string[] = [];
+  let paragraphLines: string[] = [];
+
+  const flushParagraph = () => {
+    if (paragraphLines.length) {
+      blocks.push({ type: 'paragraph', text: paragraphLines.join(' ') });
+      paragraphLines = [];
+    }
+  };
+
+  const flushList = () => {
+    if (listItems.length) {
+      blocks.push({ type: 'list', items: listItems });
+      listItems = [];
+    }
+  };
+
+  lines.forEach((line) => {
+    const listMatch = line.match(/^(?:[-•]\s*|\d+[.、)]\s*)(.+)$/);
+    if (listMatch) {
+      flushParagraph();
+      listItems.push(listMatch[1].trim());
+      return;
+    }
+    flushList();
+    paragraphLines.push(line);
+  });
+
+  flushParagraph();
+  flushList();
+
+  return (
+    <div className="space-y-2 text-sm leading-7 text-slate-700">
+      {blocks.map((block, index) =>
+        block.type === 'paragraph' ? (
+          <p key={`p-${index}`}>{block.text}</p>
+        ) : (
+          <ul key={`list-${index}`} className="space-y-1.5">
+            {block.items.map((item, itemIndex) => (
+              <li key={`${item}-${itemIndex}`} className="flex gap-2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-theme-primary/70" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        ),
+      )}
+    </div>
+  );
+}
+
 export default function BlogPost() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
@@ -104,11 +169,13 @@ export default function BlogPost() {
   const [aiGuideLoading, setAIGuideLoading] = useState(false);
   const [aiGuideError, setAIGuideError] = useState('');
   const [askQuestion, setAskQuestion] = useState('');
+  const [askAskedQuestion, setAskAskedQuestion] = useState('');
   const [askResult, setAskResult] = useState<BlogAskResponse | null>(null);
   const [askLoading, setAskLoading] = useState(false);
   const [askError, setAskError] = useState('');
   const articleSectionRef = useRef<HTMLElement | null>(null);
   const commentSectionRef = useRef<HTMLDivElement | null>(null);
+  const askAbortRef = useRef<AbortController | null>(null);
   const progressRafRef = useRef<number | null>(null);
   const progressRef = useRef(0);
 
@@ -182,8 +249,12 @@ export default function BlogPost() {
     setStatusTocId('');
     setAIGuide(null);
     setAIGuideError('');
+    askAbortRef.current?.abort();
+    askAbortRef.current = null;
     setAskQuestion('');
+    setAskAskedQuestion('');
     setAskResult(null);
+    setAskLoading(false);
     setAskError('');
   }, [id, toc.length]);
 
@@ -206,6 +277,12 @@ export default function BlogPost() {
       document.body.style.overflow = originOverflow;
     };
   }, [mobileTocOpen]);
+
+  useEffect(() => {
+    return () => {
+      askAbortRef.current?.abort();
+    };
+  }, []);
 
   const imageTextData = useMemo<ImageTextPayload | null>(() => {
     if (!post || post.postType !== 'image_text') return null;
@@ -327,16 +404,47 @@ export default function BlogPost() {
       setAskError('请输入你想问的问题。');
       return;
     }
+    askAbortRef.current?.abort();
+    const controller = new AbortController();
+    askAbortRef.current = controller;
+    setAskAskedQuestion(question);
+    setAskQuestion('');
+    setAskResult({ answer: '' });
     setAskLoading(true);
     setAskError('');
     try {
-      const data = await askBlogPost(post.id, { question });
-      setAskResult(data);
+      await askBlogPostStream(
+        post.id,
+        { question, signal: controller.signal },
+        {
+          onChunk: (payload) => {
+            if (payload.done) return;
+            if (payload.chunk) {
+              setAskResult((prev) => ({
+                answer: `${prev?.answer || ''}${payload.chunk || ''}`,
+                model: payload.model || prev?.model,
+              }));
+            } else if (payload.model) {
+              setAskResult((prev) => ({
+                answer: prev?.answer || '',
+                model: payload.model,
+              }));
+            }
+          },
+          onError: (message) => {
+            setAskError(message || '暂时无法回答这个问题，请换个问法或稍后再试。');
+          },
+        },
+      );
     } catch (error) {
+      if (controller.signal.aborted) return;
       console.error('Failed to ask blog question:', error);
       setAskError('暂时无法回答这个问题，请换个问法或稍后再试。');
     } finally {
-      setAskLoading(false);
+      if (askAbortRef.current === controller) {
+        askAbortRef.current = null;
+        setAskLoading(false);
+      }
     }
   };
 
@@ -947,66 +1055,6 @@ export default function BlogPost() {
                 </Button>
               </div>
             </section>
-            <section className="theme-panel-shell rounded-[28px] border p-5 shadow-[0_18px_46px_rgba(148,163,184,0.12)]">
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
-                <Sparkles className="h-4 w-4 text-theme-primary" />
-                问文章
-              </div>
-              <p className="mt-2 text-xs leading-6 text-slate-500">
-                基于当前文章内容回答，不会跨文章扩展。
-              </p>
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                <input
-                  value={askQuestion}
-                  onChange={(event) => setAskQuestion(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault();
-                      void handleAskPost();
-                    }
-                  }}
-                  placeholder="问问这篇文章的观点、结论或细节"
-                  className="theme-input-border h-10 min-w-0 flex-1 rounded-xl border bg-white px-3 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-theme-soft"
-                />
-                <Button
-                  type="button"
-                  className="theme-btn-primary h-10 rounded-xl px-4 sm:w-auto"
-                  onClick={() => void handleAskPost()}
-                  disabled={askLoading}
-                >
-                  {askLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '提问'}
-                </Button>
-              </div>
-              {askError ? (
-                <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-600">
-                  {askError}
-                </p>
-              ) : null}
-              {askResult ? (
-                <div className="mt-3 rounded-2xl border border-theme-soft-strong bg-white/80 p-3">
-                  <p className="text-sm leading-7 text-slate-700">{askResult.answer}</p>
-                  {askResult.citations?.length ? (
-                    <div className="mt-3 space-y-2">
-                      {askResult.citations.map((item, index) => (
-                        <div
-                          key={`${item.heading}-${index}`}
-                          className="rounded-xl bg-theme-soft/60 px-3 py-2"
-                        >
-                          {item.heading ? (
-                            <div className="text-[11px] font-medium text-theme-primary">
-                              {item.heading}
-                            </div>
-                          ) : null}
-                          <div className="mt-1 text-[11px] leading-5 text-slate-600">
-                            {item.quote}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </section>
             <div ref={commentSectionRef}>
               <PostComments
                 comments={comments}
@@ -1021,73 +1069,200 @@ export default function BlogPost() {
             </div>
           </main>
 
-          <aside className="space-y-6 xl:sticky xl:top-20 xl:self-start">
-            {toc.length > 0 && (
-              <section className="theme-panel-shell rounded-[28px] border p-5 shadow-[0_20px_52px_rgba(148,163,184,0.12)] sm:rounded-[30px] sm:p-6">
-                <div className="text-sm font-medium text-slate-900">目录导读</div>
-                <div className="mt-4 max-h-[42vh] overflow-y-auto overflow-x-hidden pr-1">
-                  <TableOfContents
-                    toc={toc}
-                    activeId={activeTocId}
-                    onActiveIdChange={setActiveTocId}
-                  />
+          <aside>
+            <div className="space-y-6">
+              {toc.length > 0 && (
+                <section className="theme-panel-shell rounded-[28px] border p-5 shadow-[0_20px_52px_rgba(148,163,184,0.12)] sm:rounded-[30px] sm:p-6">
+                  <div className="text-sm font-medium text-slate-900">目录导读</div>
+                  <div className="mt-4 overflow-x-hidden pr-1">
+                    <TableOfContents
+                      toc={toc}
+                      activeId={activeTocId}
+                      onActiveIdChange={setActiveTocId}
+                    />
+                  </div>
+                </section>
+              )}
+
+              <section className="theme-panel-shell hidden rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)] xl:block">
+                <div className="text-sm font-medium text-slate-900">阅读状态</div>
+                <div className="mt-4 space-y-3 text-sm text-slate-600">
+                  <div className="flex items-center justify-between">
+                    <span>进度</span>
+                    <span className="text-theme-primary font-medium">
+                      {Math.round(readProgress)}%
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-theme-soft">
+                    <div
+                      className="bg-theme-primary h-full rounded-full transition-[width] duration-200"
+                      style={{ width: `${readProgress}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>预计剩余</span>
+                    <span>{remainingReadMinutes} 分钟</span>
+                  </div>
+                  <div className="rounded-xl bg-theme-soft/55 px-3 py-2 text-xs leading-5 text-slate-600">
+                    {scrollStatusTip}
+                  </div>
                 </div>
               </section>
-            )}
-
-            <section className="theme-panel-shell hidden rounded-[30px] border p-6 shadow-[0_20px_52px_rgba(148,163,184,0.12)] xl:block">
-              <div className="text-sm font-medium text-slate-900">阅读状态</div>
-              <div className="mt-4 space-y-3 text-sm text-slate-600">
-                <div className="flex items-center justify-between">
-                  <span>进度</span>
-                  <span className="text-theme-primary font-medium">
-                    {Math.round(readProgress)}%
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-theme-soft">
-                  <div
-                    className="bg-theme-primary h-full rounded-full transition-[width] duration-200"
-                    style={{ width: `${readProgress}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span>预计剩余</span>
-                  <span>{remainingReadMinutes} 分钟</span>
-                </div>
-                <div className="rounded-xl bg-theme-soft/55 px-3 py-2 text-xs leading-5 text-slate-600">
-                  {scrollStatusTip}
-                </div>
-              </div>
-            </section>
-            <section className="theme-panel-shell rounded-[28px] border p-5 shadow-[0_20px_52px_rgba(148,163,184,0.12)] sm:rounded-[30px] sm:p-6">
-              <div className="text-sm font-medium text-slate-900">相关推荐</div>
-              {relatedLoading ? (
-                <div className="mt-4 space-y-2">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div key={index} className="h-14 animate-pulse rounded-xl bg-theme-soft/60" />
-                  ))}
-                </div>
-              ) : relatedPosts.length > 0 ? (
-                <div className="mt-4 space-y-2">
-                  {relatedPosts.map((item) => (
-                    <Link
-                      key={item.id}
-                      to={`/blog/${item.id}`}
-                      state={{ returnTo, returnLabel, source: 'blog-post' }}
-                      className="block rounded-xl border border-theme-soft-strong bg-theme-soft/30 px-3 py-2 transition hover:bg-theme-soft/65"
-                    >
-                      <div className="line-clamp-2 text-sm text-slate-700">{item.title}</div>
-                      <div className="mt-1 text-[11px] text-slate-500">
-                        {item.group?.name || '未分组'} ·{' '}
-                        {formatDate(item.publishedAt || item.createdAt)}
+              <section className="theme-panel-shell rounded-[28px] border p-5 shadow-[0_20px_52px_rgba(148,163,184,0.12)] sm:rounded-[30px] sm:p-6">
+                <div className="text-sm font-medium text-slate-900">相关推荐</div>
+                {relatedLoading ? (
+                  <div className="mt-4 space-y-2">
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="h-14 animate-pulse rounded-xl bg-theme-soft/60" />
+                    ))}
+                  </div>
+                ) : relatedPosts.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    {relatedPosts.map((item) => (
+                      <Link
+                        key={item.id}
+                        to={`/blog/${item.id}`}
+                        state={{ returnTo, returnLabel, source: 'blog-post' }}
+                        className="block rounded-xl border border-theme-soft-strong bg-theme-soft/30 px-3 py-2 transition hover:bg-theme-soft/65"
+                      >
+                        <div className="line-clamp-2 text-sm text-slate-700">{item.title}</div>
+                        <div className="mt-1 text-[11px] text-slate-500">
+                          {item.group?.name || '未分组'} ·{' '}
+                          {formatDate(item.publishedAt || item.createdAt)}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 text-xs text-slate-500">暂未获取到相关推荐。</p>
+                )}
+              </section>
+              <section className="theme-panel-shell overflow-hidden rounded-[28px] border p-0 shadow-[0_18px_46px_rgba(148,163,184,0.12)] sm:rounded-[30px]">
+                <div className="border-b border-theme-soft-strong bg-[linear-gradient(135deg,rgba(var(--theme-primary-rgb),0.12),rgba(255,255,255,0.9))] px-5 py-4 sm:px-6">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-theme-primary shadow-[0_12px_28px_rgba(var(--theme-primary-rgb),0.16)]">
+                      <Bot className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                        问文章
+                        <span className="rounded-full bg-white/75 px-2 py-0.5 text-[10px] font-medium text-theme-primary">
+                          AI
+                        </span>
                       </div>
-                    </Link>
-                  ))}
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        基于当前文章内容实时回答，不跨文章扩展。
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <p className="mt-4 text-xs text-slate-500">暂未获取到相关推荐。</p>
-              )}
-            </section>
+
+                <div className="space-y-4 px-5 py-5 sm:px-6">
+                  {askAskedQuestion ? (
+                    <div className="flex justify-end">
+                      <div className="max-w-[92%] rounded-2xl rounded-tr-md bg-theme-primary px-3.5 py-2.5 text-sm leading-6 text-white shadow-[0_14px_30px_rgba(var(--theme-primary-rgb),0.2)]">
+                        {askAskedQuestion}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-theme-soft-strong bg-theme-soft/40 px-3.5 py-3 text-xs leading-6 text-slate-500">
+                      可以问观点、结论、步骤、某段代码含义，回答会从当前文章里找依据。
+                    </div>
+                  )}
+
+                  {(askResult || askLoading) && (
+                    <div className="flex items-start gap-2.5">
+                      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-theme-soft text-theme-primary">
+                        {askLoading && !askResult?.answer ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-theme-soft-strong bg-white/86 px-3.5 py-3 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+                        {askResult?.answer ? (
+                          <div>
+                            {renderAskAnswer(askResult.answer)}
+                            {askLoading ? (
+                              <span className="mt-1 inline-block h-4 w-1.5 animate-pulse rounded-full bg-theme-primary align-[-2px]" />
+                            ) : null}
+                          </div>
+                        ) : (
+                          <p className="text-sm leading-7 text-slate-500">
+                            正在阅读文章并生成回答...
+                          </p>
+                        )}
+                        {askResult?.model ? (
+                          <div className="mt-2 text-[10px] text-slate-400">
+                            Model · {askResult.model}
+                          </div>
+                        ) : null}
+                        {askResult?.citations?.length ? (
+                          <div className="mt-3 space-y-2">
+                            {askResult.citations.map((item, index) => (
+                              <div
+                                key={`${item.heading}-${index}`}
+                                className="rounded-xl bg-theme-soft/60 px-3 py-2"
+                              >
+                                {item.heading ? (
+                                  <div className="text-[11px] font-medium text-theme-primary">
+                                    {item.heading}
+                                  </div>
+                                ) : null}
+                                <div className="mt-1 text-[11px] leading-5 text-slate-600">
+                                  {item.quote}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rounded-2xl border border-theme-soft-strong bg-white p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                    <textarea
+                      value={askQuestion}
+                      onChange={(event) => setAskQuestion(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && !event.shiftKey) {
+                          event.preventDefault();
+                          void handleAskPost();
+                        }
+                      }}
+                      placeholder="问问这篇文章的观点、结论或细节"
+                      rows={2}
+                      className="min-h-16 w-full resize-none bg-transparent px-2 py-2 text-sm leading-6 text-slate-700 outline-none placeholder:text-slate-400"
+                    />
+                    <div className="flex items-center justify-between gap-3 border-t border-theme-soft-strong px-2 pt-2">
+                      <div className="text-[11px] text-slate-400">
+                        {askLoading ? '流式生成中...' : 'Enter 发送，Shift + Enter 换行'}
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="theme-btn-primary h-8 rounded-full px-3 text-xs"
+                        onClick={() => void handleAskPost()}
+                        disabled={askLoading}
+                      >
+                        {askLoading ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <SendHorizontal className="h-3.5 w-3.5" />
+                        )}
+                        <span className="ml-1.5">发送</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {askError ? (
+                  <p className="mx-5 mb-5 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-600 sm:mx-6">
+                    {askError}
+                  </p>
+                ) : null}
+              </section>
+            </div>
           </aside>
         </div>
 
