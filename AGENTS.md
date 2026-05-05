@@ -31,7 +31,7 @@
 ## Skills 使用流程
 
 1. 开始任务前读取 `.codex/skills/INDEX.md`。
-2. 按“Skill 选择路由”选择需要启用的 skill。
+2. 按“Skill 选择路由”选择需要启用的通用 skill，项目专属 skill 只在对应子项目 `AGENTS.md` 内声明。
 3. 启用 skill 后读取对应 `.codex/skills/<skill>/SKILL.md`。
 4. 按 skill 内的流程、约束和校验执行。
 5. 回复中简短说明本次用了哪些 skills 以及原因。
@@ -39,8 +39,6 @@
 
 ## Skill 选择路由
 
-- IF Web 页面、视觉主题、loading、列表、分页、搜索、URL query、刷新或浏览器回退一致性发生变化 → `web-ui-consistency-guard`。
-- IF Go 服务端接入或排查火山 ARK、AI 模型配置、多模态、降级、响应解析或 AI 错误码 → `ai-capability-orchestration`。
 - IF 出现重复 JSX、重复 handler、重复弹窗/表单/上传/列表逻辑 → `component-reuse-guard`。
 - IF 生成 commit message、执行 `git commit`，或用户要求提交 → `conventional-commit-guard`。
 - IF 修改中文、Markdown、skill、配置示例或非 ASCII 文本 → `encoding-guard`。
@@ -81,7 +79,7 @@
 - 修改接口前检查路由、handler、model、service 和中间件。
 - 修改环境变量时同步检查对应 `.env.example`。
 - 只在用户明确要求沉淀长期文档时更新 `docs/`。
-- Web UI 改动使用 `web-ui-consistency-guard`；具体 UI 规则只在该 skill 中维护。
+- Web UI 改动按 `apps/web/AGENTS.md` 的局部规则处理。
 - 不要使用 Playwright 做自动验收；涉及前端、游戏或可视交互改动时，最终回复应告知用户清晰的验收标准，并提示由用户自行手动验收。
 
 ## 环境与外部服务
