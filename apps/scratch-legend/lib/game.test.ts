@@ -60,20 +60,31 @@ test('keeps dragged plate centered when table is smaller than the plate', () => 
 });
 
 test('uses cleaned plate count as work level progress within the current level', () => {
+  const level0Required = scratchLegendConfig.work.level.platesRequiredByLevel[0];
+  const level1Required = scratchLegendConfig.work.level.platesRequiredByLevel[1];
+  const maxLevelThreshold = scratchLegendConfig.work.level.platesRequiredByLevel.reduce(
+    (sum, count) => sum + count,
+    0,
+  );
+
   assert.equal(getWorkLevelProgress(0), 0);
-  assert.equal(getWorkLevelProgress(4), 0.4);
-  assert.equal(getWorkLevelProgress(10), 0);
-  assert.equal(getWorkLevelProgress(18), 0.8);
-  assert.equal(getWorkLevelProgress(100), 1);
+  assert.equal(getWorkLevelProgress(4), 4 / level0Required);
+  assert.equal(getWorkLevelProgress(level0Required), 0);
+  assert.equal(getWorkLevelProgress(level0Required + 8), 8 / level1Required);
+  assert.equal(getWorkLevelProgress(maxLevelThreshold), 1);
 });
 
 test('caps work level at the phase one max level', () => {
+  const requiredByLevel = scratchLegendConfig.work.level.platesRequiredByLevel;
+  const levelOneThreshold = requiredByLevel[0];
+  const maxLevelThreshold = requiredByLevel.reduce((sum, count) => sum + count, 0);
+
   assert.equal(getWorkLevel(0), 0);
-  assert.equal(getWorkLevel(9), 0);
-  assert.equal(getWorkLevel(10), 1);
-  assert.equal(getWorkLevel(99), 9);
-  assert.equal(getWorkLevel(100), 10);
-  assert.equal(getWorkLevel(148), 10);
+  assert.equal(getWorkLevel(levelOneThreshold - 1), 0);
+  assert.equal(getWorkLevel(levelOneThreshold), 1);
+  assert.equal(getWorkLevel(maxLevelThreshold - 1), scratchLegendConfig.work.level.maxLevel - 1);
+  assert.equal(getWorkLevel(maxLevelThreshold), scratchLegendConfig.work.level.maxLevel);
+  assert.equal(getWorkLevel(maxLevelThreshold + 48), scratchLegendConfig.work.level.maxLevel);
 });
 
 test('creates random plate spawn positions inside the playable desktop area', () => {

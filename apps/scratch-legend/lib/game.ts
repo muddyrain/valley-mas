@@ -11,7 +11,7 @@ export const WORK_BROKEN_PLATE_ENABLED_AT_LEVEL =
 export const WORK_BROKEN_PLATE_PENALTY = scratchLegendConfig.work.brokenPlate.penaltyGold;
 export const WORK_SAFE_REWARD_CHANCE = 1 - WORK_BROKEN_PLATE_CHANCE;
 export const WORK_MAX_LEVEL = scratchLegendConfig.work.level.maxLevel;
-export const WORK_PLATES_PER_LEVEL = scratchLegendConfig.work.level.platesPerLevel;
+export const WORK_PLATES_REQUIRED_BY_LEVEL = scratchLegendConfig.work.level.platesRequiredByLevel;
 export const WORK_PLATE_COST = scratchLegendConfig.work.plateCost;
 export const TRASH_CAN_UNLOCK_AFTER_PLATES =
   scratchLegendConfig.unlockables.trashCan.autoUnlockAfterCleanedPlates;
@@ -74,6 +74,21 @@ export function getWorkRewardAmountForLevel(workLevel: number) {
   return WORK_LEVEL_REWARD_TABLE[normalizedLevel];
 }
 
+export function getWorkLevelThreshold(level: number) {
+  if (level <= 0) {
+    return 0;
+  }
+
+  const normalizedLevel = Math.min(WORK_MAX_LEVEL, Math.max(0, Math.floor(level)));
+  let total = 0;
+
+  for (let currentLevel = 0; currentLevel < normalizedLevel; currentLevel += 1) {
+    total += WORK_PLATES_REQUIRED_BY_LEVEL[currentLevel] ?? 0;
+  }
+
+  return total;
+}
+
 export function getUnlockMilestoneById(milestoneId: UnlockMilestoneId) {
   return UNLOCK_MILESTONES.find((milestone) => milestone.id === milestoneId);
 }
@@ -130,15 +145,40 @@ export function clampRatio(value: number) {
 }
 
 export function getWorkLevel(plateCleaned: number) {
-  return Math.min(WORK_MAX_LEVEL, Math.floor(Math.max(0, plateCleaned) / WORK_PLATES_PER_LEVEL));
+  const normalizedPlateCleaned = Math.max(0, plateCleaned);
+  let currentLevel = 0;
+  let remainingPlates = normalizedPlateCleaned;
+
+  while (currentLevel < WORK_MAX_LEVEL) {
+    const requiredPlates = WORK_PLATES_REQUIRED_BY_LEVEL[currentLevel];
+
+    if (!requiredPlates || remainingPlates < requiredPlates) {
+      break;
+    }
+
+    remainingPlates -= requiredPlates;
+    currentLevel += 1;
+  }
+
+  return currentLevel;
 }
 
 export function getWorkLevelProgress(plateCleaned: number) {
-  if (getWorkLevel(plateCleaned) >= WORK_MAX_LEVEL) {
+  const currentLevel = getWorkLevel(plateCleaned);
+
+  if (currentLevel >= WORK_MAX_LEVEL) {
     return 1;
   }
 
-  return clampRatio((Math.max(0, plateCleaned) % WORK_PLATES_PER_LEVEL) / WORK_PLATES_PER_LEVEL);
+  const normalizedPlateCleaned = Math.max(0, plateCleaned);
+  const levelStartThreshold = getWorkLevelThreshold(currentLevel);
+  const requiredPlates = WORK_PLATES_REQUIRED_BY_LEVEL[currentLevel];
+
+  if (!requiredPlates) {
+    return 1;
+  }
+
+  return clampRatio((normalizedPlateCleaned - levelStartThreshold) / requiredPlates);
 }
 
 export function getRandomPlateSpawnPosition(random = Math.random): PlatePosition {
