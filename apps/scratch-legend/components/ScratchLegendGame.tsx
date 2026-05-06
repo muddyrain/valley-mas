@@ -60,27 +60,6 @@ function StatusPill({ label, value }: { label: string; value: string }) {
   );
 }
 
-function LockedCard({
-  title,
-  subtitle,
-  price,
-}: {
-  title: string;
-  subtitle: string;
-  price: string;
-}) {
-  return (
-    <div className="locked-card" aria-disabled="true">
-      <div className="ticket-icon">▧</div>
-      <div>
-        <strong>{title}</strong>
-        <span>{subtitle}</span>
-      </div>
-      <em>{price}</em>
-    </div>
-  );
-}
-
 export function ScratchLegendGame() {
   const save = useScratchLegendStore((state) => state.save);
   const sidebarTab = useScratchLegendStore((state) => state.sidebarTab);
@@ -567,7 +546,7 @@ export function ScratchLegendGame() {
   }
 
   return (
-    <main className="scratch-shell">
+    <main className="scratch-shell select-none">
       <section className="game-frame" aria-label="刮出传说游戏界面">
         <aside className="left-panel">
           <div className="coin-board">
@@ -691,13 +670,20 @@ export function ScratchLegendGame() {
           </div>
 
           <div className="wood-table" ref={tableRef}>
+            <div className="table-surface" aria-hidden="true" />
+            <div className="table-furniture" aria-hidden="true">
+              <span className="table-apron" />
+              <span className="table-leg left" />
+              <span className="table-leg right" />
+            </div>
+
             <div className={`phone ${phoneNoticeVisible ? 'ringing' : ''}`} aria-hidden="true">
               <span className="phone-dial" />
             </div>
 
             {phase === 'idle' && (
               <div className="idle-hint">
-                <strong>从左侧选择日常工作</strong>
+                <strong>刮个不停</strong>
                 <span>先赚启动金，再去买第一张刮刮卡。</span>
               </div>
             )}
@@ -841,66 +827,40 @@ export function ScratchLegendGame() {
 
                 <div className="work-info-card" data-cleaning-control="true">
                   <strong>日常工作</strong>
-                  <span>{activeReward.isBroken ? '这次盘子被擦坏了' : '挣得不多，都是辛苦钱'}</span>
-                  <div className="info-line">
-                    <em>中奖率</em>
-                    <b>{workSafeRewardPercent}</b>
-                  </div>
-                  <div className="info-line">
-                    <em>{activeReward.isBroken ? '碎盘扣除' : '基础收益'}</em>
-                    <b>
-                      {activeReward.total >= 0
-                        ? `$${activeReward.total}`
-                        : `-$${Math.abs(activeReward.total)}`}
-                    </b>
-                  </div>
-                  {brokenPlateEnabled && (
-                    <div className="info-line">
-                      <em>碎盘概率</em>
-                      <b>
-                        {workBrokenPlatePercent} / -${WORK_BROKEN_PLATE_PENALTY}
-                      </b>
+                  <p className="work-info-copy">挣得不多，都是辛苦钱</p>
+                  <span className="work-info-heading">中奖概率</span>
+                  <div className="work-info-odds">
+                    <div className="work-info-odds-row">
+                      <span className="work-info-odds-left">
+                        <span className="work-info-token clean" aria-hidden="true" />
+                        <em>{workSafeRewardPercent}</em>
+                      </span>
+                      <b>${previewRewardAmount}</b>
                     </div>
-                  )}
+                    {brokenPlateEnabled && (
+                      <div className="work-info-odds-row danger">
+                        <span className="work-info-odds-left">
+                          <span className="work-info-token broken" aria-hidden="true" />
+                          <em>{workBrokenPlatePercent}</em>
+                        </span>
+                        <b>-${WORK_BROKEN_PLATE_PENALTY}</b>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
           </div>
         </section>
 
-        <aside className="right-panel">
-          <section className="upgrade-panel">
-            <h2>工作面板</h2>
-            <div className="upgrade-row">
-              <span>日常工作</span>
-              <strong>等级 {workLevel}</strong>
-            </div>
-            <div className="upgrade-row">
-              <span>中奖率</span>
-              <strong>{workSafeRewardPercent}</strong>
-            </div>
-            <div className="upgrade-row">
-              <span>基础收益</span>
-              <strong>${previewRewardAmount}</strong>
-            </div>
-            <div className="upgrade-row">
-              <span>盘子成本</span>
-              <strong>${WORK_PLATE_COST}</strong>
-            </div>
-            <button className="upgrade-button" type="button" disabled>
-              升级 $10
-            </button>
-            <p>升级效果将在后续阶段解锁。</p>
-          </section>
-
-          <section className="locked-section">
-            <h2>未解锁</h2>
-            <LockedCard title="普通刮刮卡" subtitle="最高奖金 $1,000" price="$100" />
-            <LockedCard title="黄金刮刮卡" subtitle="最高奖金 $100,000" price="$1,000" />
-            <LockedCard title="自动刮卡" subtitle="后续阶段解锁" price="锁定" />
-          </section>
-        </aside>
+        <aside className="right-reserved-space" aria-hidden="true" />
       </section>
+      <p className="game-disclaimer">
+        本游戏为 vibecoding 页面玩法创意参考
+        <a href="https://store.steampowered.com/app/3948120/_/" target="_blank" rel="noreferrer">
+          《刮个爽》
+        </a>
+      </p>
     </main>
   );
 }
