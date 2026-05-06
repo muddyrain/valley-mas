@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { CLEAN_COMPLETE_THRESHOLD, clampRatio } from '@/lib/game';
 
 type CleaningCanvasProps = {
@@ -17,7 +17,6 @@ export function CleaningCanvas({ active, onProgressChange, onComplete }: Cleanin
   const drawingRef = useRef(false);
   const dirtyPixelsRef = useRef(1);
   const completedRef = useRef(false);
-  const [spongePosition, setSpongePosition] = useState({ x: 256, y: 252 });
 
   const countDirtyPixels = useCallback(() => {
     const canvas = canvasRef.current;
@@ -47,12 +46,12 @@ export function CleaningCanvas({ active, onProgressChange, onComplete }: Cleanin
   const updateProgress = useCallback(() => {
     const remainingDirty = countDirtyPixels();
     const cleanedRatio = clampRatio(1 - remainingDirty / dirtyPixelsRef.current);
+    const displayedRatio = cleanedRatio >= CLEAN_COMPLETE_THRESHOLD ? 1 : cleanedRatio;
 
-    onProgressChange(cleanedRatio);
+    onProgressChange(displayedRatio);
 
     if (!completedRef.current && cleanedRatio >= CLEAN_COMPLETE_THRESHOLD) {
       completedRef.current = true;
-      onProgressChange(1);
       onComplete();
     }
   }, [countDirtyPixels, onComplete, onProgressChange]);
@@ -163,26 +162,46 @@ export function CleaningCanvas({ active, onProgressChange, onComplete }: Cleanin
     onProgressChange(0);
   }, [countDirtyPixels, onProgressChange]);
 
+  const getCanvasPoint = useCallback((clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+
+    if (!canvas) {
+      return null;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
+
+    return {
+      x,
+      y,
+    };
+  }, []);
+
   const eraseAt = useCallback(
     (clientX: number, clientY: number) => {
       const canvas = canvasRef.current;
 
-      if (!canvas || !active || completedRef.current) {
+      if (!canvas || !active) {
         return;
       }
 
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const x = (clientX - rect.left) * scaleX;
-      const y = (clientY - rect.top) * scaleY;
+      const point = getCanvasPoint(clientX, clientY);
+
+      if (!point) {
+        return;
+      }
+
+      const { x, y } = point;
       const context = canvas.getContext('2d', { willReadFrequently: true });
 
       if (!context) {
         return;
       }
 
-      setSpongePosition({ x: x / scaleX, y: y / scaleY });
       context.save();
       context.globalCompositeOperation = 'destination-out';
 
@@ -197,12 +216,28 @@ export function CleaningCanvas({ active, onProgressChange, onComplete }: Cleanin
       context.restore();
       updateProgress();
     },
-    [active, updateProgress],
+    [active, getCanvasPoint, updateProgress],
   );
 
   useEffect(() => {
     drawDirt();
   }, [drawDirt]);
+
+  useEffect(() => {
+    function stopDrawing() {
+      drawingRef.current = false;
+    }
+
+    window.addEventListener('blur', stopDrawing);
+    window.addEventListener('pointerup', stopDrawing);
+    document.addEventListener('visibilitychange', stopDrawing);
+
+    return () => {
+      window.removeEventListener('blur', stopDrawing);
+      window.removeEventListener('pointerup', stopDrawing);
+      document.removeEventListener('visibilitychange', stopDrawing);
+    };
+  }, []);
 
   return (
     <div className="cleaning-canvas-wrap">
@@ -213,9 +248,11 @@ export function CleaningCanvas({ active, onProgressChange, onComplete }: Cleanin
         height={CANVAS_SIZE}
         aria-label="脏盘子污渍层"
         onPointerDown={(event) => {
-          drawingRef.current = true;
-          event.currentTarget.setPointerCapture(event.pointerId);
-          eraseAt(event.clientX, event.clientY);
+          if (active) {
+            drawingRef.current = true;
+            event.currentTarget.setPointerCapture(event.pointerId);
+            eraseAt(event.clientX, event.clientY);
+          }
         }}
         onPointerMove={(event) => {
           if (drawingRef.current) {
@@ -224,17 +261,13 @@ export function CleaningCanvas({ active, onProgressChange, onComplete }: Cleanin
         }}
         onPointerUp={(event) => {
           drawingRef.current = false;
-          event.currentTarget.releasePointerCapture(event.pointerId);
+
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
         }}
         onPointerCancel={() => {
           drawingRef.current = false;
-        }}
-      />
-      <div
-        className="sponge"
-        style={{
-          left: `${spongePosition.x}px`,
-          top: `${spongePosition.y}px`,
         }}
       />
     </div>

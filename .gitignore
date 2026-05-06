@@ -84,3 +84,4 @@ sysinfo.txt
 
 # cache
 tmp/
+.tmp/
