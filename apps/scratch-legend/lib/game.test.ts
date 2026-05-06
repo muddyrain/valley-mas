@@ -25,6 +25,13 @@ import {
   WORK_PLATE_COST,
 } from './game';
 import { scratchLegendConfig } from './game-config';
+import {
+  createInitialScratchLegendSave,
+  getActiveWorkPlate,
+  isUnlockMilestoneUnlocked,
+  mergeScratchLegendSave,
+  syncScratchLegendSave,
+} from './game-save';
 
 function assertNearlyEqual(actual: number, expected: number) {
   assert.ok(Math.abs(actual - expected) < 0.000001, `${actual} should be close to ${expected}`);
@@ -138,6 +145,75 @@ test('uses cumulative gold to calculate the next unlock progress', () => {
   assert.equal(getUnlockMilestoneProgress(5, scratchMilestone ?? null), 0.5);
   assert.equal(getUnlockMilestoneProgress(25, nextMilestone ?? null), 0.5);
   assert.equal(getUnlockMilestoneProgress(80, null), 1);
+});
+
+test('creates a persistable save state with separated player, unlock, notice and workspace data', () => {
+  const save = createInitialScratchLegendSave();
+
+  assert.equal(save.version, 1);
+  assert.equal(save.player.gold, 1);
+  assert.equal(save.player.lifetimeGoldEarned, 0);
+  assert.equal(save.unlocks.trashCanUnlocked, false);
+  assert.equal(save.unlocks.unlockedMilestones['scratch-mode'], false);
+  assert.equal(save.notices.workRiskMessageDismissed, false);
+  assert.equal(save.workspace.phase, 'idle');
+  assert.equal(save.workspace.nextPlateId, 1);
+});
+
+test('syncs save state derived unlocks and persisted work level', () => {
+  const save = syncScratchLegendSave({
+    ...createInitialScratchLegendSave(),
+    player: {
+      gold: 9,
+      lifetimeGoldEarned: 52,
+      plateCleaned: 10,
+      cardsScratched: 0,
+      loseStreak: 0,
+      workLevel: 0,
+    },
+  });
+
+  assert.equal(save.player.workLevel, 1);
+  assert.equal(save.unlocks.trashCanUnlocked, true);
+  assert.equal(isUnlockMilestoneUnlocked(save, 'scratch-mode'), true);
+  assert.equal(isUnlockMilestoneUnlocked(save, 'next-feature'), true);
+});
+
+test('merges partial persisted save data back into a complete save schema', () => {
+  const save = mergeScratchLegendSave({
+    player: {
+      gold: 6,
+      lifetimeGoldEarned: 12,
+    },
+    notices: {
+      scratchMessageDismissed: true,
+    },
+    workspace: {
+      phase: 'plateSpawned',
+    },
+  });
+
+  assert.equal(save.player.gold, 6);
+  assert.equal(save.player.lifetimeGoldEarned, 12);
+  assert.equal(save.player.workLevel, 0);
+  assert.equal(save.notices.scratchMessageDismissed, true);
+  assert.equal(save.notices.workRiskMessageDismissed, false);
+  assert.equal(save.workspace.phase, 'plateSpawned');
+  assert.equal(save.workspace.nextPlateId, 1);
+  assert.equal(isUnlockMilestoneUnlocked(save, 'scratch-mode'), true);
+});
+
+test('finds the current active plate from the save workspace', () => {
+  const save = createInitialScratchLegendSave();
+  save.workspace.plates.push({
+    id: 3,
+    reward: { base: 2, total: 2, isCrit: false, isBroken: false },
+    position: { xPercent: 50, yPercent: 50 },
+    seed: 3,
+  });
+  save.workspace.activePlateId = 3;
+
+  assert.equal(getActiveWorkPlate(save)?.id, 3);
 });
 
 test('uses configured work reward amounts by level', () => {
