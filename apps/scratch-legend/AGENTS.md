@@ -20,18 +20,19 @@
 
 这是一个：
 
-👉 点击赚钱 + 刮卡爆发 + 盲盒成长 + 自动化 的轻度爽感游戏
+👉 洗盘子赚启动金 + 购买刮刮卡 + 拖动刮卡 + 升级成长 + 自动化 + Prestige 的轻度爽感游戏
 
 ---
 
 # 三、核心玩法（必须理解）
 
-> 点击赚小钱 → 刮卡博大奖 → 盲盒变强 → 自动化放大收益
+> 洗盘子赚启动金 → 买低级刮刮卡 → 拖动刮卡 → 中奖 / 亏损 / 惩罚 → 买更多不同卡 → 升级能力与幸运 → 自动刮卡 → 高风险卡 / 终局卡 → Prestige 永久成长
 
 游戏依赖两个核心驱动力：
 
-* 稳定收益（点击）
-* 随机爆发（刮卡）
+* 启动金来源（洗盘子）
+* 随机爆发（刮刮卡）
+* 长期成长（升级 / 自动化 / Prestige）
 
 ---
 
@@ -44,7 +45,7 @@
 ## 1️⃣ 核心玩法文档（最高优先级）
 
 ```text id="w3v3wx"
-docs/games/scratch-legend-design.md
+apps/scratch-legend/docs/scratch-legend-design.md
 ```
 
 定义：
@@ -62,7 +63,7 @@ docs/games/scratch-legend-design.md
 ## 2️⃣ 任务文档（执行依据）
 
 ```text id="h2sn0v"
-docs/games/scratch-legend-task.md
+apps/scratch-legend/docs/scratch-legend-task.md
 ```
 
 定义：
@@ -81,8 +82,9 @@ docs/games/scratch-legend-task.md
 
 1. 读取 task.md，确认当前阶段
 2. 读取 design.md，理解玩法与数值
-3. 只执行当前阶段的任务
-4. 完成后更新 task.md
+3. 对照 design.md 检查当前任务是否一致
+4. 只执行当前阶段的任务
+5. 完成后更新 task.md
 
 ---
 
@@ -104,8 +106,32 @@ docs/games/scratch-legend-task.md
 
 如果需要新增功能：
 
-👉 必须先写入 task.md
+👉 必须先写入 design.md
+👉 再写入 task.md
 👉 不允许直接实现
+
+---
+
+## ❗ 设计一致性闸门
+
+任何功能变更、玩法插入、数值调整或阶段改动前，必须先检查：
+
+* design.md 是否已经定义该玩法
+* task.md 是否只是在拆解该玩法
+* 当前实现是否会改变核心循环
+* 是否引入新的成本、奖励、概率、惩罚或解锁条件
+
+如果 design.md 与 task.md 不一致：
+
+👉 以 design.md 为准
+👉 先更新 task.md
+👉 再继续执行
+
+如果想加入 design.md 未定义的新玩法：
+
+👉 先更新 design.md
+👉 再更新 task.md
+👉 最后才能实现
 
 ---
 
@@ -120,6 +146,7 @@ docs/games/scratch-legend-task.md
 * 修改概率
 * 修改金币数值
 * 自行调整平衡
+* 绕过设计文档加入新奖励或新惩罚
 
 ---
 
