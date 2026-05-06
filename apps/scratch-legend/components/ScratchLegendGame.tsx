@@ -9,51 +9,33 @@ import {
   getNextUnlockMilestone,
   getRandomPlateSpawnPosition,
   getUnlockMilestoneProgress,
-  getWorkLevel,
   getWorkLevelProgress,
   getWorkRewardAmountForLevel,
-  INITIAL_GOLD,
   isBrokenPlateEnabled,
   isPointInsideCircleBounds,
-  type PlatePosition,
-  type PlayerState,
   rollWorkReward,
   shouldCloseCleaningOverlay,
   shouldOpenPlateFromPointerUp,
-  shouldShowScratchUnlockNotice,
   shouldShowWorkRiskNotice,
-  shouldUnlockTrashCan,
   TRASH_CAN_UNLOCK_AFTER_PLATES,
+  type UnlockMilestoneId,
   WORK_ACTION_DURATION_MS,
   WORK_BROKEN_PLATE_CHANCE,
   WORK_BROKEN_PLATE_PENALTY,
   WORK_PLATE_COST,
   WORK_SAFE_REWARD_CHANCE,
   type WorkPhase,
-  type WorkReward,
+  type WorkPlateState,
 } from '@/lib/game';
 import { scratchLegendConfig } from '@/lib/game-config';
+import { getActiveWorkPlate, isUnlockMilestoneUnlocked } from '@/lib/game-save';
+import { useScratchLegendStore } from '@/lib/game-store';
 
-const initialPlayer: PlayerState = {
-  gold: INITIAL_GOLD,
-  lifetimeGoldEarned: 0,
-  plateCleaned: 0,
-  cardsScratched: 0,
-  loseStreak: 0,
-  workLevel: 0,
-};
-
+const SCRATCH_MODE_MILESTONE_ID: UnlockMilestoneId = 'scratch-mode';
 const DESKTOP_PLATE_SIZE = scratchLegendConfig.work.plate.desktopSize;
 const PLATE_ENTER_ANIMATION_MS = scratchLegendConfig.work.plate.enterAnimationMs;
 const PLATE_DRAG_HOLD_MS = scratchLegendConfig.work.drag.holdMs;
 const PLATE_DRAG_MOVE_THRESHOLD = scratchLegendConfig.work.drag.moveThreshold;
-
-type WorkPlate = {
-  id: number;
-  reward: WorkReward;
-  position: PlatePosition;
-  seed: number;
-};
 
 type PlatePointerState = {
   plateId: number;
@@ -67,7 +49,6 @@ type PlatePointerState = {
   holdTimer: ReturnType<typeof setTimeout> | null;
 };
 
-type SidebarTab = 'cards' | 'tools';
 type UnlockToast = 'trash' | 'scratch' | null;
 
 function StatusPill({ label, value }: { label: string; value: string }) {
@@ -101,29 +82,38 @@ function LockedCard({
 }
 
 export function ScratchLegendGame() {
-  const [player, setPlayer] = useState<PlayerState>(initialPlayer);
-  const [phase, setPhase] = useState<WorkPhase>('idle');
+  const save = useScratchLegendStore((state) => state.save);
+  const sidebarTab = useScratchLegendStore((state) => state.sidebarTab);
+  const hasHydrated = useScratchLegendStore((state) => state.hasHydrated);
+  const setSidebarTab = useScratchLegendStore((state) => state.setSidebarTab);
+  const updateSave = useScratchLegendStore((state) => state.updateSave);
   const [, setCleanProgress] = useState(0);
-  const [plates, setPlates] = useState<WorkPlate[]>([]);
-  const [activePlateId, setActivePlateId] = useState<number | null>(null);
   const [cleaningStartedAt, setCleaningStartedAt] = useState<number | null>(null);
   const [draggingPlateId, setDraggingPlateId] = useState<number | null>(null);
   const [liftedPlateId, setLiftedPlateId] = useState<number | null>(null);
   const [enteringPlateIds, setEnteringPlateIds] = useState<number[]>([]);
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('cards');
-  const [trashCanUnlocked, setTrashCanUnlocked] = useState(false);
-  const [workRiskMessageDismissed, setWorkRiskMessageDismissed] = useState(false);
-  const [scratchMessageDismissed, setScratchMessageDismissed] = useState(false);
   const [unlockToast, setUnlockToast] = useState<UnlockToast>(null);
   const [trashHoverPlateId, setTrashHoverPlateId] = useState<number | null>(null);
   const tableRef = useRef<HTMLDivElement | null>(null);
   const trashCanRef = useRef<HTMLDivElement | null>(null);
   const cleaningPlateRef = useRef<HTMLDivElement | null>(null);
   const platePointerRef = useRef<PlatePointerState | null>(null);
-  const nextPlateIdRef = useRef(1);
   const plateEnterTimerRefs = useRef<number[]>([]);
   const unlockToastTimerRef = useRef<number | null>(null);
-  const scratchUnlockToastShownRef = useRef(false);
+  const previousTrashCanUnlockedRef = useRef(save.unlocks.trashCanUnlocked);
+  const previousScratchModeUnlockedRef = useRef(
+    isUnlockMilestoneUnlocked(save, SCRATCH_MODE_MILESTONE_ID),
+  );
+  const unlockToastReadyRef = useRef(false);
+
+  const player = save.player;
+  const phase: WorkPhase = save.workspace.phase;
+  const plates = save.workspace.plates;
+  const activePlateId = save.workspace.activePlateId;
+  const trashCanUnlocked = save.unlocks.trashCanUnlocked;
+  const workRiskMessageDismissed = save.notices.workRiskMessageDismissed;
+  const scratchMessageDismissed = save.notices.scratchMessageDismissed;
+  const scratchModeUnlocked = isUnlockMilestoneUnlocked(save, SCRATCH_MODE_MILESTONE_ID);
 
   const nextUnlockMilestone = getNextUnlockMilestone(player.lifetimeGoldEarned);
   const finalUnlockMilestone =
@@ -137,7 +127,7 @@ export function ScratchLegendGame() {
     player.lifetimeGoldEarned,
     nextUnlockMilestone,
   );
-  const workLevel = getWorkLevel(player.plateCleaned);
+  const workLevel = player.workLevel;
   const workLevelProgress = getWorkLevelProgress(player.plateCleaned);
   const previewRewardAmount = getWorkRewardAmountForLevel(workLevel);
   const brokenPlateEnabled = isBrokenPlateEnabled(workLevel);
@@ -148,7 +138,7 @@ export function ScratchLegendGame() {
   const canStartWork =
     (phase === 'idle' || phase === 'plateSpawned') && canAffordWorkPlate(player.gold);
   const isCleaningView = phase === 'cleaning' || phase === 'claimable';
-  const activePlate = activePlateId ? plates.find((plate) => plate.id === activePlateId) : null;
+  const activePlate = getActiveWorkPlate(save);
   const activeReward = activePlate?.reward ?? {
     base: previewRewardAmount,
     total: previewRewardAmount,
@@ -156,10 +146,7 @@ export function ScratchLegendGame() {
     isBroken: false,
   };
   const workRiskNoticeVisible = shouldShowWorkRiskNotice(workLevel, workRiskMessageDismissed);
-  const scratchUnlockNoticeVisible = shouldShowScratchUnlockNotice(
-    player.lifetimeGoldEarned,
-    scratchMessageDismissed,
-  );
+  const scratchUnlockNoticeVisible = scratchModeUnlocked && !scratchMessageDismissed;
   const phoneNoticeVisible = workRiskNoticeVisible || scratchUnlockNoticeVisible;
 
   const statusLabel = useMemo(() => {
@@ -192,11 +179,21 @@ export function ScratchLegendGame() {
   }, []);
 
   useEffect(() => {
-    if (
-      shouldShowScratchUnlockNotice(player.lifetimeGoldEarned, scratchMessageDismissed) &&
-      !scratchUnlockToastShownRef.current
-    ) {
-      scratchUnlockToastShownRef.current = true;
+    if (!hasHydrated || unlockToastReadyRef.current) {
+      return;
+    }
+
+    previousTrashCanUnlockedRef.current = trashCanUnlocked;
+    previousScratchModeUnlockedRef.current = scratchModeUnlocked;
+    unlockToastReadyRef.current = true;
+  }, [hasHydrated, scratchModeUnlocked, trashCanUnlocked]);
+
+  useEffect(() => {
+    if (!unlockToastReadyRef.current) {
+      return;
+    }
+
+    if (scratchModeUnlocked && !previousScratchModeUnlockedRef.current) {
       if (unlockToastTimerRef.current) {
         window.clearTimeout(unlockToastTimerRef.current);
       }
@@ -207,11 +204,16 @@ export function ScratchLegendGame() {
         unlockToastTimerRef.current = null;
       }, 1800);
     }
-  }, [player.lifetimeGoldEarned, scratchMessageDismissed]);
+
+    previousScratchModeUnlockedRef.current = scratchModeUnlocked;
+  }, [scratchModeUnlocked]);
 
   useEffect(() => {
-    if (shouldUnlockTrashCan(player.plateCleaned, trashCanUnlocked)) {
-      setTrashCanUnlocked(true);
+    if (!unlockToastReadyRef.current) {
+      return;
+    }
+
+    if (trashCanUnlocked && !previousTrashCanUnlockedRef.current) {
       if (unlockToastTimerRef.current) {
         window.clearTimeout(unlockToastTimerRef.current);
       }
@@ -222,7 +224,9 @@ export function ScratchLegendGame() {
         unlockToastTimerRef.current = null;
       }, 1800);
     }
-  }, [player.plateCleaned, trashCanUnlocked]);
+
+    previousTrashCanUnlockedRef.current = trashCanUnlocked;
+  }, [trashCanUnlocked]);
 
   function updatePlatePositionFromPointer(
     plateId: number,
@@ -247,9 +251,15 @@ export function ScratchLegendGame() {
       DESKTOP_PLATE_SIZE,
     );
 
-    setPlates((current) =>
-      current.map((plate) => (plate.id === plateId ? { ...plate, position } : plate)),
-    );
+    updateSave((current) => ({
+      ...current,
+      workspace: {
+        ...current.workspace,
+        plates: current.workspace.plates.map((plate) =>
+          plate.id === plateId ? { ...plate, position } : plate,
+        ),
+      },
+    }));
   }
 
   function isPointerOverTrashCan(clientX: number, clientY: number) {
@@ -296,7 +306,7 @@ export function ScratchLegendGame() {
       return;
     }
 
-    const plateId = nextPlateIdRef.current;
+    const plateId = save.workspace.nextPlateId;
     const goldAfterCost = player.gold - WORK_PLATE_COST;
     const plateReward = rollWorkReward({
       workOrderIndex: plateId - 1,
@@ -305,35 +315,47 @@ export function ScratchLegendGame() {
     });
 
     setCleanProgress(0);
-    setPlayer((current) => ({
+    updateSave((current) => ({
       ...current,
-      gold: current.gold - WORK_PLATE_COST,
-    }));
-    setPlates((current) => [
-      ...current,
-      {
-        id: plateId,
-        reward: plateReward,
-        position: getRandomPlateSpawnPosition(),
-        seed: plateId,
+      player: {
+        ...current.player,
+        gold: current.player.gold - WORK_PLATE_COST,
       },
-    ]);
-    nextPlateIdRef.current += 1;
+      workspace: {
+        ...current.workspace,
+        phase: 'plateSpawned',
+        nextPlateId: current.workspace.nextPlateId + 1,
+        plates: [
+          ...current.workspace.plates,
+          {
+            id: plateId,
+            reward: plateReward,
+            position: getRandomPlateSpawnPosition(),
+            seed: plateId,
+          },
+        ],
+      },
+    }));
     setEnteringPlateIds((current) => [...current, plateId]);
     const enterTimer = window.setTimeout(() => {
       setEnteringPlateIds((current) => current.filter((id) => id !== plateId));
     }, PLATE_ENTER_ANIMATION_MS);
     plateEnterTimerRefs.current.push(enterTimer);
-    setPhase('plateSpawned');
   }
 
   function openCleaningView(plateId: number) {
     if (phase === 'plateSpawned') {
       resetPlatePointer();
       setCleanProgress(0);
-      setActivePlateId(plateId);
       setCleaningStartedAt(Date.now());
-      setPhase('cleaning');
+      updateSave((current) => ({
+        ...current,
+        workspace: {
+          ...current.workspace,
+          activePlateId: plateId,
+          phase: 'cleaning',
+        },
+      }));
     }
   }
 
@@ -343,9 +365,15 @@ export function ScratchLegendGame() {
     }
 
     setCleanProgress(0);
-    setActivePlateId(null);
     setCleaningStartedAt(null);
-    setPhase(plates.length > 0 ? 'plateSpawned' : 'idle');
+    updateSave((current) => ({
+      ...current,
+      workspace: {
+        ...current.workspace,
+        activePlateId: null,
+        phase: current.workspace.plates.length > 0 ? 'plateSpawned' : 'idle',
+      },
+    }));
   }
 
   function handleCleaningViewPointerDown(event: React.PointerEvent<HTMLDivElement>) {
@@ -369,7 +397,10 @@ export function ScratchLegendGame() {
     }
   }
 
-  function handlePlatePointerDown(event: React.PointerEvent<HTMLButtonElement>, plate: WorkPlate) {
+  function handlePlatePointerDown(
+    event: React.PointerEvent<HTMLButtonElement>,
+    plate: WorkPlateState,
+  ) {
     if (phase !== 'plateSpawned') {
       return;
     }
@@ -456,10 +487,19 @@ export function ScratchLegendGame() {
     }
 
     if (wasDragged && isPointerOverTrashCan(event.clientX, event.clientY)) {
-      setPlates((current) => {
-        const remainingPlates = current.filter((plate) => plate.id !== pointerState.plateId);
-        setPhase(remainingPlates.length > 0 ? 'plateSpawned' : 'idle');
-        return remainingPlates;
+      updateSave((current) => {
+        const remainingPlates = current.workspace.plates.filter(
+          (plate) => plate.id !== pointerState.plateId,
+        );
+
+        return {
+          ...current,
+          workspace: {
+            ...current.workspace,
+            plates: remainingPlates,
+            phase: remainingPlates.length > 0 ? 'plateSpawned' : 'idle',
+          },
+        };
       });
       resetPlatePointer();
       return;
@@ -480,7 +520,13 @@ export function ScratchLegendGame() {
     const delay = Math.max(0, WORK_ACTION_DURATION_MS - elapsed);
 
     window.setTimeout(() => {
-      setPhase('claimable');
+      updateSave((current) => ({
+        ...current,
+        workspace: {
+          ...current.workspace,
+          phase: 'claimable',
+        },
+      }));
     }, delay);
   }
 
@@ -495,19 +541,28 @@ export function ScratchLegendGame() {
       return;
     }
 
-    setPlayer((current) => ({
-      ...current,
-      gold: Math.max(0, current.gold + claimedPlate.reward.total),
-      lifetimeGoldEarned: current.lifetimeGoldEarned + Math.max(0, claimedPlate.reward.total),
-      plateCleaned: current.plateCleaned + 1,
-      workLevel: getWorkLevel(current.plateCleaned + 1),
-    }));
-    setPlates((current) => {
-      const remainingPlates = current.filter((plate) => plate.id !== claimedPlate.id);
-      setPhase(remainingPlates.length > 0 ? 'plateSpawned' : 'idle');
-      return remainingPlates;
+    updateSave((current) => {
+      const remainingPlates = current.workspace.plates.filter(
+        (plate) => plate.id !== claimedPlate.id,
+      );
+
+      return {
+        ...current,
+        player: {
+          ...current.player,
+          gold: Math.max(0, current.player.gold + claimedPlate.reward.total),
+          lifetimeGoldEarned:
+            current.player.lifetimeGoldEarned + Math.max(0, claimedPlate.reward.total),
+          plateCleaned: current.player.plateCleaned + 1,
+        },
+        workspace: {
+          ...current.workspace,
+          activePlateId: null,
+          plates: remainingPlates,
+          phase: remainingPlates.length > 0 ? 'plateSpawned' : 'idle',
+        },
+      };
     });
-    setActivePlateId(null);
     setCleanProgress(0);
   }
 
@@ -702,7 +757,18 @@ export function ScratchLegendGame() {
                       你已经累计赚到 {BASIC_CARD_UNLOCK_GOLD} 金币了，刮刮乐模式可以解锁了，
                       阶段二会开始接上主玩法。
                     </span>
-                    <button type="button" onClick={() => setScratchMessageDismissed(true)}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateSave((current) => ({
+                          ...current,
+                          notices: {
+                            ...current.notices,
+                            scratchMessageDismissed: true,
+                          },
+                        }))
+                      }
+                    >
                       我知道了
                     </button>
                   </>
@@ -724,7 +790,18 @@ export function ScratchLegendGame() {
                         <b>-${WORK_BROKEN_PLATE_PENALTY}</b>
                       </div>
                     </div>
-                    <button type="button" onClick={() => setWorkRiskMessageDismissed(true)}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateSave((current) => ({
+                          ...current,
+                          notices: {
+                            ...current.notices,
+                            workRiskMessageDismissed: true,
+                          },
+                        }))
+                      }
+                    >
                       我知道了
                     </button>
                   </>

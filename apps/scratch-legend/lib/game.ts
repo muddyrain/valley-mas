@@ -59,6 +59,13 @@ export type PlatePosition = {
   yPercent: number;
 };
 
+export type WorkPlateState = {
+  id: number;
+  reward: WorkReward;
+  position: PlatePosition;
+  seed: number;
+};
+
 export type UnlockMilestone = (typeof UNLOCK_MILESTONES)[number];
 export type UnlockMilestoneId = UnlockMilestone['id'];
 
