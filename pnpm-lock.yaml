@@ -155,6 +155,40 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
+  apps/scratch-legend:
+    dependencies:
+      next:
+        specifier: ^15.5.0
+        version: 15.5.15(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.4(react@19.2.4)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.19.13
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.14)
+      autoprefixer:
+        specifier: ^10.4.20
+        version: 10.4.27(postcss@8.5.10)
+      postcss:
+        specifier: ^8.4.49
+        version: 8.5.10
+      tailwindcss:
+        specifier: ^3.4.17
+        version: 3.4.19(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
   apps/toy-climb-arena:
     dependencies:
       react:
