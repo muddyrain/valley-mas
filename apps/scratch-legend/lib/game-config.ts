@@ -38,8 +38,8 @@ export const scratchLegendConfig = {
       {
         id: 'advanced-feature',
         label: '进阶功能',
-        requiredProficiency: 150,
-        description: '第四段熟练度达到 150 后预留后续中期功能解锁位。',
+        requiredProficiency: 100,
+        description: '第四段熟练度达到 100 后预留后续中期功能解锁位。',
       },
     ] as const,
   },
