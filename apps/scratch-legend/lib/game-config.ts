@@ -9,30 +9,37 @@ export const scratchLegendConfig = {
     // 开局默认金币。
     initialGold: 1,
   },
-  // 成长与解锁配置：主要承载“累计赚到多少钱后解锁什么”的长期目标。
+  // 成长与解锁配置：主要承载“熟练度达到多少后解锁什么”的长期目标。
   progression: {
-    // 累计金币里程碑列表。
+    // 熟练度分段里程碑列表。
     // 约定：
-    // - totalGoldEarned 表示“历史累计赚到的正收益”，不是当前手上剩余金币
-    // - 数组顺序就是默认展示顺序，UI 会优先展示下一个未完成里程碑
-    // - 后续如果新增 100、200 之类的里程碑，继续往后追加即可
-    unlockMilestones: [
+    // - requiredProficiency 表示“上一段清零后，本段还需要多少熟练度”
+    // - UI 展示本段进度，例如 0/3、0/10、0/50、0/150
+    // - 解锁判断会把前置分段累加为总阈值
+    proficiencyMilestones: [
       {
-        // 里程碑唯一标识，供逻辑判断、通知系统和持久化使用。
+        id: 'trash-can',
+        label: '垃圾桶',
+        requiredProficiency: 3,
+        description: '第一段熟练度达到 3 后解锁垃圾桶。',
+      },
+      {
         id: 'scratch-mode',
-        // 给 UI 展示的名称。
-        label: '刮刮乐模式',
-        // 累计赚到 10 金币后触发该里程碑。
-        totalGoldEarned: 10,
-        // 给提示文案或调试面板看的描述。
-        description: '累计赚到 10 金币后解锁刮刮乐模式提示。',
+        label: '刮刮卡',
+        requiredProficiency: 10,
+        description: '第二段熟练度达到 10 后触发刮刮卡电话解锁流程。',
       },
       {
         id: 'next-feature',
         label: '后续功能',
-        // 这里只先预留阶段二之后的下一档累计目标。
-        totalGoldEarned: 50,
-        description: '累计赚到 50 金币后预留下一阶段功能解锁位。',
+        requiredProficiency: 50,
+        description: '第三段熟练度达到 50 后预留下一阶段功能解锁位。',
+      },
+      {
+        id: 'advanced-feature',
+        label: '进阶功能',
+        requiredProficiency: 150,
+        description: '第四段熟练度达到 150 后预留后续中期功能解锁位。',
       },
     ] as const,
   },
@@ -84,7 +91,7 @@ export const scratchLegendConfig = {
       // - 1 => 2
       // - 2 => 3
       // 后续如果要调平衡，优先改这里，不要去组件内散写金额。
-      rewardByLevel: [2, 2, 3, 5, 8, 12, 18, 25, 36, 48, 64] as const,
+      rewardByLevel: [2, 3, 5, 8, 12, 15, 18, 24, 30, 36, 48] as const,
     },
     brokenPlate: {
       // 从哪个等级开始引入碎盘风险。
@@ -98,11 +105,96 @@ export const scratchLegendConfig = {
       reserveGoldForNextPlate: 1,
     },
   },
+  // 刮刮卡配置。阶段二只启用第一张低风险教学卡。
+  scratchCards: {
+    basicSafe: {
+      id: 'basic-safe',
+      label: '成双入对',
+      // 第一张卡的本地 MVP 价格，参考成双入对卡片。
+      price: 10,
+      // 有效刮开比例达到该阈值后，允许玩家结算。
+      scratchCompleteThreshold: 0.8,
+      scratchBrush: {
+        // 刮层笔刷半径。数值越小，单次拖动刮开的范围越小。
+        radius: 8,
+        // 连续拖动时采样间距，数值越小刮痕越连续。
+        stepDistance: 5,
+      },
+      // 阶段二教学规则：3 格结果区，必须刮出任意一对才给钱。
+      matchRule: {
+        slots: 3,
+        requiredMatches: 2,
+      },
+      prizePool: [
+        {
+          id: 'no-pair',
+          label: '未成对',
+          probability: 0.58,
+          displayProbability: null,
+          payout: 0,
+        },
+        {
+          id: 'pair-fire',
+          label: '火焰成对',
+          probability: 0.25,
+          displayProbability: 0.5,
+          payout: 10,
+        },
+        {
+          id: 'pair-cash',
+          label: '纸钞成对',
+          probability: 0.11,
+          displayProbability: 0.4,
+          payout: 25,
+        },
+        {
+          id: 'pair-bag',
+          label: '钱袋成对',
+          probability: 0.06,
+          displayProbability: 0.1,
+          payout: 50,
+        },
+      ] as const,
+      level: {
+        // 每一级升到下一级需要结算多少张“成双入对”。
+        cardsRequiredByLevel: [3, 10, 25, 50, 100, 200, 350, 550, 800] as const,
+        // 下标 0 代表等级 1。等级 2 使用 1.3 倍，对齐当前二级卡参考图。
+        payoutMultiplierByLevel: [1, 1.3, 1.65, 2.1, 2.7, 3.4, 4.3, 5.4, 6.8, 8.5] as const,
+      },
+    },
+  },
+  // 破产救援贷款。阶段二只做“无法继续时的兜底电话”，不接入复杂债务惩罚。
+  loans: {
+    // 签字后立刻到账的启动金。
+    principal: 5,
+    // 6000% 利率对应的偿还金额，UI 只展示整笔贷款待偿还金额。
+    repaymentAmount: 300,
+    interestRateLabel: '6000%',
+    templates: [
+      {
+        id: 'loan-1',
+        title: '贷款 #1',
+        effect: '每 20 张卡中会有 1 张不是你要的卡',
+      },
+      {
+        id: 'loan-2',
+        title: '贷款 #2',
+        effect: '你的刮除范围降低了 1',
+      },
+      {
+        id: 'loan-3',
+        title: '贷款 #3',
+        effect: '刮刮机器人的速度降低了 30%',
+      },
+    ] as const,
+  },
   // 辅助道具解锁配置。
   unlockables: {
     trashCan: {
       // 累计清洁多少个盘子后自动解锁垃圾桶。
       autoUnlockAfterCleanedPlates: 3,
+      // 解锁后仍需要在辅助道具页购买才会出现在桌面。
+      price: 2,
     },
   },
   // 电话提示与风险消息配置。

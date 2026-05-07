@@ -98,6 +98,7 @@ button {
 
 .coin-board,
 .work-card,
+.scratch-shop-card,
 .upgrade-panel,
 .locked-section,
 .sidebar-note {
@@ -137,9 +138,17 @@ button {
 }
 
 .ticket-progress {
+  display: grid;
+  gap: 3px;
   margin-top: 8px;
   color: #f7d799;
   text-align: center;
+}
+
+.ticket-progress small {
+  color: rgba(247, 215, 153, 0.72);
+  font-size: 11px;
+  line-height: 1;
 }
 
 .progress-track {
@@ -203,6 +212,132 @@ button {
   border-color: rgba(120, 183, 255, 0.55);
 }
 
+.scratch-shop-card {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 10px;
+  min-height: 112px;
+  padding: 12px;
+  color: var(--scratch-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scratch-shop-card.locked {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.scratch-shop-card:hover:not(.locked) {
+  border-color: rgba(246, 182, 71, 0.62);
+}
+
+.scratch-ticket-icon {
+  position: relative;
+  display: grid;
+  width: 48px;
+  height: 38px;
+  place-items: center;
+  align-self: center;
+  border: 3px solid #234c62;
+  border-radius: 6px;
+  background:
+    linear-gradient(135deg, #e2f2c2, #3e8f9a),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0 5px, transparent 5px 10px);
+  box-shadow: 0 5px 0 rgba(82, 40, 11, 0.24);
+}
+
+.scratch-ticket-icon::before,
+.scratch-ticket-icon::after {
+  position: absolute;
+  top: 9px;
+  width: 12px;
+  height: 18px;
+  border-radius: 999px;
+  content: "";
+  background: rgba(16, 26, 33, 0.78);
+}
+
+.scratch-ticket-icon::before {
+  left: -8px;
+}
+
+.scratch-ticket-icon::after {
+  right: -8px;
+}
+
+.scratch-ticket-icon span {
+  display: grid;
+  width: 26px;
+  height: 16px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 248, 214, 0.38);
+  color: #2c5d57;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.scratch-shop-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.scratch-shop-copy strong {
+  font-size: 17px;
+}
+
+.scratch-shop-copy em {
+  color: #fff;
+  font-style: normal;
+}
+
+.scratch-shop-copy small {
+  color: var(--scratch-muted);
+  line-height: 1.35;
+}
+
+.scratch-shop-meta {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.scratch-level-badge {
+  border: 1px solid rgba(132, 211, 116, 0.35);
+  border-radius: 4px;
+  background: rgba(50, 98, 47, 0.34);
+  padding: 3px 6px;
+  color: #c9f6a5;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.scratch-level-meter {
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  border-radius: 999px;
+  background: #263526;
+}
+
+.scratch-level-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2f8f3e, #86ca54);
+}
+
+.scratch-shop-meta small {
+  color: #d8e8d0;
+  font-size: 11px;
+  line-height: 1;
+}
+
 .work-icon {
   position: relative;
   display: grid;
@@ -241,7 +376,7 @@ button {
 }
 
 .work-copy em {
-  color: #ff4d55;
+  color: #fff;
   font-style: normal;
 }
 
@@ -293,10 +428,25 @@ button {
   border-radius: 6px;
   background: linear-gradient(180deg, rgba(17, 28, 36, 0.98), rgba(8, 14, 19, 0.98));
   padding: 12px;
+  color: #f4efe2;
+  text-align: left;
 }
 
 .tool-card.locked {
   opacity: 0.58;
+}
+
+.tool-card.buyable {
+  cursor: pointer;
+}
+
+.tool-card.buyable:not(:disabled):hover {
+  border-color: rgba(246, 209, 122, 0.46);
+  background: linear-gradient(180deg, rgba(32, 46, 38, 0.98), rgba(15, 23, 20, 0.98));
+}
+
+.tool-card.buyable:disabled {
+  cursor: not-allowed;
 }
 
 .tool-card.placeholder {
@@ -316,7 +466,7 @@ button {
 }
 
 .tool-card em {
-  color: #f6d17a;
+  color: #fff;
   font-style: normal;
 }
 
@@ -386,6 +536,59 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.loan-ledger-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  margin-left: auto;
+  border: 1px solid rgba(247, 204, 100, 0.45);
+  border-radius: 4px;
+  background: rgba(58, 37, 22, 0.9);
+  padding: 0 12px;
+  color: #ffe7a7;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.loan-ledger-button strong {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  background: #d53d34;
+  color: #fff8e1;
+  font-size: 12px;
+}
+
+.loan-ledger-icon {
+  position: relative;
+  width: 18px;
+  height: 20px;
+  border: 2px solid rgba(255, 226, 150, 0.9);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #e7c47a, #a76b2e);
+}
+
+.loan-ledger-icon::before,
+.loan-ledger-icon::after {
+  position: absolute;
+  left: 4px;
+  width: 7px;
+  height: 2px;
+  content: "";
+  background: rgba(76, 38, 20, 0.72);
+}
+
+.loan-ledger-icon::before {
+  top: 5px;
+}
+
+.loan-ledger-icon::after {
+  top: 11px;
 }
 
 .status-pill {
@@ -530,9 +733,15 @@ button {
   border: 4px solid #7f251e;
   border-radius: 22px 22px 12px 12px;
   background: linear-gradient(180deg, #d94a3a, #b52e28);
+  padding: 0;
   box-shadow:
     inset 0 8px 0 rgba(255, 255, 255, 0.12),
     0 8px 0 rgba(88, 29, 25, 0.22);
+  cursor: pointer;
+}
+
+.phone:disabled {
+  cursor: default;
 }
 
 .phone::before,
@@ -645,6 +854,57 @@ button {
   cursor: pointer;
 }
 
+.phone-loan-terms {
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  gap: 8px;
+  align-items: center;
+  justify-self: start;
+  border: 1px solid rgba(255, 216, 106, 0.28);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px 10px;
+}
+
+.phone-loan-terms em {
+  color: rgba(247, 230, 196, 0.76);
+  font-style: normal;
+}
+
+.phone-loan-terms b {
+  color: #ffe082;
+}
+
+.phone-message .fingerprint-sign-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fingerprint-sign-button span {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 246, 221, 0.86);
+  border-radius: 999px;
+}
+
+.fingerprint-sign-button span::before,
+.fingerprint-sign-button span::after {
+  position: absolute;
+  content: "";
+  border: 1px solid rgba(255, 246, 221, 0.76);
+  border-radius: 999px;
+}
+
+.fingerprint-sign-button span::before {
+  inset: 3px;
+}
+
+.fingerprint-sign-button span::after {
+  inset: 7px 5px 3px;
+}
+
 .phone-risk-grid {
   display: grid;
   gap: 6px;
@@ -672,6 +932,109 @@ button {
 
 .phone-risk-row.danger b {
   color: #ffb1a8;
+}
+
+.loan-ledger-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  background: rgba(18, 12, 8, 0.34);
+  backdrop-filter: blur(2px);
+}
+
+.loan-ledger-panel {
+  display: grid;
+  gap: 16px;
+  width: min(520px, calc(100% - 34px));
+  border: 4px solid #6d4225;
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, rgba(255, 238, 184, 0.96), rgba(220, 164, 85, 0.96)),
+    repeating-linear-gradient(0deg, rgba(105, 62, 35, 0.1) 0 2px, transparent 2px 8px);
+  padding: 18px;
+  color: #4c2a16;
+  box-shadow:
+    0 22px 46px rgba(0, 0, 0, 0.36),
+    inset 0 0 0 2px rgba(255, 249, 214, 0.36);
+}
+
+.loan-ledger-panel header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 2px dashed rgba(86, 48, 26, 0.36);
+  padding-bottom: 10px;
+}
+
+.loan-ledger-panel header strong {
+  color: #3d2112;
+  font-size: 26px;
+}
+
+.loan-ledger-panel header span {
+  color: #7d2c24;
+  font-weight: 800;
+}
+
+.loan-list {
+  display: grid;
+  gap: 10px;
+}
+
+.loan-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 62px 70px;
+  gap: 10px;
+  align-items: center;
+  border: 2px solid rgba(94, 54, 28, 0.18);
+  border-radius: 5px;
+  background: rgba(255, 247, 210, 0.52);
+  padding: 10px;
+}
+
+.loan-row div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.loan-row strong {
+  color: #412516;
+}
+
+.loan-row span {
+  color: #6b4429;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.loan-row b {
+  color: #371b0e;
+  font-size: 18px;
+  text-align: right;
+}
+
+.loan-row button,
+.loan-ledger-back {
+  min-height: 34px;
+  border: 2px solid #4d2d19;
+  border-radius: 4px;
+  background: #57311d;
+  color: #fff0bf;
+  cursor: pointer;
+}
+
+.loan-row button:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.loan-ledger-back {
+  justify-self: end;
+  min-width: 96px;
 }
 
 .idle-hint {
@@ -969,6 +1332,549 @@ button {
     radial-gradient(circle at 76% 38%, #9a603c 0 5px, transparent 6px), #d7a367;
 }
 
+.tabletop-scratch-card {
+  position: absolute;
+  display: grid;
+  width: 76px;
+  height: 58px;
+  grid-template-rows: 14px 24px 12px;
+  justify-items: center;
+  border: 0;
+  background: transparent;
+  transform: translate(-50%, -50%) rotate(-4deg);
+  cursor: pointer;
+  filter: drop-shadow(0 8px 10px rgba(47, 28, 13, 0.34));
+  touch-action: none;
+}
+
+.tabletop-scratch-card::before {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed rgba(232, 232, 199, 0.78);
+  border-radius: 3px;
+  content: "";
+  background:
+    radial-gradient(circle at 50% -18%, rgba(255, 241, 167, 0.16), transparent 38%),
+    linear-gradient(180deg, rgba(112, 145, 122, 0.98), rgba(87, 121, 110, 0.98));
+  clip-path: polygon(0 7%, 77% 0, 100% 12%, 96% 100%, 5% 96%);
+}
+
+.tabletop-scratch-card::after {
+  position: absolute;
+  right: 9px;
+  bottom: 7px;
+  left: 9px;
+  height: 9px;
+  border-radius: 1px;
+  content: "";
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(235, 241, 244, 0.9) 0 3px,
+      rgba(157, 174, 181, 0.92) 3px 6px
+    ),
+    #bdc9cf;
+  box-shadow: inset 0 0 0 1px rgba(69, 86, 87, 0.24);
+}
+
+.tabletop-scratch-card.entering {
+  animation: scratch-ticket-fly-in 420ms cubic-bezier(0.16, 0.9, 0.22, 1.15);
+}
+
+.tabletop-scratch-card:hover {
+  transform: translate(-50%, -53%) rotate(-3deg) scale(1.04);
+}
+
+.tabletop-scratch-card.lifted {
+  transform: translate(-50%, -56%) rotate(-2deg) scale(1.08);
+}
+
+.tabletop-scratch-card.dragging {
+  cursor: grabbing;
+  filter: drop-shadow(0 18px 20px rgba(47, 28, 13, 0.4))
+    drop-shadow(0 0 10px rgba(255, 232, 130, 0.2));
+}
+
+.tabletop-ticket-title,
+.tabletop-ticket-art,
+.tabletop-ticket-slots {
+  position: relative;
+  z-index: 1;
+}
+
+.tabletop-ticket-title {
+  align-self: end;
+  color: #f1df65;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 1px 1px 0 rgba(48, 84, 81, 0.9);
+}
+
+.tabletop-ticket-art {
+  position: relative;
+  width: 46px;
+  height: 22px;
+  align-self: center;
+  overflow: hidden;
+  border: 2px solid rgba(219, 245, 231, 0.82);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #b6ded1, #9fd0c5);
+}
+
+.tabletop-ticket-art .tabletop-art-sky {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 32%, #d9ef7a 0 2px, transparent 3px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent 58%);
+}
+
+.tabletop-art-mountain {
+  position: absolute;
+  bottom: 0;
+  width: 30px;
+  height: 20px;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background: #62bf8d;
+}
+
+.tabletop-art-mountain.tall {
+  left: 6px;
+}
+
+.tabletop-art-mountain.low {
+  right: 3px;
+  height: 15px;
+  background: #6bc596;
+}
+
+.tabletop-art-sun {
+  position: absolute;
+  left: 8px;
+  top: 5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: #ddf27f;
+}
+
+.tabletop-ticket-slots {
+  align-self: end;
+  color: #374b4f;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+@keyframes scratch-ticket-fly-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -350%) scale(0.7) rotate(-18deg);
+  }
+
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -45%) scale(1.05) rotate(3deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(-4deg);
+  }
+}
+
+.scratch-card-view {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  align-items: center;
+  gap: 24px;
+  padding: 42px 46px;
+}
+
+.scratch-card {
+  position: relative;
+  display: grid;
+  width: min(360px, 100%);
+  min-height: 380px;
+  justify-self: center;
+  grid-template-rows: auto 86px 1fr;
+  border: 2px dashed rgba(218, 241, 209, 0.62);
+  border-radius: 4px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(146, 185, 165, 0.98), rgba(87, 133, 122, 0.98)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 7px, transparent 7px 14px);
+  clip-path: polygon(0 5%, 83% 0, 100% 7%, 97% 100%, 3% 96%);
+  box-shadow:
+    0 18px 34px rgba(52, 31, 13, 0.38),
+    inset 0 0 0 4px rgba(255, 255, 255, 0.05);
+}
+
+.scratch-card.pair-bag {
+  box-shadow:
+    0 0 0 8px rgba(255, 220, 105, 0.18),
+    0 22px 40px rgba(52, 31, 13, 0.42),
+    inset 0 0 0 4px rgba(255, 255, 255, 0.08);
+}
+
+.scratch-card-header {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  min-height: 84px;
+  padding: 22px 20px 4px;
+  color: #eadf63;
+  text-align: center;
+}
+
+.scratch-card-header span {
+  font-size: 36px;
+  font-weight: 900;
+  line-height: 0.9;
+  text-shadow:
+    2px 2px 0 rgba(40, 81, 78, 0.92),
+    -1px 1px 0 rgba(40, 81, 78, 0.72);
+}
+
+.scratch-card-header strong {
+  color: rgba(255, 241, 132, 0.86);
+  font-size: 15px;
+}
+
+.scratch-card-picture {
+  position: relative;
+  width: 190px;
+  height: 76px;
+  justify-self: center;
+  overflow: hidden;
+  border: 5px solid rgba(221, 247, 231, 0.8);
+  border-radius: 3px;
+  background: linear-gradient(180deg, #b7e3d5, #9dd0c5);
+}
+
+.scratch-card-picture::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background:
+    radial-gradient(circle at 16% 34%, #d8f47d 0 5px, transparent 6px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 48%);
+}
+
+.scratch-card-picture .mountain {
+  position: absolute;
+  bottom: 0;
+  width: 92px;
+  height: 58px;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background: #63bd8e;
+}
+
+.scratch-card-picture .mountain.tall {
+  left: 12px;
+}
+
+.scratch-card-picture .mountain.low {
+  right: 8px;
+  height: 42px;
+  background: #6fc89a;
+}
+
+.scratch-card-picture .sun {
+  position: absolute;
+  left: 24px;
+  top: 18px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #d9f47f;
+}
+
+.scratch-result-area {
+  position: relative;
+  align-self: center;
+  justify-self: center;
+  width: 230px;
+  margin: 0 0 42px;
+}
+
+.scratch-result-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.scratch-result-slot {
+  display: grid;
+  grid-template-rows: 32px 14px;
+  align-content: center;
+  gap: 6px;
+  min-height: 66px;
+  place-items: center;
+  border: 2px solid rgba(70, 94, 93, 0.42);
+  background:
+    linear-gradient(135deg, rgba(199, 227, 230, 0.9), rgba(154, 194, 199, 0.92)),
+    repeating-linear-gradient(135deg, rgba(72, 103, 105, 0.16) 0 4px, transparent 4px 9px);
+  color: #473016;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.22);
+}
+
+.scratch-result-slot small {
+  display: block;
+  color: rgba(58, 42, 24, 0.72);
+  font-size: 10px;
+  line-height: 14px;
+  text-shadow: none;
+}
+
+.scratch-symbol-icon {
+  position: relative;
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  flex: 0 0 auto;
+  align-self: end;
+}
+
+.scratch-symbol-icon.fire span {
+  width: 18px;
+  height: 24px;
+  border-radius: 52% 52% 50% 50%;
+  background:
+    radial-gradient(circle at 56% 70%, #ffe37b 0 5px, transparent 6px),
+    linear-gradient(155deg, #ffef5a 0 18%, #ff8d28 48%, #d74425 82%);
+  box-shadow: 0 2px 0 rgba(104, 48, 18, 0.36);
+  clip-path: polygon(52% 0, 72% 28%, 92% 42%, 84% 100%, 18% 100%, 6% 44%, 32% 27%);
+}
+
+.scratch-symbol-icon.cash span {
+  position: relative;
+  width: 25px;
+  height: 17px;
+  border: 2px solid #176b43;
+  border-radius: 3px;
+  background:
+    radial-gradient(circle, #dff8a7 0 4px, transparent 5px),
+    linear-gradient(135deg, #63d88e, #249c62);
+  box-shadow: 0 2px 0 rgba(16, 75, 50, 0.32);
+}
+
+.scratch-symbol-icon.cash span::before,
+.scratch-symbol-icon.cash span::after {
+  position: absolute;
+  top: 5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  content: "";
+  background: rgba(18, 95, 59, 0.58);
+}
+
+.scratch-symbol-icon.cash span::before {
+  left: 3px;
+}
+
+.scratch-symbol-icon.cash span::after {
+  right: 3px;
+}
+
+.scratch-symbol-icon.bag span {
+  position: relative;
+  width: 23px;
+  height: 23px;
+  border: 2px solid #6e3a11;
+  border-radius: 11px 11px 9px 9px;
+  background: linear-gradient(180deg, #f6ca51, #c48324);
+  box-shadow: 0 2px 0 rgba(91, 54, 18, 0.36);
+}
+
+.scratch-symbol-icon.bag span::before {
+  position: absolute;
+  top: -7px;
+  left: 5px;
+  width: 10px;
+  height: 9px;
+  border: 2px solid #6e3a11;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  content: "";
+  background: #d99b30;
+}
+
+.scratch-symbol-icon.bag span::after {
+  position: absolute;
+  inset: 5px 7px;
+  content: "";
+  border-radius: 999px;
+  background: rgba(255, 238, 139, 0.56);
+}
+
+.scratch-symbol-icon.blank span {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(110, 98, 80, 0.72);
+  border-radius: 999px;
+  background:
+    linear-gradient(45deg, transparent 43%, rgba(110, 98, 80, 0.72) 44% 56%, transparent 57%),
+    rgba(255, 255, 255, 0.16);
+}
+
+.scratch-result-slot.blank {
+  color: #7c6b58;
+}
+
+.scratch-result-slot.fire {
+  color: #f1b32f;
+}
+
+.scratch-result-slot.cash {
+  color: #35b976;
+}
+
+.scratch-result-slot.bag {
+  color: #c48a26;
+}
+
+.scratch-card-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  touch-action: none;
+  cursor: grab;
+}
+
+.scratch-card-cover:active {
+  cursor: grabbing;
+}
+
+.scratch-info-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(53, 33, 21, 0.9);
+  padding: 20px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.32);
+}
+
+.scratch-info-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scratch-info-title em {
+  color: #c9f6a5;
+  font-size: 13px;
+  font-style: normal;
+}
+
+.scratch-info-card strong {
+  color: #fff7eb;
+  font-size: 24px;
+}
+
+.scratch-info-card span {
+  min-height: 42px;
+  color: #d9d0c0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.scratch-rule-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 10px;
+}
+
+.scratch-rule-row em {
+  color: var(--scratch-muted);
+  font-style: normal;
+}
+
+.scratch-rule-symbol {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scratch-rule-symbol .scratch-symbol-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.scratch-rule-symbol .scratch-symbol-icon.fire span {
+  width: 14px;
+  height: 18px;
+}
+
+.scratch-rule-symbol .scratch-symbol-icon.cash span {
+  width: 20px;
+  height: 14px;
+}
+
+.scratch-rule-symbol .scratch-symbol-icon.bag span {
+  width: 18px;
+  height: 18px;
+}
+
+.scratch-rule-row b {
+  color: #f6d17a;
+  text-align: right;
+}
+
+.scratch-card-level-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 10px;
+}
+
+.scratch-card-level-line em {
+  color: #b6d4a4;
+  font-style: normal;
+}
+
+.scratch-card-level-line b {
+  color: #d8f6a5;
+  text-align: right;
+}
+
+.scratch-info-card button {
+  min-height: 46px;
+  border: 3px solid #b57415;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffc73b, #e89413);
+  color: #fff;
+  font-weight: 900;
+  text-shadow: 1px 1px 0 rgba(91, 42, 9, 0.52);
+  cursor: pointer;
+}
+
+.scratch-info-card button:disabled {
+  filter: grayscale(1) brightness(0.72);
+  cursor: not-allowed;
+}
+
 .cleaning-view {
   position: absolute;
   inset: 0;
@@ -1219,6 +2125,17 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .scratch-card-view {
+    grid-template-columns: 1fr;
+  }
+
+  .scratch-info-card {
+    position: absolute;
+    right: 20px;
+    bottom: 24px;
+    width: 230px;
+  }
+
   .work-info-card {
     position: absolute;
     right: 20px;
@@ -1254,6 +2171,19 @@ button {
 
   .wood-table {
     min-height: 560px;
+  }
+
+  .scratch-card-view {
+    padding: 28px 18px 150px;
+  }
+
+  .scratch-card {
+    min-height: 330px;
+  }
+
+  .scratch-result-slot {
+    min-height: 120px;
+    font-size: 30px;
   }
 
   .table-surface::before {

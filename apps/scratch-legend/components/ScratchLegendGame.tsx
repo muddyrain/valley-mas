@@ -2,21 +2,38 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CleaningCanvas } from '@/components/CleaningCanvas';
+import { ScratchCardCanvas } from '@/components/ScratchCardCanvas';
 import {
-  BASIC_CARD_UNLOCK_GOLD,
+  advanceBasicSafeScratchCardProgress,
+  BASIC_SAFE_CARD_PRICE,
   canAffordWorkPlate,
+  canBuyBasicSafeScratchCard,
+  canBuyTrashCan,
+  createBasicSafeScratchCard,
+  createLoanFromTemplate,
+  getBasicSafeScratchCardPrizePoolForLevel,
   getBoundedPlatePosition,
   getNextUnlockMilestone,
   getRandomPlateSpawnPosition,
+  getScratchCardLevelProgress,
+  getUnlockMilestoneCurrentValue,
   getUnlockMilestoneProgress,
   getWorkLevelProgress,
   getWorkRewardAmountForLevel,
   isBrokenPlateEnabled,
   isPointInsideCircleBounds,
+  LOAN_CONFIG,
+  LOAN_REPAYMENT_AMOUNT,
+  repayLoan,
   rollWorkReward,
+  type ScratchCardState,
+  settleBasicSafeScratchCard,
   shouldCloseCleaningOverlay,
+  shouldOfferLoanPhone,
   shouldOpenPlateFromPointerUp,
+  shouldShowScratchCover,
   shouldShowWorkRiskNotice,
+  TRASH_CAN_PRICE,
   TRASH_CAN_UNLOCK_AFTER_PLATES,
   type UnlockMilestoneId,
   WORK_ACTION_DURATION_MS,
@@ -28,7 +45,11 @@ import {
   type WorkPlateState,
 } from '@/lib/game';
 import { scratchLegendConfig } from '@/lib/game-config';
-import { getActiveWorkPlate, isUnlockMilestoneUnlocked } from '@/lib/game-save';
+import {
+  getActiveScratchCard,
+  getActiveWorkPlate,
+  isUnlockMilestoneUnlocked,
+} from '@/lib/game-save';
 import { useScratchLegendStore } from '@/lib/game-store';
 
 const SCRATCH_MODE_MILESTONE_ID: UnlockMilestoneId = 'scratch-mode';
@@ -49,7 +70,35 @@ type PlatePointerState = {
   holdTimer: ReturnType<typeof setTimeout> | null;
 };
 
+type ScratchCardPointerState = {
+  cardId: number;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  offsetX: number;
+  offsetY: number;
+  holdReady: boolean;
+  dragging: boolean;
+  holdTimer: ReturnType<typeof setTimeout> | null;
+};
+
 type UnlockToast = 'trash' | 'scratch' | null;
+
+const SCRATCH_SYMBOL_LABELS = {
+  fire: '火焰',
+  cash: '纸钞',
+  bag: '钱袋',
+  blank: '未中',
+} as const;
+
+const SCRATCH_PHONE_LINES = [
+  '你对自己的日常工作感到厌烦吗？',
+  '我这里有个好东西，非常适合你......',
+  '刮刮卡！',
+] as const;
+
+const LOAN_PHONE_COPY =
+  '大发慈悲给你一笔贷款。温馨提示，我们的贷款利率是 6000%。为了防止你不还，我们贴心地给你在右上角加了一个按钮，可以查看当前贷款。';
 
 function StatusPill({ label, value }: { label: string; value: string }) {
   return (
@@ -60,6 +109,30 @@ function StatusPill({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ScratchSymbolIcon({ symbol }: { symbol: keyof typeof SCRATCH_SYMBOL_LABELS }) {
+  return (
+    <span className={`scratch-symbol-icon ${symbol}`} aria-hidden="true">
+      <span />
+    </span>
+  );
+}
+
+function getPrizeTierSymbol(tierId: ScratchCardState['result']['tierId']) {
+  if (tierId === 'pair-fire') {
+    return 'fire';
+  }
+
+  if (tierId === 'pair-cash') {
+    return 'cash';
+  }
+
+  if (tierId === 'pair-bag') {
+    return 'bag';
+  }
+
+  return 'blank';
+}
+
 export function ScratchLegendGame() {
   const save = useScratchLegendStore((state) => state.save);
   const sidebarTab = useScratchLegendStore((state) => state.sidebarTab);
@@ -67,16 +140,26 @@ export function ScratchLegendGame() {
   const setSidebarTab = useScratchLegendStore((state) => state.setSidebarTab);
   const updateSave = useScratchLegendStore((state) => state.updateSave);
   const [, setCleanProgress] = useState(0);
+  const [scratchProgress, setScratchProgress] = useState(0);
   const [cleaningStartedAt, setCleaningStartedAt] = useState<number | null>(null);
   const [draggingPlateId, setDraggingPlateId] = useState<number | null>(null);
   const [liftedPlateId, setLiftedPlateId] = useState<number | null>(null);
+  const [draggingScratchCardId, setDraggingScratchCardId] = useState<number | null>(null);
+  const [liftedScratchCardId, setLiftedScratchCardId] = useState<number | null>(null);
   const [enteringPlateIds, setEnteringPlateIds] = useState<number[]>([]);
+  const [enteringScratchCardIds, setEnteringScratchCardIds] = useState<number[]>([]);
+  const [scratchPhoneStep, setScratchPhoneStep] = useState(0);
   const [unlockToast, setUnlockToast] = useState<UnlockToast>(null);
   const [trashHoverPlateId, setTrashHoverPlateId] = useState<number | null>(null);
+  const [trashHoverScratchCardId, setTrashHoverScratchCardId] = useState<number | null>(null);
+  const [loanLedgerOpen, setLoanLedgerOpen] = useState(false);
+  const [phoneMessageOpen, setPhoneMessageOpen] = useState(false);
   const tableRef = useRef<HTMLDivElement | null>(null);
   const trashCanRef = useRef<HTMLDivElement | null>(null);
   const cleaningPlateRef = useRef<HTMLDivElement | null>(null);
+  const scratchCardRef = useRef<HTMLDivElement | null>(null);
   const platePointerRef = useRef<PlatePointerState | null>(null);
+  const scratchCardPointerRef = useRef<ScratchCardPointerState | null>(null);
   const plateEnterTimerRefs = useRef<number[]>([]);
   const unlockToastTimerRef = useRef<number | null>(null);
   const previousTrashCanUnlockedRef = useRef(save.unlocks.trashCanUnlocked);
@@ -89,19 +172,44 @@ export function ScratchLegendGame() {
   const phase: WorkPhase = save.workspace.phase;
   const plates = save.workspace.plates;
   const activePlateId = save.workspace.activePlateId;
+  const tableScratchCards = save.workspace.scratchCards;
+  const activeScratchCard = getActiveScratchCard(save);
+  const activeLoans = save.loans.activeLoans;
+  const basicSafeLevelProgress = getScratchCardLevelProgress(
+    'basic-safe',
+    save.scratchCards.basicSafe.cardsSettled,
+  );
+  const basicSafePrizePool = useMemo(
+    () => getBasicSafeScratchCardPrizePoolForLevel(basicSafeLevelProgress.level),
+    [basicSafeLevelProgress.level],
+  );
+  const activeScratchCardPrizePool = useMemo(
+    () =>
+      getBasicSafeScratchCardPrizePoolForLevel(
+        activeScratchCard?.level ?? basicSafeLevelProgress.level,
+      ),
+    [activeScratchCard?.level, basicSafeLevelProgress.level],
+  );
+  const activeScratchPrizeRows = activeScratchCardPrizePool.filter((tier) => tier.id !== 'no-pair');
   const trashCanUnlocked = save.unlocks.trashCanUnlocked;
+  const trashCanPurchased = save.unlocks.trashCanPurchased;
+  const trashCanAvailable = trashCanUnlocked && trashCanPurchased;
   const workRiskMessageDismissed = save.notices.workRiskMessageDismissed;
   const scratchMessageDismissed = save.notices.scratchMessageDismissed;
   const scratchModeUnlocked = isUnlockMilestoneUnlocked(save, SCRATCH_MODE_MILESTONE_ID);
+  const scratchCardVisible = scratchModeUnlocked && scratchMessageDismissed;
 
   const nextUnlockMilestone = getNextUnlockMilestone(player.lifetimeGoldEarned);
   const finalUnlockMilestone =
-    scratchLegendConfig.progression.unlockMilestones[
-      scratchLegendConfig.progression.unlockMilestones.length - 1
+    scratchLegendConfig.progression.proficiencyMilestones[
+      scratchLegendConfig.progression.proficiencyMilestones.length - 1
     ];
   const unlockProgressTarget =
-    nextUnlockMilestone?.totalGoldEarned ?? finalUnlockMilestone.totalGoldEarned;
-  const unlockProgressCurrent = Math.min(player.lifetimeGoldEarned, unlockProgressTarget);
+    nextUnlockMilestone?.requiredProficiency ?? finalUnlockMilestone.requiredProficiency;
+  const unlockProgressCurrent = getUnlockMilestoneCurrentValue(
+    player.lifetimeGoldEarned,
+    nextUnlockMilestone,
+  );
   const scratchUnlockProgress = getUnlockMilestoneProgress(
     player.lifetimeGoldEarned,
     nextUnlockMilestone,
@@ -116,6 +224,11 @@ export function ScratchLegendGame() {
   const workBrokenPlatePercent = `${Math.round(WORK_BROKEN_PLATE_CHANCE * 100)}%`;
   const canStartWork =
     (phase === 'idle' || phase === 'plateSpawned') && canAffordWorkPlate(player.gold);
+  const canBuyScratchCard =
+    scratchCardVisible &&
+    (phase === 'idle' || phase === 'plateSpawned' || phase === 'scratchCardSpawned') &&
+    canBuyBasicSafeScratchCard(player);
+  const canPurchaseTrashCan = canBuyTrashCan(player.gold, trashCanUnlocked, trashCanPurchased);
   const isCleaningView = phase === 'cleaning' || phase === 'claimable';
   const activePlate = getActiveWorkPlate(save);
   const activeReward = activePlate?.reward ?? {
@@ -126,10 +239,20 @@ export function ScratchLegendGame() {
   };
   const workRiskNoticeVisible = shouldShowWorkRiskNotice(workLevel, workRiskMessageDismissed);
   const scratchUnlockNoticeVisible = scratchModeUnlocked && !scratchMessageDismissed;
-  const phoneNoticeVisible = workRiskNoticeVisible || scratchUnlockNoticeVisible;
+  const loanOfferNoticeVisible =
+    phase === 'idle' &&
+    shouldOfferLoanPhone({
+      gold: player.gold,
+      plateCount: plates.length,
+      activeScratchCard: tableScratchCards.length > 0,
+      activeLoansCount: activeLoans.length,
+    });
+  const phoneNoticePending =
+    workRiskNoticeVisible || scratchUnlockNoticeVisible || loanOfferNoticeVisible;
+  const phoneNoticeVisible = phoneNoticePending && phoneMessageOpen;
 
   const statusLabel = useMemo(() => {
-    if (phase === 'idle' && plates.length === 0) {
+    if (phase === 'idle' && plates.length === 0 && tableScratchCards.length === 0) {
       return '等待接单';
     }
     if (phase === 'plateSpawned') {
@@ -138,13 +261,23 @@ export function ScratchLegendGame() {
     if (phase === 'cleaning') {
       return '清洁中';
     }
+    if (phase === 'scratchCardSpawned') {
+      return `待刮卡片 ${tableScratchCards.length}`;
+    }
+    if (phase === 'scratchingCard') {
+      return activeScratchCard?.status === 'claimable' ? '可结算刮刮卡' : '刮卡中';
+    }
     return '可领取';
-  }, [phase, plates.length]);
+  }, [activeScratchCard?.status, phase, plates.length, tableScratchCards.length]);
 
   useEffect(() => {
     return () => {
       if (platePointerRef.current?.holdTimer) {
         clearTimeout(platePointerRef.current.holdTimer);
+      }
+
+      if (scratchCardPointerRef.current?.holdTimer) {
+        clearTimeout(scratchCardPointerRef.current.holdTimer);
       }
 
       for (const timer of plateEnterTimerRefs.current) {
@@ -168,22 +301,6 @@ export function ScratchLegendGame() {
   }, [hasHydrated, scratchModeUnlocked, trashCanUnlocked]);
 
   useEffect(() => {
-    if (!unlockToastReadyRef.current) {
-      return;
-    }
-
-    if (scratchModeUnlocked && !previousScratchModeUnlockedRef.current) {
-      if (unlockToastTimerRef.current) {
-        window.clearTimeout(unlockToastTimerRef.current);
-      }
-
-      setUnlockToast('scratch');
-      unlockToastTimerRef.current = window.setTimeout(() => {
-        setUnlockToast(null);
-        unlockToastTimerRef.current = null;
-      }, 1800);
-    }
-
     previousScratchModeUnlockedRef.current = scratchModeUnlocked;
   }, [scratchModeUnlocked]);
 
@@ -206,6 +323,30 @@ export function ScratchLegendGame() {
 
     previousTrashCanUnlockedRef.current = trashCanUnlocked;
   }, [trashCanUnlocked]);
+
+  useEffect(() => {
+    if (activeLoans.length === 0) {
+      setLoanLedgerOpen(false);
+    }
+  }, [activeLoans.length]);
+
+  useEffect(() => {
+    if (!phoneNoticePending) {
+      setPhoneMessageOpen(false);
+    }
+  }, [phoneNoticePending]);
+
+  function getDesktopPhase(plateCount: number, scratchCardCount: number): WorkPhase {
+    if (scratchCardCount > 0) {
+      return 'scratchCardSpawned';
+    }
+
+    if (plateCount > 0) {
+      return 'plateSpawned';
+    }
+
+    return 'idle';
+  }
 
   function updatePlatePositionFromPointer(
     plateId: number,
@@ -241,10 +382,46 @@ export function ScratchLegendGame() {
     }));
   }
 
+  function updateScratchCardPositionFromPointer(
+    cardId: number,
+    clientX: number,
+    clientY: number,
+    offsetX = 0,
+    offsetY = 0,
+  ) {
+    const table = tableRef.current;
+
+    if (!table) {
+      return;
+    }
+
+    const bounds = table.getBoundingClientRect();
+    const position = getBoundedPlatePosition(
+      {
+        clientX: clientX - offsetX,
+        clientY: clientY - offsetY,
+      },
+      bounds,
+      DESKTOP_PLATE_SIZE,
+    );
+
+    updateSave((current) => {
+      return {
+        ...current,
+        workspace: {
+          ...current.workspace,
+          scratchCards: current.workspace.scratchCards.map((card) =>
+            card.id === cardId ? { ...card, position } : card,
+          ),
+        },
+      };
+    });
+  }
+
   function isPointerOverTrashCan(clientX: number, clientY: number) {
     const trashBounds = trashCanRef.current?.getBoundingClientRect();
 
-    if (!trashBounds || !trashCanUnlocked) {
+    if (!trashBounds || !trashCanAvailable) {
       return false;
     }
 
@@ -267,12 +444,36 @@ export function ScratchLegendGame() {
     setTrashHoverPlateId(null);
   }
 
+  function resetScratchCardPointer() {
+    if (scratchCardPointerRef.current?.holdTimer) {
+      clearTimeout(scratchCardPointerRef.current.holdTimer);
+    }
+
+    scratchCardPointerRef.current = null;
+    setDraggingScratchCardId(null);
+    setLiftedScratchCardId(null);
+    setTrashHoverScratchCardId(null);
+  }
+
   function startPlateDrag(pointerState: PlatePointerState) {
     pointerState.dragging = true;
     setDraggingPlateId(pointerState.plateId);
     setLiftedPlateId(pointerState.plateId);
     updatePlatePositionFromPointer(
       pointerState.plateId,
+      pointerState.startX,
+      pointerState.startY,
+      pointerState.offsetX,
+      pointerState.offsetY,
+    );
+  }
+
+  function startScratchCardDrag(pointerState: ScratchCardPointerState) {
+    pointerState.dragging = true;
+    setDraggingScratchCardId(pointerState.cardId);
+    setLiftedScratchCardId(pointerState.cardId);
+    updateScratchCardPositionFromPointer(
+      pointerState.cardId,
       pointerState.startX,
       pointerState.startY,
       pointerState.offsetX,
@@ -322,6 +523,94 @@ export function ScratchLegendGame() {
     plateEnterTimerRefs.current.push(enterTimer);
   }
 
+  function buyBasicSafeScratchCard() {
+    if (!canBuyScratchCard) {
+      return;
+    }
+
+    const scratchCardId = save.workspace.nextScratchCardId;
+    const scratchCard = createBasicSafeScratchCard({
+      id: scratchCardId,
+      level: basicSafeLevelProgress.level,
+    });
+
+    setScratchProgress(0);
+    updateSave((current) => ({
+      ...current,
+      player: {
+        ...current.player,
+        gold: current.player.gold - BASIC_SAFE_CARD_PRICE,
+      },
+      workspace: {
+        ...current.workspace,
+        phase: 'scratchCardSpawned',
+        scratchCards: [...current.workspace.scratchCards, scratchCard],
+        nextScratchCardId: current.workspace.nextScratchCardId + 1,
+      },
+    }));
+    setEnteringScratchCardIds((current) => [...current, scratchCardId]);
+    const enterTimer = window.setTimeout(() => {
+      setEnteringScratchCardIds((current) => current.filter((id) => id !== scratchCardId));
+    }, PLATE_ENTER_ANIMATION_MS);
+    plateEnterTimerRefs.current.push(enterTimer);
+  }
+
+  function openScratchCard(cardId: number) {
+    const selectedCard = tableScratchCards.find((card) => card.id === cardId);
+
+    if (phase !== 'scratchCardSpawned' || !selectedCard) {
+      return;
+    }
+
+    setScratchProgress(selectedCard.status === 'claimable' ? 1 : 0);
+    updateSave((current) => {
+      const currentCard = current.workspace.scratchCards.find((card) => card.id === cardId);
+
+      if (!currentCard) {
+        return current;
+      }
+
+      const nextStatus = currentCard.status === 'claimable' ? 'claimable' : 'scratching';
+
+      return {
+        ...current,
+        workspace: {
+          ...current.workspace,
+          phase: 'scratchingCard',
+          activeScratchCardId: cardId,
+          scratchCards: current.workspace.scratchCards.map((card) =>
+            card.id === cardId ? { ...card, status: nextStatus } : card,
+          ),
+        },
+      };
+    });
+  }
+
+  function closeScratchCardView() {
+    if (!activeScratchCard) {
+      return;
+    }
+
+    setScratchProgress(activeScratchCard.status === 'claimable' ? 1 : 0);
+    updateSave((current) => {
+      if (!current.workspace.activeScratchCardId) {
+        return current;
+      }
+
+      return {
+        ...current,
+        workspace: {
+          ...current.workspace,
+          phase: getDesktopPhase(
+            current.workspace.plates.length,
+            current.workspace.scratchCards.length,
+          ),
+          activeScratchCardId: null,
+        },
+      };
+    });
+  }
+
   function openCleaningView(plateId: number) {
     if (phase === 'plateSpawned') {
       resetPlatePointer();
@@ -350,7 +639,10 @@ export function ScratchLegendGame() {
       workspace: {
         ...current.workspace,
         activePlateId: null,
-        phase: current.workspace.plates.length > 0 ? 'plateSpawned' : 'idle',
+        phase: getDesktopPhase(
+          current.workspace.plates.length,
+          current.workspace.scratchCards.length,
+        ),
       },
     }));
   }
@@ -373,6 +665,19 @@ export function ScratchLegendGame() {
       )
     ) {
       closeCleaningView();
+    }
+  }
+
+  function handleScratchCardViewPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    const clickedControl = Boolean(
+      event.target instanceof Element && event.target.closest('[data-scratch-control="true"]'),
+    );
+
+    if (
+      event.target === event.currentTarget ||
+      (!clickedControl && !scratchCardRef.current?.contains(event.target as Node))
+    ) {
+      closeScratchCardView();
     }
   }
 
@@ -476,7 +781,7 @@ export function ScratchLegendGame() {
           workspace: {
             ...current.workspace,
             plates: remainingPlates,
-            phase: remainingPlates.length > 0 ? 'plateSpawned' : 'idle',
+            phase: getDesktopPhase(remainingPlates.length, current.workspace.scratchCards.length),
           },
         };
       });
@@ -492,6 +797,127 @@ export function ScratchLegendGame() {
     }
 
     resetPlatePointer();
+  }
+
+  function handleScratchCardPointerDown(
+    event: React.PointerEvent<HTMLButtonElement>,
+    card: ScratchCardState,
+  ) {
+    if (phase !== 'scratchCardSpawned') {
+      return;
+    }
+
+    resetScratchCardPointer();
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    const tableBounds = tableRef.current?.getBoundingClientRect();
+    const cardCenterX = tableBounds
+      ? tableBounds.left + (card.position.xPercent / 100) * tableBounds.width
+      : event.clientX;
+    const cardCenterY = tableBounds
+      ? tableBounds.top + (card.position.yPercent / 100) * tableBounds.height
+      : event.clientY;
+
+    const pointerState: ScratchCardPointerState = {
+      cardId: card.id,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      offsetX: event.clientX - cardCenterX,
+      offsetY: event.clientY - cardCenterY,
+      holdReady: false,
+      dragging: false,
+      holdTimer: null,
+    };
+
+    pointerState.holdTimer = setTimeout(() => {
+      pointerState.holdReady = true;
+      setLiftedScratchCardId(pointerState.cardId);
+    }, PLATE_DRAG_HOLD_MS);
+
+    scratchCardPointerRef.current = pointerState;
+  }
+
+  function handleScratchCardPointerMove(event: React.PointerEvent<HTMLButtonElement>) {
+    const pointerState = scratchCardPointerRef.current;
+
+    if (!pointerState || pointerState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const movedDistance = Math.hypot(
+      event.clientX - pointerState.startX,
+      event.clientY - pointerState.startY,
+    );
+
+    if (
+      !pointerState.dragging &&
+      pointerState.holdReady &&
+      movedDistance >= PLATE_DRAG_MOVE_THRESHOLD
+    ) {
+      startScratchCardDrag(pointerState);
+    }
+
+    if (!pointerState.dragging) {
+      return;
+    }
+
+    event.preventDefault();
+    updateScratchCardPositionFromPointer(
+      pointerState.cardId,
+      event.clientX,
+      event.clientY,
+      pointerState.offsetX,
+      pointerState.offsetY,
+    );
+    setTrashHoverScratchCardId(
+      isPointerOverTrashCan(event.clientX, event.clientY) ? pointerState.cardId : null,
+    );
+  }
+
+  function handleScratchCardPointerUp(event: React.PointerEvent<HTMLButtonElement>) {
+    const pointerState = scratchCardPointerRef.current;
+
+    if (!pointerState || pointerState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const wasDragged = pointerState.dragging;
+    const droppedOnTrashCan = wasDragged && isPointerOverTrashCan(event.clientX, event.clientY);
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (droppedOnTrashCan) {
+      updateSave((current) => {
+        const remainingScratchCards = current.workspace.scratchCards.filter(
+          (card) => card.id !== pointerState.cardId,
+        );
+
+        return {
+          ...current,
+          workspace: {
+            ...current.workspace,
+            scratchCards: remainingScratchCards,
+            activeScratchCardId: null,
+            phase: getDesktopPhase(current.workspace.plates.length, remainingScratchCards.length),
+          },
+        };
+      });
+      setScratchProgress(0);
+      resetScratchCardPointer();
+      return;
+    }
+
+    if (!wasDragged && !pointerState.holdReady) {
+      const cardId = pointerState.cardId;
+      resetScratchCardPointer();
+      openScratchCard(cardId);
+      return;
+    }
+
+    resetScratchCardPointer();
   }
 
   function completeCleaning() {
@@ -538,11 +964,160 @@ export function ScratchLegendGame() {
           ...current.workspace,
           activePlateId: null,
           plates: remainingPlates,
-          phase: remainingPlates.length > 0 ? 'plateSpawned' : 'idle',
+          phase: getDesktopPhase(remainingPlates.length, current.workspace.scratchCards.length),
         },
       };
     });
     setCleanProgress(0);
+  }
+
+  function completeScratchCard() {
+    setScratchProgress(1);
+    updateSave((current) => {
+      const activeCardId = current.workspace.activeScratchCardId;
+
+      if (!activeCardId) {
+        return current;
+      }
+
+      return {
+        ...current,
+        workspace: {
+          ...current.workspace,
+          scratchCards: current.workspace.scratchCards.map((card) =>
+            card.id === activeCardId ? { ...card, status: 'claimable' } : card,
+          ),
+        },
+      };
+    });
+  }
+
+  function claimScratchCardPrize() {
+    if (!activeScratchCard || activeScratchCard.status !== 'claimable') {
+      return;
+    }
+
+    updateSave((current) => {
+      const currentCard = getActiveScratchCard(current);
+
+      if (!currentCard) {
+        return current;
+      }
+
+      const remainingScratchCards = current.workspace.scratchCards.filter(
+        (card) => card.id !== currentCard.id,
+      );
+
+      return {
+        ...current,
+        player: settleBasicSafeScratchCard(current.player, currentCard),
+        scratchCards: {
+          ...current.scratchCards,
+          basicSafe: advanceBasicSafeScratchCardProgress(current.scratchCards.basicSafe),
+        },
+        workspace: {
+          ...current.workspace,
+          scratchCards: remainingScratchCards,
+          activeScratchCardId: null,
+          phase: getDesktopPhase(current.workspace.plates.length, remainingScratchCards.length),
+        },
+      };
+    });
+    setScratchProgress(0);
+  }
+
+  function signEmergencyLoan() {
+    if (!loanOfferNoticeVisible) {
+      return;
+    }
+
+    updateSave((current) => {
+      const loan = createLoanFromTemplate({
+        id: current.loans.nextLoanId,
+        templateIndex: current.loans.nextLoanTemplateIndex,
+      });
+
+      return {
+        ...current,
+        player: {
+          ...current.player,
+          gold: current.player.gold + loan.signGold,
+        },
+        loans: {
+          activeLoans: [...current.loans.activeLoans, loan],
+          nextLoanId: current.loans.nextLoanId + 1,
+          nextLoanTemplateIndex: current.loans.nextLoanTemplateIndex + 1,
+        },
+      };
+    });
+    setLoanLedgerOpen(true);
+  }
+
+  function buyTrashCan() {
+    if (!canPurchaseTrashCan) {
+      return;
+    }
+
+    updateSave((current) => ({
+      ...current,
+      player: {
+        ...current.player,
+        gold: current.player.gold - TRASH_CAN_PRICE,
+      },
+      unlocks: {
+        ...current.unlocks,
+        trashCanPurchased: true,
+      },
+    }));
+  }
+
+  function repayActiveLoan(loanId: number) {
+    updateSave((current) => {
+      const loan = current.loans.activeLoans.find((item) => item.id === loanId);
+
+      if (!loan || current.player.gold < loan.amount) {
+        return current;
+      }
+
+      const remainingLoans = current.loans.activeLoans.filter((item) => item.id !== loanId);
+
+      return {
+        ...current,
+        player: {
+          ...current.player,
+          gold: repayLoan(current.player.gold, loan),
+        },
+        loans: {
+          ...current.loans,
+          activeLoans: remainingLoans,
+        },
+      };
+    });
+  }
+
+  function advanceScratchUnlockPhone() {
+    if (scratchPhoneStep < SCRATCH_PHONE_LINES.length - 1) {
+      setScratchPhoneStep((current) => current + 1);
+      return;
+    }
+
+    updateSave((current) => ({
+      ...current,
+      notices: {
+        ...current.notices,
+        scratchMessageDismissed: true,
+      },
+    }));
+
+    if (unlockToastTimerRef.current) {
+      window.clearTimeout(unlockToastTimerRef.current);
+    }
+
+    setUnlockToast('scratch');
+    unlockToastTimerRef.current = window.setTimeout(() => {
+      setUnlockToast(null);
+      unlockToastTimerRef.current = null;
+    }, 1800);
   }
 
   return (
@@ -555,6 +1130,7 @@ export function ScratchLegendGame() {
               <strong>{player.gold}</strong>
             </div>
             <div className="ticket-progress">
+              <small>熟练度</small>
               <span>
                 {unlockProgressCurrent}/{unlockProgressTarget}
               </span>
@@ -613,33 +1189,91 @@ export function ScratchLegendGame() {
                 </span>
               </button>
 
+              {scratchCardVisible && (
+                <button
+                  className={`scratch-shop-card ${canBuyScratchCard ? '' : 'locked'}`}
+                  type="button"
+                  onClick={buyBasicSafeScratchCard}
+                  disabled={!canBuyScratchCard}
+                >
+                  <span className="scratch-ticket-icon">
+                    <span>2w</span>
+                  </span>
+                  <span className="scratch-shop-copy">
+                    <small>Catalog #1</small>
+                    <strong>成双入对</strong>
+                    <em>${BASIC_SAFE_CARD_PRICE}</em>
+                    <small>
+                      小奖 $
+                      {basicSafePrizePool.find((tier) => tier.id === 'pair-fire')?.payout ?? 0}
+                    </small>
+                  </span>
+                  <span className="scratch-shop-meta">
+                    <span className="scratch-level-badge">Lv. {basicSafeLevelProgress.level}</span>
+                    <span
+                      className="scratch-level-meter"
+                      role="progressbar"
+                      aria-label="成双入对等级进度"
+                      aria-valuemin={0}
+                      aria-valuemax={basicSafeLevelProgress.target}
+                      aria-valuenow={basicSafeLevelProgress.current}
+                    >
+                      <span
+                        style={{
+                          width: `${Math.max(10, basicSafeLevelProgress.ratio * 100)}%`,
+                        }}
+                      />
+                    </span>
+                    <small>
+                      {basicSafeLevelProgress.target > 0
+                        ? `${basicSafeLevelProgress.current}/${basicSafeLevelProgress.target}`
+                        : 'MAX'}
+                    </small>
+                  </span>
+                </button>
+              )}
+
               <div className="sidebar-note">
                 <strong>下一目标</strong>
                 <span>
                   {nextUnlockMilestone
-                    ? `累计赚到 ${nextUnlockMilestone.totalGoldEarned} 金币解锁${nextUnlockMilestone.label}`
-                    : '累计金币里程碑已全部达成'}
+                    ? `熟练度达到 ${nextUnlockMilestone.requiredProficiency} 解锁${nextUnlockMilestone.label}`
+                    : '熟练度里程碑已全部达成'}
                 </span>
               </div>
             </>
           ) : (
             <div className="tool-panel">
-              {trashCanUnlocked ? (
+              {trashCanPurchased ? (
                 <div className="tool-card available">
                   <span className="tool-icon trash-preview" />
                   <div>
                     <strong>垃圾桶</strong>
                     <span>已解锁，可把桌面脏盘子拖进去直接处理掉。</span>
                   </div>
-                  <em>已解锁</em>
+                  <em>已购买</em>
                 </div>
+              ) : trashCanUnlocked ? (
+                <button
+                  className={`tool-card available buyable ${canPurchaseTrashCan ? '' : 'locked'}`}
+                  type="button"
+                  onClick={buyTrashCan}
+                  disabled={!canPurchaseTrashCan}
+                >
+                  <span className="tool-icon trash-preview" />
+                  <div>
+                    <strong>垃圾桶</strong>
+                    <span>已解锁，花费 ${TRASH_CAN_PRICE} 后可拖入盘子或刮刮卡。</span>
+                  </div>
+                  <em>${TRASH_CAN_PRICE}</em>
+                </button>
               ) : (
                 <>
                   <div className="tool-card locked placeholder">
                     <span className="tool-lock">锁</span>
                     <div>
                       <strong>未解锁</strong>
-                      <span>清洁 {TRASH_CAN_UNLOCK_AFTER_PLATES} 个盘子后自动解锁垃圾桶。</span>
+                      <span>熟练度达到 {TRASH_CAN_UNLOCK_AFTER_PLATES} 后解锁购买资格。</span>
                     </div>
                   </div>
                   <div className="tool-card locked placeholder">
@@ -667,6 +1301,18 @@ export function ScratchLegendGame() {
             <StatusPill label="状态" value={statusLabel} />
             <StatusPill label="已洗盘子" value={`${player.plateCleaned}`} />
             <StatusPill label="刮卡次数" value={`${player.cardsScratched}`} />
+            {activeLoans.length > 0 && (
+              <button
+                className="loan-ledger-button"
+                type="button"
+                onClick={() => setLoanLedgerOpen(true)}
+                aria-label="查看当前贷款"
+              >
+                <span className="loan-ledger-icon" aria-hidden="true" />
+                <span>贷款</span>
+                <strong>{activeLoans.length}</strong>
+              </button>
+            )}
           </div>
 
           <div className="wood-table" ref={tableRef}>
@@ -677,9 +1323,19 @@ export function ScratchLegendGame() {
               <span className="table-leg right" />
             </div>
 
-            <div className={`phone ${phoneNoticeVisible ? 'ringing' : ''}`} aria-hidden="true">
+            <button
+              className={`phone ${phoneNoticePending ? 'ringing' : ''}`}
+              type="button"
+              onClick={() => {
+                if (phoneNoticePending) {
+                  setPhoneMessageOpen(true);
+                }
+              }}
+              disabled={!phoneNoticePending}
+              aria-label={phoneNoticePending ? '接听电话提醒' : '电话'}
+            >
               <span className="phone-dial" />
-            </div>
+            </button>
 
             {phase === 'idle' && (
               <div className="idle-hint">
@@ -688,7 +1344,7 @@ export function ScratchLegendGame() {
               </div>
             )}
 
-            {phase === 'plateSpawned' &&
+            {(phase === 'plateSpawned' || phase === 'scratchCardSpawned') &&
               plates.map((plate, index) => (
                 <button
                   className={`small-dirty-plate ${
@@ -714,10 +1370,129 @@ export function ScratchLegendGame() {
                 </button>
               ))}
 
-            {trashCanUnlocked && (
+            {phase === 'scratchCardSpawned' &&
+              tableScratchCards.map((scratchCard, index) => (
+                <button
+                  className={`tabletop-scratch-card ${
+                    enteringScratchCardIds.includes(scratchCard.id) ? 'entering' : ''
+                  } ${liftedScratchCardId === scratchCard.id ? 'lifted' : ''} ${
+                    draggingScratchCardId === scratchCard.id ? 'dragging' : ''
+                  }`}
+                  type="button"
+                  key={scratchCard.id}
+                  style={{
+                    left: `${scratchCard.position.xPercent}%`,
+                    top: `${scratchCard.position.yPercent}%`,
+                    zIndex: draggingScratchCardId === scratchCard.id ? 6 : 3 + index,
+                  }}
+                  onPointerDown={(event) => handleScratchCardPointerDown(event, scratchCard)}
+                  onPointerMove={handleScratchCardPointerMove}
+                  onPointerUp={handleScratchCardPointerUp}
+                  onPointerCancel={resetScratchCardPointer}
+                  aria-label={`打开第 ${index + 1} 张成双入对刮刮卡`}
+                  aria-grabbed={draggingScratchCardId === scratchCard.id}
+                >
+                  <span className="tabletop-ticket-title">TWO$WIN</span>
+                  <span className="tabletop-ticket-art" aria-hidden="true">
+                    <span className="tabletop-art-sky" />
+                    <span className="tabletop-art-mountain tall" />
+                    <span className="tabletop-art-mountain low" />
+                    <span className="tabletop-art-sun" />
+                  </span>
+                  <span className="tabletop-ticket-slots">???</span>
+                </button>
+              ))}
+
+            {phase === 'scratchingCard' && activeScratchCard && (
+              <div className="scratch-card-view" onPointerDown={handleScratchCardViewPointerDown}>
+                <div
+                  className={`scratch-card ${activeScratchCard.result.tierId}`}
+                  ref={scratchCardRef}
+                >
+                  <div className="scratch-card-header">
+                    <span>TWO$WIN</span>
+                    <strong>成双入对 Lv. {activeScratchCard.level}</strong>
+                  </div>
+                  <div className="scratch-card-picture" aria-hidden="true">
+                    <span className="mountain tall" />
+                    <span className="mountain low" />
+                    <span className="sun" />
+                  </div>
+                  <div className="scratch-result-area">
+                    <fieldset className="scratch-result-grid" aria-label="刮刮卡结果区">
+                      {activeScratchCard.result.symbols.map((symbol, index) => (
+                        <span
+                          className={`scratch-result-slot ${symbol}`}
+                          key={`${symbol}-${index}`}
+                        >
+                          <ScratchSymbolIcon symbol={symbol} />
+                          <small>{SCRATCH_SYMBOL_LABELS[symbol]}</small>
+                        </span>
+                      ))}
+                    </fieldset>
+                    <ScratchCardCanvas
+                      active={activeScratchCard.status === 'scratching'}
+                      visible={shouldShowScratchCover(activeScratchCard.status, scratchProgress)}
+                      brushRadius={scratchLegendConfig.scratchCards.basicSafe.scratchBrush.radius}
+                      stepDistance={
+                        scratchLegendConfig.scratchCards.basicSafe.scratchBrush.stepDistance
+                      }
+                      onProgressChange={setScratchProgress}
+                      onComplete={completeScratchCard}
+                    />
+                  </div>
+                </div>
+                <div className="scratch-info-card" data-scratch-control="true">
+                  <div className="scratch-info-title">
+                    <strong>成双入对</strong>
+                    <em>Lv. {activeScratchCard.level}</em>
+                  </div>
+                  <span>
+                    {activeScratchCard.status === 'claimable'
+                      ? activeScratchCard.result.isWinning
+                        ? '刮出一对，可以结算。'
+                        : '没有成对，本张 $0。'
+                      : `拖动刮开，已揭露 ${Math.round(scratchProgress * 100)}%`}
+                  </span>
+                  <div className="scratch-rule-row">
+                    <em>规则</em>
+                    <b>刮出一对即可获胜</b>
+                  </div>
+                  {activeScratchPrizeRows.map((tier) => (
+                    <div className="scratch-rule-row" key={tier.id}>
+                      <em className="scratch-rule-symbol">
+                        <ScratchSymbolIcon symbol={getPrizeTierSymbol(tier.id)} />
+                        {tier.label.replace('成对', '')}
+                      </em>
+                      <b>
+                        {Math.round((tier.displayProbability ?? tier.probability) * 100)}%{' / '}$
+                        {tier.payout}
+                      </b>
+                    </div>
+                  ))}
+                  <div className="scratch-card-level-line">
+                    <em>等级进度</em>
+                    <b>
+                      {basicSafeLevelProgress.target > 0
+                        ? `${basicSafeLevelProgress.current}/${basicSafeLevelProgress.target}`
+                        : 'MAX'}
+                    </b>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={claimScratchCardPrize}
+                    disabled={activeScratchCard.status !== 'claimable'}
+                  >
+                    ${activeScratchCard.result.isWinning ? activeScratchCard.result.payout : 0}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {trashCanAvailable && (
               <div
                 ref={trashCanRef}
-                className={`trash-can ${trashHoverPlateId ? 'open' : ''}`}
+                className={`trash-can ${trashHoverPlateId || trashHoverScratchCardId ? 'open' : ''}`}
                 role="img"
                 aria-label="垃圾桶"
               >
@@ -729,33 +1504,38 @@ export function ScratchLegendGame() {
             {unlockToast && (
               <div className={`unlock-toast ${unlockToast}`}>
                 <div className={`unlock-icon ${unlockToast}`} />
-                <strong>{unlockToast === 'trash' ? '已解锁' : '刮刮乐模式已解锁'}</strong>
-                <span>{unlockToast === 'trash' ? '垃圾桶' : '等待阶段二开启'}</span>
+                <strong>{unlockToast === 'trash' ? '已解锁' : '刮刮卡！'}</strong>
+                <span>{unlockToast === 'trash' ? '垃圾桶' : '成双入对已上架'}</span>
               </div>
             )}
 
             {phoneNoticeVisible && (
               <div className="phone-message">
-                {scratchUnlockNoticeVisible ? (
+                {loanOfferNoticeVisible ? (
                   <>
                     <strong>电话提醒</strong>
-                    <span>
-                      你已经累计赚到 {BASIC_CARD_UNLOCK_GOLD} 金币了，刮刮乐模式可以解锁了，
-                      阶段二会开始接上主玩法。
-                    </span>
+                    <span>{LOAN_PHONE_COPY}</span>
+                    <div className="phone-loan-terms">
+                      <em>到账</em>
+                      <b>${LOAN_CONFIG.principal}</b>
+                      <em>偿还</em>
+                      <b>${LOAN_REPAYMENT_AMOUNT}</b>
+                    </div>
                     <button
+                      className="fingerprint-sign-button"
                       type="button"
-                      onClick={() =>
-                        updateSave((current) => ({
-                          ...current,
-                          notices: {
-                            ...current.notices,
-                            scratchMessageDismissed: true,
-                          },
-                        }))
-                      }
+                      onClick={signEmergencyLoan}
                     >
-                      我知道了
+                      <span aria-hidden="true" />
+                      指纹签字
+                    </button>
+                  </>
+                ) : scratchUnlockNoticeVisible ? (
+                  <>
+                    <strong>电话提醒</strong>
+                    <span>{SCRATCH_PHONE_LINES[scratchPhoneStep]}</span>
+                    <button type="button" onClick={advanceScratchUnlockPhone}>
+                      {scratchPhoneStep < SCRATCH_PHONE_LINES.length - 1 ? '继续听' : '看看好东西'}
                     </button>
                   </>
                 ) : (
@@ -792,6 +1572,42 @@ export function ScratchLegendGame() {
                     </button>
                   </>
                 )}
+              </div>
+            )}
+
+            {loanLedgerOpen && activeLoans.length > 0 && (
+              <div className="loan-ledger-overlay" role="dialog" aria-label="当前贷款列表">
+                <div className="loan-ledger-panel">
+                  <header>
+                    <strong>当前贷款</strong>
+                    <span>利率 {LOAN_CONFIG.interestRateLabel}</span>
+                  </header>
+                  <div className="loan-list">
+                    {activeLoans.map((loan) => (
+                      <div className="loan-row" key={loan.id}>
+                        <div>
+                          <strong>{loan.title}</strong>
+                          <span>{loan.effect}</span>
+                        </div>
+                        <b>{loan.amount}</b>
+                        <button
+                          type="button"
+                          onClick={() => repayActiveLoan(loan.id)}
+                          disabled={player.gold < loan.amount}
+                        >
+                          偿付
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    className="loan-ledger-back"
+                    type="button"
+                    onClick={() => setLoanLedgerOpen(false)}
+                  >
+                    返回
+                  </button>
+                </div>
               </div>
             )}
 

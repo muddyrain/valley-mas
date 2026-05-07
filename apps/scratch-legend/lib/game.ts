@@ -1,7 +1,9 @@
 import { scratchLegendConfig } from './game-config';
 
-export const UNLOCK_MILESTONES = scratchLegendConfig.progression.unlockMilestones;
-export const BASIC_CARD_UNLOCK_GOLD = UNLOCK_MILESTONES[0].totalGoldEarned;
+export const UNLOCK_MILESTONES = scratchLegendConfig.progression.proficiencyMilestones;
+export const TRASH_CAN_MILESTONE_ID = 'trash-can' as const;
+export const SCRATCH_MODE_MILESTONE_ID = 'scratch-mode' as const;
+export const BASIC_CARD_UNLOCK_GOLD = getUnlockMilestoneThreshold(SCRATCH_MODE_MILESTONE_ID);
 export const CLEAN_COMPLETE_THRESHOLD = scratchLegendConfig.work.cleanCompleteThreshold;
 export const INITIAL_GOLD = scratchLegendConfig.economy.initialGold;
 export const WORK_ACTION_DURATION_MS = scratchLegendConfig.work.actionDurationMs;
@@ -15,9 +17,27 @@ export const WORK_PLATES_REQUIRED_BY_LEVEL = scratchLegendConfig.work.level.plat
 export const WORK_PLATE_COST = scratchLegendConfig.work.plateCost;
 export const TRASH_CAN_UNLOCK_AFTER_PLATES =
   scratchLegendConfig.unlockables.trashCan.autoUnlockAfterCleanedPlates;
+export const TRASH_CAN_PRICE = scratchLegendConfig.unlockables.trashCan.price;
 export const WORK_LEVEL_REWARD_TABLE = scratchLegendConfig.work.level.rewardByLevel;
+export const BASIC_SAFE_CARD_CONFIG = scratchLegendConfig.scratchCards.basicSafe;
+export const BASIC_SAFE_CARD_PRICE = BASIC_SAFE_CARD_CONFIG.price;
+export const BASIC_SAFE_CARD_SCRATCH_COMPLETE_THRESHOLD =
+  BASIC_SAFE_CARD_CONFIG.scratchCompleteThreshold;
+export const BASIC_SAFE_CARD_SCRATCH_BRUSH = BASIC_SAFE_CARD_CONFIG.scratchBrush;
+export const BASIC_SAFE_CARD_LEVEL_CONFIG = BASIC_SAFE_CARD_CONFIG.level;
+export const BASIC_SAFE_CARD_MAX_LEVEL =
+  BASIC_SAFE_CARD_LEVEL_CONFIG.payoutMultiplierByLevel.length;
+export const LOAN_CONFIG = scratchLegendConfig.loans;
+export const LOAN_PRINCIPAL = LOAN_CONFIG.principal;
+export const LOAN_REPAYMENT_AMOUNT = LOAN_CONFIG.repaymentAmount;
 
-export type WorkPhase = 'idle' | 'plateSpawned' | 'cleaning' | 'claimable';
+export type WorkPhase =
+  | 'idle'
+  | 'plateSpawned'
+  | 'cleaning'
+  | 'claimable'
+  | 'scratchCardSpawned'
+  | 'scratchingCard';
 
 export type PlayerState = {
   gold: number;
@@ -66,6 +86,70 @@ export type WorkPlateState = {
   seed: number;
 };
 
+export type ScratchCardType = 'basic-safe';
+export type ScratchCardStatus = 'onTable' | 'scratching' | 'claimable' | 'settled';
+type BasicSafeScratchCardPrizeTierConfig = (typeof BASIC_SAFE_CARD_CONFIG.prizePool)[number];
+export type ScratchCardPrizeTier = Omit<BasicSafeScratchCardPrizeTierConfig, 'payout'> & {
+  payout: number;
+};
+export type ScratchCardPrizeTierId = BasicSafeScratchCardPrizeTierConfig['id'];
+export type ScratchCardSymbol = 'fire' | 'cash' | 'bag' | 'blank';
+
+export type ScratchCardResult = {
+  tierId: ScratchCardPrizeTierId;
+  label: string;
+  payout: number;
+  symbols: [ScratchCardSymbol, ScratchCardSymbol, ScratchCardSymbol];
+  isWinning: boolean;
+  hasPenaltySymbol: boolean;
+  canDiscard: boolean;
+};
+
+export type ScratchCardState = {
+  id: number;
+  type: ScratchCardType;
+  price: number;
+  level: number;
+  status: ScratchCardStatus;
+  result: ScratchCardResult;
+  position: PlatePosition;
+};
+
+export type ScratchCardProgressState = {
+  cardsSettled: number;
+};
+
+export type ScratchCardLevelProgress = {
+  level: number;
+  current: number;
+  target: number;
+  ratio: number;
+  cardsSettled: number;
+};
+
+export type LoanTemplate = (typeof LOAN_CONFIG.templates)[number];
+
+export type LoanState = {
+  id: number;
+  templateId: LoanTemplate['id'];
+  title: string;
+  effect: string;
+  amount: number;
+  signGold: number;
+  interestRateLabel: string;
+};
+
+export type CreateBasicSafeScratchCardOptions = {
+  id: number;
+  level?: number;
+  random?: () => number;
+};
+
+export type CreateLoanFromTemplateOptions = {
+  id: number;
+  templateIndex: number;
+};
+
 export type UnlockMilestone = (typeof UNLOCK_MILESTONES)[number];
 export type UnlockMilestoneId = UnlockMilestone['id'];
 
@@ -93,23 +177,314 @@ export function getUnlockMilestoneById(milestoneId: UnlockMilestoneId) {
   return UNLOCK_MILESTONES.find((milestone) => milestone.id === milestoneId);
 }
 
-export function getNextUnlockMilestone(totalGoldEarned: number) {
-  return UNLOCK_MILESTONES.find((milestone) => totalGoldEarned < milestone.totalGoldEarned) ?? null;
+function getUnlockMilestoneIndex(milestoneId: UnlockMilestoneId) {
+  return UNLOCK_MILESTONES.findIndex((milestone) => milestone.id === milestoneId);
+}
+
+export function getUnlockMilestoneThreshold(milestoneId: UnlockMilestoneId) {
+  const milestoneIndex = getUnlockMilestoneIndex(milestoneId);
+
+  if (milestoneIndex < 0) {
+    return 0;
+  }
+
+  return UNLOCK_MILESTONES.slice(0, milestoneIndex + 1).reduce(
+    (sum, milestone) => sum + milestone.requiredProficiency,
+    0,
+  );
+}
+
+function getPreviousUnlockMilestoneThreshold(milestone: UnlockMilestone | null) {
+  if (!milestone) {
+    return UNLOCK_MILESTONES.reduce((sum, item) => sum + item.requiredProficiency, 0);
+  }
+
+  const milestoneIndex = getUnlockMilestoneIndex(milestone.id);
+
+  if (milestoneIndex <= 0) {
+    return 0;
+  }
+
+  return UNLOCK_MILESTONES.slice(0, milestoneIndex).reduce(
+    (sum, item) => sum + item.requiredProficiency,
+    0,
+  );
+}
+
+export function getNextUnlockMilestone(totalProficiency: number) {
+  return (
+    UNLOCK_MILESTONES.find(
+      (milestone) => totalProficiency < getUnlockMilestoneThreshold(milestone.id),
+    ) ?? null
+  );
+}
+
+export function getUnlockMilestoneCurrentValue(
+  totalProficiency: number,
+  milestone: UnlockMilestone | null,
+) {
+  if (!milestone) {
+    return 0;
+  }
+
+  const previousThreshold = getPreviousUnlockMilestoneThreshold(milestone);
+
+  return Math.max(0, Math.min(milestone.requiredProficiency, totalProficiency - previousThreshold));
 }
 
 export function getUnlockMilestoneProgress(
-  totalGoldEarned: number,
+  totalProficiency: number,
   milestone: UnlockMilestone | null,
 ) {
   if (!milestone) {
     return 1;
   }
 
-  return clampRatio(totalGoldEarned / milestone.totalGoldEarned);
+  return clampRatio(
+    getUnlockMilestoneCurrentValue(totalProficiency, milestone) / milestone.requiredProficiency,
+  );
 }
 
 export function canAffordWorkPlate(gold: number) {
   return gold >= WORK_PLATE_COST;
+}
+
+export function canBuyBasicSafeScratchCard(
+  player: Pick<PlayerState, 'gold' | 'lifetimeGoldEarned'>,
+) {
+  return (
+    player.gold >= BASIC_SAFE_CARD_PRICE && player.lifetimeGoldEarned >= BASIC_CARD_UNLOCK_GOLD
+  );
+}
+
+function getScratchCardLevelRequirements(cardType: ScratchCardType) {
+  if (cardType === 'basic-safe') {
+    return BASIC_SAFE_CARD_LEVEL_CONFIG.cardsRequiredByLevel;
+  }
+
+  return [] as const;
+}
+
+export function getScratchCardMaxLevel(cardType: ScratchCardType) {
+  if (cardType === 'basic-safe') {
+    return BASIC_SAFE_CARD_MAX_LEVEL;
+  }
+
+  return 1;
+}
+
+export function getScratchCardLevelThreshold(cardType: ScratchCardType, level: number) {
+  if (level <= 1) {
+    return 0;
+  }
+
+  const requirements = getScratchCardLevelRequirements(cardType);
+  const maxLevel = getScratchCardMaxLevel(cardType);
+  const normalizedLevel = Math.min(maxLevel, Math.max(1, Math.floor(level)));
+  let total = 0;
+
+  for (let currentLevel = 1; currentLevel < normalizedLevel; currentLevel += 1) {
+    total += requirements[currentLevel - 1] ?? 0;
+  }
+
+  return total;
+}
+
+export function getScratchCardLevel(cardType: ScratchCardType, cardsSettled: number) {
+  const requirements = getScratchCardLevelRequirements(cardType);
+  const maxLevel = getScratchCardMaxLevel(cardType);
+  let level = 1;
+  let remainingCards = Math.max(0, Math.floor(cardsSettled));
+
+  while (level < maxLevel) {
+    const requiredCards = requirements[level - 1];
+
+    if (!requiredCards || remainingCards < requiredCards) {
+      break;
+    }
+
+    remainingCards -= requiredCards;
+    level += 1;
+  }
+
+  return level;
+}
+
+export function getScratchCardLevelProgress(
+  cardType: ScratchCardType,
+  cardsSettled: number,
+): ScratchCardLevelProgress {
+  const level = getScratchCardLevel(cardType, cardsSettled);
+  const maxLevel = getScratchCardMaxLevel(cardType);
+  const normalizedCardsSettled = Math.max(0, Math.floor(cardsSettled));
+
+  if (level >= maxLevel) {
+    return {
+      level,
+      current: 0,
+      target: 0,
+      ratio: 1,
+      cardsSettled: normalizedCardsSettled,
+    };
+  }
+
+  const levelStartThreshold = getScratchCardLevelThreshold(cardType, level);
+  const target = getScratchCardLevelRequirements(cardType)[level - 1] ?? 0;
+  const current = Math.max(0, Math.min(target, normalizedCardsSettled - levelStartThreshold));
+
+  return {
+    level,
+    current,
+    target,
+    ratio: target > 0 ? clampRatio(current / target) : 1,
+    cardsSettled: normalizedCardsSettled,
+  };
+}
+
+function normalizeScratchCardLevel(level: number) {
+  return Math.max(1, Math.min(BASIC_SAFE_CARD_MAX_LEVEL, Math.floor(level)));
+}
+
+function getBasicSafeScratchCardPayoutMultiplier(level: number) {
+  const normalizedLevel = normalizeScratchCardLevel(level);
+
+  return BASIC_SAFE_CARD_LEVEL_CONFIG.payoutMultiplierByLevel[normalizedLevel - 1] ?? 1;
+}
+
+export function getBasicSafeScratchCardPrizePoolForLevel(level: number): ScratchCardPrizeTier[] {
+  const payoutMultiplier = getBasicSafeScratchCardPayoutMultiplier(level);
+
+  return BASIC_SAFE_CARD_CONFIG.prizePool.map((tier) => ({
+    ...tier,
+    payout: Math.floor(tier.payout * payoutMultiplier),
+  }));
+}
+
+export function getBasicSafeScratchCardPrizeTier(random: () => number = Math.random, level = 1) {
+  const roll = clampRatio(random());
+  let cumulativeProbability = 0;
+  const prizePool = getBasicSafeScratchCardPrizePoolForLevel(level);
+
+  for (const tier of prizePool) {
+    cumulativeProbability += tier.probability;
+
+    if (roll < cumulativeProbability - Number.EPSILON) {
+      return tier;
+    }
+  }
+
+  return prizePool[prizePool.length - 1];
+}
+
+export function isScratchCardWinningResult(symbols: readonly ScratchCardSymbol[]) {
+  return symbols.some((symbol, index) => symbol !== 'blank' && symbols.indexOf(symbol) !== index);
+}
+
+export function shouldRevealFullScratchCover(scratchedRatio: number) {
+  return scratchedRatio >= BASIC_SAFE_CARD_SCRATCH_COMPLETE_THRESHOLD;
+}
+
+export function shouldShowScratchCover(status: ScratchCardStatus, scratchProgress: number) {
+  return status === 'scratching' && !shouldRevealFullScratchCover(scratchProgress);
+}
+
+function createSymbolsForPrizeTier(
+  tierId: ScratchCardPrizeTierId,
+): [ScratchCardSymbol, ScratchCardSymbol, ScratchCardSymbol] {
+  switch (tierId) {
+    case 'pair-fire':
+      return ['fire', 'fire', 'cash'];
+    case 'pair-cash':
+      return ['cash', 'cash', 'fire'];
+    case 'pair-bag':
+      return ['bag', 'bag', 'cash'];
+    default:
+      return ['fire', 'cash', 'bag'];
+  }
+}
+
+export function createBasicSafeScratchCard(options: CreateBasicSafeScratchCardOptions) {
+  const level = normalizeScratchCardLevel(options.level ?? 1);
+  const tier = getBasicSafeScratchCardPrizeTier(options.random, level);
+  const symbols = createSymbolsForPrizeTier(tier.id);
+
+  return {
+    id: options.id,
+    type: BASIC_SAFE_CARD_CONFIG.id,
+    price: BASIC_SAFE_CARD_PRICE,
+    level,
+    status: 'onTable',
+    result: {
+      tierId: tier.id,
+      label: tier.label,
+      payout: tier.payout,
+      symbols,
+      isWinning: isScratchCardWinningResult(symbols),
+      hasPenaltySymbol: false,
+      canDiscard: false,
+    },
+    position: getRandomPlateSpawnPosition(),
+  } satisfies ScratchCardState;
+}
+
+export function settleBasicSafeScratchCard(player: PlayerState, card: ScratchCardState) {
+  const payout = card.result.isWinning ? card.result.payout : 0;
+  const isNetLoss = payout < card.price;
+
+  return {
+    ...player,
+    gold: Math.max(0, player.gold + payout),
+    lifetimeGoldEarned: player.lifetimeGoldEarned + Math.max(0, payout),
+    cardsScratched: player.cardsScratched + 1,
+    loseStreak: isNetLoss ? player.loseStreak + 1 : 0,
+  } satisfies PlayerState;
+}
+
+export function advanceBasicSafeScratchCardProgress(
+  progress: ScratchCardProgressState,
+): ScratchCardProgressState {
+  return {
+    ...progress,
+    cardsSettled: Math.max(0, Math.floor(progress.cardsSettled)) + 1,
+  };
+}
+
+export function getNextLoanTemplate(templateIndex: number) {
+  const templates = LOAN_CONFIG.templates;
+  const normalizedIndex = Math.abs(Math.floor(templateIndex)) % templates.length;
+
+  return templates[normalizedIndex];
+}
+
+export function createLoanFromTemplate(options: CreateLoanFromTemplateOptions) {
+  const template = getNextLoanTemplate(options.templateIndex);
+
+  return {
+    id: options.id,
+    templateId: template.id,
+    title: template.title,
+    effect: template.effect,
+    amount: LOAN_REPAYMENT_AMOUNT,
+    signGold: LOAN_PRINCIPAL,
+    interestRateLabel: LOAN_CONFIG.interestRateLabel,
+  } satisfies LoanState;
+}
+
+export function repayLoan(gold: number, loan: Pick<LoanState, 'amount'>) {
+  if (gold < loan.amount) {
+    return gold;
+  }
+
+  return gold - loan.amount;
+}
+
+export function shouldOfferLoanPhone(options: {
+  gold: number;
+  plateCount: number;
+  activeScratchCard: boolean;
+  activeLoansCount: number;
+}) {
+  return options.gold <= 0 && options.plateCount === 0 && !options.activeScratchCard;
 }
 
 export function rollWorkReward(options?: RollWorkRewardOptions): WorkReward {
@@ -217,8 +592,18 @@ export function shouldOpenPlateFromPointerUp(wasDragged: boolean, droppedOnTrash
   return !wasDragged && !droppedOnTrashCan;
 }
 
-export function shouldUnlockTrashCan(plateCleaned: number, trashCanUnlocked: boolean) {
-  return plateCleaned >= TRASH_CAN_UNLOCK_AFTER_PLATES && !trashCanUnlocked;
+export function canBuyTrashCan(
+  gold: number,
+  trashCanUnlocked: boolean,
+  trashCanPurchased: boolean,
+) {
+  return trashCanUnlocked && !trashCanPurchased && gold >= TRASH_CAN_PRICE;
+}
+
+export function shouldUnlockTrashCan(totalProficiency: number, trashCanUnlocked: boolean) {
+  return (
+    totalProficiency >= getUnlockMilestoneThreshold(TRASH_CAN_MILESTONE_ID) && !trashCanUnlocked
+  );
 }
 
 export function shouldShowWorkRiskNotice(workLevel: number, riskMessageDismissed: boolean) {
