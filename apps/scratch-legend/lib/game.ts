@@ -10,7 +10,6 @@ export const WORK_ACTION_DURATION_MS = scratchLegendConfig.work.actionDurationMs
 export const WORK_BROKEN_PLATE_CHANCE = scratchLegendConfig.work.brokenPlate.chance;
 export const WORK_BROKEN_PLATE_ENABLED_AT_LEVEL =
   scratchLegendConfig.work.brokenPlate.enabledAtLevel;
-export const WORK_BROKEN_PLATE_PENALTY = scratchLegendConfig.work.brokenPlate.penaltyGold;
 export const WORK_SAFE_REWARD_CHANCE = 1 - WORK_BROKEN_PLATE_CHANCE;
 export const WORK_MAX_LEVEL = scratchLegendConfig.work.level.maxLevel;
 export const WORK_PLATES_REQUIRED_BY_LEVEL = scratchLegendConfig.work.level.platesRequiredByLevel;
@@ -27,6 +26,7 @@ export const BASIC_SAFE_CARD_SCRATCH_BRUSH = BASIC_SAFE_CARD_CONFIG.scratchBrush
 export const BASIC_SAFE_CARD_LEVEL_CONFIG = BASIC_SAFE_CARD_CONFIG.level;
 export const BASIC_SAFE_CARD_MAX_LEVEL =
   BASIC_SAFE_CARD_LEVEL_CONFIG.payoutMultiplierByLevel.length;
+export const UPGRADE_TOOLS_CONFIG = scratchLegendConfig.upgradeTools.items;
 export const LOAN_CONFIG = scratchLegendConfig.loans;
 export const LOAN_PRINCIPAL = LOAN_CONFIG.principal;
 export const LOAN_REPAYMENT_AMOUNT = LOAN_CONFIG.repaymentAmount;
@@ -79,10 +79,13 @@ export type PlatePosition = {
   yPercent: number;
 };
 
+export type ScratchSurfacePoint = PlatePosition;
+
 export type WorkPlateState = {
   id: number;
   reward: WorkReward;
   position: PlatePosition;
+  cleanPoints: ScratchSurfacePoint[];
   seed: number;
 };
 
@@ -113,10 +116,18 @@ export type ScratchCardState = {
   status: ScratchCardStatus;
   result: ScratchCardResult;
   position: PlatePosition;
+  scratchPoints: ScratchSurfacePoint[];
 };
 
 export type ScratchCardProgressState = {
   cardsSettled: number;
+};
+
+export type UpgradeToolConfig = (typeof UPGRADE_TOOLS_CONFIG)[number];
+export type UpgradeToolId = UpgradeToolConfig['id'];
+
+export type UpgradeToolState = {
+  level: number;
 };
 
 export type ScratchCardLevelProgress = {
@@ -128,12 +139,14 @@ export type ScratchCardLevelProgress = {
 };
 
 export type LoanTemplate = (typeof LOAN_CONFIG.templates)[number];
+export type LoanPenaltyConfig = LoanTemplate['penalty'];
 
 export type LoanState = {
   id: number;
   templateId: LoanTemplate['id'];
   title: string;
   effect: string;
+  penalty: LoanPenaltyConfig;
   amount: number;
   signGold: number;
   interestRateLabel: string;
@@ -142,7 +155,9 @@ export type LoanState = {
 export type CreateBasicSafeScratchCardOptions = {
   id: number;
   level?: number;
+  forcedTierId?: ScratchCardPrizeTierId;
   random?: () => number;
+  symbolRandom?: () => number;
 };
 
 export type CreateLoanFromTemplateOptions = {
@@ -153,9 +168,15 @@ export type CreateLoanFromTemplateOptions = {
 export type UnlockMilestone = (typeof UNLOCK_MILESTONES)[number];
 export type UnlockMilestoneId = UnlockMilestone['id'];
 
+export const UPGRADE_TOOLS_MILESTONE_ID = 'upgrade-tools' satisfies UnlockMilestoneId;
+
 export function getWorkRewardAmountForLevel(workLevel: number) {
   const normalizedLevel = Math.max(0, Math.min(WORK_MAX_LEVEL, Math.floor(workLevel)));
   return WORK_LEVEL_REWARD_TABLE[normalizedLevel];
+}
+
+export function getWorkBrokenPlatePenaltyForLevel(workLevel: number) {
+  return getWorkRewardAmountForLevel(workLevel);
 }
 
 export function getWorkLevelThreshold(level: number) {
@@ -247,6 +268,13 @@ export function getUnlockMilestoneProgress(
 
 export function canAffordWorkPlate(gold: number) {
   return gold >= WORK_PLATE_COST;
+}
+
+export function canStartWorkFromPhase(phase: WorkPhase, gold: number) {
+  return (
+    (phase === 'idle' || phase === 'plateSpawned' || phase === 'scratchCardSpawned') &&
+    canAffordWorkPlate(gold)
+  );
 }
 
 export function canBuyBasicSafeScratchCard(
@@ -376,6 +404,13 @@ export function getBasicSafeScratchCardPrizeTier(random: () => number = Math.ran
   return prizePool[prizePool.length - 1];
 }
 
+function getBasicSafeScratchCardPrizeTierById(level: number, tierId: ScratchCardPrizeTierId) {
+  return (
+    getBasicSafeScratchCardPrizePoolForLevel(level).find((tier) => tier.id === tierId) ??
+    getBasicSafeScratchCardPrizeTier(Math.random, level)
+  );
+}
+
 export function isScratchCardWinningResult(symbols: readonly ScratchCardSymbol[]) {
   return symbols.some((symbol, index) => symbol !== 'blank' && symbols.indexOf(symbol) !== index);
 }
@@ -388,25 +423,72 @@ export function shouldShowScratchCover(status: ScratchCardStatus, scratchProgres
   return status === 'scratching' && !shouldRevealFullScratchCover(scratchProgress);
 }
 
-function createSymbolsForPrizeTier(
-  tierId: ScratchCardPrizeTierId,
+const BASIC_SAFE_RESULT_SYMBOLS = [
+  'fire',
+  'cash',
+  'bag',
+] as const satisfies readonly ScratchCardSymbol[];
+
+function getRandomArrayIndex(length: number, random: () => number) {
+  return Math.min(length - 1, Math.floor(clampRatio(random()) * length));
+}
+
+function shuffleScratchCardSymbols(
+  symbols: readonly ScratchCardSymbol[],
+  random: () => number,
 ): [ScratchCardSymbol, ScratchCardSymbol, ScratchCardSymbol] {
+  const shuffled = [...symbols];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = getRandomArrayIndex(index + 1, random);
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return [shuffled[0], shuffled[1], shuffled[2]];
+}
+
+function getPairSymbolForPrizeTier(tierId: ScratchCardPrizeTierId) {
   switch (tierId) {
     case 'pair-fire':
-      return ['fire', 'fire', 'cash'];
+      return 'fire';
     case 'pair-cash':
-      return ['cash', 'cash', 'fire'];
+      return 'cash';
     case 'pair-bag':
-      return ['bag', 'bag', 'cash'];
+      return 'bag';
     default:
-      return ['fire', 'cash', 'bag'];
+      return null;
   }
+}
+
+function createSymbolsForPrizeTier(
+  tierId: ScratchCardPrizeTierId,
+  random: () => number,
+): [ScratchCardSymbol, ScratchCardSymbol, ScratchCardSymbol] {
+  const pairSymbol = getPairSymbolForPrizeTier(tierId);
+
+  if (!pairSymbol) {
+    return shuffleScratchCardSymbols(BASIC_SAFE_RESULT_SYMBOLS, random);
+  }
+
+  const decoySymbols = BASIC_SAFE_RESULT_SYMBOLS.filter((symbol) => symbol !== pairSymbol);
+  const decoySymbol = decoySymbols[getRandomArrayIndex(decoySymbols.length, random)];
+  const decoyIndex = getRandomArrayIndex(3, random);
+  const symbols: [ScratchCardSymbol, ScratchCardSymbol, ScratchCardSymbol] = [
+    pairSymbol,
+    pairSymbol,
+    pairSymbol,
+  ];
+  symbols[decoyIndex] = decoySymbol;
+
+  return symbols;
 }
 
 export function createBasicSafeScratchCard(options: CreateBasicSafeScratchCardOptions) {
   const level = normalizeScratchCardLevel(options.level ?? 1);
-  const tier = getBasicSafeScratchCardPrizeTier(options.random, level);
-  const symbols = createSymbolsForPrizeTier(tier.id);
+  const tier = options.forcedTierId
+    ? getBasicSafeScratchCardPrizeTierById(level, options.forcedTierId)
+    : getBasicSafeScratchCardPrizeTier(options.random, level);
+  const symbols = createSymbolsForPrizeTier(tier.id, options.symbolRandom ?? Math.random);
 
   return {
     id: options.id,
@@ -424,6 +506,7 @@ export function createBasicSafeScratchCard(options: CreateBasicSafeScratchCardOp
       canDiscard: false,
     },
     position: getRandomPlateSpawnPosition(),
+    scratchPoints: [],
   } satisfies ScratchCardState;
 }
 
@@ -449,6 +532,14 @@ export function advanceBasicSafeScratchCardProgress(
   };
 }
 
+export function formatGoldOutcome(amount: number) {
+  return amount >= 0 ? `$${amount}` : `-$${Math.abs(amount)}`;
+}
+
+export function getOutcomeAmountLabel(revealed: boolean, amount: number) {
+  return revealed ? formatGoldOutcome(amount) : '未揭晓';
+}
+
 export function getNextLoanTemplate(templateIndex: number) {
   const templates = LOAN_CONFIG.templates;
   const normalizedIndex = Math.abs(Math.floor(templateIndex)) % templates.length;
@@ -464,10 +555,33 @@ export function createLoanFromTemplate(options: CreateLoanFromTemplateOptions) {
     templateId: template.id,
     title: template.title,
     effect: template.effect,
+    penalty: template.penalty,
     amount: LOAN_REPAYMENT_AMOUNT,
     signGold: LOAN_PRINCIPAL,
     interestRateLabel: LOAN_CONFIG.interestRateLabel,
   } satisfies LoanState;
+}
+
+export function shouldForceWrongScratchCardForLoan(
+  activeLoans: readonly Partial<Pick<LoanState, 'penalty'>>[],
+  purchaseIndex: number,
+) {
+  const normalizedPurchaseIndex = Math.max(0, Math.floor(purchaseIndex));
+
+  if (normalizedPurchaseIndex <= 0) {
+    return false;
+  }
+
+  return activeLoans.some((loan) => {
+    const penalty = loan.penalty;
+
+    return (
+      penalty?.enabled &&
+      penalty.type === 'wrong-card-every-n' &&
+      penalty.everyCards > 0 &&
+      normalizedPurchaseIndex % penalty.everyCards === 0
+    );
+  });
 }
 
 export function repayLoan(gold: number, loan: Pick<LoanState, 'amount'>) {
@@ -476,6 +590,84 @@ export function repayLoan(gold: number, loan: Pick<LoanState, 'amount'>) {
   }
 
   return gold - loan.amount;
+}
+
+export function getLoanRepaymentFeedback(loan: Partial<Pick<LoanState, 'penalty'>>) {
+  const penalty = loan.penalty;
+
+  if (penalty?.enabled && penalty.type === 'wrong-card-every-n') {
+    return {
+      statusLabel: '错卡惩罚解除',
+      detailLabel: `每 ${penalty.everyCards} 张错卡已停止`,
+    };
+  }
+
+  if (penalty?.enabled && penalty.type === 'scratch-brush-radius-delta') {
+    return {
+      statusLabel: '刮除范围恢复',
+      detailLabel: `刮卡笔刷半径 +${Math.abs(penalty.delta)}`,
+    };
+  }
+
+  return {
+    statusLabel: '债务已偿清',
+    detailLabel: '未启用惩罚已移除',
+  };
+}
+
+export function getUpgradeToolConfig(toolId: UpgradeToolId) {
+  return UPGRADE_TOOLS_CONFIG.find((tool) => tool.id === toolId) ?? null;
+}
+
+export function createInitialUpgradeToolStates() {
+  return Object.fromEntries(
+    UPGRADE_TOOLS_CONFIG.map((tool) => [tool.id, { level: tool.level }]),
+  ) as Record<UpgradeToolId, UpgradeToolState>;
+}
+
+export function canBuyUpgradeTool(
+  gold: number,
+  tool: Pick<UpgradeToolConfig, 'price' | 'maxLevel'>,
+  state: Pick<UpgradeToolState, 'level'>,
+) {
+  return state.level < tool.maxLevel && gold >= tool.price;
+}
+
+export function getScratchBrushRadiusForUpgradeLevel(scratchRadiusLevel: number) {
+  const tool = getUpgradeToolConfig('scratch-radius');
+  const bonus =
+    tool?.effect.type === 'scratch-brush-radius'
+      ? Math.max(0, Math.floor(scratchRadiusLevel)) * tool.effect.valuePerLevel
+      : 0;
+
+  return BASIC_SAFE_CARD_SCRATCH_BRUSH.radius + bonus;
+}
+
+export function getScratchBrushRadius(
+  scratchRadiusLevel: number,
+  activeLoans: readonly Partial<Pick<LoanState, 'penalty'>>[] = [],
+) {
+  const loanDelta = activeLoans.reduce((sum, loan) => {
+    const penalty = loan.penalty;
+
+    if (!penalty?.enabled || penalty.type !== 'scratch-brush-radius-delta') {
+      return sum;
+    }
+
+    return sum + penalty.delta;
+  }, 0);
+
+  return Math.max(1, getScratchBrushRadiusForUpgradeLevel(scratchRadiusLevel) + loanDelta);
+}
+
+export function shouldShowUpgradeToolsUnlockNotice(
+  totalProficiency: number,
+  upgradeToolsMessageDismissed: boolean,
+) {
+  return (
+    totalProficiency >= getUnlockMilestoneThreshold(UPGRADE_TOOLS_MILESTONE_ID) &&
+    !upgradeToolsMessageDismissed
+  );
 }
 
 export function shouldOfferLoanPhone(options: {
@@ -493,15 +685,16 @@ export function rollWorkReward(options?: RollWorkRewardOptions): WorkReward {
   const random = options?.random ?? Math.random;
   const base =
     workLevel < WORK_BROKEN_PLATE_ENABLED_AT_LEVEL ? 2 : getWorkRewardAmountForLevel(workLevel);
+  const brokenPlatePenalty = getWorkBrokenPlatePenaltyForLevel(workLevel);
 
   if (
     workLevel >= WORK_BROKEN_PLATE_ENABLED_AT_LEVEL &&
     random() >= 1 - WORK_BROKEN_PLATE_CHANCE &&
-    gold - WORK_BROKEN_PLATE_PENALTY >= scratchLegendConfig.work.brokenPlate.reserveGoldForNextPlate
+    gold - brokenPlatePenalty >= scratchLegendConfig.work.brokenPlate.reserveGoldForNextPlate
   ) {
     return {
       base: 0,
-      total: -WORK_BROKEN_PLATE_PENALTY,
+      total: -brokenPlatePenalty,
       isCrit: false,
       isBroken: true,
     };
@@ -582,6 +775,10 @@ export function isPointInsideCircleBounds(point: DragPoint, bounds: SurfaceBound
 
 export function shouldOpenPlateFromClick(wasDragged: boolean) {
   return !wasDragged;
+}
+
+export function shouldHandlePlatePointerDown(phase: WorkPhase) {
+  return phase === 'plateSpawned' || phase === 'scratchCardSpawned';
 }
 
 export function isBrokenPlateEnabled(workLevel: number) {

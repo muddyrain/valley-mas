@@ -524,12 +524,165 @@ button {
 }
 
 .right-reserved-space {
+  display: flex;
+  min-width: 0;
   margin: 12px 0;
   border-left: 1px solid rgba(255, 255, 255, 0.04);
   background:
     linear-gradient(180deg, rgba(7, 13, 19, 0.28), rgba(7, 13, 19, 0.08)),
     radial-gradient(circle at 50% 20%, rgba(118, 150, 170, 0.08), transparent 42%);
   box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.03);
+}
+
+.right-reserved-space.active {
+  border: 1px solid rgba(138, 166, 184, 0.22);
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, rgba(10, 16, 22, 0.94), rgba(18, 29, 37, 0.9)),
+    radial-gradient(circle at 50% 0%, rgba(246, 182, 71, 0.12), transparent 40%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 14px 36px rgba(0, 0, 0, 0.24);
+}
+
+.upgrade-tools-panel {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.upgrade-tools-panel header {
+  display: grid;
+  gap: 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 12px;
+}
+
+.upgrade-tools-panel header small {
+  color: rgba(246, 209, 122, 0.72);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.upgrade-tools-panel header strong {
+  color: #fff4d6;
+  font-size: 20px;
+}
+
+.upgrade-tools-panel header span {
+  color: var(--scratch-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.upgrade-tool-list {
+  display: grid;
+  gap: 10px;
+}
+
+.upgrade-tool-card {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid rgba(138, 166, 184, 0.22);
+  border-radius: 6px;
+  background: rgba(7, 13, 18, 0.64);
+  padding: 10px;
+}
+
+.upgrade-tool-card strong,
+.upgrade-tool-card span,
+.upgrade-tool-card small {
+  display: block;
+}
+
+.upgrade-tool-card strong {
+  color: #fff1c6;
+  font-size: 14px;
+}
+
+.upgrade-tool-card span {
+  margin-top: 4px;
+  color: var(--scratch-muted);
+  font-size: 11px;
+  line-height: 1.38;
+}
+
+.upgrade-tool-card small {
+  margin-top: 6px;
+  color: rgba(246, 209, 122, 0.78);
+  font-size: 11px;
+}
+
+.upgrade-tool-icon {
+  position: relative;
+  display: block;
+  width: 30px;
+  height: 30px;
+  border: 2px solid rgba(246, 209, 122, 0.5);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.upgrade-tool-icon.scratch-luck::before,
+.upgrade-tool-icon.scratch-luck::after {
+  position: absolute;
+  content: "";
+  background: #ffe08a;
+}
+
+.upgrade-tool-icon.scratch-luck::before {
+  inset: 5px 13px;
+}
+
+.upgrade-tool-icon.scratch-luck::after {
+  inset: 13px 5px;
+}
+
+.upgrade-tool-icon.scratch-radius {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(120, 183, 255, 0.45) 0 6px, transparent 7px),
+    rgba(255, 255, 255, 0.05);
+}
+
+.upgrade-tool-icon.copper-coin {
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 28%, #ffd18b 0 4px, #b86a2d 5px 100%);
+}
+
+.upgrade-tool-meta {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.upgrade-tool-meta em,
+.upgrade-tool-meta small {
+  color: rgba(244, 239, 226, 0.78);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.upgrade-tool-meta button {
+  min-width: 54px;
+  min-height: 30px;
+  border: 1px solid rgba(246, 182, 71, 0.48);
+  border-radius: 5px;
+  background: #96561f;
+  color: #ffe7a8;
+  cursor: pointer;
+}
+
+.upgrade-tool-meta button:disabled {
+  filter: grayscale(1) brightness(0.72);
+  cursor: not-allowed;
 }
 
 .stage-topbar {
@@ -551,6 +704,10 @@ button {
   color: #ffe7a7;
   font-size: 13px;
   cursor: pointer;
+}
+
+.loan-ledger-button.settling-final {
+  animation: loan-ledger-button-settle 0.82s ease-out forwards;
 }
 
 .loan-ledger-button strong {
@@ -945,6 +1102,7 @@ button {
 }
 
 .loan-ledger-panel {
+  position: relative;
   display: grid;
   gap: 16px;
   width: min(520px, calc(100% - 34px));
@@ -985,6 +1143,7 @@ button {
 }
 
 .loan-row {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 62px 70px;
   gap: 10px;
@@ -995,10 +1154,28 @@ button {
   padding: 10px;
 }
 
-.loan-row div {
+.loan-row.repaying {
+  overflow: hidden;
+  animation: loan-row-paid-slide 1.15s ease-in forwards;
+}
+
+.loan-row.repaying::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(90deg, rgba(255, 237, 151, 0), rgba(255, 237, 151, 0.62));
+  animation: loan-row-paid-sweep 0.48s ease-out forwards;
+}
+
+.loan-row-copy {
   display: grid;
   gap: 4px;
   min-width: 0;
+}
+
+.loan-row.repaying .loan-row-copy span {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
 }
 
 .loan-row strong {
@@ -1032,9 +1209,151 @@ button {
   cursor: not-allowed;
 }
 
+.loan-paid-stamp {
+  position: absolute;
+  top: 50%;
+  left: 54%;
+  z-index: 1;
+  border: 3px solid #9d1f1a;
+  border-radius: 4px;
+  padding: 4px 10px;
+  color: #9d1f1a;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0;
+  transform: translate(-50%, -50%) rotate(-10deg) scale(0.72);
+  animation: loan-paid-stamp-pop 0.5s cubic-bezier(0.18, 1.35, 0.32, 1) forwards;
+}
+
+.loan-repayment-feedback {
+  position: absolute;
+  top: 68px;
+  right: 18px;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  min-width: 176px;
+  border: 2px solid rgba(86, 48, 26, 0.4);
+  border-radius: 5px;
+  background: rgba(67, 35, 18, 0.94);
+  padding: 10px 12px;
+  color: #fff0c2;
+  box-shadow: 0 12px 24px rgba(35, 20, 12, 0.28);
+  animation: loan-repayment-feedback-float 1.15s ease-out forwards;
+  pointer-events: none;
+}
+
+.loan-repayment-feedback strong {
+  color: #ffb6a9;
+  font-size: 22px;
+}
+
+.loan-repayment-feedback span {
+  color: #fff4cd;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.loan-repayment-feedback small {
+  color: rgba(255, 234, 181, 0.78);
+  font-size: 12px;
+}
+
+.loan-repayment-feedback.final {
+  border-color: rgba(255, 209, 97, 0.72);
+}
+
 .loan-ledger-back {
   justify-self: end;
   min-width: 96px;
+}
+
+@keyframes loan-ledger-button-settle {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  28% {
+    transform: translateY(-3px) scale(1.08);
+  }
+
+  72% {
+    opacity: 1;
+    transform: translateY(0) scale(0.98);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.92);
+  }
+}
+
+@keyframes loan-row-paid-sweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-88%);
+  }
+
+  48% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(88%);
+  }
+}
+
+@keyframes loan-paid-stamp-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(-16deg) scale(1.42);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(-10deg) scale(1);
+  }
+}
+
+@keyframes loan-row-paid-slide {
+  0% {
+    opacity: 1;
+    transform: translateX(0) rotate(0deg);
+  }
+
+  48% {
+    opacity: 1;
+    transform: translateX(0) rotate(0deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(28px) rotate(1deg);
+  }
+}
+
+@keyframes loan-repayment-feedback-float {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.94);
+  }
+
+  16% {
+    opacity: 1;
+    transform: translateY(0) scale(1.02);
+  }
+
+  76% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.98);
+  }
 }
 
 .idle-hint {
@@ -1245,6 +1564,32 @@ button {
 
 .unlock-icon.scratch::after {
   right: -10px;
+}
+
+.unlock-icon.upgrade {
+  width: 86px;
+  height: 86px;
+  border: 5px solid #7a481c;
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(255, 236, 148, 0.96), rgba(210, 126, 34, 0.96)),
+    repeating-linear-gradient(90deg, rgba(95, 52, 16, 0.12) 0 8px, transparent 8px 16px);
+  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.28);
+}
+
+.unlock-icon.upgrade::before,
+.unlock-icon.upgrade::after {
+  position: absolute;
+  content: "";
+  background: #6a3517;
+}
+
+.unlock-icon.upgrade::before {
+  inset: 36px 18px;
+}
+
+.unlock-icon.upgrade::after {
+  inset: 18px 36px;
 }
 
 .unlock-toast strong,

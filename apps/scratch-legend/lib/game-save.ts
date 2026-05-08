@@ -1,7 +1,9 @@
 import {
+  createInitialUpgradeToolStates,
   getUnlockMilestoneThreshold,
   getWorkLevel,
   INITIAL_GOLD,
+  LOAN_CONFIG,
   type LoanState,
   type PlayerState,
   type ScratchCardProgressState,
@@ -9,6 +11,8 @@ import {
   shouldUnlockTrashCan,
   UNLOCK_MILESTONES,
   type UnlockMilestoneId,
+  type UpgradeToolId,
+  type UpgradeToolState,
   type WorkPhase,
   type WorkPlateState,
 } from './game';
@@ -31,6 +35,8 @@ export type ScratchLegendNoticeState = {
   workRiskMessageDismissed: boolean;
   // 玩家是否已经关闭过刮刮乐解锁电话。
   scratchMessageDismissed: boolean;
+  // 玩家是否已经关闭过升级工具解锁电话。
+  upgradeToolsMessageDismissed: boolean;
 };
 
 export type ScratchLegendLoanState = {
@@ -46,6 +52,8 @@ export type ScratchLegendScratchCardsState = {
   // “成双入对”卡片自己的等级进度。
   basicSafe: ScratchCardProgressState;
 };
+
+export type ScratchLegendUpgradeToolsState = Record<UpgradeToolId, UpgradeToolState>;
 
 export type ScratchLegendWorkspaceState = {
   // 当前主流程处于什么阶段。
@@ -79,6 +87,8 @@ export type ScratchLegendSave = {
   loans: ScratchLegendLoanState;
   // 当前刮刮卡目录进度。
   scratchCards: ScratchLegendScratchCardsState;
+  // 当前升级工具等级状态。
+  upgradeTools: ScratchLegendUpgradeToolsState;
   // 当前桌面与工作流状态。
   workspace: ScratchLegendWorkspaceState;
 };
@@ -102,6 +112,40 @@ function isScratchCardState(card: ScratchCardState | null): card is ScratchCardS
   return Boolean(card);
 }
 
+function normalizeScratchPoints(points?: WorkPlateState['cleanPoints']) {
+  return points ?? [];
+}
+
+function mergeUpgradeToolStates(
+  partialUpgradeTools?: DeepPartial<ScratchLegendUpgradeToolsState>,
+): ScratchLegendUpgradeToolsState {
+  const initialUpgradeTools = createInitialUpgradeToolStates();
+
+  return Object.fromEntries(
+    Object.entries(initialUpgradeTools).map(([toolId, initialToolState]) => {
+      const typedToolId = toolId as UpgradeToolId;
+      const persistedToolState = partialUpgradeTools?.[typedToolId];
+
+      return [
+        typedToolId,
+        {
+          level: persistedToolState?.level ?? initialToolState.level,
+        },
+      ];
+    }),
+  ) as ScratchLegendUpgradeToolsState;
+}
+
+function normalizeLoanState(loan: LoanState) {
+  const template = LOAN_CONFIG.templates.find((item) => item.id === loan.templateId);
+
+  return {
+    ...loan,
+    penalty: loan.penalty ??
+      template?.penalty ?? { ...LOAN_CONFIG.templates[0].penalty, enabled: false },
+  } satisfies LoanState;
+}
+
 export function createInitialScratchLegendSave(): ScratchLegendSave {
   return {
     version: 1,
@@ -121,6 +165,7 @@ export function createInitialScratchLegendSave(): ScratchLegendSave {
     notices: {
       workRiskMessageDismissed: false,
       scratchMessageDismissed: false,
+      upgradeToolsMessageDismissed: false,
     },
     loans: {
       activeLoans: [],
@@ -132,6 +177,7 @@ export function createInitialScratchLegendSave(): ScratchLegendSave {
         cardsSettled: 0,
       },
     },
+    upgradeTools: createInitialUpgradeToolStates(),
     workspace: {
       phase: 'idle',
       plates: [],
@@ -157,6 +203,9 @@ export function mergeScratchLegendSave(
       ?.map((card) => normalizeScratchCardState(card))
       .filter(isScratchCardState) ??
     (legacyActiveScratchCard ? [legacyActiveScratchCard] : initialSave.workspace.scratchCards);
+  const plates =
+    partialSave?.workspace?.plates?.map((plate) => normalizeWorkPlateState(plate)) ??
+    initialSave.workspace.plates;
 
   return syncScratchLegendSave({
     ...initialSave,
@@ -180,7 +229,9 @@ export function mergeScratchLegendSave(
     loans: {
       ...initialSave.loans,
       ...partialSave?.loans,
-      activeLoans: partialSave?.loans?.activeLoans ?? initialSave.loans.activeLoans,
+      activeLoans:
+        partialSave?.loans?.activeLoans?.map((loan) => normalizeLoanState(loan)) ??
+        initialSave.loans.activeLoans,
     },
     scratchCards: {
       ...initialSave.scratchCards,
@@ -190,10 +241,11 @@ export function mergeScratchLegendSave(
         ...partialSave?.scratchCards?.basicSafe,
       },
     },
+    upgradeTools: mergeUpgradeToolStates(partialSave?.upgradeTools),
     workspace: {
       ...initialSave.workspace,
       ...partialSave?.workspace,
-      plates: partialSave?.workspace?.plates ?? initialSave.workspace.plates,
+      plates,
       scratchCards,
       activeScratchCardId: partialSave?.workspace?.activeScratchCardId ?? null,
       activeScratchCard: null,
@@ -209,7 +261,15 @@ function normalizeScratchCardState(card: ScratchCardState | null) {
   return {
     ...card,
     level: card.level ?? 1,
+    scratchPoints: normalizeScratchPoints(card.scratchPoints),
   } satisfies ScratchCardState;
+}
+
+function normalizeWorkPlateState(plate: WorkPlateState) {
+  return {
+    ...plate,
+    cleanPoints: normalizeScratchPoints(plate.cleanPoints),
+  } satisfies WorkPlateState;
 }
 
 export function syncScratchLegendSave(save: ScratchLegendSave): ScratchLegendSave {

@@ -1,22 +1,39 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
-import { CLEAN_COMPLETE_THRESHOLD, clampRatio } from '@/lib/game';
+import { CLEAN_COMPLETE_THRESHOLD, clampRatio, type ScratchSurfacePoint } from '@/lib/game';
 
 type CleaningCanvasProps = {
   active: boolean;
+  cleanPoints: readonly ScratchSurfacePoint[];
   onProgressChange: (progress: number) => void;
+  onCleanPoint: (point: ScratchSurfacePoint) => void;
   onComplete: () => void;
 };
 
 const CANVAS_SIZE = 520;
 const BRUSH_RADIUS = 27;
 
-export function CleaningCanvas({ active, onProgressChange, onComplete }: CleaningCanvasProps) {
+export function CleaningCanvas({
+  active,
+  cleanPoints,
+  onProgressChange,
+  onCleanPoint,
+  onComplete,
+}: CleaningCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const dirtyPixelsRef = useRef(1);
   const completedRef = useRef(false);
+  const cleanPointsRef = useRef(cleanPoints);
+  const onProgressChangeRef = useRef(onProgressChange);
+  const onCleanPointRef = useRef(onCleanPoint);
+  const onCompleteRef = useRef(onComplete);
+
+  cleanPointsRef.current = cleanPoints;
+  onProgressChangeRef.current = onProgressChange;
+  onCleanPointRef.current = onCleanPoint;
+  onCompleteRef.current = onComplete;
 
   const countDirtyPixels = useCallback(() => {
     const canvas = canvasRef.current;
@@ -48,13 +65,40 @@ export function CleaningCanvas({ active, onProgressChange, onComplete }: Cleanin
     const cleanedRatio = clampRatio(1 - remainingDirty / dirtyPixelsRef.current);
     const displayedRatio = cleanedRatio >= CLEAN_COMPLETE_THRESHOLD ? 1 : cleanedRatio;
 
-    onProgressChange(displayedRatio);
+    onProgressChangeRef.current(displayedRatio);
 
     if (!completedRef.current && cleanedRatio >= CLEAN_COMPLETE_THRESHOLD) {
       completedRef.current = true;
-      onComplete();
+      onCompleteRef.current();
     }
-  }, [countDirtyPixels, onComplete, onProgressChange]);
+  }, [countDirtyPixels]);
+
+  const eraseCanvasPoint = useCallback((x: number, y: number) => {
+    const canvas = canvasRef.current;
+
+    if (!canvas) {
+      return;
+    }
+
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+
+    if (!context) {
+      return;
+    }
+
+    context.save();
+    context.globalCompositeOperation = 'destination-out';
+
+    for (let index = 0; index < 4; index += 1) {
+      const offsetX = (Math.random() - 0.5) * 10;
+      const offsetY = (Math.random() - 0.5) * 10;
+      context.beginPath();
+      context.arc(x + offsetX, y + offsetY, BRUSH_RADIUS + Math.random() * 7, 0, Math.PI * 2);
+      context.fill();
+    }
+
+    context.restore();
+  }, []);
 
   const drawDirt = useCallback(() => {
     const canvas = canvasRef.current;
@@ -159,8 +203,8 @@ export function CleaningCanvas({ active, onProgressChange, onComplete }: Cleanin
     context.globalAlpha = 1;
     dirtyPixelsRef.current = Math.max(1, countDirtyPixels());
     completedRef.current = false;
-    onProgressChange(0);
-  }, [countDirtyPixels, onProgressChange]);
+    onProgressChangeRef.current(0);
+  }, [countDirtyPixels]);
 
   const getCanvasPoint = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -195,33 +239,31 @@ export function CleaningCanvas({ active, onProgressChange, onComplete }: Cleanin
         return;
       }
 
-      const { x, y } = point;
-      const context = canvas.getContext('2d', { willReadFrequently: true });
-
-      if (!context) {
-        return;
-      }
-
-      context.save();
-      context.globalCompositeOperation = 'destination-out';
-
-      for (let index = 0; index < 4; index += 1) {
-        const offsetX = (Math.random() - 0.5) * 10;
-        const offsetY = (Math.random() - 0.5) * 10;
-        context.beginPath();
-        context.arc(x + offsetX, y + offsetY, BRUSH_RADIUS + Math.random() * 7, 0, Math.PI * 2);
-        context.fill();
-      }
-
-      context.restore();
+      eraseCanvasPoint(point.x, point.y);
+      onCleanPointRef.current({
+        xPercent: clampRatio(point.x / canvas.width),
+        yPercent: clampRatio(point.y / canvas.height),
+      });
       updateProgress();
     },
-    [active, getCanvasPoint, updateProgress],
+    [active, eraseCanvasPoint, getCanvasPoint, updateProgress],
   );
 
   useEffect(() => {
     drawDirt();
-  }, [drawDirt]);
+
+    const canvas = canvasRef.current;
+
+    if (!canvas) {
+      return;
+    }
+
+    for (const point of cleanPointsRef.current) {
+      eraseCanvasPoint(point.xPercent * canvas.width, point.yPercent * canvas.height);
+    }
+
+    updateProgress();
+  }, [drawDirt, eraseCanvasPoint, updateProgress]);
 
   useEffect(() => {
     function stopDrawing() {

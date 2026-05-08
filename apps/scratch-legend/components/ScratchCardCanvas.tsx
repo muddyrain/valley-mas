@@ -1,14 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
-import { clampRatio, shouldRevealFullScratchCover } from '@/lib/game';
+import { clampRatio, type ScratchSurfacePoint, shouldRevealFullScratchCover } from '@/lib/game';
 
 type ScratchCardCanvasProps = {
   active: boolean;
   visible: boolean;
+  scratchPoints: readonly ScratchSurfacePoint[];
   brushRadius: number;
   stepDistance: number;
   onProgressChange: (progress: number) => void;
+  onScratchPoint: (point: ScratchSurfacePoint) => void;
   onComplete: () => void;
 };
 
@@ -26,9 +28,11 @@ const SCRATCH_STAMP_OFFSETS = [
 export function ScratchCardCanvas({
   active,
   visible,
+  scratchPoints,
   brushRadius,
   stepDistance,
   onProgressChange,
+  onScratchPoint,
   onComplete,
 }: ScratchCardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -36,6 +40,15 @@ export function ScratchCardCanvas({
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const coveredPixelsRef = useRef(1);
   const completedRef = useRef(false);
+  const scratchPointsRef = useRef(scratchPoints);
+  const onProgressChangeRef = useRef(onProgressChange);
+  const onScratchPointRef = useRef(onScratchPoint);
+  const onCompleteRef = useRef(onComplete);
+
+  scratchPointsRef.current = scratchPoints;
+  onProgressChangeRef.current = onProgressChange;
+  onScratchPointRef.current = onScratchPoint;
+  onCompleteRef.current = onComplete;
 
   const countCoveredPixels = useCallback(() => {
     const canvas = canvasRef.current;
@@ -68,7 +81,7 @@ export function ScratchCardCanvas({
     const shouldRevealFullCover = shouldRevealFullScratchCover(scratchedRatio);
     const displayedRatio = shouldRevealFullCover ? 1 : scratchedRatio;
 
-    onProgressChange(displayedRatio);
+    onProgressChangeRef.current(displayedRatio);
 
     if (!completedRef.current && shouldRevealFullCover) {
       const canvas = canvasRef.current;
@@ -76,9 +89,9 @@ export function ScratchCardCanvas({
 
       context?.clearRect(0, 0, canvas?.width ?? 0, canvas?.height ?? 0);
       completedRef.current = true;
-      onComplete();
+      onCompleteRef.current();
     }
-  }, [countCoveredPixels, onComplete, onProgressChange]);
+  }, [countCoveredPixels]);
 
   const drawCover = useCallback(() => {
     const canvas = canvasRef.current;
@@ -145,8 +158,8 @@ export function ScratchCardCanvas({
     coveredPixelsRef.current = Math.max(1, countCoveredPixels());
     completedRef.current = false;
     lastPointRef.current = null;
-    onProgressChange(0);
-  }, [countCoveredPixels, onProgressChange]);
+    onProgressChangeRef.current(0);
+  }, [countCoveredPixels]);
 
   const getCanvasPoint = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -165,17 +178,11 @@ export function ScratchCardCanvas({
     };
   }, []);
 
-  const eraseAt = useCallback(
-    (clientX: number, clientY: number) => {
+  const eraseCanvasPoint = useCallback(
+    (point: { x: number; y: number }) => {
       const canvas = canvasRef.current;
 
-      if (!canvas || !active) {
-        return;
-      }
-
-      const point = getCanvasPoint(clientX, clientY);
-
-      if (!point) {
+      if (!canvas) {
         return;
       }
 
@@ -229,9 +236,32 @@ export function ScratchCardCanvas({
 
       context.restore();
       lastPointRef.current = point;
+    },
+    [brushRadius, stepDistance],
+  );
+
+  const eraseAt = useCallback(
+    (clientX: number, clientY: number) => {
+      const canvas = canvasRef.current;
+
+      if (!canvas || !active) {
+        return;
+      }
+
+      const point = getCanvasPoint(clientX, clientY);
+
+      if (!point) {
+        return;
+      }
+
+      eraseCanvasPoint(point);
+      onScratchPointRef.current({
+        xPercent: clampRatio(point.x / canvas.width),
+        yPercent: clampRatio(point.y / canvas.height),
+      });
       updateProgress();
     },
-    [active, brushRadius, getCanvasPoint, stepDistance, updateProgress],
+    [active, eraseCanvasPoint, getCanvasPoint, updateProgress],
   );
 
   useLayoutEffect(() => {
@@ -240,7 +270,25 @@ export function ScratchCardCanvas({
     }
 
     drawCover();
-  }, [drawCover, visible]);
+
+    const canvas = canvasRef.current;
+
+    if (!canvas) {
+      return;
+    }
+
+    lastPointRef.current = null;
+
+    for (const point of scratchPointsRef.current) {
+      eraseCanvasPoint({
+        x: point.xPercent * canvas.width,
+        y: point.yPercent * canvas.height,
+      });
+    }
+
+    lastPointRef.current = null;
+    updateProgress();
+  }, [drawCover, eraseCanvasPoint, updateProgress, visible]);
 
   useEffect(() => {
     function stopDrawing() {

@@ -30,16 +30,22 @@ export const scratchLegendConfig = {
         description: '第二段熟练度达到 10 后触发刮刮卡电话解锁流程。',
       },
       {
-        id: 'next-feature',
-        label: '后续功能',
+        id: 'upgrade-tools',
+        label: '升级工具',
         requiredProficiency: 50,
-        description: '第三段熟练度达到 50 后预留下一阶段功能解锁位。',
+        description: '第三段熟练度达到 50 后触发升级工具电话解锁流程。',
       },
       {
-        id: 'advanced-feature',
-        label: '进阶功能',
+        id: 'triple-match-card',
+        label: '三连胜出',
         requiredProficiency: 100,
-        description: '第四段熟练度达到 100 后预留后续中期功能解锁位。',
+        description: '第四段熟练度达到 100 后预留三连胜出刮刮卡解锁位。',
+      },
+      {
+        id: 'late-game-goal',
+        label: '后续目标',
+        requiredProficiency: 1000,
+        description: '第五段熟练度达到 1000 后预留后续长期目标解锁位。',
       },
     ] as const,
   },
@@ -98,10 +104,8 @@ export const scratchLegendConfig = {
       enabledAtLevel: 1,
       // 碎盘概率，0.1 = 10%。
       chance: 0.1,
-      // 触发碎盘时扣除的金币数量。
-      penaltyGold: 3,
       // 破产保护底线。
-      // 只有在扣完碎盘惩罚后，仍然至少能保留 1 金币继续买盘子，才允许出现碎盘结果。
+      // 只有在扣完“当前等级本应赚到的收益”等额惩罚后，仍然至少能保留 1 金币继续买盘子，才允许出现碎盘结果。
       reserveGoldForNextPlate: 1,
     },
   },
@@ -129,28 +133,28 @@ export const scratchLegendConfig = {
         {
           id: 'no-pair',
           label: '未成对',
-          probability: 0.58,
+          probability: 0.72,
           displayProbability: null,
           payout: 0,
         },
         {
           id: 'pair-fire',
           label: '火焰成对',
-          probability: 0.25,
+          probability: 0.2,
           displayProbability: 0.5,
           payout: 10,
         },
         {
           id: 'pair-cash',
           label: '纸钞成对',
-          probability: 0.11,
+          probability: 0.06,
           displayProbability: 0.4,
           payout: 25,
         },
         {
           id: 'pair-bag',
           label: '钱袋成对',
-          probability: 0.06,
+          probability: 0.02,
           displayProbability: 0.1,
           payout: 50,
         },
@@ -162,6 +166,50 @@ export const scratchLegendConfig = {
         payoutMultiplierByLevel: [1, 1.3, 1.65, 2.1, 2.7, 3.4, 4.3, 5.4, 6.8, 8.5] as const,
       },
     },
+  },
+  // 阶段 2.5 升级工具配置。当前只把手动刮卡相关工具接入 UI 与本地等级状态。
+  upgradeTools: {
+    items: [
+      {
+        id: 'scratch-luck',
+        label: '刮卡运气',
+        price: 200,
+        level: 0,
+        maxLevel: 10,
+        description: '预留幸运成长入口，后续用于提高有利结果权重。',
+        effectLabel: '当前预留',
+        effect: {
+          type: 'reserved',
+          valuePerLevel: 0,
+        },
+      },
+      {
+        id: 'scratch-radius',
+        label: '刮除范围',
+        price: 25,
+        level: 0,
+        maxLevel: 10,
+        description: '提升刮层笔刷半径，改善手动刮卡效率。',
+        effectLabel: '每级 +1 刮除半径',
+        effect: {
+          type: 'scratch-brush-radius',
+          valuePerLevel: 1,
+        },
+      },
+      {
+        id: 'copper-coin',
+        label: '铜币',
+        price: 500,
+        level: 1,
+        maxLevel: 10,
+        description: '预留奖励放大和特殊资源入口，当前先作为可配置工具展示。',
+        effectLabel: '力量 1',
+        effect: {
+          type: 'reserved',
+          valuePerLevel: 0,
+        },
+      },
+    ] as const,
   },
   // 破产救援贷款。阶段二只做“无法继续时的兜底电话”，不接入复杂债务惩罚。
   loans: {
@@ -175,16 +223,31 @@ export const scratchLegendConfig = {
         id: 'loan-1',
         title: '贷款 #1',
         effect: '每 20 张卡中会有 1 张不是你要的卡',
+        penalty: {
+          type: 'wrong-card-every-n',
+          everyCards: 20,
+          enabled: true,
+        },
       },
       {
         id: 'loan-2',
         title: '贷款 #2',
         effect: '你的刮除范围降低了 1',
+        penalty: {
+          type: 'scratch-brush-radius-delta',
+          delta: -1,
+          enabled: true,
+        },
       },
       {
         id: 'loan-3',
         title: '贷款 #3',
         effect: '刮刮机器人的速度降低了 30%',
+        penalty: {
+          type: 'automation-speed-multiplier',
+          multiplier: 0.7,
+          enabled: false,
+        },
       },
     ] as const,
   },

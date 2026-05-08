@@ -6,39 +6,51 @@ import { ScratchCardCanvas } from '@/components/ScratchCardCanvas';
 import {
   advanceBasicSafeScratchCardProgress,
   BASIC_SAFE_CARD_PRICE,
-  canAffordWorkPlate,
   canBuyBasicSafeScratchCard,
   canBuyTrashCan,
+  canBuyUpgradeTool,
+  canStartWorkFromPhase,
   createBasicSafeScratchCard,
   createLoanFromTemplate,
   getBasicSafeScratchCardPrizePoolForLevel,
   getBoundedPlatePosition,
+  getLoanRepaymentFeedback,
   getNextUnlockMilestone,
+  getOutcomeAmountLabel,
   getRandomPlateSpawnPosition,
+  getScratchBrushRadius,
   getScratchCardLevelProgress,
   getUnlockMilestoneCurrentValue,
   getUnlockMilestoneProgress,
+  getWorkBrokenPlatePenaltyForLevel,
   getWorkLevelProgress,
   getWorkRewardAmountForLevel,
   isBrokenPlateEnabled,
   isPointInsideCircleBounds,
   LOAN_CONFIG,
   LOAN_REPAYMENT_AMOUNT,
+  type LoanState,
   repayLoan,
   rollWorkReward,
   type ScratchCardState,
+  type ScratchSurfacePoint,
   settleBasicSafeScratchCard,
   shouldCloseCleaningOverlay,
+  shouldForceWrongScratchCardForLoan,
+  shouldHandlePlatePointerDown,
   shouldOfferLoanPhone,
   shouldOpenPlateFromPointerUp,
   shouldShowScratchCover,
+  shouldShowUpgradeToolsUnlockNotice,
   shouldShowWorkRiskNotice,
   TRASH_CAN_PRICE,
   TRASH_CAN_UNLOCK_AFTER_PLATES,
   type UnlockMilestoneId,
+  UPGRADE_TOOLS_CONFIG,
+  UPGRADE_TOOLS_MILESTONE_ID,
+  type UpgradeToolConfig,
   WORK_ACTION_DURATION_MS,
   WORK_BROKEN_PLATE_CHANCE,
-  WORK_BROKEN_PLATE_PENALTY,
   WORK_PLATE_COST,
   WORK_SAFE_REWARD_CHANCE,
   type WorkPhase,
@@ -82,7 +94,17 @@ type ScratchCardPointerState = {
   holdTimer: ReturnType<typeof setTimeout> | null;
 };
 
-type UnlockToast = 'trash' | 'scratch' | null;
+type LoanRepaymentFeedback = {
+  loan: LoanState;
+  loanIndex: number;
+  amount: number;
+  statusLabel: string;
+  detailLabel: string;
+  isFinal: boolean;
+};
+
+type UnlockToast = 'trash' | 'scratch' | 'upgrade' | null;
+type PhoneNoticeType = 'loan' | 'scratch' | 'upgrade-tools' | 'work-risk' | null;
 
 const SCRATCH_SYMBOL_LABELS = {
   fire: '火焰',
@@ -95,6 +117,14 @@ const SCRATCH_PHONE_LINES = [
   '你对自己的日常工作感到厌烦吗？',
   '我这里有个好东西，非常适合你......',
   '刮刮卡！',
+] as const;
+
+const UPGRADE_TOOLS_PHONE_LINES = [
+  '刮起来是不是有点费力？',
+  '别担心，我这正好有你要的东西——升级！',
+  '升级到刮工具，刮起卡来轻轻松松！',
+  '听我的，现在不升级，以后那些卡的涂层你根本刮不动......',
+  '而且你还能升级运气呢，多稀罕呀！',
 ] as const;
 
 const LOAN_PHONE_COPY =
@@ -115,6 +145,10 @@ function ScratchSymbolIcon({ symbol }: { symbol: keyof typeof SCRATCH_SYMBOL_LAB
       <span />
     </span>
   );
+}
+
+function UpgradeToolIcon({ toolId }: { toolId: UpgradeToolConfig['id'] }) {
+  return <span className={`upgrade-tool-icon ${toolId}`} aria-hidden="true" />;
 }
 
 function getPrizeTierSymbol(tierId: ScratchCardState['result']['tierId']) {
@@ -153,7 +187,11 @@ export function ScratchLegendGame() {
   const [trashHoverPlateId, setTrashHoverPlateId] = useState<number | null>(null);
   const [trashHoverScratchCardId, setTrashHoverScratchCardId] = useState<number | null>(null);
   const [loanLedgerOpen, setLoanLedgerOpen] = useState(false);
+  const [loanRepaymentFeedback, setLoanRepaymentFeedback] = useState<LoanRepaymentFeedback | null>(
+    null,
+  );
   const [phoneMessageOpen, setPhoneMessageOpen] = useState(false);
+  const [upgradeToolsPhoneStep, setUpgradeToolsPhoneStep] = useState(0);
   const tableRef = useRef<HTMLDivElement | null>(null);
   const trashCanRef = useRef<HTMLDivElement | null>(null);
   const cleaningPlateRef = useRef<HTMLDivElement | null>(null);
@@ -162,9 +200,13 @@ export function ScratchLegendGame() {
   const scratchCardPointerRef = useRef<ScratchCardPointerState | null>(null);
   const plateEnterTimerRefs = useRef<number[]>([]);
   const unlockToastTimerRef = useRef<number | null>(null);
+  const loanRepaymentTimerRef = useRef<number | null>(null);
   const previousTrashCanUnlockedRef = useRef(save.unlocks.trashCanUnlocked);
   const previousScratchModeUnlockedRef = useRef(
     isUnlockMilestoneUnlocked(save, SCRATCH_MODE_MILESTONE_ID),
+  );
+  const previousUpgradeToolsUnlockedRef = useRef(
+    isUnlockMilestoneUnlocked(save, UPGRADE_TOOLS_MILESTONE_ID),
   );
   const unlockToastReadyRef = useRef(false);
 
@@ -175,6 +217,23 @@ export function ScratchLegendGame() {
   const tableScratchCards = save.workspace.scratchCards;
   const activeScratchCard = getActiveScratchCard(save);
   const activeLoans = save.loans.activeLoans;
+  const visibleLedgerLoans = loanRepaymentFeedback
+    ? (() => {
+        if (activeLoans.some((loan) => loan.id === loanRepaymentFeedback.loan.id)) {
+          return activeLoans;
+        }
+
+        const loans = [...activeLoans];
+        loans.splice(
+          Math.min(loanRepaymentFeedback.loanIndex, loans.length),
+          0,
+          loanRepaymentFeedback.loan,
+        );
+        return loans;
+      })()
+    : activeLoans;
+  const loanLedgerButtonVisible = activeLoans.length > 0 || loanRepaymentFeedback !== null;
+  const loanLedgerVisible = loanLedgerOpen && visibleLedgerLoans.length > 0;
   const basicSafeLevelProgress = getScratchCardLevelProgress(
     'basic-safe',
     save.scratchCards.basicSafe.cardsSettled,
@@ -196,8 +255,11 @@ export function ScratchLegendGame() {
   const trashCanAvailable = trashCanUnlocked && trashCanPurchased;
   const workRiskMessageDismissed = save.notices.workRiskMessageDismissed;
   const scratchMessageDismissed = save.notices.scratchMessageDismissed;
+  const upgradeToolsMessageDismissed = save.notices.upgradeToolsMessageDismissed;
   const scratchModeUnlocked = isUnlockMilestoneUnlocked(save, SCRATCH_MODE_MILESTONE_ID);
+  const upgradeToolsUnlocked = isUnlockMilestoneUnlocked(save, UPGRADE_TOOLS_MILESTONE_ID);
   const scratchCardVisible = scratchModeUnlocked && scratchMessageDismissed;
+  const upgradeToolsVisible = upgradeToolsUnlocked && upgradeToolsMessageDismissed;
 
   const nextUnlockMilestone = getNextUnlockMilestone(player.lifetimeGoldEarned);
   const finalUnlockMilestone =
@@ -218,12 +280,14 @@ export function ScratchLegendGame() {
   const workLevelProgress = getWorkLevelProgress(player.plateCleaned);
   const previewRewardAmount = getWorkRewardAmountForLevel(workLevel);
   const brokenPlateEnabled = isBrokenPlateEnabled(workLevel);
+  const workBrokenPlatePenalty = getWorkBrokenPlatePenaltyForLevel(workLevel);
+  const scratchRadiusToolLevel = save.upgradeTools['scratch-radius']?.level ?? 0;
+  const scratchBrushRadius = getScratchBrushRadius(scratchRadiusToolLevel, activeLoans);
   const workSafeRewardPercent = `${Math.round(
     (brokenPlateEnabled ? WORK_SAFE_REWARD_CHANCE : 1) * 100,
   )}%`;
   const workBrokenPlatePercent = `${Math.round(WORK_BROKEN_PLATE_CHANCE * 100)}%`;
-  const canStartWork =
-    (phase === 'idle' || phase === 'plateSpawned') && canAffordWorkPlate(player.gold);
+  const canStartWork = canStartWorkFromPhase(phase, player.gold);
   const canBuyScratchCard =
     scratchCardVisible &&
     (phase === 'idle' || phase === 'plateSpawned' || phase === 'scratchCardSpawned') &&
@@ -237,8 +301,22 @@ export function ScratchLegendGame() {
     isCrit: false,
     isBroken: false,
   };
+  const workOutcomeRevealed = phase === 'claimable';
+  const workClaimAmountLabel = getOutcomeAmountLabel(workOutcomeRevealed, activeReward.total);
+  const workSafeOutcomeLabel =
+    workOutcomeRevealed && !activeReward.isBroken
+      ? getOutcomeAmountLabel(true, activeReward.total)
+      : getOutcomeAmountLabel(false, previewRewardAmount);
+  const workBrokenOutcomeLabel =
+    workOutcomeRevealed && activeReward.isBroken
+      ? getOutcomeAmountLabel(true, activeReward.total)
+      : getOutcomeAmountLabel(false, -workBrokenPlatePenalty);
   const workRiskNoticeVisible = shouldShowWorkRiskNotice(workLevel, workRiskMessageDismissed);
   const scratchUnlockNoticeVisible = scratchModeUnlocked && !scratchMessageDismissed;
+  const upgradeToolsUnlockNoticeVisible = shouldShowUpgradeToolsUnlockNotice(
+    player.lifetimeGoldEarned,
+    upgradeToolsMessageDismissed,
+  );
   const loanOfferNoticeVisible =
     phase === 'idle' &&
     shouldOfferLoanPhone({
@@ -247,8 +325,16 @@ export function ScratchLegendGame() {
       activeScratchCard: tableScratchCards.length > 0,
       activeLoansCount: activeLoans.length,
     });
-  const phoneNoticePending =
-    workRiskNoticeVisible || scratchUnlockNoticeVisible || loanOfferNoticeVisible;
+  const phoneNoticeType: PhoneNoticeType = scratchUnlockNoticeVisible
+    ? 'scratch'
+    : upgradeToolsUnlockNoticeVisible
+      ? 'upgrade-tools'
+      : loanOfferNoticeVisible
+        ? 'loan'
+        : workRiskNoticeVisible
+          ? 'work-risk'
+          : null;
+  const phoneNoticePending = phoneNoticeType !== null;
   const phoneNoticeVisible = phoneNoticePending && phoneMessageOpen;
 
   const statusLabel = useMemo(() => {
@@ -287,6 +373,10 @@ export function ScratchLegendGame() {
       if (unlockToastTimerRef.current) {
         window.clearTimeout(unlockToastTimerRef.current);
       }
+
+      if (loanRepaymentTimerRef.current) {
+        window.clearTimeout(loanRepaymentTimerRef.current);
+      }
     };
   }, []);
 
@@ -297,12 +387,17 @@ export function ScratchLegendGame() {
 
     previousTrashCanUnlockedRef.current = trashCanUnlocked;
     previousScratchModeUnlockedRef.current = scratchModeUnlocked;
+    previousUpgradeToolsUnlockedRef.current = upgradeToolsUnlocked;
     unlockToastReadyRef.current = true;
-  }, [hasHydrated, scratchModeUnlocked, trashCanUnlocked]);
+  }, [hasHydrated, scratchModeUnlocked, trashCanUnlocked, upgradeToolsUnlocked]);
 
   useEffect(() => {
     previousScratchModeUnlockedRef.current = scratchModeUnlocked;
   }, [scratchModeUnlocked]);
+
+  useEffect(() => {
+    previousUpgradeToolsUnlockedRef.current = upgradeToolsUnlocked;
+  }, [upgradeToolsUnlocked]);
 
   useEffect(() => {
     if (!unlockToastReadyRef.current) {
@@ -325,14 +420,15 @@ export function ScratchLegendGame() {
   }, [trashCanUnlocked]);
 
   useEffect(() => {
-    if (activeLoans.length === 0) {
+    if (activeLoans.length === 0 && !loanRepaymentFeedback) {
       setLoanLedgerOpen(false);
     }
-  }, [activeLoans.length]);
+  }, [activeLoans.length, loanRepaymentFeedback]);
 
   useEffect(() => {
     if (!phoneNoticePending) {
       setPhoneMessageOpen(false);
+      setUpgradeToolsPhoneStep(0);
     }
   }, [phoneNoticePending]);
 
@@ -503,7 +599,10 @@ export function ScratchLegendGame() {
       },
       workspace: {
         ...current.workspace,
-        phase: 'plateSpawned',
+        phase: getDesktopPhase(
+          current.workspace.plates.length + 1,
+          current.workspace.scratchCards.length,
+        ),
         nextPlateId: current.workspace.nextPlateId + 1,
         plates: [
           ...current.workspace.plates,
@@ -511,6 +610,7 @@ export function ScratchLegendGame() {
             id: plateId,
             reward: plateReward,
             position: getRandomPlateSpawnPosition(),
+            cleanPoints: [],
             seed: plateId,
           },
         ],
@@ -532,6 +632,9 @@ export function ScratchLegendGame() {
     const scratchCard = createBasicSafeScratchCard({
       id: scratchCardId,
       level: basicSafeLevelProgress.level,
+      forcedTierId: shouldForceWrongScratchCardForLoan(activeLoans, scratchCardId)
+        ? 'no-pair'
+        : undefined,
     });
 
     setScratchProgress(0);
@@ -612,7 +715,7 @@ export function ScratchLegendGame() {
   }
 
   function openCleaningView(plateId: number) {
-    if (phase === 'plateSpawned') {
+    if (phase === 'plateSpawned' || phase === 'scratchCardSpawned') {
       resetPlatePointer();
       setCleanProgress(0);
       setCleaningStartedAt(Date.now());
@@ -645,6 +748,50 @@ export function ScratchLegendGame() {
         ),
       },
     }));
+  }
+
+  function recordActivePlateCleanPoint(point: ScratchSurfacePoint) {
+    updateSave((current) => {
+      const activeId = current.workspace.activePlateId;
+
+      if (!activeId) {
+        return current;
+      }
+
+      return {
+        ...current,
+        workspace: {
+          ...current.workspace,
+          plates: current.workspace.plates.map((plate) =>
+            plate.id === activeId
+              ? { ...plate, cleanPoints: [...plate.cleanPoints, point] }
+              : plate,
+          ),
+        },
+      };
+    });
+  }
+
+  function recordActiveScratchPoint(point: ScratchSurfacePoint) {
+    updateSave((current) => {
+      const activeId = current.workspace.activeScratchCardId;
+
+      if (!activeId) {
+        return current;
+      }
+
+      return {
+        ...current,
+        workspace: {
+          ...current.workspace,
+          scratchCards: current.workspace.scratchCards.map((card) =>
+            card.id === activeId
+              ? { ...card, scratchPoints: [...card.scratchPoints, point] }
+              : card,
+          ),
+        },
+      };
+    });
   }
 
   function handleCleaningViewPointerDown(event: React.PointerEvent<HTMLDivElement>) {
@@ -685,7 +832,7 @@ export function ScratchLegendGame() {
     event: React.PointerEvent<HTMLButtonElement>,
     plate: WorkPlateState,
   ) {
-    if (phase !== 'plateSpawned') {
+    if (!shouldHandlePlatePointerDown(phase)) {
       return;
     }
 
@@ -1071,7 +1218,71 @@ export function ScratchLegendGame() {
     }));
   }
 
+  function buyUpgradeTool(tool: UpgradeToolConfig) {
+    if (!upgradeToolsVisible) {
+      return;
+    }
+
+    updateSave((current) => {
+      const currentToolState = current.upgradeTools[tool.id];
+
+      if (!currentToolState || !canBuyUpgradeTool(current.player.gold, tool, currentToolState)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        player: {
+          ...current.player,
+          gold: current.player.gold - tool.price,
+        },
+        upgradeTools: {
+          ...current.upgradeTools,
+          [tool.id]: {
+            level: currentToolState.level + 1,
+          },
+        },
+      };
+    });
+  }
+
   function repayActiveLoan(loanId: number) {
+    if (loanRepaymentFeedback) {
+      return;
+    }
+
+    const repaidLoanIndex = activeLoans.findIndex((item) => item.id === loanId);
+    const repaidLoan = activeLoans[repaidLoanIndex];
+
+    if (!repaidLoan || player.gold < repaidLoan.amount) {
+      return;
+    }
+
+    const repaymentFeedback = getLoanRepaymentFeedback(repaidLoan);
+    const isFinalLoan = activeLoans.length === 1;
+
+    setLoanRepaymentFeedback({
+      loan: repaidLoan,
+      loanIndex: repaidLoanIndex,
+      amount: repaidLoan.amount,
+      statusLabel: repaymentFeedback.statusLabel,
+      detailLabel: repaymentFeedback.detailLabel,
+      isFinal: isFinalLoan,
+    });
+
+    if (loanRepaymentTimerRef.current) {
+      window.clearTimeout(loanRepaymentTimerRef.current);
+    }
+
+    loanRepaymentTimerRef.current = window.setTimeout(() => {
+      setLoanRepaymentFeedback(null);
+      loanRepaymentTimerRef.current = null;
+
+      if (isFinalLoan) {
+        setLoanLedgerOpen(false);
+      }
+    }, 1150);
+
     updateSave((current) => {
       const loan = current.loans.activeLoans.find((item) => item.id === loanId);
 
@@ -1114,6 +1325,31 @@ export function ScratchLegendGame() {
     }
 
     setUnlockToast('scratch');
+    unlockToastTimerRef.current = window.setTimeout(() => {
+      setUnlockToast(null);
+      unlockToastTimerRef.current = null;
+    }, 1800);
+  }
+
+  function advanceUpgradeToolsUnlockPhone() {
+    if (upgradeToolsPhoneStep < UPGRADE_TOOLS_PHONE_LINES.length - 1) {
+      setUpgradeToolsPhoneStep((current) => current + 1);
+      return;
+    }
+
+    updateSave((current) => ({
+      ...current,
+      notices: {
+        ...current.notices,
+        upgradeToolsMessageDismissed: true,
+      },
+    }));
+
+    if (unlockToastTimerRef.current) {
+      window.clearTimeout(unlockToastTimerRef.current);
+    }
+
+    setUnlockToast('upgrade');
     unlockToastTimerRef.current = window.setTimeout(() => {
       setUnlockToast(null);
       unlockToastTimerRef.current = null;
@@ -1301,16 +1537,18 @@ export function ScratchLegendGame() {
             <StatusPill label="状态" value={statusLabel} />
             <StatusPill label="已洗盘子" value={`${player.plateCleaned}`} />
             <StatusPill label="刮卡次数" value={`${player.cardsScratched}`} />
-            {activeLoans.length > 0 && (
+            {loanLedgerButtonVisible && (
               <button
-                className="loan-ledger-button"
+                className={`loan-ledger-button ${
+                  loanRepaymentFeedback?.isFinal ? 'settling-final' : ''
+                }`}
                 type="button"
                 onClick={() => setLoanLedgerOpen(true)}
                 aria-label="查看当前贷款"
               >
                 <span className="loan-ledger-icon" aria-hidden="true" />
                 <span>贷款</span>
-                <strong>{activeLoans.length}</strong>
+                <strong>{activeLoans.length || 1}</strong>
               </button>
             )}
           </div>
@@ -1431,13 +1669,16 @@ export function ScratchLegendGame() {
                       ))}
                     </fieldset>
                     <ScratchCardCanvas
+                      key={activeScratchCard.id}
                       active={activeScratchCard.status === 'scratching'}
                       visible={shouldShowScratchCover(activeScratchCard.status, scratchProgress)}
-                      brushRadius={scratchLegendConfig.scratchCards.basicSafe.scratchBrush.radius}
+                      scratchPoints={activeScratchCard.scratchPoints}
+                      brushRadius={scratchBrushRadius}
                       stepDistance={
                         scratchLegendConfig.scratchCards.basicSafe.scratchBrush.stepDistance
                       }
                       onProgressChange={setScratchProgress}
+                      onScratchPoint={recordActiveScratchPoint}
                       onComplete={completeScratchCard}
                     />
                   </div>
@@ -1483,7 +1724,10 @@ export function ScratchLegendGame() {
                     onClick={claimScratchCardPrize}
                     disabled={activeScratchCard.status !== 'claimable'}
                   >
-                    ${activeScratchCard.result.isWinning ? activeScratchCard.result.payout : 0}
+                    {getOutcomeAmountLabel(
+                      activeScratchCard.status === 'claimable',
+                      activeScratchCard.result.isWinning ? activeScratchCard.result.payout : 0,
+                    )}
                   </button>
                 </div>
               </div>
@@ -1504,14 +1748,26 @@ export function ScratchLegendGame() {
             {unlockToast && (
               <div className={`unlock-toast ${unlockToast}`}>
                 <div className={`unlock-icon ${unlockToast}`} />
-                <strong>{unlockToast === 'trash' ? '已解锁' : '刮刮卡！'}</strong>
-                <span>{unlockToast === 'trash' ? '垃圾桶' : '成双入对已上架'}</span>
+                <strong>
+                  {unlockToast === 'scratch'
+                    ? '刮刮卡！'
+                    : unlockToast === 'upgrade'
+                      ? '已解锁'
+                      : '已解锁'}
+                </strong>
+                <span>
+                  {unlockToast === 'scratch'
+                    ? '成双入对已上架'
+                    : unlockToast === 'upgrade'
+                      ? '升级工具'
+                      : '垃圾桶'}
+                </span>
               </div>
             )}
 
             {phoneNoticeVisible && (
               <div className="phone-message">
-                {loanOfferNoticeVisible ? (
+                {phoneNoticeType === 'loan' ? (
                   <>
                     <strong>电话提醒</strong>
                     <span>{LOAN_PHONE_COPY}</span>
@@ -1530,12 +1786,22 @@ export function ScratchLegendGame() {
                       指纹签字
                     </button>
                   </>
-                ) : scratchUnlockNoticeVisible ? (
+                ) : phoneNoticeType === 'scratch' ? (
                   <>
                     <strong>电话提醒</strong>
                     <span>{SCRATCH_PHONE_LINES[scratchPhoneStep]}</span>
                     <button type="button" onClick={advanceScratchUnlockPhone}>
                       {scratchPhoneStep < SCRATCH_PHONE_LINES.length - 1 ? '继续听' : '看看好东西'}
+                    </button>
+                  </>
+                ) : phoneNoticeType === 'upgrade-tools' ? (
+                  <>
+                    <strong>电话提醒</strong>
+                    <span>{UPGRADE_TOOLS_PHONE_LINES[upgradeToolsPhoneStep]}</span>
+                    <button type="button" onClick={advanceUpgradeToolsUnlockPhone}>
+                      {upgradeToolsPhoneStep < UPGRADE_TOOLS_PHONE_LINES.length - 1
+                        ? '继续听'
+                        : '打开升级'}
                     </button>
                   </>
                 ) : (
@@ -1553,7 +1819,7 @@ export function ScratchLegendGame() {
                       </div>
                       <div className="phone-risk-row danger">
                         <em>{workBrokenPlatePercent}</em>
-                        <b>-${WORK_BROKEN_PLATE_PENALTY}</b>
+                        <b>-${workBrokenPlatePenalty}</b>
                       </div>
                     </div>
                     <button
@@ -1575,30 +1841,46 @@ export function ScratchLegendGame() {
               </div>
             )}
 
-            {loanLedgerOpen && activeLoans.length > 0 && (
+            {loanLedgerVisible && (
               <div className="loan-ledger-overlay" role="dialog" aria-label="当前贷款列表">
                 <div className="loan-ledger-panel">
                   <header>
                     <strong>当前贷款</strong>
                     <span>利率 {LOAN_CONFIG.interestRateLabel}</span>
                   </header>
+                  {loanRepaymentFeedback && (
+                    <div
+                      className={`loan-repayment-feedback ${
+                        loanRepaymentFeedback.isFinal ? 'final' : ''
+                      }`}
+                    >
+                      <strong>-${loanRepaymentFeedback.amount}</strong>
+                      <span>{loanRepaymentFeedback.statusLabel}</span>
+                      <small>{loanRepaymentFeedback.detailLabel}</small>
+                    </div>
+                  )}
                   <div className="loan-list">
-                    {activeLoans.map((loan) => (
-                      <div className="loan-row" key={loan.id}>
-                        <div>
-                          <strong>{loan.title}</strong>
-                          <span>{loan.effect}</span>
+                    {visibleLedgerLoans.map((loan) => {
+                      const isRepaying = loanRepaymentFeedback?.loan.id === loan.id;
+
+                      return (
+                        <div className={`loan-row ${isRepaying ? 'repaying' : ''}`} key={loan.id}>
+                          <div className="loan-row-copy">
+                            <strong>{loan.title}</strong>
+                            <span>{loan.effect}</span>
+                          </div>
+                          <b>{loan.amount}</b>
+                          <button
+                            type="button"
+                            onClick={() => repayActiveLoan(loan.id)}
+                            disabled={player.gold < loan.amount || isRepaying}
+                          >
+                            {isRepaying ? '结清' : '偿付'}
+                          </button>
+                          {isRepaying && <span className="loan-paid-stamp">已偿清</span>}
                         </div>
-                        <b>{loan.amount}</b>
-                        <button
-                          type="button"
-                          onClick={() => repayActiveLoan(loan.id)}
-                          disabled={player.gold < loan.amount}
-                        >
-                          偿付
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <button
                     className="loan-ledger-back"
@@ -1623,8 +1905,11 @@ export function ScratchLegendGame() {
                   >
                     <div className="plate-rim" />
                     <CleaningCanvas
+                      key={activePlateId ?? 'cleaning'}
                       active={isCleaningView}
+                      cleanPoints={activePlate?.cleanPoints ?? []}
                       onProgressChange={setCleanProgress}
+                      onCleanPoint={recordActivePlateCleanPoint}
                       onComplete={completeCleaning}
                     />
                   </div>
@@ -1635,9 +1920,7 @@ export function ScratchLegendGame() {
                     disabled={phase !== 'claimable'}
                     data-cleaning-control="true"
                   >
-                    {activeReward.total >= 0
-                      ? `$${activeReward.total}`
-                      : `-$${Math.abs(activeReward.total)}`}
+                    {workOutcomeRevealed ? workClaimAmountLabel : '清洁后结算'}
                   </button>
                 </div>
 
@@ -1651,7 +1934,7 @@ export function ScratchLegendGame() {
                         <span className="work-info-token clean" aria-hidden="true" />
                         <em>{workSafeRewardPercent}</em>
                       </span>
-                      <b>${previewRewardAmount}</b>
+                      <b>{workSafeOutcomeLabel}</b>
                     </div>
                     {brokenPlateEnabled && (
                       <div className="work-info-odds-row danger">
@@ -1659,7 +1942,7 @@ export function ScratchLegendGame() {
                           <span className="work-info-token broken" aria-hidden="true" />
                           <em>{workBrokenPlatePercent}</em>
                         </span>
-                        <b>-${WORK_BROKEN_PLATE_PENALTY}</b>
+                        <b>{workBrokenOutcomeLabel}</b>
                       </div>
                     )}
                   </div>
@@ -1669,7 +1952,54 @@ export function ScratchLegendGame() {
           </div>
         </section>
 
-        <aside className="right-reserved-space" aria-hidden="true" />
+        <aside
+          className={`right-reserved-space ${upgradeToolsVisible ? 'active' : ''}`}
+          aria-label={upgradeToolsVisible ? '升级工具面板' : undefined}
+          aria-hidden={!upgradeToolsVisible}
+        >
+          {upgradeToolsVisible && (
+            <section className="upgrade-tools-panel">
+              <header>
+                <small>Stage 2.5</small>
+                <strong>升级工具</strong>
+                <span>把刮卡手感和后续成长目标接上。</span>
+              </header>
+              <div className="upgrade-tool-list">
+                {UPGRADE_TOOLS_CONFIG.map((tool) => {
+                  const toolState = save.upgradeTools[tool.id];
+                  const toolLevel = toolState?.level ?? tool.level;
+                  const buyable = canBuyUpgradeTool(player.gold, tool, { level: toolLevel });
+
+                  return (
+                    <article className="upgrade-tool-card" key={tool.id}>
+                      <UpgradeToolIcon toolId={tool.id} />
+                      <div>
+                        <strong>{tool.label}</strong>
+                        <span>{tool.description}</span>
+                        <small>{tool.effectLabel}</small>
+                      </div>
+                      <div className="upgrade-tool-meta">
+                        <em>
+                          {tool.id === 'copper-coin' ? '力量' : '等级'} {toolLevel}
+                        </em>
+                        <small>
+                          {toolLevel}/{tool.maxLevel}
+                        </small>
+                        <button
+                          type="button"
+                          onClick={() => buyUpgradeTool(tool)}
+                          disabled={!buyable}
+                        >
+                          ${tool.price}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+        </aside>
       </section>
       <p className="game-disclaimer">
         本游戏为 vibecoding 页面玩法创意参考
