@@ -6,10 +6,13 @@ import {
   BASIC_SAFE_CARD_PRICE,
   canAffordWorkPlate,
   canBuyBasicSafeScratchCard,
+  canBuyScratchCard,
   canBuyTrashCan,
   canStartWorkFromPhase,
   createBasicSafeScratchCard,
   createLoanFromTemplate,
+  createScratchCard,
+  createTripleMatchScratchCard,
   getBasicSafeScratchCardPrizePoolForLevel,
   getBasicSafeScratchCardPrizeTier,
   getBoundedPlatePosition,
@@ -20,7 +23,11 @@ import {
   getRandomPlateSpawnPosition,
   getScratchBrushRadius,
   getScratchBrushRadiusForUpgradeLevel,
+  getScratchCardConfig,
   getScratchCardLevelProgress,
+  getScratchCardPrizePoolForLevel,
+  getScratchCardSettlementProgressKey,
+  getScratchCardStepDistance,
   getUnlockMilestoneById,
   getUnlockMilestoneCurrentValue,
   getUnlockMilestoneProgress,
@@ -36,6 +43,7 @@ import {
   repayLoan,
   rollWorkReward,
   settleBasicSafeScratchCard,
+  settleScratchCard,
   shouldCloseCleaningOverlay,
   shouldForceWrongScratchCardForLoan,
   shouldHandlePlatePointerDown,
@@ -45,10 +53,12 @@ import {
   shouldRevealFullScratchCover,
   shouldShowScratchCover,
   shouldShowScratchUnlockNotice,
+  shouldShowTripleMatchUnlockNotice,
   shouldShowWorkRiskNotice,
   shouldUnlockTrashCan,
   TRASH_CAN_PRICE,
   TRASH_CAN_UNLOCK_AFTER_PLATES,
+  TRIPLE_MATCH_CARD_PRICE,
   WORK_PLATE_COST,
 } from './game';
 import { scratchLegendConfig } from './game-config';
@@ -477,28 +487,28 @@ test('tracks basic safe scratch card level progress by settled card count', () =
   const almostLevelTwo = getScratchCardLevelProgress('basic-safe', 2);
   const levelTwo = getScratchCardLevelProgress('basic-safe', 3);
 
-  assert.equal(levelOne.level, 1);
+  assert.equal(levelOne.level, 0);
   assert.equal(levelOne.current, 0);
   assert.equal(levelOne.target, 3);
   assert.equal(levelOne.ratio, 0);
-  assert.equal(almostLevelTwo.level, 1);
+  assert.equal(almostLevelTwo.level, 0);
   assert.equal(almostLevelTwo.current, 2);
   assert.equal(almostLevelTwo.target, 3);
-  assert.equal(levelTwo.level, 2);
+  assert.equal(levelTwo.level, 1);
   assert.equal(levelTwo.current, 0);
   assert.equal(levelTwo.target, 10);
 });
 
 test('uses level adjusted payouts for the basic safe scratch card prize pool', () => {
+  const levelZeroPool = getBasicSafeScratchCardPrizePoolForLevel(0);
   const levelOnePool = getBasicSafeScratchCardPrizePoolForLevel(1);
-  const levelTwoPool = getBasicSafeScratchCardPrizePoolForLevel(2);
 
-  assert.equal(levelOnePool.find((tier) => tier.id === 'pair-fire')?.payout, 10);
-  assert.equal(levelOnePool.find((tier) => tier.id === 'pair-cash')?.payout, 25);
-  assert.equal(levelOnePool.find((tier) => tier.id === 'pair-bag')?.payout, 50);
-  assert.equal(levelTwoPool.find((tier) => tier.id === 'pair-fire')?.payout, 13);
-  assert.equal(levelTwoPool.find((tier) => tier.id === 'pair-cash')?.payout, 32);
-  assert.equal(levelTwoPool.find((tier) => tier.id === 'pair-bag')?.payout, 65);
+  assert.equal(levelZeroPool.find((tier) => tier.id === 'pair-fire')?.payout, 10);
+  assert.equal(levelZeroPool.find((tier) => tier.id === 'pair-cash')?.payout, 25);
+  assert.equal(levelZeroPool.find((tier) => tier.id === 'pair-bag')?.payout, 50);
+  assert.equal(levelOnePool.find((tier) => tier.id === 'pair-fire')?.payout, 13);
+  assert.equal(levelOnePool.find((tier) => tier.id === 'pair-cash')?.payout, 32);
+  assert.equal(levelOnePool.find((tier) => tier.id === 'pair-bag')?.payout, 65);
 });
 
 test('pre-generates a basic safe card result when the card is created', () => {
@@ -514,7 +524,7 @@ test('pre-generates a basic safe card result when the card is created', () => {
   assert.equal(card.level, 2);
   assert.equal(card.status, 'onTable');
   assert.equal(card.result.tierId, 'pair-fire');
-  assert.equal(card.result.payout, 13);
+  assert.equal(card.result.payout, 16);
   assert.equal(card.result.hasPenaltySymbol, false);
   assert.equal(card.result.canDiscard, false);
 });
@@ -610,7 +620,7 @@ test('rolls all local MVP prize tiers from deterministic random values', () => {
   ] as const;
 
   for (const [randomValue, tierId, payout] of cases) {
-    const tier = getBasicSafeScratchCardPrizeTier(() => randomValue, 1);
+    const tier = getBasicSafeScratchCardPrizeTier(() => randomValue, 0);
 
     assert.equal(tier.id, tierId);
     assert.equal(tier.payout, payout);
@@ -682,7 +692,132 @@ test('advances basic safe card progress only after settlement', () => {
 
   assert.equal(progress.cardsSettled, 2);
   assert.equal(nextProgress.cardsSettled, 3);
-  assert.equal(getScratchCardLevelProgress('basic-safe', nextProgress.cardsSettled).level, 2);
+  assert.equal(getScratchCardLevelProgress('basic-safe', nextProgress.cardsSettled).level, 1);
+});
+
+test('configures triple match card from the static rules source', () => {
+  const tripleMatchConfig = getScratchCardConfig('triple-match');
+
+  assert.equal(TRIPLE_MATCH_CARD_PRICE, 100);
+  assert.equal(tripleMatchConfig.label, '三连胜出');
+  assert.equal(tripleMatchConfig.price, 100);
+  assert.equal(tripleMatchConfig.matchRule.slots, 5);
+  assert.equal(tripleMatchConfig.matchRule.requiredMatches, 3);
+  assert.equal(tripleMatchConfig.scratchCompleteThreshold, 0.82);
+  assert.equal(getScratchCardStepDistance('triple-match'), 5);
+});
+
+test('unlocks triple match notice at the fourth proficiency segment', () => {
+  assert.equal(getUnlockMilestoneThreshold('triple-match-card'), 163);
+  assert.equal(shouldShowTripleMatchUnlockNotice(162, false), false);
+  assert.equal(shouldShowTripleMatchUnlockNotice(163, false), true);
+  assert.equal(shouldShowTripleMatchUnlockNotice(163, true), false);
+});
+
+test('uses configured price and unlock gate for generic scratch card purchases', () => {
+  assert.equal(canBuyScratchCard('basic-safe', { gold: 9, lifetimeGoldEarned: 163 }), false);
+  assert.equal(canBuyScratchCard('basic-safe', { gold: 10, lifetimeGoldEarned: 12 }), false);
+  assert.equal(canBuyScratchCard('basic-safe', { gold: 10, lifetimeGoldEarned: 13 }), true);
+  assert.equal(canBuyScratchCard('triple-match', { gold: 99, lifetimeGoldEarned: 163 }), false);
+  assert.equal(canBuyScratchCard('triple-match', { gold: 100, lifetimeGoldEarned: 162 }), false);
+  assert.equal(canBuyScratchCard('triple-match', { gold: 100, lifetimeGoldEarned: 163 }), true);
+});
+
+test('keeps triple match real odds separate from displayed ticket odds', () => {
+  const prizePool = getScratchCardPrizePoolForLevel('triple-match', 0);
+  const lossTier = prizePool.find((tier) => tier.id === 'no-triple');
+  const coinTier = prizePool.find((tier) => tier.id === 'triple-coin');
+  const bagTier = prizePool.find((tier) => tier.id === 'triple-bag');
+  const cashTier = prizePool.find((tier) => tier.id === 'triple-cash');
+  const jackpotTier = prizePool.find((tier) => tier.id === 'triple-jackpot');
+
+  assert.equal(lossTier?.probability, 0.82);
+  assert.equal(lossTier?.displayProbability, null);
+  assert.equal(coinTier?.probability, 0.1);
+  assert.equal(coinTier?.displayProbability, 0.3);
+  assert.equal(bagTier?.probability, 0.05);
+  assert.equal(bagTier?.displayProbability, 0.3);
+  assert.equal(cashTier?.probability, 0.025);
+  assert.equal(cashTier?.displayProbability, 0.3);
+  assert.equal(jackpotTier?.probability, 0.005);
+  assert.equal(jackpotTier?.displayProbability, 0.1);
+});
+
+test('pre-generates a triple match result with five symbols and level zero', () => {
+  const card = createTripleMatchScratchCard({
+    id: 41,
+    forcedTierId: 'triple-cash',
+    symbolRandom: () => 0,
+  });
+
+  assert.equal(card.id, 41);
+  assert.equal(card.type, 'triple-match');
+  assert.equal(card.price, TRIPLE_MATCH_CARD_PRICE);
+  assert.equal(card.level, 0);
+  assert.equal(card.result.tierId, 'triple-cash');
+  assert.equal(card.result.symbols.length, 5);
+  assert.equal(card.result.symbols.filter((symbol) => symbol === 'cash').length, 3);
+  assert.equal(card.result.payout, 500);
+  assert.equal(card.result.isWinning, true);
+});
+
+test('creates triple match loss results without any three matching symbols', () => {
+  const card = createTripleMatchScratchCard({
+    id: 42,
+    forcedTierId: 'no-triple',
+    symbolRandom: () => 0,
+  });
+  const symbolCounts = new Map(card.result.symbols.map((symbol) => [symbol, 0]));
+
+  for (const symbol of card.result.symbols) {
+    symbolCounts.set(symbol, (symbolCounts.get(symbol) ?? 0) + 1);
+  }
+
+  assert.equal(card.result.tierId, 'no-triple');
+  assert.equal(Math.max(...symbolCounts.values()), 2);
+  assert.equal(card.result.payout, 0);
+  assert.equal(card.result.isWinning, false);
+});
+
+test('settles scratch cards through the generic card type rules', () => {
+  const player = {
+    gold: 100,
+    lifetimeGoldEarned: 163,
+    plateCleaned: 20,
+    cardsScratched: 4,
+    loseStreak: 1,
+    workLevel: 2,
+  };
+  const lossCard = createTripleMatchScratchCard({ id: 43, forcedTierId: 'no-triple' });
+  const winningCard = createTripleMatchScratchCard({ id: 44, forcedTierId: 'triple-coin' });
+
+  const afterLoss = settleScratchCard(player, lossCard);
+  const afterWin = settleScratchCard(player, winningCard);
+
+  assert.equal(afterLoss.gold, 100);
+  assert.equal(afterLoss.lifetimeGoldEarned, 163);
+  assert.equal(afterLoss.cardsScratched, 5);
+  assert.equal(afterLoss.loseStreak, 2);
+  assert.equal(afterWin.gold, 200);
+  assert.equal(afterWin.lifetimeGoldEarned, 263);
+  assert.equal(afterWin.cardsScratched, 5);
+  assert.equal(afterWin.loseStreak, 0);
+});
+
+test('maps scratch card types to independent settlement progress keys', () => {
+  assert.equal(getScratchCardSettlementProgressKey('basic-safe'), 'basicSafe');
+  assert.equal(getScratchCardSettlementProgressKey('triple-match'), 'tripleMatch');
+  const tripleMatchStart = getScratchCardLevelProgress('triple-match', 0);
+
+  assert.equal(tripleMatchStart.level, 0);
+  assert.equal(tripleMatchStart.current, 0);
+  assert.equal(tripleMatchStart.target, 3);
+  assert.equal(tripleMatchStart.ratio, 0);
+});
+
+test('creates scratch cards through the generic factory', () => {
+  assert.equal(createScratchCard('basic-safe', { id: 50 }).type, 'basic-safe');
+  assert.equal(createScratchCard('triple-match', { id: 51 }).type, 'triple-match');
 });
 
 test('initializes and merges scratch card catalog progress in save data', () => {

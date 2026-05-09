@@ -10,12 +10,14 @@ type ScratchCardCanvasProps = {
   brushRadius: number;
   stepDistance: number;
   onProgressChange: (progress: number) => void;
-  onScratchPoint: (point: ScratchSurfacePoint) => void;
+  onScratchPointsFlush: (points: readonly ScratchSurfacePoint[]) => void;
   onComplete: () => void;
 };
 
 const CANVAS_WIDTH = 230;
 const CANVAS_HEIGHT = 66;
+const SCRATCH_POINT_SAVE_DISTANCE = 10;
+const SCRATCH_PROGRESS_REPORT_STEP = 0.03;
 const SCRATCH_STAMP_OFFSETS = [
   [0, 0, 1],
   [-10, -3, 0.62],
@@ -32,7 +34,7 @@ export function ScratchCardCanvas({
   brushRadius,
   stepDistance,
   onProgressChange,
-  onScratchPoint,
+  onScratchPointsFlush,
   onComplete,
 }: ScratchCardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -40,14 +42,18 @@ export function ScratchCardCanvas({
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const coveredPixelsRef = useRef(1);
   const completedRef = useRef(false);
+  const progressFrameRef = useRef<number | null>(null);
+  const lastSavedPointRef = useRef<{ x: number; y: number } | null>(null);
+  const pendingScratchPointsRef = useRef<ScratchSurfacePoint[]>([]);
+  const lastReportedProgressRef = useRef(0);
   const scratchPointsRef = useRef(scratchPoints);
   const onProgressChangeRef = useRef(onProgressChange);
-  const onScratchPointRef = useRef(onScratchPoint);
+  const onScratchPointsFlushRef = useRef(onScratchPointsFlush);
   const onCompleteRef = useRef(onComplete);
 
   scratchPointsRef.current = scratchPoints;
   onProgressChangeRef.current = onProgressChange;
-  onScratchPointRef.current = onScratchPoint;
+  onScratchPointsFlushRef.current = onScratchPointsFlush;
   onCompleteRef.current = onComplete;
 
   const countCoveredPixels = useCallback(() => {
@@ -75,23 +81,71 @@ export function ScratchCardCanvas({
     return coveredPixels;
   }, []);
 
-  const updateProgress = useCallback(() => {
-    const remainingCover = countCoveredPixels();
-    const scratchedRatio = clampRatio(1 - remainingCover / coveredPixelsRef.current);
-    const shouldRevealFullCover = shouldRevealFullScratchCover(scratchedRatio);
-    const displayedRatio = shouldRevealFullCover ? 1 : scratchedRatio;
-
-    onProgressChangeRef.current(displayedRatio);
-
-    if (!completedRef.current && shouldRevealFullCover) {
-      const canvas = canvasRef.current;
-      const context = canvas?.getContext('2d', { willReadFrequently: true });
-
-      context?.clearRect(0, 0, canvas?.width ?? 0, canvas?.height ?? 0);
-      completedRef.current = true;
-      onCompleteRef.current();
+  const flushScratchPoints = useCallback(() => {
+    if (pendingScratchPointsRef.current.length === 0) {
+      return;
     }
-  }, [countCoveredPixels]);
+
+    const points = pendingScratchPointsRef.current;
+    pendingScratchPointsRef.current = [];
+    onScratchPointsFlushRef.current(points);
+  }, []);
+
+  const reportProgress = useCallback((progress: number, forceReport = false) => {
+    const previousProgress = lastReportedProgressRef.current;
+    const shouldReport =
+      forceReport ||
+      progress === 0 ||
+      progress === 1 ||
+      Math.abs(progress - previousProgress) >= SCRATCH_PROGRESS_REPORT_STEP;
+
+    if (!shouldReport) {
+      return;
+    }
+
+    lastReportedProgressRef.current = progress;
+    onProgressChangeRef.current(progress);
+  }, []);
+
+  const updateProgress = useCallback(
+    (forceReport = false) => {
+      progressFrameRef.current = null;
+      const remainingCover = countCoveredPixels();
+      const scratchedRatio = clampRatio(1 - remainingCover / coveredPixelsRef.current);
+      const shouldRevealFullCover = shouldRevealFullScratchCover(scratchedRatio);
+      const displayedRatio = shouldRevealFullCover ? 1 : scratchedRatio;
+
+      reportProgress(displayedRatio, forceReport);
+
+      if (!completedRef.current && shouldRevealFullCover) {
+        const canvas = canvasRef.current;
+        const context = canvas?.getContext('2d', { willReadFrequently: true });
+
+        context?.clearRect(0, 0, canvas?.width ?? 0, canvas?.height ?? 0);
+        completedRef.current = true;
+        flushScratchPoints();
+        onCompleteRef.current();
+      }
+    },
+    [countCoveredPixels, flushScratchPoints, reportProgress],
+  );
+
+  const scheduleProgressUpdate = useCallback(() => {
+    if (progressFrameRef.current !== null) {
+      return;
+    }
+
+    progressFrameRef.current = window.requestAnimationFrame(() => updateProgress());
+  }, [updateProgress]);
+
+  const flushProgressUpdate = useCallback(() => {
+    if (progressFrameRef.current !== null) {
+      window.cancelAnimationFrame(progressFrameRef.current);
+      progressFrameRef.current = null;
+    }
+
+    updateProgress(true);
+  }, [updateProgress]);
 
   const drawCover = useCallback(() => {
     const canvas = canvasRef.current;
@@ -158,8 +212,11 @@ export function ScratchCardCanvas({
     coveredPixelsRef.current = Math.max(1, countCoveredPixels());
     completedRef.current = false;
     lastPointRef.current = null;
-    onProgressChangeRef.current(0);
-  }, [countCoveredPixels]);
+    lastSavedPointRef.current = null;
+    pendingScratchPointsRef.current = [];
+    lastReportedProgressRef.current = 0;
+    reportProgress(0, true);
+  }, [countCoveredPixels, reportProgress]);
 
   const getCanvasPoint = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -255,13 +312,22 @@ export function ScratchCardCanvas({
       }
 
       eraseCanvasPoint(point);
-      onScratchPointRef.current({
-        xPercent: clampRatio(point.x / canvas.width),
-        yPercent: clampRatio(point.y / canvas.height),
-      });
-      updateProgress();
+      const previousSavedPoint = lastSavedPointRef.current;
+      const savedDistance = previousSavedPoint
+        ? Math.hypot(point.x - previousSavedPoint.x, point.y - previousSavedPoint.y)
+        : Number.POSITIVE_INFINITY;
+
+      if (savedDistance >= SCRATCH_POINT_SAVE_DISTANCE) {
+        lastSavedPointRef.current = point;
+        pendingScratchPointsRef.current.push({
+          xPercent: clampRatio(point.x / canvas.width),
+          yPercent: clampRatio(point.y / canvas.height),
+        });
+      }
+
+      scheduleProgressUpdate();
     },
-    [active, eraseCanvasPoint, getCanvasPoint, updateProgress],
+    [active, eraseCanvasPoint, getCanvasPoint, scheduleProgressUpdate],
   );
 
   useLayoutEffect(() => {
@@ -287,11 +353,16 @@ export function ScratchCardCanvas({
     }
 
     lastPointRef.current = null;
-    updateProgress();
-  }, [drawCover, eraseCanvasPoint, updateProgress, visible]);
+    flushProgressUpdate();
+  }, [drawCover, eraseCanvasPoint, flushProgressUpdate, visible]);
 
   useEffect(() => {
     function stopDrawing() {
+      if (drawingRef.current) {
+        flushProgressUpdate();
+        flushScratchPoints();
+      }
+
       drawingRef.current = false;
       lastPointRef.current = null;
     }
@@ -304,8 +375,12 @@ export function ScratchCardCanvas({
       window.removeEventListener('blur', stopDrawing);
       window.removeEventListener('pointerup', stopDrawing);
       document.removeEventListener('visibilitychange', stopDrawing);
+
+      if (progressFrameRef.current !== null) {
+        window.cancelAnimationFrame(progressFrameRef.current);
+      }
     };
-  }, []);
+  }, [flushProgressUpdate, flushScratchPoints]);
 
   if (!visible) {
     return null;
@@ -331,6 +406,8 @@ export function ScratchCardCanvas({
         }
       }}
       onPointerUp={(event) => {
+        flushProgressUpdate();
+        flushScratchPoints();
         drawingRef.current = false;
         lastPointRef.current = null;
 
@@ -339,6 +416,8 @@ export function ScratchCardCanvas({
         }
       }}
       onPointerCancel={() => {
+        flushProgressUpdate();
+        flushScratchPoints();
         drawingRef.current = false;
         lastPointRef.current = null;
       }}

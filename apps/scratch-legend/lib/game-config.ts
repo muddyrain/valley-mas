@@ -162,8 +162,65 @@ export const scratchLegendConfig = {
       level: {
         // 每一级升到下一级需要结算多少张“成双入对”。
         cardsRequiredByLevel: [3, 10, 25, 50, 100, 200, 350, 550, 800] as const,
-        // 下标 0 代表等级 1。等级 2 使用 1.3 倍，对齐当前二级卡参考图。
+        // 下标 0 代表等级 0。等级 1 使用 1.3 倍，对齐当前阶段 2.5 统一等级规则。
         payoutMultiplierByLevel: [1, 1.3, 1.65, 2.1, 2.7, 3.4, 4.3, 5.4, 6.8, 8.5] as const,
+      },
+    },
+    tripleMatch: {
+      id: 'triple-match',
+      label: '三连胜出',
+      price: 100,
+      scratchCompleteThreshold: 0.82,
+      scratchBrush: {
+        radius: 8,
+        stepDistance: 5,
+      },
+      // 阶段 2.5 规则：5 格结果区，必须出现 3 个相同图标才给钱。
+      matchRule: {
+        slots: 5,
+        requiredMatches: 3,
+      },
+      prizePool: [
+        {
+          id: 'no-triple',
+          label: '未三连',
+          probability: 0.82,
+          displayProbability: null,
+          payout: 0,
+        },
+        {
+          id: 'triple-coin',
+          label: '铜币三连',
+          probability: 0.1,
+          displayProbability: 0.3,
+          payout: 100,
+        },
+        {
+          id: 'triple-bag',
+          label: '钱袋三连',
+          probability: 0.05,
+          displayProbability: 0.3,
+          payout: 200,
+        },
+        {
+          id: 'triple-cash',
+          label: '纸钞三连',
+          probability: 0.025,
+          displayProbability: 0.3,
+          payout: 500,
+        },
+        {
+          id: 'triple-jackpot',
+          label: '金币堆三连',
+          probability: 0.005,
+          displayProbability: 0.1,
+          payout: 1000,
+        },
+      ] as const,
+      level: {
+        // 本阶段只接入独立等级进度，暂不启用数值成长，所以各等级倍率都保持 1。
+        cardsRequiredByLevel: [3, 10, 25, 50, 100, 200, 350, 550, 800] as const,
+        payoutMultiplierByLevel: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] as const,
       },
     },
   },

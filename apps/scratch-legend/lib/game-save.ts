@@ -37,6 +37,8 @@ export type ScratchLegendNoticeState = {
   scratchMessageDismissed: boolean;
   // 玩家是否已经关闭过升级工具解锁电话。
   upgradeToolsMessageDismissed: boolean;
+  // 玩家是否已经关闭过“三连胜出”解锁电话。
+  tripleMatchMessageDismissed: boolean;
 };
 
 export type ScratchLegendLoanState = {
@@ -51,6 +53,8 @@ export type ScratchLegendLoanState = {
 export type ScratchLegendScratchCardsState = {
   // “成双入对”卡片自己的等级进度。
   basicSafe: ScratchCardProgressState;
+  // “三连胜出”卡片自己的等级进度。
+  tripleMatch: ScratchCardProgressState;
 };
 
 export type ScratchLegendUpgradeToolsState = Record<UpgradeToolId, UpgradeToolState>;
@@ -166,6 +170,7 @@ export function createInitialScratchLegendSave(): ScratchLegendSave {
       workRiskMessageDismissed: false,
       scratchMessageDismissed: false,
       upgradeToolsMessageDismissed: false,
+      tripleMatchMessageDismissed: false,
     },
     loans: {
       activeLoans: [],
@@ -174,6 +179,9 @@ export function createInitialScratchLegendSave(): ScratchLegendSave {
     },
     scratchCards: {
       basicSafe: {
+        cardsSettled: 0,
+      },
+      tripleMatch: {
         cardsSettled: 0,
       },
     },
@@ -240,6 +248,10 @@ export function mergeScratchLegendSave(
         ...initialSave.scratchCards.basicSafe,
         ...partialSave?.scratchCards?.basicSafe,
       },
+      tripleMatch: {
+        ...initialSave.scratchCards.tripleMatch,
+        ...partialSave?.scratchCards?.tripleMatch,
+      },
     },
     upgradeTools: mergeUpgradeToolStates(partialSave?.upgradeTools),
     workspace: {
@@ -260,7 +272,7 @@ function normalizeScratchCardState(card: ScratchCardState | null) {
 
   return {
     ...card,
-    level: card.level ?? 1,
+    level: card.level ?? 0,
     scratchPoints: normalizeScratchPoints(card.scratchPoints),
   } satisfies ScratchCardState;
 }

@@ -7,32 +7,38 @@ type CleaningCanvasProps = {
   active: boolean;
   cleanPoints: readonly ScratchSurfacePoint[];
   onProgressChange: (progress: number) => void;
-  onCleanPoint: (point: ScratchSurfacePoint) => void;
+  onCleanPointsFlush: (points: readonly ScratchSurfacePoint[]) => void;
   onComplete: () => void;
 };
 
 const CANVAS_SIZE = 520;
 const BRUSH_RADIUS = 27;
+const CLEAN_POINT_SAVE_DISTANCE = 12;
+const CLEAN_PROGRESS_REPORT_STEP = 0.04;
 
 export function CleaningCanvas({
   active,
   cleanPoints,
   onProgressChange,
-  onCleanPoint,
+  onCleanPointsFlush,
   onComplete,
 }: CleaningCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const dirtyPixelsRef = useRef(1);
   const completedRef = useRef(false);
+  const progressFrameRef = useRef<number | null>(null);
+  const lastSavedPointRef = useRef<{ x: number; y: number } | null>(null);
+  const pendingCleanPointsRef = useRef<ScratchSurfacePoint[]>([]);
+  const lastReportedProgressRef = useRef(0);
   const cleanPointsRef = useRef(cleanPoints);
   const onProgressChangeRef = useRef(onProgressChange);
-  const onCleanPointRef = useRef(onCleanPoint);
+  const onCleanPointsFlushRef = useRef(onCleanPointsFlush);
   const onCompleteRef = useRef(onComplete);
 
   cleanPointsRef.current = cleanPoints;
   onProgressChangeRef.current = onProgressChange;
-  onCleanPointRef.current = onCleanPoint;
+  onCleanPointsFlushRef.current = onCleanPointsFlush;
   onCompleteRef.current = onComplete;
 
   const countDirtyPixels = useCallback(() => {
@@ -60,18 +66,66 @@ export function CleaningCanvas({
     return dirtyPixels;
   }, []);
 
-  const updateProgress = useCallback(() => {
-    const remainingDirty = countDirtyPixels();
-    const cleanedRatio = clampRatio(1 - remainingDirty / dirtyPixelsRef.current);
-    const displayedRatio = cleanedRatio >= CLEAN_COMPLETE_THRESHOLD ? 1 : cleanedRatio;
-
-    onProgressChangeRef.current(displayedRatio);
-
-    if (!completedRef.current && cleanedRatio >= CLEAN_COMPLETE_THRESHOLD) {
-      completedRef.current = true;
-      onCompleteRef.current();
+  const flushCleanPoints = useCallback(() => {
+    if (pendingCleanPointsRef.current.length === 0) {
+      return;
     }
-  }, [countDirtyPixels]);
+
+    const points = pendingCleanPointsRef.current;
+    pendingCleanPointsRef.current = [];
+    onCleanPointsFlushRef.current(points);
+  }, []);
+
+  const reportProgress = useCallback((progress: number, forceReport = false) => {
+    const previousProgress = lastReportedProgressRef.current;
+    const shouldReport =
+      forceReport ||
+      progress === 0 ||
+      progress === 1 ||
+      Math.abs(progress - previousProgress) >= CLEAN_PROGRESS_REPORT_STEP;
+
+    if (!shouldReport) {
+      return;
+    }
+
+    lastReportedProgressRef.current = progress;
+    onProgressChangeRef.current(progress);
+  }, []);
+
+  const updateProgress = useCallback(
+    (forceReport = false) => {
+      progressFrameRef.current = null;
+      const remainingDirty = countDirtyPixels();
+      const cleanedRatio = clampRatio(1 - remainingDirty / dirtyPixelsRef.current);
+      const displayedRatio = cleanedRatio >= CLEAN_COMPLETE_THRESHOLD ? 1 : cleanedRatio;
+
+      reportProgress(displayedRatio, forceReport);
+
+      if (!completedRef.current && cleanedRatio >= CLEAN_COMPLETE_THRESHOLD) {
+        completedRef.current = true;
+        flushCleanPoints();
+        onCompleteRef.current();
+      }
+    },
+    [countDirtyPixels, flushCleanPoints, reportProgress],
+  );
+
+  const scheduleProgressUpdate = useCallback(() => {
+    if (progressFrameRef.current !== null) {
+      return;
+    }
+
+    progressFrameRef.current = window.requestAnimationFrame(() => updateProgress());
+  }, [updateProgress]);
+
+  const flushProgressUpdate = useCallback(() => {
+    if (progressFrameRef.current !== null) {
+      window.cancelAnimationFrame(progressFrameRef.current);
+      progressFrameRef.current = null;
+    }
+
+    updateProgress(true);
+  }, [updateProgress]);
 
   const eraseCanvasPoint = useCallback((x: number, y: number) => {
     const canvas = canvasRef.current;
@@ -203,8 +257,11 @@ export function CleaningCanvas({
     context.globalAlpha = 1;
     dirtyPixelsRef.current = Math.max(1, countDirtyPixels());
     completedRef.current = false;
-    onProgressChangeRef.current(0);
-  }, [countDirtyPixels]);
+    lastSavedPointRef.current = null;
+    pendingCleanPointsRef.current = [];
+    lastReportedProgressRef.current = 0;
+    reportProgress(0, true);
+  }, [countDirtyPixels, reportProgress]);
 
   const getCanvasPoint = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -240,13 +297,22 @@ export function CleaningCanvas({
       }
 
       eraseCanvasPoint(point.x, point.y);
-      onCleanPointRef.current({
-        xPercent: clampRatio(point.x / canvas.width),
-        yPercent: clampRatio(point.y / canvas.height),
-      });
-      updateProgress();
+      const previousSavedPoint = lastSavedPointRef.current;
+      const savedDistance = previousSavedPoint
+        ? Math.hypot(point.x - previousSavedPoint.x, point.y - previousSavedPoint.y)
+        : Number.POSITIVE_INFINITY;
+
+      if (savedDistance >= CLEAN_POINT_SAVE_DISTANCE) {
+        lastSavedPointRef.current = point;
+        pendingCleanPointsRef.current.push({
+          xPercent: clampRatio(point.x / canvas.width),
+          yPercent: clampRatio(point.y / canvas.height),
+        });
+      }
+
+      scheduleProgressUpdate();
     },
-    [active, eraseCanvasPoint, getCanvasPoint, updateProgress],
+    [active, eraseCanvasPoint, getCanvasPoint, scheduleProgressUpdate],
   );
 
   useEffect(() => {
@@ -262,11 +328,16 @@ export function CleaningCanvas({
       eraseCanvasPoint(point.xPercent * canvas.width, point.yPercent * canvas.height);
     }
 
-    updateProgress();
-  }, [drawDirt, eraseCanvasPoint, updateProgress]);
+    flushProgressUpdate();
+  }, [drawDirt, eraseCanvasPoint, flushProgressUpdate]);
 
   useEffect(() => {
     function stopDrawing() {
+      if (drawingRef.current) {
+        flushProgressUpdate();
+        flushCleanPoints();
+      }
+
       drawingRef.current = false;
     }
 
@@ -278,8 +349,12 @@ export function CleaningCanvas({
       window.removeEventListener('blur', stopDrawing);
       window.removeEventListener('pointerup', stopDrawing);
       document.removeEventListener('visibilitychange', stopDrawing);
+
+      if (progressFrameRef.current !== null) {
+        window.cancelAnimationFrame(progressFrameRef.current);
+      }
     };
-  }, []);
+  }, [flushCleanPoints, flushProgressUpdate]);
 
   return (
     <div className="cleaning-canvas-wrap">
@@ -302,6 +377,8 @@ export function CleaningCanvas({
           }
         }}
         onPointerUp={(event) => {
+          flushProgressUpdate();
+          flushCleanPoints();
           drawingRef.current = false;
 
           if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -309,6 +386,8 @@ export function CleaningCanvas({
           }
         }}
         onPointerCancel={() => {
+          flushProgressUpdate();
+          flushCleanPoints();
           drawingRef.current = false;
         }}
       />

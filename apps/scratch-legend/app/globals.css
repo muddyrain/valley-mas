@@ -1722,6 +1722,31 @@ button {
   box-shadow: inset 0 0 0 1px rgba(69, 86, 87, 0.24);
 }
 
+.tabletop-scratch-card.triple-match::before {
+  border-color: rgba(191, 227, 255, 0.82);
+  background:
+    radial-gradient(circle at 50% -18%, rgba(177, 229, 255, 0.22), transparent 38%),
+    linear-gradient(180deg, rgba(74, 139, 191, 0.98), rgba(45, 95, 159, 0.98));
+}
+
+.tabletop-scratch-card.triple-match .tabletop-ticket-title {
+  color: #d6f0ff;
+  text-shadow: 1px 1px 0 rgba(21, 61, 116, 0.9);
+}
+
+.tabletop-scratch-card.triple-match .tabletop-ticket-art {
+  border-color: rgba(214, 240, 255, 0.86);
+  background: linear-gradient(180deg, #a4d9ff, #6ea7e4);
+}
+
+.tabletop-scratch-card.triple-match .tabletop-art-mountain {
+  background: #4c87cf;
+}
+
+.tabletop-scratch-card.triple-match .tabletop-art-mountain.low {
+  background: #6aa5e6;
+}
+
 .tabletop-scratch-card.entering {
   animation: scratch-ticket-fly-in 420ms cubic-bezier(0.16, 0.9, 0.22, 1.15);
 }
@@ -1865,6 +1890,82 @@ button {
     inset 0 0 0 4px rgba(255, 255, 255, 0.08);
 }
 
+.scratch-card.triple-match {
+  width: min(430px, 100%);
+  min-height: 250px;
+  grid-template-rows: auto 1fr;
+  border-color: rgba(185, 224, 255, 0.72);
+  background:
+    radial-gradient(circle at 90% 24%, rgba(255, 242, 116, 0.8) 0 8px, transparent 9px),
+    linear-gradient(180deg, rgba(99, 169, 218, 0.98), rgba(67, 132, 196, 0.98)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 5px, transparent 5px 10px);
+  clip-path: polygon(0 6%, 86% 0, 100% 8%, 98% 100%, 2% 96%);
+}
+
+.scratch-card.triple-match .scratch-card-header {
+  position: absolute;
+  top: 26px;
+  left: 42px;
+  z-index: 2;
+  min-height: 0;
+  justify-items: start;
+  padding: 0;
+  color: #d8f0ff;
+  text-align: left;
+  transform: rotate(-2deg);
+}
+
+.scratch-card.triple-match .scratch-card-header span {
+  font-size: 34px;
+  font-style: italic;
+  letter-spacing: 1px;
+  text-shadow:
+    2px 2px 0 rgba(23, 63, 122, 0.92),
+    -1px 1px 0 rgba(23, 63, 122, 0.72);
+}
+
+.scratch-card.triple-match .scratch-card-header strong {
+  display: none;
+  color: rgba(220, 244, 255, 0.9);
+}
+
+.scratch-card.triple-match .scratch-card-picture {
+  display: none;
+}
+
+.scratch-card.triple-match .scratch-card-picture .mountain {
+  background: #4d8bd3;
+}
+
+.scratch-card.triple-match .scratch-card-picture .mountain.low {
+  background: #68a6e8;
+}
+
+.scratch-card.triple-match .scratch-result-area {
+  display: grid;
+  width: min(360px, calc(100% - 48px));
+  grid-template-columns: 1fr 104px;
+  align-self: end;
+  justify-self: center;
+  gap: 14px;
+  margin: 84px 0 28px;
+}
+
+.scratch-card.triple-match .scratch-result-area::before {
+  position: absolute;
+  top: -50px;
+  right: 18px;
+  width: 27px;
+  height: 27px;
+  border: 2px solid rgba(41, 100, 162, 0.42);
+  border-radius: 999px;
+  content: "";
+  background:
+    radial-gradient(circle at 45% 40%, #f5f36f 0 3px, transparent 4px),
+    linear-gradient(180deg, #e3e96c, #b8cb38);
+  box-shadow: 0 2px 0 rgba(27, 73, 131, 0.24);
+}
+
 .scratch-card-header {
   display: grid;
   gap: 4px;
@@ -1954,6 +2055,94 @@ button {
   margin: 0;
   border: 0;
   padding: 0;
+}
+
+.scratch-card.triple-match .scratch-result-grid {
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(2, 46px);
+  justify-content: center;
+  gap: 6px 8px;
+  align-self: center;
+}
+
+.scratch-card.triple-match .scratch-result-slot {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  min-height: 0;
+  grid-template-rows: 1fr;
+  border: 3px solid rgba(192, 223, 242, 0.74);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.52), transparent 28%),
+    linear-gradient(145deg, #bfe5f5, #7fb5dd);
+  box-shadow:
+    inset 0 -4px 0 rgba(56, 111, 163, 0.28),
+    0 2px 0 rgba(26, 75, 132, 0.22);
+}
+
+.scratch-card.triple-match .scratch-result-slot:nth-child(4) {
+  grid-column: 1 / span 1;
+  margin-left: 26px;
+}
+
+.scratch-card.triple-match .scratch-result-slot:nth-child(5) {
+  grid-column: 2 / span 1;
+  margin-left: 26px;
+}
+
+.scratch-card.triple-match .scratch-result-slot small {
+  display: none;
+}
+
+.scratch-card.triple-match .scratch-symbol-icon {
+  width: 30px;
+  height: 30px;
+  align-self: center;
+}
+
+.triple-scratch-panel {
+  position: relative;
+  display: block;
+  width: 96px;
+  min-height: 118px;
+  align-self: stretch;
+  border: 2px solid rgba(43, 84, 132, 0.54);
+  border-radius: 3px;
+  background:
+    radial-gradient(circle at 48% 45%, rgba(255, 255, 255, 0.74) 0 25px, transparent 26px),
+    radial-gradient(circle at 66% 18%, rgba(255, 255, 255, 0.54) 0 2px, transparent 3px),
+    radial-gradient(circle at 24% 70%, rgba(255, 255, 255, 0.42) 0 2px, transparent 3px),
+    linear-gradient(135deg, #dcecf7, #a9cfe8);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.26),
+    0 2px 0 rgba(29, 75, 129, 0.22);
+}
+
+.triple-scratch-panel::before {
+  position: absolute;
+  inset: 24px;
+  border-radius: 999px;
+  content: "";
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.58) 0 3px,
+    rgba(174, 204, 224, 0.55) 3px 6px
+  );
+  opacity: 0.72;
+}
+
+.scratch-card.triple-match .scratch-card-cover {
+  inset: auto;
+  top: 50%;
+  left: 6px;
+  width: 210px;
+  height: 118px;
+  transform: translateY(-50%);
+}
+
+.scratch-card.triple-match.revealed .triple-scratch-panel {
+  opacity: 0.16;
 }
 
 .scratch-result-slot {
@@ -2065,6 +2254,39 @@ button {
   background: rgba(255, 238, 139, 0.56);
 }
 
+.scratch-symbol-icon.coin span {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #9d6418;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 245, 165, 0.84) 0 3px, transparent 4px),
+    linear-gradient(180deg, #ffd55a, #c98422);
+  box-shadow:
+    inset 0 -3px 0 rgba(121, 75, 16, 0.3),
+    0 2px 0 rgba(91, 54, 18, 0.36);
+}
+
+.scratch-symbol-icon.coin span::after {
+  position: absolute;
+  inset: 6px;
+  border: 2px solid rgba(124, 76, 18, 0.52);
+  border-radius: 999px;
+  content: "";
+}
+
+.scratch-symbol-icon.jackpot span {
+  position: relative;
+  width: 28px;
+  height: 24px;
+  background:
+    radial-gradient(circle at 8px 16px, #ffd45b 0 6px, transparent 7px),
+    radial-gradient(circle at 18px 15px, #f0aa32 0 7px, transparent 8px),
+    radial-gradient(circle at 14px 8px, #ffe07a 0 7px, transparent 8px);
+  filter: drop-shadow(0 2px 0 rgba(91, 54, 18, 0.34));
+}
+
 .scratch-symbol-icon.blank span {
   width: 22px;
   height: 22px;
@@ -2089,6 +2311,14 @@ button {
 
 .scratch-result-slot.bag {
   color: #c48a26;
+}
+
+.scratch-result-slot.coin {
+  color: #d29a2c;
+}
+
+.scratch-result-slot.jackpot {
+  color: #e2b43c;
 }
 
 .scratch-card-cover {
