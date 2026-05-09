@@ -6,19 +6,20 @@ import { CLEAN_COMPLETE_THRESHOLD, clampRatio, type ScratchSurfacePoint } from '
 type CleaningCanvasProps = {
   active: boolean;
   cleanPoints: readonly ScratchSurfacePoint[];
+  brushRadius: number;
   onProgressChange: (progress: number) => void;
   onCleanPointsFlush: (points: readonly ScratchSurfacePoint[]) => void;
   onComplete: () => void;
 };
 
 const CANVAS_SIZE = 520;
-const BRUSH_RADIUS = 27;
 const CLEAN_POINT_SAVE_DISTANCE = 12;
 const CLEAN_PROGRESS_REPORT_STEP = 0.04;
 
 export function CleaningCanvas({
   active,
   cleanPoints,
+  brushRadius,
   onProgressChange,
   onCleanPointsFlush,
   onComplete,
@@ -127,32 +128,35 @@ export function CleaningCanvas({
     updateProgress(true);
   }, [updateProgress]);
 
-  const eraseCanvasPoint = useCallback((x: number, y: number) => {
-    const canvas = canvasRef.current;
+  const eraseCanvasPoint = useCallback(
+    (x: number, y: number) => {
+      const canvas = canvasRef.current;
 
-    if (!canvas) {
-      return;
-    }
+      if (!canvas) {
+        return;
+      }
 
-    const context = canvas.getContext('2d', { willReadFrequently: true });
+      const context = canvas.getContext('2d', { willReadFrequently: true });
 
-    if (!context) {
-      return;
-    }
+      if (!context) {
+        return;
+      }
 
-    context.save();
-    context.globalCompositeOperation = 'destination-out';
+      context.save();
+      context.globalCompositeOperation = 'destination-out';
 
-    for (let index = 0; index < 4; index += 1) {
-      const offsetX = (Math.random() - 0.5) * 10;
-      const offsetY = (Math.random() - 0.5) * 10;
-      context.beginPath();
-      context.arc(x + offsetX, y + offsetY, BRUSH_RADIUS + Math.random() * 7, 0, Math.PI * 2);
-      context.fill();
-    }
+      for (let index = 0; index < 4; index += 1) {
+        const offsetX = (Math.random() - 0.5) * 10;
+        const offsetY = (Math.random() - 0.5) * 10;
+        context.beginPath();
+        context.arc(x + offsetX, y + offsetY, brushRadius + Math.random() * 7, 0, Math.PI * 2);
+        context.fill();
+      }
 
-    context.restore();
-  }, []);
+      context.restore();
+    },
+    [brushRadius],
+  );
 
   const drawDirt = useCallback(() => {
     const canvas = canvasRef.current;

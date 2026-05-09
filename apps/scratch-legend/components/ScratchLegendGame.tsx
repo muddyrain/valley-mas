@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { CleaningCanvas } from '@/components/CleaningCanvas';
 import { ScratchCardCanvas } from '@/components/ScratchCardCanvas';
 import {
@@ -13,7 +13,12 @@ import {
   canStartWorkFromPhase,
   createLoanFromTemplate,
   createScratchCard,
+  type GoldChangeEffect,
+  type GoldEffectSource,
   getBoundedPlatePosition,
+  getCleaningBrushRadius,
+  getGoldChangeEffect,
+  getGoldDisplayRollValue,
   getLoanRepaymentFeedback,
   getNextUnlockMilestone,
   getOutcomeAmountLabel,
@@ -22,16 +27,20 @@ import {
   getScratchCardConfig,
   getScratchCardLevelProgress,
   getScratchCardPrizePoolForLevel,
+  getScratchCardSettlementHighlightDelayMs,
   getScratchCardSettlementProgressKey,
+  getScratchCardSlotIndexes,
   getScratchCardStepDistance,
   getUnlockMilestoneCurrentValue,
   getUnlockMilestoneProgress,
+  getWinningScratchSymbolIndexes,
   getWorkBrokenPlatePenaltyForLevel,
   getWorkLevelProgress,
   getWorkRewardAmountForLevel,
   isBrokenPlateEnabled,
   isPointInsideCircleBounds,
   LOAN_CONFIG,
+  LOAN_PRINCIPAL,
   LOAN_REPAYMENT_AMOUNT,
   type LoanState,
   repayLoan,
@@ -114,6 +123,10 @@ type LoanRepaymentFeedback = {
 
 type UnlockToast = 'trash' | 'scratch' | 'upgrade' | 'triple-match' | null;
 type PhoneNoticeType = 'loan' | 'scratch' | 'upgrade-tools' | 'triple-match' | 'work-risk' | null;
+type GoldEffectEvent = GoldChangeEffect & {
+  id: number;
+  source: GoldEffectSource;
+};
 
 const SCRATCH_SYMBOL_LABELS: Record<ScratchCardSymbol, string> = {
   fire: '火焰',
@@ -142,6 +155,11 @@ const TRIPLE_MATCH_PHONE_LINES = ['哇哦，我这正好有新的刮刮卡！', 
 
 const LOAN_PHONE_COPY =
   '大发慈悲给你一笔贷款。温馨提示，我们的贷款利率是 6000%。为了防止你不还，我们贴心地给你在右上角加了一个按钮，可以查看当前贷款。';
+const GOLD_EFFECT_MAX_EVENTS = 6;
+const GOLD_EFFECT_DURATION_MS = 900;
+const GOLD_ROLL_DURATION_MS = 560;
+const SCRATCH_SLOT_FLASH_DURATION_MS = 420;
+const SCRATCH_SETTLEMENT_HIGHLIGHT_DELAY_MS = 140;
 
 function StatusPill({ label, value }: { label: string; value: string }) {
   return (
@@ -247,6 +265,13 @@ export function ScratchLegendGame() {
   const [loanRepaymentFeedback, setLoanRepaymentFeedback] = useState<LoanRepaymentFeedback | null>(
     null,
   );
+  const [displayedGold, setDisplayedGold] = useState(save.player.gold);
+  const [goldRolling, setGoldRolling] = useState(false);
+  const [goldEffectEvents, setGoldEffectEvents] = useState<GoldEffectEvent[]>([]);
+  const [coinEffectPulse, setCoinEffectPulse] = useState<GoldEffectEvent | null>(null);
+  const [revealedScratchSlots, setRevealedScratchSlots] = useState<number[]>([]);
+  const [flashingScratchSlots, setFlashingScratchSlots] = useState<number[]>([]);
+  const [settlementHighlightSlots, setSettlementHighlightSlots] = useState<number[]>([]);
   const [phoneMessageOpen, setPhoneMessageOpen] = useState(false);
   const [upgradeToolsPhoneStep, setUpgradeToolsPhoneStep] = useState(0);
   const [tripleMatchPhoneStep, setTripleMatchPhoneStep] = useState(0);
@@ -259,6 +284,13 @@ export function ScratchLegendGame() {
   const plateEnterTimerRefs = useRef<number[]>([]);
   const unlockToastTimerRef = useRef<number | null>(null);
   const loanRepaymentTimerRef = useRef<number | null>(null);
+  const goldEffectTimerRefs = useRef<number[]>([]);
+  const scratchSlotFlashTimerRefs = useRef<number[]>([]);
+  const settlementHighlightTimerRef = useRef<number | null>(null);
+  const goldRollFrameRef = useRef<number | null>(null);
+  const goldEffectIdRef = useRef(0);
+  const displayedGoldRef = useRef(save.player.gold);
+  const revealedScratchSlotSetRef = useRef(new Set<number>());
   const previousTrashCanUnlockedRef = useRef(save.unlocks.trashCanUnlocked);
   const previousScratchModeUnlockedRef = useRef(
     isUnlockMilestoneUnlocked(save, SCRATCH_MODE_MILESTONE_ID),
@@ -370,6 +402,7 @@ export function ScratchLegendGame() {
   const workBrokenPlatePenalty = getWorkBrokenPlatePenaltyForLevel(workLevel);
   const scratchRadiusToolLevel = save.upgradeTools['scratch-radius']?.level ?? 0;
   const scratchBrushRadius = getScratchBrushRadius(scratchRadiusToolLevel, activeLoans);
+  const cleaningBrushRadius = getCleaningBrushRadius(scratchRadiusToolLevel, activeLoans);
   const workSafeRewardPercent = `${Math.round(
     (brokenPlateEnabled ? WORK_SAFE_REWARD_CHANCE : 1) * 100,
   )}%`;
@@ -475,8 +508,64 @@ export function ScratchLegendGame() {
       if (loanRepaymentTimerRef.current) {
         window.clearTimeout(loanRepaymentTimerRef.current);
       }
+
+      for (const timer of goldEffectTimerRefs.current) {
+        window.clearTimeout(timer);
+      }
+
+      for (const timer of scratchSlotFlashTimerRefs.current) {
+        window.clearTimeout(timer);
+      }
+
+      if (settlementHighlightTimerRef.current) {
+        window.clearTimeout(settlementHighlightTimerRef.current);
+      }
+
+      if (goldRollFrameRef.current !== null) {
+        window.cancelAnimationFrame(goldRollFrameRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    const nextGold = player.gold;
+    const fromGold = displayedGoldRef.current;
+
+    if (goldRollFrameRef.current !== null) {
+      window.cancelAnimationFrame(goldRollFrameRef.current);
+      goldRollFrameRef.current = null;
+    }
+
+    if (nextGold <= fromGold) {
+      displayedGoldRef.current = nextGold;
+      setDisplayedGold(nextGold);
+      setGoldRolling(false);
+      return;
+    }
+
+    const startedAt = window.performance.now();
+    setGoldRolling(true);
+
+    function updateGoldRoll(now: number) {
+      const progress = (now - startedAt) / GOLD_ROLL_DURATION_MS;
+      const nextDisplayValue = getGoldDisplayRollValue(fromGold, nextGold, progress);
+
+      displayedGoldRef.current = nextDisplayValue;
+      setDisplayedGold(nextDisplayValue);
+
+      if (progress < 1) {
+        goldRollFrameRef.current = window.requestAnimationFrame(updateGoldRoll);
+        return;
+      }
+
+      displayedGoldRef.current = nextGold;
+      setDisplayedGold(nextGold);
+      setGoldRolling(false);
+      goldRollFrameRef.current = null;
+    }
+
+    goldRollFrameRef.current = window.requestAnimationFrame(updateGoldRoll);
+  }, [player.gold]);
 
   useEffect(() => {
     if (!hasHydrated || unlockToastReadyRef.current) {
@@ -552,6 +641,114 @@ export function ScratchLegendGame() {
     }
 
     return 'idle';
+  }
+
+  function triggerGoldEffect(previousGold: number, nextGold: number, source: GoldEffectSource) {
+    const effect = getGoldChangeEffect(previousGold, nextGold, source);
+
+    if (!effect) {
+      return;
+    }
+
+    const event = {
+      ...effect,
+      id: goldEffectIdRef.current + 1,
+      source,
+    };
+    goldEffectIdRef.current = event.id;
+    setCoinEffectPulse(event);
+    setGoldEffectEvents((current) => [...current.slice(-(GOLD_EFFECT_MAX_EVENTS - 1)), event]);
+
+    const removeTimer = window.setTimeout(() => {
+      setGoldEffectEvents((current) => current.filter((item) => item.id !== event.id));
+    }, GOLD_EFFECT_DURATION_MS);
+    const pulseTimer = window.setTimeout(() => {
+      setCoinEffectPulse((current) => (current?.id === event.id ? null : current));
+    }, GOLD_EFFECT_DURATION_MS);
+
+    goldEffectTimerRefs.current.push(removeTimer, pulseTimer);
+  }
+
+  function resetScratchRevealEffects() {
+    if (settlementHighlightTimerRef.current) {
+      window.clearTimeout(settlementHighlightTimerRef.current);
+      settlementHighlightTimerRef.current = null;
+    }
+
+    revealedScratchSlotSetRef.current = new Set();
+    setRevealedScratchSlots([]);
+    setFlashingScratchSlots([]);
+    setSettlementHighlightSlots([]);
+  }
+
+  function revealScratchSlots(slotIndexes: readonly number[]) {
+    const nextSlotIndexes: number[] = [];
+
+    for (const slotIndex of slotIndexes) {
+      if (revealedScratchSlotSetRef.current.has(slotIndex)) {
+        continue;
+      }
+
+      revealedScratchSlotSetRef.current.add(slotIndex);
+      nextSlotIndexes.push(slotIndex);
+    }
+
+    if (nextSlotIndexes.length === 0) {
+      return [...revealedScratchSlotSetRef.current];
+    }
+
+    setRevealedScratchSlots((current) => [...new Set([...current, ...nextSlotIndexes])]);
+    setFlashingScratchSlots((current) => [...new Set([...current, ...nextSlotIndexes])]);
+
+    for (const slotIndex of nextSlotIndexes) {
+      const timer = window.setTimeout(() => {
+        setFlashingScratchSlots((current) => current.filter((item) => item !== slotIndex));
+      }, SCRATCH_SLOT_FLASH_DURATION_MS);
+      scratchSlotFlashTimerRefs.current.push(timer);
+    }
+
+    return [...revealedScratchSlotSetRef.current];
+  }
+
+  function revealScratchSlot(slotIndex: number) {
+    revealScratchSlots([slotIndex]);
+  }
+
+  function scheduleSettlementHighlight(
+    card: ScratchCardState,
+    revealedSlotIndexes: readonly number[],
+  ) {
+    if (settlementHighlightTimerRef.current) {
+      window.clearTimeout(settlementHighlightTimerRef.current);
+      settlementHighlightTimerRef.current = null;
+    }
+
+    setSettlementHighlightSlots([]);
+
+    if (!card.result.isWinning) {
+      return;
+    }
+
+    const highlightDelay = getScratchCardSettlementHighlightDelayMs({
+      cardType: card.type,
+      revealedSlotIndexes,
+      revealFlashDurationMs: SCRATCH_SLOT_FLASH_DURATION_MS,
+      settleDelayMs: SCRATCH_SETTLEMENT_HIGHLIGHT_DELAY_MS,
+    });
+
+    if (highlightDelay === null) {
+      return;
+    }
+
+    const winningSlotIndexes = getWinningScratchSymbolIndexes(
+      card.result.symbols,
+      Number(getScratchCardConfig(card.type).matchRule.requiredMatches),
+    );
+
+    settlementHighlightTimerRef.current = window.setTimeout(() => {
+      setSettlementHighlightSlots(winningSlotIndexes);
+      settlementHighlightTimerRef.current = null;
+    }, highlightDelay);
   }
 
   function updatePlatePositionFromPointer(
@@ -700,6 +897,7 @@ export function ScratchLegendGame() {
       workLevel,
     });
 
+    triggerGoldEffect(player.gold, goldAfterCost, 'work-cost');
     setCleanProgress(0);
     updateSave((current) => ({
       ...current,
@@ -753,6 +951,7 @@ export function ScratchLegendGame() {
     });
     const scratchCardConfig = getScratchCardConfig(cardType);
 
+    triggerGoldEffect(player.gold, player.gold - scratchCardConfig.price, 'scratch-card-purchase');
     setScratchProgress(0);
     updateSave((current) => ({
       ...current,
@@ -779,6 +978,15 @@ export function ScratchLegendGame() {
 
     if (phase !== 'scratchCardSpawned' || !selectedCard) {
       return;
+    }
+
+    resetScratchRevealEffects();
+
+    if (selectedCard.status === 'claimable') {
+      const revealedSlotIndexes = getScratchCardSlotIndexes(selectedCard.type);
+      revealedScratchSlotSetRef.current = new Set(revealedSlotIndexes);
+      setRevealedScratchSlots(revealedSlotIndexes);
+      scheduleSettlementHighlight(selectedCard, revealedSlotIndexes);
     }
 
     setScratchProgress(selectedCard.status === 'claimable' ? 1 : 0);
@@ -810,6 +1018,7 @@ export function ScratchLegendGame() {
       return;
     }
 
+    resetScratchRevealEffects();
     setScratchProgress(activeScratchCard.status === 'claimable' ? 1 : 0);
     updateSave((current) => {
       if (!current.workspace.activeScratchCardId) {
@@ -1177,6 +1386,7 @@ export function ScratchLegendGame() {
         };
       });
       setScratchProgress(0);
+      resetScratchRevealEffects();
       resetScratchCardPointer();
       return;
     }
@@ -1217,6 +1427,12 @@ export function ScratchLegendGame() {
       return;
     }
 
+    const nextGold = Math.max(0, player.gold + claimedPlate.reward.total);
+    triggerGoldEffect(
+      player.gold,
+      nextGold,
+      claimedPlate.reward.total < 0 ? 'broken-plate' : 'work-reward',
+    );
     updateSave((current) => {
       const remainingPlates = current.workspace.plates.filter(
         (plate) => plate.id !== claimedPlate.id,
@@ -1244,6 +1460,14 @@ export function ScratchLegendGame() {
 
   function completeScratchCard() {
     setScratchProgress(1);
+
+    if (activeScratchCard) {
+      const revealedSlotIndexes = revealScratchSlots(
+        getScratchCardSlotIndexes(activeScratchCard.type),
+      );
+      scheduleSettlementHighlight(activeScratchCard, revealedSlotIndexes);
+    }
+
     updateSave((current) => {
       const activeCardId = current.workspace.activeScratchCardId;
 
@@ -1266,6 +1490,12 @@ export function ScratchLegendGame() {
   function claimScratchCardPrize() {
     if (!activeScratchCard || activeScratchCard.status !== 'claimable') {
       return;
+    }
+
+    const payout = activeScratchCard.result.isWinning ? activeScratchCard.result.payout : 0;
+
+    if (payout > 0) {
+      triggerGoldEffect(player.gold, player.gold + payout, 'scratch-prize');
     }
 
     updateSave((current) => {
@@ -1297,6 +1527,7 @@ export function ScratchLegendGame() {
         },
       };
     });
+    resetScratchRevealEffects();
     setScratchProgress(0);
   }
 
@@ -1305,6 +1536,7 @@ export function ScratchLegendGame() {
       return;
     }
 
+    triggerGoldEffect(player.gold, player.gold + LOAN_PRINCIPAL, 'loan-sign');
     updateSave((current) => {
       const loan = createLoanFromTemplate({
         id: current.loans.nextLoanId,
@@ -1332,6 +1564,7 @@ export function ScratchLegendGame() {
       return;
     }
 
+    triggerGoldEffect(player.gold, player.gold - TRASH_CAN_PRICE, 'upgrade-purchase');
     updateSave((current) => ({
       ...current,
       player: {
@@ -1348,6 +1581,12 @@ export function ScratchLegendGame() {
   function buyUpgradeTool(tool: UpgradeToolConfig) {
     if (!upgradeToolsVisible) {
       return;
+    }
+
+    const toolState = save.upgradeTools[tool.id];
+
+    if (toolState && canBuyUpgradeTool(player.gold, tool, toolState)) {
+      triggerGoldEffect(player.gold, player.gold - tool.price, 'upgrade-purchase');
     }
 
     updateSave((current) => {
@@ -1385,6 +1624,7 @@ export function ScratchLegendGame() {
       return;
     }
 
+    triggerGoldEffect(player.gold, repayLoan(player.gold, repaidLoan), 'loan-repayment');
     const repaymentFeedback = getLoanRepaymentFeedback(repaidLoan);
     const isFinalLoan = activeLoans.length === 1;
 
@@ -1512,11 +1752,39 @@ export function ScratchLegendGame() {
     <main className="scratch-shell select-none">
       <section className="game-frame" aria-label="刮出传说游戏界面">
         <aside className="left-panel">
-          <div className="coin-board">
-            <div className="coin-row">
+          <div
+            className={`coin-board ${
+              coinEffectPulse
+                ? `coin-board-${coinEffectPulse.direction} ${coinEffectPulse.intensity}`
+                : ''
+            }`}
+          >
+            <div className={`coin-row ${goldRolling ? 'rolling' : ''}`}>
               <span className="coin-icon">$</span>
-              <strong>{player.gold}</strong>
+              <strong>{displayedGold}</strong>
             </div>
+            {goldEffectEvents.length > 0 && (
+              <div className="gold-effect-layer" aria-hidden="true">
+                {goldEffectEvents.map((event) => (
+                  <span
+                    className={`gold-float ${event.direction} ${event.intensity}`}
+                    key={event.id}
+                  >
+                    {event.direction === 'increase' ? '+' : '-'}${event.amount}
+                    {Array.from({ length: event.particleCount }).map((_, index) => (
+                      <i
+                        key={`${event.id}-${index}`}
+                        style={
+                          {
+                            '--particle-index': index,
+                          } as CSSProperties
+                        }
+                      />
+                    ))}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="ticket-progress">
               <small>熟练度</small>
               <span>
@@ -1837,7 +2105,17 @@ export function ScratchLegendGame() {
                     <fieldset className="scratch-result-grid" aria-label="刮刮卡结果区">
                       {activeScratchCard.result.symbols.map((symbol, index) => (
                         <span
-                          className={`scratch-result-slot ${symbol}`}
+                          className={`scratch-result-slot ${symbol} ${
+                            revealedScratchSlots.includes(index) ? 'slot-revealed' : ''
+                          } ${flashingScratchSlots.includes(index) ? 'slot-flash' : ''} ${
+                            settlementHighlightSlots.includes(index) ? 'slot-winning' : ''
+                          } ${
+                            activeScratchCard.status === 'claimable' &&
+                            settlementHighlightSlots.length > 0 &&
+                            !settlementHighlightSlots.includes(index)
+                              ? 'slot-muted'
+                              : ''
+                          }`}
                           key={`${symbol}-${index}`}
                         >
                           <ScratchSymbolIcon symbol={symbol} />
@@ -1852,10 +2130,16 @@ export function ScratchLegendGame() {
                       key={activeScratchCard.id}
                       active={activeScratchCard.status === 'scratching'}
                       visible={shouldShowScratchCover(activeScratchCard.status, scratchProgress)}
+                      cardType={activeScratchCard.type}
                       scratchPoints={activeScratchCard.scratchPoints}
                       brushRadius={scratchBrushRadius}
                       stepDistance={getScratchCardStepDistance(activeScratchCard.type)}
                       onProgressChange={setScratchProgress}
+                      onRevealSlotsSync={(slotIndexes) => {
+                        revealedScratchSlotSetRef.current = new Set(slotIndexes);
+                        setRevealedScratchSlots([...slotIndexes]);
+                      }}
+                      onRevealSlot={revealScratchSlot}
                       onScratchPointsFlush={recordActiveScratchPoints}
                       onComplete={completeScratchCard}
                     />
@@ -2109,6 +2393,7 @@ export function ScratchLegendGame() {
                       key={activePlateId ?? 'cleaning'}
                       active={isCleaningView}
                       cleanPoints={activePlate?.cleanPoints ?? []}
+                      brushRadius={cleaningBrushRadius}
                       onProgressChange={setCleanProgress}
                       onCleanPointsFlush={recordActivePlateCleanPoints}
                       onComplete={completeCleaning}

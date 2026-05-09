@@ -108,6 +108,9 @@ export const scratchLegendConfig = {
       // 只有在扣完“当前等级本应赚到的收益”等额惩罚后，仍然至少能保留 1 金币继续买盘子，才允许出现碎盘结果。
       reserveGoldForNextPlate: 1,
     },
+    cleanBrush: {
+      radius: 27,
+    },
   },
   // 刮刮卡配置。阶段二只启用第一张低风险教学卡。
   scratchCards: {
@@ -118,6 +121,8 @@ export const scratchLegendConfig = {
       price: 10,
       // 有效刮开比例达到该阈值后，允许玩家结算。
       scratchCompleteThreshold: 0.8,
+      // 单个结果格刮开到该比例后，才触发图案揭露闪烁。
+      scratchSymbolRevealThreshold: 0.95,
       scratchBrush: {
         // 刮层笔刷半径。数值越小，单次拖动刮开的范围越小。
         radius: 8,
@@ -171,6 +176,7 @@ export const scratchLegendConfig = {
       label: '三连胜出',
       price: 100,
       scratchCompleteThreshold: 0.82,
+      scratchSymbolRevealThreshold: 0.95,
       scratchBrush: {
         radius: 8,
         stepDistance: 5,

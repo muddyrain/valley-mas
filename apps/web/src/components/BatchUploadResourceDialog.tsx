@@ -39,6 +39,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  limitBatchResourceFiles,
+  MAX_BATCH_RESOURCE_UPLOAD_IMAGES,
+} from '@/utils/batchResourceUpload';
+import {
   confirmUploadResult,
   createUploadKey,
   shouldConfirmUploadResult,
@@ -179,10 +183,21 @@ export default function BatchUploadResourceDialog({
 
     if (!validFiles.length) return;
 
+    const limitResult = limitBatchResourceFiles(validFiles, itemsRef.current.length);
+    if (limitResult.alreadyAtLimit) {
+      toast.error(`批量上传最多支持 ${MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张图片，请先移除部分图片`);
+      return;
+    }
+    if (limitResult.exceededLimit) {
+      toast.info(
+        `批量上传最多支持 ${MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张图片，本次已添加前 ${limitResult.accepted.length} 张，剩余 ${limitResult.rejectedCount} 张已跳过`,
+      );
+    }
+
     try {
       setPreparing(true);
       const newItems = await Promise.all(
-        validFiles.map(async (file): Promise<BatchResourceItem> => {
+        limitResult.accepted.map(async (file): Promise<BatchResourceItem> => {
           const previewUrl = URL.createObjectURL(file);
           const base64 = await resizeImageForAI(file, 512).catch(() => '');
           return {
@@ -512,7 +527,8 @@ export default function BatchUploadResourceDialog({
             批量上传资源
           </DialogTitle>
           <DialogDescription className="mt-0.5 text-xs text-slate-500">
-            一次选择多张图片，可批量设置 AI 名称和标签后统一上传。
+            一次最多选择 {MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张图片，可批量设置 AI
+            名称和标签后统一上传。
           </DialogDescription>
         </DialogHeader>
 
@@ -587,7 +603,9 @@ export default function BatchUploadResourceDialog({
               <p className="text-sm font-medium text-slate-600 mb-1">
                 {preparing ? '正在解析图片…' : '拖拽图片到这里，或点击选择'}
               </p>
-              <p className="text-xs text-slate-400 mb-4">支持 JPG、PNG、WebP，单张最大 30MB</p>
+              <p className="text-xs text-slate-400 mb-4">
+                支持 JPG、PNG、WebP，最多 {MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张，单张最大 30MB
+              </p>
               {preparing ? (
                 <Loader2 className="h-5 w-5 animate-spin text-theme-primary" />
               ) : (
@@ -605,7 +623,7 @@ export default function BatchUploadResourceDialog({
               {/* 工具栏 */}
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-medium text-slate-500">
-                  共 {items.length} 张图片
+                  共 {items.length}/{MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张图片
                   {pendingCount > 0 && (
                     <span className="ml-1 text-slate-400">（{pendingCount} 待上传）</span>
                   )}
@@ -640,8 +658,16 @@ export default function BatchUploadResourceDialog({
                   {!uploading && (
                     <button
                       type="button"
-                      disabled={isBusy}
-                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isBusy || items.length >= MAX_BATCH_RESOURCE_UPLOAD_IMAGES}
+                      onClick={() => {
+                        if (items.length >= MAX_BATCH_RESOURCE_UPLOAD_IMAGES) {
+                          toast.error(
+                            `批量上传最多支持 ${MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张图片，请先移除部分图片`,
+                          );
+                          return;
+                        }
+                        fileInputRef.current?.click();
+                      }}
                       className="text-xs text-slate-400 hover:text-slate-600 transition"
                     >
                       继续添加
@@ -855,8 +881,8 @@ export default function BatchUploadResourceDialog({
         <div className="shrink-0 flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-4">
           <div className="text-xs text-slate-400">
             {items.length > 0
-              ? `${items.length} 张图片 · ${uploadType === 'wallpaper' ? '壁纸' : '头像'} · ${visibility === 'private' ? '私密' : visibility === 'shared' ? '共享' : '公开'}${confirmingCount > 0 ? ` · ${confirmingCount} 项确认中` : ''}`
-              : '选择图片后即可批量上传'}
+              ? `${items.length}/${MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张图片 · ${uploadType === 'wallpaper' ? '壁纸' : '头像'} · ${visibility === 'private' ? '私密' : visibility === 'shared' ? '共享' : '公开'}${confirmingCount > 0 ? ` · ${confirmingCount} 项确认中` : ''}`
+              : `选择图片后即可批量上传，最多 ${MAX_BATCH_RESOURCE_UPLOAD_IMAGES} 张`}
           </div>
           <div className="flex items-center gap-3">
             <Button

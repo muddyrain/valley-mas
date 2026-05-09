@@ -15,6 +15,7 @@ export const WORK_SAFE_REWARD_CHANCE = 1 - WORK_BROKEN_PLATE_CHANCE;
 export const WORK_MAX_LEVEL = scratchLegendConfig.work.level.maxLevel;
 export const WORK_PLATES_REQUIRED_BY_LEVEL = scratchLegendConfig.work.level.platesRequiredByLevel;
 export const WORK_PLATE_COST = scratchLegendConfig.work.plateCost;
+export const WORK_CLEAN_BRUSH = scratchLegendConfig.work.cleanBrush;
 export const TRASH_CAN_UNLOCK_AFTER_PLATES =
   scratchLegendConfig.unlockables.trashCan.autoUnlockAfterCleanedPlates;
 export const TRASH_CAN_PRICE = scratchLegendConfig.unlockables.trashCan.price;
@@ -23,12 +24,16 @@ export const BASIC_SAFE_CARD_CONFIG = scratchLegendConfig.scratchCards.basicSafe
 export const BASIC_SAFE_CARD_PRICE = BASIC_SAFE_CARD_CONFIG.price;
 export const BASIC_SAFE_CARD_SCRATCH_COMPLETE_THRESHOLD =
   BASIC_SAFE_CARD_CONFIG.scratchCompleteThreshold;
+export const BASIC_SAFE_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD =
+  BASIC_SAFE_CARD_CONFIG.scratchSymbolRevealThreshold;
 export const BASIC_SAFE_CARD_SCRATCH_BRUSH = BASIC_SAFE_CARD_CONFIG.scratchBrush;
 export const BASIC_SAFE_CARD_LEVEL_CONFIG = BASIC_SAFE_CARD_CONFIG.level;
 export const BASIC_SAFE_CARD_MAX_LEVEL =
   BASIC_SAFE_CARD_LEVEL_CONFIG.payoutMultiplierByLevel.length;
 export const TRIPLE_MATCH_CARD_CONFIG = scratchLegendConfig.scratchCards.tripleMatch;
 export const TRIPLE_MATCH_CARD_PRICE = TRIPLE_MATCH_CARD_CONFIG.price;
+export const TRIPLE_MATCH_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD =
+  TRIPLE_MATCH_CARD_CONFIG.scratchSymbolRevealThreshold;
 export const UPGRADE_TOOLS_CONFIG = scratchLegendConfig.upgradeTools.items;
 export const LOAN_CONFIG = scratchLegendConfig.loans;
 export const LOAN_PRINCIPAL = LOAN_CONFIG.principal;
@@ -145,6 +150,26 @@ export type ScratchCardLevelProgress = {
   target: number;
   ratio: number;
   cardsSettled: number;
+};
+
+export type GoldEffectSource =
+  | 'work-reward'
+  | 'scratch-prize'
+  | 'loan-sign'
+  | 'work-cost'
+  | 'scratch-card-purchase'
+  | 'upgrade-purchase'
+  | 'loan-repayment'
+  | 'broken-plate';
+
+export type GoldEffectDirection = 'increase' | 'decrease';
+export type GoldEffectIntensity = 'light' | 'normal' | 'strong';
+
+export type GoldChangeEffect = {
+  direction: GoldEffectDirection;
+  amount: number;
+  intensity: GoldEffectIntensity;
+  particleCount: number;
 };
 
 export type LoanTemplate = (typeof LOAN_CONFIG.templates)[number];
@@ -492,6 +517,152 @@ export function isScratchCardWinningResult(
   requiredMatches: number = BASIC_SAFE_CARD_CONFIG.matchRule.requiredMatches,
 ) {
   return getScratchCardMatchCount(symbols) >= requiredMatches;
+}
+
+export function getWinningScratchSymbolIndexes(
+  symbols: readonly ScratchCardSymbol[],
+  requiredMatches: number,
+) {
+  const indexesBySymbol = new Map<ScratchCardSymbol, number[]>();
+
+  for (const [index, symbol] of symbols.entries()) {
+    if (symbol === 'blank') {
+      continue;
+    }
+
+    indexesBySymbol.set(symbol, [...(indexesBySymbol.get(symbol) ?? []), index]);
+  }
+
+  for (const indexes of indexesBySymbol.values()) {
+    if (indexes.length >= requiredMatches) {
+      return indexes.slice(0, requiredMatches);
+    }
+  }
+
+  return [];
+}
+
+export function getScratchCardRevealSlotIndex(
+  cardType: ScratchCardType,
+  point: ScratchSurfacePoint,
+) {
+  if (point.xPercent < 0 || point.xPercent > 1 || point.yPercent < 0 || point.yPercent > 1) {
+    return null;
+  }
+
+  if (cardType === 'basic-safe') {
+    return Math.min(2, Math.floor(point.xPercent * 3));
+  }
+
+  const tripleMatchSlots = [
+    { x: 0.24, y: 0.28 },
+    { x: 0.5, y: 0.28 },
+    { x: 0.76, y: 0.28 },
+    { x: 0.37, y: 0.72 },
+    { x: 0.63, y: 0.72 },
+  ] as const;
+  const revealRadius = 0.17;
+
+  for (const [index, slot] of tripleMatchSlots.entries()) {
+    if (Math.hypot(point.xPercent - slot.x, point.yPercent - slot.y) <= revealRadius) {
+      return index;
+    }
+  }
+
+  return null;
+}
+
+export function getScratchCardSlotIndexes(cardType: ScratchCardType) {
+  return Array.from(
+    { length: Number(getScratchCardConfig(cardType).matchRule.slots) },
+    (_, slotIndex) => slotIndex,
+  );
+}
+
+export function getScratchCardRevealThreshold(cardType: ScratchCardType) {
+  return cardType === 'triple-match'
+    ? TRIPLE_MATCH_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD
+    : BASIC_SAFE_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD;
+}
+
+export function getScratchCardRevealRatio(coveredRatio: number) {
+  return clampRatio(1 - coveredRatio);
+}
+
+export function shouldRevealScratchSlot(revealRatio: number, cardType: ScratchCardType) {
+  return revealRatio >= getScratchCardRevealThreshold(cardType);
+}
+
+export function getScratchCardSettlementHighlightDelayMs(options: {
+  cardType: ScratchCardType;
+  revealedSlotIndexes: readonly number[];
+  revealFlashDurationMs: number;
+  settleDelayMs: number;
+}) {
+  const slotCount = Number(getScratchCardConfig(options.cardType).matchRule.slots);
+  const revealedSlots = new Set(
+    options.revealedSlotIndexes.filter(
+      (slotIndex) => Number.isInteger(slotIndex) && slotIndex >= 0 && slotIndex < slotCount,
+    ),
+  );
+
+  if (revealedSlots.size < slotCount) {
+    return null;
+  }
+
+  return Math.max(0, options.revealFlashDurationMs) + Math.max(0, options.settleDelayMs);
+}
+
+export function getGoldChangeEffect(
+  previousGold: number,
+  nextGold: number,
+  source: GoldEffectSource,
+): GoldChangeEffect | null {
+  const amount = Math.abs(nextGold - previousGold);
+
+  if (amount <= 0) {
+    return null;
+  }
+
+  const direction: GoldEffectDirection = nextGold > previousGold ? 'increase' : 'decrease';
+  const strongSources = new Set<GoldEffectSource>([
+    'scratch-prize',
+    'loan-repayment',
+    'broken-plate',
+  ]);
+  const lightSources = new Set<GoldEffectSource>([
+    'loan-sign',
+    'work-cost',
+    'scratch-card-purchase',
+    'upgrade-purchase',
+  ]);
+  const intensity: GoldEffectIntensity = strongSources.has(source)
+    ? 'strong'
+    : lightSources.has(source)
+      ? 'light'
+      : 'normal';
+  const particleCount = direction === 'increase' && intensity === 'strong' ? 8 : 0;
+
+  return {
+    direction,
+    amount,
+    intensity,
+    particleCount,
+  };
+}
+
+export function getGoldDisplayRollValue(fromGold: number, toGold: number, progress: number) {
+  const normalizedFromGold = Math.max(0, Math.floor(fromGold));
+  const normalizedToGold = Math.max(0, Math.floor(toGold));
+
+  if (normalizedToGold <= normalizedFromGold) {
+    return normalizedToGold;
+  }
+
+  return Math.min(
+    normalizedToGold,
+    Math.round(normalizedFromGold + (normalizedToGold - normalizedFromGold) * clampRatio(progress)),
+  );
 }
 
 export function shouldRevealFullScratchCover(scratchedRatio: number) {
@@ -863,6 +1034,25 @@ export function getScratchBrushRadius(
   }, 0);
 
   return Math.max(1, getScratchBrushRadiusForUpgradeLevel(scratchRadiusLevel) + loanDelta);
+}
+
+export function getCleaningBrushRadius(
+  scratchRadiusLevel: number,
+  activeLoans: readonly Partial<Pick<LoanState, 'penalty'>>[] = [],
+) {
+  const scratchRadiusBonus =
+    getScratchBrushRadiusForUpgradeLevel(scratchRadiusLevel) - BASIC_SAFE_CARD_SCRATCH_BRUSH.radius;
+  const loanDelta = activeLoans.reduce((sum, loan) => {
+    const penalty = loan.penalty;
+
+    if (!penalty?.enabled || penalty.type !== 'scratch-brush-radius-delta') {
+      return sum;
+    }
+
+    return sum + penalty.delta;
+  }, 0);
+
+  return Math.max(1, WORK_CLEAN_BRUSH.radius + scratchRadiusBonus + loanDelta);
 }
 
 export function shouldShowUpgradeToolsUnlockNotice(

@@ -16,6 +16,9 @@ import {
   getBasicSafeScratchCardPrizePoolForLevel,
   getBasicSafeScratchCardPrizeTier,
   getBoundedPlatePosition,
+  getCleaningBrushRadius,
+  getGoldChangeEffect,
+  getGoldDisplayRollValue,
   getLoanRepaymentFeedback,
   getNextLoanTemplate,
   getNextUnlockMilestone,
@@ -26,12 +29,18 @@ import {
   getScratchCardConfig,
   getScratchCardLevelProgress,
   getScratchCardPrizePoolForLevel,
+  getScratchCardRevealRatio,
+  getScratchCardRevealSlotIndex,
+  getScratchCardRevealThreshold,
+  getScratchCardSettlementHighlightDelayMs,
   getScratchCardSettlementProgressKey,
+  getScratchCardSlotIndexes,
   getScratchCardStepDistance,
   getUnlockMilestoneById,
   getUnlockMilestoneCurrentValue,
   getUnlockMilestoneProgress,
   getUnlockMilestoneThreshold,
+  getWinningScratchSymbolIndexes,
   getWorkLevel,
   getWorkLevelProgress,
   getWorkRewardAmountForLevel,
@@ -51,6 +60,7 @@ import {
   shouldOpenPlateFromClick,
   shouldOpenPlateFromPointerUp,
   shouldRevealFullScratchCover,
+  shouldRevealScratchSlot,
   shouldShowScratchCover,
   shouldShowScratchUnlockNotice,
   shouldShowTripleMatchUnlockNotice,
@@ -95,6 +105,110 @@ test('keeps dragged plate centered when table is smaller than the plate', () => 
 
   assert.equal(position.xPercent, 50);
   assert.equal(position.yPercent, 50);
+});
+
+test('classifies gold change effects by direction and source intensity', () => {
+  assert.deepEqual(getGoldChangeEffect(10, 25, 'scratch-prize'), {
+    direction: 'increase',
+    amount: 15,
+    intensity: 'strong',
+    particleCount: 8,
+  });
+
+  assert.deepEqual(getGoldChangeEffect(25, 15, 'scratch-card-purchase'), {
+    direction: 'decrease',
+    amount: 10,
+    intensity: 'light',
+    particleCount: 0,
+  });
+
+  assert.deepEqual(getGoldChangeEffect(25, 0, 'broken-plate'), {
+    direction: 'decrease',
+    amount: 25,
+    intensity: 'strong',
+    particleCount: 0,
+  });
+
+  assert.equal(getGoldChangeEffect(10, 10, 'work-reward'), null);
+});
+
+test('calculates stepped gold display values for count-up rolling', () => {
+  assert.equal(getGoldDisplayRollValue(10, 25, 0), 10);
+  assert.equal(getGoldDisplayRollValue(10, 25, 0.5), 18);
+  assert.equal(getGoldDisplayRollValue(10, 25, 1), 25);
+  assert.equal(getGoldDisplayRollValue(25, 10, 0.5), 10);
+});
+
+test('maps scratch points to the result slot that should reveal-flash', () => {
+  assert.equal(getScratchCardRevealSlotIndex('basic-safe', { xPercent: 0.16, yPercent: 0.5 }), 0);
+  assert.equal(getScratchCardRevealSlotIndex('basic-safe', { xPercent: 0.5, yPercent: 0.5 }), 1);
+  assert.equal(getScratchCardRevealSlotIndex('basic-safe', { xPercent: 0.84, yPercent: 0.5 }), 2);
+  assert.equal(getScratchCardRevealSlotIndex('basic-safe', { xPercent: 1.2, yPercent: 0.5 }), null);
+
+  assert.equal(
+    getScratchCardRevealSlotIndex('triple-match', { xPercent: 0.24, yPercent: 0.28 }),
+    0,
+  );
+  assert.equal(getScratchCardRevealSlotIndex('triple-match', { xPercent: 0.5, yPercent: 0.28 }), 1);
+  assert.equal(
+    getScratchCardRevealSlotIndex('triple-match', { xPercent: 0.76, yPercent: 0.28 }),
+    2,
+  );
+  assert.equal(
+    getScratchCardRevealSlotIndex('triple-match', { xPercent: 0.37, yPercent: 0.72 }),
+    3,
+  );
+  assert.equal(
+    getScratchCardRevealSlotIndex('triple-match', { xPercent: 0.63, yPercent: 0.72 }),
+    4,
+  );
+  assert.equal(
+    getScratchCardRevealSlotIndex('triple-match', { xPercent: 0.95, yPercent: 0.95 }),
+    null,
+  );
+});
+
+test('requires a configured 95 percent reveal ratio before a scratch slot flashes', () => {
+  assert.equal(getScratchCardRevealThreshold('basic-safe'), 0.95);
+  assert.equal(getScratchCardRevealThreshold('triple-match'), 0.95);
+  assert.equal(getScratchCardRevealRatio(0.05), 0.95);
+  assert.equal(getScratchCardRevealRatio(0.2), 0.8);
+  assert.equal(shouldRevealScratchSlot(0.94, 'basic-safe'), false);
+  assert.equal(shouldRevealScratchSlot(0.95, 'basic-safe'), true);
+  assert.equal(shouldRevealScratchSlot(0.949, 'triple-match'), false);
+  assert.equal(shouldRevealScratchSlot(1, 'triple-match'), true);
+});
+
+test('waits until every scratch slot has revealed before scheduling winning highlights', () => {
+  assert.deepEqual(getScratchCardSlotIndexes('basic-safe'), [0, 1, 2]);
+  assert.deepEqual(getScratchCardSlotIndexes('triple-match'), [0, 1, 2, 3, 4]);
+  assert.equal(
+    getScratchCardSettlementHighlightDelayMs({
+      cardType: 'basic-safe',
+      revealedSlotIndexes: [0, 2],
+      revealFlashDurationMs: 420,
+      settleDelayMs: 140,
+    }),
+    null,
+  );
+  assert.equal(
+    getScratchCardSettlementHighlightDelayMs({
+      cardType: 'basic-safe',
+      revealedSlotIndexes: [0, 1, 2],
+      revealFlashDurationMs: 420,
+      settleDelayMs: 140,
+    }),
+    560,
+  );
+});
+
+test('finds winning scratch symbol indexes for settlement highlights', () => {
+  assert.deepEqual(getWinningScratchSymbolIndexes(['fire', 'cash', 'fire'], 2), [0, 2]);
+  assert.deepEqual(
+    getWinningScratchSymbolIndexes(['bag', 'coin', 'bag', 'cash', 'bag'], 3),
+    [0, 2, 4],
+  );
+  assert.deepEqual(getWinningScratchSymbolIndexes(['blank', 'blank', 'cash'], 2), []);
 });
 
 test('uses cleaned plate count as work level progress within the current level', () => {
@@ -451,6 +565,18 @@ test('applies active loan brush radius penalties after upgrade bonuses', () => {
   assert.equal(getScratchBrushRadiusForUpgradeLevel(2), baseRadius + 2);
   assert.equal(getScratchBrushRadius(2, [radiusLoan]), baseRadius + 1);
   assert.equal(getScratchBrushRadius(0, [radiusLoan]), baseRadius - 1);
+});
+
+test('applies scratch radius upgrades to the larger cleaning brush', () => {
+  const baseRadius = scratchLegendConfig.work.cleanBrush.radius;
+  const radiusLoan = createLoanFromTemplate({
+    id: 2,
+    templateIndex: 1,
+  });
+
+  assert.equal(getCleaningBrushRadius(0), baseRadius);
+  assert.equal(getCleaningBrushRadius(2), baseRadius + 2);
+  assert.equal(getCleaningBrushRadius(2, [radiusLoan]), baseRadius + 1);
 });
 
 test('ignores legacy active loans without penalty config in brush radius calculations', () => {

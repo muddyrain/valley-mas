@@ -1,15 +1,26 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
-import { clampRatio, type ScratchSurfacePoint, shouldRevealFullScratchCover } from '@/lib/game';
+import {
+  clampRatio,
+  getScratchCardRevealRatio,
+  getScratchCardRevealSlotIndex,
+  getScratchCardRevealThreshold,
+  type ScratchCardType,
+  type ScratchSurfacePoint,
+  shouldRevealFullScratchCover,
+} from '@/lib/game';
 
 type ScratchCardCanvasProps = {
   active: boolean;
   visible: boolean;
+  cardType: ScratchCardType;
   scratchPoints: readonly ScratchSurfacePoint[];
   brushRadius: number;
   stepDistance: number;
   onProgressChange: (progress: number) => void;
+  onRevealSlotsSync: (slotIndexes: readonly number[]) => void;
+  onRevealSlot: (slotIndex: number) => void;
   onScratchPointsFlush: (points: readonly ScratchSurfacePoint[]) => void;
   onComplete: () => void;
 };
@@ -30,10 +41,13 @@ const SCRATCH_STAMP_OFFSETS = [
 export function ScratchCardCanvas({
   active,
   visible,
+  cardType,
   scratchPoints,
   brushRadius,
   stepDistance,
   onProgressChange,
+  onRevealSlotsSync,
+  onRevealSlot,
   onScratchPointsFlush,
   onComplete,
 }: ScratchCardCanvasProps) {
@@ -46,15 +60,94 @@ export function ScratchCardCanvas({
   const lastSavedPointRef = useRef<{ x: number; y: number } | null>(null);
   const pendingScratchPointsRef = useRef<ScratchSurfacePoint[]>([]);
   const lastReportedProgressRef = useRef(0);
+  const revealedSlotIndexesRef = useRef<Set<number>>(new Set());
   const scratchPointsRef = useRef(scratchPoints);
+  const cardTypeRef = useRef(cardType);
   const onProgressChangeRef = useRef(onProgressChange);
+  const onRevealSlotsSyncRef = useRef(onRevealSlotsSync);
+  const onRevealSlotRef = useRef(onRevealSlot);
   const onScratchPointsFlushRef = useRef(onScratchPointsFlush);
   const onCompleteRef = useRef(onComplete);
 
   scratchPointsRef.current = scratchPoints;
+  cardTypeRef.current = cardType;
   onProgressChangeRef.current = onProgressChange;
+  onRevealSlotsSyncRef.current = onRevealSlotsSync;
+  onRevealSlotRef.current = onRevealSlot;
   onScratchPointsFlushRef.current = onScratchPointsFlush;
   onCompleteRef.current = onComplete;
+
+  const getSlotBounds = useCallback((slotIndex: number) => {
+    const canvas = canvasRef.current;
+
+    if (!canvas) {
+      return null;
+    }
+
+    if (cardTypeRef.current === 'basic-safe') {
+      if (slotIndex < 0 || slotIndex > 2) {
+        return null;
+      }
+
+      const slotWidth = canvas.width / 3;
+      const slotHeight = Math.min(canvas.height, 28);
+      return {
+        left: slotWidth * slotIndex + slotWidth * 0.17,
+        top: (canvas.height - slotHeight) / 2,
+        width: slotWidth * 0.66,
+        height: slotHeight,
+      };
+    }
+
+    const slots = [
+      { left: 38, top: 10, width: 34, height: 34 },
+      { left: 98, top: 10, width: 34, height: 34 },
+      { left: 158, top: 10, width: 34, height: 34 },
+      { left: 67, top: 38, width: 34, height: 34 },
+      { left: 127, top: 38, width: 34, height: 34 },
+    ] as const;
+
+    if (slotIndex < 0 || slotIndex > 4) {
+      return null;
+    }
+
+    return slots[slotIndex] ?? null;
+  }, []);
+
+  const measureSlotRevealRatio = useCallback(
+    (slotIndex: number) => {
+      const canvas = canvasRef.current;
+      const bounds = getSlotBounds(slotIndex);
+
+      if (!canvas || !bounds) {
+        return 0;
+      }
+
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+
+      if (!context) {
+        return 0;
+      }
+
+      const startX = Math.max(0, Math.floor(bounds.left));
+      const startY = Math.max(0, Math.floor(bounds.top));
+      const endX = Math.min(canvas.width, Math.ceil(bounds.left + bounds.width));
+      const endY = Math.min(canvas.height, Math.ceil(bounds.top + bounds.height));
+      const width = Math.max(1, endX - startX);
+      const height = Math.max(1, endY - startY);
+      const { data } = context.getImageData(startX, startY, width, height);
+      let coveredPixels = 0;
+
+      for (let index = 3; index < data.length; index += 4) {
+        if (data[index] > 20) {
+          coveredPixels += 1;
+        }
+      }
+
+      return getScratchCardRevealRatio(coveredPixels / (width * height));
+    },
+    [getSlotBounds],
+  );
 
   const countCoveredPixels = useCallback(() => {
     const canvas = canvasRef.current;
@@ -312,6 +405,21 @@ export function ScratchCardCanvas({
       }
 
       eraseCanvasPoint(point);
+      const surfacePoint = {
+        xPercent: clampRatio(point.x / canvas.width),
+        yPercent: clampRatio(point.y / canvas.height),
+      };
+      const revealSlotIndex = getScratchCardRevealSlotIndex(cardTypeRef.current, surfacePoint);
+
+      if (revealSlotIndex !== null && !revealedSlotIndexesRef.current.has(revealSlotIndex)) {
+        const revealRatio = measureSlotRevealRatio(revealSlotIndex);
+
+        if (revealRatio >= getScratchCardRevealThreshold(cardTypeRef.current)) {
+          revealedSlotIndexesRef.current.add(revealSlotIndex);
+          onRevealSlotRef.current(revealSlotIndex);
+        }
+      }
+
       const previousSavedPoint = lastSavedPointRef.current;
       const savedDistance = previousSavedPoint
         ? Math.hypot(point.x - previousSavedPoint.x, point.y - previousSavedPoint.y)
@@ -319,15 +427,12 @@ export function ScratchCardCanvas({
 
       if (savedDistance >= SCRATCH_POINT_SAVE_DISTANCE) {
         lastSavedPointRef.current = point;
-        pendingScratchPointsRef.current.push({
-          xPercent: clampRatio(point.x / canvas.width),
-          yPercent: clampRatio(point.y / canvas.height),
-        });
+        pendingScratchPointsRef.current.push(surfacePoint);
       }
 
       scheduleProgressUpdate();
     },
-    [active, eraseCanvasPoint, getCanvasPoint, scheduleProgressUpdate],
+    [active, eraseCanvasPoint, getCanvasPoint, measureSlotRevealRatio, scheduleProgressUpdate],
   );
 
   useLayoutEffect(() => {
@@ -352,9 +457,19 @@ export function ScratchCardCanvas({
       });
     }
 
+    const revealedSlots = Array.from(
+      { length: cardTypeRef.current === 'triple-match' ? 5 : 3 },
+      (_, slotIndex) => slotIndex,
+    ).filter(
+      (slotIndex) =>
+        measureSlotRevealRatio(slotIndex) >= getScratchCardRevealThreshold(cardTypeRef.current),
+    );
+
+    revealedSlotIndexesRef.current = new Set(revealedSlots);
+    onRevealSlotsSyncRef.current(revealedSlots);
     lastPointRef.current = null;
     flushProgressUpdate();
-  }, [drawCover, eraseCanvasPoint, flushProgressUpdate, visible]);
+  }, [drawCover, eraseCanvasPoint, flushProgressUpdate, measureSlotRevealRatio, visible]);
 
   useEffect(() => {
     function stopDrawing() {

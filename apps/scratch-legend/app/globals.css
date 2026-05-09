@@ -111,7 +111,31 @@ button {
 }
 
 .coin-board {
+  position: relative;
+  overflow: visible;
   padding: 12px;
+}
+
+.coin-board-increase {
+  animation: coin-board-gain 560ms ease-out;
+}
+
+.coin-board-decrease {
+  animation: coin-board-spend 520ms ease-out;
+}
+
+.coin-board-increase.strong {
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.05),
+    0 0 0 3px rgba(255, 218, 96, 0.26),
+    0 12px 30px rgba(0, 0, 0, 0.28);
+}
+
+.coin-board-decrease.strong {
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.05),
+    0 0 0 3px rgba(255, 101, 77, 0.24),
+    0 12px 30px rgba(0, 0, 0, 0.28);
 }
 
 .coin-row {
@@ -121,6 +145,17 @@ button {
   gap: 8px;
   color: var(--scratch-gold);
   font-size: 28px;
+}
+
+.coin-row strong {
+  display: inline-block;
+  min-width: 2.5ch;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.coin-row.rolling strong {
+  animation: coin-number-roll 560ms ease-out;
 }
 
 .coin-icon {
@@ -135,6 +170,175 @@ button {
   font-size: 18px;
   line-height: 1;
   text-shadow: 1px 1px 0 #5e220e;
+}
+
+.gold-effect-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.gold-float {
+  position: absolute;
+  right: 0px;
+  top: 16px;
+  display: inline-grid;
+  place-items: center;
+  min-width: 58px;
+  border: 2px solid rgba(255, 255, 255, 0.26);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 17px;
+  font-weight: 900;
+  transform: translateX(0);
+  animation: gold-float-rise 900ms ease-out forwards;
+}
+
+.gold-float.increase {
+  background: rgba(110, 74, 22, 0.96);
+  color: #ffe88f;
+  text-shadow: 0 2px 0 rgba(78, 34, 8, 0.62);
+}
+
+.gold-float.decrease {
+  background: rgba(98, 33, 26, 0.96);
+  color: #ffd0bd;
+  text-shadow: 0 2px 0 rgba(58, 14, 10, 0.62);
+  animation-name: gold-float-fall;
+}
+
+.gold-float.light {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.gold-float.strong {
+  min-width: 70px;
+  font-size: 20px;
+}
+
+.gold-float i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #ffd45f;
+  box-shadow: 0 0 0 2px rgba(115, 64, 16, 0.24);
+  transform: rotate(calc(var(--particle-index) * 45deg)) translate(0, -22px)
+    rotate(calc(var(--particle-index) * -45deg));
+  animation: gold-particle-pop 680ms ease-out forwards;
+}
+
+@keyframes coin-board-gain {
+  0% {
+    transform: scale(1);
+  }
+
+  24% {
+    transform: scale(1.035);
+    filter: brightness(1.22);
+  }
+
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes coin-board-spend {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  24% {
+    transform: translateY(3px);
+    filter: saturate(1.28);
+  }
+
+  44% {
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes gold-float-rise {
+  0% {
+    opacity: 0;
+    transform: translate(0, 12px) scale(0.88);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1.08);
+  }
+
+  72% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(0, -38px) scale(0.98);
+  }
+}
+
+@keyframes coin-number-roll {
+  0% {
+    transform: translateY(4px) scale(0.92);
+    filter: blur(0.3px);
+  }
+
+  52% {
+    transform: translateY(-1px) scale(1.04);
+    filter: blur(0);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes gold-float-fall {
+  0% {
+    opacity: 0;
+    transform: translate(0, -6px) scale(0.9);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translate(0, 4px) scale(1.03);
+  }
+
+  72% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(0, 36px) scale(0.96);
+  }
+}
+
+@keyframes gold-particle-pop {
+  0% {
+    opacity: 0;
+    transform: rotate(calc(var(--particle-index) * 45deg)) translate(0, -6px)
+      rotate(calc(var(--particle-index) * -45deg));
+  }
+
+  24% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: rotate(calc(var(--particle-index) * 45deg)) translate(0, -44px)
+      rotate(calc(var(--particle-index) * -45deg));
+  }
 }
 
 .ticket-progress {
@@ -2321,6 +2525,78 @@ button {
   color: #e2b43c;
 }
 
+.scratch-result-slot.slot-flash {
+  animation: scratch-slot-pop 360ms ease-out;
+}
+
+.scratch-result-slot.slot-flash.blank {
+  animation-name: scratch-slot-blank-pop;
+}
+
+.scratch-result-slot.slot-winning {
+  animation: scratch-slot-winning-pulse 720ms ease-in-out 2;
+  border-color: rgba(255, 229, 102, 0.92);
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.28),
+    0 0 0 4px rgba(255, 217, 93, 0.18),
+    0 0 18px rgba(255, 209, 73, 0.46);
+}
+
+.scratch-result-slot.slot-muted {
+  opacity: 0.62;
+  filter: saturate(0.72);
+}
+
+@keyframes scratch-slot-pop {
+  0% {
+    transform: scale(0.88);
+    filter: brightness(1);
+  }
+
+  42% {
+    transform: scale(1.12);
+    filter: brightness(1.34);
+    box-shadow:
+      inset 0 3px 0 rgba(255, 255, 255, 0.32),
+      0 0 0 4px rgba(255, 235, 128, 0.24);
+  }
+
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes scratch-slot-blank-pop {
+  0% {
+    transform: scale(0.92);
+    filter: brightness(1);
+  }
+
+  46% {
+    transform: scale(1.04);
+    filter: brightness(1.12) grayscale(0.16);
+  }
+
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes scratch-slot-winning-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+
+  50% {
+    transform: scale(1.08);
+    filter: brightness(1.38);
+  }
+}
+
 .scratch-card-cover {
   position: absolute;
   inset: 0;
@@ -2771,5 +3047,21 @@ button {
 
   .table-leg.right {
     right: 72px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coin-board-increase,
+  .coin-board-decrease,
+  .gold-float,
+  .gold-float i,
+  .scratch-result-slot.slot-flash,
+  .scratch-result-slot.slot-winning {
+    animation-duration: 1ms;
+    animation-iteration-count: 1;
+  }
+
+  .gold-float i {
+    display: none;
   }
 }
