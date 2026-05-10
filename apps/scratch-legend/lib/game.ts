@@ -94,6 +94,7 @@ export type WorkPlateState = {
   reward: WorkReward;
   position: PlatePosition;
   cleanPoints: ScratchSurfacePoint[];
+  isCleaned: boolean;
   seed: number;
 };
 
@@ -555,11 +556,11 @@ export function getScratchCardRevealSlotIndex(
   }
 
   const tripleMatchSlots = [
-    { x: 0.24, y: 0.28 },
-    { x: 0.5, y: 0.28 },
-    { x: 0.76, y: 0.28 },
-    { x: 0.37, y: 0.72 },
-    { x: 0.63, y: 0.72 },
+    { x: 45 / 230, y: 32 / 128 },
+    { x: 115 / 230, y: 32 / 128 },
+    { x: 185 / 230, y: 32 / 128 },
+    { x: 75 / 230, y: 96 / 128 },
+    { x: 145 / 230, y: 96 / 128 },
   ] as const;
   const revealRadius = 0.17;
 
@@ -665,12 +666,19 @@ export function getGoldDisplayRollValue(fromGold: number, toGold: number, progre
   );
 }
 
-export function shouldRevealFullScratchCover(scratchedRatio: number) {
-  return scratchedRatio >= BASIC_SAFE_CARD_SCRATCH_COMPLETE_THRESHOLD;
+export function shouldRevealFullScratchCover(
+  scratchedRatio: number,
+  cardType: ScratchCardType = 'basic-safe',
+) {
+  return scratchedRatio >= getScratchCardConfig(cardType).scratchCompleteThreshold;
 }
 
-export function shouldShowScratchCover(status: ScratchCardStatus, scratchProgress: number) {
-  return status === 'scratching' && !shouldRevealFullScratchCover(scratchProgress);
+export function shouldShowScratchCover(
+  status: ScratchCardStatus,
+  scratchProgress: number,
+  cardType: ScratchCardType = 'basic-safe',
+) {
+  return status === 'scratching' && !shouldRevealFullScratchCover(scratchProgress, cardType);
 }
 
 const BASIC_SAFE_RESULT_SYMBOLS = [

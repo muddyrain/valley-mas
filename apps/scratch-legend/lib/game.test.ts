@@ -454,6 +454,7 @@ test('migrates legacy table items with empty scratch progress points', () => {
   });
 
   assert.deepEqual(save.workspace.plates[0]?.cleanPoints, []);
+  assert.equal(save.workspace.plates[0]?.isCleaned, false);
   assert.deepEqual(save.workspace.scratchCards[0]?.scratchPoints, []);
 });
 
@@ -464,11 +465,48 @@ test('finds the current active plate from the save workspace', () => {
     reward: { base: 2, total: 2, isCrit: false, isBroken: false },
     position: { xPercent: 50, yPercent: 50 },
     cleanPoints: [],
+    isCleaned: false,
     seed: 3,
   });
   save.workspace.activePlateId = 3;
 
   assert.equal(getActiveWorkPlate(save)?.id, 3);
+});
+
+test('repairs stale claimable work phase without an active plate', () => {
+  const save = mergeScratchLegendSave({
+    workspace: {
+      phase: 'claimable',
+      activePlateId: null,
+      plates: [],
+      scratchCards: [],
+    },
+  });
+
+  assert.equal(save.workspace.phase, 'idle');
+  assert.equal(save.workspace.activePlateId, null);
+});
+
+test('returns stale claimable work phase to the desktop when plates remain', () => {
+  const save = mergeScratchLegendSave({
+    workspace: {
+      phase: 'claimable',
+      activePlateId: null,
+      plates: [
+        {
+          id: 4,
+          reward: { base: 2, total: 2, isCrit: false, isBroken: false },
+          position: { xPercent: 50, yPercent: 50 },
+          cleanPoints: [],
+          isCleaned: false,
+          seed: 4,
+        },
+      ],
+      scratchCards: [],
+    },
+  });
+
+  assert.equal(save.workspace.phase, 'plateSpawned');
 });
 
 test('uses configured work reward amounts by level', () => {

@@ -217,10 +217,10 @@ function getPrizeTierSymbol(tierId: ScratchCardState['result']['tierId']) {
 function getScratchCardDisplay(cardType: ScratchCardType) {
   if (cardType === 'triple-match') {
     return {
-      catalog: 'Catalog #2',
+      catalog: '三连规则',
       title: '三连胜出',
       ticketTitle: 'TRIPLE',
-      miniTitle: '3X',
+      miniTitle: '三',
       ruleLabel: '刮出三连才获胜',
       winLabel: '刮出三连，可以结算。',
       loseLabel: '没有三连，本张 $0。',
@@ -230,10 +230,10 @@ function getScratchCardDisplay(cardType: ScratchCardType) {
   }
 
   return {
-    catalog: 'Catalog #1',
+    catalog: '安全卡',
     title: '成双入对',
     ticketTitle: 'TWO$WIN',
-    miniTitle: '2w',
+    miniTitle: '双',
     ruleLabel: '刮出一对即可获胜',
     winLabel: '刮出一对，可以结算。',
     loseLabel: '没有成对，本张 $0。',
@@ -919,6 +919,7 @@ export function ScratchLegendGame() {
             reward: plateReward,
             position: getRandomPlateSpawnPosition(),
             cleanPoints: [],
+            isCleaned: false,
             seed: plateId,
           },
         ],
@@ -1041,25 +1042,23 @@ export function ScratchLegendGame() {
 
   function openCleaningView(plateId: number) {
     if (phase === 'plateSpawned' || phase === 'scratchCardSpawned') {
+      const selectedPlate = plates.find((plate) => plate.id === plateId);
+
       resetPlatePointer();
-      setCleanProgress(0);
-      setCleaningStartedAt(Date.now());
+      setCleanProgress(selectedPlate?.isCleaned ? 1 : 0);
+      setCleaningStartedAt(selectedPlate?.isCleaned ? null : Date.now());
       updateSave((current) => ({
         ...current,
         workspace: {
           ...current.workspace,
           activePlateId: plateId,
-          phase: 'cleaning',
+          phase: selectedPlate?.isCleaned ? 'claimable' : 'cleaning',
         },
       }));
     }
   }
 
   function closeCleaningView() {
-    if (!activePlateId) {
-      return;
-    }
-
     setCleanProgress(0);
     setCleaningStartedAt(null);
     updateSave((current) => ({
@@ -1406,13 +1405,25 @@ export function ScratchLegendGame() {
     const delay = Math.max(0, WORK_ACTION_DURATION_MS - elapsed);
 
     window.setTimeout(() => {
-      updateSave((current) => ({
-        ...current,
-        workspace: {
-          ...current.workspace,
-          phase: 'claimable',
-        },
-      }));
+      updateSave((current) => {
+        const activeId = current.workspace.activePlateId;
+        const activePlateExists = current.workspace.plates.some((plate) => plate.id === activeId);
+
+        if (current.workspace.phase !== 'cleaning' || !activeId || !activePlateExists) {
+          return current;
+        }
+
+        return {
+          ...current,
+          workspace: {
+            ...current.workspace,
+            plates: current.workspace.plates.map((plate) =>
+              plate.id === activeId ? { ...plate, isCleaned: true } : plate,
+            ),
+            phase: 'claimable',
+          },
+        };
+      });
     }, delay);
   }
 
@@ -1872,7 +1883,7 @@ export function ScratchLegendGame() {
                         <small>小奖 ${firstPrize}</small>
                       </span>
                       <span className="scratch-shop-meta">
-                        <span className="scratch-level-badge">Lv. {item.progress.level}</span>
+                        <span className="scratch-level-badge">等级 {item.progress.level}</span>
                         <span
                           className="scratch-level-meter"
                           role="progressbar"
@@ -2022,6 +2033,8 @@ export function ScratchLegendGame() {
                 <button
                   className={`small-dirty-plate ${
                     enteringPlateIds.includes(plate.id) ? 'entering' : ''
+                  } ${plate.isCleaned ? 'cleaned' : ''} ${
+                    plate.reward.isBroken ? 'broken-risk' : ''
                   } ${liftedPlateId === plate.id ? 'lifted' : ''} ${
                     draggingPlateId === plate.id ? 'dragging' : ''
                   }`}
@@ -2093,7 +2106,7 @@ export function ScratchLegendGame() {
                   <div className="scratch-card-header">
                     <span>{activeScratchCardDisplay.ticketTitle}</span>
                     <strong>
-                      {activeScratchCardDisplay.title} Lv. {activeScratchCard.level}
+                      {activeScratchCardDisplay.title} 等级 {activeScratchCard.level}
                     </strong>
                   </div>
                   <div className="scratch-card-picture" aria-hidden="true">
@@ -2123,13 +2136,14 @@ export function ScratchLegendGame() {
                         </span>
                       ))}
                     </fieldset>
-                    {activeScratchCard.type === 'triple-match' && (
-                      <span className="triple-scratch-panel" aria-hidden="true" />
-                    )}
                     <ScratchCardCanvas
                       key={activeScratchCard.id}
                       active={activeScratchCard.status === 'scratching'}
-                      visible={shouldShowScratchCover(activeScratchCard.status, scratchProgress)}
+                      visible={shouldShowScratchCover(
+                        activeScratchCard.status,
+                        scratchProgress,
+                        activeScratchCard.type,
+                      )}
                       cardType={activeScratchCard.type}
                       scratchPoints={activeScratchCard.scratchPoints}
                       brushRadius={scratchBrushRadius}
@@ -2148,7 +2162,7 @@ export function ScratchLegendGame() {
                 <div className="scratch-info-card" data-scratch-control="true">
                   <div className="scratch-info-title">
                     <strong>{activeScratchCardDisplay.title}</strong>
-                    <em>Lv. {activeScratchCard.level}</em>
+                    <em>等级 {activeScratchCard.level}</em>
                   </div>
                   <span>
                     {activeScratchCard.status === 'claimable'
@@ -2384,6 +2398,10 @@ export function ScratchLegendGame() {
                   <div
                     className={`plate ${
                       phase === 'claimable' && activeReward.isBroken ? 'broken' : ''
+                    } ${
+                      phase === 'claimable' && !activeReward.isBroken && activeReward.total > 0
+                        ? 'success'
+                        : ''
                     }`}
                     key={activePlate?.seed ?? activePlateId ?? 'cleaning'}
                     ref={cleaningPlateRef}
@@ -2391,7 +2409,7 @@ export function ScratchLegendGame() {
                     <div className="plate-rim" />
                     <CleaningCanvas
                       key={activePlateId ?? 'cleaning'}
-                      active={isCleaningView}
+                      active={phase === 'cleaning'}
                       cleanPoints={activePlate?.cleanPoints ?? []}
                       brushRadius={cleaningBrushRadius}
                       onProgressChange={setCleanProgress}
@@ -2446,7 +2464,7 @@ export function ScratchLegendGame() {
           {upgradeToolsVisible && (
             <section className="upgrade-tools-panel">
               <header>
-                <small>Stage 2.5</small>
+                <small>中期目标</small>
                 <strong>升级工具</strong>
                 <span>把刮卡手感和后续成长目标接上。</span>
               </header>

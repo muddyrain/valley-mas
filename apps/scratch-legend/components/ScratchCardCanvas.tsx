@@ -25,10 +25,34 @@ type ScratchCardCanvasProps = {
   onComplete: () => void;
 };
 
-const CANVAS_WIDTH = 230;
-const CANVAS_HEIGHT = 66;
+const SCRATCH_CANVAS_LAYOUTS = {
+  'basic-safe': {
+    width: 230,
+    height: 66,
+  },
+  'triple-match': {
+    width: 230,
+    height: 128,
+    slotBounds: [
+      { left: 18, top: 5, width: 54, height: 54 },
+      { left: 88, top: 5, width: 54, height: 54 },
+      { left: 158, top: 5, width: 54, height: 54 },
+      { left: 48, top: 69, width: 54, height: 54 },
+      { left: 118, top: 69, width: 54, height: 54 },
+    ],
+  },
+} as const satisfies Record<
+  ScratchCardType,
+  {
+    width: number;
+    height: number;
+    slotBounds?: readonly { left: number; top: number; width: number; height: number }[];
+  }
+>;
+
 const SCRATCH_POINT_SAVE_DISTANCE = 10;
 const SCRATCH_PROGRESS_REPORT_STEP = 0.03;
+const SCRATCH_COVER_TEXTURE_SRC = '/ui-textures/pixel-silver-scratch-layer.png';
 const SCRATCH_STAMP_OFFSETS = [
   [0, 0, 1],
   [-10, -3, 0.62],
@@ -61,6 +85,7 @@ export function ScratchCardCanvas({
   const pendingScratchPointsRef = useRef<ScratchSurfacePoint[]>([]);
   const lastReportedProgressRef = useRef(0);
   const revealedSlotIndexesRef = useRef<Set<number>>(new Set());
+  const coverTextureImageRef = useRef<HTMLImageElement | null>(null);
   const scratchPointsRef = useRef(scratchPoints);
   const cardTypeRef = useRef(cardType);
   const onProgressChangeRef = useRef(onProgressChange);
@@ -99,19 +124,11 @@ export function ScratchCardCanvas({
       };
     }
 
-    const slots = [
-      { left: 38, top: 10, width: 34, height: 34 },
-      { left: 98, top: 10, width: 34, height: 34 },
-      { left: 158, top: 10, width: 34, height: 34 },
-      { left: 67, top: 38, width: 34, height: 34 },
-      { left: 127, top: 38, width: 34, height: 34 },
-    ] as const;
-
     if (slotIndex < 0 || slotIndex > 4) {
       return null;
     }
 
-    return slots[slotIndex] ?? null;
+    return SCRATCH_CANVAS_LAYOUTS['triple-match'].slotBounds[slotIndex] ?? null;
   }, []);
 
   const measureSlotRevealRatio = useCallback(
@@ -205,7 +222,10 @@ export function ScratchCardCanvas({
       progressFrameRef.current = null;
       const remainingCover = countCoveredPixels();
       const scratchedRatio = clampRatio(1 - remainingCover / coveredPixelsRef.current);
-      const shouldRevealFullCover = shouldRevealFullScratchCover(scratchedRatio);
+      const shouldRevealFullCover = shouldRevealFullScratchCover(
+        scratchedRatio,
+        cardTypeRef.current,
+      );
       const displayedRatio = shouldRevealFullCover ? 1 : scratchedRatio;
 
       reportProgress(displayedRatio, forceReport);
@@ -256,51 +276,98 @@ export function ScratchCardCanvas({
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.globalCompositeOperation = 'source-over';
 
-    const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, '#eef3f4');
-    gradient.addColorStop(0.36, '#bac6cb');
-    gradient.addColorStop(0.72, '#d8e0e3');
-    gradient.addColorStop(1, '#9aa9b0');
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, canvas.width, canvas.height);
+    const drawTripleMatchSlotClip = cardTypeRef.current === 'triple-match';
 
-    context.globalAlpha = 0.5;
-    context.strokeStyle = '#829199';
-    context.lineWidth = 4;
-
-    for (let x = -canvas.height; x < canvas.width + canvas.height; x += 20) {
+    if (drawTripleMatchSlotClip) {
+      context.save();
       context.beginPath();
-      context.moveTo(x, canvas.height);
-      context.lineTo(x + canvas.height, 0);
-      context.stroke();
+
+      for (const bounds of SCRATCH_CANVAS_LAYOUTS['triple-match'].slotBounds) {
+        const radius = bounds.width / 2;
+
+        context.moveTo(bounds.left + bounds.width, bounds.top + radius);
+        context.arc(bounds.left + radius, bounds.top + radius, radius, 0, Math.PI * 2);
+      }
+
+      context.clip();
     }
 
-    context.globalAlpha = 1;
-    context.fillStyle = 'rgba(255, 255, 255, 0.42)';
+    const coverTextureImage = coverTextureImageRef.current;
+    const hasCoverTexture = Boolean(
+      coverTextureImage?.complete && coverTextureImage.naturalWidth > 0,
+    );
 
-    for (let index = 0; index < 80; index += 1) {
-      const x = Math.random() * canvas.width;
-      const y = Math.random() * canvas.height;
-      context.fillRect(x, y, 1 + Math.random() * 4, 1 + Math.random() * 3);
-    }
+    if (hasCoverTexture && coverTextureImage) {
+      context.drawImage(coverTextureImage, 0, 0, canvas.width, canvas.height);
 
-    context.strokeStyle = 'rgba(95, 108, 116, 0.28)';
-    context.lineWidth = 1;
+      const shine = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+      shine.addColorStop(0, 'rgba(255, 255, 255, 0.26)');
+      shine.addColorStop(0.45, 'rgba(255, 255, 255, 0)');
+      shine.addColorStop(1, 'rgba(69, 86, 96, 0.18)');
+      context.fillStyle = shine;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    } else {
+      const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, '#eef3f4');
+      gradient.addColorStop(0.36, '#bac6cb');
+      gradient.addColorStop(0.72, '#d8e0e3');
+      gradient.addColorStop(1, '#9aa9b0');
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, canvas.width, canvas.height);
 
-    for (let index = 0; index < 26; index += 1) {
-      const x = Math.random() * canvas.width;
-      const y = Math.random() * canvas.height;
+      context.globalAlpha = 0.5;
+      context.strokeStyle = '#829199';
+      context.lineWidth = 4;
 
-      context.beginPath();
-      context.moveTo(x, y);
-      context.lineTo(x + 10 + Math.random() * 18, y - 4 + Math.random() * 8);
-      context.stroke();
+      for (let x = -canvas.height; x < canvas.width + canvas.height; x += 20) {
+        context.beginPath();
+        context.moveTo(x, canvas.height);
+        context.lineTo(x + canvas.height, 0);
+        context.stroke();
+      }
+
+      context.globalAlpha = 1;
+      context.fillStyle = 'rgba(255, 255, 255, 0.42)';
+
+      for (let index = 0; index < 80; index += 1) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        context.fillRect(x, y, 1 + Math.random() * 4, 1 + Math.random() * 3);
+      }
+
+      context.strokeStyle = 'rgba(95, 108, 116, 0.28)';
+      context.lineWidth = 1;
+
+      for (let index = 0; index < 26; index += 1) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+
+        context.beginPath();
+        context.moveTo(x, y);
+        context.lineTo(x + 10 + Math.random() * 18, y - 4 + Math.random() * 8);
+        context.stroke();
+      }
     }
 
     context.fillStyle = 'rgba(65, 76, 83, 0.62)';
     context.font = '700 14px Arial';
     context.textAlign = 'center';
-    context.fillText('SCRATCH', canvas.width / 2, canvas.height / 2 + 5);
+
+    if (drawTripleMatchSlotClip) {
+      context.restore();
+      context.strokeStyle = 'rgba(255, 255, 255, 0.24)';
+      context.lineWidth = 2;
+
+      for (const bounds of SCRATCH_CANVAS_LAYOUTS['triple-match'].slotBounds) {
+        const radius = bounds.width / 2;
+
+        context.beginPath();
+        context.arc(bounds.left + radius, bounds.top + radius, radius, 0, Math.PI * 2);
+        context.stroke();
+      }
+    } else {
+      context.fillText('SCRATCH', canvas.width / 2, canvas.height / 2 + 5);
+    }
 
     coveredPixelsRef.current = Math.max(1, countCoveredPixels());
     completedRef.current = false;
@@ -435,8 +502,12 @@ export function ScratchCardCanvas({
     [active, eraseCanvasPoint, getCanvasPoint, measureSlotRevealRatio, scheduleProgressUpdate],
   );
 
-  useLayoutEffect(() => {
+  const restoreCoverFromScratchPoints = useCallback(() => {
     if (!visible) {
+      return;
+    }
+
+    if (drawingRef.current) {
       return;
     }
 
@@ -472,6 +543,49 @@ export function ScratchCardCanvas({
   }, [drawCover, eraseCanvasPoint, flushProgressUpdate, measureSlotRevealRatio, visible]);
 
   useEffect(() => {
+    if (coverTextureImageRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+    const coverTextureImage = new Image();
+    coverTextureImage.decoding = 'async';
+    coverTextureImage.src = SCRATCH_COVER_TEXTURE_SRC;
+
+    coverTextureImage.onload = () => {
+      if (cancelled) {
+        return;
+      }
+
+      coverTextureImageRef.current = coverTextureImage;
+      restoreCoverFromScratchPoints();
+    };
+
+    coverTextureImage.onerror = () => {
+      if (cancelled) {
+        return;
+      }
+
+      coverTextureImageRef.current = null;
+    };
+
+    if (coverTextureImage.complete && coverTextureImage.naturalWidth > 0) {
+      coverTextureImageRef.current = coverTextureImage;
+      restoreCoverFromScratchPoints();
+    }
+
+    return () => {
+      cancelled = true;
+      coverTextureImage.onload = null;
+      coverTextureImage.onerror = null;
+    };
+  }, [restoreCoverFromScratchPoints]);
+
+  useLayoutEffect(() => {
+    restoreCoverFromScratchPoints();
+  }, [restoreCoverFromScratchPoints]);
+
+  useEffect(() => {
     function stopDrawing() {
       if (drawingRef.current) {
         flushProgressUpdate();
@@ -501,12 +615,14 @@ export function ScratchCardCanvas({
     return null;
   }
 
+  const canvasLayout = SCRATCH_CANVAS_LAYOUTS[cardType];
+
   return (
     <canvas
       ref={canvasRef}
       className="scratch-card-cover"
-      width={CANVAS_WIDTH}
-      height={CANVAS_HEIGHT}
+      width={canvasLayout.width}
+      height={canvasLayout.height}
       aria-label="刮刮卡遮罩"
       onPointerDown={(event) => {
         if (active) {

@@ -281,11 +281,46 @@ function normalizeWorkPlateState(plate: WorkPlateState) {
   return {
     ...plate,
     cleanPoints: normalizeScratchPoints(plate.cleanPoints),
+    isCleaned: plate.isCleaned ?? false,
   } satisfies WorkPlateState;
+}
+
+function getDesktopPhase(plateCount: number, scratchCardCount: number): WorkPhase {
+  if (scratchCardCount > 0) {
+    return 'scratchCardSpawned';
+  }
+
+  if (plateCount > 0) {
+    return 'plateSpawned';
+  }
+
+  return 'idle';
+}
+
+function normalizeWorkspaceState(workspace: ScratchLegendWorkspaceState) {
+  const activePlateExists = workspace.plates.some((plate) => plate.id === workspace.activePlateId);
+  const activeScratchCardExists = workspace.scratchCards.some(
+    (card) => card.id === workspace.activeScratchCardId,
+  );
+  const shouldRepairWorkPhase =
+    (workspace.phase === 'cleaning' || workspace.phase === 'claimable') && !activePlateExists;
+  const shouldRepairScratchPhase = workspace.phase === 'scratchingCard' && !activeScratchCardExists;
+
+  if (!shouldRepairWorkPhase && !shouldRepairScratchPhase) {
+    return workspace;
+  }
+
+  return {
+    ...workspace,
+    activePlateId: activePlateExists ? workspace.activePlateId : null,
+    activeScratchCardId: activeScratchCardExists ? workspace.activeScratchCardId : null,
+    phase: getDesktopPhase(workspace.plates.length, workspace.scratchCards.length),
+  } satisfies ScratchLegendWorkspaceState;
 }
 
 export function syncScratchLegendSave(save: ScratchLegendSave): ScratchLegendSave {
   const unlockedMilestones = { ...save.unlocks.unlockedMilestones };
+  const workspace = normalizeWorkspaceState(save.workspace);
 
   for (const milestone of UNLOCK_MILESTONES) {
     if (save.player.lifetimeGoldEarned >= getUnlockMilestoneThreshold(milestone.id)) {
@@ -295,6 +330,7 @@ export function syncScratchLegendSave(save: ScratchLegendSave): ScratchLegendSav
 
   return {
     ...save,
+    workspace,
     player: {
       ...save.player,
       workLevel: getWorkLevel(save.player.plateCleaned),

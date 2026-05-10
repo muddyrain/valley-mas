@@ -103,6 +103,10 @@ export function CleaningCanvas({
       reportProgress(displayedRatio, forceReport);
 
       if (!completedRef.current && cleanedRatio >= CLEAN_COMPLETE_THRESHOLD) {
+        const canvas = canvasRef.current;
+        const context = canvas?.getContext('2d', { willReadFrequently: true });
+
+        context?.clearRect(0, 0, canvas?.width ?? 0, canvas?.height ?? 0);
         completedRef.current = true;
         flushCleanPoints();
         onCompleteRef.current();
