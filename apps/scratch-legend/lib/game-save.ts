@@ -33,6 +33,8 @@ export type ScratchLegendUnlockState = {
 export type ScratchLegendNoticeState = {
   // 玩家是否已经关闭过碎盘风险电话。
   workRiskMessageDismissed: boolean;
+  // 玩家是否已经真实遇到过碎盘，遇到后才触发风险电话。
+  workRiskNoticeTriggered: boolean;
   // 玩家是否已经关闭过刮刮乐解锁电话。
   scratchMessageDismissed: boolean;
   // 玩家是否已经关闭过升级工具解锁电话。
@@ -158,6 +160,7 @@ export function createInitialScratchLegendSave(): ScratchLegendSave {
     player: {
       gold: INITIAL_GOLD,
       lifetimeGoldEarned: 0,
+      proficiency: 0,
       plateCleaned: 0,
       cardsScratched: 0,
       loseStreak: 0,
@@ -170,6 +173,7 @@ export function createInitialScratchLegendSave(): ScratchLegendSave {
     },
     notices: {
       workRiskMessageDismissed: false,
+      workRiskNoticeTriggered: false,
       scratchMessageDismissed: false,
       upgradeToolsMessageDismissed: false,
       tripleMatchMessageDismissed: false,
@@ -199,6 +203,14 @@ export function mergeScratchLegendSave(
   partialSave?: DeepPartial<ScratchLegendSave>,
 ): ScratchLegendSave {
   const initialSave = createInitialScratchLegendSave();
+  const mergedPlayer = {
+    ...initialSave.player,
+    ...partialSave?.player,
+    proficiency:
+      partialSave?.player?.proficiency ??
+      partialSave?.player?.lifetimeGoldEarned ??
+      initialSave.player.proficiency,
+  };
   const legacyActiveScratchCard = normalizeScratchCardState(
     (partialSave?.workspace?.activeScratchCard as ScratchCardState | null | undefined) ?? null,
   );
@@ -214,10 +226,7 @@ export function mergeScratchLegendSave(
   return syncScratchLegendSave({
     ...initialSave,
     ...partialSave,
-    player: {
-      ...initialSave.player,
-      ...partialSave?.player,
-    },
+    player: mergedPlayer,
     unlocks: {
       ...initialSave.unlocks,
       ...partialSave?.unlocks,
@@ -321,6 +330,7 @@ function isFreshPlayerProgress(player: PlayerState) {
   return (
     player.gold === INITIAL_GOLD &&
     player.lifetimeGoldEarned === 0 &&
+    player.proficiency === 0 &&
     player.plateCleaned === 0 &&
     player.cardsScratched === 0 &&
     getWorkLevel(player.plateCleaned) === 0
@@ -376,13 +386,17 @@ function normalizeWorkspaceState(workspace: ScratchLegendWorkspaceState) {
 
 export function syncScratchLegendSave(save: ScratchLegendSave): ScratchLegendSave {
   const unlockedMilestones = { ...save.unlocks.unlockedMilestones };
+  const normalizedProficiency = Math.max(
+    0,
+    save.player.proficiency ?? save.player.lifetimeGoldEarned ?? 0,
+  );
   const workspace =
     isFreshPlayerProgress(save.player) && hasWorkspaceProgress(save.workspace)
       ? createInitialWorkspaceState()
       : normalizeWorkspaceState(save.workspace);
 
   for (const milestone of UNLOCK_MILESTONES) {
-    if (save.player.lifetimeGoldEarned >= getUnlockMilestoneThreshold(milestone.id)) {
+    if (normalizedProficiency >= getUnlockMilestoneThreshold(milestone.id)) {
       unlockedMilestones[milestone.id] = true;
     }
   }
@@ -392,12 +406,12 @@ export function syncScratchLegendSave(save: ScratchLegendSave): ScratchLegendSav
     workspace,
     player: {
       ...save.player,
+      proficiency: normalizedProficiency,
       workLevel: getWorkLevel(save.player.plateCleaned),
     },
     unlocks: {
       trashCanUnlocked:
-        save.unlocks.trashCanUnlocked ||
-        shouldUnlockTrashCan(save.player.lifetimeGoldEarned, false),
+        save.unlocks.trashCanUnlocked || shouldUnlockTrashCan(normalizedProficiency, false),
       trashCanPurchased: save.unlocks.trashCanPurchased,
       unlockedMilestones,
     },

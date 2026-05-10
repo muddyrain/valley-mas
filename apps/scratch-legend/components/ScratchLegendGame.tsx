@@ -5,6 +5,7 @@ import { CleaningCanvas } from '@/components/CleaningCanvas';
 import { ScratchCardCanvas } from '@/components/ScratchCardCanvas';
 import {
   advanceBasicSafeScratchCardProgress,
+  advanceSegmentedProficiency,
   BASIC_SAFE_CARD_PRICE,
   canAffordWorkPlate,
   canBuyBasicSafeScratchCard,
@@ -35,8 +36,10 @@ import {
   getScratchCardSettlementProgressKey,
   getScratchCardSlotIndexes,
   getScratchCardStepDistance,
+  getScratchLuckEffectLabel,
   getUnlockMilestoneCurrentValue,
   getUnlockMilestoneProgress,
+  getUpgradeToolPrice,
   getWinningScratchSymbolIndexes,
   getWorkBrokenPlatePenaltyForLevel,
   getWorkLevelProgress,
@@ -51,6 +54,7 @@ import {
   RISK_PEEK_CARD_PRICE,
   repayLoan,
   rollWorkReward,
+  SCRATCH_CARD_ALBUMS_CONFIG,
   type ScratchCardState,
   type ScratchCardSymbol,
   type ScratchCardType,
@@ -94,6 +98,7 @@ const SCRATCH_MODE_MILESTONE_ID: UnlockMilestoneId = 'scratch-mode';
 const DESKTOP_PLATE_SIZE = scratchLegendConfig.work.plate.desktopSize;
 const TABLETOP_SCRATCH_CARD_SIZE = { width: 108, height: 76 } as const;
 const PLATE_ENTER_ANIMATION_MS = scratchLegendConfig.work.plate.enterAnimationMs;
+const LUCKY_CARD_EFFECT_MS = 1100;
 const PLATE_DRAG_HOLD_MS = scratchLegendConfig.work.drag.holdMs;
 const PLATE_DRAG_MOVE_THRESHOLD = scratchLegendConfig.work.drag.moveThreshold;
 
@@ -165,6 +170,8 @@ const TRIPLE_MATCH_PHONE_LINES = ['哇哦，我这正好有新的刮刮卡！', 
 
 const LOAN_PHONE_COPY =
   '大发慈悲给你一笔贷款。温馨提示，我们的贷款利率是 6000%。为了防止你不还，我们贴心地给你在右上角加了一个按钮，可以查看当前贷款。';
+const getWorkRiskPhoneCopy = (level: number, brokenPlatePercent: string) =>
+  `没有人能一直顺风顺水。刚才那只盘子碎了，但你还在桌边。从等级 ${level} 开始，日常工作会有 ${brokenPlatePercent} 概率碎盘。`;
 const GOLD_EFFECT_MAX_EVENTS = 6;
 const GOLD_EFFECT_DURATION_MS = 900;
 const GOLD_ROLL_DURATION_MS = 560;
@@ -310,6 +317,7 @@ export function ScratchLegendGame() {
   }>({ plates: {}, scratchCards: {} });
   const [enteringPlateIds, setEnteringPlateIds] = useState<number[]>([]);
   const [enteringScratchCardIds, setEnteringScratchCardIds] = useState<number[]>([]);
+  const [luckyScratchCardIds, setLuckyScratchCardIds] = useState<number[]>([]);
   const [scratchPhoneStep, setScratchPhoneStep] = useState(0);
   const [unlockToast, setUnlockToast] = useState<UnlockToast>(null);
   const [trashHoverPlateId, setTrashHoverPlateId] = useState<number | null>(null);
@@ -425,16 +433,15 @@ export function ScratchLegendGame() {
     },
     {
       type: 'risk-peek' as const,
-      visible:
-        scratchModeUnlocked &&
-        scratchMessageDismissed &&
-        tripleMatchUnlocked &&
-        tripleMatchMessageDismissed,
+      visible: scratchModeUnlocked && scratchMessageDismissed,
       unlocked: tripleMatchUnlocked && tripleMatchMessageDismissed,
       price: RISK_PEEK_CARD_PRICE,
       progress: riskPeekLevelProgress,
     },
   ];
+  const scratchCardCatalogItemByType = new Map(
+    scratchCardCatalogItems.map((item) => [item.type, item]),
+  );
   const activeScratchCardPrizePool = useMemo(
     () =>
       getScratchCardPrizePoolForLevel(
@@ -460,7 +467,7 @@ export function ScratchLegendGame() {
         ? riskPeekLevelProgress
         : basicSafeLevelProgress;
 
-  const nextUnlockMilestone = getNextUnlockMilestone(player.lifetimeGoldEarned);
+  const nextUnlockMilestone = getNextUnlockMilestone(player.proficiency);
   const finalUnlockMilestone =
     scratchLegendConfig.progression.proficiencyMilestones[
       scratchLegendConfig.progression.proficiencyMilestones.length - 1
@@ -468,13 +475,10 @@ export function ScratchLegendGame() {
   const unlockProgressTarget =
     nextUnlockMilestone?.requiredProficiency ?? finalUnlockMilestone.requiredProficiency;
   const unlockProgressCurrent = getUnlockMilestoneCurrentValue(
-    player.lifetimeGoldEarned,
+    player.proficiency,
     nextUnlockMilestone,
   );
-  const scratchUnlockProgress = getUnlockMilestoneProgress(
-    player.lifetimeGoldEarned,
-    nextUnlockMilestone,
-  );
+  const scratchUnlockProgress = getUnlockMilestoneProgress(player.proficiency, nextUnlockMilestone);
   const workLevel = player.workLevel;
   const workLevelProgress = getWorkLevelProgress(player.plateCleaned);
   const previewRewardAmount = getWorkRewardAmountForLevel(workLevel);
@@ -487,6 +491,8 @@ export function ScratchLegendGame() {
     (brokenPlateEnabled ? WORK_SAFE_REWARD_CHANCE : 1) * 100,
   )}%`;
   const workBrokenPlatePercent = `${Math.round(WORK_BROKEN_PLATE_CHANCE * 100)}%`;
+  const scratchLuckToolLevel = save.upgradeTools['scratch-luck']?.level ?? 0;
+  const scratchLuckEffectLabel = getScratchLuckEffectLabel(scratchLuckToolLevel);
   const canAffordWork = canAffordWorkPlate(player.gold);
   const canStartWork = canStartWorkFromPhase(phase, player.gold);
   const canBuyBasicSafeCard =
@@ -522,14 +528,17 @@ export function ScratchLegendGame() {
     workOutcomeRevealed && activeReward.isBroken
       ? getOutcomeAmountLabel(true, activeReward.total)
       : getOutcomeAmountLabel(false, -workBrokenPlatePenalty);
-  const workRiskNoticeVisible = shouldShowWorkRiskNotice(workLevel, workRiskMessageDismissed);
+  const workRiskNoticeVisible = shouldShowWorkRiskNotice(
+    save.notices.workRiskNoticeTriggered,
+    workRiskMessageDismissed,
+  );
   const scratchUnlockNoticeVisible = scratchModeUnlocked && !scratchMessageDismissed;
   const upgradeToolsUnlockNoticeVisible = shouldShowUpgradeToolsUnlockNotice(
-    player.lifetimeGoldEarned,
+    player.proficiency,
     upgradeToolsMessageDismissed,
   );
   const tripleMatchUnlockNoticeVisible = shouldShowTripleMatchUnlockNotice(
-    player.lifetimeGoldEarned,
+    player.proficiency,
     tripleMatchMessageDismissed,
   );
   const loanOfferNoticeVisible =
@@ -1153,6 +1162,7 @@ export function ScratchLegendGame() {
     const scratchCard = createScratchCard(cardType, {
       id: scratchCardId,
       level: progress.level,
+      luckLevel: scratchLuckToolLevel,
       forcedTierId:
         cardType === 'basic-safe' && shouldForceWrongScratchCardForLoan(activeLoans, scratchCardId)
           ? 'no-pair'
@@ -1180,6 +1190,14 @@ export function ScratchLegendGame() {
       setEnteringScratchCardIds((current) => current.filter((id) => id !== scratchCardId));
     }, PLATE_ENTER_ANIMATION_MS);
     plateEnterTimerRefs.current.push(enterTimer);
+
+    if (scratchLuckToolLevel > 0 && cardType !== 'risk-peek') {
+      setLuckyScratchCardIds((current) => [...current, scratchCardId]);
+      const luckyTimer = window.setTimeout(() => {
+        setLuckyScratchCardIds((current) => current.filter((id) => id !== scratchCardId));
+      }, LUCKY_CARD_EFFECT_MS);
+      plateEnterTimerRefs.current.push(luckyTimer);
+    }
   }
 
   function openScratchCard(cardId: number) {
@@ -1672,9 +1690,9 @@ export function ScratchLegendGame() {
 
     const nextGold = Math.max(0, player.gold + claimedPlate.reward.total);
     const earnedGold = Math.max(0, claimedPlate.reward.total);
+    const nextProficiency = advanceSegmentedProficiency(player.proficiency, earnedGold);
     const shouldShowTrashCanUnlock =
-      !trashCanUnlocked &&
-      shouldUnlockTrashCan(player.lifetimeGoldEarned + earnedGold, trashCanUnlocked);
+      !trashCanUnlocked && shouldUnlockTrashCan(nextProficiency, trashCanUnlocked);
 
     triggerGoldEffect(
       player.gold,
@@ -1692,8 +1710,15 @@ export function ScratchLegendGame() {
           ...current.player,
           gold: Math.max(0, current.player.gold + claimedPlate.reward.total),
           lifetimeGoldEarned: current.player.lifetimeGoldEarned + earnedGold,
+          proficiency: advanceSegmentedProficiency(current.player.proficiency, earnedGold),
           plateCleaned: current.player.plateCleaned + 1,
         },
+        notices: claimedPlate.reward.isBroken
+          ? {
+              ...current.notices,
+              workRiskNoticeTriggered: true,
+            }
+          : current.notices,
         workspace: {
           ...current.workspace,
           activePlateId: null,
@@ -1886,9 +1911,10 @@ export function ScratchLegendGame() {
     }
 
     const toolState = save.upgradeTools[tool.id];
+    const currentPrice = toolState ? getUpgradeToolPrice(tool, toolState.level) : tool.price;
 
     if (toolState && canBuyUpgradeTool(player.gold, tool, toolState)) {
-      triggerGoldEffect(player.gold, player.gold - tool.price, 'upgrade-purchase');
+      triggerGoldEffect(player.gold, player.gold - currentPrice, 'upgrade-purchase');
     }
 
     updateSave((current) => {
@@ -1898,11 +1924,13 @@ export function ScratchLegendGame() {
         return current;
       }
 
+      const price = getUpgradeToolPrice(tool, currentToolState.level);
+
       return {
         ...current,
         player: {
           ...current.player,
-          gold: current.player.gold - tool.price,
+          gold: current.player.gold - price,
         },
         upgradeTools: {
           ...current.upgradeTools,
@@ -2118,167 +2146,223 @@ export function ScratchLegendGame() {
             </button>
           </div>
 
-          {sidebarTab === 'cards' ? (
-            <>
-              <button
-                className={`work-card ${canStartWork ? '' : 'busy'}`}
-                type="button"
-                onClick={startWork}
-                disabled={!canStartWork}
-              >
-                <span className="work-icon">
-                  <span className="mini-plate" />
-                  <span className="mini-sponge" />
-                </span>
-                <span className="work-copy">
-                  <strong>日常工作</strong>
-                  <em className={canAffordWork ? 'affordable' : 'unaffordable'}>
-                    ${WORK_PLATE_COST}
-                  </em>
-                  <small>等级 {workLevel}</small>
-                </span>
-                <span
-                  className="work-meter"
-                  role="progressbar"
-                  aria-label="日常工作等级进度"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.round(workLevelProgress * 100)}
-                >
-                  <span style={{ width: `${Math.max(12, workLevelProgress * 100)}%` }} />
-                </span>
-              </button>
-
-              {scratchCardCatalogItems
-                .filter((item) => item.visible)
-                .map((item) => {
-                  const display = getScratchCardDisplay(item.type);
-                  const prizePool = getScratchCardPrizePoolForLevel(item.type, item.progress.level);
-                  const firstPrize = prizePool.find((tier) => tier.payout > 0)?.payout ?? 0;
-                  const buyable =
-                    item.type === 'triple-match'
-                      ? canBuyTripleMatchCard
-                      : item.type === 'risk-peek'
-                        ? canBuyRiskPeekCard
-                        : canBuyBasicSafeCard;
-
-                  return item.unlocked ? (
-                    <button
-                      className={`scratch-shop-card ${item.type} ${buyable ? '' : 'locked'}`}
-                      type="button"
-                      onClick={() => buyScratchCard(item.type)}
-                      disabled={!buyable}
-                      key={item.type}
-                    >
-                      <span className="scratch-ticket-icon">
-                        <span>{display.miniTitle}</span>
-                      </span>
-                      <span className="scratch-shop-copy">
-                        <small>{display.catalog}</small>
-                        <strong>{display.title}</strong>
-                        <em>${item.price}</em>
-                        <small>小奖 ${firstPrize}</small>
-                      </span>
-                      <span className="scratch-shop-meta">
-                        <span className="scratch-level-badge">等级 {item.progress.level}</span>
-                        <span
-                          className="scratch-level-meter"
-                          role="progressbar"
-                          aria-label={display.levelAriaLabel}
-                          aria-valuemin={0}
-                          aria-valuemax={item.progress.target}
-                          aria-valuenow={item.progress.current}
-                        >
-                          <span
-                            style={{
-                              width: `${Math.max(10, item.progress.ratio * 100)}%`,
-                            }}
-                          />
-                        </span>
-                      </span>
-                    </button>
-                  ) : (
-                    <div className="scratch-shop-card locked placeholder" key={item.type}>
-                      <span className="scratch-ticket-icon locked">
-                        <span>锁</span>
-                      </span>
-                      <span className="scratch-shop-copy">
-                        <small>{display.catalog}</small>
-                        <strong>未解锁</strong>
-                        <em>${item.price}</em>
-                        <small>熟练度达到 100 后接电话解锁</small>
-                      </span>
-                    </div>
-                  );
-                })}
-
-              <div className="sidebar-note">
-                <strong>下一目标</strong>
-                <span>
-                  {nextUnlockMilestone
-                    ? `熟练度达到 ${nextUnlockMilestone.requiredProficiency} 解锁${nextUnlockMilestone.label}`
-                    : '熟练度里程碑已全部达成'}
-                </span>
-              </div>
-            </>
-          ) : (
-            <div className="tool-panel">
-              {trashCanPurchased ? (
-                <div className="tool-card available">
-                  <span className="tool-icon trash-preview" />
-                  <div>
-                    <strong>垃圾桶</strong>
-                    <span>已解锁，可把桌面脏盘子拖进去直接处理掉。</span>
-                  </div>
-                  <em>已购买</em>
-                </div>
-              ) : trashCanUnlocked ? (
+          <div className="sidebar-scroll-area">
+            {sidebarTab === 'cards' ? (
+              <>
                 <button
-                  className={`tool-card available buyable ${
-                    canPurchaseTrashCan ? '' : 'insufficient'
-                  }`}
+                  className={`work-card ${canStartWork ? '' : 'busy'}`}
                   type="button"
-                  onClick={buyTrashCan}
-                  disabled={!canPurchaseTrashCan}
+                  onClick={startWork}
+                  disabled={!canStartWork}
                 >
-                  <span className="tool-icon trash-preview" />
-                  <div>
-                    <strong>垃圾桶</strong>
-                    <span>购买资格已解锁，花费 ${TRASH_CAN_PRICE} 后才会拥有垃圾桶。</span>
-                  </div>
-                  <em>
-                    {canPurchaseTrashCan
-                      ? `$${TRASH_CAN_PRICE}`
-                      : `还差 $${TRASH_CAN_PRICE - player.gold}`}
-                  </em>
+                  <span className="work-icon">
+                    <span className="mini-plate" />
+                    <span className="mini-sponge" />
+                  </span>
+                  <span className="work-copy">
+                    <strong>日常工作</strong>
+                    <em className={canAffordWork ? 'affordable' : 'unaffordable'}>
+                      ${WORK_PLATE_COST}
+                    </em>
+                    <small>等级 {workLevel}</small>
+                  </span>
+                  <span
+                    className="work-meter"
+                    role="progressbar"
+                    aria-label="日常工作等级进度"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(workLevelProgress * 100)}
+                  >
+                    <span style={{ width: `${Math.max(12, workLevelProgress * 100)}%` }} />
+                  </span>
                 </button>
-              ) : (
-                <>
-                  <div className="tool-card locked placeholder">
-                    <span className="tool-lock">锁</span>
-                    <div>
-                      <strong>未解锁</strong>
-                      <span>熟练度达到 {TRASH_CAN_UNLOCK_AFTER_PLATES} 后解锁购买资格。</span>
-                    </div>
+
+                {scratchCardVisible && (
+                  <div className="scratch-card-album-list">
+                    {SCRATCH_CARD_ALBUMS_CONFIG.map((album) => (
+                      <section
+                        className={`scratch-card-album ${album.slots.length > 0 ? '' : 'locked'}`}
+                        key={album.id}
+                      >
+                        <header className="scratch-card-album-header">
+                          <small>{album.subtitle}</small>
+                          <strong>{album.label}</strong>
+                        </header>
+
+                        {album.slots.length > 0 ? (
+                          <div className="scratch-card-album-slots">
+                            {album.slots.map((slot) => {
+                              const item = slot.cardType
+                                ? scratchCardCatalogItemByType.get(slot.cardType)
+                                : null;
+
+                              if (!slot.cardType || !item) {
+                                return (
+                                  <div
+                                    className="scratch-shop-card locked placeholder finale"
+                                    key={slot.id}
+                                  >
+                                    <span className="scratch-ticket-icon locked">
+                                      <span>终</span>
+                                    </span>
+                                    <span className="scratch-shop-copy">
+                                      <small>{slot.roleLabel}</small>
+                                      <strong>
+                                        {'lockedLabel' in slot ? slot.lockedLabel : '终局票'}
+                                      </strong>
+                                      <em>未开放</em>
+                                      <small>后续开放</small>
+                                    </span>
+                                  </div>
+                                );
+                              }
+
+                              const display = getScratchCardDisplay(item.type);
+                              const prizePool = getScratchCardPrizePoolForLevel(
+                                item.type,
+                                item.progress.level,
+                              );
+                              const firstPrize =
+                                prizePool.find((tier) => tier.payout > 0)?.payout ?? 0;
+                              const buyable =
+                                item.type === 'triple-match'
+                                  ? canBuyTripleMatchCard
+                                  : item.type === 'risk-peek'
+                                    ? canBuyRiskPeekCard
+                                    : canBuyBasicSafeCard;
+
+                              return item.visible && item.unlocked ? (
+                                <button
+                                  className={`scratch-shop-card ${item.type} ${buyable ? '' : 'locked'}`}
+                                  type="button"
+                                  onClick={() => buyScratchCard(item.type)}
+                                  disabled={!buyable}
+                                  key={slot.id}
+                                >
+                                  <span className="scratch-ticket-icon">
+                                    <span>{display.miniTitle}</span>
+                                  </span>
+                                  <span className="scratch-shop-copy">
+                                    <small>{slot.roleLabel}</small>
+                                    <strong>{display.title}</strong>
+                                    <em>${item.price}</em>
+                                    <small>小奖 ${firstPrize}</small>
+                                  </span>
+                                  <span className="scratch-shop-meta">
+                                    <span className="scratch-level-badge">
+                                      等级 {item.progress.level}
+                                    </span>
+                                    <span
+                                      className="scratch-level-meter"
+                                      role="progressbar"
+                                      aria-label={display.levelAriaLabel}
+                                      aria-valuemin={0}
+                                      aria-valuemax={item.progress.target}
+                                      aria-valuenow={item.progress.current}
+                                    >
+                                      <span
+                                        style={{
+                                          width: `${Math.max(10, item.progress.ratio * 100)}%`,
+                                        }}
+                                      />
+                                    </span>
+                                  </span>
+                                </button>
+                              ) : (
+                                <div
+                                  className={`scratch-shop-card ${item.type} locked placeholder`}
+                                  key={slot.id}
+                                >
+                                  <span className="scratch-ticket-icon locked">
+                                    <span>锁</span>
+                                  </span>
+                                  <span className="scratch-shop-copy">
+                                    <small>{slot.roleLabel}</small>
+                                    <strong>{display.title}</strong>
+                                    <em>${item.price}</em>
+                                    <small>熟练度达到 100 后接电话解锁</small>
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="scratch-card-album-locked">完成第一本卡册后再公开</div>
+                        )}
+                      </section>
+                    ))}
                   </div>
-                  <div className="tool-card locked placeholder">
-                    <span className="tool-lock">锁</span>
+                )}
+
+                <div className="sidebar-note">
+                  <strong>下一目标</strong>
+                  <span>
+                    {nextUnlockMilestone
+                      ? `熟练度达到 ${nextUnlockMilestone.requiredProficiency} 解锁${nextUnlockMilestone.label}`
+                      : '熟练度里程碑已全部达成'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="tool-panel">
+                {trashCanPurchased ? (
+                  <div className="tool-card available">
+                    <span className="tool-icon trash-preview" />
                     <div>
-                      <strong>未解锁</strong>
-                      <span>后续阶段开放更多辅助道具。</span>
+                      <strong>垃圾桶</strong>
+                      <span>已解锁，可把桌面脏盘子拖进去直接处理掉。</span>
                     </div>
+                    <em>已购买</em>
                   </div>
-                  <div className="tool-card locked placeholder">
-                    <span className="tool-lock">锁</span>
+                ) : trashCanUnlocked ? (
+                  <button
+                    className={`tool-card available buyable ${
+                      canPurchaseTrashCan ? '' : 'insufficient'
+                    }`}
+                    type="button"
+                    onClick={buyTrashCan}
+                    disabled={!canPurchaseTrashCan}
+                  >
+                    <span className="tool-icon trash-preview" />
                     <div>
-                      <strong>未解锁</strong>
-                      <span>当前只保留占位，不提前实现后续功能。</span>
+                      <strong>垃圾桶</strong>
+                      <span>购买资格已解锁，花费 ${TRASH_CAN_PRICE} 后才会拥有垃圾桶。</span>
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+                    <em>
+                      {canPurchaseTrashCan
+                        ? `$${TRASH_CAN_PRICE}`
+                        : `还差 $${TRASH_CAN_PRICE - player.gold}`}
+                    </em>
+                  </button>
+                ) : (
+                  <>
+                    <div className="tool-card locked placeholder">
+                      <span className="tool-lock">锁</span>
+                      <div>
+                        <strong>未解锁</strong>
+                        <span>熟练度达到 {TRASH_CAN_UNLOCK_AFTER_PLATES} 后解锁购买资格。</span>
+                      </div>
+                    </div>
+                    <div className="tool-card locked placeholder">
+                      <span className="tool-lock">锁</span>
+                      <div>
+                        <strong>未解锁</strong>
+                        <span>后续阶段开放更多辅助道具。</span>
+                      </div>
+                    </div>
+                    <div className="tool-card locked placeholder">
+                      <span className="tool-lock">锁</span>
+                      <div>
+                        <strong>未解锁</strong>
+                        <span>当前只保留占位，不提前实现后续功能。</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </aside>
 
         <section className="table-stage">
@@ -2374,6 +2458,10 @@ export function ScratchLegendGame() {
                     <button
                       className={`tabletop-scratch-card ${display.cardClassName} ${
                         enteringScratchCardIds.includes(scratchCard.id) ? 'entering' : ''
+                      } ${luckyScratchCardIds.includes(scratchCard.id) ? 'lucky-active' : ''} ${
+                        scratchCard.type !== 'risk-peek' && scratchLuckToolLevel > 0
+                          ? 'luck-boosted'
+                          : ''
                       } ${liftedScratchCardId === scratchCard.id ? 'lifted' : ''} ${
                         draggingScratchCardId === scratchCard.id ? 'dragging' : ''
                       }`}
@@ -2405,6 +2493,9 @@ export function ScratchLegendGame() {
                             ? '6格'
                             : '3格'}
                       </span>
+                      {luckyScratchCardIds.includes(scratchCard.id) && (
+                        <span className="tabletop-luck-burst">幸运生效</span>
+                      )}
                     </button>
                   );
                 })}
@@ -2664,9 +2755,10 @@ export function ScratchLegendGame() {
                     <>
                       <strong>电话提醒</strong>
                       <span>
-                        日常工作升到等级{' '}
-                        {scratchLegendConfig.notifications.phone.brokenPlateNoticeLevel}{' '}
-                        了，之后擦盘子有 {workBrokenPlatePercent} 概率把盘子擦坏。
+                        {getWorkRiskPhoneCopy(
+                          scratchLegendConfig.notifications.phone.brokenPlateNoticeLevel,
+                          workBrokenPlatePercent,
+                        )}
                       </span>
                       <div className="phone-risk-grid">
                         <div className="phone-risk-row">
@@ -2768,6 +2860,7 @@ export function ScratchLegendGame() {
                     <CleaningCanvas
                       key={activePlateId ?? 'cleaning'}
                       active={phase === 'cleaning'}
+                      completed={activePlate?.isCleaned ?? false}
                       cleanPoints={activePlate?.cleanPoints ?? []}
                       brushRadius={cleaningBrushRadius}
                       onProgressChange={setCleanProgress}
@@ -2831,6 +2924,7 @@ export function ScratchLegendGame() {
                   const toolState = save.upgradeTools[tool.id];
                   const toolLevel = toolState?.level ?? tool.level;
                   const buyable = canBuyUpgradeTool(player.gold, tool, { level: toolLevel });
+                  const toolPrice = getUpgradeToolPrice(tool, toolLevel);
 
                   return (
                     <article className="upgrade-tool-card" key={tool.id}>
@@ -2839,6 +2933,11 @@ export function ScratchLegendGame() {
                         <strong>{tool.label}</strong>
                         <span>{tool.description}</span>
                         <small>{tool.effectLabel}</small>
+                        {tool.id === 'scratch-luck' && (
+                          <small className="upgrade-tool-current-effect">
+                            {scratchLuckEffectLabel}
+                          </small>
+                        )}
                       </div>
                       <div className="upgrade-tool-meta">
                         <em>
@@ -2849,7 +2948,7 @@ export function ScratchLegendGame() {
                           onClick={() => buyUpgradeTool(tool)}
                           disabled={!buyable}
                         >
-                          ${tool.price}
+                          ${toolPrice}
                         </button>
                       </div>
                     </article>

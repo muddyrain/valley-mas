@@ -5,6 +5,7 @@ import { CLEAN_COMPLETE_THRESHOLD, clampRatio, type ScratchSurfacePoint } from '
 
 type CleaningCanvasProps = {
   active: boolean;
+  completed: boolean;
   cleanPoints: readonly ScratchSurfacePoint[];
   brushRadius: number;
   onProgressChange: (progress: number) => void;
@@ -27,6 +28,7 @@ const DIRT_SPRITE_DRAWS = [
 
 export function CleaningCanvas({
   active,
+  completed,
   cleanPoints,
   brushRadius,
   onProgressChange,
@@ -143,6 +145,18 @@ export function CleaningCanvas({
 
     updateProgress(true);
   }, [updateProgress]);
+
+  const clearDirt = useCallback(() => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext('2d', { willReadFrequently: true });
+
+    context?.clearRect(0, 0, canvas?.width ?? 0, canvas?.height ?? 0);
+    dirtyPixelsRef.current = 1;
+    completedRef.current = true;
+    lastSavedPointRef.current = null;
+    pendingCleanPointsRef.current = [];
+    reportProgress(1, true);
+  }, [reportProgress]);
 
   const loadDirtSprite = useCallback(() => {
     const currentSprite = dirtSpriteRef.current;
@@ -457,6 +471,11 @@ export function CleaningCanvas({
   );
 
   useEffect(() => {
+    if (completed) {
+      clearDirt();
+      return;
+    }
+
     let cancelled = false;
 
     loadDirtSprite().then(() => {
@@ -482,7 +501,7 @@ export function CleaningCanvas({
     return () => {
       cancelled = true;
     };
-  }, [drawDirt, eraseCanvasPoint, flushProgressUpdate, loadDirtSprite]);
+  }, [clearDirt, completed, drawDirt, eraseCanvasPoint, flushProgressUpdate, loadDirtSprite]);
 
   useEffect(() => {
     function stopDrawing() {

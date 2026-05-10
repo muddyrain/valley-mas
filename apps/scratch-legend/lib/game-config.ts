@@ -286,6 +286,53 @@ export const scratchLegendConfig = {
       },
     },
   },
+  // 阶段四卡册目录结构。这里只定义卡片职责与目录归属，不改变单张卡的购买、概率或结算规则。
+  cardAlbums: [
+    {
+      id: 'street-luck',
+      label: '街角好运',
+      subtitle: '第一本卡册',
+      description: '从稳定回本到手动冒险，承接当前阶段的三张核心票。',
+      slots: [
+        {
+          id: 'street-stable',
+          role: 'stable',
+          roleLabel: '稳定票',
+          cardType: 'basic-safe',
+          description: '低风险教学票，适合反复刷基础资金。',
+        },
+        {
+          id: 'street-risk',
+          role: 'risk',
+          roleLabel: '风险票',
+          cardType: 'risk-peek',
+          description: '通过 Peek 判断继续或止损，默认手动处理。',
+        },
+        {
+          id: 'street-high-odds',
+          role: 'high-odds',
+          roleLabel: '高赔率票',
+          cardType: 'triple-match',
+          description: '更高成本和更强波动，追求三连爆奖。',
+        },
+        {
+          id: 'street-finale',
+          role: 'finale',
+          roleLabel: '终局票',
+          cardType: null,
+          lockedLabel: '终局票',
+          description: '当前卡册的最终挑战位，后续阶段再接入规则。',
+        },
+      ] as const,
+    },
+    {
+      id: 'next-album',
+      label: '下一本卡册',
+      subtitle: '设计中',
+      description: '第二本卡册尚未定义，先保留锁定入口。',
+      slots: [] as const,
+    },
+  ] as const,
   // 阶段 2.5 升级工具配置。当前只把手动刮卡相关工具接入 UI 与本地等级状态。
   upgradeTools: {
     items: [
@@ -293,19 +340,22 @@ export const scratchLegendConfig = {
         id: 'scratch-luck',
         label: '刮卡运气',
         price: 200,
+        priceMultiplierByLevel: [1, 1.5, 2.25, 3.4, 5.1, 7.6, 11.4, 17, 25.5, 38] as const,
         level: 0,
         maxLevel: 10,
-        description: '预留幸运成长入口，后续用于提高有利结果权重。',
-        effectLabel: '当前预留',
+        description: '提升基础刮刮卡和高赔率票的真实中奖权重。',
+        effectLabel: '每级 -3% 未中奖权重',
         effect: {
-          type: 'reserved',
-          valuePerLevel: 0,
+          type: 'scratch-luck',
+          valuePerLevel: 0.03,
+          losingProbabilityFloor: 0.45,
         },
       },
       {
         id: 'scratch-radius',
         label: '刮除范围',
-        price: 25,
+        price: 100,
+        priceMultiplierByLevel: [1, 1.5, 2.25, 3.4, 5.1, 7.6, 11.4, 17, 25.5, 38] as const,
         level: 0,
         maxLevel: 10,
         description: '提升刮层笔刷半径，改善手动刮卡效率。',
@@ -319,6 +369,7 @@ export const scratchLegendConfig = {
         id: 'copper-coin',
         label: '铜币',
         price: 500,
+        priceMultiplierByLevel: [1, 1.5, 2.25, 3.4, 5.1, 7.6, 11.4, 17, 25.5, 38] as const,
         level: 1,
         maxLevel: 10,
         description: '预留奖励放大和特殊资源入口，当前先作为可配置工具展示。',
@@ -382,7 +433,7 @@ export const scratchLegendConfig = {
   // 电话提示与风险消息配置。
   notifications: {
     phone: {
-      // 到达该工作等级后，电话会提示“之后擦盘子可能会碎”。
+      // 从该工作等级开始存在碎盘风险；第一次真实碎盘后电话才提示风险。
       brokenPlateNoticeLevel: 1,
     },
   },

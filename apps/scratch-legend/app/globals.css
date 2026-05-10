@@ -30,7 +30,7 @@
   --texture-ticket-landscape-basic: url("/ui-textures/pixel-ticket-landscape-basic.png");
   --texture-ticket-landscape-triple: url("/ui-textures/pixel-ticket-landscape-triple.png");
   --texture-silver-scratch-layer: url("/ui-textures/pixel-silver-scratch-layer.png");
-  --texture-clean-plate: url("/ui-textures/pixel-clean-plate-v5.png");
+  --texture-clean-plate: url("/ui-textures/pixel-clean-plate.png");
   --texture-result-cell-paper: url("/ui-textures/pixel-result-cell-paper.png");
   --texture-loan-contract-paper: url("/ui-textures/pixel-loan-contract-paper.png");
   --texture-prize-button-gold: url("/ui-textures/pixel-prize-button-gold.png");
@@ -145,11 +145,38 @@ button {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: 0;
+  overflow: hidden;
   padding: 14px;
   background:
     linear-gradient(180deg, rgba(10, 16, 22, 0.88), rgba(20, 31, 40, 0.86)),
     var(--texture-dark-panel) center / 128px 128px repeat;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.sidebar-scroll-area {
+  display: grid;
+  flex: 1 1 auto;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden auto;
+  padding-right: 2px;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+.sidebar-scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-scroll-area::-webkit-scrollbar-track {
+  background: rgba(6, 10, 14, 0.36);
+}
+
+.sidebar-scroll-area::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(172, 204, 219, 0.28);
 }
 
 .coin-board,
@@ -527,18 +554,79 @@ button {
   background: var(--texture-progress-fill-green) left center / auto 100% repeat-x;
 }
 
+.scratch-card-album-list {
+  display: grid;
+  gap: 10px;
+}
+
+.scratch-card-album {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.scratch-card-album.locked {
+  opacity: 0.68;
+}
+
+.scratch-card-album-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  border-bottom: 1px solid rgba(138, 166, 184, 0.18);
+  padding: 0 2px 5px;
+}
+
+.scratch-card-album-header small {
+  flex: 0 0 auto;
+  color: #f6d17a;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.scratch-card-album-header strong {
+  min-width: 0;
+  color: #fff8e6;
+  font-size: 15px;
+  line-height: 1.1;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scratch-card-album-locked {
+  color: #b7c9d2;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.scratch-card-album-slots {
+  display: grid;
+  gap: 7px;
+}
+
+.scratch-card-album-locked {
+  border: 1px dashed rgba(201, 211, 217, 0.28);
+  border-radius: 6px;
+  padding: 8px;
+}
+
 .scratch-shop-card {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
   align-items: center;
-  min-height: 78px;
+  min-height: 66px;
   border: 1px solid rgba(138, 166, 184, 0.24);
   border-radius: 6px;
   background:
     linear-gradient(180deg, rgba(17, 28, 36, 0.9), rgba(8, 14, 19, 0.94)),
     var(--texture-dark-panel) center / 128px 128px repeat;
-  padding: 10px;
+  padding: 8px;
   color: var(--scratch-text);
   text-align: left;
   cursor: pointer;
@@ -559,8 +647,8 @@ button {
 
 .scratch-ticket-icon {
   display: grid;
-  width: 38px;
-  height: 46px;
+  width: 32px;
+  height: 39px;
   place-items: center;
   border: 2px solid rgba(255, 236, 177, 0.74);
   border-radius: 5px;
@@ -568,7 +656,7 @@ button {
     linear-gradient(135deg, rgba(248, 204, 85, 0.28), rgba(216, 130, 31, 0.22)),
     var(--texture-blue-ticket) center / 86px 86px repeat;
   color: #fff4c7;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 900;
   line-height: 1;
   text-shadow: 1px 1px 0 rgba(53, 27, 9, 0.68);
@@ -591,14 +679,17 @@ button {
 .scratch-shop-copy {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 3px 8px;
+  gap: 2px 6px;
   min-width: 0;
 }
 
 .scratch-shop-copy small {
   color: #b7c9d2;
-  font-size: 12px;
-  line-height: 1.25;
+  font-size: 10px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .scratch-shop-copy small:first-child {
@@ -609,32 +700,36 @@ button {
 .scratch-shop-copy strong {
   min-width: 0;
   color: #fff8e6;
-  font-size: 17px;
+  font-size: 15px;
   line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .scratch-shop-copy em {
   color: #ffd064;
-  font-size: 15px;
+  font-size: 13px;
   font-style: normal;
   line-height: 1.15;
+  white-space: nowrap;
 }
 
 .scratch-shop-meta {
   grid-column: 2;
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .scratch-level-badge {
   color: #dfeef5;
-  font-size: 12px;
+  font-size: 10px;
   line-height: 1;
 }
 
 .scratch-level-meter {
   display: block;
-  width: min(112px, 100%);
+  width: min(96px, 100%);
   height: 11px;
   overflow: hidden;
   border-radius: 0;
@@ -873,6 +968,18 @@ button {
   color: #f6d17a;
   font-size: 12px;
   line-height: 1.25;
+}
+
+.upgrade-tool-card .upgrade-tool-current-effect {
+  width: fit-content;
+  border: 1px solid rgba(255, 222, 123, 0.32);
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgba(255, 218, 112, 0.18), rgba(124, 70, 24, 0.16)),
+    rgba(12, 24, 29, 0.44);
+  padding: 3px 6px;
+  color: #ffe69b;
+  text-shadow: 0 0 8px rgba(255, 212, 91, 0.18);
 }
 
 .upgrade-tool-meta {
@@ -1711,6 +1818,47 @@ button {
 
 .tabletop-scratch-card.entering {
   animation: plate-fly-in 420ms cubic-bezier(0.16, 0.9, 0.22, 1.15);
+}
+
+.tabletop-scratch-card.luck-boosted::after {
+  position: absolute;
+  inset: -3px;
+  border: 1px solid rgba(255, 224, 122, 0.28);
+  border-radius: 10px;
+  content: "";
+  opacity: 0.62;
+  pointer-events: none;
+  box-shadow: 0 0 10px rgba(255, 222, 111, 0.2);
+}
+
+.tabletop-scratch-card.lucky-active {
+  animation:
+    plate-fly-in 420ms cubic-bezier(0.16, 0.9, 0.22, 1.15),
+    lucky-card-pulse 900ms ease-out 160ms both;
+}
+
+.tabletop-luck-burst {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  z-index: 2;
+  width: max-content;
+  border: 1px solid rgba(255, 232, 142, 0.62);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(97, 52, 19, 0.86), rgba(38, 28, 16, 0.88)),
+    var(--texture-gold-sparkle) center / 72px 72px repeat;
+  padding: 3px 8px;
+  color: #fff0a9;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow:
+    1px 1px 0 rgba(73, 35, 12, 0.7),
+    0 0 8px rgba(255, 226, 118, 0.34);
+  transform: translateX(-50%);
+  animation: lucky-card-label 980ms ease-out forwards;
+  pointer-events: none;
 }
 
 .tabletop-scratch-card:hover:not(.dragging):not(.entering) {
@@ -2734,6 +2882,44 @@ button {
   }
 }
 
+@keyframes lucky-card-pulse {
+  0% {
+    filter: brightness(1) saturate(1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
+  }
+
+  36% {
+    filter: brightness(1.16) saturate(1.18);
+    box-shadow:
+      0 7px 13px rgba(0, 0, 0, 0.18),
+      0 0 0 4px rgba(255, 222, 111, 0.18),
+      0 0 16px rgba(255, 223, 116, 0.34);
+  }
+
+  100% {
+    filter: brightness(1) saturate(1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
+  }
+}
+
+@keyframes lucky-card-label {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px) scale(0.92);
+  }
+
+  18%,
+  68% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.96);
+  }
+}
+
 .work-info-card {
   display: grid;
   gap: 0;
@@ -2881,6 +3067,12 @@ button {
   .left-panel {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    max-height: min(72svh, 640px);
+  }
+
+  .sidebar-scroll-area {
+    grid-column: 1 / -1;
   }
 
   .table-stage {
@@ -2918,6 +3110,8 @@ button {
   .plate.success::after,
   .plate.broken::before,
   .plate.broken::after,
+  .tabletop-scratch-card.lucky-active,
+  .tabletop-luck-burst,
   .scratch-result-slot.slot-flash,
   .scratch-result-slot.slot-winning,
   .scratch-result-slot.slot-flash::after,

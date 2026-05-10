@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   advanceBasicSafeScratchCardProgress,
+  advanceSegmentedProficiency,
   BASIC_CARD_UNLOCK_GOLD,
   BASIC_SAFE_CARD_PRICE,
   canAffordWorkPlate,
@@ -23,12 +24,14 @@ import {
   getGoldChangeEffect,
   getGoldDisplayRollValue,
   getLoanRepaymentFeedback,
+  getLuckAdjustedScratchCardPrizePool,
   getNextLoanTemplate,
   getNextUnlockMilestone,
   getOutcomeAmountLabel,
   getRandomPlateSpawnPosition,
   getScratchBrushRadius,
   getScratchBrushRadiusForUpgradeLevel,
+  getScratchCardAlbumSlotByType,
   getScratchCardConfig,
   getScratchCardDiscardCost,
   getScratchCardLevelProgress,
@@ -40,10 +43,13 @@ import {
   getScratchCardSettlementProgressKey,
   getScratchCardSlotIndexes,
   getScratchCardStepDistance,
+  getScratchLuckEffectLabel,
+  getScratchLuckEffectPercent,
   getUnlockMilestoneById,
   getUnlockMilestoneCurrentValue,
   getUnlockMilestoneProgress,
   getUnlockMilestoneThreshold,
+  getUpgradeToolPrice,
   getWinningScratchSymbolIndexes,
   getWorkLevel,
   getWorkLevelProgress,
@@ -57,6 +63,7 @@ import {
   RISK_PEEK_CARD_PRICE,
   repayLoan,
   rollWorkReward,
+  SCRATCH_CARD_ALBUMS_CONFIG,
   settleBasicSafeScratchCard,
   settleScratchCard,
   shouldCloseCleaningOverlay,
@@ -373,16 +380,42 @@ test('uses segmented proficiency to calculate the next unlock progress', () => {
   assert.equal(getUnlockMilestoneProgress(1200, null), 1);
 });
 
+test('drops overflow proficiency when a reward crosses into the next segment', () => {
+  const trashMilestone = getUnlockMilestoneById('trash-can');
+  const scratchMilestone = getUnlockMilestoneById('scratch-mode');
+  const upgradeToolsMilestone = getUnlockMilestoneById('upgrade-tools');
+
+  const reachedTrashUnlock = advanceSegmentedProficiency(2, 2);
+  assert.equal(reachedTrashUnlock, getUnlockMilestoneThreshold('trash-can'));
+  assert.equal(getUnlockMilestoneCurrentValue(reachedTrashUnlock, scratchMilestone ?? null), 0);
+
+  const progressedScratchSegment = advanceSegmentedProficiency(reachedTrashUnlock, 2);
+  assert.equal(
+    getUnlockMilestoneCurrentValue(progressedScratchSegment, scratchMilestone ?? null),
+    2,
+  );
+
+  const reachedScratchUnlock = advanceSegmentedProficiency(12, 20);
+  assert.equal(reachedScratchUnlock, getUnlockMilestoneThreshold('scratch-mode'));
+  assert.equal(
+    getUnlockMilestoneCurrentValue(reachedScratchUnlock, upgradeToolsMilestone ?? null),
+    0,
+  );
+  assert.equal(getUnlockMilestoneProgress(0, trashMilestone ?? null), 0);
+});
+
 test('creates a persistable save state with separated player, unlock, notice and workspace data', () => {
   const save = createInitialScratchLegendSave();
 
   assert.equal(save.version, 1);
   assert.equal(save.player.gold, 1);
   assert.equal(save.player.lifetimeGoldEarned, 0);
+  assert.equal(save.player.proficiency, 0);
   assert.equal(save.unlocks.trashCanUnlocked, false);
   assert.equal(save.unlocks.trashCanPurchased, false);
   assert.equal(save.unlocks.unlockedMilestones['scratch-mode'], false);
   assert.equal(save.notices.workRiskMessageDismissed, false);
+  assert.equal(save.notices.workRiskNoticeTriggered, false);
   assert.equal(save.notices.upgradeToolsMessageDismissed, false);
   assert.equal(save.workspace.phase, 'idle');
   assert.equal(save.workspace.nextPlateId, 1);
@@ -394,6 +427,7 @@ test('syncs save state derived unlocks and persisted work level', () => {
     player: {
       gold: 9,
       lifetimeGoldEarned: 64,
+      proficiency: 64,
       plateCleaned: 10,
       cardsScratched: 0,
       loseStreak: 0,
@@ -426,6 +460,7 @@ test('merges partial persisted save data back into a complete save schema', () =
 
   assert.equal(save.player.gold, 6);
   assert.equal(save.player.lifetimeGoldEarned, 14);
+  assert.equal(save.player.proficiency, 14);
   assert.equal(save.player.workLevel, 0);
   assert.equal(save.notices.scratchMessageDismissed, true);
   assert.equal(save.notices.workRiskMessageDismissed, false);
@@ -610,6 +645,19 @@ test('guarantees level zero work plates earn two gold without breaking', () => {
   }
 });
 
+test('enables the broken plate roll starting at work level one', () => {
+  const levelOneReward = getWorkRewardAmountForLevel(1);
+  const brokenReward = rollWorkReward({
+    workOrderIndex: 0,
+    gold: levelOneReward + WORK_PLATE_COST,
+    workLevel: 1,
+    random: () => 0.95,
+  });
+
+  assert.equal(brokenReward.total, -levelOneReward);
+  assert.equal(brokenReward.isBroken, true);
+});
+
 test('rolls normal reward or protected broken plate after work level one', () => {
   const normalReward = rollWorkReward({
     workOrderIndex: 0,
@@ -656,6 +704,12 @@ test('uses the current work level reward as the broken plate penalty', () => {
   assert.equal(brokenReward.isBroken, true);
 });
 
+test('only rings the work risk phone after the first broken plate happens', () => {
+  assert.equal(shouldShowWorkRiskNotice(false, false), false);
+  assert.equal(shouldShowWorkRiskNotice(true, false), true);
+  assert.equal(shouldShowWorkRiskNotice(true, true), false);
+});
+
 test('configures the stage 2.5 upgrade tools from the static rules source', () => {
   const tools = scratchLegendConfig.upgradeTools.items;
 
@@ -668,10 +722,65 @@ test('configures the stage 2.5 upgrade tools from the static rules source', () =
     })),
     [
       { id: 'scratch-luck', price: 200, level: 0, maxLevel: 10 },
-      { id: 'scratch-radius', price: 25, level: 0, maxLevel: 10 },
+      { id: 'scratch-radius', price: 100, level: 0, maxLevel: 10 },
       { id: 'copper-coin', price: 500, level: 1, maxLevel: 10 },
     ],
   );
+});
+
+test('uses increasing upgrade prices by current tool level', () => {
+  const radiusTool = scratchLegendConfig.upgradeTools.items.find(
+    (tool) => tool.id === 'scratch-radius',
+  );
+  const luckTool = scratchLegendConfig.upgradeTools.items.find(
+    (tool) => tool.id === 'scratch-luck',
+  );
+
+  assert.ok(radiusTool);
+  assert.ok(luckTool);
+  assert.equal(getUpgradeToolPrice(radiusTool, 0), 100);
+  assert.equal(getUpgradeToolPrice(radiusTool, 1), 150);
+  assert.equal(getUpgradeToolPrice(radiusTool, 2), 225);
+  assert.equal(getUpgradeToolPrice(luckTool, 0), 200);
+  assert.equal(getUpgradeToolPrice(luckTool, 1), 300);
+});
+
+test('scratch luck shifts losing probability into winning prize tiers', () => {
+  const levelZeroPool = getLuckAdjustedScratchCardPrizePool('basic-safe', 0, 0);
+  const levelTwoPool = getLuckAdjustedScratchCardPrizePool('basic-safe', 0, 2);
+  const levelTenPool = getLuckAdjustedScratchCardPrizePool('basic-safe', 0, 10);
+
+  assert.equal(levelZeroPool.find((tier) => tier.id === 'no-pair')?.probability, 0.72);
+  assert.equal(
+    Number(levelTwoPool.find((tier) => tier.id === 'no-pair')?.probability.toFixed(2)),
+    0.66,
+  );
+  assert.equal(levelTenPool.find((tier) => tier.id === 'no-pair')?.probability, 0.45);
+  assert.ok(
+    (levelTwoPool.find((tier) => tier.id === 'pair-fire')?.probability ?? 0) >
+      (levelZeroPool.find((tier) => tier.id === 'pair-fire')?.probability ?? 0),
+  );
+});
+
+test('scratch luck affects generated safe card results without changing forced tiers', () => {
+  const levelZeroCard = createBasicSafeScratchCard({ id: 1, random: () => 0.7 });
+  const luckyCard = createBasicSafeScratchCard({ id: 2, luckLevel: 2, random: () => 0.7 });
+  const forcedCard = createBasicSafeScratchCard({
+    id: 3,
+    luckLevel: 10,
+    forcedTierId: 'no-pair',
+  });
+
+  assert.equal(levelZeroCard.result.tierId, 'no-pair');
+  assert.notEqual(luckyCard.result.tierId, 'no-pair');
+  assert.equal(forcedCard.result.tierId, 'no-pair');
+});
+
+test('describes the active scratch luck upgrade effect for the panel', () => {
+  assert.equal(getScratchLuckEffectPercent(0), 0);
+  assert.equal(getScratchLuckEffectPercent(3), 9);
+  assert.equal(getScratchLuckEffectLabel(0), '当前幸运：未生效');
+  assert.equal(getScratchLuckEffectLabel(3), '当前幸运：未中奖权重 -9%');
 });
 
 test('applies active loan brush radius penalties after upgrade bonuses', () => {
@@ -714,9 +823,9 @@ test('unlocks the trash can offer after three proficiency and requires buying it
   assert.equal(canBuyTrashCan(2, false, false), false);
   assert.equal(canBuyTrashCan(2, true, false), true);
   assert.equal(canBuyTrashCan(2, true, true), false);
-  assert.equal(shouldShowWorkRiskNotice(0, false), false);
-  assert.equal(shouldShowWorkRiskNotice(1, false), true);
-  assert.equal(shouldShowWorkRiskNotice(1, true), false);
+  assert.equal(shouldShowWorkRiskNotice(false, false), false);
+  assert.equal(shouldShowWorkRiskNotice(true, false), true);
+  assert.equal(shouldShowWorkRiskNotice(true, true), false);
 });
 
 test('uses configured price and unlock gate for the first safe scratch card', () => {
@@ -910,6 +1019,7 @@ test('settles a completed two-win card only when a pair appears', () => {
   const player = {
     gold: 10,
     lifetimeGoldEarned: 14,
+    proficiency: 14,
     plateCleaned: 4,
     cardsScratched: 2,
     loseStreak: 1,
@@ -1028,6 +1138,7 @@ test('settles scratch cards through the generic card type rules', () => {
   const player = {
     gold: 100,
     lifetimeGoldEarned: 163,
+    proficiency: 163,
     plateCleaned: 20,
     cardsScratched: 4,
     loseStreak: 1,
@@ -1059,6 +1170,28 @@ test('configures the first risk peek card from the static rules source', () => {
   assert.equal('riskRule' in riskPeekConfig ? riskPeekConfig.riskRule.discardCostRatio : null, 0.3);
   assert.equal(getScratchCardDiscardCost(riskPeekConfig.price), 45);
   assert.equal(getScratchCardStepDistance('risk-peek'), 5);
+});
+
+test('groups implemented scratch cards into the first card album roles', () => {
+  const firstAlbum = SCRATCH_CARD_ALBUMS_CONFIG[0];
+  const nextAlbum = SCRATCH_CARD_ALBUMS_CONFIG[1];
+
+  assert.equal(firstAlbum?.id, 'street-luck');
+  assert.equal(firstAlbum?.label, '街角好运');
+  assert.deepEqual(
+    firstAlbum?.slots.map((slot) => [slot.role, slot.cardType]),
+    [
+      ['stable', 'basic-safe'],
+      ['risk', 'risk-peek'],
+      ['high-odds', 'triple-match'],
+      ['finale', null],
+    ],
+  );
+  assert.equal(nextAlbum?.id, 'next-album');
+  assert.equal(nextAlbum?.slots.length, 0);
+  assert.equal(getScratchCardAlbumSlotByType('basic-safe')?.roleLabel, '稳定票');
+  assert.equal(getScratchCardAlbumSlotByType('risk-peek')?.roleLabel, '风险票');
+  assert.equal(getScratchCardAlbumSlotByType('triple-match')?.roleLabel, '高赔率票');
 });
 
 test('pre-generates real danger symbols on risk peek cards', () => {
@@ -1147,6 +1280,7 @@ test('settles risk peek safe prizes and triggered penalties through generic rule
   const player = {
     gold: 80,
     lifetimeGoldEarned: 200,
+    proficiency: 200,
     plateCleaned: 20,
     cardsScratched: 4,
     loseStreak: 1,

@@ -38,6 +38,7 @@ export const RISK_PEEK_CARD_CONFIG = scratchLegendConfig.scratchCards.riskPeek;
 export const RISK_PEEK_CARD_PRICE = RISK_PEEK_CARD_CONFIG.price;
 export const RISK_PEEK_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD =
   RISK_PEEK_CARD_CONFIG.scratchSymbolRevealThreshold;
+export const SCRATCH_CARD_ALBUMS_CONFIG = scratchLegendConfig.cardAlbums;
 export const UPGRADE_TOOLS_CONFIG = scratchLegendConfig.upgradeTools.items;
 export const LOAN_CONFIG = scratchLegendConfig.loans;
 export const LOAN_PRINCIPAL = LOAN_CONFIG.principal;
@@ -54,6 +55,7 @@ export type WorkPhase =
 export type PlayerState = {
   gold: number;
   lifetimeGoldEarned: number;
+  proficiency: number;
   plateCleaned: number;
   cardsScratched: number;
   loseStreak: number;
@@ -111,8 +113,9 @@ type ScratchCardPrizeTierConfig =
   | BasicSafeScratchCardPrizeTierConfig
   | TripleMatchScratchCardPrizeTierConfig
   | RiskPeekScratchCardPrizeTierConfig;
-export type ScratchCardPrizeTier = Omit<ScratchCardPrizeTierConfig, 'payout'> & {
+export type ScratchCardPrizeTier = Omit<ScratchCardPrizeTierConfig, 'payout' | 'probability'> & {
   payout: number;
+  probability: number;
 };
 export type ScratchCardPrizeTierId = ScratchCardPrizeTierConfig['id'];
 export type BasicSafeScratchCardPrizeTierId = BasicSafeScratchCardPrizeTierConfig['id'];
@@ -148,6 +151,9 @@ export type ScratchCardState = {
 export type ScratchCardProgressState = {
   cardsSettled: number;
 };
+
+export type ScratchCardAlbumConfig = (typeof SCRATCH_CARD_ALBUMS_CONFIG)[number];
+export type ScratchCardAlbumSlotConfig = ScratchCardAlbumConfig['slots'][number];
 
 export type UpgradeToolConfig = (typeof UPGRADE_TOOLS_CONFIG)[number];
 export type UpgradeToolId = UpgradeToolConfig['id'];
@@ -201,6 +207,7 @@ export type LoanState = {
 export type CreateBasicSafeScratchCardOptions = {
   id: number;
   level?: number;
+  luckLevel?: number;
   forcedTierId?: BasicSafeScratchCardPrizeTierId;
   random?: () => number;
   symbolRandom?: () => number;
@@ -209,6 +216,7 @@ export type CreateBasicSafeScratchCardOptions = {
 export type CreateTripleMatchScratchCardOptions = {
   id: number;
   level?: number;
+  luckLevel?: number;
   forcedTierId?: TripleMatchScratchCardPrizeTierId;
   random?: () => number;
   symbolRandom?: () => number;
@@ -217,6 +225,7 @@ export type CreateTripleMatchScratchCardOptions = {
 export type CreateRiskPeekScratchCardOptions = {
   id: number;
   level?: number;
+  luckLevel?: number;
   forcedTierId?: RiskPeekScratchCardPrizeTierId;
   random?: () => number;
   symbolRandom?: () => number;
@@ -307,6 +316,26 @@ export function getNextUnlockMilestone(totalProficiency: number) {
   );
 }
 
+export function advanceSegmentedProficiency(currentProficiency: number, earnedAmount: number) {
+  const normalizedCurrent = Math.max(0, currentProficiency);
+  const earnedProficiency = Math.max(0, earnedAmount);
+
+  if (earnedProficiency <= 0) {
+    return normalizedCurrent;
+  }
+
+  const nextMilestone = getNextUnlockMilestone(normalizedCurrent);
+
+  if (!nextMilestone) {
+    return normalizedCurrent + earnedProficiency;
+  }
+
+  const nextThreshold = getUnlockMilestoneThreshold(nextMilestone.id);
+  const progressed = normalizedCurrent + earnedProficiency;
+
+  return progressed >= nextThreshold ? nextThreshold : progressed;
+}
+
 export function getUnlockMilestoneCurrentValue(
   totalProficiency: number,
   milestone: UnlockMilestone | null,
@@ -345,22 +374,25 @@ export function canStartWorkFromPhase(phase: WorkPhase, gold: number) {
 }
 
 export function canBuyBasicSafeScratchCard(
-  player: Pick<PlayerState, 'gold' | 'lifetimeGoldEarned'>,
+  player: Pick<PlayerState, 'gold'> &
+    Partial<Pick<PlayerState, 'lifetimeGoldEarned' | 'proficiency'>>,
 ) {
   return canBuyScratchCard('basic-safe', player);
 }
 
 export function canBuyScratchCard(
   cardType: ScratchCardType,
-  player: Pick<PlayerState, 'gold' | 'lifetimeGoldEarned'>,
+  player: Pick<PlayerState, 'gold'> &
+    Partial<Pick<PlayerState, 'lifetimeGoldEarned' | 'proficiency'>>,
 ) {
   const cardConfig = getScratchCardConfig(cardType);
   const unlockThreshold =
     cardType === 'triple-match' || cardType === 'risk-peek'
       ? getUnlockMilestoneThreshold(TRIPLE_MATCH_CARD_MILESTONE_ID)
       : BASIC_CARD_UNLOCK_GOLD;
+  const proficiency = player.proficiency ?? player.lifetimeGoldEarned ?? 0;
 
-  return player.gold >= cardConfig.price && player.lifetimeGoldEarned >= unlockThreshold;
+  return player.gold >= cardConfig.price && proficiency >= unlockThreshold;
 }
 
 function getScratchCardLevelRequirements(cardType: ScratchCardType) {
@@ -502,6 +534,82 @@ export function getScratchCardPrizePoolForLevel(
   }));
 }
 
+export function getLuckAdjustedScratchCardPrizePool(
+  cardType: ScratchCardType,
+  level: number,
+  luckLevel = 0,
+): ScratchCardPrizeTier[] {
+  const prizePool = getScratchCardPrizePoolForLevel(cardType, level);
+  const normalizedLuckLevel = Math.max(0, Math.floor(luckLevel));
+  const luckTool = getUpgradeToolConfig('scratch-luck');
+
+  if (
+    normalizedLuckLevel <= 0 ||
+    cardType === 'risk-peek' ||
+    luckTool?.effect.type !== 'scratch-luck'
+  ) {
+    return prizePool;
+  }
+
+  const losingTiers = prizePool.filter((tier) => tier.payout <= 0);
+  const winningTiers = prizePool.filter((tier) => tier.payout > 0);
+  const losingProbability = losingTiers.reduce((sum, tier) => sum + tier.probability, 0);
+  const winningProbability = winningTiers.reduce((sum, tier) => sum + tier.probability, 0);
+
+  if (losingProbability <= 0 || winningProbability <= 0) {
+    return prizePool;
+  }
+
+  const maxShift = Math.max(0, losingProbability - luckTool.effect.losingProbabilityFloor);
+  const shiftedProbability = Math.min(
+    maxShift,
+    normalizedLuckLevel * luckTool.effect.valuePerLevel,
+  );
+
+  if (shiftedProbability <= 0) {
+    return prizePool;
+  }
+
+  return prizePool.map((tier) => {
+    if (tier.payout <= 0) {
+      const share = tier.probability / losingProbability;
+
+      return {
+        ...tier,
+        probability: Math.max(0, tier.probability - shiftedProbability * share),
+      };
+    }
+
+    const share = tier.probability / winningProbability;
+
+    return {
+      ...tier,
+      probability: tier.probability + shiftedProbability * share,
+    };
+  });
+}
+
+export function getScratchLuckEffectPercent(luckLevel: number) {
+  const normalizedLuckLevel = Math.max(0, Math.floor(luckLevel));
+  const luckTool = getUpgradeToolConfig('scratch-luck');
+
+  if (normalizedLuckLevel <= 0 || luckTool?.effect.type !== 'scratch-luck') {
+    return 0;
+  }
+
+  return Math.round(normalizedLuckLevel * luckTool.effect.valuePerLevel * 100);
+}
+
+export function getScratchLuckEffectLabel(luckLevel: number) {
+  const effectPercent = getScratchLuckEffectPercent(luckLevel);
+
+  if (effectPercent <= 0) {
+    return '当前幸运：未生效';
+  }
+
+  return `当前幸运：未中奖权重 -${effectPercent}%`;
+}
+
 export function getScratchCardStepDistance(cardType: ScratchCardType) {
   return getScratchCardConfig(cardType).scratchBrush.stepDistance;
 }
@@ -518,10 +626,26 @@ export function getScratchCardSettlementProgressKey(cardType: ScratchCardType) {
   return 'basicSafe';
 }
 
-export function getBasicSafeScratchCardPrizeTier(random: () => number = Math.random, level = 0) {
+export function getScratchCardAlbumSlotByType(cardType: ScratchCardType) {
+  for (const album of SCRATCH_CARD_ALBUMS_CONFIG) {
+    for (const slot of album.slots) {
+      if (slot.cardType === cardType) {
+        return slot;
+      }
+    }
+  }
+
+  return null;
+}
+
+export function getBasicSafeScratchCardPrizeTier(
+  random: () => number = Math.random,
+  level = 0,
+  luckLevel = 0,
+) {
   const roll = clampRatio(random());
   let cumulativeProbability = 0;
-  const prizePool = getBasicSafeScratchCardPrizePoolForLevel(level);
+  const prizePool = getLuckAdjustedScratchCardPrizePool('basic-safe', level, luckLevel);
 
   for (const tier of prizePool) {
     cumulativeProbability += tier.probability;
@@ -942,7 +1066,7 @@ export function createBasicSafeScratchCard(options: CreateBasicSafeScratchCardOp
   const level = normalizeScratchCardLevel(options.level ?? 0);
   const tier = options.forcedTierId
     ? getBasicSafeScratchCardPrizeTierById(level, options.forcedTierId)
-    : getBasicSafeScratchCardPrizeTier(options.random, level);
+    : getBasicSafeScratchCardPrizeTier(options.random, level, options.luckLevel);
   const symbols = createSymbolsForPrizeTier(
     tier.id as BasicSafeScratchCardPrizeTierId,
     options.symbolRandom ?? Math.random,
@@ -976,10 +1100,14 @@ function getTripleMatchScratchCardPrizePoolForLevel(_level: number): ScratchCard
   return getScratchCardPrizePoolForLevel('triple-match', 0);
 }
 
-function getTripleMatchScratchCardPrizeTier(random: () => number = Math.random, level = 0) {
+function getTripleMatchScratchCardPrizeTier(
+  random: () => number = Math.random,
+  level = 0,
+  luckLevel = 0,
+) {
   const roll = clampRatio(random());
   let cumulativeProbability = 0;
-  const prizePool = getTripleMatchScratchCardPrizePoolForLevel(level);
+  const prizePool = getLuckAdjustedScratchCardPrizePool('triple-match', level, luckLevel);
 
   for (const tier of prizePool) {
     cumulativeProbability += tier.probability;
@@ -1009,7 +1137,7 @@ export function createTripleMatchScratchCard(options: CreateTripleMatchScratchCa
   );
   const tier = options.forcedTierId
     ? getTripleMatchScratchCardPrizeTierById(level, options.forcedTierId)
-    : getTripleMatchScratchCardPrizeTier(options.random, level);
+    : getTripleMatchScratchCardPrizeTier(options.random, level, options.luckLevel);
   const symbols = createTripleMatchSymbolsForPrizeTier(
     tier.id as TripleMatchScratchCardPrizeTierId,
     options.symbolRandom ?? Math.random,
@@ -1136,6 +1264,7 @@ export function settleScratchCard(player: PlayerState, card: ScratchCardState) {
     ...player,
     gold: Math.max(0, player.gold + payout - penaltyAmount),
     lifetimeGoldEarned: player.lifetimeGoldEarned + Math.max(0, payout),
+    proficiency: advanceSegmentedProficiency(player.proficiency, payout),
     cardsScratched: player.cardsScratched + 1,
     loseStreak: isNetLoss ? player.loseStreak + 1 : 0,
   } satisfies PlayerState;
@@ -1247,12 +1376,25 @@ export function createInitialUpgradeToolStates() {
   ) as Record<UpgradeToolId, UpgradeToolState>;
 }
 
+export function getUpgradeToolPrice(
+  tool: Pick<UpgradeToolConfig, 'price'> &
+    Partial<Pick<UpgradeToolConfig, 'priceMultiplierByLevel'>>,
+  level: number,
+) {
+  const normalizedLevel = Math.max(0, Math.floor(level));
+  const multipliers = tool.priceMultiplierByLevel ?? [1];
+  const multiplier = multipliers[normalizedLevel] ?? multipliers[multipliers.length - 1] ?? 1;
+
+  return Math.floor(tool.price * multiplier);
+}
+
 export function canBuyUpgradeTool(
   gold: number,
-  tool: Pick<UpgradeToolConfig, 'price' | 'maxLevel'>,
+  tool: Pick<UpgradeToolConfig, 'price' | 'maxLevel'> &
+    Partial<Pick<UpgradeToolConfig, 'priceMultiplierByLevel'>>,
   state: Pick<UpgradeToolState, 'level'>,
 ) {
-  return state.level < tool.maxLevel && gold >= tool.price;
+  return state.level < tool.maxLevel && gold >= getUpgradeToolPrice(tool, state.level);
 }
 
 export function getScratchBrushRadiusForUpgradeLevel(scratchRadiusLevel: number) {
@@ -1454,11 +1596,11 @@ export function shouldUnlockTrashCan(totalProficiency: number, trashCanUnlocked:
   );
 }
 
-export function shouldShowWorkRiskNotice(workLevel: number, riskMessageDismissed: boolean) {
-  return (
-    workLevel >= scratchLegendConfig.notifications.phone.brokenPlateNoticeLevel &&
-    !riskMessageDismissed
-  );
+export function shouldShowWorkRiskNotice(
+  riskNoticeTriggered: boolean,
+  riskMessageDismissed: boolean,
+) {
+  return riskNoticeTriggered && !riskMessageDismissed;
 }
 
 export function shouldShowScratchUnlockNotice(
