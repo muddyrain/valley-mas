@@ -15,6 +15,7 @@ import {
   createTripleMatchScratchCard,
   getBasicSafeScratchCardPrizePoolForLevel,
   getBasicSafeScratchCardPrizeTier,
+  getBoundedDesktopPosition,
   getBoundedPlatePosition,
   getCleaningBrushRadius,
   getGoldChangeEffect,
@@ -105,6 +106,18 @@ test('keeps dragged plate centered when table is smaller than the plate', () => 
 
   assert.equal(position.xPercent, 50);
   assert.equal(position.yPercent, 50);
+});
+
+test('keeps dragged rectangular table objects inside the full desktop bounds', () => {
+  const position = getBoundedDesktopPosition(
+    { clientX: 799, clientY: 580 },
+    { left: 0, top: 100, width: 800, height: 500 },
+    108,
+    76,
+  );
+
+  assertNearlyEqual(position.xPercent, 93.25);
+  assertNearlyEqual(position.yPercent, 92.4);
 });
 
 test('classifies gold change effects by direction and source intensity', () => {
@@ -507,6 +520,60 @@ test('returns stale claimable work phase to the desktop when plates remain', () 
   });
 
   assert.equal(save.workspace.phase, 'plateSpawned');
+});
+
+test('treats fully reset player progress as a fresh workspace', () => {
+  const stalePlate = {
+    id: 4,
+    reward: { base: 2, total: 2, isCrit: false, isBroken: false },
+    position: { xPercent: 50, yPercent: 50 },
+    cleanPoints: [],
+    isCleaned: true,
+    seed: 4,
+  };
+  const save = syncScratchLegendSave({
+    ...createInitialScratchLegendSave(),
+    workspace: {
+      phase: 'claimable',
+      activePlateId: stalePlate.id,
+      plates: [stalePlate],
+      scratchCards: [],
+      activeScratchCardId: null,
+      activeScratchCard: null,
+      nextPlateId: 5,
+      nextScratchCardId: 1,
+    },
+  });
+
+  assert.equal(save.workspace.phase, 'idle');
+  assert.equal(save.workspace.plates.length, 0);
+  assert.equal(save.workspace.activePlateId, null);
+  assert.equal(canStartWorkFromPhase(save.workspace.phase, save.player.gold), true);
+});
+
+test('treats reset core progress as fresh even when lose streak remains', () => {
+  const save = syncScratchLegendSave({
+    ...createInitialScratchLegendSave(),
+    player: {
+      ...createInitialScratchLegendSave().player,
+      loseStreak: 3,
+    },
+    workspace: {
+      phase: 'scratchingCard',
+      activePlateId: null,
+      plates: [],
+      scratchCards: [createBasicSafeScratchCard({ id: 7 })],
+      activeScratchCardId: 7,
+      activeScratchCard: null,
+      nextPlateId: 1,
+      nextScratchCardId: 8,
+    },
+  });
+
+  assert.equal(save.workspace.phase, 'idle');
+  assert.equal(save.workspace.scratchCards.length, 0);
+  assert.equal(save.workspace.activeScratchCardId, null);
+  assert.equal(canStartWorkFromPhase(save.workspace.phase, save.player.gold), true);
 });
 
 test('uses configured work reward amounts by level', () => {

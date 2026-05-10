@@ -1260,6 +1260,15 @@ export function getBoundedPlatePosition(
   bounds: SurfaceBounds,
   plateSize: number,
 ): PlatePosition {
+  return getBoundedDesktopPosition(point, bounds, plateSize, plateSize);
+}
+
+export function getBoundedDesktopPosition(
+  point: DragPoint,
+  bounds: SurfaceBounds,
+  itemWidth: number,
+  itemHeight: number,
+): PlatePosition {
   if (bounds.width <= 0 || bounds.height <= 0) {
     return {
       xPercent: 50,
@@ -1267,11 +1276,12 @@ export function getBoundedPlatePosition(
     };
   }
 
-  const radius = plateSize / 2;
-  const maxX = bounds.width - radius;
-  const maxY = bounds.height - radius;
-  const x = clampToRange(point.clientX - bounds.left, radius, maxX);
-  const y = clampToRange(point.clientY - bounds.top, radius, maxY);
+  const horizontalRadius = itemWidth / 2;
+  const verticalRadius = itemHeight / 2;
+  const maxX = bounds.width - horizontalRadius;
+  const maxY = bounds.height - verticalRadius;
+  const x = clampToRange(point.clientX - bounds.left, horizontalRadius, maxX);
+  const y = clampToRange(point.clientY - bounds.top, verticalRadius, maxY);
 
   return {
     xPercent: (x / bounds.width) * 100,

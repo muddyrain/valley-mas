@@ -186,16 +186,7 @@ export function createInitialScratchLegendSave(): ScratchLegendSave {
       },
     },
     upgradeTools: createInitialUpgradeToolStates(),
-    workspace: {
-      phase: 'idle',
-      plates: [],
-      activePlateId: null,
-      scratchCards: [],
-      activeScratchCardId: null,
-      activeScratchCard: null,
-      nextPlateId: 1,
-      nextScratchCardId: 1,
-    },
+    workspace: createInitialWorkspaceState(),
   };
 }
 
@@ -297,30 +288,82 @@ function getDesktopPhase(plateCount: number, scratchCardCount: number): WorkPhas
   return 'idle';
 }
 
+function createInitialWorkspaceState(): ScratchLegendWorkspaceState {
+  return {
+    phase: 'idle',
+    plates: [],
+    activePlateId: null,
+    scratchCards: [],
+    activeScratchCardId: null,
+    activeScratchCard: null,
+    nextPlateId: 1,
+    nextScratchCardId: 1,
+  };
+}
+
+function isFreshPlayerProgress(player: PlayerState) {
+  return (
+    player.gold === INITIAL_GOLD &&
+    player.lifetimeGoldEarned === 0 &&
+    player.plateCleaned === 0 &&
+    player.cardsScratched === 0 &&
+    getWorkLevel(player.plateCleaned) === 0
+  );
+}
+
+function hasWorkspaceProgress(workspace: ScratchLegendWorkspaceState) {
+  return (
+    workspace.phase !== 'idle' ||
+    workspace.plates.length > 0 ||
+    workspace.scratchCards.length > 0 ||
+    workspace.activePlateId !== null ||
+    workspace.activeScratchCardId !== null
+  );
+}
+
 function normalizeWorkspaceState(workspace: ScratchLegendWorkspaceState) {
   const activePlateExists = workspace.plates.some((plate) => plate.id === workspace.activePlateId);
   const activeScratchCardExists = workspace.scratchCards.some(
     (card) => card.id === workspace.activeScratchCardId,
   );
-  const shouldRepairWorkPhase =
-    (workspace.phase === 'cleaning' || workspace.phase === 'claimable') && !activePlateExists;
-  const shouldRepairScratchPhase = workspace.phase === 'scratchingCard' && !activeScratchCardExists;
+  const desktopPhase = getDesktopPhase(workspace.plates.length, workspace.scratchCards.length);
 
-  if (!shouldRepairWorkPhase && !shouldRepairScratchPhase) {
+  if ((workspace.phase === 'cleaning' || workspace.phase === 'claimable') && activePlateExists) {
+    return {
+      ...workspace,
+      activeScratchCardId: null,
+    } satisfies ScratchLegendWorkspaceState;
+  }
+
+  if (workspace.phase === 'scratchingCard' && activeScratchCardExists) {
+    return {
+      ...workspace,
+      activePlateId: null,
+    } satisfies ScratchLegendWorkspaceState;
+  }
+
+  if (
+    workspace.phase === desktopPhase &&
+    workspace.activePlateId === null &&
+    workspace.activeScratchCardId === null
+  ) {
     return workspace;
   }
 
   return {
     ...workspace,
-    activePlateId: activePlateExists ? workspace.activePlateId : null,
-    activeScratchCardId: activeScratchCardExists ? workspace.activeScratchCardId : null,
-    phase: getDesktopPhase(workspace.plates.length, workspace.scratchCards.length),
+    activePlateId: null,
+    activeScratchCardId: null,
+    phase: desktopPhase,
   } satisfies ScratchLegendWorkspaceState;
 }
 
 export function syncScratchLegendSave(save: ScratchLegendSave): ScratchLegendSave {
   const unlockedMilestones = { ...save.unlocks.unlockedMilestones };
-  const workspace = normalizeWorkspaceState(save.workspace);
+  const workspace =
+    isFreshPlayerProgress(save.player) && hasWorkspaceProgress(save.workspace)
+      ? createInitialWorkspaceState()
+      : normalizeWorkspaceState(save.workspace);
 
   for (const milestone of UNLOCK_MILESTONES) {
     if (save.player.lifetimeGoldEarned >= getUnlockMilestoneThreshold(milestone.id)) {

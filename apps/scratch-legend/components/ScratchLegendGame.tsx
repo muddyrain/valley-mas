@@ -1,11 +1,12 @@
 'use client';
 
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CleaningCanvas } from '@/components/CleaningCanvas';
 import { ScratchCardCanvas } from '@/components/ScratchCardCanvas';
 import {
   advanceBasicSafeScratchCardProgress,
   BASIC_SAFE_CARD_PRICE,
+  canAffordWorkPlate,
   canBuyBasicSafeScratchCard,
   canBuyScratchCard,
   canBuyTrashCan,
@@ -15,6 +16,7 @@ import {
   createScratchCard,
   type GoldChangeEffect,
   type GoldEffectSource,
+  getBoundedDesktopPosition,
   getBoundedPlatePosition,
   getCleaningBrushRadius,
   getGoldChangeEffect,
@@ -59,6 +61,7 @@ import {
   shouldShowTripleMatchUnlockNotice,
   shouldShowUpgradeToolsUnlockNotice,
   shouldShowWorkRiskNotice,
+  shouldUnlockTrashCan,
   TRASH_CAN_PRICE,
   TRASH_CAN_UNLOCK_AFTER_PLATES,
   TRIPLE_MATCH_CARD_MILESTONE_ID,
@@ -84,6 +87,7 @@ import { useScratchLegendStore } from '@/lib/game-store';
 
 const SCRATCH_MODE_MILESTONE_ID: UnlockMilestoneId = 'scratch-mode';
 const DESKTOP_PLATE_SIZE = scratchLegendConfig.work.plate.desktopSize;
+const TABLETOP_SCRATCH_CARD_SIZE = { width: 108, height: 76 } as const;
 const PLATE_ENTER_ANIMATION_MS = scratchLegendConfig.work.plate.enterAnimationMs;
 const PLATE_DRAG_HOLD_MS = scratchLegendConfig.work.drag.holdMs;
 const PLATE_DRAG_MOVE_THRESHOLD = scratchLegendConfig.work.drag.moveThreshold;
@@ -158,6 +162,7 @@ const LOAN_PHONE_COPY =
 const GOLD_EFFECT_MAX_EVENTS = 6;
 const GOLD_EFFECT_DURATION_MS = 900;
 const GOLD_ROLL_DURATION_MS = 560;
+const UNLOCK_TOAST_DURATION_MS = 2600;
 const SCRATCH_SLOT_FLASH_DURATION_MS = 420;
 const SCRATCH_SETTLEMENT_HIGHLIGHT_DELAY_MS = 140;
 
@@ -255,6 +260,10 @@ export function ScratchLegendGame() {
   const [liftedPlateId, setLiftedPlateId] = useState<number | null>(null);
   const [draggingScratchCardId, setDraggingScratchCardId] = useState<number | null>(null);
   const [liftedScratchCardId, setLiftedScratchCardId] = useState<number | null>(null);
+  const [dragPreviewPositions, setDragPreviewPositions] = useState<{
+    plates: Record<number, WorkPlateState['position']>;
+    scratchCards: Record<number, ScratchCardState['position']>;
+  }>({ plates: {}, scratchCards: {} });
   const [enteringPlateIds, setEnteringPlateIds] = useState<number[]>([]);
   const [enteringScratchCardIds, setEnteringScratchCardIds] = useState<number[]>([]);
   const [scratchPhoneStep, setScratchPhoneStep] = useState(0);
@@ -302,6 +311,8 @@ export function ScratchLegendGame() {
     isUnlockMilestoneUnlocked(save, TRIPLE_MATCH_CARD_MILESTONE_ID),
   );
   const unlockToastReadyRef = useRef(false);
+  const hydrationSyncAppliedRef = useRef(false);
+  const trashCanOfferFocusedRef = useRef(false);
 
   const player = save.player;
   const phase: WorkPhase = save.workspace.phase;
@@ -407,6 +418,7 @@ export function ScratchLegendGame() {
     (brokenPlateEnabled ? WORK_SAFE_REWARD_CHANCE : 1) * 100,
   )}%`;
   const workBrokenPlatePercent = `${Math.round(WORK_BROKEN_PLATE_CHANCE * 100)}%`;
+  const canAffordWork = canAffordWorkPlate(player.gold);
   const canStartWork = canStartWorkFromPhase(phase, player.gold);
   const canBuyBasicSafeCard =
     scratchCardVisible &&
@@ -487,6 +499,21 @@ export function ScratchLegendGame() {
     return '可领取';
   }, [activeScratchCard?.status, phase, plates.length, tableScratchCards.length]);
 
+  const showTrashCanUnlockToast = useCallback(() => {
+    previousTrashCanUnlockedRef.current = true;
+    trashCanOfferFocusedRef.current = true;
+
+    if (unlockToastTimerRef.current) {
+      window.clearTimeout(unlockToastTimerRef.current);
+    }
+
+    setUnlockToast('trash');
+    unlockToastTimerRef.current = window.setTimeout(() => {
+      setUnlockToast(null);
+      unlockToastTimerRef.current = null;
+    }, UNLOCK_TOAST_DURATION_MS);
+  }, []);
+
   useEffect(() => {
     return () => {
       if (platePointerRef.current?.holdTimer) {
@@ -526,6 +553,15 @@ export function ScratchLegendGame() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!hasHydrated || hydrationSyncAppliedRef.current) {
+      return;
+    }
+
+    hydrationSyncAppliedRef.current = true;
+    updateSave((current) => current);
+  }, [hasHydrated, updateSave]);
 
   useEffect(() => {
     const nextGold = player.gold;
@@ -603,19 +639,20 @@ export function ScratchLegendGame() {
     }
 
     if (trashCanUnlocked && !previousTrashCanUnlockedRef.current) {
-      if (unlockToastTimerRef.current) {
-        window.clearTimeout(unlockToastTimerRef.current);
-      }
-
-      setUnlockToast('trash');
-      unlockToastTimerRef.current = window.setTimeout(() => {
-        setUnlockToast(null);
-        unlockToastTimerRef.current = null;
-      }, 1800);
+      showTrashCanUnlockToast();
     }
 
     previousTrashCanUnlockedRef.current = trashCanUnlocked;
-  }, [trashCanUnlocked]);
+  }, [showTrashCanUnlockToast, trashCanUnlocked]);
+
+  useEffect(() => {
+    if (!hasHydrated || !trashCanUnlocked || trashCanPurchased || trashCanOfferFocusedRef.current) {
+      return;
+    }
+
+    trashCanOfferFocusedRef.current = true;
+    showTrashCanUnlockToast();
+  }, [hasHydrated, showTrashCanUnlockToast, trashCanPurchased, trashCanUnlocked]);
 
   useEffect(() => {
     if (activeLoans.length === 0 && !loanRepaymentFeedback) {
@@ -751,8 +788,49 @@ export function ScratchLegendGame() {
     }, highlightDelay);
   }
 
-  function updatePlatePositionFromPointer(
+  function getPlatePositionFromPointer(clientX: number, clientY: number, offsetX = 0, offsetY = 0) {
+    const table = tableRef.current;
+
+    if (!table) {
+      return null;
+    }
+
+    const bounds = table.getBoundingClientRect();
+    return getBoundedPlatePosition(
+      {
+        clientX: clientX - offsetX,
+        clientY: clientY - offsetY,
+      },
+      bounds,
+      DESKTOP_PLATE_SIZE,
+    );
+  }
+
+  function previewPlatePositionFromPointer(
     plateId: number,
+    clientX: number,
+    clientY: number,
+    offsetX = 0,
+    offsetY = 0,
+  ) {
+    const position = getPlatePositionFromPointer(clientX, clientY, offsetX, offsetY);
+
+    if (!position) {
+      return null;
+    }
+
+    setDragPreviewPositions((current) => ({
+      ...current,
+      plates: {
+        ...current.plates,
+        [plateId]: position,
+      },
+    }));
+
+    return position;
+  }
+
+  function getScratchCardPositionFromPointer(
     clientX: number,
     clientY: number,
     offsetX = 0,
@@ -761,18 +839,49 @@ export function ScratchLegendGame() {
     const table = tableRef.current;
 
     if (!table) {
-      return;
+      return null;
     }
 
     const bounds = table.getBoundingClientRect();
-    const position = getBoundedPlatePosition(
+    return getBoundedDesktopPosition(
       {
         clientX: clientX - offsetX,
         clientY: clientY - offsetY,
       },
       bounds,
-      DESKTOP_PLATE_SIZE,
+      TABLETOP_SCRATCH_CARD_SIZE.width,
+      TABLETOP_SCRATCH_CARD_SIZE.height,
     );
+  }
+
+  function previewScratchCardPositionFromPointer(
+    cardId: number,
+    clientX: number,
+    clientY: number,
+    offsetX = 0,
+    offsetY = 0,
+  ) {
+    const position = getScratchCardPositionFromPointer(clientX, clientY, offsetX, offsetY);
+
+    if (!position) {
+      return null;
+    }
+
+    setDragPreviewPositions((current) => ({
+      ...current,
+      scratchCards: {
+        ...current.scratchCards,
+        [cardId]: position,
+      },
+    }));
+
+    return position;
+  }
+
+  function commitPlatePosition(plateId: number, position: WorkPlateState['position'] | null) {
+    if (!position) {
+      return;
+    }
 
     updateSave((current) => ({
       ...current,
@@ -785,40 +894,23 @@ export function ScratchLegendGame() {
     }));
   }
 
-  function updateScratchCardPositionFromPointer(
+  function commitScratchCardPosition(
     cardId: number,
-    clientX: number,
-    clientY: number,
-    offsetX = 0,
-    offsetY = 0,
+    position: ScratchCardState['position'] | null,
   ) {
-    const table = tableRef.current;
-
-    if (!table) {
+    if (!position) {
       return;
     }
 
-    const bounds = table.getBoundingClientRect();
-    const position = getBoundedPlatePosition(
-      {
-        clientX: clientX - offsetX,
-        clientY: clientY - offsetY,
+    updateSave((current) => ({
+      ...current,
+      workspace: {
+        ...current.workspace,
+        scratchCards: current.workspace.scratchCards.map((card) =>
+          card.id === cardId ? { ...card, position } : card,
+        ),
       },
-      bounds,
-      DESKTOP_PLATE_SIZE,
-    );
-
-    updateSave((current) => {
-      return {
-        ...current,
-        workspace: {
-          ...current.workspace,
-          scratchCards: current.workspace.scratchCards.map((card) =>
-            card.id === cardId ? { ...card, position } : card,
-          ),
-        },
-      };
-    });
+    }));
   }
 
   function isPointerOverTrashCan(clientX: number, clientY: number) {
@@ -845,6 +937,7 @@ export function ScratchLegendGame() {
     setDraggingPlateId(null);
     setLiftedPlateId(null);
     setTrashHoverPlateId(null);
+    setDragPreviewPositions((current) => ({ ...current, plates: {} }));
   }
 
   function resetScratchCardPointer() {
@@ -856,13 +949,14 @@ export function ScratchLegendGame() {
     setDraggingScratchCardId(null);
     setLiftedScratchCardId(null);
     setTrashHoverScratchCardId(null);
+    setDragPreviewPositions((current) => ({ ...current, scratchCards: {} }));
   }
 
   function startPlateDrag(pointerState: PlatePointerState) {
     pointerState.dragging = true;
     setDraggingPlateId(pointerState.plateId);
     setLiftedPlateId(pointerState.plateId);
-    updatePlatePositionFromPointer(
+    previewPlatePositionFromPointer(
       pointerState.plateId,
       pointerState.startX,
       pointerState.startY,
@@ -875,7 +969,7 @@ export function ScratchLegendGame() {
     pointerState.dragging = true;
     setDraggingScratchCardId(pointerState.cardId);
     setLiftedScratchCardId(pointerState.cardId);
-    updateScratchCardPositionFromPointer(
+    previewScratchCardPositionFromPointer(
       pointerState.cardId,
       pointerState.startX,
       pointerState.startY,
@@ -1224,7 +1318,7 @@ export function ScratchLegendGame() {
     }
 
     event.preventDefault();
-    updatePlatePositionFromPointer(
+    previewPlatePositionFromPointer(
       pointerState.plateId,
       event.clientX,
       event.clientY,
@@ -1266,6 +1360,18 @@ export function ScratchLegendGame() {
       });
       resetPlatePointer();
       return;
+    }
+
+    if (wasDragged) {
+      commitPlatePosition(
+        pointerState.plateId,
+        getPlatePositionFromPointer(
+          event.clientX,
+          event.clientY,
+          pointerState.offsetX,
+          pointerState.offsetY,
+        ),
+      );
     }
 
     if (shouldOpenPlateFromPointerUp(wasDragged, false) && !pointerState.holdReady) {
@@ -1342,7 +1448,7 @@ export function ScratchLegendGame() {
     }
 
     event.preventDefault();
-    updateScratchCardPositionFromPointer(
+    previewScratchCardPositionFromPointer(
       pointerState.cardId,
       event.clientX,
       event.clientY,
@@ -1388,6 +1494,18 @@ export function ScratchLegendGame() {
       resetScratchRevealEffects();
       resetScratchCardPointer();
       return;
+    }
+
+    if (wasDragged) {
+      commitScratchCardPosition(
+        pointerState.cardId,
+        getScratchCardPositionFromPointer(
+          event.clientX,
+          event.clientY,
+          pointerState.offsetX,
+          pointerState.offsetY,
+        ),
+      );
     }
 
     if (!wasDragged && !pointerState.holdReady) {
@@ -1439,6 +1557,11 @@ export function ScratchLegendGame() {
     }
 
     const nextGold = Math.max(0, player.gold + claimedPlate.reward.total);
+    const earnedGold = Math.max(0, claimedPlate.reward.total);
+    const shouldShowTrashCanUnlock =
+      !trashCanUnlocked &&
+      shouldUnlockTrashCan(player.lifetimeGoldEarned + earnedGold, trashCanUnlocked);
+
     triggerGoldEffect(
       player.gold,
       nextGold,
@@ -1454,8 +1577,7 @@ export function ScratchLegendGame() {
         player: {
           ...current.player,
           gold: Math.max(0, current.player.gold + claimedPlate.reward.total),
-          lifetimeGoldEarned:
-            current.player.lifetimeGoldEarned + Math.max(0, claimedPlate.reward.total),
+          lifetimeGoldEarned: current.player.lifetimeGoldEarned + earnedGold,
           plateCleaned: current.player.plateCleaned + 1,
         },
         workspace: {
@@ -1466,6 +1588,9 @@ export function ScratchLegendGame() {
         },
       };
     });
+    if (shouldShowTrashCanUnlock) {
+      showTrashCanUnlockToast();
+    }
     setCleanProgress(0);
   }
 
@@ -1706,7 +1831,7 @@ export function ScratchLegendGame() {
     unlockToastTimerRef.current = window.setTimeout(() => {
       setUnlockToast(null);
       unlockToastTimerRef.current = null;
-    }, 1800);
+    }, UNLOCK_TOAST_DURATION_MS);
   }
 
   function advanceUpgradeToolsUnlockPhone() {
@@ -1731,7 +1856,7 @@ export function ScratchLegendGame() {
     unlockToastTimerRef.current = window.setTimeout(() => {
       setUnlockToast(null);
       unlockToastTimerRef.current = null;
-    }, 1800);
+    }, UNLOCK_TOAST_DURATION_MS);
   }
 
   function advanceTripleMatchUnlockPhone() {
@@ -1756,7 +1881,7 @@ export function ScratchLegendGame() {
     unlockToastTimerRef.current = window.setTimeout(() => {
       setUnlockToast(null);
       unlockToastTimerRef.current = null;
-    }, 1800);
+    }, UNLOCK_TOAST_DURATION_MS);
   }
 
   return (
@@ -1841,7 +1966,9 @@ export function ScratchLegendGame() {
                 </span>
                 <span className="work-copy">
                   <strong>日常工作</strong>
-                  <em>${WORK_PLATE_COST}</em>
+                  <em className={canAffordWork ? 'affordable' : 'unaffordable'}>
+                    ${WORK_PLATE_COST}
+                  </em>
                   <small>等级 {workLevel}</small>
                 </span>
                 <span
@@ -1937,7 +2064,9 @@ export function ScratchLegendGame() {
                 </div>
               ) : trashCanUnlocked ? (
                 <button
-                  className={`tool-card available buyable ${canPurchaseTrashCan ? '' : 'locked'}`}
+                  className={`tool-card available buyable ${
+                    canPurchaseTrashCan ? '' : 'insufficient'
+                  }`}
                   type="button"
                   onClick={buyTrashCan}
                   disabled={!canPurchaseTrashCan}
@@ -1945,9 +2074,13 @@ export function ScratchLegendGame() {
                   <span className="tool-icon trash-preview" />
                   <div>
                     <strong>垃圾桶</strong>
-                    <span>已解锁，花费 ${TRASH_CAN_PRICE} 后可拖入盘子或刮刮卡。</span>
+                    <span>购买资格已解锁，花费 ${TRASH_CAN_PRICE} 后才会拥有垃圾桶。</span>
                   </div>
-                  <em>${TRASH_CAN_PRICE}</em>
+                  <em>
+                    {canPurchaseTrashCan
+                      ? `$${TRASH_CAN_PRICE}`
+                      : `还差 $${TRASH_CAN_PRICE - player.gold}`}
+                  </em>
                 </button>
               ) : (
                 <>
@@ -1999,7 +2132,7 @@ export function ScratchLegendGame() {
             )}
           </div>
 
-          <div className="wood-table" ref={tableRef}>
+          <div className="wood-table">
             <div className="table-surface" aria-hidden="true" />
             <div className="table-furniture" aria-hidden="true">
               <span className="table-apron" />
@@ -2007,338 +2140,348 @@ export function ScratchLegendGame() {
               <span className="table-leg right" />
             </div>
 
-            <button
-              className={`phone ${phoneNoticePending ? 'ringing' : ''}`}
-              type="button"
-              onClick={() => {
-                if (phoneNoticePending) {
-                  setPhoneMessageOpen(true);
-                }
-              }}
-              disabled={!phoneNoticePending}
-              aria-label={phoneNoticePending ? '接听电话提醒' : '电话'}
-            >
-              <span className="phone-dial" />
-            </button>
-
-            {phase === 'idle' && (
-              <div className="idle-hint">
-                <strong>刮个不停</strong>
-                <span>先赚启动金，再去买第一张刮刮卡。</span>
-              </div>
-            )}
-
-            {(phase === 'plateSpawned' || phase === 'scratchCardSpawned') &&
-              plates.map((plate, index) => (
-                <button
-                  className={`small-dirty-plate ${
-                    enteringPlateIds.includes(plate.id) ? 'entering' : ''
-                  } ${plate.isCleaned ? 'cleaned' : ''} ${
-                    plate.reward.isBroken ? 'broken-risk' : ''
-                  } ${liftedPlateId === plate.id ? 'lifted' : ''} ${
-                    draggingPlateId === plate.id ? 'dragging' : ''
-                  }`}
-                  type="button"
-                  key={plate.id}
-                  style={{
-                    left: `${plate.position.xPercent}%`,
-                    top: `${plate.position.yPercent}%`,
-                    zIndex: draggingPlateId === plate.id ? 5 : 2 + index,
-                  }}
-                  onPointerDown={(event) => handlePlatePointerDown(event, plate)}
-                  onPointerMove={handlePlatePointerMove}
-                  onPointerUp={handlePlatePointerUp}
-                  onPointerCancel={resetPlatePointer}
-                  aria-label={`点击第 ${index + 1} 个脏盘子开始清洁`}
-                  aria-grabbed={draggingPlateId === plate.id}
-                >
-                  <span />
-                </button>
-              ))}
-
-            {phase === 'scratchCardSpawned' &&
-              tableScratchCards.map((scratchCard, index) => {
-                const display = getScratchCardDisplay(scratchCard.type);
-
-                return (
-                  <button
-                    className={`tabletop-scratch-card ${display.cardClassName} ${
-                      enteringScratchCardIds.includes(scratchCard.id) ? 'entering' : ''
-                    } ${liftedScratchCardId === scratchCard.id ? 'lifted' : ''} ${
-                      draggingScratchCardId === scratchCard.id ? 'dragging' : ''
-                    }`}
-                    type="button"
-                    key={scratchCard.id}
-                    style={{
-                      left: `${scratchCard.position.xPercent}%`,
-                      top: `${scratchCard.position.yPercent}%`,
-                      zIndex: draggingScratchCardId === scratchCard.id ? 6 : 3 + index,
-                    }}
-                    onPointerDown={(event) => handleScratchCardPointerDown(event, scratchCard)}
-                    onPointerMove={handleScratchCardPointerMove}
-                    onPointerUp={handleScratchCardPointerUp}
-                    onPointerCancel={resetScratchCardPointer}
-                    aria-label={`打开第 ${index + 1} 张${display.title}刮刮卡`}
-                    aria-grabbed={draggingScratchCardId === scratchCard.id}
-                  >
-                    <span className="tabletop-ticket-title">{display.ticketTitle}</span>
-                    <span className="tabletop-ticket-art" aria-hidden="true">
-                      <span className="tabletop-art-sky" />
-                      <span className="tabletop-art-mountain tall" />
-                      <span className="tabletop-art-mountain low" />
-                      <span className="tabletop-art-sun" />
-                    </span>
-                    <span className="tabletop-ticket-slots">
-                      {scratchCard.type === 'triple-match' ? '5格' : '3格'}
-                    </span>
-                  </button>
-                );
-              })}
-
-            {phase === 'scratchingCard' && activeScratchCard && (
-              <div className="scratch-card-view" onPointerDown={handleScratchCardViewPointerDown}>
-                <div
-                  className={`scratch-card ${activeScratchCardDisplay.cardClassName} ${
-                    activeScratchCard.status === 'claimable' ? 'revealed' : 'concealed'
-                  } ${activeScratchCard.result.tierId}`}
-                  ref={scratchCardRef}
-                >
-                  <div className="scratch-card-header">
-                    <span>{activeScratchCardDisplay.ticketTitle}</span>
-                    <strong>
-                      {activeScratchCardDisplay.title} 等级 {activeScratchCard.level}
-                    </strong>
-                  </div>
-                  <div className="scratch-card-picture" aria-hidden="true">
-                    <span className="mountain tall" />
-                    <span className="mountain low" />
-                    <span className="sun" />
-                  </div>
-                  <div className="scratch-result-area">
-                    <fieldset className="scratch-result-grid" aria-label="刮刮卡结果区">
-                      {activeScratchCard.result.symbols.map((symbol, index) => (
-                        <span
-                          className={`scratch-result-slot ${symbol} ${
-                            revealedScratchSlots.includes(index) ? 'slot-revealed' : ''
-                          } ${flashingScratchSlots.includes(index) ? 'slot-flash' : ''} ${
-                            settlementHighlightSlots.includes(index) ? 'slot-winning' : ''
-                          } ${
-                            activeScratchCard.status === 'claimable' &&
-                            settlementHighlightSlots.length > 0 &&
-                            !settlementHighlightSlots.includes(index)
-                              ? 'slot-muted'
-                              : ''
-                          }`}
-                          key={`${symbol}-${index}`}
-                        >
-                          <ScratchSymbolIcon symbol={symbol} />
-                          <small>{SCRATCH_SYMBOL_LABELS[symbol]}</small>
-                        </span>
-                      ))}
-                    </fieldset>
-                    <ScratchCardCanvas
-                      key={activeScratchCard.id}
-                      active={activeScratchCard.status === 'scratching'}
-                      visible={shouldShowScratchCover(
-                        activeScratchCard.status,
-                        scratchProgress,
-                        activeScratchCard.type,
-                      )}
-                      cardType={activeScratchCard.type}
-                      scratchPoints={activeScratchCard.scratchPoints}
-                      brushRadius={scratchBrushRadius}
-                      stepDistance={getScratchCardStepDistance(activeScratchCard.type)}
-                      onProgressChange={setScratchProgress}
-                      onRevealSlotsSync={(slotIndexes) => {
-                        revealedScratchSlotSetRef.current = new Set(slotIndexes);
-                        setRevealedScratchSlots([...slotIndexes]);
-                      }}
-                      onRevealSlot={revealScratchSlot}
-                      onScratchPointsFlush={recordActiveScratchPoints}
-                      onComplete={completeScratchCard}
-                    />
-                  </div>
-                </div>
-                <div className="scratch-info-card" data-scratch-control="true">
-                  <div className="scratch-info-title">
-                    <strong>{activeScratchCardDisplay.title}</strong>
-                    <em>等级 {activeScratchCard.level}</em>
-                  </div>
-                  <span>
-                    {activeScratchCard.status === 'claimable'
-                      ? activeScratchCard.result.isWinning
-                        ? activeScratchCardDisplay.winLabel
-                        : activeScratchCardDisplay.loseLabel
-                      : `拖动刮开，已揭露 ${Math.round(scratchProgress * 100)}%`}
-                  </span>
-                  <div className="scratch-rule-row">
-                    <em>规则</em>
-                    <b>{activeScratchCardDisplay.ruleLabel}</b>
-                  </div>
-                  {activeScratchPrizeRows.map((tier) => (
-                    <div className="scratch-rule-row" key={tier.id}>
-                      <em className="scratch-rule-symbol">
-                        <ScratchSymbolIcon symbol={getPrizeTierSymbol(tier.id)} />
-                        {tier.label.replace('成对', '')}
-                      </em>
-                      <b>
-                        {Math.round((tier.displayProbability ?? tier.probability) * 100)}%{' / '}$
-                        {tier.payout}
-                      </b>
-                    </div>
-                  ))}
-                  <div className="scratch-card-level-line">
-                    <em>等级进度</em>
-                    <span
-                      className="scratch-level-meter"
-                      role="progressbar"
-                      aria-label={`${activeScratchCardDisplay.title}等级进度`}
-                      aria-valuemin={0}
-                      aria-valuemax={activeScratchCardLevelProgress.target}
-                      aria-valuenow={activeScratchCardLevelProgress.current}
-                    >
-                      <span
-                        style={{
-                          width: `${Math.max(10, activeScratchCardLevelProgress.ratio * 100)}%`,
-                        }}
-                      />
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={claimScratchCardPrize}
-                    disabled={activeScratchCard.status !== 'claimable'}
-                  >
-                    {getOutcomeAmountLabel(
-                      activeScratchCard.status === 'claimable',
-                      activeScratchCard.result.isWinning ? activeScratchCard.result.payout : 0,
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {trashCanAvailable && (
-              <div
-                ref={trashCanRef}
-                className={`trash-can ${trashHoverPlateId || trashHoverScratchCardId ? 'open' : ''}`}
-                role="img"
-                aria-label="垃圾桶"
+            <div className="table-playfield" ref={tableRef}>
+              <button
+                className={`phone ${phoneNoticePending ? 'ringing' : ''}`}
+                type="button"
+                onClick={() => {
+                  if (phoneNoticePending) {
+                    setPhoneMessageOpen(true);
+                  }
+                }}
+                disabled={!phoneNoticePending}
+                aria-label={phoneNoticePending ? '接听电话提醒' : '电话'}
               >
-                <span className="trash-lid" />
-                <span className="trash-body" />
-              </div>
-            )}
+                <span className="phone-dial" />
+              </button>
 
-            {unlockToast && (
-              <div className={`unlock-toast ${unlockToast}`}>
-                <div className={`unlock-icon ${unlockToast}`} />
-                <strong>
-                  {unlockToast === 'scratch'
-                    ? '刮刮卡！'
-                    : unlockToast === 'triple-match'
-                      ? '已解锁'
-                      : unlockToast === 'upgrade'
-                        ? '已解锁'
-                        : '已解锁'}
-                </strong>
-                <span>
-                  {unlockToast === 'scratch'
-                    ? '成双入对已上架'
-                    : unlockToast === 'triple-match'
-                      ? '三连胜出'
-                      : unlockToast === 'upgrade'
-                        ? '升级工具'
-                        : '垃圾桶'}
-                </span>
-              </div>
-            )}
+              {phase === 'idle' && (
+                <div className="idle-hint">
+                  <strong>刮个不停</strong>
+                  <span>先赚启动金，再去买第一张刮刮卡。</span>
+                </div>
+              )}
 
-            {phoneNoticeVisible && (
-              <div className="phone-message">
-                {phoneNoticeType === 'loan' ? (
-                  <>
-                    <strong>电话提醒</strong>
-                    <span>{LOAN_PHONE_COPY}</span>
-                    <div className="phone-loan-terms">
-                      <em>到账</em>
-                      <b>${LOAN_CONFIG.principal}</b>
-                      <em>偿还</em>
-                      <b>${LOAN_REPAYMENT_AMOUNT}</b>
-                    </div>
+              {(phase === 'plateSpawned' || phase === 'scratchCardSpawned') &&
+                plates.map((plate, index) => {
+                  const previewPosition = dragPreviewPositions.plates[plate.id] ?? plate.position;
+
+                  return (
                     <button
-                      className="fingerprint-sign-button"
+                      className={`small-dirty-plate ${
+                        enteringPlateIds.includes(plate.id) ? 'entering' : ''
+                      } ${plate.isCleaned ? 'cleaned' : ''} ${
+                        plate.reward.isBroken ? 'broken-risk' : ''
+                      } ${liftedPlateId === plate.id ? 'lifted' : ''} ${
+                        draggingPlateId === plate.id ? 'dragging' : ''
+                      }`}
                       type="button"
-                      onClick={signEmergencyLoan}
+                      key={plate.id}
+                      style={{
+                        left: `${previewPosition.xPercent}%`,
+                        top: `${previewPosition.yPercent}%`,
+                        zIndex: draggingPlateId === plate.id ? 5 : 2 + index,
+                      }}
+                      onPointerDown={(event) => handlePlatePointerDown(event, plate)}
+                      onPointerMove={handlePlatePointerMove}
+                      onPointerUp={handlePlatePointerUp}
+                      onPointerCancel={resetPlatePointer}
+                      aria-label={`点击第 ${index + 1} 个脏盘子开始清洁`}
+                      aria-grabbed={draggingPlateId === plate.id}
                     >
-                      <span aria-hidden="true" />
-                      指纹签字
+                      <span />
                     </button>
-                  </>
-                ) : phoneNoticeType === 'scratch' ? (
-                  <>
-                    <strong>电话提醒</strong>
-                    <span>{SCRATCH_PHONE_LINES[scratchPhoneStep]}</span>
-                    <button type="button" onClick={advanceScratchUnlockPhone}>
-                      {scratchPhoneStep < SCRATCH_PHONE_LINES.length - 1 ? '继续听' : '看看好东西'}
+                  );
+                })}
+
+              {phase === 'scratchCardSpawned' &&
+                tableScratchCards.map((scratchCard, index) => {
+                  const display = getScratchCardDisplay(scratchCard.type);
+                  const previewPosition =
+                    dragPreviewPositions.scratchCards[scratchCard.id] ?? scratchCard.position;
+
+                  return (
+                    <button
+                      className={`tabletop-scratch-card ${display.cardClassName} ${
+                        enteringScratchCardIds.includes(scratchCard.id) ? 'entering' : ''
+                      } ${liftedScratchCardId === scratchCard.id ? 'lifted' : ''} ${
+                        draggingScratchCardId === scratchCard.id ? 'dragging' : ''
+                      }`}
+                      type="button"
+                      key={scratchCard.id}
+                      style={{
+                        left: `${previewPosition.xPercent}%`,
+                        top: `${previewPosition.yPercent}%`,
+                        zIndex: draggingScratchCardId === scratchCard.id ? 6 : 3 + index,
+                      }}
+                      onPointerDown={(event) => handleScratchCardPointerDown(event, scratchCard)}
+                      onPointerMove={handleScratchCardPointerMove}
+                      onPointerUp={handleScratchCardPointerUp}
+                      onPointerCancel={resetScratchCardPointer}
+                      aria-label={`打开第 ${index + 1} 张${display.title}刮刮卡`}
+                      aria-grabbed={draggingScratchCardId === scratchCard.id}
+                    >
+                      <span className="tabletop-ticket-title">{display.ticketTitle}</span>
+                      <span className="tabletop-ticket-art" aria-hidden="true">
+                        <span className="tabletop-art-sky" />
+                        <span className="tabletop-art-mountain tall" />
+                        <span className="tabletop-art-mountain low" />
+                        <span className="tabletop-art-sun" />
+                      </span>
+                      <span className="tabletop-ticket-slots">
+                        {scratchCard.type === 'triple-match' ? '5格' : '3格'}
+                      </span>
                     </button>
-                  </>
-                ) : phoneNoticeType === 'upgrade-tools' ? (
-                  <>
-                    <strong>电话提醒</strong>
-                    <span>{UPGRADE_TOOLS_PHONE_LINES[upgradeToolsPhoneStep]}</span>
-                    <button type="button" onClick={advanceUpgradeToolsUnlockPhone}>
-                      {upgradeToolsPhoneStep < UPGRADE_TOOLS_PHONE_LINES.length - 1
-                        ? '继续听'
-                        : '打开升级'}
-                    </button>
-                  </>
-                ) : phoneNoticeType === 'triple-match' ? (
-                  <>
-                    <strong>电话提醒</strong>
-                    <span>{TRIPLE_MATCH_PHONE_LINES[tripleMatchPhoneStep]}</span>
-                    <button type="button" onClick={advanceTripleMatchUnlockPhone}>
-                      {tripleMatchPhoneStep < TRIPLE_MATCH_PHONE_LINES.length - 1
-                        ? '继续听'
-                        : '上架新卡'}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <strong>电话提醒</strong>
+                  );
+                })}
+
+              {phase === 'scratchingCard' && activeScratchCard && (
+                <div className="scratch-card-view" onPointerDown={handleScratchCardViewPointerDown}>
+                  <div
+                    className={`scratch-card ${activeScratchCardDisplay.cardClassName} ${
+                      activeScratchCard.status === 'claimable' ? 'revealed' : 'concealed'
+                    } ${activeScratchCard.result.tierId}`}
+                    ref={scratchCardRef}
+                  >
+                    <div className="scratch-card-header">
+                      <span>{activeScratchCardDisplay.ticketTitle}</span>
+                      <strong>
+                        {activeScratchCardDisplay.title} 等级 {activeScratchCard.level}
+                      </strong>
+                    </div>
+                    <div className="scratch-card-picture" aria-hidden="true">
+                      <span className="mountain tall" />
+                      <span className="mountain low" />
+                      <span className="sun" />
+                    </div>
+                    <div className="scratch-result-area">
+                      <fieldset className="scratch-result-grid" aria-label="刮刮卡结果区">
+                        {activeScratchCard.result.symbols.map((symbol, index) => (
+                          <span
+                            className={`scratch-result-slot ${symbol} ${
+                              revealedScratchSlots.includes(index) ? 'slot-revealed' : ''
+                            } ${flashingScratchSlots.includes(index) ? 'slot-flash' : ''} ${
+                              settlementHighlightSlots.includes(index) ? 'slot-winning' : ''
+                            } ${
+                              activeScratchCard.status === 'claimable' &&
+                              settlementHighlightSlots.length > 0 &&
+                              !settlementHighlightSlots.includes(index)
+                                ? 'slot-muted'
+                                : ''
+                            }`}
+                            key={`${symbol}-${index}`}
+                          >
+                            <ScratchSymbolIcon symbol={symbol} />
+                            <small>{SCRATCH_SYMBOL_LABELS[symbol]}</small>
+                          </span>
+                        ))}
+                      </fieldset>
+                      <ScratchCardCanvas
+                        key={activeScratchCard.id}
+                        active={activeScratchCard.status === 'scratching'}
+                        visible={shouldShowScratchCover(
+                          activeScratchCard.status,
+                          scratchProgress,
+                          activeScratchCard.type,
+                        )}
+                        cardType={activeScratchCard.type}
+                        scratchPoints={activeScratchCard.scratchPoints}
+                        brushRadius={scratchBrushRadius}
+                        stepDistance={getScratchCardStepDistance(activeScratchCard.type)}
+                        onProgressChange={setScratchProgress}
+                        onRevealSlotsSync={(slotIndexes) => {
+                          revealedScratchSlotSetRef.current = new Set(slotIndexes);
+                          setRevealedScratchSlots([...slotIndexes]);
+                        }}
+                        onRevealSlot={revealScratchSlot}
+                        onScratchPointsFlush={recordActiveScratchPoints}
+                        onComplete={completeScratchCard}
+                      />
+                    </div>
+                  </div>
+                  <div className="scratch-info-card" data-scratch-control="true">
+                    <div className="scratch-info-title">
+                      <strong>{activeScratchCardDisplay.title}</strong>
+                      <em>等级 {activeScratchCard.level}</em>
+                    </div>
                     <span>
-                      日常工作升到等级{' '}
-                      {scratchLegendConfig.notifications.phone.brokenPlateNoticeLevel}{' '}
-                      了，之后擦盘子有 {workBrokenPlatePercent} 概率把盘子擦坏。
+                      {activeScratchCard.status === 'claimable'
+                        ? activeScratchCard.result.isWinning
+                          ? activeScratchCardDisplay.winLabel
+                          : activeScratchCardDisplay.loseLabel
+                        : `拖动刮开，已揭露 ${Math.round(scratchProgress * 100)}%`}
                     </span>
-                    <div className="phone-risk-grid">
-                      <div className="phone-risk-row">
-                        <em>{workSafeRewardPercent}</em>
-                        <b>+${previewRewardAmount}</b>
+                    <div className="scratch-rule-row">
+                      <em>规则</em>
+                      <b>{activeScratchCardDisplay.ruleLabel}</b>
+                    </div>
+                    {activeScratchPrizeRows.map((tier) => (
+                      <div className="scratch-rule-row" key={tier.id}>
+                        <em className="scratch-rule-symbol">
+                          <ScratchSymbolIcon symbol={getPrizeTierSymbol(tier.id)} />
+                          {tier.label.replace('成对', '')}
+                        </em>
+                        <b>
+                          {Math.round((tier.displayProbability ?? tier.probability) * 100)}%{' / '}$
+                          {tier.payout}
+                        </b>
                       </div>
-                      <div className="phone-risk-row danger">
-                        <em>{workBrokenPlatePercent}</em>
-                        <b>-${workBrokenPlatePenalty}</b>
-                      </div>
+                    ))}
+                    <div className="scratch-card-level-line">
+                      <em>等级进度</em>
+                      <span
+                        className="scratch-level-meter"
+                        role="progressbar"
+                        aria-label={`${activeScratchCardDisplay.title}等级进度`}
+                        aria-valuemin={0}
+                        aria-valuemax={activeScratchCardLevelProgress.target}
+                        aria-valuenow={activeScratchCardLevelProgress.current}
+                      >
+                        <span
+                          style={{
+                            width: `${Math.max(10, activeScratchCardLevelProgress.ratio * 100)}%`,
+                          }}
+                        />
+                      </span>
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
-                        updateSave((current) => ({
-                          ...current,
-                          notices: {
-                            ...current.notices,
-                            workRiskMessageDismissed: true,
-                          },
-                        }))
-                      }
+                      onClick={claimScratchCardPrize}
+                      disabled={activeScratchCard.status !== 'claimable'}
                     >
-                      我知道了
+                      {getOutcomeAmountLabel(
+                        activeScratchCard.status === 'claimable',
+                        activeScratchCard.result.isWinning ? activeScratchCard.result.payout : 0,
+                      )}
                     </button>
-                  </>
-                )}
-              </div>
-            )}
+                  </div>
+                </div>
+              )}
+
+              {trashCanAvailable && (
+                <div
+                  ref={trashCanRef}
+                  className={`trash-can ${trashHoverPlateId || trashHoverScratchCardId ? 'open' : ''}`}
+                  role="img"
+                  aria-label="垃圾桶"
+                >
+                  <span className="trash-lid" />
+                  <span className="trash-body" />
+                </div>
+              )}
+
+              {unlockToast && (
+                <div className={`unlock-toast ${unlockToast}`}>
+                  <div className={`unlock-icon ${unlockToast}`} />
+                  <strong>
+                    {unlockToast === 'scratch'
+                      ? '刮刮卡！'
+                      : unlockToast === 'triple-match'
+                        ? '已解锁'
+                        : unlockToast === 'upgrade'
+                          ? '已解锁'
+                          : '购买资格已解锁'}
+                  </strong>
+                  <span>
+                    {unlockToast === 'scratch'
+                      ? '成双入对已上架'
+                      : unlockToast === 'triple-match'
+                        ? '三连胜出'
+                        : unlockToast === 'upgrade'
+                          ? '升级工具'
+                          : `花费 $${TRASH_CAN_PRICE} 购买垃圾桶`}
+                  </span>
+                </div>
+              )}
+
+              {phoneNoticeVisible && (
+                <div className="phone-message">
+                  {phoneNoticeType === 'loan' ? (
+                    <>
+                      <strong>电话提醒</strong>
+                      <span>{LOAN_PHONE_COPY}</span>
+                      <div className="phone-loan-terms">
+                        <em>到账</em>
+                        <b>${LOAN_CONFIG.principal}</b>
+                        <em>偿还</em>
+                        <b>${LOAN_REPAYMENT_AMOUNT}</b>
+                      </div>
+                      <button
+                        className="fingerprint-sign-button"
+                        type="button"
+                        onClick={signEmergencyLoan}
+                      >
+                        <span aria-hidden="true" />
+                        指纹签字
+                      </button>
+                    </>
+                  ) : phoneNoticeType === 'scratch' ? (
+                    <>
+                      <strong>电话提醒</strong>
+                      <span>{SCRATCH_PHONE_LINES[scratchPhoneStep]}</span>
+                      <button type="button" onClick={advanceScratchUnlockPhone}>
+                        {scratchPhoneStep < SCRATCH_PHONE_LINES.length - 1
+                          ? '继续听'
+                          : '看看好东西'}
+                      </button>
+                    </>
+                  ) : phoneNoticeType === 'upgrade-tools' ? (
+                    <>
+                      <strong>电话提醒</strong>
+                      <span>{UPGRADE_TOOLS_PHONE_LINES[upgradeToolsPhoneStep]}</span>
+                      <button type="button" onClick={advanceUpgradeToolsUnlockPhone}>
+                        {upgradeToolsPhoneStep < UPGRADE_TOOLS_PHONE_LINES.length - 1
+                          ? '继续听'
+                          : '打开升级'}
+                      </button>
+                    </>
+                  ) : phoneNoticeType === 'triple-match' ? (
+                    <>
+                      <strong>电话提醒</strong>
+                      <span>{TRIPLE_MATCH_PHONE_LINES[tripleMatchPhoneStep]}</span>
+                      <button type="button" onClick={advanceTripleMatchUnlockPhone}>
+                        {tripleMatchPhoneStep < TRIPLE_MATCH_PHONE_LINES.length - 1
+                          ? '继续听'
+                          : '上架新卡'}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <strong>电话提醒</strong>
+                      <span>
+                        日常工作升到等级{' '}
+                        {scratchLegendConfig.notifications.phone.brokenPlateNoticeLevel}{' '}
+                        了，之后擦盘子有 {workBrokenPlatePercent} 概率把盘子擦坏。
+                      </span>
+                      <div className="phone-risk-grid">
+                        <div className="phone-risk-row">
+                          <em>{workSafeRewardPercent}</em>
+                          <b>+${previewRewardAmount}</b>
+                        </div>
+                        <div className="phone-risk-row danger">
+                          <em>{workBrokenPlatePercent}</em>
+                          <b>-${workBrokenPlatePenalty}</b>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateSave((current) => ({
+                            ...current,
+                            notices: {
+                              ...current.notices,
+                              workRiskMessageDismissed: true,
+                            },
+                          }))
+                        }
+                      >
+                        我知道了
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
 
             {loanLedgerVisible && (
               <div className="loan-ledger-overlay" role="dialog" aria-label="当前贷款列表">

@@ -16,6 +16,8 @@
   --font-pixel: "Arial Rounded MT Bold", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
   --texture-dark-panel: url("/ui-textures/pixel-dark-panel.png");
   --texture-wood-table: url("/ui-textures/pixel-wood-table.png");
+  --texture-table-apron: url("/ui-textures/pixel-table-apron.png");
+  --texture-table-leg: url("/ui-textures/pixel-table-leg.png");
   --texture-ticket-paper: url("/ui-textures/pixel-ticket-paper.png");
   --texture-blue-ticket: url("/ui-textures/pixel-blue-ticket.png");
   --texture-scratch-foil: url("/ui-textures/pixel-scratch-foil.png");
@@ -23,11 +25,31 @@
   --texture-dish-dirt: url("/ui-textures/pixel-dish-dirt.png");
   --texture-basic-ticket-face: url("/ui-textures/pixel-basic-ticket-face.png");
   --texture-triple-ticket-face: url("/ui-textures/pixel-triple-ticket-face.png");
+  --texture-tabletop-basic-ticket: url("/ui-textures/pixel-tabletop-basic-ticket.png");
+  --texture-tabletop-triple-ticket: url("/ui-textures/pixel-tabletop-triple-ticket.png");
+  --texture-ticket-landscape-basic: url("/ui-textures/pixel-ticket-landscape-basic.png");
+  --texture-ticket-landscape-triple: url("/ui-textures/pixel-ticket-landscape-triple.png");
   --texture-silver-scratch-layer: url("/ui-textures/pixel-silver-scratch-layer.png");
   --texture-clean-plate: url("/ui-textures/pixel-clean-plate-v5.png");
   --texture-result-cell-paper: url("/ui-textures/pixel-result-cell-paper.png");
   --texture-loan-contract-paper: url("/ui-textures/pixel-loan-contract-paper.png");
   --texture-prize-button-gold: url("/ui-textures/pixel-prize-button-gold.png");
+  --texture-red-phone: url("/ui-textures/pixel-red-phone.png");
+  --texture-fingerprint-stamp: url("/ui-textures/pixel-fingerprint-stamp.png");
+  --texture-trash-body: url("/ui-textures/pixel-trash-body.png");
+  --texture-trash-lid: url("/ui-textures/pixel-trash-lid.png");
+  --texture-trash-can: url("/ui-textures/pixel-trash-can.png");
+  --texture-work-plate-icon: url("/ui-textures/pixel-work-plate-icon.png");
+  --texture-work-sponge-icon: url("/ui-textures/pixel-work-sponge-icon.png");
+  --texture-upgrade-tool-luck: url("/ui-textures/pixel-upgrade-tool-luck.png");
+  --texture-upgrade-tool-radius: url("/ui-textures/pixel-upgrade-tool-radius.png");
+  --texture-upgrade-tool-copper: url("/ui-textures/pixel-upgrade-tool-copper.png");
+  --texture-symbol-fire: url("/ui-textures/pixel-symbol-fire.png");
+  --texture-symbol-cash: url("/ui-textures/pixel-symbol-cash.png");
+  --texture-symbol-bag: url("/ui-textures/pixel-symbol-bag.png");
+  --texture-symbol-coin: url("/ui-textures/pixel-symbol-coin.png");
+  --texture-symbol-jackpot: url("/ui-textures/pixel-symbol-jackpot.png");
+  --texture-symbol-blank: url("/ui-textures/pixel-symbol-blank.png");
 }
 
 * {
@@ -432,24 +454,22 @@ button {
 }
 
 .mini-plate {
-  width: 42px;
-  height: 42px;
-  border: 4px solid #e8f3ff;
-  border-radius: 999px;
-  background: radial-gradient(circle, #bdd9ff 0 46%, #6e9dd7 48% 54%, #d9edff 56%);
+  width: 44px;
+  height: 44px;
+  background: var(--texture-work-plate-icon) center / contain no-repeat;
+  filter: drop-shadow(0 3px 0 rgba(19, 33, 44, 0.38));
+  image-rendering: auto;
 }
 
 .mini-sponge {
   position: absolute;
-  right: 2px;
-  bottom: 4px;
-  width: 20px;
-  height: 15px;
-  border: 2px solid #59320d;
-  border-radius: 4px;
-  background:
-    radial-gradient(circle at 30% 35%, #ffe173 0 2px, transparent 3px),
-    radial-gradient(circle at 70% 58%, #e5a52c 0 2px, transparent 3px), #f3c33e;
+  right: 0;
+  bottom: 2px;
+  width: 25px;
+  height: 21px;
+  background: var(--texture-work-sponge-icon) center / contain no-repeat;
+  filter: drop-shadow(0 2px 0 rgba(66, 33, 13, 0.38));
+  image-rendering: auto;
   transform: rotate(-12deg);
 }
 
@@ -463,8 +483,15 @@ button {
 }
 
 .work-copy em {
-  color: #ff4d55;
   font-style: normal;
+}
+
+.work-copy em.affordable {
+  color: var(--scratch-gold);
+}
+
+.work-copy em.unaffordable {
+  color: #ff4d55;
 }
 
 .work-copy small {
@@ -644,6 +671,10 @@ button {
   opacity: 0.58;
 }
 
+.tool-card.insufficient {
+  border-color: rgba(246, 182, 71, 0.34);
+}
+
 .tool-card.placeholder {
   grid-template-columns: 34px 1fr;
 }
@@ -663,6 +694,10 @@ button {
 .tool-card em {
   color: #f6d17a;
   font-style: normal;
+}
+
+.tool-card.insufficient em {
+  color: #ffb68f;
 }
 
 .tool-card button {
@@ -711,6 +746,7 @@ button {
 }
 
 .table-stage {
+  --table-leg-reserve: 124px;
   display: grid;
   grid-template-rows: auto 1fr;
   gap: 14px;
@@ -781,31 +817,23 @@ button {
 }
 
 .upgrade-tool-icon {
-  width: 30px;
-  height: 30px;
-  border: 2px solid rgba(255, 224, 154, 0.5);
-  border-radius: 6px;
-  background:
-    radial-gradient(circle at 36% 28%, rgba(255, 244, 164, 0.7) 0 16%, transparent 17%),
-    rgba(246, 182, 71, 0.22);
+  width: 32px;
+  height: 32px;
+  background: var(--texture-upgrade-tool-luck) center / contain no-repeat;
+  filter: drop-shadow(0 2px 0 rgba(5, 10, 14, 0.42));
+  image-rendering: auto;
+}
+
+.upgrade-tool-icon.scratch-luck {
+  background-image: var(--texture-upgrade-tool-luck);
 }
 
 .upgrade-tool-icon.scratch-radius {
-  background:
-    radial-gradient(
-      circle at 50% 50%,
-      transparent 0 28%,
-      rgba(255, 226, 154, 0.7) 30% 44%,
-      transparent 46%
-    ),
-    rgba(120, 183, 255, 0.22);
+  background-image: var(--texture-upgrade-tool-radius);
 }
 
 .upgrade-tool-icon.copper-coin {
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 36% 28%, rgba(255, 226, 154, 0.86) 0 14%, transparent 15%),
-    linear-gradient(180deg, #d18938, #8f4d22);
+  background-image: var(--texture-upgrade-tool-copper);
 }
 
 .upgrade-tool-card > div:first-of-type {
@@ -926,15 +954,10 @@ button {
   background: transparent;
 }
 
-.wood-table > * {
-  position: relative;
-  z-index: 1;
-}
-
 .table-surface {
   position: absolute;
-  inset: 0;
-  z-index: 0;
+  inset: 0 0 var(--table-leg-reserve);
+  z-index: 2;
   clip-path: polygon(
     2.4% 0,
     97.6% 0,
@@ -949,8 +972,8 @@ button {
     linear-gradient(180deg, rgba(157, 112, 69, 0.58), rgba(143, 98, 56, 0.68)),
     var(--texture-wood-table) center / 256px 256px repeat;
   box-shadow:
-    26px 18px 0 rgba(23, 29, 43, 0.36),
-    0 20px 34px rgba(0, 0, 0, 0.22);
+    22px 16px 0 rgba(23, 29, 43, 0.28),
+    0 18px 28px rgba(0, 0, 0, 0.18);
 }
 
 .table-surface::before {
@@ -999,102 +1022,92 @@ button {
 
 .table-furniture {
   position: absolute;
-  inset: 0;
-  z-index: 0;
+  inset: 0 0 var(--table-leg-reserve);
+  z-index: 1;
+  perspective: 520px;
+  perspective-origin: 50% 0;
   pointer-events: none;
+}
+
+.table-playfield {
+  position: absolute;
+  inset: 0 0 var(--table-leg-reserve);
+  z-index: 3;
+  overflow: visible;
 }
 
 .table-apron {
   position: absolute;
-  right: 34px;
-  bottom: -2px;
-  left: 34px;
-  height: 22px;
-  background:
-    linear-gradient(90deg, rgba(88, 60, 35, 0.18), rgba(125, 88, 55, 0.1), rgba(88, 60, 35, 0.18)),
-    linear-gradient(180deg, #7d5430, #694324);
-  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.06);
+  right: 22px;
+  bottom: -30px;
+  left: 22px;
+  z-index: 2;
+  height: 56px;
+  background: var(--texture-table-apron) center / 100% 100% no-repeat;
+  filter: brightness(0.88) drop-shadow(0 10px 8px rgba(20, 15, 12, 0.2));
+}
+
+.table-apron::before {
+  position: absolute;
+  top: -10px;
+  right: 12px;
+  left: 12px;
+  height: 18px;
+  content: "";
+  background: linear-gradient(180deg, rgba(54, 28, 16, 0.58), rgba(54, 28, 16, 0));
+  border-radius: 999px;
+}
+
+.table-apron::after {
+  position: absolute;
+  right: 0;
+  bottom: -5px;
+  left: 0;
+  height: 10px;
+  content: "";
+  background: linear-gradient(180deg, rgba(30, 15, 9, 0.2), transparent);
+  border-radius: 0 0 8px 8px;
 }
 
 .table-leg {
   position: absolute;
-  bottom: -34px;
-  width: 30px;
-  height: 108px;
-  border-radius: 0 0 8px 8px;
-  background: linear-gradient(180deg, #845933, #6d4727);
-  box-shadow: inset 0 0 0 3px rgba(95, 65, 37, 0.18);
-  clip-path: polygon(12% 0, 88% 0, 100% 100%, 0 100%);
+  bottom: -114px;
+  z-index: 1;
+  width: 36px;
+  height: 116px;
+  background: var(--texture-table-leg) center / 100% 100% no-repeat;
+  filter: brightness(0.72) saturate(0.9) drop-shadow(8px 10px 8px rgba(11, 8, 6, 0.22));
+  transform-origin: 50% 0;
 }
 
 .table-leg.left {
-  left: 112px;
-  transform: skew(-5deg);
+  left: 46px;
+  transform: rotateX(8deg) rotateZ(7deg) skew(-3deg);
 }
 
 .table-leg.right {
-  right: 112px;
-  transform: skew(5deg);
+  right: 46px;
+  transform: rotateX(8deg) rotateZ(-7deg) skew(3deg);
 }
 
 .phone {
   position: absolute;
-  top: 18px;
-  right: 38px;
-  width: 132px;
-  height: 82px;
-  border: 4px solid #7f251e;
-  border-radius: 22px 22px 12px 12px;
-  background: linear-gradient(180deg, #d94a3a, #b52e28);
-  box-shadow:
-    inset 0 8px 0 rgba(255, 255, 255, 0.12),
-    0 8px 0 rgba(88, 29, 25, 0.22);
-}
-
-.phone::before,
-.phone::after {
-  position: absolute;
-  top: -16px;
-  width: 50px;
-  height: 28px;
-  border: 4px solid #8b241e;
-  border-radius: 999px;
-  content: "";
-  background: #d94a3a;
-}
-
-.phone::before {
-  left: -4px;
-  transform: rotate(-18deg);
-}
-
-.phone::after {
-  right: -4px;
-  transform: rotate(18deg);
+  top: 2px;
+  right: 26px;
+  width: 148px;
+  height: 112px;
+  border: 0;
+  background: var(--texture-red-phone) center / contain no-repeat;
+  cursor: pointer;
 }
 
 .phone-dial {
-  position: absolute;
-  left: 50%;
-  top: 28px;
-  width: 46px;
-  height: 34px;
-  border: 5px solid rgba(96, 25, 20, 0.72);
-  border-radius: 999px;
-  transform: translateX(-50%);
-  background:
-    radial-gradient(circle, #f1c2a5 0 8px, transparent 9px),
-    radial-gradient(circle at 24% 34%, #7d261f 0 3px, transparent 4px),
-    radial-gradient(circle at 74% 34%, #7d261f 0 3px, transparent 4px),
-    radial-gradient(circle at 50% 76%, #7d261f 0 3px, transparent 4px);
+  display: none;
 }
 
 .phone.ringing {
   animation: phone-ring 520ms ease-in-out infinite;
-  box-shadow:
-    inset 0 8px 0 rgba(255, 255, 255, 0.15),
-    0 8px 0 rgba(88, 29, 25, 0.22),
-    0 0 0 6px rgba(255, 220, 123, 0.18);
+  filter: drop-shadow(0 0 8px rgba(255, 220, 123, 0.46));
 }
 
 @keyframes phone-ring {
@@ -1216,9 +1229,61 @@ button {
 }
 
 .fingerprint-sign-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 116px;
+  border: 1px solid rgba(255, 219, 136, 0.72);
+  border-radius: 8px;
   background:
-    linear-gradient(180deg, rgba(198, 114, 37, 0.78), rgba(127, 53, 24, 0.86)),
+    linear-gradient(180deg, rgba(255, 205, 105, 0.82), rgba(161, 72, 30, 0.92)),
     var(--texture-prize-button-gold) center / 130px 64px repeat;
+  padding: 5px 10px 5px 7px;
+  color: #fff4d2;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow:
+    1px 1px 0 rgba(79, 32, 14, 0.72),
+    0 0 8px rgba(255, 224, 134, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 247, 207, 0.42),
+    inset 0 -2px 0 rgba(92, 34, 18, 0.34),
+    0 3px 0 rgba(66, 29, 16, 0.42),
+    0 9px 18px rgba(0, 0, 0, 0.18);
+  transition:
+    filter 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.fingerprint-sign-button:hover {
+  filter: brightness(1.08) saturate(1.08);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 247, 207, 0.5),
+    inset 0 -2px 0 rgba(92, 34, 18, 0.34),
+    0 4px 0 rgba(66, 29, 16, 0.42),
+    0 12px 20px rgba(0, 0, 0, 0.2);
+}
+
+.fingerprint-sign-button:active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 2px 4px rgba(76, 26, 13, 0.38),
+    0 1px 0 rgba(66, 29, 16, 0.5);
+}
+
+.phone-message .fingerprint-sign-button span {
+  display: block;
+  grid-column: auto;
+  flex: 0 0 auto;
+  width: 25px;
+  height: 25px;
+  background: var(--texture-fingerprint-stamp) center / contain no-repeat;
+  filter: drop-shadow(0 1px 0 rgba(62, 24, 12, 0.44));
+  image-rendering: auto;
 }
 
 .idle-hint {
@@ -1341,33 +1406,18 @@ button {
 
 .trash-lid {
   position: absolute;
-  top: 0;
-  width: 76px;
-  height: 18px;
-  border: 3px solid #30424d;
-  border-radius: 5px;
-  background: #9fb4bf;
+  top: -8px;
+  width: 86px;
+  height: 38px;
+  background: var(--texture-trash-lid) center / contain no-repeat;
   transform-origin: 16px 16px;
   transition: transform 120ms ease;
 }
 
 .trash-body {
-  width: 66px;
-  height: 82px;
-  border: 4px solid #344650;
-  border-top: 0;
-  border-radius: 5px 5px 14px 14px;
-  background:
-    linear-gradient(
-      90deg,
-      transparent 24%,
-      rgba(255, 255, 255, 0.22) 25% 31%,
-      transparent 32% 68%,
-      rgba(255, 255, 255, 0.18) 69% 75%,
-      transparent 76%
-    ),
-    linear-gradient(180deg, #7f949f, #516773);
-  box-shadow: 0 12px 18px rgba(46, 30, 18, 0.24);
+  width: 88px;
+  height: 94px;
+  background: var(--texture-trash-body) center / contain no-repeat;
 }
 
 .trash-can.open .trash-lid {
@@ -1375,9 +1425,7 @@ button {
 }
 
 .trash-can.open .trash-body {
-  box-shadow:
-    0 0 0 8px rgba(255, 222, 127, 0.22),
-    0 12px 18px rgba(46, 30, 18, 0.24);
+  filter: drop-shadow(0 0 8px rgba(255, 222, 127, 0.42));
 }
 
 .unlock-toast {
@@ -1386,21 +1434,46 @@ button {
   z-index: 8;
   display: grid;
   justify-items: center;
-  gap: 10px;
-  width: 220px;
+  gap: 8px;
+  width: 292px;
+  border: 3px solid rgba(255, 232, 149, 0.9);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(67, 37, 14, 0.92), rgba(18, 20, 22, 0.96)),
+    var(--texture-dark-panel) center / 128px 128px repeat;
+  padding: 16px 18px 18px;
+  box-shadow:
+    0 0 0 4px rgba(56, 31, 13, 0.7),
+    0 0 0 8px rgba(255, 207, 92, 0.2),
+    0 20px 40px rgba(0, 0, 0, 0.42),
+    inset 0 2px 0 rgba(255, 255, 255, 0.16);
   transform: translate(-50%, -50%);
-  animation: unlock-toast-pop 1.8s ease-out forwards;
+  animation: unlock-toast-pop 2.6s cubic-bezier(0.2, 0.9, 0.18, 1) forwards;
   pointer-events: none;
 }
 
 .unlock-toast::before {
   position: absolute;
   inset: 50%;
-  width: 220px;
-  height: 220px;
+  z-index: -1;
+  width: 330px;
+  height: 330px;
   content: "";
-  background: radial-gradient(circle, rgba(255, 207, 92, 0.62), rgba(255, 207, 92, 0));
+  background: radial-gradient(
+    circle,
+    rgba(255, 220, 112, 0.72),
+    rgba(255, 220, 112, 0.16) 38%,
+    rgba(255, 220, 112, 0) 68%
+  );
   transform: translate(-50%, -50%);
+}
+
+.unlock-toast::after {
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgba(255, 247, 202, 0.32);
+  border-radius: 4px;
+  content: "";
 }
 
 .unlock-icon {
@@ -1409,35 +1482,14 @@ button {
 }
 
 .unlock-icon.trash {
-  width: 88px;
-  height: 96px;
-  border: 5px solid #32434d;
-  border-top: 0;
-  border-radius: 8px 8px 18px 18px;
-  background:
-    linear-gradient(
-      90deg,
-      transparent 26%,
-      rgba(255, 255, 255, 0.22) 27% 34%,
-      transparent 35% 66%,
-      rgba(255, 255, 255, 0.18) 67% 74%,
-      transparent 75%
-    ),
-    linear-gradient(180deg, #94a9b4, #657b86);
-  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.28);
+  width: 104px;
+  height: 116px;
+  background: var(--texture-trash-can) center / contain no-repeat;
+  filter: drop-shadow(0 8px 0 rgba(60, 32, 12, 0.32)) drop-shadow(0 0 12px rgba(255, 215, 97, 0.38));
 }
 
 .unlock-icon.trash::before {
-  position: absolute;
-  top: -16px;
-  left: 50%;
-  width: 98px;
-  height: 20px;
-  border: 4px solid #32434d;
-  border-radius: 6px;
-  content: "";
-  background: #aabdc7;
-  transform: translateX(-50%);
+  content: none;
 }
 
 .unlock-icon.scratch {
@@ -1480,12 +1532,19 @@ button {
 
 .unlock-toast strong {
   color: #fff8dc;
-  font-size: 30px;
+  font-size: 28px;
+  line-height: 1;
+  text-shadow:
+    2px 2px 0 rgba(72, 34, 9, 0.78),
+    0 0 12px rgba(255, 216, 91, 0.42);
 }
 
 .unlock-toast span {
-  color: #fff0c3;
-  font-size: 18px;
+  color: #ffe7a2;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-shadow: 1px 1px 0 rgba(72, 34, 9, 0.62);
 }
 
 @keyframes unlock-toast-pop {
@@ -1496,12 +1555,12 @@ button {
 
   18% {
     opacity: 1;
-    transform: translate(-50%, -52%) scale(1.06);
+    transform: translate(-50%, -52%) scale(1.08);
   }
 
-  72% {
+  70% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translate(-50%, -50%) scale(1.01);
   }
 
   100% {
@@ -1581,14 +1640,10 @@ button {
   grid-template-rows: auto 1fr auto;
   width: 108px;
   height: 76px;
-  border: 3px solid rgba(122, 68, 26, 0.86);
+  border: 0;
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(255, 216, 122, 0.34), rgba(160, 74, 26, 0.24)),
-    var(--texture-basic-ticket-face) center / 150px 150px repeat;
-  box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.28),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.16);
+  background: var(--texture-tabletop-basic-ticket) center / 100% 100% no-repeat;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
   color: #fff6d7;
   text-align: left;
   transform: translate(-50%, -50%);
@@ -1602,10 +1657,8 @@ button {
 }
 
 .tabletop-scratch-card.triple-match {
-  border-color: rgba(44, 92, 126, 0.95);
-  background:
-    linear-gradient(180deg, rgba(126, 196, 235, 0.28), rgba(20, 75, 118, 0.32)),
-    var(--texture-triple-ticket-face) center / 152px 152px repeat;
+  background: var(--texture-tabletop-triple-ticket) center / 100% 100% no-repeat;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
 }
 
 .tabletop-scratch-card.entering {
@@ -1630,28 +1683,55 @@ button {
 }
 
 .tabletop-ticket-title {
-  padding: 6px 8px 0;
+  padding: 9px 9px 0;
   color: #fff3c7;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
   line-height: 1;
   text-shadow: 1px 1px 0 rgba(65, 28, 12, 0.62);
 }
 
 .tabletop-ticket-art {
-  position: relative;
-  margin: 5px 10px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 246, 215, 0.32);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.12);
+  display: none;
+}
+
+.tabletop-scratch-card.triple-match .tabletop-ticket-art {
+  display: none;
+}
+
+.tabletop-scratch-card.triple-match .tabletop-ticket-title {
+  color: #fff7b8;
+  text-shadow:
+    1px 1px 0 rgba(18, 38, 65, 0.9),
+    0 0 8px rgba(255, 232, 137, 0.36);
+}
+
+.tabletop-ticket-slots {
+  align-self: end;
+  justify-self: end;
+  margin: 0 9px 8px 0;
+  border: 1px solid rgba(255, 240, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(92, 40, 18, 0.56);
+  padding: 2px 7px;
+  color: #fff6d7;
+  font-size: 10px;
+  line-height: 1;
+  text-shadow: 1px 1px 0 rgba(74, 31, 14, 0.72);
+}
+
+.tabletop-scratch-card.triple-match .tabletop-ticket-slots {
+  border: 1px solid rgba(206, 242, 255, 0.28);
+  background: rgba(10, 44, 78, 0.48);
+  color: #e9fbff;
+  text-shadow: 1px 1px 0 rgba(9, 24, 39, 0.72);
 }
 
 .tabletop-art-sky,
 .tabletop-art-mountain,
 .tabletop-art-sun {
   position: absolute;
-  display: block;
+  display: none;
 }
 
 .tabletop-art-sky {
@@ -1684,14 +1764,6 @@ button {
   height: 13px;
   border-radius: 999px;
   background: #ffe06f;
-}
-
-.tabletop-ticket-slots {
-  justify-self: end;
-  margin: 0 8px 6px;
-  color: rgba(255, 251, 232, 0.86);
-  font-size: 11px;
-  line-height: 1;
 }
 
 .cleaning-view {
@@ -1940,17 +2012,27 @@ button {
   position: relative;
   overflow: hidden;
   min-height: 96px;
-  border: 2px solid rgba(255, 246, 215, 0.34);
+  border: 1px solid rgba(255, 239, 189, 0.2);
   border-radius: 8px;
   background:
-    linear-gradient(180deg, rgba(112, 188, 224, 0.52), rgba(255, 209, 112, 0.28)),
-    rgba(255, 255, 255, 0.08);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(54, 109, 114, 0.04)),
+    var(--texture-ticket-landscape-basic) center / 100% 100% no-repeat;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 0 rgba(148, 82, 34, 0.1);
+  image-rendering: auto;
+}
+
+.scratch-card.triple-match .scratch-card-picture {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(22, 82, 125, 0.05)),
+    var(--texture-ticket-landscape-triple) center / 100% 100% no-repeat;
 }
 
 .scratch-card-picture .mountain,
 .scratch-card-picture .sun {
   position: absolute;
-  display: block;
+  display: none;
 }
 
 .scratch-card-picture .mountain {
@@ -2067,55 +2149,64 @@ button {
 }
 
 .scratch-result-slot small {
-  color: rgba(64, 38, 20, 0.72);
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 13px;
+  border: 1px solid rgba(118, 70, 32, 0.24);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 215, 0.82), rgba(220, 168, 92, 0.2)),
+    rgba(127, 79, 38, 0.08);
+  color: #6b3b19;
+  font-size: 9px;
+  font-weight: 900;
   line-height: 1;
+  text-shadow:
+    0 1px 0 rgba(255, 246, 207, 0.9),
+    1px 1px 0 rgba(62, 31, 13, 0.22);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 1px 0 rgba(91, 42, 9, 0.18);
 }
 
 .scratch-symbol-icon {
   position: relative;
   display: block;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
+  background: var(--texture-symbol-blank) center / contain no-repeat;
+  image-rendering: auto;
 }
 
-.scratch-symbol-icon::before {
-  position: absolute;
-  inset: 4px;
-  border-radius: 999px;
-  content: "";
-  background: #d8a24f;
+.scratch-symbol-icon > span {
+  display: none;
 }
 
-.scratch-symbol-icon.blank::before {
-  background: rgba(135, 110, 76, 0.34);
+.scratch-symbol-icon.blank {
+  background-image: var(--texture-symbol-blank);
 }
 
-.scratch-symbol-icon.fire::before {
-  border-radius: 50% 50% 50% 8px;
-  background: linear-gradient(180deg, #ffdc6b, #e55a28);
-  transform: rotate(-28deg);
+.scratch-symbol-icon.fire {
+  background-image: var(--texture-symbol-fire);
 }
 
-.scratch-symbol-icon.cash::before {
-  border-radius: 4px;
-  background: linear-gradient(180deg, #d8f3d0, #54ad67);
+.scratch-symbol-icon.cash {
+  background-image: var(--texture-symbol-cash);
 }
 
-.scratch-symbol-icon.bag::before {
-  border-radius: 48% 48% 42% 42%;
-  background: linear-gradient(180deg, #f5c25e, #b8752d);
+.scratch-symbol-icon.bag {
+  background-image: var(--texture-symbol-bag);
 }
 
-.scratch-symbol-icon.coin::before {
-  background: linear-gradient(180deg, #f6c461, #b96728);
+.scratch-symbol-icon.coin {
+  background-image: var(--texture-symbol-coin);
 }
 
-.scratch-symbol-icon.jackpot::before {
-  border-radius: 6px;
-  background:
-    var(--texture-gold-sparkle) center / 42px 42px repeat,
-    linear-gradient(180deg, #ffe178, #d58a2c);
+.scratch-symbol-icon.jackpot {
+  background-image: var(--texture-symbol-jackpot);
 }
 
 .scratch-card-cover {
@@ -2533,6 +2624,7 @@ button {
   }
 
   .table-stage {
+    --table-leg-reserve: 112px;
     padding: 0 12px 12px;
   }
 
