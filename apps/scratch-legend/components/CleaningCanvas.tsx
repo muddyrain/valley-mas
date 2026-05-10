@@ -15,6 +15,15 @@ type CleaningCanvasProps = {
 const CANVAS_SIZE = 520;
 const CLEAN_POINT_SAVE_DISTANCE = 12;
 const CLEAN_PROGRESS_REPORT_STEP = 0.04;
+const DIRT_SPRITE_SRC = '/ui-textures/pixel-dish-dirt-sprites.png';
+const DIRT_SPRITE_DRAWS = [
+  { source: [0, 0, 64, 64], target: [86, 74, 92, 78], rotation: -0.16 },
+  { source: [64, 0, 64, 64], target: [182, 76, 106, 86], rotation: 0.1 },
+  { source: [128, 0, 72, 64], target: [318, 120, 112, 78], rotation: 0.28 },
+  { source: [0, 64, 152, 64], target: [126, 246, 168, 72], rotation: -0.2 },
+  { source: [152, 64, 96, 64], target: [302, 302, 132, 74], rotation: 0.18 },
+  { source: [200, 0, 56, 84], target: [380, 212, 86, 116], rotation: 0.08 },
+] as const;
 
 export function CleaningCanvas({
   active,
@@ -24,7 +33,10 @@ export function CleaningCanvas({
   onCleanPointsFlush,
   onComplete,
 }: CleaningCanvasProps) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const spongeCursorRef = useRef<HTMLSpanElement | null>(null);
+  const dirtSpriteRef = useRef<HTMLImageElement | null>(null);
   const drawingRef = useRef(false);
   const dirtyPixelsRef = useRef(1);
   const completedRef = useRef(false);
@@ -131,6 +143,40 @@ export function CleaningCanvas({
 
     updateProgress(true);
   }, [updateProgress]);
+
+  const loadDirtSprite = useCallback(() => {
+    const currentSprite = dirtSpriteRef.current;
+
+    if (currentSprite?.complete && currentSprite.naturalWidth > 0) {
+      return Promise.resolve();
+    }
+
+    return new Promise<void>((resolve) => {
+      const image = new Image();
+      let resolved = false;
+
+      function finish() {
+        if (resolved) {
+          return;
+        }
+
+        resolved = true;
+        resolve();
+      }
+
+      image.onload = () => {
+        dirtSpriteRef.current = image;
+        finish();
+      };
+      image.onerror = finish;
+      image.src = DIRT_SPRITE_SRC;
+
+      if (image.complete) {
+        dirtSpriteRef.current = image;
+        finish();
+      }
+    });
+  }, []);
 
   const eraseCanvasPoint = useCallback(
     (x: number, y: number) => {
@@ -243,6 +289,32 @@ export function CleaningCanvas({
       context.stroke();
     }
 
+    const dirtSprite = dirtSpriteRef.current;
+
+    if (dirtSprite?.complete && dirtSprite.naturalWidth > 0) {
+      for (const { source, target, rotation } of DIRT_SPRITE_DRAWS) {
+        const [sourceX, sourceY, sourceWidth, sourceHeight] = source;
+        const [targetX, targetY, targetWidth, targetHeight] = target;
+
+        context.save();
+        context.globalAlpha = 0.9;
+        context.translate(targetX + targetWidth / 2, targetY + targetHeight / 2);
+        context.rotate(rotation);
+        context.drawImage(
+          dirtSprite,
+          sourceX,
+          sourceY,
+          sourceWidth,
+          sourceHeight,
+          -targetWidth / 2,
+          -targetHeight / 2,
+          targetWidth,
+          targetHeight,
+        );
+        context.restore();
+      }
+    }
+
     context.fillStyle = '#9f6744';
     context.globalAlpha = 0.78;
 
@@ -271,24 +343,85 @@ export function CleaningCanvas({
     reportProgress(0, true);
   }, [countDirtyPixels, reportProgress]);
 
-  const getCanvasPoint = useCallback((clientX: number, clientY: number) => {
-    const canvas = canvasRef.current;
+  const isPointInCleaningCircle = useCallback((clientX: number, clientY: number, edgeInset = 0) => {
+    const wrap = wrapRef.current;
 
-    if (!canvas) {
-      return null;
+    if (!wrap) {
+      return false;
     }
 
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = (clientX - rect.left) * scaleX;
-    const y = (clientY - rect.top) * scaleY;
+    const rect = wrap.getBoundingClientRect();
+    const radius = Math.max(0, Math.min(rect.width, rect.height) / 2 - edgeInset);
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const distanceFromCenter = Math.hypot(clientX - centerX, clientY - centerY);
 
-    return {
-      x,
-      y,
-    };
+    return distanceFromCenter <= radius;
   }, []);
+
+  const getCanvasPoint = useCallback(
+    (clientX: number, clientY: number) => {
+      const canvas = canvasRef.current;
+
+      if (!canvas || !isPointInCleaningCircle(clientX, clientY)) {
+        return null;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = (clientX - rect.left) * scaleX;
+      const y = (clientY - rect.top) * scaleY;
+
+      return {
+        x,
+        y,
+      };
+    },
+    [isPointInCleaningCircle],
+  );
+
+  const hideSpongeCursor = useCallback(() => {
+    spongeCursorRef.current?.classList.remove('visible', 'pressing');
+  }, []);
+
+  const setNativeCursorVisible = useCallback((visible: boolean) => {
+    wrapRef.current?.classList.toggle('native-cursor-visible', visible);
+  }, []);
+
+  const updateSpongeCursor = useCallback(
+    (clientX: number, clientY: number, pressed = false) => {
+      const wrap = wrapRef.current;
+      const spongeCursor = spongeCursorRef.current;
+
+      if (!wrap || !spongeCursor) {
+        return;
+      }
+
+      if (!active) {
+        hideSpongeCursor();
+        setNativeCursorVisible(true);
+        return;
+      }
+
+      if (!isPointInCleaningCircle(clientX, clientY)) {
+        hideSpongeCursor();
+        setNativeCursorVisible(true);
+        return;
+      }
+
+      const rect = wrap.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+
+      setNativeCursorVisible(false);
+      spongeCursor.style.setProperty('--sponge-x', `${x}px`);
+      spongeCursor.style.setProperty('--sponge-y', `${y}px`);
+      spongeCursor.classList.add('visible');
+      spongeCursor.classList.toggle('pressing', pressed);
+    },
+    [active, hideSpongeCursor, isPointInCleaningCircle, setNativeCursorVisible],
+  );
 
   const eraseAt = useCallback(
     (clientX: number, clientY: number) => {
@@ -324,20 +457,32 @@ export function CleaningCanvas({
   );
 
   useEffect(() => {
-    drawDirt();
+    let cancelled = false;
 
-    const canvas = canvasRef.current;
+    loadDirtSprite().then(() => {
+      if (cancelled) {
+        return;
+      }
 
-    if (!canvas) {
-      return;
-    }
+      drawDirt();
 
-    for (const point of cleanPointsRef.current) {
-      eraseCanvasPoint(point.xPercent * canvas.width, point.yPercent * canvas.height);
-    }
+      const canvas = canvasRef.current;
 
-    flushProgressUpdate();
-  }, [drawDirt, eraseCanvasPoint, flushProgressUpdate]);
+      if (!canvas) {
+        return;
+      }
+
+      for (const point of cleanPointsRef.current) {
+        eraseCanvasPoint(point.xPercent * canvas.width, point.yPercent * canvas.height);
+      }
+
+      flushProgressUpdate();
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [drawDirt, eraseCanvasPoint, flushProgressUpdate, loadDirtSprite]);
 
   useEffect(() => {
     function stopDrawing() {
@@ -347,6 +492,7 @@ export function CleaningCanvas({
       }
 
       drawingRef.current = false;
+      spongeCursorRef.current?.classList.remove('pressing');
     }
 
     window.addEventListener('blur', stopDrawing);
@@ -365,7 +511,7 @@ export function CleaningCanvas({
   }, [flushCleanPoints, flushProgressUpdate]);
 
   return (
-    <div className="cleaning-canvas-wrap">
+    <div className="cleaning-canvas-wrap" ref={wrapRef}>
       <canvas
         ref={canvasRef}
         className="dirt-canvas"
@@ -373,13 +519,20 @@ export function CleaningCanvas({
         height={CANVAS_SIZE}
         aria-label="脏盘子污渍层"
         onPointerDown={(event) => {
-          if (active) {
-            drawingRef.current = true;
-            event.currentTarget.setPointerCapture(event.pointerId);
-            eraseAt(event.clientX, event.clientY);
+          if (!active || !isPointInCleaningCircle(event.clientX, event.clientY)) {
+            hideSpongeCursor();
+            setNativeCursorVisible(true);
+            return;
           }
+
+          drawingRef.current = true;
+          updateSpongeCursor(event.clientX, event.clientY, true);
+          event.currentTarget.setPointerCapture(event.pointerId);
+          eraseAt(event.clientX, event.clientY);
         }}
         onPointerMove={(event) => {
+          updateSpongeCursor(event.clientX, event.clientY, drawingRef.current);
+
           if (drawingRef.current) {
             eraseAt(event.clientX, event.clientY);
           }
@@ -388,17 +541,30 @@ export function CleaningCanvas({
           flushProgressUpdate();
           flushCleanPoints();
           drawingRef.current = false;
+          updateSpongeCursor(event.clientX, event.clientY, false);
 
           if (event.currentTarget.hasPointerCapture(event.pointerId)) {
             event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        }}
+        onPointerEnter={(event) => {
+          updateSpongeCursor(event.clientX, event.clientY, drawingRef.current);
+        }}
+        onPointerLeave={() => {
+          if (!drawingRef.current) {
+            hideSpongeCursor();
+            setNativeCursorVisible(false);
           }
         }}
         onPointerCancel={() => {
           flushProgressUpdate();
           flushCleanPoints();
           drawingRef.current = false;
+          hideSpongeCursor();
+          setNativeCursorVisible(false);
         }}
       />
+      <span className="cleaning-sponge-cursor" ref={spongeCursorRef} aria-hidden="true" />
     </div>
   );
 }

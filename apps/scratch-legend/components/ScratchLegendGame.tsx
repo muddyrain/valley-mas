@@ -167,8 +167,16 @@ const SCRATCH_SLOT_FLASH_DURATION_MS = 420;
 const SCRATCH_SETTLEMENT_HIGHLIGHT_DELAY_MS = 140;
 
 function StatusPill({ label, value }: { label: string; value: string }) {
+  const iconClassName =
+    label === '已洗盘子'
+      ? 'status-plate'
+      : label === '刮卡次数'
+        ? 'status-ticket'
+        : 'status-default';
+
   return (
     <div className="status-pill">
+      <span className={`status-pill-icon ${iconClassName}`} aria-hidden="true" />
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
@@ -1896,7 +1904,7 @@ export function ScratchLegendGame() {
             }`}
           >
             <div className={`coin-row ${goldRolling ? 'rolling' : ''}`}>
-              <span className="coin-icon">$</span>
+              <span className="coin-icon" aria-hidden="true" />
               <strong>{displayedGold}</strong>
             </div>
             {goldEffectEvents.length > 0 && (
@@ -2420,9 +2428,7 @@ export function ScratchLegendGame() {
                       <strong>电话提醒</strong>
                       <span>{SCRATCH_PHONE_LINES[scratchPhoneStep]}</span>
                       <button type="button" onClick={advanceScratchUnlockPhone}>
-                        {scratchPhoneStep < SCRATCH_PHONE_LINES.length - 1
-                          ? '继续听'
-                          : '看看好东西'}
+                        {scratchPhoneStep < SCRATCH_PHONE_LINES.length - 1 ? '继续听' : '查看'}
                       </button>
                     </>
                   ) : phoneNoticeType === 'upgrade-tools' ? (
@@ -2567,7 +2573,7 @@ export function ScratchLegendGame() {
                     disabled={phase !== 'claimable'}
                     data-cleaning-control="true"
                   >
-                    {workOutcomeRevealed ? workClaimAmountLabel : '清洁后结算'}
+                    {workOutcomeRevealed ? workClaimAmountLabel : '结算'}
                   </button>
                 </div>
 
