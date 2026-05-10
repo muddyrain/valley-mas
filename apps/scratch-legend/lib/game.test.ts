@@ -11,6 +11,7 @@ import {
   canStartWorkFromPhase,
   createBasicSafeScratchCard,
   createLoanFromTemplate,
+  createRiskPeekScratchCard,
   createScratchCard,
   createTripleMatchScratchCard,
   getBasicSafeScratchCardPrizePoolForLevel,
@@ -18,6 +19,7 @@ import {
   getBoundedDesktopPosition,
   getBoundedPlatePosition,
   getCleaningBrushRadius,
+  getEffectiveScratchCardDiscardCost,
   getGoldChangeEffect,
   getGoldDisplayRollValue,
   getLoanRepaymentFeedback,
@@ -28,6 +30,7 @@ import {
   getScratchBrushRadius,
   getScratchBrushRadiusForUpgradeLevel,
   getScratchCardConfig,
+  getScratchCardDiscardCost,
   getScratchCardLevelProgress,
   getScratchCardPrizePoolForLevel,
   getScratchCardRevealRatio,
@@ -50,6 +53,8 @@ import {
   isScratchCardWinningResult,
   LOAN_PRINCIPAL,
   LOAN_REPAYMENT_AMOUNT,
+  markScratchCardPenaltyTriggered,
+  RISK_PEEK_CARD_PRICE,
   repayLoan,
   rollWorkReward,
   settleBasicSafeScratchCard,
@@ -66,6 +71,7 @@ import {
   shouldShowScratchUnlockNotice,
   shouldShowTripleMatchUnlockNotice,
   shouldShowWorkRiskNotice,
+  shouldTriggerScratchCardPenalty,
   shouldUnlockTrashCan,
   TRASH_CAN_PRICE,
   TRASH_CAN_UNLOCK_AFTER_PLATES,
@@ -179,22 +185,30 @@ test('maps scratch points to the result slot that should reveal-flash', () => {
     getScratchCardRevealSlotIndex('triple-match', { xPercent: 0.95, yPercent: 0.95 }),
     null,
   );
+
+  assert.equal(getScratchCardRevealSlotIndex('risk-peek', { xPercent: 0.2, yPercent: 0.24 }), 0);
+  assert.equal(getScratchCardRevealSlotIndex('risk-peek', { xPercent: 0.5, yPercent: 0.24 }), 1);
+  assert.equal(getScratchCardRevealSlotIndex('risk-peek', { xPercent: 0.8, yPercent: 0.76 }), 5);
+  assert.equal(getScratchCardRevealSlotIndex('risk-peek', { xPercent: 0.5, yPercent: 0.5 }), null);
 });
 
 test('requires a configured 95 percent reveal ratio before a scratch slot flashes', () => {
   assert.equal(getScratchCardRevealThreshold('basic-safe'), 0.95);
   assert.equal(getScratchCardRevealThreshold('triple-match'), 0.95);
+  assert.equal(getScratchCardRevealThreshold('risk-peek'), 0.95);
   assert.equal(getScratchCardRevealRatio(0.05), 0.95);
   assert.equal(getScratchCardRevealRatio(0.2), 0.8);
   assert.equal(shouldRevealScratchSlot(0.94, 'basic-safe'), false);
   assert.equal(shouldRevealScratchSlot(0.95, 'basic-safe'), true);
   assert.equal(shouldRevealScratchSlot(0.949, 'triple-match'), false);
   assert.equal(shouldRevealScratchSlot(1, 'triple-match'), true);
+  assert.equal(shouldRevealScratchSlot(0.95, 'risk-peek'), true);
 });
 
 test('waits until every scratch slot has revealed before scheduling winning highlights', () => {
   assert.deepEqual(getScratchCardSlotIndexes('basic-safe'), [0, 1, 2]);
   assert.deepEqual(getScratchCardSlotIndexes('triple-match'), [0, 1, 2, 3, 4]);
+  assert.deepEqual(getScratchCardSlotIndexes('risk-peek'), [0, 1, 2, 3, 4, 5]);
   assert.equal(
     getScratchCardSettlementHighlightDelayMs({
       cardType: 'basic-safe',
@@ -1035,20 +1049,146 @@ test('settles scratch cards through the generic card type rules', () => {
   assert.equal(afterWin.loseStreak, 0);
 });
 
+test('configures the first risk peek card from the static rules source', () => {
+  const riskPeekConfig = getScratchCardConfig('risk-peek');
+
+  assert.equal(RISK_PEEK_CARD_PRICE, 150);
+  assert.equal(riskPeekConfig.label, '险中求财');
+  assert.equal(riskPeekConfig.price, 150);
+  assert.equal(riskPeekConfig.matchRule.slots, 6);
+  assert.equal('riskRule' in riskPeekConfig ? riskPeekConfig.riskRule.discardCostRatio : null, 0.3);
+  assert.equal(getScratchCardDiscardCost(riskPeekConfig.price), 45);
+  assert.equal(getScratchCardStepDistance('risk-peek'), 5);
+});
+
+test('pre-generates real danger symbols on risk peek cards', () => {
+  for (const randomValue of [0, 0.19, 0.51, 0.99]) {
+    const card = createRiskPeekScratchCard({
+      id: 60,
+      forcedTierId: 'risk-danger',
+      symbolRandom: () => randomValue,
+    });
+
+    assert.equal(card.type, 'risk-peek');
+    assert.equal(card.price, RISK_PEEK_CARD_PRICE);
+    assert.equal(card.result.hasPenaltySymbol, true);
+    assert.equal(card.result.canDiscard, true);
+    assert.equal(card.result.penaltyTriggered, false);
+    assert.equal(card.result.discardCost, 45);
+    assert.equal(card.result.penaltySlotIndexes.length, 1);
+    assert.equal(card.result.symbols.filter((symbol) => symbol === 'danger').length, 1);
+    assert.equal(card.result.symbols[card.result.penaltySlotIndexes[0] ?? -1], 'danger');
+  }
+});
+
+test('keeps risk peek safe tier symbols from implying count-based payouts', () => {
+  const card = createRiskPeekScratchCard({
+    id: 60,
+    forcedTierId: 'risk-bag',
+    symbolRandom: () => 0,
+  });
+
+  assert.equal(card.result.tierId, 'risk-bag');
+  assert.equal(card.result.payout, 260);
+  assert.equal(card.result.symbols.filter((symbol) => symbol === 'bag').length, 1);
+  assert.equal(card.result.symbols.filter((symbol) => symbol === 'coin').length, 0);
+  assert.equal(card.result.symbols.filter((symbol) => symbol === 'cash').length, 0);
+  assert.equal(card.result.symbols.filter((symbol) => symbol === 'danger').length, 0);
+});
+
+test('keeps risk peek visible prize symbols aligned with the payout tier', () => {
+  const coinCard = createRiskPeekScratchCard({ id: 65, forcedTierId: 'risk-coin' });
+  const cashCard = createRiskPeekScratchCard({ id: 66, forcedTierId: 'risk-cash' });
+
+  assert.equal(coinCard.result.payout, 180);
+  assert.equal(coinCard.result.symbols.filter((symbol) => symbol === 'coin').length, 1);
+  assert.equal(coinCard.result.symbols.filter((symbol) => symbol === 'cash').length, 0);
+  assert.equal(cashCard.result.payout, 420);
+  assert.equal(cashCard.result.symbols.filter((symbol) => symbol === 'cash').length, 1);
+  assert.equal(cashCard.result.symbols.filter((symbol) => symbol === 'coin').length, 0);
+});
+
+test('ties risk peek penalties to revealed danger slots', () => {
+  const card = createRiskPeekScratchCard({
+    id: 61,
+    forcedTierId: 'risk-danger',
+    symbolRandom: () => 0,
+  });
+  const dangerSlotIndex = card.result.penaltySlotIndexes[0] ?? -1;
+  const safeSlotIndex = getScratchCardSlotIndexes('risk-peek').find(
+    (slotIndex) => slotIndex !== dangerSlotIndex,
+  );
+
+  assert.equal(shouldTriggerScratchCardPenalty(card, safeSlotIndex ?? -1), false);
+  assert.equal(shouldTriggerScratchCardPenalty(card, dangerSlotIndex), true);
+
+  const triggeredCard = markScratchCardPenaltyTriggered(card);
+
+  assert.equal(triggeredCard.result.penaltyTriggered, true);
+  assert.equal(triggeredCard.result.isWinning, false);
+  assert.equal(triggeredCard.result.canDiscard, false);
+});
+
+test('uses discard cost protection for risk peek cards', () => {
+  const card = createRiskPeekScratchCard({
+    id: 62,
+    forcedTierId: 'risk-danger',
+  });
+  const scratchingCard = { ...card, status: 'scratching' as const };
+  const triggeredCard = markScratchCardPenaltyTriggered(scratchingCard);
+
+  assert.equal(getEffectiveScratchCardDiscardCost(200, scratchingCard), 45);
+  assert.equal(getEffectiveScratchCardDiscardCost(20, scratchingCard), 19);
+  assert.equal(getEffectiveScratchCardDiscardCost(0, scratchingCard), 0);
+  assert.equal(getEffectiveScratchCardDiscardCost(200, triggeredCard), 0);
+});
+
+test('settles risk peek safe prizes and triggered penalties through generic rules', () => {
+  const player = {
+    gold: 80,
+    lifetimeGoldEarned: 200,
+    plateCleaned: 20,
+    cardsScratched: 4,
+    loseStreak: 1,
+    workLevel: 2,
+  };
+  const safeCard = createRiskPeekScratchCard({ id: 63, forcedTierId: 'risk-bag' });
+  const dangerCard = markScratchCardPenaltyTriggered(
+    createRiskPeekScratchCard({ id: 64, forcedTierId: 'risk-danger' }),
+  );
+
+  const afterSafe = settleScratchCard(player, safeCard);
+  const afterDanger = settleScratchCard(player, dangerCard);
+
+  assert.equal(afterSafe.gold, 340);
+  assert.equal(afterSafe.lifetimeGoldEarned, 460);
+  assert.equal(afterSafe.loseStreak, 0);
+  assert.equal(afterDanger.gold, 80);
+  assert.equal(afterDanger.lifetimeGoldEarned, 200);
+  assert.equal(afterDanger.loseStreak, 2);
+});
+
 test('maps scratch card types to independent settlement progress keys', () => {
   assert.equal(getScratchCardSettlementProgressKey('basic-safe'), 'basicSafe');
   assert.equal(getScratchCardSettlementProgressKey('triple-match'), 'tripleMatch');
+  assert.equal(getScratchCardSettlementProgressKey('risk-peek'), 'riskPeek');
   const tripleMatchStart = getScratchCardLevelProgress('triple-match', 0);
+  const riskPeekStart = getScratchCardLevelProgress('risk-peek', 0);
 
   assert.equal(tripleMatchStart.level, 0);
   assert.equal(tripleMatchStart.current, 0);
   assert.equal(tripleMatchStart.target, 3);
   assert.equal(tripleMatchStart.ratio, 0);
+  assert.equal(riskPeekStart.level, 0);
+  assert.equal(riskPeekStart.current, 0);
+  assert.equal(riskPeekStart.target, 3);
+  assert.equal(riskPeekStart.ratio, 0);
 });
 
 test('creates scratch cards through the generic factory', () => {
   assert.equal(createScratchCard('basic-safe', { id: 50 }).type, 'basic-safe');
   assert.equal(createScratchCard('triple-match', { id: 51 }).type, 'triple-match');
+  assert.equal(createScratchCard('risk-peek', { id: 52 }).type, 'risk-peek');
 });
 
 test('initializes and merges scratch card catalog progress in save data', () => {
@@ -1062,7 +1202,9 @@ test('initializes and merges scratch card catalog progress in save data', () => 
   });
 
   assert.equal(initialSave.scratchCards.basicSafe.cardsSettled, 0);
+  assert.equal(initialSave.scratchCards.riskPeek.cardsSettled, 0);
   assert.equal(mergedSave.scratchCards.basicSafe.cardsSettled, 4);
+  assert.equal(mergedSave.scratchCards.riskPeek.cardsSettled, 0);
 });
 
 test('initializes workspace scratch cards as a list for multiple table cards', () => {

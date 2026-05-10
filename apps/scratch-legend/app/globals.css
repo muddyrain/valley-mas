@@ -1700,6 +1700,15 @@ button {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
 }
 
+.tabletop-scratch-card.risk-peek {
+  background:
+    linear-gradient(180deg, rgba(255, 202, 118, 0.18), rgba(126, 28, 38, 0.2)),
+    var(--texture-tabletop-triple-ticket) center / 100% 100% no-repeat;
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 2px rgba(255, 214, 122, 0.18);
+}
+
 .tabletop-scratch-card.entering {
   animation: plate-fly-in 420ms cubic-bezier(0.16, 0.9, 0.22, 1.15);
 }
@@ -1745,6 +1754,13 @@ button {
     0 0 8px rgba(255, 232, 137, 0.36);
 }
 
+.tabletop-scratch-card.risk-peek .tabletop-ticket-title {
+  color: #ffe1a1;
+  text-shadow:
+    1px 1px 0 rgba(72, 15, 24, 0.92),
+    0 0 8px rgba(255, 199, 86, 0.26);
+}
+
 .tabletop-ticket-slots {
   align-self: end;
   justify-self: end;
@@ -1764,6 +1780,13 @@ button {
   background: rgba(10, 44, 78, 0.48);
   color: #e9fbff;
   text-shadow: 1px 1px 0 rgba(9, 24, 39, 0.72);
+}
+
+.tabletop-scratch-card.risk-peek .tabletop-ticket-slots {
+  border: 1px solid rgba(255, 226, 154, 0.28);
+  background: rgba(116, 30, 37, 0.62);
+  color: #ffe8b8;
+  text-shadow: 1px 1px 0 rgba(58, 12, 18, 0.72);
 }
 
 .tabletop-art-sky,
@@ -2123,6 +2146,13 @@ button {
     var(--texture-triple-ticket-face) center / 256px 256px repeat;
 }
 
+.scratch-card.risk-peek {
+  border-color: rgba(134, 38, 43, 0.92);
+  background:
+    linear-gradient(180deg, rgba(255, 206, 115, 0.26), rgba(122, 27, 38, 0.22)),
+    var(--texture-triple-ticket-face) center / 256px 256px repeat;
+}
+
 .scratch-card-header {
   display: flex;
   align-items: center;
@@ -2161,6 +2191,12 @@ button {
 .scratch-card.triple-match .scratch-card-picture {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(22, 82, 125, 0.05)),
+    var(--texture-ticket-landscape-triple) center / 100% 100% no-repeat;
+}
+
+.scratch-card.risk-peek .scratch-card-picture {
+  background:
+    linear-gradient(180deg, rgba(255, 210, 114, 0.12), rgba(116, 27, 39, 0.08)),
     var(--texture-ticket-landscape-triple) center / 100% 100% no-repeat;
 }
 
@@ -2210,6 +2246,10 @@ button {
   min-height: 128px;
 }
 
+.scratch-card.risk-peek .scratch-result-area {
+  min-height: 134px;
+}
+
 .scratch-result-grid {
   position: relative;
   z-index: 1;
@@ -2225,6 +2265,12 @@ button {
   grid-template-columns: repeat(3, 54px);
   grid-template-rows: repeat(2, 54px);
   gap: 10px 16px;
+}
+
+.scratch-card.risk-peek .scratch-result-grid {
+  grid-template-columns: repeat(3, 54px);
+  grid-template-rows: repeat(2, 54px);
+  gap: 16px;
 }
 
 .scratch-card.triple-match .scratch-result-slot:nth-child(4) {
@@ -2261,6 +2307,19 @@ button {
 .scratch-card.triple-match .scratch-result-slot {
   width: 54px;
   height: 54px;
+}
+
+.scratch-card.risk-peek .scratch-result-slot {
+  width: 54px;
+  height: 54px;
+  border-color: rgba(146, 50, 49, 0.46);
+}
+
+.scratch-result-slot.danger {
+  background:
+    radial-gradient(circle, rgba(255, 223, 137, 0.32), rgba(151, 34, 43, 0.2)),
+    var(--texture-result-cell-paper) center / 96px 96px repeat;
+  color: #7d1f2a;
 }
 
 .scratch-result-slot.slot-revealed {
@@ -2360,6 +2419,21 @@ button {
   background-image: var(--texture-symbol-jackpot);
 }
 
+.scratch-symbol-icon.danger {
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(255, 221, 133, 0.72);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 50% 36%, #ffe38b 0 12%, transparent 13%),
+    linear-gradient(135deg, transparent 0 38%, #fff0b0 39% 45%, transparent 46% 100%),
+    linear-gradient(45deg, transparent 0 38%, #fff0b0 39% 45%, transparent 46% 100%),
+    linear-gradient(180deg, #c83a42, #701923);
+  box-shadow:
+    inset 0 0 0 2px rgba(86, 16, 24, 0.4),
+    0 2px 0 rgba(78, 16, 19, 0.36);
+}
+
 .scratch-card-cover {
   position: absolute;
   left: 50%;
@@ -2378,6 +2452,13 @@ button {
 .scratch-card.triple-match .scratch-card-cover {
   width: 230px;
   height: 128px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.scratch-card.risk-peek .scratch-card-cover {
+  width: 230px;
+  height: 134px;
   border-radius: 0;
   box-shadow: none;
 }
@@ -2463,6 +2544,16 @@ button {
   background-image: var(--texture-ui-button-disabled);
   filter: grayscale(1) brightness(0.78);
   cursor: not-allowed;
+}
+
+.scratch-info-card .scratch-discard-button {
+  border-color: #9e3b31;
+  background: var(--texture-ui-button-red) center / 100% 100% no-repeat;
+  font-size: 16px;
+}
+
+.scratch-info-card .scratch-discard-button:disabled {
+  background-image: var(--texture-ui-button-disabled);
 }
 
 .loan-ledger-overlay {

@@ -19,6 +19,7 @@ import {
   getBoundedDesktopPosition,
   getBoundedPlatePosition,
   getCleaningBrushRadius,
+  getEffectiveScratchCardDiscardCost,
   getGoldChangeEffect,
   getGoldDisplayRollValue,
   getLoanRepaymentFeedback,
@@ -27,6 +28,7 @@ import {
   getRandomPlateSpawnPosition,
   getScratchBrushRadius,
   getScratchCardConfig,
+  getScratchCardDiscardCost,
   getScratchCardLevelProgress,
   getScratchCardPrizePoolForLevel,
   getScratchCardSettlementHighlightDelayMs,
@@ -45,6 +47,8 @@ import {
   LOAN_PRINCIPAL,
   LOAN_REPAYMENT_AMOUNT,
   type LoanState,
+  markScratchCardPenaltyTriggered,
+  RISK_PEEK_CARD_PRICE,
   repayLoan,
   rollWorkReward,
   type ScratchCardState,
@@ -61,6 +65,7 @@ import {
   shouldShowTripleMatchUnlockNotice,
   shouldShowUpgradeToolsUnlockNotice,
   shouldShowWorkRiskNotice,
+  shouldTriggerScratchCardPenalty,
   shouldUnlockTrashCan,
   TRASH_CAN_PRICE,
   TRASH_CAN_UNLOCK_AFTER_PLATES,
@@ -139,6 +144,7 @@ const SCRATCH_SYMBOL_LABELS: Record<ScratchCardSymbol, string> = {
   coin: '铜币',
   jackpot: '金币堆',
   blank: '未中',
+  danger: '危险',
 };
 
 const SCRATCH_PHONE_LINES = [
@@ -224,10 +230,40 @@ function getPrizeTierSymbol(tierId: ScratchCardState['result']['tierId']) {
     return 'jackpot';
   }
 
+  if (tierId === 'risk-coin') {
+    return 'coin';
+  }
+
+  if (tierId === 'risk-bag') {
+    return 'bag';
+  }
+
+  if (tierId === 'risk-cash') {
+    return 'cash';
+  }
+
+  if (tierId === 'risk-danger') {
+    return 'danger';
+  }
+
   return 'blank';
 }
 
 function getScratchCardDisplay(cardType: ScratchCardType) {
+  if (cardType === 'risk-peek') {
+    return {
+      catalog: '风险卡',
+      title: '险中求财',
+      ticketTitle: 'RISK',
+      miniTitle: '险',
+      ruleLabel: '预埋危险符号，刮满危险位本张归零',
+      winLabel: '没有踩到危险，可以结算。',
+      loseLabel: '危险已触发，本张 $0。',
+      cardClassName: 'risk-peek',
+      levelAriaLabel: '险中求财等级进度',
+    };
+  }
+
   if (cardType === 'triple-match') {
     return {
       catalog: '三连规则',
@@ -366,6 +402,10 @@ export function ScratchLegendGame() {
     'triple-match',
     save.scratchCards.tripleMatch.cardsSettled,
   );
+  const riskPeekLevelProgress = getScratchCardLevelProgress(
+    'risk-peek',
+    save.scratchCards.riskPeek.cardsSettled,
+  );
   const scratchCardCatalogItems = [
     {
       type: 'basic-safe' as const,
@@ -383,6 +423,17 @@ export function ScratchLegendGame() {
       price: TRIPLE_MATCH_CARD_PRICE,
       progress: tripleMatchLevelProgress,
     },
+    {
+      type: 'risk-peek' as const,
+      visible:
+        scratchModeUnlocked &&
+        scratchMessageDismissed &&
+        tripleMatchUnlocked &&
+        tripleMatchMessageDismissed,
+      unlocked: tripleMatchUnlocked && tripleMatchMessageDismissed,
+      price: RISK_PEEK_CARD_PRICE,
+      progress: riskPeekLevelProgress,
+    },
   ];
   const activeScratchCardPrizePool = useMemo(
     () =>
@@ -396,8 +447,18 @@ export function ScratchLegendGame() {
     (tier) => tier.displayProbability !== null && tier.payout > 0,
   );
   const activeScratchCardDisplay = getScratchCardDisplay(activeScratchCard?.type ?? 'basic-safe');
+  const activeScratchCardDiscardCost = activeScratchCard
+    ? getEffectiveScratchCardDiscardCost(player.gold, activeScratchCard)
+    : 0;
+  const activeScratchCardBaseDiscardCost = activeScratchCard
+    ? getScratchCardDiscardCost(activeScratchCard.price)
+    : 0;
   const activeScratchCardLevelProgress =
-    activeScratchCard?.type === 'triple-match' ? tripleMatchLevelProgress : basicSafeLevelProgress;
+    activeScratchCard?.type === 'triple-match'
+      ? tripleMatchLevelProgress
+      : activeScratchCard?.type === 'risk-peek'
+        ? riskPeekLevelProgress
+        : basicSafeLevelProgress;
 
   const nextUnlockMilestone = getNextUnlockMilestone(player.lifetimeGoldEarned);
   const finalUnlockMilestone =
@@ -437,6 +498,11 @@ export function ScratchLegendGame() {
     tripleMatchMessageDismissed &&
     (phase === 'idle' || phase === 'plateSpawned' || phase === 'scratchCardSpawned') &&
     canBuyScratchCard('triple-match', player);
+  const canBuyRiskPeekCard =
+    tripleMatchUnlocked &&
+    tripleMatchMessageDismissed &&
+    (phase === 'idle' || phase === 'plateSpawned' || phase === 'scratchCardSpawned') &&
+    canBuyScratchCard('risk-peek', player);
   const canPurchaseTrashCan = canBuyTrashCan(player.gold, trashCanUnlocked, trashCanPurchased);
   const isCleaningView = phase === 'cleaning' || phase === 'claimable';
   const activePlate = getActiveWorkPlate(save);
@@ -757,6 +823,37 @@ export function ScratchLegendGame() {
 
   function revealScratchSlot(slotIndex: number) {
     revealScratchSlots([slotIndex]);
+
+    if (!activeScratchCard || !shouldTriggerScratchCardPenalty(activeScratchCard, slotIndex)) {
+      return;
+    }
+
+    updateSave((current) => {
+      const activeCardId = current.workspace.activeScratchCardId;
+
+      if (!activeCardId) {
+        return current;
+      }
+
+      return {
+        ...current,
+        workspace: {
+          ...current.workspace,
+          scratchCards: current.workspace.scratchCards.map((card) =>
+            card.id === activeCardId ? markScratchCardPenaltyTriggered(card) : card,
+          ),
+        },
+      };
+    });
+  }
+
+  function markTriggeredPenaltiesForRevealedSlots(
+    card: ScratchCardState,
+    slotIndexes: readonly number[],
+  ) {
+    return slotIndexes.some((slotIndex) => shouldTriggerScratchCardPenalty(card, slotIndex))
+      ? markScratchCardPenaltyTriggered(card)
+      : card;
   }
 
   function scheduleSettlementHighlight(
@@ -1035,7 +1132,12 @@ export function ScratchLegendGame() {
   }
 
   function buyScratchCard(cardType: ScratchCardType) {
-    const buyable = cardType === 'triple-match' ? canBuyTripleMatchCard : canBuyBasicSafeCard;
+    const buyable =
+      cardType === 'triple-match'
+        ? canBuyTripleMatchCard
+        : cardType === 'risk-peek'
+          ? canBuyRiskPeekCard
+          : canBuyBasicSafeCard;
 
     if (!buyable) {
       return;
@@ -1043,7 +1145,11 @@ export function ScratchLegendGame() {
 
     const scratchCardId = save.workspace.nextScratchCardId;
     const progress =
-      cardType === 'triple-match' ? tripleMatchLevelProgress : basicSafeLevelProgress;
+      cardType === 'triple-match'
+        ? tripleMatchLevelProgress
+        : cardType === 'risk-peek'
+          ? riskPeekLevelProgress
+          : basicSafeLevelProgress;
     const scratchCard = createScratchCard(cardType, {
       id: scratchCardId,
       level: progress.level,
@@ -1624,7 +1730,15 @@ export function ScratchLegendGame() {
         workspace: {
           ...current.workspace,
           scratchCards: current.workspace.scratchCards.map((card) =>
-            card.id === activeCardId ? { ...card, status: 'claimable' } : card,
+            card.id === activeCardId
+              ? {
+                  ...markTriggeredPenaltiesForRevealedSlots(
+                    card,
+                    getScratchCardSlotIndexes(card.type),
+                  ),
+                  status: 'claimable',
+                }
+              : card,
           ),
         },
       };
@@ -1662,6 +1776,50 @@ export function ScratchLegendGame() {
             advanceBasicSafeScratchCardProgress(
               current.scratchCards[getScratchCardSettlementProgressKey(currentCard.type)],
             ),
+        },
+        workspace: {
+          ...current.workspace,
+          scratchCards: remainingScratchCards,
+          activeScratchCardId: null,
+          phase: getDesktopPhase(current.workspace.plates.length, remainingScratchCards.length),
+        },
+      };
+    });
+    resetScratchRevealEffects();
+    setScratchProgress(0);
+  }
+
+  function discardActiveScratchCard() {
+    if (!activeScratchCard || activeScratchCard.status !== 'scratching') {
+      return;
+    }
+
+    const discardCost = getEffectiveScratchCardDiscardCost(player.gold, activeScratchCard);
+
+    if (discardCost > 0) {
+      triggerGoldEffect(player.gold, player.gold - discardCost, 'scratch-card-purchase');
+    }
+
+    updateSave((current) => {
+      const currentCard = getActiveScratchCard(current);
+
+      if (!currentCard || !currentCard.result.canDiscard || currentCard.result.penaltyTriggered) {
+        return current;
+      }
+
+      const effectiveDiscardCost = getEffectiveScratchCardDiscardCost(
+        current.player.gold,
+        currentCard,
+      );
+      const remainingScratchCards = current.workspace.scratchCards.filter(
+        (card) => card.id !== currentCard.id,
+      );
+
+      return {
+        ...current,
+        player: {
+          ...current.player,
+          gold: Math.max(0, current.player.gold - effectiveDiscardCost),
         },
         workspace: {
           ...current.workspace,
@@ -1998,7 +2156,11 @@ export function ScratchLegendGame() {
                   const prizePool = getScratchCardPrizePoolForLevel(item.type, item.progress.level);
                   const firstPrize = prizePool.find((tier) => tier.payout > 0)?.payout ?? 0;
                   const buyable =
-                    item.type === 'triple-match' ? canBuyTripleMatchCard : canBuyBasicSafeCard;
+                    item.type === 'triple-match'
+                      ? canBuyTripleMatchCard
+                      : item.type === 'risk-peek'
+                        ? canBuyRiskPeekCard
+                        : canBuyBasicSafeCard;
 
                   return item.unlocked ? (
                     <button
@@ -2237,7 +2399,11 @@ export function ScratchLegendGame() {
                         <span className="tabletop-art-sun" />
                       </span>
                       <span className="tabletop-ticket-slots">
-                        {scratchCard.type === 'triple-match' ? '5格' : '3格'}
+                        {scratchCard.type === 'triple-match'
+                          ? '5格'
+                          : scratchCard.type === 'risk-peek'
+                            ? '6格'
+                            : '3格'}
                       </span>
                     </button>
                   );
@@ -2300,6 +2466,33 @@ export function ScratchLegendGame() {
                         onRevealSlotsSync={(slotIndexes) => {
                           revealedScratchSlotSetRef.current = new Set(slotIndexes);
                           setRevealedScratchSlots([...slotIndexes]);
+
+                          if (
+                            activeScratchCard &&
+                            slotIndexes.some((slotIndex) =>
+                              shouldTriggerScratchCardPenalty(activeScratchCard, slotIndex),
+                            )
+                          ) {
+                            updateSave((current) => {
+                              const activeCardId = current.workspace.activeScratchCardId;
+
+                              if (!activeCardId) {
+                                return current;
+                              }
+
+                              return {
+                                ...current,
+                                workspace: {
+                                  ...current.workspace,
+                                  scratchCards: current.workspace.scratchCards.map((card) =>
+                                    card.id === activeCardId
+                                      ? markScratchCardPenaltyTriggered(card)
+                                      : card,
+                                  ),
+                                },
+                              };
+                            });
+                          }
                         }}
                         onRevealSlot={revealScratchSlot}
                         onScratchPointsFlush={recordActiveScratchPoints}
@@ -2313,11 +2506,13 @@ export function ScratchLegendGame() {
                       <em>等级 {activeScratchCard.level}</em>
                     </div>
                     <span>
-                      {activeScratchCard.status === 'claimable'
-                        ? activeScratchCard.result.isWinning
-                          ? activeScratchCardDisplay.winLabel
-                          : activeScratchCardDisplay.loseLabel
-                        : `拖动刮开，已揭露 ${Math.round(scratchProgress * 100)}%`}
+                      {activeScratchCard.result.penaltyTriggered
+                        ? '危险位已完全揭露，本张收益归零。'
+                        : activeScratchCard.status === 'claimable'
+                          ? activeScratchCard.result.isWinning
+                            ? activeScratchCardDisplay.winLabel
+                            : activeScratchCardDisplay.loseLabel
+                          : `拖动刮开，已揭露 ${Math.round(scratchProgress * 100)}%`}
                     </span>
                     <div className="scratch-rule-row">
                       <em>规则</em>
@@ -2352,6 +2547,20 @@ export function ScratchLegendGame() {
                         />
                       </span>
                     </div>
+                    {activeScratchCard.result.canDiscard &&
+                      activeScratchCard.status === 'scratching' && (
+                        <button
+                          className="scratch-discard-button"
+                          type="button"
+                          onClick={discardActiveScratchCard}
+                          disabled={activeScratchCard.result.penaltyTriggered}
+                        >
+                          弃卡 ${activeScratchCardDiscardCost}
+                          {activeScratchCardDiscardCost < activeScratchCardBaseDiscardCost
+                            ? ' 封顶保护'
+                            : ''}
+                        </button>
+                      )}
                     <button
                       type="button"
                       onClick={claimScratchCardPrize}

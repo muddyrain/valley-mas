@@ -55,6 +55,8 @@ export type ScratchLegendScratchCardsState = {
   basicSafe: ScratchCardProgressState;
   // “三连胜出”卡片自己的等级进度。
   tripleMatch: ScratchCardProgressState;
+  // “险中求财”风险卡自己的等级进度。
+  riskPeek: ScratchCardProgressState;
 };
 
 export type ScratchLegendUpgradeToolsState = Record<UpgradeToolId, UpgradeToolState>;
@@ -184,6 +186,9 @@ export function createInitialScratchLegendSave(): ScratchLegendSave {
       tripleMatch: {
         cardsSettled: 0,
       },
+      riskPeek: {
+        cardsSettled: 0,
+      },
     },
     upgradeTools: createInitialUpgradeToolStates(),
     workspace: createInitialWorkspaceState(),
@@ -243,6 +248,10 @@ export function mergeScratchLegendSave(
         ...initialSave.scratchCards.tripleMatch,
         ...partialSave?.scratchCards?.tripleMatch,
       },
+      riskPeek: {
+        ...initialSave.scratchCards.riskPeek,
+        ...partialSave?.scratchCards?.riskPeek,
+      },
     },
     upgradeTools: mergeUpgradeToolStates(partialSave?.upgradeTools),
     workspace: {
@@ -264,6 +273,13 @@ function normalizeScratchCardState(card: ScratchCardState | null) {
   return {
     ...card,
     level: card.level ?? 0,
+    result: {
+      ...card.result,
+      penaltySlotIndexes: card.result.penaltySlotIndexes ?? [],
+      penaltyTriggered: card.result.penaltyTriggered ?? false,
+      discardCost: card.result.discardCost ?? 0,
+      penaltyAmount: card.result.penaltyAmount ?? 0,
+    },
     scratchPoints: normalizeScratchPoints(card.scratchPoints),
   } satisfies ScratchCardState;
 }

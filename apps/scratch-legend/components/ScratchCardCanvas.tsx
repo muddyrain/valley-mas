@@ -41,6 +41,18 @@ const SCRATCH_CANVAS_LAYOUTS = {
       { left: 118, top: 69, width: 54, height: 54 },
     ],
   },
+  'risk-peek': {
+    width: 230,
+    height: 134,
+    slotBounds: [
+      { left: 18, top: 5, width: 54, height: 54 },
+      { left: 88, top: 5, width: 54, height: 54 },
+      { left: 158, top: 5, width: 54, height: 54 },
+      { left: 18, top: 75, width: 54, height: 54 },
+      { left: 88, top: 75, width: 54, height: 54 },
+      { left: 158, top: 75, width: 54, height: 54 },
+    ],
+  },
 } as const satisfies Record<
   ScratchCardType,
   {
@@ -61,6 +73,12 @@ const SCRATCH_STAMP_OFFSETS = [
   [13, -7, 0.42],
   [-15, 6, 0.36],
 ] as const;
+
+function getLayoutSlotBounds(cardType: ScratchCardType) {
+  const layout = SCRATCH_CANVAS_LAYOUTS[cardType];
+
+  return 'slotBounds' in layout ? layout.slotBounds : undefined;
+}
 
 export function ScratchCardCanvas({
   active,
@@ -124,11 +142,13 @@ export function ScratchCardCanvas({
       };
     }
 
-    if (slotIndex < 0 || slotIndex > 4) {
+    const slotBounds = getLayoutSlotBounds(cardTypeRef.current);
+
+    if (!slotBounds || slotIndex < 0 || slotIndex >= slotBounds.length) {
       return null;
     }
 
-    return SCRATCH_CANVAS_LAYOUTS['triple-match'].slotBounds[slotIndex] ?? null;
+    return slotBounds[slotIndex] ?? null;
   }, []);
 
   const measureSlotRevealRatio = useCallback(
@@ -276,13 +296,13 @@ export function ScratchCardCanvas({
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.globalCompositeOperation = 'source-over';
 
-    const drawTripleMatchSlotClip = cardTypeRef.current === 'triple-match';
+    const slotClipBounds = getLayoutSlotBounds(cardTypeRef.current);
 
-    if (drawTripleMatchSlotClip) {
+    if (slotClipBounds) {
       context.save();
       context.beginPath();
 
-      for (const bounds of SCRATCH_CANVAS_LAYOUTS['triple-match'].slotBounds) {
+      for (const bounds of slotClipBounds) {
         const radius = bounds.width / 2;
 
         context.moveTo(bounds.left + bounds.width, bounds.top + radius);
@@ -353,12 +373,12 @@ export function ScratchCardCanvas({
     context.font = '700 14px Arial';
     context.textAlign = 'center';
 
-    if (drawTripleMatchSlotClip) {
+    if (slotClipBounds) {
       context.restore();
       context.strokeStyle = 'rgba(255, 255, 255, 0.24)';
       context.lineWidth = 2;
 
-      for (const bounds of SCRATCH_CANVAS_LAYOUTS['triple-match'].slotBounds) {
+      for (const bounds of slotClipBounds) {
         const radius = bounds.width / 2;
 
         context.beginPath();
@@ -529,7 +549,7 @@ export function ScratchCardCanvas({
     }
 
     const revealedSlots = Array.from(
-      { length: cardTypeRef.current === 'triple-match' ? 5 : 3 },
+      { length: getLayoutSlotBounds(cardTypeRef.current)?.length ?? 3 },
       (_, slotIndex) => slotIndex,
     ).filter(
       (slotIndex) =>

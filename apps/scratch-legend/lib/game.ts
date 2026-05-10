@@ -34,6 +34,10 @@ export const TRIPLE_MATCH_CARD_CONFIG = scratchLegendConfig.scratchCards.tripleM
 export const TRIPLE_MATCH_CARD_PRICE = TRIPLE_MATCH_CARD_CONFIG.price;
 export const TRIPLE_MATCH_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD =
   TRIPLE_MATCH_CARD_CONFIG.scratchSymbolRevealThreshold;
+export const RISK_PEEK_CARD_CONFIG = scratchLegendConfig.scratchCards.riskPeek;
+export const RISK_PEEK_CARD_PRICE = RISK_PEEK_CARD_CONFIG.price;
+export const RISK_PEEK_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD =
+  RISK_PEEK_CARD_CONFIG.scratchSymbolRevealThreshold;
 export const UPGRADE_TOOLS_CONFIG = scratchLegendConfig.upgradeTools.items;
 export const LOAN_CONFIG = scratchLegendConfig.loans;
 export const LOAN_PRINCIPAL = LOAN_CONFIG.principal;
@@ -98,20 +102,23 @@ export type WorkPlateState = {
   seed: number;
 };
 
-export type ScratchCardType = 'basic-safe' | 'triple-match';
+export type ScratchCardType = 'basic-safe' | 'triple-match' | 'risk-peek';
 export type ScratchCardStatus = 'onTable' | 'scratching' | 'claimable' | 'settled';
 type BasicSafeScratchCardPrizeTierConfig = (typeof BASIC_SAFE_CARD_CONFIG.prizePool)[number];
 type TripleMatchScratchCardPrizeTierConfig = (typeof TRIPLE_MATCH_CARD_CONFIG.prizePool)[number];
+type RiskPeekScratchCardPrizeTierConfig = (typeof RISK_PEEK_CARD_CONFIG.prizePool)[number];
 type ScratchCardPrizeTierConfig =
   | BasicSafeScratchCardPrizeTierConfig
-  | TripleMatchScratchCardPrizeTierConfig;
+  | TripleMatchScratchCardPrizeTierConfig
+  | RiskPeekScratchCardPrizeTierConfig;
 export type ScratchCardPrizeTier = Omit<ScratchCardPrizeTierConfig, 'payout'> & {
   payout: number;
 };
 export type ScratchCardPrizeTierId = ScratchCardPrizeTierConfig['id'];
 export type BasicSafeScratchCardPrizeTierId = BasicSafeScratchCardPrizeTierConfig['id'];
 export type TripleMatchScratchCardPrizeTierId = TripleMatchScratchCardPrizeTierConfig['id'];
-export type ScratchCardSymbol = 'fire' | 'cash' | 'bag' | 'coin' | 'jackpot' | 'blank';
+export type RiskPeekScratchCardPrizeTierId = RiskPeekScratchCardPrizeTierConfig['id'];
+export type ScratchCardSymbol = 'fire' | 'cash' | 'bag' | 'coin' | 'jackpot' | 'blank' | 'danger';
 
 export type ScratchCardResult = {
   tierId: ScratchCardPrizeTierId;
@@ -121,6 +128,10 @@ export type ScratchCardResult = {
   isWinning: boolean;
   hasPenaltySymbol: boolean;
   canDiscard: boolean;
+  penaltySlotIndexes: number[];
+  penaltyTriggered: boolean;
+  discardCost: number;
+  penaltyAmount: number;
 };
 
 export type ScratchCardState = {
@@ -203,9 +214,18 @@ export type CreateTripleMatchScratchCardOptions = {
   symbolRandom?: () => number;
 };
 
+export type CreateRiskPeekScratchCardOptions = {
+  id: number;
+  level?: number;
+  forcedTierId?: RiskPeekScratchCardPrizeTierId;
+  random?: () => number;
+  symbolRandom?: () => number;
+};
+
 export type CreateScratchCardOptions =
   | CreateBasicSafeScratchCardOptions
-  | CreateTripleMatchScratchCardOptions;
+  | CreateTripleMatchScratchCardOptions
+  | CreateRiskPeekScratchCardOptions;
 
 export type CreateLoanFromTemplateOptions = {
   id: number;
@@ -336,7 +356,7 @@ export function canBuyScratchCard(
 ) {
   const cardConfig = getScratchCardConfig(cardType);
   const unlockThreshold =
-    cardType === 'triple-match'
+    cardType === 'triple-match' || cardType === 'risk-peek'
       ? getUnlockMilestoneThreshold(TRIPLE_MATCH_CARD_MILESTONE_ID)
       : BASIC_CARD_UNLOCK_GOLD;
 
@@ -348,12 +368,20 @@ function getScratchCardLevelRequirements(cardType: ScratchCardType) {
     return BASIC_SAFE_CARD_LEVEL_CONFIG.cardsRequiredByLevel;
   }
 
+  if (cardType === 'risk-peek') {
+    return RISK_PEEK_CARD_CONFIG.level.cardsRequiredByLevel;
+  }
+
   return TRIPLE_MATCH_CARD_CONFIG.level.cardsRequiredByLevel;
 }
 
 export function getScratchCardMaxLevel(cardType: ScratchCardType) {
   if (cardType === 'basic-safe') {
     return BASIC_SAFE_CARD_MAX_LEVEL;
+  }
+
+  if (cardType === 'risk-peek') {
+    return RISK_PEEK_CARD_CONFIG.level.payoutMultiplierByLevel.length;
   }
 
   return TRIPLE_MATCH_CARD_CONFIG.level.payoutMultiplierByLevel.length;
@@ -447,7 +475,15 @@ export function getBasicSafeScratchCardPrizePoolForLevel(level: number): Scratch
 }
 
 export function getScratchCardConfig(cardType: ScratchCardType) {
-  return cardType === 'triple-match' ? TRIPLE_MATCH_CARD_CONFIG : BASIC_SAFE_CARD_CONFIG;
+  if (cardType === 'triple-match') {
+    return TRIPLE_MATCH_CARD_CONFIG;
+  }
+
+  if (cardType === 'risk-peek') {
+    return RISK_PEEK_CARD_CONFIG;
+  }
+
+  return BASIC_SAFE_CARD_CONFIG;
 }
 
 export function getScratchCardPrizePoolForLevel(
@@ -458,7 +494,9 @@ export function getScratchCardPrizePoolForLevel(
     return getBasicSafeScratchCardPrizePoolForLevel(level);
   }
 
-  return TRIPLE_MATCH_CARD_CONFIG.prizePool.map((tier) => ({
+  const config = getScratchCardConfig(cardType);
+
+  return config.prizePool.map((tier) => ({
     ...tier,
     payout: tier.payout,
   }));
@@ -469,7 +507,15 @@ export function getScratchCardStepDistance(cardType: ScratchCardType) {
 }
 
 export function getScratchCardSettlementProgressKey(cardType: ScratchCardType) {
-  return cardType === 'triple-match' ? 'tripleMatch' : 'basicSafe';
+  if (cardType === 'triple-match') {
+    return 'tripleMatch';
+  }
+
+  if (cardType === 'risk-peek') {
+    return 'riskPeek';
+  }
+
+  return 'basicSafe';
 }
 
 export function getBasicSafeScratchCardPrizeTier(random: () => number = Math.random, level = 0) {
@@ -555,6 +601,26 @@ export function getScratchCardRevealSlotIndex(
     return Math.min(2, Math.floor(point.xPercent * 3));
   }
 
+  if (cardType === 'risk-peek') {
+    const riskPeekSlots = [
+      { x: 45 / 230, y: 32 / 134 },
+      { x: 115 / 230, y: 32 / 134 },
+      { x: 185 / 230, y: 32 / 134 },
+      { x: 45 / 230, y: 102 / 134 },
+      { x: 115 / 230, y: 102 / 134 },
+      { x: 185 / 230, y: 102 / 134 },
+    ] as const;
+    const revealRadius = 0.15;
+
+    for (const [index, slot] of riskPeekSlots.entries()) {
+      if (Math.hypot(point.xPercent - slot.x, point.yPercent - slot.y) <= revealRadius) {
+        return index;
+      }
+    }
+
+    return null;
+  }
+
   const tripleMatchSlots = [
     { x: 45 / 230, y: 32 / 128 },
     { x: 115 / 230, y: 32 / 128 },
@@ -581,9 +647,15 @@ export function getScratchCardSlotIndexes(cardType: ScratchCardType) {
 }
 
 export function getScratchCardRevealThreshold(cardType: ScratchCardType) {
-  return cardType === 'triple-match'
-    ? TRIPLE_MATCH_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD
-    : BASIC_SAFE_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD;
+  if (cardType === 'triple-match') {
+    return TRIPLE_MATCH_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD;
+  }
+
+  if (cardType === 'risk-peek') {
+    return RISK_PEEK_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD;
+  }
+
+  return BASIC_SAFE_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD;
 }
 
 export function getScratchCardRevealRatio(coveredRatio: number) {
@@ -788,6 +860,84 @@ function createTripleMatchSymbolsForPrizeTier(
   );
 }
 
+function getRiskPeekScratchCardPrizePoolForLevel(_level: number): ScratchCardPrizeTier[] {
+  return getScratchCardPrizePoolForLevel('risk-peek', 0);
+}
+
+function getRiskPeekScratchCardPrizeTier(random: () => number = Math.random, level = 0) {
+  const roll = clampRatio(random());
+  let cumulativeProbability = 0;
+  const prizePool = getRiskPeekScratchCardPrizePoolForLevel(level);
+
+  for (const tier of prizePool) {
+    cumulativeProbability += tier.probability;
+
+    if (roll < cumulativeProbability - Number.EPSILON) {
+      return tier;
+    }
+  }
+
+  return prizePool[prizePool.length - 1];
+}
+
+function getRiskPeekScratchCardPrizeTierById(
+  level: number,
+  tierId: RiskPeekScratchCardPrizeTierId,
+) {
+  return (
+    getRiskPeekScratchCardPrizePoolForLevel(level).find((tier) => tier.id === tierId) ??
+    getRiskPeekScratchCardPrizeTier(Math.random, level)
+  );
+}
+
+function getRiskPeekPrimarySymbolForPrizeTier(tierId: RiskPeekScratchCardPrizeTierId) {
+  switch (tierId) {
+    case 'risk-coin':
+      return 'coin';
+    case 'risk-bag':
+      return 'bag';
+    case 'risk-cash':
+      return 'cash';
+    default:
+      return null;
+  }
+}
+
+function createRiskPeekSymbolsForPrizeTier(
+  tierId: RiskPeekScratchCardPrizeTierId,
+  random: () => number,
+) {
+  const primarySymbol = getRiskPeekPrimarySymbolForPrizeTier(tierId);
+  const baseSymbols: ScratchCardSymbol[] = ['blank', 'blank', 'blank', 'blank', 'blank', 'blank'];
+
+  if (primarySymbol) {
+    baseSymbols[0] = primarySymbol;
+  }
+
+  const symbols = shuffleScratchCardSymbols(
+    baseSymbols.slice(0, Number(RISK_PEEK_CARD_CONFIG.matchRule.slots)),
+    random,
+  );
+
+  if (primarySymbol) {
+    return {
+      symbols,
+      penaltySlotIndexes: [],
+    };
+  }
+
+  const dangerSlotIndex = getRandomArrayIndex(
+    Number(RISK_PEEK_CARD_CONFIG.matchRule.slots),
+    random,
+  );
+  symbols[dangerSlotIndex] = 'danger';
+
+  return {
+    symbols,
+    penaltySlotIndexes: [dangerSlotIndex],
+  };
+}
+
 export function createBasicSafeScratchCard(options: CreateBasicSafeScratchCardOptions) {
   const level = normalizeScratchCardLevel(options.level ?? 0);
   const tier = options.forcedTierId
@@ -812,6 +962,10 @@ export function createBasicSafeScratchCard(options: CreateBasicSafeScratchCardOp
       isWinning: isScratchCardWinningResult(symbols),
       hasPenaltySymbol: false,
       canDiscard: false,
+      penaltySlotIndexes: [],
+      penaltyTriggered: false,
+      discardCost: 0,
+      penaltyAmount: 0,
     },
     position: getRandomPlateSpawnPosition(),
     scratchPoints: [],
@@ -878,6 +1032,48 @@ export function createTripleMatchScratchCard(options: CreateTripleMatchScratchCa
       ),
       hasPenaltySymbol: false,
       canDiscard: false,
+      penaltySlotIndexes: [],
+      penaltyTriggered: false,
+      discardCost: 0,
+      penaltyAmount: 0,
+    },
+    position: getRandomPlateSpawnPosition(),
+    scratchPoints: [],
+  } satisfies ScratchCardState;
+}
+
+export function createRiskPeekScratchCard(options: CreateRiskPeekScratchCardOptions) {
+  const level = Math.max(
+    0,
+    Math.min(RISK_PEEK_CARD_CONFIG.level.payoutMultiplierByLevel.length - 1, options.level ?? 0),
+  );
+  const tier = options.forcedTierId
+    ? getRiskPeekScratchCardPrizeTierById(level, options.forcedTierId)
+    : getRiskPeekScratchCardPrizeTier(options.random, level);
+  const { symbols, penaltySlotIndexes } = createRiskPeekSymbolsForPrizeTier(
+    tier.id as RiskPeekScratchCardPrizeTierId,
+    options.symbolRandom ?? Math.random,
+  );
+  const hasPenaltySymbol = penaltySlotIndexes.length > 0;
+
+  return {
+    id: options.id,
+    type: RISK_PEEK_CARD_CONFIG.id,
+    price: RISK_PEEK_CARD_PRICE,
+    level,
+    status: 'onTable',
+    result: {
+      tierId: tier.id,
+      label: tier.label,
+      payout: tier.payout,
+      symbols,
+      isWinning: tier.payout > 0 && !hasPenaltySymbol,
+      hasPenaltySymbol,
+      canDiscard: true,
+      penaltySlotIndexes,
+      penaltyTriggered: false,
+      discardCost: getScratchCardDiscardCost(RISK_PEEK_CARD_CONFIG.price),
+      penaltyAmount: RISK_PEEK_CARD_CONFIG.riskRule.penaltyAmount,
     },
     position: getRandomPlateSpawnPosition(),
     scratchPoints: [],
@@ -885,18 +1081,60 @@ export function createTripleMatchScratchCard(options: CreateTripleMatchScratchCa
 }
 
 export function createScratchCard(cardType: ScratchCardType, options: CreateScratchCardOptions) {
-  return cardType === 'triple-match'
-    ? createTripleMatchScratchCard(options as CreateTripleMatchScratchCardOptions)
-    : createBasicSafeScratchCard(options as CreateBasicSafeScratchCardOptions);
+  if (cardType === 'triple-match') {
+    return createTripleMatchScratchCard(options as CreateTripleMatchScratchCardOptions);
+  }
+
+  if (cardType === 'risk-peek') {
+    return createRiskPeekScratchCard(options as CreateRiskPeekScratchCardOptions);
+  }
+
+  return createBasicSafeScratchCard(options as CreateBasicSafeScratchCardOptions);
+}
+
+export function getScratchCardDiscardCost(cardPrice: number) {
+  return Math.ceil(cardPrice * RISK_PEEK_CARD_CONFIG.riskRule.discardCostRatio);
+}
+
+export function getEffectiveScratchCardDiscardCost(gold: number, card: ScratchCardState) {
+  if (!card.result.canDiscard || card.status !== 'scratching' || card.result.penaltyTriggered) {
+    return 0;
+  }
+
+  const reserveGold = RISK_PEEK_CARD_CONFIG.riskRule.reserveGoldAfterDiscard;
+  const spendableGold = Math.max(0, Math.floor(gold) - reserveGold);
+
+  return Math.max(0, Math.min(card.result.discardCost, spendableGold));
+}
+
+export function shouldTriggerScratchCardPenalty(card: ScratchCardState, slotIndex: number) {
+  return card.result.penaltySlotIndexes.includes(slotIndex);
+}
+
+export function markScratchCardPenaltyTriggered(card: ScratchCardState) {
+  if (!card.result.hasPenaltySymbol || card.result.penaltyTriggered) {
+    return card;
+  }
+
+  return {
+    ...card,
+    result: {
+      ...card.result,
+      isWinning: false,
+      penaltyTriggered: true,
+      canDiscard: false,
+    },
+  } satisfies ScratchCardState;
 }
 
 export function settleScratchCard(player: PlayerState, card: ScratchCardState) {
-  const payout = card.result.isWinning ? card.result.payout : 0;
+  const penaltyAmount = card.result.penaltyTriggered ? card.result.penaltyAmount : 0;
+  const payout = card.result.isWinning && !card.result.penaltyTriggered ? card.result.payout : 0;
   const isNetLoss = payout < card.price;
 
   return {
     ...player,
-    gold: Math.max(0, player.gold + payout),
+    gold: Math.max(0, player.gold + payout - penaltyAmount),
     lifetimeGoldEarned: player.lifetimeGoldEarned + Math.max(0, payout),
     cardsScratched: player.cardsScratched + 1,
     loseStreak: isNetLoss ? player.loseStreak + 1 : 0,

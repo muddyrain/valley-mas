@@ -229,6 +229,62 @@ export const scratchLegendConfig = {
         payoutMultiplierByLevel: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] as const,
       },
     },
+    riskPeek: {
+      id: 'risk-peek',
+      label: '险中求财',
+      price: 150,
+      scratchCompleteThreshold: 0.84,
+      scratchSymbolRevealThreshold: 0.95,
+      scratchBrush: {
+        radius: 8,
+        stepDistance: 5,
+      },
+      matchRule: {
+        slots: 6,
+        requiredMatches: 1,
+      },
+      riskRule: {
+        dangerSlots: 1,
+        discardCostRatio: 0.3,
+        reserveGoldAfterDiscard: 1,
+        penaltyAmount: 0,
+      },
+      prizePool: [
+        {
+          id: 'risk-danger',
+          label: '危险符号',
+          probability: 0.32,
+          displayProbability: null,
+          payout: 0,
+        },
+        {
+          id: 'risk-coin',
+          label: '铜币保底',
+          probability: 0.38,
+          displayProbability: 0.45,
+          payout: 180,
+        },
+        {
+          id: 'risk-bag',
+          label: '钱袋翻倍',
+          probability: 0.22,
+          displayProbability: 0.35,
+          payout: 260,
+        },
+        {
+          id: 'risk-cash',
+          label: '纸钞爆发',
+          probability: 0.08,
+          displayProbability: 0.2,
+          payout: 420,
+        },
+      ] as const,
+      level: {
+        // 阶段三先接入独立等级进度，风险卡数值成长留到后续卡册/升级阶段。
+        cardsRequiredByLevel: [3, 10, 25, 50, 100, 200, 350, 550, 800] as const,
+        payoutMultiplierByLevel: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] as const,
+      },
+    },
   },
   // 阶段 2.5 升级工具配置。当前只把手动刮卡相关工具接入 UI 与本地等级状态。
   upgradeTools: {
