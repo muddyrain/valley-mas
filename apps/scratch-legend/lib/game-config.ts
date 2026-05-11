@@ -13,9 +13,9 @@ export const scratchLegendConfig = {
   progression: {
     // 熟练度分段里程碑列表。
     // 约定：
-    // - requiredProficiency 表示“上一段清零后，本段还需要多少熟练度”
-    // - UI 展示本段进度，例如 0/3、0/10、0/50、0/150
-    // - 解锁判断会把前置分段累加为总阈值
+    // - requiredProficiency 表示当前段需要刷多少熟练度，不是存档里的累计总值
+    // - UI 展示当前段熟练度 / 当前段目标，例如 5/10、25/50、125/250
+    // - 解锁判断使用内部累计总熟练度，并把前置段目标累加为真实阈值
     proficiencyMilestones: [
       {
         id: 'trash-can',
@@ -42,10 +42,16 @@ export const scratchLegendConfig = {
         description: '第四段熟练度达到 100 后预留三连胜出刮刮卡解锁位。',
       },
       {
+        id: 'auto-scratcher',
+        label: '自动刮刮机',
+        requiredProficiency: 250,
+        description: '自动刮刮机段熟练度达到 250 后触发解锁资格。',
+      },
+      {
         id: 'late-game-goal',
         label: '后续目标',
         requiredProficiency: 1000,
-        description: '第五段熟练度达到 1000 后预留后续长期目标解锁位。',
+        description: '后续熟练度达到 1000 后预留长期目标解锁位。',
       },
     ] as const,
   },
@@ -138,28 +144,28 @@ export const scratchLegendConfig = {
         {
           id: 'no-pair',
           label: '未成对',
-          probability: 0.72,
+          probability: 0.62,
           displayProbability: null,
           payout: 0,
         },
         {
           id: 'pair-fire',
           label: '火焰成对',
-          probability: 0.2,
+          probability: 0.25,
           displayProbability: 0.5,
           payout: 10,
         },
         {
           id: 'pair-cash',
           label: '纸钞成对',
-          probability: 0.06,
+          probability: 0.09,
           displayProbability: 0.4,
           payout: 25,
         },
         {
           id: 'pair-bag',
           label: '钱袋成对',
-          probability: 0.02,
+          probability: 0.04,
           displayProbability: 0.1,
           payout: 50,
         },
@@ -380,6 +386,43 @@ export const scratchLegendConfig = {
         },
       },
     ] as const,
+  },
+  // 阶段四先展示自动刮刮机作为中期目标；真实自动处理逻辑从阶段五开始接入。
+  automation: {
+    autoScratchMachine: {
+      id: 'auto-scratcher',
+      label: '自动刮刮机',
+      price: 1000,
+      description: '自动处理稳定票，风险票仍需手动。',
+      unlock: {
+        requiredMilestoneId: 'auto-scratcher',
+      },
+      base: {
+        queueCapacity: 2,
+        processingSeconds: 8,
+        defaultCardType: 'basic-safe',
+      },
+      upgrades: [
+        {
+          id: 'auto-capacity',
+          label: '刮卡机容量',
+          price: 2500,
+          description: '提高队列上限，后续从 2 张扩到 3 / 5 / 8 张。',
+        },
+        {
+          id: 'auto-power',
+          label: '刮卡机力量',
+          price: 2000,
+          description: '提高可处理票池，后续允许处理更厚的非风险票。',
+        },
+        {
+          id: 'auto-speed',
+          label: '刮卡机速度',
+          price: 5000,
+          description: '缩短单张处理时间，保持可见刮卡过程。',
+        },
+      ] as const,
+    },
   },
   // 破产救援贷款。阶段二只做“无法继续时的兜底电话”，不接入复杂债务惩罚。
   loans: {

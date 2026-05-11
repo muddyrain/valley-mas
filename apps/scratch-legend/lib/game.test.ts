@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  AUTO_SCRATCH_MACHINE_CONFIG,
   advanceBasicSafeScratchCardProgress,
   advanceSegmentedProficiency,
   BASIC_CARD_UNLOCK_GOLD,
   BASIC_SAFE_CARD_PRICE,
   canAffordWorkPlate,
+  canBuyAutoScratchMachine,
   canBuyBasicSafeScratchCard,
   canBuyScratchCard,
   canBuyTrashCan,
@@ -15,6 +17,7 @@ import {
   createRiskPeekScratchCard,
   createScratchCard,
   createTripleMatchScratchCard,
+  getAutoScratchMachineUnlockProgress,
   getBasicSafeScratchCardPrizePoolForLevel,
   getBasicSafeScratchCardPrizeTier,
   getBoundedDesktopPosition,
@@ -45,6 +48,7 @@ import {
   getScratchCardStepDistance,
   getScratchLuckEffectLabel,
   getScratchLuckEffectPercent,
+  getStageGoalProgress,
   getUnlockMilestoneById,
   getUnlockMilestoneCurrentValue,
   getUnlockMilestoneProgress,
@@ -331,7 +335,7 @@ test('allows buying work plates while scratch cards are on the table', () => {
   assert.equal(canStartWorkFromPhase('scratchCardSpawned', 0), false);
 });
 
-test('unlocks scratch mode notice at ten gold', () => {
+test('unlocks scratch mode notice when the 10 proficiency segment is filled', () => {
   assert.equal(BASIC_CARD_UNLOCK_GOLD, 13);
   assert.equal(shouldShowScratchUnlockNotice(12, false), false);
   assert.equal(shouldShowScratchUnlockNotice(13, false), true);
@@ -343,63 +347,70 @@ test('reads segmented proficiency milestones from config', () => {
   const scratchMilestone = getUnlockMilestoneById('scratch-mode');
   const upgradeToolsMilestone = getUnlockMilestoneById('upgrade-tools');
   const tripleMatchMilestone = getUnlockMilestoneById('triple-match-card');
+  const autoScratchMachineMilestone = getUnlockMilestoneById('auto-scratcher');
   const lateGameMilestone = getUnlockMilestoneById('late-game-goal');
 
   assert.equal(trashMilestone?.requiredProficiency, 3);
   assert.equal(scratchMilestone?.requiredProficiency, 10);
   assert.equal(upgradeToolsMilestone?.requiredProficiency, 50);
   assert.equal(tripleMatchMilestone?.requiredProficiency, 100);
+  assert.equal(autoScratchMachineMilestone?.requiredProficiency, 250);
   assert.equal(lateGameMilestone?.requiredProficiency, 1000);
   assert.equal(getUnlockMilestoneThreshold('trash-can'), 3);
   assert.equal(getUnlockMilestoneThreshold('scratch-mode'), 13);
   assert.equal(getUnlockMilestoneThreshold('upgrade-tools'), 63);
   assert.equal(getUnlockMilestoneThreshold('triple-match-card'), 163);
-  assert.equal(getUnlockMilestoneThreshold('late-game-goal'), 1163);
+  assert.equal(getUnlockMilestoneThreshold('auto-scratcher'), 413);
+  assert.equal(getUnlockMilestoneThreshold('late-game-goal'), 1413);
   assert.equal(getNextUnlockMilestone(0)?.id, 'trash-can');
   assert.equal(getNextUnlockMilestone(3)?.id, 'scratch-mode');
   assert.equal(getNextUnlockMilestone(13)?.id, 'upgrade-tools');
   assert.equal(getNextUnlockMilestone(63)?.id, 'triple-match-card');
-  assert.equal(getNextUnlockMilestone(163)?.id, 'late-game-goal');
+  assert.equal(getNextUnlockMilestone(163)?.id, 'auto-scratcher');
+  assert.equal(getNextUnlockMilestone(413)?.id, 'late-game-goal');
 });
 
-test('uses segmented proficiency to calculate the next unlock progress', () => {
+test('uses the current milestone segment to calculate the next unlock progress', () => {
   const trashMilestone = getUnlockMilestoneById('trash-can');
   const scratchMilestone = getUnlockMilestoneById('scratch-mode');
   const upgradeToolsMilestone = getUnlockMilestoneById('upgrade-tools');
   const tripleMatchMilestone = getUnlockMilestoneById('triple-match-card');
+  const autoScratchMachineMilestone = getUnlockMilestoneById('auto-scratcher');
 
   assert.equal(getUnlockMilestoneCurrentValue(0, trashMilestone ?? null), 0);
   assert.equal(getUnlockMilestoneCurrentValue(3, scratchMilestone ?? null), 0);
   assert.equal(getUnlockMilestoneCurrentValue(8, scratchMilestone ?? null), 5);
   assert.equal(getUnlockMilestoneCurrentValue(13, upgradeToolsMilestone ?? null), 0);
   assert.equal(getUnlockMilestoneCurrentValue(63, tripleMatchMilestone ?? null), 0);
+  assert.equal(getUnlockMilestoneCurrentValue(163, autoScratchMachineMilestone ?? null), 0);
   assert.equal(getUnlockMilestoneProgress(0, trashMilestone ?? null), 0);
   assert.equal(getUnlockMilestoneProgress(8, scratchMilestone ?? null), 0.5);
   assert.equal(getUnlockMilestoneProgress(38, upgradeToolsMilestone ?? null), 0.5);
   assert.equal(getUnlockMilestoneProgress(113, tripleMatchMilestone ?? null), 0.5);
+  assert.equal(getUnlockMilestoneProgress(288, autoScratchMachineMilestone ?? null), 0.5);
   assert.equal(getUnlockMilestoneProgress(1200, null), 1);
 });
 
-test('drops overflow proficiency when a reward crosses into the next segment', () => {
+test('carries overflow proficiency into the next segment when a reward crosses a goal', () => {
   const trashMilestone = getUnlockMilestoneById('trash-can');
   const scratchMilestone = getUnlockMilestoneById('scratch-mode');
   const upgradeToolsMilestone = getUnlockMilestoneById('upgrade-tools');
 
   const reachedTrashUnlock = advanceSegmentedProficiency(2, 2);
-  assert.equal(reachedTrashUnlock, getUnlockMilestoneThreshold('trash-can'));
-  assert.equal(getUnlockMilestoneCurrentValue(reachedTrashUnlock, scratchMilestone ?? null), 0);
+  assert.equal(reachedTrashUnlock, 4);
+  assert.equal(getUnlockMilestoneCurrentValue(reachedTrashUnlock, scratchMilestone ?? null), 1);
 
   const progressedScratchSegment = advanceSegmentedProficiency(reachedTrashUnlock, 2);
   assert.equal(
     getUnlockMilestoneCurrentValue(progressedScratchSegment, scratchMilestone ?? null),
-    2,
+    3,
   );
 
   const reachedScratchUnlock = advanceSegmentedProficiency(12, 20);
-  assert.equal(reachedScratchUnlock, getUnlockMilestoneThreshold('scratch-mode'));
+  assert.equal(reachedScratchUnlock, 32);
   assert.equal(
     getUnlockMilestoneCurrentValue(reachedScratchUnlock, upgradeToolsMilestone ?? null),
-    0,
+    19,
   );
   assert.equal(getUnlockMilestoneProgress(0, trashMilestone ?? null), 0);
 });
@@ -442,6 +453,28 @@ test('syncs save state derived unlocks and persisted work level', () => {
   assert.equal(isUnlockMilestoneUnlocked(save, 'scratch-mode'), true);
   assert.equal(isUnlockMilestoneUnlocked(save, 'upgrade-tools'), true);
   assert.equal(isUnlockMilestoneUnlocked(save, 'triple-match-card'), false);
+});
+
+test('unlocks the auto scratch machine when the 250 proficiency segment is filled', () => {
+  const beforeUnlock = syncScratchLegendSave({
+    ...createInitialScratchLegendSave(),
+    player: {
+      ...createInitialScratchLegendSave().player,
+      proficiency: 412,
+      lifetimeGoldEarned: 412,
+    },
+  });
+  const unlocked = syncScratchLegendSave({
+    ...createInitialScratchLegendSave(),
+    player: {
+      ...createInitialScratchLegendSave().player,
+      proficiency: 413,
+      lifetimeGoldEarned: 413,
+    },
+  });
+
+  assert.equal(isUnlockMilestoneUnlocked(beforeUnlock, 'auto-scratcher'), false);
+  assert.equal(isUnlockMilestoneUnlocked(unlocked, 'auto-scratcher'), true);
 });
 
 test('merges partial persisted save data back into a complete save schema', () => {
@@ -831,7 +864,7 @@ test('unlocks the trash can offer after three proficiency and requires buying it
 test('uses configured price and unlock gate for the first safe scratch card', () => {
   assert.equal(BASIC_SAFE_CARD_PRICE, scratchLegendConfig.scratchCards.basicSafe.price);
   assert.equal(BASIC_SAFE_CARD_PRICE, 10);
-  assert.equal(canBuyBasicSafeScratchCard({ gold: 9, lifetimeGoldEarned: 13 }), false);
+  assert.equal(canBuyBasicSafeScratchCard({ gold: 9, lifetimeGoldEarned: 10 }), false);
   assert.equal(canBuyBasicSafeScratchCard({ gold: 10, lifetimeGoldEarned: 12 }), false);
   assert.equal(canBuyBasicSafeScratchCard({ gold: 10, lifetimeGoldEarned: 13 }), true);
 });
@@ -1062,7 +1095,7 @@ test('configures triple match card from the static rules source', () => {
   assert.equal(getScratchCardStepDistance('triple-match'), 5);
 });
 
-test('unlocks triple match notice at the fourth proficiency segment', () => {
+test('unlocks triple match notice when the 100 proficiency segment is filled', () => {
   assert.equal(getUnlockMilestoneThreshold('triple-match-card'), 163);
   assert.equal(shouldShowTripleMatchUnlockNotice(162, false), false);
   assert.equal(shouldShowTripleMatchUnlockNotice(163, false), true);
@@ -1070,7 +1103,7 @@ test('unlocks triple match notice at the fourth proficiency segment', () => {
 });
 
 test('uses configured price and unlock gate for generic scratch card purchases', () => {
-  assert.equal(canBuyScratchCard('basic-safe', { gold: 9, lifetimeGoldEarned: 163 }), false);
+  assert.equal(canBuyScratchCard('basic-safe', { gold: 9, lifetimeGoldEarned: 100 }), false);
   assert.equal(canBuyScratchCard('basic-safe', { gold: 10, lifetimeGoldEarned: 12 }), false);
   assert.equal(canBuyScratchCard('basic-safe', { gold: 10, lifetimeGoldEarned: 13 }), true);
   assert.equal(canBuyScratchCard('triple-match', { gold: 99, lifetimeGoldEarned: 163 }), false);
@@ -1192,6 +1225,116 @@ test('groups implemented scratch cards into the first card album roles', () => {
   assert.equal(getScratchCardAlbumSlotByType('basic-safe')?.roleLabel, '稳定票');
   assert.equal(getScratchCardAlbumSlotByType('risk-peek')?.roleLabel, '风险票');
   assert.equal(getScratchCardAlbumSlotByType('triple-match')?.roleLabel, '高赔率票');
+});
+
+test('configures the auto scratch machine as a proficiency-gated purchase', () => {
+  assert.equal(AUTO_SCRATCH_MACHINE_CONFIG.price, 1000);
+  assert.equal(AUTO_SCRATCH_MACHINE_CONFIG.unlock.requiredMilestoneId, 'auto-scratcher');
+  assert.equal(AUTO_SCRATCH_MACHINE_CONFIG.base.queueCapacity, 2);
+  assert.equal(AUTO_SCRATCH_MACHINE_CONFIG.base.processingSeconds, 8);
+  assert.equal(AUTO_SCRATCH_MACHINE_CONFIG.base.defaultCardType, 'basic-safe');
+  assert.deepEqual(
+    AUTO_SCRATCH_MACHINE_CONFIG.upgrades.map((upgrade) => [upgrade.id, upgrade.price]),
+    [
+      ['auto-capacity', 2500],
+      ['auto-power', 2000],
+      ['auto-speed', 5000],
+    ],
+  );
+});
+
+test('summarizes proficiency milestone state for the locked auto scratch machine goal', () => {
+  assert.deepEqual(
+    getAutoScratchMachineUnlockProgress({
+      gold: 469,
+      milestoneUnlocked: false,
+    }),
+    {
+      price: 1000,
+      goldShortfall: 531,
+      milestoneUnlocked: false,
+      unlockedByTargets: false,
+    },
+  );
+});
+
+test('allows buying the auto scratch machine only after proficiency and gold are ready', () => {
+  assert.equal(
+    canBuyAutoScratchMachine({
+      gold: 999,
+      milestoneUnlocked: true,
+      alreadyUnlocked: false,
+    }),
+    false,
+  );
+  assert.equal(
+    canBuyAutoScratchMachine({
+      gold: 1000,
+      milestoneUnlocked: false,
+      alreadyUnlocked: false,
+    }),
+    false,
+  );
+  assert.equal(
+    canBuyAutoScratchMachine({
+      gold: 1000,
+      milestoneUnlocked: true,
+      alreadyUnlocked: false,
+    }),
+    true,
+  );
+  assert.equal(
+    canBuyAutoScratchMachine({
+      gold: 2000,
+      milestoneUnlocked: true,
+      alreadyUnlocked: true,
+    }),
+    false,
+  );
+});
+
+test('keeps the top progress on proficiency after upgrade tools unlock', () => {
+  assert.deepEqual(
+    getStageGoalProgress({
+      nextUnlockMilestone: { id: 'late-game-goal', label: '后续目标', requiredProficiency: 1000 },
+      unlockProgressCurrent: 37,
+      unlockProgressTarget: 1000,
+      unlockProgressRatio: 0.037,
+      autoScratchMachineUnlocked: false,
+      autoScratchMachineProgress: getAutoScratchMachineUnlockProgress({
+        gold: 1510,
+        milestoneUnlocked: false,
+      }),
+    }),
+    {
+      label: '熟练度',
+      current: 37,
+      target: 1000,
+      ratio: 0.037,
+    },
+  );
+});
+
+test('keeps the top progress on proficiency after the auto scratch machine is unlocked', () => {
+  assert.deepEqual(
+    getStageGoalProgress({
+      nextUnlockMilestone: { id: 'late-game-goal', label: '后续目标', requiredProficiency: 1000 },
+      unlockProgressCurrent: 0,
+      unlockProgressTarget: 1000,
+      unlockProgressRatio: 0,
+      autoScratchMachineUnlocked: true,
+      autoScratchMachineProgress: getAutoScratchMachineUnlockProgress({
+        gold: 510,
+        milestoneUnlocked: true,
+      }),
+    }),
+    {
+      label: '熟练度',
+      current: 0,
+      target: 1000,
+      ratio: 0,
+    },
+  );
 });
 
 test('pre-generates real danger symbols on risk peek cards', () => {

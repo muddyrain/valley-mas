@@ -63,6 +63,11 @@ export type ScratchLegendScratchCardsState = {
 
 export type ScratchLegendUpgradeToolsState = Record<UpgradeToolId, UpgradeToolState>;
 
+export type ScratchLegendAutomationState = {
+  // 阶段 5 入口：自动刮刮机是否已经购买解锁。
+  autoScratchMachineUnlocked: boolean;
+};
+
 export type ScratchLegendWorkspaceState = {
   // 当前主流程处于什么阶段。
   phase: WorkPhase;
@@ -97,6 +102,8 @@ export type ScratchLegendSave = {
   scratchCards: ScratchLegendScratchCardsState;
   // 当前升级工具等级状态。
   upgradeTools: ScratchLegendUpgradeToolsState;
+  // 当前自动化能力状态。
+  automation: ScratchLegendAutomationState;
   // 当前桌面与工作流状态。
   workspace: ScratchLegendWorkspaceState;
 };
@@ -195,6 +202,9 @@ export function createInitialScratchLegendSave(): ScratchLegendSave {
       },
     },
     upgradeTools: createInitialUpgradeToolStates(),
+    automation: {
+      autoScratchMachineUnlocked: false,
+    },
     workspace: createInitialWorkspaceState(),
   };
 }
@@ -263,6 +273,10 @@ export function mergeScratchLegendSave(
       },
     },
     upgradeTools: mergeUpgradeToolStates(partialSave?.upgradeTools),
+    automation: {
+      ...initialSave.automation,
+      ...partialSave?.automation,
+    },
     workspace: {
       ...initialSave.workspace,
       ...partialSave?.workspace,

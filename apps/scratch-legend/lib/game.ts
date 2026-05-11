@@ -4,6 +4,7 @@ export const UNLOCK_MILESTONES = scratchLegendConfig.progression.proficiencyMile
 export const TRASH_CAN_MILESTONE_ID = 'trash-can' as const;
 export const SCRATCH_MODE_MILESTONE_ID = 'scratch-mode' as const;
 export const TRIPLE_MATCH_CARD_MILESTONE_ID = 'triple-match-card' as const;
+export const AUTO_SCRATCH_MACHINE_MILESTONE_ID = 'auto-scratcher' as const;
 export const BASIC_CARD_UNLOCK_GOLD = getUnlockMilestoneThreshold(SCRATCH_MODE_MILESTONE_ID);
 export const CLEAN_COMPLETE_THRESHOLD = scratchLegendConfig.work.cleanCompleteThreshold;
 export const INITIAL_GOLD = scratchLegendConfig.economy.initialGold;
@@ -40,6 +41,8 @@ export const RISK_PEEK_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD =
   RISK_PEEK_CARD_CONFIG.scratchSymbolRevealThreshold;
 export const SCRATCH_CARD_ALBUMS_CONFIG = scratchLegendConfig.cardAlbums;
 export const UPGRADE_TOOLS_CONFIG = scratchLegendConfig.upgradeTools.items;
+export const AUTOMATION_CONFIG = scratchLegendConfig.automation;
+export const AUTO_SCRATCH_MACHINE_CONFIG = AUTOMATION_CONFIG.autoScratchMachine;
 export const LOAN_CONFIG = scratchLegendConfig.loans;
 export const LOAN_PRINCIPAL = LOAN_CONFIG.principal;
 export const LOAN_REPAYMENT_AMOUNT = LOAN_CONFIG.repaymentAmount;
@@ -154,12 +157,29 @@ export type ScratchCardProgressState = {
 
 export type ScratchCardAlbumConfig = (typeof SCRATCH_CARD_ALBUMS_CONFIG)[number];
 export type ScratchCardAlbumSlotConfig = ScratchCardAlbumConfig['slots'][number];
+export type ScratchCardSettlementCounts = Partial<
+  Record<ReturnType<typeof getScratchCardSettlementProgressKey>, Partial<ScratchCardProgressState>>
+>;
 
 export type UpgradeToolConfig = (typeof UPGRADE_TOOLS_CONFIG)[number];
 export type UpgradeToolId = UpgradeToolConfig['id'];
 
 export type UpgradeToolState = {
   level: number;
+};
+
+export type AutoScratchMachineUnlockProgress = {
+  price: number;
+  goldShortfall: number;
+  milestoneUnlocked: boolean;
+  unlockedByTargets: boolean;
+};
+
+export type StageGoalProgress = {
+  label: string;
+  current: number;
+  target: number;
+  ratio: number;
 };
 
 export type ScratchCardLevelProgress = {
@@ -293,7 +313,10 @@ export function getUnlockMilestoneThreshold(milestoneId: UnlockMilestoneId) {
 
 function getPreviousUnlockMilestoneThreshold(milestone: UnlockMilestone | null) {
   if (!milestone) {
-    return UNLOCK_MILESTONES.reduce((sum, item) => sum + item.requiredProficiency, 0);
+    return UNLOCK_MILESTONES.reduce(
+      (sum, currentMilestone) => sum + currentMilestone.requiredProficiency,
+      0,
+    );
   }
 
   const milestoneIndex = getUnlockMilestoneIndex(milestone.id);
@@ -303,7 +326,7 @@ function getPreviousUnlockMilestoneThreshold(milestone: UnlockMilestone | null) 
   }
 
   return UNLOCK_MILESTONES.slice(0, milestoneIndex).reduce(
-    (sum, item) => sum + item.requiredProficiency,
+    (sum, currentMilestone) => sum + currentMilestone.requiredProficiency,
     0,
   );
 }
@@ -324,16 +347,7 @@ export function advanceSegmentedProficiency(currentProficiency: number, earnedAm
     return normalizedCurrent;
   }
 
-  const nextMilestone = getNextUnlockMilestone(normalizedCurrent);
-
-  if (!nextMilestone) {
-    return normalizedCurrent + earnedProficiency;
-  }
-
-  const nextThreshold = getUnlockMilestoneThreshold(nextMilestone.id);
-  const progressed = normalizedCurrent + earnedProficiency;
-
-  return progressed >= nextThreshold ? nextThreshold : progressed;
+  return normalizedCurrent + earnedProficiency;
 }
 
 export function getUnlockMilestoneCurrentValue(
@@ -341,7 +355,7 @@ export function getUnlockMilestoneCurrentValue(
   milestone: UnlockMilestone | null,
 ) {
   if (!milestone) {
-    return 0;
+    return UNLOCK_MILESTONES[UNLOCK_MILESTONES.length - 1]?.requiredProficiency ?? 0;
   }
 
   const previousThreshold = getPreviousUnlockMilestoneThreshold(milestone);
@@ -636,6 +650,73 @@ export function getScratchCardAlbumSlotByType(cardType: ScratchCardType) {
   }
 
   return null;
+}
+
+export function getScratchCardAlbumSettledCount(
+  albumId: ScratchCardAlbumConfig['id'],
+  scratchCards: ScratchCardSettlementCounts,
+) {
+  const album = SCRATCH_CARD_ALBUMS_CONFIG.find((item) => item.id === albumId);
+
+  if (!album) {
+    return 0;
+  }
+
+  return album.slots.reduce((sum, slot) => {
+    if (!slot.cardType) {
+      return sum;
+    }
+
+    const progressKey = getScratchCardSettlementProgressKey(slot.cardType);
+
+    return sum + Math.max(0, Math.floor(scratchCards[progressKey]?.cardsSettled ?? 0));
+  }, 0);
+}
+
+export function getAutoScratchMachineUnlockProgress(options: {
+  gold: number;
+  milestoneUnlocked: boolean;
+}): AutoScratchMachineUnlockProgress {
+  const price = AUTO_SCRATCH_MACHINE_CONFIG.price;
+  const goldShortfall = Math.max(0, price - Math.max(0, Math.floor(options.gold)));
+
+  return {
+    price,
+    goldShortfall,
+    milestoneUnlocked: options.milestoneUnlocked,
+    unlockedByTargets: options.milestoneUnlocked && goldShortfall === 0,
+  };
+}
+
+export function canBuyAutoScratchMachine(options: {
+  gold: number;
+  milestoneUnlocked: boolean;
+  alreadyUnlocked: boolean;
+}) {
+  if (options.alreadyUnlocked) {
+    return false;
+  }
+
+  return getAutoScratchMachineUnlockProgress({
+    gold: options.gold,
+    milestoneUnlocked: options.milestoneUnlocked,
+  }).unlockedByTargets;
+}
+
+export function getStageGoalProgress(options: {
+  nextUnlockMilestone: Pick<UnlockMilestone, 'id' | 'label' | 'requiredProficiency'> | null;
+  unlockProgressCurrent: number;
+  unlockProgressTarget: number;
+  unlockProgressRatio: number;
+  autoScratchMachineUnlocked: boolean;
+  autoScratchMachineProgress: AutoScratchMachineUnlockProgress;
+}): StageGoalProgress {
+  return {
+    label: '熟练度',
+    current: options.unlockProgressCurrent,
+    target: options.unlockProgressTarget,
+    ratio: options.unlockProgressRatio,
+  };
 }
 
 export function getBasicSafeScratchCardPrizeTier(

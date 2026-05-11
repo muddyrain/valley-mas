@@ -3,11 +3,16 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CleaningCanvas } from '@/components/CleaningCanvas';
 import { ScratchCardCanvas } from '@/components/ScratchCardCanvas';
+import { ShopPurchaseButton } from '@/components/ShopPurchaseButton';
 import {
+  AUTO_SCRATCH_MACHINE_CONFIG,
+  AUTO_SCRATCH_MACHINE_MILESTONE_ID,
+  type AutoScratchMachineUnlockProgress,
   advanceBasicSafeScratchCardProgress,
   advanceSegmentedProficiency,
   BASIC_SAFE_CARD_PRICE,
   canAffordWorkPlate,
+  canBuyAutoScratchMachine,
   canBuyBasicSafeScratchCard,
   canBuyScratchCard,
   canBuyTrashCan,
@@ -17,6 +22,7 @@ import {
   createScratchCard,
   type GoldChangeEffect,
   type GoldEffectSource,
+  getAutoScratchMachineUnlockProgress,
   getBoundedDesktopPosition,
   getBoundedPlatePosition,
   getCleaningBrushRadius,
@@ -37,8 +43,10 @@ import {
   getScratchCardSlotIndexes,
   getScratchCardStepDistance,
   getScratchLuckEffectLabel,
+  getStageGoalProgress,
   getUnlockMilestoneCurrentValue,
   getUnlockMilestoneProgress,
+  getUnlockMilestoneThreshold,
   getUpgradeToolPrice,
   getWinningScratchSymbolIndexes,
   getWorkBrokenPlatePenaltyForLevel,
@@ -135,7 +143,7 @@ type LoanRepaymentFeedback = {
   isFinal: boolean;
 };
 
-type UnlockToast = 'trash' | 'scratch' | 'upgrade' | 'triple-match' | null;
+type UnlockToast = 'trash' | 'scratch' | 'upgrade' | 'triple-match' | 'auto-scratcher' | null;
 type PhoneNoticeType = 'loan' | 'scratch' | 'upgrade-tools' | 'triple-match' | 'work-risk' | null;
 type GoldEffectEvent = GoldChangeEffect & {
   id: number;
@@ -206,6 +214,101 @@ function ScratchSymbolIcon({ symbol }: { symbol: ScratchCardSymbol }) {
 
 function UpgradeToolIcon({ toolId }: { toolId: UpgradeToolConfig['id'] }) {
   return <span className={`upgrade-tool-icon ${toolId}`} aria-hidden="true" />;
+}
+
+function AutoScratchMachineTargetCard({
+  progress,
+  unlocked,
+  canBuy,
+  onBuy,
+  compact = false,
+}: {
+  progress: AutoScratchMachineUnlockProgress;
+  unlocked: boolean;
+  canBuy?: boolean;
+  onBuy?: () => void;
+  compact?: boolean;
+}) {
+  const machine = AUTO_SCRATCH_MACHINE_CONFIG;
+  const targetReady = progress.unlockedByTargets;
+  const canPurchase = Boolean(canBuy && onBuy);
+  const cardClassName = [
+    'automation-goal-card',
+    compact ? 'compact' : '',
+    !unlocked && !canPurchase ? 'insufficient' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const statusLabel = '已解锁';
+  let goldLabel = `资金 $${progress.price}`;
+  let eyebrowLabel = '可购买';
+
+  if (unlocked) {
+    goldLabel = '自动机已解锁';
+    eyebrowLabel = '已拥有';
+  } else if (progress.goldShortfall > 0) {
+    goldLabel = `还差 $${progress.goldShortfall}`;
+  }
+
+  return (
+    <article className={cardClassName}>
+      <span className="automation-machine-icon" aria-hidden="true" />
+      <div className="automation-goal-copy">
+        <small>{eyebrowLabel}</small>
+        <strong>{machine.label}</strong>
+        <span>{machine.description}</span>
+        <div className="automation-goal-tags">
+          <em>{goldLabel}</em>
+        </div>
+      </div>
+      {unlocked ? (
+        <b>{statusLabel}</b>
+      ) : (
+        <ShopPurchaseButton
+          className="automation-buy-button"
+          price={machine.price}
+          onClick={onBuy}
+          disabled={!targetReady}
+        />
+      )}
+    </article>
+  );
+}
+
+function getUnlockToastTitle(unlockToast: Exclude<UnlockToast, null>) {
+  if (unlockToast === 'scratch') {
+    return '刮刮卡！';
+  }
+
+  if (unlockToast === 'auto-scratcher') {
+    return '自动刮刮机！';
+  }
+
+  if (unlockToast === 'trash') {
+    return '购买资格已解锁';
+  }
+
+  return '已解锁';
+}
+
+function getUnlockToastDetail(unlockToast: Exclude<UnlockToast, null>) {
+  if (unlockToast === 'scratch') {
+    return '成双入对已上架';
+  }
+
+  if (unlockToast === 'triple-match') {
+    return '三连胜出';
+  }
+
+  if (unlockToast === 'upgrade') {
+    return '升级工具';
+  }
+
+  if (unlockToast === 'auto-scratcher') {
+    return `花费 $${AUTO_SCRATCH_MACHINE_CONFIG.price} 购买机器`;
+  }
+
+  return `花费 $${TRASH_CAN_PRICE} 购买垃圾桶`;
 }
 
 function getPrizeTierSymbol(tierId: ScratchCardState['result']['tierId']) {
@@ -362,9 +465,13 @@ export function ScratchLegendGame() {
   const previousTripleMatchUnlockedRef = useRef(
     isUnlockMilestoneUnlocked(save, TRIPLE_MATCH_CARD_MILESTONE_ID),
   );
+  const previousAutoScratchMachineMilestoneUnlockedRef = useRef(
+    isUnlockMilestoneUnlocked(save, AUTO_SCRATCH_MACHINE_MILESTONE_ID),
+  );
   const unlockToastReadyRef = useRef(false);
   const hydrationSyncAppliedRef = useRef(false);
   const trashCanOfferFocusedRef = useRef(false);
+  const autoScratchMachineOfferFocusedRef = useRef(false);
 
   const player = save.player;
   const phase: WorkPhase = save.workspace.phase;
@@ -397,11 +504,25 @@ export function ScratchLegendGame() {
   const scratchMessageDismissed = save.notices.scratchMessageDismissed;
   const upgradeToolsMessageDismissed = save.notices.upgradeToolsMessageDismissed;
   const tripleMatchMessageDismissed = save.notices.tripleMatchMessageDismissed;
+  const autoScratchMachineUnlocked = save.automation.autoScratchMachineUnlocked;
   const scratchModeUnlocked = isUnlockMilestoneUnlocked(save, SCRATCH_MODE_MILESTONE_ID);
   const upgradeToolsUnlocked = isUnlockMilestoneUnlocked(save, UPGRADE_TOOLS_MILESTONE_ID);
   const tripleMatchUnlocked = isUnlockMilestoneUnlocked(save, TRIPLE_MATCH_CARD_MILESTONE_ID);
+  const autoScratchMachineMilestoneUnlocked = isUnlockMilestoneUnlocked(
+    save,
+    AUTO_SCRATCH_MACHINE_MILESTONE_ID,
+  );
   const scratchCardVisible = scratchModeUnlocked && scratchMessageDismissed;
   const upgradeToolsVisible = upgradeToolsUnlocked && upgradeToolsMessageDismissed;
+  const autoScratchMachineProgress = getAutoScratchMachineUnlockProgress({
+    gold: player.gold,
+    milestoneUnlocked: autoScratchMachineMilestoneUnlocked,
+  });
+  const canPurchaseAutoScratchMachine = canBuyAutoScratchMachine({
+    gold: player.gold,
+    milestoneUnlocked: autoScratchMachineMilestoneUnlocked,
+    alreadyUnlocked: autoScratchMachineUnlocked,
+  });
   const basicSafeLevelProgress = getScratchCardLevelProgress(
     'basic-safe',
     save.scratchCards.basicSafe.cardsSettled,
@@ -479,6 +600,14 @@ export function ScratchLegendGame() {
     nextUnlockMilestone,
   );
   const scratchUnlockProgress = getUnlockMilestoneProgress(player.proficiency, nextUnlockMilestone);
+  const stageGoalProgress = getStageGoalProgress({
+    nextUnlockMilestone,
+    unlockProgressCurrent,
+    unlockProgressTarget,
+    unlockProgressRatio: scratchUnlockProgress,
+    autoScratchMachineUnlocked,
+    autoScratchMachineProgress,
+  });
   const workLevel = player.workLevel;
   const workLevelProgress = getWorkLevelProgress(player.plateCleaned);
   const previewRewardAmount = getWorkRewardAmountForLevel(workLevel);
@@ -523,11 +652,11 @@ export function ScratchLegendGame() {
   const workSafeOutcomeLabel =
     workOutcomeRevealed && !activeReward.isBroken
       ? getOutcomeAmountLabel(true, activeReward.total)
-      : getOutcomeAmountLabel(false, previewRewardAmount);
+      : getOutcomeAmountLabel(true, previewRewardAmount);
   const workBrokenOutcomeLabel =
     workOutcomeRevealed && activeReward.isBroken
       ? getOutcomeAmountLabel(true, activeReward.total)
-      : getOutcomeAmountLabel(false, -workBrokenPlatePenalty);
+      : getOutcomeAmountLabel(true, -workBrokenPlatePenalty);
   const workRiskNoticeVisible = shouldShowWorkRiskNotice(
     save.notices.workRiskNoticeTriggered,
     workRiskMessageDismissed,
@@ -591,6 +720,21 @@ export function ScratchLegendGame() {
     }
 
     setUnlockToast('trash');
+    unlockToastTimerRef.current = window.setTimeout(() => {
+      setUnlockToast(null);
+      unlockToastTimerRef.current = null;
+    }, UNLOCK_TOAST_DURATION_MS);
+  }, []);
+
+  const showAutoScratchMachineUnlockToast = useCallback(() => {
+    previousAutoScratchMachineMilestoneUnlockedRef.current = true;
+    autoScratchMachineOfferFocusedRef.current = true;
+
+    if (unlockToastTimerRef.current) {
+      window.clearTimeout(unlockToastTimerRef.current);
+    }
+
+    setUnlockToast('auto-scratcher');
     unlockToastTimerRef.current = window.setTimeout(() => {
       setUnlockToast(null);
       unlockToastTimerRef.current = null;
@@ -695,8 +839,10 @@ export function ScratchLegendGame() {
     previousScratchModeUnlockedRef.current = scratchModeUnlocked;
     previousUpgradeToolsUnlockedRef.current = upgradeToolsUnlocked;
     previousTripleMatchUnlockedRef.current = tripleMatchUnlocked;
+    previousAutoScratchMachineMilestoneUnlockedRef.current = autoScratchMachineMilestoneUnlocked;
     unlockToastReadyRef.current = true;
   }, [
+    autoScratchMachineMilestoneUnlocked,
     hasHydrated,
     scratchModeUnlocked,
     trashCanUnlocked,
@@ -736,6 +882,35 @@ export function ScratchLegendGame() {
     trashCanOfferFocusedRef.current = true;
     showTrashCanUnlockToast();
   }, [hasHydrated, showTrashCanUnlockToast, trashCanPurchased, trashCanUnlocked]);
+
+  useEffect(() => {
+    if (!unlockToastReadyRef.current) {
+      return;
+    }
+
+    if (
+      autoScratchMachineMilestoneUnlocked &&
+      !previousAutoScratchMachineMilestoneUnlockedRef.current
+    ) {
+      showAutoScratchMachineUnlockToast();
+    }
+
+    previousAutoScratchMachineMilestoneUnlockedRef.current = autoScratchMachineMilestoneUnlocked;
+  }, [autoScratchMachineMilestoneUnlocked, showAutoScratchMachineUnlockToast]);
+
+  useEffect(() => {
+    if (!hasHydrated || !autoScratchMachineMilestoneUnlocked || autoScratchMachineUnlocked) {
+      return;
+    }
+
+    autoScratchMachineOfferFocusedRef.current = true;
+    showAutoScratchMachineUnlockToast();
+  }, [
+    autoScratchMachineMilestoneUnlocked,
+    autoScratchMachineUnlocked,
+    hasHydrated,
+    showAutoScratchMachineUnlockToast,
+  ]);
 
   useEffect(() => {
     if (activeLoans.length === 0 && !loanRepaymentFeedback) {
@@ -1693,6 +1868,9 @@ export function ScratchLegendGame() {
     const nextProficiency = advanceSegmentedProficiency(player.proficiency, earnedGold);
     const shouldShowTrashCanUnlock =
       !trashCanUnlocked && shouldUnlockTrashCan(nextProficiency, trashCanUnlocked);
+    const shouldShowAutoScratchMachineUnlock =
+      !autoScratchMachineMilestoneUnlocked &&
+      nextProficiency >= getUnlockMilestoneThreshold(AUTO_SCRATCH_MACHINE_MILESTONE_ID);
 
     triggerGoldEffect(
       player.gold,
@@ -1729,6 +1907,9 @@ export function ScratchLegendGame() {
     });
     if (shouldShowTrashCanUnlock) {
       showTrashCanUnlockToast();
+    }
+    if (shouldShowAutoScratchMachineUnlock) {
+      showAutoScratchMachineUnlockToast();
     }
     setCleanProgress(0);
   }
@@ -1776,6 +1957,10 @@ export function ScratchLegendGame() {
     }
 
     const payout = activeScratchCard.result.isWinning ? activeScratchCard.result.payout : 0;
+    const settledPlayer = settleScratchCard(player, activeScratchCard);
+    const shouldShowAutoScratchMachineUnlock =
+      !autoScratchMachineMilestoneUnlocked &&
+      settledPlayer.proficiency >= getUnlockMilestoneThreshold(AUTO_SCRATCH_MACHINE_MILESTONE_ID);
 
     if (payout > 0) {
       triggerGoldEffect(player.gold, player.gold + payout, 'scratch-prize');
@@ -1810,6 +1995,9 @@ export function ScratchLegendGame() {
         },
       };
     });
+    if (shouldShowAutoScratchMachineUnlock) {
+      showAutoScratchMachineUnlockToast();
+    }
     resetScratchRevealEffects();
     setScratchProgress(0);
   }
@@ -1903,6 +2091,47 @@ export function ScratchLegendGame() {
         trashCanPurchased: true,
       },
     }));
+  }
+
+  function buyAutoScratchMachine() {
+    if (!canPurchaseAutoScratchMachine) {
+      return;
+    }
+
+    triggerGoldEffect(
+      player.gold,
+      player.gold - AUTO_SCRATCH_MACHINE_CONFIG.price,
+      'upgrade-purchase',
+    );
+
+    updateSave((current) => {
+      const currentAutoMachineMilestoneUnlocked = isUnlockMilestoneUnlocked(
+        current,
+        AUTO_SCRATCH_MACHINE_CONFIG.unlock.requiredMilestoneId,
+      );
+
+      if (
+        !canBuyAutoScratchMachine({
+          gold: current.player.gold,
+          milestoneUnlocked: currentAutoMachineMilestoneUnlocked,
+          alreadyUnlocked: current.automation.autoScratchMachineUnlocked,
+        })
+      ) {
+        return current;
+      }
+
+      return {
+        ...current,
+        player: {
+          ...current.player,
+          gold: current.player.gold - AUTO_SCRATCH_MACHINE_CONFIG.price,
+        },
+        automation: {
+          ...current.automation,
+          autoScratchMachineUnlocked: true,
+        },
+      };
+    });
   }
 
   function buyUpgradeTool(tool: UpgradeToolConfig) {
@@ -2116,14 +2345,13 @@ export function ScratchLegendGame() {
               </div>
             )}
             <div className="ticket-progress">
-              <small>熟练度</small>
               <span>
-                {unlockProgressCurrent}/{unlockProgressTarget}
+                {stageGoalProgress.current}/{stageGoalProgress.target}
               </span>
               <div className="progress-track">
                 <div
                   className="progress-fill amber"
-                  style={{ width: `${scratchUnlockProgress * 100}%` }}
+                  style={{ width: `${stageGoalProgress.ratio * 100}%` }}
                 />
               </div>
             </div>
@@ -2180,42 +2408,17 @@ export function ScratchLegendGame() {
 
                 {scratchCardVisible && (
                   <div className="scratch-card-album-list">
-                    {SCRATCH_CARD_ALBUMS_CONFIG.map((album) => (
-                      <section
-                        className={`scratch-card-album ${album.slots.length > 0 ? '' : 'locked'}`}
-                        key={album.id}
-                      >
-                        <header className="scratch-card-album-header">
-                          <small>{album.subtitle}</small>
-                          <strong>{album.label}</strong>
-                        </header>
-
-                        {album.slots.length > 0 ? (
+                    {SCRATCH_CARD_ALBUMS_CONFIG.filter((album) => album.slots.length > 0).map(
+                      (album) => (
+                        <section className="scratch-card-album" key={album.id}>
                           <div className="scratch-card-album-slots">
                             {album.slots.map((slot) => {
                               const item = slot.cardType
                                 ? scratchCardCatalogItemByType.get(slot.cardType)
                                 : null;
 
-                              if (!slot.cardType || !item) {
-                                return (
-                                  <div
-                                    className="scratch-shop-card locked placeholder finale"
-                                    key={slot.id}
-                                  >
-                                    <span className="scratch-ticket-icon locked">
-                                      <span>终</span>
-                                    </span>
-                                    <span className="scratch-shop-copy">
-                                      <small>{slot.roleLabel}</small>
-                                      <strong>
-                                        {'lockedLabel' in slot ? slot.lockedLabel : '终局票'}
-                                      </strong>
-                                      <em>未开放</em>
-                                      <small>后续开放</small>
-                                    </span>
-                                  </div>
-                                );
+                              if (!slot.cardType || !item || !item.visible || !item.unlocked) {
+                                return null;
                               }
 
                               const display = getScratchCardDisplay(item.type);
@@ -2232,7 +2435,7 @@ export function ScratchLegendGame() {
                                     ? canBuyRiskPeekCard
                                     : canBuyBasicSafeCard;
 
-                              return item.visible && item.unlocked ? (
+                              return (
                                 <button
                                   className={`scratch-shop-card ${item.type} ${buyable ? '' : 'locked'}`}
                                   type="button"
@@ -2269,40 +2472,14 @@ export function ScratchLegendGame() {
                                     </span>
                                   </span>
                                 </button>
-                              ) : (
-                                <div
-                                  className={`scratch-shop-card ${item.type} locked placeholder`}
-                                  key={slot.id}
-                                >
-                                  <span className="scratch-ticket-icon locked">
-                                    <span>锁</span>
-                                  </span>
-                                  <span className="scratch-shop-copy">
-                                    <small>{slot.roleLabel}</small>
-                                    <strong>{display.title}</strong>
-                                    <em>${item.price}</em>
-                                    <small>熟练度达到 100 后接电话解锁</small>
-                                  </span>
-                                </div>
                               );
                             })}
                           </div>
-                        ) : (
-                          <div className="scratch-card-album-locked">完成第一本卡册后再公开</div>
-                        )}
-                      </section>
-                    ))}
+                        </section>
+                      ),
+                    )}
                   </div>
                 )}
-
-                <div className="sidebar-note">
-                  <strong>下一目标</strong>
-                  <span>
-                    {nextUnlockMilestone
-                      ? `熟练度达到 ${nextUnlockMilestone.requiredProficiency} 解锁${nextUnlockMilestone.label}`
-                      : '熟练度里程碑已全部达成'}
-                  </span>
-                </div>
               </>
             ) : (
               <div className="tool-panel">
@@ -2316,13 +2493,10 @@ export function ScratchLegendGame() {
                     <em>已购买</em>
                   </div>
                 ) : trashCanUnlocked ? (
-                  <button
+                  <article
                     className={`tool-card available buyable ${
                       canPurchaseTrashCan ? '' : 'insufficient'
                     }`}
-                    type="button"
-                    onClick={buyTrashCan}
-                    disabled={!canPurchaseTrashCan}
                   >
                     <span className="tool-icon trash-preview" />
                     <div>
@@ -2334,31 +2508,34 @@ export function ScratchLegendGame() {
                         ? `$${TRASH_CAN_PRICE}`
                         : `还差 $${TRASH_CAN_PRICE - player.gold}`}
                     </em>
-                  </button>
+                    <ShopPurchaseButton
+                      price={TRASH_CAN_PRICE}
+                      onClick={buyTrashCan}
+                      disabled={!canPurchaseTrashCan}
+                    />
+                  </article>
                 ) : (
-                  <>
-                    <div className="tool-card locked placeholder">
-                      <span className="tool-lock">锁</span>
-                      <div>
-                        <strong>未解锁</strong>
-                        <span>熟练度达到 {TRASH_CAN_UNLOCK_AFTER_PLATES} 后解锁购买资格。</span>
-                      </div>
+                  <div className="tool-card locked placeholder">
+                    <span className="tool-lock">锁</span>
+                    <div>
+                      <strong>垃圾桶</strong>
+                      <span>熟练度达到 {TRASH_CAN_UNLOCK_AFTER_PLATES} 后解锁购买资格。</span>
                     </div>
-                    <div className="tool-card locked placeholder">
-                      <span className="tool-lock">锁</span>
-                      <div>
-                        <strong>未解锁</strong>
-                        <span>后续阶段开放更多辅助道具。</span>
-                      </div>
-                    </div>
-                    <div className="tool-card locked placeholder">
-                      <span className="tool-lock">锁</span>
-                      <div>
-                        <strong>未解锁</strong>
-                        <span>当前只保留占位，不提前实现后续功能。</span>
-                      </div>
-                    </div>
-                  </>
+                  </div>
+                )}
+                {(autoScratchMachineMilestoneUnlocked || autoScratchMachineUnlocked) && (
+                  <AutoScratchMachineTargetCard
+                    progress={autoScratchMachineProgress}
+                    unlocked={autoScratchMachineUnlocked}
+                    canBuy={canPurchaseAutoScratchMachine}
+                    onBuy={buyAutoScratchMachine}
+                  />
+                )}
+                {autoScratchMachineUnlocked && (
+                  <div className="automation-stage-five-entry">
+                    <strong>自动机已解锁</strong>
+                    <span>机器本体已购买，先保留在工具区。</span>
+                  </div>
                 )}
               </div>
             )}
@@ -2681,24 +2858,8 @@ export function ScratchLegendGame() {
               {unlockToast && (
                 <div className={`unlock-toast ${unlockToast}`}>
                   <div className={`unlock-icon ${unlockToast}`} />
-                  <strong>
-                    {unlockToast === 'scratch'
-                      ? '刮刮卡！'
-                      : unlockToast === 'triple-match'
-                        ? '已解锁'
-                        : unlockToast === 'upgrade'
-                          ? '已解锁'
-                          : '购买资格已解锁'}
-                  </strong>
-                  <span>
-                    {unlockToast === 'scratch'
-                      ? '成双入对已上架'
-                      : unlockToast === 'triple-match'
-                        ? '三连胜出'
-                        : unlockToast === 'upgrade'
-                          ? '升级工具'
-                          : `花费 $${TRASH_CAN_PRICE} 购买垃圾桶`}
-                  </span>
+                  <strong>{getUnlockToastTitle(unlockToast)}</strong>
+                  <span>{getUnlockToastDetail(unlockToast)}</span>
                 </div>
               )}
 
@@ -2915,9 +3076,9 @@ export function ScratchLegendGame() {
           {upgradeToolsVisible && (
             <section className="upgrade-tools-panel">
               <header>
-                <small>中期目标</small>
+                <small>工具</small>
                 <strong>升级工具</strong>
-                <span>把刮卡手感和后续成长目标接上。</span>
+                <span>把刮卡手感和中奖路线变顺手。</span>
               </header>
               <div className="upgrade-tool-list">
                 {UPGRADE_TOOLS_CONFIG.map((tool) => {
@@ -2943,13 +3104,11 @@ export function ScratchLegendGame() {
                         <em>
                           {tool.id === 'copper-coin' ? '力量' : '等级'} {toolLevel}
                         </em>
-                        <button
-                          type="button"
+                        <ShopPurchaseButton
+                          price={toolPrice}
                           onClick={() => buyUpgradeTool(tool)}
                           disabled={!buyable}
-                        >
-                          ${toolPrice}
-                        </button>
+                        />
                       </div>
                     </article>
                   );
