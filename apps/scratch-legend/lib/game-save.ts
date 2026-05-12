@@ -1,5 +1,11 @@
 import {
+  AUTO_SCRATCH_MACHINE_CONFIG,
+  advanceBasicSafeScratchCardProgress,
+  BASIC_SAFE_CARD_PRICE,
   createInitialUpgradeToolStates,
+  createScratchCard,
+  getScratchCardLevelProgress,
+  getScratchCardSettlementProgressKey,
   getUnlockMilestoneThreshold,
   getWorkLevel,
   INITIAL_GOLD,
@@ -8,6 +14,9 @@ import {
   type PlayerState,
   type ScratchCardProgressState,
   type ScratchCardState,
+  type ScratchCardType,
+  settleScratchCard,
+  shouldForceWrongScratchCardForLoan,
   shouldUnlockTrashCan,
   UNLOCK_MILESTONES,
   type UnlockMilestoneId,
@@ -63,9 +72,39 @@ export type ScratchLegendScratchCardsState = {
 
 export type ScratchLegendUpgradeToolsState = Record<UpgradeToolId, UpgradeToolState>;
 
+export type ScratchLegendAutoScratchMachineStatus =
+  | 'locked'
+  | 'idle'
+  | 'refilling'
+  | 'processing'
+  | 'paused'
+  | 'blocked';
+
+export type ScratchLegendAutoScratchMachineBlockReason =
+  | 'none'
+  | 'auto-buy-off'
+  | 'no-allowed-card-types'
+  | 'queue-full'
+  | 'not-enough-gold'
+  | 'reserve';
+
 export type ScratchLegendAutomationState = {
   // 阶段 5 入口：自动刮刮机是否已经购买解锁。
   autoScratchMachineUnlocked: boolean;
+  // 自动刮刮机当前运行状态。
+  autoScratchMachineStatus: ScratchLegendAutoScratchMachineStatus;
+  // 自动刮刮机等待处理的队列，第一版只自动购买和处理稳定票。
+  autoScratchQueue: ScratchCardState[];
+  // 当前正在被机器处理的卡片。
+  autoScratchCurrentCard: ScratchCardState | null;
+  // 当前处理进度，单位毫秒。
+  autoScratchProgressMs: number;
+  // 第一版默认开启自动购买。
+  autoScratchAutoBuyEnabled: boolean;
+  // 第一版只允许稳定票“成双入对”进入自动机。
+  autoScratchAllowedCardTypes: ScratchCardType[];
+  // 自动购买时至少保留的金币。
+  autoScratchMinReserveGold: number;
 };
 
 export type ScratchLegendWorkspaceState = {
@@ -151,6 +190,87 @@ function mergeUpgradeToolStates(
   ) as ScratchLegendUpgradeToolsState;
 }
 
+function createInitialAutomationState(): ScratchLegendAutomationState {
+  return {
+    autoScratchMachineUnlocked: false,
+    autoScratchMachineStatus: 'locked',
+    autoScratchQueue: [],
+    autoScratchCurrentCard: null,
+    autoScratchProgressMs: 0,
+    autoScratchAutoBuyEnabled: true,
+    autoScratchAllowedCardTypes: [AUTO_SCRATCH_MACHINE_CONFIG.base.defaultCardType],
+    autoScratchMinReserveGold: 0,
+  };
+}
+
+function normalizeAutomationCard(card?: ScratchCardState | null) {
+  return normalizeScratchCardState(card ?? null);
+}
+
+function normalizeAutoScratchMachineStatus(
+  unlocked: boolean,
+  status: ScratchLegendAutoScratchMachineStatus,
+  currentCard: ScratchCardState | null,
+) {
+  if (!unlocked) {
+    return 'locked';
+  }
+
+  if (status === 'locked') {
+    return currentCard ? 'processing' : 'idle';
+  }
+
+  return status;
+}
+
+function mergeAutomationState(
+  initialAutomation: ScratchLegendAutomationState,
+  partialAutomation?: DeepPartial<ScratchLegendAutomationState>,
+): ScratchLegendAutomationState {
+  const unlocked =
+    partialAutomation?.autoScratchMachineUnlocked ?? initialAutomation.autoScratchMachineUnlocked;
+  const queue =
+    partialAutomation?.autoScratchQueue
+      ?.map((card) => normalizeAutomationCard(card))
+      .filter(isScratchCardState) ?? initialAutomation.autoScratchQueue;
+  const currentCard = normalizeAutomationCard(partialAutomation?.autoScratchCurrentCard ?? null);
+  const allowedCardTypes =
+    partialAutomation?.autoScratchAllowedCardTypes === undefined
+      ? initialAutomation.autoScratchAllowedCardTypes
+      : Array.from(
+          new Set(
+            partialAutomation.autoScratchAllowedCardTypes.filter(
+              (cardType): cardType is ScratchCardType => cardType === 'basic-safe',
+            ),
+          ),
+        );
+  const status = partialAutomation?.autoScratchMachineStatus ?? (unlocked ? 'idle' : 'locked');
+
+  return {
+    ...initialAutomation,
+    ...partialAutomation,
+    autoScratchMachineUnlocked: unlocked,
+    autoScratchMachineStatus: normalizeAutoScratchMachineStatus(unlocked, status, currentCard),
+    autoScratchQueue: queue,
+    autoScratchCurrentCard: currentCard,
+    autoScratchProgressMs: Math.max(
+      0,
+      Math.floor(
+        partialAutomation?.autoScratchProgressMs ?? initialAutomation.autoScratchProgressMs,
+      ),
+    ),
+    autoScratchAutoBuyEnabled:
+      partialAutomation?.autoScratchAutoBuyEnabled ?? initialAutomation.autoScratchAutoBuyEnabled,
+    autoScratchAllowedCardTypes: allowedCardTypes,
+    autoScratchMinReserveGold: Math.max(
+      0,
+      Math.floor(
+        partialAutomation?.autoScratchMinReserveGold ?? initialAutomation.autoScratchMinReserveGold,
+      ),
+    ),
+  };
+}
+
 function normalizeLoanState(loan: LoanState) {
   const template = LOAN_CONFIG.templates.find((item) => item.id === loan.templateId);
 
@@ -202,9 +322,7 @@ export function createInitialScratchLegendSave(): ScratchLegendSave {
       },
     },
     upgradeTools: createInitialUpgradeToolStates(),
-    automation: {
-      autoScratchMachineUnlocked: false,
-    },
+    automation: createInitialAutomationState(),
     workspace: createInitialWorkspaceState(),
   };
 }
@@ -273,10 +391,7 @@ export function mergeScratchLegendSave(
       },
     },
     upgradeTools: mergeUpgradeToolStates(partialSave?.upgradeTools),
-    automation: {
-      ...initialSave.automation,
-      ...partialSave?.automation,
-    },
+    automation: mergeAutomationState(initialSave.automation, partialSave?.automation),
     workspace: {
       ...initialSave.workspace,
       ...partialSave?.workspace,
@@ -418,6 +533,7 @@ export function syncScratchLegendSave(save: ScratchLegendSave): ScratchLegendSav
   return {
     ...save,
     workspace,
+    automation: mergeAutomationState(createInitialAutomationState(), save.automation),
     player: {
       ...save.player,
       proficiency: normalizedProficiency,
@@ -453,4 +569,275 @@ export function getActiveScratchCard(save: ScratchLegendSave) {
     save.workspace.scratchCards.find((card) => card.id === save.workspace.activeScratchCardId) ??
     null
   );
+}
+
+type AdvanceAutoScratchMachineOptions = {
+  random?: () => number;
+  symbolRandom?: () => number;
+};
+
+function getAutoScratchMachineProcessingMs() {
+  return AUTO_SCRATCH_MACHINE_CONFIG.base.processingSeconds * 1000;
+}
+
+function getAutoScratchMachineOccupiedSlots(automation: ScratchLegendAutomationState) {
+  return automation.autoScratchQueue.length + (automation.autoScratchCurrentCard ? 1 : 0);
+}
+
+function getWorkspacePhaseAfterScratchCardAdded(workspace: ScratchLegendWorkspaceState) {
+  if (
+    (workspace.phase === 'cleaning' || workspace.phase === 'claimable') &&
+    workspace.activePlateId !== null
+  ) {
+    return workspace.phase;
+  }
+
+  if (workspace.phase === 'scratchingCard' && workspace.activeScratchCardId !== null) {
+    return workspace.phase;
+  }
+
+  return getDesktopPhase(workspace.plates.length, workspace.scratchCards.length + 1);
+}
+
+function getAutoScratchMachineStatusAfterTakeover(
+  automation: ScratchLegendAutomationState,
+  tookCurrentCard: boolean,
+  remainingQueue: ScratchCardState[],
+) {
+  if (automation.autoScratchMachineStatus === 'paused') {
+    return 'paused';
+  }
+
+  if (!tookCurrentCard && automation.autoScratchCurrentCard) {
+    return 'processing';
+  }
+
+  if (remainingQueue.length > 0) {
+    return 'idle';
+  }
+
+  return 'idle';
+}
+
+function canAutoScratchMachineBuyBasicSafeCard(save: ScratchLegendSave) {
+  const automation = save.automation;
+  const occupiedSlots = getAutoScratchMachineOccupiedSlots(automation);
+
+  return (
+    automation.autoScratchMachineUnlocked &&
+    automation.autoScratchAutoBuyEnabled &&
+    automation.autoScratchAllowedCardTypes.includes('basic-safe') &&
+    occupiedSlots < AUTO_SCRATCH_MACHINE_CONFIG.base.queueCapacity &&
+    save.player.gold - BASIC_SAFE_CARD_PRICE >= automation.autoScratchMinReserveGold
+  );
+}
+
+export function getAutoScratchMachineBlockReason(
+  save: ScratchLegendSave,
+): ScratchLegendAutoScratchMachineBlockReason {
+  const automation = save.automation;
+  const occupiedSlots = getAutoScratchMachineOccupiedSlots(automation);
+
+  if (
+    !automation.autoScratchMachineUnlocked ||
+    automation.autoScratchMachineStatus === 'paused' ||
+    automation.autoScratchCurrentCard ||
+    automation.autoScratchQueue.length > 0
+  ) {
+    return 'none';
+  }
+
+  if (!automation.autoScratchAutoBuyEnabled) {
+    return 'auto-buy-off';
+  }
+
+  if (!automation.autoScratchAllowedCardTypes.includes('basic-safe')) {
+    return 'no-allowed-card-types';
+  }
+
+  if (occupiedSlots >= AUTO_SCRATCH_MACHINE_CONFIG.base.queueCapacity) {
+    return 'queue-full';
+  }
+
+  if (save.player.gold < BASIC_SAFE_CARD_PRICE) {
+    return 'not-enough-gold';
+  }
+
+  if (save.player.gold - BASIC_SAFE_CARD_PRICE < automation.autoScratchMinReserveGold) {
+    return 'reserve';
+  }
+
+  return 'none';
+}
+
+function createAutoScratchMachineCard(
+  save: ScratchLegendSave,
+  options: AdvanceAutoScratchMachineOptions,
+) {
+  const cardType = AUTO_SCRATCH_MACHINE_CONFIG.base.defaultCardType;
+  const progressKey = getScratchCardSettlementProgressKey(cardType);
+  const progress = getScratchCardLevelProgress(
+    cardType,
+    save.scratchCards[progressKey].cardsSettled,
+  );
+  const scratchCardId = save.workspace.nextScratchCardId;
+
+  return createScratchCard(cardType, {
+    id: scratchCardId,
+    level: progress.level,
+    luckLevel: save.upgradeTools['scratch-luck']?.level ?? 0,
+    random: options.random,
+    symbolRandom: options.symbolRandom,
+    forcedTierId:
+      cardType === 'basic-safe' &&
+      shouldForceWrongScratchCardForLoan(save.loans.activeLoans, scratchCardId)
+        ? 'no-pair'
+        : undefined,
+  });
+}
+
+export function takeOverAutoScratchMachineCard(
+  save: ScratchLegendSave,
+  cardId: number,
+): ScratchLegendSave {
+  const automation = save.automation;
+  const currentCard = automation.autoScratchCurrentCard;
+  const tookCurrentCard = currentCard?.id === cardId;
+  const queuedCard = automation.autoScratchQueue.find((card) => card.id === cardId) ?? null;
+  const card = tookCurrentCard ? currentCard : queuedCard;
+
+  if (!automation.autoScratchMachineUnlocked || !card) {
+    return save;
+  }
+
+  const remainingQueue = automation.autoScratchQueue.filter((item) => item.id !== cardId);
+  const manualCard = {
+    ...card,
+    status: 'onTable',
+    scratchPoints: card.scratchPoints ?? [],
+  } satisfies ScratchCardState;
+
+  return syncScratchLegendSave({
+    ...save,
+    automation: {
+      ...automation,
+      autoScratchMachineStatus: getAutoScratchMachineStatusAfterTakeover(
+        automation,
+        tookCurrentCard,
+        remainingQueue,
+      ),
+      autoScratchQueue: remainingQueue,
+      autoScratchCurrentCard: tookCurrentCard ? null : automation.autoScratchCurrentCard,
+      autoScratchProgressMs: tookCurrentCard ? 0 : automation.autoScratchProgressMs,
+    },
+    workspace: {
+      ...save.workspace,
+      phase: getWorkspacePhaseAfterScratchCardAdded(save.workspace),
+      scratchCards: [...save.workspace.scratchCards, manualCard],
+    },
+  });
+}
+
+export function advanceAutoScratchMachineSave(
+  save: ScratchLegendSave,
+  elapsedMs: number,
+  options: AdvanceAutoScratchMachineOptions = {},
+): ScratchLegendSave {
+  const elapsed = Math.max(0, Math.floor(elapsedMs));
+  const automation = save.automation;
+
+  if (!automation.autoScratchMachineUnlocked) {
+    return {
+      ...save,
+      automation: {
+        ...automation,
+        autoScratchMachineStatus: 'locked',
+        autoScratchCurrentCard: null,
+        autoScratchProgressMs: 0,
+      },
+    };
+  }
+
+  if (automation.autoScratchMachineStatus === 'paused') {
+    return save;
+  }
+
+  if (automation.autoScratchCurrentCard) {
+    const nextProgressMs = automation.autoScratchProgressMs + elapsed;
+
+    if (nextProgressMs < getAutoScratchMachineProcessingMs()) {
+      return {
+        ...save,
+        automation: {
+          ...automation,
+          autoScratchMachineStatus: 'processing',
+          autoScratchProgressMs: nextProgressMs,
+        },
+      };
+    }
+
+    const currentCard = automation.autoScratchCurrentCard;
+    const progressKey = getScratchCardSettlementProgressKey(currentCard.type);
+
+    return syncScratchLegendSave({
+      ...save,
+      player: settleScratchCard(save.player, currentCard),
+      scratchCards: {
+        ...save.scratchCards,
+        [progressKey]: advanceBasicSafeScratchCardProgress(save.scratchCards[progressKey]),
+      },
+      automation: {
+        ...automation,
+        autoScratchMachineStatus: 'idle',
+        autoScratchCurrentCard: null,
+        autoScratchProgressMs: 0,
+      },
+    });
+  }
+
+  if (automation.autoScratchQueue.length > 0) {
+    const [nextCard, ...remainingQueue] = automation.autoScratchQueue;
+
+    return {
+      ...save,
+      automation: {
+        ...automation,
+        autoScratchMachineStatus: 'processing',
+        autoScratchQueue: remainingQueue,
+        autoScratchCurrentCard: nextCard ?? null,
+        autoScratchProgressMs: 0,
+      },
+    };
+  }
+
+  if (canAutoScratchMachineBuyBasicSafeCard(save)) {
+    const card = createAutoScratchMachineCard(save, options);
+
+    return {
+      ...save,
+      player: {
+        ...save.player,
+        gold: save.player.gold - card.price,
+      },
+      automation: {
+        ...automation,
+        autoScratchMachineStatus: 'refilling',
+        autoScratchQueue: [...automation.autoScratchQueue, card],
+      },
+      workspace: {
+        ...save.workspace,
+        nextScratchCardId: save.workspace.nextScratchCardId + 1,
+      },
+    };
+  }
+
+  return {
+    ...save,
+    automation: {
+      ...automation,
+      autoScratchMachineStatus:
+        getAutoScratchMachineBlockReason(save) === 'auto-buy-off' ? 'idle' : 'blocked',
+      autoScratchProgressMs: 0,
+    },
+  };
 }

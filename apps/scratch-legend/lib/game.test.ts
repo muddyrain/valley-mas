@@ -91,12 +91,15 @@ import {
 } from './game';
 import { scratchLegendConfig } from './game-config';
 import {
+  advanceAutoScratchMachineSave,
   createInitialScratchLegendSave,
   getActiveScratchCard,
   getActiveWorkPlate,
+  getAutoScratchMachineBlockReason,
   isUnlockMilestoneUnlocked,
   mergeScratchLegendSave,
   syncScratchLegendSave,
+  takeOverAutoScratchMachineCard,
 } from './game-save';
 
 function assertNearlyEqual(actual: number, expected: number) {
@@ -1291,6 +1294,354 @@ test('allows buying the auto scratch machine only after proficiency and gold are
     }),
     false,
   );
+});
+
+test('auto scratch machine buys a basic safe card into its queue', () => {
+  const save = mergeScratchLegendSave({
+    player: {
+      ...createInitialScratchLegendSave().player,
+      gold: 25,
+      proficiency: getUnlockMilestoneThreshold('auto-scratcher'),
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+    },
+  });
+
+  const nextSave = advanceAutoScratchMachineSave(save, 1000, {
+    random: () => 0.99,
+    symbolRandom: () => 0.25,
+  });
+
+  assert.equal(nextSave.player.gold, 15);
+  assert.equal(nextSave.automation.autoScratchMachineStatus, 'refilling');
+  assert.equal(nextSave.automation.autoScratchQueue.length, 1);
+  assert.equal(nextSave.automation.autoScratchQueue[0]?.type, 'basic-safe');
+  assert.equal(nextSave.automation.autoScratchQueue[0]?.status, 'onTable');
+  assert.equal(nextSave.workspace.scratchCards.length, 0);
+  assert.equal(nextSave.workspace.nextScratchCardId, save.workspace.nextScratchCardId + 1);
+});
+
+test('normalizes unlocked auto scratch machine away from locked status', () => {
+  const save = mergeScratchLegendSave({
+    automation: {
+      autoScratchMachineUnlocked: true,
+      autoScratchMachineStatus: 'locked',
+    },
+  });
+
+  assert.equal(save.automation.autoScratchMachineStatus, 'idle');
+
+  const syncedSave = syncScratchLegendSave({
+    ...save,
+    automation: {
+      ...save.automation,
+      autoScratchMachineStatus: 'locked',
+    },
+  });
+
+  assert.equal(syncedSave.automation.autoScratchMachineStatus, 'idle');
+});
+
+test('normalizes missing auto scratch machine ticket config to runnable defaults', () => {
+  const save = mergeScratchLegendSave({
+    player: {
+      ...createInitialScratchLegendSave().player,
+      gold: 25,
+      proficiency: getUnlockMilestoneThreshold('auto-scratcher'),
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+      autoScratchAutoBuyEnabled: false,
+      autoScratchMinReserveGold: 999,
+    },
+  });
+
+  assert.equal(save.automation.autoScratchAutoBuyEnabled, false);
+  assert.deepEqual(save.automation.autoScratchAllowedCardTypes, ['basic-safe']);
+  assert.equal(save.automation.autoScratchMinReserveGold, 999);
+
+  const nextSave = advanceAutoScratchMachineSave(save, 1000, {
+    random: () => 0.99,
+    symbolRandom: () => 0.25,
+  });
+
+  assert.equal(nextSave.player.gold, 25);
+  assert.equal(nextSave.automation.autoScratchMachineStatus, 'idle');
+  assert.equal(nextSave.automation.autoScratchQueue.length, 0);
+});
+
+test('auto scratch machine can disable every allowed ticket type', () => {
+  const save = mergeScratchLegendSave({
+    player: {
+      ...createInitialScratchLegendSave().player,
+      gold: 25,
+      proficiency: getUnlockMilestoneThreshold('auto-scratcher'),
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+      autoScratchAllowedCardTypes: [],
+    },
+  });
+
+  assert.deepEqual(save.automation.autoScratchAllowedCardTypes, []);
+  assert.equal(getAutoScratchMachineBlockReason(save), 'no-allowed-card-types');
+
+  const nextSave = advanceAutoScratchMachineSave(save, 1000, {
+    random: () => 0.99,
+    symbolRandom: () => 0.25,
+  });
+
+  assert.equal(nextSave.player.gold, 25);
+  assert.equal(nextSave.automation.autoScratchMachineStatus, 'blocked');
+  assert.equal(nextSave.automation.autoScratchQueue.length, 0);
+});
+
+test('auto scratch machine reports specific purchase block reasons', () => {
+  const notEnoughGoldSave = mergeScratchLegendSave({
+    player: {
+      ...createInitialScratchLegendSave().player,
+      gold: BASIC_SAFE_CARD_PRICE - 1,
+      proficiency: getUnlockMilestoneThreshold('auto-scratcher'),
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+    },
+  });
+  const reserveBlockedSave = mergeScratchLegendSave({
+    player: {
+      ...createInitialScratchLegendSave().player,
+      gold: BASIC_SAFE_CARD_PRICE + 5,
+      proficiency: getUnlockMilestoneThreshold('auto-scratcher'),
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+      autoScratchMinReserveGold: 10,
+    },
+  });
+  const autoBuyOffSave = mergeScratchLegendSave({
+    player: {
+      ...createInitialScratchLegendSave().player,
+      gold: 40,
+      proficiency: getUnlockMilestoneThreshold('auto-scratcher'),
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+      autoScratchAutoBuyEnabled: false,
+    },
+  });
+
+  assert.equal(getAutoScratchMachineBlockReason(notEnoughGoldSave), 'not-enough-gold');
+  assert.equal(getAutoScratchMachineBlockReason(reserveBlockedSave), 'reserve');
+  assert.equal(getAutoScratchMachineBlockReason(autoBuyOffSave), 'auto-buy-off');
+});
+
+test('auto scratch machine respects minimum reserve gold before buying', () => {
+  const blockedSave = mergeScratchLegendSave({
+    player: {
+      ...createInitialScratchLegendSave().player,
+      gold: 105,
+      proficiency: getUnlockMilestoneThreshold('auto-scratcher'),
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+      autoScratchMinReserveGold: 100,
+    },
+  });
+
+  const nextBlockedSave = advanceAutoScratchMachineSave(blockedSave, 1000);
+
+  assert.equal(nextBlockedSave.player.gold, 105);
+  assert.equal(nextBlockedSave.automation.autoScratchMachineStatus, 'blocked');
+  assert.equal(nextBlockedSave.automation.autoScratchQueue.length, 0);
+
+  const buyableSave = mergeScratchLegendSave({
+    player: {
+      ...createInitialScratchLegendSave().player,
+      gold: 110,
+      proficiency: getUnlockMilestoneThreshold('auto-scratcher'),
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+      autoScratchMinReserveGold: 100,
+    },
+  });
+
+  const nextBuyableSave = advanceAutoScratchMachineSave(buyableSave, 1000, {
+    random: () => 0.99,
+    symbolRandom: () => 0.25,
+  });
+
+  assert.equal(nextBuyableSave.player.gold, 100);
+  assert.equal(nextBuyableSave.automation.autoScratchMachineStatus, 'refilling');
+  assert.equal(nextBuyableSave.automation.autoScratchQueue.length, 1);
+});
+
+test('auto scratch machine pause freezes current processing progress', () => {
+  const currentCard = createScratchCard('basic-safe', {
+    id: 8,
+    level: 0,
+    forcedTierId: 'pair-fire',
+  });
+  const save = mergeScratchLegendSave({
+    player: {
+      ...createInitialScratchLegendSave().player,
+      gold: 40,
+      proficiency: getUnlockMilestoneThreshold('auto-scratcher'),
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+      autoScratchMachineStatus: 'paused',
+      autoScratchCurrentCard: currentCard,
+      autoScratchProgressMs: 3000,
+    },
+  });
+
+  const nextSave = advanceAutoScratchMachineSave(save, 4000);
+
+  assert.equal(nextSave.automation.autoScratchMachineStatus, 'paused');
+  assert.equal(nextSave.automation.autoScratchCurrentCard?.id, currentCard.id);
+  assert.equal(nextSave.automation.autoScratchProgressMs, 3000);
+  assert.equal(nextSave.player.gold, 40);
+  assert.equal(nextSave.player.cardsScratched, 0);
+});
+
+test('auto scratch machine processes queued cards when auto buy is disabled', () => {
+  const queuedCard = createScratchCard('basic-safe', {
+    id: 9,
+    level: 0,
+    forcedTierId: 'pair-fire',
+  });
+  const save = mergeScratchLegendSave({
+    player: {
+      ...createInitialScratchLegendSave().player,
+      gold: 40,
+      proficiency: getUnlockMilestoneThreshold('auto-scratcher'),
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+      autoScratchAutoBuyEnabled: false,
+      autoScratchQueue: [queuedCard],
+    },
+  });
+
+  const startedSave = advanceAutoScratchMachineSave(save, 0);
+
+  assert.equal(startedSave.automation.autoScratchAutoBuyEnabled, false);
+  assert.equal(startedSave.automation.autoScratchMachineStatus, 'processing');
+  assert.equal(startedSave.automation.autoScratchCurrentCard?.id, queuedCard.id);
+});
+
+test('auto scratch machine lets a queued card return to manual play', () => {
+  const queuedCard = createScratchCard('basic-safe', {
+    id: 11,
+    level: 0,
+    forcedTierId: 'pair-bag',
+  });
+  const save = mergeScratchLegendSave({
+    player: {
+      ...createInitialScratchLegendSave().player,
+      gold: 40,
+      proficiency: getUnlockMilestoneThreshold('auto-scratcher'),
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+      autoScratchMachineStatus: 'refilling',
+      autoScratchQueue: [queuedCard],
+    },
+  });
+
+  const nextSave = takeOverAutoScratchMachineCard(save, queuedCard.id);
+
+  assert.equal(nextSave.automation.autoScratchQueue.length, 0);
+  assert.equal(nextSave.automation.autoScratchCurrentCard, null);
+  assert.equal(nextSave.workspace.scratchCards.length, 1);
+  assert.equal(nextSave.workspace.scratchCards[0]?.id, queuedCard.id);
+  assert.equal(nextSave.workspace.scratchCards[0]?.result.tierId, queuedCard.result.tierId);
+  assert.equal(nextSave.workspace.scratchCards[0]?.status, 'onTable');
+  assert.equal(nextSave.workspace.phase, 'scratchCardSpawned');
+  assert.equal(nextSave.player.cardsScratched, 0);
+  assert.equal(nextSave.player.gold, 40);
+});
+
+test('auto scratch machine lets the current card return to manual play without settling', () => {
+  const currentCard = createScratchCard('basic-safe', {
+    id: 12,
+    level: 0,
+    forcedTierId: 'pair-fire',
+  });
+  const queuedCard = createScratchCard('basic-safe', {
+    id: 13,
+    level: 0,
+    forcedTierId: 'pair-cash',
+  });
+  const save = mergeScratchLegendSave({
+    player: {
+      ...createInitialScratchLegendSave().player,
+      gold: 40,
+      proficiency: getUnlockMilestoneThreshold('auto-scratcher'),
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+      autoScratchMachineStatus: 'processing',
+      autoScratchCurrentCard: currentCard,
+      autoScratchQueue: [queuedCard],
+      autoScratchProgressMs: 5000,
+    },
+  });
+
+  const nextSave = takeOverAutoScratchMachineCard(save, currentCard.id);
+
+  assert.equal(nextSave.automation.autoScratchCurrentCard, null);
+  assert.equal(nextSave.automation.autoScratchProgressMs, 0);
+  assert.equal(nextSave.automation.autoScratchQueue.length, 1);
+  assert.equal(nextSave.automation.autoScratchQueue[0]?.id, queuedCard.id);
+  assert.equal(nextSave.automation.autoScratchMachineStatus, 'idle');
+  assert.equal(nextSave.workspace.scratchCards.length, 1);
+  assert.equal(nextSave.workspace.scratchCards[0]?.id, currentCard.id);
+  assert.equal(nextSave.workspace.scratchCards[0]?.result.tierId, currentCard.result.tierId);
+  assert.equal(nextSave.player.gold, 40);
+  assert.equal(nextSave.player.cardsScratched, 0);
+  assert.equal(nextSave.scratchCards.basicSafe.cardsSettled, 0);
+});
+
+test('auto scratch machine processes queued cards over time before settlement', () => {
+  const queuedCard = createScratchCard('basic-safe', {
+    id: 7,
+    level: 0,
+    forcedTierId: 'pair-fire',
+  });
+  const save = mergeScratchLegendSave({
+    player: {
+      ...createInitialScratchLegendSave().player,
+      gold: 40,
+      proficiency: getUnlockMilestoneThreshold('auto-scratcher'),
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+      autoScratchQueue: [queuedCard],
+    },
+  });
+
+  const startedSave = advanceAutoScratchMachineSave(save, 0);
+  assert.equal(startedSave.automation.autoScratchMachineStatus, 'processing');
+  assert.equal(startedSave.automation.autoScratchCurrentCard?.id, queuedCard.id);
+  assert.equal(startedSave.automation.autoScratchQueue.length, 0);
+  assert.equal(startedSave.player.cardsScratched, 0);
+
+  const halfwaySave = advanceAutoScratchMachineSave(startedSave, 4000);
+  assert.equal(halfwaySave.automation.autoScratchMachineStatus, 'processing');
+  assert.equal(halfwaySave.automation.autoScratchProgressMs, 4000);
+  assert.equal(halfwaySave.player.gold, 40);
+  assert.equal(halfwaySave.player.cardsScratched, 0);
+
+  const settledSave = advanceAutoScratchMachineSave(halfwaySave, 4000);
+  assert.equal(settledSave.automation.autoScratchMachineStatus, 'idle');
+  assert.equal(settledSave.automation.autoScratchCurrentCard, null);
+  assert.equal(settledSave.automation.autoScratchProgressMs, 0);
+  assert.equal(settledSave.player.gold, 50);
+  assert.equal(settledSave.player.cardsScratched, 1);
+  assert.equal(settledSave.scratchCards.basicSafe.cardsSettled, 1);
 });
 
 test('keeps the top progress on proficiency after upgrade tools unlock', () => {

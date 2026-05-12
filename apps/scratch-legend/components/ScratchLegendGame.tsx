@@ -96,9 +96,14 @@ import {
 } from '@/lib/game';
 import { scratchLegendConfig } from '@/lib/game-config';
 import {
+  advanceAutoScratchMachineSave,
   getActiveScratchCard,
   getActiveWorkPlate,
+  getAutoScratchMachineBlockReason,
   isUnlockMilestoneUnlocked,
+  type ScratchLegendAutoScratchMachineBlockReason,
+  type ScratchLegendAutoScratchMachineStatus,
+  takeOverAutoScratchMachineCard,
 } from '@/lib/game-save';
 import { useScratchLegendStore } from '@/lib/game-store';
 
@@ -107,6 +112,10 @@ const DESKTOP_PLATE_SIZE = scratchLegendConfig.work.plate.desktopSize;
 const TABLETOP_SCRATCH_CARD_SIZE = { width: 108, height: 76 } as const;
 const PLATE_ENTER_ANIMATION_MS = scratchLegendConfig.work.plate.enterAnimationMs;
 const LUCKY_CARD_EFFECT_MS = 1100;
+const AUTO_SCRATCH_TICK_MS = 1000;
+const AUTO_SCRATCH_PURCHASE_EFFECT_WINDOW_MS = 120;
+const AUTO_SCRATCH_AFTER_SETTLEMENT_VISUAL_HOLD_MS = 680;
+const AUTO_SCRATCH_RESERVE_OPTIONS = [0, 100, 500] as const;
 const PLATE_DRAG_HOLD_MS = scratchLegendConfig.work.drag.holdMs;
 const PLATE_DRAG_MOVE_THRESHOLD = scratchLegendConfig.work.drag.moveThreshold;
 
@@ -148,6 +157,19 @@ type PhoneNoticeType = 'loan' | 'scratch' | 'upgrade-tools' | 'triple-match' | '
 type GoldEffectEvent = GoldChangeEffect & {
   id: number;
   source: GoldEffectSource;
+};
+
+type PendingAutoScratchPurchaseEffect = {
+  previousGold: number;
+  nextGold: number;
+};
+
+type AutoScratchSettlementFeedback = {
+  id: number;
+  title: string;
+  label: string;
+  payout: number;
+  isWinning: boolean;
 };
 
 const SCRATCH_SYMBOL_LABELS: Record<ScratchCardSymbol, string> = {
@@ -272,6 +294,76 @@ function AutoScratchMachineTargetCard({
         />
       )}
     </article>
+  );
+}
+
+const AUTO_SCRATCH_MACHINE_STATUS_LABELS: Record<ScratchLegendAutoScratchMachineStatus, string> = {
+  locked: '未解锁',
+  idle: '待命',
+  refilling: '补票中',
+  processing: '处理中',
+  paused: '已暂停',
+  blocked: '阻塞',
+};
+
+const AUTO_SCRATCH_MACHINE_BLOCK_REASON_LABELS: Record<
+  ScratchLegendAutoScratchMachineBlockReason,
+  string
+> = {
+  none: '自动购买稳定票，处理完成后自动结算',
+  'auto-buy-off': '自动购买已关闭，队列清空后待命',
+  'no-allowed-card-types': '没有允许票种，打开成双入对后才会补票',
+  'queue-full': '队列已满，等空位后继续补票',
+  'not-enough-gold': `金币不足，至少需要 $${BASIC_SAFE_CARD_PRICE}`,
+  reserve: '购买会低于保留金币',
+};
+
+function AutoScratchMachineTableUnit({
+  status,
+  currentCard,
+  queue,
+  progressRatio,
+  capacity,
+}: {
+  status: ScratchLegendAutoScratchMachineStatus;
+  currentCard: ScratchCardState | null;
+  queue: readonly ScratchCardState[];
+  progressRatio: number;
+  capacity: number;
+}) {
+  const visibleCards = currentCard ? [currentCard, ...queue] : [...queue];
+
+  return (
+    <div className={`auto-scratch-machine-unit ${status}`}>
+      <div className="auto-machine-body" aria-hidden="true">
+        <span className="auto-machine-slot" />
+        <span className="auto-machine-light" />
+      </div>
+      <div className="auto-machine-copy">
+        <strong>自动刮刮机</strong>
+        <span>{AUTO_SCRATCH_MACHINE_STATUS_LABELS[status]}</span>
+      </div>
+      <div className="auto-machine-queue">
+        {Array.from({ length: capacity }).map((_, index) => {
+          const card = visibleCards[index];
+          const isCurrent = Boolean(currentCard && card?.id === currentCard.id);
+
+          return (
+            <span
+              className={`auto-machine-queue-slot ${card ? 'filled' : ''} ${
+                isCurrent ? 'current' : ''
+              }`}
+              key={index}
+            >
+              {card ? getScratchCardDisplay(card.type).miniTitle : '空位'}
+            </span>
+          );
+        })}
+      </div>
+      <div className="auto-machine-progress" aria-hidden="true">
+        <span style={{ width: `${Math.round(progressRatio * 100)}%` }} />
+      </div>
+    </div>
   );
 }
 
@@ -433,6 +525,9 @@ export function ScratchLegendGame() {
   const [goldRolling, setGoldRolling] = useState(false);
   const [goldEffectEvents, setGoldEffectEvents] = useState<GoldEffectEvent[]>([]);
   const [coinEffectPulse, setCoinEffectPulse] = useState<GoldEffectEvent | null>(null);
+  const [autoScratchSettlementFeedback, setAutoScratchSettlementFeedback] =
+    useState<AutoScratchSettlementFeedback | null>(null);
+  const [autoScratchVisualHoldActive, setAutoScratchVisualHoldActive] = useState(false);
   const [revealedScratchSlots, setRevealedScratchSlots] = useState<number[]>([]);
   const [flashingScratchSlots, setFlashingScratchSlots] = useState<number[]>([]);
   const [settlementHighlightSlots, setSettlementHighlightSlots] = useState<number[]>([]);
@@ -449,6 +544,10 @@ export function ScratchLegendGame() {
   const unlockToastTimerRef = useRef<number | null>(null);
   const loanRepaymentTimerRef = useRef<number | null>(null);
   const goldEffectTimerRefs = useRef<number[]>([]);
+  const autoScratchPurchaseEffectTimerRef = useRef<number | null>(null);
+  const pendingAutoScratchPurchaseEffectRef = useRef<PendingAutoScratchPurchaseEffect | null>(null);
+  const autoScratchSettlementFeedbackIdRef = useRef(0);
+  const autoScratchVisualHoldTimerRef = useRef<number | null>(null);
   const scratchSlotFlashTimerRefs = useRef<number[]>([]);
   const settlementHighlightTimerRef = useRef<number | null>(null);
   const goldRollFrameRef = useRef<number | null>(null);
@@ -505,6 +604,66 @@ export function ScratchLegendGame() {
   const upgradeToolsMessageDismissed = save.notices.upgradeToolsMessageDismissed;
   const tripleMatchMessageDismissed = save.notices.tripleMatchMessageDismissed;
   const autoScratchMachineUnlocked = save.automation.autoScratchMachineUnlocked;
+  const autoScratchMachineStatus = save.automation.autoScratchMachineStatus;
+  const autoScratchMachineQueue = save.automation.autoScratchQueue;
+  const autoScratchCurrentCard = save.automation.autoScratchCurrentCard;
+  const autoScratchAutoBuyEnabled = save.automation.autoScratchAutoBuyEnabled;
+  const autoScratchAllowedCardTypes = save.automation.autoScratchAllowedCardTypes;
+  const autoScratchMinReserveGold = save.automation.autoScratchMinReserveGold;
+  const autoScratchMachineBlockReason = getAutoScratchMachineBlockReason(save);
+  const autoScratchAllowedBasicSafe = autoScratchAllowedCardTypes.includes('basic-safe');
+  const autoScratchProcessingMs = AUTO_SCRATCH_MACHINE_CONFIG.base.processingSeconds * 1000;
+  const autoScratchProgressRatio = autoScratchCurrentCard
+    ? Math.min(1, save.automation.autoScratchProgressMs / autoScratchProcessingMs)
+    : 0;
+  const autoScratchTakeoverCards = [
+    ...(autoScratchCurrentCard
+      ? [
+          {
+            card: autoScratchCurrentCard,
+            label: `处理中 ${Math.round(autoScratchProgressRatio * 100)}%`,
+          },
+        ]
+      : []),
+    ...autoScratchMachineQueue.map((card, index) => ({
+      card,
+      label: `队列 ${index + 1}`,
+    })),
+  ];
+  const autoScratchTickDelayMs = (() => {
+    if (
+      !autoScratchMachineUnlocked ||
+      autoScratchMachineStatus === 'paused' ||
+      (autoScratchVisualHoldActive && !autoScratchCurrentCard)
+    ) {
+      return null;
+    }
+
+    if (autoScratchCurrentCard) {
+      return Math.max(
+        0,
+        Math.min(
+          AUTO_SCRATCH_TICK_MS,
+          autoScratchProcessingMs - save.automation.autoScratchProgressMs,
+        ),
+      );
+    }
+
+    if (
+      autoScratchMachineQueue.length > 0 ||
+      (autoScratchMachineStatus === 'idle' && autoScratchAutoBuyEnabled) ||
+      autoScratchMachineStatus === 'refilling' ||
+      (autoScratchMachineStatus === 'blocked' &&
+        autoScratchAutoBuyEnabled &&
+        autoScratchAllowedBasicSafe &&
+        save.player.gold - BASIC_SAFE_CARD_PRICE >= autoScratchMinReserveGold)
+    ) {
+      return 0;
+    }
+
+    return null;
+  })();
+  const autoScratchTickScheduleKey = `${autoScratchMachineStatus}:${autoScratchMachineQueue.length}:${autoScratchAutoBuyEnabled}:${autoScratchAllowedCardTypes.join(',')}:${autoScratchMinReserveGold}`;
   const scratchModeUnlocked = isUnlockMilestoneUnlocked(save, SCRATCH_MODE_MILESTONE_ID);
   const upgradeToolsUnlocked = isUnlockMilestoneUnlocked(save, UPGRADE_TOOLS_MILESTONE_ID);
   const tripleMatchUnlocked = isUnlockMilestoneUnlocked(save, TRIPLE_MATCH_CARD_MILESTONE_ID);
@@ -563,6 +722,49 @@ export function ScratchLegendGame() {
   const scratchCardCatalogItemByType = new Map(
     scratchCardCatalogItems.map((item) => [item.type, item]),
   );
+  const autoScratchTicketFilterItems = scratchCardCatalogItems
+    .filter((item) => item.visible && item.unlocked)
+    .map((item) => {
+      const display = getScratchCardDisplay(item.type);
+
+      return {
+        type: item.type,
+        title: display.title,
+        miniTitle: display.miniTitle,
+        enabled: item.type === 'basic-safe' && autoScratchAllowedBasicSafe,
+        configurable: item.type === 'basic-safe',
+        unavailableLabel:
+          item.type === 'triple-match'
+            ? '需要机器力量'
+            : item.type === 'risk-peek'
+              ? '风险票手动'
+              : '已关闭',
+      };
+    });
+  const autoScratchMachineDetail = (() => {
+    if (autoScratchCurrentCard) {
+      const currentCardTitle = getScratchCardDisplay(autoScratchCurrentCard.type).title;
+      const occupiedSlots = autoScratchMachineQueue.length + (autoScratchCurrentCard ? 1 : 0);
+
+      return occupiedSlots >= AUTO_SCRATCH_MACHINE_CONFIG.base.queueCapacity
+        ? `正在处理${currentCardTitle}，队列已满`
+        : `正在处理${currentCardTitle}`;
+    }
+
+    if (autoScratchMachineQueue.length > 0) {
+      return `队列中还有 ${autoScratchMachineQueue.length} 张稳定票`;
+    }
+
+    if (autoScratchMachineStatus === 'paused') {
+      return '已暂停，点击继续后接着处理';
+    }
+
+    if (autoScratchMachineBlockReason === 'reserve') {
+      return `${AUTO_SCRATCH_MACHINE_BLOCK_REASON_LABELS.reserve} $${autoScratchMinReserveGold}`;
+    }
+
+    return AUTO_SCRATCH_MACHINE_BLOCK_REASON_LABELS[autoScratchMachineBlockReason];
+  })();
   const activeScratchCardPrizePool = useMemo(
     () =>
       getScratchCardPrizePoolForLevel(
@@ -767,6 +969,14 @@ export function ScratchLegendGame() {
         window.clearTimeout(timer);
       }
 
+      if (autoScratchPurchaseEffectTimerRef.current) {
+        window.clearTimeout(autoScratchPurchaseEffectTimerRef.current);
+      }
+
+      if (autoScratchVisualHoldTimerRef.current) {
+        window.clearTimeout(autoScratchVisualHoldTimerRef.current);
+      }
+
       for (const timer of scratchSlotFlashTimerRefs.current) {
         window.clearTimeout(timer);
       }
@@ -938,31 +1148,184 @@ export function ScratchLegendGame() {
     return 'idle';
   }
 
-  function triggerGoldEffect(previousGold: number, nextGold: number, source: GoldEffectSource) {
-    const effect = getGoldChangeEffect(previousGold, nextGold, source);
+  const triggerGoldEffect = useCallback(
+    (previousGold: number, nextGold: number, source: GoldEffectSource) => {
+      const effect = getGoldChangeEffect(previousGold, nextGold, source);
 
-    if (!effect) {
+      if (!effect) {
+        return;
+      }
+
+      const event = {
+        ...effect,
+        id: goldEffectIdRef.current + 1,
+        source,
+      };
+      goldEffectIdRef.current = event.id;
+      setCoinEffectPulse(event);
+      setGoldEffectEvents((current) => [...current.slice(-(GOLD_EFFECT_MAX_EVENTS - 1)), event]);
+
+      const removeTimer = window.setTimeout(() => {
+        setGoldEffectEvents((current) => current.filter((item) => item.id !== event.id));
+      }, GOLD_EFFECT_DURATION_MS);
+      const pulseTimer = window.setTimeout(() => {
+        setCoinEffectPulse((current) => (current?.id === event.id ? null : current));
+      }, GOLD_EFFECT_DURATION_MS);
+
+      goldEffectTimerRefs.current.push(removeTimer, pulseTimer);
+    },
+    [],
+  );
+
+  const flushAutoScratchPurchaseGoldEffect = useCallback(() => {
+    const pendingEffect = pendingAutoScratchPurchaseEffectRef.current;
+    pendingAutoScratchPurchaseEffectRef.current = null;
+    autoScratchPurchaseEffectTimerRef.current = null;
+
+    if (!pendingEffect) {
       return;
     }
 
-    const event = {
-      ...effect,
-      id: goldEffectIdRef.current + 1,
-      source,
+    triggerGoldEffect(pendingEffect.previousGold, pendingEffect.nextGold, 'scratch-card-purchase');
+  }, [triggerGoldEffect]);
+
+  const queueAutoScratchPurchaseGoldEffect = useCallback(
+    (previousGold: number, nextGold: number) => {
+      if (nextGold >= previousGold) {
+        return;
+      }
+
+      const pendingEffect = pendingAutoScratchPurchaseEffectRef.current;
+      pendingAutoScratchPurchaseEffectRef.current = pendingEffect
+        ? {
+            previousGold: pendingEffect.previousGold,
+            nextGold,
+          }
+        : {
+            previousGold,
+            nextGold,
+          };
+
+      if (autoScratchPurchaseEffectTimerRef.current) {
+        window.clearTimeout(autoScratchPurchaseEffectTimerRef.current);
+      }
+
+      autoScratchPurchaseEffectTimerRef.current = window.setTimeout(
+        flushAutoScratchPurchaseGoldEffect,
+        AUTO_SCRATCH_PURCHASE_EFFECT_WINDOW_MS,
+      );
+    },
+    [flushAutoScratchPurchaseGoldEffect],
+  );
+
+  const showAutoScratchSettlementFeedback = useCallback((card: ScratchCardState) => {
+    autoScratchSettlementFeedbackIdRef.current += 1;
+    const display = getScratchCardDisplay(card.type);
+
+    setAutoScratchSettlementFeedback({
+      id: autoScratchSettlementFeedbackIdRef.current,
+      title: display.title,
+      label: card.result.label,
+      payout: card.result.isWinning && !card.result.penaltyTriggered ? card.result.payout : 0,
+      isWinning: card.result.isWinning && !card.result.penaltyTriggered,
+    });
+  }, []);
+
+  const holdAutoScratchNextVisualBeat = useCallback(() => {
+    if (autoScratchVisualHoldTimerRef.current) {
+      window.clearTimeout(autoScratchVisualHoldTimerRef.current);
+    }
+
+    setAutoScratchVisualHoldActive(true);
+    autoScratchVisualHoldTimerRef.current = window.setTimeout(() => {
+      setAutoScratchVisualHoldActive(false);
+      autoScratchVisualHoldTimerRef.current = null;
+    }, AUTO_SCRATCH_AFTER_SETTLEMENT_VISUAL_HOLD_MS);
+  }, []);
+
+  useEffect(() => {
+    if (!autoScratchMachineUnlocked || autoScratchTickDelayMs === null) {
+      return;
+    }
+
+    const scheduleKey = autoScratchTickScheduleKey;
+    const elapsedMs = autoScratchCurrentCard
+      ? Math.max(
+          0,
+          Math.min(
+            AUTO_SCRATCH_TICK_MS,
+            autoScratchProcessingMs - save.automation.autoScratchProgressMs,
+          ),
+        )
+      : 0;
+
+    const timer = window.setTimeout(() => {
+      if (scheduleKey !== autoScratchTickScheduleKey) {
+        return;
+      }
+
+      const goldEffects: {
+        previousGold: number;
+        nextGold: number;
+        source: GoldEffectSource;
+      }[] = [];
+      const completedCards: ScratchCardState[] = [];
+
+      updateSave((current) => {
+        const nextSave = advanceAutoScratchMachineSave(current, elapsedMs);
+        const completedCard = current.automation.autoScratchCurrentCard;
+
+        if (completedCard && nextSave.player.cardsScratched > current.player.cardsScratched) {
+          completedCards.push(completedCard);
+        }
+
+        if (nextSave.player.gold !== current.player.gold) {
+          goldEffects.push({
+            previousGold: current.player.gold,
+            nextGold: nextSave.player.gold,
+            source:
+              nextSave.player.gold > current.player.gold
+                ? 'scratch-prize'
+                : 'scratch-card-purchase',
+          });
+        }
+
+        return nextSave;
+      });
+
+      const goldEffect = goldEffects[0];
+      const completedCard = completedCards[0];
+
+      if (completedCard) {
+        showAutoScratchSettlementFeedback(completedCard);
+        holdAutoScratchNextVisualBeat();
+      }
+
+      if (goldEffect) {
+        if (goldEffect.source === 'scratch-card-purchase') {
+          queueAutoScratchPurchaseGoldEffect(goldEffect.previousGold, goldEffect.nextGold);
+        } else {
+          triggerGoldEffect(goldEffect.previousGold, goldEffect.nextGold, goldEffect.source);
+        }
+      }
+    }, autoScratchTickDelayMs);
+
+    return () => {
+      window.clearTimeout(timer);
     };
-    goldEffectIdRef.current = event.id;
-    setCoinEffectPulse(event);
-    setGoldEffectEvents((current) => [...current.slice(-(GOLD_EFFECT_MAX_EVENTS - 1)), event]);
-
-    const removeTimer = window.setTimeout(() => {
-      setGoldEffectEvents((current) => current.filter((item) => item.id !== event.id));
-    }, GOLD_EFFECT_DURATION_MS);
-    const pulseTimer = window.setTimeout(() => {
-      setCoinEffectPulse((current) => (current?.id === event.id ? null : current));
-    }, GOLD_EFFECT_DURATION_MS);
-
-    goldEffectTimerRefs.current.push(removeTimer, pulseTimer);
-  }
+  }, [
+    autoScratchCurrentCard,
+    autoScratchMachineUnlocked,
+    autoScratchProcessingMs,
+    autoScratchTickDelayMs,
+    autoScratchTickScheduleKey,
+    queueAutoScratchPurchaseGoldEffect,
+    holdAutoScratchNextVisualBeat,
+    save.automation.autoScratchProgressMs,
+    showAutoScratchSettlementFeedback,
+    triggerGoldEffect,
+    updateSave,
+  ]);
 
   function resetScratchRevealEffects() {
     if (settlementHighlightTimerRef.current) {
@@ -2129,6 +2492,188 @@ export function ScratchLegendGame() {
         automation: {
           ...current.automation,
           autoScratchMachineUnlocked: true,
+          autoScratchMachineStatus: 'idle',
+          autoScratchAutoBuyEnabled: true,
+          autoScratchAllowedCardTypes: [AUTO_SCRATCH_MACHINE_CONFIG.base.defaultCardType],
+          autoScratchMinReserveGold: 0,
+        },
+      };
+    });
+  }
+
+  function toggleAutoScratchMachinePaused() {
+    if (!autoScratchMachineUnlocked) {
+      return;
+    }
+
+    updateSave((current) => {
+      if (!current.automation.autoScratchMachineUnlocked) {
+        return current;
+      }
+
+      const currentlyPaused = current.automation.autoScratchMachineStatus === 'paused';
+
+      return {
+        ...current,
+        automation: {
+          ...current.automation,
+          autoScratchMachineStatus: currentlyPaused
+            ? current.automation.autoScratchCurrentCard
+              ? 'processing'
+              : 'idle'
+            : 'paused',
+        },
+      };
+    });
+  }
+
+  function toggleAutoScratchMachineAutoBuy() {
+    if (!autoScratchMachineUnlocked) {
+      return;
+    }
+
+    updateSave((current) => {
+      if (!current.automation.autoScratchMachineUnlocked) {
+        return current;
+      }
+
+      const nextAutoBuyEnabled = !current.automation.autoScratchAutoBuyEnabled;
+      const nextStatus = (() => {
+        if (current.automation.autoScratchMachineStatus === 'paused') {
+          return 'paused';
+        }
+
+        if (current.automation.autoScratchCurrentCard) {
+          return 'processing';
+        }
+
+        if (current.automation.autoScratchQueue.length > 0) {
+          return 'idle';
+        }
+
+        if (!nextAutoBuyEnabled) {
+          return 'idle';
+        }
+
+        return current.automation.autoScratchMachineStatus === 'blocked'
+          ? 'idle'
+          : current.automation.autoScratchMachineStatus;
+      })();
+
+      return {
+        ...current,
+        automation: {
+          ...current.automation,
+          autoScratchAutoBuyEnabled: nextAutoBuyEnabled,
+          autoScratchMachineStatus: nextStatus,
+        },
+      };
+    });
+  }
+
+  function toggleAutoScratchMachineAllowedCardType(cardType: ScratchCardType) {
+    if (!autoScratchMachineUnlocked || cardType !== 'basic-safe') {
+      return;
+    }
+
+    updateSave((current) => {
+      if (!current.automation.autoScratchMachineUnlocked) {
+        return current;
+      }
+
+      const currentAllowedTypes = current.automation.autoScratchAllowedCardTypes;
+      const nextAllowedTypes = currentAllowedTypes.includes(cardType)
+        ? currentAllowedTypes.filter((allowedCardType) => allowedCardType !== cardType)
+        : [cardType];
+      const hasMachineWork =
+        current.automation.autoScratchCurrentCard !== null ||
+        current.automation.autoScratchQueue.length > 0;
+      const nextStatus = (() => {
+        if (current.automation.autoScratchMachineStatus === 'paused') {
+          return 'paused';
+        }
+
+        if (current.automation.autoScratchCurrentCard) {
+          return 'processing';
+        }
+
+        if (hasMachineWork) {
+          return 'idle';
+        }
+
+        if (current.automation.autoScratchAutoBuyEnabled && nextAllowedTypes.length === 0) {
+          return 'blocked';
+        }
+
+        return current.automation.autoScratchMachineStatus === 'blocked'
+          ? 'idle'
+          : current.automation.autoScratchMachineStatus;
+      })();
+
+      return {
+        ...current,
+        automation: {
+          ...current.automation,
+          autoScratchAllowedCardTypes: nextAllowedTypes,
+          autoScratchMachineStatus: nextStatus,
+        },
+      };
+    });
+  }
+
+  function takeOverAutoScratchCard(cardId: number) {
+    if (!autoScratchMachineUnlocked) {
+      return;
+    }
+
+    let didTakeOver = false;
+
+    updateSave((current) => {
+      const nextSave = takeOverAutoScratchMachineCard(current, cardId);
+      didTakeOver = nextSave !== current;
+
+      return nextSave;
+    });
+
+    if (!didTakeOver) {
+      return;
+    }
+
+    setScratchProgress(0);
+    setEnteringScratchCardIds((current) => [...current, cardId]);
+    const enterTimer = window.setTimeout(() => {
+      setEnteringScratchCardIds((current) => current.filter((id) => id !== cardId));
+    }, PLATE_ENTER_ANIMATION_MS);
+    plateEnterTimerRefs.current.push(enterTimer);
+  }
+
+  function setAutoScratchMachineReserveGold(value: number) {
+    if (!autoScratchMachineUnlocked) {
+      return;
+    }
+
+    const reserveGold = Math.max(0, Math.floor(Number.isFinite(value) ? value : 0));
+
+    updateSave((current) => {
+      if (!current.automation.autoScratchMachineUnlocked) {
+        return current;
+      }
+
+      const canBuyWithReserve =
+        current.automation.autoScratchAutoBuyEnabled &&
+        current.automation.autoScratchAllowedCardTypes.includes('basic-safe') &&
+        current.player.gold - BASIC_SAFE_CARD_PRICE >= reserveGold;
+      const nextStatus =
+        current.automation.autoScratchMachineStatus === 'blocked' && canBuyWithReserve
+          ? 'idle'
+          : current.automation.autoScratchMachineStatus;
+
+      return {
+        ...current,
+        automation: {
+          ...current.automation,
+          autoScratchMinReserveGold: reserveGold,
+          autoScratchMachineStatus: nextStatus,
         },
       };
     });
@@ -2532,9 +3077,145 @@ export function ScratchLegendGame() {
                   />
                 )}
                 {autoScratchMachineUnlocked && (
-                  <div className="automation-stage-five-entry">
-                    <strong>自动机已解锁</strong>
-                    <span>机器本体已购买，先保留在工具区。</span>
+                  <div className={`automation-stage-five-entry ${autoScratchMachineStatus}`}>
+                    <strong>{AUTO_SCRATCH_MACHINE_STATUS_LABELS[autoScratchMachineStatus]}</strong>
+                    <span>{autoScratchMachineDetail}</span>
+                    <div className="automation-mini-meter" aria-hidden="true">
+                      <span style={{ width: `${Math.round(autoScratchProgressRatio * 100)}%` }} />
+                    </div>
+                    {autoScratchTakeoverCards.length > 0 && (
+                      <div className="automation-takeover-list">
+                        {autoScratchTakeoverCards.map(({ card, label }) => {
+                          const display = getScratchCardDisplay(card.type);
+
+                          return (
+                            <button
+                              className="automation-takeover-card"
+                              key={card.id}
+                              type="button"
+                              onClick={() => takeOverAutoScratchCard(card.id)}
+                            >
+                              <span>{label}</span>
+                              <strong>{display.miniTitle}</strong>
+                              <em>接管</em>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {autoScratchSettlementFeedback && (
+                      <div
+                        className={`automation-settlement-feedback ${
+                          autoScratchSettlementFeedback.isWinning ? 'winning' : 'blank'
+                        }`}
+                      >
+                        <span>上次结算</span>
+                        <strong>{autoScratchSettlementFeedback.label}</strong>
+                        <em>
+                          {autoScratchSettlementFeedback.payout > 0
+                            ? `+$${autoScratchSettlementFeedback.payout}`
+                            : '$0'}
+                        </em>
+                      </div>
+                    )}
+                    <div className="automation-controls">
+                      <button
+                        className="automation-control-button"
+                        type="button"
+                        onClick={toggleAutoScratchMachinePaused}
+                      >
+                        {autoScratchMachineStatus === 'paused' ? '继续' : '暂停'}
+                      </button>
+                      <label className="automation-switch">
+                        <input
+                          type="checkbox"
+                          checked={autoScratchAutoBuyEnabled}
+                          onChange={toggleAutoScratchMachineAutoBuy}
+                        />
+                        <span aria-hidden="true" />
+                        <em>自动购买</em>
+                      </label>
+                    </div>
+                    <div className="automation-reserve-control">
+                      <span>保留金币</span>
+                      <div className="automation-reserve-options">
+                        {AUTO_SCRATCH_RESERVE_OPTIONS.map((reserveGold) => (
+                          <button
+                            className={reserveGold === autoScratchMinReserveGold ? 'active' : ''}
+                            key={reserveGold}
+                            type="button"
+                            onClick={() => setAutoScratchMachineReserveGold(reserveGold)}
+                          >
+                            ${reserveGold}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="automation-reserve-input">
+                        <span aria-hidden="true">$</span>
+                        <input
+                          aria-label="自动刮刮机最低保留金币"
+                          inputMode="numeric"
+                          min={0}
+                          step={10}
+                          type="number"
+                          value={autoScratchMinReserveGold}
+                          onChange={(event) =>
+                            setAutoScratchMachineReserveGold(Number(event.currentTarget.value))
+                          }
+                        />
+                        <div className="automation-reserve-stepper">
+                          <button
+                            aria-label="增加保留金币"
+                            type="button"
+                            onClick={() =>
+                              setAutoScratchMachineReserveGold(autoScratchMinReserveGold + 10)
+                            }
+                          >
+                            +
+                          </button>
+                          <button
+                            aria-label="减少保留金币"
+                            type="button"
+                            disabled={autoScratchMinReserveGold <= 0}
+                            onClick={() =>
+                              setAutoScratchMachineReserveGold(autoScratchMinReserveGold - 10)
+                            }
+                          >
+                            -
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="automation-filter-control">
+                      <span>允许票种</span>
+                      <div className="automation-ticket-filter-list">
+                        {autoScratchTicketFilterItems.map((item) =>
+                          item.configurable ? (
+                            <label
+                              className={`automation-ticket-filter ${
+                                item.enabled ? 'enabled' : ''
+                              }`}
+                              key={item.type}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={item.enabled}
+                                onChange={() => toggleAutoScratchMachineAllowedCardType(item.type)}
+                              />
+                              <span>{item.miniTitle}</span>
+                              <strong>{item.title}</strong>
+                              <em>{item.enabled ? '机器可补票' : item.unavailableLabel}</em>
+                            </label>
+                          ) : (
+                            <div className="automation-ticket-filter locked" key={item.type}>
+                              <span>{item.miniTitle}</span>
+                              <strong>{item.title}</strong>
+                              <em>{item.unavailableLabel}</em>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2585,6 +3266,16 @@ export function ScratchLegendGame() {
               >
                 <span className="phone-dial" />
               </button>
+
+              {autoScratchMachineUnlocked && (
+                <AutoScratchMachineTableUnit
+                  status={autoScratchMachineStatus}
+                  currentCard={autoScratchCurrentCard}
+                  queue={autoScratchMachineQueue}
+                  progressRatio={autoScratchProgressRatio}
+                  capacity={AUTO_SCRATCH_MACHINE_CONFIG.base.queueCapacity}
+                />
+              )}
 
               {phase === 'idle' && (
                 <div className="idle-hint">
