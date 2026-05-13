@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   AUTO_SCRATCH_MACHINE_CONFIG,
@@ -12,14 +13,17 @@ import {
   canBuyScratchCard,
   canBuyTrashCan,
   canStartWorkFromPhase,
+  canUnlockFinalChanceCard,
   cashOutPushLuckScratchCard,
   continuePushLuckScratchCard,
   createBasicSafeScratchCard,
+  createFinalChanceScratchCard,
   createLoanFromTemplate,
   createPushLuckScratchCard,
   createRiskPeekScratchCard,
   createScratchCard,
   createTripleMatchScratchCard,
+  FINAL_CHANCE_CARD_PRICE,
   getAutoScratchMachineUnlockProgress,
   getBasicSafeScratchCardPrizePoolForLevel,
   getBasicSafeScratchCardPrizeTier,
@@ -27,6 +31,7 @@ import {
   getBoundedPlatePosition,
   getCleaningBrushRadius,
   getEffectiveScratchCardDiscardCost,
+  getFinalChanceGloryPreview,
   getGoldChangeEffect,
   getGoldDisplayRollValue,
   getLoanRepaymentFeedback,
@@ -106,12 +111,22 @@ import {
   getAutoScratchMachineBlockReason,
   isUnlockMilestoneUnlocked,
   mergeScratchLegendSave,
+  settleFinalChanceScratchCardSave,
   syncScratchLegendSave,
   takeOverAutoScratchMachineCard,
 } from './game-save';
 
+const scratchLegendStylesheet = readFileSync(
+  new URL('../app/globals.css', import.meta.url),
+  'utf8',
+);
+
 function assertNearlyEqual(actual: number, expected: number) {
   assert.ok(Math.abs(actual - expected) < 0.000001, `${actual} should be close to ${expected}`);
+}
+
+function getCssRuleBody(selector: string) {
+  return scratchLegendStylesheet.match(new RegExp(`${selector}\\s*{([^}]+)}`))?.[1] ?? '';
 }
 
 test('keeps dragged plate center inside the table bounds', () => {
@@ -146,6 +161,19 @@ test('keeps dragged rectangular table objects inside the full desktop bounds', (
 
   assertNearlyEqual(position.xPercent, 93.25);
   assertNearlyEqual(position.yPercent, 92.4);
+});
+
+test('docks table utility props without covering scratch information', () => {
+  const autoMachineRule = getCssRuleBody('\\.auto-scratch-machine-unit');
+  const trashWithMachineRule = getCssRuleBody('\\.trash-can\\.with-auto-machine');
+
+  assert.match(autoMachineRule, /\btop:\s*18px;/);
+  assert.match(autoMachineRule, /\bright:\s*188px;/);
+  assert.match(autoMachineRule, /\bz-index:\s*1;/);
+  assert.match(autoMachineRule, /\bpointer-events:\s*none;/);
+  assert.doesNotMatch(autoMachineRule, /\bbottom:/);
+  assert.doesNotMatch(trashWithMachineRule, /\bbottom:\s*154px;/);
+  assert.doesNotMatch(trashWithMachineRule, /\bright:\s*30px;/);
 });
 
 test('classifies gold change effects by direction and source intensity', () => {
@@ -549,9 +577,9 @@ test('merges partial persisted save data back into a complete save schema', () =
   assert.equal(save.player.workLevel, 0);
   assert.equal(save.notices.scratchMessageDismissed, true);
   assert.equal(save.notices.workRiskMessageDismissed, false);
-  assert.equal(save.workspace.phase, 'plateSpawned');
+  assert.equal(save.workspace.phase, 'idle');
   assert.equal(save.workspace.nextPlateId, 1);
-  assert.equal(isUnlockMilestoneUnlocked(save, 'scratch-mode'), true);
+  assert.equal(isUnlockMilestoneUnlocked(save, 'scratch-mode'), false);
 });
 
 test('migrates legacy loans without penalty config back to current templates', () => {
@@ -582,6 +610,10 @@ test('migrates legacy loans without penalty config back to current templates', (
 
 test('migrates legacy table items with empty scratch progress points', () => {
   const save = mergeScratchLegendSave({
+    player: {
+      lifetimeGoldEarned: 1,
+      proficiency: 1,
+    },
     workspace: {
       plates: [
         {
@@ -622,6 +654,10 @@ test('finds the current active plate from the save workspace', () => {
 
 test('repairs stale claimable work phase without an active plate', () => {
   const save = mergeScratchLegendSave({
+    player: {
+      lifetimeGoldEarned: 1,
+      proficiency: 1,
+    },
     workspace: {
       phase: 'claimable',
       activePlateId: null,
@@ -636,6 +672,10 @@ test('repairs stale claimable work phase without an active plate', () => {
 
 test('returns stale claimable work phase to the desktop when plates remain', () => {
   const save = mergeScratchLegendSave({
+    player: {
+      lifetimeGoldEarned: 1,
+      proficiency: 1,
+    },
     workspace: {
       phase: 'claimable',
       activePlateId: null,
@@ -835,10 +875,10 @@ test('scratch luck shifts losing probability into winning prize tiers', () => {
   const levelTwoPool = getLuckAdjustedScratchCardPrizePool('basic-safe', 0, 2);
   const levelTenPool = getLuckAdjustedScratchCardPrizePool('basic-safe', 0, 10);
 
-  assert.equal(levelZeroPool.find((tier) => tier.id === 'no-pair')?.probability, 0.72);
+  assert.equal(levelZeroPool.find((tier) => tier.id === 'no-pair')?.probability, 0.62);
   assert.equal(
     Number(levelTwoPool.find((tier) => tier.id === 'no-pair')?.probability.toFixed(2)),
-    0.66,
+    0.56,
   );
   assert.equal(levelTenPool.find((tier) => tier.id === 'no-pair')?.probability, 0.45);
   assert.ok(
@@ -848,8 +888,8 @@ test('scratch luck shifts losing probability into winning prize tiers', () => {
 });
 
 test('scratch luck affects generated safe card results without changing forced tiers', () => {
-  const levelZeroCard = createBasicSafeScratchCard({ id: 1, random: () => 0.7 });
-  const luckyCard = createBasicSafeScratchCard({ id: 2, luckLevel: 2, random: () => 0.7 });
+  const levelZeroCard = createBasicSafeScratchCard({ id: 1, random: () => 0.6 });
+  const luckyCard = createBasicSafeScratchCard({ id: 2, luckLevel: 2, random: () => 0.6 });
   const forcedCard = createBasicSafeScratchCard({
     id: 3,
     luckLevel: 10,
@@ -1083,13 +1123,13 @@ test('keeps real scratch odds separate from displayed ticket odds', () => {
   const cashTier = prizePool.find((tier) => tier.id === 'pair-cash');
   const bagTier = prizePool.find((tier) => tier.id === 'pair-bag');
 
-  assert.equal(lossTier?.probability, 0.72);
+  assert.equal(lossTier?.probability, 0.62);
   assert.equal(lossTier?.displayProbability, null);
-  assert.equal(fireTier?.probability, 0.2);
+  assert.equal(fireTier?.probability, 0.25);
   assert.equal(fireTier?.displayProbability, 0.5);
-  assert.equal(cashTier?.probability, 0.06);
+  assert.equal(cashTier?.probability, 0.09);
   assert.equal(cashTier?.displayProbability, 0.4);
-  assert.equal(bagTier?.probability, 0.02);
+  assert.equal(bagTier?.probability, 0.04);
   assert.equal(bagTier?.displayProbability, 0.1);
 });
 
@@ -1154,7 +1194,7 @@ test('configures triple match card from the static rules source', () => {
   assert.equal(tripleMatchConfig.matchRule.slots, 5);
   assert.equal(tripleMatchConfig.matchRule.requiredMatches, 3);
   assert.equal(tripleMatchConfig.scratchCompleteThreshold, 0.82);
-  assert.equal(getScratchCardStepDistance('triple-match'), 5);
+  assert.equal(getScratchCardStepDistance('triple-match'), 4);
 });
 
 test('unlocks triple match notice when the 500 proficiency segment is filled', () => {
@@ -1264,7 +1304,7 @@ test('configures the first risk peek card from the static rules source', () => {
   assert.equal(riskPeekConfig.matchRule.slots, 6);
   assert.equal('riskRule' in riskPeekConfig ? riskPeekConfig.riskRule.discardCostRatio : null, 0.3);
   assert.equal(getScratchCardDiscardCost(riskPeekConfig.price), 45);
-  assert.equal(getScratchCardStepDistance('risk-peek'), 5);
+  assert.equal(getScratchCardStepDistance('risk-peek'), 4);
 });
 
 test('groups implemented scratch cards into the first card album roles', () => {
@@ -1279,7 +1319,8 @@ test('groups implemented scratch cards into the first card album roles', () => {
       ['stable', 'basic-safe'],
       ['risk', 'risk-peek'],
       ['high-odds', 'triple-match'],
-      ['finale', null],
+      ['high-risk', 'push-luck'],
+      ['finale', 'final-chance'],
     ],
   );
   assert.equal(nextAlbum?.id, 'next-album');
@@ -1923,7 +1964,12 @@ test('initializes workspace scratch cards as a list for multiple table cards', (
   const firstCard = createBasicSafeScratchCard({ id: 1, random: () => 0.72 });
   const secondCard = createBasicSafeScratchCard({ id: 2, random: () => 0.98 });
   const save = mergeScratchLegendSave({
+    player: {
+      lifetimeGoldEarned: 1,
+      proficiency: 1,
+    },
     workspace: {
+      phase: 'scratchingCard',
       scratchCards: [firstCard, secondCard],
       activeScratchCardId: 2,
     },
@@ -1937,6 +1983,10 @@ test('initializes workspace scratch cards as a list for multiple table cards', (
 test('migrates a legacy single active scratch card into the table card list', () => {
   const legacyCard = createBasicSafeScratchCard({ id: 9, random: () => 0.72 });
   const save = mergeScratchLegendSave({
+    player: {
+      lifetimeGoldEarned: 1,
+      proficiency: 1,
+    },
     workspace: {
       activeScratchCard: legacyCard,
     },
@@ -2173,4 +2223,125 @@ test('merge save fills missing push luck progress for legacy saves', () => {
 
   assert.equal(save.scratchCards.basicSafe.cardsSettled, 2);
   assert.equal(save.scratchCards.pushLuck.cardsSettled, 0);
+});
+
+test('configures final chance as a manual finale card', () => {
+  const config = getScratchCardConfig('final-chance');
+
+  assert.equal(config.label, '最后一刮');
+  assert.equal(FINAL_CHANCE_CARD_PRICE, 5000);
+  assert.equal(getScratchCardSettlementProgressKey('final-chance'), 'finalChance');
+  assert.equal(getScratchCardAlbumSlotByType('final-chance')?.role, 'finale');
+  assert.equal(getScratchCardStepDistance('final-chance'), 4);
+  assert.equal(getScratchCardRevealThreshold('final-chance'), 0.95);
+  assert.deepEqual(
+    config.prizePool.map((tier) => [tier.id, tier.probability]),
+    [
+      ['final-0', 0.1],
+      ['final-1', 0.22],
+      ['final-2', 0.33],
+      ['final-3', 0.24],
+      ['final-4', 0.09],
+      ['final-5', 0.02],
+    ],
+  );
+});
+
+test('unlocks final chance after the auto machine and three push luck settlements', () => {
+  assert.equal(
+    canUnlockFinalChanceCard({
+      autoScratchMachineUnlocked: true,
+      pushLuckMilestoneUnlocked: true,
+      pushLuckCardsSettled: 2,
+    }),
+    false,
+  );
+  assert.equal(
+    canUnlockFinalChanceCard({
+      autoScratchMachineUnlocked: true,
+      pushLuckMilestoneUnlocked: true,
+      pushLuckCardsSettled: 3,
+    }),
+    true,
+  );
+  assert.equal(
+    canUnlockFinalChanceCard({
+      autoScratchMachineUnlocked: false,
+      pushLuckMilestoneUnlocked: true,
+      pushLuckCardsSettled: 3,
+    }),
+    false,
+  );
+});
+
+test('pre-generates final chance legend symbols and glory preview', () => {
+  const card = createFinalChanceScratchCard({ id: 92, forcedLegendCount: 4 });
+
+  assert.equal(card.type, 'final-chance');
+  assert.equal(card.price, FINAL_CHANCE_CARD_PRICE);
+  assert.equal(card.result.finalChance?.legendCount, 4);
+  assert.equal(card.result.finalChance?.gloryPreview, 3);
+  assert.equal(card.result.finalChance?.outcome, 'great-success');
+  assert.equal(card.result.symbols.filter((symbol) => symbol === 'legend').length, 4);
+  assert.equal(card.result.isWinning, true);
+  assert.equal(card.result.payout, 0);
+});
+
+test('final chance glory preview follows the finale table', () => {
+  assert.equal(getFinalChanceGloryPreview(0), 1);
+  assert.equal(getFinalChanceGloryPreview(2), 1);
+  assert.equal(getFinalChanceGloryPreview(3), 2);
+  assert.equal(getFinalChanceGloryPreview(4), 3);
+  assert.equal(getFinalChanceGloryPreview(5), 5);
+});
+
+test('merge save fills missing final chance progress and round settlement for legacy saves', () => {
+  const save = mergeScratchLegendSave({
+    scratchCards: {
+      basicSafe: { cardsSettled: 2 },
+    },
+  });
+
+  assert.equal(save.scratchCards.basicSafe.cardsSettled, 2);
+  assert.equal(save.scratchCards.finalChance.cardsSettled, 0);
+  assert.equal(save.roundSettlement.completed, false);
+  assert.equal(save.roundSettlement.gloryPreview, 0);
+});
+
+test('settling final chance ends the round without granting prestige yet', () => {
+  const card = {
+    ...createFinalChanceScratchCard({ id: 93, forcedLegendCount: 3 }),
+    status: 'claimable' as const,
+  };
+  const save = mergeScratchLegendSave({
+    player: {
+      gold: 1000,
+      cardsScratched: 12,
+    },
+    scratchCards: {
+      pushLuck: { cardsSettled: 3 },
+    },
+    automation: {
+      autoScratchMachineUnlocked: true,
+      autoScratchMachineStatus: 'idle',
+    },
+    workspace: {
+      phase: 'scratchingCard',
+      activeScratchCardId: card.id,
+      scratchCards: [card],
+    },
+  });
+  const settledSave = settleFinalChanceScratchCardSave(save);
+
+  assert.equal(settledSave.roundSettlement.completed, true);
+  assert.equal(settledSave.roundSettlement.result, 'success');
+  assert.equal(settledSave.roundSettlement.legendCount, 3);
+  assert.equal(settledSave.roundSettlement.gloryPreview, 2);
+  assert.equal(settledSave.player.gold, 1000);
+  assert.equal(settledSave.player.cardsScratched, 13);
+  assert.equal(settledSave.scratchCards.finalChance.cardsSettled, 1);
+  assert.equal(settledSave.workspace.scratchCards.length, 0);
+  assert.equal(settledSave.workspace.phase, 'idle');
+  assert.equal(settledSave.automation.autoScratchMachineStatus, 'paused');
+  assert.equal(settledSave.automation.autoScratchAutoBuyEnabled, false);
 });

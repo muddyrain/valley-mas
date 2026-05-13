@@ -4,6 +4,7 @@ import {
   BASIC_SAFE_CARD_PRICE,
   createInitialUpgradeToolStates,
   createScratchCard,
+  type FinalChanceOutcome,
   getScratchCardLevelProgress,
   getScratchCardSettlementProgressKey,
   getUnlockMilestoneThreshold,
@@ -70,6 +71,8 @@ export type ScratchLegendScratchCardsState = {
   riskPeek: ScratchCardProgressState;
   // “步步加码”高风险卡自己的等级进度。
   pushLuck: ScratchCardProgressState;
+  // “最后一刮”终局票自己的结算进度。
+  finalChance: ScratchCardProgressState;
 };
 
 export type ScratchLegendUpgradeToolsState = Record<UpgradeToolId, UpgradeToolState>;
@@ -128,6 +131,14 @@ export type ScratchLegendWorkspaceState = {
   nextScratchCardId: number;
 };
 
+export type ScratchLegendRoundSettlementState = {
+  completed: boolean;
+  result: FinalChanceOutcome | 'none';
+  legendCount: number;
+  gloryPreview: number;
+  finalChanceCardId: number | null;
+};
+
 export type ScratchLegendSave = {
   // 存档版本，后续结构演进时用于兼容迁移。
   version: 1;
@@ -145,6 +156,8 @@ export type ScratchLegendSave = {
   upgradeTools: ScratchLegendUpgradeToolsState;
   // 当前自动化能力状态。
   automation: ScratchLegendAutomationState;
+  // 当前轮是否已经由终局票推进到结算时刻。
+  roundSettlement: ScratchLegendRoundSettlementState;
   // 当前桌面与工作流状态。
   workspace: ScratchLegendWorkspaceState;
 };
@@ -164,7 +177,7 @@ function createInitialMilestoneUnlockState(): Record<UnlockMilestoneId, boolean>
   >;
 }
 
-function isScratchCardState(card: ScratchCardState | null): card is ScratchCardState {
+function isScratchCardState(card: ScratchCardState | null | undefined): card is ScratchCardState {
   return Boolean(card);
 }
 
@@ -202,6 +215,42 @@ function createInitialAutomationState(): ScratchLegendAutomationState {
     autoScratchAutoBuyEnabled: true,
     autoScratchAllowedCardTypes: [AUTO_SCRATCH_MACHINE_CONFIG.base.defaultCardType],
     autoScratchMinReserveGold: 0,
+  };
+}
+
+function createInitialRoundSettlementState(): ScratchLegendRoundSettlementState {
+  return {
+    completed: false,
+    result: 'none',
+    legendCount: 0,
+    gloryPreview: 0,
+    finalChanceCardId: null,
+  };
+}
+
+function mergeRoundSettlementState(
+  partialRoundSettlement?: DeepPartial<ScratchLegendRoundSettlementState>,
+): ScratchLegendRoundSettlementState {
+  const initialRoundSettlement = createInitialRoundSettlementState();
+  const completed = partialRoundSettlement?.completed ?? initialRoundSettlement.completed;
+
+  if (!completed) {
+    return initialRoundSettlement;
+  }
+
+  return {
+    completed,
+    result: partialRoundSettlement?.result ?? initialRoundSettlement.result,
+    legendCount: Math.max(
+      0,
+      Math.floor(partialRoundSettlement?.legendCount ?? initialRoundSettlement.legendCount),
+    ),
+    gloryPreview: Math.max(
+      0,
+      Math.floor(partialRoundSettlement?.gloryPreview ?? initialRoundSettlement.gloryPreview),
+    ),
+    finalChanceCardId:
+      partialRoundSettlement?.finalChanceCardId ?? initialRoundSettlement.finalChanceCardId,
   };
 }
 
@@ -325,9 +374,13 @@ export function createInitialScratchLegendSave(): ScratchLegendSave {
       pushLuck: {
         cardsSettled: 0,
       },
+      finalChance: {
+        cardsSettled: 0,
+      },
     },
     upgradeTools: createInitialUpgradeToolStates(),
     automation: createInitialAutomationState(),
+    roundSettlement: createInitialRoundSettlementState(),
     workspace: createInitialWorkspaceState(),
   };
 }
@@ -398,9 +451,14 @@ export function mergeScratchLegendSave(
         ...initialSave.scratchCards.pushLuck,
         ...partialSave?.scratchCards?.pushLuck,
       },
+      finalChance: {
+        ...initialSave.scratchCards.finalChance,
+        ...partialSave?.scratchCards?.finalChance,
+      },
     },
     upgradeTools: mergeUpgradeToolStates(partialSave?.upgradeTools),
     automation: mergeAutomationState(initialSave.automation, partialSave?.automation),
+    roundSettlement: mergeRoundSettlementState(partialSave?.roundSettlement),
     workspace: {
       ...initialSave.workspace,
       ...partialSave?.workspace,
@@ -412,7 +470,9 @@ export function mergeScratchLegendSave(
   });
 }
 
-function normalizeScratchCardState(card: ScratchCardState | null) {
+function normalizeScratchCardState(
+  card: ScratchCardState | null | undefined,
+): ScratchCardState | null {
   if (!card) {
     return null;
   }
@@ -426,6 +486,14 @@ function normalizeScratchCardState(card: ScratchCardState | null) {
       penaltyTriggered: card.result.penaltyTriggered ?? false,
       discardCost: card.result.discardCost ?? 0,
       penaltyAmount: card.result.penaltyAmount ?? 0,
+      finalChance:
+        card.type === 'final-chance'
+          ? {
+              legendCount: Math.max(0, Math.floor(card.result.finalChance?.legendCount ?? 0)),
+              gloryPreview: Math.max(0, Math.floor(card.result.finalChance?.gloryPreview ?? 0)),
+              outcome: card.result.finalChance?.outcome ?? 'failure',
+            }
+          : card.result.finalChance,
     },
     scratchPoints: normalizeScratchPoints(card.scratchPoints),
   } satisfies ScratchCardState;
@@ -539,10 +607,21 @@ export function syncScratchLegendSave(save: ScratchLegendSave): ScratchLegendSav
     }
   }
 
+  const automation = mergeAutomationState(createInitialAutomationState(), save.automation);
+  const roundSettlement = mergeRoundSettlementState(save.roundSettlement);
+
   return {
     ...save,
     workspace,
-    automation: mergeAutomationState(createInitialAutomationState(), save.automation),
+    automation: roundSettlement.completed
+      ? {
+          ...automation,
+          autoScratchMachineStatus: automation.autoScratchMachineUnlocked ? 'paused' : 'locked',
+          autoScratchAutoBuyEnabled: false,
+          autoScratchProgressMs: 0,
+        }
+      : automation,
+    roundSettlement,
     player: {
       ...save.player,
       proficiency: normalizedProficiency,
@@ -578,6 +657,56 @@ export function getActiveScratchCard(save: ScratchLegendSave) {
     save.workspace.scratchCards.find((card) => card.id === save.workspace.activeScratchCardId) ??
     null
   );
+}
+
+export function settleFinalChanceScratchCardSave(save: ScratchLegendSave): ScratchLegendSave {
+  const activeCard = getActiveScratchCard(save);
+
+  if (!activeCard || activeCard.type !== 'final-chance' || activeCard.status !== 'claimable') {
+    return save;
+  }
+
+  const finalChance = activeCard.result.finalChance;
+
+  if (!finalChance) {
+    return save;
+  }
+
+  const remainingScratchCards = save.workspace.scratchCards.filter(
+    (card) => card.id !== activeCard.id,
+  );
+
+  return syncScratchLegendSave({
+    ...save,
+    player: {
+      ...save.player,
+      cardsScratched: save.player.cardsScratched + 1,
+      loseStreak: finalChance.outcome === 'failure' ? save.player.loseStreak + 1 : 0,
+    },
+    scratchCards: {
+      ...save.scratchCards,
+      finalChance: advanceBasicSafeScratchCardProgress(save.scratchCards.finalChance),
+    },
+    automation: {
+      ...save.automation,
+      autoScratchMachineStatus: save.automation.autoScratchMachineUnlocked ? 'paused' : 'locked',
+      autoScratchAutoBuyEnabled: false,
+      autoScratchProgressMs: 0,
+    },
+    roundSettlement: {
+      completed: true,
+      result: finalChance.outcome,
+      legendCount: finalChance.legendCount,
+      gloryPreview: finalChance.gloryPreview,
+      finalChanceCardId: activeCard.id,
+    },
+    workspace: {
+      ...save.workspace,
+      scratchCards: remainingScratchCards,
+      activeScratchCardId: null,
+      phase: getDesktopPhase(save.workspace.plates.length, remainingScratchCards.length),
+    },
+  });
 }
 
 type AdvanceAutoScratchMachineOptions = {
@@ -754,6 +883,10 @@ export function advanceAutoScratchMachineSave(
 ): ScratchLegendSave {
   const elapsed = Math.max(0, Math.floor(elapsedMs));
   const automation = save.automation;
+
+  if (save.roundSettlement.completed) {
+    return syncScratchLegendSave(save);
+  }
 
   if (!automation.autoScratchMachineUnlocked) {
     return {

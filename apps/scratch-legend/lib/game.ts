@@ -44,6 +44,10 @@ export const PUSH_LUCK_CARD_CONFIG = scratchLegendConfig.scratchCards.pushLuck;
 export const PUSH_LUCK_CARD_PRICE = PUSH_LUCK_CARD_CONFIG.price;
 export const PUSH_LUCK_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD =
   PUSH_LUCK_CARD_CONFIG.scratchSymbolRevealThreshold;
+export const FINAL_CHANCE_CARD_CONFIG = scratchLegendConfig.scratchCards.finalChance;
+export const FINAL_CHANCE_CARD_PRICE = FINAL_CHANCE_CARD_CONFIG.price;
+export const FINAL_CHANCE_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD =
+  FINAL_CHANCE_CARD_CONFIG.scratchSymbolRevealThreshold;
 export const SCRATCH_CARD_ALBUMS_CONFIG = scratchLegendConfig.cardAlbums;
 export const UPGRADE_TOOLS_CONFIG = scratchLegendConfig.upgradeTools.items;
 export const AUTOMATION_CONFIG = scratchLegendConfig.automation;
@@ -112,17 +116,24 @@ export type WorkPlateState = {
   seed: number;
 };
 
-export type ScratchCardType = 'basic-safe' | 'triple-match' | 'risk-peek' | 'push-luck';
+export type ScratchCardType =
+  | 'basic-safe'
+  | 'triple-match'
+  | 'risk-peek'
+  | 'push-luck'
+  | 'final-chance';
 export type ScratchCardStatus = 'onTable' | 'scratching' | 'claimable' | 'settled';
 type BasicSafeScratchCardPrizeTierConfig = (typeof BASIC_SAFE_CARD_CONFIG.prizePool)[number];
 type TripleMatchScratchCardPrizeTierConfig = (typeof TRIPLE_MATCH_CARD_CONFIG.prizePool)[number];
 type RiskPeekScratchCardPrizeTierConfig = (typeof RISK_PEEK_CARD_CONFIG.prizePool)[number];
 type PushLuckScratchCardPrizeTierConfig = (typeof PUSH_LUCK_CARD_CONFIG.prizePool)[number];
+type FinalChanceScratchCardPrizeTierConfig = (typeof FINAL_CHANCE_CARD_CONFIG.prizePool)[number];
 type ScratchCardPrizeTierConfig =
   | BasicSafeScratchCardPrizeTierConfig
   | TripleMatchScratchCardPrizeTierConfig
   | RiskPeekScratchCardPrizeTierConfig
-  | PushLuckScratchCardPrizeTierConfig;
+  | PushLuckScratchCardPrizeTierConfig
+  | FinalChanceScratchCardPrizeTierConfig;
 export type ScratchCardPrizeTier = Omit<ScratchCardPrizeTierConfig, 'payout' | 'probability'> & {
   payout: number;
   probability: number;
@@ -132,7 +143,16 @@ export type BasicSafeScratchCardPrizeTierId = BasicSafeScratchCardPrizeTierConfi
 export type TripleMatchScratchCardPrizeTierId = TripleMatchScratchCardPrizeTierConfig['id'];
 export type RiskPeekScratchCardPrizeTierId = RiskPeekScratchCardPrizeTierConfig['id'];
 export type PushLuckScratchCardPrizeTierId = PushLuckScratchCardPrizeTierConfig['id'];
-export type ScratchCardSymbol = 'fire' | 'cash' | 'bag' | 'coin' | 'jackpot' | 'blank' | 'danger';
+export type FinalChanceScratchCardPrizeTierId = FinalChanceScratchCardPrizeTierConfig['id'];
+export type ScratchCardSymbol =
+  | 'fire'
+  | 'cash'
+  | 'bag'
+  | 'coin'
+  | 'jackpot'
+  | 'blank'
+  | 'danger'
+  | 'legend';
 
 export type PushLuckLayerOutcome = 'locked' | 'safe' | 'bust';
 export type PushLuckFirstBustLayer = 2 | 3 | 4 | null;
@@ -151,6 +171,12 @@ export type PushLuckScratchCardState = {
   bustedLayer: number | null;
   stages: PushLuckStageState[];
 };
+export type FinalChanceOutcome = 'failure' | 'success' | 'great-success' | 'legend';
+export type FinalChanceScratchCardState = {
+  legendCount: number;
+  gloryPreview: number;
+  outcome: FinalChanceOutcome;
+};
 
 export type ScratchCardResult = {
   tierId: ScratchCardPrizeTierId;
@@ -167,6 +193,7 @@ export type ScratchCardResult = {
   canCashOut?: boolean;
   canContinue?: boolean;
   pushLuck?: PushLuckScratchCardState;
+  finalChance?: FinalChanceScratchCardState;
 };
 
 export type ScratchCardState = {
@@ -288,11 +315,20 @@ export type CreatePushLuckScratchCardOptions = {
   random?: () => number;
 };
 
+export type CreateFinalChanceScratchCardOptions = {
+  id: number;
+  level?: number;
+  forcedLegendCount?: number;
+  random?: () => number;
+  symbolRandom?: () => number;
+};
+
 export type CreateScratchCardOptions =
   | CreateBasicSafeScratchCardOptions
   | CreateTripleMatchScratchCardOptions
   | CreateRiskPeekScratchCardOptions
-  | CreatePushLuckScratchCardOptions;
+  | CreatePushLuckScratchCardOptions
+  | CreateFinalChanceScratchCardOptions;
 
 export type CreateLoanFromTemplateOptions = {
   id: number;
@@ -447,6 +483,19 @@ export function canBuyScratchCard(
   return player.gold >= cardConfig.price && proficiency >= unlockThreshold;
 }
 
+export function canUnlockFinalChanceCard(options: {
+  autoScratchMachineUnlocked: boolean;
+  pushLuckMilestoneUnlocked: boolean;
+  pushLuckCardsSettled: number;
+}) {
+  return (
+    options.autoScratchMachineUnlocked &&
+    options.pushLuckMilestoneUnlocked &&
+    Math.max(0, Math.floor(options.pushLuckCardsSettled)) >=
+      FINAL_CHANCE_CARD_CONFIG.finalRule.requiredPushLuckSettlements
+  );
+}
+
 function getScratchCardLevelRequirements(cardType: ScratchCardType) {
   if (cardType === 'basic-safe') {
     return BASIC_SAFE_CARD_LEVEL_CONFIG.cardsRequiredByLevel;
@@ -454,6 +503,14 @@ function getScratchCardLevelRequirements(cardType: ScratchCardType) {
 
   if (cardType === 'risk-peek') {
     return RISK_PEEK_CARD_CONFIG.level.cardsRequiredByLevel;
+  }
+
+  if (cardType === 'push-luck') {
+    return PUSH_LUCK_CARD_CONFIG.level.cardsRequiredByLevel;
+  }
+
+  if (cardType === 'final-chance') {
+    return FINAL_CHANCE_CARD_CONFIG.level.cardsRequiredByLevel;
   }
 
   return TRIPLE_MATCH_CARD_CONFIG.level.cardsRequiredByLevel;
@@ -466,6 +523,14 @@ export function getScratchCardMaxLevel(cardType: ScratchCardType) {
 
   if (cardType === 'risk-peek') {
     return RISK_PEEK_CARD_CONFIG.level.payoutMultiplierByLevel.length;
+  }
+
+  if (cardType === 'push-luck') {
+    return PUSH_LUCK_CARD_CONFIG.level.payoutMultiplierByLevel.length;
+  }
+
+  if (cardType === 'final-chance') {
+    return FINAL_CHANCE_CARD_CONFIG.level.payoutMultiplierByLevel.length;
   }
 
   return TRIPLE_MATCH_CARD_CONFIG.level.payoutMultiplierByLevel.length;
@@ -559,6 +624,10 @@ export function getBasicSafeScratchCardPrizePoolForLevel(level: number): Scratch
 }
 
 export function getScratchCardConfig(cardType: ScratchCardType) {
+  if (cardType === 'final-chance') {
+    return FINAL_CHANCE_CARD_CONFIG;
+  }
+
   if (cardType === 'push-luck') {
     return PUSH_LUCK_CARD_CONFIG;
   }
@@ -603,6 +672,7 @@ export function getLuckAdjustedScratchCardPrizePool(
     normalizedLuckLevel <= 0 ||
     cardType === 'risk-peek' ||
     cardType === 'push-luck' ||
+    cardType === 'final-chance' ||
     luckTool?.effect.type !== 'scratch-luck'
   ) {
     return prizePool;
@@ -672,6 +742,10 @@ export function getScratchCardStepDistance(cardType: ScratchCardType) {
 }
 
 export function getScratchCardSettlementProgressKey(cardType: ScratchCardType) {
+  if (cardType === 'final-chance') {
+    return 'finalChance';
+  }
+
   if (cardType === 'push-luck') {
     return 'pushLuck';
   }
@@ -902,6 +976,25 @@ export function getScratchCardRevealSlotIndex(
     return null;
   }
 
+  if (cardType === 'final-chance') {
+    const finalChanceSlots = [
+      { x: 45 / 230, y: 32 / 128 },
+      { x: 115 / 230, y: 32 / 128 },
+      { x: 185 / 230, y: 32 / 128 },
+      { x: 75 / 230, y: 96 / 128 },
+      { x: 145 / 230, y: 96 / 128 },
+    ] as const;
+    const revealRadius = 0.17;
+
+    for (const [index, slot] of finalChanceSlots.entries()) {
+      if (Math.hypot(point.xPercent - slot.x, point.yPercent - slot.y) <= revealRadius) {
+        return index;
+      }
+    }
+
+    return null;
+  }
+
   const tripleMatchSlots = [
     { x: 45 / 230, y: 32 / 128 },
     { x: 115 / 230, y: 32 / 128 },
@@ -938,6 +1031,10 @@ export function getScratchCardRevealThreshold(cardType: ScratchCardType) {
 
   if (cardType === 'push-luck') {
     return PUSH_LUCK_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD;
+  }
+
+  if (cardType === 'final-chance') {
+    return FINAL_CHANCE_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD;
   }
 
   return BASIC_SAFE_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD;
@@ -1584,7 +1681,139 @@ export function cashOutPushLuckScratchCard(card: ScratchCardState) {
   } satisfies ScratchCardState;
 }
 
+function getFinalChanceLegendCount(random: () => number = Math.random) {
+  const roll = clampRatio(random());
+  let cumulativeProbability = 0;
+
+  for (const tier of FINAL_CHANCE_CARD_CONFIG.prizePool) {
+    cumulativeProbability += tier.probability;
+
+    if (roll < cumulativeProbability - Number.EPSILON) {
+      return Number(tier.id.replace('final-', ''));
+    }
+  }
+
+  return Number(
+    FINAL_CHANCE_CARD_CONFIG.prizePool[FINAL_CHANCE_CARD_CONFIG.prizePool.length - 1].id.replace(
+      'final-',
+      '',
+    ),
+  );
+}
+
+export function getFinalChanceGloryPreview(legendCount: number) {
+  const normalizedLegendCount = Math.max(
+    0,
+    Math.min(
+      FINAL_CHANCE_CARD_CONFIG.finalRule.gloryPreviewByLegendCount.length - 1,
+      Math.floor(legendCount),
+    ),
+  );
+
+  return FINAL_CHANCE_CARD_CONFIG.finalRule.gloryPreviewByLegendCount[normalizedLegendCount] ?? 1;
+}
+
+function getFinalChanceOutcome(legendCount: number): FinalChanceOutcome {
+  if (legendCount >= 5) {
+    return 'legend';
+  }
+
+  if (legendCount >= 4) {
+    return 'great-success';
+  }
+
+  if (legendCount >= FINAL_CHANCE_CARD_CONFIG.finalRule.requiredLegendSymbols) {
+    return 'success';
+  }
+
+  return 'failure';
+}
+
+function createFinalChanceSymbols(legendCount: number, random: () => number) {
+  const normalizedLegendCount = Math.max(
+    0,
+    Math.min(Number(FINAL_CHANCE_CARD_CONFIG.matchRule.slots), Math.floor(legendCount)),
+  );
+  const symbols: ScratchCardSymbol[] = [
+    ...Array.from({ length: normalizedLegendCount }, () => 'legend' as const),
+    ...Array.from(
+      { length: Number(FINAL_CHANCE_CARD_CONFIG.matchRule.slots) - normalizedLegendCount },
+      () => 'blank' as const,
+    ),
+  ];
+
+  return shuffleScratchCardSymbols(symbols, random);
+}
+
+function getFinalChanceTierId(legendCount: number): FinalChanceScratchCardPrizeTierId {
+  const normalizedLegendCount = Math.max(
+    0,
+    Math.min(Number(FINAL_CHANCE_CARD_CONFIG.matchRule.slots), Math.floor(legendCount)),
+  );
+
+  return `final-${normalizedLegendCount}` as FinalChanceScratchCardPrizeTierId;
+}
+
+function getFinalChanceTierByLegendCount(legendCount: number) {
+  const tierId = getFinalChanceTierId(legendCount);
+
+  return (
+    FINAL_CHANCE_CARD_CONFIG.prizePool.find((tier) => tier.id === tierId) ??
+    FINAL_CHANCE_CARD_CONFIG.prizePool[0]
+  );
+}
+
+export function createFinalChanceScratchCard(options: CreateFinalChanceScratchCardOptions) {
+  const level = Math.max(
+    0,
+    Math.min(FINAL_CHANCE_CARD_CONFIG.level.payoutMultiplierByLevel.length - 1, options.level ?? 0),
+  );
+  const legendCount =
+    options.forcedLegendCount === undefined
+      ? getFinalChanceLegendCount(options.random)
+      : Math.max(
+          0,
+          Math.min(Number(FINAL_CHANCE_CARD_CONFIG.matchRule.slots), options.forcedLegendCount),
+        );
+  const tier = getFinalChanceTierByLegendCount(legendCount);
+  const symbols = createFinalChanceSymbols(legendCount, options.symbolRandom ?? Math.random);
+  const outcome = getFinalChanceOutcome(legendCount);
+  const isWinning = outcome !== 'failure';
+
+  return {
+    id: options.id,
+    type: FINAL_CHANCE_CARD_CONFIG.id,
+    price: FINAL_CHANCE_CARD_PRICE,
+    level,
+    status: 'onTable',
+    result: {
+      tierId: tier.id,
+      label: tier.label,
+      payout: 0,
+      symbols,
+      isWinning,
+      hasPenaltySymbol: false,
+      canDiscard: false,
+      penaltySlotIndexes: [],
+      penaltyTriggered: false,
+      discardCost: 0,
+      penaltyAmount: 0,
+      finalChance: {
+        legendCount,
+        gloryPreview: getFinalChanceGloryPreview(legendCount),
+        outcome,
+      },
+    },
+    position: getRandomPlateSpawnPosition(),
+    scratchPoints: [],
+  } satisfies ScratchCardState;
+}
+
 export function createScratchCard(cardType: ScratchCardType, options: CreateScratchCardOptions) {
+  if (cardType === 'final-chance') {
+    return createFinalChanceScratchCard(options as CreateFinalChanceScratchCardOptions);
+  }
+
   if (cardType === 'push-luck') {
     return createPushLuckScratchCard(options as CreatePushLuckScratchCardOptions);
   }

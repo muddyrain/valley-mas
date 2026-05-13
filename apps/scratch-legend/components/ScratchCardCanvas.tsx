@@ -65,6 +65,17 @@ const SCRATCH_CANVAS_LAYOUTS = {
       { left: 178, top: 13, width: 46, height: 46 },
     ],
   },
+  'final-chance': {
+    width: 230,
+    height: 128,
+    slotBounds: [
+      { left: 18, top: 5, width: 54, height: 54 },
+      { left: 88, top: 5, width: 54, height: 54 },
+      { left: 158, top: 5, width: 54, height: 54 },
+      { left: 48, top: 69, width: 54, height: 54 },
+      { left: 118, top: 69, width: 54, height: 54 },
+    ],
+  },
 } as const satisfies Record<
   ScratchCardType,
   {
