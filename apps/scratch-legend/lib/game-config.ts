@@ -14,44 +14,56 @@ export const scratchLegendConfig = {
     // 熟练度分段里程碑列表。
     // 约定：
     // - requiredProficiency 表示当前段需要刷多少熟练度，不是存档里的累计总值
-    // - UI 展示当前段熟练度 / 当前段目标，例如 5/10、25/50、125/250
+    // - UI 展示当前段熟练度 / 当前段目标，例如 5/10、25/300、125/1000
     // - 解锁判断使用内部累计总熟练度，并把前置段目标累加为真实阈值
     proficiencyMilestones: [
       {
         id: 'trash-can',
         label: '垃圾桶',
-        requiredProficiency: 3,
-        description: '第一段熟练度达到 3 后解锁垃圾桶。',
+        requiredProficiency: 10,
+        description: '第一段熟练度达到 10 后解锁垃圾桶。',
       },
       {
         id: 'scratch-mode',
         label: '刮刮卡',
-        requiredProficiency: 10,
-        description: '第二段熟练度达到 10 后触发刮刮卡电话解锁流程。',
+        requiredProficiency: 50,
+        description: '第二段熟练度达到 50 后触发刮刮卡电话解锁流程。',
       },
       {
         id: 'upgrade-tools',
         label: '升级工具',
-        requiredProficiency: 50,
-        description: '第三段熟练度达到 50 后触发升级工具电话解锁流程。',
+        requiredProficiency: 300,
+        description: '第三段熟练度达到 300 后触发升级工具电话解锁流程。',
       },
       {
         id: 'triple-match-card',
         label: '三连胜出',
-        requiredProficiency: 100,
-        description: '第四段熟练度达到 100 后预留三连胜出刮刮卡解锁位。',
+        requiredProficiency: 500,
+        description: '第四段熟练度达到 500 后预留三连胜出刮刮卡解锁位。',
       },
       {
         id: 'auto-scratcher',
         label: '自动刮刮机',
-        requiredProficiency: 250,
-        description: '自动刮刮机段熟练度达到 250 后触发解锁资格。',
+        requiredProficiency: 1000,
+        description: '自动刮刮机段熟练度达到 1000 后触发解锁资格。',
       },
       {
-        id: 'late-game-goal',
-        label: '后续目标',
-        requiredProficiency: 1000,
-        description: '后续熟练度达到 1000 后预留长期目标解锁位。',
+        id: 'auto-stable',
+        label: '自动机稳定期',
+        requiredProficiency: 3000,
+        description: '自动机稳定期熟练度达到 3000 后承接后期自动化升级。',
+      },
+      {
+        id: 'risk-warmup',
+        label: '高风险预热',
+        requiredProficiency: 5000,
+        description: '高风险预热段熟练度达到 5000 后承接风险管理能力。',
+      },
+      {
+        id: 'push-luck-card',
+        label: '步步加码',
+        requiredProficiency: 10000,
+        description: '步步加码段熟练度达到 10000 后解锁高风险逐层挑战票。',
       },
     ] as const,
   },
@@ -585,8 +597,8 @@ export const scratchLegendConfig = {
   // 辅助道具解锁配置。
   unlockables: {
     trashCan: {
-      // 累计清洁多少个盘子后自动解锁垃圾桶。
-      autoUnlockAfterCleanedPlates: 3,
+      // 熟练度达到多少后自动解锁垃圾桶购买资格。
+      autoUnlockAfterCleanedPlates: 10,
       // 解锁后仍需要在辅助道具页购买才会出现在桌面。
       price: 2,
     },

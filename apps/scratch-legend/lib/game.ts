@@ -5,6 +5,7 @@ export const TRASH_CAN_MILESTONE_ID = 'trash-can' as const;
 export const SCRATCH_MODE_MILESTONE_ID = 'scratch-mode' as const;
 export const TRIPLE_MATCH_CARD_MILESTONE_ID = 'triple-match-card' as const;
 export const AUTO_SCRATCH_MACHINE_MILESTONE_ID = 'auto-scratcher' as const;
+export const PUSH_LUCK_CARD_MILESTONE_ID = 'push-luck-card' as const;
 export const BASIC_CARD_UNLOCK_GOLD = getUnlockMilestoneThreshold(SCRATCH_MODE_MILESTONE_ID);
 export const CLEAN_COMPLETE_THRESHOLD = scratchLegendConfig.work.cleanCompleteThreshold;
 export const INITIAL_GOLD = scratchLegendConfig.economy.initialGold;
@@ -767,7 +768,7 @@ export function getStageGoalProgress(options: {
     ratio: options.unlockProgressRatio,
     displayText:
       options.nextUnlockMilestone === null
-        ? '等待最终挑战'
+        ? '当前目标已完成'
         : `${normalizedCurrent}/${normalizedTarget}`,
   };
 }

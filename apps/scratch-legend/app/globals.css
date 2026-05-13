@@ -2458,6 +2458,11 @@ button {
   pointer-events: none;
 }
 
+.trash-can.with-auto-machine {
+  right: 30px;
+  bottom: 154px;
+}
+
 .trash-lid {
   position: absolute;
   top: -8px;

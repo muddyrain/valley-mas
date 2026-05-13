@@ -62,6 +62,7 @@ import {
   LOAN_REPAYMENT_AMOUNT,
   type LoanState,
   markScratchCardPenaltyTriggered,
+  PUSH_LUCK_CARD_MILESTONE_ID,
   PUSH_LUCK_CARD_PRICE,
   RISK_PEEK_CARD_PRICE,
   repayLoan,
@@ -113,7 +114,6 @@ import {
 import { useScratchLegendStore } from '@/lib/game-store';
 
 const SCRATCH_MODE_MILESTONE_ID: UnlockMilestoneId = 'scratch-mode';
-const PUSH_LUCK_CARD_MILESTONE_ID: UnlockMilestoneId = 'late-game-goal';
 const DESKTOP_PLATE_SIZE = scratchLegendConfig.work.plate.desktopSize;
 const TABLETOP_SCRATCH_CARD_SIZE = { width: 108, height: 76 } as const;
 const PLATE_ENTER_ANIMATION_MS = scratchLegendConfig.work.plate.enterAnimationMs;
@@ -3804,7 +3804,9 @@ export function ScratchLegendGame() {
               {trashCanAvailable && (
                 <div
                   ref={trashCanRef}
-                  className={`trash-can ${trashHoverPlateId || trashHoverScratchCardId ? 'open' : ''}`}
+                  className={`trash-can ${autoScratchMachineUnlocked ? 'with-auto-machine' : ''} ${
+                    trashHoverPlateId || trashHoverScratchCardId ? 'open' : ''
+                  }`}
                   role="img"
                   aria-label="垃圾桶"
                 >
