@@ -39,6 +39,10 @@ export const RISK_PEEK_CARD_CONFIG = scratchLegendConfig.scratchCards.riskPeek;
 export const RISK_PEEK_CARD_PRICE = RISK_PEEK_CARD_CONFIG.price;
 export const RISK_PEEK_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD =
   RISK_PEEK_CARD_CONFIG.scratchSymbolRevealThreshold;
+export const PUSH_LUCK_CARD_CONFIG = scratchLegendConfig.scratchCards.pushLuck;
+export const PUSH_LUCK_CARD_PRICE = PUSH_LUCK_CARD_CONFIG.price;
+export const PUSH_LUCK_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD =
+  PUSH_LUCK_CARD_CONFIG.scratchSymbolRevealThreshold;
 export const SCRATCH_CARD_ALBUMS_CONFIG = scratchLegendConfig.cardAlbums;
 export const UPGRADE_TOOLS_CONFIG = scratchLegendConfig.upgradeTools.items;
 export const AUTOMATION_CONFIG = scratchLegendConfig.automation;
@@ -107,15 +111,17 @@ export type WorkPlateState = {
   seed: number;
 };
 
-export type ScratchCardType = 'basic-safe' | 'triple-match' | 'risk-peek';
+export type ScratchCardType = 'basic-safe' | 'triple-match' | 'risk-peek' | 'push-luck';
 export type ScratchCardStatus = 'onTable' | 'scratching' | 'claimable' | 'settled';
 type BasicSafeScratchCardPrizeTierConfig = (typeof BASIC_SAFE_CARD_CONFIG.prizePool)[number];
 type TripleMatchScratchCardPrizeTierConfig = (typeof TRIPLE_MATCH_CARD_CONFIG.prizePool)[number];
 type RiskPeekScratchCardPrizeTierConfig = (typeof RISK_PEEK_CARD_CONFIG.prizePool)[number];
+type PushLuckScratchCardPrizeTierConfig = (typeof PUSH_LUCK_CARD_CONFIG.prizePool)[number];
 type ScratchCardPrizeTierConfig =
   | BasicSafeScratchCardPrizeTierConfig
   | TripleMatchScratchCardPrizeTierConfig
-  | RiskPeekScratchCardPrizeTierConfig;
+  | RiskPeekScratchCardPrizeTierConfig
+  | PushLuckScratchCardPrizeTierConfig;
 export type ScratchCardPrizeTier = Omit<ScratchCardPrizeTierConfig, 'payout' | 'probability'> & {
   payout: number;
   probability: number;
@@ -124,7 +130,26 @@ export type ScratchCardPrizeTierId = ScratchCardPrizeTierConfig['id'];
 export type BasicSafeScratchCardPrizeTierId = BasicSafeScratchCardPrizeTierConfig['id'];
 export type TripleMatchScratchCardPrizeTierId = TripleMatchScratchCardPrizeTierConfig['id'];
 export type RiskPeekScratchCardPrizeTierId = RiskPeekScratchCardPrizeTierConfig['id'];
+export type PushLuckScratchCardPrizeTierId = PushLuckScratchCardPrizeTierConfig['id'];
 export type ScratchCardSymbol = 'fire' | 'cash' | 'bag' | 'coin' | 'jackpot' | 'blank' | 'danger';
+
+export type PushLuckLayerOutcome = 'locked' | 'safe' | 'bust';
+export type PushLuckFirstBustLayer = 2 | 3 | 4 | null;
+export type PushLuckStageState = {
+  layer: number;
+  cashOutAmount: number;
+  bustPenalty: number;
+  symbol: ScratchCardSymbol;
+  outcome: PushLuckLayerOutcome;
+};
+export type PushLuckScratchCardState = {
+  firstBustLayer: PushLuckFirstBustLayer;
+  currentLayer: number;
+  highestRevealedLayer: number;
+  cashedOutLayer: number | null;
+  bustedLayer: number | null;
+  stages: PushLuckStageState[];
+};
 
 export type ScratchCardResult = {
   tierId: ScratchCardPrizeTierId;
@@ -138,6 +163,9 @@ export type ScratchCardResult = {
   penaltyTriggered: boolean;
   discardCost: number;
   penaltyAmount: number;
+  canCashOut?: boolean;
+  canContinue?: boolean;
+  pushLuck?: PushLuckScratchCardState;
 };
 
 export type ScratchCardState = {
@@ -180,6 +208,7 @@ export type StageGoalProgress = {
   current: number;
   target: number;
   ratio: number;
+  displayText: string;
 };
 
 export type ScratchCardLevelProgress = {
@@ -251,10 +280,18 @@ export type CreateRiskPeekScratchCardOptions = {
   symbolRandom?: () => number;
 };
 
+export type CreatePushLuckScratchCardOptions = {
+  id: number;
+  level?: number;
+  forcedFirstBustLayer?: PushLuckFirstBustLayer;
+  random?: () => number;
+};
+
 export type CreateScratchCardOptions =
   | CreateBasicSafeScratchCardOptions
   | CreateTripleMatchScratchCardOptions
-  | CreateRiskPeekScratchCardOptions;
+  | CreateRiskPeekScratchCardOptions
+  | CreatePushLuckScratchCardOptions;
 
 export type CreateLoanFromTemplateOptions = {
   id: number;
@@ -521,6 +558,10 @@ export function getBasicSafeScratchCardPrizePoolForLevel(level: number): Scratch
 }
 
 export function getScratchCardConfig(cardType: ScratchCardType) {
+  if (cardType === 'push-luck') {
+    return PUSH_LUCK_CARD_CONFIG;
+  }
+
   if (cardType === 'triple-match') {
     return TRIPLE_MATCH_CARD_CONFIG;
   }
@@ -560,6 +601,7 @@ export function getLuckAdjustedScratchCardPrizePool(
   if (
     normalizedLuckLevel <= 0 ||
     cardType === 'risk-peek' ||
+    cardType === 'push-luck' ||
     luckTool?.effect.type !== 'scratch-luck'
   ) {
     return prizePool;
@@ -629,6 +671,10 @@ export function getScratchCardStepDistance(cardType: ScratchCardType) {
 }
 
 export function getScratchCardSettlementProgressKey(cardType: ScratchCardType) {
+  if (cardType === 'push-luck') {
+    return 'pushLuck';
+  }
+
   if (cardType === 'triple-match') {
     return 'tripleMatch';
   }
@@ -711,11 +757,18 @@ export function getStageGoalProgress(options: {
   autoScratchMachineUnlocked: boolean;
   autoScratchMachineProgress: AutoScratchMachineUnlockProgress;
 }): StageGoalProgress {
+  const normalizedCurrent = Math.max(0, Math.floor(options.unlockProgressCurrent));
+  const normalizedTarget = Math.max(0, Math.floor(options.unlockProgressTarget));
+
   return {
     label: '熟练度',
-    current: options.unlockProgressCurrent,
-    target: options.unlockProgressTarget,
+    current: normalizedCurrent,
+    target: normalizedTarget,
     ratio: options.unlockProgressRatio,
+    displayText:
+      options.nextUnlockMilestone === null
+        ? '等待最终挑战'
+        : `${normalizedCurrent}/${normalizedTarget}`,
   };
 }
 
@@ -826,6 +879,28 @@ export function getScratchCardRevealSlotIndex(
     return null;
   }
 
+  if (cardType === 'push-luck') {
+    const pushLuckSlotBounds = [
+      { left: 7 / 230, top: 13 / 72, right: 53 / 230, bottom: 59 / 72 },
+      { left: 64 / 230, top: 13 / 72, right: 110 / 230, bottom: 59 / 72 },
+      { left: 121 / 230, top: 13 / 72, right: 167 / 230, bottom: 59 / 72 },
+      { left: 178 / 230, top: 13 / 72, right: 224 / 230, bottom: 59 / 72 },
+    ] as const;
+
+    for (const [index, bounds] of pushLuckSlotBounds.entries()) {
+      if (
+        point.xPercent >= bounds.left &&
+        point.xPercent <= bounds.right &&
+        point.yPercent >= bounds.top &&
+        point.yPercent <= bounds.bottom
+      ) {
+        return index;
+      }
+    }
+
+    return null;
+  }
+
   const tripleMatchSlots = [
     { x: 45 / 230, y: 32 / 128 },
     { x: 115 / 230, y: 32 / 128 },
@@ -860,6 +935,10 @@ export function getScratchCardRevealThreshold(cardType: ScratchCardType) {
     return RISK_PEEK_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD;
   }
 
+  if (cardType === 'push-luck') {
+    return PUSH_LUCK_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD;
+  }
+
   return BASIC_SAFE_CARD_SCRATCH_SYMBOL_REVEAL_THRESHOLD;
 }
 
@@ -869,6 +948,10 @@ export function getScratchCardRevealRatio(coveredRatio: number) {
 
 export function shouldRevealScratchSlot(revealRatio: number, cardType: ScratchCardType) {
   return revealRatio >= getScratchCardRevealThreshold(cardType);
+}
+
+export function shouldClearScratchSlotCover(revealRatio: number, cardType: ScratchCardType) {
+  return shouldRevealScratchSlot(revealRatio, cardType);
 }
 
 export function getScratchCardSettlementHighlightDelayMs(options: {
@@ -1289,7 +1372,222 @@ export function createRiskPeekScratchCard(options: CreateRiskPeekScratchCardOpti
   } satisfies ScratchCardState;
 }
 
+function getPushLuckFirstBustLayer(random: () => number = Math.random): PushLuckFirstBustLayer {
+  const roll = clampRatio(random());
+  let cumulativeProbability = 0;
+
+  for (const path of PUSH_LUCK_CARD_CONFIG.pushRule.bustPathPool) {
+    cumulativeProbability += path.probability;
+
+    if (roll < cumulativeProbability - Number.EPSILON) {
+      return path.firstBustLayer;
+    }
+  }
+
+  return PUSH_LUCK_CARD_CONFIG.pushRule.bustPathPool[
+    PUSH_LUCK_CARD_CONFIG.pushRule.bustPathPool.length - 1
+  ].firstBustLayer;
+}
+
+function createPushLuckStages(firstBustLayer: PushLuckFirstBustLayer): PushLuckStageState[] {
+  return PUSH_LUCK_CARD_CONFIG.pushRule.layers.map((layerConfig) => {
+    const layer = Number(layerConfig.layer);
+    const outcome: PushLuckLayerOutcome =
+      firstBustLayer === layer
+        ? 'bust'
+        : firstBustLayer !== null && layer > firstBustLayer
+          ? 'locked'
+          : 'safe';
+
+    return {
+      layer,
+      cashOutAmount: layerConfig.cashOutAmount,
+      bustPenalty: layerConfig.bustPenalty,
+      symbol: layerConfig.symbol,
+      outcome,
+    };
+  });
+}
+
+function getPushLuckTierIdForLayer(layer: number): PushLuckScratchCardPrizeTierId {
+  if (layer >= 1 && layer <= 4) {
+    return `push-layer-${layer}` as PushLuckScratchCardPrizeTierId;
+  }
+
+  return 'push-bust';
+}
+
+function getPushLuckStage(card: ScratchCardState, layer: number) {
+  return card.result.pushLuck?.stages.find((stage) => stage.layer === layer) ?? null;
+}
+
+export function createPushLuckScratchCard(options: CreatePushLuckScratchCardOptions) {
+  const level = Math.max(
+    0,
+    Math.min(PUSH_LUCK_CARD_CONFIG.level.payoutMultiplierByLevel.length - 1, options.level ?? 0),
+  );
+  const firstBustLayer =
+    options.forcedFirstBustLayer === undefined
+      ? getPushLuckFirstBustLayer(options.random)
+      : options.forcedFirstBustLayer;
+  const stages = createPushLuckStages(firstBustLayer);
+
+  return {
+    id: options.id,
+    type: PUSH_LUCK_CARD_CONFIG.id,
+    price: PUSH_LUCK_CARD_PRICE,
+    level,
+    status: 'onTable',
+    result: {
+      tierId: 'push-bust',
+      label: '尚未揭露',
+      payout: 0,
+      symbols: stages.map((stage) => (stage.outcome === 'bust' ? 'danger' : stage.symbol)),
+      isWinning: false,
+      hasPenaltySymbol: firstBustLayer !== null,
+      canDiscard: false,
+      penaltySlotIndexes: firstBustLayer === null ? [] : [firstBustLayer - 1],
+      penaltyTriggered: false,
+      discardCost: 0,
+      penaltyAmount: 0,
+      canCashOut: false,
+      canContinue: false,
+      pushLuck: {
+        firstBustLayer,
+        currentLayer: 1,
+        highestRevealedLayer: 0,
+        cashedOutLayer: null,
+        bustedLayer: null,
+        stages,
+      },
+    },
+    position: getRandomPlateSpawnPosition(),
+    scratchPoints: [],
+  } satisfies ScratchCardState;
+}
+
+export function revealPushLuckLayer(card: ScratchCardState, layer: number) {
+  if (card.type !== 'push-luck' || !card.result.pushLuck) {
+    return card;
+  }
+
+  const normalizedLayer = Math.max(1, Math.floor(layer));
+  const pushLuck = card.result.pushLuck;
+
+  if (
+    normalizedLayer !== pushLuck.currentLayer ||
+    pushLuck.cashedOutLayer !== null ||
+    pushLuck.bustedLayer !== null
+  ) {
+    return card;
+  }
+
+  const stage = getPushLuckStage(card, normalizedLayer);
+
+  if (!stage || stage.outcome === 'locked') {
+    return card;
+  }
+
+  if (stage.outcome === 'bust') {
+    return {
+      ...card,
+      status: 'claimable',
+      result: {
+        ...card.result,
+        tierId: 'push-bust',
+        label: '爆雷归零',
+        payout: 0,
+        isWinning: false,
+        penaltyTriggered: true,
+        penaltyAmount: stage.bustPenalty,
+        canCashOut: false,
+        canContinue: false,
+        pushLuck: {
+          ...pushLuck,
+          highestRevealedLayer: normalizedLayer,
+          bustedLayer: normalizedLayer,
+        },
+      },
+    } satisfies ScratchCardState;
+  }
+
+  return {
+    ...card,
+    status: 'claimable',
+    result: {
+      ...card.result,
+      tierId: getPushLuckTierIdForLayer(normalizedLayer),
+      label: `第 ${normalizedLayer} 层安全`,
+      payout: stage.cashOutAmount,
+      isWinning: true,
+      penaltyTriggered: false,
+      penaltyAmount: 0,
+      canCashOut: true,
+      canContinue: normalizedLayer < PUSH_LUCK_CARD_CONFIG.pushRule.layers.length,
+      pushLuck: {
+        ...pushLuck,
+        highestRevealedLayer: normalizedLayer,
+      },
+    },
+  } satisfies ScratchCardState;
+}
+
+export function continuePushLuckScratchCard(card: ScratchCardState) {
+  const pushLuck = card.result.pushLuck;
+
+  if (
+    card.type !== 'push-luck' ||
+    !pushLuck ||
+    !card.result.canContinue ||
+    pushLuck.bustedLayer !== null ||
+    pushLuck.cashedOutLayer !== null
+  ) {
+    return card;
+  }
+
+  return {
+    ...card,
+    status: 'scratching',
+    result: {
+      ...card.result,
+      payout: 0,
+      isWinning: false,
+      canCashOut: false,
+      canContinue: false,
+      pushLuck: {
+        ...pushLuck,
+        currentLayer: pushLuck.highestRevealedLayer + 1,
+      },
+    },
+  } satisfies ScratchCardState;
+}
+
+export function cashOutPushLuckScratchCard(card: ScratchCardState) {
+  const pushLuck = card.result.pushLuck;
+
+  if (card.type !== 'push-luck' || !pushLuck || !card.result.canCashOut) {
+    return card;
+  }
+
+  return {
+    ...card,
+    status: 'claimable',
+    result: {
+      ...card.result,
+      canContinue: false,
+      pushLuck: {
+        ...pushLuck,
+        cashedOutLayer: pushLuck.highestRevealedLayer,
+      },
+    },
+  } satisfies ScratchCardState;
+}
+
 export function createScratchCard(cardType: ScratchCardType, options: CreateScratchCardOptions) {
+  if (cardType === 'push-luck') {
+    return createPushLuckScratchCard(options as CreatePushLuckScratchCardOptions);
+  }
+
   if (cardType === 'triple-match') {
     return createTripleMatchScratchCard(options as CreateTripleMatchScratchCardOptions);
   }
@@ -1316,6 +1614,17 @@ export function getEffectiveScratchCardDiscardCost(gold: number, card: ScratchCa
   return Math.max(0, Math.min(card.result.discardCost, spendableGold));
 }
 
+export function getPushLuckBustPenalty(gold: number, card: ScratchCardState) {
+  if (card.type !== 'push-luck' || !card.result.penaltyTriggered) {
+    return 0;
+  }
+
+  const reserveGold = PUSH_LUCK_CARD_CONFIG.pushRule.reserveGoldAfterBust;
+  const spendableGold = Math.max(0, Math.floor(gold) - reserveGold);
+
+  return Math.max(0, Math.min(card.result.penaltyAmount, spendableGold));
+}
+
 export function shouldTriggerScratchCardPenalty(card: ScratchCardState, slotIndex: number) {
   return card.result.penaltySlotIndexes.includes(slotIndex);
 }
@@ -1337,7 +1646,12 @@ export function markScratchCardPenaltyTriggered(card: ScratchCardState) {
 }
 
 export function settleScratchCard(player: PlayerState, card: ScratchCardState) {
-  const penaltyAmount = card.result.penaltyTriggered ? card.result.penaltyAmount : 0;
+  const penaltyAmount =
+    card.type === 'push-luck'
+      ? getPushLuckBustPenalty(player.gold, card)
+      : card.result.penaltyTriggered
+        ? card.result.penaltyAmount
+        : 0;
   const payout = card.result.isWinning && !card.result.penaltyTriggered ? card.result.payout : 0;
   const isNetLoss = payout < card.price;
 
@@ -1488,11 +1802,8 @@ export function getScratchBrushRadiusForUpgradeLevel(scratchRadiusLevel: number)
   return BASIC_SAFE_CARD_SCRATCH_BRUSH.radius + bonus;
 }
 
-export function getScratchBrushRadius(
-  scratchRadiusLevel: number,
-  activeLoans: readonly Partial<Pick<LoanState, 'penalty'>>[] = [],
-) {
-  const loanDelta = activeLoans.reduce((sum, loan) => {
+function getScratchBrushLoanDelta(activeLoans: readonly Partial<Pick<LoanState, 'penalty'>>[]) {
+  return activeLoans.reduce((sum, loan) => {
     const penalty = loan.penalty;
 
     if (!penalty?.enabled || penalty.type !== 'scratch-brush-radius-delta') {
@@ -1501,8 +1812,35 @@ export function getScratchBrushRadius(
 
     return sum + penalty.delta;
   }, 0);
+}
+
+function getScratchBrushUpgradeBonus(scratchRadiusLevel: number) {
+  const tool = getUpgradeToolConfig('scratch-radius');
+
+  return tool?.effect.type === 'scratch-brush-radius'
+    ? Math.max(0, Math.floor(scratchRadiusLevel)) * tool.effect.valuePerLevel
+    : 0;
+}
+
+export function getScratchBrushRadius(
+  scratchRadiusLevel: number,
+  activeLoans: readonly Partial<Pick<LoanState, 'penalty'>>[] = [],
+) {
+  const loanDelta = getScratchBrushLoanDelta(activeLoans);
 
   return Math.max(1, getScratchBrushRadiusForUpgradeLevel(scratchRadiusLevel) + loanDelta);
+}
+
+export function getScratchCardBrushRadius(
+  cardType: ScratchCardType,
+  scratchRadiusLevel: number,
+  activeLoans: readonly Partial<Pick<LoanState, 'penalty'>>[] = [],
+) {
+  const baseRadius = getScratchCardConfig(cardType).scratchBrush.radius;
+  const bonus = getScratchBrushUpgradeBonus(scratchRadiusLevel);
+  const loanDelta = getScratchBrushLoanDelta(activeLoans);
+
+  return Math.max(1, baseRadius + bonus + loanDelta);
 }
 
 export function getCleaningBrushRadius(

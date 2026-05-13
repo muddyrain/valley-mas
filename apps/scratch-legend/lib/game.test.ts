@@ -12,8 +12,11 @@ import {
   canBuyScratchCard,
   canBuyTrashCan,
   canStartWorkFromPhase,
+  cashOutPushLuckScratchCard,
+  continuePushLuckScratchCard,
   createBasicSafeScratchCard,
   createLoanFromTemplate,
+  createPushLuckScratchCard,
   createRiskPeekScratchCard,
   createScratchCard,
   createTripleMatchScratchCard,
@@ -31,10 +34,12 @@ import {
   getNextLoanTemplate,
   getNextUnlockMilestone,
   getOutcomeAmountLabel,
+  getPushLuckBustPenalty,
   getRandomPlateSpawnPosition,
   getScratchBrushRadius,
   getScratchBrushRadiusForUpgradeLevel,
   getScratchCardAlbumSlotByType,
+  getScratchCardBrushRadius,
   getScratchCardConfig,
   getScratchCardDiscardCost,
   getScratchCardLevelProgress,
@@ -64,12 +69,15 @@ import {
   LOAN_PRINCIPAL,
   LOAN_REPAYMENT_AMOUNT,
   markScratchCardPenaltyTriggered,
+  PUSH_LUCK_CARD_PRICE,
   RISK_PEEK_CARD_PRICE,
   repayLoan,
+  revealPushLuckLayer,
   rollWorkReward,
   SCRATCH_CARD_ALBUMS_CONFIG,
   settleBasicSafeScratchCard,
   settleScratchCard,
+  shouldClearScratchSlotCover,
   shouldCloseCleaningOverlay,
   shouldForceWrongScratchCardForLoan,
   shouldHandlePlatePointerDown,
@@ -204,6 +212,36 @@ test('maps scratch points to the result slot that should reveal-flash', () => {
   assert.equal(getScratchCardRevealSlotIndex('risk-peek', { xPercent: 0.5, yPercent: 0.24 }), 1);
   assert.equal(getScratchCardRevealSlotIndex('risk-peek', { xPercent: 0.8, yPercent: 0.76 }), 5);
   assert.equal(getScratchCardRevealSlotIndex('risk-peek', { xPercent: 0.5, yPercent: 0.5 }), null);
+
+  assert.equal(
+    getScratchCardRevealSlotIndex('push-luck', { xPercent: 30 / 230, yPercent: 36 / 72 }),
+    0,
+  );
+  assert.equal(
+    getScratchCardRevealSlotIndex('push-luck', { xPercent: 87 / 230, yPercent: 36 / 72 }),
+    1,
+  );
+  assert.equal(
+    getScratchCardRevealSlotIndex('push-luck', { xPercent: 144 / 230, yPercent: 36 / 72 }),
+    2,
+  );
+  assert.equal(
+    getScratchCardRevealSlotIndex('push-luck', { xPercent: 201 / 230, yPercent: 36 / 72 }),
+    3,
+  );
+  assert.equal(
+    getScratchCardRevealSlotIndex('push-luck', { xPercent: 30 / 230, yPercent: 14 / 72 }),
+    0,
+  );
+  assert.equal(
+    getScratchCardRevealSlotIndex('push-luck', { xPercent: 30 / 230, yPercent: 58 / 72 }),
+    0,
+  );
+  assert.equal(
+    getScratchCardRevealSlotIndex('push-luck', { xPercent: 58 / 230, yPercent: 36 / 72 }),
+    null,
+  );
+  assert.equal(getScratchCardRevealSlotIndex('push-luck', { xPercent: 0.5, yPercent: 0.08 }), null);
 });
 
 test('requires a configured 95 percent reveal ratio before a scratch slot flashes', () => {
@@ -217,6 +255,8 @@ test('requires a configured 95 percent reveal ratio before a scratch slot flashe
   assert.equal(shouldRevealScratchSlot(0.949, 'triple-match'), false);
   assert.equal(shouldRevealScratchSlot(1, 'triple-match'), true);
   assert.equal(shouldRevealScratchSlot(0.95, 'risk-peek'), true);
+  assert.equal(shouldClearScratchSlotCover(0.949, 'push-luck'), false);
+  assert.equal(shouldClearScratchSlotCover(0.95, 'push-luck'), true);
 });
 
 test('waits until every scratch slot has revealed before scheduling winning highlights', () => {
@@ -829,6 +869,16 @@ test('applies active loan brush radius penalties after upgrade bonuses', () => {
   assert.equal(getScratchBrushRadiusForUpgradeLevel(2), baseRadius + 2);
   assert.equal(getScratchBrushRadius(2, [radiusLoan]), baseRadius + 1);
   assert.equal(getScratchBrushRadius(0, [radiusLoan]), baseRadius - 1);
+});
+
+test('uses a smaller default scratch brush for push luck card layers', () => {
+  const basicRadius = scratchLegendConfig.scratchCards.basicSafe.scratchBrush.radius;
+  const pushLuckRadius = scratchLegendConfig.scratchCards.pushLuck.scratchBrush.radius;
+
+  assert.ok(pushLuckRadius < basicRadius);
+  assert.equal(getScratchCardBrushRadius('basic-safe', 0), basicRadius);
+  assert.equal(getScratchCardBrushRadius('push-luck', 0), pushLuckRadius);
+  assert.equal(getScratchCardBrushRadius('push-luck', 2), pushLuckRadius + 2);
 });
 
 test('applies scratch radius upgrades to the larger cleaning brush', () => {
@@ -1662,6 +1712,7 @@ test('keeps the top progress on proficiency after upgrade tools unlock', () => {
       current: 37,
       target: 1000,
       ratio: 0.037,
+      displayText: '37/1000',
     },
   );
 });
@@ -1684,6 +1735,30 @@ test('keeps the top progress on proficiency after the auto scratch machine is un
       current: 0,
       target: 1000,
       ratio: 0,
+      displayText: '0/1000',
+    },
+  );
+});
+
+test('shows a clear end-of-current-goals label after the last proficiency milestone', () => {
+  assert.deepEqual(
+    getStageGoalProgress({
+      nextUnlockMilestone: null,
+      unlockProgressCurrent: 1000,
+      unlockProgressTarget: 1000,
+      unlockProgressRatio: 1,
+      autoScratchMachineUnlocked: true,
+      autoScratchMachineProgress: getAutoScratchMachineUnlockProgress({
+        gold: 1510,
+        milestoneUnlocked: true,
+      }),
+    }),
+    {
+      label: '熟练度',
+      current: 1000,
+      target: 1000,
+      ratio: 1,
+      displayText: '等待最终挑战',
     },
   );
 });
@@ -2004,4 +2079,89 @@ test('only offers a loan phone when the player is broke and the table is empty',
     }),
     true,
   );
+});
+
+test('configures push luck as the manual high risk card', () => {
+  const config = getScratchCardConfig('push-luck');
+
+  assert.equal(config.label, '步步加码');
+  assert.equal(PUSH_LUCK_CARD_PRICE, 800);
+  assert.equal(getScratchCardSettlementProgressKey('push-luck'), 'pushLuck');
+  assert.equal(getScratchCardAlbumSlotByType('push-luck')?.role, 'high-risk');
+  assert.equal(getScratchCardStepDistance('push-luck'), 4);
+});
+
+test('pre-generates the push luck bust layer when the card is bought', () => {
+  const card = createPushLuckScratchCard({ id: 88, forcedFirstBustLayer: 3 });
+
+  assert.equal(card.type, 'push-luck');
+  assert.equal(card.price, PUSH_LUCK_CARD_PRICE);
+  assert.equal(card.result.pushLuck?.firstBustLayer, 3);
+  assert.equal(card.result.pushLuck?.currentLayer, 1);
+  assert.deepEqual(
+    card.result.pushLuck?.stages.map((stage) => stage.outcome),
+    ['safe', 'safe', 'bust', 'locked'],
+  );
+  assert.equal(card.result.payout, 0);
+  assert.equal(card.result.canCashOut, false);
+  assert.equal(card.result.canContinue, false);
+});
+
+test('push luck can cash out after a safe revealed layer', () => {
+  const card = createPushLuckScratchCard({ id: 89, forcedFirstBustLayer: 4 });
+  const revealedCard = revealPushLuckLayer(card, 1);
+  const cashedOutCard = cashOutPushLuckScratchCard(revealedCard);
+  const player = createInitialScratchLegendSave().player;
+  const settledPlayer = settleScratchCard(player, cashedOutCard);
+
+  assert.equal(revealedCard.status, 'claimable');
+  assert.equal(revealedCard.result.payout, 260);
+  assert.equal(revealedCard.result.canCashOut, true);
+  assert.equal(revealedCard.result.canContinue, true);
+  assert.equal(cashedOutCard.result.pushLuck?.cashedOutLayer, 1);
+  assert.equal(settledPlayer.gold, player.gold + 260);
+});
+
+test('push luck must continue before the next layer can be revealed', () => {
+  const card = createPushLuckScratchCard({ id: 90, forcedFirstBustLayer: null });
+  const firstLayerCard = revealPushLuckLayer(card, 1);
+  const blockedRevealCard = revealPushLuckLayer(firstLayerCard, 2);
+  const continuedCard = continuePushLuckScratchCard(firstLayerCard);
+  const secondLayerCard = revealPushLuckLayer(continuedCard, 2);
+
+  assert.equal(blockedRevealCard.result.pushLuck?.highestRevealedLayer, 1);
+  assert.equal(continuedCard.status, 'scratching');
+  assert.equal(continuedCard.result.pushLuck?.currentLayer, 2);
+  assert.equal(secondLayerCard.result.pushLuck?.highestRevealedLayer, 2);
+  assert.equal(secondLayerCard.result.payout, 760);
+});
+
+test('push luck bust settles at zero and protects the final plate dollar', () => {
+  const card = createPushLuckScratchCard({ id: 91, forcedFirstBustLayer: 2 });
+  const firstLayerCard = revealPushLuckLayer(card, 1);
+  const continuedCard = continuePushLuckScratchCard(firstLayerCard);
+  const bustedCard = revealPushLuckLayer(continuedCard, 2);
+  const player = {
+    ...createInitialScratchLegendSave().player,
+    gold: 50,
+  };
+  const settledPlayer = settleScratchCard(player, bustedCard);
+
+  assert.equal(bustedCard.status, 'claimable');
+  assert.equal(bustedCard.result.penaltyTriggered, true);
+  assert.equal(bustedCard.result.payout, 0);
+  assert.equal(bustedCard.result.penaltyAmount, 120);
+  assert.equal(getPushLuckBustPenalty(50, bustedCard), 49);
+  assert.equal(settledPlayer.gold, 1);
+});
+
+test('merge save fills missing push luck progress for legacy saves', () => {
+  const save = mergeScratchLegendSave({
+    scratchCards: {
+      basicSafe: { cardsSettled: 2 },
+    },
+  });
+
+  assert.equal(save.scratchCards.basicSafe.cardsSettled, 2);
+  assert.equal(save.scratchCards.pushLuck.cardsSettled, 0);
 });

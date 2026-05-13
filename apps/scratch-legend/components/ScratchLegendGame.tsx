@@ -18,6 +18,8 @@ import {
   canBuyTrashCan,
   canBuyUpgradeTool,
   canStartWorkFromPhase,
+  cashOutPushLuckScratchCard,
+  continuePushLuckScratchCard,
   createLoanFromTemplate,
   createScratchCard,
   type GoldChangeEffect,
@@ -32,8 +34,9 @@ import {
   getLoanRepaymentFeedback,
   getNextUnlockMilestone,
   getOutcomeAmountLabel,
+  getPushLuckBustPenalty,
   getRandomPlateSpawnPosition,
-  getScratchBrushRadius,
+  getScratchCardBrushRadius,
   getScratchCardConfig,
   getScratchCardDiscardCost,
   getScratchCardLevelProgress,
@@ -59,8 +62,10 @@ import {
   LOAN_REPAYMENT_AMOUNT,
   type LoanState,
   markScratchCardPenaltyTriggered,
+  PUSH_LUCK_CARD_PRICE,
   RISK_PEEK_CARD_PRICE,
   repayLoan,
+  revealPushLuckLayer,
   rollWorkReward,
   SCRATCH_CARD_ALBUMS_CONFIG,
   type ScratchCardState,
@@ -108,6 +113,7 @@ import {
 import { useScratchLegendStore } from '@/lib/game-store';
 
 const SCRATCH_MODE_MILESTONE_ID: UnlockMilestoneId = 'scratch-mode';
+const PUSH_LUCK_CARD_MILESTONE_ID: UnlockMilestoneId = 'late-game-goal';
 const DESKTOP_PLATE_SIZE = scratchLegendConfig.work.plate.desktopSize;
 const TABLETOP_SCRATCH_CARD_SIZE = { width: 108, height: 76 } as const;
 const PLATE_ENTER_ANIMATION_MS = scratchLegendConfig.work.plate.enterAnimationMs;
@@ -448,10 +454,44 @@ function getPrizeTierSymbol(tierId: ScratchCardState['result']['tierId']) {
     return 'danger';
   }
 
+  if (tierId === 'push-layer-1') {
+    return 'coin';
+  }
+
+  if (tierId === 'push-layer-2') {
+    return 'bag';
+  }
+
+  if (tierId === 'push-layer-3') {
+    return 'cash';
+  }
+
+  if (tierId === 'push-layer-4') {
+    return 'jackpot';
+  }
+
+  if (tierId === 'push-bust') {
+    return 'danger';
+  }
+
   return 'blank';
 }
 
 function getScratchCardDisplay(cardType: ScratchCardType) {
+  if (cardType === 'push-luck') {
+    return {
+      catalog: '高风险票',
+      title: '步步加码',
+      ticketTitle: 'PUSH',
+      miniTitle: '加',
+      ruleLabel: '逐层刮开，安全后可收手或继续加码',
+      winLabel: '当前层安全，可以见好就收。',
+      loseLabel: '爆雷归零，本张只能结算。',
+      cardClassName: 'push-luck',
+      levelAriaLabel: '步步加码等级进度',
+    };
+  }
+
   if (cardType === 'risk-peek') {
     return {
       catalog: '风险卡',
@@ -491,6 +531,21 @@ function getScratchCardDisplay(cardType: ScratchCardType) {
     cardClassName: 'basic-safe',
     levelAriaLabel: '成双入对等级进度',
   };
+}
+
+function getPersistedRevealedScratchSlotIndexes(card: ScratchCardState) {
+  if (card.type === 'push-luck' && card.result.pushLuck) {
+    return Array.from(
+      { length: Math.max(0, card.result.pushLuck.highestRevealedLayer) },
+      (_, index) => index,
+    );
+  }
+
+  if (card.status === 'claimable') {
+    return getScratchCardSlotIndexes(card.type);
+  }
+
+  return [];
 }
 
 export function ScratchLegendGame() {
@@ -694,6 +749,12 @@ export function ScratchLegendGame() {
     'risk-peek',
     save.scratchCards.riskPeek.cardsSettled,
   );
+  const pushLuckLevelProgress = getScratchCardLevelProgress(
+    'push-luck',
+    save.scratchCards.pushLuck.cardsSettled,
+  );
+  const pushLuckUnlocked =
+    autoScratchMachineUnlocked && isUnlockMilestoneUnlocked(save, PUSH_LUCK_CARD_MILESTONE_ID);
   const scratchCardCatalogItems = [
     {
       type: 'basic-safe' as const,
@@ -718,6 +779,13 @@ export function ScratchLegendGame() {
       price: RISK_PEEK_CARD_PRICE,
       progress: riskPeekLevelProgress,
     },
+    {
+      type: 'push-luck' as const,
+      visible: pushLuckUnlocked,
+      unlocked: pushLuckUnlocked,
+      price: PUSH_LUCK_CARD_PRICE,
+      progress: pushLuckLevelProgress,
+    },
   ];
   const scratchCardCatalogItemByType = new Map(
     scratchCardCatalogItems.map((item) => [item.type, item]),
@@ -738,7 +806,9 @@ export function ScratchLegendGame() {
             ? '需要机器力量'
             : item.type === 'risk-peek'
               ? '风险票手动'
-              : '已关闭',
+              : item.type === 'push-luck'
+                ? '高风险手动'
+                : '已关闭',
       };
     });
   const autoScratchMachineDetail = (() => {
@@ -773,9 +843,12 @@ export function ScratchLegendGame() {
       ),
     [activeScratchCard?.level, activeScratchCard?.type, basicSafeLevelProgress.level],
   );
-  const activeScratchPrizeRows = activeScratchCardPrizePool.filter(
-    (tier) => tier.displayProbability !== null && tier.payout > 0,
-  );
+  const activeScratchPrizeRows =
+    activeScratchCard?.type === 'push-luck'
+      ? activeScratchCardPrizePool.filter((tier) => tier.payout > 0)
+      : activeScratchCardPrizePool.filter(
+          (tier) => tier.displayProbability !== null && tier.payout > 0,
+        );
   const activeScratchCardDisplay = getScratchCardDisplay(activeScratchCard?.type ?? 'basic-safe');
   const activeScratchCardDiscardCost = activeScratchCard
     ? getEffectiveScratchCardDiscardCost(player.gold, activeScratchCard)
@@ -788,7 +861,9 @@ export function ScratchLegendGame() {
       ? tripleMatchLevelProgress
       : activeScratchCard?.type === 'risk-peek'
         ? riskPeekLevelProgress
-        : basicSafeLevelProgress;
+        : activeScratchCard?.type === 'push-luck'
+          ? pushLuckLevelProgress
+          : basicSafeLevelProgress;
 
   const nextUnlockMilestone = getNextUnlockMilestone(player.proficiency);
   const finalUnlockMilestone =
@@ -816,7 +891,6 @@ export function ScratchLegendGame() {
   const brokenPlateEnabled = isBrokenPlateEnabled(workLevel);
   const workBrokenPlatePenalty = getWorkBrokenPlatePenaltyForLevel(workLevel);
   const scratchRadiusToolLevel = save.upgradeTools['scratch-radius']?.level ?? 0;
-  const scratchBrushRadius = getScratchBrushRadius(scratchRadiusToolLevel, activeLoans);
   const cleaningBrushRadius = getCleaningBrushRadius(scratchRadiusToolLevel, activeLoans);
   const workSafeRewardPercent = `${Math.round(
     (brokenPlateEnabled ? WORK_SAFE_REWARD_CHANCE : 1) * 100,
@@ -840,6 +914,10 @@ export function ScratchLegendGame() {
     tripleMatchMessageDismissed &&
     (phase === 'idle' || phase === 'plateSpawned' || phase === 'scratchCardSpawned') &&
     canBuyScratchCard('risk-peek', player);
+  const canBuyPushLuckCard =
+    pushLuckUnlocked &&
+    (phase === 'idle' || phase === 'plateSpawned' || phase === 'scratchCardSpawned') &&
+    canBuyScratchCard('push-luck', player);
   const canPurchaseTrashCan = canBuyTrashCan(player.gold, trashCanUnlocked, trashCanPurchased);
   const isCleaningView = phase === 'cleaning' || phase === 'claimable';
   const activePlate = getActiveWorkPlate(save);
@@ -1371,7 +1449,32 @@ export function ScratchLegendGame() {
   function revealScratchSlot(slotIndex: number) {
     revealScratchSlots([slotIndex]);
 
-    if (!activeScratchCard || !shouldTriggerScratchCardPenalty(activeScratchCard, slotIndex)) {
+    if (!activeScratchCard) {
+      return;
+    }
+
+    if (activeScratchCard.type === 'push-luck') {
+      updateSave((current) => {
+        const activeCardId = current.workspace.activeScratchCardId;
+
+        if (!activeCardId) {
+          return current;
+        }
+
+        return {
+          ...current,
+          workspace: {
+            ...current.workspace,
+            scratchCards: current.workspace.scratchCards.map((card) =>
+              card.id === activeCardId ? revealPushLuckLayer(card, slotIndex + 1) : card,
+            ),
+          },
+        };
+      });
+      return;
+    }
+
+    if (!shouldTriggerScratchCardPenalty(activeScratchCard, slotIndex)) {
       return;
     }
 
@@ -1684,7 +1787,9 @@ export function ScratchLegendGame() {
         ? canBuyTripleMatchCard
         : cardType === 'risk-peek'
           ? canBuyRiskPeekCard
-          : canBuyBasicSafeCard;
+          : cardType === 'push-luck'
+            ? canBuyPushLuckCard
+            : canBuyBasicSafeCard;
 
     if (!buyable) {
       return;
@@ -1696,7 +1801,9 @@ export function ScratchLegendGame() {
         ? tripleMatchLevelProgress
         : cardType === 'risk-peek'
           ? riskPeekLevelProgress
-          : basicSafeLevelProgress;
+          : cardType === 'push-luck'
+            ? pushLuckLevelProgress
+            : basicSafeLevelProgress;
     const scratchCard = createScratchCard(cardType, {
       id: scratchCardId,
       level: progress.level,
@@ -1729,7 +1836,7 @@ export function ScratchLegendGame() {
     }, PLATE_ENTER_ANIMATION_MS);
     plateEnterTimerRefs.current.push(enterTimer);
 
-    if (scratchLuckToolLevel > 0 && cardType !== 'risk-peek') {
+    if (scratchLuckToolLevel > 0 && cardType !== 'risk-peek' && cardType !== 'push-luck') {
       setLuckyScratchCardIds((current) => [...current, scratchCardId]);
       const luckyTimer = window.setTimeout(() => {
         setLuckyScratchCardIds((current) => current.filter((id) => id !== scratchCardId));
@@ -1747,10 +1854,14 @@ export function ScratchLegendGame() {
 
     resetScratchRevealEffects();
 
-    if (selectedCard.status === 'claimable') {
-      const revealedSlotIndexes = getScratchCardSlotIndexes(selectedCard.type);
+    const revealedSlotIndexes = getPersistedRevealedScratchSlotIndexes(selectedCard);
+
+    if (revealedSlotIndexes.length > 0) {
       revealedScratchSlotSetRef.current = new Set(revealedSlotIndexes);
       setRevealedScratchSlots(revealedSlotIndexes);
+    }
+
+    if (selectedCard.status === 'claimable') {
       scheduleSettlementHighlight(selectedCard, revealedSlotIndexes);
     }
 
@@ -2278,6 +2389,10 @@ export function ScratchLegendGame() {
   }
 
   function completeScratchCard() {
+    if (activeScratchCard?.type === 'push-luck') {
+      return;
+    }
+
     setScratchProgress(1);
 
     if (activeScratchCard) {
@@ -2319,14 +2434,20 @@ export function ScratchLegendGame() {
       return;
     }
 
-    const payout = activeScratchCard.result.isWinning ? activeScratchCard.result.payout : 0;
-    const settledPlayer = settleScratchCard(player, activeScratchCard);
+    const cardToSettle =
+      activeScratchCard.type === 'push-luck'
+        ? cashOutPushLuckScratchCard(activeScratchCard)
+        : activeScratchCard;
+    const payout = cardToSettle.result.isWinning ? cardToSettle.result.payout : 0;
+    const settledPlayer = settleScratchCard(player, cardToSettle);
     const shouldShowAutoScratchMachineUnlock =
       !autoScratchMachineMilestoneUnlocked &&
       settledPlayer.proficiency >= getUnlockMilestoneThreshold(AUTO_SCRATCH_MACHINE_MILESTONE_ID);
 
     if (payout > 0) {
       triggerGoldEffect(player.gold, player.gold + payout, 'scratch-prize');
+    } else if (settledPlayer.gold < player.gold) {
+      triggerGoldEffect(player.gold, settledPlayer.gold, 'broken-plate');
     }
 
     updateSave((current) => {
@@ -2342,7 +2463,10 @@ export function ScratchLegendGame() {
 
       return {
         ...current,
-        player: settleScratchCard(current.player, currentCard),
+        player: settleScratchCard(
+          current.player,
+          currentCard.type === 'push-luck' ? cashOutPushLuckScratchCard(currentCard) : currentCard,
+        ),
         scratchCards: {
           ...current.scratchCards,
           [getScratchCardSettlementProgressKey(currentCard.type)]:
@@ -2363,6 +2487,34 @@ export function ScratchLegendGame() {
     }
     resetScratchRevealEffects();
     setScratchProgress(0);
+  }
+
+  function continuePushLuckCard() {
+    if (
+      !activeScratchCard ||
+      activeScratchCard.type !== 'push-luck' ||
+      !activeScratchCard.result.canContinue
+    ) {
+      return;
+    }
+
+    updateSave((current) => {
+      const activeCardId = current.workspace.activeScratchCardId;
+
+      if (!activeCardId) {
+        return current;
+      }
+
+      return {
+        ...current,
+        workspace: {
+          ...current.workspace,
+          scratchCards: current.workspace.scratchCards.map((card) =>
+            card.id === activeCardId ? continuePushLuckScratchCard(card) : card,
+          ),
+        },
+      };
+    });
   }
 
   function discardActiveScratchCard() {
@@ -2890,9 +3042,7 @@ export function ScratchLegendGame() {
               </div>
             )}
             <div className="ticket-progress">
-              <span>
-                {stageGoalProgress.current}/{stageGoalProgress.target}
-              </span>
+              <span>{stageGoalProgress.displayText}</span>
               <div className="progress-track">
                 <div
                   className="progress-fill amber"
@@ -2978,7 +3128,9 @@ export function ScratchLegendGame() {
                                   ? canBuyTripleMatchCard
                                   : item.type === 'risk-peek'
                                     ? canBuyRiskPeekCard
-                                    : canBuyBasicSafeCard;
+                                    : item.type === 'push-luck'
+                                      ? canBuyPushLuckCard
+                                      : canBuyBasicSafeCard;
 
                               return (
                                 <button
@@ -3349,17 +3501,31 @@ export function ScratchLegendGame() {
                     >
                       <span className="tabletop-ticket-title">{display.ticketTitle}</span>
                       <span className="tabletop-ticket-art" aria-hidden="true">
-                        <span className="tabletop-art-sky" />
-                        <span className="tabletop-art-mountain tall" />
-                        <span className="tabletop-art-mountain low" />
-                        <span className="tabletop-art-sun" />
+                        {scratchCard.type === 'push-luck' ? (
+                          <>
+                            <span className="tabletop-push-step step-1" />
+                            <span className="tabletop-push-step step-2" />
+                            <span className="tabletop-push-step step-3" />
+                            <span className="tabletop-push-step step-4" />
+                            <span className="tabletop-push-bust" />
+                          </>
+                        ) : (
+                          <>
+                            <span className="tabletop-art-sky" />
+                            <span className="tabletop-art-mountain tall" />
+                            <span className="tabletop-art-mountain low" />
+                            <span className="tabletop-art-sun" />
+                          </>
+                        )}
                       </span>
                       <span className="tabletop-ticket-slots">
                         {scratchCard.type === 'triple-match'
                           ? '5格'
                           : scratchCard.type === 'risk-peek'
                             ? '6格'
-                            : '3格'}
+                            : scratchCard.type === 'push-luck'
+                              ? '4层'
+                              : '3格'}
                       </span>
                       {luckyScratchCardIds.includes(scratchCard.id) && (
                         <span className="tabletop-luck-burst">幸运生效</span>
@@ -3383,9 +3549,22 @@ export function ScratchLegendGame() {
                       </strong>
                     </div>
                     <div className="scratch-card-picture" aria-hidden="true">
-                      <span className="mountain tall" />
-                      <span className="mountain low" />
-                      <span className="sun" />
+                      {activeScratchCard.type === 'push-luck' ? (
+                        <>
+                          <span className="push-route-line" />
+                          <span className="push-route-step step-1">1</span>
+                          <span className="push-route-step step-2">2</span>
+                          <span className="push-route-step step-3">3</span>
+                          <span className="push-route-step step-4">4</span>
+                          <span className="push-route-label">CASH OUT OR PUSH</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="mountain tall" />
+                          <span className="mountain low" />
+                          <span className="sun" />
+                        </>
+                      )}
                     </div>
                     <div className="scratch-result-area">
                       <fieldset className="scratch-result-grid" aria-label="刮刮卡结果区">
@@ -3401,11 +3580,27 @@ export function ScratchLegendGame() {
                               !settlementHighlightSlots.includes(index)
                                 ? 'slot-muted'
                                 : ''
+                            } ${
+                              activeScratchCard.type === 'push-luck' &&
+                              !revealedScratchSlots.includes(index)
+                                ? 'slot-concealed'
+                                : ''
                             }`}
+                            data-layer={index + 1}
                             key={`${symbol}-${index}`}
                           >
-                            <ScratchSymbolIcon symbol={symbol} />
-                            <small>{SCRATCH_SYMBOL_LABELS[symbol]}</small>
+                            {activeScratchCard.type !== 'push-luck' ||
+                            revealedScratchSlots.includes(index) ? (
+                              <ScratchSymbolIcon symbol={symbol} />
+                            ) : (
+                              <span className="push-layer-label">第 {index + 1} 层</span>
+                            )}
+                            <small>
+                              {activeScratchCard.type === 'push-luck' &&
+                              !revealedScratchSlots.includes(index)
+                                ? '未揭露'
+                                : SCRATCH_SYMBOL_LABELS[symbol]}
+                            </small>
                           </span>
                         ))}
                       </fieldset>
@@ -3413,18 +3608,65 @@ export function ScratchLegendGame() {
                         key={activeScratchCard.id}
                         active={activeScratchCard.status === 'scratching'}
                         visible={shouldShowScratchCover(
-                          activeScratchCard.status,
+                          activeScratchCard.type === 'push-luck' &&
+                            activeScratchCard.result.pushLuck?.bustedLayer === null &&
+                            activeScratchCard.result.pushLuck?.cashedOutLayer === null
+                            ? 'scratching'
+                            : activeScratchCard.status,
                           scratchProgress,
                           activeScratchCard.type,
                         )}
                         cardType={activeScratchCard.type}
                         scratchPoints={activeScratchCard.scratchPoints}
-                        brushRadius={scratchBrushRadius}
+                        revealedSlotIndexes={getPersistedRevealedScratchSlotIndexes(
+                          activeScratchCard,
+                        )}
+                        brushRadius={getScratchCardBrushRadius(
+                          activeScratchCard.type,
+                          scratchRadiusToolLevel,
+                          activeLoans,
+                        )}
                         stepDistance={getScratchCardStepDistance(activeScratchCard.type)}
+                        enabledSlotIndexes={
+                          activeScratchCard.type === 'push-luck'
+                            ? [(activeScratchCard.result.pushLuck?.currentLayer ?? 1) - 1]
+                            : undefined
+                        }
                         onProgressChange={setScratchProgress}
                         onRevealSlotsSync={(slotIndexes) => {
                           revealedScratchSlotSetRef.current = new Set(slotIndexes);
                           setRevealedScratchSlots([...slotIndexes]);
+
+                          if (
+                            activeScratchCard?.type === 'push-luck' &&
+                            slotIndexes.includes(
+                              (activeScratchCard.result.pushLuck?.currentLayer ?? 1) - 1,
+                            )
+                          ) {
+                            updateSave((current) => {
+                              const activeCardId = current.workspace.activeScratchCardId;
+
+                              if (!activeCardId) {
+                                return current;
+                              }
+
+                              return {
+                                ...current,
+                                workspace: {
+                                  ...current.workspace,
+                                  scratchCards: current.workspace.scratchCards.map((card) =>
+                                    card.id === activeCardId
+                                      ? revealPushLuckLayer(
+                                          card,
+                                          activeScratchCard.result.pushLuck?.currentLayer ?? 1,
+                                        )
+                                      : card,
+                                  ),
+                                },
+                              };
+                            });
+                            return;
+                          }
 
                           if (
                             activeScratchCard &&
@@ -3465,13 +3707,22 @@ export function ScratchLegendGame() {
                       <em>等级 {activeScratchCard.level}</em>
                     </div>
                     <span>
-                      {activeScratchCard.result.penaltyTriggered
-                        ? '危险位已完全揭露，本张收益归零。'
-                        : activeScratchCard.status === 'claimable'
-                          ? activeScratchCard.result.isWinning
-                            ? activeScratchCardDisplay.winLabel
-                            : activeScratchCardDisplay.loseLabel
-                          : `拖动刮开，已揭露 ${Math.round(scratchProgress * 100)}%`}
+                      {activeScratchCard.type === 'push-luck' &&
+                      activeScratchCard.result.penaltyTriggered
+                        ? `爆雷归零，手续费 $${getPushLuckBustPenalty(player.gold, activeScratchCard)}。`
+                        : activeScratchCard.result.penaltyTriggered
+                          ? '危险位已完全揭露，本张收益归零。'
+                          : activeScratchCard.status === 'claimable'
+                            ? activeScratchCard.result.isWinning
+                              ? activeScratchCardDisplay.winLabel
+                              : activeScratchCardDisplay.loseLabel
+                            : activeScratchCard.type === 'push-luck'
+                              ? `刮开第 ${
+                                  activeScratchCard.result.pushLuck
+                                    ? activeScratchCard.result.pushLuck.currentLayer
+                                    : 1
+                                } 层`
+                              : `拖动刮开，已揭露 ${Math.round(scratchProgress * 100)}%`}
                     </span>
                     <div className="scratch-rule-row">
                       <em>规则</em>
@@ -3484,8 +3735,9 @@ export function ScratchLegendGame() {
                           {tier.label.replace('成对', '')}
                         </em>
                         <b>
-                          {Math.round((tier.displayProbability ?? tier.probability) * 100)}%{' / '}$
-                          {tier.payout}
+                          {activeScratchCard.type === 'push-luck'
+                            ? `$${tier.payout}`
+                            : `${Math.round((tier.displayProbability ?? tier.probability) * 100)}% / $${tier.payout}`}
                         </b>
                       </div>
                     ))}
@@ -3520,15 +3772,30 @@ export function ScratchLegendGame() {
                             : ''}
                         </button>
                       )}
+                    {activeScratchCard.type === 'push-luck' &&
+                      activeScratchCard.result.canContinue &&
+                      !activeScratchCard.result.penaltyTriggered && (
+                        <button
+                          className="scratch-discard-button"
+                          type="button"
+                          onClick={continuePushLuckCard}
+                        >
+                          继续加码
+                        </button>
+                      )}
                     <button
                       type="button"
                       onClick={claimScratchCardPrize}
                       disabled={activeScratchCard.status !== 'claimable'}
                     >
-                      {getOutcomeAmountLabel(
-                        activeScratchCard.status === 'claimable',
-                        activeScratchCard.result.isWinning ? activeScratchCard.result.payout : 0,
-                      )}
+                      {activeScratchCard.type === 'push-luck' && activeScratchCard.result.canCashOut
+                        ? `见好就收 $${activeScratchCard.result.payout}`
+                        : getOutcomeAmountLabel(
+                            activeScratchCard.status === 'claimable',
+                            activeScratchCard.result.isWinning
+                              ? activeScratchCard.result.payout
+                              : 0,
+                          )}
                     </button>
                   </div>
                 </div>

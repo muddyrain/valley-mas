@@ -2767,6 +2767,27 @@ button {
     inset 0 0 0 2px rgba(255, 214, 122, 0.18);
 }
 
+.tabletop-scratch-card.push-luck {
+  grid-template-rows: auto 1fr auto;
+  width: 96px;
+  height: 92px;
+  border: 2px solid rgba(255, 213, 112, 0.36);
+  border-radius: 6px 6px 14px 14px;
+  background:
+    linear-gradient(135deg, rgba(255, 213, 108, 0.24) 0 20%, transparent 21% 100%),
+    linear-gradient(
+      180deg,
+      rgba(57, 24, 24, 0.92),
+      rgba(116, 42, 26, 0.9) 54%,
+      rgba(32, 22, 18, 0.94)
+    ),
+    var(--texture-ticket-paper) center / 150px 150px repeat;
+  box-shadow:
+    0 7px 14px rgba(0, 0, 0, 0.26),
+    inset 0 0 0 2px rgba(255, 236, 171, 0.08),
+    inset 0 -12px 0 rgba(20, 12, 10, 0.24);
+}
+
 .tabletop-scratch-card.entering {
   animation: plate-fly-in 420ms cubic-bezier(0.16, 0.9, 0.22, 1.15);
 }
@@ -2860,6 +2881,16 @@ button {
     0 0 8px rgba(255, 199, 86, 0.26);
 }
 
+.tabletop-scratch-card.push-luck .tabletop-ticket-title {
+  padding: 8px 8px 0;
+  color: #ffefad;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-shadow:
+    1px 1px 0 rgba(38, 12, 10, 0.94),
+    0 0 9px rgba(255, 202, 74, 0.26);
+}
+
 .tabletop-ticket-slots {
   align-self: end;
   justify-self: end;
@@ -2888,11 +2919,93 @@ button {
   text-shadow: 1px 1px 0 rgba(58, 12, 18, 0.72);
 }
 
+.tabletop-scratch-card.push-luck .tabletop-ticket-slots {
+  justify-self: center;
+  margin: 0 0 8px;
+  border-color: rgba(255, 225, 132, 0.38);
+  border-radius: 4px;
+  background: rgba(26, 17, 14, 0.72);
+  color: #ffe28a;
+  font-size: 10px;
+  text-shadow: 1px 1px 0 rgba(31, 11, 9, 0.86);
+}
+
 .tabletop-art-sky,
 .tabletop-art-mountain,
-.tabletop-art-sun {
+.tabletop-art-sun,
+.tabletop-push-step,
+.tabletop-push-bust {
   position: absolute;
   display: none;
+}
+
+.tabletop-scratch-card.push-luck .tabletop-ticket-art {
+  position: relative;
+  display: block;
+  width: 70px;
+  height: 40px;
+  margin: 2px auto 0;
+}
+
+.tabletop-scratch-card.push-luck .tabletop-ticket-art::before {
+  position: absolute;
+  left: 7px;
+  top: 20px;
+  width: 54px;
+  height: 3px;
+  background: linear-gradient(90deg, #ffe08d, #f47c4d);
+  content: "";
+  opacity: 0.78;
+  transform: rotate(-18deg);
+  box-shadow: 0 0 8px rgba(255, 190, 67, 0.26);
+}
+
+.tabletop-scratch-card.push-luck .tabletop-push-step {
+  display: block;
+  width: 13px;
+  height: 13px;
+  border: 1px solid rgba(255, 232, 162, 0.58);
+  border-radius: 3px;
+  background: linear-gradient(180deg, #ffeaa5, #d6833e);
+  box-shadow:
+    0 2px 0 rgba(48, 18, 12, 0.45),
+    0 0 8px rgba(255, 185, 60, 0.24);
+}
+
+.tabletop-scratch-card.push-luck .tabletop-push-step.step-1 {
+  left: 2px;
+  bottom: 2px;
+}
+
+.tabletop-scratch-card.push-luck .tabletop-push-step.step-2 {
+  left: 19px;
+  bottom: 9px;
+}
+
+.tabletop-scratch-card.push-luck .tabletop-push-step.step-3 {
+  right: 21px;
+  top: 10px;
+}
+
+.tabletop-scratch-card.push-luck .tabletop-push-step.step-4 {
+  right: 2px;
+  top: 2px;
+  background: linear-gradient(180deg, #fff4bb, #f4a33b);
+}
+
+.tabletop-scratch-card.push-luck .tabletop-push-bust {
+  right: 0;
+  bottom: 1px;
+  display: block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 224, 127, 0.72);
+  border-radius: 4px;
+  background:
+    linear-gradient(45deg, transparent 0 38%, #fff0b0 39% 45%, transparent 46% 100%),
+    linear-gradient(135deg, transparent 0 38%, #fff0b0 39% 45%, transparent 46% 100%),
+    linear-gradient(180deg, #c93a44, #681822);
+  box-shadow: 0 0 10px rgba(218, 57, 60, 0.34);
 }
 
 .tabletop-art-sky {
@@ -3252,6 +3365,41 @@ button {
     var(--texture-triple-ticket-face) center / 256px 256px repeat;
 }
 
+.scratch-card.push-luck {
+  overflow: hidden;
+  grid-template-rows: auto minmax(112px, 1fr) auto;
+  border-color: rgba(255, 202, 89, 0.78);
+  border-radius: 10px 10px 22px 22px;
+  background:
+    linear-gradient(135deg, rgba(255, 210, 85, 0.2) 0 18%, transparent 19% 100%),
+    linear-gradient(
+      180deg,
+      rgba(54, 24, 24, 0.94),
+      rgba(122, 43, 29, 0.9) 48%,
+      rgba(30, 20, 18, 0.96)
+    ),
+    var(--texture-ticket-paper) center / 220px 220px repeat;
+  box-shadow:
+    0 22px 42px rgba(28, 16, 14, 0.44),
+    inset 0 0 0 3px rgba(255, 238, 173, 0.1),
+    inset 0 -20px 0 rgba(16, 10, 9, 0.2);
+}
+
+.scratch-card.push-luck::before {
+  position: absolute;
+  inset: 14px;
+  z-index: 0;
+  border: 1px solid rgba(255, 224, 137, 0.14);
+  border-radius: 8px 8px 18px 18px;
+  content: "";
+  pointer-events: none;
+}
+
+.scratch-card.push-luck > * {
+  position: relative;
+  z-index: 1;
+}
+
 .scratch-card-header {
   display: flex;
   align-items: center;
@@ -3299,6 +3447,29 @@ button {
     var(--texture-ticket-landscape-triple) center / 100% 100% no-repeat;
 }
 
+.scratch-card.push-luck .scratch-card-picture {
+  min-height: 112px;
+  border-color: rgba(255, 215, 118, 0.28);
+  background:
+    linear-gradient(180deg, rgba(28, 18, 18, 0.2), rgba(255, 199, 79, 0.08)),
+    radial-gradient(
+      circle at 82% 22%,
+      rgba(255, 216, 103, 0.34),
+      transparent 0 16%,
+      transparent 17%
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 215, 114, 0.16) 0 8px,
+      rgba(67, 23, 24, 0.18) 8px 16px
+    ),
+    rgba(34, 23, 20, 0.72);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 230, 154, 0.08),
+    inset 0 -18px 28px rgba(14, 9, 8, 0.28),
+    0 1px 0 rgba(255, 221, 135, 0.1);
+}
+
 .scratch-card-picture .mountain,
 .scratch-card-picture .sun {
   position: absolute;
@@ -3333,6 +3504,83 @@ button {
   box-shadow: 0 0 0 8px rgba(255, 224, 111, 0.16);
 }
 
+.scratch-card.push-luck .push-route-line,
+.scratch-card.push-luck .push-route-step,
+.scratch-card.push-luck .push-route-label {
+  position: absolute;
+}
+
+.scratch-card.push-luck .push-route-line {
+  left: 74px;
+  right: 74px;
+  top: 57px;
+  height: 7px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ffe794, #f19c42 48%, #c73542);
+  box-shadow:
+    0 0 14px rgba(255, 184, 55, 0.24),
+    0 3px 0 rgba(30, 12, 10, 0.32);
+  transform: rotate(-10deg);
+}
+
+.scratch-card.push-luck .push-route-step {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 2px solid rgba(255, 232, 158, 0.66);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255, 241, 174, 0.98), rgba(218, 123, 47, 0.94)),
+    var(--texture-gold-sparkle) center / 80px 80px repeat;
+  color: #4a1f14;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(255, 241, 190, 0.78);
+  box-shadow:
+    0 5px 0 rgba(48, 18, 13, 0.42),
+    0 0 16px rgba(255, 185, 53, 0.22);
+}
+
+.scratch-card.push-luck .push-route-step.step-1 {
+  left: 54px;
+  bottom: 16px;
+}
+
+.scratch-card.push-luck .push-route-step.step-2 {
+  left: 34%;
+  bottom: 28px;
+}
+
+.scratch-card.push-luck .push-route-step.step-3 {
+  right: 34%;
+  top: 28px;
+}
+
+.scratch-card.push-luck .push-route-step.step-4 {
+  right: 54px;
+  top: 14px;
+  border-color: rgba(255, 243, 188, 0.78);
+  background:
+    linear-gradient(180deg, rgba(255, 245, 188, 1), rgba(238, 72, 56, 0.92)),
+    var(--texture-gold-sparkle) center / 80px 80px repeat;
+}
+
+.scratch-card.push-luck .push-route-label {
+  left: 18px;
+  top: 14px;
+  border: 1px solid rgba(255, 221, 129, 0.3);
+  border-radius: 4px;
+  background: rgba(25, 15, 13, 0.72);
+  padding: 5px 8px;
+  color: #ffe08d;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 1px 1px 0 rgba(24, 8, 7, 0.84);
+}
+
 .scratch-result-area {
   position: relative;
   display: grid;
@@ -3347,6 +3595,31 @@ button {
 
 .scratch-card.risk-peek .scratch-result-area {
   min-height: 134px;
+}
+
+.scratch-card.push-luck .scratch-result-area {
+  min-height: 94px;
+  border: 1px solid rgba(255, 221, 126, 0.16);
+  background:
+    linear-gradient(90deg, rgba(22, 14, 12, 0.5), rgba(92, 36, 26, 0.36), rgba(22, 14, 12, 0.5)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 213, 102, 0.08) 0 16px,
+      rgba(120, 34, 34, 0.08) 16px 32px
+    );
+  box-shadow: inset 0 0 0 2px rgba(255, 238, 174, 0.04);
+}
+
+.scratch-card.push-luck .scratch-result-area::before {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 210px;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 226, 128, 0.52), rgba(198, 54, 62, 0.52));
+  content: "";
+  transform: translate(-50%, -50%);
 }
 
 .scratch-result-grid {
@@ -3370,6 +3643,12 @@ button {
   grid-template-columns: repeat(3, 54px);
   grid-template-rows: repeat(2, 54px);
   gap: 16px;
+}
+
+.scratch-card.push-luck .scratch-result-grid {
+  grid-template-columns: repeat(4, 46px);
+  grid-template-rows: 46px;
+  gap: 11px;
 }
 
 .scratch-card.triple-match .scratch-result-slot:nth-child(4) {
@@ -3412,6 +3691,54 @@ button {
   width: 54px;
   height: 54px;
   border-color: rgba(146, 50, 49, 0.46);
+}
+
+.scratch-card.push-luck .scratch-result-slot {
+  width: 46px;
+  height: 46px;
+  border: 2px solid rgba(255, 222, 130, 0.48);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 239, 172, 0.88), rgba(214, 120, 46, 0.34)),
+    var(--texture-result-cell-paper) center / 96px 96px repeat;
+  color: #552419;
+  box-shadow:
+    0 4px 0 rgba(37, 14, 11, 0.28),
+    0 0 13px rgba(255, 178, 47, 0.12);
+  transform: none;
+}
+
+.scratch-card.push-luck .scratch-result-slot.slot-concealed {
+  border-color: rgba(255, 215, 119, 0.34);
+  background:
+    linear-gradient(180deg, rgba(64, 32, 26, 0.84), rgba(132, 47, 35, 0.78)),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 222, 127, 0.1) 0 6px,
+      rgba(39, 17, 14, 0.1) 6px 12px
+    );
+  color: #ffe08d;
+  opacity: 0.96;
+}
+
+.scratch-card.push-luck .push-layer-label {
+  display: grid;
+  width: 34px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgba(255, 229, 143, 0.42);
+  border-radius: 5px;
+  background: rgba(26, 16, 13, 0.48);
+  color: #ffe59b;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.05;
+  text-align: center;
+  text-shadow: 1px 1px 0 rgba(24, 8, 7, 0.78);
+}
+
+.scratch-card.push-luck .scratch-result-slot.slot-concealed small {
+  display: none;
 }
 
 .scratch-result-slot.danger {
@@ -3558,6 +3885,13 @@ button {
 .scratch-card.risk-peek .scratch-card-cover {
   width: 230px;
   height: 134px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.scratch-card.push-luck .scratch-card-cover {
+  width: 230px;
+  height: 72px;
   border-radius: 0;
   box-shadow: none;
 }

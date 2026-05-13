@@ -5,9 +5,9 @@ import {
   clampRatio,
   getScratchCardRevealRatio,
   getScratchCardRevealSlotIndex,
-  getScratchCardRevealThreshold,
   type ScratchCardType,
   type ScratchSurfacePoint,
+  shouldClearScratchSlotCover,
   shouldRevealFullScratchCover,
 } from '@/lib/game';
 
@@ -16,8 +16,10 @@ type ScratchCardCanvasProps = {
   visible: boolean;
   cardType: ScratchCardType;
   scratchPoints: readonly ScratchSurfacePoint[];
+  revealedSlotIndexes?: readonly number[];
   brushRadius: number;
   stepDistance: number;
+  enabledSlotIndexes?: readonly number[];
   onProgressChange: (progress: number) => void;
   onRevealSlotsSync: (slotIndexes: readonly number[]) => void;
   onRevealSlot: (slotIndex: number) => void;
@@ -53,6 +55,16 @@ const SCRATCH_CANVAS_LAYOUTS = {
       { left: 158, top: 75, width: 54, height: 54 },
     ],
   },
+  'push-luck': {
+    width: 230,
+    height: 72,
+    slotBounds: [
+      { left: 7, top: 13, width: 46, height: 46 },
+      { left: 64, top: 13, width: 46, height: 46 },
+      { left: 121, top: 13, width: 46, height: 46 },
+      { left: 178, top: 13, width: 46, height: 46 },
+    ],
+  },
 } as const satisfies Record<
   ScratchCardType,
   {
@@ -80,13 +92,37 @@ function getLayoutSlotBounds(cardType: ScratchCardType) {
   return 'slotBounds' in layout ? layout.slotBounds : undefined;
 }
 
+function drawSlotCoverPath(
+  context: CanvasRenderingContext2D,
+  cardType: ScratchCardType,
+  bounds: { left: number; top: number; width: number; height: number },
+  padding = 0,
+) {
+  const left = bounds.left - padding;
+  const top = bounds.top - padding;
+  const width = bounds.width + padding * 2;
+  const height = bounds.height + padding * 2;
+
+  if (cardType === 'push-luck') {
+    context.rect(left, top, width, height);
+    return;
+  }
+
+  const radius = Math.max(width, height) / 2;
+
+  context.moveTo(left + width, top + radius);
+  context.arc(left + width / 2, top + height / 2, radius, 0, Math.PI * 2);
+}
+
 export function ScratchCardCanvas({
   active,
   visible,
   cardType,
   scratchPoints,
+  revealedSlotIndexes,
   brushRadius,
   stepDistance,
+  enabledSlotIndexes,
   onProgressChange,
   onRevealSlotsSync,
   onRevealSlot,
@@ -103,6 +139,8 @@ export function ScratchCardCanvas({
   const pendingScratchPointsRef = useRef<ScratchSurfacePoint[]>([]);
   const lastReportedProgressRef = useRef(0);
   const revealedSlotIndexesRef = useRef<Set<number>>(new Set());
+  const enabledSlotIndexesRef = useRef<readonly number[] | null>(enabledSlotIndexes ?? null);
+  const persistedRevealedSlotIndexesRef = useRef<readonly number[]>(revealedSlotIndexes ?? []);
   const coverTextureImageRef = useRef<HTMLImageElement | null>(null);
   const scratchPointsRef = useRef(scratchPoints);
   const cardTypeRef = useRef(cardType);
@@ -114,6 +152,8 @@ export function ScratchCardCanvas({
 
   scratchPointsRef.current = scratchPoints;
   cardTypeRef.current = cardType;
+  enabledSlotIndexesRef.current = enabledSlotIndexes ?? null;
+  persistedRevealedSlotIndexesRef.current = revealedSlotIndexes ?? [];
   onProgressChangeRef.current = onProgressChange;
   onRevealSlotsSyncRef.current = onRevealSlotsSync;
   onRevealSlotRef.current = onRevealSlot;
@@ -182,6 +222,46 @@ export function ScratchCardCanvas({
       }
 
       return getScratchCardRevealRatio(coveredPixels / (width * height));
+    },
+    [getSlotBounds],
+  );
+
+  const clearSlotCover = useCallback(
+    (slotIndex: number) => {
+      const canvas = canvasRef.current;
+      const bounds = getSlotBounds(slotIndex);
+
+      if (!canvas || !bounds) {
+        return;
+      }
+
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+
+      if (!context) {
+        return;
+      }
+
+      const slotBounds = getLayoutSlotBounds(cardTypeRef.current);
+      const padding = 1;
+
+      context.save();
+      context.globalCompositeOperation = 'destination-out';
+      context.fillStyle = '#000';
+      context.beginPath();
+
+      if (slotBounds) {
+        drawSlotCoverPath(context, cardTypeRef.current, bounds, padding);
+        context.fill();
+      } else {
+        context.fillRect(
+          bounds.left - padding,
+          bounds.top - padding,
+          bounds.width + padding * 2,
+          bounds.height + padding * 2,
+        );
+      }
+
+      context.restore();
     },
     [getSlotBounds],
   );
@@ -303,10 +383,7 @@ export function ScratchCardCanvas({
       context.beginPath();
 
       for (const bounds of slotClipBounds) {
-        const radius = bounds.width / 2;
-
-        context.moveTo(bounds.left + bounds.width, bounds.top + radius);
-        context.arc(bounds.left + radius, bounds.top + radius, radius, 0, Math.PI * 2);
+        drawSlotCoverPath(context, cardTypeRef.current, bounds);
       }
 
       context.clip();
@@ -379,10 +456,8 @@ export function ScratchCardCanvas({
       context.lineWidth = 2;
 
       for (const bounds of slotClipBounds) {
-        const radius = bounds.width / 2;
-
         context.beginPath();
-        context.arc(bounds.left + radius, bounds.top + radius, radius, 0, Math.PI * 2);
+        drawSlotCoverPath(context, cardTypeRef.current, bounds);
         context.stroke();
       }
     } else {
@@ -437,6 +512,7 @@ export function ScratchCardCanvas({
 
       context.save();
       context.globalCompositeOperation = 'destination-out';
+      context.fillStyle = '#000';
 
       for (let step = 0; step <= steps; step += 1) {
         const ratio = step / steps;
@@ -491,17 +567,28 @@ export function ScratchCardCanvas({
         return;
       }
 
-      eraseCanvasPoint(point);
       const surfacePoint = {
         xPercent: clampRatio(point.x / canvas.width),
         yPercent: clampRatio(point.y / canvas.height),
       };
       const revealSlotIndex = getScratchCardRevealSlotIndex(cardTypeRef.current, surfacePoint);
+      const enabledSlotIndexes = enabledSlotIndexesRef.current;
+
+      if (
+        enabledSlotIndexes &&
+        (revealSlotIndex === null || !enabledSlotIndexes.includes(revealSlotIndex))
+      ) {
+        lastPointRef.current = point;
+        return;
+      }
+
+      eraseCanvasPoint(point);
 
       if (revealSlotIndex !== null && !revealedSlotIndexesRef.current.has(revealSlotIndex)) {
         const revealRatio = measureSlotRevealRatio(revealSlotIndex);
 
-        if (revealRatio >= getScratchCardRevealThreshold(cardTypeRef.current)) {
+        if (shouldClearScratchSlotCover(revealRatio, cardTypeRef.current)) {
+          clearSlotCover(revealSlotIndex);
           revealedSlotIndexesRef.current.add(revealSlotIndex);
           onRevealSlotRef.current(revealSlotIndex);
         }
@@ -519,7 +606,14 @@ export function ScratchCardCanvas({
 
       scheduleProgressUpdate();
     },
-    [active, eraseCanvasPoint, getCanvasPoint, measureSlotRevealRatio, scheduleProgressUpdate],
+    [
+      active,
+      clearSlotCover,
+      eraseCanvasPoint,
+      getCanvasPoint,
+      measureSlotRevealRatio,
+      scheduleProgressUpdate,
+    ],
   );
 
   const restoreCoverFromScratchPoints = useCallback(() => {
@@ -541,26 +635,50 @@ export function ScratchCardCanvas({
 
     lastPointRef.current = null;
 
+    const scratchedSlotIndexes = new Set<number>();
+
     for (const point of scratchPointsRef.current) {
+      const slotIndex = getScratchCardRevealSlotIndex(cardTypeRef.current, point);
+
+      if (slotIndex !== null) {
+        scratchedSlotIndexes.add(slotIndex);
+      }
+
       eraseCanvasPoint({
         x: point.xPercent * canvas.width,
         y: point.yPercent * canvas.height,
       });
     }
 
-    const revealedSlots = Array.from(
-      { length: getLayoutSlotBounds(cardTypeRef.current)?.length ?? 3 },
-      (_, slotIndex) => slotIndex,
-    ).filter(
-      (slotIndex) =>
-        measureSlotRevealRatio(slotIndex) >= getScratchCardRevealThreshold(cardTypeRef.current),
+    const revealedSlotSet = new Set(persistedRevealedSlotIndexesRef.current);
+
+    for (const slotIndex of scratchedSlotIndexes) {
+      if (shouldClearScratchSlotCover(measureSlotRevealRatio(slotIndex), cardTypeRef.current)) {
+        revealedSlotSet.add(slotIndex);
+      }
+    }
+
+    const revealedSlots = [...revealedSlotSet].filter(
+      (slotIndex) => getSlotBounds(slotIndex) !== null,
     );
+
+    for (const slotIndex of revealedSlots) {
+      clearSlotCover(slotIndex);
+    }
 
     revealedSlotIndexesRef.current = new Set(revealedSlots);
     onRevealSlotsSyncRef.current(revealedSlots);
     lastPointRef.current = null;
     flushProgressUpdate();
-  }, [drawCover, eraseCanvasPoint, flushProgressUpdate, measureSlotRevealRatio, visible]);
+  }, [
+    clearSlotCover,
+    drawCover,
+    eraseCanvasPoint,
+    flushProgressUpdate,
+    getSlotBounds,
+    measureSlotRevealRatio,
+    visible,
+  ]);
 
   useEffect(() => {
     if (coverTextureImageRef.current) {

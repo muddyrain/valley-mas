@@ -68,6 +68,8 @@ export type ScratchLegendScratchCardsState = {
   tripleMatch: ScratchCardProgressState;
   // “险中求财”风险卡自己的等级进度。
   riskPeek: ScratchCardProgressState;
+  // “步步加码”高风险卡自己的等级进度。
+  pushLuck: ScratchCardProgressState;
 };
 
 export type ScratchLegendUpgradeToolsState = Record<UpgradeToolId, UpgradeToolState>;
@@ -320,6 +322,9 @@ export function createInitialScratchLegendSave(): ScratchLegendSave {
       riskPeek: {
         cardsSettled: 0,
       },
+      pushLuck: {
+        cardsSettled: 0,
+      },
     },
     upgradeTools: createInitialUpgradeToolStates(),
     automation: createInitialAutomationState(),
@@ -388,6 +393,10 @@ export function mergeScratchLegendSave(
       riskPeek: {
         ...initialSave.scratchCards.riskPeek,
         ...partialSave?.scratchCards?.riskPeek,
+      },
+      pushLuck: {
+        ...initialSave.scratchCards.pushLuck,
+        ...partialSave?.scratchCards?.pushLuck,
       },
     },
     upgradeTools: mergeUpgradeToolStates(partialSave?.upgradeTools),

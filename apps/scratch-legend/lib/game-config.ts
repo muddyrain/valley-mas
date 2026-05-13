@@ -184,8 +184,8 @@ export const scratchLegendConfig = {
       scratchCompleteThreshold: 0.82,
       scratchSymbolRevealThreshold: 0.95,
       scratchBrush: {
-        radius: 8,
-        stepDistance: 5,
+        radius: 5,
+        stepDistance: 4,
       },
       // 阶段 2.5 规则：5 格结果区，必须出现 3 个相同图标才给钱。
       matchRule: {
@@ -242,8 +242,8 @@ export const scratchLegendConfig = {
       scratchCompleteThreshold: 0.84,
       scratchSymbolRevealThreshold: 0.95,
       scratchBrush: {
-        radius: 8,
-        stepDistance: 5,
+        radius: 5,
+        stepDistance: 4,
       },
       matchRule: {
         slots: 6,
@@ -291,6 +291,117 @@ export const scratchLegendConfig = {
         payoutMultiplierByLevel: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] as const,
       },
     },
+    pushLuck: {
+      id: 'push-luck',
+      label: '步步加码',
+      price: 800,
+      scratchCompleteThreshold: 1,
+      scratchSymbolRevealThreshold: 0.95,
+      scratchBrush: {
+        radius: 5,
+        stepDistance: 4,
+      },
+      matchRule: {
+        slots: 4,
+        requiredMatches: 1,
+      },
+      prizePool: [
+        {
+          id: 'push-layer-1',
+          label: '第一层止盈',
+          probability: 1,
+          displayProbability: null,
+          payout: 260,
+        },
+        {
+          id: 'push-layer-2',
+          label: '第二层止盈',
+          probability: 1,
+          displayProbability: null,
+          payout: 760,
+        },
+        {
+          id: 'push-layer-3',
+          label: '第三层止盈',
+          probability: 1,
+          displayProbability: null,
+          payout: 1800,
+        },
+        {
+          id: 'push-layer-4',
+          label: '第四层大奖',
+          probability: 1,
+          displayProbability: null,
+          payout: 5200,
+        },
+        {
+          id: 'push-bust',
+          label: '爆雷归零',
+          probability: 1,
+          displayProbability: null,
+          payout: 0,
+        },
+      ] as const,
+      pushRule: {
+        reserveGoldAfterBust: 1,
+        layers: [
+          {
+            layer: 1,
+            cashOutAmount: 260,
+            bustPenalty: 0,
+            symbol: 'coin',
+          },
+          {
+            layer: 2,
+            cashOutAmount: 760,
+            bustPenalty: 120,
+            symbol: 'bag',
+          },
+          {
+            layer: 3,
+            cashOutAmount: 1800,
+            bustPenalty: 240,
+            symbol: 'cash',
+          },
+          {
+            layer: 4,
+            cashOutAmount: 5200,
+            bustPenalty: 400,
+            symbol: 'jackpot',
+          },
+        ] as const,
+        bustPathPool: [
+          {
+            id: 'bust-layer-2',
+            label: '第二层爆雷',
+            probability: 0.35,
+            firstBustLayer: 2,
+          },
+          {
+            id: 'bust-layer-3',
+            label: '第三层爆雷',
+            probability: 0.25,
+            firstBustLayer: 3,
+          },
+          {
+            id: 'bust-layer-4',
+            label: '第四层爆雷',
+            probability: 0.175,
+            firstBustLayer: 4,
+          },
+          {
+            id: 'all-safe',
+            label: '全程安全',
+            probability: 0.05,
+            firstBustLayer: null,
+          },
+        ] as const,
+      },
+      level: {
+        cardsRequiredByLevel: [3, 10, 25, 50, 100, 200, 350, 550, 800] as const,
+        payoutMultiplierByLevel: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] as const,
+      },
+    },
   },
   // 阶段四卡册目录结构。这里只定义卡片职责与目录归属，不改变单张卡的购买、概率或结算规则。
   cardAlbums: [
@@ -320,6 +431,13 @@ export const scratchLegendConfig = {
           roleLabel: '高赔率票',
           cardType: 'triple-match',
           description: '更高成本和更强波动，追求三连爆奖。',
+        },
+        {
+          id: 'street-high-risk',
+          role: 'high-risk',
+          roleLabel: '高风险票',
+          cardType: 'push-luck',
+          description: '逐层止盈或继续加码，越贪越危险。',
         },
         {
           id: 'street-finale',
