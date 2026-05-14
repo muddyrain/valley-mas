@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { applyPrestige, buyPermanentUpgrade, type PermanentUpgradeId } from './game';
 import {
   createInitialScratchLegendSave,
   mergeScratchLegendSave,
@@ -9,7 +10,7 @@ import {
   syncScratchLegendSave,
 } from './game-save';
 
-export type ScratchLegendSidebarTab = 'cards' | 'tools';
+export type ScratchLegendSidebarTab = 'cards' | 'tools' | 'prestige';
 
 type ScratchLegendStore = {
   // 当前局运行态，后续由 persist 自动写入 localStorage。
@@ -26,13 +27,17 @@ type ScratchLegendStore = {
   ) => void;
   // 重置为一份全新初始存档。
   resetSave: () => void;
+  // 购买永久升级（消耗荣耀点）。
+  buyPermanentUpgrade: (upgradeId: PermanentUpgradeId) => void;
+  // 执行 Prestige：将当前轮终局荣耀预览转为真实荣耀点，重置本轮进度，保留永久状态。
+  triggerPrestige: () => void;
 };
 
 const STORAGE_KEY = 'scratch_legend_save';
 
 export const useScratchLegendStore = create<ScratchLegendStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       save: createInitialScratchLegendSave(),
       sidebarTab: 'cards',
       hasHydrated: false,
@@ -50,6 +55,37 @@ export const useScratchLegendStore = create<ScratchLegendStore>()(
           save: createInitialScratchLegendSave(),
           sidebarTab: 'cards',
         }),
+      buyPermanentUpgrade: (upgradeId: PermanentUpgradeId) => {
+        set((state) => ({
+          save: syncScratchLegendSave({
+            ...state.save,
+            prestige: buyPermanentUpgrade(state.save.prestige, upgradeId),
+          }),
+        }));
+      },
+      triggerPrestige: () => {
+        const { save } = get();
+
+        if (!save.roundSettlement.completed) {
+          return;
+        }
+
+        const newPrestige = applyPrestige({
+          roundSettlementGloryPreview: save.roundSettlement.gloryPreview,
+          prestige: save.prestige,
+        });
+        // 重置本轮进度，但保留永久 prestige 状态
+        const freshSave = createInitialScratchLegendSave();
+        const nextSave: ScratchLegendSave = {
+          ...freshSave,
+          prestige: newPrestige,
+        };
+
+        set({
+          save: syncScratchLegendSave(nextSave),
+          sidebarTab: 'prestige',
+        });
+      },
     }),
     {
       name: STORAGE_KEY,

@@ -678,6 +678,90 @@ export const scratchLegendConfig = {
       brokenPlateNoticeLevel: 1,
     },
   },
+  // Prestige 永久成长配置。阶段 7 开始接入。
+  prestige: {
+    permanentUpgrades: [
+      {
+        id: 'starter-gold',
+        label: '起始资金',
+        description: '每级使开局启动金增加 $5，让下一轮更快买到第一张卡。',
+        maxLevel: 5,
+        // 各等级购买所需荣耀点，下标代表当前等级（购买后进入 level+1）。
+        gloryCostByLevel: [1, 2, 4, 8, 15] as const,
+        effect: {
+          type: 'starter-gold-bonus',
+          // 每级增加多少开局金币。
+          valuePerLevel: 5,
+        },
+      },
+      {
+        id: 'eternal-luck',
+        label: '永久幸运',
+        description: '每级提升安全卡与高赔率卡的基础中奖权重 2%，与刮卡运气工具叠加。',
+        maxLevel: 5,
+        gloryCostByLevel: [2, 4, 8, 15, 25] as const,
+        effect: {
+          type: 'global-luck-bonus',
+          // 每级从未中奖权重中移出的比例。
+          valuePerLevel: 0.02,
+          // 与刮卡运气叠加后，未中奖概率总底线。
+          losingProbabilityFloor: 0.45,
+        },
+      },
+      {
+        id: 'payout-amplifier',
+        label: '永久收益',
+        description: '每级将安全卡与高赔率卡结算 payout 提升 5%，风险卡和步步加码不受影响。',
+        maxLevel: 5,
+        gloryCostByLevel: [2, 5, 10, 20, 35] as const,
+        effect: {
+          type: 'global-payout-multiplier',
+          // 每级 payout 倍率增量，例如 level=2 时 payout ×1.10。
+          valuePerLevel: 0.05,
+        },
+      },
+      {
+        id: 'scratch-efficiency',
+        label: '刮擦基础',
+        description: '每级使下一轮开局刮除半径 +1，等价于已升级刮除范围工具。',
+        maxLevel: 3,
+        gloryCostByLevel: [1, 3, 6] as const,
+        effect: {
+          type: 'base-scratch-radius-bonus',
+          // 每级增加多少刮除半径。
+          valuePerLevel: 1,
+        },
+      },
+      {
+        id: 'early-automation',
+        label: '自动化提早接入',
+        description: '每级将自动刮刮机解锁所需熟练度降低 100 点，最低保留 200 点。',
+        maxLevel: 3,
+        gloryCostByLevel: [3, 7, 15] as const,
+        effect: {
+          type: 'auto-scratcher-threshold-reduction',
+          // 每级降低多少熟练度门槛。
+          valuePerLevel: 100,
+          // 降低后的最低保留值。
+          minimumThreshold: 200,
+        },
+      },
+      {
+        id: 'album-headstart',
+        label: '卡册起步',
+        description: '每级将刮刮卡解锁（scratch-mode 段）熟练度门槛降低 5 点，最低保留 10 点。',
+        maxLevel: 3,
+        gloryCostByLevel: [2, 5, 12] as const,
+        effect: {
+          type: 'scratch-card-unlock-threshold-reduction',
+          // 每级降低多少熟练度门槛。
+          valuePerLevel: 5,
+          // 降低后的最低保留值（不低于 trash-can 段目标）。
+          minimumThreshold: 10,
+        },
+      },
+    ] as const,
+  },
 } as const;
 
 export type ScratchLegendConfig = typeof scratchLegendConfig;

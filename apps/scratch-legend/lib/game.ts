@@ -55,6 +55,29 @@ export const AUTO_SCRATCH_MACHINE_CONFIG = AUTOMATION_CONFIG.autoScratchMachine;
 export const LOAN_CONFIG = scratchLegendConfig.loans;
 export const LOAN_PRINCIPAL = LOAN_CONFIG.principal;
 export const LOAN_REPAYMENT_AMOUNT = LOAN_CONFIG.repaymentAmount;
+export const PRESTIGE_UPGRADES_CONFIG = scratchLegendConfig.prestige.permanentUpgrades;
+
+// ────────────────────────────────────────────────────────────────
+// Prestige 永久升级类型
+// ────────────────────────────────────────────────────────────────
+
+export type PermanentUpgradeConfig = (typeof PRESTIGE_UPGRADES_CONFIG)[number];
+export type PermanentUpgradeId = PermanentUpgradeConfig['id'];
+
+export type PermanentUpgradeState = {
+  level: number;
+};
+
+export type PrestigeState = {
+  // 累计 Prestige 次数。
+  prestigeCount: number;
+  // 累计获得的总荣耀点（含已花费，用于历史展示）。
+  totalGloryPointsEarned: number;
+  // 当前可用荣耀点（未花费）。
+  availableGloryPoints: number;
+  // 各永久升级当前等级。
+  upgrades: Record<PermanentUpgradeId, PermanentUpgradeState>;
+};
 
 export type WorkPhase =
   | 'idle'
@@ -2316,4 +2339,260 @@ export function getBoundedDesktopPosition(
     xPercent: (x / bounds.width) * 100,
     yPercent: (y / bounds.height) * 100,
   };
+}
+
+// ────────────────────────────────────────────────────────────────
+// Prestige 永久升级辅助函数
+// ────────────────────────────────────────────────────────────────
+
+export function createInitialPrestigeUpgrades(): Record<PermanentUpgradeId, PermanentUpgradeState> {
+  return Object.fromEntries(
+    PRESTIGE_UPGRADES_CONFIG.map((upgrade) => [upgrade.id, { level: 0 }]),
+  ) as Record<PermanentUpgradeId, PermanentUpgradeState>;
+}
+
+export function createInitialPrestigeState(): PrestigeState {
+  return {
+    prestigeCount: 0,
+    totalGloryPointsEarned: 0,
+    availableGloryPoints: 0,
+    upgrades: createInitialPrestigeUpgrades(),
+  };
+}
+
+export function getPermanentUpgradeConfig(
+  upgradeId: PermanentUpgradeId,
+): PermanentUpgradeConfig | null {
+  return (
+    (PRESTIGE_UPGRADES_CONFIG.find((u) => u.id === upgradeId) as PermanentUpgradeConfig) ?? null
+  );
+}
+
+export function getPermanentUpgradeLevel(
+  prestige: Pick<PrestigeState, 'upgrades'>,
+  upgradeId: PermanentUpgradeId,
+): number {
+  return Math.max(0, Math.floor(prestige.upgrades[upgradeId]?.level ?? 0));
+}
+
+export function getPermanentUpgradeCost(
+  upgradeId: PermanentUpgradeId,
+  currentLevel: number,
+): number {
+  const config = getPermanentUpgradeConfig(upgradeId);
+
+  if (!config) {
+    return Infinity;
+  }
+
+  const normalizedLevel = Math.max(0, Math.floor(currentLevel));
+
+  if (normalizedLevel >= config.maxLevel) {
+    return Infinity;
+  }
+
+  return config.gloryCostByLevel[normalizedLevel] ?? Infinity;
+}
+
+export function canBuyPermanentUpgrade(
+  availableGloryPoints: number,
+  upgradeId: PermanentUpgradeId,
+  currentLevel: number,
+): boolean {
+  const config = getPermanentUpgradeConfig(upgradeId);
+
+  if (!config) {
+    return false;
+  }
+
+  if (currentLevel >= config.maxLevel) {
+    return false;
+  }
+
+  const cost = getPermanentUpgradeCost(upgradeId, currentLevel);
+
+  return availableGloryPoints >= cost;
+}
+
+/** 开局金币（含起始资金永久升级加成）。 */
+export function getPrestigeEffectiveInitialGold(prestige: Pick<PrestigeState, 'upgrades'>): number {
+  const level = getPermanentUpgradeLevel(prestige, 'starter-gold');
+  const config = getPermanentUpgradeConfig('starter-gold');
+  const bonus =
+    config?.effect.type === 'starter-gold-bonus' ? level * config.effect.valuePerLevel : 0;
+
+  return INITIAL_GOLD + bonus;
+}
+
+/** 开局刮除半径加成（来自刮擦基础永久升级）。 */
+export function getPrestigeEffectiveScratchRadiusBonus(
+  prestige: Pick<PrestigeState, 'upgrades'>,
+): number {
+  const level = getPermanentUpgradeLevel(prestige, 'scratch-efficiency');
+  const config = getPermanentUpgradeConfig('scratch-efficiency');
+
+  return config?.effect.type === 'base-scratch-radius-bonus'
+    ? level * config.effect.valuePerLevel
+    : 0;
+}
+
+/** 永久幸运加成的移出概率量（作用等同于额外的刮卡运气档位）。 */
+export function getPrestigeEternalLuckShift(prestige: Pick<PrestigeState, 'upgrades'>): number {
+  const level = getPermanentUpgradeLevel(prestige, 'eternal-luck');
+  const config = getPermanentUpgradeConfig('eternal-luck');
+
+  return config?.effect.type === 'global-luck-bonus' ? level * config.effect.valuePerLevel : 0;
+}
+
+/** 永久收益倍率（安全卡 + 高赔率卡 payout 乘数）。 */
+export function getPrestigePayoutMultiplier(prestige: Pick<PrestigeState, 'upgrades'>): number {
+  const level = getPermanentUpgradeLevel(prestige, 'payout-amplifier');
+  const config = getPermanentUpgradeConfig('payout-amplifier');
+
+  return (
+    1 +
+    (config?.effect.type === 'global-payout-multiplier' ? level * config.effect.valuePerLevel : 0)
+  );
+}
+
+/**
+ * 考虑永久升级后，指定里程碑的 requiredProficiency。
+ * 只对 scratch-mode（album-headstart）和 auto-scratcher（early-automation）有效。
+ */
+export function getPrestigeAdjustedMilestoneRequiredProficiency(
+  milestoneId: UnlockMilestoneId,
+  prestige: Pick<PrestigeState, 'upgrades'>,
+): number {
+  const milestone = UNLOCK_MILESTONES.find((m) => m.id === milestoneId);
+
+  if (!milestone) {
+    return 0;
+  }
+
+  const base = milestone.requiredProficiency;
+
+  if (milestoneId === 'scratch-mode') {
+    const level = getPermanentUpgradeLevel(prestige, 'album-headstart');
+    const config = getPermanentUpgradeConfig('album-headstart');
+    const reduction =
+      config?.effect.type === 'scratch-card-unlock-threshold-reduction'
+        ? level * config.effect.valuePerLevel
+        : 0;
+    const minimum =
+      config?.effect.type === 'scratch-card-unlock-threshold-reduction'
+        ? config.effect.minimumThreshold
+        : 10;
+
+    return Math.max(minimum, base - reduction);
+  }
+
+  if (milestoneId === 'auto-scratcher') {
+    const level = getPermanentUpgradeLevel(prestige, 'early-automation');
+    const config = getPermanentUpgradeConfig('early-automation');
+    const reduction =
+      config?.effect.type === 'auto-scratcher-threshold-reduction'
+        ? level * config.effect.valuePerLevel
+        : 0;
+    const minimum =
+      config?.effect.type === 'auto-scratcher-threshold-reduction'
+        ? config.effect.minimumThreshold
+        : 200;
+
+    return Math.max(minimum, base - reduction);
+  }
+
+  return base;
+}
+
+/**
+ * 考虑永久升级后，指定里程碑的累计熟练度阈值。
+ * 其余里程碑保持原始阈值不变；只有受永久升级影响的里程碑会变动。
+ */
+export function getPrestigeAdjustedMilestoneThreshold(
+  milestoneId: UnlockMilestoneId,
+  prestige: Pick<PrestigeState, 'upgrades'>,
+): number {
+  const milestoneIndex = UNLOCK_MILESTONES.findIndex((m) => m.id === milestoneId);
+
+  if (milestoneIndex < 0) {
+    return 0;
+  }
+
+  let total = 0;
+
+  for (let i = 0; i <= milestoneIndex; i++) {
+    const m = UNLOCK_MILESTONES[i];
+
+    if (!m) {
+      continue;
+    }
+
+    total += getPrestigeAdjustedMilestoneRequiredProficiency(m.id, prestige);
+  }
+
+  return total;
+}
+
+/** 将 roundSettlement.gloryPreview 转换为实际荣耀点（保底 1）。 */
+export function convertGloryPreviewToPoints(gloryPreview: number): number {
+  return Math.max(1, Math.floor(gloryPreview));
+}
+
+export type PrestigeTriggerInput = {
+  roundSettlementGloryPreview: number;
+  prestige: PrestigeState;
+};
+
+/**
+ * 执行 Prestige：
+ * - 将 gloryPreview 转为荣耀点累加
+ * - prestigeCount 加一
+ * - 返回更新后的 PrestigeState（保留已购买的永久升级）
+ * 调用方负责用这个新 prestige 状态重置整份 save。
+ */
+export function applyPrestige(input: PrestigeTriggerInput): PrestigeState {
+  const earnedPoints = convertGloryPreviewToPoints(input.roundSettlementGloryPreview);
+  const currentPrestige = input.prestige;
+
+  return {
+    ...currentPrestige,
+    prestigeCount: currentPrestige.prestigeCount + 1,
+    totalGloryPointsEarned: currentPrestige.totalGloryPointsEarned + earnedPoints,
+    availableGloryPoints: currentPrestige.availableGloryPoints + earnedPoints,
+  };
+}
+
+export function buyPermanentUpgrade(
+  prestige: PrestigeState,
+  upgradeId: PermanentUpgradeId,
+): PrestigeState {
+  const currentLevel = getPermanentUpgradeLevel(prestige, upgradeId);
+  const cost = getPermanentUpgradeCost(upgradeId, currentLevel);
+
+  if (prestige.availableGloryPoints < cost) {
+    return prestige;
+  }
+
+  const config = getPermanentUpgradeConfig(upgradeId);
+
+  if (!config || currentLevel >= config.maxLevel) {
+    return prestige;
+  }
+
+  return {
+    ...prestige,
+    availableGloryPoints: prestige.availableGloryPoints - cost,
+    upgrades: {
+      ...prestige.upgrades,
+      [upgradeId]: { level: currentLevel + 1 },
+    },
+  };
+}
+
+/** 是否可以显示"荣耀"标签页（首次终局结算后或已 Prestige 过）。 */
+export function shouldShowPrestigeTab(options: {
+  roundSettlementCompleted: boolean;
+  prestigeCount: number;
+}): boolean {
+  return options.roundSettlementCompleted || options.prestigeCount > 0;
 }

@@ -2,6 +2,7 @@ import {
   AUTO_SCRATCH_MACHINE_CONFIG,
   advanceBasicSafeScratchCardProgress,
   BASIC_SAFE_CARD_PRICE,
+  createInitialPrestigeState,
   createInitialUpgradeToolStates,
   createScratchCard,
   type FinalChanceOutcome,
@@ -12,7 +13,9 @@ import {
   INITIAL_GOLD,
   LOAN_CONFIG,
   type LoanState,
+  type PermanentUpgradeId,
   type PlayerState,
+  type PrestigeState,
   type ScratchCardProgressState,
   type ScratchCardState,
   type ScratchCardType,
@@ -158,6 +161,8 @@ export type ScratchLegendSave = {
   automation: ScratchLegendAutomationState;
   // 当前轮是否已经由终局票推进到结算时刻。
   roundSettlement: ScratchLegendRoundSettlementState;
+  // Prestige 永久成长状态；该字段在 Prestige 时不重置，跨轮保留。
+  prestige: PrestigeState;
   // 当前桌面与工作流状态。
   workspace: ScratchLegendWorkspaceState;
 };
@@ -251,6 +256,35 @@ function mergeRoundSettlementState(
     ),
     finalChanceCardId:
       partialRoundSettlement?.finalChanceCardId ?? initialRoundSettlement.finalChanceCardId,
+  };
+}
+
+function mergePrestigeState(partialPrestige?: DeepPartial<PrestigeState>): PrestigeState {
+  const initial = createInitialPrestigeState();
+
+  if (!partialPrestige) {
+    return initial;
+  }
+
+  const mergedUpgrades: PrestigeState['upgrades'] = { ...initial.upgrades };
+
+  for (const key of Object.keys(initial.upgrades) as PermanentUpgradeId[]) {
+    mergedUpgrades[key] = {
+      level: Math.max(0, Math.floor(partialPrestige.upgrades?.[key]?.level ?? 0)),
+    };
+  }
+
+  return {
+    prestigeCount: Math.max(0, Math.floor(partialPrestige.prestigeCount ?? initial.prestigeCount)),
+    totalGloryPointsEarned: Math.max(
+      0,
+      Math.floor(partialPrestige.totalGloryPointsEarned ?? initial.totalGloryPointsEarned),
+    ),
+    availableGloryPoints: Math.max(
+      0,
+      Math.floor(partialPrestige.availableGloryPoints ?? initial.availableGloryPoints),
+    ),
+    upgrades: mergedUpgrades,
   };
 }
 
@@ -381,6 +415,7 @@ export function createInitialScratchLegendSave(): ScratchLegendSave {
     upgradeTools: createInitialUpgradeToolStates(),
     automation: createInitialAutomationState(),
     roundSettlement: createInitialRoundSettlementState(),
+    prestige: createInitialPrestigeState(),
     workspace: createInitialWorkspaceState(),
   };
 }
@@ -459,6 +494,7 @@ export function mergeScratchLegendSave(
     upgradeTools: mergeUpgradeToolStates(partialSave?.upgradeTools),
     automation: mergeAutomationState(initialSave.automation, partialSave?.automation),
     roundSettlement: mergeRoundSettlementState(partialSave?.roundSettlement),
+    prestige: mergePrestigeState(partialSave?.prestige),
     workspace: {
       ...initialSave.workspace,
       ...partialSave?.workspace,

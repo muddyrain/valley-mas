@@ -448,6 +448,17 @@ button {
   gap: 5px;
 }
 
+.tab-row:has(.prestige-tab) {
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+}
+
+.tab-row:has(.prestige-tab) .tab {
+  font-size: 12px;
+  min-height: 32px;
+  padding: 0 4px;
+}
+
 .tab {
   min-height: 34px;
   border: 1px solid rgba(175, 205, 220, 0.24);
@@ -461,6 +472,15 @@ button {
   background: linear-gradient(180deg, #2e7895, #255d75);
   color: #fff;
   cursor: default;
+}
+
+.tab.prestige-tab {
+  border-color: rgba(255, 210, 100, 0.28);
+}
+
+.tab.prestige-tab.active {
+  background: linear-gradient(180deg, #8f5210, #6a3a08);
+  border-color: rgba(255, 200, 80, 0.4);
 }
 
 .work-card {
@@ -4736,4 +4756,389 @@ button {
   .gold-float i {
     display: none;
   }
+}
+
+/* ===== Prestige / Glory ===== */
+
+.prestige-tab {
+  background: linear-gradient(180deg, #4a2e6e, #331e4f);
+  border-color: rgba(200, 160, 255, 0.3);
+  color: #d4aaff;
+}
+
+.prestige-tab.active {
+  background: linear-gradient(180deg, #7b3fc4, #5c2e96);
+  color: #fff;
+}
+
+/* ======================================================
+   Prestige / Glory 永久成长面板
+   风格：与游戏深青色调对齐，避免与紫色 UI 混用
+   ====================================================== */
+
+.prestige-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  gap: 10px;
+  min-height: 0;
+  padding: 10px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.prestige-panel::-webkit-scrollbar {
+  width: 4px;
+}
+
+.prestige-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.prestige-panel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(100, 180, 220, 0.2);
+}
+
+/* prestige-panel 作为 sidebar-scroll-area 唯一子元素时，父容器不需要再滚 */
+.sidebar-scroll-area:has(.prestige-panel) {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── 荣耀点头部 ── */
+.glory-points-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(160, 220, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(20, 40, 60, 0.6);
+}
+
+.glory-points-display > div:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+
+.glory-icon {
+  width: 30px;
+  height: 30px;
+  background: radial-gradient(circle at 38% 32%, #c8f0ff, #2a80b8 65%);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(80, 180, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.glory-points-display > div:nth-child(2) {
+  min-width: 0;
+}
+
+.glory-points-display strong {
+  display: block;
+  font-size: 22px;
+  font-weight: 800;
+  color: #a8e0ff;
+  line-height: 1;
+}
+
+.glory-points-display small {
+  display: block;
+  font-size: 10px;
+  color: #5a8ea8;
+  margin-top: 3px;
+  white-space: nowrap;
+}
+
+.prestige-count-meta {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.prestige-count-meta em {
+  display: inline-block;
+  font-style: normal;
+  font-size: 10px;
+  color: #7ab8d4;
+  background: rgba(30, 70, 95, 0.55);
+  padding: 3px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* ── 结算触发区 ── */
+.prestige-trigger-area {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 200, 80, 0.28);
+  border-radius: 8px;
+  background: rgba(42, 30, 8, 0.55);
+}
+
+.prestige-trigger-hint {
+  font-size: 12px;
+  color: #c8b880;
+  margin: 0 0 10px;
+  line-height: 1.55;
+}
+
+.prestige-trigger-hint strong {
+  color: #ffe08d;
+  font-size: 15px;
+}
+
+.prestige-confirm-button {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid rgba(255, 200, 80, 0.42);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #c47820, #8f5210);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.prestige-confirm-button:hover {
+  opacity: 0.85;
+}
+
+/* ── 永久升级列表 ── */
+.prestige-upgrade-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prestige-upgrade-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 6px;
+  border-bottom: 1px solid rgba(160, 220, 255, 0.1);
+}
+
+.prestige-upgrade-header strong {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6a9eb8;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.prestige-upgrade-header span {
+  font-size: 10px;
+  color: #3d6a82;
+}
+
+.prestige-upgrade-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(160, 220, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(12, 26, 38, 0.6);
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.prestige-upgrade-card.buyable {
+  border-color: rgba(160, 220, 255, 0.25);
+  background: rgba(20, 42, 60, 0.65);
+}
+
+.prestige-upgrade-card.maxed {
+  opacity: 0.45;
+}
+
+.prestige-upgrade-info {
+  min-width: 0;
+}
+
+.prestige-upgrade-info strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #b8ddf0;
+  line-height: 1.3;
+}
+
+.prestige-upgrade-info span {
+  display: block;
+  font-size: 10px;
+  color: #4e8099;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prestige-upgrade-info small {
+  display: inline-block;
+  font-size: 10px;
+  color: #375d72;
+  margin-top: 3px;
+  background: rgba(20, 50, 70, 0.5);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.prestige-upgrade-action {
+  flex-shrink: 0;
+}
+
+.prestige-buy-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px 9px;
+  border: 1px solid rgba(80, 160, 210, 0.35);
+  border-radius: 5px;
+  background: linear-gradient(180deg, #1a5270, #0f3548);
+  cursor: pointer;
+  transition:
+    opacity 0.15s,
+    border-color 0.15s;
+  min-width: 40px;
+}
+
+.prestige-buy-button span {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  color: #88d0f0;
+}
+
+.prestige-buy-button small {
+  font-size: 9px;
+  color: #3d7a98;
+  margin-top: 2px;
+}
+
+.prestige-buy-button:hover:not(:disabled) {
+  opacity: 0.85;
+  border-color: rgba(100, 190, 240, 0.55);
+}
+
+.prestige-buy-button.insufficient,
+.prestige-buy-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.maxed-label {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  color: #3d6a82;
+  background: rgba(15, 40, 58, 0.6);
+  padding: 4px 7px;
+  border-radius: 4px;
+}
+
+/* ── round-settlement 荣耀结算按钮 ── */
+.round-settlement-prestige-button {
+  margin-top: 5px;
+  padding: 7px 14px;
+  border: 1px solid rgba(255, 200, 80, 0.42);
+  border-radius: 5px;
+  background: linear-gradient(180deg, #c47820, #8f5210);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.round-settlement-prestige-button:hover {
+  opacity: 0.85;
+}
+
+/* ── 确认弹窗 ── */
+.prestige-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+}
+
+.prestige-confirm-dialog {
+  width: min(340px, 90vw);
+  padding: 26px 22px;
+  border: 1px solid rgba(160, 220, 255, 0.2);
+  border-radius: 12px;
+  background: #091520;
+  color: #8ac8e8;
+  text-align: center;
+}
+
+.prestige-confirm-dialog h2 {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 800;
+  color: #b8e0f8;
+}
+
+.prestige-confirm-glory {
+  font-size: 13px;
+  color: #ffe08d;
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+
+.prestige-confirm-glory strong {
+  font-size: 30px;
+  font-weight: 800;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.prestige-confirm-warning {
+  font-size: 11px;
+  color: #3a6070;
+  margin: 0 0 20px;
+  line-height: 1.55;
+}
+
+.prestige-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.prestige-confirm-cancel,
+.prestige-confirm-ok {
+  flex: 1;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.prestige-confirm-cancel {
+  border: 1px solid rgba(160, 220, 255, 0.15);
+  background: rgba(15, 35, 50, 0.8);
+  color: #4a7a96;
+}
+
+.prestige-confirm-ok {
+  border: 1px solid rgba(255, 200, 80, 0.42);
+  background: linear-gradient(180deg, #c47820, #8f5210);
+  color: #fff;
+}
+
+.prestige-confirm-cancel:hover,
+.prestige-confirm-ok:hover {
+  opacity: 0.85;
 }

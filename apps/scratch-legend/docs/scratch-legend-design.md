@@ -1458,6 +1458,92 @@ Prestige 必须让玩家感受到：
 * 虽然重置了，但没有白玩
 * 第一次 Prestige 后，玩家应明显缩短回到中期卡册的时间
 
+## 12.5 荣耀点来源与数值规则
+
+荣耀点统一命名为 **荣耀点**（内部字段 `gloryPoints`）。
+
+来源：
+
+* 主要来源：终局票"最后一刮"结算时，将 `roundSettlement.gloryPreview` 转换为真实荣耀点。
+  * 传说符号数 0~2：`1` 点。
+  * 传说符号数 3：`2` 点。
+  * 传说符号数 4：`3` 点。
+  * 传说符号数 5（传说结局）：`5` 点。
+* 保底规则：每次 Prestige 至少获得 `1` 点，避免首次重置白玩。
+* 本阶段只接入"终局票来源"，次要来源（大奖连胜等）留作后续扩展。
+
+## 12.6 重置规则（Prestige 时重置的内容）
+
+触发 Prestige 后，以下内容**完全重置**到初始状态（但受永久升级影响）：
+
+* 金币 → 重置为 `初始值 + 起始资金永久升级加成`
+* 熟练度 → 重置为 `0`
+* 洗盘子等级 → 重置为 `0`，清洁次数重置
+* 已解锁里程碑 → 全部重置（但永久升级可降低里程碑门槛，让下一轮更快）
+* 刮刮卡等级进度 → 全部重置
+* 升级工具等级 → 全部重置
+* 自动刮刮机 → 重置为未购买
+* 贷款 → 全部清除
+* 本轮终局结算状态 → 重置
+* 桌面工作区 → 清空
+* 电话通知状态 → 全部重置（下一轮重新触发解锁流程）
+
+以下内容**永久保留**，不被 Prestige 重置：
+
+* `prestige.prestigeCount`：Prestige 次数计数器
+* `prestige.totalGloryPointsEarned`：累计获得的总荣耀点（含已花费，仅用于历史展示）
+* `prestige.availableGloryPoints`：当前可用荣耀点
+* `prestige.upgrades`：各永久升级的当前等级
+
+## 12.7 永久升级规则（数值细化）
+
+所有永久升级只在每次 Prestige 后的新轮才生效；升级只消耗荣耀点，不消耗金币。
+
+| ID | 名称 | 每级效果 | 上限 | 各级费用（荣耀点） |
+| --- | --- | --- | --- | --- |
+| `starter-gold` | 起始资金 | 开局金币 +$5 | 5 级 | 1 / 2 / 4 / 8 / 15 |
+| `eternal-luck` | 永久幸运 | 全局基础中奖权重 +2%（同刮卡运气叠加，上限总移出 20%） | 5 级 | 2 / 4 / 8 / 15 / 25 |
+| `payout-amplifier` | 永久收益 | 安全卡与高赔率卡 payout ×(1 + 5% × 等级) | 5 级 | 2 / 5 / 10 / 20 / 35 |
+| `scratch-efficiency` | 刮擦基础 | 开局刮除半径 +1 | 3 级 | 1 / 3 / 6 |
+| `early-automation` | 自动化提早接入 | 自动刮刮机熟练度门槛 -100 | 3 级 | 3 / 7 / 15 |
+| `album-headstart` | 卡册起步 | 刮刮卡（scratch-mode）解锁熟练度门槛 -5 | 3 级 | 2 / 5 / 12 |
+
+规则约束：
+
+* `eternal-luck` 与刮卡运气工具效果叠加，但合计移出未中奖概率上限为原概率的 `20%`，未中奖底线不低于 `45%`。
+* `payout-amplifier` 只对 `basic-safe` 和 `triple-match` 的 payout 生效，不影响风险卡手续费、步步加码止盈金额或终局票。
+* `album-headstart` 只降低 `scratch-mode` 里程碑的 `requiredProficiency`，最低保留 `10`，不会低于 `trash-can` 段。
+* `early-automation` 只降低 `auto-scratcher` 里程碑的 `requiredProficiency`，最低保留 `200`。
+* `scratch-efficiency` 作为开局刮除半径加成，等价于"已购买 N 级刮除范围"，与工具升级数值独立叠加。
+* 玩家未达成 `roundSettlement.completed` 时，永久升级面板只可查看，不可购买。
+* 永久升级在当轮不会立即生效，只在下一轮开始（即 Prestige 后）才应用效果。
+
+## 12.8 Prestige 触发流程
+
+```txt
+玩家完成"最后一刮"终局票
+→ roundSettlement.completed = true（阶段 6B 已实现）
+→ 本轮结算卡展示传说符号数量与荣耀点预览
+→ 玩家点击"荣耀结算 / 开始新一轮"按钮
+→ 弹出确认面板：展示获得荣耀点数、重置内容清单
+→ 玩家确认 Prestige
+→ 将 gloryPreview 转换为真实荣耀点累加到 prestige.availableGloryPoints
+→ prestige.totalGloryPointsEarned += gloryPreview
+→ prestige.prestigeCount += 1
+→ 按永久升级状态重新计算开局参数
+→ 重置存档（保留 prestige 字段）
+→ 进入新轮，应用开局参数
+```
+
+## 12.9 Prestige 面板 UI 规则
+
+* 左侧面板新增"荣耀"标签页（`prestige`），在 `roundSettlement.completed = true` 后解锁；`prestigeCount > 0` 后始终可见。
+* 荣耀标签页展示：当前荣耀点数量、已 Prestige 次数、永久升级列表（每项展示名称、当前等级、效果说明、花费和购买按钮）。
+* 购买永久升级时立即扣除荣耀点并升级，升级效果在下一轮才生效；当前轮 UI 可展示"下一轮生效"提示。
+* 本轮结算卡上展示"荣耀结算"按钮，点击弹出确认面板后再触发 Prestige；确认面板需展示"将获得 X 荣耀点"和"将重置当前进度"。
+* Prestige 后，左上角进度、金币、工作等级、刮刮卡目录等均恢复到初始状态，但荣耀标签页保持可见并展示更新后的荣耀点。
+* 玩家界面不出现"阶段 7""Prestige 已完成"等开发文案。
+
 ---
 
 # 十三、前 10 分钟体验目标

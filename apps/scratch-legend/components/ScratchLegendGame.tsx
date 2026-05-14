@@ -14,6 +14,7 @@ import {
   canAffordWorkPlate,
   canBuyAutoScratchMachine,
   canBuyBasicSafeScratchCard,
+  canBuyPermanentUpgrade,
   canBuyScratchCard,
   canBuyTrashCan,
   canBuyUpgradeTool,
@@ -21,6 +22,7 @@ import {
   canUnlockFinalChanceCard,
   cashOutPushLuckScratchCard,
   continuePushLuckScratchCard,
+  convertGloryPreviewToPoints,
   createLoanFromTemplate,
   createScratchCard,
   FINAL_CHANCE_CARD_PRICE,
@@ -36,6 +38,9 @@ import {
   getLoanRepaymentFeedback,
   getNextUnlockMilestone,
   getOutcomeAmountLabel,
+  getPermanentUpgradeConfig,
+  getPermanentUpgradeCost,
+  getPermanentUpgradeLevel,
   getPushLuckBustPenalty,
   getRandomPlateSpawnPosition,
   getScratchCardBrushRadius,
@@ -64,6 +69,8 @@ import {
   LOAN_REPAYMENT_AMOUNT,
   type LoanState,
   markScratchCardPenaltyTriggered,
+  type PermanentUpgradeId,
+  PRESTIGE_UPGRADES_CONFIG,
   PUSH_LUCK_CARD_MILESTONE_ID,
   PUSH_LUCK_CARD_PRICE,
   RISK_PEEK_CARD_PRICE,
@@ -81,6 +88,7 @@ import {
   shouldHandlePlatePointerDown,
   shouldOfferLoanPhone,
   shouldOpenPlateFromPointerUp,
+  shouldShowPrestigeTab,
   shouldShowScratchCover,
   shouldShowTripleMatchUnlockNotice,
   shouldShowUpgradeToolsUnlockNotice,
@@ -576,6 +584,9 @@ export function ScratchLegendGame() {
   const hasHydrated = useScratchLegendStore((state) => state.hasHydrated);
   const setSidebarTab = useScratchLegendStore((state) => state.setSidebarTab);
   const updateSave = useScratchLegendStore((state) => state.updateSave);
+  const storeBuyPermanentUpgrade = useScratchLegendStore((state) => state.buyPermanentUpgrade);
+  const storeTriggerPrestige = useScratchLegendStore((state) => state.triggerPrestige);
+  const [prestigeConfirmOpen, setPrestigeConfirmOpen] = useState(false);
   const [, setCleanProgress] = useState(0);
   const [scratchProgress, setScratchProgress] = useState(0);
   const [cleaningStartedAt, setCleaningStartedAt] = useState<number | null>(null);
@@ -682,6 +693,9 @@ export function ScratchLegendGame() {
   const tripleMatchMessageDismissed = save.notices.tripleMatchMessageDismissed;
   const autoScratchMachineUnlocked = save.automation.autoScratchMachineUnlocked;
   const roundSettlementCompleted = save.roundSettlement.completed;
+  const prestigeCount = save.prestige.prestigeCount;
+  const availableGloryPoints = save.prestige.availableGloryPoints;
+  const showPrestigeTab = shouldShowPrestigeTab({ roundSettlementCompleted, prestigeCount });
   const autoScratchMachineStatus = save.automation.autoScratchMachineStatus;
   const autoScratchMachineQueue = save.automation.autoScratchQueue;
   const autoScratchCurrentCard = save.automation.autoScratchCurrentCard;
@@ -3149,6 +3163,15 @@ export function ScratchLegendGame() {
             >
               辅助道具
             </button>
+            {showPrestigeTab && (
+              <button
+                className={`tab prestige-tab ${sidebarTab === 'prestige' ? 'active' : ''}`}
+                type="button"
+                onClick={() => setSidebarTab('prestige')}
+              >
+                荣耀
+              </button>
+            )}
           </div>
 
           <div className="sidebar-scroll-area">
@@ -3262,6 +3285,125 @@ export function ScratchLegendGame() {
                   </div>
                 )}
               </>
+            ) : sidebarTab === 'prestige' ? (
+              <div className="prestige-panel">
+                <div className="glory-points-display">
+                  <span className="glory-icon" aria-hidden="true" />
+                  <div>
+                    <strong>{availableGloryPoints}</strong>
+                    <small>可用荣耀点</small>
+                  </div>
+                  <div className="prestige-count-meta">
+                    <em>第 {prestigeCount} 次轮回</em>
+                  </div>
+                </div>
+                {roundSettlementCompleted && (
+                  <div className="prestige-trigger-area">
+                    <p className="prestige-trigger-hint">
+                      本轮终局已就绪，可消耗当前进度换取{' '}
+                      <strong>
+                        {convertGloryPreviewToPoints(save.roundSettlement.gloryPreview)}
+                      </strong>{' '}
+                      荣耀点并开启新轮回。
+                    </p>
+                    <button
+                      className="prestige-confirm-button"
+                      type="button"
+                      onClick={() => setPrestigeConfirmOpen(true)}
+                    >
+                      荣耀结算
+                    </button>
+                  </div>
+                )}
+                <div className="prestige-upgrade-list">
+                  <header className="prestige-upgrade-header">
+                    <strong>永久升级</strong>
+                    <span>荣耀点将在轮回后保留</span>
+                  </header>
+                  {PRESTIGE_UPGRADES_CONFIG.map((upgrade) => {
+                    const cfg = getPermanentUpgradeConfig(upgrade.id);
+                    if (!cfg) return null;
+                    const level = getPermanentUpgradeLevel(save.prestige, upgrade.id);
+                    const isMaxed = level >= cfg.maxLevel;
+                    const cost = getPermanentUpgradeCost(upgrade.id, level);
+                    const canBuy = canBuyPermanentUpgrade(availableGloryPoints, upgrade.id, level);
+                    const upgradeLabels: Record<string, { name: string; effect: string }> = {
+                      'starter-gold': {
+                        name: '起始资金',
+                        effect:
+                          level > 0
+                            ? `+$${cfg.effect.valuePerLevel * level} 初始金币`
+                            : '提升初始金币',
+                      },
+                      'eternal-luck': {
+                        name: '永久幸运',
+                        effect:
+                          level > 0
+                            ? `+${(cfg.effect.valuePerLevel * level * 100).toFixed(0)}% 中奖概率`
+                            : '提升中奖概率',
+                      },
+                      'payout-amplifier': {
+                        name: '永久收益',
+                        effect:
+                          level > 0
+                            ? `收益 ×${(1 + cfg.effect.valuePerLevel * level).toFixed(2)}`
+                            : '提升全局收益倍率',
+                      },
+                      'scratch-efficiency': {
+                        name: '刮擦基础',
+                        effect:
+                          level > 0
+                            ? `+${cfg.effect.valuePerLevel * level} 刷新半径`
+                            : '增加刷新半径',
+                      },
+                      'early-automation': {
+                        name: '自动化提早',
+                        effect:
+                          level > 0
+                            ? `自动机门槛 -${cfg.effect.valuePerLevel * level}`
+                            : '降低自动机解锁门槛',
+                      },
+                      'album-headstart': {
+                        name: '卡册起步',
+                        effect:
+                          level > 0
+                            ? `刮卡模式门槛 -${cfg.effect.valuePerLevel * level}`
+                            : '降低刮卡解锁门槛',
+                      },
+                    };
+                    const label = upgradeLabels[upgrade.id] ?? { name: upgrade.id, effect: '' };
+                    return (
+                      <article
+                        className={`prestige-upgrade-card ${isMaxed ? 'maxed' : ''} ${canBuy ? 'buyable' : ''}`}
+                        key={upgrade.id}
+                      >
+                        <div className="prestige-upgrade-info">
+                          <strong>{label.name}</strong>
+                          <span>{label.effect}</span>
+                          <small>{isMaxed ? '已满级' : `Lv ${level} / ${cfg.maxLevel}`}</small>
+                        </div>
+                        <div className="prestige-upgrade-action">
+                          {isMaxed ? (
+                            <em className="maxed-label">MAX</em>
+                          ) : (
+                            <button
+                              className={`prestige-buy-button ${canBuy ? '' : 'insufficient'}`}
+                              type="button"
+                              disabled={!canBuy}
+                              onClick={() =>
+                                storeBuyPermanentUpgrade(upgrade.id as PermanentUpgradeId)
+                              }
+                            >
+                              <span>{cost}</span>
+                              <small>荣耀点</small>
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
             ) : (
               <div className="tool-panel">
                 {trashCanPurchased ? (
@@ -3523,7 +3665,16 @@ export function ScratchLegendGame() {
                   </strong>
                   <em>{save.roundSettlement.legendCount} 个传说符号</em>
                   <b>荣耀预览 {save.roundSettlement.gloryPreview}</b>
-                  <small>等待荣耀结算</small>
+                  <button
+                    className="round-settlement-prestige-button"
+                    type="button"
+                    onClick={() => {
+                      setSidebarTab('prestige');
+                      setPrestigeConfirmOpen(true);
+                    }}
+                  >
+                    荣耀结算
+                  </button>
                 </div>
               )}
 
@@ -4232,6 +4383,45 @@ export function ScratchLegendGame() {
           )}
         </aside>
       </section>
+      {prestigeConfirmOpen && roundSettlementCompleted && (
+        <div
+          className="prestige-confirm-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="荣耀结算确认"
+        >
+          <div className="prestige-confirm-dialog">
+            <h2>荣耀结算</h2>
+            <p className="prestige-confirm-glory">
+              将获得{' '}
+              <strong>{convertGloryPreviewToPoints(save.roundSettlement.gloryPreview)}</strong>{' '}
+              荣耀点
+            </p>
+            <p className="prestige-confirm-warning">
+              当前所有进度（金币、熟练度、刮刮卡、道具）将被重置，荣耀点与永久升级永久保留。
+            </p>
+            <div className="prestige-confirm-actions">
+              <button
+                className="prestige-confirm-cancel"
+                type="button"
+                onClick={() => setPrestigeConfirmOpen(false)}
+              >
+                取消
+              </button>
+              <button
+                className="prestige-confirm-ok"
+                type="button"
+                onClick={() => {
+                  setPrestigeConfirmOpen(false);
+                  storeTriggerPrestige();
+                }}
+              >
+                确认轮回
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <p className="game-disclaimer">
         本游戏为 vibecoding 页面玩法创意参考
         <a href="https://store.steampowered.com/app/3948120/_/" target="_blank" rel="noreferrer">
