@@ -1,5 +1,4 @@
 import {
-  ArrowLeftRight,
   Bell,
   BookOpen,
   CheckCheck,
@@ -10,7 +9,6 @@ import {
   LogOut,
   Menu,
   MessageCircleHeart,
-  Mountain,
   Palette,
   RefreshCw,
   Sparkles,
@@ -88,18 +86,6 @@ export default function Header() {
       label: '留言墙',
       icon: MessageCircleHeart,
       active: location.pathname.startsWith('/guestbook'),
-    },
-    {
-      to: '/tools/format',
-      label: '格式转换',
-      icon: ArrowLeftRight,
-      active: location.pathname.startsWith('/tools/format'),
-    },
-    {
-      to: '/labs/climber',
-      label: '玩具攀爬',
-      icon: Mountain,
-      active: location.pathname.startsWith('/labs/climber'),
     },
   ];
 

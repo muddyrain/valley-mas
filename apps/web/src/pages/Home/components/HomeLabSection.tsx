@@ -1,11 +1,11 @@
-import { ArrowUpRight, Brain, Gamepad2, Wrench } from 'lucide-react';
+import { ArrowUpRight, Brain, Gamepad2, TicketPercent, Wrench } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 // ── 类型 ──────────────────────────────────────────────────────────────────────
 
 export type LabStatus = 'live' | 'beta' | 'soon';
 
-export interface LabEntry {
+export type LabEntry = {
   /** 唯一标识，用于 key */
   id: string;
   /** 图标节点 */
@@ -23,8 +23,8 @@ export interface LabEntry {
   /** 是否在新 tab 打开（外链默认 true） */
   external?: boolean;
   /** 卡片渐变色主题 */
-  colorTheme: 'violet' | 'emerald' | 'amber';
-}
+  colorTheme: 'violet' | 'emerald' | 'amber' | 'sky';
+};
 
 // ── 预设实验场目录（后续追加只需在这里加对象）─────────────────────────────────
 
@@ -66,6 +66,18 @@ export const labEntries: LabEntry[] = [
     href: '/tools/format',
     external: false,
     colorTheme: 'amber',
+  },
+  {
+    id: 'scratch-legend',
+    icon: <TicketPercent className="h-6 w-6" />,
+    tag: '游戏实验',
+    title: '刮刮传说',
+    description:
+      '洗盘子攒金币，买刮刮卡，升级工具，用荣耀点数 Prestige——关于运气与积累的循环小游戏。',
+    status: 'live',
+    href: '/labs/scratch-legend',
+    external: false,
+    colorTheme: 'sky',
   },
 ];
 
@@ -121,6 +133,18 @@ const colorMap: Record<
     liveDot: 'bg-emerald-400',
     liveBg: 'bg-emerald-500/16 border-emerald-400/28',
     liveText: 'text-emerald-300',
+  },
+  sky: {
+    card: 'bg-[linear-gradient(148deg,rgba(5,18,30,0.96),rgba(7,89,133,0.52),rgba(14,165,233,0.16))]',
+    glow: 'bg-[radial-gradient(circle_at_80%_20%,rgba(14,165,233,0.28),transparent_55%)]',
+    iconBg: 'bg-sky-500/18 border-sky-400/28',
+    iconText: 'text-sky-300',
+    tag: 'bg-sky-500/16 text-sky-300 border-sky-400/26',
+    tagDot: 'bg-sky-400',
+    accent: 'from-sky-500/70 to-cyan-500/70',
+    liveDot: 'bg-amber-400',
+    liveBg: 'bg-amber-500/16 border-amber-400/28',
+    liveText: 'text-amber-300',
   },
 };
 

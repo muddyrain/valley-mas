@@ -31,6 +31,7 @@ import ResourceAlbumManage from './pages/ResourceAlbumManage';
 import ResourceDetail from './pages/ResourceDetail';
 import Resources from './pages/Resources';
 import ResourceTagManage from './pages/ResourceTagManage';
+import ScratchLegendLab from './pages/ScratchLegendLab';
 
 function RouteTitle() {
   const location = useLocation();
@@ -49,6 +50,8 @@ function RouteTitle() {
       title = '格式转换工具 | Valley';
     } else if (pathname === '/labs/climber') {
       title = '玩具攀爬实验场 | Valley';
+    } else if (pathname === '/labs/scratch-legend') {
+      title = '刮刮传说 | Valley';
     } else if (pathname.startsWith('/blog/')) {
       title = '内容详情 | Valley';
     } else if (pathname === '/resources') {
@@ -148,6 +151,7 @@ function App() {
           <Route path="guestbook" element={<Guestbook />} />
           <Route path="tools/format" element={<FormatTools />} />
           <Route path="labs/climber" element={<ClimberLab />} />
+          <Route path="labs/scratch-legend" element={<ScratchLegendLab />} />
           <Route path="blog/:id" element={<BlogPost />} />
           <Route path="*" element={<NotFound />} />
         </Route>
