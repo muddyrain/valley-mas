@@ -1,6 +1,6 @@
 # Valley MAS AI 协作约定
 
-本文件是 AI 在 Valley MAS 仓库内工作的调度入口。详细项目定位、技术栈、模块地图、启动命令与环境变量以 `docs/PROJECT_GUIDE.md` 为准；文档索引见 `docs/README.md`。
+本文件是 AI 在 Valley MAS 仓库内工作的调度入口。详细项目定位、技术栈、模块地图、启动命令与环境变量以 `docs/PROJECT_GUIDE.md` 为准；文档索引见 `docs/README.md`；AI coding Harness Engineering 约定见 `docs/HARNESS_ENGINEERING.md`。
 
 默认使用中文沟通与输出。进入任务后先读取 `.codex/skills/INDEX.md`，再按任务范围读取相关代码和文档。
 
@@ -14,8 +14,9 @@
 
 1. 读取 `.codex/skills/INDEX.md`，确认是否需要启用项目 skill。
 2. 按任务范围读取 `docs/PROJECT_GUIDE.md` 的相关章节。
-3. 读取当前任务相关目录下的 `README.md`、`.env.example`、package scripts、Go 路由或 handler。
-4. 以当前代码和当前文档为准，不凭旧记忆推断路径、命令或业务规则。
+3. 涉及 AI 协作流程、agent 工作方式、验证闭环或任务执行可靠性时，读取 `docs/HARNESS_ENGINEERING.md`。
+4. 读取当前任务相关目录下的 `README.md`、`.env.example`、package scripts、Go 路由或 handler。
+5. 以当前代码和当前文档为准，不凭旧记忆推断路径、命令或业务规则。
 
 ## 子项目 AGENTS 路由
 
@@ -26,6 +27,7 @@
 | Web 前台 | `apps/web/AGENTS.md` | 用户侧页面、创作者空间、资源、博客、我的空间、个人状态与 Web API 封装。 |
 | Admin 后台 | `apps/admin/AGENTS.md` | 管理后台页面、审核与管理流程、Ant Design 管理端组件和 Admin API 封装。 |
 | AI Mind Arena | `apps/ai-mind-arena/AGENTS.md` | 脑内会议室 Next.js 前端、多人格辩论 UI、SSE 对战流和分享体验。 |
+| WorldSim | `apps/world-sim/AGENTS.md` | 沙盒文明模拟游戏、游戏设计文档、Phaser/Vite 子项目规则。 |
 | Go 服务端 | `server/AGENTS.md` | Gin/GORM API、认证中间件、业务 handler、数据模型、AI 与 Mind Arena 服务端能力。 |
 
 ## Skills 使用流程
@@ -66,6 +68,7 @@
 | Web 前台 | `apps/web` | 路由看 `apps/web/src/App.tsx`，API 看 `apps/web/src/api`。 |
 | Admin 后台 | `apps/admin` | 路由看 `apps/admin/src/App.tsx`，API 看 `apps/admin/src/api`。 |
 | AI Mind Arena | `apps/ai-mind-arena` | 页面看 `app`，组件看 `components`，接口看 `lib/api.ts`。 |
+| WorldSim | `apps/world-sim` | 协作入口看 `apps/world-sim/AGENTS.md`，设计文档看 `apps/world-sim/docs`。 |
 | Go 服务端 | `server` | 路由看 `server/internal/router/router.go`，配置看 `server/internal/config/config.go`。 |
 | 服务端模型 | `server/internal/model` | 数据结构和 GORM 模型入口。 |
 | 服务端处理器 | `server/internal/handler` | API handler 和业务入口。 |
@@ -108,6 +111,9 @@ cd apps/admin && pnpm dev
 # 启动 AI Mind Arena
 cd apps/ai-mind-arena && pnpm dev
 
+# 启动 WorldSim
+cd apps/world-sim && pnpm dev
+
 # 启动 Go 服务
 cd server && go run ./cmd/server
 ```
@@ -120,6 +126,7 @@ cd server && go run ./cmd/server
 - [ ] Admin 后台改动：`pnpm --filter @valley/admin exec tsc --noEmit`
 - [ ] Admin 样式或 lint 相关改动：`pnpm --filter @valley/admin check`
 - [ ] AI Mind Arena 改动：`pnpm --filter @valley/ai-mind-arena typecheck`
+- [ ] WorldSim 改动：`pnpm --filter @valley/world-sim typecheck`
 - [ ] 共享包改动：对应包的 `pnpm --filter <package> typecheck` 或 `pnpm --filter <package> build`
 - [ ] 中文文案、Markdown、skill 或配置示例改动：`python3 .codex/skills/encoding-guard/scripts/check_mojibake.py <相关文件>`
 - [ ] 只改协作规则或文档：至少运行 encoding 检查，并说明未运行应用级编译的原因

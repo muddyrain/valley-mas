@@ -21,8 +21,15 @@
 
 | 文档 | 路径 | 内容 |
 |---|---|---|
+| 架构合同 | `docs/ARCHITECTURE.md` | 渲染层、模拟层、数据层、Worker 层、依赖边界、状态真源 |
+| 模拟合同 | `docs/SIMULATION_CONTRACT.md` | tick 顺序、命令模型、事件模型、确定性与失败处理 |
+| 实体 Schema | `docs/ENTITY_SCHEMA.md` | World / Tile / Unit / Faction / Building / Event 等实体字段 |
+| 内容定义 | `docs/CONTENT_DEFS.md` | 种族、职业、建筑、神力、事件等配置格式 |
+| 存档格式 | `docs/SAVE_FORMAT.md` | 存档顶层字段、版本、迁移、导入导出、确定性要求 |
+| 评测平衡 | `docs/EVAL_AND_BALANCE.md` | 指标、不变量、回放、压测、平衡方法 |
+| 设计评审工作流 | `docs/DESIGN_REVIEW_WORKFLOW.md` | 熟练玩家、玩法评审、架构师、平衡数据等研发评审视角 |
 | 游戏设计文档 (GDD) | `docs/GAME_DESIGN.md` | 世界观、系统设计、玩法、视觉风格、里程碑 |
-| 任务拆分 | `docs/TASK_BREAKDOWN.md` | 37 个 Task，按 M0~M4 里程碑分阶段 |
+| 任务拆分 | `docs/TASK_BREAKDOWN.md` | 40 个 Task，按 M0~M4 里程碑分阶段 |
 | UI 设计文档 | `docs/UI_DESIGN.md` | 像素风 UI 规范、布局、美工资产清单、免版权资源推荐 |
 
 ---
@@ -47,8 +54,16 @@
 apps/world-sim/
 ├── AGENTS.md              ← 本文件，AI 协作入口
 ├── docs/
-│   ├── GAME_DESIGN.md     ← 游戏设计文档
-│   └── TASK_BREAKDOWN.md  ← 任务拆分
+│   ├── ARCHITECTURE.md           ← 架构合同
+│   ├── SIMULATION_CONTRACT.md    ← 模拟合同
+│   ├── ENTITY_SCHEMA.md          ← 实体 Schema
+│   ├── CONTENT_DEFS.md           ← 内容定义规范
+│   ├── SAVE_FORMAT.md            ← 存档格式
+│   ├── EVAL_AND_BALANCE.md       ← 评测与平衡
+│   ├── DESIGN_REVIEW_WORKFLOW.md ← 设计评审工作流
+│   ├── GAME_DESIGN.md            ← 游戏设计文档
+│   ├── TASK_BREAKDOWN.md         ← 任务拆分
+│   └── UI_DESIGN.md              ← UI 与资产规范
 ├── src/
 │   ├── main.ts            ← 入口
 │   ├── game/              ← Phaser 实例 + 场景
@@ -75,19 +90,19 @@ apps/world-sim/
 
 | 里程碑 | 状态 | 说明 |
 |---|---|---|
-| M0 技术验证 | ⏳ 未开始 | 工程搭建、Phaser 骨架、基础地图渲染 |
+| M0 技术验证 | 🚧 进行中 | Vite/TypeScript 子项目骨架已创建，Phaser 场景骨架尚未接入 |
 | M1 最小原型 | ⏳ 未开始 | 地形生成、寻路、FSM、战斗、领土 |
 | M2 完整循环 | ⏳ 未开始 | 全职业、文明升级、外交、神力 |
 | M3 内容填充 | ⏳ 未开始 | 4 种族、怪物、随机事件 |
 | M4 Web 性能优化 | ⏳ 未开始 | 渲染优化、AI 分帧、Worker 批处理、压测 |
 
-> 第一步：执行 TASK-001（工程初始化），在 monorepo 中创建可运行的 Vite 项目。
+> 当前下一步：继续完成 TASK-001 中的 Phaser 依赖接入，然后执行 TASK-002（Phaser 场景骨架）。
 
 ---
 
 ## 核心系统概览
 
-进入某个系统开发时，先阅读 `docs/GAME_DESIGN.md` 对应章节，再开始编码。
+进入某个系统开发时，先阅读 `docs/GAME_DESIGN.md` 对应章节；如果涉及分层、数据、存档或 tick 规则，再优先补读上面的合同文档，再开始编码。
 
 | 系统 | 设计文档章节 | 核心文件（规划）|
 |---|---|---|

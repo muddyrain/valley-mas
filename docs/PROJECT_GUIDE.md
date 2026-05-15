@@ -1,6 +1,6 @@
 # Valley MAS 项目指南
 
-本文件沉淀 Valley MAS 的项目级信息，供开发者和 AI 协作时快速理解项目边界。AI 协作规则仍以根目录 `AGENTS.md` 为入口。
+本文件沉淀 Valley MAS 的项目级信息，供开发者和 AI 协作时快速理解项目边界。AI 协作规则仍以根目录 `AGENTS.md` 为入口；AI coding Harness Engineering 约定见 `docs/HARNESS_ENGINEERING.md`。
 
 ## 项目定位
 
@@ -16,9 +16,10 @@
 | Web 前台 | `apps/web` | React 19 + Vite 6 + React Router 7 + Tailwind 4，包含首页、创作者、资源、博客、我的空间等用户侧页面。 |
 | Admin 后台 | `apps/admin` | React 19 + Vite 6 + Ant Design 6 + Pro Components，包含用户、创作者、资源、博客、记录与审核管理。 |
 | Toy Climb Arena | `apps/toy-climb-arena` | Vite 6 + TypeScript + Three.js，玩具世界攀爬跳跃游戏，开发端口 5175。详见 `apps/toy-climb-arena/AGENTS.md`。 |
+| WorldSim | `apps/world-sim` | Phaser 3 + TypeScript + Vite 的沙盒文明模拟游戏，设计文档与协作入口见 `apps/world-sim/AGENTS.md`。 |
 | Go 服务端 | `server` | Gin + GORM，入口在 `server/cmd/server`，路由集中在 `server/internal/router/router.go`。 |
 | 共享包 | `packages/*` | `shared`、`shared-request`、`shared-router`、`shared-format`、`format-tools` 等 workspace 包。 |
-| 文档 | `docs` | 沉淀长期有价值文档；普通问答、临时总结不要自动写入。 |
+| 文档 | `docs` | 沉淀长期有价值文档；Harness Engineering 是仓库级 AI coding 协作体系，不属于某个业务 app 页面。 |
 | Unity 实验 | `apps/unity-dungeon` | Unity 相关实验资产，除非任务明确涉及，不主动改动。 |
 
 ## 关键业务模块
@@ -49,6 +50,10 @@ cd apps/admin && pnpm dev
 cd apps/toy-climb-arena && pnpm dev
 # 或：pnpm --filter @valley/toy-climb-arena dev
 # 访问 http://localhost:5175
+
+# 启动 WorldSim
+cd apps/world-sim && pnpm dev
+# 或：pnpm --filter @valley/world-sim dev
 
 # 启动 Go 服务
 cd server && go run ./cmd/server

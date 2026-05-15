@@ -7,8 +7,26 @@
 
 | 文档 | 路径 | 与本文档的关系 |
 |---|---|---|
+| 架构合同 | `docs/ARCHITECTURE.md` | 分层、依赖边界、状态真源、Worker 责任划分 |
+| 模拟合同 | `docs/SIMULATION_CONTRACT.md` | tick 顺序、命令模型、事件模型、确定性 |
+| 实体 Schema | `docs/ENTITY_SCHEMA.md` | 任务实现时应遵守的实体字段约束 |
+| 内容定义 | `docs/CONTENT_DEFS.md` | 配置型内容的字段格式与校验要求 |
+| 存档格式 | `docs/SAVE_FORMAT.md` | 存档相关 Task 的格式、版本和迁移规则 |
+| 评测平衡 | `docs/EVAL_AND_BALANCE.md` | 性能、回放、压测、不变量与平衡回归 |
 | 游戏设计文档 | `docs/GAME_DESIGN.md` | 所有 Task 的功能来源；机制、数值、种族规则以该文档为准 |
 | UI 设计文档 | `docs/UI_DESIGN.md` | §六 资产清单是美工类 Task 的交付标准；§十 阶段策略对应各里程碑美工目标 |
+
+## 开发前置
+
+进入具体 Task 前，先确认是否需要补读以下设计合同：
+
+- 架构与边界：`ARCHITECTURE.md`
+- 模拟与 tick：`SIMULATION_CONTRACT.md`
+- 数据字段：`ENTITY_SCHEMA.md`
+- 配置内容：`CONTENT_DEFS.md`
+- 存档与迁移：`SAVE_FORMAT.md`
+- 评测与回放：`EVAL_AND_BALANCE.md`
+- 设计评审工作流：`DESIGN_REVIEW_WORKFLOW.md`
 
 ---
 
@@ -17,11 +35,11 @@
 目标：跑通最小技术栈，验证 Phaser 3 + Vite + TS 在 monorepo 中可行。
 
 ### TASK-001 · 工程初始化 🔴 ⭐
-- [ ] 在 `apps/world-sim` 创建 ### TASK-035 · 成就系统（优先级：可以做）⭐⭐ite + TypeScript 项目
-- [ ] 接入 monorepo（`pnpm-workspace.yaml` + `turbo.json`）
+- [x] 在 `apps/world-sim` 创建 Vite + TypeScript 项目
+- [x] 接入 monorepo（`pnpm-workspace.yaml` + `turbo.json`）
 - [ ] 安装 Phaser 3 依赖
 - [ ] 配置 `tsconfig.json`、`biome.json`
-- [ ] 添加 `dev` / `build` / `typecheck` 脚本
+- [x] 添加 `dev` / `build` / `typecheck` 脚本
 
 ### TASK-002 · Phaser 场景骨架 🔴 ⭐
 - [ ] 创建 `Game.ts`，初始化 Phaser.Game 实例（WebGL 渲染）
@@ -71,13 +89,13 @@
 - [ ] 实现 `WanderState` — 随机游走
 - [ ] 实现 `MarchState` — 向目标寻路移动
 - [ ] 实现 `HarvestState` — 走到资源点，采集
-- [ ] 实现 `EatState` — 走到仓库，吃食物
+- [ ] 实现 `RestState` — 走到仓库，补充体力
 - [ ] 验证状态切换逻辑无死锁
 
 ### TASK-008 · 小人生存属性 🟡 ⭐⭐
-- [ ] 为 `Unit` 添加 `hunger` / `hp` / `energy` / `age` 属性
-- [ ] `SimLoop` 每 tick 递减饥饿值
-- [ ] 饥饿值 < 30 → 强制切换到 EatState
+- [ ] 为 `Unit` 添加 `vitality` / `hp` / `age` 属性
+- [ ] `SimLoop` 每 tick 递减体力值
+- [ ] 体力值 < 30 → 强制切换到 RestState
 - [ ] HP = 0 → 触发死亡（移除单位，播放死亡动画）
 - [ ] 年龄系统：每游戏年 age+1，60 岁自然死亡
 
@@ -206,6 +224,7 @@
 - [ ] 保存到 `localStorage`（自动存档 + 手动存档 3 个槽）
 - [ ] 读取存档还原游戏状态
 - [ ] 存档文件导出/导入（JSON 文件）
+- [ ] 读取/写入前先做 `SAVE_FORMAT.md` 版本校验
 
 ### TASK-040 · M2 Spritesheet 整合 🟢 ⭐⭐
 > 视觉规范：`UI_DESIGN.md §六 + §八 + §九`
@@ -247,7 +266,7 @@
 ### TASK-029 · 国王与传承系统 🟢 ⭐⭐⭐
 - [ ] 每个势力唯一国王单位（金色标识）
 - [ ] 国王提升周围士兵士气（攻击+10%）
-- [ ] 国王死亡 → 人口最多的成年男性继承
+- [ ] 国王死亡 → 按 `GAME_DESIGN.md` 的传承规则继承（后续可由 `ENTITY_SCHEMA.md` 扩展）
 - [ ] 国王逃跑机制（HP < 10% 时向地图边缘逃跑）
 - [ ] 国王传位事件日志
 
@@ -324,7 +343,7 @@
 | M2 完整循环 | 9 个 Task | Week 7-12 |
 | M3 内容填充 | 7 个 Task | Week 13-20 |
 | M4 Web 性能优化 | 6 个 Task | Week 21-26 |
-| **合计** | **38 个 Task** | **~26 周** |
+| **合计** | **40 个 Task** | **~26 周** |
 
 ---
 
@@ -339,7 +358,8 @@
 只需完成以下 Task 即可验证核心玩法：
 
 ```
-TASK-001 ~ TASK-016（M0 + M1 全部）
+TASK-001 ~ TASK-016（M0 + M1 核心玩法）
+TASK-039（M1 美工资产接入，作为同阶段验收项）
 ```
 
 约 6 周，完成后应该能看到：
