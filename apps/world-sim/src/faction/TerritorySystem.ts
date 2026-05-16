@@ -6,6 +6,11 @@ export type TerritoryClaimResult = {
   changedTiles: TerrainTile[];
 };
 
+export type TerritoryCaptureResult = {
+  capturedCount: number;
+  changedTiles: TerrainTile[];
+};
+
 export type TerritoryContactPair = {
   firstFactionId: string;
   secondFactionId: string;
@@ -41,6 +46,71 @@ export class TerritorySystem {
 
     return {
       claimedCount: changedTiles.length,
+      changedTiles,
+    };
+  }
+
+  captureAroundWorldPoint(
+    attackerFactionId: string,
+    defeatedFactionId: string,
+    worldPoint: Phaser.Math.Vector2,
+    radiusTiles = DEFAULT_TERRITORY_RADIUS_TILES,
+  ): TerritoryCaptureResult {
+    if (attackerFactionId === defeatedFactionId) {
+      return {
+        capturedCount: 0,
+        changedTiles: [],
+      };
+    }
+
+    const centerX = Math.floor(worldPoint.x / this.map.tileSize);
+    const centerY = Math.floor(worldPoint.y / this.map.tileSize);
+    const radius = Math.max(0, Math.floor(radiusTiles));
+    const changedTiles: TerrainTile[] = [];
+
+    for (let y = centerY - radius; y <= centerY + radius; y += 1) {
+      for (let x = centerX - radius; x <= centerX + radius; x += 1) {
+        const tile = this.getTile(x, y);
+
+        if (!tile || tile.ownerFactionId !== defeatedFactionId) {
+          continue;
+        }
+
+        tile.ownerFactionId = undefined;
+        changedTiles.push(tile);
+      }
+    }
+
+    return {
+      capturedCount: changedTiles.length,
+      changedTiles,
+    };
+  }
+
+  captureAllFactionTerritory(
+    attackerFactionId: string,
+    defeatedFactionId: string,
+  ): TerritoryCaptureResult {
+    if (attackerFactionId === defeatedFactionId) {
+      return {
+        capturedCount: 0,
+        changedTiles: [],
+      };
+    }
+
+    const changedTiles: TerrainTile[] = [];
+
+    for (const tile of this.map.tiles) {
+      if (tile.ownerFactionId !== defeatedFactionId) {
+        continue;
+      }
+
+      tile.ownerFactionId = undefined;
+      changedTiles.push(tile);
+    }
+
+    return {
+      capturedCount: changedTiles.length,
       changedTiles,
     };
   }

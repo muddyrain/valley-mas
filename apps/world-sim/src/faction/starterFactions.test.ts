@@ -2,22 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { createM1StarterFactions, getHumanPrototypeCampPoints } from './starterFactions';
 
 describe('createM1StarterFactions', () => {
-  it('creates two visible starter factions with paired units and starter territory', () => {
-    const starters = createM1StarterFactions({
+  it('creates two visible starter factions with ten-unit starter camps and starter territory', () => {
+    const map = {
       width: 64,
       height: 64,
       tileSize: 16,
-    });
+    };
+    const starters = createM1StarterFactions(map);
 
     expect(starters).toHaveLength(2);
     expect(starters.map((starter) => starter.factionId)).toEqual(['faction-1', 'faction-2']);
     expect(starters.map((starter) => starter.race)).toEqual(['human', 'orc']);
     expect(starters[1].units.every((unit) => unit.wanderRadius === 32)).toBe(true);
+    expect(starters[1].capitalPosition.x - starters[0].capitalPosition.x).toBeGreaterThanOrEqual(
+      map.width * map.tileSize * 0.45,
+    );
 
     for (const starter of starters) {
       expect(starter.starterTerritoryRadiusTiles).toBe(2);
-      expect(starter.units).toHaveLength(2);
-      expect(starter.units.map((unit) => unit.gender)).toEqual(['male', 'female']);
+      expect(starter.units).toHaveLength(10);
+      expect(starter.units.filter((unit) => unit.gender === 'male')).toHaveLength(5);
+      expect(starter.units.filter((unit) => unit.gender === 'female')).toHaveLength(5);
       expect(starter.units.every((unit) => unit.factionId === starter.factionId)).toBe(true);
       expect(starter.units.every((unit) => unit.restPoint.x === starter.capitalPosition.x)).toBe(
         true,

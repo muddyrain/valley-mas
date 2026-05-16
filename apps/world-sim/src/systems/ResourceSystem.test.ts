@@ -127,5 +127,33 @@ describe('ResourceSystem', () => {
 
     expect(system.needsHarvest()).toBe(false);
     expect(system.getHarvestPriorityTypes()).toEqual([]);
+    expect(system.findNextHarvestTarget(new Phaser.Math.Vector2(2, 2))).toBeUndefined();
+  });
+
+  it('targets food before nearby wood when food stockpile is still low', () => {
+    const map = createSmallTestMap(
+      [
+        {
+          x: 1,
+          y: 1,
+          terrainType: 'forest',
+          resourceType: 'wood',
+          resourceAmount: 10,
+        },
+        {
+          x: 3,
+          y: 3,
+          terrainType: 'grass',
+          resourceType: 'food',
+          resourceAmount: 8,
+        },
+      ],
+      5,
+    );
+    const system = new ResourceSystem(map);
+
+    const target = system.findNextHarvestTarget(new Phaser.Math.Vector2(16, 16));
+
+    expect(target).toEqual(new Phaser.Math.Vector2(56, 56));
   });
 });

@@ -59,4 +59,60 @@ describe('BuildSystem', () => {
       progress: 0,
     });
   });
+
+  it('tracks the owning faction and removes a building when it is destroyed', () => {
+    const resourceSystem = new ResourceSystem(createSmallTestMap([]));
+    const buildSystem = new BuildSystem(
+      resourceSystem,
+      new Phaser.Math.Vector2(24, 24),
+      'faction-2',
+    );
+
+    expect(buildSystem.hasBuildTask()).toBe(true);
+    const buildings = buildSystem.getBuildings();
+    expect(buildings[0]).toMatchObject({
+      factionId: 'faction-2',
+      type: 'hut',
+    });
+
+    const destroyed = buildSystem.damageBuilding(buildings[0].id, 999);
+
+    expect(destroyed).toBe(true);
+    expect(buildSystem.getBuildings()).toHaveLength(0);
+  });
+
+  it('queues additional huts when population exceeds the current housing demand', () => {
+    const resourceSystem = new ResourceSystem(
+      createSmallTestMap(
+        [
+          {
+            x: 0,
+            y: 0,
+            terrainType: 'forest',
+            resourceType: 'wood',
+            resourceAmount: 10,
+          },
+        ],
+        4,
+      ),
+    );
+    const buildPoint = new Phaser.Math.Vector2(24, 24);
+    const buildSystem = new BuildSystem(resourceSystem, buildPoint);
+
+    buildSystem.setPopulationDemand(10);
+    expect(buildSystem.hasBuildTask()).toBe(true);
+    expect(buildSystem.buildAt(buildPoint, 3000)).toBe(true);
+
+    for (let i = 0; i < 5; i += 1) {
+      resourceSystem.harvestAt(new Phaser.Math.Vector2(8, 8));
+    }
+
+    expect(buildSystem.hasBuildTask()).toBe(true);
+    expect(buildSystem.getBuildings()).toHaveLength(2);
+    expect(buildSystem.getBuildings()[1]).toMatchObject({
+      type: 'hut',
+      status: 'queued',
+    });
+    expect(buildSystem.getBuildings()[1].position).not.toEqual(buildPoint);
+  });
 });

@@ -73,6 +73,26 @@ export class ResourceSystem {
     );
   }
 
+  getActiveHarvestPriorityTypes() {
+    for (const resourceType of this.getHarvestPriorityTypes()) {
+      if (this.hasHarvestableResource([resourceType])) {
+        return [resourceType];
+      }
+    }
+
+    return [];
+  }
+
+  findNextHarvestTarget(from: Phaser.Math.Vector2) {
+    const activeTypes = this.getActiveHarvestPriorityTypes();
+
+    if (activeTypes.length === 0) {
+      return undefined;
+    }
+
+    return this.findNearestHarvestTarget(from, activeTypes);
+  }
+
   canAfford(cost: Partial<Record<ResourceType, number>>) {
     return Object.entries(cost).every(([resourceType, amount]) => {
       return this.inventory[resourceType as ResourceType] >= (amount ?? 0);

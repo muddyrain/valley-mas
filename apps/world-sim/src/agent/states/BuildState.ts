@@ -7,6 +7,11 @@ export class BuildState implements StateLifecycle<UnitStateContext> {
   }
 
   update(context: UnitStateContext, deltaMs: number) {
+    if (!context.hasBuildTask()) {
+      context.transition('Rest');
+      return;
+    }
+
     if (context.hasTarget()) {
       context.moveTowardTarget(deltaMs);
       return;

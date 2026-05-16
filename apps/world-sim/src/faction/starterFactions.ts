@@ -45,18 +45,32 @@ export type HumanPrototypeCampPoints = {
 export const HUMAN_FACTION_ID = 'faction-1';
 export const ORC_FACTION_ID = 'faction-2';
 export const STARTER_TERRITORY_RADIUS_TILES = 2;
+const STARTER_UNIT_COUNT = 10;
+const HUMAN_STARTER_X_RATIO = 0.25;
+const ORC_STARTER_X_RATIO = 0.75;
+const STARTER_UNIT_NAMES = [
+  'alpha',
+  'beta',
+  'gamma',
+  'delta',
+  'epsilon',
+  'zeta',
+  'eta',
+  'theta',
+  'iota',
+  'kappa',
+];
 
 export function createM1StarterFactions(
   map: Pick<TestWorldMap, 'width' | 'height' | 'tileSize'>,
 ): StarterFactionSpec[] {
-  const centerTileX = Math.floor(map.width / 2);
   const centerTileY = Math.floor(map.height / 2);
 
   return [
     createStarterFaction({
       factionId: HUMAN_FACTION_ID,
       race: 'human',
-      tileX: centerTileX,
+      tileX: getStarterTileX(map.width, HUMAN_STARTER_X_RATIO),
       tileY: centerTileY,
       unitPrefix: 'human',
       map,
@@ -64,7 +78,7 @@ export function createM1StarterFactions(
     createStarterFaction({
       factionId: ORC_FACTION_ID,
       race: 'orc',
-      tileX: Math.min(map.width - 4, centerTileX + 10),
+      tileX: getStarterTileX(map.width, ORC_STARTER_X_RATIO),
       tileY: centerTileY,
       unitPrefix: 'orc',
       wanderRadius: 32,
@@ -89,6 +103,14 @@ export function getHumanPrototypeCampPoints(
   };
 }
 
+function getStarterTileX(width: number, ratio: number) {
+  const edgePaddingTiles = Math.min(4, Math.max(1, Math.floor(width / 8)));
+  const minTileX = edgePaddingTiles;
+  const maxTileX = Math.max(minTileX, width - 1 - edgePaddingTiles);
+
+  return Math.min(maxTileX, Math.max(minTileX, Math.floor(width * ratio)));
+}
+
 function createStarterFaction(options: {
   factionId: string;
   race: Unit['race'];
@@ -108,6 +130,19 @@ function createStarterFaction(options: {
     x: centerX + options.map.tileSize,
     y: centerY + options.map.tileSize,
   };
+  const unitSpacing = options.map.tileSize;
+  const unitOffsets = [
+    { x: -2, y: -1 },
+    { x: -1, y: -1 },
+    { x: 0, y: -1 },
+    { x: 1, y: -1 },
+    { x: 2, y: -1 },
+    { x: -2, y: 1 },
+    { x: -1, y: 1 },
+    { x: 0, y: 1 },
+    { x: 1, y: 1 },
+    { x: 2, y: 1 },
+  ];
 
   return {
     factionId: options.factionId,
@@ -115,29 +150,16 @@ function createStarterFaction(options: {
     capitalPosition,
     buildPoint,
     starterTerritoryRadiusTiles: STARTER_TERRITORY_RADIUS_TILES,
-    units: [
-      {
-        id: `${options.unitPrefix}-unit-001`,
-        name: `${options.unitPrefix}-alpha`,
-        x: centerX - options.map.tileSize / 2,
-        y: centerY,
-        race: options.race,
-        gender: 'male',
-        factionId: options.factionId,
-        wanderRadius: options.wanderRadius,
-        restPoint: capitalPosition,
-      },
-      {
-        id: `${options.unitPrefix}-unit-002`,
-        name: `${options.unitPrefix}-beta`,
-        x: centerX + options.map.tileSize / 2,
-        y: centerY,
-        race: options.race,
-        gender: 'female',
-        factionId: options.factionId,
-        wanderRadius: options.wanderRadius,
-        restPoint: capitalPosition,
-      },
-    ],
+    units: unitOffsets.slice(0, STARTER_UNIT_COUNT).map((offset, index) => ({
+      id: `${options.unitPrefix}-unit-${String(index + 1).padStart(3, '0')}`,
+      name: `${options.unitPrefix}-${STARTER_UNIT_NAMES[index]}`,
+      x: centerX + offset.x * unitSpacing,
+      y: centerY + offset.y * unitSpacing,
+      race: options.race,
+      gender: index < STARTER_UNIT_COUNT / 2 ? 'male' : 'female',
+      factionId: options.factionId,
+      wanderRadius: options.wanderRadius,
+      restPoint: capitalPosition,
+    })),
   };
 }

@@ -7,6 +7,7 @@ export type BuildingStatus = 'queued' | 'building' | 'complete';
 export type BuildingInstance = {
   id: string;
   type: BuildingType;
+  factionId: string;
   position: Phaser.Math.Vector2;
   hp: number;
   progress: number;
@@ -15,15 +16,19 @@ export type BuildingInstance = {
 };
 
 const BUILD_PROGRESS_PER_SECOND = 35;
+const HUT_CAPACITY = 5;
+const BUILDING_SPACING = 16;
 
 export class BuildSystem {
   private readonly buildings: BuildingInstance[] = [];
   private dirty = true;
   private nextBuildingId = 1;
+  private populationDemand = 1;
 
   constructor(
     private readonly resourceSystem: ResourceSystem,
     private readonly buildPoint: Phaser.Math.Vector2,
+    private readonly factionId = 'faction-1',
   ) {}
 
   getBuildings() {
@@ -31,6 +36,19 @@ export class BuildSystem {
       ...building,
       position: building.position.clone(),
     }));
+  }
+
+  getBuilding(buildingId: string) {
+    const building = this.buildings.find((candidate) => candidate.id === buildingId);
+
+    if (!building) {
+      return undefined;
+    }
+
+    return {
+      ...building,
+      position: building.position.clone(),
+    };
   }
 
   getSummary() {
@@ -58,6 +76,17 @@ export class BuildSystem {
 
   hasBuildTask() {
     return Boolean(this.getActiveBuildTask() || this.tryQueueInitialBuilding());
+  }
+
+  setPopulationDemand(population: number) {
+    const nextDemand = Math.max(1, Math.ceil(Math.max(0, Math.floor(population)) / HUT_CAPACITY));
+
+    if (nextDemand === this.populationDemand) {
+      return;
+    }
+
+    this.populationDemand = nextDemand;
+    this.dirty = true;
   }
 
   getBuildTarget() {
@@ -102,6 +131,28 @@ export class BuildSystem {
     return task.status === 'complete';
   }
 
+  damageBuilding(buildingId: string, damage: number) {
+    const building = this.buildings.find((candidate) => candidate.id === buildingId);
+
+    if (!building) {
+      return false;
+    }
+
+    building.hp = Math.max(0, building.hp - Math.max(0, Math.floor(damage)));
+    this.dirty = true;
+
+    if (building.hp > 0) {
+      return false;
+    }
+
+    this.buildings.splice(
+      this.buildings.findIndex((candidate) => candidate.id === buildingId),
+      1,
+    );
+    this.dirty = true;
+    return true;
+  }
+
   private getActiveBuilding() {
     return this.buildings.at(-1);
   }
@@ -111,7 +162,7 @@ export class BuildSystem {
   }
 
   private tryQueueInitialBuilding() {
-    if (this.buildings.length > 0) {
+    if (this.countCompletedOrQueuedHuts() >= this.populationDemand) {
       return undefined;
     }
 
@@ -124,7 +175,8 @@ export class BuildSystem {
     const building: BuildingInstance = {
       id: `building-${this.nextBuildingId}`,
       type: def.id,
-      position: this.buildPoint.clone(),
+      factionId: this.factionId,
+      position: this.getNextHutPosition(),
       hp: def.hp,
       progress: 0,
       progressRequired: def.buildProgressRequired,
@@ -135,5 +187,20 @@ export class BuildSystem {
     this.buildings.push(building);
     this.dirty = true;
     return building;
+  }
+
+  private countCompletedOrQueuedHuts() {
+    return this.buildings.filter((building) => building.type === 'hut').length;
+  }
+
+  private getNextHutPosition() {
+    const hutIndex = this.countCompletedOrQueuedHuts();
+    const column = hutIndex % 2;
+    const row = Math.floor(hutIndex / 2);
+
+    return new Phaser.Math.Vector2(
+      this.buildPoint.x + column * BUILDING_SPACING,
+      this.buildPoint.y + row * BUILDING_SPACING,
+    );
   }
 }

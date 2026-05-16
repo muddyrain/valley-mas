@@ -1,6 +1,8 @@
 import * as Phaser from 'phaser';
 import { StateMachine } from './StateMachine';
+import { AttackState } from './states/AttackState';
 import { BuildState } from './states/BuildState';
+import { FleeState } from './states/FleeState';
 import { HarvestState } from './states/HarvestState';
 import { IdleState } from './states/IdleState';
 import { MarchState } from './states/MarchState';
@@ -28,9 +30,14 @@ export type UnitOptions = {
   pickHarvestTarget: () => Phaser.Math.Vector2 | undefined;
   harvestResource: () => boolean;
   hasBuildTask: () => boolean;
+  hasAttackTask?: () => boolean;
+  hasFleeTask?: () => boolean;
   shouldHarvest?: () => boolean;
   pickBuildTarget: () => Phaser.Math.Vector2 | undefined;
+  pickAttackTarget?: () => Phaser.Math.Vector2 | undefined;
+  pickFleeTarget?: () => Phaser.Math.Vector2 | undefined;
   buildAtTarget: (deltaMs: number) => boolean;
+  attackAtTarget?: (deltaMs: number) => boolean;
   restPoint: Phaser.Math.Vector2;
 };
 
@@ -68,9 +75,14 @@ export class Unit {
   private readonly pickHarvestTargetFn: () => Phaser.Math.Vector2 | undefined;
   private readonly harvestResourceFn: () => boolean;
   private readonly hasBuildTaskFn: () => boolean;
+  private readonly hasAttackTaskFn: () => boolean;
+  private readonly hasFleeTaskFn: () => boolean;
   private readonly shouldHarvestFn: () => boolean;
   private readonly pickBuildTargetFn: () => Phaser.Math.Vector2 | undefined;
+  private readonly pickAttackTargetFn: () => Phaser.Math.Vector2 | undefined;
+  private readonly pickFleeTargetFn: () => Phaser.Math.Vector2 | undefined;
   private readonly buildAtTargetFn: (deltaMs: number) => boolean;
+  private readonly attackAtTargetFn: (deltaMs: number) => boolean;
   private readonly restPoint: Phaser.Math.Vector2;
   private readonly scene: Phaser.Scene;
   private readonly wanderRadius: number;
@@ -97,9 +109,14 @@ export class Unit {
     this.pickHarvestTargetFn = options.pickHarvestTarget;
     this.harvestResourceFn = options.harvestResource;
     this.hasBuildTaskFn = options.hasBuildTask;
+    this.hasAttackTaskFn = options.hasAttackTask ?? (() => false);
+    this.hasFleeTaskFn = options.hasFleeTask ?? (() => false);
     this.shouldHarvestFn = options.shouldHarvest ?? (() => true);
     this.pickBuildTargetFn = options.pickBuildTarget;
+    this.pickAttackTargetFn = options.pickAttackTarget ?? (() => undefined);
+    this.pickFleeTargetFn = options.pickFleeTarget ?? (() => undefined);
     this.buildAtTargetFn = options.buildAtTarget;
+    this.attackAtTargetFn = options.attackAtTarget ?? (() => false);
     this.restPoint = options.restPoint.clone();
     this.sprite = options.scene.add.rectangle(options.x, options.y, 14, 14, 0xf4f4f4, 1);
     this.sprite.setStrokeStyle(2, this.factionColor, 0.9);
@@ -123,10 +140,15 @@ export class Unit {
       pickHarvestTarget: () => this.pickHarvestTarget(),
       pickBuildTarget: () => this.pickBuildTarget(),
       pickRestTarget: () => this.pickRestTarget(),
+      pickAttackTarget: () => this.pickAttackTarget(),
+      pickFleeTarget: () => this.pickFleeTarget(),
       harvestResource: () => this.harvestResource(),
       hasBuildTask: () => this.hasBuildTask(),
+      hasAttackTask: () => this.hasAttackTask(),
+      hasFleeTask: () => this.hasFleeTask(),
       shouldHarvest: () => this.shouldHarvest(),
       buildAtTarget: (deltaMs: number) => this.buildAtTarget(deltaMs),
+      attackAtTarget: (deltaMs: number) => this.attackAtTarget(deltaMs),
       isRested: () => this.vitality >= 80,
       transition: (state: UnitState) => this.stateMachine.transition(state),
     };
@@ -139,6 +161,8 @@ export class Unit {
         Harvest: new HarvestState(),
         Build: new BuildState(),
         Rest: new RestState(),
+        Attack: new AttackState(),
+        Flee: new FleeState(),
       },
       'Idle',
     );
@@ -185,8 +209,33 @@ export class Unit {
       this.stateMachine.transition('Rest');
     }
 
+    if (this.hp < this.maxHp * 0.2 && this.stateMachine.state !== 'Flee') {
+      this.stateMachine.transition('Flee');
+    } else if (
+      this.stateMachine.state !== 'Attack' &&
+      this.stateMachine.state !== 'Flee' &&
+      this.hasAttackTask()
+    ) {
+      this.stateMachine.transition('Attack');
+    }
+
     this.stateMachine.update(deltaMs);
     this.syncSpriteStyle();
+  }
+
+  applyDamage(amount: number) {
+    if (this.dead) {
+      return true;
+    }
+
+    this.hp = Phaser.Math.Clamp(this.hp - Math.max(0, Math.floor(amount)), 0, this.maxHp);
+
+    if (this.hp <= 0) {
+      this.die();
+      return true;
+    }
+
+    return false;
   }
 
   destroy() {
@@ -269,6 +318,22 @@ export class Unit {
     }
   }
 
+  private pickAttackTarget() {
+    const attackTarget = this.pickAttackTargetFn();
+
+    if (attackTarget) {
+      this.setTarget(attackTarget.x, attackTarget.y);
+    }
+  }
+
+  private pickFleeTarget() {
+    const fleeTarget = this.pickFleeTargetFn();
+
+    if (fleeTarget) {
+      this.setTarget(fleeTarget.x, fleeTarget.y);
+    }
+  }
+
   private updateSurvival(deltaMs: number) {
     this.gameYearElapsedMs += deltaMs;
 
@@ -320,6 +385,8 @@ export class Unit {
       Harvest: 0x38b764,
       Build: 0xc0a080,
       Rest: 0x5b6ee1,
+      Attack: 0xb13e53,
+      Flee: 0xef7d57,
     };
 
     this.sprite.setFillStyle(fillColorByState[this.stateMachine.state], 1);
@@ -363,11 +430,23 @@ export class Unit {
     return this.hasBuildTaskFn();
   }
 
+  private hasAttackTask() {
+    return this.hasAttackTaskFn();
+  }
+
+  private hasFleeTask() {
+    return this.hasFleeTaskFn();
+  }
+
   private shouldHarvest() {
     return this.shouldHarvestFn();
   }
 
   private buildAtTarget(deltaMs: number) {
     return this.buildAtTargetFn(deltaMs);
+  }
+
+  private attackAtTarget(deltaMs: number) {
+    return this.attackAtTargetFn(deltaMs);
   }
 }

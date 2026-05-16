@@ -64,6 +64,10 @@ export class Faction {
     this.relations[factionId] = relation;
   }
 
+  clearRelation(factionId: string) {
+    delete this.relations[factionId];
+  }
+
   addPopulation(amount = 1) {
     this.population = Math.max(0, this.population + Math.floor(amount));
   }

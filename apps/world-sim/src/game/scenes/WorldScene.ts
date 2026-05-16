@@ -1,12 +1,17 @@
 import * as Phaser from 'phaser';
 import { Unit } from '../../agent/Unit';
 import { BUILDING_DEFS } from '../../config/buildings';
+import { DiplomacySystem } from '../../faction/DiplomacySystem';
 import { FactionManager } from '../../faction/FactionManager';
 import { createM1StarterFactions, HUMAN_FACTION_ID } from '../../faction/starterFactions';
 import { TerritorySystem } from '../../faction/TerritorySystem';
 import { BuildSystem } from '../../systems/BuildSystem';
+import { CombatSystem } from '../../systems/CombatSystem';
 import { type ReproductionBirth, ReproductionSystem } from '../../systems/ReproductionSystem';
 import { ResourceSystem } from '../../systems/ResourceSystem';
+import { getTimeScaleSpeedFromKeyboardEvent, TimeScaleSystem } from '../../systems/TimeScaleSystem';
+import { TimeSystem } from '../../systems/TimeSystem';
+import { WarMobilizationSystem } from '../../systems/WarMobilizationSystem';
 import {
   createTestWorldMap,
   type ResourceType,
@@ -37,6 +42,24 @@ type FactionRuntime = {
   buildSystem: BuildSystem;
 };
 
+type CombatTargetKind = 'unit' | 'building';
+
+type CombatTargetRef = {
+  id: string;
+  kind: CombatTargetKind;
+  factionId: string;
+  position: Phaser.Math.Vector2;
+  hp: number;
+  maxHp: number;
+  applyDamage: (damage: number) => boolean;
+};
+
+const COMBAT_DETECTION_RANGE = 48;
+const COMBAT_ATTACK_POWER = 12;
+const COMBAT_UNIT_DEFENSE = 2;
+const COMBAT_BUILDING_DEFENSE = 0;
+const COMBAT_OCCUPATION_RADIUS_TILES = 2;
+
 type UnitSpawnSpec = {
   id: string;
   name: string;
@@ -62,12 +85,18 @@ export class WorldScene extends Phaser.Scene {
   private readonly factionManager: FactionManager;
   private readonly territorySystem: TerritorySystem;
   private readonly reproductionSystem: ReproductionSystem;
+  private readonly combatSystem: CombatSystem;
+  private readonly diplomacySystem: DiplomacySystem;
+  private readonly warMobilizationSystem: WarMobilizationSystem;
+  private readonly timeScaleSystem: TimeScaleSystem;
+  private readonly timeSystem: TimeSystem;
   private readonly factionRuntimes = new Map<string, FactionRuntime>();
   private units: Unit[] = [];
   private mapGraphics?: Phaser.GameObjects.Graphics;
   private territoryGraphics?: Phaser.GameObjects.Graphics;
   private overlayGraphics?: Phaser.GameObjects.Graphics;
   private buildingGraphics?: Phaser.GameObjects.Graphics;
+  private nightOverlay?: Phaser.GameObjects.Rectangle;
   private readonly claimedTerritoryBuildingIds = new Set<string>();
   private readonly notifiedTerritoryContactKeys = new Set<string>();
   private selectedUnit?: Unit;
@@ -86,6 +115,11 @@ export class WorldScene extends Phaser.Scene {
     super(WORLD_SIM_SCENE_KEYS.World);
     this.factionManager = new FactionManager();
     this.territorySystem = new TerritorySystem(this.map);
+    this.combatSystem = new CombatSystem();
+    this.diplomacySystem = new DiplomacySystem(this.factionManager);
+    this.warMobilizationSystem = new WarMobilizationSystem();
+    this.timeScaleSystem = new TimeScaleSystem();
+    this.timeSystem = new TimeSystem();
     this.reproductionSystem = new ReproductionSystem({
       canAffordBirth: (factionId: string) =>
         (this.factionRuntimes.get(factionId)?.resourceSystem.getInventory().food ?? 0) > 20,
@@ -110,11 +144,17 @@ export class WorldScene extends Phaser.Scene {
     this.territoryGraphics = this.add.graphics();
     this.buildingGraphics = this.add.graphics();
     this.overlayGraphics = this.add.graphics();
+    this.nightOverlay = this.add.rectangle(0, 0, worldWidth, worldHeight, 0x0b1328, 0);
+    this.nightOverlay.setOrigin(0, 0);
+    this.nightOverlay.setScrollFactor(0);
+    this.nightOverlay.setDepth(50);
     this.mapGraphics.setDepth(0);
     this.territoryGraphics.setDepth(2);
     this.buildingGraphics.setDepth(5);
     this.overlayGraphics.setDepth(10);
 
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.layout, this);
+    this.layout();
     this.drawMap();
     this.drawTerritoryOverlay();
     this.drawBuildings();
@@ -128,12 +168,18 @@ export class WorldScene extends Phaser.Scene {
     this.input.on(Phaser.Input.Events.POINTER_UP, this.handlePointerUp, this);
     this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.handlePointerUp, this);
     this.input.on(Phaser.Input.Events.POINTER_WHEEL, this.handlePointerWheel, this);
-    this.input.keyboard?.on(Phaser.Input.Keyboard.Events.DOWN, this.handleKeyDown, this);
+    window.addEventListener('keydown', this.handleKeyDown);
   }
 
   update(_time: number, delta: number) {
+    const simDelta = this.timeScaleSystem.scaleDelta(delta);
+
+    this.timeSystem.update(simDelta);
+    this.updateNightOverlay();
+    this.syncFactionBuildDemands();
+
     for (const unit of this.units) {
-      unit.update(delta);
+      unit.update(simDelta);
     }
 
     for (const unit of this.units) {
@@ -152,9 +198,11 @@ export class WorldScene extends Phaser.Scene {
       this.commandUnit = this.units[0];
     }
 
-    for (const birth of this.reproductionSystem.update(delta, this.units)) {
+    for (const birth of this.reproductionSystem.update(simDelta, this.units)) {
       this.units.push(this.spawnBirthUnit(birth));
     }
+
+    this.syncFactionBuildDemands();
 
     if (this.consumeResourceDirty()) {
       this.syncFactionInventories();
@@ -176,7 +224,8 @@ export class WorldScene extends Phaser.Scene {
     this.input.off(Phaser.Input.Events.POINTER_UP, this.handlePointerUp, this);
     this.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.handlePointerUp, this);
     this.input.off(Phaser.Input.Events.POINTER_WHEEL, this.handlePointerWheel, this);
-    this.input.keyboard?.off(Phaser.Input.Keyboard.Events.DOWN, this.handleKeyDown, this);
+    window.removeEventListener('keydown', this.handleKeyDown);
+    this.scale.off(Phaser.Scale.Events.RESIZE, this.layout, this);
 
     this.mapGraphics?.destroy();
     this.mapGraphics = undefined;
@@ -184,6 +233,8 @@ export class WorldScene extends Phaser.Scene {
     this.territoryGraphics = undefined;
     this.overlayGraphics?.destroy();
     this.overlayGraphics = undefined;
+    this.nightOverlay?.destroy();
+    this.nightOverlay = undefined;
     this.buildingGraphics?.destroy();
     this.buildingGraphics = undefined;
     this.unitLabel?.destroy();
@@ -566,6 +617,12 @@ export class WorldScene extends Phaser.Scene {
       spawnPosition,
       runtime.resourceSystem,
     );
+    let currentAttackTarget: CombatTargetRef | undefined;
+    let attackCooldownMs = 0;
+    const refreshAttackTarget = () => {
+      currentAttackTarget = this.findNearestEnemyCombatTarget(unit, COMBAT_DETECTION_RANGE);
+      return currentAttackTarget;
+    };
 
     unit = new Unit({
       id: spec.id,
@@ -588,20 +645,33 @@ export class WorldScene extends Phaser.Scene {
         this.map.height * this.map.tileSize - this.map.tileSize,
       ),
       pickHarvestTarget: () =>
-        runtime.resourceSystem.findNearestHarvestTarget(unit?.position ?? spawnPosition),
+        runtime.resourceSystem.findNextHarvestTarget(unit?.position ?? spawnPosition),
       harvestResource: () => this.harvestResource(unit, runtime.resourceSystem),
       hasBuildTask: () => runtime.buildSystem.hasBuildTask(),
       pickBuildTarget: () => runtime.buildSystem.getBuildTarget(),
       buildAtTarget: (deltaMs: number) =>
         runtime.buildSystem.buildAt(unit?.position ?? spawnPosition, deltaMs),
+      hasAttackTask: () => Boolean(refreshAttackTarget()),
+      pickAttackTarget: () => refreshAttackTarget()?.position,
+      attackAtTarget: (deltaMs: number) => {
+        attackCooldownMs = Math.max(0, attackCooldownMs - deltaMs);
+
+        if (attackCooldownMs > 0) {
+          return false;
+        }
+
+        const targetDestroyed = this.attackCombatTarget(unit, currentAttackTarget);
+        attackCooldownMs = 900;
+        return targetDestroyed;
+      },
+      hasFleeTask: () => unit.hp < unit.maxHp * 0.2,
+      pickFleeTarget: () => this.pickFleeTarget(unit, refreshAttackTarget()?.position),
       restPoint: spec.restPoint
         ? new Phaser.Math.Vector2(spec.restPoint.x, spec.restPoint.y)
         : faction.capitalPosition,
       shouldHarvest: () =>
         runtime.resourceSystem.needsHarvest() &&
-        runtime.resourceSystem.hasHarvestableResource(
-          runtime.resourceSystem.getHarvestPriorityTypes(),
-        ),
+        runtime.resourceSystem.getActiveHarvestPriorityTypes().length > 0,
     });
     unit.sprite.setInteractive({ useHandCursor: true });
     this.factionManager.attachUnit(unit.id, faction.id);
@@ -698,8 +768,20 @@ export class WorldScene extends Phaser.Scene {
     this.updateCoordinateText(pointer);
   }
 
-  private handleKeyDown(event: KeyboardEvent) {
-    if (event.key.toLowerCase() !== 'f') {
+  private readonly handleKeyDown = (event: KeyboardEvent) => {
+    const key = event.key.toLowerCase();
+    const nextSpeed = getTimeScaleSpeedFromKeyboardEvent(event);
+
+    if (nextSpeed !== undefined) {
+      this.timeScaleSystem.setSpeed(
+        nextSpeed === 0 && this.timeScaleSystem.speed === 0 ? 1 : nextSpeed,
+      );
+      this.updateCoordinateText();
+      event.preventDefault();
+      return;
+    }
+
+    if (key !== 'f') {
       return;
     }
 
@@ -710,7 +792,7 @@ export class WorldScene extends Phaser.Scene {
     }
 
     this.followSelectedUnit();
-  }
+  };
 
   private shouldPan(pointer: Phaser.Input.Pointer) {
     return pointer.rightButtonDown() || pointer.middleButtonDown();
@@ -738,6 +820,195 @@ export class WorldScene extends Phaser.Scene {
     return new Phaser.Math.Vector2(
       Phaser.Math.Clamp(x, this.map.tileSize / 2, maxX),
       Phaser.Math.Clamp(y, this.map.tileSize / 2, maxY),
+    );
+  }
+
+  private findNearestEnemyCombatTarget(unit: Unit, maxDistance: number) {
+    if (!unit || unit.isDead) {
+      return undefined;
+    }
+
+    let nearestTarget: CombatTargetRef | undefined;
+    let nearestDistance = maxDistance;
+
+    for (const candidate of this.units) {
+      if (candidate.isDead || candidate.id === unit.id || candidate.factionId === unit.factionId) {
+        continue;
+      }
+
+      if (!this.diplomacySystem.isAtWar(unit.factionId, candidate.factionId)) {
+        continue;
+      }
+
+      const distance = Phaser.Math.Distance.Between(
+        unit.position.x,
+        unit.position.y,
+        candidate.position.x,
+        candidate.position.y,
+      );
+
+      if (distance > nearestDistance) {
+        continue;
+      }
+
+      nearestDistance = distance;
+      nearestTarget = {
+        id: candidate.id,
+        kind: 'unit',
+        factionId: candidate.factionId,
+        position: candidate.position,
+        hp: candidate.hp,
+        maxHp: candidate.maxHp,
+        applyDamage: (damage: number) => candidate.applyDamage(damage),
+      };
+    }
+
+    for (const [factionId, runtime] of this.factionRuntimes) {
+      if (factionId === unit.factionId) {
+        continue;
+      }
+
+      if (!this.diplomacySystem.isAtWar(unit.factionId, factionId)) {
+        continue;
+      }
+
+      for (const building of runtime.buildSystem.getBuildings()) {
+        if (building.status !== 'complete') {
+          continue;
+        }
+
+        const distance = Phaser.Math.Distance.Between(
+          unit.position.x,
+          unit.position.y,
+          building.position.x,
+          building.position.y,
+        );
+
+        if (distance > nearestDistance) {
+          continue;
+        }
+
+        nearestDistance = distance;
+        nearestTarget = {
+          id: building.id,
+          kind: 'building',
+          factionId: building.factionId,
+          position: building.position,
+          hp: building.hp,
+          maxHp: BUILDING_DEFS[building.type].hp,
+          applyDamage: (damage: number) => runtime.buildSystem.damageBuilding(building.id, damage),
+        };
+      }
+    }
+
+    return nearestTarget;
+  }
+
+  private attackCombatTarget(attacker: Unit, target?: CombatTargetRef) {
+    if (!target || attacker.isDead) {
+      return true;
+    }
+
+    const damage = this.combatSystem.calculateDamage({
+      attackPower: COMBAT_ATTACK_POWER,
+      defense: target.kind === 'unit' ? COMBAT_UNIT_DEFENSE : COMBAT_BUILDING_DEFENSE,
+    });
+    const targetDestroyed = target.applyDamage(damage);
+
+    if (targetDestroyed) {
+      const capturedTerritory = this.captureTerritoryAfterCombat(attacker, target);
+
+      if (!capturedTerritory) {
+        this.hudNotice =
+          target.kind === 'unit'
+            ? `战斗：${attacker.name} 击倒目标`
+            : `战斗：${attacker.name} 摧毁建筑`;
+        this.hudNoticeExpiresAt = this.time.now + 3000;
+      }
+    }
+
+    return targetDestroyed;
+  }
+
+  private captureTerritoryAfterCombat(attacker: Unit, target: CombatTargetRef) {
+    if (!this.hasSurvivingFactionUnits(target.factionId)) {
+      const result = this.territorySystem.captureAllFactionTerritory(
+        attacker.factionId,
+        target.factionId,
+      );
+
+      this.factionRuntimes.delete(target.factionId);
+      this.syncFactionTerritoryCounts();
+      this.notifyTerritoryContacts();
+      this.drawTerritoryOverlay();
+      this.drawBuildings();
+      this.spawnMarkers();
+      this.hudNotice = `征服：${this.factionManager.getFactionName(
+        target.factionId,
+      )} 据点清空，${result.capturedCount} 格领土变为无主`;
+      this.hudNoticeExpiresAt = this.time.now + 5000;
+      return true;
+    }
+
+    if (this.hasEnemyUnitInOccupationArea(target.factionId, target.position)) {
+      return false;
+    }
+
+    const result = this.territorySystem.captureAroundWorldPoint(
+      attacker.factionId,
+      target.factionId,
+      target.position,
+      COMBAT_OCCUPATION_RADIUS_TILES,
+    );
+
+    if (result.capturedCount <= 0) {
+      return false;
+    }
+
+    this.syncFactionTerritoryCounts();
+    this.notifyTerritoryContacts();
+    this.drawTerritoryOverlay();
+    this.hudNotice = `占领：${this.factionManager.getFactionName(attacker.factionId)} 清空 ${
+      result.capturedCount
+    } 格敌方领土`;
+    this.hudNoticeExpiresAt = this.time.now + 4000;
+    return true;
+  }
+
+  private hasSurvivingFactionUnits(factionId: string) {
+    return this.units.some((unit) => unit.factionId === factionId && !unit.isDead);
+  }
+
+  private hasEnemyUnitInOccupationArea(factionId: string, position: Phaser.Math.Vector2) {
+    const centerX = Math.floor(position.x / this.map.tileSize);
+    const centerY = Math.floor(position.y / this.map.tileSize);
+
+    return this.units.some((unit) => {
+      if (unit.isDead || unit.factionId !== factionId) {
+        return false;
+      }
+
+      const unitTileX = Math.floor(unit.position.x / this.map.tileSize);
+      const unitTileY = Math.floor(unit.position.y / this.map.tileSize);
+
+      return (
+        Math.abs(unitTileX - centerX) <= COMBAT_OCCUPATION_RADIUS_TILES &&
+        Math.abs(unitTileY - centerY) <= COMBAT_OCCUPATION_RADIUS_TILES
+      );
+    });
+  }
+
+  private pickFleeTarget(unit: Unit, threatPosition?: Phaser.Math.Vector2) {
+    const unitPosition = unit.position;
+    const threat = threatPosition ?? new Phaser.Math.Vector2(unitPosition.x - 1, unitPosition.y);
+    const directionX = unitPosition.x - threat.x;
+    const directionY = unitPosition.y - threat.y;
+    const length = Math.max(1, Math.hypot(directionX, directionY));
+    const fleeDistance = this.map.tileSize * 4;
+
+    return this.clampToWorld(
+      unitPosition.x + (directionX / length) * fleeDistance,
+      unitPosition.y + (directionY / length) * fleeDistance,
     );
   }
 
@@ -827,6 +1098,8 @@ export class WorldScene extends Phaser.Scene {
       Harvest: '采集',
       Build: '建造',
       Rest: '休息',
+      Attack: '攻击',
+      Flee: '逃跑',
     };
 
     return labels[state];
@@ -867,12 +1140,15 @@ export class WorldScene extends Phaser.Scene {
     const population = `人口：${this.factionManager.getTotalPopulation()}`;
     const inventory = this.getFactionInventorySummary();
     const buildSummary = this.getFactionBuildSummary();
+    const diplomacySummary = this.getDiplomacySummary();
+    const timeScale = `速度：${this.timeScaleSystem.getLabel()}`;
+    const timeSummary = `时间：${this.timeSystem.getTimeLabel()}`;
     const notice = this.getHudNotice();
     const hoverLine = this.getTileFocusLine('光标', this.hoveredWorldPoint);
     const centerLine = this.getTileFocusLine('镜头中心', camera.midPoint);
     const status = `${hoverLine}\n${centerLine}\n镜头：${followMode}  缩放 ${camera.zoom.toFixed(
       1,
-    )}x\n${factionSummary}\n${population}\n${unitStats}\n${inventory}\n${buildSummary}`;
+    )}x  ${timeScale}\n${timeSummary}\n${factionSummary}\n${diplomacySummary}\n${population}\n${unitStats}\n${inventory}\n${buildSummary}`;
 
     return notice ? `${notice}\n${status}` : status;
   }
@@ -889,6 +1165,7 @@ export class WorldScene extends Phaser.Scene {
     const result = this.factionManager.detachUnit(unit.id);
 
     if (result?.extinct) {
+      this.diplomacySystem.resetRelationsForFaction(result.faction.id);
       this.hudNotice = `势力灭亡：${result.faction.name}`;
       this.hudNoticeExpiresAt = this.time.now + 5000;
     }
@@ -897,6 +1174,12 @@ export class WorldScene extends Phaser.Scene {
   private syncFactionInventories() {
     for (const [factionId, runtime] of this.factionRuntimes) {
       this.factionManager.replaceFactionInventory(factionId, runtime.resourceSystem.getInventory());
+    }
+  }
+
+  private syncFactionBuildDemands() {
+    for (const [factionId, runtime] of this.factionRuntimes) {
+      runtime.buildSystem.setPopulationDemand(this.factionManager.getFactionPopulation(factionId));
     }
   }
 
@@ -943,7 +1226,19 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private notifyTerritoryContacts() {
-    for (const pair of this.territorySystem.getAdjacentFactionPairs()) {
+    const adjacentPairs = this.territorySystem.getAdjacentFactionPairs();
+    const warDeclarations = this.diplomacySystem.evaluateTerritoryContacts(adjacentPairs);
+    const mobilizedCount = this.warMobilizationSystem.mobilize(warDeclarations, this.units);
+
+    if (warDeclarations.length > 0) {
+      const declaration = warDeclarations[0];
+      this.hudNotice = `宣战并集结：${this.factionManager.getFactionName(
+        declaration.firstFactionId,
+      )} / ${this.factionManager.getFactionName(declaration.secondFactionId)} (${mobilizedCount})`;
+      this.hudNoticeExpiresAt = this.time.now + 5000;
+    }
+
+    for (const pair of adjacentPairs) {
       const contactKey = [pair.firstFactionId, pair.secondFactionId].sort().join('|');
 
       if (this.notifiedTerritoryContactKeys.has(contactKey)) {
@@ -951,10 +1246,12 @@ export class WorldScene extends Phaser.Scene {
       }
 
       this.notifiedTerritoryContactKeys.add(contactKey);
-      this.hudNotice = `领土接壤：${this.factionManager.getFactionName(pair.firstFactionId)} / ${this.factionManager.getFactionName(
-        pair.secondFactionId,
-      )}`;
-      this.hudNoticeExpiresAt = this.time.now + 5000;
+      if (warDeclarations.length === 0) {
+        this.hudNotice = `领土接壤：${this.factionManager.getFactionName(pair.firstFactionId)} / ${this.factionManager.getFactionName(
+          pair.secondFactionId,
+        )}`;
+        this.hudNoticeExpiresAt = this.time.now + 5000;
+      }
     }
   }
 
@@ -1029,6 +1326,30 @@ export class WorldScene extends Phaser.Scene {
       .join('\n');
   }
 
+  private getDiplomacySummary() {
+    const relationLines = this.diplomacySystem.getRelationSummaryLines();
+
+    if (relationLines.length === 0) {
+      return '外交：无';
+    }
+
+    return relationLines.join('\n');
+  }
+
+  private layout = () => {
+    const { width, height } = this.scale;
+
+    this.nightOverlay?.setSize(width, height);
+  };
+
+  private updateNightOverlay() {
+    if (!this.nightOverlay) {
+      return;
+    }
+
+    this.nightOverlay.setAlpha(this.timeSystem.isNight() ? 0.2 : 0);
+  }
+
   private consumeResourceDirty() {
     let hasDirtyResource = false;
 
@@ -1059,7 +1380,7 @@ export class WorldScene extends Phaser.Scene {
     const resourceSystem = new ResourceSystem(this.map);
     const runtime: FactionRuntime = {
       resourceSystem,
-      buildSystem: new BuildSystem(resourceSystem, buildPoint),
+      buildSystem: new BuildSystem(resourceSystem, buildPoint, factionId),
     };
 
     this.factionRuntimes.set(factionId, runtime);

@@ -61,10 +61,7 @@ export class ReproductionSystem {
 
     const births: ReproductionBirth[] = [];
     const livingUnits = units.filter((unit) => unit.isDead === false);
-
-    if (livingUnits.length >= (this.options.populationLimit ?? DEFAULT_POPULATION_LIMIT)) {
-      return births;
-    }
+    const populationByFaction = this.getPopulationByFaction(livingUnits);
 
     const usedUnitIds = new Set<string>();
 
@@ -91,6 +88,10 @@ export class ReproductionSystem {
           continue;
         }
 
+        if (this.isFactionAtPopulationLimit(first.factionId, populationByFaction)) {
+          continue;
+        }
+
         if (!this.options.canAffordBirth(first.factionId)) {
           continue;
         }
@@ -103,6 +104,10 @@ export class ReproductionSystem {
         births.push(birth);
         usedUnitIds.add(first.id);
         usedUnitIds.add(second.id);
+        populationByFaction.set(
+          first.factionId,
+          (populationByFaction.get(first.factionId) ?? 0) + 1,
+        );
         this.pairCooldowns.set(pairKey, this.options.cooldownMs ?? DEFAULT_COOLDOWN_MS);
         break;
       }
@@ -122,6 +127,26 @@ export class ReproductionSystem {
 
       this.pairCooldowns.set(pairKey, nextRemainingMs);
     }
+  }
+
+  private getPopulationByFaction(units: ReproductionAgent[]) {
+    const populationByFaction = new Map<string, number>();
+
+    for (const unit of units) {
+      populationByFaction.set(unit.factionId, (populationByFaction.get(unit.factionId) ?? 0) + 1);
+    }
+
+    return populationByFaction;
+  }
+
+  private isFactionAtPopulationLimit(
+    factionId: string,
+    populationByFaction: ReadonlyMap<string, number>,
+  ) {
+    return (
+      (populationByFaction.get(factionId) ?? 0) >=
+      (this.options.populationLimit ?? DEFAULT_POPULATION_LIMIT)
+    );
   }
 
   private isFertile(unit: ReproductionAgent) {

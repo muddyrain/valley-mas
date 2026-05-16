@@ -110,6 +110,56 @@ describe('Unit state machine', () => {
     expect(unit.targetPosition).toEqual(new Phaser.Math.Vector2(24, 24));
   });
 
+  it('leaves Build when another unit already completed the build task', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const hasBuildTask = vi.fn().mockReturnValueOnce(true).mockReturnValue(false);
+    const { unit } = createUnit({
+      hasBuildTask,
+      pickBuildTarget: vi.fn(() => new Phaser.Math.Vector2(24, 24)),
+      buildAtTarget: vi.fn(() => false),
+    });
+
+    unit.update(900);
+    expect(unit.state).toBe('Build');
+
+    unit.update(100);
+
+    expect(unit.state).toBe('Rest');
+    expect(unit.targetPosition).toEqual(new Phaser.Math.Vector2(64, 64));
+  });
+
+  it('switches to Attack when an enemy is nearby and resolves the strike', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const attackAtTarget = vi.fn(() => true);
+    const { unit } = createUnit({
+      hasAttackTask: vi.fn(() => true),
+      pickAttackTarget: vi.fn(() => new Phaser.Math.Vector2(40, 24)),
+      attackAtTarget,
+      hasFleeTask: vi.fn(() => false),
+    });
+
+    unit.update(900);
+
+    expect(unit.state).toBe('Idle');
+    expect(attackAtTarget).toHaveBeenCalled();
+  });
+
+  it('switches to Flee when hp falls below the combat threshold', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const pickFleeTarget = vi.fn(() => new Phaser.Math.Vector2(24, 24));
+    const { unit } = createUnit({
+      hp: 19,
+      pickFleeTarget,
+      hasFleeTask: vi.fn(() => true),
+      hasAttackTask: vi.fn(() => false),
+    });
+
+    unit.update(100);
+
+    expect(unit.state).toBe('Flee');
+    expect(pickFleeTarget).toHaveBeenCalled();
+  });
+
   it('wanders instead of harvesting when the stockpile target is met', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const { unit } = createUnit({

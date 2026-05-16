@@ -21,7 +21,7 @@ export class UIScene extends Phaser.Scene {
 
     this.topBar = this.add.rectangle(0, 0, 1, 32, 0x0e1528, 0.9).setOrigin(0, 0);
     this.footerBar = this.add.rectangle(0, 0, 1, 28, 0x0e1528, 0.75).setOrigin(0, 1);
-    this.statusPanel = this.add.rectangle(12, 42, 310, 128, 0x0e1528, 0.82).setOrigin(0, 0);
+    this.statusPanel = this.add.rectangle(12, 42, 310, 152, 0x0e1528, 0.82).setOrigin(0, 0);
     this.statusPanel.setStrokeStyle(1, 0x4052a1, 0.82);
 
     this.titleText = this.add.text(12, 8, 'WorldSim / M0 瓦片地图', {
@@ -33,7 +33,7 @@ export class UIScene extends Phaser.Scene {
     this.statusText = this.add.text(
       22,
       50,
-      '光标：--\n镜头中心：--\n镜头：--\n势力：--\n单位：未选中\n库存：粮0 木0 石0 铁0\n建造：等待',
+      '光标：--\n镜头中心：--\n镜头：--\n时间：--\n势力：--\n单位：未选中\n库存：粮0 木0 石0 铁0\n建造：等待',
       {
         color: '#ffcd75',
         fontFamily: 'monospace',
@@ -45,7 +45,7 @@ export class UIScene extends Phaser.Scene {
     this.helpText = this.add.text(
       12,
       0,
-      '左键：选中单位    右键/中键：平移    滚轮：缩放    F：跟随/自由镜头',
+      '左键：选中单位    右键/中键：平移    滚轮：缩放    F：跟随/自由镜头    1/2/4：速度    0/P：暂停',
       {
         color: '#94b0c2',
         fontFamily: 'monospace',

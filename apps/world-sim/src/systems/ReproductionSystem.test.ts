@@ -93,4 +93,50 @@ describe('ReproductionSystem', () => {
     expect(canAffordBirth).not.toHaveBeenCalled();
     expect(spendBirthCost).not.toHaveBeenCalled();
   });
+
+  it('applies the population limit per faction instead of globally', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.2);
+    const canAffordBirth = vi.fn(() => true);
+    const spendBirthCost = vi.fn(() => true);
+    const system = new ReproductionSystem({
+      canAffordBirth,
+      spendBirthCost,
+      populationLimit: 4,
+    });
+
+    const cappedHumanUnits = Array.from({ length: 4 }, (_, index) =>
+      createAgent({
+        id: `human-${index}`,
+        factionId: 'human-faction',
+        gender: index % 2 === 0 ? 'male' : 'female',
+        position: new Phaser.Math.Vector2(96 + index * 32, 96),
+      }),
+    );
+    const orcParents = [
+      createAgent({
+        id: 'orc-father',
+        factionId: 'orc-faction',
+        race: 'orc',
+        gender: 'male',
+        position: new Phaser.Math.Vector2(16, 16),
+      }),
+      createAgent({
+        id: 'orc-mother',
+        factionId: 'orc-faction',
+        race: 'orc',
+        gender: 'female',
+        position: new Phaser.Math.Vector2(20, 16),
+      }),
+    ];
+
+    const births = system.update(300_000, [...cappedHumanUnits, ...orcParents]);
+
+    expect(births).toHaveLength(1);
+    expect(births[0].child).toMatchObject({
+      factionId: 'orc-faction',
+      race: 'orc',
+    });
+    expect(canAffordBirth).toHaveBeenCalledWith('orc-faction');
+    expect(spendBirthCost).toHaveBeenCalledWith('orc-faction');
+  });
 });
