@@ -41,6 +41,9 @@ interface TileSchema {
   terrainType: TerrainType;
   ownerFactionId?: EntityId;
   resourceId?: string;
+  resourceType?: "food" | "wood" | "stone" | "iron";
+  resourceAmount?: number;
+  resourceCapacity?: number;
   fogState?: "unknown" | "revealed" | "visible";
 }
 
@@ -79,6 +82,8 @@ interface BuildingSchema {
   position: Position;
   hp: number;
   progress: number;
+  progressRequired: number;
+  status: "queued" | "building" | "complete";
   ownerTileIds: string[];
 }
 
