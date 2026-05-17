@@ -20,6 +20,7 @@ export type UnitOptions = {
   gender?: 'male' | 'female';
   factionId?: string;
   factionColor?: number;
+  unitTextureKey?: string;
   traits?: string[];
   speed?: number;
   wanderRadius?: number;
@@ -61,6 +62,7 @@ export class Unit {
   readonly factionColor: number;
   readonly traits: string[];
   readonly sprite: Phaser.GameObjects.Rectangle;
+  readonly artSprite?: Phaser.GameObjects.Image;
   readonly factionBadge: Phaser.GameObjects.Rectangle;
   readonly speed: number;
   readonly maxHp = MAX_HP;
@@ -118,9 +120,13 @@ export class Unit {
     this.buildAtTargetFn = options.buildAtTarget;
     this.attackAtTargetFn = options.attackAtTarget ?? (() => false);
     this.restPoint = options.restPoint.clone();
-    this.sprite = options.scene.add.rectangle(options.x, options.y, 14, 14, 0xf4f4f4, 1);
-    this.sprite.setStrokeStyle(2, this.factionColor, 0.9);
+    this.sprite = options.scene.add.rectangle(options.x, options.y, 14, 14, 0xf4f4f4, 0);
     this.sprite.setDepth(10);
+    this.artSprite = options.unitTextureKey
+      ? options.scene.add.image(options.x, options.y, options.unitTextureKey)
+      : undefined;
+    this.artSprite?.setDisplaySize(16, 16);
+    this.artSprite?.setDepth(11);
     this.factionBadge = options.scene.add.rectangle(
       options.x,
       options.y - 9,
@@ -129,7 +135,7 @@ export class Unit {
       this.factionColor,
       1,
     );
-    this.factionBadge.setDepth(11);
+    this.factionBadge.setDepth(12);
 
     this.stateContext = {
       waitUntil: 0,
@@ -241,6 +247,7 @@ export class Unit {
   destroy() {
     this.dead = true;
     this.factionBadge.destroy();
+    this.artSprite?.destroy();
     this.sprite.destroy();
   }
 
@@ -378,24 +385,8 @@ export class Unit {
   }
 
   private syncSpriteStyle() {
-    const fillColorByState: Record<UnitState, number> = {
-      Idle: 0xf4f4f4,
-      Wander: 0x94b0c2,
-      March: 0xffcd75,
-      Harvest: 0x38b764,
-      Build: 0xc0a080,
-      Rest: 0x5b6ee1,
-      Attack: 0xb13e53,
-      Flee: 0xef7d57,
-    };
-
-    this.sprite.setFillStyle(fillColorByState[this.stateMachine.state], 1);
-    this.sprite.setStrokeStyle(
-      2,
-      this.vitality < LOW_VITALITY_THRESHOLD ? 0xb13e53 : this.factionColor,
-      0.95,
-    );
     this.factionBadge.setPosition(this.sprite.x, this.sprite.y - 9);
+    this.artSprite?.setPosition(this.sprite.x, this.sprite.y);
   }
 
   private die() {
@@ -406,17 +397,17 @@ export class Unit {
     this.dead = true;
     this.target = undefined;
     this.factionBadge.destroy();
-    this.sprite.setFillStyle(0x566c86, 1);
-    this.sprite.setStrokeStyle(2, 0xb13e53, 0.95);
+    this.artSprite?.setTint(0x94b0c2);
 
     this.scene.tweens.add({
-      targets: this.sprite,
+      targets: this.artSprite ? [this.sprite, this.artSprite] : this.sprite,
       alpha: 0,
       scaleX: 0.35,
       scaleY: 0.35,
       duration: 480,
       ease: 'Quad.easeIn',
       onComplete: () => {
+        this.artSprite?.destroy();
         this.sprite.destroy();
       },
     });

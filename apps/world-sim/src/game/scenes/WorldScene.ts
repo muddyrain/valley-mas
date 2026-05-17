@@ -1,6 +1,13 @@
 import * as Phaser from 'phaser';
 import { Unit } from '../../agent/Unit';
 import { BUILDING_DEFS } from '../../config/buildings';
+import {
+  getM1ArtAssetEntries,
+  M1_BUILDING_ART_ASSETS,
+  M1_RESOURCE_ART_ASSETS,
+  M1_UNIT_ART_ASSETS,
+  type M1VisibleResourceType,
+} from '../../config/m1ArtAssets';
 import { DiplomacySystem } from '../../faction/DiplomacySystem';
 import { FactionManager } from '../../faction/FactionManager';
 import { createM1StarterFactions, HUMAN_FACTION_ID } from '../../faction/starterFactions';
@@ -17,6 +24,7 @@ import {
   type ResourceType,
   TERRAIN_COLORS,
   TERRAIN_LABELS,
+  type TerrainType,
   type TestWorldMap,
 } from '../../world/testMap';
 import { WORLD_SIM_SCENE_KEYS } from './sceneKeys';
@@ -92,7 +100,11 @@ export class WorldScene extends Phaser.Scene {
   private readonly timeSystem: TimeSystem;
   private readonly factionRuntimes = new Map<string, FactionRuntime>();
   private units: Unit[] = [];
+  private terrainTextureLayer?: Phaser.GameObjects.RenderTexture;
+  private resourceTextureLayer?: Phaser.GameObjects.RenderTexture;
+  private buildingTextureLayer?: Phaser.GameObjects.RenderTexture;
   private mapGraphics?: Phaser.GameObjects.Graphics;
+  private resourceGraphics?: Phaser.GameObjects.Graphics;
   private territoryGraphics?: Phaser.GameObjects.Graphics;
   private overlayGraphics?: Phaser.GameObjects.Graphics;
   private buildingGraphics?: Phaser.GameObjects.Graphics;
@@ -110,6 +122,7 @@ export class WorldScene extends Phaser.Scene {
   private hudNoticeExpiresAt = 0;
   private hoveredWorldPoint?: Phaser.Math.Vector2;
   private lastPointerPosition = new Phaser.Math.Vector2();
+  private terrainDirtyFromHarvest = false;
 
   constructor() {
     super(WORLD_SIM_SCENE_KEYS.World);
@@ -128,6 +141,12 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
+  preload() {
+    for (const asset of getM1ArtAssetEntries()) {
+      this.load.image(asset.key, asset.url);
+    }
+  }
+
   create() {
     const worldWidth = this.map.width * this.map.tileSize;
     const worldHeight = this.map.height * this.map.tileSize;
@@ -140,7 +159,11 @@ export class WorldScene extends Phaser.Scene {
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
 
+    this.terrainTextureLayer = this.add.renderTexture(0, 0, worldWidth, worldHeight);
+    this.resourceTextureLayer = this.add.renderTexture(0, 0, worldWidth, worldHeight);
+    this.buildingTextureLayer = this.add.renderTexture(0, 0, worldWidth, worldHeight);
     this.mapGraphics = this.add.graphics();
+    this.resourceGraphics = this.add.graphics();
     this.territoryGraphics = this.add.graphics();
     this.buildingGraphics = this.add.graphics();
     this.overlayGraphics = this.add.graphics();
@@ -148,14 +171,22 @@ export class WorldScene extends Phaser.Scene {
     this.nightOverlay.setOrigin(0, 0);
     this.nightOverlay.setScrollFactor(0);
     this.nightOverlay.setDepth(50);
-    this.mapGraphics.setDepth(0);
+    this.terrainTextureLayer.setOrigin(0, 0);
+    this.resourceTextureLayer.setOrigin(0, 0);
+    this.buildingTextureLayer.setOrigin(0, 0);
+    this.terrainTextureLayer.setDepth(0);
+    this.mapGraphics.setDepth(1);
     this.territoryGraphics.setDepth(2);
-    this.buildingGraphics.setDepth(5);
+    this.resourceTextureLayer.setDepth(4);
+    this.resourceGraphics.setDepth(4.1);
+    this.buildingTextureLayer.setDepth(5);
+    this.buildingGraphics.setDepth(6);
     this.overlayGraphics.setDepth(10);
 
     this.scale.on(Phaser.Scale.Events.RESIZE, this.layout, this);
     this.layout();
-    this.drawMap();
+    this.drawTerrainMap();
+    this.drawResources();
     this.drawTerritoryOverlay();
     this.drawBuildings();
     this.drawMapBorder();
@@ -206,7 +237,11 @@ export class WorldScene extends Phaser.Scene {
 
     if (this.consumeResourceDirty()) {
       this.syncFactionInventories();
-      this.drawMap();
+      if (this.terrainDirtyFromHarvest) {
+        this.drawTerrainMap();
+        this.terrainDirtyFromHarvest = false;
+      }
+      this.drawResources();
     }
 
     if (this.consumeBuildDirty()) {
@@ -227,8 +262,16 @@ export class WorldScene extends Phaser.Scene {
     window.removeEventListener('keydown', this.handleKeyDown);
     this.scale.off(Phaser.Scale.Events.RESIZE, this.layout, this);
 
+    this.terrainTextureLayer?.destroy();
+    this.terrainTextureLayer = undefined;
+    this.resourceTextureLayer?.destroy();
+    this.resourceTextureLayer = undefined;
+    this.buildingTextureLayer?.destroy();
+    this.buildingTextureLayer = undefined;
     this.mapGraphics?.destroy();
     this.mapGraphics = undefined;
+    this.resourceGraphics?.destroy();
+    this.resourceGraphics = undefined;
     this.territoryGraphics?.destroy();
     this.territoryGraphics = undefined;
     this.overlayGraphics?.destroy();
@@ -260,34 +303,25 @@ export class WorldScene extends Phaser.Scene {
     this.factionManager.clear();
   }
 
-  private drawMap() {
+  private drawTerrainMap() {
     if (!this.mapGraphics) {
       return;
     }
 
     this.mapGraphics.clear();
+    this.terrainTextureLayer?.clear();
 
     for (const tile of this.map.tiles) {
       const color = TERRAIN_COLORS[tile.terrainType];
+      const x = tile.x * this.map.tileSize;
+      const y = tile.y * this.map.tileSize;
 
-      this.mapGraphics.fillStyle(color, 1);
-      this.mapGraphics.fillRect(
-        tile.x * this.map.tileSize,
-        tile.y * this.map.tileSize,
-        this.map.tileSize,
-        this.map.tileSize,
-      );
-
-      if (tile.resourceType && tile.resourceAmount > 0) {
-        this.drawResourceIcon(
-          tile.x * this.map.tileSize,
-          tile.y * this.map.tileSize,
-          tile.resourceType,
-        );
-      }
+      this.mapGraphics.fillStyle(color, 0.92);
+      this.mapGraphics.fillRect(x, y, this.map.tileSize, this.map.tileSize);
+      this.drawTerrainDetail(x, y, tile.terrainType);
     }
 
-    this.mapGraphics.lineStyle(1, 0x1a1c2c, 0.18);
+    this.mapGraphics.lineStyle(1, 0x101726, 0.08);
 
     for (let x = 0; x <= this.map.width; x += 1) {
       const worldX = x * this.map.tileSize;
@@ -300,8 +334,89 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private drawResourceIcon(x: number, y: number, resourceType: ResourceType) {
+  private drawTerrainDetail(x: number, y: number, terrainType: TerrainType) {
     if (!this.mapGraphics) {
+      return;
+    }
+
+    const seed = (x / this.map.tileSize) * 31 + (y / this.map.tileSize) * 17;
+
+    switch (terrainType) {
+      case 'grass':
+        if (seed % 3 === 0) {
+          this.mapGraphics.fillStyle(0x99e550, 0.22);
+          this.mapGraphics.fillRect(x + 4, y + 5, 2, 1);
+          this.mapGraphics.fillRect(x + 11, y + 10, 2, 1);
+        }
+        break;
+      case 'forest':
+        this.mapGraphics.fillStyle(0x1a1c2c, 0.16);
+        this.mapGraphics.fillRect(x + 4, y + 11, 8, 2);
+        this.mapGraphics.fillStyle(0x38b764, 0.32);
+        this.mapGraphics.fillRect(x + 5, y + 4, 6, 3);
+        this.mapGraphics.fillRect(x + 4, y + 7, 8, 3);
+        break;
+      case 'mountain':
+        this.mapGraphics.fillStyle(0x94b0c2, 0.28);
+        this.mapGraphics.fillTriangle(x + 3, y + 12, x + 8, y + 3, x + 13, y + 12);
+        this.mapGraphics.lineStyle(1, 0x1a1c2c, 0.16);
+        this.mapGraphics.lineBetween(x + 8, y + 4, x + 11, y + 12);
+        break;
+      case 'water':
+        this.mapGraphics.fillStyle(0x5b6ee1, 0.18);
+        this.mapGraphics.fillRect(x + 3, y + 5, 5, 1);
+        this.mapGraphics.fillRect(x + 8, y + 10, 5, 1);
+        break;
+      case 'desert':
+        this.mapGraphics.fillStyle(0xef7d57, 0.12);
+        this.mapGraphics.fillRect(x + 4, y + 6, 2, 1);
+        this.mapGraphics.fillRect(x + 10, y + 11, 3, 1);
+        break;
+      case 'snow':
+        this.mapGraphics.fillStyle(0x94b0c2, 0.18);
+        this.mapGraphics.fillRect(x + 4, y + 5, 2, 1);
+        this.mapGraphics.fillRect(x + 10, y + 11, 2, 1);
+        break;
+      case 'lava':
+        this.mapGraphics.fillStyle(0xffcd75, 0.32);
+        this.mapGraphics.fillRect(x + 4, y + 4, 2, 2);
+        this.mapGraphics.fillRect(x + 10, y + 10, 3, 1);
+        break;
+    }
+  }
+
+  private drawResources() {
+    this.resourceTextureLayer?.clear();
+    this.resourceGraphics?.clear();
+
+    for (const tile of this.map.tiles) {
+      if (!tile.resourceType || tile.resourceAmount <= 0) {
+        continue;
+      }
+
+      const x = tile.x * this.map.tileSize;
+      const y = tile.y * this.map.tileSize;
+
+      if (!this.shouldDrawResourceMarker(tile.resourceType)) {
+        continue;
+      }
+
+      const resourceAsset = M1_RESOURCE_ART_ASSETS[tile.resourceType];
+
+      if (!this.drawTextureFrame(this.resourceTextureLayer, resourceAsset.key, x, y)) {
+        this.drawResourceIcon(x, y, tile.resourceType);
+      }
+    }
+  }
+
+  private shouldDrawResourceMarker(
+    resourceType: ResourceType,
+  ): resourceType is M1VisibleResourceType {
+    return resourceType === 'food' || resourceType === 'iron';
+  }
+
+  private drawResourceIcon(x: number, y: number, resourceType: ResourceType) {
+    if (!this.getResourceIconGraphics()) {
       return;
     }
 
@@ -322,72 +437,79 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private drawWoodIcon(x: number, y: number) {
-    if (!this.mapGraphics) {
+    const graphics = this.getResourceIconGraphics();
+
+    if (!graphics) {
       return;
     }
 
-    this.mapGraphics.fillStyle(0x1a1c2c, 0.45);
-    this.mapGraphics.fillRect(x + 5, y + 5, 7, 9);
-    this.mapGraphics.fillStyle(0x8f563b, 1);
-    this.mapGraphics.fillRect(x + 7, y + 8, 3, 6);
-    this.mapGraphics.fillStyle(0x38b764, 1);
-    this.mapGraphics.fillRect(x + 5, y + 3, 7, 4);
-    this.mapGraphics.fillStyle(0x257179, 1);
-    this.mapGraphics.fillRect(x + 4, y + 6, 9, 4);
-    this.mapGraphics.fillStyle(0x99e550, 0.95);
-    this.mapGraphics.fillRect(x + 7, y + 4, 3, 2);
+    graphics.fillStyle(0x1a1c2c, 0.25);
+    graphics.fillRect(x + 6, y + 7, 5, 7);
+    graphics.fillStyle(0x8f563b, 0.9);
+    graphics.fillRect(x + 7, y + 9, 3, 5);
+    graphics.fillStyle(0x99e550, 0.85);
+    graphics.fillRect(x + 5, y + 5, 7, 3);
+    graphics.fillStyle(0x38b764, 0.85);
+    graphics.fillRect(x + 4, y + 7, 9, 3);
   }
 
   private drawStoneIcon(x: number, y: number) {
-    if (!this.mapGraphics) {
+    const graphics = this.getResourceIconGraphics();
+
+    if (!graphics) {
       return;
     }
 
-    this.mapGraphics.fillStyle(0x1a1c2c, 0.45);
-    this.mapGraphics.fillRect(x + 3, y + 8, 10, 5);
-    this.mapGraphics.fillStyle(0x333c57, 1);
-    this.mapGraphics.fillRect(x + 4, y + 8, 4, 4);
-    this.mapGraphics.fillRect(x + 9, y + 7, 4, 5);
-    this.mapGraphics.fillStyle(0x566c86, 1);
-    this.mapGraphics.fillRect(x + 5, y + 7, 4, 4);
-    this.mapGraphics.fillRect(x + 8, y + 9, 5, 3);
-    this.mapGraphics.fillStyle(0x94b0c2, 0.95);
-    this.mapGraphics.fillRect(x + 6, y + 8, 2, 1);
-    this.mapGraphics.fillRect(x + 10, y + 9, 2, 1);
+    graphics.fillStyle(0x1a1c2c, 0.26);
+    graphics.fillRect(x + 4, y + 9, 9, 4);
+    graphics.fillStyle(0x333c57, 0.9);
+    graphics.fillRect(x + 4, y + 9, 4, 4);
+    graphics.fillRect(x + 9, y + 8, 4, 5);
+    graphics.fillStyle(0x94b0c2, 0.85);
+    graphics.fillRect(x + 6, y + 8, 2, 1);
+    graphics.fillRect(x + 10, y + 9, 2, 1);
   }
 
   private drawIronIcon(x: number, y: number) {
-    if (!this.mapGraphics) {
+    const graphics = this.getResourceIconGraphics();
+
+    if (!graphics) {
       return;
     }
 
     this.drawStoneIcon(x, y);
-    this.mapGraphics.fillStyle(0xb13e53, 1);
-    this.mapGraphics.fillRect(x + 6, y + 9, 2, 2);
-    this.mapGraphics.fillStyle(0xef7d57, 1);
-    this.mapGraphics.fillRect(x + 10, y + 8, 2, 2);
-    this.mapGraphics.fillStyle(0xffcd75, 0.95);
-    this.mapGraphics.fillRect(x + 11, y + 8, 1, 1);
+    graphics.fillStyle(0xb13e53, 1);
+    graphics.fillRect(x + 6, y + 9, 2, 2);
+    graphics.fillStyle(0xef7d57, 1);
+    graphics.fillRect(x + 10, y + 8, 2, 2);
+    graphics.fillStyle(0xffcd75, 0.95);
+    graphics.fillRect(x + 11, y + 8, 1, 1);
   }
 
   private drawFoodIcon(x: number, y: number) {
-    if (!this.mapGraphics) {
+    const graphics = this.getResourceIconGraphics();
+
+    if (!graphics) {
       return;
     }
 
-    this.mapGraphics.fillStyle(0x1a1c2c, 0.35);
-    this.mapGraphics.fillRect(x + 4, y + 5, 8, 8);
-    this.mapGraphics.fillStyle(0x5d9e4f, 1);
-    this.mapGraphics.fillRect(x + 7, y + 8, 2, 5);
-    this.mapGraphics.fillRect(x + 5, y + 10, 2, 2);
-    this.mapGraphics.fillRect(x + 9, y + 10, 2, 2);
-    this.mapGraphics.fillStyle(0xffcd75, 1);
-    this.mapGraphics.fillRect(x + 7, y + 5, 2, 2);
-    this.mapGraphics.fillRect(x + 6, y + 7, 2, 2);
-    this.mapGraphics.fillRect(x + 9, y + 7, 2, 2);
-    this.mapGraphics.fillStyle(0xb13e53, 1);
-    this.mapGraphics.fillRect(x + 5, y + 8, 2, 2);
-    this.mapGraphics.fillRect(x + 10, y + 8, 2, 2);
+    graphics.fillStyle(0x1a1c2c, 0.24);
+    graphics.fillRect(x + 4, y + 5, 8, 8);
+    graphics.fillStyle(0x5d9e4f, 0.95);
+    graphics.fillRect(x + 7, y + 8, 2, 5);
+    graphics.fillRect(x + 5, y + 10, 2, 2);
+    graphics.fillRect(x + 9, y + 10, 2, 2);
+    graphics.fillStyle(0xffcd75, 1);
+    graphics.fillRect(x + 7, y + 5, 2, 2);
+    graphics.fillRect(x + 6, y + 7, 2, 2);
+    graphics.fillRect(x + 9, y + 7, 2, 2);
+    graphics.fillStyle(0xb13e53, 1);
+    graphics.fillRect(x + 5, y + 8, 2, 2);
+    graphics.fillRect(x + 10, y + 8, 2, 2);
+  }
+
+  private getResourceIconGraphics() {
+    return this.resourceGraphics ?? this.mapGraphics;
   }
 
   private drawMapBorder() {
@@ -432,6 +554,7 @@ export class WorldScene extends Phaser.Scene {
     }
 
     this.buildingGraphics.clear();
+    this.buildingTextureLayer?.clear();
 
     for (const runtime of this.factionRuntimes.values()) {
       for (const building of runtime.buildSystem.getBuildings()) {
@@ -460,6 +583,18 @@ export class WorldScene extends Phaser.Scene {
     const x = position.x - this.map.tileSize / 2;
     const y = position.y - this.map.tileSize / 2;
 
+    if (
+      this.drawTextureFrame(
+        this.buildingTextureLayer,
+        M1_BUILDING_ART_ASSETS.buildingSite.key,
+        x,
+        y,
+      )
+    ) {
+      this.drawBuildingProgressBar(x, y, progress, progressRequired);
+      return;
+    }
+
     this.buildingGraphics.fillStyle(0x1a1c2c, 0.55);
     this.buildingGraphics.fillRect(x + 2, y + 7, 12, 7);
     this.buildingGraphics.lineStyle(1, 0xffcd75, 0.9);
@@ -468,12 +603,7 @@ export class WorldScene extends Phaser.Scene {
     this.buildingGraphics.lineBetween(x + 3, y + 5, x + 13, y + 12);
     this.buildingGraphics.lineBetween(x + 13, y + 5, x + 3, y + 12);
 
-    const progressWidth = ((this.map.tileSize - 4) * progress) / progressRequired;
-
-    this.buildingGraphics.fillStyle(0x4052a1, 0.9);
-    this.buildingGraphics.fillRect(x + 2, y + this.map.tileSize - 3, this.map.tileSize - 4, 2);
-    this.buildingGraphics.fillStyle(0xffcd75, 1);
-    this.buildingGraphics.fillRect(x + 2, y + this.map.tileSize - 3, progressWidth, 2);
+    this.drawBuildingProgressBar(x, y, progress, progressRequired);
   }
 
   private drawHut(position: Phaser.Math.Vector2) {
@@ -483,6 +613,10 @@ export class WorldScene extends Phaser.Scene {
 
     const x = position.x - this.map.tileSize / 2;
     const y = position.y - this.map.tileSize / 2;
+
+    if (this.drawTextureFrame(this.buildingTextureLayer, M1_BUILDING_ART_ASSETS.hut.key, x, y)) {
+      return;
+    }
 
     this.buildingGraphics.fillStyle(0xb55945, 1);
     this.buildingGraphics.fillTriangle(x, y + 8, x + 8, y + 1, x + 16, y + 8);
@@ -510,6 +644,38 @@ export class WorldScene extends Phaser.Scene {
     this.buildingGraphics.fillRect(x + 1, y + 1, this.map.tileSize - 2, this.map.tileSize - 2);
     this.buildingGraphics.lineStyle(1, 0x1a1c2c, 0.9);
     this.buildingGraphics.strokeRect(x + 1, y + 1, this.map.tileSize - 2, this.map.tileSize - 2);
+  }
+
+  private drawBuildingProgressBar(
+    x: number,
+    y: number,
+    progress: number,
+    progressRequired: number,
+  ) {
+    if (!this.buildingGraphics) {
+      return;
+    }
+
+    const progressWidth = ((this.map.tileSize - 4) * progress) / progressRequired;
+
+    this.buildingGraphics.fillStyle(0x4052a1, 0.9);
+    this.buildingGraphics.fillRect(x + 2, y + this.map.tileSize - 3, this.map.tileSize - 4, 2);
+    this.buildingGraphics.fillStyle(0xffcd75, 1);
+    this.buildingGraphics.fillRect(x + 2, y + this.map.tileSize - 3, progressWidth, 2);
+  }
+
+  private drawTextureFrame(
+    layer: Phaser.GameObjects.RenderTexture | undefined,
+    key: string,
+    x: number,
+    y: number,
+  ) {
+    if (!layer || !this.textures.exists(key)) {
+      return false;
+    }
+
+    layer.drawFrame(key, undefined, x, y);
+    return true;
   }
 
   private spawnMarkers() {
@@ -634,6 +800,7 @@ export class WorldScene extends Phaser.Scene {
       gender: spec.gender,
       factionId,
       factionColor: faction.getColorValue(),
+      unitTextureKey: M1_UNIT_ART_ASSETS[spec.race ?? 'human'][spec.gender].key,
       wanderRadius: spec.wanderRadius,
       hp: spec.hp,
       vitality: spec.vitality,
@@ -677,10 +844,14 @@ export class WorldScene extends Phaser.Scene {
     this.factionManager.attachUnit(unit.id, faction.id);
 
     if (spec.id.startsWith('birth-')) {
+      const birthTargets = unit.artSprite ? [unit.sprite, unit.artSprite] : unit.sprite;
+
       unit.sprite.setAlpha(0);
       unit.sprite.setScale(0.25);
+      unit.artSprite?.setAlpha(0);
+      unit.artSprite?.setScale(0.25);
       this.tweens.add({
-        targets: unit.sprite,
+        targets: birthTargets,
         alpha: 1,
         scaleX: 1,
         scaleY: 1,
@@ -1041,6 +1212,11 @@ export class WorldScene extends Phaser.Scene {
     if (!result) {
       return false;
     }
+
+    if (result.depleted && result.resourceType === 'wood' && result.tile.terrainType === 'grass') {
+      this.terrainDirtyFromHarvest = true;
+    }
+
     return true;
   }
 

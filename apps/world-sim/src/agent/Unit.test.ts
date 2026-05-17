@@ -9,6 +9,23 @@ function createMockScene() {
     setStrokeStyle: vi.fn(),
     setDepth: vi.fn(),
     setFillStyle: vi.fn(),
+    setAlpha: vi.fn(),
+    setScale: vi.fn(),
+    setPosition(x: number, y: number) {
+      this.x = x;
+      this.y = y;
+      return this;
+    },
+    destroy: vi.fn(),
+  };
+  const image = {
+    x: 0,
+    y: 0,
+    setDepth: vi.fn(),
+    setDisplaySize: vi.fn(),
+    setTint: vi.fn(),
+    setAlpha: vi.fn(),
+    setScale: vi.fn(),
     setPosition(x: number, y: number) {
       this.x = x;
       this.y = y;
@@ -21,6 +38,11 @@ function createMockScene() {
     add: {
       rectangle: vi.fn((x: number, y: number) => ({
         ...rectangle,
+        x,
+        y,
+      })),
+      image: vi.fn((x: number, y: number) => ({
+        ...image,
         x,
         y,
       })),
@@ -188,6 +210,23 @@ describe('Unit state machine', () => {
 
     expect(unit.factionBadge.x).toBe(unit.position.x);
     expect(unit.factionBadge.y).toBe(unit.position.y - 9);
+  });
+
+  it('keeps optional unit art aligned with the movement hitbox', () => {
+    const { scene, unit } = createUnit({
+      unitTextureKey: 'm1-unit-human-male',
+      shouldHarvest: vi.fn(() => false),
+    });
+
+    expect(scene.add.image).toHaveBeenCalledWith(24, 24, 'm1-unit-human-male');
+    expect(unit.artSprite?.x).toBe(24);
+    expect(unit.artSprite?.y).toBe(24);
+
+    unit.moveTo(48, 24);
+    unit.update(250);
+
+    expect(unit.artSprite?.x).toBe(unit.position.x);
+    expect(unit.artSprite?.y).toBe(unit.position.y);
   });
 
   it('uses a smaller wander radius for guard-style units', () => {
