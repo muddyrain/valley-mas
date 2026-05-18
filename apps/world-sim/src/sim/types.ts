@@ -13,6 +13,11 @@ export type ResourceType = 'food' | 'wood' | 'stone' | 'iron';
 export type UnitRace = 'human' | 'orc' | 'elf' | 'dwarf';
 export type UnitGender = 'male' | 'female';
 export type UnitIntent = 'idle' | 'seek_food' | 'eat' | 'wander' | 'dead';
+export type VillageStatus = 'camp' | 'stable' | 'declining';
+export type VillageBuildingType = 'hut' | 'storage' | 'farm';
+export type VillageBuildingStatus = 'active' | 'abandoned' | 'ruined';
+export type KingdomStatus = 'rising' | 'stable' | 'declining' | 'fallen';
+export type ArmyGroupStatus = 'marching' | 'fighting' | 'retreating' | 'disbanded';
 
 export type Position = {
   x: number;
@@ -40,6 +45,67 @@ export type Unit = {
   ageTicks: number;
   reproductionCooldownTicks: number;
   intent: UnitIntent;
+  villageId?: string;
+  homeVillageId?: string;
+};
+
+export type Village = {
+  id: string;
+  race: UnitRace;
+  kingdomId?: string;
+  center: Position;
+  population: number;
+  foodInventory: number;
+  foodCapacity: number;
+  housingCapacity: number;
+  territoryTiles: number;
+  foundedAtTick: number;
+  status: VillageStatus;
+};
+
+export type Kingdom = {
+  id: string;
+  race: UnitRace;
+  color: number;
+  capitalVillageId: string;
+  villageIds: string[];
+  population: number;
+  buildingCount: number;
+  territoryTiles: number;
+  foodInventory: number;
+  diplomacyPressure: number;
+  diplomacyTargetKingdomId?: string;
+  foundedAtTick: number;
+  status: KingdomStatus;
+};
+
+export type VillageBuilding = {
+  id: string;
+  villageId: string;
+  type: VillageBuildingType;
+  status: VillageBuildingStatus;
+  position: Position;
+  builtAtTick: number;
+};
+
+export type ArmyGroup = {
+  id: string;
+  kingdomId: string;
+  targetKingdomId: string;
+  originVillageId: string;
+  targetVillageId: string;
+  position: Position;
+  soldierCount: number;
+  morale: number;
+  formedAtTick: number;
+  status: ArmyGroupStatus;
+};
+
+export type TerritoryTile = {
+  x: number;
+  y: number;
+  villageId: string;
+  kingdomId?: string;
 };
 
 export type SimCommand =
@@ -116,7 +182,24 @@ export type SimEvent = {
     | 'terrain_changed'
     | 'lightning_struck'
     | 'speed_changed'
-    | 'pause_changed';
+    | 'pause_changed'
+    | 'village_founded'
+    | 'village_declining'
+    | 'village_abandoned'
+    | 'building_built'
+    | 'territory_changed'
+    | 'kingdom_founded'
+    | 'kingdom_joined'
+    | 'kingdom_capital_changed'
+    | 'kingdom_fallen'
+    | 'border_friction'
+    | 'resource_pressure'
+    | 'diplomacy_pressure'
+    | 'war_declared'
+    | 'army_formed'
+    | 'battle_resolved'
+    | 'village_captured'
+    | 'army_disbanded';
   message: string;
   sourceCommandId?: string;
   unitId?: string;
@@ -140,10 +223,26 @@ export type WorldProjection = {
   paused: boolean;
   tiles: Tile[];
   units: Unit[];
+  villages: Village[];
+  kingdoms: Kingdom[];
+  buildings: VillageBuilding[];
+  armies: ArmyGroup[];
+  territory: TerritoryTile[];
   recentEvents: SimEvent[];
   stats: {
     population: number;
+    villages: number;
+    kingdoms: number;
+    fallenKingdoms: number;
+    buildings: number;
+    activeArmies: number;
+    activeBuildings: number;
+    abandonedBuildings: number;
+    ruinedBuildings: number;
+    territoryTiles: number;
     foodTiles: number;
     totalFood: number;
+    totalVillageFood: number;
+    housingCapacity: number;
   };
 };

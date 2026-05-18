@@ -2,6 +2,8 @@ export { createWorldMap, DEFAULT_WORLD_HEIGHT, DEFAULT_WORLD_WIDTH } from './map
 export { FIXED_TICK_MS, SimLoop } from './SimLoop';
 export { SimWorld } from './SimWorld';
 export type {
+  ArmyGroup,
+  ArmyGroupStatus,
   BiomeType,
   Position,
   ResourceType,

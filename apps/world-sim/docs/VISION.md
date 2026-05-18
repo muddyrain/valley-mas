@@ -31,11 +31,16 @@ The first v2 slice deliberately avoids full WorldBox parity. It establishes the 
 - Pure simulation truth outside Phaser.
 - Deterministic seed and replay behavior.
 - Tile, chunk, biome, and resource data.
-- Units with hunger, age, health, death, birth, movement, and simple needs.
+- Units with hunger, age, health, death, birth, movement, stable home village membership, and simple needs.
+- Villages that emerge from local population and food pressure, with inventory, housing, and decline state.
+- Village buildings that turn surplus into housing, storage, farm production, and settlement influence.
+- Kingdoms that emerge from strong villages and aggregate capital, members, population, buildings, territory, and food.
+- Diplomacy pressure that turns border friction, resource shortage, and race tendencies into observable declaration causes.
+- Minimal grouped war that lets declarations create armies, casualties, and village ownership changes without full single-unit combat.
 - God commands for spawning life, placing food, changing terrain, lightning, pause, and speed.
 - Phaser projection that only renders a read-only snapshot.
 
-Villages, kingdoms, diplomacy, war, species-specific culture, religions, families, disasters, monsters, and large-scale optimization are staged in `ROADMAP.md`.
+Diplomacy, war, species-specific culture, religions, families, disasters, monsters, and large-scale optimization are staged in `ROADMAP.md`.
 
 ## Permanent Product Rules
 

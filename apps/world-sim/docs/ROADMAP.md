@@ -37,6 +37,7 @@ Status: `Foundation slice`
 - Acceptance: map generation is deterministic and resource lookup avoids full-map unit behavior scans.
 - Implemented:
   - Seeded tile map, biome tags, resource deposits, chunk index.
+  - Default foundation demo map size is 128 x 128 tiles.
   - Deterministic map test.
 - Acceptance gaps:
   - Resource lookup is radius-bound, but resource deposits are not indexed separately yet.
@@ -68,6 +69,7 @@ Status: `Foundation slice`
   - Input creates commands for food, spawn, terrain, lightning, speed, and pause.
   - Source-level architecture scan rejects Phaser imports and browser globals inside `src/sim`.
   - UI now uses a Chinese fullscreen debug HUD with state, controls, and event panels.
+  - HUD panels use a separate UI camera and responsive panel sizing, so map zoom and browser resize do not distort the status overlay.
 - Acceptance gaps:
   - Projection currently returns all tiles and all units; no viewport culling yet.
   - Full projection is allowed only through the 128 x 128 foundation map target. Before moving beyond 128 x 128 or 1000 simulated units, add viewport/chunk projection culling or move that work into PR-11 with a measured reason.
@@ -88,41 +90,93 @@ Status: `Foundation slice`
 
 ## PR-6: Villages
 
-Status: `Planned`
+Status: `Done`
 
 - Add camps, village inventory, housing capacity, food consumption, growth and decline.
 - Acceptance: villages emerge from local population and resources.
-- Entry criteria:
-  - Close PR-1 through PR-5 acceptance gaps that affect village modeling.
-  - Add a 1000-unit pure simulation check or consciously lower the first village scale target.
+- Implemented:
+  - Camps form when a same-race population cluster has enough nearby food.
+  - Villages track home population, center, food inventory, housing capacity, and camp/stable/declining status.
+  - Units now expose stable `homeVillageId` ownership; `villageId` is only current nearby village presence.
+  - Village food is gathered from nearby deposits and consumed on a fixed interval.
+  - Village-supported reproduction respects home village housing capacity.
+  - Village founding, decline, and abandonment produce simulation events and projection data.
+  - HUD renders village count, housing, village inventory, buildings, territory, and kingdom summaries.
+- Acceptance gaps:
+  - Migration, explicit citizenship changes, and family lines are not implemented yet.
+  - Village centers remain internal anchors; no village inspection panel or named settlement UI yet.
 
 ## PR-7: Buildings and Territory
 
-Status: `Planned`
+Status: `Done`
 
 - Add hut, storage, farm, and settlement influence territory.
 - Acceptance: buildings affect survival or expansion and are not decorative.
+- Implemented:
+  - Villages spend food surplus on hut, storage, and farm buildings.
+  - Huts increase housing capacity.
+  - Storage increases village food capacity.
+  - Farms produce village food after nearby deposits are exhausted.
+  - Active building influence projects stable walkable territory tiles.
+  - Buildings become abandoned remnants instead of disappearing when a village loses all population.
+  - HUD renders building count, territory size, territory shading, and building markers.
+- Acceptance gaps:
+  - Buildings are auto-built from food surplus; no worker job, wood cost, construction time, or manual inspection panel yet.
+  - Territory is projection influence only; it can feed diplomacy pressure but does not block movement or create hard borders yet.
+  - Ruin decay, reclamation, and cleanup are represented by status fields but not yet simulated.
 
 ## PR-8: Kingdoms
 
-Status: `Planned`
+Status: `Done`
 
 - Add kingdom, capital, multi-village membership, and summary statistics.
 - Acceptance: kingdoms are derived from village and population state.
+- Implemented:
+  - Eligible villages can automatically found rising kingdoms.
+  - Nearby same-race villages can join an existing kingdom.
+  - Kingdoms track capital village, member village ids, population, active building count, active territory, food inventory, and status.
+  - Kingdom population is derived from member villages' home population, so walking away from the settlement no longer changes kingdom population by itself.
+  - Territory projection stamps `kingdomId` for kingdom-owned village territory while preserving `villageId`.
+  - Kingdom status can become fallen when all member villages disappear.
+  - HUD renders active kingdom count, fallen kingdom count, and largest active kingdom population.
+- Acceptance gaps:
+  - Kingdom names, rulers, banners, culture, claims, and inspection panels are not implemented yet.
+  - Capital relocation is basic and based on surviving/larger member villages.
+  - Kingdom names, rulers, banners, culture, claims, rebellions, and deep war resolution remain PR-12+ flavor.
 
 ## PR-9: Diplomacy Pressure
 
-Status: `Planned`
+Status: `Done`
 
 - Add relationship pressure, border friction, resource pressure, race modifiers, and declaration events.
 - Acceptance: wars have observable causes.
+- Implemented:
+  - Active kingdom pairs maintain accumulating diplomacy pressure.
+  - Border friction increases pressure for nearby rival kingdoms.
+  - Low food per resident adds resource pressure.
+  - Race modifiers affect escalation speed; orcs escalate faster, elves slower, dwarves slightly faster, and same-race pressure is reduced.
+  - Kingdom projection exposes each kingdom's current highest diplomacy pressure and target kingdom.
+  - Diplomacy emits `border_friction`, `resource_pressure`, `diplomacy_pressure`, and `war_declared` events.
+- Acceptance gaps:
+  - Peace resolution, long wars, multiple fronts, and post-war diplomacy remain after PR-10.
 
 ## PR-10: Minimal War
 
-Status: `Planned`
+Status: `Done`
 
 - Add army groups, rallying, marching, battle resolution, casualties, retreat, and village capture.
 - Acceptance: wars can start, progress, and end without simulating every distant fighter as a full AI unit.
+- Implemented:
+  - War declarations form aggregate `ArmyGroup` records instead of switching every unit into single-combat AI.
+  - Army groups track kingdom, target kingdom, origin village, target village, position, soldier count, morale, formed tick, and status.
+  - Armies march toward target villages and resolve grouped battles on contact.
+  - Battle resolution applies aggregate casualties to both sides.
+  - Winning attackers can capture the target village and transfer it to the attacker's kingdom.
+  - Army state is exposed through projection and rendered in the Phaser HUD as owner-colored triangular markers.
+  - Kingdom territory is rendered with stable kingdom colors, and captured village territory switches to the attacker's color through `kingdomId`.
+- Acceptance gaps:
+  - No multiple-front strategy, peace treaty, occupation timer, commander/king participation, prisoner handling, or detailed soldier job model yet.
+  - Capture is direct village ownership transfer; culture, rebellion, resistance, and recapture depth remain PR-12+ flavor.
 
 ## PR-11: Scale Gate
 
@@ -139,10 +193,15 @@ Status: `Planned`
 
 ## Immediate Next Work
 
-Before starting PR-6, tighten the foundation:
+After PR-8, move toward diplomacy pressure while keeping the foundation constraints visible:
 
 1. Done: add command validation and rejection events. Invalid commands now produce `command_rejected` and do not mutate world state.
 2. Done: add source-level architecture scan proving `src/sim` has no Phaser imports or browser globals.
 3. Done: add 1000-unit pure simulation foundation test.
 4. Active constraint: keep full projection only through the 128 x 128 foundation map target; add culling before larger maps or document a measured PR-11 deferral.
 5. Done: slow early reproduction pacing so spawn commands do not immediately create surprise births in basic command tests.
+6. Done: PR-7 turns village surplus into hut, storage, farm, and settlement influence systems.
+7. Done: PR-8 groups villages into kingdoms with capital, membership, and summary statistics.
+8. Done: PR-9 uses border friction, resource pressure, and race modifiers to produce diplomacy pressure and declaration events.
+9. Done: PR-10 turns declarations into minimal army groups, grouped battles, casualties, retreat/disband, and village capture.
+10. Next: start PR-11 by measuring the 128 x 128 full projection path and adding culling or a documented deferral before larger maps.

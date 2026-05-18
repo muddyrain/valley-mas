@@ -1,8 +1,8 @@
 import { SeededRng } from './rng';
 import type { BiomeType, Position, ResourceType, TerrainType, Tile } from './types';
 
-export const DEFAULT_WORLD_WIDTH = 96;
-export const DEFAULT_WORLD_HEIGHT = 64;
+export const DEFAULT_WORLD_WIDTH = 128;
+export const DEFAULT_WORLD_HEIGHT = 128;
 export const CHUNK_SIZE = 16;
 
 export type ChunkKey = `${number}:${number}`;

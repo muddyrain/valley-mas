@@ -30,13 +30,18 @@ WorldSim v2 是一个 2D 像素风上帝沙盒文明模拟游戏：
 |---|---|---|
 | PR-0 原地清场 | 已完成 | 旧 `src` 和旧 `docs` 已替换为 v2 入口 |
 | PR-1 纯模拟内核 | Foundation slice | `SimWorld`、`SimLoop`、seed RNG、命令队列、事件日志、命令拒绝已接入；正式回放/存档格式仍缺 |
-| PR-2 地图/资源 | Foundation slice | tile、chunk、biome、resource deposit 与 seed 地图生成已接入；资源独立索引和渲染裁剪仍缺 |
+| PR-2 地图/资源 | Foundation slice | 128 x 128 foundation 地图、tile、chunk、biome、resource deposit 与 seed 地图生成已接入；资源独立索引和渲染裁剪仍缺 |
 | PR-3 生命求生 | Foundation slice | hunger、hp、age、eat、wander、death、birth 已接入；1000 单位基础测试已补，行为仍是最小 needs loop |
-| PR-4 Phaser Projection | Foundation slice | Scene 只读 projection，输入只发 command，源码级 sim 边界扫描已补，中文全屏调试 HUD 已接入；projection 仍是全量快照 |
+| PR-4 Phaser Projection | Foundation slice | Scene 只读 projection，输入只发 command，源码级 sim 边界扫描已补，中文全屏调试 HUD 和独立 UI camera 已接入；projection 仍是全量快照 |
 | PR-5 God Command | Foundation slice | 基础神力命令、命令校验和拒绝路径已接入；正式工具栏仍缺 |
-| PR-6+ | 待实现 | 村庄、建筑、王国、外交、战争和规模优化按 `ROADMAP.md` 顺序推进 |
+| PR-6 村庄 | Done | 人口聚集和本地食物压力会形成村庄；村庄库存、住房容量、食物消耗、增长上限和衰退状态已接入 |
+| PR-7 建筑和领土 | Done | 村庄 surplus 会自动建造 hut、storage、farm；建筑影响住房、库存上限、食物生产和领土投射 |
+| PR-8 王国 | Done | 稳定村庄会自动建国，同族村庄可加入同一王国，王国聚合首都、成员村庄、人口、建筑、领土和库存统计 |
+| PR-9 外交压力 | Done | 王国会根据边境摩擦、资源压力和种族倾向积累外交压力，并产生宣战事件 |
+| PR-10 最小战争 | Done | 宣战会生成聚合军队组，军队可推进、结算伤亡、撤退/解散并占领村庄 |
+| PR-11+ | 待实现 | 规模优化和 WorldBox 风味按 `ROADMAP.md` 顺序推进 |
 
-进入 PR-6 前，仍需尊重 `ROADMAP.md` 的 projection 约束：全量 projection 只允许用于 128 x 128 foundation 地图目标，更大地图必须先做 culling 或给出有测量依据的 PR-11 deferral。
+进入 PR-11+ 和更大地图目标前，仍需尊重 `ROADMAP.md` 的 projection 约束：全量 projection 只允许用于 128 x 128 foundation 地图目标，更大地图必须先做 culling 或给出有测量依据的 PR-11 deferral。
 
 ## 目录结构
 

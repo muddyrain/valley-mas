@@ -2,7 +2,7 @@
 
 ## World
 
-The world is a tile grid split into chunks. Each tile has terrain, biome, and optional resource deposits. Early terrain types are grass, forest, hill, water, sand, snow, and lava. Early biomes are temperate, woodland, highland, coast, dryland, frozen, and volcanic.
+The world is a tile grid split into chunks. The foundation demo map defaults to 128 x 128 tiles, which is the current full-projection ceiling before PR-11 culling work. Each tile has terrain, biome, and optional resource deposits. Early terrain types are grass, forest, hill, water, sand, snow, and lava. Early biomes are temperate, woodland, highland, coast, dryland, frozen, and volcanic.
 
 ## Units
 
@@ -38,16 +38,61 @@ Food is the first active resource. It exists as tile deposits and supports the l
 
 ## Villages and Kingdoms
 
-Villages and kingdoms are intentionally not part of the first code slice. They must emerge after individual survival works:
+Villages now form after individual survival pressure is visible. A cluster of at least eight same-race units near enough food can found a camp. Founding units receive a stable `homeVillageId`; later same-race homeless units near the settlement can be adopted into that home village. The village stores gathered food, tracks home population, exposes housing capacity, consumes food on a fixed interval, and enters a declining state when inventory cannot satisfy residents.
+
+The village `center` is an internal settlement anchor, not a visible building or capital marker. Population ownership is stable and does not depend on whether villagers are currently inside this anchor radius. The anchor supports village formation spacing, food search, and construction placement; player-facing village presence should come from buildings, territory, kingdom summaries, and later inspection panels.
 
 - villages form from population clusters and local food pressure
+- village population is counted by `homeVillageId`, while `villageId` only marks the current nearby village presence
+- village inventory is gathered from nearby food deposits
+- housing capacity caps village-supported reproduction
+- food shortage causes village decline before later systems add migration, abandonment pressure, or war
+- villages are abandoned only when their home population reaches zero, not when residents temporarily walk away
 - buildings change capacity or production
-- territory follows settlement influence
-- kingdoms group villages and produce diplomacy
+- territory follows settlement and building influence
+- kingdoms group villages and prepare diplomacy
+
+Kingdoms form from village strength instead of player commands. A village with enough home population and active buildings can found a rising kingdom. Nearby same-race villages can join that kingdom. A kingdom tracks capital village, member villages, total home population, active buildings, active territory, food inventory, stable display color, and status. If all member villages disappear, the kingdom becomes fallen and remains as history data for later UI. Territory projection now keeps both `villageId` and optional `kingdomId`, so diplomacy, war, and rendering can reason about ownership by kingdom without changing the simulation/rendering boundary.
+
+## Diplomacy Pressure
+
+Diplomacy is currently pressure-based rather than menu-driven. Active kingdoms compare nearby rivals each tick and maintain pairwise pressure. Each kingdom exposes its highest current `diplomacyPressure` and `diplomacyTargetKingdomId` in projection data.
+
+Pressure comes from:
+
+- border friction when rival village centers are close enough to represent a contested frontier
+- resource pressure when either rival has low food per resident
+- race modifiers, with orcs escalating faster, elves slower, dwarves slightly faster, and same-race rivalry reduced
+
+When pressure crosses report tiers, the simulation emits `border_friction`, `resource_pressure`, and `diplomacy_pressure` events with cause data. When pressure crosses the declaration threshold, the simulation emits `war_declared`. PR-10 turns declarations into army movement, battles, casualties, retreat, and capture.
+
+## Buildings and Territory
+
+Villages spend food surplus on simple functional buildings:
+
+- hut increases housing capacity
+- storage increases village food capacity
+- farm produces village food even after nearby deposits are exhausted
+
+The first territory model is influence-based. Active buildings claim walkable tiles around their fixed positions, which keeps territory stable while villagers move. Territory is projection data for rendering, diplomacy, and war feedback; it does not yet block movement or create borders. Unaffiliated villages claim tiles with only `villageId`; villages inside a kingdom also stamp `kingdomId` on their territory tiles. The Phaser layer renders kingdom-owned territory with that kingdom's stable color, so captured villages visually switch to the attacker's color after ownership transfer.
+
+When a village loses all population, its buildings are not deleted immediately. They become abandoned remnants. Abandoned buildings stay visible but no longer provide housing, storage, farm production, or active territory. Later stages may let these remnants decay into ruins, be reclaimed, or be cleared by another settlement.
 
 ## Combat and War
 
-War starts later at the group level. The model should prefer armies, fronts, morale, and casualties before visible individual brawls. Nearby battles may project individual fighters, but distant battles should use grouped simulation.
+War starts at the group level. A `war_declared` event can form an `ArmyGroup` from the aggressor kingdom's capital village. Army groups are projected as aggregate military units with position, target kingdom, target village, soldier count, morale, and status.
+
+The first war model intentionally avoids complex individual brawls:
+
+- armies march toward a target village as grouped simulation objects
+- battle resolution compares aggregate attacker strength against village defender strength
+- casualties remove a small number of residents from the origin and target villages
+- winning attackers can capture the target village for their kingdom
+- armies disband after capture, retreat, or losing their target
+
+This PR-10 model is enough for wars to start, move, cause casualties, and change village ownership. Later stages can add multiple armies, fronts, commanders, peace deals, occupation, culture, rebellion, and visible local fighters.
+
+In the current UI, army groups render as triangular markers using their owning kingdom's color, with the outline preserving basic status feedback. This keeps war readable without turning every unit into a soldier.
 
 ## Race Identity
 

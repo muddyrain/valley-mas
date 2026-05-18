@@ -11,7 +11,7 @@
    - Must not import Phaser or browser-only APIs.
 
 2. Domain data
-   - Tiles, chunks, resources, units, future villages, kingdoms, armies.
+   - Tiles, chunks, resources, units, villages, buildings, kingdoms, future armies.
    - Stored as serializable plain data.
 
 3. Command layer
@@ -32,9 +32,10 @@ The v2 fixed tick order is:
 
 1. Drain queued commands.
 2. Apply accepted command effects.
-3. Update units and resource interactions.
-4. Resolve births, deaths, and emitted events.
-5. Build projection on demand.
+3. Refresh village formation candidates from homeless local population and local resources.
+4. Update units and resource interactions.
+5. Resolve births, deaths, village home ownership, village inventory, village pressure, building construction, farm production, territory influence, kingdom membership, kingdom summary, diplomacy pressure, army movement, grouped battle resolution, and emitted events.
+6. Build projection on demand.
 
 Future systems append only after documenting their position in this order.
 
