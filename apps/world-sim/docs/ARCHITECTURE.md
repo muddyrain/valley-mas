@@ -1,72 +1,63 @@
-# WorldSim - 架构合同
+# WorldSim v2 Architecture
 
-> 版本：v0.1 · 日期：2026-05-15  
-> 这份文档只定义“系统怎么分层、怎么依赖、谁是状态真源”。玩法细节仍以 `GAME_DESIGN.md` 为准。
+## Ownership
 
-## 1. 目标
+`SimWorld` is the only simulation truth source. Phaser scenes, UI, HUDs, and future workers read snapshots or issue commands; they do not own units, tiles, resources, or civilizations.
 
-- 让渲染、模拟、数据、评测各自独立
-- 避免 Phaser Scene 变成业务真源
-- 避免后续新增系统时反复改核心循环
-- 让存档、回放、调试和压测有同一套结构入口
+## Layers
 
-## 2. 分层
+1. Simulation core
+   - `SimWorld`, `SimLoop`, systems, seed RNG, command queue, event log.
+   - Must not import Phaser or browser-only APIs.
 
-### 2.1 表现层
+2. Domain data
+   - Tiles, chunks, resources, units, future villages, kingdoms, armies.
+   - Stored as serializable plain data.
 
-- Phaser Scene、HUD、菜单、弹窗、地图渲染
-- 只负责显示和收集输入
-- 不直接持有业务真状态
+3. Command layer
+   - All player and debug actions enter as `SimCommand`.
+   - Commands can be accepted, rejected, delayed, or converted to events.
 
-### 2.2 模拟层
+4. Projection layer
+   - `WorldProjection` is a read-only view prepared for rendering and UI.
+   - Projection data is disposable and does not enter saves.
 
-- `SimLoop` 驱动所有系统 tick
-- `Command` 进入队列后统一结算
-- `Event` 负责记录结果，不直接替代规则
+5. Phaser presentation
+   - Renders projection, captures input, and displays HUD.
+   - Does not mutate `SimWorld` directly.
 
-### 2.3 领域层
+## Tick Contract
 
-- `Unit`、`Faction`、`WorldMap`、`Building`、`Territory`
-- 所有字段变更必须经过模拟层
-- 领域对象只描述状态，不直接触发 UI
+The v2 fixed tick order is:
 
-### 2.4 数据层
+1. Drain queued commands.
+2. Apply accepted command effects.
+3. Update units and resource interactions.
+4. Resolve births, deaths, and emitted events.
+5. Build projection on demand.
 
-- `config/` 保存可调参数和内容定义
-- `schema` 保存实体字段约束
-- `save` 保存可恢复状态
+Future systems append only after documenting their position in this order.
 
-### 2.5 工具层
+## Determinism
 
-- `workers/` 放寻路、批处理、重计算
-- 任何可能阻塞渲染的工作优先下沉到 Worker
+- Simulation randomness uses seed-backed RNG.
+- No simulation system may use `Math.random()`.
+- Replays are based on seed, initial options, tick count, and command sequence.
+- Events are part of the deterministic evidence trail.
 
-## 3. 依赖规则
+## Performance Direction
 
-- `ui -> simulation -> domain -> config`
-- `ui` 不反向依赖 `game rules`
-- `worker` 只能读入纯数据，不能直接操作 Scene
-- `config` 不依赖运行时状态
+The first implementation stays plain TypeScript for clarity. Scaling work must preserve the same boundaries:
 
-## 4. 状态真源
+- Spatial grid before all-neighbor scans.
+- Chunk and projection culling before render-heavy features.
+- Worker simulation before main-thread micro-optimizations.
+- TypedArray hot paths only after the domain shape is stable.
 
-- 世界地图真源：`WorldMap`
-- 单位状态真源：`Unit`
-- 势力状态真源：`Faction`
-- 时间状态真源：`TimeSystem`
-- 玩家神力状态真源：`GodPower` / `GodState`
+## Red Lines
 
-## 5. 需要显式隔离的边界
-
-- 渲染与模拟
-- 命令与结果
-- 配置与实例
-- 事件日志与规则执行
-- 存档格式与运行时对象
-
-## 6. 后续扩展原则
-
-- 新系统先补 schema，再补 content，再补 UI
-- 复杂规则先进入 `SIMULATION_CONTRACT.md`
-- 数据扩展优先改配置，不优先改代码
-- 当某个规则会影响存档、回放或评测时，必须同步相关合同文档
+- No Phaser import inside `src/sim`.
+- No scene-owned simulation truth.
+- No direct unit movement commands from player UI.
+- No full-map search in high-frequency unit behavior when an index can answer the query.
+- No feature that bypasses command/event logging.

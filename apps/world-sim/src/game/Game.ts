@@ -1,34 +1,18 @@
 import * as Phaser from 'phaser';
-import { BootScene } from './scenes/BootScene';
-import { UIScene } from './scenes/UIScene';
-import { WorldScene } from './scenes/WorldScene';
+import { WorldScene } from './WorldScene';
 
-export type WorldSimGameOptions = {
-  parent: string | HTMLElement;
-};
-
-export class WorldSimGame {
-  readonly instance: Phaser.Game;
-
-  constructor(options: WorldSimGameOptions) {
-    this.instance = new Phaser.Game({
-      type: Phaser.WEBGL,
-      parent: options.parent,
-      backgroundColor: '#0b1020',
-      disableContextMenu: true,
-      pixelArt: true,
-      antialias: false,
-      roundPixels: true,
-      scale: {
-        mode: Phaser.Scale.RESIZE,
-        width: window.innerWidth,
-        height: window.innerHeight,
-      },
-      scene: [BootScene, WorldScene, UIScene],
-    });
-  }
-
-  destroy() {
-    this.instance.destroy(true);
-  }
+export function createGame(parent: HTMLElement) {
+  return new Phaser.Game({
+    type: Phaser.AUTO,
+    parent,
+    width: window.innerWidth,
+    height: window.innerHeight,
+    backgroundColor: '#101726',
+    pixelArt: true,
+    scene: [WorldScene],
+    scale: {
+      mode: Phaser.Scale.RESIZE,
+      autoCenter: Phaser.Scale.CENTER_BOTH,
+    },
+  });
 }
