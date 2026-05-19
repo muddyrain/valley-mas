@@ -39,9 +39,9 @@ Status: `Foundation slice`
   - Seeded tile map, biome tags, resource deposits, chunk index.
   - Default foundation demo map size is 128 x 128 tiles.
   - Deterministic map test.
+  - Projection culling can reuse chunk-indexed tile lookup for visible tile slices.
 - Acceptance gaps:
   - Resource lookup is radius-bound, but resource deposits are not indexed separately yet.
-  - Chunk index is present but not yet used by rendering culling.
 
 ## PR-3: Life Survival Loop
 
@@ -70,9 +70,11 @@ Status: `Foundation slice`
   - Source-level architecture scan rejects Phaser imports and browser globals inside `src/sim`.
   - UI now uses a Chinese fullscreen debug HUD with state, controls, and event panels.
   - HUD panels use a separate UI camera and responsive panel sizing, so map zoom and browser resize do not distort the status overlay.
+  - Scene projection requests now pass the active camera viewport, so render-facing tiles, units, territory, buildings, and armies are culled before drawing.
+  - Terrain redraws are keyed by terrain revision plus viewport instead of ticking every frame.
 - Acceptance gaps:
-  - Projection currently returns all tiles and all units; no viewport culling yet.
-  - Full projection is allowed only through the 128 x 128 foundation map target. Before moving beyond 128 x 128 or 1000 simulated units, add viewport/chunk projection culling or move that work into PR-11 with a measured reason.
+  - Full projection remains the default compatibility path for tests, replay inspection, and tools that do not pass a viewport.
+  - PR-11 still needs measured scale evidence before moving beyond 128 x 128 or 1000 simulated units as a product target.
 
 ## PR-5: God Command Foundation
 
@@ -180,10 +182,21 @@ Status: `Done`
 
 ## PR-11: Scale Gate
 
-Status: `Planned`
+Status: `Foundation slice`
 
 - Add worker simulation, hot-data layout, projection culling, and render pooling where metrics justify it.
 - Acceptance: 10000 aggregate population and 500 visible units remain stable.
+- Implemented:
+  - `SimWorld.project()` accepts an optional tile viewport while preserving the full-projection default.
+  - Viewport projection returns only visible tiles, units, territory, buildings, and army groups while keeping HUD stats global.
+  - Visible tile collection uses the map chunk index instead of scanning the entire tile array.
+  - Phaser now projects from the active camera viewport and reuses the terrain graphics layer unless terrain revision or viewport changes.
+  - Regression coverage proves a 64 x 64 full projection can be reduced to a 10 x 10 visible tile slice while global population stats stay intact.
+- Acceptance gaps:
+  - Worker simulation is not implemented yet.
+  - Hot-data layout is still plain object/map storage.
+  - No measured 10000 aggregate population / 500 visible unit stability evidence yet.
+  - Render pooling beyond reused graphics layers is not implemented yet.
 
 ## PR-12+: WorldBox Flavor
 
@@ -198,10 +211,10 @@ After PR-8, move toward diplomacy pressure while keeping the foundation constrai
 1. Done: add command validation and rejection events. Invalid commands now produce `command_rejected` and do not mutate world state.
 2. Done: add source-level architecture scan proving `src/sim` has no Phaser imports or browser globals.
 3. Done: add 1000-unit pure simulation foundation test.
-4. Active constraint: keep full projection only through the 128 x 128 foundation map target; add culling before larger maps or document a measured PR-11 deferral.
+4. Done: camera-driven projection culling now limits render-facing tiles, units, territory, buildings, and armies while preserving full projection as the default compatibility path.
 5. Done: slow early reproduction pacing so spawn commands do not immediately create surprise births in basic command tests.
 6. Done: PR-7 turns village surplus into hut, storage, farm, and settlement influence systems.
 7. Done: PR-8 groups villages into kingdoms with capital, membership, and summary statistics.
 8. Done: PR-9 uses border friction, resource pressure, and race modifiers to produce diplomacy pressure and declaration events.
 9. Done: PR-10 turns declarations into minimal army groups, grouped battles, casualties, retreat/disband, and village capture.
-10. Next: start PR-11 by measuring the 128 x 128 full projection path and adding culling or a documented deferral before larger maps.
+10. Next: measure PR-11 scale targets and decide whether worker simulation, hot-data layout, or deeper render pooling is the next bottleneck.

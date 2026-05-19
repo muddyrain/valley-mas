@@ -16,4 +16,6 @@ export type {
   UnitIntent,
   UnitRace,
   WorldProjection,
+  WorldProjectionOptions,
+  WorldProjectionViewport,
 } from './types';

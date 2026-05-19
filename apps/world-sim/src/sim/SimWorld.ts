@@ -1,4 +1,12 @@
-import { createWorldMap, forEachTileInRadius, getTile, isWalkable, resourceTotals } from './map';
+import {
+  createWorldMap,
+  forEachTileInRadius,
+  getTile,
+  isWalkable,
+  resourceTotals,
+  type TileBounds,
+  tilesInBounds,
+} from './map';
 import { SeededRng } from './rng';
 import { SpatialIndex } from './spatialIndex';
 import type {
@@ -17,6 +25,8 @@ import type {
   VillageBuilding,
   VillageBuildingType,
   WorldProjection,
+  WorldProjectionOptions,
+  WorldProjectionViewport,
 } from './types';
 
 const MAX_HP = 100;
@@ -129,6 +139,7 @@ export class SimWorld {
   private readonly armies = new Map<string, ArmyGroup>();
   private readonly spatialIndex = new SpatialIndex();
   private tick = 0;
+  private terrainRevision = 0;
   private nextUnitId = 1;
   private nextEventId = 1;
   private nextVillageId = 1;
@@ -170,36 +181,54 @@ export class SimWorld {
     this.spatialIndex.rebuild([...this.units.values()]);
   }
 
-  project(): WorldProjection {
+  project(options: WorldProjectionOptions = {}): WorldProjection {
+    const bounds = options.viewport
+      ? viewportToTileBounds(options.viewport, this.map.width, this.map.height)
+      : undefined;
     const food = resourceTotals(this.map.tiles, 'food');
     const territory = this.projectTerritory();
+    const visibleTerritory = bounds
+      ? territory.filter((tile) => isTileInBounds(tile, bounds))
+      : territory;
     const territoryByVillage = this.countTerritoryByVillage(territory);
-    const units = [...this.units.values()].map((unit) => cloneUnit(unit));
+    const allUnits = [...this.units.values()];
+    const units = allUnits
+      .filter((unit) => !bounds || isPositionInBounds(unit.position, bounds))
+      .map((unit) => cloneUnit(unit));
     const villages = [...this.villages.values()].map((village) =>
       cloneVillage(village, territoryByVillage.get(village.id) ?? 0),
     );
-    const buildings = [...this.buildings.values()].map((building) => cloneBuilding(building));
+    const buildings = [...this.buildings.values()]
+      .filter((building) => !bounds || isPositionInBounds(building.position, bounds))
+      .map((building) => cloneBuilding(building));
     const kingdoms = [...this.kingdoms.values()].map((kingdom) => cloneKingdom(kingdom));
-    const armies = [...this.armies.values()].map((army) => cloneArmy(army));
-    const activeBuildings = buildings.filter((building) => building.status === 'active').length;
-    const activeArmies = armies.filter((army) => army.status !== 'disbanded').length;
-    const abandonedBuildings = buildings.filter(
+    const armies = [...this.armies.values()]
+      .filter((army) => !bounds || isPositionInBounds(army.position, bounds))
+      .map((army) => cloneArmy(army));
+    const allBuildings = [...this.buildings.values()];
+    const allArmies = [...this.armies.values()];
+    const activeBuildings = allBuildings.filter((building) => building.status === 'active').length;
+    const activeArmies = allArmies.filter((army) => army.status !== 'disbanded').length;
+    const abandonedBuildings = allBuildings.filter(
       (building) => building.status === 'abandoned',
     ).length;
-    const ruinedBuildings = buildings.filter((building) => building.status === 'ruined').length;
+    const ruinedBuildings = allBuildings.filter((building) => building.status === 'ruined').length;
     const totalVillageFood = villages.reduce((total, village) => total + village.foodInventory, 0);
     const housingCapacity = villages.reduce((total, village) => total + village.housingCapacity, 0);
     const activeKingdoms = kingdoms.filter((kingdom) => kingdom.status !== 'fallen').length;
     const fallenKingdoms = kingdoms.length - activeKingdoms;
+    const tiles = bounds ? tilesInBounds(this.map, bounds) : this.map.tiles;
 
     return {
       tick: this.tick,
       seed: this.seed,
       width: this.map.width,
       height: this.map.height,
+      terrainRevision: this.terrainRevision,
+      viewport: options.viewport ? normalizeViewport(options.viewport) : undefined,
       speed: this.speed,
       paused: this.paused,
-      tiles: this.map.tiles.map((tile) => ({
+      tiles: tiles.map((tile) => ({
         ...tile,
         resource: tile.resource ? { ...tile.resource } : undefined,
       })),
@@ -208,17 +237,17 @@ export class SimWorld {
       kingdoms,
       buildings,
       armies,
-      territory,
+      territory: visibleTerritory,
       recentEvents: this.events
         .filter((event) => RECENT_EVENT_TYPES.has(event.type))
         .slice(-12)
         .map((event) => ({ ...event })),
       stats: {
-        population: units.length,
+        population: allUnits.length,
         villages: villages.length,
         kingdoms: activeKingdoms,
         fallenKingdoms,
-        buildings: buildings.length,
+        buildings: allBuildings.length,
         activeArmies,
         activeBuildings,
         abandonedBuildings,
@@ -1797,7 +1826,10 @@ export class SimWorld {
     radius: number,
     commandId: string,
   ) {
+    let changedTerrain = false;
+
     forEachTileInRadius(this.map, position, radius, (tile) => {
+      changedTerrain ||= tile.terrain !== terrain;
       tile.terrain = terrain;
       tile.biome =
         terrain === 'forest'
@@ -1818,6 +1850,11 @@ export class SimWorld {
         tile.resource = undefined;
       }
     });
+
+    if (changedTerrain) {
+      this.terrainRevision += 1;
+    }
+
     this.emit('terrain_changed', `Terrain changed to ${terrain}`, commandId, undefined, position, {
       terrain,
     });
@@ -1943,6 +1980,45 @@ function cloneArmy(army: ArmyGroup): ArmyGroup {
     },
     morale: round(army.morale),
   };
+}
+
+function viewportToTileBounds(
+  viewport: WorldProjectionViewport,
+  mapWidth: number,
+  mapHeight: number,
+): TileBounds {
+  const padding = viewport.paddingTiles ?? 0;
+  const minX = clamp(Math.floor(viewport.x - padding), 0, mapWidth - 1);
+  const minY = clamp(Math.floor(viewport.y - padding), 0, mapHeight - 1);
+  const maxX = clamp(Math.ceil(viewport.x + viewport.width + padding) - 1, minX, mapWidth - 1);
+  const maxY = clamp(Math.ceil(viewport.y + viewport.height + padding) - 1, minY, mapHeight - 1);
+
+  return { minX, minY, maxX, maxY };
+}
+
+function normalizeViewport(viewport: WorldProjectionViewport): WorldProjectionViewport {
+  return {
+    x: round(viewport.x),
+    y: round(viewport.y),
+    width: round(viewport.width),
+    height: round(viewport.height),
+    paddingTiles: viewport.paddingTiles,
+  };
+}
+
+function isTileInBounds(tile: Pick<Position, 'x' | 'y'>, bounds: TileBounds) {
+  return (
+    tile.x >= bounds.minX && tile.x <= bounds.maxX && tile.y >= bounds.minY && tile.y <= bounds.maxY
+  );
+}
+
+function isPositionInBounds(position: Position, bounds: TileBounds) {
+  return (
+    position.x >= bounds.minX &&
+    position.x <= bounds.maxX + 1 &&
+    position.y >= bounds.minY &&
+    position.y <= bounds.maxY + 1
+  );
 }
 
 function averagePosition(positions: Position[]) {

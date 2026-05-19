@@ -14,6 +14,13 @@ export type WorldMap = {
   chunks: Map<ChunkKey, number[]>;
 };
 
+export type TileBounds = {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+};
+
 export function createWorldMap(
   seed: string,
   width = DEFAULT_WORLD_WIDTH,
@@ -78,6 +85,34 @@ export function forEachTileInRadius(
       visit(map.tiles[y * map.width + x]);
     }
   }
+}
+
+export function tilesInBounds(map: WorldMap, bounds: TileBounds) {
+  const minX = clampInt(bounds.minX, 0, map.width - 1);
+  const minY = clampInt(bounds.minY, 0, map.height - 1);
+  const maxX = clampInt(bounds.maxX, minX, map.width - 1);
+  const maxY = clampInt(bounds.maxY, minY, map.height - 1);
+  const minChunkX = Math.floor(minX / CHUNK_SIZE);
+  const maxChunkX = Math.floor(maxX / CHUNK_SIZE);
+  const minChunkY = Math.floor(minY / CHUNK_SIZE);
+  const maxChunkY = Math.floor(maxY / CHUNK_SIZE);
+  const tiles: Tile[] = [];
+
+  for (let chunkY = minChunkY; chunkY <= maxChunkY; chunkY += 1) {
+    for (let chunkX = minChunkX; chunkX <= maxChunkX; chunkX += 1) {
+      for (const index of map.chunks.get(`${chunkX}:${chunkY}`) ?? []) {
+        const tile = map.tiles[index];
+
+        if (tile.x < minX || tile.x > maxX || tile.y < minY || tile.y > maxY) {
+          continue;
+        }
+
+        tiles.push(tile);
+      }
+    }
+  }
+
+  return tiles;
 }
 
 export function isWalkable(terrain: TerrainType) {
@@ -196,4 +231,8 @@ function indexChunks(width: number, height: number) {
 
 export function getChunkKey(x: number, y: number): ChunkKey {
   return `${Math.floor(x / CHUNK_SIZE)}:${Math.floor(y / CHUNK_SIZE)}`;
+}
+
+function clampInt(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, Math.floor(value)));
 }

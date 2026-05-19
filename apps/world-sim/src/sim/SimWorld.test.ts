@@ -206,6 +206,62 @@ describe('SimWorld life loop', () => {
   });
 });
 
+describe('SimWorld projection culling', () => {
+  it('keeps global stats while returning only viewport-visible simulation slices', () => {
+    const world = new SimWorld({
+      seed: 'projection-culling',
+      width: 64,
+      height: 64,
+      initialUnits: 0,
+    });
+
+    world.enqueue({
+      id: 'cmd-near-spawn',
+      type: 'spawn_unit',
+      issuedAtTick: 0,
+      payload: {
+        race: 'human',
+        position: { x: 5, y: 5 },
+        count: 1,
+      },
+    });
+    world.enqueue({
+      id: 'cmd-far-spawn',
+      type: 'spawn_unit',
+      issuedAtTick: 0,
+      payload: {
+        race: 'human',
+        position: { x: 40, y: 40 },
+        count: 1,
+      },
+    });
+    world.enqueue({
+      id: 'cmd-terrain',
+      type: 'change_terrain',
+      issuedAtTick: 0,
+      payload: {
+        terrain: 'lava',
+        position: { x: 5, y: 5 },
+        radius: 1,
+      },
+    });
+
+    world.step();
+
+    const fullProjection = world.project();
+    const viewportProjection = world.project({
+      viewport: { x: 0, y: 0, width: 10, height: 10, paddingTiles: 0 },
+    });
+
+    expect(fullProjection.tiles).toHaveLength(64 * 64);
+    expect(viewportProjection.tiles).toHaveLength(100);
+    expect(viewportProjection.tiles.every((tile) => tile.x < 10 && tile.y < 10)).toBe(true);
+    expect(viewportProjection.units).toHaveLength(1);
+    expect(viewportProjection.stats.population).toBe(2);
+    expect(viewportProjection.terrainRevision).toBeGreaterThan(0);
+  });
+});
+
 describe('SimWorld villages', () => {
   it('forms a village from a local population cluster with food pressure', () => {
     const world = new SimWorld({

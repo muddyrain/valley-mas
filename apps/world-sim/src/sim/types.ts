@@ -108,6 +108,18 @@ export type TerritoryTile = {
   kingdomId?: string;
 };
 
+export type WorldProjectionViewport = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  paddingTiles?: number;
+};
+
+export type WorldProjectionOptions = {
+  viewport?: WorldProjectionViewport;
+};
+
 export type SimCommand =
   | {
       id: string;
@@ -219,6 +231,8 @@ export type WorldProjection = {
   seed: string;
   width: number;
   height: number;
+  terrainRevision: number;
+  viewport?: WorldProjectionViewport;
   speed: 0 | 1 | 2 | 4;
   paused: boolean;
   tiles: Tile[];

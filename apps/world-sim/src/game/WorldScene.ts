@@ -103,12 +103,12 @@ export class WorldScene extends Phaser.Scene {
     window.addEventListener('keydown', this.handleKeyDown);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
 
-    this.renderProjection(this.world.project());
+    this.renderProjection(this.projectVisibleWorld());
   }
 
   update(_time: number, delta: number) {
     this.loop.advance(delta);
-    this.renderProjection(this.world.project());
+    this.renderProjection(this.projectVisibleWorld());
   }
 
   private shutdown() {
@@ -407,12 +407,35 @@ export class WorldScene extends Phaser.Scene {
     this.commandSequence += 1;
   }
 
+  private projectVisibleWorld() {
+    const view = this.cameras.main.worldView;
+
+    return this.world.project({
+      viewport: {
+        x: view.x / TILE_SIZE,
+        y: view.y / TILE_SIZE,
+        width: view.width / TILE_SIZE,
+        height: view.height / TILE_SIZE,
+        paddingTiles: 3,
+      },
+    });
+  }
+
   private getTerrainDrawKey(projection: WorldProjection) {
-    return `${projection.tick}:${
-      projection.tiles.filter(
-        (tile) => tile.terrain === 'water' || tile.terrain === 'forest' || tile.terrain === 'lava',
-      ).length
-    }`;
+    const viewport = projection.viewport;
+
+    if (!viewport) {
+      return `full:${projection.terrainRevision}`;
+    }
+
+    return [
+      projection.terrainRevision,
+      Math.floor(viewport.x),
+      Math.floor(viewport.y),
+      Math.ceil(viewport.width),
+      Math.ceil(viewport.height),
+      viewport.paddingTiles ?? 0,
+    ].join(':');
   }
 
   private createUiText(x: number, y: number, fontSize: number) {

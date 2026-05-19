@@ -2,7 +2,7 @@
 
 ## World
 
-The world is a tile grid split into chunks. The foundation demo map defaults to 128 x 128 tiles, which is the current full-projection ceiling before PR-11 culling work. Each tile has terrain, biome, and optional resource deposits. Early terrain types are grass, forest, hill, water, sand, snow, and lava. Early biomes are temperate, woodland, highland, coast, dryland, frozen, and volcanic.
+The world is a tile grid split into chunks. The foundation demo map defaults to 128 x 128 tiles. Full projection remains available for tests and tooling, while the Phaser render path now requests a camera viewport so visible tiles and entities can be culled through the chunk-indexed projection path. Each tile has terrain, biome, and optional resource deposits. Early terrain types are grass, forest, hill, water, sand, snow, and lava. Early biomes are temperate, woodland, highland, coast, dryland, frozen, and volcanic.
 
 ## Units
 

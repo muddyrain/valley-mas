@@ -20,6 +20,8 @@
 
 4. Projection layer
    - `WorldProjection` is a read-only view prepared for rendering and UI.
+   - `SimWorld.project()` can accept a tile viewport for render-facing culling; no-argument projection remains the full snapshot path for tests, replay inspection, and tooling.
+   - Viewport projection may cull tiles, units, territory, buildings, and army groups, but global HUD stats still describe the whole world.
    - Projection data is disposable and does not enter saves.
 
 5. Phaser presentation
@@ -51,7 +53,7 @@ Future systems append only after documenting their position in this order.
 The first implementation stays plain TypeScript for clarity. Scaling work must preserve the same boundaries:
 
 - Spatial grid before all-neighbor scans.
-- Chunk and projection culling before render-heavy features.
+- Chunk and projection culling before render-heavy features. PR-11 starts this by using chunk-indexed tile collection for camera viewport projection.
 - Worker simulation before main-thread micro-optimizations.
 - TypedArray hot paths only after the domain shape is stable.
 
