@@ -1,5 +1,13 @@
 import * as Phaser from 'phaser';
 import { type SimCommand, SimLoop, SimWorld, type TerrainType, type WorldProjection } from '../sim';
+import {
+  buildInspectionLines,
+  buildMapLabels,
+  filterEventsForSelection,
+  selectNextKingdom,
+  selectWorldEntity,
+  type WorldSelection,
+} from './inspection';
 
 const TILE_SIZE = 10;
 const PANEL_COLOR = 0x101726;
@@ -29,7 +37,8 @@ const INTENT_COLORS = {
 } as const;
 
 const BUILDING_COLORS = {
-  hut: 0xc2c3c7,
+  town_hall: 0xf4f4f4,
+  house: 0xc2c3c7,
   storage: 0xffcd75,
   farm: 0x99e550,
 } as const;
@@ -50,14 +59,17 @@ export class WorldScene extends Phaser.Scene {
   private armyLayer?: Phaser.GameObjects.Graphics;
   private buildingLayer?: Phaser.GameObjects.Graphics;
   private resourceLayer?: Phaser.GameObjects.Graphics;
+  private selectionLayer?: Phaser.GameObjects.Graphics;
   private uiLayer?: Phaser.GameObjects.Graphics;
   private uiCamera?: Phaser.Cameras.Scene2D.Camera;
   private titleText?: Phaser.GameObjects.Text;
   private statusText?: Phaser.GameObjects.Text;
   private controlsText?: Phaser.GameObjects.Text;
   private eventsText?: Phaser.GameObjects.Text;
+  private mapLabelTexts: Phaser.GameObjects.Text[] = [];
   private commandSequence = 1;
   private lastTerrainDrawKey = '';
+  private selection: WorldSelection = { type: 'none' };
 
   constructor() {
     super('world');
@@ -81,6 +93,7 @@ export class WorldScene extends Phaser.Scene {
       (this.world.map.height * TILE_SIZE) / 2,
     );
     this.cameras.main.setZoom(1);
+    this.cameras.main.roundPixels = true;
 
     this.terrainLayer = this.add.graphics();
     this.territoryLayer = this.add.graphics();
@@ -88,6 +101,7 @@ export class WorldScene extends Phaser.Scene {
     this.buildingLayer = this.add.graphics();
     this.armyLayer = this.add.graphics();
     this.unitLayer = this.add.graphics();
+    this.selectionLayer = this.add.graphics();
     this.uiLayer = this.add.graphics();
     this.uiLayer.setScrollFactor(0);
     this.uiLayer.setDepth(20);
@@ -116,6 +130,7 @@ export class WorldScene extends Phaser.Scene {
     this.input.off(Phaser.Input.Events.POINTER_WHEEL, this.handlePointerWheel, this);
     this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this);
     window.removeEventListener('keydown', this.handleKeyDown);
+    this.clearMapLabels();
   }
 
   private renderProjection(projection: WorldProjection) {
@@ -131,6 +146,8 @@ export class WorldScene extends Phaser.Scene {
     this.drawBuildings(projection);
     this.drawArmies(projection);
     this.drawUnits(projection);
+    this.drawSelection(projection);
+    this.drawMapLabels(projection);
     this.drawHud(projection);
   }
 
@@ -223,6 +240,10 @@ export class WorldScene extends Phaser.Scene {
 
       if (building.type === 'farm') {
         this.buildingLayer.fillCircle(x, y, 5);
+      } else if (building.type === 'town_hall') {
+        this.buildingLayer.fillRect(x - 6, y - 6, 12, 12);
+        this.buildingLayer.lineStyle(2, 0x101726, 0.85);
+        this.buildingLayer.strokeRect(x - 6, y - 6, 12, 12);
       } else {
         this.buildingLayer.fillRect(x - 5, y - 5, 10, 10);
       }
@@ -265,11 +286,154 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  private drawSelection(projection: WorldProjection) {
+    if (!this.selectionLayer) {
+      return;
+    }
+
+    this.selectionLayer.clear();
+    this.selectionLayer.lineStyle(2, 0xf4f4f4, 0.95);
+    this.selectionLayer.fillStyle(0xffffff, 0.08);
+
+    const selection = this.selection;
+
+    switch (selection.type) {
+      case 'none':
+        return;
+      case 'tile':
+        this.selectionLayer.strokeRect(
+          selection.x * TILE_SIZE,
+          selection.y * TILE_SIZE,
+          TILE_SIZE,
+          TILE_SIZE,
+        );
+        return;
+      case 'unit': {
+        const unit = projection.units.find((candidate) => candidate.id === selection.id);
+
+        if (!unit) {
+          return;
+        }
+
+        this.selectionLayer.strokeCircle(
+          unit.position.x * TILE_SIZE,
+          unit.position.y * TILE_SIZE,
+          7,
+        );
+        return;
+      }
+      case 'village': {
+        const village = projection.villages.find((candidate) => candidate.id === selection.id);
+
+        if (!village) {
+          return;
+        }
+
+        this.selectionLayer.fillCircle(
+          village.center.x * TILE_SIZE,
+          village.center.y * TILE_SIZE,
+          TILE_SIZE * 2.2,
+        );
+        this.selectionLayer.strokeCircle(
+          village.center.x * TILE_SIZE,
+          village.center.y * TILE_SIZE,
+          TILE_SIZE * 7,
+        );
+        return;
+      }
+      case 'kingdom': {
+        const kingdom = projection.kingdoms.find((candidate) => candidate.id === selection.id);
+        const capital = projection.villages.find(
+          (candidate) => candidate.id === kingdom?.capitalVillageId,
+        );
+
+        if (!kingdom || !capital) {
+          return;
+        }
+
+        this.selectionLayer.lineStyle(3, kingdom.color, 0.95);
+        this.selectionLayer.fillStyle(kingdom.color, 0.12);
+        this.selectionLayer.fillCircle(
+          capital.center.x * TILE_SIZE,
+          capital.center.y * TILE_SIZE,
+          TILE_SIZE * 3,
+        );
+        this.selectionLayer.strokeCircle(
+          capital.center.x * TILE_SIZE,
+          capital.center.y * TILE_SIZE,
+          TILE_SIZE * 8,
+        );
+        return;
+      }
+      case 'building': {
+        const building = projection.buildings.find((candidate) => candidate.id === selection.id);
+
+        if (!building) {
+          return;
+        }
+
+        this.selectionLayer.strokeRect(
+          building.position.x * TILE_SIZE - 8,
+          building.position.y * TILE_SIZE - 8,
+          16,
+          16,
+        );
+        return;
+      }
+      case 'army': {
+        const army = projection.armies.find((candidate) => candidate.id === selection.id);
+
+        if (!army) {
+          return;
+        }
+
+        this.selectionLayer.strokeCircle(
+          army.position.x * TILE_SIZE,
+          army.position.y * TILE_SIZE,
+          14,
+        );
+        return;
+      }
+    }
+  }
+
+  private drawMapLabels(projection: WorldProjection) {
+    this.clearMapLabels();
+
+    for (const label of buildMapLabels(projection)) {
+      const x = Math.round(label.position.x * TILE_SIZE);
+      const y = Math.round(label.position.y * TILE_SIZE);
+      const text = this.add.text(x, y, label.text, {
+        fontFamily: 'system-ui, "PingFang SC", "Microsoft YaHei", sans-serif',
+        fontSize: '13px',
+        fontStyle: '600',
+        color: label.color,
+        backgroundColor: 'rgba(16, 23, 38, 0.72)',
+        stroke: '#101726',
+        strokeThickness: 2,
+        resolution: 2,
+      });
+      text.setOrigin(0.5);
+      text.setDepth(12);
+      this.uiCamera?.ignore(text);
+      this.mapLabelTexts.push(text);
+    }
+  }
+
+  private clearMapLabels() {
+    for (const label of this.mapLabelTexts) {
+      label.destroy();
+    }
+
+    this.mapLabelTexts = [];
+  }
+
   private drawHud(projection: WorldProjection) {
     this.layoutUiPanels();
-    const leadingKingdom = projection.kingdoms
+    const activeKingdoms = projection.kingdoms
       .filter((kingdom) => kingdom.status !== 'fallen')
-      .sort((a, b) => b.population - a.population)[0];
+      .sort((a, b) => b.population - a.population);
+    const leadingKingdom = activeKingdoms[0];
 
     this.titleText?.setText('WorldSim v2 基础原型');
     this.statusText?.setText(
@@ -282,6 +446,15 @@ export class WorldScene extends Phaser.Scene {
         `村庄：${projection.stats.villages}`,
         `王国：${projection.stats.kingdoms} / 陨落 ${projection.stats.fallenKingdoms}`,
         `最大王国：${leadingKingdom ? `${leadingKingdom.population} 人` : '无'}`,
+        '王国列表',
+        ...(activeKingdoms.length > 0
+          ? activeKingdoms
+              .slice(0, 4)
+              .map(
+                (kingdom) =>
+                  `${kingdom.id}：${kingdom.population} 人 / ${kingdom.villageIds.length} 村`,
+              )
+          : ['无活跃王国']),
         `军队：${projection.stats.activeArmies}`,
         `建筑：${projection.stats.activeBuildings} 有效 / ${projection.stats.abandonedBuildings} 废弃`,
         `领土：${projection.stats.territoryTiles}`,
@@ -303,22 +476,27 @@ export class WorldScene extends Phaser.Scene {
     this.controlsText?.setText(
       [
         '操作',
-        '左键：投放食物',
+        '左键：选择实体 / 地块',
+        'Ctrl + 左键：投放食物',
         'Shift + 左键：召唤 4 个小人',
         'Alt + 左键：闪电打击',
         '滚轮：缩放地图',
         '1 / 2 / 4：调整速度',
+        'K：循环选择王国',
         '0 或 P：暂停 / 恢复',
         'F / G / W：将镜头中心改成森林 / 草地 / 水域',
       ].join('    '),
     );
+    const storyEvents = filterEventsForSelection(projection, this.selection).slice(-8);
     this.eventsText?.setText(
       [
-        '最近事件',
+        ...buildInspectionLines(projection, this.selection),
         '',
-        ...projection.recentEvents
-          .slice(-8)
-          .map((event) => `第 ${event.tick} tick：${translateEvent(event.message)}`),
+        this.selection.type === 'none' || this.selection.type === 'tile' ? '最近事件' : '相关事件',
+        '',
+        ...(storyEvents.length > 0
+          ? storyEvents.map((event) => `第 ${event.tick} tick：${translateEvent(event.message)}`)
+          : ['暂无相关事件']),
       ].join('\n'),
     );
   }
@@ -346,9 +524,17 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
 
-    this.issue({
-      type: 'place_resource',
-      payload: { resourceType: 'food', position, amount: 20, radius: 2 },
+    if (pointer.event.ctrlKey || pointer.event.metaKey) {
+      this.issue({
+        type: 'place_resource',
+        payload: { resourceType: 'food', position, amount: 20, radius: 2 },
+      });
+      return;
+    }
+
+    this.selection = selectWorldEntity(this.projectVisibleWorld(), {
+      x: worldPoint.x / TILE_SIZE,
+      y: worldPoint.y / TILE_SIZE,
     });
   };
 
@@ -377,6 +563,11 @@ export class WorldScene extends Phaser.Scene {
     if (key === '0' || key === 'p') {
       const projection = this.world.project();
       this.issue({ type: 'pause', payload: { paused: !projection.paused } });
+      return;
+    }
+
+    if (key === 'k') {
+      this.selection = selectNextKingdom(this.projectVisibleWorld(), this.selection);
       return;
     }
 
@@ -521,6 +712,7 @@ export class WorldScene extends Phaser.Scene {
       this.buildingLayer,
       this.armyLayer,
       this.unitLayer,
+      this.selectionLayer,
     ];
     const uiObjects: Array<Phaser.GameObjects.GameObject | undefined> = [
       this.uiLayer,

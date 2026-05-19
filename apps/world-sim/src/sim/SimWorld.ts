@@ -57,12 +57,13 @@ const VILLAGE_FOOD_PER_RESIDENT = 2;
 const VILLAGE_BASE_HOUSING = 12;
 const VILLAGE_MAX_HOUSING = 60;
 const VILLAGE_BASE_FOOD_CAPACITY = 120;
-const HUT_HOUSING_BONUS = 6;
+const HOUSE_HOUSING_BONUS = 6;
 const STORAGE_FOOD_CAPACITY_BONUS = 140;
 const FARM_FOOD_PER_TICK = 3;
 const BUILDING_INTERVAL_TICKS = 60;
 const BUILDING_COSTS: Record<VillageBuildingType, number> = {
-  hut: 45,
+  town_hall: 0,
+  house: 45,
   storage: 60,
   farm: 70,
 };
@@ -354,7 +355,7 @@ export class SimWorld {
         (building) =>
           `${building.id}:${building.villageId}:${building.type}:${round(
             building.position.x,
-          )},${round(building.position.y)}:${building.status}`,
+          )},${round(building.position.y)}:${building.status}:${building.tier ?? 0}`,
       ),
       kingdoms: [...this.kingdoms.values()].map(
         (kingdom) =>
@@ -722,6 +723,8 @@ export class SimWorld {
 
       this.nextVillageId += 1;
       this.villages.set(village.id, village);
+      const townHall = this.createBuilding(village, 'town_hall');
+      this.buildings.set(townHall.id, townHall);
 
       for (const local of locals) {
         local.villageId = village.id;
@@ -971,10 +974,12 @@ export class SimWorld {
     this.buildings.set(building.id, building);
 
     switch (type) {
-      case 'hut':
+      case 'town_hall':
+        break;
+      case 'house':
         village.housingCapacity = Math.min(
           VILLAGE_MAX_HOUSING,
-          village.housingCapacity + HUT_HOUSING_BONUS,
+          village.housingCapacity + HOUSE_HOUSING_BONUS,
         );
         break;
       case 'storage':
@@ -999,12 +1004,12 @@ export class SimWorld {
 
   private chooseNextBuilding(village: Village): VillageBuildingType | undefined {
     const buildings = this.findVillageBuildings(village.id);
-    const huts = buildings.filter((building) => building.type === 'hut').length;
+    const houses = buildings.filter((building) => building.type === 'house').length;
     const storage = buildings.filter((building) => building.type === 'storage').length;
     const farms = buildings.filter((building) => building.type === 'farm').length;
 
-    if (huts === 0) {
-      return 'hut';
+    if (houses === 0) {
+      return 'house';
     }
 
     if (storage === 0) {
@@ -1019,7 +1024,7 @@ export class SimWorld {
       village.population >= village.housingCapacity - 2 &&
       village.housingCapacity < VILLAGE_MAX_HOUSING
     ) {
-      return 'hut';
+      return 'house';
     }
 
     return undefined;
@@ -1029,10 +1034,13 @@ export class SimWorld {
     const buildingCount = this.findVillageBuildings(village.id).length;
     const angle = buildingCount * 2.399963229728653;
     const radius = 2 + (buildingCount % 4);
-    const position = this.findBuildablePosition({
-      x: village.center.x + Math.cos(angle) * radius,
-      y: village.center.y + Math.sin(angle) * radius,
-    });
+    const position =
+      type === 'town_hall'
+        ? village.center
+        : this.findBuildablePosition({
+            x: village.center.x + Math.cos(angle) * radius,
+            y: village.center.y + Math.sin(angle) * radius,
+          });
 
     const building: VillageBuilding = {
       id: `building-${String(this.nextBuildingId).padStart(5, '0')}`,
@@ -1041,6 +1049,7 @@ export class SimWorld {
       status: 'active',
       position,
       builtAtTick: this.tick,
+      tier: type === 'town_hall' || type === 'house' ? 1 : undefined,
     };
 
     this.nextBuildingId += 1;
@@ -1177,7 +1186,9 @@ export class SimWorld {
   private refreshKingdomMembership(kingdom: Kingdom) {
     const villages = kingdom.villageIds
       .map((id) => this.villages.get(id))
-      .filter((village): village is Village => Boolean(village));
+      .filter(
+        (village): village is Village => village !== undefined && village.kingdomId === kingdom.id,
+      );
 
     kingdom.villageIds = villages.map((village) => village.id);
 
@@ -1197,9 +1208,9 @@ export class SimWorld {
     }
 
     const capital = this.villages.get(kingdom.capitalVillageId);
-    const nextCapital = [...villages].sort((a, b) => b.population - a.population)[0];
 
-    if (!capital || nextCapital.population > capital.population) {
+    if (!capital || !kingdom.villageIds.includes(capital.id) || capital.kingdomId !== kingdom.id) {
+      const nextCapital = this.chooseReplacementCapital(villages);
       kingdom.capitalVillageId = nextCapital.id;
       this.emit(
         'kingdom_capital_changed',
@@ -1222,6 +1233,39 @@ export class SimWorld {
     }
 
     this.updateKingdomSummary(kingdom, villages);
+  }
+
+  private chooseReplacementCapital(villages: Village[]) {
+    return [...villages].sort((left, right) => {
+      const townHallTierDelta =
+        this.highestTownHallTier(right.id) - this.highestTownHallTier(left.id);
+
+      if (townHallTierDelta !== 0) {
+        return townHallTierDelta;
+      }
+
+      const buildingCountDelta =
+        this.findVillageBuildings(right.id).length - this.findVillageBuildings(left.id).length;
+
+      if (buildingCountDelta !== 0) {
+        return buildingCountDelta;
+      }
+
+      const populationDelta = right.population - left.population;
+
+      if (populationDelta !== 0) {
+        return populationDelta;
+      }
+
+      return left.id.localeCompare(right.id);
+    })[0];
+  }
+
+  private highestTownHallTier(villageId: string) {
+    return this.findVillageBuildings(villageId, 'town_hall').reduce(
+      (highest, building) => Math.max(highest, building.tier ?? 0),
+      0,
+    );
   }
 
   private isKingdomEligibleVillage(village: Village) {

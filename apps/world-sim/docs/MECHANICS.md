@@ -52,7 +52,7 @@ The village `center` is an internal settlement anchor, not a visible building or
 - territory follows settlement and building influence
 - kingdoms group villages and prepare diplomacy
 
-Kingdoms form from village strength instead of player commands. A village with enough home population and active buildings can found a rising kingdom. Nearby same-race villages can join that kingdom. A kingdom tracks capital village, member villages, total home population, active buildings, active territory, food inventory, stable display color, and status. If all member villages disappear, the kingdom becomes fallen and remains as history data for later UI. Territory projection now keeps both `villageId` and optional `kingdomId`, so diplomacy, war, and rendering can reason about ownership by kingdom without changing the simulation/rendering boundary.
+Kingdoms form from village strength instead of player commands. A village with enough home population and active buildings can found a rising kingdom. Nearby same-race villages can join that kingdom. A kingdom tracks capital village, member villages, total home population, active buildings, active territory, food inventory, stable display color, and status. The founding capital is stable: it does not move just because another member village has more population. A replacement capital is chosen only when the current capital is no longer a valid member, such as after abandonment, removal, or capture. Replacement priority is highest active town hall tier, then active building count, then population, then deterministic village id order. If all member villages disappear, the kingdom becomes fallen and remains as history data for later UI. Territory projection now keeps both `villageId` and optional `kingdomId`, so diplomacy, war, and rendering can reason about ownership by kingdom without changing the simulation/rendering boundary.
 
 ## Diplomacy Pressure
 
@@ -68,15 +68,17 @@ When pressure crosses report tiers, the simulation emits `border_friction`, `res
 
 ## Buildings and Territory
 
-Villages spend food surplus on simple functional buildings:
+Villages spend food surplus on simple functional buildings. PR-12B starts turning the older
+hut/storage/farm foundation into a clearer settlement chain:
 
-- hut increases housing capacity
+- town hall is created when a village is founded and marks the visible settlement anchor
+- house is the visible housing building; the first slice stores `tier: 1` for future upgrades and increases housing capacity
 - storage increases village food capacity
 - farm produces village food even after nearby deposits are exhausted
 
 The first territory model is influence-based. Active buildings claim walkable tiles around their fixed positions, which keeps territory stable while villagers move. Territory is projection data for rendering, diplomacy, and war feedback; it does not yet block movement or create borders. Unaffiliated villages claim tiles with only `villageId`; villages inside a kingdom also stamp `kingdomId` on their territory tiles. The Phaser layer renders kingdom-owned territory with that kingdom's stable color, so captured villages visually switch to the attacker's color after ownership transfer.
 
-When a village loses all population, its buildings are not deleted immediately. They become abandoned remnants. Abandoned buildings stay visible but no longer provide housing, storage, farm production, or active territory. Later stages may let these remnants decay into ruins, be reclaimed, or be cleared by another settlement.
+When a village loses all population, its buildings are not deleted immediately. They become abandoned remnants. Abandoned buildings stay visible but no longer provide housing, storage, farm production, or active territory. Later PR-12B work can add mine, barrack, dock, and higher house/town hall tiers before PR-12C introduces job-driven resource chains.
 
 ## Combat and War
 

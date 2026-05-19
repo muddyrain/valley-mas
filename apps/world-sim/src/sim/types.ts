@@ -14,7 +14,7 @@ export type UnitRace = 'human' | 'orc' | 'elf' | 'dwarf';
 export type UnitGender = 'male' | 'female';
 export type UnitIntent = 'idle' | 'seek_food' | 'eat' | 'wander' | 'dead';
 export type VillageStatus = 'camp' | 'stable' | 'declining';
-export type VillageBuildingType = 'hut' | 'storage' | 'farm';
+export type VillageBuildingType = 'town_hall' | 'house' | 'storage' | 'farm';
 export type VillageBuildingStatus = 'active' | 'abandoned' | 'ruined';
 export type KingdomStatus = 'rising' | 'stable' | 'declining' | 'fallen';
 export type ArmyGroupStatus = 'marching' | 'fighting' | 'retreating' | 'disbanded';
@@ -87,6 +87,7 @@ export type VillageBuilding = {
   status: VillageBuildingStatus;
   position: Position;
   builtAtTick: number;
+  tier?: number;
 };
 
 export type ArmyGroup = {

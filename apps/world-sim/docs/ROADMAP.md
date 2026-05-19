@@ -112,10 +112,10 @@ Status: `Done`
 
 Status: `Done`
 
-- Add hut, storage, farm, and settlement influence territory.
+- Add housing, storage, farm, and settlement influence territory.
 - Acceptance: buildings affect survival or expansion and are not decorative.
 - Implemented:
-  - Villages spend food surplus on hut, storage, and farm buildings.
+  - Villages spend food surplus on housing, storage, and farm buildings.
   - Huts increase housing capacity.
   - Storage increases village food capacity.
   - Farms produce village food after nearby deposits are exhausted.
@@ -137,13 +137,12 @@ Status: `Done`
   - Eligible villages can automatically found rising kingdoms.
   - Nearby same-race villages can join an existing kingdom.
   - Kingdoms track capital village, member village ids, population, active building count, active territory, food inventory, and status.
+  - Founding capitals stay stable while valid; replacement capitals are chosen only after capital loss, preferring town hall tier, active building count, population, then village id order.
   - Kingdom population is derived from member villages' home population, so walking away from the settlement no longer changes kingdom population by itself.
   - Territory projection stamps `kingdomId` for kingdom-owned village territory while preserving `villageId`.
   - Kingdom status can become fallen when all member villages disappear.
   - HUD renders active kingdom count, fallen kingdom count, and largest active kingdom population.
 - Acceptance gaps:
-  - Kingdom names, rulers, banners, culture, claims, and inspection panels are not implemented yet.
-  - Capital relocation is basic and based on surviving/larger member villages.
   - Kingdom names, rulers, banners, culture, claims, rebellions, and deep war resolution remain PR-12+ flavor.
 
 ## PR-9: Diplomacy Pressure
@@ -214,7 +213,111 @@ Status: `Done`
 
 Status: `Planned`
 
-- Add race behavior depth, logs, kingdom panels, trends, cultures, religions, families, rebellions, world laws, monsters, and disaster chains only after the core loop is stable.
+- Add WorldBox-style readability and civilization depth after the core loop is stable. The next phase should preserve the god-sim shape: the player creates conditions and intervenes, while villages and kingdoms build, expand, fight, and collapse mostly on their own.
+- Order matters: first make the existing simulation understandable, then add deeper building and society systems.
+
+### PR-12A: Inspection and Event Story
+
+Status: `Done`
+
+- Add selection/inspection for villages, kingdoms, buildings, armies, and recent events.
+- Acceptance: a player can click or select a visible world entity and understand what it is, who owns it, why it matters, and what recently happened around it.
+- Planned:
+  - Village panel: name placeholder, race, population, food, housing, status, kingdom, buildings, territory size, recent local events.
+  - Kingdom panel: capital, member villages, population, food, buildings, active territory, diplomacy pressure, war target, army count.
+  - Army panel: owner kingdom, target kingdom, origin village, target village, soldiers, morale, status.
+  - Event log filters by global, village, kingdom, war, diplomacy, and command events.
+  - Selected entity highlight and map labels for village/kingdom names.
+- Implemented:
+  - Plain left click now selects visible armies, buildings, village centers/territory, units, or tiles.
+  - `Ctrl + left click` places food, while `Shift + left click` still spawns units and `Alt + left click` still strikes lightning.
+  - The right HUD panel shows selected village, building, army, unit, or tile inspection details.
+  - Recent events are filtered to the selected story context, including village-owned buildings, kingdom war pressure, and selected armies.
+  - The map draws a highlight around the selected entity or tile.
+  - `K` cycles direct kingdom selection and the status panel lists the leading active kingdoms.
+  - Village and kingdom labels render over the map near settlement centers and capitals.
+- Deferred:
+  - Full searchable or typed event log.
+  - Clickable UI list rows for direct panel selection.
+- Non-goals:
+  - No new economy resource chain yet.
+  - No deep citizen jobs yet.
+
+### PR-12B: Building Chain Expansion
+
+Status: `Foundation slice`
+
+- Expand the current hut/storage/farm foundation into a clearer civilization building chain.
+- Acceptance: villages visibly progress from camp to settlement to town through buildings with gameplay effects, not decorative markers.
+- Planned:
+  - Add `town_hall` as the village anchor and upgrade gate.
+  - Convert or extend `hut` into house tiers for housing capacity growth.
+  - Add `mine` for stone/iron access.
+  - Add `barrack` for army capacity or army formation strength.
+  - Add `dock` as a coast-only building reserved for later boats/trade/colonization.
+  - Expose building type, tier, status, and owner in projection/inspection.
+- Implemented:
+  - Villages now create a visible `town_hall` at the settlement center when founded.
+  - The former `hut` building path now creates `house` buildings with `tier: 1`.
+  - House buildings preserve the old housing-capacity gameplay effect while making housing visible as a building chain.
+  - Building projection, replay serialization, inspection, and Phaser rendering now include the new building types and tier.
+- Acceptance gaps:
+  - `town_hall` does not gate upgrades yet.
+  - Higher house tiers are not implemented yet.
+  - `mine`, `barrack`, and `dock` are still pending.
+- Non-goals:
+  - No manual player building placement.
+  - No boat simulation until the dock has a reason to exist in later PRs.
+
+### PR-12C: Villager Jobs and Resource Economy
+
+Status: `Planned`
+
+- Replace part of the current abstract village economy with simple job-driven gathering and construction.
+- Acceptance: village growth depends on visible resource availability and assigned work, while staying cheap enough for the PR-11 scale target.
+- Planned:
+  - Add lightweight jobs such as farmer, builder, miner, and soldier.
+  - Track village stores for food, wood, stone, and iron.
+  - Buildings consume resources and optionally construction time.
+  - Farms, mines, and nearby deposits feed village stores.
+  - Resource shortages slow construction, housing growth, and army formation.
+- Non-goals:
+  - No per-citizen deep inventory.
+  - No full logistics pathfinding between every worker and resource.
+
+### PR-12D: City Growth Feedback
+
+Status: `Planned`
+
+- Make village growth readable on the map and in the HUD.
+- Acceptance: a player can tell at a glance which settlements are camps, growing towns, capitals, declining towns, or ruins.
+- Planned:
+  - Village names and capital markers.
+  - Village level derived from population, housing, town hall tier, and building count.
+  - More visible borders and selected territory highlight.
+  - Building upgrade events and settlement growth events.
+  - Ruin/abandoned building readability for collapsed settlements.
+
+### PR-12E: Kingdom Readability and God Interventions
+
+Status: `Planned`
+
+- Make kingdom-level conflict and diplomacy understandable and lightly steerable.
+- Acceptance: wars and diplomatic pressure have visible causes, visible participants, and a small set of god commands that can push the world without direct unit control.
+- Planned:
+  - Kingdom list and relation summary.
+  - War list with attacker, defender, target village, armies, and casualties.
+  - God commands for forcing war, forcing peace, inspiring growth, and marking a village/kingdom for attention.
+  - Basic rebellion or resistance hooks after capture, if metrics remain healthy.
+- Non-goals:
+  - No full culture/religion/family simulation in the first PR-12 pass.
+  - No larger-map target increase unless `measure:scale` says the current bottleneck is understood.
+
+### Later Flavor Backlog
+
+Status: `Planned`
+
+- Cultures, religions, families, rulers, traits, rebellions, world laws, monsters, disasters, boats, colonization, trade, and larger maps remain after PR-12A-E establish observability and core civilization growth.
 
 ## Immediate Next Work
 
@@ -225,7 +328,7 @@ After PR-8, move toward diplomacy pressure while keeping the foundation constrai
 3. Done: add 1000-unit pure simulation foundation test.
 4. Done: camera-driven projection culling now limits render-facing tiles, units, territory, buildings, and armies while preserving full projection as the default compatibility path.
 5. Done: slow early reproduction pacing so spawn commands do not immediately create surprise births in basic command tests.
-6. Done: PR-7 turns village surplus into hut, storage, farm, and settlement influence systems.
+6. Done: PR-7 turns village surplus into housing, storage, farm, and settlement influence systems.
 7. Done: PR-8 groups villages into kingdoms with capital, membership, and summary statistics.
 8. Done: PR-9 uses border friction, resource pressure, and race modifiers to produce diplomacy pressure and declaration events.
 9. Done: PR-10 turns declarations into minimal army groups, grouped battles, casualties, retreat/disband, and village capture.
@@ -235,4 +338,10 @@ After PR-8, move toward diplomacy pressure while keeping the foundation constrai
 13. Done: PR-11D exposes `updateUnits` sub-phase timing and gates nearby food lookup behind the hunger threshold.
 14. Done: PR-11E/F lowers non-urgent home-village behavior frequency, exposes behavior update counts in the scale report, and removes a duplicate village resident-index rebuild.
 15. Done: PR-11 stability sign-off confirms 10000 population with 656 viewport-visible units stays below the 16.7 ms simulation-step budget across five consecutive local runs.
-16. Next: start the first PR-12 WorldBox flavor slice, preferably a village/kingdom inspection and event log surface, while keeping larger-map scale work metric-driven.
+16. Done: PR-12A inspection and event story supports click selection, right-panel details, selected highlights, context-filtered recent events, kingdom cycling/listing, and village/kingdom map labels.
+17. Foundation slice: PR-12B building chain now creates town halls and tier-1 houses, replacing the old hut path while preserving housing effects.
+18. Done: kingdom capitals now stay stable while valid; replacement capitals are chosen after capital loss by town hall tier, active building count, population, then id.
+19. Next: continue PR-12B with town hall upgrade gates, higher house tiers, mine, barrack, and dock.
+20. Planned: PR-12C villager jobs and resource economy with farmer, builder, miner, soldier, and village material stores.
+21. Planned: PR-12D city growth feedback with names, levels, capital markers, borders, upgrades, and ruins.
+22. Planned: PR-12E kingdom readability and god interventions for war, peace, growth, and attention marking.

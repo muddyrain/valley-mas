@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type SimCommand, SimWorld } from './index';
+import type { Kingdom, Village, VillageBuilding } from './types';
 
 describe('SimWorld deterministic replay', () => {
   it('produces the same replay snapshot for the same seed and commands', () => {
@@ -357,6 +358,21 @@ describe('SimWorld villages', () => {
 });
 
 describe('SimWorld village buildings and territory', () => {
+  it('starts villages with a visible town hall anchor', () => {
+    const world = foundFoodRichVillage('village-town-hall');
+    const projection = world.project();
+    const village = projection.villages[0];
+    const townHall = projection.buildings.find((building) => building.type === 'town_hall');
+
+    expect(townHall).toBeDefined();
+    expect(townHall).toMatchObject({
+      villageId: village.id,
+      status: 'active',
+      tier: 1,
+    });
+    expect(townHall?.position).toEqual(village.center);
+  });
+
   it('builds functional village buildings from surplus food and projects territory', () => {
     const world = foundFoodRichVillage('village-buildings');
     const initialVillage = world.project().villages[0];
@@ -368,9 +384,12 @@ describe('SimWorld village buildings and territory', () => {
     const projection = world.project();
     const village = projection.villages[0];
     const buildingTypes = projection.buildings.map((building) => building.type);
+    const houses = projection.buildings.filter((building) => building.type === 'house');
 
-    expect(buildingTypes).toContain('hut');
+    expect(buildingTypes).toContain('town_hall');
+    expect(buildingTypes).toContain('house');
     expect(buildingTypes).toContain('storage');
+    expect(houses.every((building) => building.tier && building.tier >= 1)).toBe(true);
     expect(village.housingCapacity).toBeGreaterThan(initialVillage.housingCapacity);
     expect(village.foodCapacity).toBeGreaterThan(initialVillage.foodCapacity);
     expect(village.territoryTiles).toBeGreaterThan(initialVillage.territoryTiles);
@@ -505,6 +524,55 @@ describe('SimWorld kingdoms', () => {
     expect(kingdom.buildingCount).toBe(projection.stats.activeBuildings);
     expect((kingdom as { color?: number }).color).toBeGreaterThan(0);
     expect(projection.stats.kingdoms).toBe(1);
+  });
+
+  it('keeps the founding capital stable when a larger member village joins', () => {
+    const world = foundTwoFoodRichVillages('kingdom-stable-capital');
+
+    for (let tick = 0; tick < 300; tick += 1) {
+      world.step();
+    }
+
+    const projection = world.project();
+    const kingdom = projection.kingdoms[0];
+    const foundingCapitalId = kingdom.capitalVillageId;
+    const foundingCapital = projection.villages.find((village) => village.id === foundingCapitalId);
+    const largerMember = projection.villages.find((village) => village.id !== foundingCapitalId);
+
+    if (!foundingCapital || !largerMember) {
+      throw new Error('Expected a kingdom with at least two villages');
+    }
+
+    setVillagePopulation(world, largerMember.id, foundingCapital.population + 20);
+    refreshProjectedKingdom(world, kingdom.id);
+
+    expect(world.project().kingdoms[0].capitalVillageId).toBe(foundingCapitalId);
+  });
+
+  it('chooses the strongest remaining town as capital only after the current capital is lost', () => {
+    const world = foundThreeFoodRichVillages('kingdom-capital-replacement');
+
+    for (let tick = 0; tick < 300; tick += 1) {
+      world.step();
+    }
+
+    const projection = world.project();
+    const kingdom = projection.kingdoms[0];
+    const originalCapitalId = kingdom.capitalVillageId;
+    const candidates = projection.villages.filter((village) => village.id !== originalCapitalId);
+
+    if (candidates.length < 2) {
+      throw new Error('Expected a kingdom with at least two replacement candidates');
+    }
+
+    const [townHallCandidate, populationCandidate] = candidates;
+    setVillagePopulation(world, townHallCandidate.id, 8);
+    setVillagePopulation(world, populationCandidate.id, 40);
+    setTownHallTier(world, townHallCandidate.id, 2);
+    removeCapitalFromKingdom(world, kingdom.id, originalCapitalId);
+    refreshProjectedKingdom(world, kingdom.id);
+
+    expect(world.project().kingdoms[0].capitalVillageId).toBe(townHallCandidate.id);
   });
 
   it('adds nearby same-race villages to an existing kingdom and aggregates summary stats', () => {
@@ -812,6 +880,42 @@ function foundTwoFoodRichVillages(seed: string) {
   return world;
 }
 
+function foundThreeFoodRichVillages(seed: string) {
+  const world = new SimWorld({ seed, width: 84, height: 32, initialUnits: 0 });
+
+  for (const [index, position] of [
+    { x: 12, y: 10 },
+    { x: 42, y: 22 },
+    { x: 70, y: 10 },
+  ].entries()) {
+    world.enqueue({
+      id: `cmd-food-${index}`,
+      type: 'place_resource',
+      issuedAtTick: 0,
+      payload: {
+        resourceType: 'food',
+        position,
+        amount: 700,
+        radius: 5,
+      },
+    });
+    world.enqueue({
+      id: `cmd-settlers-${index}`,
+      type: 'spawn_unit',
+      issuedAtTick: 0,
+      payload: {
+        race: 'human',
+        position,
+        count: 12,
+      },
+    });
+  }
+
+  world.step();
+
+  return world;
+}
+
 function foundRivalKingdoms(
   seed: string,
   options?: {
@@ -889,6 +993,61 @@ function moveVillageResidents(
       unit.position = { ...position };
     }
   }
+}
+
+function setVillagePopulation(world: SimWorld, villageId: string, population: number) {
+  const village = getMutableWorld(world).villages.get(villageId);
+
+  if (!village) {
+    throw new Error(`Expected village ${villageId}`);
+  }
+
+  village.population = population;
+}
+
+function setTownHallTier(world: SimWorld, villageId: string, tier: number) {
+  const townHall = [...getMutableWorld(world).buildings.values()].find(
+    (building) => building.villageId === villageId && building.type === 'town_hall',
+  );
+
+  if (!townHall) {
+    throw new Error(`Expected town hall for village ${villageId}`);
+  }
+
+  townHall.tier = tier;
+}
+
+function removeCapitalFromKingdom(world: SimWorld, kingdomId: string, capitalVillageId: string) {
+  const mutableWorld = getMutableWorld(world);
+  const kingdom = mutableWorld.kingdoms.get(kingdomId);
+  const village = mutableWorld.villages.get(capitalVillageId);
+
+  if (!kingdom || !village) {
+    throw new Error('Expected capital village and kingdom');
+  }
+
+  kingdom.villageIds = kingdom.villageIds.filter((villageId) => villageId !== capitalVillageId);
+  village.kingdomId = undefined;
+}
+
+function refreshProjectedKingdom(world: SimWorld, kingdomId: string) {
+  const mutableWorld = getMutableWorld(world);
+  const kingdom = mutableWorld.kingdoms.get(kingdomId);
+
+  if (!kingdom) {
+    throw new Error(`Expected kingdom ${kingdomId}`);
+  }
+
+  mutableWorld.refreshKingdomMembership(kingdom);
+}
+
+function getMutableWorld(world: SimWorld) {
+  return world as unknown as {
+    villages: Map<string, Village>;
+    kingdoms: Map<string, Kingdom>;
+    buildings: Map<string, VillageBuilding>;
+    refreshKingdomMembership(kingdom: Kingdom): void;
+  };
 }
 
 function serializeTerritory(
