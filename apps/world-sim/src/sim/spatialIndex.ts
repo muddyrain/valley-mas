@@ -1,4 +1,4 @@
-import { type ChunkKey, getChunkKey } from './map';
+import { CHUNK_SIZE, type ChunkKey, getChunkKey } from './map';
 import type { Position, Unit } from './types';
 
 export class SpatialIndex {
@@ -26,9 +26,14 @@ export class SpatialIndex {
     const maxY = Math.floor(position.y + radius);
     const ids = new Set<string>();
 
-    for (let y = minY; y <= maxY; y += 16) {
-      for (let x = minX; x <= maxX; x += 16) {
-        for (const id of this.cells.get(getChunkKey(x, y)) ?? []) {
+    const minChunkX = Math.floor(minX / CHUNK_SIZE);
+    const maxChunkX = Math.floor(maxX / CHUNK_SIZE);
+    const minChunkY = Math.floor(minY / CHUNK_SIZE);
+    const maxChunkY = Math.floor(maxY / CHUNK_SIZE);
+
+    for (let chunkY = minChunkY; chunkY <= maxChunkY; chunkY += 1) {
+      for (let chunkX = minChunkX; chunkX <= maxChunkX; chunkX += 1) {
+        for (const id of this.cells.get(`${chunkX}:${chunkY}`) ?? []) {
           ids.add(id);
         }
       }

@@ -44,6 +44,7 @@ export type Unit = {
   hunger: number;
   ageTicks: number;
   reproductionCooldownTicks: number;
+  behaviorPhase?: number;
   intent: UnitIntent;
   villageId?: string;
   homeVillageId?: string;
@@ -224,6 +225,34 @@ export type SimWorldOptions = {
   width?: number;
   height?: number;
   initialUnits?: number;
+};
+
+export type SimStepPhaseTimings = {
+  commandDrain: number;
+  spatialIndexRebuildBeforeVillages: number;
+  formVillages: number;
+  rebuildVillageResidentsIndex: number;
+  updateUnits: number;
+  updateUnitNeeds: number;
+  nearbyFoodLookup: number;
+  nearestFoodLookup: number;
+  unitMovement: number;
+  reproduction: number;
+  removeDeadUnits: number;
+  unitBehaviorCandidates: number;
+  unitBehaviorUpdates: number;
+  unitBehaviorSkipped: number;
+  spatialIndexRebuildBeforeVillagesUpdate: number;
+  updateVillages: number;
+  updateVillagePresence: number;
+  updateVillageResidents: number;
+  updateVillageEconomy: number;
+  updateVillageConsumption: number;
+  updateKingdoms: number;
+  updateDiplomacy: number;
+  updateArmies: number;
+  spatialIndexRebuildAfterArmies: number;
+  total: number;
 };
 
 export type WorldProjection = {

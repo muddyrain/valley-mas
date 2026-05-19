@@ -74,7 +74,7 @@ Status: `Foundation slice`
   - Terrain redraws are keyed by terrain revision plus viewport instead of ticking every frame.
 - Acceptance gaps:
   - Full projection remains the default compatibility path for tests, replay inspection, and tools that do not pass a viewport.
-  - PR-11 still needs measured scale evidence before moving beyond 128 x 128 or 1000 simulated units as a product target.
+  - PR-11 has a repeatable scale measurement harness and a local 128 x 128 / 10000 population / 500+ visible unit stability sign-off; larger maps still require fresh metrics.
 
 ## PR-5: God Command Foundation
 
@@ -182,7 +182,7 @@ Status: `Done`
 
 ## PR-11: Scale Gate
 
-Status: `Foundation slice`
+Status: `Done`
 
 - Add worker simulation, hot-data layout, projection culling, and render pooling where metrics justify it.
 - Acceptance: 10000 aggregate population and 500 visible units remain stable.
@@ -192,11 +192,23 @@ Status: `Foundation slice`
   - Visible tile collection uses the map chunk index instead of scanning the entire tile array.
   - Phaser now projects from the active camera viewport and reuses the terrain graphics layer unless terrain revision or viewport changes.
   - Regression coverage proves a 64 x 64 full projection can be reduced to a 10 x 10 visible tile slice while global population stats stay intact.
-- Acceptance gaps:
+  - `src/sim/scaleMeasurement.ts` defines repeatable 1000 / 3000 / 5000 / 10000 population scale scenarios and a `pnpm --filter @valley/world-sim measure:scale` report command.
+  - PR-11A first local measurement on 2026-05-19: 10000 aggregate population with 503 viewport-visible units reported average simulation step 16.976 ms, full projection 1.261 ms, and viewport projection 0.682 ms.
+  - PR-11B adds profiled `SimWorld.stepProfiled()` phase timing and prints the slowest simulation phase in the scale report.
+  - PR-11B local measurement on 2026-05-19: 10000 aggregate population with 503 viewport-visible units reported average simulation step 19.620 ms; the slowest phase was `updateVillages` at 11.138 ms.
+  - PR-11C adds a per-tick village resident index, uses the spatial index for nearby unit lookup, and fixes chunk-boundary lookup coverage in `SpatialIndex`.
+  - PR-11C local measurement on 2026-05-19: 10000 aggregate population with 503 viewport-visible units reported average simulation step 12.784 ms; `updateVillages` dropped to 5.660 ms.
+  - PR-11D adds `updateUnits` sub-phase profiling and avoids nearby food lookup for units below the hunger threshold.
+  - PR-11D final local verification on 2026-05-19: 10000 aggregate population with 498 viewport-visible units reported average simulation step 20.222 ms; the remaining slowest phase was `updateUnits` at 7.040 ms.
+  - PR-11E spreads non-urgent home-village unit behavior over a 4-tick cadence while keeping homeless or hungry units responsive every tick, and reports behavior update counts in the scale harness.
+  - PR-11F removes the duplicate full resident-index rebuild inside `updateVillages`; the tick already rebuilds the index after village formation and updates it incrementally for births and newly assigned residents.
+  - PR-11E/F local measurement on 2026-05-19: 10000 aggregate population with 461 viewport-visible units reported average simulation step 12.301 ms; the slowest phase was `updateVillages` at 5.230 ms, with 2955 / 10000 unit behavior updates on the profiled tick.
+  - PR-11 stability sign-off on 2026-05-19 widened the scale viewport to 560 visible tiles and 656 visible units. Five consecutive 10000-population runs stayed below the 16.7 ms frame budget with average simulation steps of 11.821 ms, 12.684 ms, 12.924 ms, 13.646 ms, and 12.032 ms.
+- Deferred until metrics justify:
   - Worker simulation is not implemented yet.
   - Hot-data layout is still plain object/map storage.
-  - No measured 10000 aggregate population / 500 visible unit stability evidence yet.
   - Render pooling beyond reused graphics layers is not implemented yet.
+  - The remaining 10000-population hotspot is consistently `updateVillages`; deeper scale work should target less frequent village economy/presence passes, resource indexing, worker simulation, or hot-data layout only when the next target needs it.
 
 ## PR-12+: WorldBox Flavor
 
@@ -217,4 +229,10 @@ After PR-8, move toward diplomacy pressure while keeping the foundation constrai
 7. Done: PR-8 groups villages into kingdoms with capital, membership, and summary statistics.
 8. Done: PR-9 uses border friction, resource pressure, and race modifiers to produce diplomacy pressure and declaration events.
 9. Done: PR-10 turns declarations into minimal army groups, grouped battles, casualties, retreat/disband, and village capture.
-10. Next: measure PR-11 scale targets and decide whether worker simulation, hot-data layout, or deeper render pooling is the next bottleneck.
+10. Done: PR-11A scale measurement harness now reports 1000 / 3000 / 5000 / 10000 population scenarios with full and viewport projection timings.
+11. Done: PR-11B step phase profiling shows the current 10000 population bottleneck is `updateVillages`, not projection.
+12. Done: PR-11C reduces `updateVillages` full-population scans with a resident index and spatial-indexed nearby unit lookup.
+13. Done: PR-11D exposes `updateUnits` sub-phase timing and gates nearby food lookup behind the hunger threshold.
+14. Done: PR-11E/F lowers non-urgent home-village behavior frequency, exposes behavior update counts in the scale report, and removes a duplicate village resident-index rebuild.
+15. Done: PR-11 stability sign-off confirms 10000 population with 656 viewport-visible units stays below the 16.7 ms simulation-step budget across five consecutive local runs.
+16. Next: start the first PR-12 WorldBox flavor slice, preferably a village/kingdom inspection and event log surface, while keeping larger-map scale work metric-driven.

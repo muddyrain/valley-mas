@@ -39,10 +39,10 @@ WorldSim v2 是一个 2D 像素风上帝沙盒文明模拟游戏：
 | PR-8 王国 | Done | 稳定村庄会自动建国，同族村庄可加入同一王国，王国聚合首都、成员村庄、人口、建筑、领土和库存统计 |
 | PR-9 外交压力 | Done | 王国会根据边境摩擦、资源压力和种族倾向积累外交压力，并产生宣战事件 |
 | PR-10 最小战争 | Done | 宣战会生成聚合军队组，军队可推进、结算伤亡、撤退/解散并占领村庄 |
-| PR-11 规模门槛 | Foundation slice | `SimWorld.project()` 已支持 viewport culling，Phaser 已按 camera 视口取可见 tiles/units/territory/buildings/armies；worker simulation、hot-data layout、10000 聚合人口 / 500 可见单位测量仍缺 |
+| PR-11 规模门槛 | Done | `SimWorld.project()` 已支持 viewport culling，Phaser 已按 camera 视口取可见 tiles/units/territory/buildings/armies；PR-11A 测量 harness、PR-11B/PR-11D step phase profiling、PR-11C 村庄居民索引优化、PR-11E 单位行为降频和 PR-11F 重复居民索引重建移除已补；本地 10000 聚合人口 / 656 可见单位连续 5 次低于 16.7 ms；worker simulation 和 hot-data layout 留到更大目标按指标决定 |
 | PR-12+ | 待实现 | WorldBox 风味按 `ROADMAP.md` 顺序推进 |
 
-进入 PR-12+ 和更大地图目标前，仍需尊重 `ROADMAP.md` 的 PR-11 约束：当前已具备 viewport projection culling，但 worker simulation、hot-data layout 和 10000 聚合人口 / 500 可见单位稳定性测量尚未完成；更大地图或更高人口目标必须先补测量和瓶颈处理。
+进入 PR-12+ 时仍需尊重 `ROADMAP.md` 的 PR-11 约束：当前已具备 viewport projection culling、第一版 10000 聚合人口 / 500+ 可见单位本地稳定性签收、step phase profiling、村庄居民索引优化和非紧急单位行为降频；更大地图、worker simulation、hot-data layout 或资源索引应继续由 `measure:scale` 的最慢阶段驱动。
 
 ## 目录结构
 
@@ -82,6 +82,7 @@ apps/world-sim/
 pnpm --filter @valley/world-sim dev
 pnpm --filter @valley/world-sim typecheck
 pnpm --filter @valley/world-sim test
+pnpm --filter @valley/world-sim measure:scale
 pnpm --filter @valley/world-sim build
 ```
 

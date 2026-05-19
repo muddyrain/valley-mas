@@ -16,8 +16,10 @@ import type {
   ResourceType,
   SimCommand,
   SimEvent,
+  SimStepPhaseTimings,
   SimWorldOptions,
   TerrainType,
+  Tile,
   Unit,
   UnitGender,
   UnitRace,
@@ -36,6 +38,7 @@ const STARVATION_DAMAGE_PER_TICK = 1.4;
 const OLD_AGE_TICKS = 60 * 240;
 const ADULT_AGE_TICKS = 12 * 240;
 const REPRODUCTION_COOLDOWN_TICKS = 240 * 3;
+const UNIT_BEHAVIOR_INTERVAL_TICKS = 4;
 const SEEK_FOOD_RADIUS = 12;
 const REPRODUCTION_RADIUS = 3;
 const BASE_BIRTH_CHANCE = 0.008;
@@ -133,6 +136,7 @@ export class SimWorld {
   private readonly events: SimEvent[] = [];
   private readonly units = new Map<string, Unit>();
   private readonly villages = new Map<string, Village>();
+  private readonly villageResidents = new Map<string, Unit[]>();
   private readonly kingdoms = new Map<string, Kingdom>();
   private readonly diplomacy = new Map<string, KingdomDiplomacyRelation>();
   private readonly buildings = new Map<string, VillageBuilding>();
@@ -164,21 +168,75 @@ export class SimWorld {
   }
 
   step() {
+    this.runStep();
+  }
+
+  stepProfiled(): SimStepPhaseTimings {
+    return this.runStep(true);
+  }
+
+  private runStep(profile = false): SimStepPhaseTimings {
+    const timings = createEmptyStepPhaseTimings();
+    const totalStart = profile ? performance.now() : 0;
+
     if (this.paused || this.speed === 0) {
-      return;
+      return timings;
     }
 
     this.tick += 1;
-    this.drainCommands();
-    this.spatialIndex.rebuild([...this.units.values()]);
-    this.formVillages();
-    this.updateUnits();
-    this.spatialIndex.rebuild([...this.units.values()]);
-    this.updateVillages();
-    this.updateKingdoms();
-    this.updateDiplomacy();
-    this.updateArmies();
-    this.spatialIndex.rebuild([...this.units.values()]);
+    timings.commandDrain = this.measureStepPhase(profile, () => this.drainCommands());
+    timings.spatialIndexRebuildBeforeVillages = this.measureStepPhase(profile, () =>
+      this.spatialIndex.rebuild([...this.units.values()]),
+    );
+    timings.formVillages = this.measureStepPhase(profile, () => this.formVillages());
+    timings.rebuildVillageResidentsIndex = this.measureStepPhase(profile, () =>
+      this.rebuildVillageResidentsIndex(),
+    );
+    timings.updateUnits = this.measureStepPhase(profile, () => {
+      const unitTimings = this.updateUnits(profile);
+      timings.updateUnitNeeds = unitTimings.updateUnitNeeds;
+      timings.nearbyFoodLookup = unitTimings.nearbyFoodLookup;
+      timings.nearestFoodLookup = unitTimings.nearestFoodLookup;
+      timings.unitMovement = unitTimings.unitMovement;
+      timings.reproduction = unitTimings.reproduction;
+      timings.removeDeadUnits = unitTimings.removeDeadUnits;
+      timings.unitBehaviorCandidates = unitTimings.unitBehaviorCandidates;
+      timings.unitBehaviorUpdates = unitTimings.unitBehaviorUpdates;
+      timings.unitBehaviorSkipped = unitTimings.unitBehaviorSkipped;
+    });
+    timings.spatialIndexRebuildBeforeVillagesUpdate = this.measureStepPhase(profile, () =>
+      this.spatialIndex.rebuild([...this.units.values()]),
+    );
+    timings.updateVillages = this.measureStepPhase(profile, () => {
+      const villageTimings = this.updateVillages(profile);
+      timings.updateVillagePresence = villageTimings.updateVillagePresence;
+      timings.updateVillageResidents = villageTimings.updateVillageResidents;
+      timings.updateVillageEconomy = villageTimings.updateVillageEconomy;
+      timings.updateVillageConsumption = villageTimings.updateVillageConsumption;
+    });
+    timings.updateKingdoms = this.measureStepPhase(profile, () => this.updateKingdoms());
+    timings.updateDiplomacy = this.measureStepPhase(profile, () => this.updateDiplomacy());
+    timings.updateArmies = this.measureStepPhase(profile, () => this.updateArmies());
+    timings.spatialIndexRebuildAfterArmies = this.measureStepPhase(profile, () =>
+      this.spatialIndex.rebuild([...this.units.values()]),
+    );
+
+    if (profile) {
+      timings.total = performance.now() - totalStart;
+    }
+
+    return timings;
+  }
+
+  private measureStepPhase(profile: boolean, run: () => void) {
+    if (!profile) {
+      run();
+      return 0;
+    }
+
+    const start = performance.now();
+    run();
+    return performance.now() - start;
   }
 
   project(options: WorldProjectionOptions = {}): WorldProjection {
@@ -457,68 +515,123 @@ export class SimWorld {
     return undefined;
   }
 
-  private updateUnits() {
+  private updateUnits(profile = false) {
+    const timings = createEmptyUnitUpdateTimings();
     const units = [...this.units.values()];
 
     for (const unit of units) {
-      this.updateUnit(unit);
+      const unitTimings = this.updateUnit(unit, profile);
+      timings.updateUnitNeeds += unitTimings.updateUnitNeeds;
+      timings.nearbyFoodLookup += unitTimings.nearbyFoodLookup;
+      timings.nearestFoodLookup += unitTimings.nearestFoodLookup;
+      timings.unitMovement += unitTimings.unitMovement;
+      timings.reproduction += unitTimings.reproduction;
+      timings.unitBehaviorCandidates += unitTimings.unitBehaviorCandidates;
+      timings.unitBehaviorUpdates += unitTimings.unitBehaviorUpdates;
+      timings.unitBehaviorSkipped += unitTimings.unitBehaviorSkipped;
     }
 
-    for (const unit of units) {
-      if (unit.intent === 'dead') {
-        this.units.delete(unit.id);
+    timings.removeDeadUnits = this.measureStepPhase(profile, () => {
+      for (const unit of units) {
+        if (unit.intent === 'dead') {
+          this.units.delete(unit.id);
+        }
       }
-    }
+    });
+
+    return timings;
   }
 
-  private updateUnit(unit: Unit) {
-    if (unit.intent === 'dead') {
-      return;
+  private updateUnit(unit: Unit, profile = false) {
+    const timings = createEmptyUnitUpdateTimings();
+
+    if ((unit as Unit).intent === 'dead') {
+      return timings;
     }
 
-    unit.ageTicks += 1;
-    unit.reproductionCooldownTicks = Math.max(0, unit.reproductionCooldownTicks - 1);
-    unit.hunger = Math.min(MAX_HUNGER, unit.hunger + HUNGER_GAIN_PER_TICK);
+    timings.updateUnitNeeds = this.measureStepPhase(profile, () => {
+      unit.ageTicks += 1;
+      unit.reproductionCooldownTicks = Math.max(0, unit.reproductionCooldownTicks - 1);
+      unit.hunger = Math.min(MAX_HUNGER, unit.hunger + HUNGER_GAIN_PER_TICK);
 
-    if (unit.ageTicks >= OLD_AGE_TICKS) {
-      this.killUnit(unit, 'old age');
-      return;
-    }
-
-    if (unit.hunger >= MAX_HUNGER) {
-      unit.hp -= STARVATION_DAMAGE_PER_TICK;
-
-      if (unit.hp <= 0) {
-        this.killUnit(unit, 'starvation');
+      if (unit.ageTicks >= OLD_AGE_TICKS) {
+        this.killUnit(unit, 'old age');
         return;
       }
+
+      if (unit.hunger >= MAX_HUNGER) {
+        unit.hp -= STARVATION_DAMAGE_PER_TICK;
+
+        if (unit.hp <= 0) {
+          this.killUnit(unit, 'starvation');
+        }
+      }
+    });
+
+    if (unit.intent === 'dead') {
+      return timings;
     }
 
-    const foodTile = this.findNearbyFood(unit.position);
+    timings.unitBehaviorCandidates = 1;
 
-    if (unit.hunger > 35 && foodTile) {
-      unit.intent = 'eat';
-      const eaten = Math.min(4, foodTile.resource?.amount ?? 0);
-      foodTile.resource!.amount -= eaten;
-      unit.hunger = Math.max(0, unit.hunger - eaten * 10);
-      this.emit('unit_ate', `${unit.id} ate food`, undefined, unit.id, unit.position, {
-        amount: eaten,
+    if (!this.shouldUpdateUnitBehavior(unit)) {
+      timings.unitBehaviorSkipped = 1;
+      return timings;
+    }
+
+    timings.unitBehaviorUpdates = 1;
+
+    if (unit.hunger > 35) {
+      let foodTile: Tile | undefined;
+      timings.nearbyFoodLookup = this.measureStepPhase(profile, () => {
+        foodTile = this.findNearbyFood(unit.position);
       });
 
-      if (foodTile.resource!.amount <= 0) {
-        foodTile.resource = undefined;
+      if (foodTile) {
+        unit.intent = 'eat';
+        const eaten = Math.min(4, foodTile.resource?.amount ?? 0);
+        foodTile.resource!.amount -= eaten;
+        unit.hunger = Math.max(0, unit.hunger - eaten * 10);
+        this.emit('unit_ate', `${unit.id} ate food`, undefined, unit.id, unit.position, {
+          amount: eaten,
+        });
+
+        if (foodTile.resource!.amount <= 0) {
+          foodTile.resource = undefined;
+        }
+        return timings;
       }
-    } else if (unit.hunger > 35) {
+
       unit.intent = 'seek_food';
-      this.moveUnitToward(
-        unit,
-        this.findNearestFoodPosition(unit.position) ?? this.randomNearbyPosition(unit.position),
-      );
-    } else {
-      unit.intent = 'wander';
-      this.moveUnitToward(unit, this.randomNearbyPosition(unit.position));
-      this.tryReproduce(unit);
+      let target: Position | undefined;
+      timings.nearestFoodLookup = this.measureStepPhase(profile, () => {
+        target = this.findNearestFoodPosition(unit.position);
+      });
+      timings.unitMovement = this.measureStepPhase(profile, () => {
+        this.moveUnitToward(unit, target ?? this.randomNearbyPosition(unit.position));
+      });
+      return timings;
     }
+
+    unit.intent = 'wander';
+    timings.unitMovement = this.measureStepPhase(profile, () => {
+      this.moveUnitToward(unit, this.randomNearbyPosition(unit.position));
+    });
+    timings.reproduction = this.measureStepPhase(profile, () => this.tryReproduce(unit));
+
+    return timings;
+  }
+
+  private shouldUpdateUnitBehavior(unit: Unit) {
+    if (!unit.homeVillageId) {
+      return true;
+    }
+
+    if (unit.hunger > 35) {
+      return true;
+    }
+
+    return (this.tick + (unit.behaviorPhase ?? 0)) % UNIT_BEHAVIOR_INTERVAL_TICKS === 0;
   }
 
   private tryReproduce(first: Unit) {
@@ -560,6 +673,7 @@ export class SimWorld {
     });
 
     this.units.set(child.id, child);
+    this.addVillageResident(child);
     this.emit('unit_born', `${child.id} was born`, undefined, child.id, child.position, {
       parentA: first.id,
       parentB: partner.id,
@@ -621,19 +735,28 @@ export class SimWorld {
     }
   }
 
-  private updateVillages() {
-    for (const unit of this.units.values()) {
-      unit.villageId = undefined;
-    }
+  private updateVillages(profile = false) {
+    const timings = createEmptyVillageUpdateTimings();
+
+    timings.updateVillagePresence = this.measureStepPhase(profile, () => {
+      for (const unit of this.units.values()) {
+        unit.villageId = undefined;
+      }
+    });
 
     for (const village of [...this.villages.values()]) {
-      const nearbyUnits = this.findUnitsNear(village.center, VILLAGE_RADIUS, village.race);
+      let nearbyUnits: Unit[] = [];
 
-      for (const nearbyUnit of nearbyUnits) {
-        if (!nearbyUnit.homeVillageId) {
-          nearbyUnit.homeVillageId = village.id;
+      timings.updateVillagePresence += this.measureStepPhase(profile, () => {
+        nearbyUnits = this.findUnitsNear(village.center, VILLAGE_RADIUS, village.race);
+
+        for (const nearbyUnit of nearbyUnits) {
+          if (!nearbyUnit.homeVillageId) {
+            nearbyUnit.homeVillageId = village.id;
+            this.addVillageResident(nearbyUnit);
+          }
         }
-      }
+      });
 
       const residents = this.findVillageResidents(village.id);
       village.population = residents.length;
@@ -651,62 +774,76 @@ export class SimWorld {
         continue;
       }
 
-      for (const member of nearbyUnits) {
-        if (member.homeVillageId !== village.id) {
-          continue;
+      timings.updateVillagePresence += this.measureStepPhase(profile, () => {
+        for (const member of nearbyUnits) {
+          if (member.homeVillageId !== village.id) {
+            continue;
+          }
+
+          member.villageId = village.id;
+        }
+      });
+
+      timings.updateVillageEconomy += this.measureStepPhase(profile, () => {
+        this.produceFarmFood(village);
+        village.foodInventory += this.forageVillageFood(village.center, VILLAGE_FORAGE_PER_TICK);
+        village.foodInventory = Math.min(village.foodInventory, village.foodCapacity);
+
+        if (
+          village.status !== 'declining' &&
+          village.foodInventory >= village.housingCapacity * 4 &&
+          village.housingCapacity < VILLAGE_MAX_HOUSING
+        ) {
+          village.housingCapacity += 1;
         }
 
-        member.villageId = village.id;
-      }
+        this.tryBuildForVillage(village);
+      });
 
-      this.produceFarmFood(village);
-      village.foodInventory += this.forageVillageFood(village.center, VILLAGE_FORAGE_PER_TICK);
-      village.foodInventory = Math.min(village.foodInventory, village.foodCapacity);
+      timings.updateVillageConsumption += this.measureStepPhase(profile, () => {
+        if (
+          this.tick <= village.foundedAtTick ||
+          this.tick % VILLAGE_CONSUMPTION_INTERVAL_TICKS !== 0
+        ) {
+          return;
+        }
 
-      if (
-        village.status !== 'declining' &&
-        village.foodInventory >= village.housingCapacity * 4 &&
-        village.housingCapacity < VILLAGE_MAX_HOUSING
-      ) {
-        village.housingCapacity += 1;
-      }
+        const requiredFood = village.population * VILLAGE_FOOD_PER_RESIDENT;
 
-      this.tryBuildForVillage(village);
+        if (village.foodInventory >= requiredFood) {
+          village.foodInventory -= requiredFood;
+          village.status = 'stable';
+          return;
+        }
 
-      if (
-        this.tick <= village.foundedAtTick ||
-        this.tick % VILLAGE_CONSUMPTION_INTERVAL_TICKS !== 0
-      ) {
-        continue;
-      }
+        if (village.status !== 'declining') {
+          this.emit(
+            'village_declining',
+            `${village.id} is declining`,
+            undefined,
+            undefined,
+            village.center,
+          );
+        }
 
-      const requiredFood = village.population * VILLAGE_FOOD_PER_RESIDENT;
-
-      if (village.foodInventory >= requiredFood) {
-        village.foodInventory -= requiredFood;
-        village.status = 'stable';
-        continue;
-      }
-
-      if (village.status !== 'declining') {
-        this.emit(
-          'village_declining',
-          `${village.id} is declining`,
-          undefined,
-          undefined,
-          village.center,
-        );
-      }
-
-      village.foodInventory = 0;
-      village.status = 'declining';
+        village.foodInventory = 0;
+        village.status = 'declining';
+      });
     }
+
+    return timings;
   }
 
   private findUnitsNear(position: Position, radius: number, race?: UnitRace) {
     const units: Unit[] = [];
 
-    for (const unit of this.units.values()) {
+    for (const id of this.spatialIndex.nearbyUnitIds(position, radius)) {
+      const unit = this.units.get(id);
+
+      if (!unit) {
+        continue;
+      }
+
       if (unit.intent === 'dead' || (race && unit.race !== race)) {
         continue;
       }
@@ -776,9 +913,33 @@ export class SimWorld {
   }
 
   private findVillageResidents(villageId: string) {
-    return [...this.units.values()].filter(
-      (unit) => unit.intent !== 'dead' && unit.homeVillageId === villageId,
+    return (this.villageResidents.get(villageId) ?? []).filter(
+      (unit) =>
+        this.units.has(unit.id) && unit.intent !== 'dead' && unit.homeVillageId === villageId,
     );
+  }
+
+  private rebuildVillageResidentsIndex() {
+    this.villageResidents.clear();
+
+    for (const unit of this.units.values()) {
+      this.addVillageResident(unit);
+    }
+  }
+
+  private addVillageResident(unit: Unit) {
+    if (unit.intent === 'dead' || !unit.homeVillageId) {
+      return;
+    }
+
+    const residents = this.villageResidents.get(unit.homeVillageId);
+
+    if (residents) {
+      residents.push(unit);
+      return;
+    }
+
+    this.villageResidents.set(unit.homeVillageId, [unit]);
   }
 
   private produceFarmFood(village: Village) {
@@ -1789,6 +1950,7 @@ export class SimWorld {
       ageTicks: options.ageTicks,
       reproductionCooldownTicks:
         options.reproductionCooldownTicks ?? this.rng.int(REPRODUCTION_COOLDOWN_TICKS),
+      behaviorPhase: this.nextUnitId % UNIT_BEHAVIOR_INTERVAL_TICKS,
       intent: 'idle',
       villageId: options.villageId,
       homeVillageId: options.homeVillageId,
@@ -2038,6 +2200,59 @@ function averagePosition(positions: Position[]) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function createEmptyStepPhaseTimings(): SimStepPhaseTimings {
+  return {
+    commandDrain: 0,
+    spatialIndexRebuildBeforeVillages: 0,
+    formVillages: 0,
+    rebuildVillageResidentsIndex: 0,
+    updateUnits: 0,
+    updateUnitNeeds: 0,
+    nearbyFoodLookup: 0,
+    nearestFoodLookup: 0,
+    unitMovement: 0,
+    reproduction: 0,
+    removeDeadUnits: 0,
+    unitBehaviorCandidates: 0,
+    unitBehaviorUpdates: 0,
+    unitBehaviorSkipped: 0,
+    spatialIndexRebuildBeforeVillagesUpdate: 0,
+    updateVillages: 0,
+    updateVillagePresence: 0,
+    updateVillageResidents: 0,
+    updateVillageEconomy: 0,
+    updateVillageConsumption: 0,
+    updateKingdoms: 0,
+    updateDiplomacy: 0,
+    updateArmies: 0,
+    spatialIndexRebuildAfterArmies: 0,
+    total: 0,
+  };
+}
+
+function createEmptyVillageUpdateTimings() {
+  return {
+    updateVillagePresence: 0,
+    updateVillageResidents: 0,
+    updateVillageEconomy: 0,
+    updateVillageConsumption: 0,
+  };
+}
+
+function createEmptyUnitUpdateTimings() {
+  return {
+    updateUnitNeeds: 0,
+    nearbyFoodLookup: 0,
+    nearestFoodLookup: 0,
+    unitMovement: 0,
+    reproduction: 0,
+    removeDeadUnits: 0,
+    unitBehaviorCandidates: 0,
+    unitBehaviorUpdates: 0,
+    unitBehaviorSkipped: 0,
+  };
 }
 
 function distance(a: Position, b: Position) {
