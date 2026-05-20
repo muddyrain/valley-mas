@@ -32,9 +32,9 @@ The first v2 slice deliberately avoids full WorldBox parity. It establishes the 
 - Deterministic seed and replay behavior.
 - Tile, chunk, biome, and resource data.
 - Units with hunger, age, health, death, birth, movement, stable home village membership, and simple needs.
-- Villages that emerge from local population and food pressure, with inventory, housing, and decline state.
-- Village buildings that turn surplus into housing, storage, farm production, and settlement influence.
-- Kingdoms that emerge from strong villages and aggregate capital, members, population, buildings, territory, and food.
+- Villages that emerge from local population and food pressure, with food and material stores, housing, and decline state.
+- Village buildings that turn surplus into housing, storage, farm production, mine access, military capacity, shore access, and settlement influence.
+- Kingdoms that emerge from strong villages and aggregate capital, members, population, buildings, territory, food, and material stores.
 - Diplomacy pressure that turns border friction, resource shortage, and race tendencies into observable declaration causes.
 - Minimal grouped war that lets declarations create armies, casualties, and village ownership changes without full single-unit combat.
 - God commands for spawning life, placing food, changing terrain, lightning, pause, and speed.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type SimCommand, SimWorld } from './index';
-import type { Kingdom, Village, VillageBuilding } from './types';
+import type { Kingdom, Unit, Village, VillageBuilding } from './types';
 
 describe('SimWorld deterministic replay', () => {
   it('produces the same replay snapshot for the same seed and commands', () => {
@@ -397,6 +397,85 @@ describe('SimWorld village buildings and territory', () => {
     expect(projection.stats.buildings).toBeGreaterThanOrEqual(2);
   });
 
+  it('upgrades town halls before unlocking higher house tiers', () => {
+    const world = foundFoodRichVillage('village-upgrade-chain');
+    const mutableWorld = getMutableWorld(world);
+    const village = mutableWorld.villages.values().next().value as Village | undefined;
+    const townHall = [...mutableWorld.buildings.values()].find(
+      (building) => village && building.villageId === village.id && building.type === 'town_hall',
+    );
+
+    if (!village || !townHall) {
+      throw new Error('Expected village with town hall');
+    }
+
+    village.population = 20;
+    village.foodInventory = 3000;
+    village.foodCapacity = 3000;
+    village.housingCapacity = 40;
+
+    for (let index = 0; index < 8; index += 1) {
+      const building = mutableWorld.createBuilding(village, 'house');
+      mutableWorld.buildings.set(building.id, building);
+    }
+
+    const houses = [...mutableWorld.buildings.values()].filter(
+      (building) => building.villageId === village.id && building.type === 'house',
+    );
+    const sim = world as unknown as {
+      tryUpgradeTownHall(village: Village): boolean;
+      tryUpgradeHouse(village: Village): boolean;
+    };
+
+    expect(sim.tryUpgradeTownHall(village)).toBe(true);
+    expect(townHall.tier).toBe(2);
+    expect(sim.tryUpgradeHouse(village)).toBe(true);
+    expect(sim.tryUpgradeTownHall(village)).toBe(true);
+    expect(townHall.tier).toBe(3);
+    houses[0].tier = 2;
+    houses[1].tier = 2;
+    for (let index = 2; index < houses.length; index += 1) {
+      houses[index].tier = 3;
+    }
+    expect(sim.tryUpgradeHouse(village)).toBe(true);
+
+    const projection = world.project();
+    const projectedHouses = projection.buildings.filter(
+      (building) => building.villageId === village.id && building.type === 'house',
+    );
+
+    expect(projectedHouses.some((building) => building.tier === 2)).toBe(true);
+    expect(projectedHouses.some((building) => building.tier === 3)).toBe(true);
+    expect(
+      projection.recentEvents.some(
+        (event) => event.type === 'building_upgraded' && event.payload?.tier === 3,
+      ),
+    ).toBe(true);
+  });
+
+  it('does not upgrade houses beyond the active town hall tier', () => {
+    const world = foundFoodRichVillage('village-house-gate');
+    const village = world.project().villages[0];
+
+    prepareVillageForBuildingUpgrades(world, village.id, 8, 1600);
+
+    for (let tick = 0; tick < 420; tick += 1) {
+      world.step();
+    }
+
+    const projection = world.project();
+    const townHall = projection.buildings.find(
+      (building) => building.villageId === village.id && building.type === 'town_hall',
+    );
+    const houses = projection.buildings.filter(
+      (building) => building.villageId === village.id && building.type === 'house',
+    );
+
+    expect(townHall?.tier ?? 1).toBe(1);
+    expect(houses.length).toBeGreaterThan(0);
+    expect(houses.every((building) => (building.tier ?? 1) <= 1)).toBe(true);
+  });
+
   it('lets farm buildings produce village food after nearby deposits are exhausted', () => {
     const world = foundFoodRichVillage('village-farm');
 
@@ -421,6 +500,154 @@ describe('SimWorld village buildings and territory', () => {
     }
 
     expect(world.project().stats.totalVillageFood).toBeGreaterThan(depletedFood);
+  });
+
+  it('builds a mine when the village has a nearby stone or iron site', () => {
+    const world = foundFoodRichVillage('village-mine');
+    const village = world.project().villages[0];
+
+    prepareVillageForBuildingUpgrades(world, village.id, 12, 2000);
+    addMineSiteNearVillage(world, village.id, 'stone');
+
+    for (let tick = 0; tick < 330; tick += 1) {
+      world.step();
+    }
+
+    const projection = world.project();
+    const mine = projection.buildings.find((building) => String(building.type) === 'mine');
+
+    expect(mine).toBeDefined();
+    expect(mine?.villageId).toBe(village.id);
+    expect(
+      projection.recentEvents.some(
+        (event) => event.type === 'building_built' && event.payload?.type === 'mine',
+      ),
+    ).toBe(true);
+
+    const viewportProjection = world.project({
+      viewport: {
+        x: (mine?.position.x ?? 0) - 1,
+        y: (mine?.position.y ?? 0) - 1,
+        width: 3,
+        height: 3,
+        paddingTiles: 0,
+      },
+    });
+
+    expect(viewportProjection.buildings.some((building) => building.id === mine?.id)).toBe(true);
+  });
+
+  it('stores stone from active mines without requiring miner jobs yet', () => {
+    const world = foundFoodRichVillage('village-mine-stores');
+    const village = world.project().villages[0];
+
+    prepareVillageForBuildingUpgrades(world, village.id, 8, 2400);
+    addMineSiteNearVillage(world, village.id, 'stone');
+
+    for (let tick = 0; tick < 340; tick += 1) {
+      world.step();
+    }
+
+    const projection = world.project();
+    const updatedVillage = projection.villages.find((candidate) => candidate.id === village.id);
+    const deposit = world.map.tiles.find(
+      (tile) =>
+        tile.x === Math.floor(village.center.x + 3) && tile.y === Math.floor(village.center.y),
+    );
+
+    expect(updatedVillage?.stoneInventory).toBeGreaterThan(0);
+    expect(updatedVillage?.ironInventory).toBe(0);
+    expect(deposit?.resource?.amount ?? 0).toBeLessThan(80);
+  });
+
+  it('does not build a mine when no nearby mine site exists', () => {
+    const world = foundFoodRichVillage('village-no-mine');
+    const village = world.project().villages[0];
+
+    prepareVillageForBuildingUpgrades(world, village.id, 12, 2000);
+    removeMineSitesNearVillage(world, village.id);
+
+    for (let tick = 0; tick < 420; tick += 1) {
+      world.step();
+    }
+
+    expect(world.project().buildings.some((building) => String(building.type) === 'mine')).toBe(
+      false,
+    );
+  });
+
+  it('builds a barrack after the village has a basic food and housing chain', () => {
+    const world = foundFoodRichVillage('village-barrack');
+    const village = world.project().villages[0];
+
+    prepareVillageForBuildingUpgrades(world, village.id, 12, 2000);
+    removeMineSitesNearVillage(world, village.id);
+
+    for (let tick = 0; tick < 330; tick += 1) {
+      world.step();
+    }
+
+    const projection = world.project();
+    const barrack = projection.buildings.find((building) => String(building.type) === 'barrack');
+
+    expect(barrack).toBeDefined();
+    expect(barrack?.villageId).toBe(village.id);
+    expect(
+      projection.recentEvents.some(
+        (event) => event.type === 'building_built' && event.payload?.type === 'barrack',
+      ),
+    ).toBe(true);
+  });
+
+  it('builds a dock when the village has a nearby shore site', () => {
+    const world = foundFoodRichVillage('village-dock');
+    const village = world.project().villages[0];
+
+    prepareVillageForBuildingUpgrades(world, village.id, 8, 2400);
+    removeMineSitesNearVillage(world, village.id);
+    addDockSiteNearVillage(world, village.id);
+
+    for (let tick = 0; tick < 390; tick += 1) {
+      world.step();
+    }
+
+    const projection = world.project();
+    const dock = projection.buildings.find((building) => String(building.type) === 'dock');
+
+    expect(dock).toBeDefined();
+    expect(dock?.villageId).toBe(village.id);
+    expect(
+      projection.recentEvents.some(
+        (event) => event.type === 'building_built' && event.payload?.type === 'dock',
+      ),
+    ).toBe(true);
+
+    const dockTile = dock
+      ? world.map.tiles.find(
+          (tile) =>
+            tile.x === Math.floor(dock.position.x) && tile.y === Math.floor(dock.position.y),
+        )
+      : undefined;
+
+    expect(dockTile?.terrain).not.toBe('water');
+    expect(hasAdjacentWater(world, dock?.position ?? village.center)).toBe(true);
+  });
+
+  it('does not build a dock when no nearby shore site exists', () => {
+    const world = foundFoodRichVillage('village-no-dock');
+    const village = world.project().villages[0];
+
+    prepareVillageForBuildingUpgrades(world, village.id, 8, 2400);
+    removeMineSitesNearVillage(world, village.id);
+    removeDockSitesNearVillage(world, village.id);
+
+    for (let tick = 0; tick < 480; tick += 1) {
+      world.step();
+    }
+
+    expect(world.project().buildings.some((building) => String(building.type) === 'dock')).toBe(
+      false,
+    );
   });
 
   it('keeps abandoned buildings as ruins-in-progress without active village benefits', () => {
@@ -462,19 +689,9 @@ describe('SimWorld village buildings and territory', () => {
 
     const before = serializeTerritory(world.project().territory);
 
-    world.enqueue({
-      id: 'cmd-far-food',
-      type: 'place_resource',
-      issuedAtTick: world.currentTick,
-      payload: {
-        resourceType: 'food',
-        position: { x: 2, y: 2 },
-        amount: 400,
-        radius: 3,
-      },
-    });
+    moveVillageResidents(world, world.project().villages[0].id, { x: 2, y: 2 });
 
-    for (let tick = 0; tick < 120; tick += 1) {
+    for (let tick = 0; tick < 20; tick += 1) {
       world.step();
     }
 
@@ -569,6 +786,7 @@ describe('SimWorld kingdoms', () => {
     setVillagePopulation(world, townHallCandidate.id, 8);
     setVillagePopulation(world, populationCandidate.id, 40);
     setTownHallTier(world, townHallCandidate.id, 2);
+    setTownHallTier(world, populationCandidate.id, 1);
     removeCapitalFromKingdom(world, kingdom.id, originalCapitalId);
     refreshProjectedKingdom(world, kingdom.id);
 
@@ -720,6 +938,25 @@ describe('SimWorld minimal war', () => {
     expect(projection.armies.length).toBeGreaterThan(0);
     expect(projection.stats.activeArmies).toBeGreaterThan(0);
     expect(projection.armies.every((army) => army.soldierCount > 0)).toBe(true);
+  });
+
+  it('uses barracks to mobilize larger army groups from the capital village', () => {
+    const plainWorld = foundRivalKingdoms('barrack-army-boost');
+    const barrackWorld = foundRivalKingdoms('barrack-army-boost');
+
+    for (let tick = 0; tick < 260; tick += 1) {
+      plainWorld.step();
+      barrackWorld.step();
+    }
+
+    const barrackCapitalId = barrackWorld.project().kingdoms[0].capitalVillageId;
+
+    addBarrackToVillage(barrackWorld, barrackCapitalId);
+
+    const plainArmy = formFirstArmyGroup(plainWorld);
+    const barrackArmy = formFirstArmyGroup(barrackWorld);
+
+    expect(barrackArmy.soldierCount).toBeGreaterThan(plainArmy.soldierCount);
   });
 
   it('resolves group battles with casualties and village capture', () => {
@@ -1017,6 +1254,145 @@ function setTownHallTier(world: SimWorld, villageId: string, tier: number) {
   townHall.tier = tier;
 }
 
+function addMineSiteNearVillage(
+  world: SimWorld,
+  villageId: string,
+  resourceType: 'stone' | 'iron',
+) {
+  const village = getMutableWorld(world).villages.get(villageId);
+
+  if (!village) {
+    throw new Error(`Expected village ${villageId}`);
+  }
+
+  const tile = world.map.tiles.find(
+    (candidate) =>
+      candidate.x === Math.floor(village.center.x + 3) &&
+      candidate.y === Math.floor(village.center.y),
+  );
+
+  if (!tile) {
+    throw new Error('Expected nearby mine tile');
+  }
+
+  tile.terrain = 'hill';
+  tile.biome = 'highland';
+  tile.resource = { type: resourceType, amount: 80 };
+}
+
+function removeMineSitesNearVillage(world: SimWorld, villageId: string) {
+  const village = getMutableWorld(world).villages.get(villageId);
+
+  if (!village) {
+    throw new Error(`Expected village ${villageId}`);
+  }
+
+  for (const tile of world.map.tiles) {
+    const dx = tile.x - village.center.x;
+    const dy = tile.y - village.center.y;
+
+    if (dx * dx + dy * dy > 8 * 8) {
+      continue;
+    }
+
+    if (tile.terrain === 'hill') {
+      tile.terrain = 'grass';
+      tile.biome = 'temperate';
+    }
+
+    if (tile.resource?.type === 'stone' || tile.resource?.type === 'iron') {
+      tile.resource = undefined;
+    }
+  }
+}
+
+function addDockSiteNearVillage(world: SimWorld, villageId: string) {
+  const village = getMutableWorld(world).villages.get(villageId);
+
+  if (!village) {
+    throw new Error(`Expected village ${villageId}`);
+  }
+
+  const shore = world.map.tiles.find(
+    (candidate) =>
+      candidate.x === Math.floor(village.center.x + 4) &&
+      candidate.y === Math.floor(village.center.y),
+  );
+  const water = world.map.tiles.find(
+    (candidate) =>
+      candidate.x === Math.floor(village.center.x + 5) &&
+      candidate.y === Math.floor(village.center.y),
+  );
+
+  if (!shore || !water) {
+    throw new Error('Expected nearby dock tiles');
+  }
+
+  shore.terrain = 'grass';
+  shore.biome = 'coast';
+  shore.resource = undefined;
+  water.terrain = 'water';
+  water.biome = 'coast';
+  water.resource = undefined;
+}
+
+function removeDockSitesNearVillage(world: SimWorld, villageId: string) {
+  const village = getMutableWorld(world).villages.get(villageId);
+
+  if (!village) {
+    throw new Error(`Expected village ${villageId}`);
+  }
+
+  for (const tile of world.map.tiles) {
+    const dx = tile.x - village.center.x;
+    const dy = tile.y - village.center.y;
+
+    if (dx * dx + dy * dy > 9 * 9 || tile.terrain !== 'water') {
+      continue;
+    }
+
+    tile.terrain = 'grass';
+    tile.biome = 'temperate';
+  }
+}
+
+function hasAdjacentWater(world: SimWorld, position: { x: number; y: number }) {
+  const x = Math.floor(position.x);
+  const y = Math.floor(position.y);
+
+  return [
+    { x: x + 1, y },
+    { x: x - 1, y },
+    { x, y: y + 1 },
+    { x, y: y - 1 },
+  ].some((candidate) =>
+    world.map.tiles.some(
+      (tile) => tile.x === candidate.x && tile.y === candidate.y && tile.terrain === 'water',
+    ),
+  );
+}
+
+function addBarrackToVillage(world: SimWorld, villageId: string) {
+  const mutableWorld = getMutableWorld(world);
+  const village = mutableWorld.villages.get(villageId);
+
+  if (!village) {
+    throw new Error(`Expected village ${villageId}`);
+  }
+
+  mutableWorld.buildings.set(`test-barrack-${villageId}`, {
+    id: `test-barrack-${villageId}`,
+    villageId,
+    type: 'barrack' as VillageBuilding['type'],
+    status: 'active',
+    position: {
+      x: village.center.x + 1,
+      y: village.center.y,
+    },
+    builtAtTick: world.currentTick,
+  });
+}
+
 function removeCapitalFromKingdom(world: SimWorld, kingdomId: string, capitalVillageId: string) {
   const mutableWorld = getMutableWorld(world);
   const kingdom = mutableWorld.kingdoms.get(kingdomId);
@@ -1046,8 +1422,142 @@ function getMutableWorld(world: SimWorld) {
     villages: Map<string, Village>;
     kingdoms: Map<string, Kingdom>;
     buildings: Map<string, VillageBuilding>;
+    units: Map<string, Unit>;
+    createUnit(options: {
+      race: Unit['race'];
+      gender: Unit['gender'];
+      position: { x: number; y: number };
+      ageTicks: number;
+      hunger: number;
+      reproductionCooldownTicks: number;
+      villageId?: string;
+      homeVillageId?: string;
+    }): Unit;
+    createBuilding(village: Village, type: VillageBuilding['type']): VillageBuilding;
     refreshKingdomMembership(kingdom: Kingdom): void;
+    formArmyGroup(
+      aggressor: Kingdom,
+      target: Kingdom,
+      relation: {
+        pressure: number;
+        warDeclared: boolean;
+        armyFormed: boolean;
+        pressureReportTier: number;
+        borderReportTier: number;
+        resourceReportTier: number;
+      },
+    ): void;
   };
+}
+
+function formFirstArmyGroup(world: SimWorld) {
+  const [aggressor, target] = world.project().kingdoms;
+
+  if (!aggressor || !target) {
+    throw new Error('Expected two kingdoms');
+  }
+
+  getMutableWorld(world).formArmyGroup(aggressor, target, {
+    pressure: 0,
+    warDeclared: true,
+    armyFormed: false,
+    pressureReportTier: -1,
+    borderReportTier: -1,
+    resourceReportTier: -1,
+  });
+
+  const army = world
+    .project()
+    .armies.find(
+      (candidate) =>
+        candidate.kingdomId === aggressor.id && candidate.targetKingdomId === target.id,
+    );
+
+  if (!army) {
+    throw new Error('Expected army to form');
+  }
+
+  return army;
+}
+
+function prepareVillageForBuildingUpgrades(
+  world: SimWorld,
+  villageId: string,
+  residentsToKeep: number,
+  foodInventory: number,
+  extraSettlers = 0,
+) {
+  const mutableWorld = getMutableWorld(world);
+  const village = mutableWorld.villages.get(villageId);
+
+  if (!village) {
+    throw new Error(`Expected village ${villageId}`);
+  }
+
+  village.foodInventory = foodInventory;
+  village.foodCapacity = Math.max(village.foodCapacity, foodInventory);
+  village.housingCapacity = Math.max(village.housingCapacity, 24);
+
+  if (extraSettlers > 0) {
+    for (let index = 0; index < extraSettlers; index += 1) {
+      const unit = mutableWorld.createUnit({
+        race: village.race,
+        gender: index % 2 === 0 ? 'female' : 'male',
+        position: {
+          x: village.center.x + (index % 3) - 1,
+          y: village.center.y + Math.floor(index / 3) - 1,
+        },
+        ageTicks: 0,
+        hunger: 0,
+        reproductionCooldownTicks: 0,
+        villageId,
+        homeVillageId: villageId,
+      });
+
+      mutableWorld.units.set(unit.id, unit);
+    }
+
+    let adopted = 0;
+
+    for (const unit of mutableWorld.units.values()) {
+      if (unit.homeVillageId === villageId) {
+        continue;
+      }
+
+      if (adopted >= extraSettlers) {
+        break;
+      }
+
+      unit.homeVillageId = villageId;
+      unit.villageId = villageId;
+      unit.position = {
+        x: village.center.x + (adopted % 3) - 1,
+        y: village.center.y + Math.floor(adopted / 3) - 1,
+      };
+      adopted += 1;
+    }
+  }
+
+  let kept = 0;
+
+  for (const unit of mutableWorld.units.values()) {
+    if (unit.homeVillageId !== villageId) {
+      continue;
+    }
+
+    kept += 1;
+
+    if (kept <= residentsToKeep) {
+      continue;
+    }
+
+    unit.homeVillageId = undefined;
+    unit.villageId = undefined;
+    unit.position = {
+      x: 0,
+      y: 0,
+    };
+  }
 }
 
 function serializeTerritory(

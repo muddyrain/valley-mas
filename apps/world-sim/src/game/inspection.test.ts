@@ -40,23 +40,28 @@ describe('world inspection helpers', () => {
     const projection = createProjection();
 
     expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
-      '村庄 village-1',
+      '村庄 1',
     );
     expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
-      '所属王国：kingdom-1',
+      '所属王国：王国 1',
     );
-    expect(buildInspectionLines(projection, { type: 'army', id: 'army-1' })).toContain(
-      '军队 army-1',
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '材料：木材 3, 石料 5, 铁矿 1',
+    );
+    expect(buildInspectionLines(projection, { type: 'army', id: 'army-1' })).toContain('军队 1');
+    expect(buildInspectionLines(projection, { type: 'building', id: 'building-1' })).toContain(
+      '建筑 1',
     );
     expect(buildInspectionLines(projection, { type: 'building', id: 'building-1' })).toContain(
-      '建筑 building-1',
+      '类型：民居',
     );
     expect(buildInspectionLines(projection, { type: 'tile', x: 1, y: 1 })).toContain('地块 1,1');
+    expect(buildInspectionLines(projection, { type: 'tile', x: 1, y: 1 })).toContain('地形：草地');
     expect(buildInspectionLines(projection, { type: 'kingdom', id: 'kingdom-1' })).toContain(
-      '王国 kingdom-1',
+      '王国 1',
     );
     expect(buildInspectionLines(projection, { type: 'kingdom', id: 'kingdom-1' })).toContain(
-      '首都：village-1',
+      '首都：村庄 1',
     );
   });
 
@@ -97,13 +102,13 @@ describe('world inspection helpers', () => {
     expect(buildMapLabels(projection)).toEqual([
       {
         id: 'village:village-1',
-        text: 'village-1',
+        text: '村庄 1',
         position: { x: 20, y: 18.4 },
         color: '#f4f4f4',
       },
       {
         id: 'kingdom:kingdom-1',
-        text: 'kingdom-1',
+        text: '王国 1',
         position: { x: 20, y: 16.8 },
         color: '#ffcd75',
       },
@@ -147,6 +152,9 @@ function createProjection(): WorldProjection {
         population: 24,
         foodInventory: 80,
         foodCapacity: 120,
+        woodInventory: 3,
+        stoneInventory: 5,
+        ironInventory: 1,
         housingCapacity: 30,
         territoryTiles: 12,
         foundedAtTick: 2,
@@ -164,6 +172,9 @@ function createProjection(): WorldProjection {
         buildingCount: 1,
         territoryTiles: 12,
         foodInventory: 80,
+        woodInventory: 3,
+        stoneInventory: 5,
+        ironInventory: 1,
         diplomacyPressure: 42,
         diplomacyTargetKingdomId: 'kingdom-2',
         foundedAtTick: 4,
@@ -247,6 +258,9 @@ function createProjection(): WorldProjection {
       foodTiles: 0,
       totalFood: 0,
       totalVillageFood: 80,
+      totalVillageWood: 3,
+      totalVillageStone: 5,
+      totalVillageIron: 1,
       housingCapacity: 30,
     },
   };

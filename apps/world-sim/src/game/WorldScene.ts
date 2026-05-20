@@ -41,6 +41,9 @@ const BUILDING_COLORS = {
   house: 0xc2c3c7,
   storage: 0xffcd75,
   farm: 0x99e550,
+  mine: 0x566c86,
+  barrack: 0xef7d57,
+  dock: 0x29adff,
 } as const;
 
 const ARMY_STATUS_COLORS = {
@@ -240,10 +243,29 @@ export class WorldScene extends Phaser.Scene {
 
       if (building.type === 'farm') {
         this.buildingLayer.fillCircle(x, y, 5);
+      } else if (building.type === 'mine') {
+        this.buildingLayer.fillRect(x - 5, y - 5, 10, 10);
+        this.buildingLayer.lineStyle(2, 0xffcd75, alpha);
+        this.buildingLayer.strokeRect(x - 5, y - 5, 10, 10);
+      } else if (building.type === 'barrack') {
+        this.buildingLayer.fillRect(x - 6, y - 4, 12, 8);
+        this.buildingLayer.lineStyle(2, 0x101726, 0.85);
+        this.buildingLayer.strokeRect(x - 6, y - 4, 12, 8);
+      } else if (building.type === 'dock') {
+        this.buildingLayer.fillRect(x - 7, y - 3, 14, 6);
+        this.buildingLayer.lineStyle(2, 0x101726, 0.85);
+        this.buildingLayer.strokeRect(x - 7, y - 3, 14, 6);
       } else if (building.type === 'town_hall') {
         this.buildingLayer.fillRect(x - 6, y - 6, 12, 12);
         this.buildingLayer.lineStyle(2, 0x101726, 0.85);
         this.buildingLayer.strokeRect(x - 6, y - 6, 12, 12);
+      } else if (building.type === 'house') {
+        const size = building.tier === 3 ? 12 : building.tier === 2 ? 10 : 8;
+        this.buildingLayer.fillRect(x - size / 2, y - size / 2, size, size);
+        if ((building.tier ?? 1) > 1) {
+          this.buildingLayer.lineStyle(1.5, 0x101726, 0.85);
+          this.buildingLayer.strokeRect(x - size / 2, y - size / 2, size, size);
+        }
       } else {
         this.buildingLayer.fillRect(x - 5, y - 5, 10, 10);
       }
@@ -435,12 +457,12 @@ export class WorldScene extends Phaser.Scene {
       .sort((a, b) => b.population - a.population);
     const leadingKingdom = activeKingdoms[0];
 
-    this.titleText?.setText('WorldSim v2 基础原型');
+    this.titleText?.setText('世界模拟器 v2 基础原型');
     this.statusText?.setText(
       [
         '世界状态',
         `种子：${projection.seed}`,
-        `时间：第 ${projection.tick} tick`,
+        `时间：第 ${projection.tick} 刻`,
         `速度：${projection.paused ? '已暂停' : `${projection.speed} 倍速`}`,
         `人口：${projection.stats.population}`,
         `村庄：${projection.stats.villages}`,
@@ -477,14 +499,14 @@ export class WorldScene extends Phaser.Scene {
       [
         '操作',
         '左键：选择实体 / 地块',
-        'Ctrl + 左键：投放食物',
-        'Shift + 左键：召唤 4 个小人',
-        'Alt + 左键：闪电打击',
+        '按住控制键 + 左键：投放食物',
+        '按住上档键 + 左键：召唤 4 个小人',
+        '按住替代键 + 左键：闪电打击',
         '滚轮：缩放地图',
-        '1 / 2 / 4：调整速度',
-        'K：循环选择王国',
-        '0 或 P：暂停 / 恢复',
-        'F / G / W：将镜头中心改成森林 / 草地 / 水域',
+        '1 / 2 / 4 键：调整速度',
+        'K 键：循环选择王国',
+        '0 或 P 键：暂停 / 恢复',
+        'F / G / W 键：将镜头中心改成森林 / 草地 / 水域',
       ].join('    '),
     );
     const storyEvents = filterEventsForSelection(projection, this.selection).slice(-8);
@@ -495,7 +517,7 @@ export class WorldScene extends Phaser.Scene {
         this.selection.type === 'none' || this.selection.type === 'tile' ? '最近事件' : '相关事件',
         '',
         ...(storyEvents.length > 0
-          ? storyEvents.map((event) => `第 ${event.tick} tick：${translateEvent(event.message)}`)
+          ? storyEvents.map((event) => `第 ${event.tick} 刻：${translateEvent(event.message)}`)
           : ['暂无相关事件']),
       ].join('\n'),
     );
@@ -829,6 +851,10 @@ function translateEvent(message: string) {
 
   if (message.includes('built')) {
     return '村庄建筑已完成';
+  }
+
+  if (message.includes('upgraded')) {
+    return '建筑已升级';
   }
 
   if (message.includes('Speed changed')) {

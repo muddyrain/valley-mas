@@ -15,6 +15,89 @@ const BUILDING_PICK_RADIUS = 1.5;
 const VILLAGE_PICK_RADIUS = 2.5;
 const UNIT_PICK_RADIUS = 1.2;
 
+const TERRAIN_LABELS: Record<string, string> = {
+  grass: '草地',
+  forest: '森林',
+  hill: '丘陵',
+  water: '水域',
+  sand: '沙地',
+  snow: '雪地',
+  lava: '熔岩',
+};
+
+const BIOME_LABELS: Record<string, string> = {
+  temperate: '温带',
+  woodland: '林地',
+  highland: '高地',
+  coast: '海岸',
+  dryland: '旱地',
+  frozen: '寒地',
+  volcanic: '火山地',
+};
+
+const RESOURCE_LABELS: Record<string, string> = {
+  food: '食物',
+  wood: '木材',
+  stone: '石料',
+  iron: '铁矿',
+};
+
+const RACE_LABELS: Record<string, string> = {
+  human: '人类',
+  orc: '兽人',
+  elf: '精灵',
+  dwarf: '矮人',
+};
+
+const GENDER_LABELS: Record<string, string> = {
+  male: '男',
+  female: '女',
+};
+
+const UNIT_INTENT_LABELS: Record<string, string> = {
+  idle: '空闲',
+  seek_food: '寻找食物',
+  eat: '进食',
+  wander: '游荡',
+  dead: '死亡',
+};
+
+const VILLAGE_STATUS_LABELS: Record<string, string> = {
+  camp: '营地',
+  stable: '稳定',
+  declining: '衰退',
+};
+
+const KINGDOM_STATUS_LABELS: Record<string, string> = {
+  rising: '兴起',
+  stable: '稳定',
+  declining: '衰退',
+  fallen: '陨落',
+};
+
+const BUILDING_LABELS: Record<string, string> = {
+  town_hall: '市政厅',
+  house: '民居',
+  storage: '仓库',
+  farm: '农田',
+  mine: '矿场',
+  barrack: '兵营',
+  dock: '码头',
+};
+
+const BUILDING_STATUS_LABELS: Record<string, string> = {
+  active: '有效',
+  abandoned: '废弃',
+  ruined: '废墟',
+};
+
+const ARMY_STATUS_LABELS: Record<string, string> = {
+  marching: '行军中',
+  fighting: '交战中',
+  retreating: '撤退中',
+  disbanded: '已解散',
+};
+
 export type WorldSelection =
   | { type: 'none' }
   | { type: 'tile'; x: number; y: number }
@@ -151,7 +234,7 @@ export function selectNextKingdom(
 export function buildMapLabels(projection: WorldProjection): MapLabel[] {
   const villageLabels = projection.villages.map((village) => ({
     id: `village:${village.id}`,
-    text: village.id,
+    text: `村庄 ${shortId(village.id)}`,
     position: {
       x: Math.round(village.center.x * 10) / 10,
       y: Math.round((village.center.y - 1.6) * 10) / 10,
@@ -167,7 +250,7 @@ export function buildMapLabels(projection: WorldProjection): MapLabel[] {
 
       return {
         id: `kingdom:${kingdom.id}`,
-        text: kingdom.id,
+        text: `王国 ${shortId(kingdom.id)}`,
         position: {
           x: Math.round((capital?.center.x ?? 0) * 10) / 10,
           y: Math.round(((capital?.center.y ?? 0) - 3.2) * 10) / 10,
@@ -190,13 +273,13 @@ function buildTileLines(projection: WorldProjection, x: number, y: number) {
   const kingdom = territory?.kingdomId
     ? projection.kingdoms.find((candidate) => candidate.id === territory.kingdomId)
     : undefined;
-  const terrain = tile?.terrain || '未知';
-  const biome = tile?.biome || '未知';
+  const terrain = tile?.terrain ? labelFromMap(TERRAIN_LABELS, tile.terrain) : '未知';
+  const biome = tile?.biome ? labelFromMap(BIOME_LABELS, tile.biome) : '未知';
   const resource = tile?.resource
-    ? `${tile.resource.type} x ${Math.round(tile.resource.amount)}`
+    ? `${labelFromMap(RESOURCE_LABELS, tile.resource.type)} x ${Math.round(tile.resource.amount)}`
     : '无';
-  const villageId = village?.id || '无';
-  const kingdomId = kingdom?.id || '无';
+  const villageId = village ? `村庄 ${shortId(village.id)}` : '无';
+  const kingdomId = kingdom ? `王国 ${shortId(kingdom.id)}` : '无';
 
   return [
     `地块 ${x},${y}`,
@@ -216,13 +299,13 @@ function buildUnitLines(projection: WorldProjection, id: string) {
   }
 
   return [
-    `单位 ${unit.id}`,
-    `种族：${unit.race}`,
-    `性别：${unit.gender}`,
-    `状态：${unit.intent}`,
+    `单位 ${shortId(unit.id)}`,
+    `种族：${labelFromMap(RACE_LABELS, unit.race)}`,
+    `性别：${labelFromMap(GENDER_LABELS, unit.gender)}`,
+    `状态：${labelFromMap(UNIT_INTENT_LABELS, unit.intent)}`,
     `生命：${Math.round(unit.hp)}`,
     `饥饿：${Math.round(unit.hunger)}`,
-    `归属村庄：${unit.homeVillageId || '无'}`,
+    `归属村庄：${unit.homeVillageId ? `村庄 ${shortId(unit.homeVillageId)}` : '无'}`,
     `当前位置：${formatPosition(unit.position)}`,
   ];
 }
@@ -243,13 +326,16 @@ function buildVillageLines(projection: WorldProjection, id: string) {
   );
 
   return [
-    `村庄 ${village.id}`,
-    `种族：${village.race}`,
-    `状态：${village.status}`,
-    `所属王国：${kingdom?.id || '无'}`,
+    `村庄 ${shortId(village.id)}`,
+    `种族：${labelFromMap(RACE_LABELS, village.race)}`,
+    `状态：${labelFromMap(VILLAGE_STATUS_LABELS, village.status)}`,
+    `所属王国：${kingdom ? `王国 ${shortId(kingdom.id)}` : '无'}`,
     `人口：${village.population}`,
     `住房：${village.housingCapacity}`,
     `食物：${Math.round(village.foodInventory)} / ${village.foodCapacity}`,
+    `材料：木材 ${Math.round(village.woodInventory)}, 石料 ${Math.round(
+      village.stoneInventory,
+    )}, 铁矿 ${Math.round(village.ironInventory)}`,
     `建筑：${buildings.length}`,
     `领土：${village.territoryTiles}`,
     `军队：${activeArmies.length}`,
@@ -269,17 +355,22 @@ function buildKingdomLines(projection: WorldProjection, id: string) {
   );
 
   return [
-    `王国 ${kingdom.id}`,
-    `种族：${kingdom.race}`,
-    `状态：${kingdom.status}`,
-    `首都：${kingdom.capitalVillageId}`,
+    `王国 ${shortId(kingdom.id)}`,
+    `种族：${labelFromMap(RACE_LABELS, kingdom.race)}`,
+    `状态：${labelFromMap(KINGDOM_STATUS_LABELS, kingdom.status)}`,
+    `首都：村庄 ${shortId(kingdom.capitalVillageId)}`,
     `村庄：${kingdom.villageIds.length}`,
     `人口：${kingdom.population}`,
     `建筑：${kingdom.buildingCount}`,
     `领土：${kingdom.territoryTiles}`,
     `库存：${Math.round(kingdom.foodInventory)}`,
+    `材料：木材 ${Math.round(kingdom.woodInventory)}, 石料 ${Math.round(
+      kingdom.stoneInventory,
+    )}, 铁矿 ${Math.round(kingdom.ironInventory)}`,
     `外交压力：${Math.round(kingdom.diplomacyPressure)}`,
-    `压力目标：${kingdom.diplomacyTargetKingdomId || '无'}`,
+    `压力目标：${
+      kingdom.diplomacyTargetKingdomId ? `王国 ${shortId(kingdom.diplomacyTargetKingdomId)}` : '无'
+    }`,
     `军队：${activeArmies.length}`,
   ];
 }
@@ -297,13 +388,13 @@ function buildBuildingLines(projection: WorldProjection, id: string) {
     : undefined;
 
   return [
-    `建筑 ${building.id}`,
-    `类型：${building.type}`,
+    `建筑 ${shortId(building.id)}`,
+    `类型：${labelFromMap(BUILDING_LABELS, building.type)}`,
     `等级：${building.tier || 1}`,
-    `状态：${building.status}`,
-    `村庄：${building.villageId}`,
-    `王国：${kingdom?.id || '无'}`,
-    `建造时间：第 ${building.builtAtTick} tick`,
+    `状态：${labelFromMap(BUILDING_STATUS_LABELS, building.status)}`,
+    `村庄：村庄 ${shortId(building.villageId)}`,
+    `王国：${kingdom ? `王国 ${shortId(kingdom.id)}` : '无'}`,
+    `建造时间：第 ${building.builtAtTick} 刻`,
     `位置：${formatPosition(building.position)}`,
   ];
 }
@@ -316,12 +407,12 @@ function buildArmyLines(projection: WorldProjection, id: string) {
   }
 
   return [
-    `军队 ${army.id}`,
-    `状态：${army.status}`,
-    `所属王国：${army.kingdomId}`,
-    `目标王国：${army.targetKingdomId}`,
-    `出发村庄：${army.originVillageId}`,
-    `目标村庄：${army.targetVillageId}`,
+    `军队 ${shortId(army.id)}`,
+    `状态：${labelFromMap(ARMY_STATUS_LABELS, army.status)}`,
+    `所属王国：王国 ${shortId(army.kingdomId)}`,
+    `目标王国：王国 ${shortId(army.targetKingdomId)}`,
+    `出发村庄：村庄 ${shortId(army.originVillageId)}`,
+    `目标村庄：村庄 ${shortId(army.targetVillageId)}`,
     `士兵：${army.soldierCount}`,
     `士气：${army.morale.toFixed(2)}`,
     `位置：${formatPosition(army.position)}`,
@@ -408,6 +499,15 @@ function distance(a: Position, b: Position) {
 
 function hexColor(color: number) {
   return `#${color.toString(16).padStart(6, '0')}`;
+}
+
+function shortId(id: string) {
+  const suffix = id.split('-').at(-1) ?? id;
+  return /^\d+$/.test(suffix) ? suffix : id;
+}
+
+function labelFromMap(map: Record<string, string>, value: string) {
+  return map[value] ?? value;
 }
 
 // Keep the type imports above visible to TypeScript as the feature grows.

@@ -34,17 +34,18 @@ Commands are not guaranteed to succeed. Rejections become events so UI and tests
 
 ## Resources
 
-Food is the first active resource. It exists as tile deposits and supports the life loop. Later resources such as wood, stone, and iron must become meaningful through village and building systems, not through decorative counters.
+Food is the first active resource. It exists as tile deposits and supports the life loop. PR-12C now exposes village and kingdom stores for food, wood, stone, and iron. Active mines can gather nearby stone or iron deposits into village stores, while wood gathering and material-based construction costs remain pending.
 
 ## Villages and Kingdoms
 
-Villages now form after individual survival pressure is visible. A cluster of at least eight same-race units near enough food can found a camp. Founding units receive a stable `homeVillageId`; later same-race homeless units near the settlement can be adopted into that home village. The village stores gathered food, tracks home population, exposes housing capacity, consumes food on a fixed interval, and enters a declining state when inventory cannot satisfy residents.
+Villages now form after individual survival pressure is visible. A cluster of at least eight same-race units near enough food can found a camp. Founding units receive a stable `homeVillageId`; later same-race homeless units near the settlement can be adopted into that home village. The village stores gathered food and early materials, tracks home population, exposes housing capacity, consumes food on a fixed interval, and enters a declining state when inventory cannot satisfy residents.
 
 The village `center` is an internal settlement anchor, not a visible building or capital marker. Population ownership is stable and does not depend on whether villagers are currently inside this anchor radius. The anchor supports village formation spacing, food search, and construction placement; player-facing village presence should come from buildings, territory, kingdom summaries, and later inspection panels.
 
 - villages form from population clusters and local food pressure
 - village population is counted by `homeVillageId`, while `villageId` only marks the current nearby village presence
-- village inventory is gathered from nearby food deposits
+- village food inventory is gathered from nearby food deposits
+- active mines gather nearby stone or iron deposits into village material stores
 - housing capacity caps village-supported reproduction
 - food shortage causes village decline before later systems add migration, abandonment pressure, or war
 - villages are abandoned only when their home population reaches zero, not when residents temporarily walk away
@@ -72,17 +73,23 @@ Villages spend food surplus on simple functional buildings. PR-12B starts turnin
 hut/storage/farm foundation into a clearer settlement chain:
 
 - town hall is created when a village is founded and marks the visible settlement anchor
-- house is the visible housing building; the first slice stores `tier: 1` for future upgrades and increases housing capacity
+- town hall now acts as the upgrade gate for the rest of the chain
+- house is the visible housing building; the first slice stores `tier: 1`, then can upgrade to tiers 2 and 3 for extra housing capacity
 - storage increases village food capacity
 - farm produces village food even after nearby deposits are exhausted
+- mine can be built once when the village has a nearby hill, stone deposit, or iron deposit; it claims territory and marks future stone/iron access, but does not gather materials until PR-12C
+- barrack can be built once after the basic food and housing chain is in place; it increases army mobilization from the capital village
+- dock can be built once on a nearby walkable shore tile adjacent to water; it claims territory and marks future boat, trade, and colonization access, but does not launch ships yet
 
 The first territory model is influence-based. Active buildings claim walkable tiles around their fixed positions, which keeps territory stable while villagers move. Territory is projection data for rendering, diplomacy, and war feedback; it does not yet block movement or create borders. Unaffiliated villages claim tiles with only `villageId`; villages inside a kingdom also stamp `kingdomId` on their territory tiles. The Phaser layer renders kingdom-owned territory with that kingdom's stable color, so captured villages visually switch to the attacker's color after ownership transfer.
 
-When a village loses all population, its buildings are not deleted immediately. They become abandoned remnants. Abandoned buildings stay visible but no longer provide housing, storage, farm production, or active territory. Later PR-12B work can add mine, barrack, dock, and higher house/town hall tiers before PR-12C introduces job-driven resource chains.
+When a village loses all population, its buildings are not deleted immediately. They become abandoned remnants. Abandoned buildings stay visible but no longer provide housing, storage, farm production, mine access, army mobilization bonuses, dock access, or active territory. PR-12C can now build on this chain with job-driven resource stores.
 
 ## Combat and War
 
 War starts at the group level. A `war_declared` event can form an `ArmyGroup` from the aggressor kingdom's capital village. Army groups are projected as aggregate military units with position, target kingdom, target village, soldier count, morale, and status.
+
+Barracks are the first building hook into war. If the capital village has an active barrack when an army group forms, the simulation raises both the mobilization ratio and the maximum soldier cap for that army. This keeps barracks functional without introducing individual soldier jobs before PR-12C.
 
 The first war model intentionally avoids complex individual brawls:
 

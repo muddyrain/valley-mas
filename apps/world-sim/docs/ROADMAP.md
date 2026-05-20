@@ -18,7 +18,7 @@ Status: `Done`
 
 ## PR-1: Pure Simulation Core
 
-Status: `Foundation slice`
+Status: `Done`
 
 - Add `SimWorld`, `SimLoop`, `SimCommand`, `SimEvent`, seed RNG, fixed tick.
 - Acceptance: same seed and command sequence replay to the same result.
@@ -211,7 +211,7 @@ Status: `Done`
 
 ## PR-12+: WorldBox Flavor
 
-Status: `Planned`
+Status: `Foundation slice`
 
 - Add WorldBox-style readability and civilization depth after the core loop is stable. The next phase should preserve the god-sim shape: the player creates conditions and intervenes, while villages and kingdoms build, expand, fight, and collapse mostly on their own.
 - Order matters: first make the existing simulation understandable, then add deeper building and society systems.
@@ -250,21 +250,22 @@ Status: `Foundation slice`
 - Expand the current hut/storage/farm foundation into a clearer civilization building chain.
 - Acceptance: villages visibly progress from camp to settlement to town through buildings with gameplay effects, not decorative markers.
 - Planned:
-  - Add `town_hall` as the village anchor and upgrade gate.
-  - Convert or extend `hut` into house tiers for housing capacity growth.
-  - Add `mine` for stone/iron access.
-  - Add `barrack` for army capacity or army formation strength.
-  - Add `dock` as a coast-only building reserved for later boats/trade/colonization.
   - Expose building type, tier, status, and owner in projection/inspection.
 - Implemented:
   - Villages now create a visible `town_hall` at the settlement center when founded.
   - The former `hut` building path now creates `house` buildings with `tier: 1`.
-  - House buildings preserve the old housing-capacity gameplay effect while making housing visible as a building chain.
+  - `town_hall` now gates further upgrades, so higher house tiers only unlock after the anchor reaches the next tier.
+  - House buildings can upgrade to tiers 2 and 3 while preserving the old housing-capacity gameplay effect.
+  - Villages can now build one visible `mine` when a nearby hill, stone deposit, or iron deposit gives them a valid mine site.
+  - Mine buildings are projected, inspectable, territory-claiming, and rendered in Phaser as the PR-12B hook for later stone/iron stores.
+  - Villages can now build one visible `barrack` after the basic food and housing chain is in place.
+  - Barracks increase the capital village's army mobilization ratio and soldier cap when a kingdom forms an army group.
+  - Villages can now build one visible `dock` on a nearby walkable shore tile adjacent to water.
+  - Dock buildings are projected, inspectable, territory-claiming, and rendered in Phaser as the PR-12B hook for later boats, trade, and colonization.
   - Building projection, replay serialization, inspection, and Phaser rendering now include the new building types and tier.
 - Acceptance gaps:
-  - `town_hall` does not gate upgrades yet.
-  - Higher house tiers are not implemented yet.
-  - `mine`, `barrack`, and `dock` are still pending.
+  - `mine` does not gather stone or iron until PR-12C adds job-driven resource stores.
+  - `dock` does not launch boats, trade, or colonization until later PRs.
 - Non-goals:
   - No manual player building placement.
   - No boat simulation until the dock has a reason to exist in later PRs.
@@ -277,10 +278,15 @@ Status: `Planned`
 - Acceptance: village growth depends on visible resource availability and assigned work, while staying cheap enough for the PR-11 scale target.
 - Planned:
   - Add lightweight jobs such as farmer, builder, miner, and soldier.
-  - Track village stores for food, wood, stone, and iron.
   - Buildings consume resources and optionally construction time.
-  - Farms, mines, and nearby deposits feed village stores.
   - Resource shortages slow construction, housing growth, and army formation.
+- Implemented:
+  - Villages and kingdoms now expose material stores for food, wood, stone, and iron in projection and inspection.
+  - Active mines gather nearby stone or iron deposits into village stores without requiring individual miner jobs yet.
+  - Mine-site selection now prefers actual stone or iron deposits before falling back to generic hill tiles.
+- Acceptance gaps:
+  - Farmer, builder, miner, and soldier job assignment is still pending.
+  - Wood gathering and material-based building costs are still pending.
 - Non-goals:
   - No per-citizen deep inventory.
   - No full logistics pathfinding between every worker and resource.
@@ -339,9 +345,9 @@ After PR-8, move toward diplomacy pressure while keeping the foundation constrai
 14. Done: PR-11E/F lowers non-urgent home-village behavior frequency, exposes behavior update counts in the scale report, and removes a duplicate village resident-index rebuild.
 15. Done: PR-11 stability sign-off confirms 10000 population with 656 viewport-visible units stays below the 16.7 ms simulation-step budget across five consecutive local runs.
 16. Done: PR-12A inspection and event story supports click selection, right-panel details, selected highlights, context-filtered recent events, kingdom cycling/listing, and village/kingdom map labels.
-17. Foundation slice: PR-12B building chain now creates town halls and tier-1 houses, replacing the old hut path while preserving housing effects.
+17. Done: PR-12B building chain now creates town halls, tier-1 houses, tier-2/3 upgrade gates, mine-site-gated mines, army-boosting barracks, and shore-gated docks while preserving existing housing effects.
 18. Done: kingdom capitals now stay stable while valid; replacement capitals are chosen after capital loss by town hall tier, active building count, population, then id.
-19. Next: continue PR-12B with town hall upgrade gates, higher house tiers, mine, barrack, and dock.
+19. Next: begin PR-12C villager jobs and material resource economy.
 20. Planned: PR-12C villager jobs and resource economy with farmer, builder, miner, soldier, and village material stores.
 21. Planned: PR-12D city growth feedback with names, levels, capital markers, borders, upgrades, and ruins.
 22. Planned: PR-12E kingdom readability and god interventions for war, peace, growth, and attention marking.

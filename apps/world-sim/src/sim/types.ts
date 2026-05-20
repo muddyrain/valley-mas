@@ -14,7 +14,14 @@ export type UnitRace = 'human' | 'orc' | 'elf' | 'dwarf';
 export type UnitGender = 'male' | 'female';
 export type UnitIntent = 'idle' | 'seek_food' | 'eat' | 'wander' | 'dead';
 export type VillageStatus = 'camp' | 'stable' | 'declining';
-export type VillageBuildingType = 'town_hall' | 'house' | 'storage' | 'farm';
+export type VillageBuildingType =
+  | 'town_hall'
+  | 'house'
+  | 'storage'
+  | 'farm'
+  | 'mine'
+  | 'barrack'
+  | 'dock';
 export type VillageBuildingStatus = 'active' | 'abandoned' | 'ruined';
 export type KingdomStatus = 'rising' | 'stable' | 'declining' | 'fallen';
 export type ArmyGroupStatus = 'marching' | 'fighting' | 'retreating' | 'disbanded';
@@ -58,6 +65,9 @@ export type Village = {
   population: number;
   foodInventory: number;
   foodCapacity: number;
+  woodInventory: number;
+  stoneInventory: number;
+  ironInventory: number;
   housingCapacity: number;
   territoryTiles: number;
   foundedAtTick: number;
@@ -74,6 +84,9 @@ export type Kingdom = {
   buildingCount: number;
   territoryTiles: number;
   foodInventory: number;
+  woodInventory: number;
+  stoneInventory: number;
+  ironInventory: number;
   diplomacyPressure: number;
   diplomacyTargetKingdomId?: string;
   foundedAtTick: number;
@@ -201,6 +214,7 @@ export type SimEvent = {
     | 'village_declining'
     | 'village_abandoned'
     | 'building_built'
+    | 'building_upgraded'
     | 'territory_changed'
     | 'kingdom_founded'
     | 'kingdom_joined'
@@ -287,6 +301,9 @@ export type WorldProjection = {
     foodTiles: number;
     totalFood: number;
     totalVillageFood: number;
+    totalVillageWood: number;
+    totalVillageStone: number;
+    totalVillageIron: number;
     housingCapacity: number;
   };
 };

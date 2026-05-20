@@ -35,14 +35,14 @@ WorldSim v2 是一个 2D 像素风上帝沙盒文明模拟游戏：
 | PR-4 Phaser Projection | Foundation slice | Scene 只读 projection，输入只发 command，源码级 sim 边界扫描已补，中文全屏调试 HUD 和独立 UI camera 已接入；渲染路径已开始传入 camera viewport 做 projection culling，全量 projection 仍作为默认兼容路径保留 |
 | PR-5 God Command | Foundation slice | 基础神力命令、命令校验和拒绝路径已接入；正式工具栏仍缺 |
 | PR-6 村庄 | Done | 人口聚集和本地食物压力会形成村庄；村庄库存、住房容量、食物消耗、增长上限和衰退状态已接入 |
-| PR-7 建筑和领土 | Done | 村庄 surplus 会自动建造 house、storage、farm，且 PR-12B 已补 town hall anchor；建筑影响住房、库存上限、食物生产和领土投射 |
+| PR-7 建筑和领土 | Done | 村庄 surplus 会自动建造 house、storage、farm，且 PR-12B 已补 town hall anchor、house 升级链、mine 矿址 hook、barrack 军队 hook 和 dock 岸线 hook；建筑影响住房、库存上限、食物生产、军队动员、未来航运入口和领土投射 |
 | PR-8 王国 | Done | 稳定村庄会自动建国，同族村庄可加入同一王国，王国聚合首都、成员村庄、人口、建筑、领土和库存统计；首都在有效时保持稳定，失效后才按 town hall/建筑/人口重选 |
 | PR-9 外交压力 | Done | 王国会根据边境摩擦、资源压力和种族倾向积累外交压力，并产生宣战事件 |
 | PR-10 最小战争 | Done | 宣战会生成聚合军队组，军队可推进、结算伤亡、撤退/解散并占领村庄 |
 | PR-11 规模门槛 | Done | `SimWorld.project()` 已支持 viewport culling，Phaser 已按 camera 视口取可见 tiles/units/territory/buildings/armies；PR-11A 测量 harness、PR-11B/PR-11D step phase profiling、PR-11C 村庄居民索引优化、PR-11E 单位行为降频和 PR-11F 重复居民索引重建移除已补；本地 10000 聚合人口 / 656 可见单位连续 5 次低于 16.7 ms；worker simulation 和 hot-data layout 留到更大目标按指标决定 |
-| PR-12+ | Foundation slice | `PR-12A` inspection/event story 已完成；`PR-12B` 建筑链已接入 town hall 和 tier-1 house，下一步继续补升级门槛、mine、barrack、dock，再到 `PR-12C` 职业资源、`PR-12D` 城市成长反馈、`PR-12E` 王国可读性与神力干预 |
+| PR-12+ | Foundation slice | `PR-12A` inspection/event story 已完成；`PR-12B` 建筑链已完成 town hall、tier-1 house、house 2/3 升级门槛、mine 矿址 hook、barrack 军队 hook 和 dock 岸线 hook；`PR-12C` 已开始接入 food/wood/stone/iron 仓储和 mine stone/iron 产出，下一步继续补 farmer/builder/miner/soldier，再到 `PR-12D` 城市成长反馈、`PR-12E` 王国可读性与神力干预 |
 
-进入 PR-12+ 时仍需尊重 `ROADMAP.md` 的 PR-11 约束：当前已具备 viewport projection culling、第一版 10000 聚合人口 / 500+ 可见单位本地稳定性签收、step phase profiling、村庄居民索引优化和非紧急单位行为降频；下一步应继续 `PR-12B` 建筑链扩展，让 town hall/house tiers 接入升级门槛，并补 mine、barrack 和 dock。更大地图、worker simulation、hot-data layout 或资源索引应继续由 `measure:scale` 的最慢阶段驱动。
+进入 PR-12+ 时仍需尊重 `ROADMAP.md` 的 PR-11 约束：当前已具备 viewport projection culling、第一版 10000 聚合人口 / 500+ 可见单位本地稳定性签收、step phase profiling、村庄居民索引优化和非紧急单位行为降频；下一步应继续 `PR-12C` 职业资源，把 farmer、builder、miner、soldier 和材料成本接上，再往 `PR-12D` 城市成长反馈、`PR-12E` 王国可读性与神力干预推进。更大地图、worker simulation、hot-data layout 或资源索引应继续由 `measure:scale` 的最慢阶段驱动。
 
 ## 目录结构
 
