@@ -28,6 +28,7 @@ export type {
   UnitGender,
   UnitIntent,
   UnitRace,
+  VillageJobs,
   WorldProjection,
   WorldProjectionOptions,
   WorldProjectionViewport,

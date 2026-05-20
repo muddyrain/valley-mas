@@ -26,6 +26,7 @@ import type {
   Village,
   VillageBuilding,
   VillageBuildingType,
+  VillageJobs,
   WorldProjection,
   WorldProjectionOptions,
   WorldProjectionViewport,
@@ -49,10 +50,12 @@ const STARTING_REPRODUCTION_COOLDOWN_TICKS = REPRODUCTION_COOLDOWN_TICKS;
 const VILLAGE_FOUNDING_POPULATION = 8;
 const VILLAGE_RADIUS = 7;
 const VILLAGE_FOOD_RADIUS = 8;
+const VILLAGE_WOOD_RADIUS = 8;
 const VILLAGE_MIN_LOCAL_FOOD = 30;
 const VILLAGE_INITIAL_FORAGE = 24;
 const VILLAGE_FORAGE_PER_TICK = 3;
 const VILLAGE_CONSUMPTION_INTERVAL_TICKS = 30;
+const VILLAGE_CAMP_FOOD_PER_RESIDENT = 1;
 const VILLAGE_FOOD_PER_RESIDENT = 2;
 const VILLAGE_BASE_HOUSING = 12;
 const VILLAGE_MAX_HOUSING = 60;
@@ -60,19 +63,43 @@ const VILLAGE_BASE_FOOD_CAPACITY = 120;
 const HOUSE_HOUSING_BONUS = 6;
 const STORAGE_FOOD_CAPACITY_BONUS = 140;
 const FARM_FOOD_PER_TICK = 3;
+const BASE_FARMER_FOOD_PER_TICK = 1;
 const MINE_RESOURCE_PER_TICK = 2;
+const WOOD_PER_BUILDER_TICK = 2;
+const CONSTRUCTION_WORK_PER_BUILDER_TICK = 8;
 const BUILDING_INTERVAL_TICKS = 60;
-const BUILDING_COSTS: Record<VillageBuildingType, number> = {
+const VILLAGE_SHALLOW_QUARRY_RADIUS = 6;
+const VILLAGE_SHALLOW_QUARRY_AMOUNT = 80;
+type BuildingResourceCost = {
+  food: number;
+  wood: number;
+  stone: number;
+  iron: number;
+};
+const BUILDING_COSTS: Record<VillageBuildingType, BuildingResourceCost> = {
+  town_hall: { food: 0, wood: 0, stone: 0, iron: 0 },
+  house: { food: 0, wood: 18, stone: 0, iron: 0 },
+  storage: { food: 0, wood: 24, stone: 0, iron: 0 },
+  farm: { food: 0, wood: 16, stone: 0, iron: 0 },
+  mine: { food: 0, wood: 20, stone: 0, iron: 0 },
+  barrack: { food: 0, wood: 28, stone: 10, iron: 0 },
+  dock: { food: 0, wood: 24, stone: 0, iron: 0 },
+};
+const BUILDING_WORK_REQUIRED: Record<VillageBuildingType, number> = {
   town_hall: 0,
-  house: 45,
-  storage: 60,
-  farm: 70,
-  mine: 90,
-  barrack: 110,
-  dock: 95,
+  house: 32,
+  storage: 40,
+  farm: 44,
+  mine: 52,
+  barrack: 64,
+  dock: 52,
 };
 const TOWN_HALL_UPGRADE_COSTS = [0, 120, 220];
-const HOUSE_UPGRADE_COSTS = [0, 90, 150];
+const HOUSE_UPGRADE_COSTS: Array<BuildingResourceCost | undefined> = [
+  undefined,
+  { food: 0, wood: 14, stone: 0, iron: 0 },
+  { food: 0, wood: 22, stone: 6, iron: 0 },
+];
 const TOWN_HALL_UPGRADE_REQUIREMENTS = [
   undefined,
   { population: 12, buildings: 6, food: 500 },
@@ -95,6 +122,8 @@ const DIPLOMACY_CAUSE_REPORT_STEP = 5;
 const DIPLOMACY_WAR_DECLARATION_PRESSURE = 120;
 const ARMY_MOBILIZATION_RATIO = 0.58;
 const BARRACK_MOBILIZATION_RATIO_BONUS = 0.22;
+const SOLDIER_JOB_MOBILIZATION_BONUS = 0.015;
+const SOLDIER_JOB_CAP_BONUS = 2;
 const ARMY_MIN_SOLDIERS = 4;
 const ARMY_MAX_SOLDIERS = 32;
 const ARMY_BARRACK_MAX_SOLDIERS = 42;
@@ -106,6 +135,12 @@ const ATTACKER_CAPTURE_ADVANTAGE = 0.92;
 const KINGDOM_COLORS = [
   0xef7d57, 0xffcd75, 0x38b764, 0x29adff, 0x9b5de5, 0xf15bb5, 0x00f5d4, 0xc2c3c7,
 ];
+const VILLAGE_NAME_POOLS: Record<UnitRace, string[]> = {
+  human: ['晨林', '河湾', '青川', '星原', '暖风', '白石'],
+  orc: ['铁牙', '黑脊', '裂石', '灰岩', '赤角', '荒谷'],
+  elf: ['银叶', '露泉', '风歌', '月湾', '花岚', '星枝'],
+  dwarf: ['岩炉', '石歌', '铜岭', '铁砧', '深谷', '炉堡'],
+};
 const RECENT_EVENT_TYPES = new Set<SimEvent['type']>([
   'command_accepted',
   'command_rejected',
@@ -115,6 +150,7 @@ const RECENT_EVENT_TYPES = new Set<SimEvent['type']>([
   'speed_changed',
   'pause_changed',
   'village_founded',
+  'village_leveled_up',
   'village_declining',
   'village_abandoned',
   'building_built',
@@ -373,17 +409,23 @@ export class SimWorld {
         (village) =>
           `${village.id}:${village.race}:${round(village.center.x)},${round(
             village.center.y,
-          )}:${village.population}:${round(village.foodInventory)}:${village.housingCapacity}:${
+          )}:${village.name}:${village.level}:${village.population}:${round(
+            village.foodInventory,
+          )}:${village.housingCapacity}:${
             village.status
           }:${round(village.woodInventory)}:${round(village.stoneInventory)}:${round(
             village.ironInventory,
-          )}`,
+          )}:${village.jobs.farmer},${village.jobs.builder},${village.jobs.miner},${
+            village.jobs.soldier
+          }`,
       ),
       buildings: [...this.buildings.values()].map(
         (building) =>
           `${building.id}:${building.villageId}:${building.type}:${round(
             building.position.x,
-          )},${round(building.position.y)}:${building.status}:${building.tier ?? 0}`,
+          )},${round(building.position.y)}:${building.status}:${building.tier ?? 0}:${
+            building.constructionProgress ?? 0
+          }:${building.constructionWorkRequired ?? 0}`,
       ),
       kingdoms: [...this.kingdoms.values()].map(
         (kingdom) =>
@@ -398,8 +440,8 @@ export class SimWorld {
           `${army.id}:${army.kingdomId}:${army.targetKingdomId}:${army.originVillageId}:${
             army.targetVillageId
           }:${round(army.position.x)},${round(army.position.y)}:${army.soldierCount}:${
-            army.status
-          }`,
+            army.trainedSoldiers
+          }:${army.status}`,
       ),
       events: this.events.map((event) => `${event.tick}:${event.type}:${event.message}`),
     });
@@ -631,6 +673,27 @@ export class SimWorld {
         return timings;
       }
 
+      const village = unit.homeVillageId ? this.villages.get(unit.homeVillageId) : undefined;
+
+      if (village && village.foodInventory > 0) {
+        unit.intent = 'eat';
+        const eaten = Math.min(4, village.foodInventory);
+        village.foodInventory -= eaten;
+        unit.hunger = Math.max(0, unit.hunger - eaten * 10);
+        this.emit(
+          'unit_ate',
+          `${unit.id} ate from village stores`,
+          undefined,
+          unit.id,
+          unit.position,
+          {
+            amount: eaten,
+            source: 'village',
+          },
+        );
+        return timings;
+      }
+
       unit.intent = 'seek_food';
       let target: Position | undefined;
       timings.nearestFoodLookup = this.measureStepPhase(profile, () => {
@@ -738,6 +801,8 @@ export class SimWorld {
 
       const village: Village = {
         id: `village-${String(this.nextVillageId).padStart(4, '0')}`,
+        name: createVillageName(unit.race, this.nextVillageId),
+        level: 1,
         race: unit.race,
         center,
         population: locals.length,
@@ -746,6 +811,7 @@ export class SimWorld {
         woodInventory: 0,
         stoneInventory: 0,
         ironInventory: 0,
+        jobs: createEmptyVillageJobs(),
         housingCapacity: Math.max(VILLAGE_BASE_HOUSING, locals.length + 4),
         territoryTiles: 0,
         foundedAtTick: this.tick,
@@ -819,8 +885,11 @@ export class SimWorld {
       });
 
       timings.updateVillageEconomy += this.measureStepPhase(profile, () => {
+        this.assignVillageJobs(village, residents);
         this.produceFarmFood(village);
+        this.gatherVillageWood(village);
         this.produceMineResources(village);
+        this.progressVillageConstruction(village);
         village.foodInventory += this.forageVillageFood(village.center, VILLAGE_FORAGE_PER_TICK);
         village.foodInventory = Math.min(village.foodInventory, village.foodCapacity);
 
@@ -833,6 +902,7 @@ export class SimWorld {
         }
 
         this.tryBuildForVillage(village);
+        this.updateVillageGrowthFeedback(village);
       });
 
       timings.updateVillageConsumption += this.measureStepPhase(profile, () => {
@@ -843,7 +913,9 @@ export class SimWorld {
           return;
         }
 
-        const requiredFood = village.population * VILLAGE_FOOD_PER_RESIDENT;
+        const requiredFood =
+          village.population *
+          (village.status === 'camp' ? VILLAGE_CAMP_FOOD_PER_RESIDENT : VILLAGE_FOOD_PER_RESIDENT);
 
         if (village.foodInventory >= requiredFood) {
           village.foodInventory -= requiredFood;
@@ -977,23 +1049,164 @@ export class SimWorld {
     this.villageResidents.set(unit.homeVillageId, [unit]);
   }
 
+  private assignVillageJobs(village: Village, residents: Unit[]) {
+    let availableWorkers = residents.length;
+    const farms = this.findVillageBuildings(village.id, 'farm').length;
+    const mines = this.findVillageBuildings(village.id, 'mine').length;
+    const barracks = this.findVillageBuildings(village.id, 'barrack').length;
+
+    const farmers =
+      residents.length > 0
+        ? Math.min(
+            availableWorkers,
+            farms > 0 ? Math.max(1, farms, Math.ceil(residents.length * 0.3)) : 1,
+          )
+        : 0;
+    availableWorkers -= farmers;
+
+    const miners =
+      mines > 0
+        ? Math.min(availableWorkers, Math.max(mines, Math.ceil(residents.length * 0.12)))
+        : 0;
+    availableWorkers -= miners;
+
+    const builders = Math.min(availableWorkers, Math.max(0, Math.ceil(residents.length * 0.12)));
+    availableWorkers -= builders;
+
+    const soldiers =
+      barracks > 0
+        ? Math.min(availableWorkers, Math.max(1, Math.floor(residents.length * 0.16)))
+        : 0;
+
+    village.jobs = {
+      farmer: farmers,
+      builder: builders,
+      miner: miners,
+      soldier: soldiers,
+    };
+  }
+
   private produceFarmFood(village: Village) {
     const farms = this.findVillageBuildings(village.id, 'farm').length;
+    const farmerFood = village.jobs.farmer * BASE_FARMER_FOOD_PER_TICK;
+    const farmFood = farms * FARM_FOOD_PER_TICK;
 
-    if (farms <= 0) {
+    if (farmerFood <= 0 && farmFood <= 0) {
       return;
     }
 
     village.foodInventory = Math.min(
       village.foodCapacity,
-      village.foodInventory + farms * FARM_FOOD_PER_TICK,
+      village.foodInventory + farmerFood + farmFood,
     );
+  }
+
+  private gatherVillageWood(village: Village) {
+    let activeBuilders = village.jobs.builder;
+
+    while (activeBuilders > 0) {
+      const deposit = this.findWoodResourceTile(village.center);
+
+      if (!deposit?.resource || deposit.resource.amount <= 0) {
+        return;
+      }
+
+      const gathered = Math.min(WOOD_PER_BUILDER_TICK, deposit.resource.amount);
+      village.woodInventory += gathered;
+      deposit.resource.amount -= gathered;
+      activeBuilders -= 1;
+
+      if (deposit.resource.amount <= 0) {
+        deposit.resource = undefined;
+      }
+    }
+  }
+
+  private progressVillageConstruction(village: Village) {
+    let builderWork = village.jobs.builder * CONSTRUCTION_WORK_PER_BUILDER_TICK;
+
+    if (builderWork <= 0) {
+      return;
+    }
+
+    const constructionSites = this.findVillageConstructionSites(village.id).sort(
+      (left, right) => left.builtAtTick - right.builtAtTick,
+    );
+
+    for (const building of constructionSites) {
+      if (builderWork <= 0) {
+        return;
+      }
+
+      const remaining =
+        (building.constructionWorkRequired ?? BUILDING_WORK_REQUIRED[building.type]) -
+        (building.constructionProgress ?? 0);
+      const progress = Math.min(builderWork, remaining);
+
+      building.constructionProgress = (building.constructionProgress ?? 0) + progress;
+      builderWork -= progress;
+
+      if (
+        building.constructionProgress >=
+        (building.constructionWorkRequired ?? BUILDING_WORK_REQUIRED[building.type])
+      ) {
+        this.completeBuilding(village, building);
+      }
+    }
+  }
+
+  private completeBuilding(village: Village, building: VillageBuilding) {
+    building.status = 'active';
+    building.builtAtTick = this.tick;
+    building.constructionProgress = building.constructionWorkRequired;
+    this.applyCompletedBuildingEffects(village, building.type);
+
+    this.emit(
+      'building_built',
+      `${building.id} ${building.type} built`,
+      undefined,
+      undefined,
+      building.position,
+      {
+        villageId: village.id,
+        type: building.type,
+      },
+    );
+  }
+
+  private applyCompletedBuildingEffects(village: Village, type: VillageBuildingType) {
+    switch (type) {
+      case 'town_hall':
+        break;
+      case 'house':
+        village.housingCapacity = Math.min(
+          VILLAGE_MAX_HOUSING,
+          village.housingCapacity + HOUSE_HOUSING_BONUS,
+        );
+        break;
+      case 'storage':
+        village.foodCapacity += STORAGE_FOOD_CAPACITY_BONUS;
+        break;
+      case 'farm':
+        break;
+      case 'mine':
+        break;
+      case 'barrack':
+        break;
+      case 'dock':
+        break;
+    }
   }
 
   private produceMineResources(village: Village) {
     const mines = this.findVillageBuildings(village.id, 'mine');
+    let activeMiners = village.jobs.miner;
 
     for (const mine of mines) {
+      if (activeMiners <= 0) {
+        return;
+      }
+
       const deposit = this.findMineResourceTile(mine.position);
 
       if (!deposit?.resource || deposit.resource.amount <= 0) {
@@ -1015,7 +1228,29 @@ export class SimWorld {
       if (deposit.resource.amount <= 0) {
         deposit.resource = undefined;
       }
+
+      activeMiners -= 1;
     }
+  }
+
+  private findWoodResourceTile(position: Position) {
+    let nearest: Tile | undefined;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    forEachTileInRadius(this.map, position, VILLAGE_WOOD_RADIUS, (tile) => {
+      if (tile.resource?.type !== 'wood' || tile.resource.amount <= 0) {
+        return;
+      }
+
+      const candidateDistance = distance(position, tile);
+
+      if (candidateDistance < nearestDistance) {
+        nearestDistance = candidateDistance;
+        nearest = tile;
+      }
+    });
+
+    return nearest;
   }
 
   private findMineResourceTile(position: Position) {
@@ -1054,47 +1289,65 @@ export class SimWorld {
 
     const type = this.chooseNextBuilding(village);
 
-    if (!type || village.foodInventory < BUILDING_COSTS[type]) {
+    if (!type || !this.canPayBuildingCost(village, type)) {
       return;
     }
 
-    village.foodInventory -= BUILDING_COSTS[type];
-    const building = this.createBuilding(village, type);
+    this.payBuildingCost(village, type);
+    const building = this.createBuilding(village, type, 'constructing');
     this.buildings.set(building.id, building);
+  }
 
-    switch (type) {
-      case 'town_hall':
-        break;
-      case 'house':
-        village.housingCapacity = Math.min(
-          VILLAGE_MAX_HOUSING,
-          village.housingCapacity + HOUSE_HOUSING_BONUS,
-        );
-        break;
-      case 'storage':
-        village.foodCapacity += STORAGE_FOOD_CAPACITY_BONUS;
-        break;
-      case 'farm':
-        break;
-      case 'mine':
-        break;
-      case 'barrack':
-        break;
-      case 'dock':
-        break;
-    }
-
-    this.emit(
-      'building_built',
-      `${building.id} ${type} built`,
-      undefined,
-      undefined,
-      building.position,
-      {
-        villageId: village.id,
-        type,
-      },
+  private updateVillageGrowthFeedback(village: Village) {
+    const previousLevel = village.level;
+    const nextLevel = computeVillageLevel(
+      village.population,
+      village.housingCapacity,
+      this.highestTownHallTier(village.id),
+      this.findVillageOwnedBuildings(village.id).length,
     );
+
+    village.level = nextLevel;
+
+    if (nextLevel > previousLevel) {
+      this.emit(
+        'village_leveled_up',
+        `${village.id} reached level ${nextLevel}`,
+        undefined,
+        undefined,
+        village.center,
+        {
+          villageId: village.id,
+          previousLevel,
+          level: nextLevel,
+          name: village.name,
+        },
+      );
+    }
+  }
+
+  private canPayBuildingCost(village: Village, type: VillageBuildingType) {
+    return this.canPayResourceCost(village, BUILDING_COSTS[type]);
+  }
+
+  private canPayResourceCost(village: Village, cost: BuildingResourceCost) {
+    return (
+      village.foodInventory >= cost.food &&
+      village.woodInventory >= cost.wood &&
+      village.stoneInventory >= cost.stone &&
+      village.ironInventory >= cost.iron
+    );
+  }
+
+  private payResourceCost(village: Village, cost: BuildingResourceCost) {
+    village.foodInventory -= cost.food;
+    village.woodInventory -= cost.wood;
+    village.stoneInventory -= cost.stone;
+    village.ironInventory -= cost.iron;
+  }
+
+  private payBuildingCost(village: Village, type: VillageBuildingType) {
+    this.payResourceCost(village, BUILDING_COSTS[type]);
   }
 
   private tryUpgradeTownHall(village: Village) {
@@ -1167,11 +1420,11 @@ export class SimWorld {
 
     const cost = HOUSE_UPGRADE_COSTS[nextTier - 1];
 
-    if (village.foodInventory < cost) {
+    if (!cost || !this.canPayResourceCost(village, cost)) {
       return false;
     }
 
-    village.foodInventory -= cost;
+    this.payResourceCost(village, cost);
     house.tier = nextTier;
     village.housingCapacity = Math.min(
       VILLAGE_MAX_HOUSING,
@@ -1194,7 +1447,7 @@ export class SimWorld {
   }
 
   private chooseNextBuilding(village: Village): VillageBuildingType | undefined {
-    const buildings = this.findVillageBuildings(village.id);
+    const buildings = this.findVillageOwnedBuildings(village.id);
     const houses = buildings.filter((building) => building.type === 'house').length;
     const storage = buildings.filter((building) => building.type === 'storage').length;
     const farms = buildings.filter((building) => building.type === 'farm').length;
@@ -1210,12 +1463,24 @@ export class SimWorld {
       return 'storage';
     }
 
-    if (farms < 2) {
+    if (farms === 0) {
       return 'farm';
     }
 
-    if (mines === 0 && this.findMineSite(village)) {
-      return 'mine';
+    if (mines === 0) {
+      const mineSite = this.findMineSite(village);
+      const shallowQuarrySite =
+        village.stoneInventory < BUILDING_COSTS.barrack.stone
+          ? this.findShallowQuarrySite(village)
+          : undefined;
+
+      if (mineSite || shallowQuarrySite) {
+        return 'mine';
+      }
+    }
+
+    if (farms < 2) {
+      return 'farm';
     }
 
     if (barracks === 0 && village.population >= ARMY_MIN_SOLDIERS) {
@@ -1236,15 +1501,21 @@ export class SimWorld {
     return undefined;
   }
 
-  private createBuilding(village: Village, type: VillageBuildingType): VillageBuilding {
-    const buildingCount = this.findVillageBuildings(village.id).length;
+  private createBuilding(
+    village: Village,
+    type: VillageBuildingType,
+    status: VillageBuilding['status'] = 'active',
+  ): VillageBuilding {
+    const buildingCount = this.findVillageOwnedBuildings(village.id).length;
     const angle = buildingCount * 2.399963229728653;
     const radius = 2 + (buildingCount % 4);
     const position =
       type === 'town_hall'
         ? village.center
         : type === 'mine'
-          ? (this.findMineSite(village) ?? this.findBuildablePosition(village.center))
+          ? (this.findMineSite(village) ??
+            this.createShallowQuarrySite(village) ??
+            this.findBuildablePosition(village.center))
           : type === 'dock'
             ? (this.findDockSite(village) ?? this.findBuildablePosition(village.center))
             : this.findBuildablePosition({
@@ -1261,6 +1532,12 @@ export class SimWorld {
       builtAtTick: this.tick,
       tier: type === 'town_hall' || type === 'house' ? 1 : undefined,
     };
+
+    if (status === 'constructing') {
+      building.status = 'constructing';
+      building.constructionProgress = 0;
+      building.constructionWorkRequired = BUILDING_WORK_REQUIRED[type];
+    }
 
     this.nextBuildingId += 1;
     return building;
@@ -1294,6 +1571,45 @@ export class SimWorld {
     });
 
     return nearestDeposit ?? nearestHill;
+  }
+
+  private findShallowQuarrySite(village: Village): Tile | undefined {
+    let nearest: Tile | undefined;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    forEachTileInRadius(this.map, village.center, VILLAGE_SHALLOW_QUARRY_RADIUS, (tile) => {
+      if (!isWalkable(tile.terrain) || tile.resource) {
+        return;
+      }
+
+      const candidateDistance = distance(village.center, tile);
+
+      if (candidateDistance < 2 || candidateDistance >= nearestDistance) {
+        return;
+      }
+
+      nearestDistance = candidateDistance;
+      nearest = tile;
+    });
+
+    return nearest;
+  }
+
+  private createShallowQuarrySite(village: Village): Position | undefined {
+    const tile = this.findShallowQuarrySite(village);
+
+    if (!tile) {
+      return undefined;
+    }
+
+    tile.terrain = 'hill';
+    tile.biome = 'highland';
+    tile.resource = {
+      type: 'stone',
+      amount: VILLAGE_SHALLOW_QUARRY_AMOUNT,
+    };
+
+    return { x: tile.x, y: tile.y };
   }
 
   private isMineSite(tile: Tile) {
@@ -1372,9 +1688,27 @@ export class SimWorld {
     );
   }
 
+  private findVillageConstructionSites(villageId: string) {
+    return [...this.buildings.values()].filter(
+      (building) => building.status === 'constructing' && building.villageId === villageId,
+    );
+  }
+
+  private findVillageOwnedBuildings(villageId: string, type?: VillageBuildingType) {
+    return [...this.buildings.values()].filter(
+      (building) =>
+        (building.status === 'active' || building.status === 'constructing') &&
+        building.villageId === villageId &&
+        (!type || building.type === type),
+    );
+  }
+
   private abandonVillageBuildings(villageId: string) {
     for (const building of this.buildings.values()) {
-      if (building.villageId === villageId && building.status === 'active') {
+      if (
+        building.villageId === villageId &&
+        (building.status === 'active' || building.status === 'constructing')
+      ) {
         building.status = 'abandoned';
       }
     }
@@ -1965,8 +2299,14 @@ export class SimWorld {
     }
 
     const barracks = this.findVillageBuildings(originVillage.id, 'barrack').length;
-    const mobilizationRatio = ARMY_MOBILIZATION_RATIO + barracks * BARRACK_MOBILIZATION_RATIO_BONUS;
-    const maxSoldiers = barracks > 0 ? ARMY_BARRACK_MAX_SOLDIERS : ARMY_MAX_SOLDIERS;
+    const trainedSoldiers = originVillage.jobs.soldier;
+    const mobilizationRatio =
+      ARMY_MOBILIZATION_RATIO +
+      barracks * BARRACK_MOBILIZATION_RATIO_BONUS +
+      Math.min(0.18, trainedSoldiers * SOLDIER_JOB_MOBILIZATION_BONUS);
+    const maxSoldiers =
+      (barracks > 0 ? ARMY_BARRACK_MAX_SOLDIERS : ARMY_MAX_SOLDIERS) +
+      Math.min(8, trainedSoldiers * SOLDIER_JOB_CAP_BONUS);
     const soldierCount = Math.min(
       maxSoldiers,
       Math.max(ARMY_MIN_SOLDIERS, Math.floor(originVillage.population * mobilizationRatio)),
@@ -1979,6 +2319,7 @@ export class SimWorld {
       targetVillageId: targetVillage.id,
       position: { ...originVillage.center },
       soldierCount,
+      trainedSoldiers,
       morale: 1,
       formedAtTick: this.tick,
       status: 'marching',
@@ -1991,6 +2332,7 @@ export class SimWorld {
       kingdomId: army.kingdomId,
       targetKingdomId: army.targetKingdomId,
       soldiers: army.soldierCount,
+      trainedSoldiers: army.trainedSoldiers,
       originVillageId: army.originVillageId,
       targetVillageId: army.targetVillageId,
     });
@@ -2064,7 +2406,9 @@ export class SimWorld {
 
     army.status = 'fighting';
     const defenderBuildings = this.findVillageBuildings(targetVillage.id).length;
-    const attackerStrength = army.soldierCount * army.morale * this.raceAggression(attacker.race);
+    const attackerStrength =
+      army.soldierCount * army.morale * this.raceAggression(attacker.race) +
+      army.trainedSoldiers * 0.35;
     const defenderStrength =
       targetVillage.population * DEFENDER_POPULATION_STRENGTH +
       defenderBuildings * DEFENDER_BUILDING_STRENGTH;
@@ -2097,6 +2441,7 @@ export class SimWorld {
         attackerCasualties,
         defenderCasualties,
         captured,
+        trainedSoldiers: army.trainedSoldiers,
       },
     );
 
@@ -2440,6 +2785,7 @@ function cloneUnit(unit: Unit): Unit {
 function cloneVillage(village: Village, territoryTiles: number): Village {
   return {
     ...village,
+    level: village.level,
     center: {
       x: round(village.center.x),
       y: round(village.center.y),
@@ -2448,6 +2794,7 @@ function cloneVillage(village: Village, territoryTiles: number): Village {
     woodInventory: round(village.woodInventory),
     stoneInventory: round(village.stoneInventory),
     ironInventory: round(village.ironInventory),
+    jobs: { ...village.jobs },
     territoryTiles,
   };
 }
@@ -2580,6 +2927,36 @@ function createEmptyVillageUpdateTimings() {
     updateVillageEconomy: 0,
     updateVillageConsumption: 0,
   };
+}
+
+function createEmptyVillageJobs(): VillageJobs {
+  return {
+    farmer: 0,
+    builder: 0,
+    miner: 0,
+    soldier: 0,
+  };
+}
+
+function createVillageName(race: UnitRace, villageId: number) {
+  const pool = VILLAGE_NAME_POOLS[race];
+  const baseName = pool[(villageId - 1) % pool.length];
+
+  return `${baseName}村`;
+}
+
+function computeVillageLevel(
+  population: number,
+  housingCapacity: number,
+  townHallTier: number,
+  buildingCount: number,
+) {
+  const populationBand = Math.floor(Math.max(0, population - 1) / 10);
+  const housingBand = Math.floor(Math.max(0, housingCapacity - VILLAGE_BASE_HOUSING) / 8);
+  const townHallBand = Math.max(0, townHallTier - 1);
+  const buildingBand = Math.floor(Math.max(0, buildingCount - 1) / 3);
+
+  return Math.max(1, Math.min(5, 1 + populationBand + housingBand + townHallBand + buildingBand));
 }
 
 function createEmptyUnitUpdateTimings() {

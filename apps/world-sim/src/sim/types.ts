@@ -14,6 +14,12 @@ export type UnitRace = 'human' | 'orc' | 'elf' | 'dwarf';
 export type UnitGender = 'male' | 'female';
 export type UnitIntent = 'idle' | 'seek_food' | 'eat' | 'wander' | 'dead';
 export type VillageStatus = 'camp' | 'stable' | 'declining';
+export type VillageJobs = {
+  farmer: number;
+  builder: number;
+  miner: number;
+  soldier: number;
+};
 export type VillageBuildingType =
   | 'town_hall'
   | 'house'
@@ -22,7 +28,7 @@ export type VillageBuildingType =
   | 'mine'
   | 'barrack'
   | 'dock';
-export type VillageBuildingStatus = 'active' | 'abandoned' | 'ruined';
+export type VillageBuildingStatus = 'constructing' | 'active' | 'abandoned' | 'ruined';
 export type KingdomStatus = 'rising' | 'stable' | 'declining' | 'fallen';
 export type ArmyGroupStatus = 'marching' | 'fighting' | 'retreating' | 'disbanded';
 
@@ -59,6 +65,8 @@ export type Unit = {
 
 export type Village = {
   id: string;
+  name: string;
+  level: number;
   race: UnitRace;
   kingdomId?: string;
   center: Position;
@@ -68,6 +76,7 @@ export type Village = {
   woodInventory: number;
   stoneInventory: number;
   ironInventory: number;
+  jobs: VillageJobs;
   housingCapacity: number;
   territoryTiles: number;
   foundedAtTick: number;
@@ -101,6 +110,8 @@ export type VillageBuilding = {
   position: Position;
   builtAtTick: number;
   tier?: number;
+  constructionProgress?: number;
+  constructionWorkRequired?: number;
 };
 
 export type ArmyGroup = {
@@ -111,6 +122,7 @@ export type ArmyGroup = {
   targetVillageId: string;
   position: Position;
   soldierCount: number;
+  trainedSoldiers: number;
   morale: number;
   formedAtTick: number;
   status: ArmyGroupStatus;
@@ -211,6 +223,7 @@ export type SimEvent = {
     | 'speed_changed'
     | 'pause_changed'
     | 'village_founded'
+    | 'village_leveled_up'
     | 'village_declining'
     | 'village_abandoned'
     | 'building_built'

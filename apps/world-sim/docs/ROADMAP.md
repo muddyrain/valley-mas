@@ -115,7 +115,7 @@ Status: `Done`
 - Add housing, storage, farm, and settlement influence territory.
 - Acceptance: buildings affect survival or expansion and are not decorative.
 - Implemented:
-  - Villages spend food surplus on housing, storage, and farm buildings.
+  - Villages originally spent food surplus on housing, storage, and farm buildings; PR-12C has since shifted active construction toward material stores.
   - Huts increase housing capacity.
   - Storage increases village food capacity.
   - Farms produce village food after nearby deposits are exhausted.
@@ -272,34 +272,50 @@ Status: `Foundation slice`
 
 ### PR-12C: Villager Jobs and Resource Economy
 
-Status: `Planned`
+Status: `Foundation slice`
 
 - Replace part of the current abstract village economy with simple job-driven gathering and construction.
 - Acceptance: village growth depends on visible resource availability and assigned work, while staying cheap enough for the PR-11 scale target.
 - Planned:
-  - Add lightweight jobs such as farmer, builder, miner, and soldier.
   - Buildings consume resources and optionally construction time.
   - Resource shortages slow construction, housing growth, and army formation.
 - Implemented:
   - Villages and kingdoms now expose material stores for food, wood, stone, and iron in projection and inspection.
-  - Active mines gather nearby stone or iron deposits into village stores without requiring individual miner jobs yet.
+  - Villages now auto-assign aggregate farmer, builder, miner, and soldier jobs and expose those counts in village inspection.
+  - Villages start with a small farmer workforce so early settlements can survive before the first farm is built.
+  - Camp villages use a lighter early food drain so 30-person bootstrap cases can survive long enough to reach the farm/build loop.
+  - Farmer jobs drive baseline food gathering and amplify farm food production, so farms no longer produce without assigned workers.
+  - Builder jobs gather nearby wood deposits into village stores.
+  - Wood deposits are now rendered as visible map markers, and stone/iron deposits are also rendered so material sources are visible on the map.
+  - House, storage, farm, mine, barrack, dock, and house-upgrade construction are now material-driven instead of food-driven.
+  - Residents can now draw food from village stores as a fallback when nearby tile food runs out.
+  - Food is reserved for feeding people and prosperity gates instead of being consumed by ordinary building construction.
+  - Mine construction now enters the normal chain after the first farm, and villages can open a small early stone quarry when no natural hill or ore deposit is close enough.
+  - Miner jobs gather nearby stone or iron deposits from active mines into village stores.
   - Mine-site selection now prefers actual stone or iron deposits before falling back to generic hill tiles.
+  - Soldier jobs now also feed army mobilization and battle strength, so barracks and trained soldiers affect war output together.
 - Acceptance gaps:
-  - Farmer, builder, miner, and soldier job assignment is still pending.
-  - Wood gathering and material-based building costs are still pending.
+  - Building, food, and army balance numbers are still first-pass values and still need tuning.
+  - Soldier jobs are assigned and inspectable, but detailed soldier mustering, promotion, and per-fighter combat remain later depth.
 - Non-goals:
   - No per-citizen deep inventory.
   - No full logistics pathfinding between every worker and resource.
 
 ### PR-12D: City Growth Feedback
 
-Status: `Planned`
+Status: `Foundation slice`
 
 - Make village growth readable on the map and in the HUD.
 - Acceptance: a player can tell at a glance which settlements are camps, growing towns, capitals, declining towns, or ruins.
+- Implemented:
+  - Villages now generate race-themed names when founded.
+  - Map labels now show village name, level, and a capital marker for the founding capital.
+  - Village inspection now shows name, level, growth state, and whether the village is the capital.
+  - Village level-up events now enter the recent event stream with readable growth summaries.
+  - Kingdom inspection now shows the capital village by name and level when it still exists.
+  - Territory rendering now uses a clearer outer boundary outline and selected village/kingdom highlighting.
+
 - Planned:
-  - Village names and capital markers.
-  - Village level derived from population, housing, town hall tier, and building count.
   - More visible borders and selected territory highlight.
   - Building upgrade events and settlement growth events.
   - Ruin/abandoned building readability for collapsed settlements.
@@ -347,7 +363,6 @@ After PR-8, move toward diplomacy pressure while keeping the foundation constrai
 16. Done: PR-12A inspection and event story supports click selection, right-panel details, selected highlights, context-filtered recent events, kingdom cycling/listing, and village/kingdom map labels.
 17. Done: PR-12B building chain now creates town halls, tier-1 houses, tier-2/3 upgrade gates, mine-site-gated mines, army-boosting barracks, and shore-gated docks while preserving existing housing effects.
 18. Done: kingdom capitals now stay stable while valid; replacement capitals are chosen after capital loss by town hall tier, active building count, population, then id.
-19. Next: begin PR-12C villager jobs and material resource economy.
-20. Planned: PR-12C villager jobs and resource economy with farmer, builder, miner, soldier, and village material stores.
-21. Planned: PR-12D city growth feedback with names, levels, capital markers, borders, upgrades, and ruins.
-22. Planned: PR-12E kingdom readability and god interventions for war, peace, growth, and attention marking.
+19. Done: PR-12C villager jobs and material resource economy.
+20. In progress: PR-12D city growth feedback with names, levels, capital markers, borders, upgrades, and ruins.
+21. Planned: PR-12E kingdom readability and god interventions for war, peace, growth, and attention marking.

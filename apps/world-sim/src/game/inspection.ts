@@ -3,6 +3,7 @@ import type {
   Kingdom,
   Position,
   SimEvent,
+  TerritoryTile,
   Tile,
   Unit,
   Village,
@@ -86,6 +87,7 @@ const BUILDING_LABELS: Record<string, string> = {
 };
 
 const BUILDING_STATUS_LABELS: Record<string, string> = {
+  constructing: '建设中',
   active: '有效',
   abandoned: '废弃',
   ruined: '废墟',
@@ -112,6 +114,23 @@ export type MapLabel = {
   text: string;
   position: Position;
   color: string;
+};
+
+export type TerritoryBorderSegment = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color: number;
+  selected: boolean;
+};
+
+const GROWTH_LABELS: Record<number, string> = {
+  1: '营地',
+  2: '村落',
+  3: '小镇',
+  4: '城镇',
+  5: '成熟城市',
 };
 
 export function selectWorldEntity(projection: WorldProjection, position: Position): WorldSelection {
@@ -232,15 +251,24 @@ export function selectNextKingdom(
 }
 
 export function buildMapLabels(projection: WorldProjection): MapLabel[] {
-  const villageLabels = projection.villages.map((village) => ({
-    id: `village:${village.id}`,
-    text: `村庄 ${shortId(village.id)}`,
-    position: {
-      x: Math.round(village.center.x * 10) / 10,
-      y: Math.round((village.center.y - 1.6) * 10) / 10,
-    },
-    color: '#f4f4f4',
-  }));
+  const villageLabels = projection.villages.map((village) => {
+    const kingdom = village.kingdomId
+      ? projection.kingdoms.find((candidate) => candidate.id === village.kingdomId)
+      : undefined;
+    const isCapital = kingdom?.capitalVillageId === village.id;
+
+    return {
+      id: `village:${village.id}`,
+      text: `${isCapital ? '首都 · ' : ''}${village.name} · Lv.${village.level}${
+        village.level >= 4 ? ' ★' : ''
+      }`,
+      position: {
+        x: Math.round(village.center.x * 10) / 10,
+        y: Math.round((village.center.y - 1.6) * 10) / 10,
+      },
+      color: kingdom ? hexColor(kingdom.color) : '#f4f4f4',
+    };
+  });
   const kingdomLabels = projection.kingdoms
     .filter((kingdom) => kingdom.status !== 'fallen')
     .map((kingdom) => {
@@ -260,6 +288,76 @@ export function buildMapLabels(projection: WorldProjection): MapLabel[] {
     });
 
   return [...villageLabels, ...kingdomLabels];
+}
+
+export function isTerritoryTileSelected(
+  projection: WorldProjection,
+  selection: WorldSelection,
+  territoryTile: TerritoryTile,
+) {
+  if (selection.type === 'village') {
+    return territoryTile.villageId === selection.id;
+  }
+
+  if (selection.type === 'kingdom') {
+    return territoryTile.kingdomId === selection.id;
+  }
+
+  return false;
+}
+
+export function buildTerritoryBorderSegments(
+  projection: WorldProjection,
+  selection: WorldSelection,
+) {
+  const territoryByPosition = new Map(
+    projection.territory.map((tile) => [`${tile.x}:${tile.y}`, tile] as const),
+  );
+
+  return projection.territory.flatMap<TerritoryBorderSegment>((tile) => {
+    const kingdom = tile.kingdomId
+      ? projection.kingdoms.find((candidate) => candidate.id === tile.kingdomId)
+      : undefined;
+    const selected = isTerritoryTileSelected(projection, selection, tile);
+    const color = kingdom?.color ?? 0xffffff;
+
+    return [
+      makeBorderSegment(territoryByPosition, tile, 'top', color, selected),
+      makeBorderSegment(territoryByPosition, tile, 'right', color, selected),
+      makeBorderSegment(territoryByPosition, tile, 'bottom', color, selected),
+      makeBorderSegment(territoryByPosition, tile, 'left', color, selected),
+    ].filter((segment): segment is TerritoryBorderSegment => Boolean(segment));
+  });
+}
+
+export function formatEventSummary(event: SimEvent) {
+  if (event.type === 'village_leveled_up') {
+    const name = typeof event.payload?.name === 'string' ? event.payload.name : '村庄';
+    const level = typeof event.payload?.level === 'number' ? event.payload.level : undefined;
+
+    return level ? `${name}成长为 Lv.${level} ${growthLabel(level)}` : `${name}正在成长`;
+  }
+
+  if (event.type === 'building_upgraded') {
+    const type = typeof event.payload?.type === 'string' ? event.payload.type : undefined;
+    const tier = typeof event.payload?.tier === 'number' ? event.payload.tier : undefined;
+    const building = type ? labelFromMap(BUILDING_LABELS, type) : '建筑';
+
+    return tier ? `${building}升级到 ${tier} 级` : `${building}完成升级`;
+  }
+
+  if (event.type === 'building_built') {
+    const type = typeof event.payload?.type === 'string' ? event.payload.type : undefined;
+    const building = type ? labelFromMap(BUILDING_LABELS, type) : '建筑';
+
+    return `${building}建造完成`;
+  }
+
+  return undefined;
+}
+
+function growthLabel(level: number) {
+  return GROWTH_LABELS[level] ?? '聚落';
 }
 
 function buildTileLines(projection: WorldProjection, x: number, y: number) {
@@ -327,15 +425,24 @@ function buildVillageLines(projection: WorldProjection, id: string) {
 
   return [
     `村庄 ${shortId(village.id)}`,
+    `名称：${village.name}`,
+    `等级：${village.level}`,
+    `成长：${growthLabel(village.level)}${
+      village.level < 5 ? '，正在向更高等级发展' : '，已达到当前成长上限'
+    }`,
     `种族：${labelFromMap(RACE_LABELS, village.race)}`,
     `状态：${labelFromMap(VILLAGE_STATUS_LABELS, village.status)}`,
     `所属王国：${kingdom ? `王国 ${shortId(kingdom.id)}` : '无'}`,
+    `首都：${kingdom?.capitalVillageId === village.id ? '是' : '否'}`,
     `人口：${village.population}`,
     `住房：${village.housingCapacity}`,
     `食物：${Math.round(village.foodInventory)} / ${village.foodCapacity}`,
     `材料：木材 ${Math.round(village.woodInventory)}, 石料 ${Math.round(
       village.stoneInventory,
     )}, 铁矿 ${Math.round(village.ironInventory)}`,
+    `职业：农民 ${village.jobs.farmer}, 建筑工 ${village.jobs.builder}, 矿工 ${village.jobs.miner}, 士兵 ${
+      village.jobs.soldier
+    }`,
     `建筑：${buildings.length}`,
     `领土：${village.territoryTiles}`,
     `军队：${activeArmies.length}`,
@@ -353,12 +460,19 @@ function buildKingdomLines(projection: WorldProjection, id: string) {
   const activeArmies = projection.armies.filter(
     (army) => army.kingdomId === kingdom.id && army.status !== 'disbanded',
   );
+  const capital = projection.villages.find(
+    (candidate) => candidate.id === kingdom.capitalVillageId,
+  );
 
   return [
     `王国 ${shortId(kingdom.id)}`,
     `种族：${labelFromMap(RACE_LABELS, kingdom.race)}`,
     `状态：${labelFromMap(KINGDOM_STATUS_LABELS, kingdom.status)}`,
-    `首都：村庄 ${shortId(kingdom.capitalVillageId)}`,
+    `首都：${
+      capital
+        ? `${capital.name}（等级 ${capital.level}）`
+        : `村庄 ${shortId(kingdom.capitalVillageId)}`
+    }`,
     `村庄：${kingdom.villageIds.length}`,
     `人口：${kingdom.population}`,
     `建筑：${kingdom.buildingCount}`,
@@ -392,6 +506,13 @@ function buildBuildingLines(projection: WorldProjection, id: string) {
     `类型：${labelFromMap(BUILDING_LABELS, building.type)}`,
     `等级：${building.tier || 1}`,
     `状态：${labelFromMap(BUILDING_STATUS_LABELS, building.status)}`,
+    ...(building.status === 'constructing'
+      ? [
+          `进度：${Math.round(building.constructionProgress ?? 0)} / ${
+            building.constructionWorkRequired ?? 0
+          }`,
+        ]
+      : []),
     `村庄：村庄 ${shortId(building.villageId)}`,
     `王国：${kingdom ? `王国 ${shortId(kingdom.id)}` : '无'}`,
     `建造时间：第 ${building.builtAtTick} 刻`,
@@ -414,6 +535,7 @@ function buildArmyLines(projection: WorldProjection, id: string) {
     `出发村庄：村庄 ${shortId(army.originVillageId)}`,
     `目标村庄：村庄 ${shortId(army.targetVillageId)}`,
     `士兵：${army.soldierCount}`,
+    `训练士兵：${army.trainedSoldiers}`,
     `士气：${army.morale.toFixed(2)}`,
     `位置：${formatPosition(army.position)}`,
   ];
@@ -508,6 +630,53 @@ function shortId(id: string) {
 
 function labelFromMap(map: Record<string, string>, value: string) {
   return map[value] ?? value;
+}
+
+function territoryOwnerKey(tile: TerritoryTile) {
+  return tile.kingdomId ? `kingdom:${tile.kingdomId}` : `village:${tile.villageId}`;
+}
+
+function makeBorderSegment(
+  territoryByPosition: Map<string, TerritoryTile>,
+  tile: TerritoryTile,
+  edge: 'top' | 'right' | 'bottom' | 'left',
+  color: number,
+  selected: boolean,
+) {
+  const neighbor = findAdjacentTerritoryTile(territoryByPosition, tile.x, tile.y, edge);
+
+  if (neighbor && territoryOwnerKey(neighbor) === territoryOwnerKey(tile)) {
+    return undefined;
+  }
+
+  switch (edge) {
+    case 'top':
+      return { x1: tile.x, y1: tile.y, x2: tile.x + 1, y2: tile.y, color, selected };
+    case 'right':
+      return { x1: tile.x + 1, y1: tile.y, x2: tile.x + 1, y2: tile.y + 1, color, selected };
+    case 'bottom':
+      return { x1: tile.x, y1: tile.y + 1, x2: tile.x + 1, y2: tile.y + 1, color, selected };
+    case 'left':
+      return { x1: tile.x, y1: tile.y, x2: tile.x, y2: tile.y + 1, color, selected };
+  }
+}
+
+function findAdjacentTerritoryTile(
+  territoryByPosition: Map<string, TerritoryTile>,
+  x: number,
+  y: number,
+  edge: 'top' | 'right' | 'bottom' | 'left',
+) {
+  switch (edge) {
+    case 'top':
+      return territoryByPosition.get(`${x}:${y - 1}`);
+    case 'right':
+      return territoryByPosition.get(`${x + 1}:${y}`);
+    case 'bottom':
+      return territoryByPosition.get(`${x}:${y + 1}`);
+    case 'left':
+      return territoryByPosition.get(`${x - 1}:${y}`);
+  }
 }
 
 // Keep the type imports above visible to TypeScript as the feature grows.

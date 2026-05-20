@@ -3,7 +3,9 @@ import { type SimCommand, SimLoop, SimWorld, type TerrainType, type WorldProject
 import {
   buildInspectionLines,
   buildMapLabels,
+  buildTerritoryBorderSegments,
   filterEventsForSelection,
+  formatEventSummary,
   selectNextKingdom,
   selectWorldEntity,
   type WorldSelection,
@@ -175,16 +177,43 @@ export class WorldScene extends Phaser.Scene {
     this.resourceLayer.clear();
 
     for (const tile of projection.tiles) {
-      if (tile.resource?.type !== 'food' || tile.resource.amount <= 0) {
+      if (!tile.resource || tile.resource.amount <= 0) {
         continue;
       }
 
-      this.resourceLayer.fillStyle(0xffcd75, 0.95);
-      this.resourceLayer.fillCircle(
-        tile.x * TILE_SIZE + TILE_SIZE / 2,
-        tile.y * TILE_SIZE + TILE_SIZE / 2,
-        2,
-      );
+      const cx = tile.x * TILE_SIZE + TILE_SIZE / 2;
+      const cy = tile.y * TILE_SIZE + TILE_SIZE / 2;
+
+      if (tile.resource.type === 'food') {
+        this.resourceLayer.fillStyle(0xffcd75, 0.95);
+        this.resourceLayer.fillCircle(cx, cy, 2);
+        continue;
+      }
+
+      if (tile.resource.type === 'wood') {
+        this.resourceLayer.fillStyle(0x4d8b43, 0.95);
+        this.resourceLayer.fillTriangle(cx, cy - 3, cx - 3, cy + 2, cx + 3, cy + 2);
+        this.resourceLayer.fillStyle(0x8b5a2b, 0.95);
+        this.resourceLayer.fillRect(cx - 0.75, cy + 1.5, 1.5, 3);
+        continue;
+      }
+
+      if (tile.resource.type === 'stone') {
+        this.resourceLayer.fillStyle(0xa7b0b7, 0.95);
+        this.resourceLayer.fillTriangle(cx - 3, cy + 2, cx, cy - 3, cx + 3, cy + 2);
+        this.resourceLayer.fillTriangle(cx - 2, cy - 1, cx + 2, cy - 1, cx, cy + 3);
+        this.resourceLayer.fillStyle(0x566c86, 0.95);
+        this.resourceLayer.fillRect(cx - 1.5, cy + 0.5, 3, 2);
+        continue;
+      }
+
+      if (tile.resource.type === 'iron') {
+        this.resourceLayer.fillStyle(0xc5c8cf, 0.95);
+        this.resourceLayer.fillCircle(cx, cy, 2.5);
+        this.resourceLayer.fillStyle(0x29366f, 0.95);
+        this.resourceLayer.fillCircle(cx - 1, cy - 0.5, 0.8);
+        this.resourceLayer.fillCircle(cx + 1, cy + 0.4, 0.8);
+      }
     }
   }
 
@@ -200,10 +229,30 @@ export class WorldScene extends Phaser.Scene {
     for (const tile of projection.territory) {
       const kingdom = tile.kingdomId ? kingdomsById.get(tile.kingdomId) : undefined;
       const color = kingdom?.color ?? 0xffffff;
-      const alpha = kingdom ? 0.22 : 0.08;
+      const selected =
+        this.selection.type === 'village'
+          ? tile.villageId === this.selection.id
+          : this.selection.type === 'kingdom'
+            ? tile.kingdomId === this.selection.id
+            : false;
+      const alpha = selected ? 0.34 : kingdom ? 0.22 : 0.08;
 
       this.territoryLayer.fillStyle(color, alpha);
       this.territoryLayer.fillRect(tile.x * TILE_SIZE, tile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    }
+
+    const borderSegments = buildTerritoryBorderSegments(projection, this.selection);
+
+    for (const segment of borderSegments) {
+      this.territoryLayer.lineStyle(
+        segment.selected ? 2 : 1,
+        segment.selected ? 0xf4f4f4 : segment.color,
+        segment.selected ? 0.95 : 0.72,
+      );
+      this.territoryLayer.beginPath();
+      this.territoryLayer.moveTo(segment.x1 * TILE_SIZE, segment.y1 * TILE_SIZE);
+      this.territoryLayer.lineTo(segment.x2 * TILE_SIZE, segment.y2 * TILE_SIZE);
+      this.territoryLayer.strokePath();
     }
   }
 
@@ -237,7 +286,13 @@ export class WorldScene extends Phaser.Scene {
       const x = building.position.x * TILE_SIZE;
       const y = building.position.y * TILE_SIZE;
       const alpha =
-        building.status === 'active' ? 0.95 : building.status === 'abandoned' ? 0.38 : 0.22;
+        building.status === 'active'
+          ? 0.95
+          : building.status === 'constructing'
+            ? 0.58
+            : building.status === 'abandoned'
+              ? 0.38
+              : 0.22;
 
       this.buildingLayer.fillStyle(color, alpha);
 
@@ -517,7 +572,11 @@ export class WorldScene extends Phaser.Scene {
         this.selection.type === 'none' || this.selection.type === 'tile' ? '最近事件' : '相关事件',
         '',
         ...(storyEvents.length > 0
-          ? storyEvents.map((event) => `第 ${event.tick} 刻：${translateEvent(event.message)}`)
+          ? storyEvents.map((event) => {
+              const summary = formatEventSummary(event);
+
+              return `第 ${event.tick} 刻：${summary || translateEvent(event.message)}`;
+            })
           : ['暂无相关事件']),
       ].join('\n'),
     );
