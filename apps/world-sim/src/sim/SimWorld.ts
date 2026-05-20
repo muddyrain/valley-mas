@@ -70,6 +70,13 @@ const CONSTRUCTION_WORK_PER_BUILDER_TICK = 8;
 const BUILDING_INTERVAL_TICKS = 60;
 const VILLAGE_SHALLOW_QUARRY_RADIUS = 6;
 const VILLAGE_SHALLOW_QUARRY_AMOUNT = 80;
+const VILLAGE_EXPANSION_INTERVAL_TICKS = 120;
+const VILLAGE_EXPANSION_MIN_POPULATION = 18;
+const VILLAGE_EXPANSION_SETTLERS = 8;
+const VILLAGE_EXPANSION_MIN_RADIUS = 16;
+const VILLAGE_EXPANSION_MAX_RADIUS = 28;
+const VILLAGE_EXPANSION_FOOD_COST = 90;
+const VILLAGE_EXPANSION_WOOD_COST = 20;
 type BuildingResourceCost = {
   food: number;
   wood: number;
@@ -893,15 +900,8 @@ export class SimWorld {
         village.foodInventory += this.forageVillageFood(village.center, VILLAGE_FORAGE_PER_TICK);
         village.foodInventory = Math.min(village.foodInventory, village.foodCapacity);
 
-        if (
-          village.status !== 'declining' &&
-          village.foodInventory >= village.housingCapacity * 4 &&
-          village.housingCapacity < VILLAGE_MAX_HOUSING
-        ) {
-          village.housingCapacity += 1;
-        }
-
         this.tryBuildForVillage(village);
+        this.tryFoundSatelliteVillage(village, residents);
         this.updateVillageGrowthFeedback(village);
       });
 
@@ -1005,6 +1005,158 @@ export class SimWorld {
     });
 
     return gathered;
+  }
+
+  private tryFoundSatelliteVillage(parent: Village, residents: Unit[]) {
+    if (
+      this.tick <= parent.foundedAtTick ||
+      this.tick % VILLAGE_EXPANSION_INTERVAL_TICKS !== 0 ||
+      parent.status === 'declining' ||
+      !parent.kingdomId
+    ) {
+      return false;
+    }
+
+    if (
+      residents.length < VILLAGE_EXPANSION_MIN_POPULATION ||
+      parent.population < Math.floor(parent.housingCapacity * 0.7) ||
+      parent.foodInventory < VILLAGE_EXPANSION_FOOD_COST ||
+      parent.woodInventory < VILLAGE_EXPANSION_WOOD_COST ||
+      this.findVillageOwnedBuildings(parent.id).length < 4
+    ) {
+      return false;
+    }
+
+    const site = this.findSatelliteVillageSite(parent);
+
+    if (!site) {
+      return false;
+    }
+
+    const settlers = [...residents]
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .slice(0, VILLAGE_EXPANSION_SETTLERS);
+
+    if (settlers.length < VILLAGE_EXPANSION_SETTLERS) {
+      return false;
+    }
+
+    parent.foodInventory -= VILLAGE_EXPANSION_FOOD_COST;
+    parent.woodInventory -= VILLAGE_EXPANSION_WOOD_COST;
+
+    const village: Village = {
+      id: `village-${String(this.nextVillageId).padStart(4, '0')}`,
+      name: createVillageName(parent.race, this.nextVillageId),
+      level: 1,
+      race: parent.race,
+      kingdomId: parent.kingdomId,
+      center: site,
+      population: settlers.length,
+      foodInventory:
+        this.forageVillageFood(site, VILLAGE_INITIAL_FORAGE) +
+        settlers.length * VILLAGE_CAMP_FOOD_PER_RESIDENT,
+      foodCapacity: VILLAGE_BASE_FOOD_CAPACITY,
+      woodInventory: 0,
+      stoneInventory: 0,
+      ironInventory: 0,
+      jobs: createEmptyVillageJobs(),
+      housingCapacity: Math.max(VILLAGE_BASE_HOUSING, settlers.length + 4),
+      territoryTiles: 0,
+      foundedAtTick: this.tick,
+      status: 'camp',
+    };
+
+    this.nextVillageId += 1;
+    this.villages.set(village.id, village);
+    const townHall = this.createBuilding(village, 'town_hall');
+    this.buildings.set(townHall.id, townHall);
+
+    const settlerIds = new Set(settlers.map((settler) => settler.id));
+    let index = 0;
+
+    for (const settler of settlers) {
+      settler.villageId = village.id;
+      settler.homeVillageId = village.id;
+      settler.position = {
+        x: clamp(site.x + (index % 3) - 1, 0, this.map.width - 1),
+        y: clamp(site.y + Math.floor(index / 3) - 1, 0, this.map.height - 1),
+      };
+      index += 1;
+    }
+
+    parent.population = Math.max(0, parent.population - settlers.length);
+    this.villageResidents.set(
+      parent.id,
+      residents.filter((resident) => !settlerIds.has(resident.id)),
+    );
+    this.villageResidents.set(village.id, settlers);
+
+    const kingdom = this.kingdoms.get(parent.kingdomId);
+
+    if (kingdom && !kingdom.villageIds.includes(village.id)) {
+      kingdom.villageIds.push(village.id);
+      this.refreshKingdomMembership(kingdom);
+    }
+
+    const payload: Record<string, string | number | boolean> = {
+      race: village.race,
+      population: village.population,
+      parentVillageId: parent.id,
+    };
+
+    if (village.kingdomId) {
+      payload.kingdomId = village.kingdomId;
+    }
+
+    this.emit(
+      'village_founded',
+      `${village.id} founded from ${parent.id}`,
+      undefined,
+      undefined,
+      site,
+      payload,
+    );
+
+    return true;
+  }
+
+  private findSatelliteVillageSite(parent: Village): Position | undefined {
+    let best: { position: Position; food: number; distance: number } | undefined;
+
+    forEachTileInRadius(this.map, parent.center, VILLAGE_EXPANSION_MAX_RADIUS, (tile) => {
+      if (!isWalkable(tile.terrain)) {
+        return;
+      }
+
+      const candidate = { x: tile.x, y: tile.y };
+      const candidateDistance = distance(parent.center, candidate);
+
+      if (
+        candidateDistance < VILLAGE_EXPANSION_MIN_RADIUS ||
+        this.findVillageNear(candidate, VILLAGE_RADIUS * 2)
+      ) {
+        return;
+      }
+
+      const food = this.foodAmountNear(candidate, VILLAGE_FOOD_RADIUS);
+
+      if (food < VILLAGE_MIN_LOCAL_FOOD) {
+        return;
+      }
+
+      if (
+        !best ||
+        food > best.food ||
+        (food === best.food && candidateDistance < best.distance) ||
+        (food === best.food &&
+          candidateDistance === best.distance &&
+          `${candidate.x}:${candidate.y}` < `${best.position.x}:${best.position.y}`)
+      ) {
+        best = { position: candidate, food, distance: candidateDistance };
+      }
+    });
+
+    return best?.position;
   }
 
   private getSharedVillage(first: Unit, second: Unit) {
@@ -1454,6 +1606,9 @@ export class SimWorld {
     const mines = buildings.filter((building) => building.type === 'mine').length;
     const barracks = buildings.filter((building) => building.type === 'barrack').length;
     const docks = buildings.filter((building) => building.type === 'dock').length;
+    const hasHousingPressure =
+      village.population >= village.housingCapacity - 2 &&
+      village.housingCapacity < VILLAGE_MAX_HOUSING;
 
     if (houses === 0) {
       return 'house';
@@ -1465,6 +1620,10 @@ export class SimWorld {
 
     if (farms === 0) {
       return 'farm';
+    }
+
+    if (hasHousingPressure) {
+      return 'house';
     }
 
     if (mines === 0) {
@@ -1491,10 +1650,7 @@ export class SimWorld {
       return 'dock';
     }
 
-    if (
-      village.population >= village.housingCapacity - 2 &&
-      village.housingCapacity < VILLAGE_MAX_HOUSING
-    ) {
+    if (hasHousingPressure) {
       return 'house';
     }
 

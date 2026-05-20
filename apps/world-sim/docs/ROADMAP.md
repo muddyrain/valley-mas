@@ -288,6 +288,8 @@ Status: `Foundation slice`
   - Builder jobs gather nearby wood deposits into village stores.
   - Wood deposits are now rendered as visible map markers, and stone/iron deposits are also rendered so material sources are visible on the map.
   - House, storage, farm, mine, barrack, dock, and house-upgrade construction are now material-driven instead of food-driven.
+  - Housing capacity now grows through visible houses and house upgrades instead of hidden food-surplus growth.
+  - Housing pressure now makes villages choose another house before optional mine, barrack, or dock work after the basic survival chain is present.
   - Residents can now draw food from village stores as a fallback when nearby tile food runs out.
   - Food is reserved for feeding people and prosperity gates instead of being consumed by ordinary building construction.
   - Mine construction now enters the normal chain after the first farm, and villages can open a small early stone quarry when no natural hill or ore deposit is close enough.
@@ -314,6 +316,7 @@ Status: `Foundation slice`
   - Village level-up events now enter the recent event stream with readable growth summaries.
   - Kingdom inspection now shows the capital village by name and level when it still exists.
   - Territory rendering now uses a clearer outer boundary outline and selected village/kingdom highlighting.
+  - Mature pressured kingdom villages can now spend food and wood to found satellite villages on separate food-rich walkable land, transferring residents into the new village and keeping it in the parent kingdom.
 
 - Planned:
   - More visible borders and selected territory highlight.
@@ -364,5 +367,5 @@ After PR-8, move toward diplomacy pressure while keeping the foundation constrai
 17. Done: PR-12B building chain now creates town halls, tier-1 houses, tier-2/3 upgrade gates, mine-site-gated mines, army-boosting barracks, and shore-gated docks while preserving existing housing effects.
 18. Done: kingdom capitals now stay stable while valid; replacement capitals are chosen after capital loss by town hall tier, active building count, population, then id.
 19. Done: PR-12C villager jobs and material resource economy.
-20. In progress: PR-12D city growth feedback with names, levels, capital markers, borders, upgrades, and ruins.
+20. In progress: PR-12D city growth feedback with names, levels, capital markers, borders, automatic satellite villages, upgrades, and ruins.
 21. Planned: PR-12E kingdom readability and god interventions for war, peace, growth, and attention marking.

@@ -898,6 +898,37 @@ describe('SimWorld village buildings and territory', () => {
     ).toBe(true);
   });
 
+  it('prioritizes another house over mines when housing is nearly full', () => {
+    const world = foundFoodRichVillage('village-housing-pressure');
+    const village = world.project().villages[0];
+
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'storage');
+    addActiveBuildingToVillage(world, village.id, 'farm');
+    addMineSiteNearVillage(world, village.id, 'stone');
+    prepareVillageForBuildingUpgrades(world, village.id, 20, 800, 8);
+
+    const mutableVillage = getMutableWorld(world).villages.get(village.id);
+
+    if (!mutableVillage) {
+      throw new Error('Expected village');
+    }
+
+    mutableVillage.housingCapacity = 20;
+
+    for (let tick = 0; tick < 70; tick += 1) {
+      world.step();
+    }
+
+    const buildings = world
+      .project()
+      .buildings.filter((building) => building.villageId === village.id);
+    const houseCount = buildings.filter((building) => building.type === 'house').length;
+
+    expect(houseCount).toBeGreaterThanOrEqual(2);
+    expect(buildings.some((building) => building.type === 'mine')).toBe(false);
+  });
+
   it('builds a dock when the village has a nearby shore site', () => {
     const world = foundFoodRichVillage('village-dock');
     const village = world.project().villages[0];
@@ -1079,6 +1110,70 @@ describe('SimWorld kingdoms', () => {
     refreshProjectedKingdom(world, kingdom.id);
 
     expect(world.project().kingdoms[0].capitalVillageId).toBe(foundingCapitalId);
+  });
+
+  it('lets a mature pressured kingdom found a satellite village on suitable land', () => {
+    const world = foundFoodRichVillage('kingdom-satellite-village', { width: 56, height: 32 });
+    const village = world.project().villages[0];
+
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'storage');
+    addActiveBuildingToVillage(world, village.id, 'farm');
+    prepareVillageForBuildingUpgrades(world, village.id, 24, 1600, 12);
+    clearFoodPatches(world);
+    placeFoodPatch(world, { x: 36, y: 12 }, 500, 4);
+
+    const parent = getMutableWorld(world).villages.get(village.id);
+
+    if (!parent) {
+      throw new Error('Expected parent village');
+    }
+
+    parent.housingCapacity = 24;
+
+    for (let tick = 0; tick < 180; tick += 1) {
+      world.step();
+    }
+
+    const projection = world.project();
+    const kingdom = projection.kingdoms[0];
+
+    expect(projection.villages.length).toBeGreaterThanOrEqual(2);
+    expect(kingdom.villageIds).toHaveLength(projection.villages.length);
+    expect(projection.villages.every((candidate) => candidate.kingdomId === kingdom.id)).toBe(true);
+    expect(
+      projection.recentEvents.some(
+        (event) =>
+          event.type === 'village_founded' &&
+          event.payload?.parentVillageId === village.id &&
+          event.payload?.kingdomId === kingdom.id,
+      ),
+    ).toBe(true);
+  });
+
+  it('does not found a satellite village when no suitable food site exists', () => {
+    const world = foundFoodRichVillage('kingdom-no-satellite-site', { width: 56, height: 32 });
+    const village = world.project().villages[0];
+
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'storage');
+    addActiveBuildingToVillage(world, village.id, 'farm');
+    prepareVillageForBuildingUpgrades(world, village.id, 24, 1600, 12);
+    clearFoodPatches(world);
+
+    const parent = getMutableWorld(world).villages.get(village.id);
+
+    if (!parent) {
+      throw new Error('Expected parent village');
+    }
+
+    parent.housingCapacity = 24;
+
+    for (let tick = 0; tick < 240; tick += 1) {
+      world.step();
+    }
+
+    expect(world.project().villages).toHaveLength(1);
   });
 
   it('chooses the strongest remaining town as capital only after the current capital is lost', () => {
@@ -1406,8 +1501,13 @@ function runReplay() {
   return world.serializeForReplay();
 }
 
-function foundFoodRichVillage(seed: string) {
-  const world = new SimWorld({ seed, width: 32, height: 24, initialUnits: 0 });
+function foundFoodRichVillage(seed: string, options: { width?: number; height?: number } = {}) {
+  const world = new SimWorld({
+    seed,
+    width: options.width ?? 32,
+    height: options.height ?? 24,
+    initialUnits: 0,
+  });
 
   world.enqueue({
     id: 'cmd-food',
@@ -1615,6 +1715,54 @@ function setTownHallTier(world: SimWorld, villageId: string, tier: number) {
   }
 
   townHall.tier = tier;
+}
+
+function addActiveBuildingToVillage(
+  world: SimWorld,
+  villageId: string,
+  type: VillageBuilding['type'],
+) {
+  const mutableWorld = getMutableWorld(world);
+  const village = mutableWorld.villages.get(villageId);
+
+  if (!village) {
+    throw new Error(`Expected village ${villageId}`);
+  }
+
+  const building = mutableWorld.createBuilding(village, type);
+  mutableWorld.buildings.set(building.id, building);
+}
+
+function placeFoodPatch(
+  world: SimWorld,
+  position: { x: number; y: number },
+  amount: number,
+  radius: number,
+) {
+  for (const tile of world.map.tiles) {
+    const dx = tile.x - position.x;
+    const dy = tile.y - position.y;
+
+    if (dx * dx + dy * dy > radius * radius) {
+      continue;
+    }
+
+    tile.terrain = 'grass';
+    tile.biome = 'temperate';
+
+    tile.resource = {
+      type: 'food',
+      amount,
+    };
+  }
+}
+
+function clearFoodPatches(world: SimWorld) {
+  for (const tile of world.map.tiles) {
+    if (tile.resource?.type === 'food') {
+      tile.resource = undefined;
+    }
+  }
 }
 
 function addMineSiteNearVillage(

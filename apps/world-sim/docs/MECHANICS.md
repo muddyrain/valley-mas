@@ -55,14 +55,15 @@ Villages also carry a race-themed name and a growth level:
 - village population is counted by `homeVillageId`, while `villageId` only marks the current nearby village presence
 - village food inventory is gathered from nearby food deposits and can be shared back to nearby residents through the village store
 - active mines gather nearby stone or iron deposits into village material stores
-- housing capacity caps village-supported reproduction
+- housing capacity caps village-supported reproduction and now grows through visible houses or house upgrades, not invisible food-only expansion
+- mature kingdom villages can found satellite villages when they have at least 18 residents, about 70% housing use, enough food and wood reserves, a basic building chain, and a separate food-rich walkable site 16-28 tiles away; founding transfers 8 residents, spends 90 food and 20 wood, creates a new town hall, and keeps the new village inside the parent kingdom
 - food shortage causes village decline before later systems add migration, abandonment pressure, or war; camp villages have a gentler early drain so they can survive the bootstrap phase
 - villages are abandoned only when their home population reaches zero, not when residents temporarily walk away
 - buildings change capacity or production
 - territory follows settlement and building influence
 - kingdoms group villages and prepare diplomacy
 
-Kingdoms form from village strength instead of player commands. A village with enough home population and active buildings can found a rising kingdom. Nearby same-race villages can join that kingdom. A kingdom tracks capital village, member villages, total home population, active buildings, active territory, food inventory, stable display color, and status. The founding capital is stable: it does not move just because another member village has more population. A replacement capital is chosen only when the current capital is no longer a valid member, such as after abandonment, removal, or capture. Replacement priority is highest active town hall tier, then active building count, then population, then deterministic village id order. If all member villages disappear, the kingdom becomes fallen and remains as history data for later UI. Territory projection now keeps both `villageId` and optional `kingdomId`, so diplomacy, war, and rendering can reason about ownership by kingdom without changing the simulation/rendering boundary.
+Kingdoms form from village strength instead of player commands. A village with enough home population and active buildings can found a rising kingdom. Nearby same-race villages can join that kingdom, and mature pressured member villages can now seed new satellite villages when suitable land and food exist nearby. A kingdom tracks capital village, member villages, total home population, active buildings, active territory, food inventory, stable display color, and status. The founding capital is stable: it does not move just because another member village has more population. A replacement capital is chosen only when the current capital is no longer a valid member, such as after abandonment, removal, or capture. Replacement priority is highest active town hall tier, then active building count, then population, then deterministic village id order. If all member villages disappear, the kingdom becomes fallen and remains as history data for later UI. Territory projection now keeps both `villageId` and optional `kingdomId`, so diplomacy, war, and rendering can reason about ownership by kingdom without changing the simulation/rendering boundary.
 
 ## Diplomacy Pressure
 
@@ -84,6 +85,7 @@ hut/storage/farm foundation into a clearer settlement chain, and PR-12C shifts c
 - town hall is created when a village is founded and marks the visible settlement anchor
 - town hall now acts as the upgrade gate for the rest of the chain
 - house is the visible housing building; the first slice stores `tier: 1`, then can upgrade to tiers 2 and 3 for extra housing capacity, and its construction is wood-driven rather than food-driven
+- when population presses against housing after the first house/storage/farm chain, villages prioritize another house before optional mine, barrack, or dock work
 - storage increases village food capacity and costs wood
 - farm produces village food when the village has assigned farmer jobs, even after nearby deposits are exhausted, and costs wood
 - mine can be built once after the village has a house, storage, and at least one farm; it prefers a nearby hill, stone deposit, or iron deposit, but can open a shallow stone quarry if no natural mine site is close enough

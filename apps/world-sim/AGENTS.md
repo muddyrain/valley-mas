@@ -40,9 +40,9 @@ WorldSim v2 是一个 2D 像素风上帝沙盒文明模拟游戏：
 | PR-9 外交压力 | Done | 王国会根据边境摩擦、资源压力和种族倾向积累外交压力，并产生宣战事件 |
 | PR-10 最小战争 | Done | 宣战会生成聚合军队组，军队可推进、结算伤亡、撤退/解散并占领村庄 |
 | PR-11 规模门槛 | Done | `SimWorld.project()` 已支持 viewport culling，Phaser 已按 camera 视口取可见 tiles/units/territory/buildings/armies；PR-11A 测量 harness、PR-11B/PR-11D step phase profiling、PR-11C 村庄居民索引优化、PR-11E 单位行为降频和 PR-11F 重复居民索引重建移除已补；本地 10000 聚合人口 / 656 可见单位连续 5 次低于 16.7 ms；worker simulation 和 hot-data layout 留到更大目标按指标决定 |
-| PR-12+ | Foundation slice | `PR-12A` inspection/event story 已完成；`PR-12B` 建筑链已完成 town hall、tier-1 house、house 2/3 升级门槛、mine 矿址 hook、barrack 军队 hook 和 dock 岸线 hook；`PR-12C` 已接入 food/wood/stone/iron 仓储、默认 farmer 过渡劳力、camp 轻口粮缓冲、farmer/builder/miner/soldier 聚合职业、农场职业产粮、builder 伐木、木材点与石料/铁矿点可视化、建筑材料成本、施工时间、居民从村庄库存补粮、soldier 参与军队动员和 battle strength、miner 采矿，以及早期浅层采石场；`PR-12D` 已补村庄命名、等级、首都标记、成长事件和更清晰的领土外轮廓，下一步继续补建筑升级/成长事件与废墟可读性，再往 `PR-12E` 王国可读性与神力干预推进 |
+| PR-12+ | Foundation slice | `PR-12A` inspection/event story 已完成；`PR-12B` 建筑链已完成 town hall、tier-1 house、house 2/3 升级门槛、mine 矿址 hook、barrack 军队 hook 和 dock 岸线 hook；`PR-12C` 已接入 food/wood/stone/iron 仓储、默认 farmer 过渡劳力、camp 轻口粮缓冲、farmer/builder/miner/soldier 聚合职业、农场职业产粮、builder 伐木、木材点与石料/铁矿点可视化、建筑材料成本、施工时间、居民从村庄库存补粮、soldier 参与军队动员和 battle strength、miner 采矿，以及早期浅层采石场；`PR-12D` 已补村庄命名、等级、首都标记、成长事件、更清晰的领土外轮廓、住房压力优先补房，以及成熟王国村庄自动建立卫星村，下一步继续补建筑升级/成长事件与废墟可读性，再往 `PR-12E` 王国可读性与神力干预推进 |
 
-进入 PR-12+ 时仍需尊重 `ROADMAP.md` 的 PR-11 约束：当前已具备 viewport projection culling、第一版 10000 聚合人口 / 500+ 可见单位本地稳定性签收、step phase profiling、村庄居民索引优化和非紧急单位行为降频；`PR-12C` 职业资源已完成，`PR-12D` 已进入领土可读性和城市成长反馈阶段，接下来补建筑升级/成长事件与废墟可读性，再往 `PR-12E` 王国可读性与神力干预推进。更大地图、worker simulation、hot-data layout 或资源索引应继续由 `measure:scale` 的最慢阶段驱动。
+进入 PR-12+ 时仍需尊重 `ROADMAP.md` 的 PR-11 约束：当前已具备 viewport projection culling、第一版 10000 聚合人口 / 500+ 可见单位本地稳定性签收、step phase profiling、村庄居民索引优化和非紧急单位行为降频；`PR-12C` 职业资源已完成，`PR-12D` 已进入领土可读性、城市成长反馈、住房压力和自动分村阶段，接下来补建筑升级/成长事件与废墟可读性，再往 `PR-12E` 王国可读性与神力干预推进。更大地图、worker simulation、hot-data layout 或资源索引应继续由 `measure:scale` 的最慢阶段驱动。
 
 ## 目录结构
 
