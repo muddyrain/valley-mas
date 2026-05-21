@@ -72,7 +72,7 @@ Status: `Foundation slice`
   - HUD panels use a separate UI camera and responsive panel sizing, so map zoom and browser resize do not distort the status overlay.
   - Scene projection requests now pass the active camera viewport, so render-facing tiles, units, territory, buildings, and armies are culled before drawing.
   - Terrain redraws are keyed by terrain revision plus viewport instead of ticking every frame.
-  - The main camera now supports WorldBox-style keyboard movement, edge scrolling, pointer-anchored wheel zoom, keyboard zoom, and a dynamic cover zoom so terrain fills the viewport instead of leaving exposed camera background.
+  - The main camera now supports WorldBox-style keyboard movement, pointer-anchored wheel zoom, keyboard zoom, and a dynamic cover zoom so terrain fills the viewport instead of leaving exposed camera background.
 - Acceptance gaps:
   - Full projection remains the default compatibility path for tests, replay inspection, and tools that do not pass a viewport.
   - PR-11 has a repeatable scale measurement harness and a local 128 x 128 / 10000 population / 500+ visible unit stability sign-off; larger maps still require fresh metrics.
@@ -332,12 +332,12 @@ Status: `Foundation slice`
 - Before PR-12E, make the small-people development loop feel closer to WorldBox: villagers should appear to gather, build, settle, and expand before the player is asked to reason about kingdom-level diplomacy tools.
 - Acceptance: a player watching one settlement for several minutes can tell why it is or is not growing, see wood/home/territory pressure, and observe the village spreading without direct management.
 - Implemented:
-  - Builder wood gathering now projects short-lived work sites, while nearby wood deposits deplete as stores fill.
+  - Builder wood gathering now remains available as projection data for simulation-side territory pressure, while nearby wood deposits deplete as stores fill.
   - Construction starts and builder progress now project short-lived construction work sites.
   - Villages now expose `growthBlockers` in projection and inspection for housing pressure, missing wood, exhausted nearby wood, insufficient builders, low food reserve, and no buildable land.
   - Housing pressure now triggers at roughly 75% housing use and can prioritize another house before optional farm, mine, barrack, or dock work once the first house/storage chain exists.
   - Territory projection now includes settlement pressure from village centers and active work sites, so the visible claim can spread with lived activity instead of only finished building radii.
-  - Phaser renders gathering/construction work-site pulses so aggregate village work has a map-level trace.
+  - Phaser renders construction work-site pulses only; wood gathering no longer has a separate chopping pulse and is read through resource depletion and inventory changes.
 - Remaining scope:
   - Keep deep roads/paths, per-citizen worker trips, and richer stall events for later growth-depth passes.
   - Keep the player in a god role: no manual job assignment, no manual house placement, and no direct unit control.
@@ -385,16 +385,21 @@ Status: `Foundation slice`
 Status: `Foundation slice`
 
 - Make the demo feel closer to WorldBox's fullscreen sandbox map before adding more god tools.
-- Acceptance: the browser viewport is filled by world terrain, the HUD stays a light overlay, the player can navigate with WorldBox-style keyboard/edge camera controls, and wheel zoom keeps the pointed world location stable instead of zooming only around the center.
+- Acceptance: the browser viewport is filled by world terrain, the HUD stays a light overlay, the player can navigate with WorldBox-style keyboard camera controls, and wheel zoom keeps the pointed world location stable instead of zooming only around the center.
 - Implemented:
   - The Phaser demo now creates a 256 x 256 world while preserving the 128 x 128 simulation default for unit tests and tooling.
   - The main camera uses a dynamic cover zoom derived from viewport size and world pixel size, so max zoom-out still keeps terrain behind the full screen instead of exposing camera background.
   - The minimum zoom now switches to a contain-style overview, so the player can zoom far enough out to see the whole generated world at once without leaving the camera on a black background.
   - The default HUD now stays compact enough that the map remains the first-screen surface; inspection grows only after the player selects something.
-  - Mouse-wheel zoom preserves the world coordinate under the pointer, while Q/E and +/- provide keyboard zoom.
-  - WASD and arrow keys move the camera, and pointer-edge scrolling provides mouse-only navigation without stealing left-click selection or god-power placement.
+  - Mouse-wheel zoom preserves the world coordinate under the pointer, while Q/E and +/- provide keyboard zoom from the screen center.
+  - WASD and arrow keys move the camera through the same center-based camera model as zoom and resize, and pan speed is measured as a fixed percentage of the currently visible viewport with a fast keyboard rate for wide map sweeps.
+  - Mouse edge panning is intentionally disabled because it interferes with pointer placement near UI and map borders.
   - Ctrl + wheel changes simulation speed, matching the WorldBox control convention closely enough for the current prototype.
-  - Regression coverage locks cover zoom, contain zoom, Phaser scroll-derived viewport centering, and clamp behavior so zoom-out does not drift the map toward a corner or expose black camera background.
+  - Regression coverage locks cover zoom, contain zoom, center-based clamping, pointer-anchored zoom, viewport-relative pan speed, and live center-derived viewport projection so zoom-out does not drift the map toward a corner or expose black camera background.
+  - Terrain projection now uses a wider camera buffer, and heavy Phaser layers redraw on coarse viewport buckets instead of every tiny camera movement.
+  - Static Phaser layers such as terrain, resources, territory, buildings, army routes, and map labels stay viewport-capped, so zoomed-out panning does not keep a full-map Graphics command list on screen every frame.
+  - HUD layout and text refresh now use a state key plus a short throttle, so camera-only panning no longer rebuilds overlay panels every frame.
+  - Camera zoom now drives render detail levels: overview zoom keeps terrain, territory, map labels, and army context readable; regional zoom adds buildings; local zoom adds units, resource markers, and work-site details.
 - Deferred:
   - 512+ world presets, resource indexing, and incremental resource statistics remain later scale work.
 

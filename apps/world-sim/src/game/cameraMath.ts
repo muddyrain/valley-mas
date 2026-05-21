@@ -8,16 +8,16 @@ export type CameraViewportSize = {
   height: number;
 };
 
-export type CameraViewState = {
-  scrollX: number;
-  scrollY: number;
-  screenWidth: number;
-  screenHeight: number;
+export type CameraCenterState = {
+  centerX: number;
+  centerY: number;
   viewportWidth: number;
   viewportHeight: number;
   worldWidth: number;
   worldHeight: number;
 };
+
+export type CameraViewSizeState = Omit<CameraCenterState, 'centerX' | 'centerY'>;
 
 export type CameraMotionState = {
   velocityX: number;
@@ -32,6 +32,32 @@ export type CameraMotionInput = {
   acceleration: number;
   deceleration: number;
 };
+
+export type CameraZoomAnchorInput = {
+  centerX: number;
+  centerY: number;
+  screenX: number;
+  screenY: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  currentZoom: number;
+  nextZoom: number;
+};
+
+export type CameraViewportFromCenterInput = {
+  centerX: number;
+  centerY: number;
+  viewportWidth: number;
+  viewportHeight: number;
+};
+
+export type CameraViewportPanSpeedInput = {
+  viewportWidth: number;
+  viewportHeight: number;
+  viewportFractionPerSecond: number;
+};
+
+export type CameraDetailLevel = 'overview' | 'regional' | 'local';
 
 export function getCoverZoom(
   viewport: CameraViewportSize,
@@ -55,34 +81,55 @@ export function getContainZoom(
   return Math.min(maxZoom, Math.min(zoomToFitWidth, zoomToFitHeight));
 }
 
-export function centerCameraScroll(state: CameraViewState) {
-  const offsetX = getScrollToWorldViewOffset(state.screenWidth, state.viewportWidth);
-  const offsetY = getScrollToWorldViewOffset(state.screenHeight, state.viewportHeight);
-
+export function centerCameraView(state: CameraViewSizeState) {
   return {
-    scrollX: (state.worldWidth - state.viewportWidth) / 2 + offsetX,
-    scrollY: (state.worldHeight - state.viewportHeight) / 2 + offsetY,
+    centerX: state.worldWidth / 2,
+    centerY: state.worldHeight / 2,
   };
 }
 
-export function clampCameraScroll(state: CameraViewState) {
-  const minViewX =
-    state.viewportWidth > state.worldWidth ? (state.worldWidth - state.viewportWidth) / 2 : 0;
-  const minViewY =
-    state.viewportHeight > state.worldHeight ? (state.worldHeight - state.viewportHeight) / 2 : 0;
-  const maxViewX =
-    state.viewportWidth > state.worldWidth ? minViewX : state.worldWidth - state.viewportWidth;
-  const maxViewY =
-    state.viewportHeight > state.worldHeight ? minViewY : state.worldHeight - state.viewportHeight;
-  const offsetX = getScrollToWorldViewOffset(state.screenWidth, state.viewportWidth);
-  const offsetY = getScrollToWorldViewOffset(state.screenHeight, state.viewportHeight);
-  const worldViewX = getWorldViewPosition(state.scrollX, state.screenWidth, state.viewportWidth);
-  const worldViewY = getWorldViewPosition(state.scrollY, state.screenHeight, state.viewportHeight);
+export function clampCameraCenter(state: CameraCenterState) {
+  return {
+    centerX: clampCenterAxis(state.centerX, state.viewportWidth, state.worldWidth),
+    centerY: clampCenterAxis(state.centerY, state.viewportHeight, state.worldHeight),
+  };
+}
+
+export function getAnchoredZoomCenter(input: CameraZoomAnchorInput) {
+  const screenOffsetX = input.screenX - input.viewportWidth / 2;
+  const screenOffsetY = input.screenY - input.viewportHeight / 2;
+  const anchoredWorldX = input.centerX + screenOffsetX / input.currentZoom;
+  const anchoredWorldY = input.centerY + screenOffsetY / input.currentZoom;
 
   return {
-    scrollX: clamp(worldViewX, minViewX, maxViewX) + offsetX,
-    scrollY: clamp(worldViewY, minViewY, maxViewY) + offsetY,
+    centerX: anchoredWorldX - screenOffsetX / input.nextZoom,
+    centerY: anchoredWorldY - screenOffsetY / input.nextZoom,
   };
+}
+
+export function getCameraViewportFromCenter(input: CameraViewportFromCenterInput) {
+  return {
+    x: input.centerX - input.viewportWidth / 2,
+    y: input.centerY - input.viewportHeight / 2,
+    width: input.viewportWidth,
+    height: input.viewportHeight,
+  };
+}
+
+export function getViewportRelativePanSpeed(input: CameraViewportPanSpeedInput) {
+  return Math.max(input.viewportWidth, input.viewportHeight) * input.viewportFractionPerSecond;
+}
+
+export function getCameraDetailLevel(zoom: number): CameraDetailLevel {
+  if (zoom < 0.85) {
+    return 'overview';
+  }
+
+  if (zoom < 1.35) {
+    return 'regional';
+  }
+
+  return 'local';
 }
 
 export function stepCameraMotion(state: CameraMotionState, input: CameraMotionInput) {
@@ -105,12 +152,12 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function getWorldViewPosition(scroll: number, screenSize: number, viewportSize: number) {
-  return scroll + screenSize / 2 - viewportSize / 2;
-}
+function clampCenterAxis(center: number, viewportSize: number, worldSize: number) {
+  if (viewportSize >= worldSize) {
+    return worldSize / 2;
+  }
 
-function getScrollToWorldViewOffset(screenSize: number, viewportSize: number) {
-  return viewportSize / 2 - screenSize / 2;
+  return clamp(center, viewportSize / 2, worldSize - viewportSize / 2);
 }
 
 function lerp(from: number, to: number, mix: number) {

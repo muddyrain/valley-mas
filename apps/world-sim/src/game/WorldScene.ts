@@ -1,10 +1,15 @@
 import * as Phaser from 'phaser';
 import { type SimCommand, SimLoop, SimWorld, type TerrainType, type WorldProjection } from '../sim';
 import {
-  centerCameraScroll,
-  clampCameraScroll,
+  type CameraDetailLevel,
+  centerCameraView,
+  clampCameraCenter,
+  getAnchoredZoomCenter,
+  getCameraDetailLevel,
+  getCameraViewportFromCenter,
   getContainZoom,
   getCoverZoom,
+  getViewportRelativePanSpeed,
   stepCameraMotion,
 } from './cameraMath';
 import {
@@ -26,15 +31,17 @@ const DEMO_WORLD_HEIGHT = 256;
 const DEMO_INITIAL_UNITS = 48;
 const INITIAL_CAMERA_ZOOM = 0.72;
 const MAX_CAMERA_ZOOM = 3;
-const CAMERA_KEYBOARD_SPEED = 560;
-const CAMERA_EDGE_SPEED = 480;
-const CAMERA_EDGE_MARGIN = 26;
-const CAMERA_ACCELERATION = 18;
-const CAMERA_DECELERATION = 24;
-const CAMERA_MAX_DELTA_SECONDS = 0.05;
-const CAMERA_KEY_ZOOM_PER_SECOND = 1.9;
-const CAMERA_WHEEL_ZOOM_IN = 1.12;
-const CAMERA_WHEEL_ZOOM_OUT = 0.88;
+const CAMERA_KEYBOARD_VIEWPORTS_PER_SECOND = 1.55;
+const CAMERA_ACCELERATION = 82;
+const CAMERA_DECELERATION = 56;
+const CAMERA_MAX_DELTA_SECONDS = 1 / 30;
+const CAMERA_VIEWPORT_PADDING_TILES = 18;
+const STATIC_VIEWPORT_REDRAW_TILE_STEP = 16;
+const STATIC_LAYER_REDRAW_TICK_STEP = 60;
+const HUD_REDRAW_INTERVAL_MS = 250;
+const CAMERA_KEY_ZOOM_PER_SECOND = 2.1;
+const CAMERA_WHEEL_ZOOM_IN = 1.16;
+const CAMERA_WHEEL_ZOOM_OUT = 1 / CAMERA_WHEEL_ZOOM_IN;
 const PANEL_COLOR = 0x101726;
 const PANEL_STROKE = 0x4052a1;
 const TEXT_COLOR = '#f4f4f4';
@@ -118,6 +125,13 @@ export class WorldScene extends Phaser.Scene {
   private mapLabelTexts: Phaser.GameObjects.Text[] = [];
   private commandSequence = 1;
   private lastTerrainDrawKey = '';
+  private lastResourceDrawKey = '';
+  private lastTerritoryDrawKey = '';
+  private lastBuildingDrawKey = '';
+  private lastArmyRouteDrawKey = '';
+  private lastMapLabelsDrawKey = '';
+  private lastHudDrawKey = '';
+  private lastHudDrawAtMs = -Infinity;
   private selection: WorldSelection = { type: 'none' };
   private cameraInitialized = false;
   private lastCameraWidth = 0;
@@ -171,14 +185,14 @@ export class WorldScene extends Phaser.Scene {
     window.addEventListener('keyup', this.handleKeyUp);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
 
-    this.renderProjection(this.projectVisibleWorld());
+    this.renderProjection(this.projectVisibleWorld(), 0);
   }
 
-  update(_time: number, delta: number) {
+  update(time: number, delta: number) {
     this.ensureMainCameraInitialized();
     this.updateCameraControls(delta);
     this.loop.advance(delta);
-    this.renderProjection(this.projectVisibleWorld());
+    this.renderProjection(this.projectVisibleWorld(), time);
   }
 
   private shutdown() {
@@ -190,24 +204,60 @@ export class WorldScene extends Phaser.Scene {
     this.clearMapLabels();
   }
 
-  private renderProjection(projection: WorldProjection) {
+  private renderProjection(projection: WorldProjection, timeMs: number) {
+    const detailLevel = this.getRenderDetailLevel();
     const terrainDrawKey = this.getTerrainDrawKey(projection);
-
+    const resourceDrawKey = this.getResourceDrawKey(projection, detailLevel);
+    const territoryDrawKey = this.getTerritoryDrawKey(projection);
+    const buildingDrawKey = this.getBuildingDrawKey(projection, detailLevel);
+    const armyRouteDrawKey = this.getArmyRouteDrawKey(projection);
+    const mapLabelsDrawKey = this.getMapLabelsDrawKey(projection, detailLevel);
     if (terrainDrawKey !== this.lastTerrainDrawKey) {
       this.drawTerrain(projection);
       this.lastTerrainDrawKey = terrainDrawKey;
     }
 
-    this.drawTerritory(projection);
-    this.drawResources(projection);
-    this.drawWorkSites(projection);
-    this.drawBuildings(projection);
-    this.drawArmyRoutes(projection);
+    if (territoryDrawKey !== this.lastTerritoryDrawKey) {
+      this.drawTerritory(projection);
+      this.lastTerritoryDrawKey = territoryDrawKey;
+    }
+
+    if (resourceDrawKey !== this.lastResourceDrawKey) {
+      this.drawResources(projection, detailLevel);
+      this.lastResourceDrawKey = resourceDrawKey;
+    }
+
+    this.drawWorkSites(projection, detailLevel);
+
+    if (buildingDrawKey !== this.lastBuildingDrawKey) {
+      this.drawBuildings(projection, detailLevel);
+      this.lastBuildingDrawKey = buildingDrawKey;
+    }
+
+    if (armyRouteDrawKey !== this.lastArmyRouteDrawKey) {
+      this.drawArmyRoutes(projection);
+      this.lastArmyRouteDrawKey = armyRouteDrawKey;
+    }
+
     this.drawArmies(projection);
-    this.drawUnits(projection);
+    this.drawUnits(projection, detailLevel);
     this.drawSelection(projection);
-    this.drawMapLabels(projection);
-    this.drawHud(projection);
+
+    if (mapLabelsDrawKey !== this.lastMapLabelsDrawKey) {
+      this.drawMapLabels(projection);
+      this.lastMapLabelsDrawKey = mapLabelsDrawKey;
+    }
+
+    const hudDrawKey = this.getHudDrawKey(projection);
+
+    if (
+      hudDrawKey !== this.lastHudDrawKey ||
+      timeMs - this.lastHudDrawAtMs >= HUD_REDRAW_INTERVAL_MS
+    ) {
+      this.drawHud(projection);
+      this.lastHudDrawKey = hudDrawKey;
+      this.lastHudDrawAtMs = timeMs;
+    }
   }
 
   private drawTerrain(projection: WorldProjection) {
@@ -223,12 +273,16 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private drawResources(projection: WorldProjection) {
+  private drawResources(projection: WorldProjection, detailLevel: CameraDetailLevel) {
     if (!this.resourceLayer) {
       return;
     }
 
     this.resourceLayer.clear();
+
+    if (detailLevel !== 'local') {
+      return;
+    }
 
     for (const tile of projection.tiles) {
       if (!tile.resource || tile.resource.amount <= 0) {
@@ -310,12 +364,16 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private drawUnits(projection: WorldProjection) {
+  private drawUnits(projection: WorldProjection, detailLevel: CameraDetailLevel) {
     if (!this.unitLayer) {
       return;
     }
 
     this.unitLayer.clear();
+
+    if (detailLevel !== 'local') {
+      return;
+    }
 
     for (const unit of projection.units) {
       this.unitLayer.fillStyle(INTENT_COLORS[unit.intent], 1);
@@ -328,12 +386,16 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private drawBuildings(projection: WorldProjection) {
+  private drawBuildings(projection: WorldProjection, detailLevel: CameraDetailLevel) {
     if (!this.buildingLayer) {
       return;
     }
 
     this.buildingLayer.clear();
+
+    if (detailLevel === 'overview') {
+      return;
+    }
 
     for (const building of projection.buildings) {
       const color = BUILDING_COLORS[building.type];
@@ -398,12 +460,16 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private drawWorkSites(projection: WorldProjection) {
+  private drawWorkSites(projection: WorldProjection, detailLevel: CameraDetailLevel) {
     if (!this.workSiteLayer) {
       return;
     }
 
     this.workSiteLayer.clear();
+
+    if (detailLevel !== 'local') {
+      return;
+    }
 
     for (const site of projection.workSites) {
       const x = site.position.x * TILE_SIZE;
@@ -413,11 +479,6 @@ export class WorldScene extends Phaser.Scene {
       const alpha = Math.min(0.9, Math.max(0.2, (remainingTicks / 60) * pulse));
 
       if (site.type === 'wood_gathering') {
-        this.workSiteLayer.lineStyle(1.5, 0xffcd75, alpha);
-        this.workSiteLayer.strokeCircle(x, y, 6);
-        this.workSiteLayer.fillStyle(0xffcd75, alpha * 0.7);
-        this.workSiteLayer.fillRect(x - 1, y - 5, 2, 10);
-        this.workSiteLayer.fillRect(x - 5, y - 1, 10, 2);
         continue;
       }
 
@@ -695,7 +756,6 @@ export class WorldScene extends Phaser.Scene {
         '按住上档键 + 左键：召唤 4 个小人',
         '按住替代键 + 左键：闪电打击',
         'WASD / 方向键：移动镜头',
-        '鼠标靠近屏幕边缘：移动镜头',
         '滚轮 / Q / +：放大，E / -：缩小',
         '1 / 2 / 4 键：调整速度',
         'K 键：循环选择王国',
@@ -836,15 +896,18 @@ export class WorldScene extends Phaser.Scene {
     const deltaSeconds = Math.min(deltaMs / 1000, CAMERA_MAX_DELTA_SECONDS);
     const camera = this.cameras.main;
     const keyboardMove = this.getKeyboardCameraDirection();
-    const hasKeyboardMove = keyboardMove.x !== 0 || keyboardMove.y !== 0;
-    const edgeMove = hasKeyboardMove ? { x: 0, y: 0 } : this.getEdgeCameraDirection();
-    const move = hasKeyboardMove ? keyboardMove : edgeMove;
-    const speed = hasKeyboardMove ? CAMERA_KEYBOARD_SPEED : CAMERA_EDGE_SPEED;
+    const viewportWidth = camera.width / camera.zoom;
+    const viewportHeight = camera.height / camera.zoom;
+    const speed = getViewportRelativePanSpeed({
+      viewportWidth,
+      viewportHeight,
+      viewportFractionPerSecond: CAMERA_KEYBOARD_VIEWPORTS_PER_SECOND,
+    });
     const nextMotion = stepCameraMotion(
       { velocityX: this.cameraVelocityX, velocityY: this.cameraVelocityY },
       {
-        directionX: move.x,
-        directionY: move.y,
+        directionX: keyboardMove.x,
+        directionY: keyboardMove.y,
         speed,
         deltaSeconds,
         acceleration: CAMERA_ACCELERATION,
@@ -856,17 +919,15 @@ export class WorldScene extends Phaser.Scene {
     this.cameraVelocityY = nextMotion.velocityY;
 
     if (this.cameraVelocityX !== 0 || this.cameraVelocityY !== 0) {
-      camera.scrollX += (this.cameraVelocityX * deltaSeconds) / camera.zoom;
-      camera.scrollY += (this.cameraVelocityY * deltaSeconds) / camera.zoom;
-      const attemptedScrollX = camera.scrollX;
-      const attemptedScrollY = camera.scrollY;
-      const clampedScroll = this.clampMainCameraScroll();
+      const attemptedCenterX = camera.midPoint.x + this.cameraVelocityX * deltaSeconds;
+      const attemptedCenterY = camera.midPoint.y + this.cameraVelocityY * deltaSeconds;
+      const clampedCenter = this.setMainCameraCenter(attemptedCenterX, attemptedCenterY);
 
-      if (Math.abs(clampedScroll.scrollX - attemptedScrollX) > 0.001) {
+      if (Math.abs(clampedCenter.centerX - attemptedCenterX) > 0.001) {
         this.cameraVelocityX = 0;
       }
 
-      if (Math.abs(clampedScroll.scrollY - attemptedScrollY) > 0.001) {
+      if (Math.abs(clampedCenter.centerY - attemptedCenterY) > 0.001) {
         this.cameraVelocityY = 0;
       }
     }
@@ -894,36 +955,9 @@ export class WorldScene extends Phaser.Scene {
     };
   }
 
-  private getEdgeCameraDirection() {
-    const pointer = this.input.activePointer;
-
-    if (
-      !pointer ||
-      pointer.isDown ||
-      pointer.x < 0 ||
-      pointer.y < 0 ||
-      pointer.x > this.scale.width ||
-      pointer.y > this.scale.height
-    ) {
-      return { x: 0, y: 0 };
-    }
-
-    const width = this.scale.width;
-    const height = this.scale.height;
-
-    return {
-      x:
-        (pointer.x >= width - CAMERA_EDGE_MARGIN ? 1 : 0) -
-        (pointer.x <= CAMERA_EDGE_MARGIN ? 1 : 0),
-      y:
-        (pointer.y >= height - CAMERA_EDGE_MARGIN ? 1 : 0) -
-        (pointer.y <= CAMERA_EDGE_MARGIN ? 1 : 0),
-    };
-  }
-
   private zoomCameraAt(screenX: number, screenY: number, multiplier: number) {
     const camera = this.cameras.main;
-    const before = camera.getWorldPoint(screenX, screenY);
+    const center = camera.midPoint;
     const nextZoom = Phaser.Math.Clamp(
       camera.zoom * multiplier,
       this.getMinimumCameraZoom(),
@@ -934,11 +968,19 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
 
+    const nextCenter = getAnchoredZoomCenter({
+      centerX: center.x,
+      centerY: center.y,
+      screenX,
+      screenY,
+      viewportWidth: camera.width,
+      viewportHeight: camera.height,
+      currentZoom: camera.zoom,
+      nextZoom,
+    });
+
     camera.setZoom(nextZoom);
-    const after = camera.getWorldPoint(screenX, screenY);
-    camera.scrollX += before.x - after.x;
-    camera.scrollY += before.y - after.y;
-    this.clampMainCameraScroll();
+    this.setMainCameraCenter(nextCenter.centerX, nextCenter.centerY);
   }
 
   private issueSpeedFromWheel(deltaY: number) {
@@ -970,7 +1012,13 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private projectVisibleWorld() {
-    const view = this.cameras.main.worldView;
+    const camera = this.cameras.main;
+    const view = getCameraViewportFromCenter({
+      centerX: camera.midPoint.x,
+      centerY: camera.midPoint.y,
+      viewportWidth: camera.width / camera.zoom,
+      viewportHeight: camera.height / camera.zoom,
+    });
 
     return this.world.project({
       viewport: {
@@ -978,26 +1026,111 @@ export class WorldScene extends Phaser.Scene {
         y: view.y / TILE_SIZE,
         width: view.width / TILE_SIZE,
         height: view.height / TILE_SIZE,
-        paddingTiles: 3,
+        paddingTiles: CAMERA_VIEWPORT_PADDING_TILES,
       },
     });
   }
 
   private getTerrainDrawKey(projection: WorldProjection) {
+    return `${projection.terrainRevision}:${this.getViewportBucketKey(projection)}`;
+  }
+
+  private getResourceDrawKey(projection: WorldProjection, detailLevel: CameraDetailLevel) {
+    return [
+      detailLevel,
+      projection.terrainRevision,
+      this.getViewportBucketKey(projection),
+      this.getStaticLayerTickBucket(projection),
+    ].join(':');
+  }
+
+  private getTerritoryDrawKey(projection: WorldProjection) {
+    return [
+      this.getViewportBucketKey(projection),
+      this.getSelectionDrawKey(),
+      projection.stats.territoryTiles,
+      this.getStaticLayerTickBucket(projection),
+    ].join(':');
+  }
+
+  private getBuildingDrawKey(projection: WorldProjection, detailLevel: CameraDetailLevel) {
+    return [
+      detailLevel,
+      this.getViewportBucketKey(projection),
+      projection.stats.activeBuildings,
+      projection.buildings.length,
+      this.getStaticLayerTickBucket(projection),
+    ].join(':');
+  }
+
+  private getArmyRouteDrawKey(projection: WorldProjection) {
+    return [
+      this.getViewportBucketKey(projection),
+      this.getSelectionDrawKey(),
+      projection.armies.length,
+      this.getStaticLayerTickBucket(projection),
+    ].join(':');
+  }
+
+  private getMapLabelsDrawKey(projection: WorldProjection, detailLevel: CameraDetailLevel) {
+    return [
+      detailLevel,
+      this.getViewportBucketKey(projection),
+      projection.villages.length,
+      projection.kingdoms.length,
+      this.getStaticLayerTickBucket(projection),
+    ].join(':');
+  }
+
+  private getHudDrawKey(projection: WorldProjection) {
+    return [
+      this.getRenderDetailLevel(),
+      this.getSelectionDrawKey(),
+      projection.paused ? 'paused' : projection.speed,
+      projection.stats.population,
+      projection.stats.villages,
+      projection.stats.kingdoms,
+      projection.stats.activeBuildings,
+      projection.stats.territoryTiles,
+      projection.stats.fallenKingdoms,
+      this.scale.width,
+      this.scale.height,
+    ].join(':');
+  }
+
+  private getRenderDetailLevel() {
+    return getCameraDetailLevel(this.cameras.main.zoom);
+  }
+
+  private getViewportBucketKey(projection: WorldProjection) {
     const viewport = projection.viewport;
 
     if (!viewport) {
-      return `full:${projection.terrainRevision}`;
+      return 'full';
     }
 
     return [
-      projection.terrainRevision,
-      Math.floor(viewport.x),
-      Math.floor(viewport.y),
+      Math.floor(viewport.x / STATIC_VIEWPORT_REDRAW_TILE_STEP),
+      Math.floor(viewport.y / STATIC_VIEWPORT_REDRAW_TILE_STEP),
       Math.ceil(viewport.width),
       Math.ceil(viewport.height),
       viewport.paddingTiles ?? 0,
     ].join(':');
+  }
+
+  private getStaticLayerTickBucket(projection: WorldProjection) {
+    return Math.floor(projection.tick / STATIC_LAYER_REDRAW_TICK_STEP);
+  }
+
+  private getSelectionDrawKey() {
+    switch (this.selection.type) {
+      case 'none':
+        return 'none';
+      case 'tile':
+        return `tile:${this.selection.x}:${this.selection.y}`;
+      default:
+        return `${this.selection.type}:${this.selection.id}`;
+    }
   }
 
   private createUiText(x: number, y: number, fontSize: number) {
@@ -1079,16 +1212,17 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.setZoom(
       Phaser.Math.Clamp(this.cameras.main.zoom, this.getMinimumCameraZoom(), MAX_CAMERA_ZOOM),
     );
-    this.centerMainCamera();
+    this.clampMainCameraCenter();
     this.cameraInitialized = true;
     this.lastCameraWidth = this.cameras.main.width;
     this.lastCameraHeight = this.cameras.main.height;
+    this.resetWorldLayerDrawKeys();
     this.uiCamera?.setSize(this.scale.width, this.scale.height);
     this.layoutUiPanels();
   };
 
   private configureMainCamera() {
-    this.cameras.main.setOrigin(0, 0);
+    this.cameras.main.setOrigin(0.5, 0.5);
     this.cameras.main.roundPixels = false;
     this.cameras.main.setBackgroundColor(TERRAIN_COLORS.water);
   }
@@ -1133,11 +1267,27 @@ export class WorldScene extends Phaser.Scene {
         MAX_CAMERA_ZOOM,
       ),
     );
-    this.centerMainCamera();
+    if (this.cameraInitialized) {
+      this.clampMainCameraCenter();
+    } else {
+      this.centerMainCamera();
+    }
+
     this.cameraInitialized = true;
     this.lastCameraWidth = camera.width;
     this.lastCameraHeight = camera.height;
+    this.resetWorldLayerDrawKeys();
+  }
+
+  private resetWorldLayerDrawKeys() {
     this.lastTerrainDrawKey = '';
+    this.lastResourceDrawKey = '';
+    this.lastTerritoryDrawKey = '';
+    this.lastBuildingDrawKey = '';
+    this.lastArmyRouteDrawKey = '';
+    this.lastMapLabelsDrawKey = '';
+    this.lastHudDrawKey = '';
+    this.lastHudDrawAtMs = -Infinity;
   }
 
   private centerMainCamera() {
@@ -1146,40 +1296,39 @@ export class WorldScene extends Phaser.Scene {
     const viewportHeight = camera.height / camera.zoom;
     const worldPixelWidth = this.world.map.width * TILE_SIZE;
     const worldPixelHeight = this.world.map.height * TILE_SIZE;
-    const nextScroll = centerCameraScroll({
-      scrollX: camera.scrollX,
-      scrollY: camera.scrollY,
-      screenWidth: camera.width,
-      screenHeight: camera.height,
+    const nextCenter = centerCameraView({
       viewportWidth,
       viewportHeight,
       worldWidth: worldPixelWidth,
       worldHeight: worldPixelHeight,
     });
 
-    camera.setScroll(nextScroll.scrollX, nextScroll.scrollY);
-    this.clampMainCameraScroll();
+    this.setMainCameraCenter(nextCenter.centerX, nextCenter.centerY);
   }
 
-  private clampMainCameraScroll() {
+  private clampMainCameraCenter() {
+    const camera = this.cameras.main;
+
+    return this.setMainCameraCenter(camera.midPoint.x, camera.midPoint.y);
+  }
+
+  private setMainCameraCenter(centerX: number, centerY: number) {
     const camera = this.cameras.main;
     const viewportWidth = camera.width / camera.zoom;
     const viewportHeight = camera.height / camera.zoom;
     const worldPixelWidth = this.world.map.width * TILE_SIZE;
     const worldPixelHeight = this.world.map.height * TILE_SIZE;
-    const nextScroll = clampCameraScroll({
-      scrollX: camera.scrollX,
-      scrollY: camera.scrollY,
-      screenWidth: camera.width,
-      screenHeight: camera.height,
+    const nextCenter = clampCameraCenter({
+      centerX,
+      centerY,
       viewportWidth,
       viewportHeight,
       worldWidth: worldPixelWidth,
       worldHeight: worldPixelHeight,
     });
 
-    camera.setScroll(nextScroll.scrollX, nextScroll.scrollY);
-    return nextScroll;
+    camera.centerOn(nextCenter.centerX, nextCenter.centerY);
+    return nextCenter;
   }
 
   private setupUiCamera() {

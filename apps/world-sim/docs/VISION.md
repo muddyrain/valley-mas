@@ -30,7 +30,7 @@ WorldSim should converge toward the WorldBox-style play loop, not a generic RTS 
 
 Near-term iterations must prioritize the parts that make the small-people development loop feel correct:
 
-- visible wood gathering and forest/resource depletion
+- visible forest/resource depletion from wood gathering
 - more frequent and readable house construction under population pressure
 - territory growth that feels like settlement expansion, not only sparse building influence
 - autonomous village expansion before kingdom-level diplomacy tools
@@ -46,7 +46,7 @@ The first v2 slice deliberately avoids full WorldBox parity. It establishes the 
 - Units with hunger, age, health, death, birth, movement, stable home village membership, and simple needs.
 - Villages that emerge from local population and food pressure, with food and material stores, housing, and decline state.
 - Village buildings that turn surplus into housing, storage, farm production, mine access, military capacity, shore access, and settlement influence.
-- Readable settlement growth signals: aggregate wood gathering and construction work sites, growth blockers, earlier house pressure, and territory spread from lived settlement activity.
+- Readable settlement growth signals: visible resource depletion, construction work sites, growth blockers, earlier house pressure, and territory spread from lived settlement activity.
 - Kingdoms that emerge from strong villages and aggregate capital, members, population, buildings, territory, food, and material stores.
 - Diplomacy pressure that turns border friction, resource shortage, and race tendencies into observable declaration causes.
 - Minimal grouped war that lets declarations create armies, casualties, and village ownership changes without full single-unit combat.

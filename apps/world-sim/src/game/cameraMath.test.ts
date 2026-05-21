@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  centerCameraScroll,
-  clampCameraScroll,
+  centerCameraView,
+  clampCameraCenter,
+  getAnchoredZoomCenter,
+  getCameraDetailLevel,
+  getCameraViewportFromCenter,
   getContainZoom,
   getCoverZoom,
+  getViewportRelativePanSpeed,
   stepCameraMotion,
 } from './cameraMath';
 
@@ -20,68 +24,130 @@ describe('cameraMath', () => {
     );
   });
 
-  it('centers the world view while preserving Phaser scroll offset', () => {
-    const nextScroll = centerCameraScroll({
-      scrollX: 218,
-      scrollY: 157,
-      screenWidth: 1200,
-      screenHeight: 887,
+  it('centers the camera on the world center', () => {
+    const nextCenter = centerCameraView({
       viewportWidth: 1667,
       viewportHeight: 1233,
       worldWidth: 2560,
       worldHeight: 2560,
     });
 
-    expect(nextScroll.scrollX).toBeCloseTo((2560 - 1667) / 2 + 233.5, 5);
-    expect(nextScroll.scrollY).toBeCloseTo((2560 - 1233) / 2 + 173, 5);
+    expect(nextCenter.centerX).toBe(1280);
+    expect(nextCenter.centerY).toBe(1280);
   });
 
-  it('clamps a covered viewport so the camera background is not exposed', () => {
-    const nextScroll = clampCameraScroll({
-      scrollX: 218,
-      scrollY: 157,
-      screenWidth: 1200,
-      screenHeight: 887,
+  it('clamps camera center so contained viewports do not expose map background', () => {
+    const nextCenter = clampCameraCenter({
+      centerX: 200,
+      centerY: 2500,
       viewportWidth: 1667,
       viewportHeight: 1233,
       worldWidth: 2560,
       worldHeight: 2560,
     });
 
-    expect(nextScroll.scrollX).toBeCloseTo(233.5, 5);
-    expect(nextScroll.scrollY).toBeCloseTo(173, 5);
+    expect(nextCenter.centerX).toBeCloseTo(833.5, 5);
+    expect(nextCenter.centerY).toBeCloseTo(1943.5, 5);
   });
 
-  it('centers an oversized viewport on the smaller world axis', () => {
-    const nextScroll = clampCameraScroll({
-      scrollX: -50,
-      scrollY: 20,
-      screenWidth: 1200,
-      screenHeight: 800,
+  it('centers oversized viewport axes on the world center', () => {
+    const nextCenter = clampCameraCenter({
+      centerX: -50,
+      centerY: 20,
       viewportWidth: 1200,
       viewportHeight: 800,
       worldWidth: 1000,
       worldHeight: 1600,
     });
 
-    expect(nextScroll.scrollX).toBeCloseTo(-100, 5);
-    expect(nextScroll.scrollY).toBeCloseTo(20, 5);
+    expect(nextCenter.centerX).toBeCloseTo(500, 5);
+    expect(nextCenter.centerY).toBeCloseTo(400, 5);
   });
 
-  it('clamps from current scroll instead of stale cached worldView values after zoom', () => {
-    const nextScroll = clampCameraScroll({
-      scrollX: -360,
-      scrollY: -140,
-      screenWidth: 2048,
-      screenHeight: 969,
+  it('keeps the pointed world coordinate stable when zooming around a screen anchor', () => {
+    const currentCenter = { centerX: 1280, centerY: 1280 };
+    const screenAnchor = { screenX: 400, screenY: 600 };
+    const beforeWorldX = currentCenter.centerX + (screenAnchor.screenX - 600) / 0.75;
+    const beforeWorldY = currentCenter.centerY + (screenAnchor.screenY - 450) / 0.75;
+    const nextCenter = getAnchoredZoomCenter({
+      ...currentCenter,
+      ...screenAnchor,
+      viewportWidth: 1200,
+      viewportHeight: 900,
+      currentZoom: 0.75,
+      nextZoom: 1.25,
+    });
+    const afterWorldX = nextCenter.centerX + (screenAnchor.screenX - 600) / 1.25;
+    const afterWorldY = nextCenter.centerY + (screenAnchor.screenY - 450) / 1.25;
+
+    expect(afterWorldX).toBeCloseTo(beforeWorldX, 5);
+    expect(afterWorldY).toBeCloseTo(beforeWorldY, 5);
+  });
+
+  it('clamps around the center after zoom instead of stale scroll offsets', () => {
+    const nextCenter = clampCameraCenter({
+      centerX: -360,
+      centerY: -140,
       viewportWidth: 3900,
       viewportHeight: 1846,
       worldWidth: 2560,
       worldHeight: 2560,
     });
 
-    expect(nextScroll.scrollX).toBeCloseTo(256, 5);
-    expect(nextScroll.scrollY).toBeCloseTo(438.5, 5);
+    expect(nextCenter.centerX).toBeCloseTo(1280, 5);
+    expect(nextCenter.centerY).toBeCloseTo(923, 5);
+  });
+
+  it('derives the visible viewport from the live camera center and zoom-sized view', () => {
+    const viewport = getCameraViewportFromCenter({
+      centerX: 1280,
+      centerY: 900,
+      viewportWidth: 1600,
+      viewportHeight: 1000,
+    });
+
+    expect(viewport).toEqual({
+      x: 480,
+      y: 400,
+      width: 1600,
+      height: 1000,
+    });
+  });
+
+  it('uses viewport-relative pan speed so perceived screen speed stays stable across zoom', () => {
+    const screenWidth = 1200;
+    const fraction = 0.7;
+    const zoomedInZoom = 3;
+    const zoomedOutZoom = 0.5;
+    const zoomedInWorldSpeed = getViewportRelativePanSpeed({
+      viewportWidth: screenWidth / zoomedInZoom,
+      viewportHeight: 900 / zoomedInZoom,
+      viewportFractionPerSecond: fraction,
+    });
+    const zoomedOutWorldSpeed = getViewportRelativePanSpeed({
+      viewportWidth: screenWidth / zoomedOutZoom,
+      viewportHeight: 900 / zoomedOutZoom,
+      viewportFractionPerSecond: fraction,
+    });
+
+    expect(zoomedInWorldSpeed * zoomedInZoom).toBeCloseTo(screenWidth * fraction, 5);
+    expect(zoomedOutWorldSpeed * zoomedOutZoom).toBeCloseTo(screenWidth * fraction, 5);
+  });
+
+  it('uses the larger viewport axis for diagonal-friendly pan speed', () => {
+    const speed = getViewportRelativePanSpeed({
+      viewportWidth: 1600,
+      viewportHeight: 900,
+      viewportFractionPerSecond: 0.5,
+    });
+
+    expect(speed).toBe(800);
+  });
+
+  it('maps zoom to WorldBox-style render detail levels', () => {
+    expect(getCameraDetailLevel(0.6)).toBe('overview');
+    expect(getCameraDetailLevel(1)).toBe('regional');
+    expect(getCameraDetailLevel(1.6)).toBe('local');
   });
 
   it('eases keyboard camera velocity instead of jumping directly to full speed', () => {
