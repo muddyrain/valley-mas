@@ -123,6 +123,22 @@ describe('world inspection helpers', () => {
     ]);
   });
 
+  it('shows occupation progress for fighting armies', () => {
+    const projection = createProjection();
+    projection.armies[0].status = 'fighting';
+    projection.armies[0].occupationProgress = 47;
+
+    expect(buildInspectionLines(projection, { type: 'army', id: 'army-1' })).toContain(
+      '攻占进度：47%',
+    );
+    expect(buildConflictSummaryLines(projection)).toEqual([
+      '王国 1 -> 王国 2：12 兵，目标 河湾村，交战中，攻占 47%',
+    ]);
+    expect(buildInspectionLines(projection, { type: 'kingdom', id: 'kingdom-1' })).toContain(
+      '出征：军队 1 -> 河湾村（12 人，交战中，攻占 47%）',
+    );
+  });
+
   it('builds map labels with village names, levels, and capital markers', () => {
     const projection = createProjection();
     const labels = buildMapLabels(projection);
@@ -227,9 +243,10 @@ describe('world inspection helpers', () => {
           attackerCasualties: 2,
           defenderCasualties: 5,
           captured: false,
+          occupationProgress: 63,
         },
       }),
-    ).toBe('王国 1 与王国 2 交战：攻方损失 2，守方损失 5');
+    ).toBe('王国 1 与王国 2 交战：攻方损失 2，守方损失 5，攻占 63% 后撤退');
     expect(
       formatEventSummary({
         id: 'event-capture',

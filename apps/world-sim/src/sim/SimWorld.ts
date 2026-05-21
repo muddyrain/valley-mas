@@ -148,9 +148,10 @@ const ARMY_MAX_SOLDIERS = 32;
 const ARMY_BARRACK_MAX_SOLDIERS = 42;
 const ARMY_SPEED_PER_TICK = 0.8;
 const ARMY_BATTLE_DISTANCE = 1.2;
+const ARMY_BATTLE_CASUALTY_INTERVAL_TICKS = 12;
+const ARMY_OCCUPATION_PROGRESS_PER_TICK = 3.2;
 const DEFENDER_POPULATION_STRENGTH = 0.42;
 const DEFENDER_BUILDING_STRENGTH = 1.8;
-const ATTACKER_CAPTURE_ADVANTAGE = 0.92;
 const KINGDOM_COLORS = [
   0xef7d57, 0xffcd75, 0x38b764, 0x29adff, 0x9b5de5, 0xf15bb5, 0x00f5d4, 0xc2c3c7,
 ];
@@ -471,7 +472,7 @@ export class SimWorld {
             army.targetVillageId
           }:${round(army.position.x)},${round(army.position.y)}:${army.soldierCount}:${
             army.trainedSoldiers
-          }:${army.status}`,
+          }:${army.status}:${round(army.occupationProgress ?? 0)}`,
       ),
       events: this.events.map((event) => `${event.tick}:${event.type}:${event.message}`),
     });
@@ -688,16 +689,18 @@ export class SimWorld {
         foodTile = this.findNearbyFood(unit.position);
       });
 
-      if (foodTile) {
+      const resource = foodTile?.resource;
+
+      if (foodTile && resource) {
         unit.intent = 'eat';
-        const eaten = Math.min(4, foodTile.resource?.amount ?? 0);
-        foodTile.resource!.amount -= eaten;
+        const eaten = Math.min(4, resource.amount);
+        resource.amount -= eaten;
         unit.hunger = Math.max(0, unit.hunger - eaten * 10);
         this.emit('unit_ate', `${unit.id} ate food`, undefined, unit.id, unit.position, {
           amount: eaten,
         });
 
-        if (foodTile.resource!.amount <= 0) {
+        if (resource.amount <= 0) {
           foodTile.resource = undefined;
         }
         return timings;
@@ -2816,7 +2819,7 @@ export class SimWorld {
       this.moveArmyToward(army, targetVillage.center);
 
       if (distance(army.position, targetVillage.center) <= ARMY_BATTLE_DISTANCE) {
-        this.resolveArmyBattle(army, targetVillage);
+        this.updateArmyBattle(army, targetVillage);
       }
     }
   }
@@ -2833,7 +2836,7 @@ export class SimWorld {
     };
   }
 
-  private resolveArmyBattle(army: ArmyGroup, targetVillage: Village) {
+  private updateArmyBattle(army: ArmyGroup, targetVillage: Village) {
     const attacker = this.kingdoms.get(army.kingdomId);
     const defender = this.kingdoms.get(army.targetKingdomId);
 
@@ -2843,6 +2846,8 @@ export class SimWorld {
     }
 
     army.status = 'fighting';
+    army.battleStartedAtTick ??= this.tick;
+    army.occupationProgress ??= 0;
     const defenderBuildings = this.findVillageBuildings(targetVillage.id).length;
     const attackerStrength =
       army.soldierCount * army.morale * this.raceAggression(attacker.race) +
@@ -2850,22 +2855,89 @@ export class SimWorld {
     const defenderStrength =
       targetVillage.population * DEFENDER_POPULATION_STRENGTH +
       defenderBuildings * DEFENDER_BUILDING_STRENGTH;
-    const attackerCasualties = Math.min(
-      army.soldierCount,
-      Math.max(1, Math.floor(defenderStrength / 4)),
+    const pressureRatio = attackerStrength / Math.max(1, defenderStrength);
+
+    if (pressureRatio < 0.45 && army.occupationProgress <= 0) {
+      this.resolveArmyBattle(army, targetVillage, attacker, defender, 0, 0, false);
+      army.status = 'retreating';
+      this.disbandArmy(army, 'repelled');
+      return;
+    }
+
+    army.occupationProgress = clamp(
+      army.occupationProgress + ARMY_OCCUPATION_PROGRESS_PER_TICK * clamp(pressureRatio, 0.45, 1.8),
+      0,
+      100,
     );
-    const defenderCasualties = Math.min(
-      targetVillage.population,
-      Math.max(1, Math.floor(attackerStrength / 3)),
+
+    if (
+      army.lastBattleTick === undefined ||
+      this.tick - army.lastBattleTick >= ARMY_BATTLE_CASUALTY_INTERVAL_TICKS ||
+      army.occupationProgress >= 100
+    ) {
+      const attackerCasualties = Math.min(
+        army.soldierCount,
+        Math.max(1, Math.floor(defenderStrength / 12)),
+      );
+      const defenderCasualties = Math.min(
+        targetVillage.population,
+        Math.max(1, Math.floor(attackerStrength / 7)),
+      );
+
+      army.lastBattleTick = this.tick;
+      army.soldierCount -= attackerCasualties;
+      army.battleAttackerCasualties = (army.battleAttackerCasualties ?? 0) + attackerCasualties;
+      army.battleDefenderCasualties = (army.battleDefenderCasualties ?? 0) + defenderCasualties;
+      this.removeCasualtiesFromVillage(army.originVillageId, attackerCasualties, 'battle');
+      this.removeCasualtiesFromVillage(targetVillage.id, defenderCasualties, 'battle');
+
+      if (army.soldierCount <= 0) {
+        this.resolveArmyBattle(
+          army,
+          targetVillage,
+          attacker,
+          defender,
+          army.battleAttackerCasualties ?? 0,
+          army.battleDefenderCasualties ?? 0,
+          false,
+        );
+        army.status = 'retreating';
+        this.disbandArmy(army, 'destroyed');
+        return;
+      }
+    }
+
+    if (army.occupationProgress < 100) {
+      return;
+    }
+
+    const captured = army.soldierCount > 0;
+
+    this.resolveArmyBattle(
+      army,
+      targetVillage,
+      attacker,
+      defender,
+      army.battleAttackerCasualties ?? 0,
+      army.battleDefenderCasualties ?? 0,
+      captured,
     );
 
-    army.soldierCount -= attackerCasualties;
-    this.removeCasualtiesFromVillage(army.originVillageId, attackerCasualties, 'battle');
-    this.removeCasualtiesFromVillage(targetVillage.id, defenderCasualties, 'battle');
+    if (!captured) {
+      army.status = 'retreating';
+      this.disbandArmy(army, 'repelled');
+    }
+  }
 
-    const captured =
-      army.soldierCount > 0 && attackerStrength >= defenderStrength * ATTACKER_CAPTURE_ADVANTAGE;
-
+  private resolveArmyBattle(
+    army: ArmyGroup,
+    targetVillage: Village,
+    attacker: Kingdom,
+    defender: Kingdom,
+    attackerCasualties: number,
+    defenderCasualties: number,
+    captured: boolean,
+  ) {
     this.emit(
       'battle_resolved',
       `${army.id} battle resolved`,
@@ -2880,6 +2952,7 @@ export class SimWorld {
         defenderCasualties,
         captured,
         trainedSoldiers: army.trainedSoldiers,
+        occupationProgress: round(army.occupationProgress ?? 0),
       },
     );
 
@@ -2888,9 +2961,6 @@ export class SimWorld {
       this.disbandArmy(army, 'captured target');
       return;
     }
-
-    army.status = 'retreating';
-    this.disbandArmy(army, 'retreated');
   }
 
   private removeCasualtiesFromVillage(villageId: string, count: number, reason: string) {

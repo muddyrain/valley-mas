@@ -358,7 +358,13 @@ Status: `Foundation slice`
   - Kingdom inspection now lists member villages and active campaigns.
   - Army routes now render from active armies to target villages so wars have a visible direction.
   - Diplomacy and war events now have readable summaries for border friction, resource pressure, rising diplomacy, declarations, army formation, battles, and captures.
+  - Army groups now enter a multi-tick fighting/occupation state at the target village; occupation progress, periodic casualties, capture, and retreat are projected to inspection and HUD summaries.
+- Direction:
+  - Move war toward the WorldBox shape: villages maintain visible armies, soldiers follow a grouped army/captain marker toward enemy villages, defenders resist locally, and capture happens through a readable occupation process instead of instant ownership transfer.
+  - Keep the first implementation aggregate for performance, but expose enough state for the map to show marching, fighting, occupation progress, casualties, capture, and retreat.
 - Planned:
+  - Let multiple eligible villages send army groups instead of only the capital village.
+  - Add local defender/militia response and later near-zoom soldier dots around the grouped army marker.
   - God commands for forcing war, forcing peace, inspiring growth, and marking a village/kingdom for attention.
   - Basic rebellion or resistance hooks after capture, if metrics remain healthy.
 - Non-goals:

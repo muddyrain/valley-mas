@@ -149,6 +149,11 @@ export type ArmyGroup = {
   morale: number;
   formedAtTick: number;
   status: ArmyGroupStatus;
+  occupationProgress?: number;
+  battleStartedAtTick?: number;
+  lastBattleTick?: number;
+  battleAttackerCasualties?: number;
+  battleDefenderCasualties?: number;
 };
 
 export type TerritoryTile = {

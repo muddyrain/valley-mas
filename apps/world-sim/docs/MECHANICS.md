@@ -114,21 +114,22 @@ WorldBox-aligned growth treats builders and homes as a core early loop, not only
 
 ## Combat and War
 
-War starts at the group level. A `war_declared` event can form an `ArmyGroup` from the aggressor kingdom's capital village. Army groups are projected as aggregate military units with position, target kingdom, target village, soldier count, morale, and status.
+War starts at the group level. A `war_declared` event can form an `ArmyGroup` from the aggressor kingdom's capital village. Army groups are projected as aggregate military units with position, target kingdom, target village, soldier count, morale, status, and occupation progress.
 
 Barracks are the first building hook into war. If the capital village has an active barrack when an army group forms, the simulation raises both the mobilization ratio and the maximum soldier cap for that army. PR-12C now exposes village-level soldier jobs, and those trained soldiers now feed army formation and battle strength as a first pass, while detailed soldier mustering and per-fighter combat remain later depth.
 
-The first war model intentionally avoids complex individual brawls:
+The first war model intentionally avoids complex individual brawls, but it should still read like a WorldBox-style invasion:
 
 - armies march toward a target village as grouped simulation objects
-- battle resolution compares aggregate attacker strength against village defender strength
-- casualties remove a small number of residents from the origin and target villages
-- winning attackers can capture the target village for their kingdom
+- when an army reaches the village, it enters a multi-tick fighting/occupation state instead of resolving instantly
+- battle pressure compares aggregate attacker strength against village defender strength
+- casualties periodically remove a small number of residents from the origin and target villages
+- winning attackers capture the target village for their kingdom once occupation progress completes
 - armies disband after capture, retreat, or losing their target
 
-This PR-10 model is enough for wars to start, move, cause casualties, and change village ownership. Later stages can add multiple armies, fronts, commanders, peace deals, occupation, culture, rebellion, and visible local fighters.
+This PR-10/PR-12E model is enough for wars to start, move, visibly fight, cause casualties, and change village ownership. Later stages can add multiple armies, fronts, commanders, peace deals, deeper occupation, culture, rebellion, and visible local fighters.
 
-In the current UI, army groups render as triangular markers using their owning kingdom's color, with the outline preserving basic status feedback. PR-12E also draws route lines from active armies to their target villages, lists active campaigns in kingdom inspection, and shows current kingdom pressure/conflict summaries in the HUD. This keeps war readable without turning every unit into a soldier.
+In the current UI, army groups render as triangular markers using their owning kingdom's color, with the outline preserving basic status feedback. PR-12E also draws route lines from active armies to their target villages, lists active campaigns in kingdom inspection, and shows current kingdom pressure/conflict summaries in the HUD. The near-term direction is to keep this aggregate marker at far zoom while adding more local soldier/defender readability at close zoom.
 
 ## Race Identity
 

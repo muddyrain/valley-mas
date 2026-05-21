@@ -322,10 +322,14 @@ export function buildConflictSummaryLines(projection: WorldProjection, limit = 4
       (village) => village.id === army.targetVillageId,
     );
     const targetLabel = targetVillage?.name ?? `村庄 ${shortId(army.targetVillageId)}`;
+    const occupation =
+      army.status === 'fighting' && army.occupationProgress !== undefined
+        ? `，攻占 ${Math.round(army.occupationProgress)}%`
+        : '';
 
     return `王国 ${shortId(army.kingdomId)} -> 王国 ${shortId(army.targetKingdomId)}：${
       army.soldierCount
-    } 兵，目标 ${targetLabel}，${labelFromMap(ARMY_STATUS_LABELS, army.status)}`;
+    } 兵，目标 ${targetLabel}，${labelFromMap(ARMY_STATUS_LABELS, army.status)}${occupation}`;
   });
 }
 
@@ -370,7 +374,7 @@ export function buildMapLabels(projection: WorldProjection): MapLabel[] {
 }
 
 export function isTerritoryTileSelected(
-  projection: WorldProjection,
+  _projection: WorldProjection,
   selection: WorldSelection,
   territoryTile: TerritoryTile,
 ) {
@@ -476,9 +480,10 @@ export function formatEventSummary(event: SimEvent) {
     const attackerCasualties = payloadNumber(event, 'attackerCasualties', 0);
     const defenderCasualties = payloadNumber(event, 'defenderCasualties', 0);
     const captured = Boolean(event.payload?.captured);
+    const occupationProgress = payloadNumber(event, 'occupationProgress', captured ? 100 : 0);
 
     return `${kingdomLabel(attacker)} 与${kingdomLabel(defender)} 交战：攻方损失 ${attackerCasualties}，守方损失 ${defenderCasualties}${
-      captured ? '，目标被占领' : ''
+      captured ? '，目标被占领' : `，攻占 ${occupationProgress}% 后撤退`
     }`;
   }
 
@@ -619,7 +624,11 @@ function buildKingdomLines(projection: WorldProjection, id: string) {
     return `军队 ${shortId(army.id)} -> ${targetLabel}（${army.soldierCount} 人，${labelFromMap(
       ARMY_STATUS_LABELS,
       army.status,
-    )}）`;
+    )}${
+      army.status === 'fighting' && army.occupationProgress !== undefined
+        ? `，攻占 ${Math.round(army.occupationProgress)}%`
+        : ''
+    }）`;
   });
 
   return [
@@ -707,6 +716,9 @@ function buildArmyLines(projection: WorldProjection, id: string) {
     `士兵：${army.soldierCount}`,
     `训练士兵：${army.trainedSoldiers}`,
     `士气：${army.morale.toFixed(2)}`,
+    ...(army.occupationProgress !== undefined
+      ? [`攻占进度：${Math.round(army.occupationProgress)}%`]
+      : []),
     `位置：${formatPosition(army.position)}`,
   ];
 }

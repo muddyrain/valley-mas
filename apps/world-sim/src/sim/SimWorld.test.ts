@@ -1508,6 +1508,16 @@ describe('SimWorld minimal war', () => {
     }
 
     const barrackCapitalId = barrackWorld.project().kingdoms[0].capitalVillageId;
+    const plainCapitalId = plainWorld.project().kingdoms[0].capitalVillageId;
+    const plainCapital = getMutableWorld(plainWorld).villages.get(plainCapitalId);
+    const barrackCapital = getMutableWorld(barrackWorld).villages.get(barrackCapitalId);
+
+    if (!plainCapital || !barrackCapital) {
+      throw new Error('Expected capital villages');
+    }
+
+    plainCapital.population = 16;
+    barrackCapital.population = 16;
 
     addBarrackToVillage(barrackWorld, barrackCapitalId);
 
@@ -1548,18 +1558,72 @@ describe('SimWorld minimal war', () => {
     expect(trainedArmy.soldierCount).toBeGreaterThan(controlArmy.soldierCount);
   });
 
+  it('keeps invading armies fighting across multiple ticks before capture', () => {
+    const world = foundRivalKingdoms('minimal-war-occupation', {
+      leftFood: 220,
+      rightFood: 760,
+      distance: 24,
+    });
+
+    waitForKingdoms(world);
+    formFirstArmyGroup(world);
+
+    let fightingArmy = world.project().armies.find((army) => army.status === 'fighting');
+    let sawBattleResolved = false;
+
+    for (let tick = 0; tick < 180; tick += 1) {
+      world.step();
+      const projection = world.project();
+      sawBattleResolved ||= projection.recentEvents.some(
+        (event) => event.type === 'battle_resolved',
+      );
+      fightingArmy = projection.armies.find((army) => army.status === 'fighting');
+
+      if (
+        fightingArmy &&
+        (fightingArmy.occupationProgress ?? 0) > 0 &&
+        (fightingArmy.occupationProgress ?? 0) < 100
+      ) {
+        break;
+      }
+    }
+
+    expect(fightingArmy).toBeDefined();
+    expect(fightingArmy?.occupationProgress).toBeGreaterThan(0);
+    expect(fightingArmy?.occupationProgress).toBeLessThan(100);
+    expect(sawBattleResolved).toBe(false);
+  });
+
   it('resolves group battles with casualties and village capture', () => {
     const world = foundRivalKingdoms('minimal-war-capture', {
       leftFood: 220,
       rightFood: 760,
       distance: 24,
     });
+    waitForKingdoms(world);
+    const [aggressor] = world.project().kingdoms;
+
+    if (!aggressor) {
+      throw new Error('Expected aggressor kingdom');
+    }
+
+    const aggressorCapital = getMutableWorld(world).villages.get(aggressor.capitalVillageId);
+
+    if (!aggressorCapital) {
+      throw new Error('Expected aggressor capital');
+    }
+
+    aggressorCapital.population = 40;
+    aggressorCapital.jobs.soldier = 8;
+    addBarrackToVillage(world, aggressor.capitalVillageId);
+    formFirstArmyGroup(world);
+
     const initialPopulation = world.project().stats.population;
     let sawBattleResolved = false;
     let sawVillageCaptured = false;
     let capturePayload: Record<string, string | number | boolean> | undefined;
 
-    for (let tick = 0; tick < 900; tick += 1) {
+    for (let tick = 0; tick < 420; tick += 1) {
       world.step();
       const recentEvents = world.project().recentEvents;
       sawBattleResolved ||= recentEvents.some((event) => event.type === 'battle_resolved');
@@ -2220,6 +2284,18 @@ function formFirstArmyGroup(world: SimWorld) {
   }
 
   return army;
+}
+
+function waitForKingdoms(world: SimWorld, expected = 2) {
+  for (let tick = 0; tick < 360; tick += 1) {
+    if (world.project().kingdoms.length >= expected) {
+      return;
+    }
+
+    world.step();
+  }
+
+  throw new Error(`Expected ${expected} kingdoms`);
 }
 
 function prepareVillageForBuildingUpgrades(
