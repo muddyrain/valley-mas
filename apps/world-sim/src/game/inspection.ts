@@ -69,6 +69,29 @@ const VILLAGE_STATUS_LABELS: Record<string, string> = {
   declining: '衰退',
 };
 
+const VILLAGE_GROWTH_BLOCKER_LABELS: Record<string, string> = {
+  housing_pressure: '住房紧张',
+  missing_wood: '缺少木材',
+  no_wood_source: '附近无可采木材',
+  insufficient_builders: '建筑工不足',
+  low_food_reserve: '食物储备偏低',
+  no_buildable_land: '缺少可建设土地',
+};
+
+const VILLAGE_BUILD_PLAN_LABELS: Record<string, string> = {
+  expand_housing: '扩建民居',
+  expand_farms: '扩建农田',
+  expand_storage: '扩建仓储',
+  expand_mining: '建设矿场',
+  expand_military: '建设兵营',
+  expand_dock: '建设码头',
+  prepare_expansion: '准备分村',
+  waiting_population_pressure: '等待人口压力',
+  waiting_resources: '等待资源',
+  waiting_land: '等待土地',
+  idle: '暂无扩建',
+};
+
 const KINGDOM_STATUS_LABELS: Record<string, string> = {
   rising: '兴起',
   stable: '稳定',
@@ -250,6 +273,62 @@ export function selectNextKingdom(
   return { type: 'kingdom', id: activeKingdoms[nextIndex].id };
 }
 
+export function buildKingdomOverviewLines(projection: WorldProjection, limit = 4): string[] {
+  const activeKingdoms = projection.kingdoms
+    .filter((kingdom) => kingdom.status !== 'fallen')
+    .sort((a, b) => b.population - a.population || a.id.localeCompare(b.id));
+
+  if (activeKingdoms.length === 0) {
+    return ['无活跃王国'];
+  }
+
+  return activeKingdoms.slice(0, limit).map((kingdom) => {
+    const pressureTarget = kingdom.diplomacyTargetKingdomId
+      ? ` -> 王国 ${shortId(kingdom.diplomacyTargetKingdomId)}`
+      : '';
+
+    return `王国 ${shortId(kingdom.id)}：${kingdom.population} 人 / ${
+      kingdom.villageIds.length
+    } 村 / 压力 ${Math.round(kingdom.diplomacyPressure)}${pressureTarget}`;
+  });
+}
+
+export function buildConflictSummaryLines(projection: WorldProjection, limit = 4): string[] {
+  const activeArmies = projection.armies
+    .filter((army) => army.status !== 'disbanded')
+    .sort((a, b) => b.soldierCount - a.soldierCount || a.id.localeCompare(b.id));
+
+  if (activeArmies.length === 0) {
+    const tenseKingdoms = projection.kingdoms
+      .filter((kingdom) => kingdom.status !== 'fallen' && kingdom.diplomacyPressure > 0)
+      .sort((a, b) => b.diplomacyPressure - a.diplomacyPressure || a.id.localeCompare(b.id));
+
+    return tenseKingdoms.length > 0
+      ? tenseKingdoms
+          .slice(0, limit)
+          .map(
+            (kingdom) =>
+              `王国 ${shortId(kingdom.id)} -> ${
+                kingdom.diplomacyTargetKingdomId
+                  ? `王国 ${shortId(kingdom.diplomacyTargetKingdomId)}`
+                  : '未知目标'
+              }：压力 ${Math.round(kingdom.diplomacyPressure)}`,
+          )
+      : ['暂无战争'];
+  }
+
+  return activeArmies.slice(0, limit).map((army) => {
+    const targetVillage = projection.villages.find(
+      (village) => village.id === army.targetVillageId,
+    );
+    const targetLabel = targetVillage?.name ?? `村庄 ${shortId(army.targetVillageId)}`;
+
+    return `王国 ${shortId(army.kingdomId)} -> 王国 ${shortId(army.targetKingdomId)}：${
+      army.soldierCount
+    } 兵，目标 ${targetLabel}，${labelFromMap(ARMY_STATUS_LABELS, army.status)}`;
+  });
+}
+
 export function buildMapLabels(projection: WorldProjection): MapLabel[] {
   const villageLabels = projection.villages.map((village) => {
     const kingdom = village.kingdomId
@@ -353,6 +432,63 @@ export function formatEventSummary(event: SimEvent) {
     return `${building}建造完成`;
   }
 
+  if (event.type === 'building_ruined') {
+    const type = typeof event.payload?.type === 'string' ? event.payload.type : undefined;
+    const building = type ? labelFromMap(BUILDING_LABELS, type) : '建筑';
+
+    return `${building}沦为废墟`;
+  }
+
+  if (event.type === 'border_friction') {
+    return `${kingdomPairLabel(event)} 边境摩擦，压力 ${payloadNumber(event, 'pressure', 0)}`;
+  }
+
+  if (event.type === 'resource_pressure') {
+    return `${kingdomPairLabel(event)} 因资源紧张升压 ${payloadNumber(event, 'pressure', 0)}`;
+  }
+
+  if (event.type === 'diplomacy_pressure') {
+    return `${kingdomPairLabel(event)} 外交压力升至 ${payloadNumber(event, 'pressure', 0)}`;
+  }
+
+  if (event.type === 'war_declared') {
+    const aggressor = payloadString(event, 'aggressorKingdomId');
+    const target = payloadString(event, 'targetKingdomId');
+
+    return `${kingdomLabel(aggressor)} 向${kingdomLabel(target)} 宣战，压力 ${payloadNumber(
+      event,
+      'pressure',
+      0,
+    )}`;
+  }
+
+  if (event.type === 'army_formed') {
+    const kingdom = payloadString(event, 'kingdomId');
+    const soldiers = payloadNumber(event, 'soldiers', 0);
+    const targetVillage = payloadString(event, 'targetVillageId');
+
+    return `${kingdomLabel(kingdom)} 集结 ${soldiers} 人军队，目标${villageLabel(targetVillage)}`;
+  }
+
+  if (event.type === 'battle_resolved') {
+    const attacker = payloadString(event, 'attackerKingdomId');
+    const defender = payloadString(event, 'defenderKingdomId');
+    const attackerCasualties = payloadNumber(event, 'attackerCasualties', 0);
+    const defenderCasualties = payloadNumber(event, 'defenderCasualties', 0);
+    const captured = Boolean(event.payload?.captured);
+
+    return `${kingdomLabel(attacker)} 与${kingdomLabel(defender)} 交战：攻方损失 ${attackerCasualties}，守方损失 ${defenderCasualties}${
+      captured ? '，目标被占领' : ''
+    }`;
+  }
+
+  if (event.type === 'village_captured') {
+    const attacker = payloadString(event, 'attackerKingdomId');
+    const villageId = payloadString(event, 'villageId');
+
+    return `${kingdomLabel(attacker)} 占领${villageLabel(villageId)}`;
+  }
+
   return undefined;
 }
 
@@ -443,6 +579,14 @@ function buildVillageLines(projection: WorldProjection, id: string) {
     `职业：农民 ${village.jobs.farmer}, 建筑工 ${village.jobs.builder}, 矿工 ${village.jobs.miner}, 士兵 ${
       village.jobs.soldier
     }`,
+    `成长阻塞：${
+      village.growthBlockers.length > 0
+        ? village.growthBlockers
+            .map((blocker) => labelFromMap(VILLAGE_GROWTH_BLOCKER_LABELS, blocker))
+            .join('、')
+        : '无'
+    }`,
+    `建设计划：${labelFromMap(VILLAGE_BUILD_PLAN_LABELS, village.buildPlan)}`,
     `建筑：${buildings.length}`,
     `领土：${village.territoryTiles}`,
     `军队：${activeArmies.length}`,
@@ -463,6 +607,20 @@ function buildKingdomLines(projection: WorldProjection, id: string) {
   const capital = projection.villages.find(
     (candidate) => candidate.id === kingdom.capitalVillageId,
   );
+  const memberVillages = kingdom.villageIds
+    .map((villageId) => projection.villages.find((village) => village.id === villageId))
+    .filter((village): village is Village => Boolean(village));
+  const campaigns = activeArmies.map((army) => {
+    const targetVillage = projection.villages.find(
+      (village) => village.id === army.targetVillageId,
+    );
+    const targetLabel = targetVillage?.name ?? `村庄 ${shortId(army.targetVillageId)}`;
+
+    return `军队 ${shortId(army.id)} -> ${targetLabel}（${army.soldierCount} 人，${labelFromMap(
+      ARMY_STATUS_LABELS,
+      army.status,
+    )}）`;
+  });
 
   return [
     `王国 ${shortId(kingdom.id)}`,
@@ -486,6 +644,12 @@ function buildKingdomLines(projection: WorldProjection, id: string) {
       kingdom.diplomacyTargetKingdomId ? `王国 ${shortId(kingdom.diplomacyTargetKingdomId)}` : '无'
     }`,
     `军队：${activeArmies.length}`,
+    `成员村庄：${
+      memberVillages.length > 0
+        ? memberVillages.map((village) => village.name).join('、')
+        : kingdom.villageIds.map((villageId) => `村庄 ${shortId(villageId)}`).join('、') || '无'
+    }`,
+    ...(campaigns.length > 0 ? campaigns.map((campaign) => `出征：${campaign}`) : ['出征：无']),
   ];
 }
 
@@ -512,6 +676,12 @@ function buildBuildingLines(projection: WorldProjection, id: string) {
             building.constructionWorkRequired ?? 0
           }`,
         ]
+      : []),
+    ...(building.status === 'abandoned' && building.abandonedAtTick !== undefined
+      ? [`废弃时间：第 ${building.abandonedAtTick} 刻`]
+      : []),
+    ...(building.status === 'ruined' && building.ruinedAtTick !== undefined
+      ? [`成墟时间：第 ${building.ruinedAtTick} 刻`]
       : []),
     `村庄：村庄 ${shortId(building.villageId)}`,
     `王国：${kingdom ? `王国 ${shortId(kingdom.id)}` : '无'}`,
@@ -621,6 +791,33 @@ function distance(a: Position, b: Position) {
 
 function hexColor(color: number) {
   return `#${color.toString(16).padStart(6, '0')}`;
+}
+
+function kingdomPairLabel(event: SimEvent) {
+  const left = payloadString(event, 'kingdomAId') ?? payloadString(event, 'attackerKingdomId');
+  const right = payloadString(event, 'kingdomBId') ?? payloadString(event, 'defenderKingdomId');
+
+  return `${kingdomLabel(left)} 与${kingdomLabel(right)}`;
+}
+
+function kingdomLabel(id: string | undefined) {
+  return id ? `王国 ${shortId(id)}` : '未知王国';
+}
+
+function villageLabel(id: string | undefined) {
+  return id ? `村庄 ${shortId(id)}` : '未知村庄';
+}
+
+function payloadString(event: SimEvent, key: string) {
+  const value = event.payload?.[key];
+
+  return typeof value === 'string' ? value : undefined;
+}
+
+function payloadNumber(event: SimEvent, key: string, fallback: number) {
+  const value = event.payload?.[key];
+
+  return typeof value === 'number' ? Math.round(value) : fallback;
 }
 
 function shortId(id: string) {

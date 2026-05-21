@@ -37,7 +37,7 @@ Status: `Foundation slice`
 - Acceptance: map generation is deterministic and resource lookup avoids full-map unit behavior scans.
 - Implemented:
   - Seeded tile map, biome tags, resource deposits, chunk index.
-  - Default foundation demo map size is 128 x 128 tiles.
+  - Default simulation map size remains 128 x 128 tiles for tests and tooling; the interactive Phaser demo now uses a 256 x 256 world for a fuller WorldBox-style screen experience.
   - Deterministic map test.
   - Projection culling can reuse chunk-indexed tile lookup for visible tile slices.
 - Acceptance gaps:
@@ -72,6 +72,7 @@ Status: `Foundation slice`
   - HUD panels use a separate UI camera and responsive panel sizing, so map zoom and browser resize do not distort the status overlay.
   - Scene projection requests now pass the active camera viewport, so render-facing tiles, units, territory, buildings, and armies are culled before drawing.
   - Terrain redraws are keyed by terrain revision plus viewport instead of ticking every frame.
+  - The main camera now supports WorldBox-style keyboard movement, edge scrolling, pointer-anchored wheel zoom, keyboard zoom, and a dynamic cover zoom so terrain fills the viewport instead of leaving exposed camera background.
 - Acceptance gaps:
   - Full projection remains the default compatibility path for tests, replay inspection, and tools that do not pass a viewport.
   - PR-11 has a repeatable scale measurement harness and a local 128 x 128 / 10000 population / 500+ visible unit stability sign-off; larger maps still require fresh metrics.
@@ -305,7 +306,7 @@ Status: `Foundation slice`
 
 ### PR-12D: City Growth Feedback
 
-Status: `Foundation slice`
+Status: `Done`
 
 - Make village growth readable on the map and in the HUD.
 - Acceptance: a player can tell at a glance which settlements are camps, growing towns, capitals, declining towns, or ruins.
@@ -317,26 +318,85 @@ Status: `Foundation slice`
   - Kingdom inspection now shows the capital village by name and level when it still exists.
   - Territory rendering now uses a clearer outer boundary outline and selected village/kingdom highlighting.
   - Mature pressured kingdom villages can now spend food and wood to found satellite villages on separate food-rich walkable land, transferring residents into the new village and keeping it in the parent kingdom.
+  - Abandoned settlement buildings now keep a visible abandoned phase, then decay into ruins with a readable map marker and recent event entry.
 
 - Planned:
   - More visible borders and selected territory highlight.
   - Building upgrade events and settlement growth events.
-  - Ruin/abandoned building readability for collapsed settlements.
+  - Further ruin readability for collapsed settlements, including richer ruin inspection and recovery hooks.
+
+### PR-12D.5: WorldBox Growth Alignment
+
+Status: `Foundation slice`
+
+- Before PR-12E, make the small-people development loop feel closer to WorldBox: villagers should appear to gather, build, settle, and expand before the player is asked to reason about kingdom-level diplomacy tools.
+- Acceptance: a player watching one settlement for several minutes can tell why it is or is not growing, see wood/home/territory pressure, and observe the village spreading without direct management.
+- Implemented:
+  - Builder wood gathering now projects short-lived work sites, while nearby wood deposits deplete as stores fill.
+  - Construction starts and builder progress now project short-lived construction work sites.
+  - Villages now expose `growthBlockers` in projection and inspection for housing pressure, missing wood, exhausted nearby wood, insufficient builders, low food reserve, and no buildable land.
+  - Housing pressure now triggers at roughly 75% housing use and can prioritize another house before optional farm, mine, barrack, or dock work once the first house/storage chain exists.
+  - Territory projection now includes settlement pressure from village centers and active work sites, so the visible claim can spread with lived activity instead of only finished building radii.
+  - Phaser renders gathering/construction work-site pulses so aggregate village work has a map-level trace.
+- Remaining scope:
+  - Keep deep roads/paths, per-citizen worker trips, and richer stall events for later growth-depth passes.
+  - Keep the player in a god role: no manual job assignment, no manual house placement, and no direct unit control.
+- Non-goals:
+  - No full per-citizen pathfinding or inventory in this pass.
+  - No family/culture/loyalty/rebellion yet; those remain later civilization-depth work.
+  - No PR-12E god diplomacy commands until this growth loop is readable.
 
 ### PR-12E: Kingdom Readability and God Interventions
 
-Status: `Planned`
+Status: `Foundation slice`
 
 - Make kingdom-level conflict and diplomacy understandable and lightly steerable.
 - Acceptance: wars and diplomatic pressure have visible causes, visible participants, and a small set of god commands that can push the world without direct unit control.
+- Implemented:
+  - HUD now shows compact kingdom status lines with population, village count, diplomacy pressure, and pressure target.
+  - HUD now shows conflict summaries for active armies, including attacker, defender, soldier count, target village, and army status.
+  - Kingdom inspection now lists member villages and active campaigns.
+  - Army routes now render from active armies to target villages so wars have a visible direction.
+  - Diplomacy and war events now have readable summaries for border friction, resource pressure, rising diplomacy, declarations, army formation, battles, and captures.
 - Planned:
-  - Kingdom list and relation summary.
-  - War list with attacker, defender, target village, armies, and casualties.
   - God commands for forcing war, forcing peace, inspiring growth, and marking a village/kingdom for attention.
   - Basic rebellion or resistance hooks after capture, if metrics remain healthy.
 - Non-goals:
   - No full culture/religion/family simulation in the first PR-12 pass.
-  - No larger-map target increase unless `measure:scale` says the current bottleneck is understood.
+  - No larger-than-256 demo target increase unless `measure:scale` says the current bottleneck is understood.
+
+### PR-12E.1: Continuous Town Growth
+
+Status: `Foundation slice`
+
+- Fix the mid-game village stall where a stable rich town can reach around 30 residents, 48 housing, full food, high wood, and no growth blockers, then stop building because housing pressure is not high enough and the fixed building chain is exhausted.
+- Acceptance: a player watching a rich stable town for several minutes should see continued construction pressure, or at least a clear build plan explaining what the town is waiting for.
+- Implemented:
+  - Add a projected village build plan such as expanding houses, farms, storage, preparing expansion, waiting for population pressure, waiting for land, or waiting for resources.
+  - Add prosperity construction pressure so rich stable villages can keep turning surplus wood/food into more houses, farms, and storage even when housing is not yet nearly full.
+  - Village inspection now shows the current build plan, so `growthBlockers: none` no longer hides why a town is or is not building.
+  - Regression coverage now locks the observed stall shape: around 30 residents, 48 housing, full food, large wood stockpile, existing core buildings, and no dock path still produces an `expand_housing` plan and starts another building.
+- Planned:
+  - Keep growth autonomous and WorldBox-like: no manual building placement, no job micromanagement, and no RTS queue UI.
+  - Keep deeper roads, markets, wells, decoration, and culture-specific buildings as later city-depth work unless the simple repeatable chain still feels too sparse.
+
+### PR-12E.2: Fullscreen Map Camera
+
+Status: `Foundation slice`
+
+- Make the demo feel closer to WorldBox's fullscreen sandbox map before adding more god tools.
+- Acceptance: the browser viewport is filled by world terrain, the HUD stays a light overlay, the player can navigate with WorldBox-style keyboard/edge camera controls, and wheel zoom keeps the pointed world location stable instead of zooming only around the center.
+- Implemented:
+  - The Phaser demo now creates a 256 x 256 world while preserving the 128 x 128 simulation default for unit tests and tooling.
+  - The main camera uses a dynamic cover zoom derived from viewport size and world pixel size, so max zoom-out still keeps terrain behind the full screen instead of exposing camera background.
+  - The minimum zoom now switches to a contain-style overview, so the player can zoom far enough out to see the whole generated world at once without leaving the camera on a black background.
+  - The default HUD now stays compact enough that the map remains the first-screen surface; inspection grows only after the player selects something.
+  - Mouse-wheel zoom preserves the world coordinate under the pointer, while Q/E and +/- provide keyboard zoom.
+  - WASD and arrow keys move the camera, and pointer-edge scrolling provides mouse-only navigation without stealing left-click selection or god-power placement.
+  - Ctrl + wheel changes simulation speed, matching the WorldBox control convention closely enough for the current prototype.
+  - Regression coverage locks cover zoom, contain zoom, Phaser scroll-derived viewport centering, and clamp behavior so zoom-out does not drift the map toward a corner or expose black camera background.
+- Deferred:
+  - 512+ world presets, resource indexing, and incremental resource statistics remain later scale work.
 
 ### Later Flavor Backlog
 
@@ -367,5 +427,6 @@ After PR-8, move toward diplomacy pressure while keeping the foundation constrai
 17. Done: PR-12B building chain now creates town halls, tier-1 houses, tier-2/3 upgrade gates, mine-site-gated mines, army-boosting barracks, and shore-gated docks while preserving existing housing effects.
 18. Done: kingdom capitals now stay stable while valid; replacement capitals are chosen after capital loss by town hall tier, active building count, population, then id.
 19. Done: PR-12C villager jobs and material resource economy.
-20. In progress: PR-12D city growth feedback with names, levels, capital markers, borders, automatic satellite villages, upgrades, and ruins.
-21. Planned: PR-12E kingdom readability and god interventions for war, peace, growth, and attention marking.
+20. Done: PR-12D city growth feedback with names, levels, capital markers, borders, automatic satellite villages, upgrades, and ruins.
+21. Done: PR-12D.5 WorldBox growth alignment foundation with readable work sites, growth blockers, earlier house pressure, and settlement/work-site territory expansion.
+22. In progress: PR-12E kingdom readability now has kingdom/conflict HUD summaries, campaign inspection, army route lines, and readable diplomacy/war event summaries; god intervention commands remain next.

@@ -30,9 +30,9 @@ WorldSim v2 是一个 2D 像素风上帝沙盒文明模拟游戏：
 |---|---|---|
 | PR-0 原地清场 | 已完成 | 旧 `src` 和旧 `docs` 已替换为 v2 入口 |
 | PR-1 纯模拟内核 | Foundation slice | `SimWorld`、`SimLoop`、seed RNG、命令队列、事件日志、命令拒绝已接入；正式回放/存档格式仍缺 |
-| PR-2 地图/资源 | Foundation slice | 128 x 128 foundation 地图、tile、chunk、biome、resource deposit 与 seed 地图生成已接入；资源独立索引和渲染裁剪仍缺 |
+| PR-2 地图/资源 | Foundation slice | 128 x 128 simulation 默认地图、256 x 256 交互 demo 地图、tile、chunk、biome、resource deposit 与 seed 地图生成已接入；资源独立索引和渲染裁剪仍缺 |
 | PR-3 生命求生 | Foundation slice | hunger、hp、age、eat、wander、death、birth 已接入；1000 单位基础测试已补，行为仍是最小 needs loop |
-| PR-4 Phaser Projection | Foundation slice | Scene 只读 projection，输入只发 command，源码级 sim 边界扫描已补，中文全屏调试 HUD 和独立 UI camera 已接入；渲染路径已开始传入 camera viewport 做 projection culling，全量 projection 仍作为默认兼容路径保留 |
+| PR-4 Phaser Projection | Foundation slice | Scene 只读 projection，输入只发 command，源码级 sim 边界扫描已补，中文轻量 HUD、独立 UI camera、WASD/方向键移动、屏幕边缘移动、Q/E 与 +/- 缩放、鼠标点滚轮缩放、默认 cover 视角和最小 contain 全图概览已接入；渲染路径已开始传入 camera viewport 做 projection culling，全量 projection 仍作为默认兼容路径保留 |
 | PR-5 God Command | Foundation slice | 基础神力命令、命令校验和拒绝路径已接入；正式工具栏仍缺 |
 | PR-6 村庄 | Done | 人口聚集和本地食物压力会形成村庄；村庄库存、住房容量、食物消耗、增长上限和衰退状态已接入 |
 | PR-7 建筑和领土 | Done | 村庄 surplus 会自动建造 house、storage、farm，且 PR-12B 已补 town hall anchor、house 升级链、mine 矿址 hook、barrack 军队 hook 和 dock 岸线 hook；建筑影响住房、库存上限、食物生产、军队动员、未来航运入口和领土投射 |
@@ -40,9 +40,9 @@ WorldSim v2 是一个 2D 像素风上帝沙盒文明模拟游戏：
 | PR-9 外交压力 | Done | 王国会根据边境摩擦、资源压力和种族倾向积累外交压力，并产生宣战事件 |
 | PR-10 最小战争 | Done | 宣战会生成聚合军队组，军队可推进、结算伤亡、撤退/解散并占领村庄 |
 | PR-11 规模门槛 | Done | `SimWorld.project()` 已支持 viewport culling，Phaser 已按 camera 视口取可见 tiles/units/territory/buildings/armies；PR-11A 测量 harness、PR-11B/PR-11D step phase profiling、PR-11C 村庄居民索引优化、PR-11E 单位行为降频和 PR-11F 重复居民索引重建移除已补；本地 10000 聚合人口 / 656 可见单位连续 5 次低于 16.7 ms；worker simulation 和 hot-data layout 留到更大目标按指标决定 |
-| PR-12+ | Foundation slice | `PR-12A` inspection/event story 已完成；`PR-12B` 建筑链已完成 town hall、tier-1 house、house 2/3 升级门槛、mine 矿址 hook、barrack 军队 hook 和 dock 岸线 hook；`PR-12C` 已接入 food/wood/stone/iron 仓储、默认 farmer 过渡劳力、camp 轻口粮缓冲、farmer/builder/miner/soldier 聚合职业、农场职业产粮、builder 伐木、木材点与石料/铁矿点可视化、建筑材料成本、施工时间、居民从村庄库存补粮、soldier 参与军队动员和 battle strength、miner 采矿，以及早期浅层采石场；`PR-12D` 已补村庄命名、等级、首都标记、成长事件、更清晰的领土外轮廓、住房压力优先补房，以及成熟王国村庄自动建立卫星村，下一步继续补建筑升级/成长事件与废墟可读性，再往 `PR-12E` 王国可读性与神力干预推进 |
+| PR-12+ | Foundation slice | `PR-12A` inspection/event story 已完成；`PR-12B` 建筑链已完成 town hall、tier-1 house、house 2/3 升级门槛、mine 矿址 hook、barrack 军队 hook 和 dock 岸线 hook；`PR-12C` 已接入 food/wood/stone/iron 仓储、默认 farmer 过渡劳力、camp 轻口粮缓冲、farmer/builder/miner/soldier 聚合职业、农场职业产粮、builder 伐木、木材点与石料/铁矿点可视化、建筑材料成本、施工时间、居民从村庄库存补粮、soldier 参与军队动员和 battle strength、miner 采矿，以及早期浅层采石场；`PR-12D` 已完成村庄命名、等级、首都标记、成长事件、更清晰的领土外轮廓、住房压力优先补房、自动分村，以及建筑废弃到废墟的可读性收尾；`PR-12D.5` 已补可读伐木/施工工地、成长阻塞、提前住房压力和领土自然扩张 foundation slice；`PR-12E` 已开始王国态势、冲突态势、军队路线和外交/战争事件可读性；`PR-12E.1` 已补持续城镇成长与建设计划，修复富裕村庄无阻塞但停工的问题；`PR-12E.2` 已补全屏地图相机、256 x 256 demo 地图、WorldBox 式键盘/边缘移动和鼠标点缩放；下一步补神力干预 |
 
-进入 PR-12+ 时仍需尊重 `ROADMAP.md` 的 PR-11 约束：当前已具备 viewport projection culling、第一版 10000 聚合人口 / 500+ 可见单位本地稳定性签收、step phase profiling、村庄居民索引优化和非紧急单位行为降频；`PR-12C` 职业资源已完成，`PR-12D` 已进入领土可读性、城市成长反馈、住房压力和自动分村阶段，接下来补建筑升级/成长事件与废墟可读性，再往 `PR-12E` 王国可读性与神力干预推进。更大地图、worker simulation、hot-data layout 或资源索引应继续由 `measure:scale` 的最慢阶段驱动。
+进入 PR-12+ 时仍需尊重 `ROADMAP.md` 的 PR-11 约束：当前已具备 viewport projection culling、第一版 10000 聚合人口 / 500+ 可见单位本地稳定性签收、step phase profiling、村庄居民索引优化和非紧急单位行为降频；`PR-12C` 职业资源已完成，`PR-12D` 已完成领土可读性、城市成长反馈、住房压力、自动分村和废墟可读性收尾，`PR-12D.5` 已补木材采集可读性、房屋压力、成长阻塞和领土自然扩张，`PR-12E` 正在推进王国可读性与神力干预，`PR-12E.1` 已补富裕稳定村庄的建设计划和持续扩建压力，`PR-12E.2` 已补 WorldBox 式全屏地图相机体验。下一步补强制战争/和平、成长祝福和关注标记等神力命令。更大地图、worker simulation、hot-data layout 或资源索引应继续由 `measure:scale` 的最慢阶段驱动。
 
 ## 目录结构
 
@@ -73,6 +73,7 @@ apps/world-sim/
 - MUST NOT 让 UI 直接修改 unit、tile、resource 或后续 village/kingdom。
 - MUST 玩家输入统一转换为 `SimCommand`。
 - MUST 模拟结果通过 `SimEvent` 和 `WorldProjection` 暴露。
+- MUST 在新增或调整玩法前先做 WorldBox 一致性检查：它是否强化了“玩家是神、世界自治、因果可读、干预有后果”这条核心循环；如果不强化，先改设计形态或记录明确的偏离理由。
 - MUST 新增玩法时同步更新 v2 四件套文档中的对应章节。
 - MUST 避免高频行为全图扫描；优先使用 chunk、空间索引或后续 Worker/TypedArray 热路径。
 

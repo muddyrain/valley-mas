@@ -24,6 +24,18 @@ Good systems create cause and effect:
 - Kingdoms fight because pressure accumulates, not because borders merely touch.
 - God powers matter because they alter the conditions that life and civilization react to.
 
+## WorldBox Alignment Target
+
+WorldSim should converge toward the WorldBox-style play loop, not a generic RTS or city builder. The player should mainly create conditions, watch civilizations emerge, and intervene with god powers. Civilizations should visibly gather resources, construct homes, expand territory, form settlements, colonize new land, fight, collapse, and leave ruins without direct player management.
+
+Near-term iterations must prioritize the parts that make the small-people development loop feel correct:
+
+- visible wood gathering and forest/resource depletion
+- more frequent and readable house construction under population pressure
+- territory growth that feels like settlement expansion, not only sparse building influence
+- autonomous village expansion before kingdom-level diplomacy tools
+- clear events explaining why a settlement grew, stalled, expanded, or declined
+
 ## Current v2 Scope
 
 The first v2 slice deliberately avoids full WorldBox parity. It establishes the foundation:
@@ -34,6 +46,7 @@ The first v2 slice deliberately avoids full WorldBox parity. It establishes the 
 - Units with hunger, age, health, death, birth, movement, stable home village membership, and simple needs.
 - Villages that emerge from local population and food pressure, with food and material stores, housing, and decline state.
 - Village buildings that turn surplus into housing, storage, farm production, mine access, military capacity, shore access, and settlement influence.
+- Readable settlement growth signals: aggregate wood gathering and construction work sites, growth blockers, earlier house pressure, and territory spread from lived settlement activity.
 - Kingdoms that emerge from strong villages and aggregate capital, members, population, buildings, territory, food, and material stores.
 - Diplomacy pressure that turns border friction, resource shortage, and race tendencies into observable declaration causes.
 - Minimal grouped war that lets declarations create armies, casualties, and village ownership changes without full single-unit combat.
@@ -49,3 +62,4 @@ Diplomacy, war, species-specific culture, religions, families, disasters, monste
 - UI can observe and issue commands, but cannot mutate simulation state directly.
 - Visuals are projections of world state, not the state itself.
 - Big numbers are achieved with layered simulation: visible individuals nearby, grouped or statistical populations far away.
+- Every new gameplay idea must first pass a WorldBox consistency check: does it make the world feel more alive through autonomy, pressure, readable cause/effect, and meaningful god intervention; if not, it needs a design justification or should be deferred.

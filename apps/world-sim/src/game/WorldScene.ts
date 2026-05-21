@@ -1,7 +1,16 @@
 import * as Phaser from 'phaser';
 import { type SimCommand, SimLoop, SimWorld, type TerrainType, type WorldProjection } from '../sim';
 import {
+  centerCameraScroll,
+  clampCameraScroll,
+  getContainZoom,
+  getCoverZoom,
+  stepCameraMotion,
+} from './cameraMath';
+import {
+  buildConflictSummaryLines,
   buildInspectionLines,
+  buildKingdomOverviewLines,
   buildMapLabels,
   buildTerritoryBorderSegments,
   filterEventsForSelection,
@@ -12,14 +21,30 @@ import {
 } from './inspection';
 
 const TILE_SIZE = 10;
+const DEMO_WORLD_WIDTH = 256;
+const DEMO_WORLD_HEIGHT = 256;
+const DEMO_INITIAL_UNITS = 48;
+const INITIAL_CAMERA_ZOOM = 0.72;
+const MAX_CAMERA_ZOOM = 3;
+const CAMERA_KEYBOARD_SPEED = 560;
+const CAMERA_EDGE_SPEED = 480;
+const CAMERA_EDGE_MARGIN = 26;
+const CAMERA_ACCELERATION = 18;
+const CAMERA_DECELERATION = 24;
+const CAMERA_MAX_DELTA_SECONDS = 0.05;
+const CAMERA_KEY_ZOOM_PER_SECOND = 1.9;
+const CAMERA_WHEEL_ZOOM_IN = 1.12;
+const CAMERA_WHEEL_ZOOM_OUT = 0.88;
 const PANEL_COLOR = 0x101726;
 const PANEL_STROKE = 0x4052a1;
 const TEXT_COLOR = '#f4f4f4';
 const UI_MARGIN = 12;
-const TITLE_PANEL_HEIGHT = 46;
-const BOTTOM_PANEL_HEIGHT = 74;
-const STATUS_PANEL_TOP = 62;
-const EVENTS_PANEL_TOP = 62;
+const TITLE_PANEL_HEIGHT = 38;
+const BOTTOM_PANEL_HEIGHT = 54;
+const STATUS_PANEL_TOP = 54;
+const EVENTS_PANEL_TOP = 54;
+const COMPACT_STATUS_PANEL_HEIGHT = 118;
+const COMPACT_EVENTS_PANEL_HEIGHT = 118;
 const TERRAIN_COLORS: Record<TerrainType, number> = {
   grass: 0x38b764,
   forest: 0x257179,
@@ -55,6 +80,23 @@ const ARMY_STATUS_COLORS = {
   disbanded: 0x566c86,
 } as const;
 
+const CAMERA_CONTROL_KEYS = new Set([
+  'w',
+  'a',
+  's',
+  'd',
+  'arrowup',
+  'arrowleft',
+  'arrowdown',
+  'arrowright',
+  'q',
+  'e',
+  '+',
+  '=',
+  '-',
+  '_',
+]);
+
 export class WorldScene extends Phaser.Scene {
   private world!: SimWorld;
   private loop!: SimLoop;
@@ -62,8 +104,10 @@ export class WorldScene extends Phaser.Scene {
   private territoryLayer?: Phaser.GameObjects.Graphics;
   private unitLayer?: Phaser.GameObjects.Graphics;
   private armyLayer?: Phaser.GameObjects.Graphics;
+  private armyRouteLayer?: Phaser.GameObjects.Graphics;
   private buildingLayer?: Phaser.GameObjects.Graphics;
   private resourceLayer?: Phaser.GameObjects.Graphics;
+  private workSiteLayer?: Phaser.GameObjects.Graphics;
   private selectionLayer?: Phaser.GameObjects.Graphics;
   private uiLayer?: Phaser.GameObjects.Graphics;
   private uiCamera?: Phaser.Cameras.Scene2D.Camera;
@@ -75,6 +119,12 @@ export class WorldScene extends Phaser.Scene {
   private commandSequence = 1;
   private lastTerrainDrawKey = '';
   private selection: WorldSelection = { type: 'none' };
+  private cameraInitialized = false;
+  private lastCameraWidth = 0;
+  private lastCameraHeight = 0;
+  private cameraVelocityX = 0;
+  private cameraVelocityY = 0;
+  private readonly pressedKeys = new Set<string>();
 
   constructor() {
     super('world');
@@ -83,27 +133,24 @@ export class WorldScene extends Phaser.Scene {
   create() {
     this.world = new SimWorld({
       seed: 'worldsim-v2-demo',
-      initialUnits: 32,
+      width: DEMO_WORLD_WIDTH,
+      height: DEMO_WORLD_HEIGHT,
+      initialUnits: DEMO_INITIAL_UNITS,
     });
     this.loop = new SimLoop(this.world);
 
-    this.cameras.main.setBounds(
-      0,
-      0,
-      this.world.map.width * TILE_SIZE,
-      this.world.map.height * TILE_SIZE,
+    this.configureMainCamera();
+    this.cameras.main.setZoom(
+      Phaser.Math.Clamp(this.getDefaultCameraZoom(), this.getMinimumCameraZoom(), MAX_CAMERA_ZOOM),
     );
-    this.cameras.main.centerOn(
-      (this.world.map.width * TILE_SIZE) / 2,
-      (this.world.map.height * TILE_SIZE) / 2,
-    );
-    this.cameras.main.setZoom(1);
-    this.cameras.main.roundPixels = true;
+    this.centerMainCamera();
 
     this.terrainLayer = this.add.graphics();
     this.territoryLayer = this.add.graphics();
     this.resourceLayer = this.add.graphics();
+    this.workSiteLayer = this.add.graphics();
     this.buildingLayer = this.add.graphics();
+    this.armyRouteLayer = this.add.graphics();
     this.armyLayer = this.add.graphics();
     this.unitLayer = this.add.graphics();
     this.selectionLayer = this.add.graphics();
@@ -115,17 +162,21 @@ export class WorldScene extends Phaser.Scene {
     this.controlsText = this.createUiText(18, 0, 13);
     this.eventsText = this.createUiText(0, 70, 12);
     this.setupUiCamera();
+    this.focusGameCanvas();
 
     this.input.on(Phaser.Input.Events.POINTER_DOWN, this.handlePointerDown, this);
     this.input.on(Phaser.Input.Events.POINTER_WHEEL, this.handlePointerWheel, this);
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this);
     window.addEventListener('keydown', this.handleKeyDown);
+    window.addEventListener('keyup', this.handleKeyUp);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
 
     this.renderProjection(this.projectVisibleWorld());
   }
 
   update(_time: number, delta: number) {
+    this.ensureMainCameraInitialized();
+    this.updateCameraControls(delta);
     this.loop.advance(delta);
     this.renderProjection(this.projectVisibleWorld());
   }
@@ -135,6 +186,7 @@ export class WorldScene extends Phaser.Scene {
     this.input.off(Phaser.Input.Events.POINTER_WHEEL, this.handlePointerWheel, this);
     this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this);
     window.removeEventListener('keydown', this.handleKeyDown);
+    window.removeEventListener('keyup', this.handleKeyUp);
     this.clearMapLabels();
   }
 
@@ -148,7 +200,9 @@ export class WorldScene extends Phaser.Scene {
 
     this.drawTerritory(projection);
     this.drawResources(projection);
+    this.drawWorkSites(projection);
     this.drawBuildings(projection);
+    this.drawArmyRoutes(projection);
     this.drawArmies(projection);
     this.drawUnits(projection);
     this.drawSelection(projection);
@@ -285,14 +339,16 @@ export class WorldScene extends Phaser.Scene {
       const color = BUILDING_COLORS[building.type];
       const x = building.position.x * TILE_SIZE;
       const y = building.position.y * TILE_SIZE;
+      const isAbandoned = building.status === 'abandoned';
+      const isRuined = building.status === 'ruined';
       const alpha =
         building.status === 'active'
           ? 0.95
           : building.status === 'constructing'
             ? 0.58
-            : building.status === 'abandoned'
+            : isAbandoned
               ? 0.38
-              : 0.22;
+              : 0.2;
 
       this.buildingLayer.fillStyle(color, alpha);
 
@@ -324,6 +380,57 @@ export class WorldScene extends Phaser.Scene {
       } else {
         this.buildingLayer.fillRect(x - 5, y - 5, 10, 10);
       }
+
+      if (isAbandoned || isRuined) {
+        this.buildingLayer.lineStyle(1.5, isRuined ? 0x333c57 : color, isRuined ? 0.82 : 0.48);
+        this.buildingLayer.strokeRect(x - 6, y - 6, 12, 12);
+      }
+
+      if (isRuined) {
+        this.buildingLayer.lineStyle(2, 0x333c57, 0.88);
+        this.buildingLayer.beginPath();
+        this.buildingLayer.moveTo(x - 5, y - 5);
+        this.buildingLayer.lineTo(x + 5, y + 5);
+        this.buildingLayer.moveTo(x + 5, y - 5);
+        this.buildingLayer.lineTo(x - 5, y + 5);
+        this.buildingLayer.strokePath();
+      }
+    }
+  }
+
+  private drawWorkSites(projection: WorldProjection) {
+    if (!this.workSiteLayer) {
+      return;
+    }
+
+    this.workSiteLayer.clear();
+
+    for (const site of projection.workSites) {
+      const x = site.position.x * TILE_SIZE;
+      const y = site.position.y * TILE_SIZE;
+      const remainingTicks = Math.max(0, site.expiresAtTick - projection.tick);
+      const pulse = 0.55 + 0.35 * Math.sin((projection.tick + site.position.x * 3) / 6);
+      const alpha = Math.min(0.9, Math.max(0.2, (remainingTicks / 60) * pulse));
+
+      if (site.type === 'wood_gathering') {
+        this.workSiteLayer.lineStyle(1.5, 0xffcd75, alpha);
+        this.workSiteLayer.strokeCircle(x, y, 6);
+        this.workSiteLayer.fillStyle(0xffcd75, alpha * 0.7);
+        this.workSiteLayer.fillRect(x - 1, y - 5, 2, 10);
+        this.workSiteLayer.fillRect(x - 5, y - 1, 10, 2);
+        continue;
+      }
+
+      if (site.type === 'construction') {
+        this.workSiteLayer.lineStyle(1.5, 0xf4f4f4, alpha);
+        this.workSiteLayer.strokeRect(x - 7, y - 7, 14, 14);
+        this.workSiteLayer.fillStyle(0xf4f4f4, alpha * 0.45);
+        this.workSiteLayer.fillTriangle(x, y - 6, x - 5, y + 4, x + 5, y + 4);
+        continue;
+      }
+
+      this.workSiteLayer.lineStyle(1.2, 0x99e550, alpha);
+      this.workSiteLayer.strokeCircle(x, y, 8);
     }
   }
 
@@ -359,6 +466,51 @@ export class WorldScene extends Phaser.Scene {
         y + radius + 1,
         x + radius + 1,
         y + radius + 1,
+      );
+    }
+  }
+
+  private drawArmyRoutes(projection: WorldProjection) {
+    if (!this.armyRouteLayer) {
+      return;
+    }
+
+    this.armyRouteLayer.clear();
+
+    for (const army of projection.armies) {
+      if (army.status === 'disbanded') {
+        continue;
+      }
+
+      const targetVillage = projection.villages.find(
+        (village) => village.id === army.targetVillageId,
+      );
+
+      if (!targetVillage) {
+        continue;
+      }
+
+      const selected =
+        this.selection.type === 'army'
+          ? this.selection.id === army.id
+          : this.selection.type === 'kingdom'
+            ? this.selection.id === army.kingdomId || this.selection.id === army.targetKingdomId
+            : false;
+      const routeColor = army.status === 'fighting' ? 0xffcd75 : 0xef7d57;
+
+      this.armyRouteLayer.lineStyle(selected ? 2.5 : 1.5, routeColor, selected ? 0.9 : 0.46);
+      this.armyRouteLayer.beginPath();
+      this.armyRouteLayer.moveTo(army.position.x * TILE_SIZE, army.position.y * TILE_SIZE);
+      this.armyRouteLayer.lineTo(
+        targetVillage.center.x * TILE_SIZE,
+        targetVillage.center.y * TILE_SIZE,
+      );
+      this.armyRouteLayer.strokePath();
+      this.armyRouteLayer.fillStyle(routeColor, selected ? 0.85 : 0.52);
+      this.armyRouteLayer.fillCircle(
+        targetVillage.center.x * TILE_SIZE,
+        targetVillage.center.y * TILE_SIZE,
+        selected ? 5 : 3,
       );
     }
   }
@@ -511,44 +663,29 @@ export class WorldScene extends Phaser.Scene {
       .filter((kingdom) => kingdom.status !== 'fallen')
       .sort((a, b) => b.population - a.population);
     const leadingKingdom = activeKingdoms[0];
+    const kingdomLines = buildKingdomOverviewLines(projection).slice(0, 2);
+    const conflictLines = buildConflictSummaryLines(projection).slice(0, 2);
 
-    this.titleText?.setText('世界模拟器 v2 基础原型');
+    this.titleText?.setText(
+      `世界模拟器 · 人口 ${projection.stats.population} · 村庄 ${projection.stats.villages} · 王国 ${projection.stats.kingdoms}`,
+    );
     this.statusText?.setText(
-      [
-        '世界状态',
-        `种子：${projection.seed}`,
-        `时间：第 ${projection.tick} 刻`,
-        `速度：${projection.paused ? '已暂停' : `${projection.speed} 倍速`}`,
-        `人口：${projection.stats.population}`,
-        `村庄：${projection.stats.villages}`,
-        `王国：${projection.stats.kingdoms} / 陨落 ${projection.stats.fallenKingdoms}`,
-        `最大王国：${leadingKingdom ? `${leadingKingdom.population} 人` : '无'}`,
-        '王国列表',
-        ...(activeKingdoms.length > 0
-          ? activeKingdoms
-              .slice(0, 4)
-              .map(
-                (kingdom) =>
-                  `${kingdom.id}：${kingdom.population} 人 / ${kingdom.villageIds.length} 村`,
-              )
-          : ['无活跃王国']),
-        `军队：${projection.stats.activeArmies}`,
-        `建筑：${projection.stats.activeBuildings} 有效 / ${projection.stats.abandonedBuildings} 废弃`,
-        `领土：${projection.stats.territoryTiles}`,
-        `住房：${projection.stats.housingCapacity}`,
-        `村庄库存：${projection.stats.totalVillageFood}`,
-        `食物：${projection.stats.totalFood}`,
-        `食物地块：${projection.stats.foodTiles}`,
-        '',
-        '颜色说明',
-        '白色：空闲',
-        '黄色：寻找食物',
-        '绿色：正在进食',
-        '灰蓝：游荡',
-        '方块/圆点：建筑',
-        '王国色块：领土',
-        '同色三角：军队',
-      ].join('\n'),
+      this.selection.type === 'none'
+        ? ''
+        : [
+            `第 ${projection.tick} 刻 · ${projection.paused ? '暂停' : `${projection.speed}x`}`,
+            `领土 ${projection.stats.territoryTiles} · 建筑 ${projection.stats.activeBuildings}`,
+            `库存 食物 ${Math.round(projection.stats.totalVillageFood)} / 木石铁 ${Math.round(
+              projection.stats.totalVillageWood,
+            )}/${Math.round(projection.stats.totalVillageStone)}/${Math.round(
+              projection.stats.totalVillageIron,
+            )}`,
+            `最大王国 ${leadingKingdom ? `${leadingKingdom.population} 人` : '无'} · 陨落 ${
+              projection.stats.fallenKingdoms
+            }`,
+            ...kingdomLines,
+            ...conflictLines,
+          ].join('\n'),
     );
     this.controlsText?.setText(
       [
@@ -557,32 +694,37 @@ export class WorldScene extends Phaser.Scene {
         '按住控制键 + 左键：投放食物',
         '按住上档键 + 左键：召唤 4 个小人',
         '按住替代键 + 左键：闪电打击',
-        '滚轮：缩放地图',
+        'WASD / 方向键：移动镜头',
+        '鼠标靠近屏幕边缘：移动镜头',
+        '滚轮 / Q / +：放大，E / -：缩小',
         '1 / 2 / 4 键：调整速度',
         'K 键：循环选择王国',
         '0 或 P 键：暂停 / 恢复',
-        'F / G / W 键：将镜头中心改成森林 / 草地 / 水域',
+        'F / G / V 键：将镜头中心改成森林 / 草地 / 水域',
       ].join('    '),
     );
-    const storyEvents = filterEventsForSelection(projection, this.selection).slice(-8);
+    const storyEvents = filterEventsForSelection(projection, this.selection).slice(-5);
+    const inspectionLines = buildInspectionLines(projection, this.selection);
     this.eventsText?.setText(
-      [
-        ...buildInspectionLines(projection, this.selection),
-        '',
-        this.selection.type === 'none' || this.selection.type === 'tile' ? '最近事件' : '相关事件',
-        '',
-        ...(storyEvents.length > 0
-          ? storyEvents.map((event) => {
-              const summary = formatEventSummary(event);
+      this.selection.type === 'none'
+        ? ''
+        : [
+            ...inspectionLines,
+            '',
+            this.selection.type === 'tile' ? '最近事件' : '相关事件',
+            ...(storyEvents.length > 0
+              ? storyEvents.map((event) => {
+                  const summary = formatEventSummary(event);
 
-              return `第 ${event.tick} 刻：${summary || translateEvent(event.message)}`;
-            })
-          : ['暂无相关事件']),
-      ].join('\n'),
+                  return `第 ${event.tick} 刻：${summary || translateEvent(event.message)}`;
+                })
+              : ['暂无相关事件']),
+          ].join('\n'),
     );
   }
 
   private readonly handlePointerDown = (pointer: Phaser.Input.Pointer) => {
+    this.focusGameCanvas();
     const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const position = {
       x: Math.floor(worldPoint.x / TILE_SIZE),
@@ -625,16 +767,25 @@ export class WorldScene extends Phaser.Scene {
     _deltaX: number,
     deltaY: number,
   ) => {
-    const camera = this.cameras.main;
-    const before = camera.getWorldPoint(pointer.x, pointer.y);
-    camera.setZoom(Phaser.Math.Clamp(camera.zoom + (deltaY > 0 ? -0.1 : 0.1), 0.5, 3));
-    const after = camera.getWorldPoint(pointer.x, pointer.y);
-    camera.scrollX += before.x - after.x;
-    camera.scrollY += before.y - after.y;
+    if (pointer.event.ctrlKey || pointer.event.metaKey) {
+      this.issueSpeedFromWheel(deltaY);
+      return;
+    }
+
+    this.zoomCameraAt(
+      pointer.x,
+      pointer.y,
+      deltaY > 0 ? CAMERA_WHEEL_ZOOM_OUT : CAMERA_WHEEL_ZOOM_IN,
+    );
   };
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
     const key = event.key.toLowerCase();
+    this.pressedKeys.add(key);
+
+    if (CAMERA_CONTROL_KEYS.has(key)) {
+      event.preventDefault();
+    }
 
     if (key === '1' || key === '2' || key === '4') {
       this.issue({ type: 'set_speed', payload: { speed: Number(key) as 1 | 2 | 4 } });
@@ -658,17 +809,156 @@ export class WorldScene extends Phaser.Scene {
       y: Math.floor(center.y / TILE_SIZE),
     };
 
-    if (key === 'f' || key === 'g' || key === 'w') {
+    if (key === 'f' || key === 'g' || key === 'v') {
       this.issue({
         type: 'change_terrain',
         payload: {
-          terrain: key === 'f' ? 'forest' : key === 'w' ? 'water' : 'grass',
+          terrain: key === 'f' ? 'forest' : key === 'v' ? 'water' : 'grass',
           position,
           radius: 4,
         },
       });
     }
   };
+
+  private readonly handleKeyUp = (event: KeyboardEvent) => {
+    this.pressedKeys.delete(event.key.toLowerCase());
+  };
+
+  private focusGameCanvas() {
+    const canvas = this.game.canvas;
+
+    canvas.tabIndex = 0;
+    canvas.focus({ preventScroll: true });
+  }
+
+  private updateCameraControls(deltaMs: number) {
+    const deltaSeconds = Math.min(deltaMs / 1000, CAMERA_MAX_DELTA_SECONDS);
+    const camera = this.cameras.main;
+    const keyboardMove = this.getKeyboardCameraDirection();
+    const hasKeyboardMove = keyboardMove.x !== 0 || keyboardMove.y !== 0;
+    const edgeMove = hasKeyboardMove ? { x: 0, y: 0 } : this.getEdgeCameraDirection();
+    const move = hasKeyboardMove ? keyboardMove : edgeMove;
+    const speed = hasKeyboardMove ? CAMERA_KEYBOARD_SPEED : CAMERA_EDGE_SPEED;
+    const nextMotion = stepCameraMotion(
+      { velocityX: this.cameraVelocityX, velocityY: this.cameraVelocityY },
+      {
+        directionX: move.x,
+        directionY: move.y,
+        speed,
+        deltaSeconds,
+        acceleration: CAMERA_ACCELERATION,
+        deceleration: CAMERA_DECELERATION,
+      },
+    );
+
+    this.cameraVelocityX = nextMotion.velocityX;
+    this.cameraVelocityY = nextMotion.velocityY;
+
+    if (this.cameraVelocityX !== 0 || this.cameraVelocityY !== 0) {
+      camera.scrollX += (this.cameraVelocityX * deltaSeconds) / camera.zoom;
+      camera.scrollY += (this.cameraVelocityY * deltaSeconds) / camera.zoom;
+      const attemptedScrollX = camera.scrollX;
+      const attemptedScrollY = camera.scrollY;
+      const clampedScroll = this.clampMainCameraScroll();
+
+      if (Math.abs(clampedScroll.scrollX - attemptedScrollX) > 0.001) {
+        this.cameraVelocityX = 0;
+      }
+
+      if (Math.abs(clampedScroll.scrollY - attemptedScrollY) > 0.001) {
+        this.cameraVelocityY = 0;
+      }
+    }
+
+    const zoomDirection =
+      (this.pressedKeys.has('q') || this.pressedKeys.has('+') || this.pressedKeys.has('=')
+        ? 1
+        : 0) -
+      (this.pressedKeys.has('e') || this.pressedKeys.has('-') || this.pressedKeys.has('_') ? 1 : 0);
+
+    if (zoomDirection !== 0) {
+      const multiplier = Math.exp(CAMERA_KEY_ZOOM_PER_SECOND * zoomDirection * deltaSeconds);
+      this.zoomCameraAt(camera.width / 2, camera.height / 2, multiplier);
+    }
+  }
+
+  private getKeyboardCameraDirection() {
+    return {
+      x:
+        (this.pressedKeys.has('d') || this.pressedKeys.has('arrowright') ? 1 : 0) -
+        (this.pressedKeys.has('a') || this.pressedKeys.has('arrowleft') ? 1 : 0),
+      y:
+        (this.pressedKeys.has('s') || this.pressedKeys.has('arrowdown') ? 1 : 0) -
+        (this.pressedKeys.has('w') || this.pressedKeys.has('arrowup') ? 1 : 0),
+    };
+  }
+
+  private getEdgeCameraDirection() {
+    const pointer = this.input.activePointer;
+
+    if (
+      !pointer ||
+      pointer.isDown ||
+      pointer.x < 0 ||
+      pointer.y < 0 ||
+      pointer.x > this.scale.width ||
+      pointer.y > this.scale.height
+    ) {
+      return { x: 0, y: 0 };
+    }
+
+    const width = this.scale.width;
+    const height = this.scale.height;
+
+    return {
+      x:
+        (pointer.x >= width - CAMERA_EDGE_MARGIN ? 1 : 0) -
+        (pointer.x <= CAMERA_EDGE_MARGIN ? 1 : 0),
+      y:
+        (pointer.y >= height - CAMERA_EDGE_MARGIN ? 1 : 0) -
+        (pointer.y <= CAMERA_EDGE_MARGIN ? 1 : 0),
+    };
+  }
+
+  private zoomCameraAt(screenX: number, screenY: number, multiplier: number) {
+    const camera = this.cameras.main;
+    const before = camera.getWorldPoint(screenX, screenY);
+    const nextZoom = Phaser.Math.Clamp(
+      camera.zoom * multiplier,
+      this.getMinimumCameraZoom(),
+      MAX_CAMERA_ZOOM,
+    );
+
+    if (nextZoom === camera.zoom) {
+      return;
+    }
+
+    camera.setZoom(nextZoom);
+    const after = camera.getWorldPoint(screenX, screenY);
+    camera.scrollX += before.x - after.x;
+    camera.scrollY += before.y - after.y;
+    this.clampMainCameraScroll();
+  }
+
+  private issueSpeedFromWheel(deltaY: number) {
+    const projection = this.world.project();
+    const speeds: Array<0 | 1 | 2 | 4> = [0, 1, 2, 4];
+    const currentIndex = speeds.indexOf(projection.paused ? 0 : projection.speed);
+    const direction = deltaY > 0 ? -1 : 1;
+    const nextSpeed = speeds[Phaser.Math.Clamp(currentIndex + direction, 0, speeds.length - 1)];
+
+    if (nextSpeed === 0) {
+      this.issue({ type: 'pause', payload: { paused: true } });
+      return;
+    }
+
+    if (projection.paused) {
+      this.issue({ type: 'pause', payload: { paused: false } });
+    }
+
+    this.issue({ type: 'set_speed', payload: { speed: nextSpeed } });
+  }
 
   private issue(command: Omit<SimCommand, 'id' | 'issuedAtTick'>) {
     this.world.enqueue({
@@ -730,21 +1020,23 @@ export class WorldScene extends Phaser.Scene {
     const width = this.scale.width;
     const height = this.scale.height;
     const compact = width < 900 || height < 680;
-    const sidePanelWidth = Math.min(compact ? 320 : 430, Math.max(280, Math.floor(width * 0.3)));
-    const eventsWidth = Math.min(compact ? 350 : 430, Math.max(280, Math.floor(width * 0.3)));
-    const bottomHeight = compact ? 88 : BOTTOM_PANEL_HEIGHT;
-    const statusPanelHeight = Math.max(
-      320,
-      Math.min(height - STATUS_PANEL_TOP - bottomHeight - UI_MARGIN * 3, compact ? 440 : 560),
+    const hasSelection = this.selection.type !== 'none';
+    const sidePanelWidth = Math.min(compact ? 300 : 345, Math.max(260, Math.floor(width * 0.22)));
+    const eventsWidth = Math.min(
+      hasSelection ? (compact ? 330 : 420) : compact ? 300 : 350,
+      Math.max(260, Math.floor(width * 0.28)),
     );
-    const eventsPanelHeight = Math.max(
-      220,
-      Math.min(height - EVENTS_PANEL_TOP - bottomHeight - UI_MARGIN * 3, compact ? 300 : 360),
-    );
+    const bottomHeight = compact ? 72 : BOTTOM_PANEL_HEIGHT;
+    const statusPanelHeight = compact ? 104 : COMPACT_STATUS_PANEL_HEIGHT;
+    const eventsPanelHeight = hasSelection
+      ? Math.min(height - EVENTS_PANEL_TOP - bottomHeight - UI_MARGIN * 3, compact ? 280 : 340)
+      : COMPACT_EVENTS_PANEL_HEIGHT;
 
     this.uiLayer.clear();
     this.drawPanel(UI_MARGIN, 10, sidePanelWidth, TITLE_PANEL_HEIGHT, 0.82);
-    this.drawPanel(UI_MARGIN, STATUS_PANEL_TOP, sidePanelWidth, statusPanelHeight, 0.78);
+    if (hasSelection) {
+      this.drawPanel(UI_MARGIN, STATUS_PANEL_TOP, sidePanelWidth, statusPanelHeight, 0.78);
+    }
     this.drawPanel(
       UI_MARGIN,
       height - bottomHeight - UI_MARGIN,
@@ -752,20 +1044,22 @@ export class WorldScene extends Phaser.Scene {
       bottomHeight,
       0.78,
     );
-    this.drawPanel(
-      width - eventsWidth - UI_MARGIN,
-      EVENTS_PANEL_TOP,
-      eventsWidth,
-      eventsPanelHeight,
-      0.78,
-    );
+    if (hasSelection) {
+      this.drawPanel(
+        width - eventsWidth - UI_MARGIN,
+        EVENTS_PANEL_TOP,
+        eventsWidth,
+        eventsPanelHeight,
+        0.78,
+      );
+    }
 
     this.titleText?.setPosition(26, 21);
-    this.statusText?.setPosition(26, 78);
+    this.statusText?.setPosition(26, 68);
     this.statusText?.setWordWrapWidth(sidePanelWidth - 28);
     this.controlsText?.setPosition(26, height - bottomHeight + (compact ? 8 : 9));
     this.controlsText?.setWordWrapWidth(width - 52);
-    this.eventsText?.setPosition(width - eventsWidth + 4, 78);
+    this.eventsText?.setPosition(width - eventsWidth + 4, 68);
     this.eventsText?.setWordWrapWidth(eventsWidth - 28);
   }
 
@@ -781,16 +1075,121 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private readonly handleResize = () => {
+    this.configureMainCamera();
+    this.cameras.main.setZoom(
+      Phaser.Math.Clamp(this.cameras.main.zoom, this.getMinimumCameraZoom(), MAX_CAMERA_ZOOM),
+    );
+    this.centerMainCamera();
+    this.cameraInitialized = true;
+    this.lastCameraWidth = this.cameras.main.width;
+    this.lastCameraHeight = this.cameras.main.height;
     this.uiCamera?.setSize(this.scale.width, this.scale.height);
     this.layoutUiPanels();
   };
+
+  private configureMainCamera() {
+    this.cameras.main.setOrigin(0, 0);
+    this.cameras.main.roundPixels = false;
+    this.cameras.main.setBackgroundColor(TERRAIN_COLORS.water);
+  }
+
+  private getMinimumCameraZoom() {
+    const worldPixelWidth = this.world.map.width * TILE_SIZE;
+    const worldPixelHeight = this.world.map.height * TILE_SIZE;
+
+    return getContainZoom(
+      { width: this.scale.width, height: this.scale.height },
+      { width: worldPixelWidth, height: worldPixelHeight },
+      MAX_CAMERA_ZOOM,
+    );
+  }
+
+  private getDefaultCameraZoom() {
+    const worldPixelWidth = this.world.map.width * TILE_SIZE;
+    const worldPixelHeight = this.world.map.height * TILE_SIZE;
+
+    const coverZoom = getCoverZoom(
+      { width: this.scale.width, height: this.scale.height },
+      { width: worldPixelWidth, height: worldPixelHeight },
+      MAX_CAMERA_ZOOM,
+    );
+
+    return Math.max(INITIAL_CAMERA_ZOOM, coverZoom);
+  }
+
+  private ensureMainCameraInitialized() {
+    const camera = this.cameras.main;
+    const sizeChanged =
+      this.lastCameraWidth !== camera.width || this.lastCameraHeight !== camera.height;
+
+    if (this.cameraInitialized && !sizeChanged) {
+      return;
+    }
+
+    camera.setZoom(
+      Phaser.Math.Clamp(
+        this.cameraInitialized ? camera.zoom : this.getDefaultCameraZoom(),
+        this.getMinimumCameraZoom(),
+        MAX_CAMERA_ZOOM,
+      ),
+    );
+    this.centerMainCamera();
+    this.cameraInitialized = true;
+    this.lastCameraWidth = camera.width;
+    this.lastCameraHeight = camera.height;
+    this.lastTerrainDrawKey = '';
+  }
+
+  private centerMainCamera() {
+    const camera = this.cameras.main;
+    const viewportWidth = camera.width / camera.zoom;
+    const viewportHeight = camera.height / camera.zoom;
+    const worldPixelWidth = this.world.map.width * TILE_SIZE;
+    const worldPixelHeight = this.world.map.height * TILE_SIZE;
+    const nextScroll = centerCameraScroll({
+      scrollX: camera.scrollX,
+      scrollY: camera.scrollY,
+      screenWidth: camera.width,
+      screenHeight: camera.height,
+      viewportWidth,
+      viewportHeight,
+      worldWidth: worldPixelWidth,
+      worldHeight: worldPixelHeight,
+    });
+
+    camera.setScroll(nextScroll.scrollX, nextScroll.scrollY);
+    this.clampMainCameraScroll();
+  }
+
+  private clampMainCameraScroll() {
+    const camera = this.cameras.main;
+    const viewportWidth = camera.width / camera.zoom;
+    const viewportHeight = camera.height / camera.zoom;
+    const worldPixelWidth = this.world.map.width * TILE_SIZE;
+    const worldPixelHeight = this.world.map.height * TILE_SIZE;
+    const nextScroll = clampCameraScroll({
+      scrollX: camera.scrollX,
+      scrollY: camera.scrollY,
+      screenWidth: camera.width,
+      screenHeight: camera.height,
+      viewportWidth,
+      viewportHeight,
+      worldWidth: worldPixelWidth,
+      worldHeight: worldPixelHeight,
+    });
+
+    camera.setScroll(nextScroll.scrollX, nextScroll.scrollY);
+    return nextScroll;
+  }
 
   private setupUiCamera() {
     const worldObjects: Array<Phaser.GameObjects.GameObject | undefined> = [
       this.terrainLayer,
       this.territoryLayer,
       this.resourceLayer,
+      this.workSiteLayer,
       this.buildingLayer,
+      this.armyRouteLayer,
       this.armyLayer,
       this.unitLayer,
       this.selectionLayer,
@@ -902,6 +1301,10 @@ function translateEvent(message: string) {
 
   if (message.includes('is declining')) {
     return '村庄进入衰退';
+  }
+
+  if (message.includes('ruined')) {
+    return '建筑已沦为废墟';
   }
 
   if (message.includes('abandoned')) {

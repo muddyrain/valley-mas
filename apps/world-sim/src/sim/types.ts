@@ -14,6 +14,25 @@ export type UnitRace = 'human' | 'orc' | 'elf' | 'dwarf';
 export type UnitGender = 'male' | 'female';
 export type UnitIntent = 'idle' | 'seek_food' | 'eat' | 'wander' | 'dead';
 export type VillageStatus = 'camp' | 'stable' | 'declining';
+export type VillageGrowthBlocker =
+  | 'housing_pressure'
+  | 'missing_wood'
+  | 'no_wood_source'
+  | 'insufficient_builders'
+  | 'low_food_reserve'
+  | 'no_buildable_land';
+export type VillageBuildPlan =
+  | 'expand_housing'
+  | 'expand_farms'
+  | 'expand_storage'
+  | 'expand_mining'
+  | 'expand_military'
+  | 'expand_dock'
+  | 'prepare_expansion'
+  | 'waiting_population_pressure'
+  | 'waiting_resources'
+  | 'waiting_land'
+  | 'idle';
 export type VillageJobs = {
   farmer: number;
   builder: number;
@@ -77,6 +96,8 @@ export type Village = {
   stoneInventory: number;
   ironInventory: number;
   jobs: VillageJobs;
+  growthBlockers: VillageGrowthBlocker[];
+  buildPlan: VillageBuildPlan;
   housingCapacity: number;
   territoryTiles: number;
   foundedAtTick: number;
@@ -109,6 +130,8 @@ export type VillageBuilding = {
   status: VillageBuildingStatus;
   position: Position;
   builtAtTick: number;
+  abandonedAtTick?: number;
+  ruinedAtTick?: number;
   tier?: number;
   constructionProgress?: number;
   constructionWorkRequired?: number;
@@ -133,6 +156,15 @@ export type TerritoryTile = {
   y: number;
   villageId: string;
   kingdomId?: string;
+};
+
+export type VillageWorkSite = {
+  id: string;
+  type: 'wood_gathering' | 'construction' | 'territory_growth';
+  villageId: string;
+  position: Position;
+  amount?: number;
+  expiresAtTick: number;
 };
 
 export type WorldProjectionViewport = {
@@ -228,6 +260,7 @@ export type SimEvent = {
     | 'village_abandoned'
     | 'building_built'
     | 'building_upgraded'
+    | 'building_ruined'
     | 'territory_changed'
     | 'kingdom_founded'
     | 'kingdom_joined'
@@ -299,6 +332,7 @@ export type WorldProjection = {
   buildings: VillageBuilding[];
   armies: ArmyGroup[];
   territory: TerritoryTile[];
+  workSites: VillageWorkSite[];
   recentEvents: SimEvent[];
   stats: {
     population: number;

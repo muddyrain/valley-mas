@@ -756,6 +756,127 @@ describe('SimWorld village buildings and territory', () => {
     expect(updatedVillage?.jobs.builder).toBeGreaterThan(0);
     expect(updatedVillage?.woodInventory).toBeGreaterThan(0);
     expect(deposit?.resource?.amount ?? 0).toBeLessThan(80);
+    expect(
+      projection.workSites.some(
+        (site) => site.type === 'wood_gathering' && site.villageId === village.id,
+      ),
+    ).toBe(true);
+  });
+
+  it('explains growth blockers when a pressured village lacks build materials', () => {
+    const world = foundFoodRichVillage('village-growth-blockers');
+    const village = world.project().villages[0];
+
+    removeWoodSitesNearVillage(world, village.id);
+
+    const mutableVillage = getMutableWorld(world).villages.get(village.id);
+
+    if (!mutableVillage) {
+      throw new Error('Expected village');
+    }
+
+    mutableVillage.woodInventory = 0;
+    mutableVillage.housingCapacity = mutableVillage.population;
+
+    for (let tick = 0; tick < 3; tick += 1) {
+      world.step();
+    }
+
+    const updatedVillage = world
+      .project()
+      .villages.find((candidate) => candidate.id === village.id);
+
+    expect(updatedVillage?.growthBlockers).toContain('housing_pressure');
+    expect(updatedVillage?.growthBlockers).toContain('missing_wood');
+    expect(updatedVillage?.growthBlockers).toContain('no_wood_source');
+  });
+
+  it('keeps a rich stable town building even before housing is nearly full', () => {
+    const world = foundFoodRichVillage('village-rich-town-continues-building');
+    const village = world.project().villages[0];
+    const mutableVillage = getMutableWorld(world).villages.get(village.id);
+
+    if (!mutableVillage) {
+      throw new Error('Expected village');
+    }
+
+    for (const type of [
+      'house',
+      'house',
+      'house',
+      'house',
+      'storage',
+      'farm',
+      'farm',
+      'mine',
+      'barrack',
+    ] as const) {
+      addActiveBuildingToVillage(world, village.id, type);
+    }
+    removeDockSitesNearVillage(world, village.id);
+
+    prepareVillageForBuildingUpgrades(world, village.id, 32, 260, 20);
+    mutableVillage.foodCapacity = 260;
+    mutableVillage.foodInventory = 260;
+    mutableVillage.woodInventory = 1750;
+    mutableVillage.stoneInventory = 70;
+    mutableVillage.ironInventory = 0;
+    mutableVillage.housingCapacity = 48;
+    mutableVillage.status = 'stable';
+    world.step();
+
+    const beforeProjection = world.project();
+    const beforeBuildings = beforeProjection.buildings.filter(
+      (building) => building.villageId === village.id,
+    ).length;
+
+    expect(
+      beforeProjection.villages.find((candidate) => candidate.id === village.id)?.population,
+    ).toBe(32);
+    expect(
+      beforeProjection.villages.find((candidate) => candidate.id === village.id)?.buildPlan,
+    ).toBe('expand_housing');
+
+    for (let tick = 0; tick < 80; tick += 1) {
+      world.step();
+    }
+
+    const afterProjection = world.project();
+    const afterVillage = afterProjection.villages.find((candidate) => candidate.id === village.id);
+    const afterBuildings = afterProjection.buildings.filter(
+      (building) => building.villageId === village.id,
+    ).length;
+
+    expect(afterVillage?.buildPlan).not.toBe('idle');
+    expect(afterBuildings).toBeGreaterThan(beforeBuildings);
+  });
+
+  it('lets visible work sites extend village territory beyond finished buildings', () => {
+    const world = foundFoodRichVillage('village-worksite-territory');
+    const village = world.project().villages[0];
+    const woodPosition = {
+      x: Math.floor(village.center.x + 6),
+      y: Math.floor(village.center.y),
+    };
+
+    world.step();
+
+    const projection = world.project();
+
+    expect(
+      projection.workSites.some(
+        (site) =>
+          site.type === 'wood_gathering' &&
+          Math.floor(site.position.x) === woodPosition.x &&
+          Math.floor(site.position.y) === woodPosition.y,
+      ),
+    ).toBe(true);
+    expect(
+      projection.territory.some(
+        (tile) =>
+          tile.villageId === village.id && tile.x === woodPosition.x && tile.y === woodPosition.y,
+      ),
+    ).toBe(true);
   });
 
   it('builds a mine when the village has a nearby stone or iron site', () => {
@@ -980,10 +1101,11 @@ describe('SimWorld village buildings and territory', () => {
     );
   });
 
-  it('keeps abandoned buildings as ruins-in-progress without active village benefits', () => {
+  it('decays abandoned buildings into ruins without active village benefits', () => {
     const world = foundFoodRichVillage('village-abandoned-buildings');
     const mutableWorld = getMutableWorld(world) as unknown as {
       villages: Map<string, Village>;
+      buildings: Map<string, VillageBuilding>;
     };
     const villageId = world.project().villages[0]?.id;
 
@@ -1024,6 +1146,25 @@ describe('SimWorld village buildings and territory', () => {
     expect(projection.stats.totalVillageFood).toBe(0);
     expect(projection.stats.territoryTiles).toBe(0);
     expect(projection.buildings.every((building) => building.status === 'abandoned')).toBe(true);
+
+    for (const building of mutableWorld.buildings.values()) {
+      if (building.status === 'abandoned') {
+        building.abandonedAtTick = -100000;
+      }
+    }
+
+    world.step();
+    const ruinedProjection = world.project();
+
+    expect(ruinedProjection.stats.activeBuildings).toBe(0);
+    expect(ruinedProjection.stats.abandonedBuildings).toBe(0);
+    expect(ruinedProjection.stats.ruinedBuildings).toBeGreaterThan(0);
+    expect(ruinedProjection.stats.housingCapacity).toBe(0);
+    expect(ruinedProjection.stats.territoryTiles).toBe(0);
+    expect(ruinedProjection.buildings.every((building) => building.status === 'ruined')).toBe(true);
+    expect(ruinedProjection.recentEvents.some((event) => event.type === 'building_ruined')).toBe(
+      true,
+    );
   });
 
   it('keeps territory stable when villagers move away from the settlement center', () => {
