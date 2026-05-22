@@ -72,6 +72,9 @@ describe('world inspection helpers', () => {
       '成长阻塞：住房紧张、缺少木材',
     );
     expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '主要阻塞：缺少木材',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
       '建设计划：扩建民居',
     );
     expect(buildInspectionLines(projection, { type: 'army', id: 'army-1' })).toContain('军队 1');
@@ -395,6 +398,7 @@ function createProjection(): WorldProjection {
           soldier: 3,
         },
         growthBlockers: ['housing_pressure', 'missing_wood'],
+        primaryGrowthBlocker: 'missing_wood',
         buildPlan: 'expand_housing',
         housingCapacity: 30,
         territoryTiles: 12,
@@ -420,6 +424,7 @@ function createProjection(): WorldProjection {
           soldier: 0,
         },
         growthBlockers: [],
+        primaryGrowthBlocker: undefined,
         buildPlan: 'idle',
         housingCapacity: 18,
         territoryTiles: 8,
@@ -494,6 +499,7 @@ function createProjection(): WorldProjection {
         status: 'marching',
       },
     ],
+    battleMarkers: [],
     territory: [
       { x: 18, y: 18, villageId: 'village-1', kingdomId: 'kingdom-1' },
       { x: 19, y: 18, villageId: 'village-1', kingdomId: 'kingdom-1' },

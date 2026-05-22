@@ -36,6 +36,20 @@ Near-term iterations must prioritize the parts that make the small-people develo
 - autonomous village expansion before kingdom-level diplomacy tools
 - clear events explaining why a settlement grew, stalled, expanded, or declined
 
+## Civilization Spine Rework Target
+
+The next structural pass should make the early-to-mid civilization loop read like a single lived chain instead of a set of adjacent systems. The target spine is:
+
+1. **Life seed**: units are placed into a terrain and resource context, then survive through hunger, foraging, wandering, and reproduction.
+2. **Camp founding**: a same-race cluster near food creates a named camp with a visible town hall, first food reserve, and stable home ownership.
+3. **Settlement work loop**: residents create visible pressure through housing demand, wood gathering, construction sites, food storage, farm work, and material gathering.
+4. **Town density**: growth turns surplus into more houses, farms, storage, upgrades, and clear level changes before the game asks the player to reason about diplomacy.
+5. **Frontier expansion**: settled activity expands soft territory first, then mature towns send settlers to nearby food-rich land and keep the new village inside the parent kingdom.
+6. **Kingdom pressure**: multiple villages aggregate into a kingdom, create colored ownership, generate frontier/resource pressure, and eventually send grouped armies.
+7. **Collapse memory**: starvation, lightning, capture, or depopulation leaves abandoned buildings and ruins so the map remembers what happened.
+
+This rework starts with the first three stages because they decide whether the world feels alive before the player sees kingdoms. The first implementation target is not deeper UI or more commands; it is a more legible village-growth spine: every expansion, stall, and territorial spread should have a visible cause and an inspection/event explanation.
+
 ## Current v2 Scope
 
 The first v2 slice deliberately avoids full WorldBox parity. It establishes the foundation:

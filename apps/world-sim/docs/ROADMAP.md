@@ -359,13 +359,16 @@ Status: `Foundation slice`
   - Army routes now render from active armies to target villages so wars have a visible direction.
   - Diplomacy and war events now have readable summaries for border friction, resource pressure, rising diplomacy, declarations, army formation, battles, and captures.
   - Army groups now enter a multi-tick fighting/occupation state at the target village; occupation progress, periodic casualties, capture, and retreat are projected to inspection and HUD summaries.
+  - Declared wars now remember attacker/target direction and can form a later army after the previous army disbands, with a 360-tick natural re-formation cooldown to avoid immediate wave spam.
+  - Wars can now field up to three active army groups from eligible villages in the attacking kingdom, each targeting the nearest valid enemy village instead of only using the capital-to-capital route.
+  - Fighting armies now project local attacker and defender battle dots, rendered only at local zoom, to make clashes readable without switching to per-soldier simulation.
+  - God commands can now force war or force peace between active kingdoms; forced peace disbands pair armies and applies a 720-tick truce before natural pressure can re-escalate.
 - Direction:
   - Move war toward the WorldBox shape: villages maintain visible armies, soldiers follow a grouped army/captain marker toward enemy villages, defenders resist locally, and capture happens through a readable occupation process instead of instant ownership transfer.
   - Keep the first implementation aggregate for performance, but expose enough state for the map to show marching, fighting, occupation progress, casualties, capture, and retreat.
 - Planned:
-  - Let multiple eligible villages send army groups instead of only the capital village.
-  - Add local defender/militia response and later near-zoom soldier dots around the grouped army marker.
-  - God commands for forcing war, forcing peace, inspiring growth, and marking a village/kingdom for attention.
+  - Add stronger local defender/militia response and richer near-zoom soldier motion around grouped army markers.
+  - God commands for inspiring growth and marking a village/kingdom for attention.
   - Basic rebellion or resistance hooks after capture, if metrics remain healthy.
 - Non-goals:
   - No full culture/religion/family simulation in the first PR-12 pass.
@@ -409,15 +412,39 @@ Status: `Foundation slice`
 - Deferred:
   - 512+ world presets, resource indexing, and incremental resource statistics remain later scale work.
 
+### PR-12F: Civilization Spine Rework
+
+Status: `Foundation slice`
+
+- Reframe the next implementation wave around the WorldBox-like civilization spine: life seed -> camp -> hamlet -> village -> town -> frontier -> kingdom. This should happen before adding more flashy god powers, because the player first needs to believe the small people are developing on their own.
+- Acceptance: watching one seeded settlement for several minutes should show a complete early story: people survive, found a camp, gather visible resources, build homes, expose why growth stalls, expand soft territory, and eventually prepare a satellite village or kingdom membership without manual player management.
+- Start here:
+  - `PR-12F.1` Build-plan truth model. Refactor the existing village plan/blocker path so every village has one readable current intention and one primary missing condition. This is the safest first step because it mostly reorganizes existing data (`buildPlan`, `growthBlockers`, jobs, inventories, buildings, and sites) before adding new systems.
+  - Acceptance for `PR-12F.1`: a new camp, a wood-starved pressured village, a rich stable town, and a mature expansion-ready kingdom village each project a non-ambiguous plan; inspection can explain the next condition without relying on guesswork.
+- Implemented:
+  - Villages no longer treat "no wood in the immediate center radius" as a hard stop. Builder jobs can scout a wider reachable wood radius, gather from that frontier source, project a wood-gathering work site, and avoid reporting `no_wood_source` while reachable wood exists.
+  - Villages now project a single `primaryGrowthBlocker` alongside the full `growthBlockers` list, and village inspection shows that primary blocker so the next missing condition is readable.
+  - Mature kingdom villages now expose expansion intent before the satellite village appears: `prepare_expansion` when a site and resources are ready, `waiting_land` when no suitable site exists, and `waiting_resources` / `waiting_population_pressure` when the parent lacks reserves or settlers.
+- Planned implementation slices:
+  - `PR-12F.1` Build-plan truth model: continue centralizing plan selection around the primary blocker, then lock regression scenarios for camp bootstrap, no-wood stall, rich-town growth, and expansion preparation.
+  - `PR-12F.2` Camp-to-hamlet readability: introduce explicit growth-phase labels derived from level/buildings/population, tune early house/storage/farm pressure, and make the first 5 minutes read as settlement formation rather than instant kingdom setup.
+  - `PR-12F.3` Staged territory influence: separate core settlement influence, building influence, temporary work-site influence, and frontier-preparation influence in projection data so territory growth tells the player what caused it.
+  - `PR-12F.4` Expansion preparation: make mature villages expose `prepare_expansion` before spawning a satellite, including missing settlers, food, wood, land, or kingdom membership as inspectable reasons.
+  - `PR-12F.5` Early-game observation harness: add deterministic scenarios that summarize tick-by-tick village phase, population, housing, inventories, build plan, blockers, territory, and satellite events for balance tuning.
+- Non-goals:
+  - No manual building placement, manual job assignment, or direct movement commands.
+  - No full roads, trade, boats, culture, rulers, families, or rebellion in this pass.
+  - No hard border collision yet; territory remains readable projection for now.
+
 ### Later Flavor Backlog
 
 Status: `Planned`
 
-- Cultures, religions, families, rulers, traits, rebellions, world laws, monsters, disasters, boats, colonization, trade, and larger maps remain after PR-12A-E establish observability and core civilization growth.
+- Cultures, religions, families, rulers, traits, rebellions, world laws, monsters, disasters, boats, colonization, trade, and larger maps remain after PR-12A-F establish observability and core civilization growth.
 
 ## Immediate Next Work
 
-After PR-8, move toward diplomacy pressure while keeping the foundation constraints visible:
+Current tracked sequence:
 
 1. Done: add command validation and rejection events. Invalid commands now produce `command_rejected` and do not mutate world state.
 2. Done: add source-level architecture scan proving `src/sim` has no Phaser imports or browser globals.
@@ -440,4 +467,9 @@ After PR-8, move toward diplomacy pressure while keeping the foundation constrai
 19. Done: PR-12C villager jobs and material resource economy.
 20. Done: PR-12D city growth feedback with names, levels, capital markers, borders, automatic satellite villages, upgrades, and ruins.
 21. Done: PR-12D.5 WorldBox growth alignment foundation with readable work sites, growth blockers, earlier house pressure, and settlement/work-site territory expansion.
-22. In progress: PR-12E kingdom readability now has kingdom/conflict HUD summaries, campaign inspection, army route lines, and readable diplomacy/war event summaries; god intervention commands remain next.
+22. In progress: PR-12E kingdom readability now has kingdom/conflict HUD summaries, campaign inspection, army route lines, readable diplomacy/war event summaries, multi-village armies, local battle dots, and forced war/peace; growth blessing and attention markers are deferred behind the civilization spine unless needed for testing.
+23. In progress: PR-12F.1 build-plan truth model. Villages can now scout farther reachable wood instead of freezing when immediate local wood is missing, projection exposes `primaryGrowthBlocker`, and mature kingdom villages expose `prepare_expansion` / `waiting_land` before satellite founding; next, make camp bootstrap and rich-town continued growth use the same truth-model style.
+24. Next: PR-12F.2 camp-to-hamlet readability. Tune the first settlement minutes so the player sees food security, first home, storage, farm, and early territory expansion before kingdom-level systems dominate.
+25. Next: PR-12F.3 staged territory influence. Make projection identify whether territory came from settlement core, buildings, work sites, or frontier preparation, while keeping movement/borders soft.
+26. Next: PR-12F.4 expansion preparation. Surface `prepare_expansion` before satellite founding and explain missing settlers, food, wood, land, or kingdom membership.
+27. Next: PR-12F.5 observation harness. Add deterministic reports for early settlement progression so future balance changes are judged by story quality, not only unit tests.

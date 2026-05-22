@@ -29,6 +29,8 @@ The first god commands are:
 - `lightning`
 - `set_speed`
 - `pause`
+- `force_war`
+- `force_peace`
 
 Commands are not guaranteed to succeed. Rejections become events so UI and tests can observe why an action failed.
 
@@ -36,7 +38,7 @@ Commands are not guaranteed to succeed. Rejections become events so UI and tests
 
 Food is the first active resource. It exists as tile deposits and supports the life loop. PR-12C now exposes village and kingdom stores for food, wood, stone, and iron. Wood deposits sit on forest tiles and render as small map markers, and stone/iron deposits on hills also render as visible markers so material sources are readable. Builders gather nearby wood into village stores, active mines can gather nearby stone or iron deposits, and villages can open a small early stone quarry when no rare natural hill is close enough. Building construction now uses material costs instead of spending food. Residents can also draw food from their home village stores when nearby tile food runs out. Food is reserved for feeding people and for prosperity-style gates. Early camp villages also use a lighter food drain so the first 30-person settlement can bootstrap before the farm/build loop is online.
 
-Resource gathering remains village-aggregate rather than visually per-person. Builder jobs gather nearby wood deposits, forest/wood sources visibly deplete, and village inspection now exposes growth blockers such as missing wood or no nearby wood source when construction stalls. Wood gathering work sites remain projection data for simulation-side territory pressure, but the Phaser map no longer renders a separate chopping pulse.
+Resource gathering remains village-aggregate rather than visually per-person. Builder jobs prefer nearby wood deposits, but can now scout reachable wood out to a wider frontier radius when a new village has no local construction material. Forest/wood sources visibly deplete, and village inspection exposes growth blockers such as missing wood or no reachable wood source when construction stalls. It also exposes a single primary growth blocker so the player can understand the next missing condition without guessing from a list. Wood gathering work sites remain projection data for simulation-side territory pressure, but the Phaser map no longer renders a separate chopping pulse.
 
 ## Villages and Kingdoms
 
@@ -67,6 +69,28 @@ Villages also carry a race-themed name and a growth level:
 
 Kingdoms form from village strength instead of player commands. A village with enough home population and active buildings can found a rising kingdom. Nearby same-race villages can join that kingdom, and mature pressured member villages can now seed new satellite villages when suitable land and food exist nearby. A kingdom tracks capital village, member villages, total home population, active buildings, active territory, food inventory, stable display color, and status. The founding capital is stable: it does not move just because another member village has more population. A replacement capital is chosen only when the current capital is no longer a valid member, such as after abandonment, removal, or capture. Replacement priority is highest active town hall tier, then active building count, then population, then deterministic village id order. If all member villages disappear, the kingdom becomes fallen and remains as history data for later UI. Territory projection now keeps both `villageId` and optional `kingdomId`, so diplomacy, war, and rendering can reason about ownership by kingdom without changing the simulation/rendering boundary.
 
+## Civilization Progression Spine
+
+The world should be balanced around one readable progression spine. Each stage must be autonomous, visible, and inspectable before the next stage becomes the focus.
+
+| Stage | Player reads on map | Simulation gate | Main pressure | Failure state |
+|---|---|---|---|---|
+| Life seed | scattered people moving, eating, and reproducing | living units on walkable terrain with food nearby | hunger and partner availability | starvation or low birth rate |
+| Camp | named camp, town hall, first territory patch | 8 same-race homeless units near enough food | food reserve and stable home ownership | declining camp |
+| Hamlet | first house/storage/farm construction sites | wood access, builders, first housing pressure | missing wood, low food, no builders | visible growth blockers |
+| Village | houses, farm loop, growing territory outline | stable food, housing below cap, basic buildings | housing pressure and material supply | stalled build plan |
+| Town | upgrades, mine, barrack, dock hook, level changes | surplus food/wood, town hall gates, enough residents | prosperity construction and specialization | overbuilt but low population |
+| Frontier | work-site claims, larger soft territory, satellite founding | mature kingdom village with surplus and nearby food-rich land | land availability and settler cost | waiting land or resources |
+| Kingdom | colored territory, capital, member villages, pressure target | eligible village strength and same-race join radius | border friction and resource deficit | war, capture, or kingdom fall |
+
+Near-term changes should start at the Hamlet/Village boundary. That is where the current prototype most needs stronger WorldBox alignment: residents already have survival needs, and kingdoms already exist, but the middle step still depends on aggregate jobs that can feel abstract. The improvement path is:
+
+1. Make build intent more explicit: every village should project whether it is trying to get food security, housing, storage, farm capacity, materials, military, dock access, or a satellite site. The projection should include both the full blocker list and a single primary blocker.
+2. Make territory expansion staged: core settlement territory comes from population and town hall level; work territory comes from temporary work sites; frontier territory comes from repeated activity, resource scouting, or satellite planning. Territory remains soft until a later border-rule pass.
+3. Make stalls actionable: each blocked growth plan should map to one primary blocker and one visible remedy, such as missing wood, no reachable wood source, low food reserve, no builders, no buildable land, or waiting for population pressure.
+4. Make satellite founding feel like settlement expansion: before a new village appears, the parent exposes `prepare_expansion` when it is ready, `waiting_land` when no suitable food-rich site exists, and `waiting_resources` or `waiting_population_pressure` when it lacks food, wood, settlers, or housing pressure.
+5. Keep the player as a god: no manual building placement, job assignment, or move orders. God powers can nudge conditions, but the settlement decides how to use them.
+
 ## Diplomacy Pressure
 
 Diplomacy is currently pressure-based rather than menu-driven. Active kingdoms compare nearby rivals each tick and maintain pairwise pressure. Each kingdom exposes its highest current `diplomacyPressure` and `diplomacyTargetKingdomId` in projection data.
@@ -78,6 +102,8 @@ Pressure comes from:
 - race modifiers, with orcs escalating faster, elves slower, dwarves slightly faster, and same-race rivalry reduced
 
 When pressure crosses report tiers, the simulation emits `border_friction`, `resource_pressure`, and `diplomacy_pressure` events with cause data. When pressure crosses the declaration threshold, the simulation emits `war_declared`. PR-10 turns declarations into army movement, battles, casualties, retreat, and capture. PR-12E starts the kingdom readability UI by translating these events into player-facing summaries and adding a compact kingdom/conflict panel to the HUD.
+
+God diplomacy commands can now override the pressure curve without directly controlling units. `force_war` declares war between two active kingdoms and immediately attempts to raise eligible attacking army groups. `force_peace` disbands active armies between the two kingdoms, clears their pairwise war pressure, and applies a short truce window so the same border pressure does not instantly re-declare war on the next tick.
 
 ## Buildings and Territory
 
@@ -120,16 +146,19 @@ Barracks are the first building hook into war. If the capital village has an act
 
 The first war model intentionally avoids complex individual brawls, but it should still read like a WorldBox-style invasion:
 
-- armies march toward a target village as grouped simulation objects
+- up to three eligible villages in the attacking kingdom can send grouped army objects into the same war, so conflict is no longer only a capital-to-capital strike
+- each army marches from its origin village toward the nearest valid enemy village
 - when an army reaches the village, it enters a multi-tick fighting/occupation state instead of resolving instantly
 - battle pressure compares aggregate attacker strength against village defender strength
 - casualties periodically remove a small number of residents from the origin and target villages
 - winning attackers capture the target village for their kingdom once occupation progress completes
 - armies disband after capture, retreat, or losing their target
+- an ongoing declared war can raise another aggregate army after the previous army is destroyed, repelled, or captures its target, but natural re-formation waits for a 360-tick cooldown so wars do not instantly spam waves
+- forced peace disbands active armies between two kingdoms and suppresses immediate re-escalation with a 720-tick truce
 
-This PR-10/PR-12E model is enough for wars to start, move, visibly fight, cause casualties, and change village ownership. Later stages can add multiple armies, fronts, commanders, peace deals, deeper occupation, culture, rebellion, and visible local fighters.
+This PR-10/PR-12E model is enough for wars to start, move, visibly fight, cause casualties, and change village ownership. Later stages can add richer fronts, commanders, peace deals, deeper occupation, culture, rebellion, and more expressive local fighters.
 
-In the current UI, army groups render as triangular markers using their owning kingdom's color, with the outline preserving basic status feedback. PR-12E also draws route lines from active armies to their target villages, lists active campaigns in kingdom inspection, and shows current kingdom pressure/conflict summaries in the HUD. The near-term direction is to keep this aggregate marker at far zoom while adding more local soldier/defender readability at close zoom.
+In the current UI, army groups render as triangular markers using their owning kingdom's color, with the outline preserving basic status feedback. PR-12E also draws route lines from active armies to their target villages, lists active campaigns in kingdom inspection, and shows current kingdom pressure/conflict summaries in the HUD. At local zoom, fighting armies now project small attacker and defender dots around the clash so battles read more like local combat while the simulation still stays aggregate for performance.
 
 ## Race Identity
 

@@ -97,6 +97,7 @@ export type Village = {
   ironInventory: number;
   jobs: VillageJobs;
   growthBlockers: VillageGrowthBlocker[];
+  primaryGrowthBlocker?: VillageGrowthBlocker;
   buildPlan: VillageBuildPlan;
   housingCapacity: number;
   territoryTiles: number;
@@ -154,6 +155,15 @@ export type ArmyGroup = {
   lastBattleTick?: number;
   battleAttackerCasualties?: number;
   battleDefenderCasualties?: number;
+};
+
+export type BattleMarker = {
+  id: string;
+  armyId: string;
+  kingdomId: string;
+  side: 'attacker' | 'defender';
+  position: Position;
+  count: number;
 };
 
 export type TerritoryTile = {
@@ -242,6 +252,24 @@ export type SimCommand =
       payload: {
         paused: boolean;
       };
+    }
+  | {
+      id: string;
+      type: 'force_war';
+      issuedAtTick: number;
+      payload: {
+        aggressorKingdomId: string;
+        targetKingdomId: string;
+      };
+    }
+  | {
+      id: string;
+      type: 'force_peace';
+      issuedAtTick: number;
+      payload: {
+        kingdomAId: string;
+        kingdomBId: string;
+      };
     };
 
 export type SimEvent = {
@@ -275,6 +303,7 @@ export type SimEvent = {
     | 'resource_pressure'
     | 'diplomacy_pressure'
     | 'war_declared'
+    | 'peace_forced'
     | 'army_formed'
     | 'battle_resolved'
     | 'village_captured'
@@ -336,6 +365,7 @@ export type WorldProjection = {
   kingdoms: Kingdom[];
   buildings: VillageBuilding[];
   armies: ArmyGroup[];
+  battleMarkers: BattleMarker[];
   territory: TerritoryTile[];
   workSites: VillageWorkSite[];
   recentEvents: SimEvent[];

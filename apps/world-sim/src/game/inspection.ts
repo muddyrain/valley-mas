@@ -72,7 +72,7 @@ const VILLAGE_STATUS_LABELS: Record<string, string> = {
 const VILLAGE_GROWTH_BLOCKER_LABELS: Record<string, string> = {
   housing_pressure: '住房紧张',
   missing_wood: '缺少木材',
-  no_wood_source: '附近无可采木材',
+  no_wood_source: '无可达木材',
   insufficient_builders: '建筑工不足',
   low_food_reserve: '食物储备偏低',
   no_buildable_land: '缺少可建设土地',
@@ -458,12 +458,20 @@ export function formatEventSummary(event: SimEvent) {
   if (event.type === 'war_declared') {
     const aggressor = payloadString(event, 'aggressorKingdomId');
     const target = payloadString(event, 'targetKingdomId');
+    const prefix = event.payload?.forced === true ? '神力强制：' : '';
 
-    return `${kingdomLabel(aggressor)} 向${kingdomLabel(target)} 宣战，压力 ${payloadNumber(
+    return `${prefix}${kingdomLabel(aggressor)} 向${kingdomLabel(target)} 宣战，压力 ${payloadNumber(
       event,
       'pressure',
       0,
     )}`;
+  }
+
+  if (event.type === 'peace_forced') {
+    const kingdomA = payloadString(event, 'kingdomAId');
+    const kingdomB = payloadString(event, 'kingdomBId');
+
+    return `神力强制：${kingdomLabel(kingdomA)} 与${kingdomLabel(kingdomB)} 停战`;
   }
 
   if (event.type === 'army_formed') {
@@ -589,6 +597,11 @@ function buildVillageLines(projection: WorldProjection, id: string) {
         ? village.growthBlockers
             .map((blocker) => labelFromMap(VILLAGE_GROWTH_BLOCKER_LABELS, blocker))
             .join('、')
+        : '无'
+    }`,
+    `主要阻塞：${
+      village.primaryGrowthBlocker
+        ? labelFromMap(VILLAGE_GROWTH_BLOCKER_LABELS, village.primaryGrowthBlocker)
         : '无'
     }`,
     `建设计划：${labelFromMap(VILLAGE_BUILD_PLAN_LABELS, village.buildPlan)}`,

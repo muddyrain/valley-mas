@@ -11,6 +11,7 @@ import { SeededRng } from './rng';
 import { SpatialIndex } from './spatialIndex';
 import type {
   ArmyGroup,
+  BattleMarker,
   Kingdom,
   Position,
   ResourceType,
@@ -54,6 +55,7 @@ const VILLAGE_FOUNDING_POPULATION = 8;
 const VILLAGE_RADIUS = 7;
 const VILLAGE_FOOD_RADIUS = 8;
 const VILLAGE_WOOD_RADIUS = 8;
+const VILLAGE_WOOD_SCOUT_RADIUS = 18;
 const VILLAGE_MIN_LOCAL_FOOD = 30;
 const VILLAGE_INITIAL_FORAGE = 24;
 const VILLAGE_FORAGE_PER_TICK = 3;
@@ -150,6 +152,9 @@ const ARMY_SPEED_PER_TICK = 0.8;
 const ARMY_BATTLE_DISTANCE = 1.2;
 const ARMY_BATTLE_CASUALTY_INTERVAL_TICKS = 12;
 const ARMY_OCCUPATION_PROGRESS_PER_TICK = 3.2;
+const ARMY_REFORM_COOLDOWN_TICKS = 360;
+const ARMY_GROUPS_PER_WAR = 3;
+const FORCED_PEACE_TRUCE_TICKS = 720;
 const DEFENDER_POPULATION_STRENGTH = 0.42;
 const DEFENDER_BUILDING_STRENGTH = 1.8;
 const KINGDOM_COLORS = [
@@ -183,6 +188,7 @@ const RECENT_EVENT_TYPES = new Set<SimEvent['type']>([
   'border_friction',
   'resource_pressure',
   'war_declared',
+  'peace_forced',
   'army_formed',
   'battle_resolved',
   'village_captured',
@@ -194,6 +200,10 @@ type KingdomDiplomacyRelation = {
   pressure: number;
   warDeclared: boolean;
   armyFormed: boolean;
+  aggressorKingdomId?: string;
+  targetKingdomId?: string;
+  nextArmyReadyTick?: number;
+  truceUntilTick?: number;
   pressureReportTier: number;
   borderReportTier: number;
   resourceReportTier: number;
@@ -341,6 +351,7 @@ export class SimWorld {
     const armies = [...this.armies.values()]
       .filter((army) => !bounds || isPositionInBounds(army.position, bounds))
       .map((army) => cloneArmy(army));
+    const battleMarkers = this.projectBattleMarkers(bounds);
     const workSites = [...this.workSites.values()]
       .filter((site) => site.expiresAtTick >= this.tick)
       .filter((site) => !bounds || isPositionInBounds(site.position, bounds))
@@ -383,6 +394,7 @@ export class SimWorld {
       kingdoms,
       buildings,
       armies,
+      battleMarkers,
       territory: visibleTerritory,
       workSites,
       recentEvents: this.events
@@ -409,6 +421,88 @@ export class SimWorld {
         housingCapacity,
       },
     };
+  }
+
+  private projectBattleMarkers(bounds?: TileBounds): BattleMarker[] {
+    const markers: BattleMarker[] = [];
+
+    for (const army of this.armies.values()) {
+      if (army.status !== 'fighting') {
+        continue;
+      }
+
+      const targetVillage = this.villages.get(army.targetVillageId);
+
+      if (!targetVillage) {
+        continue;
+      }
+
+      const attackerCount = Math.max(1, Math.min(8, Math.ceil(army.soldierCount / 5)));
+      const defenderCount = Math.max(1, Math.min(8, Math.ceil(targetVillage.population / 8)));
+
+      markers.push(
+        ...this.projectBattleMarkerSide(
+          army,
+          army.kingdomId,
+          'attacker',
+          army.position,
+          attackerCount,
+          army.soldierCount,
+          bounds,
+        ),
+        ...this.projectBattleMarkerSide(
+          army,
+          army.targetKingdomId,
+          'defender',
+          targetVillage.center,
+          defenderCount,
+          targetVillage.population,
+          bounds,
+        ),
+      );
+    }
+
+    return markers;
+  }
+
+  private projectBattleMarkerSide(
+    army: ArmyGroup,
+    kingdomId: string,
+    side: BattleMarker['side'],
+    center: Position,
+    markerCount: number,
+    representedCount: number,
+    bounds?: TileBounds,
+  ): BattleMarker[] {
+    const markers: BattleMarker[] = [];
+    const sideOffset = side === 'attacker' ? -0.65 : 0.65;
+
+    for (let index = 0; index < markerCount; index += 1) {
+      const angle = (index / markerCount) * Math.PI * 2 + (side === 'attacker' ? 0 : Math.PI / 8);
+      const radius = 0.45 + (index % 3) * 0.28;
+      const position = {
+        x: clamp(center.x + Math.cos(angle) * radius + sideOffset, 0, this.map.width - 1),
+        y: clamp(center.y + Math.sin(angle) * radius, 0, this.map.height - 1),
+      };
+
+      if (bounds && !isPositionInBounds(position, bounds)) {
+        continue;
+      }
+
+      markers.push({
+        id: `${army.id}-${side}-${index}`,
+        armyId: army.id,
+        kingdomId,
+        side,
+        position: {
+          x: round(position.x),
+          y: round(position.y),
+        },
+        count: representedCount,
+      });
+    }
+
+    return markers;
   }
 
   serializeForReplay() {
@@ -562,6 +656,18 @@ export class SimWorld {
           },
         );
         break;
+      case 'force_war':
+        this.accept(command, 'Force war command accepted');
+        this.forceWar(
+          command.payload.aggressorKingdomId,
+          command.payload.targetKingdomId,
+          command.id,
+        );
+        break;
+      case 'force_peace':
+        this.accept(command, 'Force peace command accepted');
+        this.forcePeace(command.payload.kingdomAId, command.payload.kingdomBId, command.id);
+        break;
     }
   }
 
@@ -606,12 +712,34 @@ export class SimWorld {
       case 'set_speed':
       case 'pause':
         return undefined;
+      case 'force_war':
+        return this.validateKingdomPair(
+          command.payload.aggressorKingdomId,
+          command.payload.targetKingdomId,
+        );
+      case 'force_peace':
+        return this.validateKingdomPair(command.payload.kingdomAId, command.payload.kingdomBId);
     }
   }
 
   private validateRadius(radius = 0) {
     if (radius < 0 || radius > MAX_COMMAND_RADIUS) {
       return `Command radius must be between 0 and ${MAX_COMMAND_RADIUS}.`;
+    }
+
+    return undefined;
+  }
+
+  private validateKingdomPair(leftId: string, rightId: string) {
+    if (leftId === rightId) {
+      return 'God diplomacy commands require two different kingdoms.';
+    }
+
+    const left = this.kingdoms.get(leftId);
+    const right = this.kingdoms.get(rightId);
+
+    if (!left || left.status === 'fallen' || !right || right.status === 'fallen') {
+      return 'God diplomacy command kingdom is missing or fallen.';
     }
 
     return undefined;
@@ -846,6 +974,7 @@ export class SimWorld {
         ironInventory: 0,
         jobs: createEmptyVillageJobs(),
         growthBlockers: [],
+        primaryGrowthBlocker: undefined,
         buildPlan: 'idle',
         housingCapacity: Math.max(VILLAGE_BASE_HOUSING, locals.length + 4),
         territoryTiles: 0,
@@ -1090,6 +1219,7 @@ export class SimWorld {
       ironInventory: 0,
       jobs: createEmptyVillageJobs(),
       growthBlockers: [],
+      primaryGrowthBlocker: undefined,
       buildPlan: 'idle',
       housingCapacity: Math.max(VILLAGE_BASE_HOUSING, settlers.length + 4),
       territoryTiles: 0,
@@ -1288,7 +1418,7 @@ export class SimWorld {
     let activeBuilders = village.jobs.builder;
 
     while (activeBuilders > 0) {
-      const deposit = this.findWoodResourceTile(village.center);
+      const deposit = this.findWoodResourceTile(village.center, VILLAGE_WOOD_SCOUT_RADIUS);
 
       if (!deposit?.resource || deposit.resource.amount <= 0) {
         return;
@@ -1418,11 +1548,11 @@ export class SimWorld {
     }
   }
 
-  private findWoodResourceTile(position: Position) {
+  private findWoodResourceTile(position: Position, radius = VILLAGE_WOOD_RADIUS) {
     let nearest: Tile | undefined;
     let nearestDistance = Number.POSITIVE_INFINITY;
 
-    forEachTileInRadius(this.map, position, VILLAGE_WOOD_RADIUS, (tile) => {
+    forEachTileInRadius(this.map, position, radius, (tile) => {
       if (tile.resource?.type !== 'wood' || tile.resource.amount <= 0) {
         return;
       }
@@ -1701,6 +1831,12 @@ export class SimWorld {
       return prosperityPlan;
     }
 
+    const expansionPlan = this.chooseExpansionBuildPlan(village, buildings.length);
+
+    if (expansionPlan) {
+      return expansionPlan;
+    }
+
     if (!this.hasProsperityForConstruction(village)) {
       return 'waiting_resources';
     }
@@ -1710,6 +1846,45 @@ export class SimWorld {
     }
 
     return 'idle';
+  }
+
+  private chooseExpansionBuildPlan(
+    village: Village,
+    buildingCount: number,
+  ): VillageBuildPlan | undefined {
+    if (village.status === 'declining' || !village.kingdomId || buildingCount < 4) {
+      return undefined;
+    }
+
+    const buildings = this.findVillageOwnedBuildings(village.id);
+    const hasBasicChain =
+      buildings.some((building) => building.type === 'house') &&
+      buildings.some((building) => building.type === 'storage') &&
+      buildings.some((building) => building.type === 'farm');
+
+    if (!hasBasicChain) {
+      return undefined;
+    }
+
+    if (
+      village.population < VILLAGE_EXPANSION_MIN_POPULATION ||
+      village.population < Math.floor(village.housingCapacity * 0.7)
+    ) {
+      return 'waiting_population_pressure';
+    }
+
+    if (
+      village.foodInventory < VILLAGE_EXPANSION_FOOD_COST ||
+      village.woodInventory < VILLAGE_EXPANSION_WOOD_COST
+    ) {
+      return 'waiting_resources';
+    }
+
+    if (!this.findSatelliteVillageSite(village)) {
+      return 'waiting_land';
+    }
+
+    return 'prepare_expansion';
   }
 
   private chooseProsperityBuildPlan(
@@ -1778,7 +1953,7 @@ export class SimWorld {
     if (desiredCost && village.woodInventory < desiredCost.wood) {
       blockers.push('missing_wood');
 
-      if (!this.findWoodResourceTile(village.center)) {
+      if (!this.findWoodResourceTile(village.center, VILLAGE_WOOD_SCOUT_RADIUS)) {
         blockers.push('no_wood_source');
       }
     }
@@ -1795,7 +1970,26 @@ export class SimWorld {
       blockers.push('no_buildable_land');
     }
 
+    if (village.buildPlan === 'waiting_resources') {
+      if (village.foodInventory < VILLAGE_EXPANSION_FOOD_COST) {
+        blockers.push('low_food_reserve');
+      }
+
+      if (village.woodInventory < VILLAGE_EXPANSION_WOOD_COST) {
+        blockers.push('missing_wood');
+
+        if (!this.findWoodResourceTile(village.center, VILLAGE_WOOD_SCOUT_RADIUS)) {
+          blockers.push('no_wood_source');
+        }
+      }
+    }
+
+    if (village.buildPlan === 'waiting_land') {
+      blockers.push('no_buildable_land');
+    }
+
     village.growthBlockers = uniqueBlockers(blockers);
+    village.primaryGrowthBlocker = selectPrimaryGrowthBlocker(village.growthBlockers);
   }
 
   private hasHousingPressure(village: Village) {
@@ -2455,6 +2649,14 @@ export class SimWorld {
         const relation = this.getDiplomacyRelation(left.id, right.id);
         const distanceToBorder = this.distanceBetweenKingdoms(left, right);
 
+        if (relation.truceUntilTick !== undefined && this.tick < relation.truceUntilTick) {
+          relation.pressure = 0;
+          relation.warDeclared = false;
+          relation.armyFormed = false;
+          this.recordDiplomacySummary(left, right, relation.pressure);
+          continue;
+        }
+
         if (!Number.isFinite(distanceToBorder) || distanceToBorder > DIPLOMACY_INTERACTION_RANGE) {
           relation.pressure = Math.max(0, relation.pressure - DIPLOMACY_DECAY_PER_TICK);
           this.recordDiplomacySummary(left, right, relation.pressure);
@@ -2487,7 +2689,11 @@ export class SimWorld {
           resourcePressure,
           raceModifier,
         );
-        this.tryDeclareWar(relation, left, right, borderPressure, resourcePressure, raceModifier);
+        if (relation.warDeclared) {
+          this.ensureWarArmy(relation, left, right);
+        } else {
+          this.tryDeclareWar(relation, left, right, borderPressure, resourcePressure, raceModifier);
+        }
         this.recordDiplomacySummary(left, right, relation.pressure);
       }
     }
@@ -2701,6 +2907,8 @@ export class SimWorld {
     relation.warDeclared = true;
     const aggressor = this.chooseWarDeclarer(left, right);
     const target = aggressor.id === left.id ? right : left;
+    relation.aggressorKingdomId = aggressor.id;
+    relation.targetKingdomId = target.id;
 
     this.emit(
       'war_declared',
@@ -2720,6 +2928,105 @@ export class SimWorld {
     this.formArmyGroup(aggressor, target, relation);
   }
 
+  private forceWar(aggressorKingdomId: string, targetKingdomId: string, commandId: string) {
+    const aggressor = this.kingdoms.get(aggressorKingdomId);
+    const target = this.kingdoms.get(targetKingdomId);
+
+    if (!aggressor || !target) {
+      return;
+    }
+
+    const relation = this.getDiplomacyRelation(aggressor.id, target.id);
+    relation.pressure = Math.max(relation.pressure, DIPLOMACY_WAR_DECLARATION_PRESSURE);
+    relation.warDeclared = true;
+    relation.armyFormed = false;
+    relation.aggressorKingdomId = aggressor.id;
+    relation.targetKingdomId = target.id;
+    relation.nextArmyReadyTick = undefined;
+    relation.truceUntilTick = undefined;
+
+    this.emit(
+      'war_declared',
+      `${aggressor.id} forced war on ${target.id}`,
+      commandId,
+      undefined,
+      this.villages.get(aggressor.capitalVillageId)?.center,
+      {
+        aggressorKingdomId: aggressor.id,
+        targetKingdomId: target.id,
+        pressure: round(relation.pressure),
+        forced: true,
+      },
+    );
+    this.formArmyGroup(aggressor, target, relation);
+  }
+
+  private forcePeace(kingdomAId: string, kingdomBId: string, commandId: string) {
+    const left = this.kingdoms.get(kingdomAId);
+    const right = this.kingdoms.get(kingdomBId);
+
+    if (!left || !right) {
+      return;
+    }
+
+    for (const army of this.armies.values()) {
+      const belongsToPair =
+        (army.kingdomId === left.id && army.targetKingdomId === right.id) ||
+        (army.kingdomId === right.id && army.targetKingdomId === left.id);
+
+      if (belongsToPair && army.status !== 'disbanded') {
+        this.disbandArmy(army, 'forced peace');
+      }
+    }
+
+    const relation = this.getDiplomacyRelation(left.id, right.id);
+    relation.pressure = 0;
+    relation.warDeclared = false;
+    relation.armyFormed = false;
+    relation.aggressorKingdomId = undefined;
+    relation.targetKingdomId = undefined;
+    relation.nextArmyReadyTick = undefined;
+    relation.truceUntilTick = this.tick + FORCED_PEACE_TRUCE_TICKS;
+    relation.pressureReportTier = -1;
+    relation.borderReportTier = -1;
+    relation.resourceReportTier = -1;
+    left.diplomacyPressure = 0;
+    left.diplomacyTargetKingdomId = undefined;
+    right.diplomacyPressure = 0;
+    right.diplomacyTargetKingdomId = undefined;
+
+    this.emit(
+      'peace_forced',
+      `${left.id} and ${right.id} forced peace`,
+      commandId,
+      undefined,
+      undefined,
+      {
+        kingdomAId: left.id,
+        kingdomBId: right.id,
+      },
+    );
+  }
+
+  private ensureWarArmy(relation: KingdomDiplomacyRelation, left: Kingdom, right: Kingdom) {
+    const aggressor =
+      relation.aggressorKingdomId === right.id
+        ? right
+        : relation.aggressorKingdomId === left.id
+          ? left
+          : this.chooseWarDeclarer(left, right);
+    const target =
+      relation.targetKingdomId === left.id
+        ? left
+        : relation.targetKingdomId === right.id
+          ? right
+          : aggressor.id === left.id
+            ? right
+            : left;
+
+    this.formArmyGroup(aggressor, target, relation);
+  }
+
   private chooseWarDeclarer(left: Kingdom, right: Kingdom) {
     const leftScore = this.raceAggression(left.race) + this.kingdomFoodDeficit(left) / 4;
     const rightScore = this.raceAggression(right.race) + this.kingdomFoodDeficit(right) / 4;
@@ -2728,17 +3035,110 @@ export class SimWorld {
   }
 
   private formArmyGroup(aggressor: Kingdom, target: Kingdom, relation: KingdomDiplomacyRelation) {
-    if (relation.armyFormed || this.hasActiveArmyAgainst(aggressor.id, target.id)) {
+    const currentAggressor = this.kingdoms.get(aggressor.id) ?? aggressor;
+    const currentTarget = this.kingdoms.get(target.id) ?? target;
+
+    if (relation.nextArmyReadyTick !== undefined && this.tick < relation.nextArmyReadyTick) {
       return;
     }
 
-    const originVillage = this.villages.get(aggressor.capitalVillageId);
-    const targetVillage = this.villages.get(target.capitalVillageId);
+    const activeArmyCount = this.countActiveArmiesAgainst(currentAggressor.id, currentTarget.id);
+    let remainingSlots = Math.max(0, ARMY_GROUPS_PER_WAR - activeArmyCount);
 
-    if (!originVillage || !targetVillage || originVillage.population < ARMY_MIN_SOLDIERS) {
+    if (remainingSlots <= 0) {
       return;
     }
 
+    let formedAny = false;
+    const originVillages = this.eligibleArmyOriginVillages(currentAggressor, currentTarget);
+
+    for (const originVillage of originVillages) {
+      if (remainingSlots <= 0) {
+        break;
+      }
+
+      if (this.hasActiveArmyFromOrigin(originVillage.id, currentTarget.id)) {
+        continue;
+      }
+
+      const targetVillage = this.findArmyTargetVillage(originVillage, currentTarget);
+
+      if (!targetVillage) {
+        continue;
+      }
+
+      this.createArmyGroup(currentAggressor, currentTarget, originVillage, targetVillage, relation);
+      formedAny = true;
+      remainingSlots -= 1;
+    }
+
+    if (formedAny) {
+      relation.armyFormed = true;
+      relation.aggressorKingdomId = currentAggressor.id;
+      relation.targetKingdomId = currentTarget.id;
+      relation.nextArmyReadyTick = undefined;
+    }
+  }
+
+  private eligibleArmyOriginVillages(aggressor: Kingdom, target: Kingdom) {
+    return aggressor.villageIds
+      .map((villageId) => this.villages.get(villageId))
+      .filter((village): village is Village => {
+        if (
+          !village ||
+          village.kingdomId !== aggressor.id ||
+          village.population < ARMY_MIN_SOLDIERS
+        ) {
+          return false;
+        }
+
+        return this.findArmyTargetVillage(village, target) !== undefined;
+      })
+      .sort((left, right) => {
+        if (left.id === aggressor.capitalVillageId) {
+          return -1;
+        }
+
+        if (right.id === aggressor.capitalVillageId) {
+          return 1;
+        }
+
+        return right.population - left.population || left.id.localeCompare(right.id);
+      });
+  }
+
+  private findArmyTargetVillage(originVillage: Village, target: Kingdom) {
+    let nearest: Village | undefined;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    for (const targetVillageId of target.villageIds) {
+      const targetVillage = this.villages.get(targetVillageId);
+
+      if (!targetVillage || targetVillage.kingdomId !== target.id) {
+        continue;
+      }
+
+      const targetDistance = distance(originVillage.center, targetVillage.center);
+
+      if (
+        targetDistance < nearestDistance ||
+        (targetDistance === nearestDistance && targetVillage.id < (nearest?.id ?? ''))
+      ) {
+        nearest = targetVillage;
+        nearestDistance = targetDistance;
+      }
+    }
+
+    return nearest;
+  }
+
+  private createArmyGroup(
+    aggressor: Kingdom,
+    target: Kingdom,
+    originVillage: Village,
+    targetVillage: Village,
+    relation: KingdomDiplomacyRelation,
+  ) {
     const barracks = this.findVillageBuildings(originVillage.id, 'barrack').length;
     const trainedSoldiers = originVillage.jobs.soldier;
     const mobilizationRatio =
@@ -2768,7 +3168,6 @@ export class SimWorld {
 
     this.nextArmyId += 1;
     this.armies.set(army.id, army);
-    relation.armyFormed = true;
     this.emit('army_formed', `${army.id} formed`, undefined, undefined, army.position, {
       kingdomId: army.kingdomId,
       targetKingdomId: army.targetKingdomId,
@@ -2779,11 +3178,27 @@ export class SimWorld {
     });
   }
 
-  private hasActiveArmyAgainst(kingdomId: string, targetKingdomId: string) {
+  private countActiveArmiesAgainst(kingdomId: string, targetKingdomId: string) {
+    let count = 0;
+
     for (const army of this.armies.values()) {
       if (
         army.status !== 'disbanded' &&
         army.kingdomId === kingdomId &&
+        army.targetKingdomId === targetKingdomId
+      ) {
+        count += 1;
+      }
+    }
+
+    return count;
+  }
+
+  private hasActiveArmyFromOrigin(originVillageId: string, targetKingdomId: string) {
+    for (const army of this.armies.values()) {
+      if (
+        army.status !== 'disbanded' &&
+        army.originVillageId === originVillageId &&
         army.targetKingdomId === targetKingdomId
       ) {
         return true;
@@ -2995,6 +3410,13 @@ export class SimWorld {
     }
 
     army.status = 'disbanded';
+    const relation = this.diplomacy.get(this.diplomacyKey(army.kingdomId, army.targetKingdomId));
+
+    if (relation) {
+      relation.armyFormed = false;
+      relation.nextArmyReadyTick = this.tick + ARMY_REFORM_COOLDOWN_TICKS;
+    }
+
     this.emit('army_disbanded', `${army.id} disbanded`, undefined, undefined, army.position, {
       armyId: army.id,
       kingdomId: army.kingdomId,
@@ -3304,6 +3726,7 @@ function cloneVillage(village: Village, territoryTiles: number): Village {
     ironInventory: round(village.ironInventory),
     jobs: { ...village.jobs },
     growthBlockers: [...village.growthBlockers],
+    primaryGrowthBlocker: village.primaryGrowthBlocker,
     buildPlan: village.buildPlan,
     territoryTiles,
   };
@@ -3394,6 +3817,19 @@ function isPositionInBounds(position: Position, bounds: TileBounds) {
 
 function uniqueBlockers(blockers: VillageGrowthBlocker[]) {
   return [...new Set(blockers)];
+}
+
+function selectPrimaryGrowthBlocker(blockers: VillageGrowthBlocker[]) {
+  const priority: VillageGrowthBlocker[] = [
+    'no_wood_source',
+    'missing_wood',
+    'insufficient_builders',
+    'no_buildable_land',
+    'low_food_reserve',
+    'housing_pressure',
+  ];
+
+  return priority.find((blocker) => blockers.includes(blocker));
 }
 
 function averagePosition(positions: Position[]) {

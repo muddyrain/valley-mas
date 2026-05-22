@@ -239,7 +239,7 @@ export class WorldScene extends Phaser.Scene {
       this.lastArmyRouteDrawKey = armyRouteDrawKey;
     }
 
-    this.drawArmies(projection);
+    this.drawArmies(projection, detailLevel);
     this.drawUnits(projection, detailLevel);
     this.drawSelection(projection);
 
@@ -495,7 +495,7 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private drawArmies(projection: WorldProjection) {
+  private drawArmies(projection: WorldProjection, detailLevel: CameraDetailLevel) {
     if (!this.armyLayer) {
       return;
     }
@@ -528,6 +528,22 @@ export class WorldScene extends Phaser.Scene {
         x + radius + 1,
         y + radius + 1,
       );
+    }
+
+    if (detailLevel !== 'local') {
+      return;
+    }
+
+    for (const marker of projection.battleMarkers) {
+      const kingdom = kingdomsById.get(marker.kingdomId);
+      const x = marker.position.x * TILE_SIZE;
+      const y = marker.position.y * TILE_SIZE;
+      const fillColor = kingdom?.color ?? (marker.side === 'attacker' ? 0xef7d57 : 0x29adff);
+
+      this.armyLayer.fillStyle(fillColor, marker.side === 'attacker' ? 0.92 : 0.78);
+      this.armyLayer.fillCircle(x, y, marker.side === 'attacker' ? 2.3 : 2);
+      this.armyLayer.lineStyle(1, marker.side === 'attacker' ? 0xffcd75 : 0xf4f4f4, 0.75);
+      this.armyLayer.strokeCircle(x, y, marker.side === 'attacker' ? 2.8 : 2.5);
     }
   }
 
@@ -759,6 +775,7 @@ export class WorldScene extends Phaser.Scene {
         '滚轮 / Q / +：放大，E / -：缩小',
         '1 / 2 / 4 键：调整速度',
         'K 键：循环选择王国',
+        'H / J 键：让选中王国向压力目标开战 / 和平',
         '0 或 P 键：暂停 / 恢复',
         'F / G / V 键：将镜头中心改成森林 / 草地 / 水域',
       ].join('    '),
@@ -860,6 +877,11 @@ export class WorldScene extends Phaser.Scene {
 
     if (key === 'k') {
       this.selection = selectNextKingdom(this.projectVisibleWorld(), this.selection);
+      return;
+    }
+
+    if (key === 'h' || key === 'j') {
+      this.issueSelectedDiplomacyCommand(key === 'h' ? 'force_war' : 'force_peace');
       return;
     }
 
@@ -1000,6 +1022,53 @@ export class WorldScene extends Phaser.Scene {
     }
 
     this.issue({ type: 'set_speed', payload: { speed: nextSpeed } });
+  }
+
+  private issueSelectedDiplomacyCommand(type: 'force_war' | 'force_peace') {
+    const projection = this.projectVisibleWorld();
+    const selection = this.selection;
+    let kingdomId: string | undefined;
+    let targetKingdomId: string | undefined;
+
+    if (selection.type === 'army') {
+      const army = projection.armies.find((candidate) => candidate.id === selection.id);
+      kingdomId = army?.kingdomId;
+      targetKingdomId = army?.targetKingdomId;
+    } else if (selection.type === 'kingdom') {
+      const kingdom = projection.kingdoms.find((candidate) => candidate.id === selection.id);
+      kingdomId = kingdom?.id;
+      targetKingdomId = kingdom?.diplomacyTargetKingdomId;
+    } else if (selection.type === 'village') {
+      const village = projection.villages.find((candidate) => candidate.id === selection.id);
+      const kingdom = village?.kingdomId
+        ? projection.kingdoms.find((candidate) => candidate.id === village.kingdomId)
+        : undefined;
+      kingdomId = kingdom?.id;
+      targetKingdomId = kingdom?.diplomacyTargetKingdomId;
+    }
+
+    if (!kingdomId || !targetKingdomId || kingdomId === targetKingdomId) {
+      return;
+    }
+
+    if (type === 'force_war') {
+      this.issue({
+        type: 'force_war',
+        payload: {
+          aggressorKingdomId: kingdomId,
+          targetKingdomId,
+        },
+      });
+      return;
+    }
+
+    this.issue({
+      type: 'force_peace',
+      payload: {
+        kingdomAId: kingdomId,
+        kingdomBId: targetKingdomId,
+      },
+    });
   }
 
   private issue(command: Omit<SimCommand, 'id' | 'issuedAtTick'>) {

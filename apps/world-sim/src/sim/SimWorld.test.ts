@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type SimCommand, SimWorld } from './index';
-import type { Kingdom, Unit, Village, VillageBuilding } from './types';
+import type { ArmyGroup, Kingdom, Unit, Village, VillageBuilding } from './types';
 
 describe('SimWorld deterministic replay', () => {
   it('produces the same replay snapshot for the same seed and commands', () => {
@@ -763,6 +763,40 @@ describe('SimWorld village buildings and territory', () => {
     ).toBe(true);
   });
 
+  it('scouts farther wood sources when a new village has no local construction materials', () => {
+    const world = foundFoodRichVillage('village-frontier-wood-jobs');
+    const village = world.project().villages[0];
+    const frontierWoodX = Math.floor(village.center.x + 12);
+    const frontierWoodY = Math.floor(village.center.y);
+
+    removeWoodSitesNearVillage(world, village.id);
+    addWoodSiteNearVillage(world, village.id, 12);
+
+    for (let tick = 0; tick < 20; tick += 1) {
+      world.step();
+    }
+
+    const projection = world.project();
+    const updatedVillage = projection.villages.find((candidate) => candidate.id === village.id);
+    const deposit = world.map.tiles.find(
+      (tile) => tile.x === frontierWoodX && tile.y === frontierWoodY,
+    );
+
+    expect(updatedVillage?.woodInventory).toBeGreaterThan(0);
+    expect(updatedVillage?.growthBlockers).not.toContain('no_wood_source');
+    expect(updatedVillage?.primaryGrowthBlocker).not.toBe('no_wood_source');
+    expect(deposit?.resource?.amount ?? 0).toBeLessThan(80);
+    expect(
+      projection.workSites.some(
+        (site) =>
+          site.type === 'wood_gathering' &&
+          site.villageId === village.id &&
+          Math.floor(site.position.x) === frontierWoodX &&
+          Math.floor(site.position.y) === frontierWoodY,
+      ),
+    ).toBe(true);
+  });
+
   it('explains growth blockers when a pressured village lacks build materials', () => {
     const world = foundFoodRichVillage('village-growth-blockers');
     const village = world.project().villages[0];
@@ -789,6 +823,7 @@ describe('SimWorld village buildings and territory', () => {
     expect(updatedVillage?.growthBlockers).toContain('housing_pressure');
     expect(updatedVillage?.growthBlockers).toContain('missing_wood');
     expect(updatedVillage?.growthBlockers).toContain('no_wood_source');
+    expect(updatedVillage?.primaryGrowthBlocker).toBe('no_wood_source');
   });
 
   it('keeps a rich stable town building even before housing is nearly full', () => {
@@ -1258,9 +1293,19 @@ describe('SimWorld kingdoms', () => {
     const village = world.project().villages[0];
 
     addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'storage');
     addActiveBuildingToVillage(world, village.id, 'storage');
     addActiveBuildingToVillage(world, village.id, 'farm');
-    prepareVillageForBuildingUpgrades(world, village.id, 24, 1600, 12);
+    addActiveBuildingToVillage(world, village.id, 'farm');
+    addActiveBuildingToVillage(world, village.id, 'mine');
+    addActiveBuildingToVillage(world, village.id, 'barrack');
+    addActiveBuildingToVillage(world, village.id, 'dock');
+    prepareVillageForBuildingUpgrades(world, village.id, 28, 1600, 16);
     clearFoodPatches(world);
     placeFoodPatch(world, { x: 36, y: 12 }, 500, 4);
 
@@ -1270,7 +1315,18 @@ describe('SimWorld kingdoms', () => {
       throw new Error('Expected parent village');
     }
 
-    parent.housingCapacity = 24;
+    parent.housingCapacity = 40;
+
+    for (let tick = 0; tick < 5; tick += 1) {
+      world.step();
+    }
+
+    const preparingVillage = world
+      .project()
+      .villages.find((candidate) => candidate.id === village.id);
+
+    expect(preparingVillage?.buildPlan).toBe('prepare_expansion');
+    expect(preparingVillage?.growthBlockers).toHaveLength(0);
 
     for (let tick = 0; tick < 180; tick += 1) {
       world.step();
@@ -1297,9 +1353,19 @@ describe('SimWorld kingdoms', () => {
     const village = world.project().villages[0];
 
     addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'storage');
     addActiveBuildingToVillage(world, village.id, 'storage');
     addActiveBuildingToVillage(world, village.id, 'farm');
-    prepareVillageForBuildingUpgrades(world, village.id, 24, 1600, 12);
+    addActiveBuildingToVillage(world, village.id, 'farm');
+    addActiveBuildingToVillage(world, village.id, 'mine');
+    addActiveBuildingToVillage(world, village.id, 'barrack');
+    addActiveBuildingToVillage(world, village.id, 'dock');
+    prepareVillageForBuildingUpgrades(world, village.id, 28, 1600, 16);
     clearFoodPatches(world);
 
     const parent = getMutableWorld(world).villages.get(village.id);
@@ -1308,13 +1374,18 @@ describe('SimWorld kingdoms', () => {
       throw new Error('Expected parent village');
     }
 
-    parent.housingCapacity = 24;
+    parent.housingCapacity = 40;
 
-    for (let tick = 0; tick < 240; tick += 1) {
+    for (let tick = 0; tick < 5; tick += 1) {
       world.step();
     }
 
-    expect(world.project().villages).toHaveLength(1);
+    const projection = world.project();
+    const blockedVillage = projection.villages.find((candidate) => candidate.id === village.id);
+
+    expect(projection.villages).toHaveLength(1);
+    expect(blockedVillage?.buildPlan).toBe('waiting_land');
+    expect(blockedVillage?.primaryGrowthBlocker).toBe('no_buildable_land');
   });
 
   it('chooses the strongest remaining town as capital only after the current capital is lost', () => {
@@ -1655,6 +1726,208 @@ describe('SimWorld minimal war', () => {
 
     expect(capturedTerritory.length).toBeGreaterThan(0);
     expect(capturedTerritory.every((tile) => tile.kingdomId === attackerKingdomId)).toBe(true);
+  });
+
+  it('can send another army after the first attack is repelled', () => {
+    const world = foundRivalKingdoms('minimal-war-rearm', {
+      leftFood: 220,
+      rightFood: 760,
+      distance: 24,
+    });
+    waitForKingdoms(world);
+    const [aggressor, target] = world.project().kingdoms;
+
+    if (!aggressor || !target) {
+      throw new Error('Expected rival kingdoms');
+    }
+
+    const mutableWorld = getMutableWorld(world);
+    const aggressorCapital = mutableWorld.villages.get(aggressor.capitalVillageId);
+    const targetCapital = mutableWorld.villages.get(target.capitalVillageId);
+
+    if (!aggressorCapital || !targetCapital) {
+      throw new Error('Expected capital villages');
+    }
+
+    aggressorCapital.population = 4;
+    targetCapital.population = 80;
+    const relation = {
+      pressure: 140,
+      warDeclared: true,
+      armyFormed: false,
+      pressureReportTier: -1,
+      borderReportTier: -1,
+      resourceReportTier: -1,
+    };
+
+    mutableWorld.formArmyGroup(aggressor, target, relation);
+    const firstArmy = getMutableWorld(world).armies.values().next().value;
+
+    if (!firstArmy) {
+      throw new Error('Expected first army');
+    }
+
+    firstArmy.status = 'disbanded';
+    relation.armyFormed = false;
+
+    aggressorCapital.population = 16;
+    targetCapital.population = 24;
+    mutableWorld.formArmyGroup(aggressor, target, relation);
+
+    const projection = world.project();
+    const activeArmies = projection.armies.filter((army) => army.status !== 'disbanded');
+
+    expect(activeArmies).toHaveLength(1);
+    expect(activeArmies[0]?.kingdomId).toBe(aggressor.id);
+    expect(activeArmies[0]?.targetKingdomId).toBe(target.id);
+  });
+
+  it('lets multiple eligible villages send armies into the same war', () => {
+    const world = foundRivalKingdoms('multi-village-war', {
+      leftFood: 220,
+      rightFood: 760,
+      distance: 24,
+    });
+    waitForKingdoms(world);
+    const [aggressor, target] = world.project().kingdoms;
+
+    if (!aggressor || !target) {
+      throw new Error('Expected rival kingdoms');
+    }
+
+    const satellite = addVillageToKingdom(world, aggressor.id, {
+      id: 'test-war-satellite',
+      position: { x: 18, y: 16 },
+      population: 18,
+    });
+    const relation = {
+      pressure: 140,
+      warDeclared: true,
+      armyFormed: false,
+      pressureReportTier: -1,
+      borderReportTier: -1,
+      resourceReportTier: -1,
+    };
+
+    getMutableWorld(world).formArmyGroup(aggressor, target, relation);
+
+    const activeArmies = world
+      .project()
+      .armies.filter((army) => army.kingdomId === aggressor.id && army.status !== 'disbanded');
+
+    expect(activeArmies.map((army) => army.originVillageId)).toEqual(
+      expect.arrayContaining([aggressor.capitalVillageId, satellite.id]),
+    );
+    expect(new Set(activeArmies.map((army) => army.originVillageId)).size).toBeGreaterThan(1);
+  });
+
+  it('projects local attacker and defender battle dots while an army is fighting', () => {
+    const world = foundRivalKingdoms('battle-dots', {
+      leftFood: 220,
+      rightFood: 760,
+      distance: 24,
+    });
+    waitForKingdoms(world);
+    formFirstArmyGroup(world);
+
+    let projection = world.project();
+
+    for (let tick = 0; tick < 180; tick += 1) {
+      world.step();
+      projection = world.project();
+
+      if (projection.armies.some((army) => army.status === 'fighting')) {
+        break;
+      }
+    }
+
+    const fightingArmy = projection.armies.find((army) => army.status === 'fighting');
+
+    expect(fightingArmy).toBeDefined();
+    expect(projection.battleMarkers.some((marker) => marker.side === 'attacker')).toBe(true);
+    expect(projection.battleMarkers.some((marker) => marker.side === 'defender')).toBe(true);
+    expect(projection.battleMarkers.every((marker) => marker.armyId === fightingArmy?.id)).toBe(
+      true,
+    );
+  });
+
+  it('lets god commands force a war between selected kingdoms', () => {
+    const world = foundRivalKingdoms('force-war-command', {
+      leftFood: 700,
+      rightFood: 700,
+      distance: 24,
+    });
+    waitForKingdoms(world);
+    const [aggressor, target] = world.project().kingdoms;
+
+    if (!aggressor || !target) {
+      throw new Error('Expected rival kingdoms');
+    }
+
+    world.enqueue({
+      id: 'cmd-force-war',
+      type: 'force_war',
+      issuedAtTick: world.currentTick,
+      payload: {
+        aggressorKingdomId: aggressor.id,
+        targetKingdomId: target.id,
+      },
+    });
+    world.step();
+
+    const projection = world.project();
+
+    expect(projection.recentEvents.some((event) => event.type === 'war_declared')).toBe(true);
+    expect(projection.stats.activeArmies).toBeGreaterThan(0);
+    expect(
+      projection.armies.some(
+        (army) =>
+          army.status !== 'disbanded' &&
+          army.kingdomId === aggressor.id &&
+          army.targetKingdomId === target.id,
+      ),
+    ).toBe(true);
+  });
+
+  it('lets god commands force peace and clear active armies between kingdoms', () => {
+    const world = foundRivalKingdoms('force-peace-command', {
+      leftFood: 220,
+      rightFood: 760,
+      distance: 24,
+    });
+    waitForKingdoms(world);
+    const [aggressor, target] = world.project().kingdoms;
+
+    if (!aggressor || !target) {
+      throw new Error('Expected rival kingdoms');
+    }
+
+    formFirstArmyGroup(world);
+    expect(world.project().stats.activeArmies).toBeGreaterThan(0);
+
+    world.enqueue({
+      id: 'cmd-force-peace',
+      type: 'force_peace',
+      issuedAtTick: world.currentTick,
+      payload: {
+        kingdomAId: aggressor.id,
+        kingdomBId: target.id,
+      },
+    });
+    world.step();
+
+    const projection = world.project();
+
+    expect(projection.stats.activeArmies).toBe(0);
+    expect(projection.recentEvents.some((event) => event.type === 'peace_forced')).toBe(true);
+    expect(
+      projection.kingdoms.every(
+        (kingdom) =>
+          ![aggressor.id, target.id].includes(kingdom.id) ||
+          kingdom.diplomacyTargetKingdomId === undefined ||
+          kingdom.diplomacyPressure === 0,
+      ),
+    ).toBe(true);
   });
 });
 
@@ -2039,7 +2312,7 @@ function removeQuarrySitesNearVillage(world: SimWorld, villageId: string) {
   }
 }
 
-function removeWoodSitesNearVillage(world: SimWorld, villageId: string) {
+function removeWoodSitesNearVillage(world: SimWorld, villageId: string, radius = 18) {
   const village = getMutableWorld(world).villages.get(villageId);
 
   if (!village) {
@@ -2050,7 +2323,7 @@ function removeWoodSitesNearVillage(world: SimWorld, villageId: string) {
     const dx = tile.x - village.center.x;
     const dy = tile.y - village.center.y;
 
-    if (dx * dx + dy * dy > 8 * 8) {
+    if (dx * dx + dy * dy > radius * radius) {
       continue;
     }
 
@@ -2199,6 +2472,53 @@ function addBarrackToVillage(world: SimWorld, villageId: string) {
   });
 }
 
+function addVillageToKingdom(
+  world: SimWorld,
+  kingdomId: string,
+  options: { id: string; position: { x: number; y: number }; population: number },
+) {
+  const mutableWorld = getMutableWorld(world);
+  const kingdom = mutableWorld.kingdoms.get(kingdomId);
+
+  if (!kingdom) {
+    throw new Error(`Expected kingdom ${kingdomId}`);
+  }
+
+  const village: Village = {
+    id: options.id,
+    name: 'Test March',
+    level: 1,
+    race: kingdom.race,
+    kingdomId,
+    center: { ...options.position },
+    population: options.population,
+    foodInventory: 120,
+    foodCapacity: 180,
+    woodInventory: 80,
+    stoneInventory: 20,
+    ironInventory: 0,
+    jobs: {
+      farmer: 3,
+      builder: 2,
+      miner: 0,
+      soldier: 4,
+    },
+    growthBlockers: [],
+    primaryGrowthBlocker: undefined,
+    buildPlan: 'idle',
+    housingCapacity: Math.max(24, options.population),
+    territoryTiles: 0,
+    foundedAtTick: world.currentTick,
+    status: 'stable',
+  };
+
+  mutableWorld.villages.set(village.id, village);
+  kingdom.villageIds.push(village.id);
+  mutableWorld.refreshKingdomMembership(kingdom);
+
+  return village;
+}
+
 function removeCapitalFromKingdom(world: SimWorld, kingdomId: string, capitalVillageId: string) {
   const mutableWorld = getMutableWorld(world);
   const kingdom = mutableWorld.kingdoms.get(kingdomId);
@@ -2228,6 +2548,7 @@ function getMutableWorld(world: SimWorld) {
     villages: Map<string, Village>;
     kingdoms: Map<string, Kingdom>;
     buildings: Map<string, VillageBuilding>;
+    armies: Map<string, ArmyGroup>;
     units: Map<string, Unit>;
     createUnit(options: {
       race: Unit['race'];
