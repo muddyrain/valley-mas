@@ -24,6 +24,7 @@ import {
   selectWorldEntity,
   type WorldSelection,
 } from './inspection';
+import { resolveDemoWorldSeed } from './worldSeed';
 
 const TILE_SIZE = 10;
 const DEMO_WORLD_WIDTH = 256;
@@ -146,7 +147,7 @@ export class WorldScene extends Phaser.Scene {
 
   create() {
     this.world = new SimWorld({
-      seed: 'worldsim-v2-demo',
+      seed: resolveDemoWorldSeed(window.location.search),
       width: DEMO_WORLD_WIDTH,
       height: DEMO_WORLD_HEIGHT,
       initialUnits: DEMO_INITIAL_UNITS,
@@ -343,7 +344,14 @@ export class WorldScene extends Phaser.Scene {
           : this.selection.type === 'kingdom'
             ? tile.kingdomId === this.selection.id
             : false;
-      const alpha = selected ? 0.34 : kingdom ? 0.22 : 0.08;
+      const alpha =
+        tile.surface === 'water'
+          ? selected
+            ? 0.22
+            : sourceAlpha(tile.source, kingdom ? 0.13 : 0.05)
+          : selected
+            ? 0.34
+            : sourceAlpha(tile.source, kingdom ? 0.22 : 0.08);
 
       this.territoryLayer.fillStyle(color, alpha);
       this.territoryLayer.fillRect(tile.x * TILE_SIZE, tile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
@@ -353,9 +361,9 @@ export class WorldScene extends Phaser.Scene {
 
     for (const segment of borderSegments) {
       this.territoryLayer.lineStyle(
-        segment.selected ? 2 : 1,
+        segment.width,
         segment.selected ? 0xf4f4f4 : segment.color,
-        segment.selected ? 0.95 : 0.72,
+        segment.alpha,
       );
       this.territoryLayer.beginPath();
       this.territoryLayer.moveTo(segment.x1 * TILE_SIZE, segment.y1 * TILE_SIZE);
@@ -1118,6 +1126,8 @@ export class WorldScene extends Phaser.Scene {
       this.getViewportBucketKey(projection),
       this.getSelectionDrawKey(),
       projection.stats.territoryTiles,
+      projection.territory.length,
+      projection.terrainRevision,
       this.getStaticLayerTickBucket(projection),
     ].join(':');
   }
@@ -1550,4 +1560,15 @@ function translateEvent(message: string) {
   }
 
   return message;
+}
+
+function sourceAlpha(source: string, baseAlpha: number) {
+  switch (source) {
+    case 'work_site':
+      return baseAlpha * 0.7;
+    case 'frontier':
+      return baseAlpha * 0.55;
+    default:
+      return baseAlpha;
+  }
 }

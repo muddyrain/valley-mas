@@ -20,6 +20,7 @@ import type {
   SimStepPhaseTimings,
   SimWorldOptions,
   TerrainType,
+  TerritorySource,
   Tile,
   Unit,
   UnitGender,
@@ -29,6 +30,7 @@ import type {
   VillageBuildingType,
   VillageBuildPlan,
   VillageGrowthBlocker,
+  VillageGrowthPhase,
   VillageJobs,
   VillageWorkSite,
   WorldProjection,
@@ -73,6 +75,7 @@ const MINE_RESOURCE_PER_TICK = 2;
 const WOOD_PER_BUILDER_TICK = 2;
 const CONSTRUCTION_WORK_PER_BUILDER_TICK = 8;
 const BUILDING_INTERVAL_TICKS = 60;
+const BASIC_CHAIN_BUILDING_INTERVAL_TICKS = 40;
 const BUILDING_RUIN_TICKS = 240;
 const WORK_SITE_VISIBLE_TICKS = 60;
 const WORK_SITE_TERRITORY_RADIUS = 2;
@@ -91,6 +94,7 @@ const VILLAGE_EXPANSION_MIN_RADIUS = 16;
 const VILLAGE_EXPANSION_MAX_RADIUS = 28;
 const VILLAGE_EXPANSION_FOOD_COST = 90;
 const VILLAGE_EXPANSION_WOOD_COST = 20;
+const VILLAGE_EXPANSION_PREPARATION_TICKS = 60;
 type BuildingResourceCost = {
   food: number;
   wood: number;
@@ -176,6 +180,8 @@ const RECENT_EVENT_TYPES = new Set<SimEvent['type']>([
   'pause_changed',
   'village_founded',
   'village_leveled_up',
+  'village_phase_changed',
+  'village_expansion_status',
   'village_declining',
   'village_abandoned',
   'building_built',
@@ -236,6 +242,8 @@ export class SimWorld {
   private nextBuildingId = 1;
   private nextArmyId = 1;
   private readonly workSites = new Map<string, VillageWorkSite>();
+  private readonly villageExpansionStatus = new Map<string, VillageBuildPlan>();
+  private readonly villageExpansionReadySince = new Map<string, number>();
 
   constructor(options: SimWorldOptions) {
     this.seed = options.seed;
@@ -337,6 +345,7 @@ export class SimWorld {
       ? territory.filter((tile) => isTileInBounds(tile, bounds))
       : territory;
     const territoryByVillage = this.countTerritoryByVillage(territory);
+    const landTerritoryTiles = territory.filter((tile) => tile.surface === 'land').length;
     const allUnits = [...this.units.values()];
     const units = allUnits
       .filter((unit) => !bounds || isPositionInBounds(unit.position, bounds))
@@ -411,7 +420,7 @@ export class SimWorld {
         activeBuildings,
         abandonedBuildings,
         ruinedBuildings,
-        territoryTiles: territory.length,
+        territoryTiles: landTerritoryTiles,
         foodTiles: food.tileCount,
         totalFood: food.amount,
         totalVillageFood,
@@ -973,9 +982,11 @@ export class SimWorld {
         stoneInventory: 0,
         ironInventory: 0,
         jobs: createEmptyVillageJobs(),
+        growthPhase: 'camp',
         growthBlockers: [],
         primaryGrowthBlocker: undefined,
         buildPlan: 'idle',
+        primaryIntention: 'idle',
         housingCapacity: Math.max(VILLAGE_BASE_HOUSING, locals.length + 4),
         territoryTiles: 0,
         foundedAtTick: this.tick,
@@ -1166,6 +1177,8 @@ export class SimWorld {
   }
 
   private tryFoundSatelliteVillage(parent: Village, residents: Unit[]) {
+    const isPreparingExpansion = this.villageExpansionReadySince.has(parent.id);
+
     if (
       this.tick <= parent.foundedAtTick ||
       this.tick % VILLAGE_EXPANSION_INTERVAL_TICKS !== 0 ||
@@ -1177,7 +1190,7 @@ export class SimWorld {
 
     if (
       residents.length < VILLAGE_EXPANSION_MIN_POPULATION ||
-      parent.population < Math.floor(parent.housingCapacity * 0.7) ||
+      (!isPreparingExpansion && parent.population < Math.floor(parent.housingCapacity * 0.7)) ||
       parent.foodInventory < VILLAGE_EXPANSION_FOOD_COST ||
       parent.woodInventory < VILLAGE_EXPANSION_WOOD_COST ||
       this.findVillageOwnedBuildings(parent.id).length < 4
@@ -1188,6 +1201,15 @@ export class SimWorld {
     const site = this.findSatelliteVillageSite(parent);
 
     if (!site) {
+      return false;
+    }
+
+    const expansionReadySince = this.villageExpansionReadySince.get(parent.id);
+
+    if (
+      expansionReadySince === undefined ||
+      this.tick - expansionReadySince < VILLAGE_EXPANSION_PREPARATION_TICKS
+    ) {
       return false;
     }
 
@@ -1218,9 +1240,11 @@ export class SimWorld {
       stoneInventory: 0,
       ironInventory: 0,
       jobs: createEmptyVillageJobs(),
+      growthPhase: 'camp',
       growthBlockers: [],
       primaryGrowthBlocker: undefined,
       buildPlan: 'idle',
+      primaryIntention: 'idle',
       housingCapacity: Math.max(VILLAGE_BASE_HOUSING, settlers.length + 4),
       territoryTiles: 0,
       foundedAtTick: this.tick,
@@ -1246,6 +1270,7 @@ export class SimWorld {
     }
 
     parent.population = Math.max(0, parent.population - settlers.length);
+    this.villageExpansionReadySince.delete(parent.id);
     this.villageResidents.set(
       parent.id,
       residents.filter((resident) => !settlerIds.has(resident.id)),
@@ -1590,7 +1615,9 @@ export class SimWorld {
   }
 
   private tryBuildForVillage(village: Village) {
-    if (this.tick <= village.foundedAtTick || this.tick % BUILDING_INTERVAL_TICKS !== 0) {
+    const buildingInterval = this.buildingIntervalForVillage(village);
+
+    if (this.tick <= village.foundedAtTick || this.tick % buildingInterval !== 0) {
       return;
     }
 
@@ -1615,16 +1642,50 @@ export class SimWorld {
     this.recordWorkSite(village, 'construction', building.position);
   }
 
+  private buildingIntervalForVillage(village: Village) {
+    const buildings = this.findVillageOwnedBuildings(village.id);
+    const hasHouse = buildings.some((building) => building.type === 'house');
+    const hasBasicChain =
+      hasHouse &&
+      buildings.some((building) => building.type === 'storage') &&
+      buildings.some((building) => building.type === 'farm');
+
+    if (!hasHouse || hasBasicChain) {
+      return BUILDING_INTERVAL_TICKS;
+    }
+
+    return BASIC_CHAIN_BUILDING_INTERVAL_TICKS;
+  }
+
   private updateVillageGrowthFeedback(village: Village) {
     const previousLevel = village.level;
+    const previousPhase = village.growthPhase;
+    const buildings = this.findVillageOwnedBuildings(village.id);
     const nextLevel = computeVillageLevel(
       village.population,
       village.housingCapacity,
       this.highestTownHallTier(village.id),
-      this.findVillageOwnedBuildings(village.id).length,
+      buildings.length,
     );
 
     village.level = nextLevel;
+    village.growthPhase = this.determineVillageGrowthPhase(village, buildings);
+
+    if (village.growthPhase !== previousPhase) {
+      this.emit(
+        'village_phase_changed',
+        `${village.id} entered ${village.growthPhase} phase`,
+        undefined,
+        undefined,
+        village.center,
+        {
+          villageId: village.id,
+          name: village.name,
+          previousPhase,
+          phase: village.growthPhase,
+        },
+      );
+    }
 
     if (nextLevel > previousLevel) {
       this.emit(
@@ -1641,6 +1702,47 @@ export class SimWorld {
         },
       );
     }
+  }
+
+  private determineVillageGrowthPhase(
+    village: Village,
+    buildings = this.findVillageOwnedBuildings(village.id),
+  ): VillageGrowthPhase {
+    if (village.status === 'camp') {
+      return 'camp';
+    }
+
+    const hasHouse = buildings.some((building) => building.type === 'house');
+    const hasStorage = buildings.some((building) => building.type === 'storage');
+    const hasFarm = buildings.some((building) => building.type === 'farm');
+    const hasTownSpecialization = buildings.some((building) =>
+      ['mine', 'barrack', 'dock'].includes(building.type),
+    );
+    const expansionPlan = this.chooseExpansionBuildPlan(village, buildings.length);
+
+    if (expansionPlan === 'prepare_expansion') {
+      return 'frontier';
+    }
+
+    if (!hasHouse || !hasStorage || !hasFarm) {
+      return 'hamlet';
+    }
+
+    if (hasTownSpecialization || village.population >= PROSPERITY_BUILD_MIN_POPULATION) {
+      return 'town';
+    }
+
+    return 'village';
+  }
+
+  private hasBasicVillageBuildingChain(village: Village) {
+    const buildings = this.findVillageOwnedBuildings(village.id);
+
+    return (
+      buildings.some((building) => building.type === 'house') &&
+      buildings.some((building) => building.type === 'storage') &&
+      buildings.some((building) => building.type === 'farm')
+    );
   }
 
   private canPayBuildingCost(village: Village, type: VillageBuildingType) {
@@ -1866,8 +1968,12 @@ export class SimWorld {
       return undefined;
     }
 
+    if (village.population < VILLAGE_EXPANSION_MIN_POPULATION) {
+      return undefined;
+    }
+
     if (
-      village.population < VILLAGE_EXPANSION_MIN_POPULATION ||
+      !this.villageExpansionReadySince.has(village.id) &&
       village.population < Math.floor(village.housingCapacity * 0.7)
     ) {
       return 'waiting_population_pressure';
@@ -1990,6 +2096,59 @@ export class SimWorld {
 
     village.growthBlockers = uniqueBlockers(blockers);
     village.primaryGrowthBlocker = selectPrimaryGrowthBlocker(village.growthBlockers);
+    village.primaryIntention = village.buildPlan;
+    village.expansionPlan = this.activeExpansionPlanForVillage(village);
+    this.updateVillageExpansionPreparation(village);
+    this.updateVillageExpansionStatusEvent(village);
+  }
+
+  private updateVillageExpansionPreparation(village: Village) {
+    if (village.expansionPlan !== 'prepare_expansion') {
+      this.villageExpansionReadySince.delete(village.id);
+      return;
+    }
+
+    if (!this.villageExpansionReadySince.has(village.id)) {
+      this.villageExpansionReadySince.set(village.id, this.tick);
+    }
+  }
+
+  private updateVillageExpansionStatusEvent(village: Village) {
+    const plan = village.expansionPlan;
+    const reason = plan ? expansionReasonForPlan(plan) : undefined;
+
+    if (!plan || !reason) {
+      this.villageExpansionStatus.delete(village.id);
+      return;
+    }
+
+    if (this.villageExpansionStatus.get(village.id) === plan) {
+      return;
+    }
+
+    this.villageExpansionStatus.set(village.id, plan);
+    this.emit(
+      'village_expansion_status',
+      `${village.id} expansion status ${plan}`,
+      undefined,
+      undefined,
+      village.center,
+      {
+        villageId: village.id,
+        name: village.name,
+        plan,
+        reason,
+      },
+    );
+  }
+
+  private activeExpansionPlanForVillage(village: Village) {
+    const expansionPlan = this.chooseExpansionBuildPlan(
+      village,
+      this.findVillageOwnedBuildings(village.id).length,
+    );
+
+    return village.buildPlan === expansionPlan ? expansionPlan : undefined;
   }
 
   private hasHousingPressure(village: Village) {
@@ -2039,8 +2198,6 @@ export class SimWorld {
     status: VillageBuilding['status'] = 'active',
   ): VillageBuilding {
     const buildingCount = this.findVillageOwnedBuildings(village.id).length;
-    const angle = buildingCount * 2.399963229728653;
-    const radius = 2 + (buildingCount % 4);
     const position =
       type === 'town_hall'
         ? village.center
@@ -2050,10 +2207,7 @@ export class SimWorld {
             this.findBuildablePosition(village.center))
           : type === 'dock'
             ? (this.findDockSite(village) ?? this.findBuildablePosition(village.center))
-            : this.findBuildablePosition({
-                x: village.center.x + Math.cos(angle) * radius,
-                y: village.center.y + Math.sin(angle) * radius,
-              });
+            : this.findPurposefulBuildingPosition(village, type, buildingCount);
 
     const building: VillageBuilding = {
       id: `building-${String(this.nextBuildingId).padStart(5, '0')}`,
@@ -2075,11 +2229,109 @@ export class SimWorld {
     return building;
   }
 
+  private findPurposefulBuildingPosition(
+    village: Village,
+    type: VillageBuildingType,
+    buildingCount: number,
+  ) {
+    const searchRadius = buildingSiteSearchRadius(type);
+    const occupied = new Set(
+      this.findVillageOwnedBuildings(village.id).map(
+        (building) => `${Math.floor(building.position.x)}:${Math.floor(building.position.y)}`,
+      ),
+    );
+    let best: { position: Position; score: number } | undefined;
+
+    forEachTileInRadius(this.map, village.center, searchRadius, (tile) => {
+      if (!isWalkable(tile.terrain) || occupied.has(`${tile.x}:${tile.y}`)) {
+        return;
+      }
+
+      if (tile.resource) {
+        if (type !== 'farm' || tile.resource.type !== 'food') {
+          return;
+        }
+      }
+
+      const position = { x: tile.x, y: tile.y };
+
+      if (type === 'house' && this.nearestMineableResourceDistance(position, 3) < 2.5) {
+        return;
+      }
+
+      const score =
+        this.scoreBuildingSite(village, type, position) +
+        deterministicSiteJitter(village.id, type, tile.x, tile.y, buildingCount);
+
+      if (!best || score < best.score) {
+        best = { position, score };
+      }
+    });
+
+    if (best) {
+      return best.position;
+    }
+
+    const angle = buildingCount * 2.399963229728653;
+    const radius = 2 + (buildingCount % 4);
+
+    return this.findBuildablePosition({
+      x: village.center.x + Math.cos(angle) * radius,
+      y: village.center.y + Math.sin(angle) * radius,
+    });
+  }
+
+  private scoreBuildingSite(village: Village, type: VillageBuildingType, position: Position) {
+    const centerDistance = distance(village.center, position);
+    const nearestHouseDistance = this.nearestVillageBuildingDistance(village.id, position, 'house');
+    const nearestFarmDistance = this.nearestVillageBuildingDistance(village.id, position, 'farm');
+    const nearestMineDistance = this.nearestVillageBuildingDistance(village.id, position, 'mine');
+    const nearestFoodDistance = this.nearestResourceDistance(position, 'food', 5);
+    const nearestStoneOrIronDistance = Math.min(
+      this.nearestResourceDistance(position, 'stone', 4),
+      this.nearestResourceDistance(position, 'iron', 4),
+    );
+    const waterDistance = this.nearestTerrainDistance(position, 'water', 4);
+
+    switch (type) {
+      case 'house':
+        return (
+          Math.abs(centerDistance - 3) * 1.2 +
+          Math.min(nearestHouseDistance, 4) * 0.55 +
+          this.resourceProximityPenalty(position, 2) +
+          Math.max(0, 3 - nearestStoneOrIronDistance) * 4
+        );
+      case 'storage':
+        return (
+          centerDistance * 0.9 +
+          Math.min(nearestHouseDistance, 5) * 0.35 +
+          Math.min(nearestFarmDistance, 5) * 0.25 +
+          Math.min(nearestMineDistance, 5) * 0.25 +
+          this.resourceProximityPenalty(position, 1)
+        );
+      case 'farm':
+        return (
+          nearestFoodDistance * 1.4 +
+          Math.min(waterDistance, 4) * 0.35 +
+          centerDistance * 0.18 +
+          this.nearbyBuildingPenalty(village.id, position, 2)
+        );
+      case 'barrack':
+        return (
+          Math.abs(centerDistance - 6) * 1.1 +
+          Math.min(nearestHouseDistance, 5) * 0.2 +
+          this.nearbyBuildingPenalty(village.id, position, 2)
+        );
+      default:
+        return centerDistance;
+    }
+  }
+
   private findMineSite(village: Village): Position | undefined {
     let nearestDeposit: Position | undefined;
-    let nearestDepositDistance = Number.POSITIVE_INFINITY;
+    let nearestDepositScore = Number.POSITIVE_INFINITY;
     let nearestHill: Position | undefined;
-    let nearestHillDistance = Number.POSITIVE_INFINITY;
+    let nearestHillScore = Number.POSITIVE_INFINITY;
 
     forEachTileInRadius(this.map, village.center, MINE_SITE_RADIUS, (tile) => {
       if (!isWalkable(tile.terrain) || !this.isMineSite(tile)) {
@@ -2087,17 +2339,19 @@ export class SimWorld {
       }
 
       const candidateDistance = distance(village.center, tile);
+      const residentialPenalty = this.residentialMineSitePenalty(village.id, tile);
+      const candidateScore = candidateDistance + residentialPenalty;
 
       if (tile.resource?.type === 'stone' || tile.resource?.type === 'iron') {
-        if (candidateDistance < nearestDepositDistance) {
-          nearestDepositDistance = candidateDistance;
+        if (candidateScore < nearestDepositScore) {
+          nearestDepositScore = candidateScore;
           nearestDeposit = { x: tile.x, y: tile.y };
         }
         return;
       }
 
-      if (candidateDistance < nearestHillDistance) {
-        nearestHillDistance = candidateDistance;
+      if (candidateScore < nearestHillScore) {
+        nearestHillScore = candidateScore;
         nearestHill = { x: tile.x, y: tile.y };
       }
     });
@@ -2107,7 +2361,7 @@ export class SimWorld {
 
   private findShallowQuarrySite(village: Village): Tile | undefined {
     let nearest: Tile | undefined;
-    let nearestDistance = Number.POSITIVE_INFINITY;
+    let nearestScore = Number.POSITIVE_INFINITY;
 
     forEachTileInRadius(this.map, village.center, VILLAGE_SHALLOW_QUARRY_RADIUS, (tile) => {
       if (!isWalkable(tile.terrain) || tile.resource) {
@@ -2116,15 +2370,26 @@ export class SimWorld {
 
       const candidateDistance = distance(village.center, tile);
 
-      if (candidateDistance < 2 || candidateDistance >= nearestDistance) {
+      if (candidateDistance < 2) {
         return;
       }
 
-      nearestDistance = candidateDistance;
+      const candidateScore = candidateDistance + this.residentialMineSitePenalty(village.id, tile);
+
+      if (candidateScore >= nearestScore) {
+        return;
+      }
+
+      nearestScore = candidateScore;
       nearest = tile;
     });
 
     return nearest;
+  }
+
+  private residentialMineSitePenalty(villageId: string, position: Position) {
+    const nearestHouseDistance = this.nearestVillageBuildingDistance(villageId, position, 'house');
+    return Math.max(0, 3 - nearestHouseDistance) * 8;
   }
 
   private createShallowQuarrySite(village: Village): Position | undefined {
@@ -2181,6 +2446,93 @@ export class SimWorld {
       { x: tile.x, y: tile.y + 1 },
       { x: tile.x, y: tile.y - 1 },
     ].some((position) => getTile(this.map, position)?.terrain === 'water');
+  }
+
+  private nearestVillageBuildingDistance(
+    villageId: string,
+    position: Position,
+    type?: VillageBuildingType,
+  ) {
+    let nearest = Number.POSITIVE_INFINITY;
+
+    for (const building of this.buildings.values()) {
+      if (building.villageId !== villageId || building.status === 'ruined') {
+        continue;
+      }
+
+      if (type && building.type !== type) {
+        continue;
+      }
+
+      nearest = Math.min(nearest, distance(position, building.position));
+    }
+
+    return nearest === Number.POSITIVE_INFINITY ? 8 : nearest;
+  }
+
+  private nearestResourceDistance(position: Position, resourceType: ResourceType, radius: number) {
+    let nearest = Number.POSITIVE_INFINITY;
+
+    forEachTileInRadius(this.map, position, radius, (tile) => {
+      if (tile.resource?.type !== resourceType || tile.resource.amount <= 0) {
+        return;
+      }
+
+      nearest = Math.min(nearest, distance(position, tile));
+    });
+
+    return nearest === Number.POSITIVE_INFINITY ? radius + 2 : nearest;
+  }
+
+  private nearestMineableResourceDistance(position: Position, radius: number) {
+    return Math.min(
+      this.nearestResourceDistance(position, 'stone', radius),
+      this.nearestResourceDistance(position, 'iron', radius),
+    );
+  }
+
+  private nearestTerrainDistance(position: Position, terrain: TerrainType, radius: number) {
+    let nearest = Number.POSITIVE_INFINITY;
+
+    forEachTileInRadius(this.map, position, radius, (tile) => {
+      if (tile.terrain !== terrain) {
+        return;
+      }
+
+      nearest = Math.min(nearest, distance(position, tile));
+    });
+
+    return nearest === Number.POSITIVE_INFINITY ? radius + 2 : nearest;
+  }
+
+  private nearbyBuildingPenalty(villageId: string, position: Position, radius: number) {
+    let penalty = 0;
+
+    for (const building of this.buildings.values()) {
+      if (building.villageId !== villageId || building.status === 'ruined') {
+        continue;
+      }
+
+      const buildingDistance = distance(position, building.position);
+
+      if (buildingDistance < radius) {
+        penalty += (radius - buildingDistance) * 2;
+      }
+    }
+
+    return penalty;
+  }
+
+  private resourceProximityPenalty(position: Position, radius: number) {
+    let penalty = 0;
+
+    forEachTileInRadius(this.map, position, radius, (tile) => {
+      if (tile.resource && tile.resource.amount > 0) {
+        penalty += Math.max(0, radius + 1 - distance(position, tile));
+      }
+    });
+
+    return penalty;
   }
 
   private findBuildablePosition(position: Position) {
@@ -2323,10 +2675,19 @@ export class SimWorld {
   }
 
   private projectTerritory() {
-    const claims = new Map<string, { villageId: string; kingdomId?: string }>();
+    const claims = new Map<
+      string,
+      { villageId: string; kingdomId?: string; surface: 'land' | 'water'; source: TerritorySource }
+    >();
 
     for (const village of this.villages.values()) {
-      this.claimTerritory(claims, village, village.center, this.settlementTerritoryRadius(village));
+      this.claimTerritory(
+        claims,
+        village,
+        village.center,
+        this.settlementTerritoryRadius(village),
+        'settlement_core',
+      );
     }
 
     for (const building of this.buildings.values()) {
@@ -2340,7 +2701,25 @@ export class SimWorld {
         continue;
       }
 
-      this.claimTerritory(claims, village, building.position, BUILDING_TERRITORY_RADIUS);
+      this.claimTerritory(
+        claims,
+        village,
+        building.position,
+        BUILDING_TERRITORY_RADIUS,
+        'building',
+      );
+    }
+
+    for (const village of this.villages.values()) {
+      if (village.expansionPlan !== 'prepare_expansion') {
+        continue;
+      }
+
+      const site = this.findSatelliteVillageSite(village);
+
+      if (site) {
+        this.claimTerritory(claims, village, site, WORK_SITE_TERRITORY_RADIUS, 'frontier');
+      }
     }
 
     for (const site of this.workSites.values()) {
@@ -2354,12 +2733,19 @@ export class SimWorld {
         continue;
       }
 
-      this.claimTerritory(claims, village, site.position, WORK_SITE_TERRITORY_RADIUS);
+      this.claimTerritory(claims, village, site.position, WORK_SITE_TERRITORY_RADIUS, 'work_site');
     }
 
     return [...claims.entries()].map(([key, claim]) => {
       const [x, y] = key.split(':').map(Number);
-      return { x, y, villageId: claim.villageId, kingdomId: claim.kingdomId };
+      return {
+        x,
+        y,
+        villageId: claim.villageId,
+        kingdomId: claim.kingdomId,
+        surface: claim.surface,
+        source: claim.source,
+      };
     });
   }
 
@@ -2373,27 +2759,39 @@ export class SimWorld {
   }
 
   private claimTerritory(
-    claims: Map<string, { villageId: string; kingdomId?: string }>,
+    claims: Map<
+      string,
+      { villageId: string; kingdomId?: string; surface: 'land' | 'water'; source: TerritorySource }
+    >,
     village: Village,
     center: Position,
     radius: number,
+    source: TerritorySource,
   ) {
     forEachTileInRadius(this.map, center, radius, (tile) => {
-      if (!isWalkable(tile.terrain)) {
+      if (tile.terrain === 'lava') {
         return;
       }
 
       claims.set(`${tile.x}:${tile.y}`, {
         villageId: village.id,
         kingdomId: village.kingdomId,
+        surface: tile.terrain === 'water' ? 'water' : 'land',
+        source,
       });
     });
   }
 
-  private countTerritoryByVillage(territory: Array<{ villageId: string }>) {
+  private countTerritoryByVillage(
+    territory: Array<{ villageId: string; surface: 'land' | 'water' }>,
+  ) {
     const counts = new Map<string, number>();
 
     for (const tile of territory) {
+      if (tile.surface !== 'land') {
+        continue;
+      }
+
       counts.set(tile.villageId, (counts.get(tile.villageId) ?? 0) + 1);
     }
 
@@ -3517,8 +3915,55 @@ export class SimWorld {
   }
 
   private spawnInitialUnits(count: number) {
-    const center = { x: this.map.width / 2, y: this.map.height / 2 };
-    this.spawnUnits(center, 'human', count);
+    if (count <= 0) {
+      return;
+    }
+
+    this.spawnUnits(this.findInitialSpawnPosition(), 'human', count);
+  }
+
+  private findInitialSpawnPosition() {
+    const viable = this.findInitialSpawnCandidates(true);
+
+    if (viable.length > 0) {
+      return viable[this.rng.int(viable.length)];
+    }
+
+    const walkable = this.findInitialSpawnCandidates(false);
+
+    if (walkable.length > 0) {
+      return walkable[this.rng.int(walkable.length)];
+    }
+
+    return this.findBuildablePosition({ x: this.map.width / 2, y: this.map.height / 2 });
+  }
+
+  private findInitialSpawnCandidates(requireFood: boolean) {
+    const margin = Math.max(
+      2,
+      Math.min(10, Math.floor(Math.min(this.map.width, this.map.height) / 8)),
+    );
+
+    return this.map.tiles
+      .filter((tile) => {
+        if (!isWalkable(tile.terrain)) {
+          return false;
+        }
+
+        if (
+          tile.x < margin ||
+          tile.y < margin ||
+          tile.x > this.map.width - 1 - margin ||
+          tile.y > this.map.height - 1 - margin
+        ) {
+          return false;
+        }
+
+        return (
+          !requireFood || this.foodAmountNear(tile, VILLAGE_FOOD_RADIUS) >= VILLAGE_MIN_LOCAL_FOOD
+        );
+      })
+      .map((tile) => ({ x: tile.x, y: tile.y }));
   }
 
   private spawnUnits(position: Position, race: UnitRace, count: number, gender?: UnitGender) {
@@ -3725,9 +4170,12 @@ function cloneVillage(village: Village, territoryTiles: number): Village {
     stoneInventory: round(village.stoneInventory),
     ironInventory: round(village.ironInventory),
     jobs: { ...village.jobs },
+    growthPhase: village.growthPhase,
     growthBlockers: [...village.growthBlockers],
     primaryGrowthBlocker: village.primaryGrowthBlocker,
     buildPlan: village.buildPlan,
+    primaryIntention: village.primaryIntention,
+    expansionPlan: village.expansionPlan,
     territoryTiles,
   };
 }
@@ -3830,6 +4278,54 @@ function selectPrimaryGrowthBlocker(blockers: VillageGrowthBlocker[]) {
   ];
 
   return priority.find((blocker) => blockers.includes(blocker));
+}
+
+function expansionReasonForPlan(plan: VillageBuildPlan) {
+  switch (plan) {
+    case 'prepare_expansion':
+      return 'ready';
+    case 'waiting_land':
+      return 'no_site';
+    case 'waiting_resources':
+      return 'low_resources';
+    case 'waiting_population_pressure':
+      return 'low_population';
+    default:
+      return undefined;
+  }
+}
+
+function buildingSiteSearchRadius(type: VillageBuildingType) {
+  switch (type) {
+    case 'farm':
+      return 9;
+    case 'barrack':
+      return 8;
+    case 'storage':
+      return 7;
+    case 'house':
+      return 6;
+    default:
+      return 6;
+  }
+}
+
+function deterministicSiteJitter(
+  villageId: string,
+  type: VillageBuildingType,
+  x: number,
+  y: number,
+  buildingCount: number,
+) {
+  const text = `${villageId}:${type}:${x}:${y}:${buildingCount}`;
+  let hash = 2166136261;
+
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return ((hash >>> 0) % 1000) / 1000;
 }
 
 function averagePosition(positions: Position[]) {

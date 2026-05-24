@@ -27,11 +27,12 @@ export function createWorldMap(
   height = DEFAULT_WORLD_HEIGHT,
 ) {
   const rng = new SeededRng(`${seed}:map`);
+  const terrainSeed = createTerrainSeed(seed);
   const tiles: Tile[] = [];
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      const terrain = pickTerrain(seed, x, y, width, height);
+      const terrain = pickTerrain(terrainSeed, x, y, width, height);
       tiles.push({
         x,
         y,
@@ -136,7 +137,7 @@ export function resourceTotals(tiles: Tile[], type: ResourceType) {
 }
 
 function pickTerrain(
-  seed: string,
+  seed: TerrainSeed,
   x: number,
   y: number,
   width: number,
@@ -146,9 +147,9 @@ function pickTerrain(
   const ny = y / Math.max(1, height - 1);
   const edge = Math.min(nx, ny, 1 - nx, 1 - ny);
   const wave =
-    Math.sin((x + seed.length) * 0.21) +
-    Math.cos((y - seed.length) * 0.17) +
-    Math.sin((x + y) * 0.09);
+    Math.sin((x + seed.xPhase) * 0.21 + seed.wavePhase) +
+    Math.cos((y - seed.yPhase) * 0.17 + seed.ridgePhase) +
+    Math.sin((x + y + seed.diagonalPhase) * 0.09);
 
   if (edge < 0.05) {
     return 'water';
@@ -175,6 +176,26 @@ function pickTerrain(
   }
 
   return 'grass';
+}
+
+type TerrainSeed = {
+  xPhase: number;
+  yPhase: number;
+  wavePhase: number;
+  ridgePhase: number;
+  diagonalPhase: number;
+};
+
+function createTerrainSeed(seed: string): TerrainSeed {
+  const rng = new SeededRng(`${seed}:terrain`);
+
+  return {
+    xPhase: rng.next() * 1000,
+    yPhase: rng.next() * 1000,
+    wavePhase: rng.next() * Math.PI * 2,
+    ridgePhase: rng.next() * Math.PI * 2,
+    diagonalPhase: rng.next() * 1000,
+  };
 }
 
 function pickBiome(terrain: TerrainType): BiomeType {

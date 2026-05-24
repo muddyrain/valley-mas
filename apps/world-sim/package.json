@@ -9,8 +9,10 @@
     "preview": "vite preview",
     "check": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --exclude src/sim/scaleMeasurement.measure.test.ts",
+    "test": "vitest run --exclude src/sim/scaleMeasurement.measure.test.ts --exclude src/sim/growthObservation.measure.test.ts --exclude src/sim/buildingSiteObservation.measure.test.ts",
     "measure:scale": "vitest run src/sim/scaleMeasurement.measure.test.ts --reporter=verbose",
+    "observe:growth": "vitest run src/sim/growthObservation.measure.test.ts --reporter=verbose",
+    "observe:building-sites": "vitest run src/sim/buildingSiteObservation.measure.test.ts --reporter=verbose",
     "test:watch": "vitest",
     "clean": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true});\""
   },

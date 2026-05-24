@@ -46,6 +46,7 @@ Future systems append only after documenting their position in this order.
 - Simulation randomness uses seed-backed RNG.
 - No simulation system may use `Math.random()`.
 - Replays are based on seed, initial options, tick count, and command sequence.
+- The Phaser demo may create a fresh seed at startup for player-facing variety, but that generated seed is passed into `SimWorld` before simulation begins; terrain phases, resources, unit starts, and later autonomous building sites all derive from the full seed. `?seed=...` keeps the same deterministic world across reloads.
 - Events are part of the deterministic evidence trail.
 
 ## Performance Direction

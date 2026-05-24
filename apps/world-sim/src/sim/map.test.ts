@@ -17,6 +17,15 @@ describe('world map generation', () => {
     expect(second.tiles).toEqual(first.tiles);
   });
 
+  it('changes the terrain layout for different same-length seeds', () => {
+    const first = createWorldMap('worldsim-aa-111111', 48, 36);
+    const second = createWorldMap('worldsim-bb-222222', 48, 36);
+    const firstTerrain = first.tiles.map((tile) => tile.terrain).join(',');
+    const secondTerrain = second.tiles.map((tile) => tile.terrain).join(',');
+
+    expect(secondTerrain).not.toBe(firstTerrain);
+  });
+
   it('indexes tiles by chunk', () => {
     const map = createWorldMap('chunks', 40, 40);
     const key = getChunkKey(17, 17);

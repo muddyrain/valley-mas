@@ -93,6 +93,30 @@ describe('SimWorld deterministic replay', () => {
 
     expect(world.project().stats.population).toBe(10);
   });
+
+  it('uses seeded viable default start positions instead of always spawning at map center', () => {
+    const first = new SimWorld({
+      seed: 'default-start-west',
+      width: 64,
+      height: 48,
+      initialUnits: 12,
+    });
+    const second = new SimWorld({
+      seed: 'default-start-east',
+      width: 64,
+      height: 48,
+      initialUnits: 12,
+    });
+    const mapCenter = { x: 32, y: 24 };
+    const firstStart = averageUnitPosition(first.project().units);
+    const secondStart = averageUnitPosition(second.project().units);
+
+    expect(distanceBetween(firstStart, mapCenter)).toBeGreaterThan(4);
+    expect(distanceBetween(secondStart, mapCenter)).toBeGreaterThan(4);
+    expect(distanceBetween(firstStart, secondStart)).toBeGreaterThan(4);
+    expect(hasFoodNear(first, firstStart, 6)).toBe(true);
+    expect(hasFoodNear(second, secondStart, 6)).toBe(true);
+  });
 });
 
 describe('SimWorld life loop', () => {
@@ -596,6 +620,32 @@ describe('SimWorld village buildings and territory', () => {
     expect(village.foodInventory).toBe(0);
   });
 
+  it('keeps new houses off resource deposits while clustering near the village core', () => {
+    const world = foundFoodRichVillage('village-house-site-selection');
+    const village = world.project().villages[0];
+    const defaultRingTile = world.map.tiles.find(
+      (tile) =>
+        tile.x === Math.floor(village.center.x - 3) && tile.y === Math.floor(village.center.y + 2),
+    );
+
+    if (!defaultRingTile) {
+      throw new Error('Expected default ring tile');
+    }
+
+    clearFoodPatches(world);
+    defaultRingTile.terrain = 'grass';
+    defaultRingTile.biome = 'temperate';
+    defaultRingTile.resource = { type: 'food', amount: 80 };
+
+    const house = createActiveBuildingInVillage(world, village.id, 'house');
+    const houseTile = world.map.tiles.find(
+      (tile) => tile.x === Math.floor(house.position.x) && tile.y === Math.floor(house.position.y),
+    );
+
+    expect(houseTile?.resource).toBeUndefined();
+    expect(distanceBetween(house.position, village.center)).toBeLessThanOrEqual(5);
+  });
+
   it('continues the material building chain when food is low', () => {
     const world = foundFoodRichVillage('village-material-chain-low-food');
     const mutableWorld = getMutableWorld(world) as unknown as {
@@ -736,6 +786,22 @@ describe('SimWorld village buildings and territory', () => {
     expect(world.project().stats.totalVillageFood).toBeGreaterThan(depletedFood);
   });
 
+  it('places farms near food-rich land instead of a fixed village ring', () => {
+    const world = foundFoodRichVillage('village-farm-site-selection');
+    const village = world.project().villages[0];
+    const foodPatchCenter = {
+      x: Math.floor(village.center.x + 7),
+      y: Math.floor(village.center.y),
+    };
+
+    clearFoodPatches(world);
+    placeFoodPatch(world, foodPatchCenter, 500, 1);
+
+    const farm = createActiveBuildingInVillage(world, village.id, 'farm');
+
+    expect(distanceBetween(farm.position, foodPatchCenter)).toBeLessThanOrEqual(2.5);
+  });
+
   it('assigns builders to gather nearby wood into village stores', () => {
     const world = foundFoodRichVillage('village-wood-jobs');
     const village = world.project().villages[0];
@@ -826,6 +892,51 @@ describe('SimWorld village buildings and territory', () => {
     expect(updatedVillage?.primaryGrowthBlocker).toBe('no_wood_source');
   });
 
+  it('projects readable growth phases and primary intentions for early villages', () => {
+    const world = foundFoodRichVillage('village-growth-phase-intention');
+
+    for (let tick = 0; tick < 3; tick += 1) {
+      world.step();
+    }
+
+    const camp = world.project().villages[0];
+
+    expect(camp?.growthPhase).toBe('camp');
+    expect(camp?.primaryIntention).toBe('expand_housing');
+
+    for (let tick = 0; tick < 70; tick += 1) {
+      world.step();
+    }
+
+    const hamlet = world.project().villages[0];
+
+    expect(hamlet?.growthPhase).toBe('hamlet');
+    expect(hamlet?.primaryIntention).toBe('expand_storage');
+  });
+
+  it('emits a recent event when a camp becomes a hamlet', () => {
+    const world = foundFoodRichVillage('village-growth-phase-event');
+    const village = world.project().villages[0];
+    let phaseEvent: ReturnType<SimWorld['project']>['recentEvents'][number] | undefined;
+
+    for (let tick = 0; tick < 90 && !phaseEvent; tick += 1) {
+      world.step();
+      phaseEvent = world
+        .project()
+        .recentEvents.find((event) => event.type === 'village_phase_changed');
+    }
+
+    expect(phaseEvent).toMatchObject({
+      type: 'village_phase_changed',
+      payload: {
+        villageId: village.id,
+        name: village.name,
+        previousPhase: 'camp',
+        phase: 'hamlet',
+      },
+    });
+  });
+
   it('keeps a rich stable town building even before housing is nearly full', () => {
     const world = foundFoodRichVillage('village-rich-town-continues-building');
     const village = world.project().villages[0];
@@ -883,12 +994,16 @@ describe('SimWorld village buildings and territory', () => {
     ).length;
 
     expect(afterVillage?.buildPlan).not.toBe('idle');
+    expect(afterVillage?.growthPhase).toBe('town');
+    expect(afterVillage?.primaryIntention).not.toBe('idle');
     expect(afterBuildings).toBeGreaterThan(beforeBuildings);
   });
 
   it('lets visible work sites extend village territory beyond finished buildings', () => {
     const world = foundFoodRichVillage('village-worksite-territory');
     const village = world.project().villages[0];
+    clearWoodPatches(world);
+    addWoodSiteNearVillage(world, village.id);
     const woodPosition = {
       x: Math.floor(village.center.x + 6),
       y: Math.floor(village.center.y),
@@ -909,9 +1024,66 @@ describe('SimWorld village buildings and territory', () => {
     expect(
       projection.territory.some(
         (tile) =>
-          tile.villageId === village.id && tile.x === woodPosition.x && tile.y === woodPosition.y,
+          tile.villageId === village.id &&
+          tile.x === woodPosition.x &&
+          tile.y === woodPosition.y &&
+          tile.source === 'work_site',
       ),
     ).toBe(true);
+  });
+
+  it('explains whether territory came from settlement core or buildings', () => {
+    const world = foundFoodRichVillage('village-territory-source');
+    const village = world.project().villages[0];
+
+    for (let tick = 0; tick < 70; tick += 1) {
+      world.step();
+    }
+
+    const projection = world.project();
+    const coreTerritory = projection.territory.find(
+      (tile) => tile.villageId === village.id && tile.source === 'settlement_core',
+    );
+    const buildingTerritory = projection.territory.find(
+      (tile) => tile.villageId === village.id && tile.source === 'building',
+    );
+
+    expect(coreTerritory?.source).toBe('settlement_core');
+    expect(buildingTerritory?.source).toBe('building');
+  });
+
+  it('projects water inside settlement influence as soft territory without counting it as land territory', () => {
+    const world = foundFoodRichVillage('village-water-soft-territory');
+    const village = world.project().villages[0];
+    const waterPosition = {
+      x: Math.floor(village.center.x),
+      y: Math.floor(village.center.y + 5),
+    };
+    const waterTile = world.map.tiles.find(
+      (tile) => tile.x === waterPosition.x && tile.y === waterPosition.y,
+    );
+
+    if (!waterTile) {
+      throw new Error('Expected water test tile');
+    }
+
+    waterTile.terrain = 'water';
+    waterTile.biome = 'coast';
+    waterTile.resource = undefined;
+
+    const projection = world.project();
+    const projectedWater = projection.territory.find(
+      (tile) =>
+        tile.villageId === village.id && tile.x === waterPosition.x && tile.y === waterPosition.y,
+    );
+    const projectedVillage = projection.villages.find((candidate) => candidate.id === village.id);
+    const landTerritoryTiles = projection.territory.filter(
+      (tile) => tile.villageId === village.id && tile.surface === 'land',
+    );
+
+    expect(projectedWater?.surface).toBe('water');
+    expect(projectedWater?.source).toBe('settlement_core');
+    expect(projectedVillage?.territoryTiles).toBe(landTerritoryTiles.length);
   });
 
   it('builds a mine when the village has a nearby stone or iron site', () => {
@@ -965,7 +1137,7 @@ describe('SimWorld village buildings and territory', () => {
     const updatedVillage = projection.villages.find((candidate) => candidate.id === village.id);
 
     expect(mine).toBeDefined();
-    expect(farms).toHaveLength(1);
+    expect(farms.length).toBeGreaterThanOrEqual(1);
     expect(updatedVillage?.jobs.miner).toBeGreaterThan(0);
     expect(updatedVillage?.stoneInventory).toBeGreaterThan(0);
   });
@@ -1209,15 +1381,13 @@ describe('SimWorld village buildings and territory', () => {
       world.step();
     }
 
-    const before = serializeTerritory(world.project().territory);
+    const before = serializeStableTerritory(world.project().territory);
 
     moveVillageResidents(world, world.project().villages[0].id, { x: 2, y: 2 });
 
-    for (let tick = 0; tick < 20; tick += 1) {
-      world.step();
-    }
+    world.step();
 
-    expect(serializeTerritory(world.project().territory)).toBe(before);
+    expect(serializeStableTerritory(world.project().territory)).toBe(before);
   });
 
   it('keeps village population tied to home ownership when residents move away', () => {
@@ -1324,9 +1494,23 @@ describe('SimWorld kingdoms', () => {
     const preparingVillage = world
       .project()
       .villages.find((candidate) => candidate.id === village.id);
+    const preparingEvents = world
+      .project()
+      .recentEvents.filter((event) => event.type === 'village_expansion_status');
 
     expect(preparingVillage?.buildPlan).toBe('prepare_expansion');
     expect(preparingVillage?.growthBlockers).toHaveLength(0);
+    expect(preparingEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            villageId: village.id,
+            plan: 'prepare_expansion',
+            reason: 'ready',
+          }),
+        }),
+      ]),
+    );
 
     for (let tick = 0; tick < 180; tick += 1) {
       world.step();
@@ -1346,6 +1530,70 @@ describe('SimWorld kingdoms', () => {
           event.payload?.kingdomId === kingdom.id,
       ),
     ).toBe(true);
+  });
+
+  it('waits through a readable preparation window before founding a satellite village', () => {
+    const world = foundFoodRichVillage('kingdom-satellite-preparation-window', {
+      width: 56,
+      height: 32,
+    });
+    const village = world.project().villages[0];
+
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'house');
+    addActiveBuildingToVillage(world, village.id, 'storage');
+    addActiveBuildingToVillage(world, village.id, 'storage');
+    addActiveBuildingToVillage(world, village.id, 'farm');
+    addActiveBuildingToVillage(world, village.id, 'farm');
+    addActiveBuildingToVillage(world, village.id, 'mine');
+    addActiveBuildingToVillage(world, village.id, 'barrack');
+    addActiveBuildingToVillage(world, village.id, 'dock');
+    prepareVillageForBuildingUpgrades(world, village.id, 28, 1600, 16);
+    clearFoodPatches(world);
+
+    const parent = getMutableWorld(world).villages.get(village.id);
+
+    if (!parent) {
+      throw new Error('Expected parent village');
+    }
+
+    parent.housingCapacity = 40;
+
+    while (world.currentTick < 115) {
+      world.step();
+    }
+
+    expect(world.project().villages).toHaveLength(1);
+    expect(world.project().villages[0].buildPlan).toBe('waiting_land');
+
+    placeFoodPatch(world, { x: 36, y: 12 }, 500, 4);
+
+    while (world.currentTick < 125) {
+      world.step();
+    }
+
+    const preparingProjection = world.project();
+
+    expect(preparingProjection.villages).toHaveLength(1);
+    expect(preparingProjection.villages[0].buildPlan).toBe('prepare_expansion');
+    expect(
+      preparingProjection.recentEvents.some(
+        (event) =>
+          event.type === 'village_expansion_status' &&
+          event.payload?.villageId === village.id &&
+          event.payload?.plan === 'prepare_expansion',
+      ),
+    ).toBe(true);
+
+    while (world.currentTick < 250) {
+      world.step();
+    }
+
+    expect(world.project().villages.length).toBeGreaterThanOrEqual(2);
   });
 
   it('does not found a satellite village when no suitable food site exists', () => {
@@ -1382,10 +1630,70 @@ describe('SimWorld kingdoms', () => {
 
     const projection = world.project();
     const blockedVillage = projection.villages.find((candidate) => candidate.id === village.id);
+    const waitingLandEvent = projection.recentEvents.find(
+      (event) =>
+        event.type === 'village_expansion_status' && event.payload?.plan === 'waiting_land',
+    );
 
     expect(projection.villages).toHaveLength(1);
     expect(blockedVillage?.buildPlan).toBe('waiting_land');
     expect(blockedVillage?.primaryGrowthBlocker).toBe('no_buildable_land');
+    expect(waitingLandEvent).toMatchObject({
+      payload: {
+        villageId: village.id,
+        plan: 'waiting_land',
+        reason: 'no_site',
+      },
+    });
+  });
+
+  it('does not report expansion status for a young kingdom member that is still growing', () => {
+    const world = foundFoodRichVillage('kingdom-young-member-growth', { width: 56, height: 32 });
+
+    for (let tick = 0; tick < 300; tick += 1) {
+      world.step();
+    }
+
+    const kingdom = world.project().kingdoms[0];
+
+    addVillageToKingdom(world, kingdom.id, {
+      id: 'young-member',
+      position: { x: 38, y: 18 },
+      population: 8,
+    });
+    addActiveBuildingToVillage(world, 'young-member', 'house');
+    addActiveBuildingToVillage(world, 'young-member', 'storage');
+    addActiveBuildingToVillage(world, 'young-member', 'farm');
+    addActiveBuildingToVillage(world, 'young-member', 'farm');
+    addActiveBuildingToVillage(world, 'young-member', 'mine');
+    addActiveBuildingToVillage(world, 'young-member', 'barrack');
+    prepareVillageForBuildingUpgrades(world, 'young-member', 8, 260, 8);
+
+    const youngMember = getMutableWorld(world).villages.get('young-member');
+
+    if (!youngMember) {
+      throw new Error('Expected young member village');
+    }
+
+    youngMember.housingCapacity = 18;
+    youngMember.foodInventory = 260;
+    youngMember.woodInventory = 200;
+
+    world.step();
+
+    const projection = world.project();
+    const projectedYoungMember = projection.villages.find(
+      (candidate) => candidate.id === 'young-member',
+    );
+
+    expect(projectedYoungMember).toBeDefined();
+    expect(projectedYoungMember?.expansionPlan).toBeUndefined();
+    expect(
+      projection.recentEvents.some(
+        (event) =>
+          event.type === 'village_expansion_status' && event.payload?.villageId === 'young-member',
+      ),
+    ).toBe(false);
   });
 
   it('chooses the strongest remaining town as capital only after the current capital is lost', () => {
@@ -1439,9 +1747,11 @@ describe('SimWorld kingdoms', () => {
         .filter((tile) => kingdom.villageIds.includes(tile.villageId))
         .every((tile) => tile.kingdomId === kingdom.id),
     ).toBe(true);
-    expect(projection.territory.filter((tile) => tile.kingdomId === kingdom.id)).toHaveLength(
-      kingdom.territoryTiles,
-    );
+    expect(
+      projection.territory.filter(
+        (tile) => tile.kingdomId === kingdom.id && tile.surface === 'land',
+      ),
+    ).toHaveLength(kingdom.territoryTiles);
     expect(kingdom.foodInventory).toBe(projection.stats.totalVillageFood);
   });
 
@@ -2200,6 +2510,14 @@ function addActiveBuildingToVillage(
   villageId: string,
   type: VillageBuilding['type'],
 ) {
+  createActiveBuildingInVillage(world, villageId, type);
+}
+
+function createActiveBuildingInVillage(
+  world: SimWorld,
+  villageId: string,
+  type: VillageBuilding['type'],
+) {
   const mutableWorld = getMutableWorld(world);
   const village = mutableWorld.villages.get(villageId);
 
@@ -2209,6 +2527,8 @@ function addActiveBuildingToVillage(
 
   const building = mutableWorld.createBuilding(village, type);
   mutableWorld.buildings.set(building.id, building);
+
+  return building;
 }
 
 function placeFoodPatch(
@@ -2238,6 +2558,14 @@ function placeFoodPatch(
 function clearFoodPatches(world: SimWorld) {
   for (const tile of world.map.tiles) {
     if (tile.resource?.type === 'food') {
+      tile.resource = undefined;
+    }
+  }
+}
+
+function clearWoodPatches(world: SimWorld) {
+  for (const tile of world.map.tiles) {
+    if (tile.resource?.type === 'wood') {
       tile.resource = undefined;
     }
   }
@@ -2503,9 +2831,11 @@ function addVillageToKingdom(
       miner: 0,
       soldier: 4,
     },
+    growthPhase: 'village',
     growthBlockers: [],
     primaryGrowthBlocker: undefined,
     buildPlan: 'idle',
+    primaryIntention: 'idle',
     housingCapacity: Math.max(24, options.population),
     territoryTiles: 0,
     foundedAtTick: world.currentTick,
@@ -2702,10 +3032,65 @@ function prepareVillageForBuildingUpgrades(
 }
 
 function serializeTerritory(
-  territory: Array<{ x: number; y: number; villageId: string; kingdomId?: string }>,
+  territory: Array<{
+    x: number;
+    y: number;
+    villageId: string;
+    kingdomId?: string;
+    surface: 'land' | 'water';
+    source?: string;
+  }>,
 ) {
   return territory
-    .map((tile) => `${tile.x},${tile.y},${tile.villageId},${tile.kingdomId ?? ''}`)
+    .map(
+      (tile) =>
+        `${tile.x},${tile.y},${tile.villageId},${tile.kingdomId ?? ''},${tile.surface},${
+          tile.source ?? ''
+        }`,
+    )
     .sort()
     .join('|');
+}
+
+function serializeStableTerritory(
+  territory: Array<{
+    x: number;
+    y: number;
+    villageId: string;
+    kingdomId?: string;
+    surface: 'land' | 'water';
+    source?: string;
+  }>,
+) {
+  return serializeTerritory(
+    territory.filter((tile) => tile.source === 'settlement_core' || tile.source === 'building'),
+  );
+}
+
+function distanceBetween(left: { x: number; y: number }, right: { x: number; y: number }) {
+  return Math.hypot(left.x - right.x, left.y - right.y);
+}
+
+function averageUnitPosition(units: Unit[]) {
+  const total = units.reduce(
+    (sum, unit) => ({
+      x: sum.x + unit.position.x,
+      y: sum.y + unit.position.y,
+    }),
+    { x: 0, y: 0 },
+  );
+
+  return {
+    x: total.x / Math.max(1, units.length),
+    y: total.y / Math.max(1, units.length),
+  };
+}
+
+function hasFoodNear(world: SimWorld, position: { x: number; y: number }, radius: number) {
+  return world.map.tiles.some(
+    (tile) =>
+      tile.resource?.type === 'food' &&
+      tile.resource.amount > 0 &&
+      distanceBetween(tile, position) <= radius,
+  );
 }

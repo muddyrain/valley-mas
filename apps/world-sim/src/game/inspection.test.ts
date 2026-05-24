@@ -57,6 +57,9 @@ describe('world inspection helpers', () => {
       '成长：小镇，正在向更高等级发展',
     );
     expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '阶段：城镇',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
       '首都：是',
     );
     expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
@@ -76,6 +79,42 @@ describe('world inspection helpers', () => {
     );
     expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
       '建设计划：扩建民居',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '主要意图：扩建民居',
+    );
+    projection.villages[0].buildPlan = 'prepare_expansion';
+    projection.villages[0].primaryIntention = 'prepare_expansion';
+    projection.villages[0].expansionPlan = 'prepare_expansion';
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '扩张原因：已具备拓荒条件',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '边疆提示：正在准备分村，领土边缘会出现扩张准备区',
+    );
+    projection.villages[0].buildPlan = 'waiting_land';
+    projection.villages[0].primaryIntention = 'waiting_land';
+    projection.villages[0].expansionPlan = 'waiting_land';
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '扩张原因：缺少合适新址',
+    );
+    projection.villages[1].buildPlan = 'waiting_population_pressure';
+    projection.villages[1].primaryIntention = 'waiting_population_pressure';
+    projection.villages[1].expansionPlan = undefined;
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-2' })).toContain(
+      '建设计划：等待人口增长',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-2' })).toContain(
+      '主要意图：等待人口增长',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-2' })).not.toContain(
+      '扩张原因：人口或住房压力不足',
+    );
+    projection.villages[0].buildPlan = 'waiting_population_pressure';
+    projection.villages[0].primaryIntention = 'waiting_population_pressure';
+    projection.villages[0].expansionPlan = 'waiting_population_pressure';
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '建设计划：等待扩张压力',
     );
     expect(buildInspectionLines(projection, { type: 'army', id: 'army-1' })).toContain('军队 1');
     expect(buildInspectionLines(projection, { type: 'army', id: 'army-1' })).toContain(
@@ -101,6 +140,9 @@ describe('world inspection helpers', () => {
     );
     expect(buildInspectionLines(projection, { type: 'tile', x: 1, y: 1 })).toContain('地块 1,1');
     expect(buildInspectionLines(projection, { type: 'tile', x: 1, y: 1 })).toContain('地形：草地');
+    expect(buildInspectionLines(projection, { type: 'tile', x: 18, y: 18 })).toContain(
+      '领土来源：聚落核心',
+    );
     expect(buildInspectionLines(projection, { type: 'kingdom', id: 'kingdom-1' })).toContain(
       '王国 1',
     );
@@ -154,6 +196,12 @@ describe('world inspection helpers', () => {
     expect(
       buildMapLabels(highLevelProjection).some((label) => label.text === '河湾村 · Lv.4 ★'),
     ).toBe(true);
+
+    projection.villages[0].expansionPlan = 'prepare_expansion';
+
+    expect(
+      buildMapLabels(projection).some((label) => label.text === '拓荒 · 首都 · 晨林村 · Lv.3'),
+    ).toBe(true);
   });
 
   it('builds readable growth and building event summaries', () => {
@@ -166,6 +214,20 @@ describe('world inspection helpers', () => {
         payload: { villageId: 'village-1', name: '晨林村', level: 4, previousLevel: 3 },
       }),
     ).toBe('晨林村成长为 Lv.4 城镇');
+    expect(
+      formatEventSummary({
+        id: 'event-phase',
+        tick: 20,
+        type: 'village_phase_changed',
+        message: 'village-1 entered hamlet phase',
+        payload: {
+          villageId: 'village-1',
+          name: '晨林村',
+          previousPhase: 'camp',
+          phase: 'hamlet',
+        },
+      }),
+    ).toBe('晨林村形成村落');
     expect(
       formatEventSummary({
         id: 'event-upgrade',
@@ -263,6 +325,34 @@ describe('world inspection helpers', () => {
         },
       }),
     ).toBe('王国 1 占领村庄 2');
+    expect(
+      formatEventSummary({
+        id: 'event-expansion-ready',
+        tick: 36,
+        type: 'village_expansion_status',
+        message: 'village-1 expansion status prepare_expansion',
+        payload: {
+          villageId: 'village-1',
+          name: '晨林村',
+          plan: 'prepare_expansion',
+          reason: 'ready',
+        },
+      }),
+    ).toBe('晨林村正在准备拓荒');
+    expect(
+      formatEventSummary({
+        id: 'event-expansion-land',
+        tick: 37,
+        type: 'village_expansion_status',
+        message: 'village-1 expansion status waiting_land',
+        payload: {
+          villageId: 'village-1',
+          name: '晨林村',
+          plan: 'waiting_land',
+          reason: 'no_site',
+        },
+      }),
+    ).toBe('晨林村缺少合适新址');
   });
 
   it('marks selected village and kingdom territory tiles', () => {
@@ -282,15 +372,47 @@ describe('world inspection helpers', () => {
 
   it('builds territory borders only around exposed edges', () => {
     const projection = createProjection();
-    const segments = buildTerritoryBorderSegments(projection, { type: 'kingdom', id: 'kingdom-1' });
+    const segments = buildTerritoryBorderSegments(projection, { type: 'none' });
 
     expect(segments).toHaveLength(6);
+    expect(segments.every((segment) => segment.alpha === 0.42 && segment.width === 1)).toBe(true);
     expect(
       segments.some(
         (segment) =>
           segment.x1 === 19 && segment.y1 === 18 && segment.x2 === 19 && segment.y2 === 19,
       ),
     ).toBe(false);
+  });
+
+  it('does not draw an internal border between land and water territory for the same owner', () => {
+    const projection = createProjection();
+
+    projection.territory.push({
+      x: 20,
+      y: 18,
+      villageId: 'village-1',
+      kingdomId: 'kingdom-1',
+      surface: 'water',
+      source: 'settlement_core',
+    });
+
+    const segments = buildTerritoryBorderSegments(projection, { type: 'none' });
+
+    expect(segments.some((segment) => segment.alpha === 0.28 && segment.width === 1)).toBe(true);
+    expect(
+      segments.some(
+        (segment) =>
+          segment.x1 === 20 && segment.y1 === 18 && segment.x2 === 20 && segment.y2 === 19,
+      ),
+    ).toBe(false);
+  });
+
+  it('keeps selected territory borders prominent', () => {
+    const projection = createProjection();
+    const segments = buildTerritoryBorderSegments(projection, { type: 'village', id: 'village-1' });
+
+    expect(segments.every((segment) => segment.selected)).toBe(true);
+    expect(segments.every((segment) => segment.alpha === 0.95 && segment.width === 2)).toBe(true);
   });
 
   it('filters recent events to the selected story context', () => {
@@ -397,9 +519,11 @@ function createProjection(): WorldProjection {
           miner: 1,
           soldier: 3,
         },
+        growthPhase: 'town',
         growthBlockers: ['housing_pressure', 'missing_wood'],
         primaryGrowthBlocker: 'missing_wood',
         buildPlan: 'expand_housing',
+        primaryIntention: 'expand_housing',
         housingCapacity: 30,
         territoryTiles: 12,
         foundedAtTick: 2,
@@ -423,9 +547,11 @@ function createProjection(): WorldProjection {
           miner: 0,
           soldier: 0,
         },
+        growthPhase: 'village',
         growthBlockers: [],
         primaryGrowthBlocker: undefined,
         buildPlan: 'idle',
+        primaryIntention: 'idle',
         housingCapacity: 18,
         territoryTiles: 8,
         foundedAtTick: 6,
@@ -501,8 +627,22 @@ function createProjection(): WorldProjection {
     ],
     battleMarkers: [],
     territory: [
-      { x: 18, y: 18, villageId: 'village-1', kingdomId: 'kingdom-1' },
-      { x: 19, y: 18, villageId: 'village-1', kingdomId: 'kingdom-1' },
+      {
+        x: 18,
+        y: 18,
+        villageId: 'village-1',
+        kingdomId: 'kingdom-1',
+        surface: 'land',
+        source: 'settlement_core',
+      },
+      {
+        x: 19,
+        y: 18,
+        villageId: 'village-1',
+        kingdomId: 'kingdom-1',
+        surface: 'land',
+        source: 'building',
+      },
     ],
     workSites: [],
     recentEvents: [

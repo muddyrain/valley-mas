@@ -14,6 +14,7 @@ export type UnitRace = 'human' | 'orc' | 'elf' | 'dwarf';
 export type UnitGender = 'male' | 'female';
 export type UnitIntent = 'idle' | 'seek_food' | 'eat' | 'wander' | 'dead';
 export type VillageStatus = 'camp' | 'stable' | 'declining';
+export type VillageGrowthPhase = 'camp' | 'hamlet' | 'village' | 'town' | 'frontier';
 export type VillageGrowthBlocker =
   | 'housing_pressure'
   | 'missing_wood'
@@ -96,9 +97,12 @@ export type Village = {
   stoneInventory: number;
   ironInventory: number;
   jobs: VillageJobs;
+  growthPhase: VillageGrowthPhase;
   growthBlockers: VillageGrowthBlocker[];
   primaryGrowthBlocker?: VillageGrowthBlocker;
   buildPlan: VillageBuildPlan;
+  primaryIntention: VillageBuildPlan;
+  expansionPlan?: VillageBuildPlan;
   housingCapacity: number;
   territoryTiles: number;
   foundedAtTick: number;
@@ -166,11 +170,15 @@ export type BattleMarker = {
   count: number;
 };
 
+export type TerritorySource = 'settlement_core' | 'building' | 'work_site' | 'frontier';
+
 export type TerritoryTile = {
   x: number;
   y: number;
   villageId: string;
   kingdomId?: string;
+  surface: 'land' | 'water';
+  source: TerritorySource;
 };
 
 export type VillageWorkSite = {
@@ -289,6 +297,8 @@ export type SimEvent = {
     | 'pause_changed'
     | 'village_founded'
     | 'village_leveled_up'
+    | 'village_phase_changed'
+    | 'village_expansion_status'
     | 'village_declining'
     | 'village_abandoned'
     | 'building_built'

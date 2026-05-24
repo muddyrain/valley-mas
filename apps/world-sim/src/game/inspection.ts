@@ -69,6 +69,14 @@ const VILLAGE_STATUS_LABELS: Record<string, string> = {
   declining: '衰退',
 };
 
+const VILLAGE_GROWTH_PHASE_LABELS: Record<string, string> = {
+  camp: '营地',
+  hamlet: '村落',
+  village: '村庄',
+  town: '城镇',
+  frontier: '扩张前线',
+};
+
 const VILLAGE_GROWTH_BLOCKER_LABELS: Record<string, string> = {
   housing_pressure: '住房紧张',
   missing_wood: '缺少木材',
@@ -86,10 +94,24 @@ const VILLAGE_BUILD_PLAN_LABELS: Record<string, string> = {
   expand_military: '建设兵营',
   expand_dock: '建设码头',
   prepare_expansion: '准备分村',
-  waiting_population_pressure: '等待人口压力',
+  waiting_population_pressure: '等待人口增长',
   waiting_resources: '等待资源',
   waiting_land: '等待土地',
   idle: '暂无扩建',
+};
+
+const TERRITORY_SOURCE_LABELS: Record<string, string> = {
+  settlement_core: '聚落核心',
+  building: '建筑影响',
+  work_site: '施工/采集活动',
+  frontier: '扩张准备',
+};
+
+const EXPANSION_REASON_LABELS: Record<string, string> = {
+  prepare_expansion: '已具备拓荒条件',
+  waiting_land: '缺少合适新址',
+  waiting_resources: '缺少拓荒食物或木材',
+  waiting_population_pressure: '人口或住房压力不足',
 };
 
 const KINGDOM_STATUS_LABELS: Record<string, string> = {
@@ -146,6 +168,8 @@ export type TerritoryBorderSegment = {
   y2: number;
   color: number;
   selected: boolean;
+  alpha: number;
+  width: number;
 };
 
 const GROWTH_LABELS: Record<number, string> = {
@@ -342,9 +366,9 @@ export function buildMapLabels(projection: WorldProjection): MapLabel[] {
 
     return {
       id: `village:${village.id}`,
-      text: `${isCapital ? '首都 · ' : ''}${village.name} · Lv.${village.level}${
-        village.level >= 4 ? ' ★' : ''
-      }`,
+      text: `${village.expansionPlan === 'prepare_expansion' ? '拓荒 · ' : ''}${
+        isCapital ? '首都 · ' : ''
+      }${village.name} · Lv.${village.level}${village.level >= 4 ? ' ★' : ''}`,
       position: {
         x: Math.round(village.center.x * 10) / 10,
         y: Math.round((village.center.y - 1.6) * 10) / 10,
@@ -414,6 +438,35 @@ export function buildTerritoryBorderSegments(
 }
 
 export function formatEventSummary(event: SimEvent) {
+  if (event.type === 'village_expansion_status') {
+    const name = typeof event.payload?.name === 'string' ? event.payload.name : '村庄';
+    const plan = typeof event.payload?.plan === 'string' ? event.payload.plan : undefined;
+    const labels: Record<string, string> = {
+      prepare_expansion: '正在准备拓荒',
+      waiting_land: '缺少合适新址',
+      waiting_resources: '缺少拓荒资源',
+      waiting_population_pressure: '等待更多人口压力',
+    };
+    const statusLabel = plan ? labels[plan] : undefined;
+
+    return `${name}${statusLabel || '正在评估扩张'}`;
+  }
+
+  if (event.type === 'village_phase_changed') {
+    const name = typeof event.payload?.name === 'string' ? event.payload.name : '村庄';
+    const phase = typeof event.payload?.phase === 'string' ? event.payload.phase : undefined;
+    const transitionLabels: Record<string, string> = {
+      camp: '重新成为营地',
+      hamlet: '形成村落',
+      village: '发展为村庄',
+      town: '发展为城镇',
+      frontier: '进入扩张前线',
+    };
+    const transitionLabel = phase ? transitionLabels[phase] : undefined;
+
+    return `${name}${transitionLabel || '正在变化'}`;
+  }
+
   if (event.type === 'village_leveled_up') {
     const name = typeof event.payload?.name === 'string' ? event.payload.name : '村庄';
     const level = typeof event.payload?.level === 'number' ? event.payload.level : undefined;
@@ -527,6 +580,9 @@ function buildTileLines(projection: WorldProjection, x: number, y: number) {
     : '无';
   const villageId = village ? `村庄 ${shortId(village.id)}` : '无';
   const kingdomId = kingdom ? `王国 ${shortId(kingdom.id)}` : '无';
+  const territorySource = territory
+    ? labelFromMap(TERRITORY_SOURCE_LABELS, territory.source)
+    : '无';
 
   return [
     `地块 ${x},${y}`,
@@ -535,6 +591,7 @@ function buildTileLines(projection: WorldProjection, x: number, y: number) {
     `资源：${resource}`,
     `村庄：${villageId}`,
     `王国：${kingdomId}`,
+    `领土来源：${territorySource}`,
   ];
 }
 
@@ -579,6 +636,7 @@ function buildVillageLines(projection: WorldProjection, id: string) {
     `成长：${growthLabel(village.level)}${
       village.level < 5 ? '，正在向更高等级发展' : '，已达到当前成长上限'
     }`,
+    `阶段：${labelFromMap(VILLAGE_GROWTH_PHASE_LABELS, village.growthPhase)}`,
     `种族：${labelFromMap(RACE_LABELS, village.race)}`,
     `状态：${labelFromMap(VILLAGE_STATUS_LABELS, village.status)}`,
     `所属王国：${kingdom ? `王国 ${shortId(kingdom.id)}` : '无'}`,
@@ -604,12 +662,48 @@ function buildVillageLines(projection: WorldProjection, id: string) {
         ? labelFromMap(VILLAGE_GROWTH_BLOCKER_LABELS, village.primaryGrowthBlocker)
         : '无'
     }`,
-    `建设计划：${labelFromMap(VILLAGE_BUILD_PLAN_LABELS, village.buildPlan)}`,
+    `建设计划：${villagePlanLabel(village.buildPlan, village.expansionPlan)}`,
+    `主要意图：${villagePlanLabel(village.primaryIntention, village.expansionPlan)}`,
+    ...buildExpansionReasonLines(village.expansionPlan),
+    ...buildExpansionHintLines(village.expansionPlan),
     `建筑：${buildings.length}`,
     `领土：${village.territoryTiles}`,
     `军队：${activeArmies.length}`,
     `中心：${formatPosition(village.center)}`,
   ];
+}
+
+function buildExpansionReasonLines(plan: string | undefined) {
+  if (!plan) {
+    return [];
+  }
+
+  const reason = EXPANSION_REASON_LABELS[plan];
+
+  return reason ? [`扩张原因：${reason}`] : [];
+}
+
+function buildExpansionHintLines(plan: string | undefined) {
+  switch (plan) {
+    case 'prepare_expansion':
+      return ['边疆提示：正在准备分村，领土边缘会出现扩张准备区'];
+    case 'waiting_land':
+      return ['边疆提示：正在寻找食物充足且距离合适的新址'];
+    case 'waiting_resources':
+      return ['边疆提示：正在等待拓荒所需食物和木材'];
+    case 'waiting_population_pressure':
+      return ['边疆提示：正在等待更多居民或住房压力'];
+    default:
+      return [];
+  }
+}
+
+function villagePlanLabel(plan: string, expansionPlan?: string) {
+  if (plan === 'waiting_population_pressure' && expansionPlan === 'waiting_population_pressure') {
+    return '等待扩张压力';
+  }
+
+  return labelFromMap(VILLAGE_BUILD_PLAN_LABELS, plan);
 }
 
 function buildKingdomLines(projection: WorldProjection, id: string) {
@@ -871,15 +965,36 @@ function makeBorderSegment(
     return undefined;
   }
 
+  const alpha = selected ? 0.95 : tile.surface === 'water' ? 0.28 : 0.42;
+  const width = selected ? 2 : 1;
+
   switch (edge) {
     case 'top':
-      return { x1: tile.x, y1: tile.y, x2: tile.x + 1, y2: tile.y, color, selected };
+      return { x1: tile.x, y1: tile.y, x2: tile.x + 1, y2: tile.y, color, selected, alpha, width };
     case 'right':
-      return { x1: tile.x + 1, y1: tile.y, x2: tile.x + 1, y2: tile.y + 1, color, selected };
+      return {
+        x1: tile.x + 1,
+        y1: tile.y,
+        x2: tile.x + 1,
+        y2: tile.y + 1,
+        color,
+        selected,
+        alpha,
+        width,
+      };
     case 'bottom':
-      return { x1: tile.x, y1: tile.y + 1, x2: tile.x + 1, y2: tile.y + 1, color, selected };
+      return {
+        x1: tile.x,
+        y1: tile.y + 1,
+        x2: tile.x + 1,
+        y2: tile.y + 1,
+        color,
+        selected,
+        alpha,
+        width,
+      };
     case 'left':
-      return { x1: tile.x, y1: tile.y, x2: tile.x, y2: tile.y + 1, color, selected };
+      return { x1: tile.x, y1: tile.y, x2: tile.x, y2: tile.y + 1, color, selected, alpha, width };
   }
 }
 

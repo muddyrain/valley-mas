@@ -1,3 +1,31 @@
+export type {
+  BuildingSiteObservation,
+  BuildingSiteObservationOptions,
+  BuildingSiteObservationReport,
+  BuildingSiteObservationRun,
+} from './buildingSiteObservation';
+export {
+  formatBuildingSiteObservationReport,
+  observeBuildingSiteReport,
+} from './buildingSiteObservation';
+export type {
+  GrowthObservationOptions,
+  GrowthObservationReport,
+  GrowthObservationReportOptions,
+  GrowthObservationRun,
+  GrowthObservationSnapshot,
+  SatelliteObservationOptions,
+  SatelliteObservationReport,
+  SatelliteObservationRun,
+} from './growthObservation';
+export {
+  formatGrowthObservation,
+  formatGrowthObservationReport,
+  formatSatelliteObservationReport,
+  observeEarlySettlement,
+  observeEarlySettlementReport,
+  observeSatelliteSettlementReport,
+} from './growthObservation';
 export { createWorldMap, DEFAULT_WORLD_HEIGHT, DEFAULT_WORLD_WIDTH } from './map';
 export { FIXED_TICK_MS, SimLoop } from './SimLoop';
 export { SimWorld } from './SimWorld';
@@ -24,12 +52,14 @@ export type {
   SimStepPhaseTimings,
   SimWorldOptions,
   TerrainType,
+  TerritorySource,
   Unit,
   UnitGender,
   UnitIntent,
   UnitRace,
   VillageBuildPlan,
   VillageGrowthBlocker,
+  VillageGrowthPhase,
   VillageJobs,
   VillageWorkSite,
   WorldProjection,

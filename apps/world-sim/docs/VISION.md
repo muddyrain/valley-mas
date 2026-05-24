@@ -48,18 +48,23 @@ The next structural pass should make the early-to-mid civilization loop read lik
 6. **Kingdom pressure**: multiple villages aggregate into a kingdom, create colored ownership, generate frontier/resource pressure, and eventually send grouped armies.
 7. **Collapse memory**: starvation, lightning, capture, or depopulation leaves abandoned buildings and ruins so the map remembers what happened.
 
-This rework starts with the first three stages because they decide whether the world feels alive before the player sees kingdoms. The first implementation target is not deeper UI or more commands; it is a more legible village-growth spine: every expansion, stall, and territorial spread should have a visible cause and an inspection/event explanation.
+This rework starts with the first three stages because they decide whether the world feels alive before the player sees kingdoms. The first implementation target is not deeper UI or more commands; it is a more legible village-growth spine: every expansion, stall, and territorial spread should have a visible cause and an inspection/event explanation. Expansion explanations should only appear once a settlement is actually mature enough to be judged as a frontier parent; ordinary young villages should read as growing, not as failed colonizers.
+
+The first PR-12F slice now gives each settlement an explicit projected growth phase (`camp`, `hamlet`, `village`, `town`, or `frontier`) and one projected primary intention. The phase explains what the settlement has become; the intention explains what it is trying to do next. This keeps early civilization readable without giving the player RTS-style control.
+
+Phase changes now enter the recent-event story, and a deterministic early-settlement observation report records phase, intention, blocker, stores, construction, and territory over time. Balance adjustments to the early gates should be made from this observable story rather than by changing thresholds blindly.
 
 ## Current v2 Scope
 
 The first v2 slice deliberately avoids full WorldBox parity. It establishes the foundation:
 
 - Pure simulation truth outside Phaser.
-- Deterministic seed and replay behavior.
+- Deterministic seed and replay behavior. The interactive demo starts a fresh seed when no URL seed is supplied, while `?seed=...` keeps a world reproducible for debugging and comparison.
 - Tile, chunk, biome, and resource data.
 - Units with hunger, age, health, death, birth, movement, stable home village membership, and simple needs.
 - Villages that emerge from local population and food pressure, with food and material stores, housing, and decline state.
 - Village buildings that turn surplus into housing, storage, farm production, mine access, military capacity, shore access, and settlement influence.
+- Autonomous building placement that reads as local choice: homes cluster without covering resources, farms follow useful land, mines follow ore and hills, military buildings sit toward the settlement edge, and docks follow shorelines.
 - Readable settlement growth signals: visible resource depletion, construction work sites, growth blockers, earlier house pressure, and territory spread from lived settlement activity.
 - Kingdoms that emerge from strong villages and aggregate capital, members, population, buildings, territory, food, and material stores.
 - Diplomacy pressure that turns border friction, resource shortage, and race tendencies into observable declaration causes.
