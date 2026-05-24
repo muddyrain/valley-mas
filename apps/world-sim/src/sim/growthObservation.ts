@@ -60,8 +60,13 @@ export type SatelliteObservationRun = {
   firstExpansionStatusTick?: number;
   firstExpansionStatusPlan?: VillageBuildPlan;
   firstPrepareExpansionTick?: number;
+  firstFrontierLabelTick?: number;
+  firstExpansionReasonTick?: number;
+  firstExpansionHintTick?: number;
   satelliteFoundedTick?: number;
   expansionLeadTicks?: number;
+  frontierLabelLeadTicks?: number;
+  expansionHintLeadTicks?: number;
   villageCount: number;
   parentPopulationAfter: number;
   parentHousingCapacity: number;
@@ -234,6 +239,11 @@ function formatSatelliteObservationRun(run: SatelliteObservationRun) {
     `firstExpansionPlan=${run.firstExpansionStatusPlan ?? '-'}`,
     `firstPrepareExpansion=${formatTick(run.firstPrepareExpansionTick)}`,
     `expansionLead=${formatTick(run.expansionLeadTicks)}`,
+    `frontierLabel=${formatTick(run.firstFrontierLabelTick)}`,
+    `reason=${formatTick(run.firstExpansionReasonTick)}`,
+    `hint=${formatTick(run.firstExpansionHintTick)}`,
+    `labelLead=${formatTick(run.frontierLabelLeadTicks)}`,
+    `hintLead=${formatTick(run.expansionHintLeadTicks)}`,
     `satelliteFounded=${formatTick(run.satelliteFoundedTick)}`,
     `villages=${run.villageCount}`,
     `parentPopulation=${run.parentPopulationAfter}`,
@@ -250,6 +260,9 @@ function observeSatelliteSettlementRun(seed: string, ticks: number): SatelliteOb
   let firstExpansionStatusTick: number | undefined;
   let firstExpansionStatusPlan: VillageBuildPlan | undefined;
   let firstPrepareExpansionTick: number | undefined;
+  let firstFrontierLabelTick: number | undefined;
+  let firstExpansionReasonTick: number | undefined;
+  let firstExpansionHintTick: number | undefined;
   let satelliteFoundedTick: number | undefined;
   let childVillageId: string | undefined;
 
@@ -263,6 +276,18 @@ function observeSatelliteSettlementRun(seed: string, ticks: number): SatelliteOb
 
     if (!firstPrepareExpansionTick && parent?.expansionPlan === 'prepare_expansion') {
       firstPrepareExpansionTick = projection.tick;
+    }
+
+    if (!firstFrontierLabelTick && parent && hasFrontierLabelSignal(parent)) {
+      firstFrontierLabelTick = projection.tick;
+    }
+
+    if (!firstExpansionReasonTick && parent && hasExpansionReasonSignal(parent.expansionPlan)) {
+      firstExpansionReasonTick = projection.tick;
+    }
+
+    if (!firstExpansionHintTick && parent && hasExpansionHintSignal(parent.expansionPlan)) {
+      firstExpansionHintTick = projection.tick;
     }
 
     const expansionStatus = projection.recentEvents.find(
@@ -300,10 +325,21 @@ function observeSatelliteSettlementRun(seed: string, ticks: number): SatelliteOb
     firstExpansionStatusTick,
     firstExpansionStatusPlan,
     firstPrepareExpansionTick,
+    firstFrontierLabelTick,
+    firstExpansionReasonTick,
+    firstExpansionHintTick,
     satelliteFoundedTick,
     expansionLeadTicks:
       firstPrepareExpansionTick !== undefined && satelliteFoundedTick !== undefined
         ? satelliteFoundedTick - firstPrepareExpansionTick
+        : undefined,
+    frontierLabelLeadTicks:
+      firstFrontierLabelTick !== undefined && satelliteFoundedTick !== undefined
+        ? satelliteFoundedTick - firstFrontierLabelTick
+        : undefined,
+    expansionHintLeadTicks:
+      firstExpansionHintTick !== undefined && satelliteFoundedTick !== undefined
+        ? satelliteFoundedTick - firstExpansionHintTick
         : undefined,
     villageCount: finalProjection.villages.length,
     parentPopulationAfter: parent?.population ?? 0,
@@ -313,6 +349,28 @@ function observeSatelliteSettlementRun(seed: string, ticks: number): SatelliteOb
     childPopulation: child?.population,
     childHousingCapacity: child?.housingCapacity,
   };
+}
+
+function hasFrontierLabelSignal(village: Village) {
+  return village.expansionPlan === 'prepare_expansion';
+}
+
+function hasExpansionReasonSignal(plan: VillageBuildPlan | undefined) {
+  return (
+    plan === 'prepare_expansion' ||
+    plan === 'waiting_land' ||
+    plan === 'waiting_resources' ||
+    plan === 'waiting_population_pressure'
+  );
+}
+
+function hasExpansionHintSignal(plan: VillageBuildPlan | undefined) {
+  return (
+    plan === 'prepare_expansion' ||
+    plan === 'waiting_land' ||
+    plan === 'waiting_resources' ||
+    plan === 'waiting_population_pressure'
+  );
 }
 
 function summarizePhaseFirstTicks(snapshots: GrowthObservationSnapshot[]) {

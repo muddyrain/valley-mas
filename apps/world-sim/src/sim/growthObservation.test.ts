@@ -110,8 +110,15 @@ describe('early settlement growth observation harness', () => {
       expect(run.firstPrepareExpansionTick).toBeGreaterThanOrEqual(
         run.firstExpansionStatusTick ?? 0,
       );
+      expect(run.firstFrontierLabelTick).toBeGreaterThanOrEqual(run.firstPrepareExpansionTick ?? 0);
+      expect(run.firstExpansionReasonTick).toBeGreaterThanOrEqual(
+        run.firstPrepareExpansionTick ?? 0,
+      );
+      expect(run.firstExpansionHintTick).toBeGreaterThanOrEqual(run.firstPrepareExpansionTick ?? 0);
       expect(run.satelliteFoundedTick).toBeGreaterThan(run.firstExpansionStatusTick ?? 0);
       expect(run.expansionLeadTicks).toBeGreaterThanOrEqual(60);
+      expect(run.frontierLabelLeadTicks).toBeGreaterThanOrEqual(60);
+      expect(run.expansionHintLeadTicks).toBeGreaterThanOrEqual(60);
       expect(run.villageCount).toBeGreaterThanOrEqual(2);
       expect(run.parentPopulationAfter).toBeGreaterThan(0);
       expect(run.childPopulation).toBe(8);
@@ -123,6 +130,11 @@ describe('early settlement growth observation harness', () => {
 
     expect(formatted).toContain('firstExpansionStatus=');
     expect(formatted).toContain('expansionLead=');
+    expect(formatted).toContain('frontierLabel=');
+    expect(formatted).toContain('reason=');
+    expect(formatted).toContain('hint=');
+    expect(formatted).toContain('labelLead=');
+    expect(formatted).toContain('hintLead=');
     expect(formatted).toContain('satelliteFounded=');
     expect(formatted).toContain('childPopulation=');
   });
