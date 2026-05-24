@@ -117,6 +117,40 @@ describe('SimWorld deterministic replay', () => {
     expect(hasFoodNear(first, firstStart, 6)).toBe(true);
     expect(hasFoodNear(second, secondStart, 6)).toBe(true);
   });
+
+  it('spreads larger default populations across distant food-supported start clusters', () => {
+    const world = new SimWorld({
+      seed: 'default-start-multi-cluster',
+      width: 128,
+      height: 96,
+      initialUnits: 36,
+    });
+    const units = world.project().units;
+    const clusters = groupPositionsByDistance(
+      units.map((unit) => unit.position),
+      8,
+    );
+
+    expect(clusters.length).toBeGreaterThanOrEqual(2);
+    expect(maxDistanceBetween(clusters)).toBeGreaterThan(60);
+    expect(clusters.some((cluster) => hasFoodNear(world, cluster, 8))).toBe(true);
+    expect(clusters.every((cluster) => hasWoodNear(world, cluster, 24))).toBe(true);
+  });
+
+  it('lets distant default start clusters grow into separate kingdoms for rebellion testing', () => {
+    const world = new SimWorld({
+      seed: 'default-start-multi-kingdom',
+      width: 128,
+      height: 96,
+      initialUnits: 36,
+    });
+
+    for (let tick = 0; tick < 520; tick += 1) {
+      world.step();
+    }
+
+    expect(world.project().kingdoms.length).toBeGreaterThanOrEqual(2);
+  });
 });
 
 describe('SimWorld life loop', () => {
@@ -802,6 +836,73 @@ describe('SimWorld village buildings and territory', () => {
     expect(distanceBetween(farm.position, foodPatchCenter)).toBeLessThanOrEqual(2.5);
   });
 
+  it('never places non-town-hall buildings on an occupied building tile', () => {
+    const world = foundFoodRichVillage('village-building-no-overlap', { width: 48, height: 32 });
+    const village = world.project().villages[0];
+    const townHall = world
+      .project()
+      .buildings.find(
+        (building) => building.villageId === village.id && building.type === 'town_hall',
+      );
+
+    if (!townHall) {
+      throw new Error('Expected town hall');
+    }
+
+    const fallbackTile = {
+      x: Math.floor(village.center.x + 8),
+      y: Math.floor(village.center.y),
+    };
+
+    for (const tile of world.map.tiles) {
+      if (
+        (tile.x === Math.floor(village.center.x) && tile.y === Math.floor(village.center.y)) ||
+        (tile.x === fallbackTile.x && tile.y === fallbackTile.y)
+      ) {
+        tile.terrain = 'grass';
+        tile.biome = 'temperate';
+        tile.resource = undefined;
+        continue;
+      }
+
+      if (distanceBetween(tile, village.center) <= 9) {
+        tile.terrain = 'water';
+        tile.biome = 'coast';
+        tile.resource = undefined;
+      }
+    }
+
+    const storage = createActiveBuildingInVillage(world, village.id, 'storage');
+
+    expect(tileKey(storage.position)).not.toBe(tileKey(townHall.position));
+  });
+
+  it('keeps early utility buildings from crowding the town hall tile', () => {
+    const world = foundFoodRichVillage('village-building-spacing', { width: 48, height: 32 });
+    const village = world.project().villages[0];
+    const buildings = [
+      ...world.project().buildings.filter((building) => building.villageId === village.id),
+      createActiveBuildingInVillage(world, village.id, 'storage'),
+      createActiveBuildingInVillage(world, village.id, 'house'),
+      createActiveBuildingInVillage(world, village.id, 'farm'),
+      createActiveBuildingInVillage(world, village.id, 'barrack'),
+    ];
+
+    const minimumSpacing = buildings.reduce((minimum, building, index) => {
+      const nearest = buildings
+        .slice(index + 1)
+        .reduce(
+          (nearestDistance, other) =>
+            Math.min(nearestDistance, distanceBetween(building.position, other.position)),
+          Number.POSITIVE_INFINITY,
+        );
+
+      return Math.min(minimum, nearest);
+    }, Number.POSITIVE_INFINITY);
+
+    expect(minimumSpacing).toBeGreaterThanOrEqual(3);
+  });
+
   it('assigns builders to gather nearby wood into village stores', () => {
     const world = foundFoodRichVillage('village-wood-jobs');
     const village = world.project().villages[0];
@@ -827,16 +928,39 @@ describe('SimWorld village buildings and territory', () => {
         (site) => site.type === 'wood_gathering' && site.villageId === village.id,
       ),
     ).toBe(true);
+    expect(
+      projection.territory.some(
+        (tile) => tile.villageId === village.id && tile.source === 'work_site',
+      ),
+    ).toBe(false);
+  });
+
+  it('accounts for every resident in the village job summary', () => {
+    const world = foundFoodRichVillage('village-jobs-account-for-residents');
+
+    for (let tick = 0; tick < 4; tick += 1) {
+      world.step();
+    }
+
+    const village = world.project().villages[0];
+    const assignedJobs =
+      village.jobs.farmer +
+      village.jobs.builder +
+      village.jobs.miner +
+      village.jobs.soldier +
+      village.jobs.laborer;
+
+    expect(assignedJobs).toBe(village.population);
   });
 
   it('scouts farther wood sources when a new village has no local construction materials', () => {
-    const world = foundFoodRichVillage('village-frontier-wood-jobs');
+    const world = foundFoodRichVillage('village-frontier-wood-jobs', { width: 80, height: 40 });
     const village = world.project().villages[0];
-    const frontierWoodX = Math.floor(village.center.x + 12);
+    const frontierWoodX = Math.floor(village.center.x + 28);
     const frontierWoodY = Math.floor(village.center.y);
 
-    removeWoodSitesNearVillage(world, village.id);
-    addWoodSiteNearVillage(world, village.id, 12);
+    clearWoodPatches(world);
+    addWoodSiteNearVillage(world, village.id, 28);
 
     for (let tick = 0; tick < 20; tick += 1) {
       world.step();
@@ -859,6 +983,28 @@ describe('SimWorld village buildings and territory', () => {
           site.villageId === village.id &&
           Math.floor(site.position.x) === frontierWoodX &&
           Math.floor(site.position.y) === frontierWoodY,
+      ),
+    ).toBe(true);
+  });
+
+  it('shows farm tending work sites when farmers maintain active farms', () => {
+    const world = foundFoodRichVillage('village-farm-tending-worksite');
+    const village = world.project().villages[0];
+    const farm = createActiveBuildingInVillage(world, village.id, 'farm');
+
+    for (let tick = 0; tick < 4; tick += 1) {
+      world.step();
+    }
+
+    const projection = world.project();
+
+    expect(
+      projection.workSites.some(
+        (site) =>
+          site.type === 'farm_tending' &&
+          site.villageId === village.id &&
+          Math.floor(site.position.x) === Math.floor(farm.position.x) &&
+          Math.floor(site.position.y) === Math.floor(farm.position.y),
       ),
     ).toBe(true);
   });
@@ -956,6 +1102,7 @@ describe('SimWorld village buildings and territory', () => {
       'farm',
       'mine',
       'barrack',
+      'dock',
     ] as const) {
       addActiveBuildingToVillage(world, village.id, type);
     }
@@ -999,7 +1146,52 @@ describe('SimWorld village buildings and territory', () => {
     expect(afterBuildings).toBeGreaterThan(beforeBuildings);
   });
 
-  it('lets visible work sites extend village territory beyond finished buildings', () => {
+  it('waits for population instead of materials when a resource-rich town is below prosperity size', () => {
+    const world = foundFoodRichVillage('village-low-pop-not-materials');
+    const village = world.project().villages[0];
+    const mutableVillage = getMutableWorld(world).villages.get(village.id);
+
+    if (!mutableVillage) {
+      throw new Error('Expected village');
+    }
+
+    for (const type of [
+      'house',
+      'house',
+      'house',
+      'house',
+      'storage',
+      'farm',
+      'farm',
+      'mine',
+      'barrack',
+      'dock',
+    ] as const) {
+      addActiveBuildingToVillage(world, village.id, type);
+    }
+    removeDockSitesNearVillage(world, village.id);
+
+    prepareVillageForBuildingUpgrades(world, village.id, 13, 260, 1);
+    mutableVillage.foodCapacity = 260;
+    mutableVillage.foodInventory = 260;
+    mutableVillage.woodInventory = 3822;
+    mutableVillage.stoneInventory = 275;
+    mutableVillage.ironInventory = 135;
+    mutableVillage.housingCapacity = 22;
+    mutableVillage.status = 'stable';
+
+    world.step();
+
+    const updatedVillage = world
+      .project()
+      .villages.find((candidate) => candidate.id === village.id);
+
+    expect(updatedVillage?.buildPlan).toBe('waiting_population_pressure');
+    expect(updatedVillage?.primaryIntention).toBe('waiting_population_pressure');
+    expect(updatedVillage?.growthBlockers).toHaveLength(0);
+  });
+
+  it('keeps visible work sites from creating temporary territory islands', () => {
     const world = foundFoodRichVillage('village-worksite-territory');
     const village = world.project().villages[0];
     clearWoodPatches(world);
@@ -1029,7 +1221,7 @@ describe('SimWorld village buildings and territory', () => {
           tile.y === woodPosition.y &&
           tile.source === 'work_site',
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('explains whether territory came from settlement core or buildings', () => {
@@ -1456,6 +1648,190 @@ describe('SimWorld kingdoms', () => {
     refreshProjectedKingdom(world, kingdom.id);
 
     expect(world.project().kingdoms[0].capitalVillageId).toBe(foundingCapitalId);
+  });
+
+  it('projects village loyalty so overextended kingdoms are readable before rebellion exists', () => {
+    const world = foundFoodRichVillage('kingdom-loyalty-projection', { width: 128, height: 48 });
+
+    for (let tick = 0; tick < 300; tick += 1) {
+      world.step();
+    }
+
+    const kingdom = world.project().kingdoms[0];
+
+    addVillageToKingdom(world, kingdom.id, {
+      id: 'far-frontier',
+      position: { x: 104, y: 34 },
+      population: 18,
+    });
+
+    const projection = world.project();
+    const capital = projection.villages.find(
+      (village) => village.id === projection.kingdoms[0].capitalVillageId,
+    );
+    const frontier = projection.villages.find((village) => village.id === 'far-frontier');
+
+    expect(capital?.loyalty).toBe(100);
+    expect(capital?.loyaltyReason).toBe('capital');
+    expect(frontier?.loyalty).toBeLessThan(80);
+    expect(frontier?.loyaltyReason).toBe('capital_distance');
+  });
+
+  it('projects low-loyalty unrest before rebellion preparation', () => {
+    const world = foundFoodRichVillage('kingdom-rebellion-preparation', {
+      width: 128,
+      height: 48,
+    });
+
+    for (let tick = 0; tick < 300; tick += 1) {
+      world.step();
+    }
+
+    const kingdom = world.project().kingdoms[0];
+
+    addVillageToKingdom(world, kingdom.id, {
+      id: 'far-rebel-frontier',
+      position: { x: 108, y: 36 },
+      population: 22,
+    });
+
+    const preparingProjection = world.project();
+    const rebel = preparingProjection.villages.find(
+      (village) => village.id === 'far-rebel-frontier',
+    );
+
+    expect(rebel?.loyalty).toBeLessThan(50);
+    expect(rebel?.loyalty).toBeGreaterThanOrEqual(0);
+    expect(rebel?.unrestPlan).toBe('low_loyalty');
+    expect(rebel?.rebellionPlan).toBeUndefined();
+    expect(rebel?.rebellionReason).toBeUndefined();
+    expect(preparingProjection.kingdoms).toHaveLength(1);
+    expect(rebel?.kingdomId).toBe(kingdom.id);
+  });
+
+  it('projects a readable rebellion preparation state only after loyalty falls below zero', () => {
+    const world = foundFoodRichVillage('kingdom-negative-loyalty-rebellion-preparation', {
+      width: 160,
+      height: 64,
+    });
+
+    for (let tick = 0; tick < 300; tick += 1) {
+      world.step();
+    }
+
+    const kingdom = world.project().kingdoms[0];
+
+    const frontier = addVillageToKingdom(world, kingdom.id, {
+      id: 'negative-loyalty-frontier',
+      position: { x: 150, y: 56 },
+      population: 120,
+    });
+    frontier.foodInventory = 0;
+
+    const preparingProjection = world.project();
+    const rebel = preparingProjection.villages.find(
+      (village) => village.id === 'negative-loyalty-frontier',
+    );
+
+    expect(rebel?.loyalty).toBeLessThan(0);
+    expect(rebel?.unrestPlan).toBeUndefined();
+    expect(rebel?.rebellionPlan).toBe('prepare_rebellion');
+    expect(rebel?.rebellionReason).toBe('capital_distance');
+    expect(preparingProjection.kingdoms).toHaveLength(1);
+    expect(rebel?.kingdomId).toBe(kingdom.id);
+  });
+
+  it('accumulates readable rebellion preparation progress without splitting the kingdom yet', () => {
+    const world = foundFoodRichVillage('kingdom-rebellion-progress-window', {
+      width: 160,
+      height: 64,
+    });
+
+    for (let tick = 0; tick < 300; tick += 1) {
+      world.step();
+    }
+
+    const kingdom = world.project().kingdoms[0];
+    const frontier = addVillageToKingdom(world, kingdom.id, {
+      id: 'progress-rebel-frontier',
+      position: { x: 150, y: 56 },
+      population: 36,
+    });
+    addResidentUnitsToVillage(world, frontier.id, 36);
+    addActiveBuildingToVillage(world, frontier.id, 'barrack');
+    prepareVillageForBuildingUpgrades(world, frontier.id, 36, 400);
+    frontier.foodInventory = 0;
+
+    for (let tick = 0; tick < 5; tick += 1) {
+      world.step();
+    }
+
+    const preparingProjection = world.project();
+    const rebel = preparingProjection.villages.find(
+      (village) => village.id === 'progress-rebel-frontier',
+    );
+
+    expect(rebel?.loyalty).toBeLessThan(0);
+    expect(rebel?.rebellionPlan).toBe('prepare_rebellion');
+    expect(rebel?.rebellionProgress).toBeGreaterThan(0);
+    expect(rebel?.rebellionProgress).toBeLessThan(100);
+    expect(preparingProjection.kingdoms).toHaveLength(1);
+    expect(rebel?.kingdomId).toBe(kingdom.id);
+  });
+
+  it('rolls rebellion preparation progress back when loyalty recovers', () => {
+    const world = foundFoodRichVillage('kingdom-rebellion-progress-recovers', {
+      width: 160,
+      height: 64,
+    });
+
+    for (let tick = 0; tick < 300; tick += 1) {
+      world.step();
+    }
+
+    const projection = world.project();
+    const kingdom = projection.kingdoms[0];
+    const capital = projection.villages.find((village) => village.id === kingdom.capitalVillageId);
+
+    if (!capital) {
+      throw new Error('Expected capital village');
+    }
+
+    const frontier = addVillageToKingdom(world, kingdom.id, {
+      id: 'recovering-rebel-frontier',
+      position: { x: 150, y: 56 },
+      population: 36,
+    });
+    addResidentUnitsToVillage(world, frontier.id, 36);
+    addActiveBuildingToVillage(world, frontier.id, 'barrack');
+    prepareVillageForBuildingUpgrades(world, frontier.id, 36, 400);
+    frontier.foodInventory = 0;
+
+    for (let tick = 0; tick < 5; tick += 1) {
+      world.step();
+    }
+
+    const progressBeforeRecovery = world
+      .project()
+      .villages.find((village) => village.id === 'recovering-rebel-frontier')?.rebellionProgress;
+
+    frontier.center = { x: capital.center.x + 2, y: capital.center.y };
+    frontier.foodInventory = 500;
+    frontier.foodCapacity = 500;
+    moveVillageResidents(world, frontier.id, frontier.center);
+
+    for (let tick = 0; tick < 5; tick += 1) {
+      world.step();
+    }
+
+    const recovered = world
+      .project()
+      .villages.find((village) => village.id === 'recovering-rebel-frontier');
+
+    expect(progressBeforeRecovery).toBeGreaterThan(0);
+    expect(recovered?.loyalty).toBeGreaterThanOrEqual(0);
+    expect(recovered?.rebellionPlan).toBeUndefined();
+    expect(recovered?.rebellionProgress).toBeLessThan(progressBeforeRecovery ?? 0);
   });
 
   it('lets a mature pressured kingdom found a satellite village on suitable land', () => {
@@ -2493,6 +2869,33 @@ function setVillagePopulation(world: SimWorld, villageId: string, population: nu
   village.population = population;
 }
 
+function addResidentUnitsToVillage(world: SimWorld, villageId: string, count: number) {
+  const mutableWorld = getMutableWorld(world);
+  const village = mutableWorld.villages.get(villageId);
+
+  if (!village) {
+    throw new Error(`Expected village ${villageId}`);
+  }
+
+  for (let index = 0; index < count; index += 1) {
+    const unit = mutableWorld.createUnit({
+      race: village.race,
+      gender: index % 2 === 0 ? 'female' : 'male',
+      position: {
+        x: village.center.x + (index % 3) - 1,
+        y: village.center.y + Math.floor(index / 3) - 1,
+      },
+      ageTicks: 12 * 240,
+      hunger: 0,
+      reproductionCooldownTicks: 0,
+      villageId,
+      homeVillageId: villageId,
+    });
+
+    mutableWorld.units.set(unit.id, unit);
+  }
+}
+
 function setTownHallTier(world: SimWorld, villageId: string, tier: number) {
   const townHall = [...getMutableWorld(world).buildings.values()].find(
     (building) => building.villageId === villageId && building.type === 'town_hall',
@@ -2830,6 +3233,7 @@ function addVillageToKingdom(
       builder: 2,
       miner: 0,
       soldier: 4,
+      laborer: Math.max(0, options.population - 9),
     },
     growthPhase: 'village',
     growthBlockers: [],
@@ -3086,10 +3490,54 @@ function averageUnitPosition(units: Unit[]) {
   };
 }
 
+function groupPositionsByDistance(positions: Array<{ x: number; y: number }>, radius: number) {
+  const clusters: Array<{ x: number; y: number; count: number }> = [];
+
+  for (const position of positions) {
+    const cluster = clusters.find((candidate) => distanceBetween(candidate, position) <= radius);
+
+    if (!cluster) {
+      clusters.push({ ...position, count: 1 });
+      continue;
+    }
+
+    cluster.x = (cluster.x * cluster.count + position.x) / (cluster.count + 1);
+    cluster.y = (cluster.y * cluster.count + position.y) / (cluster.count + 1);
+    cluster.count += 1;
+  }
+
+  return clusters;
+}
+
+function maxDistanceBetween(positions: Array<{ x: number; y: number }>) {
+  let maxDistance = 0;
+
+  for (let left = 0; left < positions.length; left += 1) {
+    for (let right = left + 1; right < positions.length; right += 1) {
+      maxDistance = Math.max(maxDistance, distanceBetween(positions[left], positions[right]));
+    }
+  }
+
+  return maxDistance;
+}
+
+function tileKey(position: { x: number; y: number }) {
+  return `${Math.floor(position.x)}:${Math.floor(position.y)}`;
+}
+
 function hasFoodNear(world: SimWorld, position: { x: number; y: number }, radius: number) {
   return world.map.tiles.some(
     (tile) =>
       tile.resource?.type === 'food' &&
+      tile.resource.amount > 0 &&
+      distanceBetween(tile, position) <= radius,
+  );
+}
+
+function hasWoodNear(world: SimWorld, position: { x: number; y: number }, radius: number) {
+  return world.map.tiles.some(
+    (tile) =>
+      tile.resource?.type === 'wood' &&
       tile.resource.amount > 0 &&
       distanceBetween(tile, position) <= radius,
   );

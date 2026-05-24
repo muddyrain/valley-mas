@@ -80,6 +80,8 @@ const VILLAGE_GROWTH_PHASE_LABELS: Record<string, string> = {
 const VILLAGE_GROWTH_BLOCKER_LABELS: Record<string, string> = {
   housing_pressure: '住房紧张',
   missing_wood: '缺少木材',
+  missing_stone: '缺少石料',
+  missing_iron: '缺少铁矿',
   no_wood_source: '无可达木材',
   insufficient_builders: '建筑工不足',
   low_food_reserve: '食物储备偏低',
@@ -112,6 +114,17 @@ const EXPANSION_REASON_LABELS: Record<string, string> = {
   waiting_land: '缺少合适新址',
   waiting_resources: '缺少拓荒食物或木材',
   waiting_population_pressure: '人口或住房压力不足',
+};
+
+const LOYALTY_REASON_LABELS: Record<string, string> = {
+  capital: '首都核心',
+  stable: '内政稳定',
+  capital_distance: '距离首都过远',
+  overextended_kingdom: '王国过度扩张',
+  food_pressure: '食物压力',
+  war_pressure: '战争压力',
+  strong_frontier: '边疆实力过强',
+  recently_captured: '新近被征服',
 };
 
 const KINGDOM_STATUS_LABELS: Record<string, string> = {
@@ -366,7 +379,11 @@ export function buildMapLabels(projection: WorldProjection): MapLabel[] {
 
     return {
       id: `village:${village.id}`,
-      text: `${village.expansionPlan === 'prepare_expansion' ? '拓荒 · ' : ''}${
+      text: `${village.rebellionPlan === 'prepare_rebellion' ? '叛乱 · ' : ''}${
+        village.rebellionPlan !== 'prepare_rebellion' && village.unrestPlan === 'low_loyalty'
+          ? '不稳 · '
+          : ''
+      }${village.expansionPlan === 'prepare_expansion' ? '拓荒 · ' : ''}${
         isCapital ? '首都 · ' : ''
       }${village.name} · Lv.${village.level}${village.level >= 4 ? ' ★' : ''}`,
       position: {
@@ -641,6 +658,9 @@ function buildVillageLines(projection: WorldProjection, id: string) {
     `状态：${labelFromMap(VILLAGE_STATUS_LABELS, village.status)}`,
     `所属王国：${kingdom ? `王国 ${shortId(kingdom.id)}` : '无'}`,
     `首都：${kingdom?.capitalVillageId === village.id ? '是' : '否'}`,
+    ...buildLoyaltyLines(village),
+    ...buildUnrestLines(village),
+    ...buildRebellionLines(village),
     `人口：${village.population}`,
     `住房：${village.housingCapacity}`,
     `食物：${Math.round(village.foodInventory)} / ${village.foodCapacity}`,
@@ -649,7 +669,7 @@ function buildVillageLines(projection: WorldProjection, id: string) {
     )}, 铁矿 ${Math.round(village.ironInventory)}`,
     `职业：农民 ${village.jobs.farmer}, 建筑工 ${village.jobs.builder}, 矿工 ${village.jobs.miner}, 士兵 ${
       village.jobs.soldier
-    }`,
+    }, 劳力 ${village.jobs.laborer}`,
     `成长阻塞：${
       village.growthBlockers.length > 0
         ? village.growthBlockers
@@ -662,14 +682,56 @@ function buildVillageLines(projection: WorldProjection, id: string) {
         ? labelFromMap(VILLAGE_GROWTH_BLOCKER_LABELS, village.primaryGrowthBlocker)
         : '无'
     }`,
-    `建设计划：${villagePlanLabel(village.buildPlan, village.expansionPlan)}`,
-    `主要意图：${villagePlanLabel(village.primaryIntention, village.expansionPlan)}`,
+    `建设计划：${villagePlanLabel(village.buildPlan, village.expansionPlan, village)}`,
+    `主要意图：${villagePlanLabel(village.primaryIntention, village.expansionPlan, village)}`,
     ...buildExpansionReasonLines(village.expansionPlan),
     ...buildExpansionHintLines(village.expansionPlan),
     `建筑：${buildings.length}`,
     `领土：${village.territoryTiles}`,
     `军队：${activeArmies.length}`,
     `中心：${formatPosition(village.center)}`,
+  ];
+}
+
+function buildUnrestLines(village: Village) {
+  if (village.unrestPlan !== 'low_loyalty') {
+    return [];
+  }
+
+  return [
+    `不稳原因：${
+      village.loyaltyReason ? labelFromMap(LOYALTY_REASON_LABELS, village.loyaltyReason) : '无'
+    }`,
+    '内政提示：忠诚偏低',
+  ];
+}
+
+function buildRebellionLines(village: Village) {
+  if (village.rebellionPlan !== 'prepare_rebellion') {
+    return [];
+  }
+
+  const progress = Math.round(village.rebellionProgress ?? 0);
+
+  return [
+    `叛乱原因：${
+      village.rebellionReason ? labelFromMap(LOYALTY_REASON_LABELS, village.rebellionReason) : '无'
+    }`,
+    `叛乱进度：${progress}%`,
+    '内政提示：正在秘密组织独立',
+  ];
+}
+
+function buildLoyaltyLines(village: Village) {
+  if (village.loyalty === undefined) {
+    return [];
+  }
+
+  return [
+    `忠诚：${Math.round(village.loyalty)}`,
+    `内政原因：${
+      village.loyaltyReason ? labelFromMap(LOYALTY_REASON_LABELS, village.loyaltyReason) : '无'
+    }`,
   ];
 }
 
@@ -698,12 +760,67 @@ function buildExpansionHintLines(plan: string | undefined) {
   }
 }
 
-function villagePlanLabel(plan: string, expansionPlan?: string) {
+function villagePlanLabel(
+  plan: string,
+  expansionPlan?: string,
+  village?: Pick<WorldProjection['villages'][number], 'growthBlockers' | 'primaryGrowthBlocker'>,
+) {
   if (plan === 'waiting_population_pressure' && expansionPlan === 'waiting_population_pressure') {
     return '等待扩张压力';
   }
 
+  if (plan === 'waiting_resources') {
+    return waitingResourceLabel(village, expansionPlan);
+  }
+
   return labelFromMap(VILLAGE_BUILD_PLAN_LABELS, plan);
+}
+
+function waitingResourceLabel(
+  village:
+    | Pick<WorldProjection['villages'][number], 'growthBlockers' | 'primaryGrowthBlocker'>
+    | undefined,
+  expansionPlan?: string,
+) {
+  const blockers = new Set(village?.growthBlockers ?? []);
+  const primary = village?.primaryGrowthBlocker;
+  const lacksFood = blockers.has('low_food_reserve') || primary === 'low_food_reserve';
+  const lacksWood = blockers.has('missing_wood') || primary === 'missing_wood';
+  const lacksBuildMaterial =
+    blockers.has('missing_stone') ||
+    blockers.has('missing_iron') ||
+    primary === 'missing_stone' ||
+    primary === 'missing_iron';
+
+  if (expansionPlan === 'waiting_resources') {
+    if (lacksFood && lacksWood) {
+      return '等待拓荒食物和木材';
+    }
+
+    if (lacksFood) {
+      return '等待拓荒食物';
+    }
+
+    if (lacksWood) {
+      return '等待拓荒木材';
+    }
+
+    return '等待拓荒资源';
+  }
+
+  if (lacksWood) {
+    return '等待木材';
+  }
+
+  if (lacksFood) {
+    return '等待食物';
+  }
+
+  if (lacksBuildMaterial) {
+    return '等待建造材料';
+  }
+
+  return '等待人口增长';
 }
 
 function buildKingdomLines(projection: WorldProjection, id: string) {

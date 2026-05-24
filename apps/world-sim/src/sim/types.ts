@@ -18,6 +18,8 @@ export type VillageGrowthPhase = 'camp' | 'hamlet' | 'village' | 'town' | 'front
 export type VillageGrowthBlocker =
   | 'housing_pressure'
   | 'missing_wood'
+  | 'missing_stone'
+  | 'missing_iron'
   | 'no_wood_source'
   | 'insufficient_builders'
   | 'low_food_reserve'
@@ -39,6 +41,7 @@ export type VillageJobs = {
   builder: number;
   miner: number;
   soldier: number;
+  laborer: number;
 };
 export type VillageBuildingType =
   | 'town_hall'
@@ -51,6 +54,17 @@ export type VillageBuildingType =
 export type VillageBuildingStatus = 'constructing' | 'active' | 'abandoned' | 'ruined';
 export type KingdomStatus = 'rising' | 'stable' | 'declining' | 'fallen';
 export type ArmyGroupStatus = 'marching' | 'fighting' | 'retreating' | 'disbanded';
+export type VillageUnrestPlan = 'low_loyalty';
+export type VillageRebellionPlan = 'prepare_rebellion';
+export type VillageLoyaltyReason =
+  | 'capital'
+  | 'stable'
+  | 'capital_distance'
+  | 'overextended_kingdom'
+  | 'food_pressure'
+  | 'war_pressure'
+  | 'strong_frontier'
+  | 'recently_captured';
 
 export type Position = {
   x: number;
@@ -103,6 +117,12 @@ export type Village = {
   buildPlan: VillageBuildPlan;
   primaryIntention: VillageBuildPlan;
   expansionPlan?: VillageBuildPlan;
+  loyalty?: number;
+  loyaltyReason?: VillageLoyaltyReason;
+  unrestPlan?: VillageUnrestPlan;
+  rebellionPlan?: VillageRebellionPlan;
+  rebellionReason?: VillageLoyaltyReason;
+  rebellionProgress?: number;
   housingCapacity: number;
   territoryTiles: number;
   foundedAtTick: number;
@@ -183,7 +203,7 @@ export type TerritoryTile = {
 
 export type VillageWorkSite = {
   id: string;
-  type: 'wood_gathering' | 'construction' | 'territory_growth';
+  type: 'wood_gathering' | 'farm_tending' | 'construction' | 'territory_growth';
   villageId: string;
   position: Position;
   amount?: number;

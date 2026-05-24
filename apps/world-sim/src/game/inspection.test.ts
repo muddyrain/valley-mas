@@ -66,10 +66,41 @@ describe('world inspection helpers', () => {
       '所属王国：王国 1',
     );
     expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '忠诚：100',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '内政原因：首都核心',
+    );
+    projection.villages[1].loyalty = 28;
+    projection.villages[1].loyaltyReason = 'capital_distance';
+    projection.villages[1].unrestPlan = 'low_loyalty';
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-2' })).toContain(
+      '不稳原因：距离首都过远',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-2' })).toContain(
+      '内政提示：忠诚偏低',
+    );
+    projection.villages[1].unrestPlan = undefined;
+    projection.villages[1].rebellionPlan = 'prepare_rebellion';
+    projection.villages[1].rebellionReason = 'capital_distance';
+    projection.villages[1].rebellionProgress = 34;
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-2' })).toContain(
+      '叛乱原因：距离首都过远',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-2' })).toContain(
+      '叛乱进度：34%',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-2' })).toContain(
+      '内政提示：正在秘密组织独立',
+    );
+    projection.villages[1].rebellionPlan = undefined;
+    projection.villages[1].rebellionReason = undefined;
+    projection.villages[1].rebellionProgress = undefined;
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
       '材料：木材 3, 石料 5, 铁矿 1',
     );
     expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
-      '职业：农民 4, 建筑工 2, 矿工 1, 士兵 3',
+      '职业：农民 4, 建筑工 2, 矿工 1, 士兵 3, 劳力 14',
     );
     expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
       '成长阻塞：住房紧张、缺少木材',
@@ -115,6 +146,29 @@ describe('world inspection helpers', () => {
     projection.villages[0].expansionPlan = 'waiting_population_pressure';
     expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
       '建设计划：等待扩张压力',
+    );
+    projection.villages[0].buildPlan = 'waiting_resources';
+    projection.villages[0].primaryIntention = 'waiting_resources';
+    projection.villages[0].expansionPlan = undefined;
+    projection.villages[0].growthBlockers = ['missing_wood'];
+    projection.villages[0].primaryGrowthBlocker = 'missing_wood';
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '建设计划：等待木材',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '主要意图：等待木材',
+    );
+    projection.villages[0].expansionPlan = 'waiting_resources';
+    projection.villages[0].growthBlockers = ['low_food_reserve', 'missing_wood'];
+    projection.villages[0].primaryGrowthBlocker = 'low_food_reserve';
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '建设计划：等待拓荒食物和木材',
+    );
+    projection.villages[0].expansionPlan = undefined;
+    projection.villages[0].growthBlockers = [];
+    projection.villages[0].primaryGrowthBlocker = undefined;
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '建设计划：等待人口增长',
     );
     expect(buildInspectionLines(projection, { type: 'army', id: 'army-1' })).toContain('军队 1');
     expect(buildInspectionLines(projection, { type: 'army', id: 'army-1' })).toContain(
@@ -202,6 +256,19 @@ describe('world inspection helpers', () => {
     expect(
       buildMapLabels(projection).some((label) => label.text === '拓荒 · 首都 · 晨林村 · Lv.3'),
     ).toBe(true);
+
+    projection.villages[1].rebellionPlan = 'prepare_rebellion';
+
+    expect(buildMapLabels(projection).some((label) => label.text === '叛乱 · 河湾村 · Lv.2')).toBe(
+      true,
+    );
+
+    projection.villages[1].rebellionPlan = undefined;
+    projection.villages[1].unrestPlan = 'low_loyalty';
+
+    expect(buildMapLabels(projection).some((label) => label.text === '不稳 · 河湾村 · Lv.2')).toBe(
+      true,
+    );
   });
 
   it('builds readable growth and building event summaries', () => {
@@ -518,12 +585,15 @@ function createProjection(): WorldProjection {
           builder: 2,
           miner: 1,
           soldier: 3,
+          laborer: 14,
         },
         growthPhase: 'town',
         growthBlockers: ['housing_pressure', 'missing_wood'],
         primaryGrowthBlocker: 'missing_wood',
         buildPlan: 'expand_housing',
         primaryIntention: 'expand_housing',
+        loyalty: 100,
+        loyaltyReason: 'capital',
         housingCapacity: 30,
         territoryTiles: 12,
         foundedAtTick: 2,
@@ -546,12 +616,15 @@ function createProjection(): WorldProjection {
           builder: 1,
           miner: 0,
           soldier: 0,
+          laborer: 9,
         },
         growthPhase: 'village',
         growthBlockers: [],
         primaryGrowthBlocker: undefined,
         buildPlan: 'idle',
         primaryIntention: 'idle',
+        loyalty: 72,
+        loyaltyReason: 'capital_distance',
         housingCapacity: 18,
         territoryTiles: 8,
         foundedAtTick: 6,

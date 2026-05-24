@@ -45,7 +45,7 @@ The next structural pass should make the early-to-mid civilization loop read lik
 3. **Settlement work loop**: residents create visible pressure through housing demand, wood gathering, construction sites, food storage, farm work, and material gathering.
 4. **Town density**: growth turns surplus into more houses, farms, storage, upgrades, and clear level changes before the game asks the player to reason about diplomacy.
 5. **Frontier expansion**: settled activity expands soft territory first, then mature towns send settlers to nearby food-rich land and keep the new village inside the parent kingdom.
-6. **Kingdom pressure**: multiple villages aggregate into a kingdom, create colored ownership, generate frontier/resource pressure, and eventually send grouped armies.
+6. **Kingdom pressure**: multiple villages aggregate into a kingdom, create colored ownership, generate frontier/resource pressure, expose village loyalty, and eventually send grouped armies.
 7. **Collapse memory**: starvation, lightning, capture, or depopulation leaves abandoned buildings and ruins so the map remembers what happened.
 
 This rework starts with the first three stages because they decide whether the world feels alive before the player sees kingdoms. The first implementation target is not deeper UI or more commands; it is a more legible village-growth spine: every expansion, stall, and territorial spread should have a visible cause and an inspection/event explanation. Expansion explanations should only appear once a settlement is actually mature enough to be judged as a frontier parent; ordinary young villages should read as growing, not as failed colonizers.
@@ -60,13 +60,15 @@ The first v2 slice deliberately avoids full WorldBox parity. It establishes the 
 
 - Pure simulation truth outside Phaser.
 - Deterministic seed and replay behavior. The interactive demo starts a fresh seed when no URL seed is supplied, while `?seed=...` keeps a world reproducible for debugging and comparison.
+- Multi-origin civilization starts on larger worlds, so normal play can produce multiple villages, kingdoms, border pressure, and later rebellion conditions instead of one capital-centered realm every time.
 - Tile, chunk, biome, and resource data.
 - Units with hunger, age, health, death, birth, movement, stable home village membership, and simple needs.
 - Villages that emerge from local population and food pressure, with food and material stores, housing, and decline state.
 - Village buildings that turn surplus into housing, storage, farm production, mine access, military capacity, shore access, and settlement influence.
-- Autonomous building placement that reads as local choice: homes cluster without covering resources, farms follow useful land, mines follow ore and hills, military buildings sit toward the settlement edge, and docks follow shorelines.
-- Readable settlement growth signals: visible resource depletion, construction work sites, growth blockers, earlier house pressure, and territory spread from lived settlement activity.
+- Autonomous building placement that reads as local choice: homes cluster without covering resources, farms follow useful land, mines follow ore and hills, military buildings sit toward the settlement edge, docks follow shorelines, and buildings never stack onto the same tile or crowd the first available tile.
+- Readable settlement growth signals: visible resource depletion, construction and gathering work sites, growth blockers, earlier house pressure, and stable territory spread from settlement cores, buildings, and frontier preparation rather than temporary work pulses.
 - Kingdoms that emerge from strong villages and aggregate capital, members, population, buildings, territory, food, and material stores.
+- Village loyalty, unrest, and sustained rebellion-preparation projection inside kingdoms, so distance from capital, overextension, food pressure, war pressure, and strong frontier towns become readable before rebellion mechanics are allowed to split the realm.
 - Diplomacy pressure that turns border friction, resource shortage, and race tendencies into observable declaration causes.
 - Minimal grouped war that lets declarations create armies, casualties, and village ownership changes without full single-unit combat.
 - God commands for spawning life, placing food, changing terrain, lightning, pause, and speed.

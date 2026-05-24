@@ -487,6 +487,18 @@ export class WorldScene extends Phaser.Scene {
       const alpha = Math.min(0.9, Math.max(0.2, (remainingTicks / 60) * pulse));
 
       if (site.type === 'wood_gathering') {
+        this.workSiteLayer.lineStyle(1.2, 0x6abe30, alpha);
+        this.workSiteLayer.strokeCircle(x, y, 6);
+        this.workSiteLayer.fillStyle(0x8f563b, alpha * 0.7);
+        this.workSiteLayer.fillRect(x - 1, y - 6, 2, 12);
+        continue;
+      }
+
+      if (site.type === 'farm_tending') {
+        this.workSiteLayer.lineStyle(1.2, 0xffcd75, alpha);
+        this.workSiteLayer.strokeCircle(x, y, 7);
+        this.workSiteLayer.fillStyle(0x99e550, alpha * 0.45);
+        this.workSiteLayer.fillRect(x - 5, y - 2, 10, 4);
         continue;
       }
 

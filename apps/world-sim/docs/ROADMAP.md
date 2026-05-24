@@ -282,7 +282,7 @@ Status: `Foundation slice`
   - Resource shortages slow construction, housing growth, and army formation.
 - Implemented:
   - Villages and kingdoms now expose material stores for food, wood, stone, and iron in projection and inspection.
-  - Villages now auto-assign aggregate farmer, builder, miner, and soldier jobs and expose those counts in village inspection.
+  - Villages now auto-assign aggregate farmer, builder, miner, soldier, and laborer jobs and expose those counts in village inspection.
   - Villages start with a small farmer workforce so early settlements can survive before the first farm is built.
   - Camp villages use a lighter early food drain so 30-person bootstrap cases can survive long enough to reach the farm/build loop.
   - Farmer jobs drive baseline food gathering and amplify farm food production, so farms no longer produce without assigned workers.
@@ -332,18 +332,18 @@ Status: `Foundation slice`
 - Before PR-12E, make the small-people development loop feel closer to WorldBox: villagers should appear to gather, build, settle, and expand before the player is asked to reason about kingdom-level diplomacy tools.
 - Acceptance: a player watching one settlement for several minutes can tell why it is or is not growing, see wood/home/territory pressure, and observe the village spreading without direct management.
 - Implemented:
-  - Builder wood gathering now remains available as projection data for simulation-side territory pressure, while nearby wood deposits deplete as stores fill.
+  - Builder wood gathering now remains available as readable work-site projection data, renders a short-lived work pulse, and nearby wood deposits deplete as stores fill without creating temporary territory islands.
   - Construction starts and builder progress now project short-lived construction work sites.
   - Villages now expose `growthBlockers` in projection and inspection for housing pressure, missing wood, exhausted nearby wood, insufficient builders, low food reserve, and no buildable land.
   - Housing pressure now triggers at roughly 75% housing use and can prioritize another house before optional farm, mine, barrack, or dock work once the first house/storage chain exists.
-  - Territory projection now includes settlement pressure from village centers and active work sites, so the visible claim can spread with lived activity instead of only finished building radii.
-  - Phaser renders construction work-site pulses only; wood gathering no longer has a separate chopping pulse and is read through resource depletion and inventory changes.
+  - Territory projection now includes settlement pressure from village centers and active buildings, while work sites stay as activity pulses instead of formal claims.
+  - Phaser renders construction, wood-gathering, and farm-tending work-site pulses, while resource depletion and inventory changes remain the durable evidence of work.
 - Remaining scope:
   - Keep deep roads/paths, per-citizen worker trips, and richer stall events for later growth-depth passes.
   - Keep the player in a god role: no manual job assignment, no manual house placement, and no direct unit control.
 - Non-goals:
   - No full per-citizen pathfinding or inventory in this pass.
-  - No family/culture/loyalty/rebellion yet; those remain later civilization-depth work.
+  - No family/culture/rebellion in this pass; the first loyalty projection arrives later in PR-12G.
   - No PR-12E god diplomacy commands until this growth loop is readable.
 
 ### PR-12E: Kingdom Readability and God Interventions
@@ -431,11 +431,12 @@ Status: `Foundation slice`
   - Farm-leg tuning keeps the first house construction visible at the old cadence, speeds up follow-up house/storage/farm bootstrap attempts, and prevents the phase model from skipping directly from `hamlet` to `town` on level alone.
   - Regression coverage now locks camp-to-hamlet phase progression, the first housing-to-storage intention handoff, and rich-town continued building with a town phase.
   - Territory projection now includes faint `surface: water` soft control inside settlement influence, while village/kingdom/HUD territory totals still count only `surface: land`; this makes coast and lake realms visually continuous without making water walkable or buildable.
-  - Territory projection now includes `source` (`settlement_core`, `building`, `work_site`, or `frontier`) and tile inspection translates it, so territory growth explains whether it came from stable settlement pressure, built structures, temporary work, or expansion preparation.
+  - Territory projection now includes `source` (`settlement_core`, `building`, or `frontier`) and tile inspection translates it, so territory growth explains whether it came from stable settlement pressure, built structures, or expansion preparation; temporary work sites no longer create border islands.
   - Building site selection now scores candidate tiles by purpose instead of using a fixed ring: houses avoid resource deposits and nearby mineable resources, farms bias toward food-rich or water-adjacent arable land without occupying wood/stone/iron resource tiles, storage stays central, barracks bias outward, mines avoid the residential cluster when alternative ore/hill/quarry sites exist, and docks keep shore constraints.
+  - Building placement now rejects occupied tiles for all non-town-hall buildings, including fallback placement, and prefers a small gap from nearby buildings so storage, farms, mines, barracks, docks, and houses cannot stack or crowd the same cluster.
   - `observe:building-sites` now prints deterministic multi-seed diagnostics for purpose-scored building placement, including building type, position, site resource type, center distance, nearest food, nearest stone or iron, nearest water, and nearest same-type building.
   - The interactive demo now generates a fresh world seed by default while preserving deterministic reproduction through `?seed=...`, and terrain phases now use the full seed so reloads no longer replay the same map/building layout unless the seed is explicitly fixed.
-  - Default initial life now uses the seed to choose a viable food-supported start area anywhere on the map instead of always spawning around the map center.
+  - Default initial life now uses the seed to choose viable food-supported start areas anywhere on the map instead of always spawning around the map center; larger initial populations split into multiple distant clusters so the default sandbox can naturally produce multiple villages and kingdoms for rebellion testing.
   - Mature kingdom villages now expose expansion intent before the satellite village appears: `prepare_expansion` when a site and resources are ready, `waiting_land` when no suitable site exists, and `waiting_resources` / `waiting_population_pressure` when the parent has enough settlers but lacks reserves or housing pressure.
   - Satellite founding now requires a sustained 60 tick `prepare_expansion` window, and an already committed expedition is not canceled only because house upgrades temporarily lower the population-to-housing pressure ratio.
   - Expansion preparation now emits throttled `village_expansion_status` recent events when the parent village changes between ready, missing land, missing resources, or missing population pressure, and village inspection shows the same reason as `扩张原因` plus a short `边疆提示`; young member villages keep ordinary `等待人口增长` wording until they reach the frontier-parent threshold, while mature frontier candidates can show `等待扩张压力`.
@@ -451,11 +452,36 @@ Status: `Foundation slice`
   - No full roads, trade, boats, culture, rulers, families, or rebellion in this pass.
   - No hard border collision yet; territory remains readable projection for now.
 
+### PR-12G: Kingdom Loyalty and Rebellion Foundation
+
+Status: `Foundation slice`
+
+- Reintroduce internal pressure after PR-12F made external growth readable. The WorldBox-aligned goal is that a unified or overextended realm does not become static forever: large kingdoms should first expose why villages are loyal or unstable, then later prepare rebellion, split, and possibly enter civil war without direct player orders.
+- Acceptance: selecting a capital and a far frontier member village should show different loyalty values and a readable internal reason before any rebellion behavior exists.
+- Implemented:
+  - Village projection now includes `loyalty` from 0-100 and `loyaltyReason`.
+  - Capitals project 100 loyalty with `capital`.
+  - Non-capital villages lose loyalty from distance to capital, kingdom overextension, food pressure, current diplomacy/war pressure, or being a stronger frontier town than the capital.
+  - Village inspection shows `忠诚` and `内政原因`, so internal stability is visible alongside growth, expansion, and war pressure.
+  - Loyalty can now fall below 0. Villages from 0 to below 50 loyalty project `low_loyalty`, map labels prefix them with `不稳 ·`, and inspection shows `不稳原因` plus `内政提示：忠诚偏低`.
+  - Only eligible negative-loyalty villages project `prepare_rebellion`, map labels prefix them with `叛乱 ·`, and village inspection shows `叛乱原因`, `叛乱进度`, plus `内政提示：正在秘密组织独立`.
+  - Rebellion progress accumulates while negative loyalty persists and rolls back when loyalty recovers; this creates a WorldBox-style intervention window before any split.
+  - Larger default starts now seed multiple distant population clusters, giving loyalty and rebellion systems a natural multi-kingdom test ecology instead of forcing every run into one capital-centered realm.
+- Planned implementation slices:
+  - `PR-12G.1` Loyalty projection: expose village loyalty and reasons only; no kingdom split yet.
+  - `PR-12G.2` Rebellion preparation readability: low-loyalty villages first enter a visible `low_loyalty` / `不稳 ·` warning state; only eligible negative-loyalty villages enter `prepare_rebellion` with `叛乱 ·` map label, inspection hint, and sustained progress; still no kingdom split.
+  - `PR-12G.3` Split founding: sustained rebellion creates a new kingdom from the rebel village and nearby low-loyalty supporters.
+  - `PR-12G.4` Civil war hookup: rebel and parent kingdoms enter war or high diplomatic pressure using the existing army/capture path.
+  - `PR-12G.5` Observation harness: add `observe:rebellion` so loyalty drop, preparation, split, and civil-war timing can be tuned from deterministic reports.
+- Non-goals:
+  - No rulers, culture, clans, religion, or full diplomacy overhaul in the first loyalty slice.
+  - No immediate rebellion from a single low tick; future split behavior must have a readable preparation window.
+
 ### Later Flavor Backlog
 
 Status: `Planned`
 
-- Cultures, religions, families, rulers, traits, rebellions, world laws, monsters, disasters, boats, colonization, trade, and larger maps remain after PR-12A-F establish observability and core civilization growth.
+- Cultures, religions, families, rulers, traits, deeper rebellion politics, world laws, monsters, disasters, boats, colonization, trade, and larger maps remain after PR-12A-F establish observability and core civilization growth.
 
 ## Immediate Next Work
 
@@ -481,10 +507,18 @@ Current tracked sequence:
 18. Done: kingdom capitals now stay stable while valid; replacement capitals are chosen after capital loss by town hall tier, active building count, population, then id.
 19. Done: PR-12C villager jobs and material resource economy.
 20. Done: PR-12D city growth feedback with names, levels, capital markers, borders, automatic satellite villages, upgrades, and ruins.
-21. Done: PR-12D.5 WorldBox growth alignment foundation with readable work sites, growth blockers, earlier house pressure, and settlement/work-site territory expansion.
+21. Done: PR-12D.5 WorldBox growth alignment foundation with readable work sites, growth blockers, earlier house pressure, and stable settlement/building territory expansion.
 22. In progress: PR-12E kingdom readability now has kingdom/conflict HUD summaries, campaign inspection, army route lines, readable diplomacy/war event summaries, multi-village armies, local battle dots, and forced war/peace; growth blessing and attention markers are deferred behind the civilization spine unless needed for testing.
-23. In progress: PR-12F.1 build-plan truth model. Villages can now scout farther reachable wood instead of freezing when immediate local wood is missing; projection exposes `primaryGrowthBlocker`, `primaryIntention`, and `growthPhase`; mature kingdom villages expose `prepare_expansion` / `waiting_land` before satellite founding.
+23. In progress: PR-12F.1 build-plan truth model. Villages can now scout farther reachable wood instead of freezing when immediate local wood is missing; projection exposes `primaryGrowthBlocker`, `primaryIntention`, and `growthPhase`; inspection distinguishes waiting for population growth, wood, food, building materials, or frontier supplies; mature kingdom villages expose `prepare_expansion` / `waiting_land` before satellite founding.
 24. In progress: PR-12F.2 camp-to-hamlet readability. Explicit phase labels and phase-change recent events now appear in projection/inspection; multi-seed observation now reaches `village` inside the early window after the basic farm leg completes, while `town` waits for specialization or population-driven prosperity instead of level-only promotion.
-25. In progress: PR-12F.3 staged territory influence. Projection now identifies settlement core, building, work-site, and frontier territory sources; next manually inspect whether the lighter work/frontier rendering is readable enough before adding more UI.
+25. In progress: PR-12F.3 staged territory influence. Projection now identifies settlement core, building, and frontier territory sources; work sites remain visible activity pulses without border claims; next manually inspect whether frontier rendering is readable enough before adding more UI.
 26. In progress: PR-12F.4 expansion preparation. `village_expansion_status` events and village `扩张原因` inspection now surface ready, missing-land, missing-resource, and missing-population-pressure states only for mature frontier-parent candidates; next do manual readability tuning.
 27. In progress: PR-12F.5 observation harness. `observe:growth` now reports deterministic early camp-to-hamlet progression across multiple seeds, phase timing, missing chain buildings, recent growth/build events, satellite-expansion timing, `expansionLead`, `拓荒 ·` label timing, `扩张原因` / `边疆提示` timing, and label/hint lead ticks; `observe:building-sites` reports multi-seed house/storage/farm/mine/barrack placement distances for purpose-scored site tuning; next use the reports for manual frontier and building-placement readability review so future balance changes are judged by story quality, not only unit tests.
+28. In progress: PR-12G.1/G.2 kingdom loyalty and rebellion preparation. Villages inside kingdoms now expose loyalty and a primary internal reason in projection/inspection; low-loyalty villages first project `low_loyalty` / `不稳 ·`, eligible negative-loyalty villages project `prepare_rebellion` / `叛乱 ·`, and inspection explains the internal reason plus progress before any actual split or civil war behavior. Larger default starts now spread into distant clusters that can grow into multiple kingdoms, making rebellion tuning observable in normal play. Next: PR-12G.3 split founding from sustained completed rebellion progress.
+
+Current unfinished follow-ups from the WorldBox-alignment pass:
+
+- Same-kingdom settlement connection is not implemented yet. Nearby villages can show stable building/core/frontier territory, but there is no same-kingdom infill rule that actively tries to make adjacent member borders touch.
+- Rebellion is still a preparation state. Low-loyalty villages can become readable unrest or rebellion candidates, but completed rebellion progress does not yet found a rebel kingdom or trigger civil war.
+- Work sites are readable pulses only. There is still no per-citizen worker pathing, road network, market/trade loop, or deep profession simulation.
+- Frontier, building spacing, and early growth pacing still need manual readability review through normal play plus `observe:growth` / `observe:building-sites` before deeper balance changes.
