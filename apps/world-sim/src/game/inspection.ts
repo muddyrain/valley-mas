@@ -82,6 +82,8 @@ const VILLAGE_GROWTH_BLOCKER_LABELS: Record<string, string> = {
   missing_wood: '缺少木材',
   missing_stone: '缺少石料',
   missing_iron: '缺少铁矿',
+  storage_full: '仓储接近满载',
+  insufficient_storage: '仓储容量不足',
   no_wood_source: '无可达木材',
   insufficient_builders: '建筑工不足',
   low_food_reserve: '食物储备偏低',
@@ -138,7 +140,7 @@ const BUILDING_LABELS: Record<string, string> = {
   town_hall: '市政厅',
   house: '民居',
   storage: '仓库',
-  farm: '农田',
+  farm: '风车农田',
   mine: '矿场',
   barrack: '兵营',
   dock: '码头',
@@ -664,9 +666,12 @@ function buildVillageLines(projection: WorldProjection, id: string) {
     `人口：${village.population}`,
     `住房：${village.housingCapacity}`,
     `食物：${Math.round(village.foodInventory)} / ${village.foodCapacity}`,
-    `材料：木材 ${Math.round(village.woodInventory)}, 石料 ${Math.round(
+    `材料：木材 ${Math.round(village.woodInventory)} / ${village.woodCapacity}, 石料 ${Math.round(
       village.stoneInventory,
-    )}, 铁矿 ${Math.round(village.ironInventory)}`,
+    )} / ${village.stoneCapacity}, 铁矿 ${Math.round(village.ironInventory)} / ${
+      village.ironCapacity
+    }`,
+    ...buildVillageFoodDiagnosticLines(village),
     `职业：农民 ${village.jobs.farmer}, 建筑工 ${village.jobs.builder}, 矿工 ${village.jobs.miner}, 士兵 ${
       village.jobs.soldier
     }, 劳力 ${village.jobs.laborer}`,
@@ -691,6 +696,51 @@ function buildVillageLines(projection: WorldProjection, id: string) {
     `军队：${activeArmies.length}`,
     `中心：${formatPosition(village.center)}`,
   ];
+}
+
+function buildVillageFoodDiagnosticLines(village: WorldProjection['villages'][number]) {
+  const reserveTarget = Math.round(village.foodReserveTarget);
+  const reserveBalance = Math.round(village.foodReserveBalance);
+  const balanceText =
+    reserveBalance >= 0 ? `结余 ${reserveBalance}` : `缺口 ${Math.abs(reserveBalance)}`;
+  const activeFarmCount = village.activeFarmCount;
+  const maintainedFarmCount = village.maintainedFarmCount;
+  const farmCoverage =
+    activeFarmCount <= 0
+      ? '暂无农田'
+      : maintainedFarmCount >= activeFarmCount
+        ? '全覆盖'
+        : '农夫不足';
+
+  return [
+    `食物储备：${Math.round(village.foodInventory)} / ${reserveTarget}（${balanceText}）`,
+    `农田维护：${maintainedFarmCount} / ${activeFarmCount}（${farmCoverage}）`,
+    `食物状态：${foodStatusLabel(village, reserveBalance, farmCoverage)}`,
+  ];
+}
+
+function foodStatusLabel(
+  village: WorldProjection['villages'][number],
+  reserveBalance: number,
+  farmCoverage: string,
+) {
+  const storageLimited = village.foodCapacity < village.foodReserveTarget;
+  const lowReserve = reserveBalance < 0;
+  const farmerShortage = farmCoverage === '农夫不足';
+
+  if (storageLimited) {
+    return farmerShortage ? '仓储不足，且农夫不足' : '仓储不足';
+  }
+
+  if (lowReserve) {
+    return farmerShortage ? '储备偏低，且农夫不足' : '储备偏低';
+  }
+
+  if (farmerShortage) {
+    return '农夫不足';
+  }
+
+  return '充足';
 }
 
 function buildUnrestLines(village: Village) {
@@ -838,7 +888,7 @@ function buildKingdomLines(projection: WorldProjection, id: string) {
   );
   const memberVillages = kingdom.villageIds
     .map((villageId) => projection.villages.find((village) => village.id === villageId))
-    .filter((village): village is Village => Boolean(village));
+    .filter((village): village is WorldProjection['villages'][number] => Boolean(village));
   const campaigns = activeArmies.map((army) => {
     const targetVillage = projection.villages.find(
       (village) => village.id === army.targetVillageId,

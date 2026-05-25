@@ -20,6 +20,8 @@ export type VillageGrowthBlocker =
   | 'missing_wood'
   | 'missing_stone'
   | 'missing_iron'
+  | 'storage_full'
+  | 'insufficient_storage'
   | 'no_wood_source'
   | 'insufficient_builders'
   | 'low_food_reserve'
@@ -108,8 +110,11 @@ export type Village = {
   foodInventory: number;
   foodCapacity: number;
   woodInventory: number;
+  woodCapacity: number;
   stoneInventory: number;
+  stoneCapacity: number;
   ironInventory: number;
+  ironCapacity: number;
   jobs: VillageJobs;
   growthPhase: VillageGrowthPhase;
   growthBlockers: VillageGrowthBlocker[];
@@ -129,6 +134,13 @@ export type Village = {
   status: VillageStatus;
 };
 
+export type ProjectedVillage = Village & {
+  foodReserveTarget: number;
+  foodReserveBalance: number;
+  activeFarmCount: number;
+  maintainedFarmCount: number;
+};
+
 export type Kingdom = {
   id: string;
   race: UnitRace;
@@ -139,9 +151,13 @@ export type Kingdom = {
   buildingCount: number;
   territoryTiles: number;
   foodInventory: number;
+  foodCapacity: number;
   woodInventory: number;
+  woodCapacity: number;
   stoneInventory: number;
+  stoneCapacity: number;
   ironInventory: number;
+  ironCapacity: number;
   diplomacyPressure: number;
   diplomacyTargetKingdomId?: string;
   foundedAtTick: number;
@@ -160,6 +176,13 @@ export type VillageBuilding = {
   tier?: number;
   constructionProgress?: number;
   constructionWorkRequired?: number;
+};
+
+export type FarmlandTile = {
+  x: number;
+  y: number;
+  villageId: string;
+  farmId: string;
 };
 
 export type ArmyGroup = {
@@ -391,9 +414,10 @@ export type WorldProjection = {
   paused: boolean;
   tiles: Tile[];
   units: Unit[];
-  villages: Village[];
+  villages: ProjectedVillage[];
   kingdoms: Kingdom[];
   buildings: VillageBuilding[];
+  farmland: FarmlandTile[];
   armies: ArmyGroup[];
   battleMarkers: BattleMarker[];
   territory: TerritoryTile[];
@@ -413,9 +437,13 @@ export type WorldProjection = {
     foodTiles: number;
     totalFood: number;
     totalVillageFood: number;
+    totalVillageFoodCapacity: number;
     totalVillageWood: number;
+    totalVillageWoodCapacity: number;
     totalVillageStone: number;
+    totalVillageStoneCapacity: number;
     totalVillageIron: number;
+    totalVillageIronCapacity: number;
     housingCapacity: number;
   };
 };

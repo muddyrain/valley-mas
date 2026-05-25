@@ -3,9 +3,11 @@ import {
   formatGrowthObservation,
   formatGrowthObservationReport,
   formatSatelliteObservationReport,
+  formatWindmillSupportObservationReport,
   observeEarlySettlement,
   observeEarlySettlementReport,
   observeSatelliteSettlementReport,
+  observeWindmillSupportReport,
 } from './growthObservation';
 
 describe('PR-12F early settlement observation report', () => {
@@ -27,6 +29,15 @@ describe('PR-12F early settlement observation report', () => {
 
     expect(report.runs.length).toBeGreaterThan(1);
     expect(report.runs.every((run) => run.phaseFirstTicks.hamlet !== undefined)).toBe(true);
+  });
+
+  it('prints isolated windmill support diagnostics for food tuning', () => {
+    const report = observeWindmillSupportReport({ ticks: 240 });
+
+    console.info(formatWindmillSupportObservationReport(report));
+
+    expect(report.runs.length).toBeGreaterThan(1);
+    expect(report.runs.every((run) => run.finalFoodReserveBalance >= 0)).toBe(true);
   });
 
   it('prints satellite expansion timing diagnostics for frontier tuning', () => {

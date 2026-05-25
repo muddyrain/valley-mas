@@ -1,6 +1,7 @@
 import { SimWorld } from './SimWorld';
 import type {
   Position,
+  ResourceType,
   SimEvent,
   Unit,
   Village,
@@ -30,6 +31,10 @@ export type GrowthObservationSnapshot = {
   population: number;
   housingCapacity: number;
   foodInventory: number;
+  foodReserveTarget: number;
+  foodReserveBalance: number;
+  activeFarmCount: number;
+  maintainedFarmCount: number;
   woodInventory: number;
   buildings: number;
   territoryTiles: number;
@@ -81,6 +86,30 @@ export type SatelliteObservationReport = {
   runs: SatelliteObservationRun[];
 };
 
+export type WindmillSupportObservationOptions = {
+  seeds?: string[];
+  ticks?: number;
+};
+
+export type WindmillSupportObservationRun = {
+  seed: string;
+  ticks: number;
+  farmReadyTick?: number;
+  population: number;
+  startFoodInventory: number;
+  finalFoodInventory: number;
+  foodReserveTarget: number;
+  finalFoodReserveBalance: number;
+  activeFarmCount: number;
+  maintainedFarmCount: number;
+  status?: Village['status'];
+};
+
+export type WindmillSupportObservationReport = {
+  ticks: number;
+  runs: WindmillSupportObservationRun[];
+};
+
 const DEFAULT_OPTIONS: Required<GrowthObservationOptions> = {
   seed: 'early-settlement-observation',
   ticks: 120,
@@ -96,6 +125,11 @@ const DEFAULT_SATELLITE_REPORT_SEEDS = [
   'satellite-observation-a',
   'satellite-observation-b',
   'satellite-observation-c',
+];
+const DEFAULT_WINDMILL_SUPPORT_SEEDS = [
+  'windmill-support-observation-a',
+  'windmill-support-observation-b',
+  'windmill-support-observation-c',
 ];
 
 const VILLAGE_CHAIN_BUILDINGS = ['house', 'storage', 'farm'] as const;
@@ -126,6 +160,16 @@ export function observeSatelliteSettlementReport(options: SatelliteObservationOp
   };
 }
 
+export function observeWindmillSupportReport(options: WindmillSupportObservationOptions = {}) {
+  const ticks = options.ticks ?? 240;
+  const seeds = options.seeds ?? DEFAULT_WINDMILL_SUPPORT_SEEDS;
+
+  return {
+    ticks,
+    runs: seeds.map((seed) => observeWindmillSupportRun(seed, ticks)),
+  };
+}
+
 function observeEarlySettlementRun(options: GrowthObservationOptions): GrowthObservationRun {
   const scenario = { ...DEFAULT_OPTIONS, ...options };
   const world = createEarlySettlementWorld(scenario.seed);
@@ -152,6 +196,10 @@ function observeEarlySettlementRun(options: GrowthObservationOptions): GrowthObs
         population: village?.population ?? 0,
         housingCapacity: village?.housingCapacity ?? 0,
         foodInventory: village?.foodInventory ?? 0,
+        foodReserveTarget: village?.foodReserveTarget ?? 0,
+        foodReserveBalance: village?.foodReserveBalance ?? 0,
+        activeFarmCount: village?.activeFarmCount ?? 0,
+        maintainedFarmCount: village?.maintainedFarmCount ?? 0,
         woodInventory: village?.woodInventory ?? 0,
         buildings: village
           ? projection.buildings.filter((building) => building.villageId === village.id).length
@@ -198,6 +246,10 @@ export function formatGrowthObservation(snapshot: GrowthObservationSnapshot) {
     `population=${snapshot.population}`,
     `housing=${snapshot.housingCapacity}`,
     `food=${snapshot.foodInventory}`,
+    `reserve=${snapshot.foodReserveTarget}`,
+    `balance=${snapshot.foodReserveBalance}`,
+    `farms=${snapshot.activeFarmCount}`,
+    `maintained=${snapshot.maintainedFarmCount}`,
     `wood=${snapshot.woodInventory}`,
     `buildings=${snapshot.buildings}`,
     `territory=${snapshot.territoryTiles}`,
@@ -210,6 +262,10 @@ export function formatGrowthObservationReport(report: GrowthObservationReport) {
 
 export function formatSatelliteObservationReport(report: SatelliteObservationReport) {
   return report.runs.map(formatSatelliteObservationRun).join('\n');
+}
+
+export function formatWindmillSupportObservationReport(report: WindmillSupportObservationReport) {
+  return report.runs.map(formatWindmillSupportObservationRun).join('\n');
 }
 
 function formatGrowthObservationRun(run: GrowthObservationRun) {
@@ -225,10 +281,27 @@ function formatGrowthObservationRun(run: GrowthObservationRun) {
     `finalBlocker=${final.primaryBlocker ?? '-'}`,
     `population=${final.population}`,
     `housing=${final.housingCapacity}`,
+    `food=${final.foodInventory}/${final.foodReserveTarget}`,
+    `foodBalance=${final.foodReserveBalance}`,
+    `farmCoverage=${final.maintainedFarmCount}/${final.activeFarmCount}`,
     `buildings=${final.buildings}`,
     `territory=${final.territoryTiles}`,
     `missing=${run.missingVillageBuildings.join(',') || '-'}`,
     `events=${run.recentEventSummaries.join(';') || '-'}`,
+  ].join(' | ');
+}
+
+function formatWindmillSupportObservationRun(run: WindmillSupportObservationRun) {
+  return [
+    run.seed,
+    `farmReady=${formatTick(run.farmReadyTick)}`,
+    `population=${run.population}`,
+    `startFood=${run.startFoodInventory}`,
+    `finalFood=${run.finalFoodInventory}`,
+    `reserve=${run.foodReserveTarget}`,
+    `finalBalance=${run.finalFoodReserveBalance}`,
+    `farmCoverage=${run.maintainedFarmCount}/${run.activeFarmCount}`,
+    `status=${run.status ?? '-'}`,
   ].join(' | ');
 }
 
@@ -253,6 +326,83 @@ function formatSatelliteObservationRun(run: SatelliteObservationRun) {
     `childPopulation=${run.childPopulation ?? '-'}`,
     `childHousing=${run.childHousingCapacity ?? '-'}`,
   ].join(' | ');
+}
+
+function observeWindmillSupportRun(seed: string, ticks: number): WindmillSupportObservationRun {
+  const world = createEarlySettlementWorld(seed);
+  let farmReadyTick: number | undefined;
+
+  for (let elapsed = 0; elapsed <= 180; elapsed += 1) {
+    const projection = world.project();
+    const village = projection.villages[0];
+
+    if (village && village.activeFarmCount > 0 && village.maintainedFarmCount > 0) {
+      farmReadyTick = projection.tick;
+      break;
+    }
+
+    world.step();
+  }
+
+  const readyProjection = world.project();
+  const readyVillage = readyProjection.villages[0];
+
+  if (!readyVillage) {
+    throw new Error('Expected windmill support village');
+  }
+
+  const mutableWorld = world as unknown as {
+    villages: Map<string, Village>;
+    units: Map<string, Unit>;
+  };
+  const mutableVillage = mutableWorld.villages.get(readyVillage.id);
+
+  if (!mutableVillage) {
+    throw new Error(`Expected mutable village ${readyVillage.id}`);
+  }
+
+  clearTileResources(world, new Set(['food', 'wood']));
+  mutableVillage.foodInventory = readyVillage.foodReserveTarget;
+  mutableVillage.foodCapacity = Math.max(
+    mutableVillage.foodCapacity,
+    readyVillage.foodReserveTarget,
+  );
+  mutableVillage.woodInventory = 0;
+
+  for (const unit of mutableWorld.units.values()) {
+    if (unit.homeVillageId === mutableVillage.id) {
+      unit.hunger = 0;
+      unit.hp = 100;
+    }
+  }
+
+  const startFoodInventory = mutableVillage.foodInventory;
+
+  for (let elapsed = 0; elapsed < ticks; elapsed += 1) {
+    world.step();
+  }
+
+  const finalVillage = world
+    .project()
+    .villages.find((candidate) => candidate.id === mutableVillage.id);
+
+  if (!finalVillage) {
+    throw new Error(`Expected final village ${mutableVillage.id}`);
+  }
+
+  return {
+    seed,
+    ticks,
+    farmReadyTick,
+    population: finalVillage.population,
+    startFoodInventory,
+    finalFoodInventory: finalVillage.foodInventory,
+    foodReserveTarget: finalVillage.foodReserveTarget,
+    finalFoodReserveBalance: finalVillage.foodReserveBalance,
+    activeFarmCount: finalVillage.activeFarmCount,
+    maintainedFarmCount: finalVillage.maintainedFarmCount,
+    status: finalVillage.status,
+  };
 }
 
 function observeSatelliteSettlementRun(seed: string, ticks: number): SatelliteObservationRun {
@@ -410,6 +560,10 @@ function createEmptySnapshot(tick: number): GrowthObservationSnapshot {
     population: 0,
     housingCapacity: 0,
     foodInventory: 0,
+    foodReserveTarget: 0,
+    foodReserveBalance: 0,
+    activeFarmCount: 0,
+    maintainedFarmCount: 0,
     woodInventory: 0,
     buildings: 0,
     territoryTiles: 0,
@@ -561,6 +715,14 @@ function placeFoodPatch(world: SimWorld, position: Position, amount: number, rad
     tile.terrain = 'grass';
     tile.biome = 'temperate';
     tile.resource = { type: 'food', amount };
+  }
+}
+
+function clearTileResources(world: SimWorld, types: Set<ResourceType>) {
+  for (const tile of world.map.tiles) {
+    if (tile.resource && types.has(tile.resource.type)) {
+      tile.resource = undefined;
+    }
   }
 }
 

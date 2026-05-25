@@ -3,9 +3,11 @@ import {
   formatGrowthObservation,
   formatGrowthObservationReport,
   formatSatelliteObservationReport,
+  formatWindmillSupportObservationReport,
   observeEarlySettlement,
   observeEarlySettlementReport,
   observeSatelliteSettlementReport,
+  observeWindmillSupportReport,
 } from './growthObservation';
 
 describe('early settlement growth observation harness', () => {
@@ -34,6 +36,10 @@ describe('early settlement growth observation harness', () => {
     expect(formatGrowthObservation(hamlet!)).toContain('population=');
     expect(formatGrowthObservation(hamlet!)).toContain('housing=');
     expect(formatGrowthObservation(hamlet!)).toContain('food=');
+    expect(formatGrowthObservation(hamlet!)).toContain('reserve=');
+    expect(formatGrowthObservation(hamlet!)).toContain('balance=');
+    expect(formatGrowthObservation(hamlet!)).toContain('farms=');
+    expect(formatGrowthObservation(hamlet!)).toContain('maintained=');
     expect(formatGrowthObservation(hamlet!)).toContain('wood=');
     expect(formatGrowthObservation(hamlet!)).toContain('buildings=');
     expect(formatGrowthObservation(hamlet!)).toContain('territory=');
@@ -73,6 +79,8 @@ describe('early settlement growth observation harness', () => {
     expect(formatGrowthObservationReport(report)).toContain('growth-diagnosis-a');
     expect(formatGrowthObservationReport(report)).toContain('firstHamlet=');
     expect(formatGrowthObservationReport(report)).toContain('missing=');
+    expect(formatGrowthObservationReport(report)).toContain('foodBalance=');
+    expect(formatGrowthObservationReport(report)).toContain('farmCoverage=');
     expect(formatGrowthObservationReport(report)).toContain('events=');
   });
 
@@ -92,6 +100,28 @@ describe('early settlement growth observation harness', () => {
         run.recentEventSummaries.some((summary) => summary.includes('building_built:farm')),
       ).toBe(true);
     }
+  });
+
+  it('summarizes whether one maintained windmill can support a small village without flooding stores', () => {
+    const report = observeWindmillSupportReport({
+      seeds: ['windmill-support-a', 'windmill-support-b'],
+      ticks: 240,
+    });
+
+    expect(report.runs).toHaveLength(2);
+
+    for (const run of report.runs) {
+      expect(run.population).toBe(12);
+      expect(run.activeFarmCount).toBe(1);
+      expect(run.maintainedFarmCount).toBe(1);
+      expect(run.finalFoodReserveBalance).toBeGreaterThanOrEqual(0);
+      expect(run.finalFoodReserveBalance).toBeLessThanOrEqual(80);
+    }
+
+    const formatted = formatWindmillSupportObservationReport(report);
+
+    expect(formatted).toContain('finalBalance=');
+    expect(formatted).toContain('farmCoverage=1/1');
   });
 
   it('summarizes satellite expansion timing for manual frontier tuning', () => {

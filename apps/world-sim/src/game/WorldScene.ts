@@ -75,7 +75,7 @@ const BUILDING_COLORS = {
   town_hall: 0xf4f4f4,
   house: 0xc2c3c7,
   storage: 0xffcd75,
-  farm: 0x99e550,
+  farm: 0xd6b45f,
   mine: 0x566c86,
   barrack: 0xef7d57,
   dock: 0x29adff,
@@ -405,6 +405,24 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
 
+    for (const field of projection.farmland) {
+      const x = field.x * TILE_SIZE;
+      const y = field.y * TILE_SIZE;
+
+      this.buildingLayer.fillStyle(0x8fc65a, detailLevel === 'local' ? 0.46 : 0.32);
+      this.buildingLayer.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+
+      if (detailLevel === 'local') {
+        this.buildingLayer.lineStyle(0.8, 0xe4cf8a, 0.5);
+        this.buildingLayer.lineBetween(
+          x + 2,
+          y + TILE_SIZE / 2,
+          x + TILE_SIZE - 2,
+          y + TILE_SIZE / 2,
+        );
+      }
+    }
+
     for (const building of projection.buildings) {
       const color = BUILDING_COLORS[building.type];
       const x = building.position.x * TILE_SIZE;
@@ -423,7 +441,14 @@ export class WorldScene extends Phaser.Scene {
       this.buildingLayer.fillStyle(color, alpha);
 
       if (building.type === 'farm') {
-        this.buildingLayer.fillCircle(x, y, 5);
+        this.buildingLayer.fillRect(x - 4, y - 5, 8, 10);
+        this.buildingLayer.fillStyle(0xf4f4f4, alpha);
+        this.buildingLayer.fillTriangle(x, y - 11, x - 6, y - 4, x + 6, y - 4);
+        this.buildingLayer.lineStyle(1.4, 0x101726, 0.8);
+        this.buildingLayer.strokeRect(x - 4, y - 5, 8, 10);
+        this.buildingLayer.lineStyle(1.2, 0xf4f4f4, alpha * 0.9);
+        this.buildingLayer.lineBetween(x - 7, y - 1, x + 7, y - 1);
+        this.buildingLayer.lineBetween(x, y - 8, x, y + 6);
       } else if (building.type === 'mine') {
         this.buildingLayer.fillRect(x - 5, y - 5, 10, 10);
         this.buildingLayer.lineStyle(2, 0xffcd75, alpha);
@@ -772,11 +797,15 @@ export class WorldScene extends Phaser.Scene {
         : [
             `第 ${projection.tick} 刻 · ${projection.paused ? '暂停' : `${projection.speed}x`}`,
             `领土 ${projection.stats.territoryTiles} · 建筑 ${projection.stats.activeBuildings}`,
-            `库存 食物 ${Math.round(projection.stats.totalVillageFood)} / 木石铁 ${Math.round(
+            `库存 食物 ${Math.round(projection.stats.totalVillageFood)} / ${Math.round(
+              projection.stats.totalVillageFoodCapacity,
+            )} · 木石铁 ${Math.round(
               projection.stats.totalVillageWood,
-            )}/${Math.round(projection.stats.totalVillageStone)}/${Math.round(
+            )}/${Math.round(projection.stats.totalVillageWoodCapacity)} ${Math.round(
+              projection.stats.totalVillageStone,
+            )}/${Math.round(projection.stats.totalVillageStoneCapacity)} ${Math.round(
               projection.stats.totalVillageIron,
-            )}`,
+            )}/${Math.round(projection.stats.totalVillageIronCapacity)}`,
             `最大王国 ${leadingKingdom ? `${leadingKingdom.population} 人` : '无'} · 陨落 ${
               projection.stats.fallenKingdoms
             }`,

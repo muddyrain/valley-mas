@@ -63,11 +63,11 @@ The first v2 slice deliberately avoids full WorldBox parity. It establishes the 
 - Multi-origin civilization starts on larger worlds, so normal play can produce multiple villages, kingdoms, border pressure, and later rebellion conditions instead of one capital-centered realm every time.
 - Tile, chunk, biome, and resource data.
 - Units with hunger, age, health, death, birth, movement, stable home village membership, and simple needs.
-- Villages that emerge from local population and food pressure, with food and material stores, housing, and decline state.
-- Village buildings that turn surplus into housing, storage, farm production, mine access, military capacity, shore access, and settlement influence.
+- Villages that emerge from local population and food pressure, with food/material stores, storage capacity, housing, and decline state.
+- Village buildings that turn surplus into housing, storage, windmill-centered farm production, mine access, military capacity, shore access, and settlement influence; storage is now pressure-sensitive and settlement-scale-aware, so near-full material stores or future upgrade capacity limits can drive autonomous warehouse expansion beyond a tiny fixed count in larger towns.
 - Autonomous building placement that reads as local choice: homes cluster without covering resources, farms follow useful land, mines follow ore and hills, military buildings sit toward the settlement edge, docks follow shorelines, and buildings never stack onto the same tile or crowd the first available tile.
-- Readable settlement growth signals: visible resource depletion, construction and gathering work sites, growth blockers, earlier house pressure, and stable territory spread from settlement cores, buildings, and frontier preparation rather than temporary work pulses.
-- Kingdoms that emerge from strong villages and aggregate capital, members, population, buildings, territory, food, and material stores.
+- Readable settlement growth signals: visible resource depletion, windmill farmland rings, construction and gathering work sites, food reserve diagnostics, farmer coverage, growth blockers, earlier house pressure, storage pressure, capacity blockers, and stable territory spread from settlement cores, buildings, and frontier preparation rather than temporary work pulses.
+- Kingdoms that emerge from strong villages and aggregate capital, members, population, buildings, territory, food/material stores, and storage capacity.
 - Village loyalty, unrest, and sustained rebellion-preparation projection inside kingdoms, so distance from capital, overextension, food pressure, war pressure, and strong frontier towns become readable before rebellion mechanics are allowed to split the realm.
 - Diplomacy pressure that turns border friction, resource shortage, and race tendencies into observable declaration causes.
 - Minimal grouped war that lets declarations create armies, casualties, and village ownership changes without full single-unit combat.

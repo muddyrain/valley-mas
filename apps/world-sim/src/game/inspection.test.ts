@@ -97,7 +97,16 @@ describe('world inspection helpers', () => {
     projection.villages[1].rebellionReason = undefined;
     projection.villages[1].rebellionProgress = undefined;
     expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
-      '材料：木材 3, 石料 5, 铁矿 1',
+      '材料：木材 3 / 40, 石料 5 / 20, 铁矿 1 / 10',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '食物储备：80 / 96（缺口 16）',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '农田维护：2 / 3（农夫不足）',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '食物状态：储备偏低，且农夫不足',
     );
     expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
       '职业：农民 4, 建筑工 2, 矿工 1, 士兵 3, 劳力 14',
@@ -114,6 +123,16 @@ describe('world inspection helpers', () => {
     expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
       '主要意图：扩建民居',
     );
+    projection.villages[0].growthBlockers = ['storage_full', 'insufficient_storage'];
+    projection.villages[0].primaryGrowthBlocker = 'insufficient_storage';
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '成长阻塞：仓储接近满载、仓储容量不足',
+    );
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-1' })).toContain(
+      '主要阻塞：仓储容量不足',
+    );
+    projection.villages[0].growthBlockers = ['housing_pressure', 'missing_wood'];
+    projection.villages[0].primaryGrowthBlocker = 'missing_wood';
     projection.villages[0].buildPlan = 'prepare_expansion';
     projection.villages[0].primaryIntention = 'prepare_expansion';
     projection.villages[0].expansionPlan = 'prepare_expansion';
@@ -185,6 +204,9 @@ describe('world inspection helpers', () => {
     );
     expect(buildInspectionLines(projection, { type: 'building', id: 'building-2' })).toContain(
       '废弃时间：第 30 刻',
+    );
+    expect(buildInspectionLines(projection, { type: 'building', id: 'building-3' })).toContain(
+      '类型：风车农田',
     );
     expect(buildInspectionLines(projection, { type: 'building', id: 'building-3' })).toContain(
       '状态：废墟',
@@ -577,9 +599,16 @@ function createProjection(): WorldProjection {
         population: 24,
         foodInventory: 80,
         foodCapacity: 120,
+        foodReserveTarget: 96,
+        foodReserveBalance: -16,
+        activeFarmCount: 3,
+        maintainedFarmCount: 2,
         woodInventory: 3,
+        woodCapacity: 40,
         stoneInventory: 5,
+        stoneCapacity: 20,
         ironInventory: 1,
+        ironCapacity: 10,
         jobs: {
           farmer: 4,
           builder: 2,
@@ -608,9 +637,16 @@ function createProjection(): WorldProjection {
         population: 12,
         foodInventory: 42,
         foodCapacity: 120,
+        foodReserveTarget: 48,
+        foodReserveBalance: -6,
+        activeFarmCount: 1,
+        maintainedFarmCount: 1,
         woodInventory: 1,
+        woodCapacity: 40,
         stoneInventory: 0,
+        stoneCapacity: 20,
         ironInventory: 0,
+        ironCapacity: 10,
         jobs: {
           farmer: 2,
           builder: 1,
@@ -642,9 +678,13 @@ function createProjection(): WorldProjection {
         buildingCount: 1,
         territoryTiles: 12,
         foodInventory: 80,
+        foodCapacity: 120,
         woodInventory: 3,
+        woodCapacity: 40,
         stoneInventory: 5,
+        stoneCapacity: 20,
         ironInventory: 1,
+        ironCapacity: 10,
         diplomacyPressure: 42,
         diplomacyTargetKingdomId: 'kingdom-2',
         foundedAtTick: 4,
@@ -681,6 +721,14 @@ function createProjection(): WorldProjection {
         abandonedAtTick: 40,
         ruinedAtTick: 80,
         tier: 1,
+      },
+    ],
+    farmland: [
+      {
+        x: 27,
+        y: 22,
+        villageId: 'village-1',
+        farmId: 'building-3',
       },
     ],
     armies: [
@@ -766,9 +814,13 @@ function createProjection(): WorldProjection {
       foodTiles: 0,
       totalFood: 0,
       totalVillageFood: 80,
+      totalVillageFoodCapacity: 120,
       totalVillageWood: 3,
+      totalVillageWoodCapacity: 40,
       totalVillageStone: 5,
+      totalVillageStoneCapacity: 20,
       totalVillageIron: 1,
+      totalVillageIronCapacity: 10,
       housingCapacity: 30,
     },
   };

@@ -118,14 +118,14 @@ Status: `Done`
 - Implemented:
   - Villages originally spent food surplus on housing, storage, and farm buildings; PR-12C has since shifted active construction toward material stores.
   - Huts increase housing capacity.
-  - Storage increases village food capacity.
-  - Farms produce village food after nearby deposits are exhausted.
+  - Storage increases village food, wood, stone, and iron capacity; PR-12F now also lets near-full stores or future upgrade capacity blockers drive warehouse expansion.
+  - Farms produce village food after nearby deposits are exhausted; PR-12F now treats them as windmill-centered farmland that requires assigned farmer maintenance for stable field output.
   - Active building influence projects stable walkable territory tiles.
   - Buildings become abandoned remnants instead of disappearing when a village loses all population.
   - HUD renders building count, territory size, territory shading, and building markers.
 - Acceptance gaps:
-  - Buildings are auto-built from food surplus; no worker job, wood cost, construction time, or manual inspection panel yet.
-  - Territory is projection influence only; it can feed diplomacy pressure but does not block movement or create hard borders yet.
+  - Historical PR-7 gaps around worker jobs, wood/material costs, construction time, and inspection panels have since been covered by PR-12C through PR-12F slices.
+  - Territory is projection influence only; it can feed diplomacy pressure and readability, but still does not block movement or create hard borders yet.
   - Ruin decay, reclamation, and cleanup are represented by status fields but not yet simulated.
 
 ## PR-8: Kingdoms
@@ -173,7 +173,7 @@ Status: `Done`
   - Army groups track kingdom, target kingdom, origin village, target village, position, soldier count, morale, formed tick, and status.
   - Armies march toward target villages and resolve grouped battles on contact.
   - Battle resolution applies aggregate casualties to both sides.
-  - Winning attackers can capture the target village and transfer it to the attacker's kingdom.
+  - Winning attackers can capture the target village and transfer it to the attacker's kingdom; active buildings remain with the captured village, while 50% of stored food, wood, stone, and iron is lost to plunder.
   - Army state is exposed through projection and rendered in the Phaser HUD as owner-colored triangular markers.
   - Kingdom territory is rendered with stable kingdom colors, and captured village territory switches to the attacker's color through `kingdomId`.
 - Acceptance gaps:
@@ -282,10 +282,13 @@ Status: `Foundation slice`
   - Resource shortages slow construction, housing growth, and army formation.
 - Implemented:
   - Villages and kingdoms now expose material stores for food, wood, stone, and iron in projection and inspection.
+  - Town halls provide the first small resource capacity, while storage buildings expand food, wood, stone, and iron caps; builder and miner gathering stop when the relevant store is full, resources above remaining capacity are lost when storage stops being active, and prosperous villages now treat near-full material stores or town-hall upgrade capacity blockers as reasons to expand storage. The storage cap now scales with settlement size instead of stopping at a fixed six warehouses, with a current safety hard limit of 10.
   - Villages now auto-assign aggregate farmer, builder, miner, soldier, and laborer jobs and expose those counts in village inspection.
   - Villages start with a small farmer workforce so early settlements can survive before the first farm is built.
   - Camp villages use a lighter early food drain so 30-person bootstrap cases can survive long enough to reach the farm/build loop.
-  - Farmer jobs drive baseline food gathering and amplify farm food production, so farms no longer produce without assigned workers.
+  - Farmer jobs drive baseline food gathering and are now required for stable windmill-field output; active farms project visible farmland tiles around a windmill-like center. Windmill output has been tuned down to a slower early surplus: farmers provide `0.1` food each per tick, maintained windmills provide `0.2` base food per tick, and projected field tiles add `0.012` food each per tick.
+  - Unit hunger now rises more slowly, and the village food interval is a reserve-health check instead of a second direct inventory deduction; residents still eat from village stores when hungry.
+  - Village projection and inspection now expose food reserve target, reserve surplus or deficit, active farms, maintained farms, and a compact food status so food pressure explains itself before deeper crops are added.
   - Builder jobs gather nearby wood deposits into village stores.
   - Wood deposits are now rendered as visible map markers, and stone/iron deposits are also rendered so material sources are visible on the map.
   - House, storage, farm, mine, barrack, dock, and house-upgrade construction are now material-driven instead of food-driven.
@@ -359,6 +362,7 @@ Status: `Foundation slice`
   - Army routes now render from active armies to target villages so wars have a visible direction.
   - Diplomacy and war events now have readable summaries for border friction, resource pressure, rising diplomacy, declarations, army formation, battles, and captures.
   - Army groups now enter a multi-tick fighting/occupation state at the target village; occupation progress, periodic casualties, capture, and retreat are projected to inspection and HUD summaries.
+  - Village capture now keeps active buildings with the captured village but applies a 50% resource plunder loss before the village joins the attacker.
   - Declared wars now remember attacker/target direction and can form a later army after the previous army disbands, with a 360-tick natural re-formation cooldown to avoid immediate wave spam.
   - Wars can now field up to three active army groups from eligible villages in the attacking kingdom, each targeting the nearest valid enemy village instead of only using the capital-to-capital route.
   - Fighting armies now project local attacker and defender battle dots, rendered only at local zoom, to make clashes readable without switching to per-soldier simulation.
@@ -427,8 +431,10 @@ Status: `Foundation slice`
   - Villages now project `growthPhase` (`camp`, `hamlet`, `village`, `town`, or `frontier`) and `primaryIntention`, and village inspection shows both so the early settlement story is readable as a stage plus a next action.
   - Growth phase transitions now emit recent events translated into readable settlement news, so `camp -> hamlet` is visible without opening raw simulation data.
   - `observe:growth` now runs deterministic early-settlement reports for phase, intention, primary blocker, population, housing, stores, buildings, land territory, first phase ticks, missing house/storage/farm chain pieces, and recent phase/building events; it is intentionally observational before future balance tuning.
+  - `observe:growth` now includes food reserve, reserve balance, farm count, maintained farm count, final food balance, and farm coverage in the early-settlement report.
+  - `observe:growth` also prints isolated windmill-support diagnostics; the current tuned result keeps a 12-person village stable for 240 ticks on one maintained windmill after ground food is removed, ending at `finalBalance=48`.
   - `observe:growth` also prints satellite-expansion diagnostics for first expansion status tick/plan, first `prepare_expansion` tick, first `拓荒 ·` label tick, first `扩张原因` / `边疆提示` inspection ticks, `expansionLead`, `labelLead`, `hintLead`, satellite-founded tick, parent population/housing/resource snapshots, and child population/housing after founding.
-  - Farm-leg tuning keeps the first house construction visible at the old cadence, speeds up follow-up house/storage/farm bootstrap attempts, and prevents the phase model from skipping directly from `hamlet` to `town` on level alone.
+  - Farm-leg tuning keeps the first house construction visible at the old cadence, speeds up follow-up house/storage/farm bootstrap attempts, renders farms as windmill-centered farmland rings, and prevents the phase model from skipping directly from `hamlet` to `town` on level alone.
   - Regression coverage now locks camp-to-hamlet phase progression, the first housing-to-storage intention handoff, and rich-town continued building with a town phase.
   - Territory projection now includes faint `surface: water` soft control inside settlement influence, while village/kingdom/HUD territory totals still count only `surface: land`; this makes coast and lake realms visually continuous without making water walkable or buildable.
   - Territory projection now includes `source` (`settlement_core`, `building`, or `frontier`) and tile inspection translates it, so territory growth explains whether it came from stable settlement pressure, built structures, or expansion preparation; temporary work sites no longer create border islands.
@@ -442,8 +448,9 @@ Status: `Foundation slice`
   - Expansion preparation now emits throttled `village_expansion_status` recent events when the parent village changes between ready, missing land, missing resources, or missing population pressure, and village inspection shows the same reason as `扩张原因` plus a short `边疆提示`; young member villages keep ordinary `等待人口增长` wording until they reach the frontier-parent threshold, while mature frontier candidates can show `等待扩张压力`.
   - Map labels now prefix active `prepare_expansion` villages with `拓荒 ·`, so the parent village visibly signals a pending satellite before settlers depart.
 - Planned implementation slices:
-  - `PR-12F.1` Build-plan truth model: continue centralizing plan selection around the primary blocker and align plan selection with phase transitions for blocked or declining settlements.
+  - `PR-12F.1` Build-plan truth model: continue centralizing plan selection around the primary blocker and align plan selection with phase transitions for blocked or declining settlements. Storage pressure is now part of that truth model: near-full material stores and insufficient upgrade capacity can project `expand_storage` with a clear storage blocker, and larger settlements can exceed the old fixed six-storage ceiling.
   - `PR-12F.2` Camp-to-hamlet readability: growth-phase labels are now in projection and inspection; next tune early house/storage/farm pressure and map feedback so the first 5 minutes read as settlement formation rather than instant kingdom setup.
+  - `PR-12F.2a` Food rhythm follow-up: explicit village inspection lines for food reserve target, reserve surplus/deficit, and farmer coverage are in place; `observe:growth` now includes an isolated windmill-support report, and the first tuning pass makes one maintained windmill stabilize a 12-person village without rapid storage flooding. Next broaden the report to larger populations before adding wheat/bread resources.
   - `PR-12F.3` Staged territory influence: source-tagged projection and inspection are in place; next add richer visual legends or per-village summaries only if manual play shows the source labels are not enough.
   - `PR-12F.4` Expansion preparation: initial event, inspection reason, frontier hint, and map-label slice is implemented; next expand reasons only if manual play still makes the frontier story unclear.
   - `PR-12F.5` Early-game observation harness: the first single-settlement, multi-seed, satellite-expansion, building-site, and satellite-readability lead reports are implemented; next use those reports for manual frontier readability review, purpose-scored placement review, and broader expansion balance tuning.
@@ -509,11 +516,11 @@ Current tracked sequence:
 20. Done: PR-12D city growth feedback with names, levels, capital markers, borders, automatic satellite villages, upgrades, and ruins.
 21. Done: PR-12D.5 WorldBox growth alignment foundation with readable work sites, growth blockers, earlier house pressure, and stable settlement/building territory expansion.
 22. In progress: PR-12E kingdom readability now has kingdom/conflict HUD summaries, campaign inspection, army route lines, readable diplomacy/war event summaries, multi-village armies, local battle dots, and forced war/peace; growth blessing and attention markers are deferred behind the civilization spine unless needed for testing.
-23. In progress: PR-12F.1 build-plan truth model. Villages can now scout farther reachable wood instead of freezing when immediate local wood is missing; projection exposes `primaryGrowthBlocker`, `primaryIntention`, and `growthPhase`; inspection distinguishes waiting for population growth, wood, food, building materials, or frontier supplies; mature kingdom villages expose `prepare_expansion` / `waiting_land` before satellite founding.
-24. In progress: PR-12F.2 camp-to-hamlet readability. Explicit phase labels and phase-change recent events now appear in projection/inspection; multi-seed observation now reaches `village` inside the early window after the basic farm leg completes, while `town` waits for specialization or population-driven prosperity instead of level-only promotion.
+23. In progress: PR-12F.1 build-plan truth model. Villages can now scout farther reachable wood instead of freezing when immediate local wood is missing; projection exposes `primaryGrowthBlocker`, `primaryIntention`, and `growthPhase`; inspection distinguishes waiting for population growth, wood, food, building materials, storage pressure, insufficient storage capacity, or frontier supplies; mature kingdom villages expose `prepare_expansion` / `waiting_land` before satellite founding.
+24. In progress: PR-12F.2 camp-to-hamlet readability. Explicit phase labels and phase-change recent events now appear in projection/inspection; farms now project windmill-centered farmland rings; windmill field output requires farmer maintenance; unit hunger is slower and village food reserve checks no longer double-charge inventory; village inspection now shows reserve target, surplus/deficit, farmer coverage, and compact food status; `observe:growth` now includes food reserve/farm coverage plus an isolated windmill-support report; multi-seed observation now reaches `village` inside the early window after the basic farm leg completes, while `town` waits for specialization or population-driven prosperity instead of level-only promotion.
 25. In progress: PR-12F.3 staged territory influence. Projection now identifies settlement core, building, and frontier territory sources; work sites remain visible activity pulses without border claims; next manually inspect whether frontier rendering is readable enough before adding more UI.
 26. In progress: PR-12F.4 expansion preparation. `village_expansion_status` events and village `扩张原因` inspection now surface ready, missing-land, missing-resource, and missing-population-pressure states only for mature frontier-parent candidates; next do manual readability tuning.
-27. In progress: PR-12F.5 observation harness. `observe:growth` now reports deterministic early camp-to-hamlet progression across multiple seeds, phase timing, missing chain buildings, recent growth/build events, satellite-expansion timing, `expansionLead`, `拓荒 ·` label timing, `扩张原因` / `边疆提示` timing, and label/hint lead ticks; `observe:building-sites` reports multi-seed house/storage/farm/mine/barrack placement distances for purpose-scored site tuning; next use the reports for manual frontier and building-placement readability review so future balance changes are judged by story quality, not only unit tests.
+27. In progress: PR-12F.5 observation harness. `observe:growth` now reports deterministic early camp-to-hamlet progression across multiple seeds, phase timing, missing chain buildings, food reserve balance, farm coverage, isolated windmill support, recent growth/build events, satellite-expansion timing, `expansionLead`, `拓荒 ·` label timing, `扩张原因` / `边疆提示` timing, and label/hint lead ticks; `observe:building-sites` reports multi-seed house/storage/farm/mine/barrack placement distances for purpose-scored site tuning; next use the reports for manual frontier and building-placement readability review so future balance changes are judged by story quality, not only unit tests.
 28. In progress: PR-12G.1/G.2 kingdom loyalty and rebellion preparation. Villages inside kingdoms now expose loyalty and a primary internal reason in projection/inspection; low-loyalty villages first project `low_loyalty` / `不稳 ·`, eligible negative-loyalty villages project `prepare_rebellion` / `叛乱 ·`, and inspection explains the internal reason plus progress before any actual split or civil war behavior. Larger default starts now spread into distant clusters that can grow into multiple kingdoms, making rebellion tuning observable in normal play. Next: PR-12G.3 split founding from sustained completed rebellion progress.
 
 Current unfinished follow-ups from the WorldBox-alignment pass:
