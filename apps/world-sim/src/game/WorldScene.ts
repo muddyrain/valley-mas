@@ -508,35 +508,35 @@ export class WorldScene extends Phaser.Scene {
       const x = site.position.x * TILE_SIZE;
       const y = site.position.y * TILE_SIZE;
       const remainingTicks = Math.max(0, site.expiresAtTick - projection.tick);
-      const pulse = 0.55 + 0.35 * Math.sin((projection.tick + site.position.x * 3) / 6);
-      const alpha = Math.min(0.9, Math.max(0.2, (remainingTicks / 60) * pulse));
+      const pulse = 0.42 + 0.18 * Math.sin((projection.tick + site.position.x * 3) / 8);
+      const alpha = Math.min(0.38, Math.max(0.06, (remainingTicks / 60) * pulse));
 
       if (site.type === 'wood_gathering') {
-        this.workSiteLayer.lineStyle(1.2, 0x6abe30, alpha);
-        this.workSiteLayer.strokeCircle(x, y, 6);
-        this.workSiteLayer.fillStyle(0x8f563b, alpha * 0.7);
-        this.workSiteLayer.fillRect(x - 1, y - 6, 2, 12);
+        this.workSiteLayer.lineStyle(0.8, 0x6abe30, alpha);
+        this.workSiteLayer.strokeCircle(x, y, 4);
+        this.workSiteLayer.fillStyle(0x8f563b, alpha * 0.45);
+        this.workSiteLayer.fillRect(x - 1, y - 4, 2, 8);
         continue;
       }
 
       if (site.type === 'farm_tending') {
-        this.workSiteLayer.lineStyle(1.2, 0xffcd75, alpha);
-        this.workSiteLayer.strokeCircle(x, y, 7);
-        this.workSiteLayer.fillStyle(0x99e550, alpha * 0.45);
-        this.workSiteLayer.fillRect(x - 5, y - 2, 10, 4);
+        this.workSiteLayer.lineStyle(0.8, 0xffcd75, alpha);
+        this.workSiteLayer.strokeCircle(x, y, 4);
+        this.workSiteLayer.fillStyle(0x99e550, alpha * 0.28);
+        this.workSiteLayer.fillRect(x - 4, y - 1.5, 8, 3);
         continue;
       }
 
       if (site.type === 'construction') {
-        this.workSiteLayer.lineStyle(1.5, 0xf4f4f4, alpha);
-        this.workSiteLayer.strokeRect(x - 7, y - 7, 14, 14);
-        this.workSiteLayer.fillStyle(0xf4f4f4, alpha * 0.45);
-        this.workSiteLayer.fillTriangle(x, y - 6, x - 5, y + 4, x + 5, y + 4);
+        this.workSiteLayer.lineStyle(1, 0xf4f4f4, alpha);
+        this.workSiteLayer.strokeRect(x - 5, y - 5, 10, 10);
+        this.workSiteLayer.fillStyle(0xf4f4f4, alpha * 0.28);
+        this.workSiteLayer.fillTriangle(x, y - 4, x - 4, y + 3, x + 4, y + 3);
         continue;
       }
 
-      this.workSiteLayer.lineStyle(1.2, 0x99e550, alpha);
-      this.workSiteLayer.strokeCircle(x, y, 8);
+      this.workSiteLayer.lineStyle(0.8, 0x99e550, alpha);
+      this.workSiteLayer.strokeCircle(x, y, 5);
     }
   }
 
