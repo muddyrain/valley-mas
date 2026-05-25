@@ -145,9 +145,9 @@ describe('cameraMath', () => {
   });
 
   it('maps zoom to WorldBox-style render detail levels', () => {
-    expect(getCameraDetailLevel(0.6)).toBe('overview');
-    expect(getCameraDetailLevel(1)).toBe('regional');
-    expect(getCameraDetailLevel(1.6)).toBe('local');
+    expect(getCameraDetailLevel(0.8)).toBe('overview');
+    expect(getCameraDetailLevel(1.4)).toBe('regional');
+    expect(getCameraDetailLevel(2.1)).toBe('local');
   });
 
   it('eases keyboard camera velocity instead of jumping directly to full speed', () => {

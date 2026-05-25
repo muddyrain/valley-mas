@@ -2257,6 +2257,117 @@ describe('SimWorld kingdoms', () => {
     expect(recovered?.rebellionProgress).toBeLessThan(progressBeforeRecovery ?? 0);
   });
 
+  it('splits a completed rebellion into a new kingdom and starts a rebellion war', () => {
+    const world = foundFoodRichVillage('kingdom-rebellion-split-founding', {
+      width: 180,
+      height: 72,
+    });
+
+    for (let tick = 0; tick < 300; tick += 1) {
+      world.step();
+    }
+
+    const parentKingdom = world.project().kingdoms[0];
+    const rebelLeader = addVillageToKingdom(world, parentKingdom.id, {
+      id: 'completed-rebel-frontier',
+      position: { x: 168, y: 62 },
+      population: 72,
+    });
+    const rebelSupporter = addVillageToKingdom(world, parentKingdom.id, {
+      id: 'nearby-rebel-supporter',
+      position: { x: 158, y: 58 },
+      population: 48,
+    });
+
+    for (const village of [rebelLeader, rebelSupporter]) {
+      addResidentUnitsToVillage(world, village.id, village.population);
+      addActiveBuildingToVillage(world, village.id, 'barrack');
+      prepareVillageForBuildingUpgrades(world, village.id, village.population, 500);
+      village.foodInventory = 0;
+    }
+
+    rebelLeader.rebellionProgress = 99;
+    world.step();
+
+    const projection = world.project();
+    const parentAfterSplit = projection.kingdoms.find((kingdom) => kingdom.id === parentKingdom.id);
+    const rebelKingdom = projection.kingdoms.find(
+      (kingdom) => kingdom.id !== parentKingdom.id && kingdom.capitalVillageId === rebelLeader.id,
+    );
+    const rebelLeaderAfterSplit = projection.villages.find(
+      (village) => village.id === rebelLeader.id,
+    );
+    const rebelSupporterAfterSplit = projection.villages.find(
+      (village) => village.id === rebelSupporter.id,
+    );
+
+    expect(rebelKingdom).toBeDefined();
+    expect(parentAfterSplit?.villageIds).not.toContain(rebelLeader.id);
+    expect(parentAfterSplit?.villageIds).not.toContain(rebelSupporter.id);
+    expect(rebelKingdom?.villageIds).toContain(rebelLeader.id);
+    expect(rebelKingdom?.villageIds).toContain(rebelSupporter.id);
+    expect(rebelLeaderAfterSplit?.kingdomId).toBe(rebelKingdom?.id);
+    expect(rebelLeaderAfterSplit?.rebellionProgress).toBeUndefined();
+    expect(rebelSupporterAfterSplit?.kingdomId).toBe(rebelKingdom?.id);
+    expect(projection.recentEvents.some((event) => event.type === 'rebellion_succeeded')).toBe(
+      true,
+    );
+    expect(
+      projection.recentEvents.some(
+        (event) =>
+          event.type === 'war_declared' &&
+          event.payload?.aggressorKingdomId === parentKingdom.id &&
+          event.payload?.targetKingdomId === rebelKingdom?.id,
+      ),
+    ).toBe(true);
+  });
+
+  it('limits completed rebellions to one split per parent kingdom each tick', () => {
+    const world = foundFoodRichVillage('kingdom-rebellion-same-tick-limit', {
+      width: 220,
+      height: 84,
+    });
+
+    for (let tick = 0; tick < 300; tick += 1) {
+      world.step();
+    }
+
+    const parentKingdom = world.project().kingdoms[0];
+    const firstRebel = addVillageToKingdom(world, parentKingdom.id, {
+      id: 'first-same-tick-rebel',
+      position: { x: 188, y: 66 },
+      population: 72,
+    });
+    const secondRebel = addVillageToKingdom(world, parentKingdom.id, {
+      id: 'second-same-tick-rebel',
+      position: { x: 208, y: 72 },
+      population: 72,
+    });
+
+    for (const village of [firstRebel, secondRebel]) {
+      addResidentUnitsToVillage(world, village.id, village.population);
+      addActiveBuildingToVillage(world, village.id, 'barrack');
+      prepareVillageForBuildingUpgrades(world, village.id, village.population, 500);
+      village.foodInventory = 0;
+      village.rebellionProgress = 99;
+    }
+
+    world.step();
+
+    const projection = world.project();
+    const rebellionEvents = projection.recentEvents.filter(
+      (event) => event.type === 'rebellion_succeeded',
+    );
+    const remainingParentVillage = projection.villages.find(
+      (village) => village.id === secondRebel.id,
+    );
+
+    expect(rebellionEvents).toHaveLength(1);
+    expect(projection.kingdoms.filter((kingdom) => kingdom.status !== 'fallen')).toHaveLength(2);
+    expect(remainingParentVillage?.kingdomId).toBe(parentKingdom.id);
+    expect(remainingParentVillage?.rebellionProgress).toBeGreaterThan(0);
+  });
+
   it('lets a mature pressured kingdom found a satellite village on suitable land', () => {
     const world = foundFoodRichVillage('kingdom-satellite-village', { width: 56, height: 32 });
     const village = world.project().villages[0];

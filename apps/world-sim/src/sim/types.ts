@@ -352,6 +352,7 @@ export type SimEvent = {
     | 'kingdom_joined'
     | 'kingdom_capital_changed'
     | 'kingdom_fallen'
+    | 'rebellion_succeeded'
     | 'border_friction'
     | 'resource_pressure'
     | 'diplomacy_pressure'

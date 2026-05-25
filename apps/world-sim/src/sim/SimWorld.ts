@@ -175,6 +175,7 @@ const KINGDOM_REBELLION_MIN_KINGDOM_AGE_TICKS = 120;
 const KINGDOM_REBELLION_PROGRESS_BASE_PER_TICK = 0.8;
 const KINGDOM_REBELLION_PROGRESS_PER_NEGATIVE_LOYALTY = 0.05;
 const KINGDOM_REBELLION_PROGRESS_DECAY_PER_TICK = 2;
+const KINGDOM_REBELLION_SUPPORT_RADIUS = 18;
 const DIPLOMACY_INTERACTION_RANGE = 80;
 const DIPLOMACY_BORDER_RANGE = 28;
 const DIPLOMACY_BORDER_PRESSURE_PER_TILE = 1.2;
@@ -231,6 +232,7 @@ const RECENT_EVENT_TYPES = new Set<SimEvent['type']>([
   'kingdom_joined',
   'kingdom_capital_changed',
   'kingdom_fallen',
+  'rebellion_succeeded',
   'border_friction',
   'resource_pressure',
   'war_declared',
@@ -678,6 +680,7 @@ export class SimWorld {
   private updateVillageRebellionPreparation() {
     const villages = [...this.villages.values()];
     const kingdoms = [...this.kingdoms.values()];
+    const completedParentKingdomIds = new Set<string>();
 
     for (const village of villages) {
       const loyaltyProjection = this.projectVillageLoyalty(village, villages, kingdoms);
@@ -687,9 +690,22 @@ export class SimWorld {
         continue;
       }
 
+      if (village.kingdomId && completedParentKingdomIds.has(village.kingdomId)) {
+        continue;
+      }
+
       const nextProgress =
         (village.rebellionProgress ?? 0) + this.rebellionProgressPerTick(loyaltyProjection.loyalty);
       village.rebellionProgress = clamp(nextProgress, 0, 100);
+
+      if (village.rebellionProgress >= 100) {
+        const parentKingdomId = village.kingdomId;
+        this.completeVillageRebellion(village, loyaltyProjection.loyaltyReason, villages, kingdoms);
+
+        if (parentKingdomId) {
+          completedParentKingdomIds.add(parentKingdomId);
+        }
+      }
     }
   }
 
@@ -722,6 +738,113 @@ export class SimWorld {
       village.population >= KINGDOM_REBELLION_MIN_POPULATION &&
       village.jobs.soldier >= KINGDOM_REBELLION_MIN_SOLDIERS
     );
+  }
+
+  private completeVillageRebellion(
+    leader: Village,
+    reason: VillageLoyaltyReason,
+    villages: Village[],
+    kingdoms: Kingdom[],
+  ) {
+    const parentKingdomId = leader.kingdomId;
+
+    if (!parentKingdomId) {
+      leader.rebellionProgress = undefined;
+      return;
+    }
+
+    const parentKingdom = this.kingdoms.get(parentKingdomId);
+
+    if (!parentKingdom || parentKingdom.status === 'fallen') {
+      leader.rebellionProgress = undefined;
+      return;
+    }
+
+    const supporters = this.findRebellionSupporters(leader, parentKingdom, villages, kingdoms);
+    const supporterIds = new Set(supporters.map((village) => village.id));
+
+    parentKingdom.villageIds = parentKingdom.villageIds.filter(
+      (villageId) => villageId !== leader.id && !supporterIds.has(villageId),
+    );
+    leader.kingdomId = undefined;
+    leader.rebellionProgress = undefined;
+
+    const rebelKingdom = this.foundKingdom(leader);
+
+    for (const supporter of supporters) {
+      supporter.rebellionProgress = undefined;
+      this.addVillageToKingdom(supporter, rebelKingdom);
+    }
+
+    this.refreshKingdomMembership(parentKingdom);
+    this.refreshKingdomMembership(rebelKingdom);
+    this.emit('rebellion_succeeded', `${leader.id} rebelled`, undefined, undefined, leader.center, {
+      villageId: leader.id,
+      parentKingdomId,
+      rebelKingdomId: rebelKingdom.id,
+      supporterCount: supporters.length,
+      reason,
+    });
+
+    if (parentKingdom.villageIds.length > 0) {
+      this.startRebellionWar(parentKingdom, rebelKingdom, leader);
+    }
+  }
+
+  private findRebellionSupporters(
+    leader: Village,
+    parentKingdom: Kingdom,
+    villages: Village[],
+    kingdoms: Kingdom[],
+  ) {
+    const maxSupporters = Math.max(0, Math.ceil(parentKingdom.villageIds.length / 2) - 1);
+
+    return villages
+      .filter((candidate) => {
+        if (
+          candidate.id === leader.id ||
+          candidate.kingdomId !== parentKingdom.id ||
+          candidate.id === parentKingdom.capitalVillageId ||
+          distance(candidate.center, leader.center) > KINGDOM_REBELLION_SUPPORT_RADIUS
+        ) {
+          return false;
+        }
+
+        const loyalty = this.projectVillageLoyalty(candidate, villages, kingdoms);
+
+        return loyalty !== undefined && loyalty.loyalty < KINGDOM_UNREST_WARNING_LOYALTY;
+      })
+      .sort(
+        (left, right) =>
+          distance(left.center, leader.center) - distance(right.center, leader.center),
+      )
+      .slice(0, maxSupporters);
+  }
+
+  private startRebellionWar(parentKingdom: Kingdom, rebelKingdom: Kingdom, leader: Village) {
+    const relation = this.getDiplomacyRelation(parentKingdom.id, rebelKingdom.id);
+    relation.pressure = Math.max(relation.pressure, DIPLOMACY_WAR_DECLARATION_PRESSURE);
+    relation.warDeclared = true;
+    relation.armyFormed = false;
+    relation.aggressorKingdomId = parentKingdom.id;
+    relation.targetKingdomId = rebelKingdom.id;
+    relation.nextArmyReadyTick = undefined;
+    relation.truceUntilTick = undefined;
+
+    this.emit(
+      'war_declared',
+      `${parentKingdom.id} declared rebellion war on ${rebelKingdom.id}`,
+      undefined,
+      undefined,
+      leader.center,
+      {
+        aggressorKingdomId: parentKingdom.id,
+        targetKingdomId: rebelKingdom.id,
+        pressure: round(relation.pressure),
+        rebellion: true,
+      },
+    );
+    this.formArmyGroup(parentKingdom, rebelKingdom, relation);
   }
 
   serializeForReplay() {
@@ -3509,6 +3632,8 @@ export class SimWorld {
       villageId: village.id,
       race: village.race,
     });
+
+    return kingdom;
   }
 
   private addVillageToKingdom(village: Village, kingdom: Kingdom) {

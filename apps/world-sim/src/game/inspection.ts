@@ -176,6 +176,13 @@ export type MapLabel = {
   color: string;
 };
 
+export type MapLabelDetailLevel = 'overview' | 'regional' | 'local';
+
+export type MapLabelOptions = {
+  detailLevel?: MapLabelDetailLevel;
+  selection?: WorldSelection;
+};
+
 export type TerritoryBorderSegment = {
   x1: number;
   y1: number;
@@ -372,27 +379,45 @@ export function buildConflictSummaryLines(projection: WorldProjection, limit = 4
   });
 }
 
-export function buildMapLabels(projection: WorldProjection): MapLabel[] {
-  const villageLabels = projection.villages.map((village) => {
+export function buildMapLabels(
+  projection: WorldProjection,
+  options: MapLabelOptions = {},
+): MapLabel[] {
+  const detailLevel = options.detailLevel ?? 'local';
+  const selectedVillageId =
+    options.selection?.type === 'village' ? options.selection.id : undefined;
+  const villageLabels = projection.villages.map((village, index) => {
     const kingdom = village.kingdomId
       ? projection.kingdoms.find((candidate) => candidate.id === village.kingdomId)
       : undefined;
     const isCapital = kingdom?.capitalVillageId === village.id;
 
     return {
-      id: `village:${village.id}`,
-      text: `${village.rebellionPlan === 'prepare_rebellion' ? '叛乱 · ' : ''}${
-        village.rebellionPlan !== 'prepare_rebellion' && village.unrestPlan === 'low_loyalty'
-          ? '不稳 · '
-          : ''
-      }${village.expansionPlan === 'prepare_expansion' ? '拓荒 · ' : ''}${
-        isCapital ? '首都 · ' : ''
-      }${village.name} · Lv.${village.level}${village.level >= 4 ? ' ★' : ''}`,
-      position: {
-        x: Math.round(village.center.x * 10) / 10,
-        y: Math.round((village.center.y - 1.6) * 10) / 10,
+      label: {
+        id: `village:${village.id}`,
+        text: `${village.rebellionPlan === 'prepare_rebellion' ? '叛乱 · ' : ''}${
+          village.rebellionPlan !== 'prepare_rebellion' && village.unrestPlan === 'low_loyalty'
+            ? '不稳 · '
+            : ''
+        }${village.expansionPlan === 'prepare_expansion' ? '拓荒 · ' : ''}${
+          isCapital ? '首都 · ' : ''
+        }${village.name} · Lv.${village.level}${village.level >= 4 ? ' ★' : ''}`,
+        position: {
+          x: Math.round(village.center.x * 10) / 10,
+          y: Math.round((village.center.y - 1.6) * 10) / 10,
+        },
+        color: kingdom ? hexColor(kingdom.color) : '#f4f4f4',
       },
-      color: kingdom ? hexColor(kingdom.color) : '#f4f4f4',
+      score: mapLabelPriority({
+        isSelected: village.id === selectedVillageId,
+        isCapital,
+        isRebel: village.rebellionPlan === 'prepare_rebellion',
+        isUnstable: village.unrestPlan === 'low_loyalty',
+        isExpanding: village.expansionPlan === 'prepare_expansion',
+        level: village.level,
+        population: village.population,
+        index,
+      }),
     };
   });
   const kingdomLabels = projection.kingdoms
@@ -413,7 +438,15 @@ export function buildMapLabels(projection: WorldProjection): MapLabel[] {
       };
     });
 
-  return [...villageLabels, ...kingdomLabels];
+  return [
+    ...villageLabels
+      .sort(
+        (left, right) => right.score - left.score || left.label.id.localeCompare(right.label.id),
+      )
+      .slice(0, mapVillageLabelLimit(detailLevel))
+      .map((candidate) => candidate.label),
+    ...kingdomLabels,
+  ];
 }
 
 export function isTerritoryTileSelected(
@@ -448,10 +481,10 @@ export function buildTerritoryBorderSegments(
     const color = kingdom?.color ?? 0xffffff;
 
     return [
-      makeBorderSegment(territoryByPosition, tile, 'top', color, selected),
-      makeBorderSegment(territoryByPosition, tile, 'right', color, selected),
-      makeBorderSegment(territoryByPosition, tile, 'bottom', color, selected),
-      makeBorderSegment(territoryByPosition, tile, 'left', color, selected),
+      makeBorderSegment(territoryByPosition, tile, 'top', color, selected, selection),
+      makeBorderSegment(territoryByPosition, tile, 'right', color, selected, selection),
+      makeBorderSegment(territoryByPosition, tile, 'bottom', color, selected, selection),
+      makeBorderSegment(territoryByPosition, tile, 'left', color, selected, selection),
     ].filter((segment): segment is TerritoryBorderSegment => Boolean(segment));
   });
 }
@@ -527,10 +560,26 @@ export function formatEventSummary(event: SimEvent) {
     return `${kingdomPairLabel(event)} 外交压力升至 ${payloadNumber(event, 'pressure', 0)}`;
   }
 
+  if (event.type === 'rebellion_succeeded') {
+    const village = payloadString(event, 'villageId');
+    const parent = payloadString(event, 'parentKingdomId');
+    const rebel = payloadString(event, 'rebelKingdomId');
+    const supporterCount = payloadNumber(event, 'supporterCount', 0);
+
+    return `${villageLabel(village)} 脱离${kingdomLabel(parent)}，成立${kingdomLabel(
+      rebel,
+    )}，${supporterCount} 个响应村庄`;
+  }
+
   if (event.type === 'war_declared') {
     const aggressor = payloadString(event, 'aggressorKingdomId');
     const target = payloadString(event, 'targetKingdomId');
-    const prefix = event.payload?.forced === true ? '神力强制：' : '';
+    const prefix =
+      event.payload?.forced === true
+        ? '神力强制：'
+        : event.payload?.rebellion === true
+          ? '叛乱：'
+          : '';
 
     return `${prefix}${kingdomLabel(aggressor)} 向${kingdomLabel(target)} 宣战，压力 ${payloadNumber(
       event,
@@ -1115,6 +1164,40 @@ function labelFromMap(map: Record<string, string>, value: string) {
   return map[value] ?? value;
 }
 
+function mapVillageLabelLimit(detailLevel: MapLabelDetailLevel) {
+  if (detailLevel === 'overview') {
+    return 8;
+  }
+
+  if (detailLevel === 'regional') {
+    return 12;
+  }
+
+  return 16;
+}
+
+function mapLabelPriority(input: {
+  isSelected: boolean;
+  isCapital: boolean;
+  isRebel: boolean;
+  isUnstable: boolean;
+  isExpanding: boolean;
+  level: number;
+  population: number;
+  index: number;
+}) {
+  return (
+    (input.isSelected ? 10_000 : 0) +
+    (input.isRebel ? 5_000 : 0) +
+    (input.isUnstable ? 3_500 : 0) +
+    (input.isCapital ? 2_500 : 0) +
+    (input.isExpanding ? 1_500 : 0) +
+    input.level * 100 +
+    Math.min(input.population, 99) -
+    input.index / 1_000
+  );
+}
+
 function territoryOwnerKey(tile: TerritoryTile) {
   return tile.kingdomId ? `kingdom:${tile.kingdomId}` : `village:${tile.villageId}`;
 }
@@ -1125,11 +1208,25 @@ function makeBorderSegment(
   edge: 'top' | 'right' | 'bottom' | 'left',
   color: number,
   selected: boolean,
+  selection: WorldSelection,
 ) {
   const neighbor = findAdjacentTerritoryTile(territoryByPosition, tile.x, tile.y, edge);
 
-  if (neighbor && territoryOwnerKey(neighbor) === territoryOwnerKey(tile)) {
+  if (
+    selection.type === 'village' &&
+    tile.villageId !== selection.id &&
+    neighbor?.villageId === selection.id
+  ) {
     return undefined;
+  }
+
+  if (neighbor && territoryOwnerKey(neighbor) === territoryOwnerKey(tile)) {
+    const selectedVillageNeighbor =
+      selection.type === 'village' && selected && neighbor.villageId !== tile.villageId;
+
+    if (!selectedVillageNeighbor) {
+      return undefined;
+    }
   }
 
   const alpha = selected ? 0.95 : tile.surface === 'water' ? 0.28 : 0.42;

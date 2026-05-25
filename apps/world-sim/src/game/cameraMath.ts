@@ -121,11 +121,11 @@ export function getViewportRelativePanSpeed(input: CameraViewportPanSpeedInput) 
 }
 
 export function getCameraDetailLevel(zoom: number): CameraDetailLevel {
-  if (zoom < 0.85) {
+  if (zoom < 1.05) {
     return 'overview';
   }
 
-  if (zoom < 1.35) {
+  if (zoom < 2) {
     return 'regional';
   }
 

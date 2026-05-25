@@ -1,5 +1,12 @@
 import * as Phaser from 'phaser';
-import { type SimCommand, SimLoop, SimWorld, type TerrainType, type WorldProjection } from '../sim';
+import {
+  type ArmyGroup,
+  type SimCommand,
+  SimLoop,
+  SimWorld,
+  type TerrainType,
+  type WorldProjection,
+} from '../sim';
 import {
   type CameraDetailLevel,
   centerCameraView,
@@ -24,6 +31,14 @@ import {
   selectWorldEntity,
   type WorldSelection,
 } from './inspection';
+import { getChunkKeyForTile, getRenderChunkBounds, getVisibleChunkKeys } from './renderChunks';
+import {
+  getDensityAdjustedDetailLevel,
+  getTerritoryFillAlpha,
+  shouldDrawBuildingAtDetail,
+  shouldDrawFarmlandAtDetail,
+} from './renderDetail';
+import { buildHorizontalTileRuns } from './renderRuns';
 import { resolveDemoWorldSeed } from './worldSeed';
 
 const TILE_SIZE = 10;
@@ -38,11 +53,29 @@ const CAMERA_DECELERATION = 56;
 const CAMERA_MAX_DELTA_SECONDS = 1 / 30;
 const CAMERA_VIEWPORT_PADDING_TILES = 18;
 const STATIC_VIEWPORT_REDRAW_TILE_STEP = 16;
+const TERRAIN_RENDER_CHUNK_TILES = 32;
 const STATIC_LAYER_REDRAW_TICK_STEP = 60;
 const HUD_REDRAW_INTERVAL_MS = 250;
 const CAMERA_KEY_ZOOM_PER_SECOND = 2.1;
 const CAMERA_WHEEL_ZOOM_IN = 1.16;
 const CAMERA_WHEEL_ZOOM_OUT = 1 / CAMERA_WHEEL_ZOOM_IN;
+const ARMY_ROUTE_LIMITS: Record<CameraDetailLevel, number> = {
+  overview: 12,
+  regional: 24,
+  local: Infinity,
+};
+const LAYER_DEPTHS = {
+  terrain: 0,
+  territoryFill: 1,
+  territoryBorders: 1.1,
+  resources: 2,
+  workSites: 3,
+  buildings: 4,
+  armyRoutes: 5,
+  armies: 6,
+  units: 7,
+  selection: 8,
+} as const;
 const PANEL_COLOR = 0x101726;
 const PANEL_STROKE = 0x4052a1;
 const TEXT_COLOR = '#f4f4f4';
@@ -105,10 +138,21 @@ const CAMERA_CONTROL_KEYS = new Set([
   '_',
 ]);
 
+function isArmyRouteSelected(army: ArmyGroup, selection: WorldSelection) {
+  if (selection.type === 'army') {
+    return selection.id === army.id;
+  }
+
+  if (selection.type === 'kingdom') {
+    return selection.id === army.kingdomId || selection.id === army.targetKingdomId;
+  }
+
+  return false;
+}
+
 export class WorldScene extends Phaser.Scene {
   private world!: SimWorld;
   private loop!: SimLoop;
-  private terrainLayer?: Phaser.GameObjects.Graphics;
   private territoryLayer?: Phaser.GameObjects.Graphics;
   private unitLayer?: Phaser.GameObjects.Graphics;
   private armyLayer?: Phaser.GameObjects.Graphics;
@@ -124,6 +168,9 @@ export class WorldScene extends Phaser.Scene {
   private controlsText?: Phaser.GameObjects.Text;
   private eventsText?: Phaser.GameObjects.Text;
   private mapLabelTexts: Phaser.GameObjects.Text[] = [];
+  private readonly terrainChunkTextures = new Map<string, Phaser.GameObjects.RenderTexture>();
+  private readonly territoryFillChunkTextures = new Map<string, Phaser.GameObjects.RenderTexture>();
+  private readonly territoryFillChunkDrawKeys = new Map<string, string>();
   private commandSequence = 1;
   private lastTerrainDrawKey = '';
   private lastResourceDrawKey = '';
@@ -132,7 +179,14 @@ export class WorldScene extends Phaser.Scene {
   private lastArmyRouteDrawKey = '';
   private lastMapLabelsDrawKey = '';
   private lastHudDrawKey = '';
+  private lastWorkSiteDrawKey = '';
+  private lastArmyDrawKey = '';
+  private lastUnitDrawKey = '';
+  private lastSelectionDrawKey = '';
   private lastHudDrawAtMs = -Infinity;
+  private lastProjectionCacheKey = '';
+  private terrainTextureRevision = -1;
+  private lastProjection?: WorldProjection;
   private selection: WorldSelection = { type: 'none' };
   private cameraInitialized = false;
   private lastCameraWidth = 0;
@@ -160,7 +214,6 @@ export class WorldScene extends Phaser.Scene {
     );
     this.centerMainCamera();
 
-    this.terrainLayer = this.add.graphics();
     this.territoryLayer = this.add.graphics();
     this.resourceLayer = this.add.graphics();
     this.workSiteLayer = this.add.graphics();
@@ -169,6 +222,14 @@ export class WorldScene extends Phaser.Scene {
     this.armyLayer = this.add.graphics();
     this.unitLayer = this.add.graphics();
     this.selectionLayer = this.add.graphics();
+    this.territoryLayer.setDepth(LAYER_DEPTHS.territoryBorders);
+    this.resourceLayer.setDepth(LAYER_DEPTHS.resources);
+    this.workSiteLayer.setDepth(LAYER_DEPTHS.workSites);
+    this.buildingLayer.setDepth(LAYER_DEPTHS.buildings);
+    this.armyRouteLayer.setDepth(LAYER_DEPTHS.armyRoutes);
+    this.armyLayer.setDepth(LAYER_DEPTHS.armies);
+    this.unitLayer.setDepth(LAYER_DEPTHS.units);
+    this.selectionLayer.setDepth(LAYER_DEPTHS.selection);
     this.uiLayer = this.add.graphics();
     this.uiLayer.setScrollFactor(0);
     this.uiLayer.setDepth(20);
@@ -203,16 +264,23 @@ export class WorldScene extends Phaser.Scene {
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
     this.clearMapLabels();
+    this.destroyTerrainChunkTextures();
+    this.destroyTerritoryFillChunkTextures();
   }
 
   private renderProjection(projection: WorldProjection, timeMs: number) {
-    const detailLevel = this.getRenderDetailLevel();
+    const detailLevel = this.getEffectiveRenderDetailLevel(projection);
     const terrainDrawKey = this.getTerrainDrawKey(projection);
     const resourceDrawKey = this.getResourceDrawKey(projection, detailLevel);
     const territoryDrawKey = this.getTerritoryDrawKey(projection);
     const buildingDrawKey = this.getBuildingDrawKey(projection, detailLevel);
-    const armyRouteDrawKey = this.getArmyRouteDrawKey(projection);
+    const armyRouteDrawKey = this.getArmyRouteDrawKey(projection, detailLevel);
     const mapLabelsDrawKey = this.getMapLabelsDrawKey(projection, detailLevel);
+    const workSiteDrawKey = this.getWorkSiteDrawKey(projection, detailLevel);
+    const armyDrawKey = this.getArmyDrawKey(projection, detailLevel);
+    const unitDrawKey = this.getUnitDrawKey(projection, detailLevel);
+    const selectionDrawKey = this.getSelectionContentDrawKey(projection);
+
     if (terrainDrawKey !== this.lastTerrainDrawKey) {
       this.drawTerrain(projection);
       this.lastTerrainDrawKey = terrainDrawKey;
@@ -228,7 +296,10 @@ export class WorldScene extends Phaser.Scene {
       this.lastResourceDrawKey = resourceDrawKey;
     }
 
-    this.drawWorkSites(projection, detailLevel);
+    if (workSiteDrawKey !== this.lastWorkSiteDrawKey) {
+      this.drawWorkSites(projection, detailLevel);
+      this.lastWorkSiteDrawKey = workSiteDrawKey;
+    }
 
     if (buildingDrawKey !== this.lastBuildingDrawKey) {
       this.drawBuildings(projection, detailLevel);
@@ -236,16 +307,27 @@ export class WorldScene extends Phaser.Scene {
     }
 
     if (armyRouteDrawKey !== this.lastArmyRouteDrawKey) {
-      this.drawArmyRoutes(projection);
+      this.drawArmyRoutes(projection, detailLevel);
       this.lastArmyRouteDrawKey = armyRouteDrawKey;
     }
 
-    this.drawArmies(projection, detailLevel);
-    this.drawUnits(projection, detailLevel);
-    this.drawSelection(projection);
+    if (armyDrawKey !== this.lastArmyDrawKey) {
+      this.drawArmies(projection, detailLevel);
+      this.lastArmyDrawKey = armyDrawKey;
+    }
+
+    if (unitDrawKey !== this.lastUnitDrawKey) {
+      this.drawUnits(projection, detailLevel);
+      this.lastUnitDrawKey = unitDrawKey;
+    }
+
+    if (selectionDrawKey !== this.lastSelectionDrawKey) {
+      this.drawSelection(projection);
+      this.lastSelectionDrawKey = selectionDrawKey;
+    }
 
     if (mapLabelsDrawKey !== this.lastMapLabelsDrawKey) {
-      this.drawMapLabels(projection);
+      this.drawMapLabels(projection, detailLevel);
       this.lastMapLabelsDrawKey = mapLabelsDrawKey;
     }
 
@@ -262,16 +344,89 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private drawTerrain(projection: WorldProjection) {
-    if (!this.terrainLayer) {
+    if (this.terrainTextureRevision !== projection.terrainRevision) {
+      this.destroyTerrainChunkTextures();
+      this.terrainTextureRevision = projection.terrainRevision;
+    }
+
+    const visibleChunkKeys = getVisibleChunkKeys(projection.tiles, TERRAIN_RENDER_CHUNK_TILES);
+
+    for (const key of visibleChunkKeys) {
+      this.ensureTerrainChunkTexture(key, projection);
+    }
+
+    for (const [key, texture] of this.terrainChunkTextures) {
+      texture.setVisible(visibleChunkKeys.has(key));
+    }
+  }
+
+  private ensureTerrainChunkTexture(key: string, projection: WorldProjection) {
+    if (this.terrainChunkTextures.has(key)) {
       return;
     }
 
-    this.terrainLayer.clear();
+    const [chunkX, chunkY] = key.split(':').map(Number);
+    const bounds = getRenderChunkBounds(
+      chunkX,
+      chunkY,
+      projection.width,
+      projection.height,
+      TERRAIN_RENDER_CHUNK_TILES,
+    );
 
-    for (const tile of projection.tiles) {
-      this.terrainLayer.fillStyle(TERRAIN_COLORS[tile.terrain], 0.94);
-      this.terrainLayer.fillRect(tile.x * TILE_SIZE, tile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    if (bounds.width <= 0 || bounds.height <= 0) {
+      return;
     }
+
+    const texture = this.add.renderTexture(
+      bounds.tileX * TILE_SIZE,
+      bounds.tileY * TILE_SIZE,
+      bounds.width * TILE_SIZE,
+      bounds.height * TILE_SIZE,
+    );
+    texture.setOrigin(0);
+    texture.setDepth(LAYER_DEPTHS.terrain);
+    this.uiCamera?.ignore(texture);
+
+    const chunkProjection = this.world.project({
+      viewport: {
+        x: bounds.tileX,
+        y: bounds.tileY,
+        width: bounds.width,
+        height: bounds.height,
+        paddingTiles: 0,
+      },
+    });
+
+    for (const run of buildHorizontalTileRuns(chunkProjection.tiles, (tile) => tile.terrain)) {
+      texture.fill(
+        TERRAIN_COLORS[run.sample.terrain],
+        0.94,
+        (run.x - bounds.tileX) * TILE_SIZE,
+        (run.y - bounds.tileY) * TILE_SIZE,
+        run.width * TILE_SIZE,
+        TILE_SIZE,
+      );
+    }
+
+    this.terrainChunkTextures.set(key, texture);
+  }
+
+  private destroyTerrainChunkTextures() {
+    for (const texture of this.terrainChunkTextures.values()) {
+      texture.destroy();
+    }
+
+    this.terrainChunkTextures.clear();
+  }
+
+  private destroyTerritoryFillChunkTextures() {
+    for (const texture of this.territoryFillChunkTextures.values()) {
+      texture.destroy();
+    }
+
+    this.territoryFillChunkTextures.clear();
+    this.territoryFillChunkDrawKeys.clear();
   }
 
   private drawResources(projection: WorldProjection, detailLevel: CameraDetailLevel) {
@@ -335,7 +490,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.territoryLayer.clear();
 
-    for (const tile of projection.territory) {
+    const territoryTiles = projection.territory.map((tile) => {
       const kingdom = tile.kingdomId ? kingdomsById.get(tile.kingdomId) : undefined;
       const color = kingdom?.color ?? 0xffffff;
       const selected =
@@ -344,18 +499,22 @@ export class WorldScene extends Phaser.Scene {
           : this.selection.type === 'kingdom'
             ? tile.kingdomId === this.selection.id
             : false;
-      const alpha =
-        tile.surface === 'water'
-          ? selected
-            ? 0.22
-            : sourceAlpha(tile.source, kingdom ? 0.13 : 0.05)
-          : selected
-            ? 0.34
-            : sourceAlpha(tile.source, kingdom ? 0.22 : 0.08);
+      const alpha = getTerritoryFillAlpha({
+        surface: tile.surface,
+        source: tile.source,
+        hasKingdom: Boolean(kingdom),
+        selected,
+      });
 
-      this.territoryLayer.fillStyle(color, alpha);
-      this.territoryLayer.fillRect(tile.x * TILE_SIZE, tile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-    }
+      return {
+        ...tile,
+        color,
+        alpha,
+        selected,
+      };
+    });
+
+    this.drawTerritoryFillChunks(projection, territoryTiles);
 
     const borderSegments = buildTerritoryBorderSegments(projection, this.selection);
 
@@ -370,6 +529,105 @@ export class WorldScene extends Phaser.Scene {
       this.territoryLayer.lineTo(segment.x2 * TILE_SIZE, segment.y2 * TILE_SIZE);
       this.territoryLayer.strokePath();
     }
+  }
+
+  private drawTerritoryFillChunks(
+    projection: WorldProjection,
+    territoryTiles: Array<
+      WorldProjection['territory'][number] & { color: number; alpha: number; selected: boolean }
+    >,
+  ) {
+    const visibleChunkKeys = getVisibleChunkKeys(territoryTiles, TERRAIN_RENDER_CHUNK_TILES);
+
+    for (const [key, texture] of this.territoryFillChunkTextures) {
+      texture.setVisible(visibleChunkKeys.has(key));
+    }
+
+    for (const key of visibleChunkKeys) {
+      this.ensureTerritoryFillChunkTexture(key, projection);
+    }
+
+    const tilesByChunk = new Map<string, typeof territoryTiles>();
+    for (const tile of territoryTiles) {
+      const key = getChunkKeyForTile(tile.x, tile.y, TERRAIN_RENDER_CHUNK_TILES);
+      const chunkTiles = tilesByChunk.get(key);
+      if (chunkTiles) {
+        chunkTiles.push(tile);
+      } else {
+        tilesByChunk.set(key, [tile]);
+      }
+    }
+
+    for (const [key, chunkTiles] of tilesByChunk) {
+      const texture = this.territoryFillChunkTextures.get(key);
+      if (!texture) {
+        continue;
+      }
+
+      const drawKey = chunkTiles
+        .map(
+          (tile) =>
+            `${tile.x},${tile.y},${tile.color},${tile.alpha},${tile.selected},${tile.source},${tile.surface}`,
+        )
+        .join('|');
+      if (this.territoryFillChunkDrawKeys.get(key) === drawKey) {
+        continue;
+      }
+
+      const [chunkX, chunkY] = key.split(':').map(Number);
+      const bounds = getRenderChunkBounds(
+        chunkX,
+        chunkY,
+        projection.width,
+        projection.height,
+        TERRAIN_RENDER_CHUNK_TILES,
+      );
+      texture.clear();
+      for (const run of buildHorizontalTileRuns(
+        chunkTiles,
+        (tile) => `${tile.color}:${tile.alpha}:${tile.selected}`,
+      )) {
+        texture.fill(
+          run.sample.color,
+          run.sample.alpha,
+          (run.x - bounds.tileX) * TILE_SIZE,
+          (run.y - bounds.tileY) * TILE_SIZE,
+          run.width * TILE_SIZE,
+          TILE_SIZE,
+        );
+      }
+      this.territoryFillChunkDrawKeys.set(key, drawKey);
+    }
+  }
+
+  private ensureTerritoryFillChunkTexture(key: string, projection: WorldProjection) {
+    if (this.territoryFillChunkTextures.has(key)) {
+      return;
+    }
+
+    const [chunkX, chunkY] = key.split(':').map(Number);
+    const bounds = getRenderChunkBounds(
+      chunkX,
+      chunkY,
+      projection.width,
+      projection.height,
+      TERRAIN_RENDER_CHUNK_TILES,
+    );
+
+    if (bounds.width <= 0 || bounds.height <= 0) {
+      return;
+    }
+
+    const texture = this.add.renderTexture(
+      bounds.tileX * TILE_SIZE,
+      bounds.tileY * TILE_SIZE,
+      bounds.width * TILE_SIZE,
+      bounds.height * TILE_SIZE,
+    );
+    texture.setOrigin(0);
+    texture.setDepth(LAYER_DEPTHS.territoryFill);
+    this.uiCamera?.ignore(texture);
+    this.territoryFillChunkTextures.set(key, texture);
   }
 
   private drawUnits(projection: WorldProjection, detailLevel: CameraDetailLevel) {
@@ -401,18 +659,13 @@ export class WorldScene extends Phaser.Scene {
 
     this.buildingLayer.clear();
 
-    if (detailLevel === 'overview') {
-      return;
-    }
+    if (shouldDrawFarmlandAtDetail(detailLevel)) {
+      for (const field of projection.farmland) {
+        const x = field.x * TILE_SIZE;
+        const y = field.y * TILE_SIZE;
 
-    for (const field of projection.farmland) {
-      const x = field.x * TILE_SIZE;
-      const y = field.y * TILE_SIZE;
-
-      this.buildingLayer.fillStyle(0x8fc65a, detailLevel === 'local' ? 0.46 : 0.32);
-      this.buildingLayer.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-
-      if (detailLevel === 'local') {
+        this.buildingLayer.fillStyle(0x8fc65a, 0.46);
+        this.buildingLayer.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
         this.buildingLayer.lineStyle(0.8, 0xe4cf8a, 0.5);
         this.buildingLayer.lineBetween(
           x + 2,
@@ -424,6 +677,10 @@ export class WorldScene extends Phaser.Scene {
     }
 
     for (const building of projection.buildings) {
+      if (!shouldDrawBuildingAtDetail(building, detailLevel)) {
+        continue;
+      }
+
       const color = BUILDING_COLORS[building.type];
       const x = building.position.x * TILE_SIZE;
       const y = building.position.y * TILE_SIZE;
@@ -477,18 +734,18 @@ export class WorldScene extends Phaser.Scene {
       }
 
       if (isAbandoned || isRuined) {
-        this.buildingLayer.lineStyle(1.5, isRuined ? 0x333c57 : color, isRuined ? 0.82 : 0.48);
-        this.buildingLayer.strokeRect(x - 6, y - 6, 12, 12);
+        this.buildingLayer.lineStyle(1.1, isRuined ? 0x566c86 : color, isRuined ? 0.5 : 0.48);
+        this.buildingLayer.strokeRect(x - 5, y - 5, 10, 10);
       }
 
       if (isRuined) {
-        this.buildingLayer.lineStyle(2, 0x333c57, 0.88);
-        this.buildingLayer.beginPath();
-        this.buildingLayer.moveTo(x - 5, y - 5);
-        this.buildingLayer.lineTo(x + 5, y + 5);
-        this.buildingLayer.moveTo(x + 5, y - 5);
-        this.buildingLayer.lineTo(x - 5, y + 5);
-        this.buildingLayer.strokePath();
+        this.buildingLayer.fillStyle(0x566c86, 0.48);
+        this.buildingLayer.fillRect(x - 5, y + 1, 4, 3);
+        this.buildingLayer.fillRect(x, y - 4, 5, 3);
+        this.buildingLayer.fillRect(x + 2, y + 3, 3, 2);
+        this.buildingLayer.lineStyle(1.2, 0xc2c3c7, 0.34);
+        this.buildingLayer.lineBetween(x - 4, y - 2, x + 3, y - 5);
+        this.buildingLayer.lineBetween(x - 2, y + 5, x + 5, y + 2);
       }
     }
   }
@@ -592,32 +849,32 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private drawArmyRoutes(projection: WorldProjection) {
+  private drawArmyRoutes(projection: WorldProjection, detailLevel: CameraDetailLevel) {
     if (!this.armyRouteLayer) {
       return;
     }
 
     this.armyRouteLayer.clear();
+    const villagesById = new Map(projection.villages.map((village) => [village.id, village]));
+    const visibleArmies = projection.armies
+      .filter((army) => army.status !== 'disbanded')
+      .sort(
+        (left, right) =>
+          Number(isArmyRouteSelected(right, this.selection)) -
+            Number(isArmyRouteSelected(left, this.selection)) ||
+          right.soldierCount - left.soldierCount ||
+          left.id.localeCompare(right.id),
+      )
+      .slice(0, ARMY_ROUTE_LIMITS[detailLevel]);
 
-    for (const army of projection.armies) {
-      if (army.status === 'disbanded') {
-        continue;
-      }
-
-      const targetVillage = projection.villages.find(
-        (village) => village.id === army.targetVillageId,
-      );
+    for (const army of visibleArmies) {
+      const targetVillage = villagesById.get(army.targetVillageId);
 
       if (!targetVillage) {
         continue;
       }
 
-      const selected =
-        this.selection.type === 'army'
-          ? this.selection.id === army.id
-          : this.selection.type === 'kingdom'
-            ? this.selection.id === army.kingdomId || this.selection.id === army.targetKingdomId
-            : false;
+      const selected = isArmyRouteSelected(army, this.selection);
       const routeColor = army.status === 'fighting' ? 0xffcd75 : 0xef7d57;
 
       this.armyRouteLayer.lineStyle(selected ? 2.5 : 1.5, routeColor, selected ? 0.9 : 0.46);
@@ -748,10 +1005,10 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private drawMapLabels(projection: WorldProjection) {
+  private drawMapLabels(projection: WorldProjection, detailLevel: CameraDetailLevel) {
     this.clearMapLabels();
 
-    for (const label of buildMapLabels(projection)) {
+    for (const label of buildMapLabels(projection, { detailLevel, selection: this.selection })) {
       const x = Math.round(label.position.x * TILE_SIZE);
       const y = Math.round(label.position.y * TILE_SIZE);
       const text = this.add.text(x, y, label.text, {
@@ -1137,20 +1394,54 @@ export class WorldScene extends Phaser.Scene {
       viewportWidth: camera.width / camera.zoom,
       viewportHeight: camera.height / camera.zoom,
     });
+    const viewport = {
+      x: view.x / TILE_SIZE,
+      y: view.y / TILE_SIZE,
+      width: view.width / TILE_SIZE,
+      height: view.height / TILE_SIZE,
+      paddingTiles: CAMERA_VIEWPORT_PADDING_TILES,
+    };
+    const cacheKey = [
+      this.world.currentTick,
+      this.world.paused ? 'paused' : this.world.speed,
+      Math.floor(viewport.x),
+      Math.floor(viewport.y),
+      Math.ceil(viewport.x + viewport.width),
+      Math.ceil(viewport.y + viewport.height),
+      viewport.paddingTiles,
+    ].join(':');
 
-    return this.world.project({
-      viewport: {
-        x: view.x / TILE_SIZE,
-        y: view.y / TILE_SIZE,
-        width: view.width / TILE_SIZE,
-        height: view.height / TILE_SIZE,
-        paddingTiles: CAMERA_VIEWPORT_PADDING_TILES,
-      },
-    });
+    if (this.lastProjection && cacheKey === this.lastProjectionCacheKey) {
+      return this.lastProjection;
+    }
+
+    const projection = this.world.project({ viewport });
+
+    this.lastProjection = projection;
+    this.lastProjectionCacheKey = cacheKey;
+
+    return projection;
   }
 
   private getTerrainDrawKey(projection: WorldProjection) {
     return `${projection.terrainRevision}:${this.getViewportBucketKey(projection)}`;
+  }
+
+  private getEffectiveRenderDetailLevel(projection: WorldProjection) {
+    const visibleResourceTiles = projection.tiles.reduce(
+      (count, tile) => (tile.resource && tile.resource.amount > 0 ? count + 1 : count),
+      0,
+    );
+
+    return getDensityAdjustedDetailLevel({
+      detailLevel: this.getRenderDetailLevel(),
+      visibleVillages: projection.villages.length,
+      visibleBuildings: projection.buildings.length,
+      visibleResourceTiles,
+      visibleUnits: projection.units.length,
+      visibleArmies: projection.armies.filter((army) => army.status !== 'disbanded').length,
+      visibleWorkSites: projection.workSites.length,
+    });
   }
 
   private getResourceDrawKey(projection: WorldProjection, detailLevel: CameraDetailLevel) {
@@ -1169,7 +1460,7 @@ export class WorldScene extends Phaser.Scene {
       projection.stats.territoryTiles,
       projection.territory.length,
       projection.terrainRevision,
-      this.getStaticLayerTickBucket(projection),
+      this.getKingdomOwnershipDrawKey(projection),
     ].join(':');
   }
 
@@ -1183,8 +1474,9 @@ export class WorldScene extends Phaser.Scene {
     ].join(':');
   }
 
-  private getArmyRouteDrawKey(projection: WorldProjection) {
+  private getArmyRouteDrawKey(projection: WorldProjection, detailLevel: CameraDetailLevel) {
     return [
+      detailLevel,
       this.getViewportBucketKey(projection),
       this.getSelectionDrawKey(),
       projection.armies.length,
@@ -1192,13 +1484,42 @@ export class WorldScene extends Phaser.Scene {
     ].join(':');
   }
 
+  private getWorkSiteDrawKey(projection: WorldProjection, detailLevel: CameraDetailLevel) {
+    return [
+      detailLevel,
+      this.getViewportBucketKey(projection),
+      projection.tick,
+      projection.workSites.length,
+    ].join(':');
+  }
+
+  private getArmyDrawKey(projection: WorldProjection, detailLevel: CameraDetailLevel) {
+    return [
+      detailLevel,
+      this.getViewportBucketKey(projection),
+      projection.tick,
+      projection.armies.length,
+      projection.battleMarkers.length,
+    ].join(':');
+  }
+
+  private getUnitDrawKey(projection: WorldProjection, detailLevel: CameraDetailLevel) {
+    return [
+      detailLevel,
+      this.getViewportBucketKey(projection),
+      projection.tick,
+      projection.units.length,
+    ].join(':');
+  }
+
   private getMapLabelsDrawKey(projection: WorldProjection, detailLevel: CameraDetailLevel) {
     return [
       detailLevel,
       this.getViewportBucketKey(projection),
+      this.getSelectionDrawKey(),
       projection.villages.length,
       projection.kingdoms.length,
-      this.getStaticLayerTickBucket(projection),
+      this.getMapLabelContentDrawKey(projection),
     ].join(':');
   }
 
@@ -1240,6 +1561,44 @@ export class WorldScene extends Phaser.Scene {
 
   private getStaticLayerTickBucket(projection: WorldProjection) {
     return Math.floor(projection.tick / STATIC_LAYER_REDRAW_TICK_STEP);
+  }
+
+  private getSelectionContentDrawKey(projection: WorldProjection) {
+    return [this.getSelectionDrawKey(), projection.tick].join(':');
+  }
+
+  private getKingdomOwnershipDrawKey(projection: WorldProjection) {
+    const villageOwners = projection.villages
+      .map((village) => `${village.id}:${village.kingdomId ?? 'none'}:${village.territoryTiles}`)
+      .join('|');
+    const kingdoms = projection.kingdoms
+      .map(
+        (kingdom) =>
+          `${kingdom.id}:${kingdom.color}:${kingdom.status}:${kingdom.capitalVillageId}:${kingdom.villageIds.length}`,
+      )
+      .join('|');
+
+    return `${villageOwners}/${kingdoms}`;
+  }
+
+  private getMapLabelContentDrawKey(projection: WorldProjection) {
+    const villages = projection.villages
+      .map(
+        (village) =>
+          `${village.id}:${village.name}:${village.level}:${village.population}:${
+            village.kingdomId ?? 'none'
+          }:${village.expansionPlan ?? 'none'}:${village.unrestPlan ?? 'none'}:${
+            village.rebellionPlan ?? 'none'
+          }`,
+      )
+      .join('|');
+    const kingdoms = projection.kingdoms
+      .map(
+        (kingdom) => `${kingdom.id}:${kingdom.color}:${kingdom.status}:${kingdom.capitalVillageId}`,
+      )
+      .join('|');
+
+    return `${villages}/${kingdoms}`;
   }
 
   private getSelectionDrawKey() {
@@ -1453,7 +1812,6 @@ export class WorldScene extends Phaser.Scene {
 
   private setupUiCamera() {
     const worldObjects: Array<Phaser.GameObjects.GameObject | undefined> = [
-      this.terrainLayer,
       this.territoryLayer,
       this.resourceLayer,
       this.workSiteLayer,
@@ -1601,15 +1959,4 @@ function translateEvent(message: string) {
   }
 
   return message;
-}
-
-function sourceAlpha(source: string, baseAlpha: number) {
-  switch (source) {
-    case 'work_site':
-      return baseAlpha * 0.7;
-    case 'frontier':
-      return baseAlpha * 0.55;
-    default:
-      return baseAlpha;
-  }
 }

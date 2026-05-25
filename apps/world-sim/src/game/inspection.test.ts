@@ -293,6 +293,99 @@ describe('world inspection helpers', () => {
     );
   });
 
+  it('limits overview map labels to capitals and unstable villages first', () => {
+    const projection = createProjection();
+
+    projection.kingdoms[0].villageIds = ['village-1', 'village-2'];
+    projection.villages[1].kingdomId = 'kingdom-1';
+    projection.villages[1].rebellionPlan = 'prepare_rebellion';
+
+    for (let index = 3; index <= 20; index += 1) {
+      projection.villages.push({
+        ...projection.villages[1],
+        id: `village-${index}`,
+        name: `边村${index}`,
+        center: { x: 10 + index, y: 16 + index },
+        level: 1,
+        population: 5,
+        rebellionPlan: undefined,
+        unrestPlan: index === 3 ? 'low_loyalty' : undefined,
+      });
+    }
+
+    const overviewLabels = buildMapLabels(projection, { detailLevel: 'overview' });
+    const villageLabels = overviewLabels.filter((label) => label.id.startsWith('village:'));
+
+    expect(villageLabels).toHaveLength(8);
+    expect(overviewLabels.some((label) => label.text === '首都 · 晨林村 · Lv.3')).toBe(true);
+    expect(overviewLabels.some((label) => label.text === '叛乱 · 河湾村 · Lv.2')).toBe(true);
+    expect(overviewLabels.some((label) => label.text === '不稳 · 边村3 · Lv.1')).toBe(true);
+  });
+
+  it('keeps regional map labels capped below dense village counts', () => {
+    const projection = createProjection();
+
+    for (let index = 3; index <= 24; index += 1) {
+      projection.villages.push({
+        ...projection.villages[1],
+        id: `village-${index}`,
+        name: `边村${index}`,
+        center: { x: 12 + index, y: 17 + index },
+        level: index % 4 === 0 ? 4 : 2,
+        population: 8 + index,
+      });
+    }
+
+    const labels = buildMapLabels(projection, { detailLevel: 'regional' }).filter((label) =>
+      label.id.startsWith('village:'),
+    );
+
+    expect(labels).toHaveLength(12);
+  });
+
+  it('keeps local map labels capped in dense village views', () => {
+    const projection = createProjection();
+
+    for (let index = 3; index <= 24; index += 1) {
+      projection.villages.push({
+        ...projection.villages[1],
+        id: `village-${index}`,
+        name: `边村${index}`,
+        center: { x: 12 + index, y: 17 + index },
+        level: index % 4 === 0 ? 4 : 2,
+        population: 8 + index,
+      });
+    }
+
+    const labels = buildMapLabels(projection, { detailLevel: 'local' }).filter((label) =>
+      label.id.startsWith('village:'),
+    );
+
+    expect(labels).toHaveLength(16);
+  });
+
+  it('keeps the selected village label visible in overview', () => {
+    const projection = createProjection();
+
+    for (let index = 3; index <= 24; index += 1) {
+      projection.villages.push({
+        ...projection.villages[1],
+        id: `village-${index}`,
+        name: `边村${index}`,
+        center: { x: 10 + index, y: 18 + index },
+        level: 1,
+        population: 4,
+      });
+    }
+
+    const labels = buildMapLabels(projection, {
+      detailLevel: 'overview',
+      selection: { type: 'village', id: 'village-24' },
+    });
+
+    expect(labels.some((label) => label.text === '边村24 · Lv.1')).toBe(true);
+  });
+
   it('builds readable growth and building event summaries', () => {
     expect(
       formatEventSummary({
@@ -371,6 +464,20 @@ describe('world inspection helpers', () => {
         payload: { aggressorKingdomId: 'kingdom-1', targetKingdomId: 'kingdom-2', pressure: 80 },
       }),
     ).toBe('王国 1 向王国 2 宣战，压力 80');
+    expect(
+      formatEventSummary({
+        id: 'event-rebellion',
+        tick: 32,
+        type: 'rebellion_succeeded',
+        message: 'village-2 rebelled',
+        payload: {
+          villageId: 'village-2',
+          parentKingdomId: 'kingdom-1',
+          rebelKingdomId: 'kingdom-3',
+          supporterCount: 1,
+        },
+      }),
+    ).toBe('村庄 2 脱离王国 1，成立王国 3，1 个响应村庄');
     expect(
       formatEventSummary({
         id: 'event-army',
@@ -494,6 +601,32 @@ describe('world inspection helpers', () => {
           segment.x1 === 20 && segment.y1 === 18 && segment.x2 === 20 && segment.y2 === 19,
       ),
     ).toBe(false);
+  });
+
+  it('closes selected village borders against adjacent same-kingdom villages', () => {
+    const projection = createProjection();
+
+    projection.territory.push({
+      x: 20,
+      y: 18,
+      villageId: 'village-2',
+      kingdomId: 'kingdom-1',
+      surface: 'land',
+      source: 'settlement_core',
+    });
+
+    const unselectedSegments = buildTerritoryBorderSegments(projection, { type: 'none' });
+    const selectedSegments = buildTerritoryBorderSegments(projection, {
+      type: 'village',
+      id: 'village-1',
+    });
+    const sharedVillageEdge = (segment: (typeof selectedSegments)[number]) =>
+      segment.x1 === 20 && segment.y1 === 18 && segment.x2 === 20 && segment.y2 === 19;
+
+    expect(unselectedSegments.some(sharedVillageEdge)).toBe(false);
+    expect(selectedSegments.some((segment) => sharedVillageEdge(segment) && segment.selected)).toBe(
+      true,
+    );
   });
 
   it('keeps selected territory borders prominent', () => {
