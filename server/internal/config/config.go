@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -63,6 +64,8 @@ type QWeatherConfig struct {
 
 func Load() *Config {
 	env := getEnv("ENV", "development")
+	qWeatherAPIHost := normalizeURL(getEnv("QWEATHER_API_HOST", getEnv("QWEATHER_HOST", "")))
+	qWeatherGeoHost := normalizeURL(getEnv("QWEATHER_GEO_HOST", qWeatherAPIHost))
 
 	return &Config{
 		Env:  env,
@@ -103,8 +106,8 @@ func Load() *Config {
 		},
 		QWeather: QWeatherConfig{
 			APIKey:          getEnv("QWEATHER_API_KEY", ""),
-			APIHost:         getEnv("QWEATHER_API_HOST", "https://devapi.qweather.com"),
-			GeoHost:         getEnv("QWEATHER_GEO_HOST", "https://geoapi.qweather.com"),
+			APIHost:         qWeatherAPIHost,
+			GeoHost:         qWeatherGeoHost,
 			CacheTTLMinutes: getEnvInt("QWEATHER_CACHE_TTL_MINUTES", 30),
 			TimeoutSeconds:  getEnvInt("QWEATHER_TIMEOUT_SECONDS", 5),
 		},
@@ -156,4 +159,15 @@ func getEnvBool(key string, defaultValue bool) bool {
 	default:
 		return defaultValue
 	}
+}
+
+func normalizeURL(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if !strings.HasPrefix(value, "http://") && !strings.HasPrefix(value, "https://") {
+		value = "https://" + value
+	}
+	return strings.TrimRight(value, "/")
 }

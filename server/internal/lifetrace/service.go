@@ -87,6 +87,9 @@ func (s *WeatherService) fetchQWeather(ctx context.Context, city string) (Weathe
 	if strings.TrimSpace(s.cfg.APIKey) == "" {
 		return WeatherResponse{}, fmt.Errorf("QWEATHER_API_KEY 未配置，已使用 mock 天气")
 	}
+	if err := s.validateConfig(); err != nil {
+		return WeatherResponse{}, err
+	}
 
 	locationID, normalizedCity, err := s.lookupLocation(ctx, city)
 	if err != nil {
@@ -104,9 +107,24 @@ func (s *WeatherService) fetchQWeather(ctx context.Context, city string) (Weathe
 	return normalizeQWeather(normalizedCity, now, hourly, daily, indices), nil
 }
 
+func (s *WeatherService) validateConfig() error {
+	if strings.TrimSpace(s.cfg.APIHost) == "" {
+		return fmt.Errorf("QWEATHER_API_HOST 未配置，请在和风天气控制台复制项目的 API Host")
+	}
+	if isLegacyQWeatherHost(s.cfg.APIHost) || isLegacyQWeatherHost(s.cfg.GeoHost) {
+		return fmt.Errorf("QWEATHER_API_HOST 正在使用和风旧公共域名，请改为控制台中的专属 API Host")
+	}
+	return nil
+}
+
+func isLegacyQWeatherHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	return strings.Contains(host, "devapi.qweather.com") || strings.Contains(host, "geoapi.qweather.com")
+}
+
 func (s *WeatherService) lookupLocation(ctx context.Context, city string) (string, string, error) {
 	var resp qWeatherGeoResponse
-	if err := s.getJSON(ctx, s.url(s.cfg.GeoHost, "/v2/city/lookup", map[string]string{
+	if err := s.getJSON(ctx, s.url(s.cfg.GeoHost, "/geo/v2/city/lookup", map[string]string{
 		"location": city,
 		"lang":     "zh",
 	}), &resp); err != nil {

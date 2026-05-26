@@ -25,6 +25,24 @@ pnpm --filter @valley/life-trace check
 
 默认开发端口：`5178`。
 
+## 天气服务
+
+今日页会通过 Vite 代理请求 Go 服务端：
+
+```bash
+cd server && go run ./cmd/server
+pnpm --filter @valley/life-trace dev
+```
+
+服务端需要在 `server/.env` 配置和风天气：
+
+```env
+QWEATHER_API_KEY=你的和风天气 Key
+QWEATHER_API_HOST=和风控制台里的 API Host
+```
+
+如果 `QWEATHER_API_HOST` 未配置，或仍使用旧公共域名，接口会返回 mock 天气并在 `warning` 字段说明原因。
+
 ## 当前原型能力
 
 - 底部 Tab 切换今日、计划、AI、踪迹、我的。
