@@ -17,6 +17,20 @@ export type TileExtents = {
   height: number;
 };
 
+const SEAM_OVERDRAW_PIXELS = 1;
+const CACHED_TERRAIN_FILL_ALPHA = 1;
+
+type TileRunRectInput = {
+  x: number;
+  y: number;
+  width: number;
+};
+
+type TileOriginInput = {
+  tileX: number;
+  tileY: number;
+};
+
 export function getRenderChunkBounds(
   chunkX: number,
   chunkY: number,
@@ -44,6 +58,40 @@ export function getChunkKeyForTile(x: number, y: number, chunkTiles: number) {
 
 export function getVisibleChunkKeys(tiles: Array<{ x: number; y: number }>, chunkTiles: number) {
   return new Set(tiles.map((tile) => getChunkKeyForTile(tile.x, tile.y, chunkTiles)));
+}
+
+export function getVisibleChunkKeySignature(
+  tiles: Array<{ x: number; y: number }>,
+  chunkTiles: number,
+) {
+  return [...getVisibleChunkKeys(tiles, chunkTiles)].sort().join('|');
+}
+
+export function getCachedTerrainFillAlpha() {
+  return CACHED_TERRAIN_FILL_ALPHA;
+}
+
+export function getSeamSafeRenderTextureSize(
+  bounds: Pick<RenderChunkBounds, 'width' | 'height'>,
+  tileSize: number,
+) {
+  return {
+    width: bounds.width * tileSize + SEAM_OVERDRAW_PIXELS,
+    height: bounds.height * tileSize + SEAM_OVERDRAW_PIXELS,
+  };
+}
+
+export function getSeamSafeTileRunRect(
+  run: TileRunRectInput,
+  origin: TileOriginInput,
+  tileSize: number,
+) {
+  return {
+    x: (run.x - origin.tileX) * tileSize,
+    y: (run.y - origin.tileY) * tileSize,
+    width: run.width * tileSize + SEAM_OVERDRAW_PIXELS,
+    height: tileSize + SEAM_OVERDRAW_PIXELS,
+  };
 }
 
 export function getTileExtents(tiles: Array<{ x: number; y: number }>): TileExtents | undefined {

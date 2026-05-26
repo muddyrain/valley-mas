@@ -2,13 +2,19 @@ import { describe, expect, it } from 'vitest';
 import type { WorldProjection } from '../sim';
 import {
   buildConflictSummaryLines,
+  buildEventTimelineLines,
   buildInspectionLines,
   buildKingdomOverviewLines,
   buildMapLabels,
+  buildObservationFocusLines,
   buildTerritoryBorderSegments,
+  classifyEvent,
   filterEventsForSelection,
   formatEventSummary,
   isTerritoryTileSelected,
+  isTrackableSelection,
+  resolveObservationEventSelection,
+  resolveSelectionPosition,
   selectNextKingdom,
   selectWorldEntity,
   type WorldSelection,
@@ -193,6 +199,54 @@ describe('world inspection helpers', () => {
     expect(buildInspectionLines(projection, { type: 'army', id: 'army-1' })).toContain(
       '训练士兵：5',
     );
+    projection.kingdoms.push({
+      id: 'kingdom-3',
+      race: 'human',
+      color: 0xd96a6a,
+      capitalVillageId: 'village-2',
+      villageIds: ['village-2'],
+      population: 12,
+      buildingCount: 1,
+      territoryTiles: 8,
+      foodInventory: 42,
+      foodCapacity: 120,
+      woodInventory: 1,
+      woodCapacity: 40,
+      stoneInventory: 0,
+      stoneCapacity: 20,
+      ironInventory: 0,
+      ironCapacity: 10,
+      diplomacyPressure: 80,
+      diplomacyTargetKingdomId: 'kingdom-1',
+      foundedAtTick: 12,
+      status: 'rising',
+    });
+    projection.villages[1].kingdomId = 'kingdom-3';
+    projection.armies[0].targetKingdomId = 'kingdom-3';
+    projection.recentEvents.push({
+      id: 'event-civil-war',
+      tick: 12,
+      type: 'war_declared',
+      message: 'kingdom-1 declared rebellion war on kingdom-3',
+      payload: {
+        aggressorKingdomId: 'kingdom-1',
+        targetKingdomId: 'kingdom-3',
+        parentKingdomId: 'kingdom-1',
+        rebelKingdomId: 'kingdom-3',
+        rebellionVillageId: 'village-2',
+        rebellion: true,
+        pressure: 80,
+      },
+    });
+    expect(buildInspectionLines(projection, { type: 'village', id: 'village-2' })).toContain(
+      '内战：源自本村叛乱，王国 1 正在镇压王国 3',
+    );
+    expect(buildInspectionLines(projection, { type: 'kingdom', id: 'kingdom-1' })).toContain(
+      '内战：正在镇压王国 3，源自村庄 2叛乱',
+    );
+    expect(buildInspectionLines(projection, { type: 'army', id: 'army-1' })).toContain(
+      '内战：王国 1 镇压王国 3，源自村庄 2叛乱',
+    );
     expect(buildInspectionLines(projection, { type: 'building', id: 'building-1' })).toContain(
       '建筑 1',
     );
@@ -322,6 +376,29 @@ describe('world inspection helpers', () => {
     expect(overviewLabels.some((label) => label.text === '不稳 · 边村3 · Lv.1')).toBe(true);
   });
 
+  it('keeps active war endpoints visible in dense overview labels', () => {
+    const projection = createProjection();
+
+    for (let index = 3; index <= 24; index += 1) {
+      projection.villages.push({
+        ...projection.villages[1],
+        id: `village-${index}`,
+        name: `叛乱边村${index}`,
+        center: { x: 10 + index, y: 16 + index },
+        level: 2,
+        population: 18 + index,
+        rebellionPlan: index % 2 === 0 ? 'prepare_rebellion' : undefined,
+        unrestPlan: index % 2 === 0 ? undefined : 'low_loyalty',
+      });
+    }
+
+    const overviewLabels = buildMapLabels(projection, { detailLevel: 'overview' });
+    const villageLabels = overviewLabels.filter((label) => label.id.startsWith('village:'));
+
+    expect(villageLabels).toHaveLength(8);
+    expect(overviewLabels.some((label) => label.text === '河湾村 · Lv.2')).toBe(true);
+  });
+
   it('keeps regional map labels capped below dense village counts', () => {
     const projection = createProjection();
 
@@ -387,6 +464,22 @@ describe('world inspection helpers', () => {
   });
 
   it('builds readable growth and building event summaries', () => {
+    expect(
+      formatEventSummary({
+        id: 'event-force-war-command',
+        tick: 18,
+        type: 'command_accepted',
+        message: 'Force war command accepted',
+      }),
+    ).toBe('神力外交开战已接受');
+    expect(
+      formatEventSummary({
+        id: 'event-force-peace-command',
+        tick: 18,
+        type: 'command_accepted',
+        message: 'Force peace command accepted',
+      }),
+    ).toBe('神力外交和平已接受');
     expect(
       formatEventSummary({
         id: 'event-growth',
@@ -474,10 +567,32 @@ describe('world inspection helpers', () => {
           villageId: 'village-2',
           parentKingdomId: 'kingdom-1',
           rebelKingdomId: 'kingdom-3',
+          parentCapitalVillageId: 'village-1',
+          rebelCapitalVillageId: 'village-2',
           supporterCount: 1,
+          reason: 'capital_distance',
         },
       }),
-    ).toBe('村庄 2 脱离王国 1，成立王国 3，1 个响应村庄');
+    ).toBe('村庄 2 因距离首都过远脱离王国 1，成立王国 3，1 个村庄响应');
+    expect(
+      formatEventSummary({
+        id: 'event-rebellion-war',
+        tick: 33,
+        type: 'war_declared',
+        message: 'kingdom-1 declared rebellion war on kingdom-3',
+        payload: {
+          aggressorKingdomId: 'kingdom-1',
+          targetKingdomId: 'kingdom-3',
+          parentKingdomId: 'kingdom-1',
+          rebelKingdomId: 'kingdom-3',
+          rebellionVillageId: 'village-2',
+          parentCapitalVillageId: 'village-1',
+          rebelCapitalVillageId: 'village-2',
+          rebellion: true,
+          pressure: 80,
+        },
+      }),
+    ).toBe('内战：王国 1 镇压王国 3（源自村庄 2叛乱），压力 80');
     expect(
       formatEventSummary({
         id: 'event-army',
@@ -658,6 +773,184 @@ describe('world inspection helpers', () => {
     expect(
       filterEventsForSelection(projection, { type: 'none' }).map((event) => event.type),
     ).toEqual(['building_built', 'war_declared', 'army_formed', 'resource_placed']);
+
+    projection.recentEvents.push({
+      id: 'event-civil-war',
+      tick: 12,
+      type: 'war_declared',
+      message: 'kingdom-1 declared rebellion war on kingdom-3',
+      payload: {
+        aggressorKingdomId: 'kingdom-1',
+        targetKingdomId: 'kingdom-3',
+        parentKingdomId: 'kingdom-1',
+        rebelKingdomId: 'kingdom-3',
+        rebellionVillageId: 'village-2',
+        rebellion: true,
+        pressure: 80,
+      },
+    });
+    expect(
+      filterEventsForSelection(projection, { type: 'village', id: 'village-2' }).some(
+        (event) => event.id === 'event-civil-war',
+      ),
+    ).toBe(true);
+    expect(
+      filterEventsForSelection(projection, { type: 'kingdom', id: 'kingdom-1' }).some(
+        (event) => event.id === 'event-civil-war',
+      ),
+    ).toBe(true);
+  });
+
+  it('builds persistent observation focus state for favorite and follow tools', () => {
+    const projection = createProjection();
+    const favorite: WorldSelection = { type: 'village', id: 'village-1' };
+    const followed: WorldSelection = { type: 'army', id: 'army-1' };
+
+    expect(buildObservationFocusLines(projection, { favorite, followed })).toEqual([
+      '关注：晨林村',
+      '追踪：军队 1',
+    ]);
+    expect(resolveSelectionPosition(projection, favorite)).toEqual({ x: 20, y: 20 });
+    expect(resolveSelectionPosition(projection, { type: 'kingdom', id: 'kingdom-1' })).toEqual({
+      x: 20,
+      y: 20,
+    });
+    expect(isTrackableSelection({ type: 'tile', x: 1, y: 1 })).toBe(false);
+    expect(isTrackableSelection(followed)).toBe(true);
+  });
+
+  it('uses selected entity first, then followed and favorite objects for event context', () => {
+    const favorite: WorldSelection = { type: 'village', id: 'village-1' };
+    const followed: WorldSelection = { type: 'army', id: 'army-1' };
+
+    expect(
+      resolveObservationEventSelection({
+        selection: { type: 'kingdom', id: 'kingdom-1' },
+        favorite,
+        followed,
+      }),
+    ).toEqual({ type: 'kingdom', id: 'kingdom-1' });
+    expect(
+      resolveObservationEventSelection({
+        selection: { type: 'none' },
+        favorite,
+        followed,
+      }),
+    ).toBe(followed);
+    expect(
+      resolveObservationEventSelection({
+        selection: { type: 'tile', x: 1, y: 1 },
+        favorite,
+      }),
+    ).toBe(favorite);
+  });
+
+  it('classifies events into player-readable timeline categories', () => {
+    expect(classifyEvent({ id: 'e1', tick: 1, type: 'building_built', message: 'built' })).toEqual({
+      id: 'building',
+      label: '建设',
+    });
+    expect(classifyEvent({ id: 'e2', tick: 1, type: 'war_declared', message: 'war' })).toEqual({
+      id: 'war',
+      label: '战争',
+    });
+    expect(
+      classifyEvent({ id: 'e3', tick: 1, type: 'rebellion_succeeded', message: 'rebellion' }),
+    ).toEqual({
+      id: 'rebellion',
+      label: '叛乱',
+    });
+    expect(
+      classifyEvent({
+        id: 'e4',
+        tick: 1,
+        type: 'resource_placed',
+        message: 'food placed',
+        sourceCommandId: 'cmd-1',
+      }),
+    ).toEqual({
+      id: 'god',
+      label: '神力',
+    });
+  });
+
+  it('builds a timeline with explicit source and grouped recent god consequences first', () => {
+    const projection = createProjection();
+
+    projection.recentEvents.push(
+      {
+        id: 'event-god-accepted',
+        tick: 12,
+        type: 'command_accepted',
+        message: 'Place resource command accepted',
+        sourceCommandId: 'cmd-1',
+      },
+      {
+        id: 'event-god-result',
+        tick: 13,
+        type: 'resource_placed',
+        message: 'food placed',
+        sourceCommandId: 'cmd-1',
+        payload: { amount: 20 },
+      },
+    );
+
+    expect(
+      buildEventTimelineLines(projection, {
+        selection: { type: 'none' },
+        favorite: { type: 'village', id: 'village-1' },
+        lastCommandId: 'cmd-1',
+        limit: 4,
+      }),
+    ).toEqual([
+      '事件来源：最近神力',
+      '第 13 刻 · 神力后果：神力命令已接受',
+      '  -> 神力投放食物 x 20',
+      '第 10 刻 · 战争：王国 1 集结 0 人军队，目标村庄 2',
+      '第 9 刻 · 战争：未知王国 向王国 2 宣战，压力 0',
+    ]);
+  });
+
+  it('groups multiple god consequences under one command heading', () => {
+    const projection = createProjection();
+
+    projection.recentEvents = [
+      {
+        id: 'event-accepted',
+        tick: 20,
+        type: 'command_accepted',
+        message: 'Lightning command accepted',
+        sourceCommandId: 'cmd-lightning',
+      },
+      {
+        id: 'event-lightning',
+        tick: 21,
+        type: 'lightning_struck',
+        message: 'Lightning struck',
+        sourceCommandId: 'cmd-lightning',
+        payload: { damage: 80 },
+      },
+      {
+        id: 'event-unit-died',
+        tick: 21,
+        type: 'unit_died',
+        message: 'unit-1 died from lightning',
+        sourceCommandId: 'cmd-lightning',
+      },
+    ];
+
+    expect(
+      buildEventTimelineLines(projection, {
+        selection: { type: 'none' },
+        lastCommandId: 'cmd-lightning',
+        limit: 4,
+      }),
+    ).toEqual([
+      '事件来源：最近神力',
+      '第 21 刻 · 神力后果：神力命令已接受',
+      '  -> 神力闪电造成 80 伤害',
+      '  -> 生命因神力死亡',
+    ]);
   });
 
   it('cycles active kingdom selection and builds map labels', () => {

@@ -760,6 +760,7 @@ export class SimWorld {
       return;
     }
 
+    const parentCapitalVillageId = parentKingdom.capitalVillageId;
     const supporters = this.findRebellionSupporters(leader, parentKingdom, villages, kingdoms);
     const supporterIds = new Set(supporters.map((village) => village.id));
 
@@ -782,6 +783,8 @@ export class SimWorld {
       villageId: leader.id,
       parentKingdomId,
       rebelKingdomId: rebelKingdom.id,
+      parentCapitalVillageId,
+      rebelCapitalVillageId: rebelKingdom.capitalVillageId,
       supporterCount: supporters.length,
       reason,
     });
@@ -800,25 +803,48 @@ export class SimWorld {
     const maxSupporters = Math.max(0, Math.ceil(parentKingdom.villageIds.length / 2) - 1);
 
     return villages
-      .filter((candidate) => {
+      .flatMap((candidate) => {
         if (
           candidate.id === leader.id ||
           candidate.kingdomId !== parentKingdom.id ||
           candidate.id === parentKingdom.capitalVillageId ||
           distance(candidate.center, leader.center) > KINGDOM_REBELLION_SUPPORT_RADIUS
         ) {
-          return false;
+          return [];
         }
 
         const loyalty = this.projectVillageLoyalty(candidate, villages, kingdoms);
 
-        return loyalty !== undefined && loyalty.loyalty < KINGDOM_UNREST_WARNING_LOYALTY;
+        if (loyalty === undefined || loyalty.loyalty >= KINGDOM_UNREST_WARNING_LOYALTY) {
+          return [];
+        }
+
+        const leaderDistance = distance(candidate.center, leader.center);
+
+        return [
+          {
+            candidate,
+            leaderDistance,
+            score: this.scoreRebellionSupporter(candidate, loyalty.loyalty, leaderDistance),
+          },
+        ];
       })
       .sort(
         (left, right) =>
-          distance(left.center, leader.center) - distance(right.center, leader.center),
+          right.score - left.score ||
+          left.leaderDistance - right.leaderDistance ||
+          left.candidate.id.localeCompare(right.candidate.id),
       )
-      .slice(0, maxSupporters);
+      .slice(0, maxSupporters)
+      .map((entry) => entry.candidate);
+  }
+
+  private scoreRebellionSupporter(candidate: Village, loyalty: number, leaderDistance: number) {
+    const unrest = Math.max(0, KINGDOM_UNREST_WARNING_LOYALTY - loyalty);
+    const localStrength = candidate.population + candidate.jobs.soldier * 6;
+    const proximity = Math.max(0, KINGDOM_REBELLION_SUPPORT_RADIUS - leaderDistance);
+
+    return unrest * 4 + localStrength * 0.8 + proximity;
   }
 
   private startRebellionWar(parentKingdom: Kingdom, rebelKingdom: Kingdom, leader: Village) {
@@ -840,6 +866,11 @@ export class SimWorld {
       {
         aggressorKingdomId: parentKingdom.id,
         targetKingdomId: rebelKingdom.id,
+        parentKingdomId: parentKingdom.id,
+        rebelKingdomId: rebelKingdom.id,
+        rebellionVillageId: leader.id,
+        parentCapitalVillageId: parentKingdom.capitalVillageId,
+        rebelCapitalVillageId: rebelKingdom.capitalVillageId,
         pressure: round(relation.pressure),
         rebellion: true,
       },

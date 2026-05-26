@@ -27,6 +27,15 @@ export {
   observeSatelliteSettlementReport,
 } from './growthObservation';
 export { createWorldMap, DEFAULT_WORLD_HEIGHT, DEFAULT_WORLD_WIDTH } from './map';
+export type {
+  RebellionObservationOptions,
+  RebellionObservationReport,
+  RebellionObservationRun,
+} from './rebellionObservation';
+export {
+  formatRebellionObservationReport,
+  observeRebellionReport,
+} from './rebellionObservation';
 export { FIXED_TICK_MS, SimLoop } from './SimLoop';
 export { SimWorld } from './SimWorld';
 export type {

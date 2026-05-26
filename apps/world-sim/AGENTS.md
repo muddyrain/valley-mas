@@ -18,9 +18,11 @@ WorldSim v2 是一个 2D 像素风上帝沙盒文明模拟游戏：
 | 愿景 | `docs/VISION.md` | WorldBox 式核心循环、产品北极星和永久玩法规则 |
 | 架构 | `docs/ARCHITECTURE.md` | 模拟真源、命令、事件、projection、Phaser 边界 |
 | 机制 | `docs/MECHANICS.md` | 地图、单位、资源、神力、村庄、王国和战争规则草案 |
-| 路线图 | `docs/ROADMAP.md` | PR 链条、阶段验收和后续功能顺序 |
+| 路线图 | `docs/ROADMAP.md` | 当前阶段、下一步、验收点和延后队列 |
+| WorldBox 对齐计划 | `docs/WORLDBOX_ALIGNMENT_PLAN.md` | WorldBox 玩法调研、差距矩阵和未来分期路线 |
+| 计划规范 | `docs/PLANNING.md` | 后续计划文档的状态口径、模板和防膨胀规则 |
 
-旧版 M1 原型文档已被 v2 四件套替换。后续不要引用旧 `GAME_DESIGN.md`、`TASK_BREAKDOWN.md`、`SIMULATION_CONTRACT.md` 等文件。
+旧版 M1 原型文档已被 v2 文档入口替换。后续不要引用旧 `GAME_DESIGN.md`、`TASK_BREAKDOWN.md`、`SIMULATION_CONTRACT.md` 等文件。
 
 ## 当前 v2 状态
 
@@ -33,16 +35,18 @@ WorldSim v2 是一个 2D 像素风上帝沙盒文明模拟游戏：
 | PR-2 地图/资源 | Foundation slice | 128 x 128 simulation 默认地图、256 x 256 交互 demo 地图、tile、chunk、biome、resource deposit 与 seed 地图生成已接入；资源独立索引和渲染裁剪仍缺 |
 | PR-3 生命求生 | Foundation slice | hunger、hp、age、eat、wander、death、birth 已接入；1000 单位基础测试已补，行为仍是最小 needs loop |
 | PR-4 Phaser Projection | Foundation slice | Scene 只读 projection，输入只发 command，源码级 sim 边界扫描已补，中文轻量 HUD、独立 UI camera、WASD/方向键移动、viewport-relative pan speed、Q/E 与 +/- 缩放、鼠标点滚轮缩放、默认 cover 视角和最小 contain 全图概览已接入；渲染路径已开始传入 camera viewport 做 projection culling，全量 projection 仍作为默认兼容路径保留 |
-| PR-5 God Command | Foundation slice | 基础神力命令、命令校验和拒绝路径已接入；正式工具栏仍缺 |
+| PR-5 God Command | Foundation slice | 基础神力命令、命令校验和拒绝路径已接入；PR-13.1 已补分组可点击神力工具栏，PR-13.2 已补基础笔刷范围、越界目标和点击拒绝反馈，PR-13.3a/b 已补关注/追踪观察工具和事件后果时间线，PR-13.4a/b/c 已补基础地形目标限制、外交工具入口、底部后果反馈和最近神力事件聚合 |
 | PR-6 村庄 | Done | 人口聚集和本地食物压力会形成村庄；村庄库存、住房容量、食物消耗、增长上限和衰退状态已接入 |
 | PR-7 建筑和领土 | Done | 村庄 surplus 会自动建造 house、storage、farm，且 PR-12B 已补 town hall anchor、house 升级链、mine 矿址 hook、barrack 军队 hook 和 dock 岸线 hook；建筑影响住房、库存上限、食物生产、军队动员、未来航运入口和领土投射 |
 | PR-8 王国 | Done | 稳定村庄会自动建国，同族村庄可加入同一王国，王国聚合首都、成员村庄、人口、建筑、领土和库存统计；首都在有效时保持稳定，失效后才按 town hall/建筑/人口重选 |
 | PR-9 外交压力 | Done | 王国会根据边境摩擦、资源压力和种族倾向积累外交压力，并产生宣战事件 |
 | PR-10 最小战争 | Done | 宣战会生成聚合军队组，军队可推进、结算伤亡、撤退/解散并占领村庄 |
 | PR-11 规模门槛 | Done | `SimWorld.project()` 已支持 viewport culling，Phaser 已按 camera 视口取可见 tiles/units/territory/buildings/armies；PR-11A 测量 harness、PR-11B/PR-11D step phase profiling、PR-11C 村庄居民索引优化、PR-11E 单位行为降频和 PR-11F 重复居民索引重建移除已补；本地 10000 聚合人口 / 656 可见单位连续 5 次低于 16.7 ms；worker simulation 和 hot-data layout 留到更大目标按指标决定 |
-| PR-12+ | Foundation slice | `PR-12A` inspection/event story 已完成；`PR-12B` 建筑链已完成 town hall、tier-1 house、house 2/3 升级门槛、mine 矿址 hook、barrack 军队 hook 和 dock 岸线 hook；`PR-12C` 已接入 food/wood/stone/iron 仓储、默认 farmer 过渡劳力、camp 轻口粮缓冲、farmer/builder/miner/soldier/laborer 聚合职业、农场职业产粮、builder 伐木、木材点与石料/铁矿点可视化、建筑材料成本、施工时间、居民从村庄库存补粮、soldier 参与军队动员和 battle strength、miner 采矿，以及早期浅层采石场；`PR-12D` 已完成村庄命名、等级、首都标记、成长事件、更清晰的领土外轮廓、住房压力优先补房、自动分村，以及建筑废弃到废墟的可读性收尾；`PR-12D` 后续补了废墟视觉去 debug X 化和选中村庄闭合轮廓；`PR-12D.5` 已补木材消耗可读性、施工工地、成长阻塞、提前住房压力和稳定领土自然扩张 foundation slice；`PR-12E` 已开始王国态势、冲突态势、军队路线、外交/战争事件可读性、多 tick 战斗/攻占进度、多村庄出兵、近景战斗点，以及强制战争/和平神力；`PR-12E.1` 已补持续城镇成长与建设计划，修复富裕村庄无阻塞但停工的问题；`PR-12E.2` 已补全屏地图相机、256 x 256 demo 地图、WorldBox 式键盘移动、鼠标点缩放、stricter zoom-driven render detail levels、同 tick/同视口 projection 缓存、8/12 概览与区域标签上限、区域层仅保留地图级建筑信号、军队路线限流、地形 32x32 render-texture chunk 缓存、领土填充固定 chunk texture 缓存、边界 Graphics 分层和动态层按 key 重绘，并让 demo 默认新 seed、`?seed=` 固定复现；`PR-12F.1` 已开始文明成长主线重整，已补默认生命 seed 选址、多起点默认生命、村庄远距可达木材侦察采集、伐木/农田维护工作点、建筑不重叠且减少拥挤占位、primary growth blocker、`growthPhase`、`primaryIntention`、更细的等待资源/人口文案、阶段变化近期事件、水面软领土可视化、基础 house/storage/farm 链调速、领土来源投影、用途评分建筑选址、分村前扩张意图、成熟村庄扩张准备近期事件、扩张原因、边疆提示和 `拓荒 ·` 地图标签，并区分普通 `等待人口增长` 与成熟候选 `等待扩张压力` 文案；`PR-12F.5` 已补 `observe:growth` 单聚落、多 seed 早期成长、satellite 扩张时序诊断报告、分村可读性 lead 报告、`observe:building-sites` 建筑选址诊断和 60 tick 分村准备窗口；`PR-12G.1/G.2/G.3` 已开始王国忠诚、叛乱准备和分裂建国 foundation slice，村庄 projection/inspection 会显示忠诚、内政原因、`不稳 ·`、`叛乱 ·`、忠诚偏低、叛乱进度和正在秘密组织独立提示；叛乱进度完成后会创建新 rebel kingdom，拉入附近低忠诚支持村庄，发出 `rebellion_succeeded`，并通过既有 `war_declared` / army-group 路径进入叛乱战争；同一 parent kingdom 同 tick 只完成一个叛乱，支持者数量有上限；较大的默认世界会自然长出多村/多国，方便观察叛乱条件；下一步做内战可读性和调参 |
+| PR-12+ | Foundation slice | `PR-12A-D` 已完成检查面板、建筑链、职业资源和城市成长 foundation；`PR-12E/F` 已完成王国/战争可读性与文明成长主线的大部分 foundation；`PR-12G` 已完成忠诚、叛乱准备、分裂建国、parent-vs-rebel war、内战事件故事、支持者调参、密集冲突标签优先级和 `observe:rebellion` foundation。当前下一步是 `PR-13.5` 关注列表和对象历史。 |
 
-进入 PR-12+ 时仍需尊重 `ROADMAP.md` 的 PR-11 约束：当前已具备 viewport projection culling、第一版 10000 聚合人口 / 500+ 可见单位本地稳定性签收、step phase profiling、村庄居民索引优化和非紧急单位行为降频；`PR-12C` 职业资源已完成，`PR-12D` 已完成领土可读性、城市成长反馈、住房压力、自动分村和废墟可读性收尾，`PR-12D.5` 已补木材消耗可读性、房屋压力、成长阻塞和领土自然扩张，`PR-12E` 正在推进王国可读性与神力干预，已补多村庄出兵、近景战斗点和强制战争/和平，`PR-12E.1` 已补富裕稳定村庄的建设计划和持续扩建压力，`PR-12E.2` 已补 WorldBox 式全屏地图相机体验。下一步先按 `ROADMAP.md` 的 `PR-12F` 调整文明成长骨架；成长祝福、关注标记等神力命令延后到成长链路更清晰后再补。更大地图、worker simulation、hot-data layout 或资源索引应继续由 `measure:scale` 的最慢阶段驱动。
+进入 PR-12+ 时以 `docs/ROADMAP.md` 的 `Current Position` 和 `Active Work` 为准。
+后续不得在本文件维护长篇历史状态；计划文档写法遵守 `docs/PLANNING.md`。
+更大地图、worker simulation、hot-data layout 或资源索引继续由 `measure:scale` 的最慢阶段驱动。
 
 ## 目录结构
 
@@ -52,7 +56,9 @@ apps/world-sim/
 │   ├── VISION.md
 │   ├── ARCHITECTURE.md
 │   ├── MECHANICS.md
-│   └── ROADMAP.md
+│   ├── ROADMAP.md
+│   ├── WORLDBOX_ALIGNMENT_PLAN.md
+│   └── PLANNING.md
 ├── src/
 │   ├── sim/          # 纯模拟核心，不允许 import Phaser
 │   ├── game/         # Phaser 表现层，只读 projection
@@ -75,7 +81,7 @@ apps/world-sim/
 - MUST 模拟结果通过 `SimEvent` 和 `WorldProjection` 暴露。
 - MUST 在新增或调整玩法、数值、神力、文明、战争、叛乱或可读性 UI 前使用 `worldbox-alignment-guard`，先分析 WorldBox 对应机制，再决定镜像、简化、延后或有意识地偏离。
 - MUST 保持 WorldBox 式核心循环：玩家是神、世界自治、因果可读、干预有后果；如果不强化这条循环，先改设计形态或记录明确的偏离理由。
-- MUST 新增玩法时同步更新 v2 四件套文档中的对应章节。
+- MUST 新增玩法时同步更新 v2 文档入口中的对应章节。
 - MUST 避免高频行为全图扫描；优先使用 chunk、空间索引或后续 Worker/TypedArray 热路径。
 
 ## 开发命令

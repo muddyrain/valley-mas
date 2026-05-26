@@ -2313,13 +2313,31 @@ describe('SimWorld kingdoms', () => {
       true,
     );
     expect(
-      projection.recentEvents.some(
+      projection.recentEvents.find((event) => event.type === 'rebellion_succeeded')?.payload,
+    ).toMatchObject({
+      villageId: rebelLeader.id,
+      parentKingdomId: parentKingdom.id,
+      rebelKingdomId: rebelKingdom?.id,
+      parentCapitalVillageId: parentKingdom.capitalVillageId,
+      rebelCapitalVillageId: rebelLeader.id,
+      supporterCount: 1,
+      reason: 'capital_distance',
+    });
+    expect(
+      projection.recentEvents.find(
         (event) =>
-          event.type === 'war_declared' &&
-          event.payload?.aggressorKingdomId === parentKingdom.id &&
-          event.payload?.targetKingdomId === rebelKingdom?.id,
-      ),
-    ).toBe(true);
+          event.type === 'war_declared' && event.payload?.targetKingdomId === rebelKingdom?.id,
+      )?.payload,
+    ).toMatchObject({
+      aggressorKingdomId: parentKingdom.id,
+      targetKingdomId: rebelKingdom?.id,
+      parentKingdomId: parentKingdom.id,
+      rebelKingdomId: rebelKingdom?.id,
+      rebellionVillageId: rebelLeader.id,
+      parentCapitalVillageId: parentKingdom.capitalVillageId,
+      rebelCapitalVillageId: rebelLeader.id,
+      rebellion: true,
+    });
   });
 
   it('limits completed rebellions to one split per parent kingdom each tick', () => {
@@ -2366,6 +2384,52 @@ describe('SimWorld kingdoms', () => {
     expect(projection.kingdoms.filter((kingdom) => kingdom.status !== 'fallen')).toHaveLength(2);
     expect(remainingParentVillage?.kingdomId).toBe(parentKingdom.id);
     expect(remainingParentVillage?.rebellionProgress).toBeGreaterThan(0);
+  });
+
+  it('prioritizes strong low-loyalty supporters over merely nearest unrest villages', () => {
+    const world = foundFoodRichVillage('kingdom-rebellion-supporter-score', {
+      width: 220,
+      height: 84,
+    });
+
+    for (let tick = 0; tick < 300; tick += 1) {
+      world.step();
+    }
+
+    const parentKingdom = world.project().kingdoms[0];
+    const rebelLeader = addVillageToKingdom(world, parentKingdom.id, {
+      id: 'scored-rebel-leader',
+      position: { x: 190, y: 64 },
+      population: 72,
+    });
+    const nearestWeakSupporter = addVillageToKingdom(world, parentKingdom.id, {
+      id: 'nearest-weak-supporter',
+      position: { x: 182, y: 62 },
+      population: 10,
+    });
+    const strongerFrontierSupporter = addVillageToKingdom(world, parentKingdom.id, {
+      id: 'stronger-frontier-supporter',
+      position: { x: 176, y: 62 },
+      population: 64,
+    });
+
+    for (const village of [rebelLeader, nearestWeakSupporter, strongerFrontierSupporter]) {
+      addResidentUnitsToVillage(world, village.id, village.population);
+      addActiveBuildingToVillage(world, village.id, 'barrack');
+      prepareVillageForBuildingUpgrades(world, village.id, village.population, 500);
+      village.foodInventory = 0;
+    }
+
+    rebelLeader.rebellionProgress = 99;
+    world.step();
+
+    const projection = world.project();
+    const rebelKingdom = projection.kingdoms.find(
+      (kingdom) => kingdom.id !== parentKingdom.id && kingdom.capitalVillageId === rebelLeader.id,
+    );
+
+    expect(rebelKingdom?.villageIds).toContain(strongerFrontierSupporter.id);
+    expect(rebelKingdom?.villageIds).not.toContain(nearestWeakSupporter.id);
   });
 
   it('lets a mature pressured kingdom found a satellite village on suitable land', () => {

@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getCachedTerrainFillAlpha,
   getChunkKeyForTile,
   getRenderChunkBounds,
+  getSeamSafeRenderTextureSize,
+  getSeamSafeTileRunRect,
   getTileExtents,
+  getVisibleChunkKeySignature,
   getVisibleChunkKeys,
 } from './renderChunks';
 
@@ -38,6 +42,19 @@ describe('render chunk helpers', () => {
     ]).toEqual(['0:0', '1:0', '1:1']);
   });
 
+  it('builds a stable visible chunk signature for terrain refreshes', () => {
+    expect(
+      getVisibleChunkKeySignature(
+        [
+          { x: 35, y: 40 },
+          { x: 0, y: 0 },
+          { x: 35, y: 1 },
+        ],
+        32,
+      ),
+    ).toBe('0:0|1:0|1:1');
+  });
+
   it('computes tile extents for viewport-sized render textures', () => {
     expect(
       getTileExtents([
@@ -54,5 +71,38 @@ describe('render chunk helpers', () => {
       height: 5,
     });
     expect(getTileExtents([])).toBeUndefined();
+  });
+
+  it('overdraws cached chunk textures by one pixel to hide fractional zoom seams', () => {
+    expect(getSeamSafeRenderTextureSize({ width: 32, height: 11 }, 10)).toEqual({
+      width: 321,
+      height: 111,
+    });
+  });
+
+  it('overdraws tile runs by one pixel inside cached textures', () => {
+    expect(
+      getSeamSafeTileRunRect(
+        {
+          x: 34,
+          y: 66,
+          width: 3,
+        },
+        {
+          tileX: 32,
+          tileY: 64,
+        },
+        10,
+      ),
+    ).toEqual({
+      x: 20,
+      y: 20,
+      width: 31,
+      height: 11,
+    });
+  });
+
+  it('keeps cached terrain opaque so chunk-edge overdraw cannot create dashed seams', () => {
+    expect(getCachedTerrainFillAlpha()).toBe(1);
   });
 });

@@ -13,6 +13,7 @@
     "measure:scale": "vitest run src/sim/scaleMeasurement.measure.test.ts --reporter=verbose",
     "observe:growth": "vitest run src/sim/growthObservation.measure.test.ts --reporter=verbose",
     "observe:building-sites": "vitest run src/sim/buildingSiteObservation.measure.test.ts --reporter=verbose",
+    "observe:rebellion": "vitest run src/sim/rebellionObservation.measure.test.ts --reporter=verbose",
     "test:watch": "vitest",
     "clean": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true});\""
   },

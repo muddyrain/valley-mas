@@ -20,18 +20,41 @@ import {
   stepCameraMotion,
 } from './cameraMath';
 import {
+  buildGodPowerExecutionFeedback,
+  buildGodPowerPreview,
+  type GodPowerPreview,
+  type GodPowerToolId,
+  isDiplomacyGodPowerTool,
+  layoutGodPowerToolbar,
+  resolveDiplomacyGodPowerCommand,
+  resolveDiplomacyGodPowerPreview,
+  resolveGodPowerHotkey,
+  resolveGodPowerToolbarHit,
+  resolvePointerGodPowerCommand,
+} from './godPowers';
+import {
   buildConflictSummaryLines,
+  buildEventTimelineLines,
   buildInspectionLines,
   buildKingdomOverviewLines,
   buildMapLabels,
+  buildObservationFocusLines,
   buildTerritoryBorderSegments,
-  filterEventsForSelection,
-  formatEventSummary,
+  isTrackableSelection,
+  resolveSelectionPosition,
   selectNextKingdom,
   selectWorldEntity,
   type WorldSelection,
 } from './inspection';
-import { getChunkKeyForTile, getRenderChunkBounds, getVisibleChunkKeys } from './renderChunks';
+import {
+  getCachedTerrainFillAlpha,
+  getChunkKeyForTile,
+  getRenderChunkBounds,
+  getSeamSafeRenderTextureSize,
+  getSeamSafeTileRunRect,
+  getVisibleChunkKeySignature,
+  getVisibleChunkKeys,
+} from './renderChunks';
 import {
   getDensityAdjustedDetailLevel,
   getTerritoryFillAlpha,
@@ -75,13 +98,20 @@ const LAYER_DEPTHS = {
   armies: 6,
   units: 7,
   selection: 8,
+  observationFocus: 9,
+  godPowerPreview: 10,
 } as const;
 const PANEL_COLOR = 0x101726;
 const PANEL_STROKE = 0x4052a1;
 const TEXT_COLOR = '#f4f4f4';
 const UI_MARGIN = 12;
 const TITLE_PANEL_HEIGHT = 38;
-const BOTTOM_PANEL_HEIGHT = 54;
+const BOTTOM_PANEL_HEIGHT = 88;
+const GOD_POWER_TOOLBAR_HELP_TEXT =
+  '先选神力再点地图；检查只选择目标，创造投放生命与食物，塑形改变地貌，破坏制造灾害；选中王国后 H/J 处理战争与和平，底部按钮可直接切换当前工具。';
+const GOD_POWER_TOOLBAR_SHORT_HELP_TEXT =
+  '先选神力再点地图；检查不改变世界，按钮分为观察、创造、塑形、破坏。';
+const GOD_POWER_TOOLBAR_WIDE_HELP_TEXT = '神力工具盘保持玩家是神、世界自治、干预有后果的操作逻辑。';
 const STATUS_PANEL_TOP = 54;
 const EVENTS_PANEL_TOP = 54;
 const COMPACT_STATUS_PANEL_HEIGHT = 118;
@@ -150,6 +180,137 @@ function isArmyRouteSelected(army: ArmyGroup, selection: WorldSelection) {
   return false;
 }
 
+function selectionKeyForHud(selection: WorldSelection) {
+  switch (selection.type) {
+    case 'none':
+      return 'none';
+    case 'tile':
+      return `tile:${selection.x}:${selection.y}`;
+    default:
+      return `${selection.type}:${selection.id}`;
+  }
+}
+
+function translateEvent(message: string) {
+  if (message.includes('Spawn life command accepted')) {
+    return '召唤生命命令已接受';
+  }
+
+  if (message.includes('Place resource command accepted')) {
+    return '投放资源命令已接受';
+  }
+
+  if (message.includes('Change terrain command accepted')) {
+    return '改变地形命令已接受';
+  }
+
+  if (message.includes('Lightning command accepted')) {
+    return '闪电命令已接受';
+  }
+
+  if (message.includes('was born')) {
+    return '新小人出生';
+  }
+
+  if (message.includes('died from lightning')) {
+    return '小人被闪电击倒';
+  }
+
+  if (message.includes('food placed')) {
+    return '食物已投放';
+  }
+
+  if (message.includes('Terrain changed')) {
+    return '地形已改变';
+  }
+
+  if (message.includes('Lightning struck')) {
+    return '闪电已落下';
+  }
+
+  if (message.includes('kingdom') && message.includes('founded')) {
+    return '王国已建立';
+  }
+
+  if (message.includes('joined kingdom')) {
+    return '村庄加入王国';
+  }
+
+  if (message.includes('capital moved')) {
+    return '王国迁都';
+  }
+
+  if (message.includes('border friction')) {
+    return '王国边境摩擦升温';
+  }
+
+  if (message.includes('resource pressure')) {
+    return '王国资源压力升温';
+  }
+
+  if (message.includes('declared war')) {
+    return '王国宣战';
+  }
+
+  if (message.includes('formed')) {
+    return '军队已集结';
+  }
+
+  if (message.includes('battle resolved')) {
+    return '战斗已结算';
+  }
+
+  if (message.includes('captured')) {
+    return '村庄被占领';
+  }
+
+  if (message.includes('disbanded')) {
+    return '军队已解散';
+  }
+
+  if (message.includes('fallen')) {
+    return '王国陨落';
+  }
+
+  if (message.includes('founded')) {
+    return '村庄已形成';
+  }
+
+  if (message.includes('is declining')) {
+    return '村庄进入衰退';
+  }
+
+  if (message.includes('ruined')) {
+    return '建筑已沦为废墟';
+  }
+
+  if (message.includes('abandoned')) {
+    return '村庄已废弃';
+  }
+
+  if (message.includes('built')) {
+    return '村庄建筑已完成';
+  }
+
+  if (message.includes('upgraded')) {
+    return '建筑已升级';
+  }
+
+  if (message.includes('Speed changed')) {
+    return '速度已调整';
+  }
+
+  if (message.includes('Simulation paused')) {
+    return '模拟已暂停';
+  }
+
+  if (message.includes('Simulation resumed')) {
+    return '模拟已恢复';
+  }
+
+  return message;
+}
+
 export class WorldScene extends Phaser.Scene {
   private world!: SimWorld;
   private loop!: SimLoop;
@@ -161,6 +322,8 @@ export class WorldScene extends Phaser.Scene {
   private resourceLayer?: Phaser.GameObjects.Graphics;
   private workSiteLayer?: Phaser.GameObjects.Graphics;
   private selectionLayer?: Phaser.GameObjects.Graphics;
+  private observationFocusLayer?: Phaser.GameObjects.Graphics;
+  private godPowerPreviewLayer?: Phaser.GameObjects.Graphics;
   private uiLayer?: Phaser.GameObjects.Graphics;
   private uiCamera?: Phaser.Cameras.Scene2D.Camera;
   private titleText?: Phaser.GameObjects.Text;
@@ -168,6 +331,7 @@ export class WorldScene extends Phaser.Scene {
   private controlsText?: Phaser.GameObjects.Text;
   private eventsText?: Phaser.GameObjects.Text;
   private mapLabelTexts: Phaser.GameObjects.Text[] = [];
+  private godPowerToolbarTexts: Phaser.GameObjects.Text[] = [];
   private readonly terrainChunkTextures = new Map<string, Phaser.GameObjects.RenderTexture>();
   private readonly territoryFillChunkTextures = new Map<string, Phaser.GameObjects.RenderTexture>();
   private readonly territoryFillChunkDrawKeys = new Map<string, string>();
@@ -183,6 +347,7 @@ export class WorldScene extends Phaser.Scene {
   private lastArmyDrawKey = '';
   private lastUnitDrawKey = '';
   private lastSelectionDrawKey = '';
+  private lastObservationFocusDrawKey = '';
   private lastHudDrawAtMs = -Infinity;
   private lastProjectionCacheKey = '';
   private terrainTextureRevision = -1;
@@ -193,6 +358,13 @@ export class WorldScene extends Phaser.Scene {
   private lastCameraHeight = 0;
   private cameraVelocityX = 0;
   private cameraVelocityY = 0;
+  private activeGodPowerToolId: GodPowerToolId = 'inspect';
+  private pointerTileTarget?: { x: number; y: number };
+  private pointerOverGodPowerToolbar = false;
+  private godPowerClickFeedback?: { text: string; expiresAtMs: number };
+  private favoriteSelection?: WorldSelection;
+  private followedSelection?: WorldSelection;
+  private lastGodCommandId?: string;
   private readonly pressedKeys = new Set<string>();
 
   constructor() {
@@ -222,6 +394,8 @@ export class WorldScene extends Phaser.Scene {
     this.armyLayer = this.add.graphics();
     this.unitLayer = this.add.graphics();
     this.selectionLayer = this.add.graphics();
+    this.observationFocusLayer = this.add.graphics();
+    this.godPowerPreviewLayer = this.add.graphics();
     this.territoryLayer.setDepth(LAYER_DEPTHS.territoryBorders);
     this.resourceLayer.setDepth(LAYER_DEPTHS.resources);
     this.workSiteLayer.setDepth(LAYER_DEPTHS.workSites);
@@ -230,6 +404,8 @@ export class WorldScene extends Phaser.Scene {
     this.armyLayer.setDepth(LAYER_DEPTHS.armies);
     this.unitLayer.setDepth(LAYER_DEPTHS.units);
     this.selectionLayer.setDepth(LAYER_DEPTHS.selection);
+    this.observationFocusLayer.setDepth(LAYER_DEPTHS.observationFocus);
+    this.godPowerPreviewLayer.setDepth(LAYER_DEPTHS.godPowerPreview);
     this.uiLayer = this.add.graphics();
     this.uiLayer.setScrollFactor(0);
     this.uiLayer.setDepth(20);
@@ -241,6 +417,7 @@ export class WorldScene extends Phaser.Scene {
     this.focusGameCanvas();
 
     this.input.on(Phaser.Input.Events.POINTER_DOWN, this.handlePointerDown, this);
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, this.handlePointerMove, this);
     this.input.on(Phaser.Input.Events.POINTER_WHEEL, this.handlePointerWheel, this);
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this);
     window.addEventListener('keydown', this.handleKeyDown);
@@ -254,16 +431,19 @@ export class WorldScene extends Phaser.Scene {
     this.ensureMainCameraInitialized();
     this.updateCameraControls(delta);
     this.loop.advance(delta);
+    this.applyFollowCamera();
     this.renderProjection(this.projectVisibleWorld(), time);
   }
 
   private shutdown() {
     this.input.off(Phaser.Input.Events.POINTER_DOWN, this.handlePointerDown, this);
+    this.input.off(Phaser.Input.Events.POINTER_MOVE, this.handlePointerMove, this);
     this.input.off(Phaser.Input.Events.POINTER_WHEEL, this.handlePointerWheel, this);
     this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this);
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
     this.clearMapLabels();
+    this.clearGodPowerToolbarTexts();
     this.destroyTerrainChunkTextures();
     this.destroyTerritoryFillChunkTextures();
   }
@@ -326,6 +506,15 @@ export class WorldScene extends Phaser.Scene {
       this.lastSelectionDrawKey = selectionDrawKey;
     }
 
+    const observationFocusDrawKey = this.getObservationFocusDrawKey(projection);
+
+    if (observationFocusDrawKey !== this.lastObservationFocusDrawKey) {
+      this.drawObservationFocus(projection);
+      this.lastObservationFocusDrawKey = observationFocusDrawKey;
+    }
+
+    this.drawGodPowerPreview(projection);
+
     if (mapLabelsDrawKey !== this.lastMapLabelsDrawKey) {
       this.drawMapLabels(projection, detailLevel);
       this.lastMapLabelsDrawKey = mapLabelsDrawKey;
@@ -378,11 +567,12 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
 
+    const textureSize = getSeamSafeRenderTextureSize(bounds, TILE_SIZE);
     const texture = this.add.renderTexture(
       bounds.tileX * TILE_SIZE,
       bounds.tileY * TILE_SIZE,
-      bounds.width * TILE_SIZE,
-      bounds.height * TILE_SIZE,
+      textureSize.width,
+      textureSize.height,
     );
     texture.setOrigin(0);
     texture.setDepth(LAYER_DEPTHS.terrain);
@@ -399,13 +589,14 @@ export class WorldScene extends Phaser.Scene {
     });
 
     for (const run of buildHorizontalTileRuns(chunkProjection.tiles, (tile) => tile.terrain)) {
+      const rect = getSeamSafeTileRunRect(run, bounds, TILE_SIZE);
       texture.fill(
         TERRAIN_COLORS[run.sample.terrain],
-        0.94,
-        (run.x - bounds.tileX) * TILE_SIZE,
-        (run.y - bounds.tileY) * TILE_SIZE,
-        run.width * TILE_SIZE,
-        TILE_SIZE,
+        getCachedTerrainFillAlpha(),
+        rect.x,
+        rect.y,
+        rect.width,
+        rect.height,
       );
     }
 
@@ -587,14 +778,8 @@ export class WorldScene extends Phaser.Scene {
         chunkTiles,
         (tile) => `${tile.color}:${tile.alpha}:${tile.selected}`,
       )) {
-        texture.fill(
-          run.sample.color,
-          run.sample.alpha,
-          (run.x - bounds.tileX) * TILE_SIZE,
-          (run.y - bounds.tileY) * TILE_SIZE,
-          run.width * TILE_SIZE,
-          TILE_SIZE,
-        );
+        const rect = getSeamSafeTileRunRect(run, bounds, TILE_SIZE);
+        texture.fill(run.sample.color, run.sample.alpha, rect.x, rect.y, rect.width, rect.height);
       }
       this.territoryFillChunkDrawKeys.set(key, drawKey);
     }
@@ -618,11 +803,12 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
 
+    const textureSize = getSeamSafeRenderTextureSize(bounds, TILE_SIZE);
     const texture = this.add.renderTexture(
       bounds.tileX * TILE_SIZE,
       bounds.tileY * TILE_SIZE,
-      bounds.width * TILE_SIZE,
-      bounds.height * TILE_SIZE,
+      textureSize.width,
+      textureSize.height,
     );
     texture.setOrigin(0);
     texture.setDepth(LAYER_DEPTHS.territoryFill);
@@ -1005,6 +1191,108 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  private drawObservationFocus(projection: WorldProjection) {
+    if (!this.observationFocusLayer) {
+      return;
+    }
+
+    this.observationFocusLayer.clear();
+    this.drawObservationMarker(projection, this.favoriteSelection, 0xffcd75, 9, 0.72);
+    this.drawObservationMarker(projection, this.followedSelection, 0x29adff, 13, 0.86);
+  }
+
+  private drawObservationMarker(
+    projection: WorldProjection,
+    selection: WorldSelection | undefined,
+    color: number,
+    radius: number,
+    alpha: number,
+  ) {
+    if (!this.observationFocusLayer || !selection) {
+      return;
+    }
+
+    const position = resolveSelectionPosition(projection, selection);
+
+    if (!position) {
+      return;
+    }
+
+    const x = position.x * TILE_SIZE;
+    const y = position.y * TILE_SIZE;
+
+    this.observationFocusLayer.lineStyle(2, color, alpha);
+    this.observationFocusLayer.strokeCircle(x, y, radius);
+    this.observationFocusLayer.lineStyle(1, color, alpha * 0.72);
+    this.observationFocusLayer.beginPath();
+    this.observationFocusLayer.moveTo(x - radius - 4, y);
+    this.observationFocusLayer.lineTo(x - radius + 2, y);
+    this.observationFocusLayer.moveTo(x + radius - 2, y);
+    this.observationFocusLayer.lineTo(x + radius + 4, y);
+    this.observationFocusLayer.moveTo(x, y - radius - 4);
+    this.observationFocusLayer.lineTo(x, y - radius + 2);
+    this.observationFocusLayer.moveTo(x, y + radius - 2);
+    this.observationFocusLayer.lineTo(x, y + radius + 4);
+    this.observationFocusLayer.strokePath();
+  }
+
+  private drawGodPowerPreview(projection: WorldProjection) {
+    if (!this.godPowerPreviewLayer) {
+      return;
+    }
+
+    this.godPowerPreviewLayer.clear();
+
+    if (this.pointerOverGodPowerToolbar || !this.pointerTileTarget) {
+      return;
+    }
+
+    const preview = this.getGodPowerPreview(projection);
+    const centerX = this.pointerTileTarget.x * TILE_SIZE + TILE_SIZE / 2;
+    const centerY = this.pointerTileTarget.y * TILE_SIZE + TILE_SIZE / 2;
+    const color = preview.valid ? preview.accent : 0xef7d57;
+    const alpha = preview.valid ? 0.18 : 0.1;
+
+    this.godPowerPreviewLayer.lineStyle(
+      preview.valid ? 2 : 2.5,
+      color,
+      preview.valid ? 0.86 : 0.95,
+    );
+    this.godPowerPreviewLayer.fillStyle(color, alpha);
+
+    if (preview.radius <= 0) {
+      this.godPowerPreviewLayer.fillRect(
+        this.pointerTileTarget.x * TILE_SIZE,
+        this.pointerTileTarget.y * TILE_SIZE,
+        TILE_SIZE,
+        TILE_SIZE,
+      );
+      this.godPowerPreviewLayer.strokeRect(
+        this.pointerTileTarget.x * TILE_SIZE,
+        this.pointerTileTarget.y * TILE_SIZE,
+        TILE_SIZE,
+        TILE_SIZE,
+      );
+      return;
+    }
+
+    const radiusPx = preview.radius * TILE_SIZE + TILE_SIZE / 2;
+    this.godPowerPreviewLayer.fillCircle(centerX, centerY, radiusPx);
+    this.godPowerPreviewLayer.strokeCircle(centerX, centerY, radiusPx);
+    this.godPowerPreviewLayer.lineStyle(1, color, preview.valid ? 0.45 : 0.7);
+    this.godPowerPreviewLayer.strokeCircle(centerX, centerY, TILE_SIZE / 2);
+  }
+
+  private getGodPowerPreview(projection: WorldProjection): GodPowerPreview {
+    return buildGodPowerPreview({
+      toolId: this.activeGodPowerToolId,
+      target: this.pointerTileTarget,
+      targetTerrain: this.getTerrainAtPosition(this.pointerTileTarget),
+      worldWidth: projection.width,
+      worldHeight: projection.height,
+    });
+  }
+
   private drawMapLabels(projection: WorldProjection, detailLevel: CameraDetailLevel) {
     this.clearMapLabels();
 
@@ -1070,78 +1358,188 @@ export class WorldScene extends Phaser.Scene {
             ...conflictLines,
           ].join('\n'),
     );
-    this.controlsText?.setText(
-      [
-        '操作',
-        '左键：选择实体 / 地块',
-        '按住控制键 + 左键：投放食物',
-        '按住上档键 + 左键：召唤 4 个小人',
-        '按住替代键 + 左键：闪电打击',
-        'WASD / 方向键：移动镜头',
-        '滚轮 / Q / +：放大，E / -：缩小',
-        '1 / 2 / 4 键：调整速度',
-        'K 键：循环选择王国',
-        'H / J 键：让选中王国向压力目标开战 / 和平',
-        '0 或 P 键：暂停 / 恢复',
-        'F / G / V 键：将镜头中心改成森林 / 草地 / 水域',
-      ].join('    '),
-    );
-    const storyEvents = filterEventsForSelection(projection, this.selection).slice(-5);
+    this.controlsText?.setText('');
+    this.drawGodPowerToolbar();
+    const timelineLines = buildEventTimelineLines(projection, {
+      selection: this.selection,
+      favorite: this.favoriteSelection,
+      followed: this.followedSelection,
+      lastCommandId: this.lastGodCommandId,
+      limit: 5,
+    });
     const inspectionLines = buildInspectionLines(projection, this.selection);
+    const observationLines = buildObservationFocusLines(projection, {
+      favorite: this.favoriteSelection,
+      followed: this.followedSelection,
+    });
     this.eventsText?.setText(
-      this.selection.type === 'none'
+      this.selection.type === 'none' && !this.favoriteSelection && !this.followedSelection
         ? ''
-        : [
-            ...inspectionLines,
-            '',
-            this.selection.type === 'tile' ? '最近事件' : '相关事件',
-            ...(storyEvents.length > 0
-              ? storyEvents.map((event) => {
-                  const summary = formatEventSummary(event);
-
-                  return `第 ${event.tick} 刻：${summary || translateEvent(event.message)}`;
-                })
-              : ['暂无相关事件']),
-          ].join('\n'),
+        : [...inspectionLines, '', ...observationLines, '', ...timelineLines].join('\n'),
     );
   }
 
   private readonly handlePointerDown = (pointer: Phaser.Input.Pointer) => {
     this.focusGameCanvas();
+    const toolbarHit = resolveGodPowerToolbarHit(this.getGodPowerToolbarLayout(), {
+      x: pointer.x,
+      y: pointer.y,
+    });
+
+    if (toolbarHit) {
+      this.activeGodPowerToolId = toolbarHit;
+      this.godPowerClickFeedback = undefined;
+      this.lastHudDrawKey = '';
+      return;
+    }
+
     const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const position = {
       x: Math.floor(worldPoint.x / TILE_SIZE),
       y: Math.floor(worldPoint.y / TILE_SIZE),
     };
+    this.pointerOverGodPowerToolbar = false;
+    this.pointerTileTarget = position;
 
     if (pointer.event.altKey) {
-      this.issue({
-        type: 'lightning',
-        payload: { position, radius: 2, damage: 80 },
-      });
+      this.issuePointerGodPower('lightning', position);
       return;
     }
 
     if (pointer.event.shiftKey) {
-      this.issue({
-        type: 'spawn_unit',
-        payload: { race: 'human', position, count: 4 },
-      });
+      this.issuePointerGodPower('life', position);
       return;
     }
 
     if (pointer.event.ctrlKey || pointer.event.metaKey) {
-      this.issue({
-        type: 'place_resource',
-        payload: { resourceType: 'food', position, amount: 20, radius: 2 },
-      });
+      this.issuePointerGodPower('food', position);
       return;
     }
 
-    this.selection = selectWorldEntity(this.projectVisibleWorld(), {
+    if (isDiplomacyGodPowerTool(this.activeGodPowerToolId)) {
+      const projection = this.projectVisibleWorld();
+      const selected = selectWorldEntity(projection, {
+        x: worldPoint.x / TILE_SIZE,
+        y: worldPoint.y / TILE_SIZE,
+      });
+      this.selection = selected;
+      this.issueDiplomacyGodPower(this.activeGodPowerToolId, selected, projection);
+      return;
+    }
+
+    if (this.issuePointerGodPower(this.activeGodPowerToolId, position)) {
+      return;
+    }
+
+    const selected = selectWorldEntity(this.projectVisibleWorld(), {
       x: worldPoint.x / TILE_SIZE,
       y: worldPoint.y / TILE_SIZE,
     });
+
+    this.applyObservationToolSelection(selected);
+  };
+
+  private applyObservationToolSelection(selection: WorldSelection) {
+    this.selection = selection;
+
+    if (this.activeGodPowerToolId === 'favorite') {
+      if (isTrackableSelection(selection)) {
+        this.favoriteSelection = selection;
+        this.setGodPowerClickFeedback('已关注：事件面板会固定显示它的上下文');
+      } else {
+        this.favoriteSelection = undefined;
+        this.setGodPowerClickFeedback('已清除关注');
+      }
+
+      this.lastHudDrawKey = '';
+      this.lastObservationFocusDrawKey = '';
+      return;
+    }
+
+    if (this.activeGodPowerToolId === 'follow') {
+      if (isTrackableSelection(selection)) {
+        this.followedSelection = selection;
+        this.setGodPowerClickFeedback('已追踪：镜头会跟随这个对象');
+      } else {
+        this.followedSelection = undefined;
+        this.setGodPowerClickFeedback('已停止追踪');
+      }
+
+      this.lastHudDrawKey = '';
+      this.lastObservationFocusDrawKey = '';
+    }
+  }
+
+  private issuePointerGodPower(toolId: GodPowerToolId, position: { x: number; y: number }) {
+    const preview = buildGodPowerPreview({
+      toolId,
+      target: position,
+      targetTerrain: this.getTerrainAtPosition(position),
+      worldWidth: this.world.map.width,
+      worldHeight: this.world.map.height,
+    });
+
+    if (!preview.valid) {
+      this.setGodPowerClickFeedback(`未执行：${preview.reason || preview.status}`);
+      this.lastHudDrawKey = '';
+      return true;
+    }
+
+    const command = resolvePointerGodPowerCommand(toolId, position, {
+      targetTerrain: this.getTerrainAtPosition(position),
+      worldWidth: this.world.map.width,
+      worldHeight: this.world.map.height,
+    });
+
+    if (!command) {
+      return false;
+    }
+
+    this.lastGodCommandId = this.issue(command);
+    this.setGodPowerClickFeedback(buildGodPowerExecutionFeedback(toolId, command));
+    this.lastHudDrawKey = '';
+    return true;
+  }
+
+  private issueDiplomacyGodPower(
+    toolId: GodPowerToolId,
+    selection: WorldSelection,
+    projection: WorldProjection,
+  ) {
+    const context = this.getDiplomacyGodPowerContext(projection);
+    const preview = resolveDiplomacyGodPowerPreview(toolId, selection, context);
+
+    if (!preview.valid) {
+      this.setGodPowerClickFeedback(`未执行：${preview.reason || preview.status}`);
+      this.lastHudDrawKey = '';
+      return true;
+    }
+
+    const command = resolveDiplomacyGodPowerCommand(toolId, selection, context);
+
+    if (!command) {
+      return false;
+    }
+
+    this.lastGodCommandId = this.issue(command);
+    this.setGodPowerClickFeedback(buildGodPowerExecutionFeedback(toolId, command));
+    this.lastHudDrawKey = '';
+    return true;
+  }
+
+  private readonly handlePointerMove = (pointer: Phaser.Input.Pointer) => {
+    this.pointerOverGodPowerToolbar = this.isPointerOverGodPowerToolbar(pointer.x, pointer.y);
+
+    if (this.pointerOverGodPowerToolbar) {
+      this.pointerTileTarget = undefined;
+      return;
+    }
+
+    const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    this.pointerTileTarget = {
+      x: Math.floor(worldPoint.x / TILE_SIZE),
+      y: Math.floor(worldPoint.y / TILE_SIZE),
+    };
   };
 
   private readonly handlePointerWheel = (
@@ -1186,26 +1584,16 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
 
-    if (key === 'h' || key === 'j') {
-      this.issueSelectedDiplomacyCommand(key === 'h' ? 'force_war' : 'force_peace');
+    const selectedGodPowerToolId = resolveGodPowerHotkey(key);
+
+    if (selectedGodPowerToolId) {
+      this.activeGodPowerToolId = selectedGodPowerToolId;
       return;
     }
 
-    const center = this.cameras.main.midPoint;
-    const position = {
-      x: Math.floor(center.x / TILE_SIZE),
-      y: Math.floor(center.y / TILE_SIZE),
-    };
-
-    if (key === 'f' || key === 'g' || key === 'v') {
-      this.issue({
-        type: 'change_terrain',
-        payload: {
-          terrain: key === 'f' ? 'forest' : key === 'v' ? 'water' : 'grass',
-          position,
-          radius: 4,
-        },
-      });
+    if (key === 'h' || key === 'j') {
+      this.issueSelectedDiplomacyCommand(key === 'h' ? 'force_war' : 'force_peace');
+      return;
     }
   };
 
@@ -1218,6 +1606,23 @@ export class WorldScene extends Phaser.Scene {
 
     canvas.tabIndex = 0;
     canvas.focus({ preventScroll: true });
+  }
+
+  private applyFollowCamera() {
+    if (!this.followedSelection) {
+      return;
+    }
+
+    const position = resolveSelectionPosition(this.world.project(), this.followedSelection);
+
+    if (!position) {
+      this.followedSelection = undefined;
+      this.lastHudDrawKey = '';
+      this.lastObservationFocusDrawKey = '';
+      return;
+    }
+
+    this.setMainCameraCenter(position.x * TILE_SIZE, position.y * TILE_SIZE);
   }
 
   private updateCameraControls(deltaMs: number) {
@@ -1333,57 +1738,28 @@ export class WorldScene extends Phaser.Scene {
   private issueSelectedDiplomacyCommand(type: 'force_war' | 'force_peace') {
     const projection = this.projectVisibleWorld();
     const selection = this.selection;
-    let kingdomId: string | undefined;
-    let targetKingdomId: string | undefined;
+    const command = resolveDiplomacyGodPowerCommand(
+      type === 'force_war' ? 'forceWar' : 'forcePeace',
+      selection,
+      this.getDiplomacyGodPowerContext(projection),
+    );
 
-    if (selection.type === 'army') {
-      const army = projection.armies.find((candidate) => candidate.id === selection.id);
-      kingdomId = army?.kingdomId;
-      targetKingdomId = army?.targetKingdomId;
-    } else if (selection.type === 'kingdom') {
-      const kingdom = projection.kingdoms.find((candidate) => candidate.id === selection.id);
-      kingdomId = kingdom?.id;
-      targetKingdomId = kingdom?.diplomacyTargetKingdomId;
-    } else if (selection.type === 'village') {
-      const village = projection.villages.find((candidate) => candidate.id === selection.id);
-      const kingdom = village?.kingdomId
-        ? projection.kingdoms.find((candidate) => candidate.id === village.kingdomId)
-        : undefined;
-      kingdomId = kingdom?.id;
-      targetKingdomId = kingdom?.diplomacyTargetKingdomId;
+    if (command) {
+      this.lastGodCommandId = this.issue(command);
     }
-
-    if (!kingdomId || !targetKingdomId || kingdomId === targetKingdomId) {
-      return;
-    }
-
-    if (type === 'force_war') {
-      this.issue({
-        type: 'force_war',
-        payload: {
-          aggressorKingdomId: kingdomId,
-          targetKingdomId,
-        },
-      });
-      return;
-    }
-
-    this.issue({
-      type: 'force_peace',
-      payload: {
-        kingdomAId: kingdomId,
-        kingdomBId: targetKingdomId,
-      },
-    });
   }
 
   private issue(command: Omit<SimCommand, 'id' | 'issuedAtTick'>) {
+    const commandId = `cmd-${String(this.commandSequence).padStart(5, '0')}`;
+
     this.world.enqueue({
       ...command,
-      id: `cmd-${String(this.commandSequence).padStart(5, '0')}`,
+      id: commandId,
       issuedAtTick: this.world.currentTick,
     } as SimCommand);
     this.commandSequence += 1;
+
+    return commandId;
   }
 
   private projectVisibleWorld() {
@@ -1424,7 +1800,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private getTerrainDrawKey(projection: WorldProjection) {
-    return `${projection.terrainRevision}:${this.getViewportBucketKey(projection)}`;
+    return [
+      projection.terrainRevision,
+      getVisibleChunkKeySignature(projection.tiles, TERRAIN_RENDER_CHUNK_TILES),
+    ].join(':');
   }
 
   private getEffectiveRenderDetailLevel(projection: WorldProjection) {
@@ -1536,6 +1915,14 @@ export class WorldScene extends Phaser.Scene {
       projection.stats.fallenKingdoms,
       this.scale.width,
       this.scale.height,
+      this.activeGodPowerToolId,
+      this.pointerTileTarget
+        ? `${this.pointerTileTarget.x}:${this.pointerTileTarget.y}`
+        : 'no-target',
+      this.pointerOverGodPowerToolbar ? 'toolbar-hover' : 'world-hover',
+      this.godPowerClickFeedback?.text ?? 'no-god-feedback',
+      this.favoriteSelection ? selectionKeyForHud(this.favoriteSelection) : 'no-favorite',
+      this.followedSelection ? selectionKeyForHud(this.followedSelection) : 'no-follow',
     ].join(':');
   }
 
@@ -1565,6 +1952,26 @@ export class WorldScene extends Phaser.Scene {
 
   private getSelectionContentDrawKey(projection: WorldProjection) {
     return [this.getSelectionDrawKey(), projection.tick].join(':');
+  }
+
+  private getObservationFocusDrawKey(projection: WorldProjection) {
+    const favoritePosition = this.favoriteSelection
+      ? resolveSelectionPosition(projection, this.favoriteSelection)
+      : undefined;
+    const followedPosition = this.followedSelection
+      ? resolveSelectionPosition(projection, this.followedSelection)
+      : undefined;
+
+    return [
+      this.favoriteSelection ? selectionKeyForHud(this.favoriteSelection) : 'no-favorite',
+      favoritePosition
+        ? `${Math.round(favoritePosition.x * 10)}:${Math.round(favoritePosition.y * 10)}`
+        : 'off',
+      this.followedSelection ? selectionKeyForHud(this.followedSelection) : 'no-follow',
+      followedPosition
+        ? `${Math.round(followedPosition.x * 10)}:${Math.round(followedPosition.y * 10)}`
+        : 'off',
+    ].join(':');
   }
 
   private getKingdomOwnershipDrawKey(projection: WorldProjection) {
@@ -1638,7 +2045,7 @@ export class WorldScene extends Phaser.Scene {
       hasSelection ? (compact ? 330 : 420) : compact ? 300 : 350,
       Math.max(260, Math.floor(width * 0.28)),
     );
-    const bottomHeight = compact ? 72 : BOTTOM_PANEL_HEIGHT;
+    const bottomHeight = compact ? 104 : BOTTOM_PANEL_HEIGHT;
     const statusPanelHeight = compact ? 104 : COMPACT_STATUS_PANEL_HEIGHT;
     const eventsPanelHeight = hasSelection
       ? Math.min(height - EVENTS_PANEL_TOP - bottomHeight - UI_MARGIN * 3, compact ? 280 : 340)
@@ -1673,6 +2080,206 @@ export class WorldScene extends Phaser.Scene {
     this.controlsText?.setWordWrapWidth(width - 52);
     this.eventsText?.setPosition(width - eventsWidth + 4, 68);
     this.eventsText?.setWordWrapWidth(eventsWidth - 28);
+  }
+
+  private drawGodPowerToolbar() {
+    if (!this.uiLayer) {
+      return;
+    }
+
+    const layout = this.getGodPowerToolbarLayout();
+    const statusText = this.getGodPowerToolbarStatus(layout.status);
+    this.clearGodPowerToolbarTexts();
+
+    this.uiLayer.fillStyle(0x151f34, 0.86);
+    this.uiLayer.fillRoundedRect(
+      layout.panel.x + 8,
+      layout.panel.y + 8,
+      layout.panel.width - 16,
+      layout.panel.height - 16,
+      6,
+    );
+    this.addToolbarText(
+      layout.panel.x + 18,
+      layout.panel.y + 12,
+      `${statusText}    ${
+        this.scale.width > 1320
+          ? `${GOD_POWER_TOOLBAR_HELP_TEXT} ${GOD_POWER_TOOLBAR_WIDE_HELP_TEXT}`
+          : this.scale.width > 920
+            ? GOD_POWER_TOOLBAR_HELP_TEXT
+            : GOD_POWER_TOOLBAR_SHORT_HELP_TEXT
+      }`,
+      12,
+      statusText.startsWith('未执行') ? '#ef7d57' : '#d7e1ff',
+      '600',
+    );
+
+    for (const category of layout.categories) {
+      this.addToolbarText(
+        category.bounds.x,
+        category.bounds.y + 17,
+        category.label,
+        11,
+        '#94b0c2',
+        '700',
+      );
+    }
+
+    for (const button of layout.buttons) {
+      this.uiLayer.fillStyle(
+        button.selected ? button.accent : 0x24314f,
+        button.selected ? 0.92 : 0.84,
+      );
+      this.uiLayer.fillRoundedRect(
+        button.bounds.x,
+        button.bounds.y,
+        button.bounds.width,
+        button.bounds.height,
+        6,
+      );
+      this.uiLayer.lineStyle(
+        1,
+        button.selected ? 0xf4f4f4 : button.accent,
+        button.selected ? 0.95 : 0.54,
+      );
+      this.uiLayer.strokeRoundedRect(
+        button.bounds.x,
+        button.bounds.y,
+        button.bounds.width,
+        button.bounds.height,
+        6,
+      );
+      this.uiLayer.fillStyle(
+        button.selected ? 0x101726 : button.accent,
+        button.selected ? 0.55 : 0.3,
+      );
+      this.uiLayer.fillRoundedRect(button.bounds.x + 5, button.bounds.y + 5, 22, 24, 4);
+      this.addToolbarText(
+        button.bounds.x + 10,
+        button.bounds.y + 9,
+        button.hotkey,
+        12,
+        '#ffffff',
+        '800',
+      );
+      this.addToolbarText(
+        button.bounds.x + 32,
+        button.bounds.y + 8,
+        button.label,
+        12,
+        button.selected ? '#101726' : '#f4f4f4',
+        '700',
+      );
+    }
+  }
+
+  private getGodPowerToolbarLayout() {
+    const layout = layoutGodPowerToolbar({
+      viewportWidth: this.scale.width,
+      viewportHeight: this.scale.height,
+      activeToolId: this.activeGodPowerToolId,
+      target: this.pointerTileTarget,
+      targetTerrain: this.getTerrainAtPosition(this.pointerTileTarget),
+      worldWidth: this.world.map.width,
+      worldHeight: this.world.map.height,
+    });
+
+    return layout;
+  }
+
+  private getGodPowerToolbarStatus(fallbackStatus: string) {
+    if (!this.godPowerClickFeedback) {
+      return fallbackStatus;
+    }
+
+    if (this.time.now > this.godPowerClickFeedback.expiresAtMs) {
+      this.godPowerClickFeedback = undefined;
+      return fallbackStatus;
+    }
+
+    return this.godPowerClickFeedback.text;
+  }
+
+  private setGodPowerClickFeedback(text: string) {
+    this.godPowerClickFeedback = {
+      text,
+      expiresAtMs: this.time.now + 1400,
+    };
+  }
+
+  private getTerrainAtPosition(
+    position: { x: number; y: number } | undefined,
+  ): TerrainType | undefined {
+    if (
+      !position ||
+      position.x < 0 ||
+      position.y < 0 ||
+      position.x >= this.world.map.width ||
+      position.y >= this.world.map.height
+    ) {
+      return undefined;
+    }
+
+    return this.world.map.tiles[position.y * this.world.map.width + position.x]?.terrain;
+  }
+
+  private getDiplomacyGodPowerContext(projection: WorldProjection) {
+    return {
+      villages: projection.villages.map((village) => ({
+        id: village.id,
+        kingdomId: village.kingdomId,
+      })),
+      kingdoms: projection.kingdoms.map((kingdom) => ({
+        id: kingdom.id,
+        diplomacyTargetKingdomId: kingdom.diplomacyTargetKingdomId,
+      })),
+      armies: projection.armies.map((army) => ({
+        id: army.id,
+        kingdomId: army.kingdomId,
+        targetKingdomId: army.targetKingdomId,
+      })),
+    };
+  }
+
+  private isPointerOverGodPowerToolbar(screenX: number, screenY: number) {
+    const panel = this.getGodPowerToolbarLayout().panel;
+
+    return (
+      screenX >= panel.x &&
+      screenX <= panel.x + panel.width &&
+      screenY >= panel.y &&
+      screenY <= panel.y + panel.height
+    );
+  }
+
+  private addToolbarText(
+    x: number,
+    y: number,
+    value: string,
+    fontSize: number,
+    color: string,
+    fontStyle: string,
+  ) {
+    const text = this.add.text(x, y, value, {
+      fontFamily: 'system-ui, "PingFang SC", "Microsoft YaHei", sans-serif',
+      fontSize: `${fontSize}px`,
+      fontStyle,
+      color,
+      resolution: 2,
+    });
+
+    text.setScrollFactor(0);
+    text.setDepth(22);
+    this.cameras.main.ignore(text);
+    this.godPowerToolbarTexts.push(text);
+  }
+
+  private clearGodPowerToolbarTexts() {
+    for (const text of this.godPowerToolbarTexts) {
+      text.destroy();
+    }
+
+    this.godPowerToolbarTexts = [];
   }
 
   private drawPanel(x: number, y: number, width: number, height: number, alpha: number) {
@@ -1765,6 +2372,7 @@ export class WorldScene extends Phaser.Scene {
     this.lastBuildingDrawKey = '';
     this.lastArmyRouteDrawKey = '';
     this.lastMapLabelsDrawKey = '';
+    this.lastObservationFocusDrawKey = '';
     this.lastHudDrawKey = '';
     this.lastHudDrawAtMs = -Infinity;
   }
@@ -1820,6 +2428,8 @@ export class WorldScene extends Phaser.Scene {
       this.armyLayer,
       this.unitLayer,
       this.selectionLayer,
+      this.observationFocusLayer,
+      this.godPowerPreviewLayer,
     ];
     const uiObjects: Array<Phaser.GameObjects.GameObject | undefined> = [
       this.uiLayer,
@@ -1839,124 +2449,4 @@ export class WorldScene extends Phaser.Scene {
     this.uiCamera.ignore(visibleWorldObjects);
     this.cameras.main.ignore(visibleUiObjects);
   }
-}
-
-function translateEvent(message: string) {
-  if (message.includes('Spawn life command accepted')) {
-    return '召唤生命命令已接受';
-  }
-
-  if (message.includes('Place resource command accepted')) {
-    return '投放资源命令已接受';
-  }
-
-  if (message.includes('Change terrain command accepted')) {
-    return '改变地形命令已接受';
-  }
-
-  if (message.includes('Lightning command accepted')) {
-    return '闪电命令已接受';
-  }
-
-  if (message.includes('was born')) {
-    return '新小人出生';
-  }
-
-  if (message.includes('died from lightning')) {
-    return '小人被闪电击倒';
-  }
-
-  if (message.includes('food placed')) {
-    return '食物已投放';
-  }
-
-  if (message.includes('Terrain changed')) {
-    return '地形已改变';
-  }
-
-  if (message.includes('Lightning struck')) {
-    return '闪电已落下';
-  }
-
-  if (message.includes('kingdom') && message.includes('founded')) {
-    return '王国已建立';
-  }
-
-  if (message.includes('joined kingdom')) {
-    return '村庄加入王国';
-  }
-
-  if (message.includes('capital moved')) {
-    return '王国迁都';
-  }
-
-  if (message.includes('border friction')) {
-    return '王国边境摩擦升温';
-  }
-
-  if (message.includes('resource pressure')) {
-    return '王国资源压力升温';
-  }
-
-  if (message.includes('declared war')) {
-    return '王国宣战';
-  }
-
-  if (message.includes('formed')) {
-    return '军队已集结';
-  }
-
-  if (message.includes('battle resolved')) {
-    return '战斗已结算';
-  }
-
-  if (message.includes('captured')) {
-    return '村庄被占领';
-  }
-
-  if (message.includes('disbanded')) {
-    return '军队已解散';
-  }
-
-  if (message.includes('fallen')) {
-    return '王国陨落';
-  }
-
-  if (message.includes('founded')) {
-    return '村庄已形成';
-  }
-
-  if (message.includes('is declining')) {
-    return '村庄进入衰退';
-  }
-
-  if (message.includes('ruined')) {
-    return '建筑已沦为废墟';
-  }
-
-  if (message.includes('abandoned')) {
-    return '村庄已废弃';
-  }
-
-  if (message.includes('built')) {
-    return '村庄建筑已完成';
-  }
-
-  if (message.includes('upgraded')) {
-    return '建筑已升级';
-  }
-
-  if (message.includes('Speed changed')) {
-    return '速度已调整';
-  }
-
-  if (message.includes('Simulation paused')) {
-    return '模拟已暂停';
-  }
-
-  if (message.includes('Simulation resumed')) {
-    return '模拟已恢复';
-  }
-
-  return message;
 }
