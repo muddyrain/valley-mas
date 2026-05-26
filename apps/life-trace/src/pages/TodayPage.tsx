@@ -1,9 +1,23 @@
-import { Bell, Cloud, Droplets, MapPin, Settings, Sparkles, Sun, Wind } from 'lucide-react';
+import {
+  Bell,
+  CalendarDays,
+  Car,
+  Cloud,
+  Droplets,
+  Heart,
+  MapPin,
+  Settings,
+  Shirt,
+  Sparkles,
+  Sun,
+  Wind,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { fetchLifeTraceWeather, type WeatherApiResponse } from '@/api/weather';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { hourlyWeather, todayAdvice, weatherMetrics } from '@/data/mock';
+import { hourlyWeather, weatherMetrics } from '@/data/mock';
+import { buildWeatherBrief, buildWeatherDrivenAdvice } from '@/lib/weatherAdvice';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Advice } from '@/types';
 
@@ -32,6 +46,15 @@ const metricToneClasses = {
   muted: 'text-muted-foreground',
   health: 'text-life-health',
   alert: 'text-life-alert',
+};
+
+const adviceIconMap = {
+  wear: Shirt,
+  skin: Droplets,
+  out: Cloud,
+  commute: Car,
+  health: Heart,
+  plan: CalendarDays,
 };
 
 const fallbackWeather: WeatherApiResponse = {
@@ -88,13 +111,11 @@ export function TodayPage() {
     return () => controller.abort();
   }, [settings.city]);
 
-  const advice = todayAdvice.map((item) =>
-    item.id === 'plan'
-      ? { ...item, detail: `还有${openPlanCount}个生活计划` }
-      : item.id === 'commute'
-        ? { ...item, detail: `${settings.commuteMethod}通勤，${settings.workStart}前到达` }
-        : item,
-  );
+  const advice = buildWeatherDrivenAdvice({ weather, settings, openPlanCount }).map((item) => ({
+    ...item,
+    icon: adviceIconMap[item.id as keyof typeof adviceIconMap] ?? Sparkles,
+  }));
+  const brief = buildWeatherBrief(weather, settings);
 
   return (
     <div className="space-y-5">
@@ -192,10 +213,8 @@ export function TodayPage() {
         </div>
         <div className="min-w-0">
           <Badge tone="ai">AI 今日简报</Badge>
-          <h2 className="mt-3 text-xl font-semibold">今天也适合慢慢变好</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            早晚温差较大，{settings.commuteMethod}通勤建议提前出门，下午注意补水。
-          </p>
+          <h2 className="mt-3 text-xl font-semibold">{brief.title}</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{brief.detail}</p>
         </div>
       </Card>
 
