@@ -4,6 +4,7 @@ import (
 	"valley-server/internal/ai"
 	"valley-server/internal/config"
 	"valley-server/internal/handler"
+	"valley-server/internal/lifetrace"
 	"valley-server/internal/logger"
 	"valley-server/internal/middleware"
 	"valley-server/internal/mindarena"
@@ -31,6 +32,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 		mindArenaStore := mindarena.NewMemoryStore()
 		mindArenaService := mindarena.NewService(mindArenaStore, ai.NewServiceFromEnv())
 		mindarena.RegisterMindArenaRoutes(api, mindarena.NewHandler(mindArenaService))
+
+		lifeTraceWeatherService := lifetrace.NewWeatherService(cfg.QWeather)
+		lifetrace.RegisterRoutes(api, lifetrace.NewHandler(lifeTraceWeatherService))
 
 		public := api.Group("/public")
 		{

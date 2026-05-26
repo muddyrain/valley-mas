@@ -12,6 +12,7 @@ type Config struct {
 	TOS      TOSConfig
 	JWT      JWTConfig
 	SMTP     SMTPConfig
+	QWeather QWeatherConfig
 }
 
 type DatabaseConfig struct {
@@ -50,6 +51,14 @@ type SMTPConfig struct {
 	Pass        string
 	FromName    string
 	FromAddress string
+}
+
+type QWeatherConfig struct {
+	APIKey          string
+	APIHost         string
+	GeoHost         string
+	CacheTTLMinutes int
+	TimeoutSeconds  int
 }
 
 func Load() *Config {
@@ -91,6 +100,13 @@ func Load() *Config {
 			Pass:        getEnv("SMTP_PASS", ""),
 			FromName:    getEnv("SMTP_FROM_NAME", "Valley"),
 			FromAddress: getEnv("SMTP_FROM_ADDRESS", ""),
+		},
+		QWeather: QWeatherConfig{
+			APIKey:          getEnv("QWEATHER_API_KEY", ""),
+			APIHost:         getEnv("QWEATHER_API_HOST", "https://devapi.qweather.com"),
+			GeoHost:         getEnv("QWEATHER_GEO_HOST", "https://geoapi.qweather.com"),
+			CacheTTLMinutes: getEnvInt("QWEATHER_CACHE_TTL_MINUTES", 30),
+			TimeoutSeconds:  getEnvInt("QWEATHER_TIMEOUT_SECONDS", 5),
 		},
 	}
 }

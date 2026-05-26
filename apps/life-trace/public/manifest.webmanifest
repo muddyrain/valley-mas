@@ -1,0 +1,26 @@
+{
+  "name": "生活迹 Life Trace",
+  "short_name": "Life Trace",
+  "description": "AI 主导的个人生活计划与踪迹记录应用",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "orientation": "portrait",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

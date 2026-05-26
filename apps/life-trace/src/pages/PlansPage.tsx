@@ -1,0 +1,93 @@
+import { Bell, Check, Plus } from 'lucide-react';
+import { useState } from 'react';
+import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
+import { SectionHeader } from '@/components/SectionHeader';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { useLifeTraceStore } from '@/store/useLifeTraceStore';
+import type { PlanType } from '@/types';
+
+const typeTone: Record<PlanType, 'plan' | 'health' | 'trace' | 'weather' | 'ai' | 'alert'> = {
+  电影: 'plan',
+  吃饭: 'health',
+  运动: 'trace',
+  阅读: 'weather',
+  聚会: 'ai',
+  普通事项: 'alert',
+};
+
+export function PlansPage() {
+  const { plans, completePlan } = useLifeTraceStore();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  return (
+    <div className="space-y-5">
+      <SectionHeader title="计划" meta={`${plans.length} 个计划`} />
+
+      <div className="grid grid-cols-4 rounded-2xl bg-card p-1 text-sm font-semibold text-muted-foreground">
+        {['全部', '今天', '周末', '已提醒'].map((filter, index) => (
+          <button
+            type="button"
+            key={filter}
+            className={`rounded-xl py-3 transition ${index === 0 ? 'bg-secondary text-foreground' : 'hover:text-foreground'}`}
+          >
+            {filter}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-4">
+        {plans.map((plan) => (
+          <Card key={plan.id} className="overflow-hidden">
+            {plan.imageUrl ? (
+              <img
+                src={plan.imageUrl}
+                alt={plan.title}
+                className="h-32 w-full object-cover opacity-80"
+              />
+            ) : null}
+            <div className="space-y-4 p-5">
+              <div className="flex items-center justify-between gap-3">
+                <Badge tone={typeTone[plan.type]}>{plan.type}</Badge>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Bell className="size-4 text-life-health" />
+                  {plan.reminder ? '已设提醒' : '未提醒'}
+                </div>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold leading-snug">{plan.title}</h2>
+                <p className="mt-2 text-sm text-muted-foreground">{plan.timeLabel}</p>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="line-clamp-1 text-sm text-muted-foreground">{plan.note}</p>
+                <Button
+                  type="button"
+                  variant={plan.completed ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={() => completePlan(plan.id)}
+                  disabled={plan.completed}
+                >
+                  <Check className="size-4" />
+                  {plan.completed ? '已完成' : '完成'}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <Button
+        type="button"
+        variant="ai"
+        className="fixed bottom-28 left-1/2 z-10 -translate-x-1/2 px-6"
+        onClick={() => setDrawerOpen(true)}
+      >
+        <Plus className="size-5" />
+        创建计划
+      </Button>
+
+      <CreatePlanDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+    </div>
+  );
+}
