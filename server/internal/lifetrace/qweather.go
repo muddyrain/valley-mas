@@ -156,11 +156,13 @@ func normalizeIndices(resp qWeatherIndicesResponse) []WeatherIndex {
 }
 
 func formatHour(value string) string {
-	parsed, err := time.Parse(time.RFC3339, value)
-	if err != nil {
-		return value
+	for _, layout := range []string{time.RFC3339, "2006-01-02T15:04-07:00"} {
+		parsed, err := time.Parse(layout, value)
+		if err == nil {
+			return parsed.Format("15时")
+		}
 	}
-	return parsed.Format("15时")
+	return value
 }
 
 func degree(value string) string {

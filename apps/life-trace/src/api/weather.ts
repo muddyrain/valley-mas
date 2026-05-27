@@ -36,13 +36,25 @@ export type WeatherApiResponse = {
   metrics: WeatherApiMetric[];
   hourly: WeatherApiHour[];
   indices: WeatherApiIndex[];
+  cached: boolean;
+  refreshLimited?: boolean;
+  refreshAllowedAt?: string;
   warning?: string;
 };
 
-export async function fetchLifeTraceWeather(city: string, signal?: AbortSignal) {
+type FetchWeatherOptions = {
+  signal?: AbortSignal;
+  refresh?: boolean;
+};
+
+export async function fetchLifeTraceWeather(city: string, options: FetchWeatherOptions = {}) {
   const params = new URLSearchParams({ city });
+  if (options.refresh) {
+    params.set('refresh', 'true');
+  }
+
   const response = await fetch(`/api/v1/life-trace/weather?${params.toString()}`, {
-    signal,
+    signal: options.signal,
     headers: {
       Accept: 'application/json',
     },

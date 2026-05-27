@@ -21,6 +21,7 @@ type WeatherService struct {
 
 type cacheEntry struct {
 	data      WeatherResponse
+	fetchedAt time.Time
 	expiresAt time.Time
 }
 
@@ -37,19 +38,30 @@ func NewWeatherService(cfg config.QWeatherConfig) *WeatherService {
 	}
 }
 
-func (s *WeatherService) Fetch(ctx context.Context, city string) WeatherResponse {
+func (s *WeatherService) Fetch(ctx context.Context, city string, forceRefresh bool) WeatherResponse {
 	city = strings.TrimSpace(city)
 	if city == "" {
 		city = "上海"
 	}
 
 	cacheKey := strings.ToLower(city)
-	if cached, ok := s.getCached(cacheKey); ok {
-		return cached
+	if cached, ok := s.getCached(cacheKey); ok && !forceRefresh {
+		return cached.withFlags(true, false, time.Time{})
+	}
+	if cached, ok := s.getCached(cacheKey); ok && forceRefresh {
+		nextRefreshAt := cached.fetchedAt.Add(s.refreshCooldown())
+		if time.Now().Before(nextRefreshAt) {
+			return cached.withFlags(true, true, nextRefreshAt)
+		}
 	}
 
 	resp, err := s.fetchQWeather(ctx, city)
 	if err != nil {
+		if cached, ok := s.getCached(cacheKey); ok {
+			resp := cached.withFlags(true, false, time.Time{})
+			resp.Warning = err.Error()
+			return resp
+		}
 		mock := mockWeather(city)
 		mock.Warning = err.Error()
 		s.setCached(cacheKey, mock)
@@ -60,16 +72,16 @@ func (s *WeatherService) Fetch(ctx context.Context, city string) WeatherResponse
 	return resp
 }
 
-func (s *WeatherService) getCached(key string) (WeatherResponse, bool) {
+func (s *WeatherService) getCached(key string) (cacheEntry, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	entry, ok := s.cache[key]
 	if !ok || time.Now().After(entry.expiresAt) {
-		return WeatherResponse{}, false
+		return cacheEntry{}, false
 	}
 
-	return entry.data, true
+	return entry, true
 }
 
 func (s *WeatherService) setCached(key string, data WeatherResponse) {
@@ -80,7 +92,29 @@ func (s *WeatherService) setCached(key string, data WeatherResponse) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.cache[key] = cacheEntry{data: data, expiresAt: time.Now().Add(ttl)}
+	now := time.Now()
+	data.Cached = false
+	data.RefreshLimited = false
+	data.RefreshAllowedAt = ""
+	s.cache[key] = cacheEntry{data: data, fetchedAt: now, expiresAt: now.Add(ttl)}
+}
+
+func (s *WeatherService) refreshCooldown() time.Duration {
+	cooldown := time.Duration(s.cfg.RefreshCooldownSeconds) * time.Second
+	if cooldown <= 0 {
+		return 5 * time.Minute
+	}
+	return cooldown
+}
+
+func (entry cacheEntry) withFlags(cached bool, refreshLimited bool, refreshAllowedAt time.Time) WeatherResponse {
+	resp := entry.data
+	resp.Cached = cached
+	resp.RefreshLimited = refreshLimited
+	if !refreshAllowedAt.IsZero() {
+		resp.RefreshAllowedAt = refreshAllowedAt.Format(time.RFC3339)
+	}
+	return resp
 }
 
 func (s *WeatherService) fetchQWeather(ctx context.Context, city string) (WeatherResponse, error) {

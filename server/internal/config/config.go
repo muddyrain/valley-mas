@@ -55,11 +55,12 @@ type SMTPConfig struct {
 }
 
 type QWeatherConfig struct {
-	APIKey          string
-	APIHost         string
-	GeoHost         string
-	CacheTTLMinutes int
-	TimeoutSeconds  int
+	APIKey                 string
+	APIHost                string
+	GeoHost                string
+	CacheTTLMinutes        int
+	TimeoutSeconds         int
+	RefreshCooldownSeconds int
 }
 
 func Load() *Config {
@@ -105,11 +106,12 @@ func Load() *Config {
 			FromAddress: getEnv("SMTP_FROM_ADDRESS", ""),
 		},
 		QWeather: QWeatherConfig{
-			APIKey:          getEnv("QWEATHER_API_KEY", ""),
-			APIHost:         qWeatherAPIHost,
-			GeoHost:         qWeatherGeoHost,
-			CacheTTLMinutes: getEnvInt("QWEATHER_CACHE_TTL_MINUTES", 30),
-			TimeoutSeconds:  getEnvInt("QWEATHER_TIMEOUT_SECONDS", 5),
+			APIKey:                 getEnv("QWEATHER_API_KEY", ""),
+			APIHost:                qWeatherAPIHost,
+			GeoHost:                qWeatherGeoHost,
+			CacheTTLMinutes:        getEnvInt("QWEATHER_CACHE_TTL_MINUTES", 30),
+			TimeoutSeconds:         getEnvInt("QWEATHER_TIMEOUT_SECONDS", 5),
+			RefreshCooldownSeconds: getEnvInt("QWEATHER_REFRESH_COOLDOWN_SECONDS", 300),
 		},
 	}
 }

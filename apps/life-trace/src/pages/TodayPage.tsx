@@ -2,10 +2,13 @@ import {
   Bell,
   CalendarDays,
   Car,
+  Check,
   Cloud,
   Droplets,
   Heart,
   MapPin,
+  Plus,
+  RefreshCw,
   Settings,
   Shirt,
   Sparkles,
@@ -17,7 +20,9 @@ import { fetchLifeTraceWeather, type WeatherApiResponse } from '@/api/weather';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { hourlyWeather, weatherMetrics } from '@/data/mock';
+import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import { buildWeatherBrief, buildWeatherDrivenAdvice } from '@/lib/weatherAdvice';
+import { readWeatherCache, writeWeatherCache } from '@/lib/weatherCache';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Advice } from '@/types';
 
@@ -85,26 +90,39 @@ const fallbackWeather: WeatherApiResponse = {
     active: hour.active,
   })),
   indices: [],
+  cached: false,
 };
 
 export function TodayPage() {
   const openPlanCount = useLifeTraceStore(
     (state) => state.plans.filter((plan) => !plan.completed).length,
   );
+  const plans = useLifeTraceStore((state) => state.plans);
   const settings = useLifeTraceStore((state) => state.settings);
   const setActiveTab = useLifeTraceStore((state) => state.setActiveTab);
+  const addPlan = useLifeTraceStore((state) => state.addPlan);
   const [weather, setWeather] = useState<WeatherApiResponse>({
     ...fallbackWeather,
     city: settings.city,
   });
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [planToast, setPlanToast] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
+    const cached = readWeatherCache(window.localStorage, settings.city);
+    if (cached) {
+      setWeather(cached);
+      return () => controller.abort();
+    }
+
     setWeatherLoading(true);
 
-    fetchLifeTraceWeather(settings.city, controller.signal)
-      .then(setWeather)
+    fetchLifeTraceWeather(settings.city, { signal: controller.signal })
+      .then((resp) => {
+        setWeather(resp);
+        writeWeatherCache(window.localStorage, settings.city, resp);
+      })
       .catch(() => setWeather({ ...fallbackWeather, city: settings.city }))
       .finally(() => setWeatherLoading(false));
 
@@ -116,6 +134,46 @@ export function TodayPage() {
     icon: adviceIconMap[item.id as keyof typeof adviceIconMap] ?? Sparkles,
   }));
   const brief = buildWeatherBrief(weather, settings);
+  const handleAddAdvicePlan = (item: Advice) => {
+    if (hasAdvicePlan(plans, item.id)) {
+      setPlanToast('这个建议已经在今日计划里');
+      return;
+    }
+
+    addPlan(
+      createPlanFromAdvice({
+        id: item.id,
+        title: item.title,
+        detail: item.detail,
+        city: weather.city || settings.city,
+      }),
+    );
+    setPlanToast('已加入今日计划');
+  };
+  const handleRefreshWeather = () => {
+    if (weatherLoading) {
+      return;
+    }
+
+    setWeatherLoading(true);
+    fetchLifeTraceWeather(settings.city, { refresh: true })
+      .then((resp) => {
+        setWeather(resp);
+        writeWeatherCache(window.localStorage, settings.city, resp);
+        setPlanToast(resp.refreshLimited ? '刚刚刷新过，已使用缓存天气' : '天气已刷新');
+      })
+      .catch(() => setPlanToast('天气刷新失败，稍后再试'))
+      .finally(() => setWeatherLoading(false));
+  };
+
+  useEffect(() => {
+    if (!planToast) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setPlanToast(''), 1800);
+    return () => window.clearTimeout(timer);
+  }, [planToast]);
 
   return (
     <div className="space-y-5">
@@ -159,8 +217,25 @@ export function TodayPage() {
             <div className="mt-1 text-sm text-muted-foreground">
               {weather.city || settings.city}
             </div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              {weatherLoading ? '更新中' : weather.source === 'qweather' ? 'QWeather' : 'Mock'}
+            <div className="mt-1 flex items-center justify-end gap-2 text-xs text-muted-foreground">
+              <span>
+                {weatherLoading
+                  ? '更新中'
+                  : weather.source === 'qweather'
+                    ? weather.cached
+                      ? 'QWeather · 缓存'
+                      : 'QWeather'
+                    : 'Mock'}
+              </span>
+              <button
+                type="button"
+                className="grid size-7 cursor-pointer place-items-center rounded-full bg-secondary text-muted-foreground transition hover:text-foreground disabled:cursor-default disabled:opacity-60"
+                aria-label="刷新天气"
+                disabled={weatherLoading}
+                onClick={handleRefreshWeather}
+              >
+                <RefreshCw className={`size-3.5 ${weatherLoading ? 'animate-spin' : ''}`} />
+              </button>
             </div>
           </div>
         </div>
@@ -224,23 +299,38 @@ export function TodayPage() {
           {advice.map((item) => {
             const Icon = item.icon;
             const tone = adviceToneClasses[item.tone];
+            const isAdded = hasAdvicePlan(plans, item.id);
 
             return (
-              <Card key={item.id} className="min-h-24 p-4">
-                <div className="flex items-center gap-3">
-                  <div className={`grid size-10 place-items-center rounded-2xl ${tone.bg}`}>
-                    <Icon className={`size-5 ${tone.text}`} />
+              <Card key={item.id} className="relative h-28 p-4">
+                <button
+                  type="button"
+                  disabled={isAdded}
+                  className="absolute top-3 right-3 z-10 grid size-8 cursor-pointer place-items-center rounded-full bg-secondary text-foreground transition hover:bg-accent disabled:cursor-default disabled:text-life-trace disabled:opacity-100"
+                  aria-label={isAdded ? '已添加计划' : `添加${item.title}计划`}
+                  onClick={() => handleAddAdvicePlan(item)}
+                >
+                  {isAdded ? <Check className="size-4" /> : <Plus className="size-4" />}
+                </button>
+                <div className="flex items-center gap-2 pr-10">
+                  <div className={`grid size-8 shrink-0 place-items-center rounded-xl ${tone.bg}`}>
+                    <Icon className={`size-4.5 ${tone.text}`} />
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="truncate text-base font-semibold">{item.title}</h3>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">{item.detail}</p>
-                  </div>
+                  <h3 className="min-w-0 truncate text-base font-semibold">{item.title}</h3>
                 </div>
+                <p className="mt-3 line-clamp-2 text-sm leading-5 text-muted-foreground">
+                  {item.detail}
+                </p>
               </Card>
             );
           })}
         </div>
       </section>
+      {planToast ? (
+        <div className="fixed right-6 bottom-28 left-6 z-30 mx-auto max-w-[360px] rounded-2xl border border-life-trace/30 bg-card px-4 py-3 text-center text-sm font-medium text-life-trace shadow-2xl">
+          {planToast}
+        </div>
+      ) : null}
     </div>
   );
 }

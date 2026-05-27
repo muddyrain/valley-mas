@@ -1,15 +1,18 @@
 package lifetrace
 
 type WeatherResponse struct {
-	Source    string          `json:"source"`
-	City      string          `json:"city"`
-	UpdatedAt string          `json:"updatedAt"`
-	Now       WeatherNow      `json:"now"`
-	Metrics   []WeatherMetric `json:"metrics"`
-	Hourly    []WeatherHour   `json:"hourly"`
-	Daily     []WeatherDay    `json:"daily"`
-	Indices   []WeatherIndex  `json:"indices"`
-	Warning   string          `json:"warning,omitempty"`
+	Source           string          `json:"source"`
+	City             string          `json:"city"`
+	UpdatedAt        string          `json:"updatedAt"`
+	Now              WeatherNow      `json:"now"`
+	Metrics          []WeatherMetric `json:"metrics"`
+	Hourly           []WeatherHour   `json:"hourly"`
+	Daily            []WeatherDay    `json:"daily"`
+	Indices          []WeatherIndex  `json:"indices"`
+	Cached           bool            `json:"cached"`
+	RefreshLimited   bool            `json:"refreshLimited,omitempty"`
+	RefreshAllowedAt string          `json:"refreshAllowedAt,omitempty"`
+	Warning          string          `json:"warning,omitempty"`
 }
 
 type WeatherNow struct {

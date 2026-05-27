@@ -25,6 +25,7 @@ const baseWeather: WeatherApiResponse = {
     { time: '14时', temp: '27°', text: '阵雨' },
   ],
   indices: [],
+  cached: false,
 };
 
 const settings: UserSettings = {

@@ -5,8 +5,9 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { isAdvicePlan, splitPlansByToday } from '@/lib/planGroups';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { PlanType } from '@/types';
+import type { Plan, PlanType } from '@/types';
 
 const typeTone: Record<PlanType, 'plan' | 'health' | 'trace' | 'weather' | 'ai' | 'alert'> = {
   电影: 'plan',
@@ -20,10 +21,52 @@ const typeTone: Record<PlanType, 'plan' | 'health' | 'trace' | 'weather' | 'ai' 
 export function PlansPage() {
   const { plans, completePlan } = useLifeTraceStore();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { todayPlans, otherPlans } = splitPlansByToday(plans);
+  const planGroups = [
+    { title: '今日计划', plans: todayPlans },
+    { title: '其他计划', plans: otherPlans },
+  ].filter((group) => group.plans.length > 0);
+
+  const renderPlanCard = (plan: Plan) => (
+    <Card key={plan.id} className="overflow-hidden">
+      {plan.imageUrl ? (
+        <img src={plan.imageUrl} alt={plan.title} className="h-32 w-full object-cover opacity-80" />
+      ) : null}
+      <div className="space-y-4 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <Badge tone={typeTone[plan.type]}>{plan.type}</Badge>
+            {isAdvicePlan(plan) ? <Badge tone="ai">今日建议</Badge> : null}
+          </div>
+          <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+            <Bell className="size-4 text-life-health" />
+            {plan.reminder ? '已设提醒' : '未提醒'}
+          </div>
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold leading-snug">{plan.title}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">{plan.timeLabel}</p>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <p className="line-clamp-1 text-sm text-muted-foreground">{plan.note}</p>
+          <Button
+            type="button"
+            variant={plan.completed ? 'secondary' : 'outline'}
+            size="sm"
+            onClick={() => completePlan(plan.id)}
+            disabled={plan.completed}
+          >
+            <Check className="size-4" />
+            {plan.completed ? '已完成' : '完成'}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
 
   return (
     <div className="space-y-5">
-      <SectionHeader title="计划" meta={`${plans.length} 个计划`} />
+      <SectionHeader title="计划" meta={`${todayPlans.length} 个今日计划`} />
 
       <div className="grid grid-cols-4 rounded-2xl bg-card p-1 text-sm font-semibold text-muted-foreground">
         {['全部', '今天', '周末', '已提醒'].map((filter, index) => (
@@ -37,43 +80,15 @@ export function PlansPage() {
         ))}
       </div>
 
-      <div className="space-y-4">
-        {plans.map((plan) => (
-          <Card key={plan.id} className="overflow-hidden">
-            {plan.imageUrl ? (
-              <img
-                src={plan.imageUrl}
-                alt={plan.title}
-                className="h-32 w-full object-cover opacity-80"
-              />
-            ) : null}
-            <div className="space-y-4 p-5">
-              <div className="flex items-center justify-between gap-3">
-                <Badge tone={typeTone[plan.type]}>{plan.type}</Badge>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Bell className="size-4 text-life-health" />
-                  {plan.reminder ? '已设提醒' : '未提醒'}
-                </div>
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold leading-snug">{plan.title}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">{plan.timeLabel}</p>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <p className="line-clamp-1 text-sm text-muted-foreground">{plan.note}</p>
-                <Button
-                  type="button"
-                  variant={plan.completed ? 'secondary' : 'outline'}
-                  size="sm"
-                  onClick={() => completePlan(plan.id)}
-                  disabled={plan.completed}
-                >
-                  <Check className="size-4" />
-                  {plan.completed ? '已完成' : '完成'}
-                </Button>
-              </div>
+      <div className="space-y-6">
+        {planGroups.map((group) => (
+          <section key={group.title} className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">{group.title}</h2>
+              <span className="text-xs text-muted-foreground">{group.plans.length} 个</span>
             </div>
-          </Card>
+            <div className="space-y-4">{group.plans.map(renderPlanCard)}</div>
+          </section>
         ))}
       </div>
 
