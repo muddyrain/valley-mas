@@ -102,6 +102,7 @@ export function ImageAnalysisDrawer({
       type: analysis.planType,
       timeLabel: defaultTime,
       reminder: true,
+      source: 'image_ai',
       imageUrl: previewUrl || undefined,
       location: '',
       note: analysis.summary,
@@ -140,8 +141,10 @@ export function ImageAnalysisDrawer({
       />
       <div
         className={cn(
-          'safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[88dvh] w-full max-w-[430px] overflow-y-auto rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl transition-transform duration-300',
-          open ? 'translate-y-0' : 'translate-y-full',
+          'safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[88dvh] w-full max-w-[430px] overflow-y-auto rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl transition duration-300',
+          open
+            ? 'visible translate-y-0 opacity-100'
+            : 'invisible translate-y-[calc(100%+2rem)] opacity-0',
         )}
       >
         <div className="mb-5 flex items-center justify-between">

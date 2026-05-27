@@ -34,7 +34,11 @@ func Setup(cfg *config.Config) *gin.Engine {
 		mindarena.RegisterMindArenaRoutes(api, mindarena.NewHandler(mindArenaService))
 
 		lifeTraceWeatherService := lifetrace.NewWeatherService(cfg.QWeather)
-		lifetrace.RegisterRoutes(api, lifetrace.NewHandler(lifeTraceWeatherService))
+		lifetrace.RegisterRoutes(
+			api,
+			lifetrace.NewHandler(lifeTraceWeatherService),
+			middleware.Auth(cfg),
+		)
 
 		public := api.Group("/public")
 		{

@@ -1,13 +1,37 @@
-import { Bell, Check, Plus } from 'lucide-react';
+import { Bell, Check, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { isAdvicePlan, splitPlansByToday } from '@/lib/planGroups';
+import { filterPlans, isAdvicePlan, type PlanFilter, splitPlansByToday } from '@/lib/planGroups';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Plan, PlanType } from '@/types';
+
+const planFilters: Array<{ id: PlanFilter; label: string; emptyText: string }> = [
+  {
+    id: 'all',
+    label: '全部',
+    emptyText: '还没有计划。先创建一个今日计划，Life Trace 会帮你持续记录。',
+  },
+  {
+    id: 'today',
+    label: '今天',
+    emptyText: '今天还没有计划。可以先添加一个喝水、通勤或下班后的安排。',
+  },
+  {
+    id: 'weekend',
+    label: '周末',
+    emptyText: '周末还没有安排。可以先计划一部电影、一顿饭或一次放松活动。',
+  },
+  {
+    id: 'reminded',
+    label: '已提醒',
+    emptyText: '还没有设置提醒的计划。创建计划时打开提醒，就会出现在这里。',
+  },
+];
 
 const typeTone: Record<PlanType, 'plan' | 'health' | 'trace' | 'weather' | 'ai' | 'alert'> = {
   电影: 'plan',
@@ -19,12 +43,17 @@ const typeTone: Record<PlanType, 'plan' | 'health' | 'trace' | 'weather' | 'ai' 
 };
 
 export function PlansPage() {
-  const { plans, completePlan } = useLifeTraceStore();
+  const { plans, plansError, plansLoading, completePlan, removePlan } = useLifeTraceStore();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { todayPlans, otherPlans } = splitPlansByToday(plans);
+  const [activeFilter, setActiveFilter] = useState<PlanFilter>('all');
+  const filteredPlans = filterPlans(plans, activeFilter);
+  const { todayPlans } = splitPlansByToday(plans);
+  const filteredGroups = splitPlansByToday(filteredPlans);
+  const activeFilterConfig =
+    planFilters.find((filter) => filter.id === activeFilter) ?? planFilters[0];
   const planGroups = [
-    { title: '今日计划', plans: todayPlans },
-    { title: '其他计划', plans: otherPlans },
+    { title: '今日计划', plans: filteredGroups.todayPlans },
+    { title: '其他计划', plans: filteredGroups.otherPlans },
   ].filter((group) => group.plans.length > 0);
 
   const renderPlanCard = (plan: Plan) => (
@@ -53,11 +82,21 @@ export function PlansPage() {
             type="button"
             variant={plan.completed ? 'secondary' : 'outline'}
             size="sm"
-            onClick={() => completePlan(plan.id)}
+            onClick={() => void completePlan(plan.id)}
             disabled={plan.completed}
           >
             <Check className="size-4" />
             {plan.completed ? '已完成' : '完成'}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="px-3 text-muted-foreground"
+            aria-label={`删除${plan.title}`}
+            onClick={() => void removePlan(plan.id)}
+          >
+            <Trash2 className="size-4" />
           </Button>
         </div>
       </div>
@@ -69,16 +108,34 @@ export function PlansPage() {
       <SectionHeader title="计划" meta={`${todayPlans.length} 个今日计划`} />
 
       <div className="grid grid-cols-4 rounded-2xl bg-card p-1 text-sm font-semibold text-muted-foreground">
-        {['全部', '今天', '周末', '已提醒'].map((filter, index) => (
-          <button
-            type="button"
-            key={filter}
-            className={`rounded-xl py-3 transition ${index === 0 ? 'bg-secondary text-foreground' : 'hover:text-foreground'}`}
-          >
-            {filter}
-          </button>
-        ))}
+        {planFilters.map((filter) => {
+          const active = activeFilter === filter.id;
+
+          return (
+            <button
+              type="button"
+              key={filter.id}
+              className={`rounded-xl py-3 transition ${
+                active ? 'bg-secondary text-foreground shadow-sm' : 'hover:text-foreground'
+              }`}
+              onClick={() => setActiveFilter(filter.id)}
+              aria-pressed={active}
+            >
+              {filter.label}
+            </button>
+          );
+        })}
       </div>
+
+      {plansError ? (
+        <Card className="border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          {plansError}
+        </Card>
+      ) : null}
+
+      {plansLoading ? (
+        <Card className="p-5 text-sm text-muted-foreground">正在同步你的计划...</Card>
+      ) : null}
 
       <div className="space-y-6">
         {planGroups.map((group) => (
@@ -90,17 +147,34 @@ export function PlansPage() {
             <div className="space-y-4">{group.plans.map(renderPlanCard)}</div>
           </section>
         ))}
+        {!plansLoading && planGroups.length === 0 ? (
+          <Card className="space-y-2 p-5 text-sm text-muted-foreground">
+            <p>{activeFilterConfig.emptyText}</p>
+            {activeFilter !== 'all' && plans.length > 0 ? (
+              <button
+                type="button"
+                className="cursor-pointer text-life-ai transition hover:text-life-ai/80"
+                onClick={() => setActiveFilter('all')}
+              >
+                查看全部计划
+              </button>
+            ) : null}
+          </Card>
+        ) : null}
       </div>
 
-      <Button
-        type="button"
-        variant="ai"
-        className="fixed bottom-28 left-1/2 z-10 -translate-x-1/2 px-6"
-        onClick={() => setDrawerOpen(true)}
-      >
-        <Plus className="size-5" />
-        创建计划
-      </Button>
+      {createPortal(
+        <Button
+          type="button"
+          variant="ai"
+          className="fixed bottom-28 left-1/2 z-40 -translate-x-1/2 px-6"
+          onClick={() => setDrawerOpen(true)}
+        >
+          <Plus className="size-5" />
+          创建计划
+        </Button>,
+        document.body,
+      )}
 
       <CreatePlanDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
     </div>

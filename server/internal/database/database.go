@@ -147,6 +147,7 @@ func autoMigrate() error {
 		&model.PostTagRelation{},
 		&model.PostComment{},
 		&model.OperationLog{},
+		&model.LifeTracePlan{},
 	); err != nil {
 		return err
 	}

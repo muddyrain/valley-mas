@@ -129,7 +129,7 @@ export function AiPage() {
         </Card>
       ) : null}
 
-      <section>
+      <section className="pb-4">
         <SectionHeader title="快捷操作" />
         <div className="flex flex-wrap gap-3">
           {aiQuickActions.map((action) => {

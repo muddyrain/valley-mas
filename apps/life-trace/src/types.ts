@@ -13,10 +13,19 @@ export type Plan = {
   imageUrl?: string;
   location?: string;
   note: string;
+  source?: PlanSource;
   completed: boolean;
+  completedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
-export type NewPlanInput = Omit<Plan, 'id' | 'completed'>;
+export type NewPlanInput = Omit<
+  Plan,
+  'id' | 'completed' | 'completedAt' | 'createdAt' | 'updatedAt'
+>;
+
+export type PlanSource = 'manual' | 'weather_advice' | 'ai_advice' | 'image_ai';
 
 export type CommuteMethod = '开车' | '地铁' | '步行' | '骑行' | '远程';
 

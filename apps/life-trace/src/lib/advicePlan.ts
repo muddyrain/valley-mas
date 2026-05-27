@@ -28,6 +28,7 @@ export function createPlanFromAdvice(input: AdvicePlanInput): NewPlanInput {
     type: meta.type,
     timeLabel: meta.timeLabel,
     reminder: true,
+    source: 'weather_advice',
     note: `来自今日建议「${input.title}」。城市：${input.city}。#advice:${input.id}`,
   };
 }

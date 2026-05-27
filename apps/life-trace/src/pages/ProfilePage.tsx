@@ -5,6 +5,7 @@ import {
   Clock,
   Download,
   Heart,
+  LogOut,
   MapPin,
   Sparkles,
   Wifi,
@@ -13,6 +14,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { usePwaStatus } from '@/hooks/usePwaStatus';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { CommuteMethod, UserSettings } from '@/types';
 
@@ -81,6 +83,8 @@ function SettingToggle({
 export function ProfilePage() {
   const settings = useLifeTraceStore((state) => state.settings);
   const updateSettings = useLifeTraceStore((state) => state.updateSettings);
+  const user = useAuthStore((state) => state.user);
+  const signOut = useAuthStore((state) => state.signOut);
   const { canInstall, installed, serviceWorkerReady, promptInstall } = usePwaStatus();
 
   const update = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
@@ -106,15 +110,35 @@ export function ProfilePage() {
 
       <Card className="p-5">
         <div className="flex items-center gap-4">
-          <div className="grid size-14 place-items-center rounded-2xl bg-life-ai text-xl font-bold text-background">
-            L
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold">Life Trace 用户</h2>
+          {user?.avatar ? (
+            <img
+              src={user.avatar}
+              alt={user.nickname || user.username}
+              className="size-14 rounded-2xl object-cover"
+            />
+          ) : (
+            <div className="grid size-14 place-items-center rounded-2xl bg-life-ai text-xl font-bold text-background">
+              {(user?.nickname || user?.username || 'L').slice(0, 1).toUpperCase()}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-xl font-semibold">
+              {user?.nickname || user?.username || 'Life Trace 用户'}
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {settings.city} · {settings.commuteMethod}通勤 · {settings.dailyBriefTime} 简报
             </p>
           </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="rounded-2xl text-muted-foreground"
+            aria-label="退出登录"
+            onClick={() => void signOut()}
+          >
+            <LogOut className="size-5" />
+          </Button>
         </div>
       </Card>
 
@@ -259,7 +283,7 @@ export function ProfilePage() {
 
       <Card className="flex items-center gap-3 p-4 text-sm text-muted-foreground">
         <Sparkles className="size-5 text-life-ai" />
-        这些设置已保存在本机浏览器，后续接入账号后可同步到云端。
+        当前已启用登录门禁，下一步可把计划、打卡和踪迹按账号同步到云端。
       </Card>
     </div>
   );

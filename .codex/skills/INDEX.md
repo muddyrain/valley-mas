@@ -18,5 +18,13 @@
 | `task-completion-guard` | 多步骤任务、计划后实施、需要验证或容易停在口头承诺的任务。 |
 | `component-reuse-guard` | 发现重复 JSX、重复 handler、重复弹窗/表单/上传/列表逻辑时，先复用或抽取。 |
 | `conventional-commit-guard` | 生成 commit message、执行 `git commit`，或用户说“提交/提交吧/提交代码/帮我提交”。 |
+| `gsap-core` | 使用或评审 GSAP 基础动画、tween、stagger、ease、响应式与 reduced-motion 动画时。 |
+| `gsap-react` | 在 React/Next.js 中接入 GSAP 动画、`useGSAP`、refs、scope 和组件卸载清理时。 |
+| `gsap-timeline` | 需要多个动效步骤按时间轴编排、暂停、反转或复用动画序列时。 |
+| `gsap-scrolltrigger` | 需要滚动触发、滚动进度驱动或 pinning 动画时。 |
+| `gsap-performance` | 评估 GSAP 动画性能、低端设备体验、合成层、重排和 reduced-motion 风险时。 |
+| `gsap-utils` | 使用 `gsap.utils` 做 clamp、mapRange、random、snap、toArray、wrap 等动画辅助计算时。 |
+| `gsap-plugins` | 使用 GSAP 插件，例如 Flip、Draggable、ScrollTo、SplitText、MorphSVG、CustomEase 等时。 |
+| `gsap-frameworks` | 在 Vue、Svelte、Astro 或非 React 框架中接入 GSAP 动画时。 |
 | `worldbox-alignment-guard` | **仅 `apps/world-sim`**：调整玩法、数值、模拟规则、神力、文明、战争、叛乱或可读性 UI 前，先分析并对齐 WorldBox 式机制体验。 |
 | `game-doc-sync-guard` | **仅 `apps/world-sim`**：游戏玩法/参数/架构变更时，强制同步设计文档。其他子项目忽略。 |

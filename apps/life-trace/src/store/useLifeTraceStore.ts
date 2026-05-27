@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { initialPlans, initialTraces } from '@/data/mock';
+import { createPlan, deletePlan, listPlans, updatePlanStatus } from '@/api/plans';
+import { initialTraces } from '@/data/mock';
+import { useAuthStore } from '@/store/useAuthStore';
 import type {
   AiAction,
   AppTab,
@@ -14,14 +16,19 @@ import type {
 type LifeTraceState = {
   activeTab: AppTab;
   plans: Plan[];
+  plansLoaded: boolean;
+  plansLoading: boolean;
+  plansError: string;
   traces: Trace[];
   settings: UserSettings;
   aiActions: AiAction[];
   setActiveTab: (tab: AppTab) => void;
   updateSettings: (settings: Partial<UserSettings>) => void;
-  addPlan: (input: NewPlanInput) => void;
+  loadPlans: () => Promise<void>;
+  addPlan: (input: NewPlanInput) => Promise<Plan | null>;
   addTrace: (input: NewTraceInput) => void;
-  completePlan: (planId: string) => void;
+  completePlan: (planId: string) => Promise<void>;
+  removePlan: (planId: string) => Promise<void>;
   addAiAction: (title: string) => void;
   generateTraceFromLatestPlan: () => Trace | null;
 };
@@ -50,9 +57,6 @@ const createTraceFromPlan = (plan: Plan): Trace => ({
   source: '计划',
 });
 
-const createPlanId = () =>
-  `plan-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-
 const createActionId = () =>
   `ai-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -64,11 +68,16 @@ const createTraceId = () =>
 
 const getAiActions = (state: Pick<LifeTraceState, 'aiActions'>) => state.aiActions ?? [];
 
+const getToken = () => useAuthStore.getState().token;
+
 export const useLifeTraceStore = create<LifeTraceState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       activeTab: 'today',
-      plans: initialPlans,
+      plans: [],
+      plansLoaded: false,
+      plansLoading: false,
+      plansError: '',
       traces: initialTraces,
       settings: defaultSettings,
       aiActions: [
@@ -81,14 +90,51 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         set((state) => ({
           settings: { ...state.settings, ...settings },
         })),
-      addPlan: (input) =>
-        set((state) => ({
-          plans: [{ id: createPlanId(), completed: false, ...input }, ...state.plans],
-          aiActions: [
-            { id: createActionId(), title: `创建了「${input.title}」计划`, timeLabel: '刚刚' },
-            ...getAiActions(state),
-          ],
-        })),
+      loadPlans: async () => {
+        const token = getToken();
+        if (!token) {
+          set({ plans: [], plansLoaded: true, plansLoading: false, plansError: '' });
+          return;
+        }
+
+        set({ plansLoading: true, plansError: '' });
+        try {
+          const { list } = await listPlans(token);
+          set({ plans: list, plansLoaded: true, plansLoading: false, plansError: '' });
+        } catch (error) {
+          set({
+            plansLoading: false,
+            plansLoaded: true,
+            plansError: error instanceof Error ? error.message : '获取计划失败',
+          });
+        }
+      },
+      addPlan: async (input) => {
+        const token = getToken();
+        if (!token) {
+          set({ plansError: '请先登录后再创建计划' });
+          return null;
+        }
+
+        try {
+          const plan = await createPlan(token, {
+            ...input,
+            source: input.source ?? 'manual',
+          });
+          set((state) => ({
+            plans: [plan, ...state.plans],
+            plansError: '',
+            aiActions: [
+              { id: createActionId(), title: `创建了「${input.title}」计划`, timeLabel: '刚刚' },
+              ...getAiActions(state),
+            ],
+          }));
+          return plan;
+        } catch (error) {
+          set({ plansError: error instanceof Error ? error.message : '创建计划失败' });
+          return null;
+        }
+      },
       addTrace: (input) =>
         set((state) => ({
           traces: [{ id: createTraceId(), ...input }, ...state.traces],
@@ -97,25 +143,45 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             ...getAiActions(state),
           ],
         })),
-      completePlan: (planId) =>
-        set((state) => {
-          const target = state.plans.find((plan) => plan.id === planId);
+      completePlan: async (planId) => {
+        const target = get().plans.find((plan) => plan.id === planId);
+        const token = getToken();
 
-          if (!target || target.completed) {
-            return state;
-          }
+        if (!target || target.completed || !token) {
+          return;
+        }
 
-          return {
-            plans: state.plans.map((plan) =>
-              plan.id === planId ? { ...plan, completed: true } : plan,
-            ),
-            traces: [createTraceFromPlan(target), ...state.traces],
+        try {
+          const updated = await updatePlanStatus(token, planId, true);
+          set((state) => ({
+            plans: state.plans.map((plan) => (plan.id === planId ? updated : plan)),
+            traces: [createTraceFromPlan(updated), ...state.traces],
+            plansError: '',
             aiActions: [
-              { id: createActionId(), title: `生成了「${target.title}」踪迹`, timeLabel: '刚刚' },
+              { id: createActionId(), title: `生成了「${updated.title}」踪迹`, timeLabel: '刚刚' },
               ...getAiActions(state),
             ],
-          };
-        }),
+          }));
+        } catch (error) {
+          set({ plansError: error instanceof Error ? error.message : '更新计划失败' });
+        }
+      },
+      removePlan: async (planId) => {
+        const token = getToken();
+        if (!token) {
+          return;
+        }
+
+        try {
+          await deletePlan(token, planId);
+          set((state) => ({
+            plans: state.plans.filter((plan) => plan.id !== planId),
+            plansError: '',
+          }));
+        } catch (error) {
+          set({ plansError: error instanceof Error ? error.message : '删除计划失败' });
+        }
+      },
       addAiAction: (title) =>
         set((state) => ({
           aiActions: [{ id: createActionId(), title, timeLabel: '刚刚' }, ...getAiActions(state)],
@@ -150,13 +216,22 @@ export const useLifeTraceStore = create<LifeTraceState>()(
     }),
     {
       name: 'life-trace-state',
+      version: 2,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        plans: state.plans,
         traces: state.traces,
         settings: state.settings,
         aiActions: state.aiActions,
       }),
+      migrate: (persistedState) => {
+        const state = persistedState as Partial<LifeTraceState>;
+        const { plans, plansLoaded, plansLoading, plansError, ...rest } = state;
+        void plans;
+        void plansLoaded;
+        void plansLoading;
+        void plansError;
+        return rest;
+      },
     },
   ),
 );

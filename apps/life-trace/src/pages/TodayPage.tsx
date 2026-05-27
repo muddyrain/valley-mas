@@ -15,12 +15,14 @@ import {
   Sun,
   Wind,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchLifeTraceWeather, type WeatherApiResponse } from '@/api/weather';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { hourlyWeather, weatherMetrics } from '@/data/mock';
+import { useLifeTraceEntrance } from '@/hooks/useLifeTraceEntrance';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
+import { gsap, useGSAP } from '@/lib/gsap';
 import { buildWeatherBrief, buildWeatherDrivenAdvice } from '@/lib/weatherAdvice';
 import { readWeatherCache, writeWeatherCache } from '@/lib/weatherCache';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -107,6 +109,135 @@ export function TodayPage() {
   });
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [planToast, setPlanToast] = useState('');
+  const pageRef = useRef<HTMLDivElement>(null);
+  const advice = buildWeatherDrivenAdvice({ weather, settings, openPlanCount }).map((item) => ({
+    ...item,
+    icon: adviceIconMap[item.id as keyof typeof adviceIconMap] ?? Sparkles,
+  }));
+  const brief = buildWeatherBrief(weather, settings);
+
+  useLifeTraceEntrance(pageRef, {
+    selector: '[data-today-entrance], [data-today-stagger]',
+    y: 20,
+    scale: 0.985,
+    stagger: 0.06,
+    delay: 0.03,
+    duration: 0.62,
+    ease: 'power3.out',
+  });
+
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        const timeline = gsap.timeline({ delay: 0.42 });
+
+        timeline
+          .from('[data-ai-brief-card]', {
+            boxShadow: '0 0 0 rgba(6,182,212,0)',
+            duration: 0.42,
+            ease: 'power2.out',
+          })
+          .from(
+            '[data-ai-brief-orb]',
+            {
+              autoAlpha: 0,
+              scale: 0.72,
+              rotation: -12,
+              duration: 0.58,
+              ease: 'back.out(1.8)',
+              clearProps: 'transform,opacity,visibility',
+            },
+            '<',
+          )
+          .from(
+            '[data-ai-brief-copy]',
+            {
+              autoAlpha: 0,
+              y: 10,
+              duration: 0.48,
+              stagger: 0.055,
+              ease: 'power2.out',
+              clearProps: 'transform,opacity,visibility',
+            },
+            '-=0.24',
+          )
+          .to(
+            '[data-ai-brief-orb]',
+            {
+              y: -3,
+              scale: 1.04,
+              duration: 0.72,
+              ease: 'sine.inOut',
+              yoyo: true,
+              repeat: 1,
+              clearProps: 'transform',
+            },
+            '-=0.18',
+          );
+      });
+
+      return () => mm.revert();
+    },
+    { scope: pageRef, dependencies: [brief.title, brief.detail], revertOnUpdate: true },
+  );
+
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        const timeline = gsap.timeline({ delay: 0.56 });
+
+        timeline
+          .from('[data-advice-card]', {
+            autoAlpha: 0,
+            y: 18,
+            scale: 0.97,
+            duration: 0.52,
+            stagger: 0.07,
+            ease: 'power3.out',
+            clearProps: 'transform,opacity,visibility',
+          })
+          .from(
+            '[data-advice-icon]',
+            {
+              autoAlpha: 0,
+              scale: 0.72,
+              rotation: -8,
+              duration: 0.34,
+              stagger: 0.055,
+              ease: 'back.out(1.9)',
+              clearProps: 'transform,opacity,visibility',
+            },
+            '-=0.36',
+          )
+          .from(
+            '[data-advice-action]',
+            {
+              autoAlpha: 0,
+              scale: 0.72,
+              y: -4,
+              duration: 0.32,
+              stagger: 0.045,
+              ease: 'back.out(2)',
+              clearProps: 'transform,opacity,visibility',
+            },
+            '-=0.3',
+          );
+      });
+
+      mm.add('(prefers-reduced-motion: reduce)', () => {
+        gsap.set('[data-advice-card], [data-advice-icon], [data-advice-action]', {
+          clearProps: 'all',
+        });
+      });
+
+      return () => mm.revert();
+    },
+    { scope: pageRef, dependencies: [advice.length], revertOnUpdate: true },
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -129,18 +260,13 @@ export function TodayPage() {
     return () => controller.abort();
   }, [settings.city]);
 
-  const advice = buildWeatherDrivenAdvice({ weather, settings, openPlanCount }).map((item) => ({
-    ...item,
-    icon: adviceIconMap[item.id as keyof typeof adviceIconMap] ?? Sparkles,
-  }));
-  const brief = buildWeatherBrief(weather, settings);
-  const handleAddAdvicePlan = (item: Advice) => {
+  const handleAddAdvicePlan = async (item: Advice) => {
     if (hasAdvicePlan(plans, item.id)) {
       setPlanToast('这个建议已经在今日计划里');
       return;
     }
 
-    addPlan(
+    const plan = await addPlan(
       createPlanFromAdvice({
         id: item.id,
         title: item.title,
@@ -148,7 +274,7 @@ export function TodayPage() {
         city: weather.city || settings.city,
       }),
     );
-    setPlanToast('已加入今日计划');
+    setPlanToast(plan ? '已加入今日计划' : '计划保存失败，稍后再试');
   };
   const handleRefreshWeather = () => {
     if (weatherLoading) {
@@ -176,8 +302,8 @@ export function TodayPage() {
   }, [planToast]);
 
   return (
-    <div className="space-y-5">
-      <header className="flex items-start justify-between">
+    <div ref={pageRef} className="space-y-5">
+      <header className="flex items-start justify-between" data-today-entrance>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Life Trace</h1>
           <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -196,9 +322,9 @@ export function TodayPage() {
         </button>
       </header>
 
-      <Card className="p-5">
+      <Card className="p-5" data-today-entrance>
         <div className="mb-7 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4" data-today-stagger>
             <div className="grid size-16 place-items-center rounded-2xl bg-life-weather/10 text-life-weather">
               <Cloud className="size-9" />
             </div>
@@ -209,7 +335,7 @@ export function TodayPage() {
               <div className="mt-2 text-lg text-muted-foreground">{weather.now.text}</div>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right" data-today-stagger>
             <div className="text-xl font-semibold">
               {weather.now.high}° /{' '}
               <span className="text-muted-foreground">{weather.now.low}°</span>
@@ -248,6 +374,7 @@ export function TodayPage() {
             return (
               <div
                 key={metric.label}
+                data-today-stagger
                 className="flex min-w-0 items-center justify-between rounded-2xl bg-secondary px-3 py-3"
               >
                 <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
@@ -260,7 +387,7 @@ export function TodayPage() {
           })}
         </div>
 
-        <div className="mt-5 flex gap-3 overflow-x-auto pb-1">
+        <div className="mt-5 flex gap-3 overflow-x-auto pb-1" data-today-stagger>
           {weather.hourly.map((item) => {
             const Icon = item.text.includes('晴') ? Sun : Cloud;
 
@@ -282,19 +409,40 @@ export function TodayPage() {
         </div>
       </Card>
 
-      <Card className="flex gap-4 p-5">
-        <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
-          <Sparkles className="size-6" />
-        </div>
-        <div className="min-w-0">
-          <Badge tone="ai">AI 今日简报</Badge>
-          <h2 className="mt-3 text-xl font-semibold">{brief.title}</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{brief.detail}</p>
+      <Card
+        className="relative overflow-hidden border-life-ai/20 p-5 shadow-[0_18px_70px_rgba(6,182,212,0.08)]"
+        data-ai-brief-card
+        data-today-entrance
+      >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-ai/70 to-transparent"
+        />
+        <div className="relative flex gap-4">
+          <div
+            className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai"
+            data-ai-brief-orb
+          >
+            <Sparkles className="size-6" />
+          </div>
+          <div className="min-w-0">
+            <div data-ai-brief-copy>
+              <Badge tone="ai">AI 今日简报</Badge>
+            </div>
+            <h2 className="mt-3 text-xl font-semibold" data-ai-brief-copy>
+              {brief.title}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground" data-ai-brief-copy>
+              {brief.detail}
+            </p>
+          </div>
         </div>
       </Card>
 
       <section>
-        <h2 className="mb-3 text-xl font-semibold tracking-tight">今日建议</h2>
+        <h2 className="mb-3 text-xl font-semibold tracking-tight" data-today-entrance>
+          今日建议
+        </h2>
         <div className="grid grid-cols-2 gap-3">
           {advice.map((item) => {
             const Icon = item.icon;
@@ -302,18 +450,30 @@ export function TodayPage() {
             const isAdded = hasAdvicePlan(plans, item.id);
 
             return (
-              <Card key={item.id} className="relative h-28 p-4">
+              <Card
+                key={item.id}
+                className="group relative h-28 overflow-hidden border-border/80 p-4 transition-colors hover:border-foreground/20"
+                data-advice-card
+              >
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-foreground/20 to-transparent opacity-70"
+                />
                 <button
                   type="button"
                   disabled={isAdded}
-                  className="absolute top-3 right-3 z-10 grid size-8 cursor-pointer place-items-center rounded-full bg-secondary text-foreground transition hover:bg-accent disabled:cursor-default disabled:text-life-trace disabled:opacity-100"
+                  className="absolute top-3 right-3 z-10 grid size-8 cursor-pointer place-items-center rounded-full bg-secondary text-foreground transition duration-200 hover:scale-105 hover:bg-accent active:scale-95 disabled:cursor-default disabled:text-life-trace disabled:opacity-100 disabled:hover:scale-100"
                   aria-label={isAdded ? '已添加计划' : `添加${item.title}计划`}
-                  onClick={() => handleAddAdvicePlan(item)}
+                  onClick={() => void handleAddAdvicePlan(item)}
+                  data-advice-action
                 >
                   {isAdded ? <Check className="size-4" /> : <Plus className="size-4" />}
                 </button>
                 <div className="flex items-center gap-2 pr-10">
-                  <div className={`grid size-8 shrink-0 place-items-center rounded-xl ${tone.bg}`}>
+                  <div
+                    className={`grid size-8 shrink-0 place-items-center rounded-xl ${tone.bg}`}
+                    data-advice-icon
+                  >
                     <Icon className={`size-4.5 ${tone.text}`} />
                   </div>
                   <h3 className="min-w-0 truncate text-base font-semibold">{item.title}</h3>

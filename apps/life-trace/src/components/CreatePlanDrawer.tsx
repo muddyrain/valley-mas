@@ -24,7 +24,9 @@ type CreatePlanDrawerProps = {
 
 export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) {
   const addPlan = useLifeTraceStore((state) => state.addPlan);
+  const plansError = useLifeTraceStore((state) => state.plansError);
   const [form, setForm] = useState<NewPlanInput>(defaultForm);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -38,22 +40,28 @@ export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) 
     setForm((current) => ({ ...current, [key]: value }));
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!form.title.trim() || !form.timeLabel.trim()) {
       return;
     }
 
-    addPlan({
+    setSaving(true);
+    const plan = await addPlan({
       ...form,
+      source: form.source ?? 'manual',
       title: form.title.trim(),
       timeLabel: form.timeLabel.trim(),
       imageUrl: form.imageUrl?.trim() || undefined,
       location: form.location?.trim() || undefined,
       note: form.note.trim() || '由 Life Trace 创建的新生活计划。',
     });
-    onOpenChange(false);
+    setSaving(false);
+
+    if (plan) {
+      onOpenChange(false);
+    }
   };
 
   return (
@@ -74,8 +82,10 @@ export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) 
       />
       <div
         className={cn(
-          'safe-bottom absolute inset-x-0 bottom-0 mx-auto w-full max-w-[430px] rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl transition-transform duration-300',
-          open ? 'translate-y-0' : 'translate-y-full',
+          'safe-bottom absolute inset-x-0 bottom-0 mx-auto w-full max-w-[430px] rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl transition duration-300',
+          open
+            ? 'visible translate-y-0 opacity-100'
+            : 'invisible translate-y-[calc(100%+2rem)] opacity-0',
         )}
       >
         <div className="mb-5 flex items-center justify-between">
@@ -169,12 +179,18 @@ export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) 
             />
           </label>
 
+          {plansError ? (
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {plansError}
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-2 gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
               取消
             </Button>
-            <Button type="submit" variant="ai">
-              保存计划
+            <Button type="submit" variant="ai" disabled={saving}>
+              {saving ? '保存中' : '保存计划'}
             </Button>
           </div>
         </form>

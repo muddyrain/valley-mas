@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-trace-shell-v1';
+const CACHE_NAME = 'life-trace-shell-v2';
 const SHELL_ASSETS = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -27,6 +27,11 @@ self.addEventListener('fetch', (event) => {
   }
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  if (event.request.mode === 'navigate') {
+    event.respondWith(fetch(event.request).catch(() => caches.match('/')));
     return;
   }
 
