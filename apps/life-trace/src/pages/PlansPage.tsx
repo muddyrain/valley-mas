@@ -163,18 +163,20 @@ export function PlansPage() {
         ) : null}
       </div>
 
-      {createPortal(
-        <Button
-          type="button"
-          variant="ai"
-          className="fixed bottom-28 left-1/2 z-40 -translate-x-1/2 px-6"
-          onClick={() => setDrawerOpen(true)}
-        >
-          <Plus className="size-5" />
-          创建计划
-        </Button>,
-        document.body,
-      )}
+      {!drawerOpen
+        ? createPortal(
+            <Button
+              type="button"
+              variant="ai"
+              className="fixed bottom-28 left-1/2 z-40 -translate-x-1/2 px-6"
+              onClick={() => setDrawerOpen(true)}
+            >
+              <Plus className="size-5" />
+              创建计划
+            </Button>,
+            document.body,
+          )
+        : null}
 
       <CreatePlanDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
     </div>

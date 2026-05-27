@@ -6,6 +6,13 @@ import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { NewPlanInput, PlanType } from '@/types';
 
 const planTypes: PlanType[] = ['电影', '吃饭', '运动', '阅读', '聚会', '普通事项'];
+const dateOptions = [
+  { value: '今天', label: '今天' },
+  { value: '明天', label: '明天' },
+  { value: '周六', label: '周六' },
+  { value: '周日', label: '周日' },
+  { value: 'custom', label: '自定义' },
+] as const;
 
 const defaultForm: NewPlanInput = {
   title: '',
@@ -17,15 +24,31 @@ const defaultForm: NewPlanInput = {
   note: '',
 };
 
+type DateOptionValue = (typeof dateOptions)[number]['value'];
+
+type FormErrors = Partial<Record<'title' | 'date' | 'time', string>>;
+
 type CreatePlanDrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
+function buildTimeLabel(dateOption: DateOptionValue, customDate: string, time: string) {
+  if (dateOption === 'custom') {
+    return `${customDate} ${time}`;
+  }
+
+  return `${dateOption} ${time}`;
+}
+
 export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) {
   const addPlan = useLifeTraceStore((state) => state.addPlan);
   const plansError = useLifeTraceStore((state) => state.plansError);
   const [form, setForm] = useState<NewPlanInput>(defaultForm);
+  const [dateOption, setDateOption] = useState<DateOptionValue>('今天');
+  const [customDate, setCustomDate] = useState('');
+  const [time, setTime] = useState('');
+  const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -34,6 +57,10 @@ export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) 
     }
 
     setForm(defaultForm);
+    setDateOption('今天');
+    setCustomDate('');
+    setTime('');
+    setErrors({});
   }, [open]);
 
   const updateField = <K extends keyof NewPlanInput>(key: K, value: NewPlanInput[K]) => {
@@ -43,16 +70,30 @@ export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!form.title.trim() || !form.timeLabel.trim()) {
+    const nextErrors: FormErrors = {};
+    if (!form.title.trim()) {
+      nextErrors.title = '请输入计划标题';
+    }
+    if (dateOption === 'custom' && !customDate) {
+      nextErrors.date = '请选择日期';
+    }
+    if (!time) {
+      nextErrors.time = '请选择时间';
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
       return;
     }
+
+    const timeLabel = buildTimeLabel(dateOption, customDate, time);
 
     setSaving(true);
     const plan = await addPlan({
       ...form,
       source: form.source ?? 'manual',
       title: form.title.trim(),
-      timeLabel: form.timeLabel.trim(),
+      timeLabel,
       imageUrl: form.imageUrl?.trim() || undefined,
       location: form.location?.trim() || undefined,
       note: form.note.trim() || '由 Life Trace 创建的新生活计划。',
@@ -100,40 +141,111 @@ export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) 
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <label className="block space-y-2">
-            <span className="text-sm font-medium">计划标题</span>
+            <span className="text-sm font-medium">
+              计划标题 <span className="text-life-alert">*</span>
+            </span>
             <input
               value={form.title}
-              onChange={(event) => updateField('title', event.target.value)}
+              onChange={(event) => {
+                updateField('title', event.target.value);
+                setErrors((current) => ({ ...current, title: undefined }));
+              }}
               placeholder="例如：周六晚上看《沙丘》"
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+              aria-invalid={Boolean(errors.title)}
+              className={cn(
+                'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
+                errors.title ? 'border-destructive' : 'border-border',
+              )}
             />
+            {errors.title ? <p className="text-xs text-destructive">{errors.title}</p> : null}
           </label>
+
+          <div className="space-y-2">
+            <span className="text-sm font-medium">类型</span>
+            <div className="grid grid-cols-3 gap-2">
+              {planTypes.map((type) => {
+                const active = form.type === type;
+
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    className={cn(
+                      'h-10 rounded-2xl border px-2 text-sm font-semibold transition',
+                      active
+                        ? 'border-life-ai/40 bg-life-ai/10 text-life-ai'
+                        : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
+                    )}
+                    onClick={() => updateField('type', type)}
+                  >
+                    {type}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-2">
-              <span className="text-sm font-medium">类型</span>
+              <span className="text-sm font-medium">
+                日期 <span className="text-life-alert">*</span>
+              </span>
               <select
-                value={form.type}
-                onChange={(event) => updateField('type', event.target.value as PlanType)}
+                value={dateOption}
+                onChange={(event) => {
+                  setDateOption(event.target.value as DateOptionValue);
+                  setErrors((current) => ({ ...current, date: undefined }));
+                }}
                 className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
               >
-                {planTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
+                {dateOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
             </label>
             <label className="block space-y-2">
-              <span className="text-sm font-medium">时间</span>
+              <span className="text-sm font-medium">
+                时间 <span className="text-life-alert">*</span>
+              </span>
               <input
-                value={form.timeLabel}
-                onChange={(event) => updateField('timeLabel', event.target.value)}
-                placeholder="周六 19:30"
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+                type="time"
+                value={time}
+                onChange={(event) => {
+                  setTime(event.target.value);
+                  setErrors((current) => ({ ...current, time: undefined }));
+                }}
+                aria-invalid={Boolean(errors.time)}
+                className={cn(
+                  'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
+                  errors.time ? 'border-destructive' : 'border-border',
+                )}
               />
             </label>
           </div>
+          {dateOption === 'custom' ? (
+            <label className="block space-y-2">
+              <span className="text-sm font-medium">
+                自定义日期 <span className="text-life-alert">*</span>
+              </span>
+              <input
+                type="date"
+                value={customDate}
+                onChange={(event) => {
+                  setCustomDate(event.target.value);
+                  setErrors((current) => ({ ...current, date: undefined }));
+                }}
+                aria-invalid={Boolean(errors.date)}
+                className={cn(
+                  'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
+                  errors.date ? 'border-destructive' : 'border-border',
+                )}
+              />
+              {errors.date ? <p className="text-xs text-destructive">{errors.date}</p> : null}
+            </label>
+          ) : null}
+          {errors.time ? <p className="-mt-2 text-xs text-destructive">{errors.time}</p> : null}
 
           <label className="block space-y-2">
             <span className="text-sm font-medium">图片链接</span>
