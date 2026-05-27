@@ -1,12 +1,15 @@
-import { Bell, Check, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Bell, BellOff, Check, Plus, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { gsap, useGSAP } from '@/lib/gsap';
 import { filterPlans, isAdvicePlan, type PlanFilter, splitPlansByToday } from '@/lib/planGroups';
+import { splitPlanTimeLabel } from '@/lib/planReminder';
+import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Plan, PlanType } from '@/types';
 
@@ -44,6 +47,7 @@ const typeTone: Record<PlanType, 'plan' | 'health' | 'trace' | 'weather' | 'ai' 
 
 export function PlansPage() {
   const { plans, plansError, plansLoading, completePlan, removePlan } = useLifeTraceStore();
+  const pageRef = useRef<HTMLDivElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<PlanFilter>('all');
   const filteredPlans = filterPlans(plans, activeFilter);
@@ -56,55 +60,125 @@ export function PlansPage() {
     { title: '其他计划', plans: filteredGroups.otherPlans },
   ].filter((group) => group.plans.length > 0);
 
-  const renderPlanCard = (plan: Plan) => (
-    <Card key={plan.id} className="overflow-hidden">
-      {plan.imageUrl ? (
-        <img src={plan.imageUrl} alt={plan.title} className="h-32 w-full object-cover opacity-80" />
-      ) : null}
-      <div className="space-y-4 p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <Badge tone={typeTone[plan.type]}>{plan.type}</Badge>
-            {isAdvicePlan(plan) ? <Badge tone="ai">今日建议</Badge> : null}
-          </div>
-          <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-            <Bell className="size-4 text-life-health" />
-            {plan.reminder ? '已设提醒' : '未提醒'}
-          </div>
-        </div>
-        <div>
-          <h2 className="text-lg font-semibold leading-snug">{plan.title}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">{plan.timeLabel}</p>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <p className="line-clamp-1 text-sm text-muted-foreground">{plan.note}</p>
-          <Button
-            type="button"
-            variant={plan.completed ? 'secondary' : 'outline'}
-            size="sm"
-            onClick={() => void completePlan(plan.id)}
-            disabled={plan.completed}
-          >
-            <Check className="size-4" />
-            {plan.completed ? '已完成' : '完成'}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="px-3 text-muted-foreground"
-            aria-label={`删除${plan.title}`}
-            onClick={() => void removePlan(plan.id)}
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        </div>
-      </div>
-    </Card>
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        gsap.from('[data-plan-card]', {
+          autoAlpha: 0,
+          y: 18,
+          scale: 0.985,
+          duration: 0.46,
+          stagger: 0.055,
+          ease: 'power3.out',
+          clearProps: 'transform,opacity,visibility',
+        });
+
+        gsap.from('[data-plan-time-block]', {
+          autoAlpha: 0,
+          scale: 0.86,
+          duration: 0.34,
+          stagger: 0.045,
+          ease: 'back.out(1.7)',
+          clearProps: 'transform,opacity,visibility',
+          delay: 0.08,
+        });
+      });
+
+      return () => mm.revert();
+    },
+    { scope: pageRef, dependencies: [activeFilter, filteredPlans.length], revertOnUpdate: true },
   );
 
+  const renderPlanCard = (plan: Plan) => {
+    const { dateText, timeText } = splitPlanTimeLabel(plan.timeLabel);
+    const ReminderIcon = plan.reminder ? Bell : BellOff;
+
+    return (
+      <Card
+        key={plan.id}
+        className={cn(
+          'overflow-hidden border-border/80 transition-colors hover:border-foreground/20',
+          plan.completed && 'opacity-70',
+        )}
+        data-plan-card
+      >
+        {plan.imageUrl ? (
+          <img
+            src={plan.imageUrl}
+            alt={plan.title}
+            className="h-32 w-full object-cover opacity-80"
+          />
+        ) : null}
+        <div className="grid grid-cols-[4.75rem_1fr] gap-4 p-4">
+          <div
+            className={cn(
+              'flex h-20 flex-col items-center justify-center rounded-2xl border text-center',
+              plan.reminder
+                ? 'border-life-health/30 bg-life-health/10 text-life-health'
+                : 'border-border bg-secondary text-muted-foreground',
+            )}
+            data-plan-time-block
+          >
+            <span className="text-xs font-semibold">{dateText}</span>
+            <span className="mt-1 text-xl font-bold tracking-tight">{timeText}</span>
+          </div>
+          <div className="min-w-0 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={typeTone[plan.type]}>{plan.type}</Badge>
+                  {isAdvicePlan(plan) ? <Badge tone="ai">今日建议</Badge> : null}
+                  {plan.completed ? <Badge tone="trace">已完成</Badge> : null}
+                </div>
+                <h2 className="mt-2 line-clamp-2 text-lg font-semibold leading-snug">
+                  {plan.title}
+                </h2>
+              </div>
+              <div
+                className={cn(
+                  'flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold',
+                  plan.reminder
+                    ? 'bg-life-health/10 text-life-health'
+                    : 'bg-secondary text-muted-foreground',
+                )}
+              >
+                <ReminderIcon className="size-3.5" />
+                {plan.reminder ? '提醒' : '未开'}
+              </div>
+            </div>
+            <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">{plan.note}</p>
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant={plan.completed ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={() => void completePlan(plan.id)}
+                disabled={plan.completed}
+              >
+                <Check className="size-4" />
+                {plan.completed ? '已完成' : '完成'}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="px-3 text-muted-foreground"
+                aria-label={`删除${plan.title}`}
+                onClick={() => void removePlan(plan.id)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
   return (
-    <div className="space-y-5">
+    <div ref={pageRef} className="space-y-5">
       <SectionHeader title="计划" meta={`${todayPlans.length} 个今日计划`} />
 
       <div className="grid grid-cols-4 rounded-2xl bg-card p-1 text-sm font-semibold text-muted-foreground">

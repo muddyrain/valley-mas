@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { AppReminderToast } from '@/components/AppReminderToast';
 import { AppShell } from '@/components/AppShell';
 import { AiPage } from '@/pages/AiPage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -49,5 +50,10 @@ export default function App() {
     return <LoginPage />;
   }
 
-  return <AppShell>{pages[activeTab]}</AppShell>;
+  return (
+    <>
+      <AppShell>{pages[activeTab]}</AppShell>
+      <AppReminderToast />
+    </>
+  );
 }

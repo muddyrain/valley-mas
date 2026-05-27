@@ -23,6 +23,7 @@ import { hourlyWeather, weatherMetrics } from '@/data/mock';
 import { useLifeTraceEntrance } from '@/hooks/useLifeTraceEntrance';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import { gsap, useGSAP } from '@/lib/gsap';
+import { getNextReminder } from '@/lib/planReminder';
 import { buildWeatherBrief, buildWeatherDrivenAdvice } from '@/lib/weatherAdvice';
 import { readWeatherCache, writeWeatherCache } from '@/lib/weatherCache';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -115,6 +116,7 @@ export function TodayPage() {
     icon: adviceIconMap[item.id as keyof typeof adviceIconMap] ?? Sparkles,
   }));
   const brief = buildWeatherBrief(weather, settings);
+  const nextReminder = getNextReminder(plans);
 
   useLifeTraceEntrance(pageRef, {
     selector: '[data-today-entrance], [data-today-stagger]',
@@ -436,6 +438,54 @@ export function TodayPage() {
               {brief.detail}
             </p>
           </div>
+        </div>
+      </Card>
+
+      <Card
+        className="relative overflow-hidden border-life-health/25 p-4 shadow-[0_18px_64px_rgba(34,197,94,0.08)]"
+        data-today-entrance
+      >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-health/70 to-transparent"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-12 right-8 size-24 rounded-full bg-life-health/10 blur-3xl"
+        />
+        <div className="relative flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl border border-life-health/20 bg-life-health/10 text-life-health shadow-[0_10px_35px_rgba(34,197,94,0.10)]">
+              <Bell className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <Badge tone="health">下一个提醒</Badge>
+                {nextReminder ? (
+                  <span className="text-xs text-muted-foreground">{nextReminder.relativeText}</span>
+                ) : null}
+              </div>
+              {nextReminder ? (
+                <div className="mt-2">
+                  <h2 className="truncate text-base font-semibold">{nextReminder.plan.title}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {nextReminder.dateText} {nextReminder.timeText}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  还没有可提醒的计划。创建计划时打开提醒，首页会自动显示最近一项。
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="shrink-0 cursor-pointer rounded-full bg-secondary px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
+            onClick={() => setActiveTab('plans')}
+          >
+            查看
+          </button>
         </div>
       </Card>
 
