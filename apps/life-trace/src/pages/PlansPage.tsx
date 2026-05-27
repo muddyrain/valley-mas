@@ -1,11 +1,14 @@
 import { Bell, BellOff, Check, Plus, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { getVisiblePlanNote } from '@/lib/advicePlan';
 import { gsap, useGSAP } from '@/lib/gsap';
 import { filterPlans, isAdvicePlan, type PlanFilter, splitPlansByToday } from '@/lib/planGroups';
 import { splitPlanTimeLabel } from '@/lib/planReminder';
@@ -46,10 +49,20 @@ const typeTone: Record<PlanType, 'plan' | 'health' | 'trace' | 'weather' | 'ai' 
 };
 
 export function PlansPage() {
-  const { plans, plansError, plansLoading, completePlan, removePlan } = useLifeTraceStore();
+  const {
+    plans,
+    plansError,
+    plansLoading,
+    planCreating,
+    planCompletingById,
+    planDeletingById,
+    completePlan,
+    removePlan,
+  } = useLifeTraceStore();
   const pageRef = useRef<HTMLDivElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<PlanFilter>('all');
+  const [deleteTarget, setDeleteTarget] = useState<Plan | null>(null);
   const filteredPlans = filterPlans(plans, activeFilter);
   const { todayPlans } = splitPlansByToday(plans);
   const filteredGroups = splitPlansByToday(filteredPlans);
@@ -59,6 +72,7 @@ export function PlansPage() {
     { title: '今日计划', plans: filteredGroups.todayPlans },
     { title: '其他计划', plans: filteredGroups.otherPlans },
   ].filter((group) => group.plans.length > 0);
+  const deletePending = deleteTarget ? Boolean(planDeletingById[deleteTarget.id]) : false;
 
   useGSAP(
     () => {
@@ -94,16 +108,27 @@ export function PlansPage() {
   const renderPlanCard = (plan: Plan) => {
     const { dateText, timeText } = splitPlanTimeLabel(plan.timeLabel);
     const ReminderIcon = plan.reminder ? Bell : BellOff;
+    const completing = Boolean(planCompletingById[plan.id]);
+    const deleting = Boolean(planDeletingById[plan.id]);
+    const busy = completing || deleting;
 
     return (
       <Card
         key={plan.id}
         className={cn(
-          'overflow-hidden border-border/80 transition-colors hover:border-foreground/20',
+          'relative overflow-hidden border-border/80 transition-all duration-300 hover:border-foreground/20',
           plan.completed && 'opacity-70',
+          completing && 'border-life-trace/40 shadow-[0_18px_60px_rgba(16,185,129,0.12)]',
+          deleting && 'border-life-alert/40 shadow-[0_18px_60px_rgba(249,115,22,0.12)]',
         )}
         data-plan-card
       >
+        {busy ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 -left-1/2 z-0 w-1/2 animate-[life-shimmer_1.4s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-foreground/10 to-transparent motion-reduce:animate-none"
+          />
+        ) : null}
         {plan.imageUrl ? (
           <img
             src={plan.imageUrl}
@@ -111,7 +136,7 @@ export function PlansPage() {
             className="h-32 w-full object-cover opacity-80"
           />
         ) : null}
-        <div className="grid grid-cols-[4.75rem_1fr] gap-4 p-4">
+        <div className="relative z-10 grid grid-cols-[4.75rem_1fr] gap-4 p-4">
           <div
             className={cn(
               'flex h-20 flex-col items-center justify-center rounded-2xl border text-center',
@@ -148,17 +173,19 @@ export function PlansPage() {
                 {plan.reminder ? '提醒' : '未开'}
               </div>
             </div>
-            <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">{plan.note}</p>
+            <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">
+              {getVisiblePlanNote(plan.note)}
+            </p>
             <div className="flex items-center justify-end gap-2">
               <Button
                 type="button"
                 variant={plan.completed ? 'secondary' : 'outline'}
                 size="sm"
                 onClick={() => void completePlan(plan.id)}
-                disabled={plan.completed}
+                disabled={plan.completed || busy}
               >
-                <Check className="size-4" />
-                {plan.completed ? '已完成' : '完成'}
+                {completing ? <ActionLoadingIcon tone="trace" /> : <Check className="size-4" />}
+                {completing ? '完成中' : plan.completed ? '已完成' : '完成'}
               </Button>
               <Button
                 type="button"
@@ -166,9 +193,11 @@ export function PlansPage() {
                 size="sm"
                 className="px-3 text-muted-foreground"
                 aria-label={`删除${plan.title}`}
-                onClick={() => void removePlan(plan.id)}
+                disabled={busy}
+                onClick={() => setDeleteTarget(plan)}
               >
-                <Trash2 className="size-4" />
+                {deleting ? <ActionLoadingIcon tone="alert" /> : <Trash2 className="size-4" />}
+                {deleting ? '删除中' : null}
               </Button>
             </div>
           </div>
@@ -243,16 +272,39 @@ export function PlansPage() {
               type="button"
               variant="ai"
               className="fixed bottom-28 left-1/2 z-40 -translate-x-1/2 px-6"
+              disabled={planCreating}
               onClick={() => setDrawerOpen(true)}
             >
-              <Plus className="size-5" />
-              创建计划
+              {planCreating ? <ActionLoadingIcon /> : <Plus className="size-5" />}
+              {planCreating ? '创建中' : '创建计划'}
             </Button>,
             document.body,
           )
         : null}
 
       <CreatePlanDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="删除这个计划？"
+        description={
+          deleteTarget
+            ? `「${deleteTarget.title}」删除后不会再出现在今日计划里，已生成的踪迹不会被删除。`
+            : ''
+        }
+        confirmLabel="确认删除"
+        loading={deletePending}
+        onCancel={() => {
+          if (!deletePending) {
+            setDeleteTarget(null);
+          }
+        }}
+        onConfirm={() => {
+          if (!deleteTarget) {
+            return;
+          }
+          void removePlan(deleteTarget.id).then(() => setDeleteTarget(null));
+        }}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { Camera, ImagePlus, Sparkles, X } from 'lucide-react';
 import { type ChangeEvent, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { buildPlanSchedule, type PlanDateOption } from '@/lib/planSchedule';
 import { cn } from '@/lib/utils';
 import type { NewPlanInput, NewTraceInput, PlanType } from '@/types';
 
@@ -13,6 +14,10 @@ type ImageAnalysis = {
   planType: PlanType;
   mood: string;
   tags: string[];
+  schedule: {
+    dateOption: PlanDateOption;
+    time: string;
+  };
 };
 
 type ImageAnalysisDrawerProps = {
@@ -32,6 +37,7 @@ const analysisByKind: Record<ImageKind, ImageAnalysis> = {
     planType: '电影',
     mood: '期待',
     tags: ['电影', '周末', '放松'],
+    schedule: { dateOption: '周六', time: '20:00' },
   },
   美食照片: {
     title: '安排一次放松晚餐',
@@ -39,6 +45,7 @@ const analysisByKind: Record<ImageKind, ImageAnalysis> = {
     planType: '吃饭',
     mood: '满足',
     tags: ['美食', '晚餐', '生活奖励'],
+    schedule: { dateOption: '周五', time: '19:30' },
   },
   生活照片: {
     title: '记录一个生活瞬间',
@@ -46,6 +53,7 @@ const analysisByKind: Record<ImageKind, ImageAnalysis> = {
     planType: '普通事项',
     mood: '平静',
     tags: ['日常', '生活', '记录'],
+    schedule: { dateOption: '今天', time: '21:00' },
   },
 };
 
@@ -64,17 +72,7 @@ export function ImageAnalysisDrawer({
   const previewUrl = localPreview || imageUrl;
   const analysis = analysisByKind[kind];
 
-  const defaultTime = useMemo(() => {
-    if (kind === '电影海报') {
-      return '周六 20:00';
-    }
-
-    if (kind === '美食照片') {
-      return '周五 19:30';
-    }
-
-    return '今天 21:00';
-  }, [kind]);
+  const defaultSchedule = useMemo(() => buildPlanSchedule(analysis.schedule), [analysis.schedule]);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -100,7 +98,7 @@ export function ImageAnalysisDrawer({
     onCreatePlan({
       title: analysis.title,
       type: analysis.planType,
-      timeLabel: defaultTime,
+      ...defaultSchedule,
       reminder: true,
       source: 'image_ai',
       imageUrl: previewUrl || undefined,

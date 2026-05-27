@@ -1,5 +1,6 @@
 import { Bell, Check, Clock3, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -25,6 +26,7 @@ function writeJson(key: string, value: unknown) {
 
 export function AppReminderToast() {
   const plans = useLifeTraceStore((state) => state.plans);
+  const planCompletingById = useLifeTraceStore((state) => state.planCompletingById);
   const completePlan = useLifeTraceStore((state) => state.completePlan);
   const [now, setNow] = useState(() => new Date());
   const [dismissedPlanIds, setDismissedPlanIds] = useState<string[]>(() =>
@@ -89,6 +91,8 @@ export function AppReminderToast() {
     return null;
   }
 
+  const completing = Boolean(planCompletingById[dueReminder.plan.id]);
+
   return (
     <div className="fixed inset-x-0 bottom-24 z-50 mx-auto w-full max-w-[430px] px-4">
       <Card className="relative overflow-hidden border-life-health/30 bg-card/95 p-4 shadow-[0_18px_70px_rgba(34,197,94,0.16)] backdrop-blur">
@@ -118,14 +122,32 @@ export function AppReminderToast() {
               {dueReminder.dateText} {dueReminder.timeText}
             </p>
             <div className="mt-4 grid grid-cols-[1fr_auto_auto] gap-2">
-              <Button type="button" variant="ai" size="sm" onClick={() => void completeReminder()}>
-                <Check className="size-4" />
-                完成
+              <Button
+                type="button"
+                variant="ai"
+                size="sm"
+                disabled={completing}
+                onClick={() => void completeReminder()}
+              >
+                {completing ? <ActionLoadingIcon tone="trace" /> : <Check className="size-4" />}
+                {completing ? '完成中' : '完成'}
               </Button>
-              <Button type="button" variant="secondary" size="sm" onClick={snoozeReminder}>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={completing}
+                onClick={snoozeReminder}
+              >
                 稍后
               </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={dismissReminder}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={completing}
+                onClick={dismissReminder}
+              >
                 关闭
               </Button>
             </div>

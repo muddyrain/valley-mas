@@ -1,6 +1,8 @@
 import { X } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
+import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { Button } from '@/components/ui/button';
+import { buildPlanSchedule, type PlanDateOption } from '@/lib/planSchedule';
 import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { NewPlanInput, PlanType } from '@/types';
@@ -24,7 +26,7 @@ const defaultForm: NewPlanInput = {
   note: '',
 };
 
-type DateOptionValue = (typeof dateOptions)[number]['value'];
+type DateOptionValue = Extract<(typeof dateOptions)[number]['value'], PlanDateOption>;
 
 type FormErrors = Partial<Record<'title' | 'date' | 'time', string>>;
 
@@ -33,23 +35,15 @@ type CreatePlanDrawerProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-function buildTimeLabel(dateOption: DateOptionValue, customDate: string, time: string) {
-  if (dateOption === 'custom') {
-    return `${customDate} ${time}`;
-  }
-
-  return `${dateOption} ${time}`;
-}
-
 export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) {
   const addPlan = useLifeTraceStore((state) => state.addPlan);
   const plansError = useLifeTraceStore((state) => state.plansError);
+  const planCreating = useLifeTraceStore((state) => state.planCreating);
   const [form, setForm] = useState<NewPlanInput>(defaultForm);
   const [dateOption, setDateOption] = useState<DateOptionValue>('今天');
   const [customDate, setCustomDate] = useState('');
   const [time, setTime] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -86,19 +80,17 @@ export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) 
       return;
     }
 
-    const timeLabel = buildTimeLabel(dateOption, customDate, time);
+    const schedule = buildPlanSchedule({ dateOption, customDate, time });
 
-    setSaving(true);
     const plan = await addPlan({
       ...form,
       source: form.source ?? 'manual',
       title: form.title.trim(),
-      timeLabel,
+      ...schedule,
       imageUrl: form.imageUrl?.trim() || undefined,
       location: form.location?.trim() || undefined,
       note: form.note.trim() || '由 Life Trace 创建的新生活计划。',
     });
-    setSaving(false);
 
     if (plan) {
       onOpenChange(false);
@@ -298,11 +290,17 @@ export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) 
           ) : null}
 
           <div className="grid grid-cols-2 gap-3 pt-2">
-            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={planCreating}
+              onClick={() => onOpenChange(false)}
+            >
               取消
             </Button>
-            <Button type="submit" variant="ai" disabled={saving}>
-              {saving ? '保存中' : '保存计划'}
+            <Button type="submit" variant="ai" disabled={planCreating}>
+              {planCreating ? <ActionLoadingIcon /> : null}
+              {planCreating ? '保存中' : '保存计划'}
             </Button>
           </div>
         </form>

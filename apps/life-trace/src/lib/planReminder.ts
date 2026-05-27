@@ -1,4 +1,5 @@
 import type { Plan } from '@/types';
+import { getPlanScheduledDateTime, parseClockTime } from './planSchedule';
 
 const weekdayMap: Record<string, number> = {
   周日: 0,
@@ -30,23 +31,8 @@ export function splitPlanTimeLabel(timeLabel: string) {
   };
 }
 
-function parseTime(time: string) {
-  const match = time.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) {
-    return null;
-  }
-
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (hours > 23 || minutes > 59) {
-    return null;
-  }
-
-  return { hours, minutes };
-}
-
 function buildDate(base: Date, daysToAdd: number, time: string) {
-  const parsed = parseTime(time);
+  const parsed = parseClockTime(time);
   if (!parsed) {
     return null;
   }
@@ -63,6 +49,11 @@ function getDaysUntilWeekday(base: Date, targetWeekday: number) {
 }
 
 export function parsePlanReminderDate(plan: Plan, now = new Date()) {
+  const scheduledDateTime = getPlanScheduledDateTime(plan);
+  if (scheduledDateTime) {
+    return scheduledDateTime;
+  }
+
   const [datePart, timePart] = plan.timeLabel.trim().split(/\s+/);
   if (!datePart || !timePart) {
     return null;
@@ -70,7 +61,7 @@ export function parsePlanReminderDate(plan: Plan, now = new Date()) {
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
     const [year, month, day] = datePart.split('-').map(Number);
-    const parsed = parseTime(timePart);
+    const parsed = parseClockTime(timePart);
     return parsed ? new Date(year, month - 1, day, parsed.hours, parsed.minutes, 0, 0) : null;
   }
 

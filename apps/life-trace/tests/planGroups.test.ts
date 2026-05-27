@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { filterPlans, splitPlansByToday } from '../src/lib/planGroups';
 import type { Plan } from '../src/types';
 
-const createPlan = (id: string, timeLabel: string, reminder = true): Plan => ({
+const createPlan = (
+  id: string,
+  timeLabel: string,
+  reminder = true,
+  fields: Partial<Pick<Plan, 'scheduledDate' | 'scheduledTime'>> = {},
+): Plan => ({
   id,
   title: id,
   type: '普通事项',
@@ -10,6 +15,7 @@ const createPlan = (id: string, timeLabel: string, reminder = true): Plan => ({
   reminder,
   note: '',
   completed: false,
+  ...fields,
 });
 
 describe('splitPlansByToday', () => {
@@ -44,5 +50,28 @@ describe('filterPlans', () => {
 
   it('filters plans with reminders', () => {
     expect(filterPlans(plans, 'reminded').map((plan) => plan.id)).toEqual(['saturday', 'tomorrow']);
+  });
+
+  it('prefers structured date fields when filtering today and weekend', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 4, 27, 9, 0, 0));
+
+    try {
+      const scheduledPlans = [
+        createPlan('today', '下周某天', true, {
+          scheduledDate: '2026-05-27',
+          scheduledTime: '10:00',
+        }),
+        createPlan('weekend', '普通安排', true, {
+          scheduledDate: '2026-05-30',
+          scheduledTime: '20:00',
+        }),
+      ];
+
+      expect(filterPlans(scheduledPlans, 'today').map((plan) => plan.id)).toEqual(['today']);
+      expect(filterPlans(scheduledPlans, 'weekend').map((plan) => plan.id)).toEqual(['weekend']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

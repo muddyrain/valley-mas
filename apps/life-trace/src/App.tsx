@@ -20,7 +20,9 @@ const pages = {
 
 export default function App() {
   const activeTab = useLifeTraceStore((state) => state.activeTab);
+  const loadSettings = useLifeTraceStore((state) => state.loadSettings);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
+  const loadTraces = useLifeTraceStore((state) => state.loadTraces);
   const { status, token, verifySession } = useAuthStore();
 
   useEffect(() => {
@@ -31,9 +33,11 @@ export default function App() {
 
   useEffect(() => {
     if (status === 'authenticated' && token) {
+      void loadSettings();
       void loadPlans();
+      void loadTraces();
     }
-  }, [loadPlans, status, token]);
+  }, [loadPlans, loadSettings, loadTraces, status, token]);
 
   if ((status === 'checking' && token) || status === 'idle') {
     return (

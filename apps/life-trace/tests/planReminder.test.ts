@@ -10,7 +10,7 @@ import type { Plan } from '../src/types';
 const createPlan = (
   id: string,
   timeLabel: string,
-  options: Partial<Pick<Plan, 'reminder' | 'completed'>> = {},
+  options: Partial<Pick<Plan, 'reminder' | 'completed' | 'scheduledDate' | 'scheduledTime'>> = {},
 ): Plan => ({
   id,
   title: id,
@@ -19,6 +19,8 @@ const createPlan = (
   reminder: options.reminder ?? true,
   note: '',
   completed: options.completed ?? false,
+  scheduledDate: options.scheduledDate,
+  scheduledTime: options.scheduledTime,
 });
 
 describe('parsePlanReminderDate', () => {
@@ -44,6 +46,18 @@ describe('parsePlanReminderDate', () => {
 
   it('ignores fuzzy labels without concrete time', () => {
     expect(parsePlanReminderDate(createPlan('fuzzy', '今天 晚上'), now)).toBeNull();
+  });
+
+  it('prefers structured schedule fields over fuzzy labels', () => {
+    expect(
+      parsePlanReminderDate(
+        createPlan('structured', '今天 晚上', {
+          scheduledDate: '2026-05-27',
+          scheduledTime: '20:00',
+        }),
+        now,
+      )?.toISOString(),
+    ).toBe(new Date(2026, 4, 27, 20, 0, 0).toISOString());
   });
 });
 

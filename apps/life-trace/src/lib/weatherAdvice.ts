@@ -1,13 +1,11 @@
 import type { WeatherApiResponse } from '@/api/weather';
-import type { Advice, UserSettings } from '@/types';
+import type { AdvicePayload, UserSettings } from '@/types';
 
 type AdviceInput = {
   weather: WeatherApiResponse;
   settings: UserSettings;
   openPlanCount: number;
 };
-
-type WeatherAdvice = Omit<Advice, 'icon'>;
 
 type WeatherBrief = {
   title: string;
@@ -20,7 +18,7 @@ export function buildWeatherDrivenAdvice({
   weather,
   settings,
   openPlanCount,
-}: AdviceInput): WeatherAdvice[] {
+}: AdviceInput): AdvicePayload[] {
   const temp = parseNumber(weather.now.temp);
   const high = parseNumber(weather.now.high);
   const low = parseNumber(weather.now.low);

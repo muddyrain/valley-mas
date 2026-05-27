@@ -148,6 +148,8 @@ func autoMigrate() error {
 		&model.PostComment{},
 		&model.OperationLog{},
 		&model.LifeTracePlan{},
+		&model.LifeTraceTrace{},
+		&model.LifeTraceSettings{},
 	); err != nil {
 		return err
 	}

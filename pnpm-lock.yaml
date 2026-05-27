@@ -212,6 +212,9 @@ importers:
       vite:
         specifier: catalog:vite-6
         version: 6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
+      vitest:
+        specifier: ^4.1.6
+        version: 4.1.6(@types/node@22.19.13)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
 
   apps/scratch-legend:
     dependencies:

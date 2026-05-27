@@ -1,4 +1,5 @@
 import type { Plan } from '@/types';
+import { isPlanScheduledToday, isPlanScheduledWeekend } from './planSchedule';
 
 export type PlanFilter = 'all' | 'today' | 'weekend' | 'reminded';
 
@@ -22,18 +23,11 @@ export function splitPlansByToday(plans: Plan[]): PlanGroups {
 }
 
 export function isTodayPlan(plan: Plan) {
-  return plan.timeLabel.trim().startsWith('今天');
+  return isPlanScheduledToday(plan);
 }
 
 export function isWeekendPlan(plan: Plan) {
-  const timeLabel = plan.timeLabel.trim();
-  return (
-    timeLabel.startsWith('周末') ||
-    timeLabel.startsWith('周六') ||
-    timeLabel.startsWith('周日') ||
-    timeLabel.startsWith('星期六') ||
-    timeLabel.startsWith('星期日')
-  );
+  return isPlanScheduledWeekend(plan);
 }
 
 export function filterPlans(plans: Plan[], filter: PlanFilter) {

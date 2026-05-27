@@ -7,10 +7,11 @@ tmp_dir = "tmp"
   # Windows 下 pre_cmd 不支持，改用手动执行或移除
   # pre_cmd = ["swag init --exclude tmp,data"]
   
-  cmd = "go build -o ./tmp/main ./cmd/local"
+  # Windows CMD 只能直接执行 .exe；macOS/Linux 也可以执行这个文件名。
+  cmd = "go build -o ./tmp/main.exe ./cmd/local"
 
   # Air v1.65+ 推荐使用 entrypoint，避免回退到默认 ./tmp/main。
-  entrypoint = "./tmp/main"
+  entrypoint = "./tmp/main.exe"
 
   # 监听参数
   delay = 500

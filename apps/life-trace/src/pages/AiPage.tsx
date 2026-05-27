@@ -1,11 +1,14 @@
 import { CalendarDays, Clock, Image, Send, Sparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { generateTodayAdvice } from '@/api/advice';
+import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { ImageAnalysisDrawer } from '@/components/ImageAnalysisDrawer';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { aiQuickActions, suggestedPrompts } from '@/data/mock';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 
 type AiResult = {
@@ -25,9 +28,11 @@ export function AiPage() {
   const generateTraceFromLatestPlan = useLifeTraceStore(
     (state) => state.generateTraceFromLatestPlan,
   );
+  const token = useAuthStore((state) => state.token);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false);
   const [result, setResult] = useState<AiResult | null>(null);
+  const [quickActionLoading, setQuickActionLoading] = useState<string | null>(null);
 
   const openPlanCount = plans.filter((plan) => !plan.completed).length;
   const completedPlanCount = plans.length - openPlanCount;
@@ -37,7 +42,7 @@ export function AiPage() {
     [openPlanCount, settings.city, settings.commuteMethod],
   );
 
-  const handleQuickAction = (label: string) => {
+  const handleQuickAction = async (label: string) => {
     if (label === '创建计划') {
       setDrawerOpen(true);
       setResult({
@@ -49,14 +54,34 @@ export function AiPage() {
     }
 
     if (label === '生成今日建议') {
-      const detail = `今天在${settings.city}，建议按 ${settings.workStart} 的上班时间提前安排${settings.commuteMethod}通勤。当前还有 ${openPlanCount} 个生活计划，适合优先完成一个轻量计划。`;
-      setResult({ title: '今日 AI 建议已生成', detail, tone: 'ai' });
+      setQuickActionLoading(label);
+      try {
+        if (!token || !settings.aiPersonalization) {
+          throw new Error('use local advice');
+        }
+
+        const advice = await generateTodayAdvice(token);
+        const details = advice.list
+          .slice(0, 3)
+          .map((item) => `${item.title}：${item.detail}`)
+          .join('；');
+        setResult({
+          title: '服务端 AI 今日建议已生成',
+          detail: advice.summary || details,
+          tone: 'ai',
+        });
+      } catch {
+        const detail = `今天在${settings.city}，建议按 ${settings.workStart} 的上班时间提前安排${settings.commuteMethod}通勤。当前还有 ${openPlanCount} 个生活计划，适合优先完成一个轻量计划。`;
+        setResult({ title: '今日建议已生成', detail, tone: 'ai' });
+      } finally {
+        setQuickActionLoading(null);
+      }
       addAiAction('生成了今日生活建议');
       return;
     }
 
     if (label === '生成踪迹') {
-      const trace = generateTraceFromLatestPlan();
+      const trace = await generateTraceFromLatestPlan();
 
       setResult(
         trace
@@ -111,7 +136,7 @@ export function AiPage() {
           <button
             type="button"
             className="grid size-12 place-items-center rounded-2xl bg-life-ai text-background"
-            onClick={() => handleQuickAction('生成今日建议')}
+            onClick={() => void handleQuickAction('生成今日建议')}
           >
             <Send className="size-5" />
           </button>
@@ -134,15 +159,21 @@ export function AiPage() {
         <div className="flex flex-wrap gap-3">
           {aiQuickActions.map((action) => {
             const Icon = action.icon;
+            const loading = quickActionLoading === action.label;
 
             return (
               <button
                 type="button"
                 key={action.label}
-                className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-3 text-sm font-semibold transition hover:bg-secondary"
-                onClick={() => handleQuickAction(action.label)}
+                className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-3 text-sm font-semibold transition hover:bg-secondary disabled:cursor-default disabled:opacity-70"
+                disabled={Boolean(quickActionLoading)}
+                onClick={() => void handleQuickAction(action.label)}
               >
-                <Icon className={`size-4 ${action.tone}`} />
+                {loading ? (
+                  <ActionLoadingIcon className="size-4" />
+                ) : (
+                  <Icon className={`size-4 ${action.tone}`} />
+                )}
                 {action.label}
               </button>
             );
@@ -162,7 +193,7 @@ export function AiPage() {
                 type="button"
                 className="flex w-full items-center gap-4 rounded-[1.25rem] border border-border bg-card p-4 text-left transition hover:bg-secondary"
                 onClick={() =>
-                  handleQuickAction(
+                  void handleQuickAction(
                     prompt.type === '计划'
                       ? '创建计划'
                       : prompt.type === '回顾'
@@ -216,7 +247,7 @@ export function AiPage() {
         open={imageDrawerOpen}
         onOpenChange={setImageDrawerOpen}
         onCreatePlan={(input) => {
-          addPlan(input);
+          void addPlan(input);
           setResult({
             title: '已从图片生成计划',
             detail: `「${input.title}」已加入计划列表，完成后可以继续生成踪迹。`,
@@ -224,11 +255,20 @@ export function AiPage() {
           });
         }}
         onCreateTrace={(input) => {
-          addTrace(input);
-          setResult({
-            title: '已从图片生成踪迹',
-            detail: `「${input.title}」已加入踪迹流，可以到“踪迹”页查看。`,
-            tone: 'trace',
+          void addTrace(input).then((trace) => {
+            setResult(
+              trace
+                ? {
+                    title: '已从图片生成踪迹',
+                    detail: `「${input.title}」已加入踪迹流，可以到“踪迹”页查看。`,
+                    tone: 'trace',
+                  }
+                : {
+                    title: '踪迹保存失败',
+                    detail: '刚才的图片分析结果没有保存成功，请稍后再试。',
+                    tone: 'alert',
+                  },
+            );
           });
         }}
         onAnalyzed={(title) => addAiAction(title)}

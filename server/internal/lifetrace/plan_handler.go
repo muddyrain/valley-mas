@@ -19,14 +19,17 @@ type apiResponse struct {
 }
 
 type createPlanRequest struct {
-	Title     string `json:"title"`
-	Type      string `json:"type"`
-	TimeLabel string `json:"timeLabel"`
-	Reminder  bool   `json:"reminder"`
-	ImageURL  string `json:"imageUrl"`
-	Location  string `json:"location"`
-	Note      string `json:"note"`
-	Source    string `json:"source"`
+	Title         string `json:"title"`
+	Type          string `json:"type"`
+	TimeLabel     string `json:"timeLabel"`
+	ScheduledDate string `json:"scheduledDate"`
+	ScheduledTime string `json:"scheduledTime"`
+	Timezone      string `json:"timezone"`
+	Reminder      bool   `json:"reminder"`
+	ImageURL      string `json:"imageUrl"`
+	Location      string `json:"location"`
+	Note          string `json:"note"`
+	Source        string `json:"source"`
 }
 
 type updatePlanStatusRequest struct {
@@ -92,6 +95,33 @@ func normalizePlanType(planType string) string {
 	return planType
 }
 
+func normalizePlanSchedule(date string, clock string, timezone string) (string, string, string, bool) {
+	date = strings.TrimSpace(date)
+	clock = strings.TrimSpace(clock)
+	timezone = strings.TrimSpace(timezone)
+
+	if timezone == "" {
+		timezone = "Asia/Shanghai"
+	}
+
+	if date == "" && clock == "" {
+		return "", "", timezone, true
+	}
+
+	if date == "" || clock == "" {
+		return "", "", "", false
+	}
+
+	if _, err := time.Parse("2006-01-02", date); err != nil {
+		return "", "", "", false
+	}
+	if _, err := time.Parse("15:04", clock); err != nil {
+		return "", "", "", false
+	}
+
+	return date, clock, timezone, true
+}
+
 func (h *Handler) ListPlans(c *gin.Context) {
 	userID, ok := currentUserID(c)
 	if !ok {
@@ -131,16 +161,29 @@ func (h *Handler) CreatePlan(c *gin.Context) {
 		return
 	}
 
+	scheduledDate, scheduledTime, timezone, ok := normalizePlanSchedule(
+		req.ScheduledDate,
+		req.ScheduledTime,
+		req.Timezone,
+	)
+	if !ok {
+		fail(c, http.StatusBadRequest, "计划时间格式错误")
+		return
+	}
+
 	plan := model.LifeTracePlan{
-		UserID:    userID,
-		Title:     title,
-		Type:      normalizePlanType(req.Type),
-		TimeLabel: timeLabel,
-		Reminder:  req.Reminder,
-		ImageURL:  strings.TrimSpace(req.ImageURL),
-		Location:  strings.TrimSpace(req.Location),
-		Note:      strings.TrimSpace(req.Note),
-		Source:    normalizePlanSource(req.Source),
+		UserID:        userID,
+		Title:         title,
+		Type:          normalizePlanType(req.Type),
+		TimeLabel:     timeLabel,
+		ScheduledDate: scheduledDate,
+		ScheduledTime: scheduledTime,
+		Timezone:      timezone,
+		Reminder:      req.Reminder,
+		ImageURL:      strings.TrimSpace(req.ImageURL),
+		Location:      strings.TrimSpace(req.Location),
+		Note:          strings.TrimSpace(req.Note),
+		Source:        normalizePlanSource(req.Source),
 	}
 
 	if plan.Note == "" {

@@ -6,6 +6,8 @@ import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 
 export function TracesPage() {
   const traces = useLifeTraceStore((state) => state.traces);
+  const tracesLoading = useLifeTraceStore((state) => state.tracesLoading);
+  const tracesError = useLifeTraceStore((state) => state.tracesError);
 
   return (
     <div className="space-y-5">
@@ -24,6 +26,16 @@ export function TracesPage() {
           </button>
         ))}
       </div>
+
+      {tracesError ? (
+        <Card className="border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          {tracesError}
+        </Card>
+      ) : null}
+
+      {tracesLoading ? (
+        <Card className="p-5 text-sm text-muted-foreground">正在同步你的生活踪迹...</Card>
+      ) : null}
 
       <div className="relative space-y-6 pl-7">
         <div className="absolute bottom-0 left-2 top-0 w-px bg-border" />
@@ -68,6 +80,12 @@ export function TracesPage() {
           </article>
         ))}
       </div>
+
+      {!tracesLoading && traces.length === 0 ? (
+        <Card className="p-5 text-sm leading-6 text-muted-foreground">
+          还没有生活踪迹。先完成一个计划，Life Trace 会把它沉淀为可回看的记录。
+        </Card>
+      ) : null}
     </div>
   );
 }

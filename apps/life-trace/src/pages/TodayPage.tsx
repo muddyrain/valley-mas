@@ -15,8 +15,10 @@ import {
   Sun,
   Wind,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { generateTodayAdvice } from '@/api/advice';
 import { fetchLifeTraceWeather, type WeatherApiResponse } from '@/api/weather';
+import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { hourlyWeather, weatherMetrics } from '@/data/mock';
@@ -26,8 +28,9 @@ import { gsap, useGSAP } from '@/lib/gsap';
 import { getNextReminder } from '@/lib/planReminder';
 import { buildWeatherBrief, buildWeatherDrivenAdvice } from '@/lib/weatherAdvice';
 import { readWeatherCache, writeWeatherCache } from '@/lib/weatherCache';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { Advice } from '@/types';
+import type { Advice, AdvicePayload } from '@/types';
 
 const adviceToneClasses: Record<Advice['tone'], { bg: string; text: string }> = {
   weather: { bg: 'bg-life-weather/10', text: 'text-life-weather' },
@@ -101,17 +104,37 @@ export function TodayPage() {
     (state) => state.plans.filter((plan) => !plan.completed).length,
   );
   const plans = useLifeTraceStore((state) => state.plans);
+  const plansLoaded = useLifeTraceStore((state) => state.plansLoaded);
+  const planCreating = useLifeTraceStore((state) => state.planCreating);
   const settings = useLifeTraceStore((state) => state.settings);
+  const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const setActiveTab = useLifeTraceStore((state) => state.setActiveTab);
   const addPlan = useLifeTraceStore((state) => state.addPlan);
+  const token = useAuthStore((state) => state.token);
   const [weather, setWeather] = useState<WeatherApiResponse>({
     ...fallbackWeather,
     city: settings.city,
   });
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [remoteAdvice, setRemoteAdvice] = useState<AdvicePayload[] | null>(null);
+  const [adviceLoading, setAdviceLoading] = useState(false);
   const [planToast, setPlanToast] = useState('');
+  const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
-  const advice = buildWeatherDrivenAdvice({ weather, settings, openPlanCount }).map((item) => ({
+  const planFingerprint = useMemo(
+    () => plans.map((plan) => `${plan.id}:${plan.completed}:${plan.updatedAt ?? ''}`).join('|'),
+    [plans],
+  );
+  const adviceContextVersion = [
+    settings.city,
+    settings.workStart,
+    settings.workEnd,
+    settings.commuteMethod,
+    openPlanCount,
+    planFingerprint,
+  ].join('|');
+  const localAdvice = buildWeatherDrivenAdvice({ weather, settings, openPlanCount });
+  const advice = (remoteAdvice ?? localAdvice).map((item) => ({
     ...item,
     icon: adviceIconMap[item.id as keyof typeof adviceIconMap] ?? Sparkles,
   }));
@@ -262,21 +285,54 @@ export function TodayPage() {
     return () => controller.abort();
   }, [settings.city]);
 
+  useEffect(() => {
+    if (!token || !settings.aiPersonalization || !settingsLoaded || !plansLoaded) {
+      setRemoteAdvice(null);
+      setAdviceLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    void adviceContextVersion;
+    const timer = window.setTimeout(() => {
+      setAdviceLoading(true);
+
+      generateTodayAdvice(token, { signal: controller.signal })
+        .then((resp) => setRemoteAdvice(resp.list))
+        .catch(() => setRemoteAdvice(null))
+        .finally(() => {
+          if (!controller.signal.aborted) {
+            setAdviceLoading(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [token, settings.aiPersonalization, settingsLoaded, plansLoaded, adviceContextVersion]);
+
   const handleAddAdvicePlan = async (item: Advice) => {
     if (hasAdvicePlan(plans, item.id)) {
       setPlanToast('这个建议已经在今日计划里');
       return;
     }
 
-    const plan = await addPlan(
-      createPlanFromAdvice({
-        id: item.id,
-        title: item.title,
-        detail: item.detail,
-        city: weather.city || settings.city,
-      }),
-    );
-    setPlanToast(plan ? '已加入今日计划' : '计划保存失败，稍后再试');
+    setAddingAdviceId(item.id);
+    try {
+      const plan = await addPlan(
+        createPlanFromAdvice({
+          id: item.id,
+          title: item.title,
+          detail: item.detail,
+          city: weather.city || settings.city,
+        }),
+      );
+      setPlanToast(plan ? '已加入今日计划' : '计划保存失败，稍后再试');
+    } finally {
+      setAddingAdviceId(null);
+    }
   };
   const handleRefreshWeather = () => {
     if (weatherLoading) {
@@ -490,14 +546,22 @@ export function TodayPage() {
       </Card>
 
       <section>
-        <h2 className="mb-3 text-xl font-semibold tracking-tight" data-today-entrance>
-          今日建议
-        </h2>
+        <div className="mb-3 flex min-h-8 items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold tracking-tight">今日建议</h2>
+          <Badge
+            tone={remoteAdvice ? 'ai' : 'default'}
+            className="min-w-[86px] justify-center gap-1.5"
+          >
+            {adviceLoading ? <ActionLoadingIcon className="size-3.5" /> : null}
+            {adviceLoading ? '正在更新' : remoteAdvice ? 'AI 建议' : '基础建议'}
+          </Badge>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           {advice.map((item) => {
             const Icon = item.icon;
             const tone = adviceToneClasses[item.tone];
             const isAdded = hasAdvicePlan(plans, item.id);
+            const adding = addingAdviceId === item.id && planCreating;
 
             return (
               <Card
@@ -511,13 +575,19 @@ export function TodayPage() {
                 />
                 <button
                   type="button"
-                  disabled={isAdded}
+                  disabled={isAdded || planCreating}
                   className="absolute top-3 right-3 z-10 grid size-8 cursor-pointer place-items-center rounded-full bg-secondary text-foreground transition duration-200 hover:scale-105 hover:bg-accent active:scale-95 disabled:cursor-default disabled:text-life-trace disabled:opacity-100 disabled:hover:scale-100"
                   aria-label={isAdded ? '已添加计划' : `添加${item.title}计划`}
                   onClick={() => void handleAddAdvicePlan(item)}
                   data-advice-action
                 >
-                  {isAdded ? <Check className="size-4" /> : <Plus className="size-4" />}
+                  {adding ? (
+                    <ActionLoadingIcon className="size-4" />
+                  ) : isAdded ? (
+                    <Check className="size-4" />
+                  ) : (
+                    <Plus className="size-4" />
+                  )}
                 </button>
                 <div className="flex items-center gap-2 pr-10">
                   <div

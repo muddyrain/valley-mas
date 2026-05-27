@@ -112,3 +112,35 @@
 @utility safe-bottom {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
+
+@keyframes life-shimmer {
+  0% {
+    transform: translateX(-120%);
+    opacity: 0;
+  }
+
+  30% {
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translateX(320%);
+    opacity: 0;
+  }
+}
+
+@keyframes life-profile-sheen {
+  0% {
+    transform: translateX(-120%);
+    opacity: 0;
+  }
+
+  35% {
+    opacity: 0.9;
+  }
+
+  100% {
+    transform: translateX(320%);
+    opacity: 0;
+  }
+}

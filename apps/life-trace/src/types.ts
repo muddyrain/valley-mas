@@ -9,6 +9,9 @@ export type Plan = {
   title: string;
   type: PlanType;
   timeLabel: string;
+  scheduledDate?: string;
+  scheduledTime?: string;
+  timezone?: string;
   reminder: boolean;
   imageUrl?: string;
   location?: string;
@@ -43,6 +46,7 @@ export type UserSettings = {
 
 export type Trace = {
   id: string;
+  planId?: string;
   title: string;
   summary: string;
   timeLabel: string;
@@ -51,9 +55,11 @@ export type Trace = {
   mood: string;
   tags: string[];
   source: '计划' | '打卡' | '手动';
+  createdAt?: string;
+  updatedAt?: string;
 };
 
-export type NewTraceInput = Omit<Trace, 'id'>;
+export type NewTraceInput = Omit<Trace, 'id' | 'createdAt' | 'updatedAt'>;
 
 export type AiAction = {
   id: string;
@@ -61,10 +67,15 @@ export type AiAction = {
   timeLabel: string;
 };
 
-export type Advice = {
+export type AdviceTone = 'weather' | 'ai' | 'plan' | 'trace' | 'health' | 'alert';
+
+export type AdvicePayload = {
   id: string;
   title: string;
   detail: string;
-  tone: 'weather' | 'ai' | 'plan' | 'trace' | 'health' | 'alert';
+  tone: AdviceTone;
+};
+
+export type Advice = AdvicePayload & {
   icon: LucideIcon;
 };
