@@ -1,5 +1,15 @@
-import { CalendarDays, Clock, Image, Send, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import {
+  CalendarDays,
+  Check,
+  Clock,
+  CloudSun,
+  Image,
+  ListChecks,
+  Plus,
+  Send,
+  Sparkles,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { generateTodayAdvice } from '@/api/advice';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
@@ -8,8 +18,11 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { aiQuickActions, suggestedPrompts } from '@/data/mock';
+import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
+import { getLocalISODate } from '@/lib/planSchedule';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
+import type { AdvicePayload } from '@/types';
 
 type AiResult = {
   title: string;
@@ -20,11 +33,16 @@ type AiResult = {
 export function AiPage() {
   const plans = useLifeTraceStore((state) => state.plans);
   const traces = useLifeTraceStore((state) => state.traces);
+  const checkins = useLifeTraceStore((state) => state.checkins);
+  const checkinsDate = useLifeTraceStore((state) => state.checkinsDate);
+  const checkinsLoading = useLifeTraceStore((state) => state.checkinsLoading);
   const settings = useLifeTraceStore((state) => state.settings);
+  const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const aiActions = useLifeTraceStore((state) => state.aiActions ?? []);
   const addAiAction = useLifeTraceStore((state) => state.addAiAction);
   const addPlan = useLifeTraceStore((state) => state.addPlan);
   const addTrace = useLifeTraceStore((state) => state.addTrace);
+  const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
   const generateTraceFromLatestPlan = useLifeTraceStore(
     (state) => state.generateTraceFromLatestPlan,
   );
@@ -32,15 +50,30 @@ export function AiPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false);
   const [result, setResult] = useState<AiResult | null>(null);
+  const [adviceCards, setAdviceCards] = useState<AdvicePayload[]>([]);
   const [quickActionLoading, setQuickActionLoading] = useState<string | null>(null);
+  const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
 
   const openPlanCount = plans.filter((plan) => !plan.completed).length;
   const completedPlanCount = plans.length - openPlanCount;
+  const todayDate = useMemo(() => getLocalISODate(new Date()), []);
+  const todayCheckins = checkinsDate === todayDate ? checkins : [];
+  const completedCheckinCount = todayCheckins.filter((item) => item.completed).length;
+  const activeHabitCount = settings.habits.length;
+  const latestTrace = traces[0];
 
   const placeholder = useMemo(
     () => `${settings.city} · ${settings.commuteMethod}通勤 · ${openPlanCount} 个待完成计划`,
     [openPlanCount, settings.city, settings.commuteMethod],
   );
+
+  useEffect(() => {
+    if (!token || !settingsLoaded) {
+      return;
+    }
+
+    void loadCheckins(todayDate);
+  }, [loadCheckins, settingsLoaded, todayDate, token]);
 
   const handleQuickAction = async (label: string) => {
     if (label === '创建计划') {
@@ -61,6 +94,7 @@ export function AiPage() {
         }
 
         const advice = await generateTodayAdvice(token);
+        setAdviceCards(advice.list);
         const details = advice.list
           .slice(0, 3)
           .map((item) => `${item.title}：${item.detail}`)
@@ -71,6 +105,7 @@ export function AiPage() {
           tone: 'ai',
         });
       } catch {
+        setAdviceCards([]);
         const detail = `今天在${settings.city}，建议按 ${settings.workStart} 的上班时间提前安排${settings.commuteMethod}通勤。当前还有 ${openPlanCount} 个生活计划，适合优先完成一个轻量计划。`;
         setResult({ title: '今日建议已生成', detail, tone: 'ai' });
       } finally {
@@ -115,6 +150,44 @@ export function AiPage() {
     });
   };
 
+  const handleAddAdvicePlan = async (item: AdvicePayload) => {
+    if (hasAdvicePlan(plans, item.id)) {
+      setResult({
+        title: '这条建议已在计划里',
+        detail: `「${item.title}」已经加入过计划，不需要重复添加。`,
+        tone: 'plan',
+      });
+      return;
+    }
+
+    setAddingAdviceId(item.id);
+    try {
+      const plan = await addPlan(
+        createPlanFromAdvice({
+          id: item.id,
+          title: item.title,
+          detail: item.detail,
+          city: settings.city,
+        }),
+      );
+      setResult(
+        plan
+          ? {
+              title: '已加入今日计划',
+              detail: `「${item.title}」已经变成可提醒的生活计划。`,
+              tone: 'plan',
+            }
+          : {
+              title: '计划保存失败',
+              detail: '刚才的建议没有保存成功，请稍后再试。',
+              tone: 'alert',
+            },
+      );
+    } finally {
+      setAddingAdviceId(null);
+    }
+  };
+
   return (
     <div className="space-y-7">
       <header className="space-y-5">
@@ -130,15 +203,65 @@ export function AiPage() {
         </div>
       </header>
 
+      <section className="grid grid-cols-2 gap-3">
+        <Card className="p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+            <CloudSun className="size-4 text-life-weather" />
+            今日上下文
+          </div>
+          <p className="mt-2 text-lg font-semibold">{settings.city}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{settings.commuteMethod}通勤</p>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+            <CalendarDays className="size-4 text-life-plan" />
+            待完成计划
+          </div>
+          <p className="mt-2 text-lg font-semibold">{openPlanCount} 个</p>
+          <p className="mt-1 text-sm text-muted-foreground">{completedPlanCount} 个已完成</p>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+            <ListChecks className="size-4 text-life-trace" />
+            今日打卡
+          </div>
+          <p className="mt-2 text-lg font-semibold">
+            {checkinsLoading ? '同步中' : `${completedCheckinCount}/${activeHabitCount || 0}`}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {activeHabitCount ? settings.habits.slice(0, 3).join('、') : '还未设置打卡项'}
+          </p>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+            <Sparkles className="size-4 text-life-ai" />
+            最近踪迹
+          </div>
+          <p className="mt-2 line-clamp-1 text-lg font-semibold">
+            {latestTrace ? latestTrace.title : `${traces.length} 条`}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {latestTrace ? latestTrace.mood : '完成计划后自动沉淀'}
+          </p>
+        </Card>
+      </section>
+
       <Card className="p-4">
-        <div className="min-h-24 text-lg text-muted-foreground">告诉我你想安排什么...</div>
+        <div className="min-h-24 text-lg text-muted-foreground">
+          帮我基于今日天气、计划和打卡安排一下今天...
+        </div>
         <div className="flex justify-end">
           <button
             type="button"
-            className="grid size-12 place-items-center rounded-2xl bg-life-ai text-background"
+            className="grid size-12 cursor-pointer place-items-center rounded-2xl bg-life-ai text-background transition hover:bg-life-ai/90 disabled:cursor-default disabled:opacity-70"
+            disabled={Boolean(quickActionLoading)}
             onClick={() => void handleQuickAction('生成今日建议')}
           >
-            <Send className="size-5" />
+            {quickActionLoading === '生成今日建议' ? (
+              <ActionLoadingIcon />
+            ) : (
+              <Send className="size-5" />
+            )}
           </button>
         </div>
       </Card>
@@ -152,6 +275,48 @@ export function AiPage() {
           <h2 className="text-lg font-semibold">{result.title}</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{result.detail}</p>
         </Card>
+      ) : null}
+
+      {adviceCards.length > 0 ? (
+        <section>
+          <SectionHeader title="AI 生成的今日建议" meta={`${adviceCards.length} 条`} />
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            {adviceCards.map((item) => {
+              const added = hasAdvicePlan(plans, item.id);
+              const adding = addingAdviceId === item.id;
+
+              return (
+                <Card key={item.id} className="relative min-h-36 overflow-hidden p-4">
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-life-ai/40 to-transparent"
+                  />
+                  <div className="flex items-start justify-between gap-3">
+                    <Badge tone={item.tone}>{item.title}</Badge>
+                    <button
+                      type="button"
+                      disabled={added || Boolean(addingAdviceId)}
+                      className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full bg-secondary text-foreground transition hover:bg-accent disabled:cursor-default disabled:text-life-trace disabled:opacity-100"
+                      aria-label={added ? '已加入计划' : `添加${item.title}计划`}
+                      onClick={() => void handleAddAdvicePlan(item)}
+                    >
+                      {adding ? (
+                        <ActionLoadingIcon className="size-4" />
+                      ) : added ? (
+                        <Check className="size-4" />
+                      ) : (
+                        <Plus className="size-4" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted-foreground">
+                    {item.detail}
+                  </p>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
       ) : null}
 
       <section className="pb-4">
