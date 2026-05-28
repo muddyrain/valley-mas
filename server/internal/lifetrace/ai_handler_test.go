@@ -132,6 +132,68 @@ func TestBuildTodayAdvicePromptIncludesCheckins(t *testing.T) {
 	}
 }
 
+func TestBuildLifeTraceAssistantPromptKeepsLifeContext(t *testing.T) {
+	prompt := buildLifeTraceAssistantPrompt(
+		model.LifeTraceSettings{
+			City:          "上海",
+			WorkStart:     "09:30",
+			WorkEnd:       "18:30",
+			CommuteMethod: "开车",
+			Habits:        []string{"喝水", "休息"},
+		},
+		WeatherResponse{
+			Now: WeatherNow{Text: "多云", High: "28", Low: "21", FeelsLike: "26"},
+		},
+		[]model.LifeTracePlan{{Title: "看电影", Type: "电影", TimeLabel: "周六 晚上", Reminder: true}},
+		[]model.LifeTraceCheckin{{Name: "喝水", Completed: true}},
+		[]model.LifeTraceTrace{{Title: "吃了牛肉饭", Mood: "满足", TimeLabel: "昨天"}},
+		lifeTraceAssistantRequest{
+			Message: "帮我安排今天下班后",
+			History: []lifeTraceAssistantMessage{
+				{Role: "user", Content: "我今天有点累"},
+				{Role: "assistant", Content: "晚上安排轻一点"},
+			},
+		},
+	)
+
+	for _, want := range []string{"Life Trace 生活上下文", "今日天气", "未完成计划", "最近生活踪迹", "用户当前请求", "帮我安排今天下班后"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("expected prompt to contain %q, got %s", want, prompt)
+		}
+	}
+	if !strings.Contains(prompt, "喝水：已完成") {
+		t.Fatalf("expected checkin status in prompt, got %s", prompt)
+	}
+}
+
+func TestBuildLifeTraceAssistantPromptHandlesReminderBriefly(t *testing.T) {
+	prompt := buildLifeTraceAssistantPrompt(
+		model.LifeTraceSettings{City: "杭州", CommuteMethod: "开车"},
+		WeatherResponse{},
+		nil,
+		nil,
+		nil,
+		lifeTraceAssistantRequest{Message: "晚上提醒我记得预约取车"},
+	)
+
+	for _, want := range []string{"提醒/记事", "60 字以内", "晚上提醒我记得预约取车"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("expected prompt to contain %q, got %s", want, prompt)
+		}
+	}
+}
+
+func TestLifeTraceAssistantSystemPromptIsNotGenericChat(t *testing.T) {
+	prompt := lifeTraceAssistantSystemPrompt()
+
+	if !strings.Contains(prompt, "生活助理") || !strings.Contains(prompt, "不是通用聊天 AI") {
+		t.Fatalf("expected assistant identity guard, got %s", prompt)
+	}
+	if !strings.Contains(prompt, "提醒我") || !strings.Contains(prompt, "不要把所有天气、打卡、习惯都复述") {
+		t.Fatalf("expected reminder and brevity guard, got %s", prompt)
+	}
+}
+
 func TestReadLifeTraceAIConfigPrefersOpenAIEnv(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "test-openai-key")
 	t.Setenv("OPENAI_API_BASE_URL", "https://api.openai.com/v1/")

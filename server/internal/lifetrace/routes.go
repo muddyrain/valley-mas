@@ -11,6 +11,7 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 		ai.Use(auth)
 		{
 			ai.POST("/today-advice", handler.GenerateTodayAdvice)
+			ai.POST("/assistant/stream", handler.StreamAssistant)
 		}
 
 		plans := group.Group("/plans")

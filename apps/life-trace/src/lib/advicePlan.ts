@@ -51,5 +51,8 @@ export function hasAdvicePlan(plans: { note: string }[], adviceId: string) {
 }
 
 export function getVisiblePlanNote(note: string) {
-  return note.replace(/\s*#advice:[\w-]+/g, '').trim();
+  return note
+    .replace(/\s*#advice:[\w-]+/g, '')
+    .replace(/\s*#assistant-reminder:[^\s。；;，,]+/g, '')
+    .trim();
 }

@@ -4,7 +4,7 @@ type ApiEnvelope<T> = {
   data?: T;
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 export async function apiRequest<T>(path: string, token: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);

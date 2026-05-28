@@ -1,4 +1,5 @@
 import {
+  Bot,
   CalendarDays,
   Check,
   Clock,
@@ -8,9 +9,11 @@ import {
   Plus,
   Send,
   Sparkles,
+  UserRound,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { generateTodayAdvice } from '@/api/advice';
+import { type LifeAssistantMessage, streamLifeAssistant } from '@/api/assistant';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { ImageAnalysisDrawer } from '@/components/ImageAnalysisDrawer';
@@ -19,16 +22,86 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { aiQuickActions, suggestedPrompts } from '@/data/mock';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
-import { getLocalISODate } from '@/lib/planSchedule';
+import { buildPlanSchedule, getLocalISODate } from '@/lib/planSchedule';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { AdvicePayload } from '@/types';
+import type { AdvicePayload, NewPlanInput } from '@/types';
 
 type AiResult = {
   title: string;
   detail: string;
   tone: 'ai' | 'plan' | 'trace' | 'health' | 'alert';
 };
+
+type AssistantMessage = LifeAssistantMessage & {
+  id: string;
+};
+
+type AssistantReminderDraft = {
+  title: string;
+  scheduledTime: string;
+  dateOption: '今天' | '明天';
+};
+
+const reminderIntentPattern = /(提醒我|提醒|记得|别忘|预约|叫我|提示我)/;
+
+function normalizeClockTime(raw: string) {
+  const match = raw.match(/([01]?\d|2[0-3])[:：点时]([0-5]\d)?/);
+  if (!match) {
+    return '';
+  }
+
+  const hour = match[1].padStart(2, '0');
+  const minute = (match[2] ?? '00').padStart(2, '0');
+  return `${hour}:${minute}`;
+}
+
+function buildAssistantReminderDraft(message: string): AssistantReminderDraft | null {
+  const text = message.trim();
+  if (!reminderIntentPattern.test(text)) {
+    return null;
+  }
+
+  const dateOption = /明天|明早|明晚/.test(text) ? '明天' : '今天';
+  const scheduledTime =
+    normalizeClockTime(text) ||
+    (/早上|上午/.test(text)
+      ? '09:00'
+      : /中午/.test(text)
+        ? '12:00'
+        : /下午/.test(text)
+          ? '15:00'
+          : /下班/.test(text)
+            ? '18:30'
+            : '20:00');
+  const title =
+    text
+      .replace(/今天|今晚|晚上|明天|明早|明晚|早上|上午|中午|下午|下班后?/g, '')
+      .replace(/([01]?\d|2[0-3])[:：点时]([0-5]\d)?/g, '')
+      .replace(/提醒我|提醒|记得|别忘了?|叫我|提示我/g, '')
+      .replace(/[，。,.、\s]+/g, '')
+      .trim() || '生活提醒';
+
+  return {
+    title,
+    scheduledTime,
+    dateOption,
+  };
+}
+
+function createPlanFromAssistantReminder(draft: AssistantReminderDraft): NewPlanInput {
+  return {
+    title: draft.title,
+    type: '普通事项',
+    ...buildPlanSchedule({
+      dateOption: draft.dateOption,
+      time: draft.scheduledTime,
+    }),
+    reminder: true,
+    source: 'ai_advice',
+    note: `来自生活助理提醒：${draft.title}。#assistant-reminder:${draft.dateOption}-${draft.scheduledTime}-${draft.title}`,
+  };
+}
 
 export function AiPage() {
   const plans = useLifeTraceStore((state) => state.plans);
@@ -51,6 +124,10 @@ export function AiPage() {
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false);
   const [result, setResult] = useState<AiResult | null>(null);
   const [adviceCards, setAdviceCards] = useState<AdvicePayload[]>([]);
+  const [assistantInput, setAssistantInput] = useState('');
+  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
+  const [assistantStreaming, setAssistantStreaming] = useState(false);
+  const [assistantModel, setAssistantModel] = useState('');
   const [quickActionLoading, setQuickActionLoading] = useState<string | null>(null);
   const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
 
@@ -150,6 +227,118 @@ export function AiPage() {
     });
   };
 
+  const handleAssistantSubmit = async (value = assistantInput) => {
+    const message = value.trim();
+    if (!message || assistantStreaming) {
+      return;
+    }
+
+    if (!token) {
+      setResult({
+        title: '请先登录',
+        detail: '登录后 Life Trace 才能读取你的计划、打卡和天气上下文。',
+        tone: 'alert',
+      });
+      return;
+    }
+
+    const history = assistantMessages
+      .filter((item) => item.content.trim())
+      .slice(-6)
+      .map(({ role, content }) => ({ role, content }));
+    const userMessage: AssistantMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: message,
+    };
+    const assistantId = `assistant-${Date.now()}`;
+    const assistantMessage: AssistantMessage = {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+    };
+
+    setAssistantInput('');
+    setAdviceCards([]);
+    setAssistantModel('');
+    setAssistantStreaming(true);
+    setAssistantMessages((items) => [...items, userMessage, assistantMessage]);
+
+    let reply = '';
+    const reminderDraft = buildAssistantReminderDraft(message);
+    try {
+      await streamLifeAssistant(token, {
+        message,
+        history,
+        onMeta: (meta) => {
+          if (meta.model) {
+            setAssistantModel(meta.model);
+          }
+        },
+        onChunk: (chunk) => {
+          reply += chunk;
+          setAssistantMessages((items) =>
+            items.map((item) =>
+              item.id === assistantId ? { ...item, content: item.content + chunk } : item,
+            ),
+          );
+        },
+      });
+      setAssistantStreaming(false);
+      if (reminderDraft) {
+        setResult({
+          title: '正在创建提醒计划',
+          detail: `生活助理已回复，正在把「${reminderDraft.title}」加入计划。`,
+          tone: 'plan',
+        });
+        const existing = plans.some((plan) =>
+          plan.note.includes(
+            `#assistant-reminder:${reminderDraft.dateOption}-${reminderDraft.scheduledTime}-${reminderDraft.title}`,
+          ),
+        );
+        if (existing) {
+          setResult({
+            title: '提醒已在计划里',
+            detail: `「${reminderDraft.title}」已经存在，不会重复创建。`,
+            tone: 'plan',
+          });
+        } else {
+          const plan = await addPlan(createPlanFromAssistantReminder(reminderDraft));
+          setResult(
+            plan
+              ? {
+                  title: '已创建提醒计划',
+                  detail: `「${reminderDraft.title}」已加入计划，会在 ${plan.timeLabel} 提醒。`,
+                  tone: 'plan',
+                }
+              : {
+                  title: '提醒计划未保存',
+                  detail: '生活助理已回复，但计划保存失败，请稍后再试。',
+                  tone: 'alert',
+                },
+          );
+        }
+      }
+      addAiAction('和生活助理规划了一次安排');
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : '生活助理暂时没有回应';
+      setAssistantMessages((items) =>
+        items.map((item) =>
+          item.id === assistantId
+            ? {
+                ...item,
+                content:
+                  reply.trim() ||
+                  `刚才没有连接上生活助理。你可以稍后重试，我会继续基于天气、计划和打卡来安排。(${detail})`,
+              }
+            : item,
+        ),
+      );
+    } finally {
+      setAssistantStreaming(false);
+    }
+  };
+
   const handleAddAdvicePlan = async (item: AdvicePayload) => {
     if (hasAdvicePlan(plans, item.id)) {
       setResult({
@@ -247,24 +436,91 @@ export function AiPage() {
       </section>
 
       <Card className="p-4">
-        <div className="min-h-24 text-lg text-muted-foreground">
-          帮我基于今日天气、计划和打卡安排一下今天...
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">生活助理</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              会结合天气、计划、打卡和最近踪迹回答
+            </p>
+          </div>
+          {assistantStreaming ? (
+            <span className="inline-flex items-center gap-2 text-xs text-life-ai">
+              <ActionLoadingIcon className="size-3.5" />
+              正在安排
+            </span>
+          ) : null}
         </div>
-        <div className="flex justify-end">
+        <textarea
+          className="min-h-24 w-full resize-none rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-base leading-7 outline-none transition placeholder:text-muted-foreground focus:border-life-ai/60 focus:bg-secondary"
+          value={assistantInput}
+          disabled={assistantStreaming}
+          placeholder="例如：帮我安排今天下班后的时间，顺便提醒我该注意什么"
+          onChange={(event) => setAssistantInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              void handleAssistantSubmit();
+            }
+          }}
+        />
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate text-xs text-muted-foreground">
+            {assistantModel ? `当前由生活助理生成` : '输入后会流式生成，不用等待整段返回'}
+          </p>
           <button
             type="button"
-            className="grid size-12 cursor-pointer place-items-center rounded-2xl bg-life-ai text-background transition hover:bg-life-ai/90 disabled:cursor-default disabled:opacity-70"
-            disabled={Boolean(quickActionLoading)}
-            onClick={() => void handleQuickAction('生成今日建议')}
+            className="grid size-12 cursor-pointer place-items-center rounded-2xl bg-life-ai text-background transition hover:bg-life-ai/90 disabled:cursor-default disabled:opacity-80"
+            disabled={assistantStreaming || !assistantInput.trim()}
+            onClick={() => void handleAssistantSubmit()}
           >
-            {quickActionLoading === '生成今日建议' ? (
-              <ActionLoadingIcon />
+            {assistantStreaming ? (
+              <ActionLoadingIcon className="text-background" />
             ) : (
               <Send className="size-5" />
             )}
           </button>
         </div>
       </Card>
+
+      {assistantMessages.length > 0 ? (
+        <section className="space-y-3">
+          {assistantMessages.map((message) => {
+            const isUser = message.role === 'user';
+            const Icon = isUser ? UserRound : Bot;
+
+            return (
+              <Card
+                key={message.id}
+                className={`p-4 ${isUser ? 'border-border bg-card/80' : 'border-life-ai/20 bg-life-ai/5'}`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`grid size-9 shrink-0 place-items-center rounded-full ${
+                      isUser ? 'bg-secondary text-foreground' : 'bg-life-ai/15 text-life-ai'
+                    }`}
+                  >
+                    <Icon className="size-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      {isUser ? '你' : 'Life Trace 生活助理'}
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
+                      {message.content ||
+                        (assistantStreaming ? '正在结合今日状态整理安排...' : '暂无回复')}
+                      {!isUser &&
+                      assistantStreaming &&
+                      message.id === assistantMessages[assistantMessages.length - 1]?.id ? (
+                        <span className="ml-1 inline-block h-4 w-1 animate-pulse rounded-full bg-life-ai align-[-2px]" />
+                      ) : null}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </section>
+      ) : null}
 
       {result ? (
         <Card className="border-life-ai/20 p-5">
@@ -330,7 +586,7 @@ export function AiPage() {
               <button
                 type="button"
                 key={action.label}
-                className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-3 text-sm font-semibold transition hover:bg-secondary disabled:cursor-default disabled:opacity-70"
+                className="flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-4 py-3 text-sm font-semibold transition hover:bg-secondary disabled:cursor-default disabled:opacity-70"
                 disabled={Boolean(quickActionLoading)}
                 onClick={() => void handleQuickAction(action.label)}
               >
@@ -356,15 +612,11 @@ export function AiPage() {
               <button
                 key={prompt.title}
                 type="button"
-                className="flex w-full items-center gap-4 rounded-[1.25rem] border border-border bg-card p-4 text-left transition hover:bg-secondary"
+                className="flex w-full cursor-pointer items-center gap-4 rounded-[1.25rem] border border-border bg-card p-4 text-left transition hover:bg-secondary"
                 onClick={() =>
-                  void handleQuickAction(
-                    prompt.type === '计划'
-                      ? '创建计划'
-                      : prompt.type === '回顾'
-                        ? '每周回顾'
-                        : '分析图片',
-                  )
+                  prompt.type === '计划'
+                    ? setDrawerOpen(true)
+                    : void handleAssistantSubmit(prompt.title)
                 }
               >
                 <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
