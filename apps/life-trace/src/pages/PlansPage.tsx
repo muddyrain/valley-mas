@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
+import { PlanDetailDrawer } from '@/components/PlanDetailDrawer';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -63,6 +64,7 @@ export function PlansPage() {
   const pageRef = useRef<HTMLDivElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<PlanFilter>('all');
   const [deleteTarget, setDeleteTarget] = useState<Plan | null>(null);
   const filteredPlans = filterPlans(plans, activeFilter);
@@ -74,6 +76,9 @@ export function PlansPage() {
     { title: '今日计划', plans: filteredGroups.todayPlans },
     { title: '其他计划', plans: filteredGroups.otherPlans },
   ].filter((group) => group.plans.length > 0);
+  const selectedPlan = selectedPlanId
+    ? (plans.find((plan) => plan.id === selectedPlanId) ?? null)
+    : null;
   const deletePending = deleteTarget ? Boolean(planDeletingById[deleteTarget.id]) : false;
 
   useGSAP(
@@ -120,11 +125,21 @@ export function PlansPage() {
         key={plan.id}
         className={cn(
           'relative overflow-hidden border-border/80 transition-all duration-300 hover:border-foreground/20',
+          'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           plan.completed && 'opacity-70',
           completing && 'border-life-trace/40 shadow-[0_18px_60px_rgba(16,185,129,0.12)]',
           deleting && 'border-life-alert/40 shadow-[0_18px_60px_rgba(249,115,22,0.12)]',
         )}
+        role="button"
+        tabIndex={0}
         data-plan-card
+        onClick={() => setSelectedPlanId(plan.id)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            setSelectedPlanId(plan.id);
+          }
+        }}
       >
         {busy ? (
           <div
@@ -184,7 +199,10 @@ export function PlansPage() {
                 type="button"
                 variant={plan.completed ? 'secondary' : 'outline'}
                 size="sm"
-                onClick={() => void completePlan(plan.id)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void completePlan(plan.id);
+                }}
                 disabled={busy}
               >
                 {completing ? (
@@ -204,7 +222,8 @@ export function PlansPage() {
                   className="px-3 text-muted-foreground"
                   aria-label={`编辑${plan.title}`}
                   disabled={busy}
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.stopPropagation();
                     setEditingPlan(plan);
                     setDrawerOpen(true);
                   }}
@@ -220,7 +239,10 @@ export function PlansPage() {
                 className="px-3 text-muted-foreground"
                 aria-label={`删除${plan.title}`}
                 disabled={busy}
-                onClick={() => setDeleteTarget(plan)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setDeleteTarget(plan);
+                }}
               >
                 {deleting ? <ActionLoadingIcon tone="alert" /> : <Trash2 className="size-4" />}
                 {deleting ? '删除中' : null}
@@ -319,6 +341,23 @@ export function PlansPage() {
           if (!nextOpen) {
             setEditingPlan(null);
           }
+        }}
+      />
+      <PlanDetailDrawer
+        open={Boolean(selectedPlan)}
+        plan={selectedPlan}
+        completing={selectedPlan ? Boolean(planCompletingById[selectedPlan.id]) : false}
+        deleting={selectedPlan ? Boolean(planDeletingById[selectedPlan.id]) : false}
+        onClose={() => setSelectedPlanId(null)}
+        onComplete={(plan) => void completePlan(plan.id)}
+        onEdit={(plan) => {
+          setSelectedPlanId(null);
+          setEditingPlan(plan);
+          setDrawerOpen(true);
+        }}
+        onDelete={(plan) => {
+          setSelectedPlanId(null);
+          setDeleteTarget(plan);
         }}
       />
       <ConfirmDialog
