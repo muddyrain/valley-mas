@@ -80,3 +80,50 @@ func TestCreatePlanRejectsPartialStructuredSchedule(t *testing.T) {
 		t.Fatalf("expected validation failure, got %+v", payload)
 	}
 }
+
+func TestUpdatePlanPersistsEditableFields(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+
+	createBody := bytes.NewBufferString(`{
+		"title": "晚上预约取车",
+		"type": "普通事项",
+		"timeLabel": "明天 18:00",
+		"scheduledDate": "2026-05-29",
+		"scheduledTime": "18:00",
+		"timezone": "Asia/Shanghai",
+		"reminder": true,
+		"note": "提前联系门店",
+		"source": "manual"
+	}`)
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/plans", createBody)
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp := httptest.NewRecorder()
+	router.ServeHTTP(createResp, createReq)
+	created := decodeTracePayload(t, createResp)["data"].(map[string]interface{})
+	planID := created["id"].(string)
+
+	updateBody := bytes.NewBufferString(`{
+		"title": "改到晚上取车",
+		"type": "普通事项",
+		"timeLabel": "明天 19:30",
+		"scheduledDate": "2026-05-29",
+		"scheduledTime": "19:30",
+		"timezone": "Asia/Shanghai",
+		"reminder": false,
+		"location": "城西门店",
+		"note": "带身份证",
+		"source": "manual"
+	}`)
+	updateReq := httptest.NewRequest(http.MethodPatch, "/api/v1/life-trace/plans/"+planID, updateBody)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp := httptest.NewRecorder()
+	router.ServeHTTP(updateResp, updateReq)
+
+	updated := decodeTracePayload(t, updateResp)["data"].(map[string]interface{})
+	if updated["title"] != "改到晚上取车" || updated["scheduledTime"] != "19:30" {
+		t.Fatalf("expected editable fields to update, got %+v", updated)
+	}
+	if updated["reminder"] != false || updated["location"] != "城西门店" {
+		t.Fatalf("expected reminder and location to update, got %+v", updated)
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"valley-server/internal/model"
 )
 
 func TestGenerateTodayAdviceRequiresAIConfig(t *testing.T) {
@@ -59,6 +60,31 @@ func TestParseTodayAdviceAIResponseNormalizesItems(t *testing.T) {
 	}
 }
 
+func TestParseTodayAdviceAIResponseAcceptsSlimItems(t *testing.T) {
+	raw := `{
+		"summary": "今天先安排通勤和补水。",
+		"items": [
+			{"id": "wear", "detail": "外套轻薄即可"},
+			{"id": "skin", "detail": "午间注意补水"}
+		]
+	}`
+
+	parsed, err := parseTodayAdviceAIResponse(raw)
+	if err != nil {
+		t.Fatalf("parse response: %v", err)
+	}
+
+	if len(parsed.Items) != 6 {
+		t.Fatalf("expected 6 normalized items, got %+v", parsed.Items)
+	}
+	if parsed.Items[0].Title != "穿衣" || parsed.Items[0].Tone != "plan" {
+		t.Fatalf("expected server-filled title and tone, got %+v", parsed.Items[0])
+	}
+	if parsed.Items[1].Detail != "午间注意补水" {
+		t.Fatalf("expected slim detail to be kept, got %+v", parsed.Items[1])
+	}
+}
+
 func TestReadLifeTraceArkTextConfigValidatesModel(t *testing.T) {
 	t.Setenv("ARK_API_KEY", "test-key")
 	t.Setenv("ARK_TEXT_MODEL", "not-endpoint")
@@ -67,6 +93,23 @@ func TestReadLifeTraceArkTextConfigValidatesModel(t *testing.T) {
 
 	if !strings.Contains(errMsg, "ARK_TEXT_MODEL") {
 		t.Fatalf("expected model validation error, got %q", errMsg)
+	}
+}
+
+func TestBuildTodayAdvicePromptAsksForSlimItems(t *testing.T) {
+	prompt := buildTodayAdvicePrompt(model.LifeTraceSettings{
+		City:          "上海",
+		WorkStart:     "09:30",
+		WorkEnd:       "18:30",
+		CommuteMethod: "地铁",
+		Habits:        []string{"喝水"},
+	}, WeatherResponse{}, nil)
+
+	if !strings.Contains(prompt, `"items":[{"id":"wear","detail"`) {
+		t.Fatalf("expected slim item schema, got %s", prompt)
+	}
+	if !strings.Contains(prompt, "不要输出 title 和 tone") {
+		t.Fatalf("expected prompt to keep title and tone server-side, got %s", prompt)
 	}
 }
 

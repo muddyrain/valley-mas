@@ -1,4 +1,4 @@
-import { Bell, BellOff, Check, Plus, Trash2 } from 'lucide-react';
+import { Bell, BellOff, Check, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
@@ -54,6 +54,7 @@ export function PlansPage() {
     plansError,
     plansLoading,
     planCreating,
+    planUpdatingById,
     planCompletingById,
     planDeletingById,
     completePlan,
@@ -61,6 +62,7 @@ export function PlansPage() {
   } = useLifeTraceStore();
   const pageRef = useRef<HTMLDivElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [activeFilter, setActiveFilter] = useState<PlanFilter>('all');
   const [deleteTarget, setDeleteTarget] = useState<Plan | null>(null);
   const filteredPlans = filterPlans(plans, activeFilter);
@@ -108,9 +110,10 @@ export function PlansPage() {
   const renderPlanCard = (plan: Plan) => {
     const { dateText, timeText } = splitPlanTimeLabel(plan.timeLabel);
     const ReminderIcon = plan.reminder ? Bell : BellOff;
+    const updating = Boolean(planUpdatingById[plan.id]);
     const completing = Boolean(planCompletingById[plan.id]);
     const deleting = Boolean(planDeletingById[plan.id]);
-    const busy = completing || deleting;
+    const busy = updating || completing || deleting;
 
     return (
       <Card
@@ -182,11 +185,34 @@ export function PlansPage() {
                 variant={plan.completed ? 'secondary' : 'outline'}
                 size="sm"
                 onClick={() => void completePlan(plan.id)}
-                disabled={plan.completed || busy}
+                disabled={busy}
               >
-                {completing ? <ActionLoadingIcon tone="trace" /> : <Check className="size-4" />}
-                {completing ? '完成中' : plan.completed ? '已完成' : '完成'}
+                {completing ? (
+                  <ActionLoadingIcon tone="trace" />
+                ) : plan.completed ? (
+                  <RotateCcw className="size-4" />
+                ) : (
+                  <Check className="size-4" />
+                )}
+                {completing ? '更新中' : plan.completed ? '取消完成' : '完成'}
               </Button>
+              {!plan.completed ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="px-3 text-muted-foreground"
+                  aria-label={`编辑${plan.title}`}
+                  disabled={busy}
+                  onClick={() => {
+                    setEditingPlan(plan);
+                    setDrawerOpen(true);
+                  }}
+                >
+                  {updating ? <ActionLoadingIcon /> : <Pencil className="size-4" />}
+                  {updating ? '保存中' : null}
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="ghost"
@@ -273,7 +299,10 @@ export function PlansPage() {
               variant="ai"
               className="fixed bottom-28 left-1/2 z-40 -translate-x-1/2 px-6"
               disabled={planCreating}
-              onClick={() => setDrawerOpen(true)}
+              onClick={() => {
+                setEditingPlan(null);
+                setDrawerOpen(true);
+              }}
             >
               {planCreating ? <ActionLoadingIcon /> : <Plus className="size-5" />}
               {planCreating ? '创建中' : '创建计划'}
@@ -282,7 +311,16 @@ export function PlansPage() {
           )
         : null}
 
-      <CreatePlanDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+      <CreatePlanDrawer
+        open={drawerOpen}
+        plan={editingPlan}
+        onOpenChange={(nextOpen) => {
+          setDrawerOpen(nextOpen);
+          if (!nextOpen) {
+            setEditingPlan(null);
+          }
+        }}
+      />
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="删除这个计划？"

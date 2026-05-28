@@ -18,6 +18,7 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 		{
 			plans.GET("", handler.ListPlans)
 			plans.POST("", handler.CreatePlan)
+			plans.PATCH("/:id", handler.UpdatePlan)
 			plans.PATCH("/:id/status", handler.UpdatePlanStatus)
 			plans.DELETE("/:id", handler.DeletePlan)
 		}

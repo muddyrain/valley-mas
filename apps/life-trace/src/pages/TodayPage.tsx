@@ -68,6 +68,43 @@ const adviceIconMap = {
   plan: CalendarDays,
 };
 
+const AI_ADVICE_CACHE_KEY = 'life-trace-ai-advice-cache';
+const AI_ADVICE_VISIBLE_LOADING_MS = 1200;
+
+type CachedAdvice = {
+  contextVersion: string;
+  list: AdvicePayload[];
+  cachedAt: number;
+};
+
+function readCachedAdvice(contextVersion?: string) {
+  try {
+    const raw = window.localStorage.getItem(AI_ADVICE_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const cached = JSON.parse(raw) as CachedAdvice;
+    if (!Array.isArray(cached.list)) {
+      return null;
+    }
+    if (contextVersion && cached.contextVersion !== contextVersion) {
+      return null;
+    }
+    return cached;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedAdvice(cached: CachedAdvice) {
+  try {
+    window.localStorage.setItem(AI_ADVICE_CACHE_KEY, JSON.stringify(cached));
+  } catch {
+    // Stored advice should never block the page.
+  }
+}
+
 const fallbackWeather: WeatherApiResponse = {
   source: 'mock',
   city: '上海',
@@ -133,11 +170,15 @@ export function TodayPage() {
     openPlanCount,
     planFingerprint,
   ].join('|');
-  const localAdvice = buildWeatherDrivenAdvice({ weather, settings, openPlanCount });
+  const localAdvice = settings.aiPersonalization
+    ? []
+    : buildWeatherDrivenAdvice({ weather, settings, openPlanCount });
   const advice = (remoteAdvice ?? localAdvice).map((item) => ({
     ...item,
     icon: adviceIconMap[item.id as keyof typeof adviceIconMap] ?? Sparkles,
   }));
+  const showAdviceSkeleton = settings.aiPersonalization && adviceLoading && !remoteAdvice;
+  const showAdviceEmpty = settings.aiPersonalization && !adviceLoading && !remoteAdvice;
   const brief = buildWeatherBrief(weather, settings);
   const nextReminder = getNextReminder(plans);
 
@@ -293,13 +334,36 @@ export function TodayPage() {
     }
 
     const controller = new AbortController();
-    void adviceContextVersion;
+    const cached = readCachedAdvice(adviceContextVersion) ?? readCachedAdvice();
+    if (cached) {
+      setRemoteAdvice(cached.list);
+    } else {
+      setRemoteAdvice(null);
+    }
+    setAdviceLoading(!cached);
+    const visibleLoadingTimer = cached
+      ? undefined
+      : window.setTimeout(() => setAdviceLoading(false), AI_ADVICE_VISIBLE_LOADING_MS);
+
     const timer = window.setTimeout(() => {
-      setAdviceLoading(true);
+      if (!cached) {
+        setAdviceLoading(true);
+      }
 
       generateTodayAdvice(token, { signal: controller.signal })
-        .then((resp) => setRemoteAdvice(resp.list))
-        .catch(() => setRemoteAdvice(null))
+        .then((resp) => {
+          setRemoteAdvice(resp.list);
+          writeCachedAdvice({
+            contextVersion: adviceContextVersion,
+            list: resp.list,
+            cachedAt: Date.now(),
+          });
+        })
+        .catch(() => {
+          if (!cached) {
+            setRemoteAdvice(null);
+          }
+        })
         .finally(() => {
           if (!controller.signal.aborted) {
             setAdviceLoading(false);
@@ -308,6 +372,9 @@ export function TodayPage() {
     }, 250);
 
     return () => {
+      if (visibleLoadingTimer) {
+        window.clearTimeout(visibleLoadingTimer);
+      }
       window.clearTimeout(timer);
       controller.abort();
     };
@@ -550,13 +617,39 @@ export function TodayPage() {
           <h2 className="text-xl font-semibold tracking-tight">今日建议</h2>
           <Badge
             tone={remoteAdvice ? 'ai' : 'default'}
-            className="min-w-[86px] justify-center gap-1.5"
+            className="min-w-[92px] justify-center gap-1.5"
           >
-            {adviceLoading ? <ActionLoadingIcon className="size-3.5" /> : null}
-            {adviceLoading ? '正在更新' : remoteAdvice ? 'AI 建议' : '基础建议'}
+            {adviceLoading && !remoteAdvice ? <ActionLoadingIcon className="size-3.5" /> : null}
+            {remoteAdvice
+              ? 'AI 建议'
+              : adviceLoading
+                ? '生成中'
+                : settings.aiPersonalization
+                  ? '等待 AI'
+                  : '基础建议'}
           </Badge>
         </div>
         <div className="grid grid-cols-2 gap-3">
+          {showAdviceSkeleton
+            ? Array.from({ length: 6 }).map((_, index) => (
+                <Card
+                  key={`advice-skeleton-${index}`}
+                  className="relative h-28 overflow-hidden border-border/70 p-4"
+                >
+                  <div className="flex items-center gap-2 pr-10">
+                    <div className="size-8 shrink-0 animate-pulse rounded-xl bg-secondary" />
+                    <div className="h-4 w-16 animate-pulse rounded-full bg-secondary" />
+                  </div>
+                  <div className="mt-4 h-3 w-full animate-pulse rounded-full bg-secondary" />
+                  <div className="mt-2 h-3 w-3/4 animate-pulse rounded-full bg-secondary" />
+                </Card>
+              ))
+            : null}
+          {showAdviceEmpty ? (
+            <Card className="col-span-2 p-5 text-sm leading-6 text-muted-foreground">
+              AI 建议正在后台生成，完成后会自动替换到这里。为了避免混淆，未完成前不会显示临时建议。
+            </Card>
+          ) : null}
           {advice.map((item) => {
             const Icon = item.icon;
             const tone = adviceToneClasses[item.tone];

@@ -12,6 +12,13 @@ export function createPlan(token: string, input: NewPlanInput) {
   });
 }
 
+export function updatePlan(token: string, id: string, input: NewPlanInput) {
+  return apiRequest<Plan>(`/life-trace/plans/${id}`, token, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
 export function updatePlanStatus(token: string, id: string, completed: boolean) {
   return apiRequest<Plan>(`/life-trace/plans/${id}/status`, token, {
     method: 'PATCH',

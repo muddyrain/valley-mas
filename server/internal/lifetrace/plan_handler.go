@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -191,6 +192,7 @@ func (h *Handler) CreatePlan(c *gin.Context) {
 	}
 
 	if err := database.GetDB().Create(&plan).Error; err != nil {
+		logger.Log.WithField("error", err).Error("LifeTrace CreatePlan insert failed")
 		fail(c, http.StatusInternalServerError, "创建计划失败")
 		return
 	}
@@ -226,6 +228,73 @@ func (h *Handler) UpdatePlanStatus(c *gin.Context) {
 	}
 
 	if err := database.GetDB().Model(&plan).Updates(updates).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "更新计划失败")
+		return
+	}
+
+	if err := database.GetDB().First(&plan, "id = ? AND user_id = ?", plan.ID, userID).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "读取计划失败")
+		return
+	}
+
+	success(c, plan)
+}
+
+func (h *Handler) UpdatePlan(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	plan, found := findPlan(c.Param("id"), userID)
+	if !found {
+		fail(c, http.StatusNotFound, "计划不存在")
+		return
+	}
+
+	var req createPlanRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+
+	title := strings.TrimSpace(req.Title)
+	timeLabel := strings.TrimSpace(req.TimeLabel)
+	if title == "" || timeLabel == "" {
+		fail(c, http.StatusBadRequest, "计划标题和时间不能为空")
+		return
+	}
+
+	scheduledDate, scheduledTime, timezone, ok := normalizePlanSchedule(
+		req.ScheduledDate,
+		req.ScheduledTime,
+		req.Timezone,
+	)
+	if !ok {
+		fail(c, http.StatusBadRequest, "计划时间格式错误")
+		return
+	}
+
+	updates := map[string]interface{}{
+		"title":          title,
+		"type":           normalizePlanType(req.Type),
+		"time_label":     timeLabel,
+		"scheduled_date": scheduledDate,
+		"scheduled_time": scheduledTime,
+		"timezone":       timezone,
+		"reminder":       req.Reminder,
+		"image_url":      strings.TrimSpace(req.ImageURL),
+		"location":       strings.TrimSpace(req.Location),
+		"note":           strings.TrimSpace(req.Note),
+		"source":         normalizePlanSource(req.Source),
+	}
+	if updates["note"] == "" {
+		updates["note"] = "由 Life Trace 创建的新生活计划。"
+	}
+
+	if err := database.GetDB().Model(&plan).Updates(updates).Error; err != nil {
+		logger.Log.WithField("error", err).Error("LifeTrace UpdatePlan failed")
 		fail(c, http.StatusInternalServerError, "更新计划失败")
 		return
 	}

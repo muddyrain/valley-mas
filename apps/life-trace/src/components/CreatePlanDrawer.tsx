@@ -2,10 +2,16 @@ import { X } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { Button } from '@/components/ui/button';
-import { buildPlanSchedule, type PlanDateOption } from '@/lib/planSchedule';
+import { splitPlanTimeLabel } from '@/lib/planReminder';
+import {
+  buildPlanSchedule,
+  getLocalISODate,
+  type PlanDateOption,
+  resolveScheduledDate,
+} from '@/lib/planSchedule';
 import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { NewPlanInput, PlanType } from '@/types';
+import type { NewPlanInput, Plan, PlanType } from '@/types';
 
 const planTypes: PlanType[] = ['电影', '吃饭', '运动', '阅读', '聚会', '普通事项'];
 const dateOptions = [
@@ -33,29 +39,88 @@ type FormErrors = Partial<Record<'title' | 'date' | 'time', string>>;
 type CreatePlanDrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  plan?: Plan | null;
 };
 
-export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) {
+function addDays(base: Date, days: number) {
+  const date = new Date(base);
+  date.setDate(base.getDate() + days);
+  return date;
+}
+
+function getDateOptionFromPlan(plan: Plan, now = new Date()): DateOptionValue {
+  if (!plan.scheduledDate) {
+    const { dateText } = splitPlanTimeLabel(plan.timeLabel);
+    return dateOptions.some((option) => option.value === dateText)
+      ? (dateText as DateOptionValue)
+      : 'custom';
+  }
+
+  const today = getLocalISODate(now);
+  const tomorrow = getLocalISODate(addDays(now, 1));
+  if (plan.scheduledDate === today) {
+    return '今天';
+  }
+  if (plan.scheduledDate === tomorrow) {
+    return '明天';
+  }
+
+  const matched = dateOptions.find(
+    (option) =>
+      option.value !== 'custom' &&
+      resolveScheduledDate(option.value, '', now) === plan.scheduledDate,
+  );
+  return matched ? matched.value : 'custom';
+}
+
+export function CreatePlanDrawer({ open, onOpenChange, plan }: CreatePlanDrawerProps) {
   const addPlan = useLifeTraceStore((state) => state.addPlan);
+  const editPlan = useLifeTraceStore((state) => state.editPlan);
   const plansError = useLifeTraceStore((state) => state.plansError);
   const planCreating = useLifeTraceStore((state) => state.planCreating);
+  const planUpdating = useLifeTraceStore((state) =>
+    plan ? Boolean(state.planUpdatingById[plan.id]) : false,
+  );
   const [form, setForm] = useState<NewPlanInput>(defaultForm);
   const [dateOption, setDateOption] = useState<DateOptionValue>('今天');
   const [customDate, setCustomDate] = useState('');
   const [time, setTime] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
+  const editing = Boolean(plan);
+  const submitting = editing ? planUpdating : planCreating;
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    setForm(defaultForm);
-    setDateOption('今天');
-    setCustomDate('');
-    setTime('');
+    if (plan) {
+      const nextDateOption = getDateOptionFromPlan(plan);
+      const { timeText } = splitPlanTimeLabel(plan.timeLabel);
+      setForm({
+        title: plan.title,
+        type: plan.type,
+        timeLabel: plan.timeLabel,
+        scheduledDate: plan.scheduledDate,
+        scheduledTime: plan.scheduledTime,
+        timezone: plan.timezone,
+        reminder: plan.reminder,
+        imageUrl: plan.imageUrl ?? '',
+        location: plan.location ?? '',
+        note: plan.note,
+        source: plan.source ?? 'manual',
+      });
+      setDateOption(nextDateOption);
+      setCustomDate(nextDateOption === 'custom' ? (plan.scheduledDate ?? '') : '');
+      setTime(plan.scheduledTime || timeText);
+    } else {
+      setForm(defaultForm);
+      setDateOption('今天');
+      setCustomDate('');
+      setTime('');
+    }
     setErrors({});
-  }, [open]);
+  }, [open, plan]);
 
   const updateField = <K extends keyof NewPlanInput>(key: K, value: NewPlanInput[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -82,7 +147,7 @@ export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) 
 
     const schedule = buildPlanSchedule({ dateOption, customDate, time });
 
-    const plan = await addPlan({
+    const payload = {
       ...form,
       source: form.source ?? 'manual',
       title: form.title.trim(),
@@ -90,9 +155,11 @@ export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) 
       imageUrl: form.imageUrl?.trim() || undefined,
       location: form.location?.trim() || undefined,
       note: form.note.trim() || '由 Life Trace 创建的新生活计划。',
-    });
+    };
 
-    if (plan) {
+    const savedPlan = plan ? await editPlan(plan.id, payload) : await addPlan(payload);
+
+    if (savedPlan) {
       onOpenChange(false);
     }
   };
@@ -123,8 +190,10 @@ export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) 
       >
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold">创建计划</h2>
-            <p className="mt-1 text-sm text-muted-foreground">先计划生活，完成后留下踪迹。</p>
+            <h2 className="text-xl font-semibold">{editing ? '编辑计划' : '创建计划'}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {editing ? '调整时间、地点和提醒，让计划更准确。' : '先计划生活，完成后留下踪迹。'}
+            </p>
           </div>
           <Button type="button" variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
             <X className="size-5" />
@@ -293,14 +362,14 @@ export function CreatePlanDrawer({ open, onOpenChange }: CreatePlanDrawerProps) 
             <Button
               type="button"
               variant="secondary"
-              disabled={planCreating}
+              disabled={submitting}
               onClick={() => onOpenChange(false)}
             >
               取消
             </Button>
-            <Button type="submit" variant="ai" disabled={planCreating}>
-              {planCreating ? <ActionLoadingIcon /> : null}
-              {planCreating ? '保存中' : '保存计划'}
+            <Button type="submit" variant="ai" disabled={submitting}>
+              {submitting ? <ActionLoadingIcon /> : null}
+              {submitting ? '保存中' : editing ? '保存修改' : '保存计划'}
             </Button>
           </div>
         </form>

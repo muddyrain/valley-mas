@@ -298,10 +298,9 @@ func buildTodayAdvicePrompt(
 
 	return strings.Join([]string{
 		"你是 Life Trace 的生活计划 AI，只输出一个 JSON 对象，不要 Markdown，不要解释。",
-		"JSON 格式：{\"summary\":\"一句今日总建议，40字以内\",\"items\":[{\"id\":\"wear\",\"title\":\"穿衣\",\"detail\":\"16字以内建议\",\"tone\":\"plan\"}]}",
+		"JSON 格式：{\"summary\":\"一句今日总建议，32字以内\",\"items\":[{\"id\":\"wear\",\"detail\":\"16字以内建议\"}]}",
 		"items 必须严格包含 6 项，id 顺序固定为 wear, skin, out, commute, health, plan。",
-		"title 必须分别是：穿衣、护肤、出门、通勤、健康、今日计划。",
-		"tone 只能从 weather, ai, plan, trace, health, alert 中选择。",
+		"不要输出 title 和 tone，服务端会自动补齐。",
 		"建议要结合天气、通勤、工作时间、习惯和未完成计划，使用简体中文，短促可执行。",
 		"",
 		"用户偏好：",
@@ -321,7 +320,7 @@ func callLifeTraceTextAI(
 	modelID string,
 	prompt string,
 ) (string, string, error) {
-	maxTokens := 420
+	maxTokens := 260
 	temperature := float32(0.35)
 	content := strings.TrimSpace(prompt)
 	resp, err := client.CreateChatCompletion(ctx, arkmodel.CreateChatCompletionRequest{
@@ -409,7 +408,7 @@ func callLifeTraceOpenAI(ctx context.Context, cfg lifeTraceAIConfig, prompt stri
 			{Role: "user", Content: prompt},
 		},
 		Temperature: 0.35,
-		MaxTokens:   420,
+		MaxTokens:   260,
 		ResponseFormat: &lifeTraceResponseFormat{
 			Type: "json_object",
 		},

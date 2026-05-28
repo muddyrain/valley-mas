@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { createPlan, deletePlan, listPlans, updatePlanStatus } from '@/api/plans';
+import { createPlan, deletePlan, listPlans, updatePlan, updatePlanStatus } from '@/api/plans';
 import { getSettings, saveSettings } from '@/api/settings';
 import { createTrace, deleteTrace, listTraces } from '@/api/traces';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -21,6 +21,7 @@ type LifeTraceState = {
   plansLoading: boolean;
   plansError: string;
   planCreating: boolean;
+  planUpdatingById: Record<string, boolean>;
   planCompletingById: Record<string, boolean>;
   planDeletingById: Record<string, boolean>;
   traces: Trace[];
@@ -39,6 +40,7 @@ type LifeTraceState = {
   loadPlans: () => Promise<void>;
   loadTraces: () => Promise<void>;
   addPlan: (input: NewPlanInput) => Promise<Plan | null>;
+  editPlan: (planId: string, input: NewPlanInput) => Promise<Plan | null>;
   addTrace: (input: NewTraceInput) => Promise<Trace | null>;
   completePlan: (planId: string) => Promise<void>;
   removePlan: (planId: string) => Promise<void>;
@@ -89,6 +91,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       plansLoading: false,
       plansError: '',
       planCreating: false,
+      planUpdatingById: {},
       planCompletingById: {},
       planDeletingById: {},
       traces: [],
@@ -245,6 +248,44 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           set({ planCreating: false });
         }
       },
+      editPlan: async (planId, input) => {
+        const token = getToken();
+        if (!token) {
+          set({ plansError: '请先登录后再编辑计划' });
+          return null;
+        }
+
+        if (get().planUpdatingById[planId]) {
+          return null;
+        }
+
+        set((state) => ({
+          planUpdatingById: { ...state.planUpdatingById, [planId]: true },
+          plansError: '',
+        }));
+        try {
+          const updated = await updatePlan(token, planId, {
+            ...input,
+            source: input.source ?? 'manual',
+          });
+          set((state) => ({
+            plans: state.plans.map((plan) => (plan.id === planId ? updated : plan)),
+            plansError: '',
+            aiActions: [
+              { id: createActionId(), title: `更新了「${updated.title}」计划`, timeLabel: '刚刚' },
+              ...getAiActions(state),
+            ],
+          }));
+          return updated;
+        } catch (error) {
+          set({ plansError: error instanceof Error ? error.message : '编辑计划失败' });
+          return null;
+        } finally {
+          set((state) => ({
+            planUpdatingById: { ...state.planUpdatingById, [planId]: false },
+          }));
+        }
+      },
       addTrace: async (input) => {
         const token = getToken();
         if (!token) {
@@ -272,7 +313,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         const target = get().plans.find((plan) => plan.id === planId);
         const token = getToken();
 
-        if (!target || target.completed || !token || get().planCompletingById[planId]) {
+        if (!target || !token || get().planCompletingById[planId]) {
           return;
         }
 
@@ -281,7 +322,24 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           plansError: '',
         }));
         try {
-          const updated = await updatePlanStatus(token, planId, true);
+          const nextCompleted = !target.completed;
+          const updated = await updatePlanStatus(token, planId, nextCompleted);
+          if (!nextCompleted) {
+            set((state) => ({
+              plans: state.plans.map((plan) => (plan.id === planId ? updated : plan)),
+              plansError: '',
+              aiActions: [
+                {
+                  id: createActionId(),
+                  title: `取消了「${updated.title}」完成状态`,
+                  timeLabel: '刚刚',
+                },
+                ...getAiActions(state),
+              ],
+            }));
+            return;
+          }
+
           const trace = await createTrace(token, createTraceFromPlan(updated));
           set((state) => ({
             plans: state.plans.map((plan) => (plan.id === planId ? updated : plan)),
@@ -373,6 +431,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           plansLoading,
           plansError,
           planCreating,
+          planUpdatingById,
           planCompletingById,
           planDeletingById,
           traces,
@@ -390,6 +449,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         void plansLoading;
         void plansError;
         void planCreating;
+        void planUpdatingById;
         void planCompletingById;
         void planDeletingById;
         void traces;
