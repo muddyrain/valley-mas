@@ -24,6 +24,7 @@ func setupTraceTestRouter(t *testing.T, userID model.Int64String) *gin.Engine {
 	}
 	if err := db.AutoMigrate(
 		&model.LifeTracePlan{},
+		&model.LifeTraceCheckin{},
 		&model.LifeTraceTrace{},
 		&model.LifeTraceSettings{},
 	); err != nil {

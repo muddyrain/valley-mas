@@ -31,6 +31,29 @@ type LifeTracePlan struct {
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
+type LifeTraceCheckin struct {
+	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID      Int64String    `gorm:"column:user_id;index;not null;uniqueIndex:uidx_life_trace_checkin_day_item" json:"userId"`
+	Date        string         `gorm:"size:20;not null;index;uniqueIndex:uidx_life_trace_checkin_day_item" json:"date"`
+	Name        string         `gorm:"size:80;not null;uniqueIndex:uidx_life_trace_checkin_day_item" json:"name"`
+	Completed   bool           `gorm:"default:false;index" json:"completed"`
+	CompletedAt *time.Time     `json:"completedAt,omitempty"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (checkin *LifeTraceCheckin) BeforeCreate(tx *gorm.DB) error {
+	if checkin.ID == 0 {
+		checkin.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
+func (LifeTraceCheckin) TableName() string {
+	return "life_trace_checkins"
+}
+
 func (p *LifeTracePlan) BeforeCreate(tx *gorm.DB) error {
 	if p.ID == 0 {
 		p.ID = Int64String(utils.GenerateID())

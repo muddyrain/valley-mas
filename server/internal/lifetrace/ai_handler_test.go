@@ -103,13 +103,32 @@ func TestBuildTodayAdvicePromptAsksForSlimItems(t *testing.T) {
 		WorkEnd:       "18:30",
 		CommuteMethod: "地铁",
 		Habits:        []string{"喝水"},
-	}, WeatherResponse{}, nil)
+	}, WeatherResponse{}, nil, nil)
 
 	if !strings.Contains(prompt, `"items":[{"id":"wear","detail"`) {
 		t.Fatalf("expected slim item schema, got %s", prompt)
 	}
 	if !strings.Contains(prompt, "不要输出 title 和 tone") {
 		t.Fatalf("expected prompt to keep title and tone server-side, got %s", prompt)
+	}
+}
+
+func TestBuildTodayAdvicePromptIncludesCheckins(t *testing.T) {
+	prompt := buildTodayAdvicePrompt(model.LifeTraceSettings{
+		City:          "上海",
+		WorkStart:     "09:30",
+		WorkEnd:       "18:30",
+		CommuteMethod: "开车",
+		Habits:        []string{"喝水", "运动"},
+	}, WeatherResponse{}, nil, []model.LifeTraceCheckin{
+		{Name: "喝水", Completed: true},
+	})
+
+	if !strings.Contains(prompt, "今日打卡") {
+		t.Fatalf("expected checkin section, got %s", prompt)
+	}
+	if !strings.Contains(prompt, "喝水：已完成") || !strings.Contains(prompt, "运动：未完成") {
+		t.Fatalf("expected checkin status lines, got %s", prompt)
 	}
 }
 

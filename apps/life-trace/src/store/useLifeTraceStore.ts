@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { listCheckins, toggleCheckin } from '@/api/checkins';
 import { createPlan, deletePlan, listPlans, updatePlan, updatePlanStatus } from '@/api/plans';
 import { getSettings, saveSettings } from '@/api/settings';
 import { createTrace, deleteTrace, listTraces } from '@/api/traces';
@@ -7,6 +8,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import type {
   AiAction,
   AppTab,
+  Checkin,
   NewPlanInput,
   NewTraceInput,
   Plan,
@@ -28,6 +30,12 @@ type LifeTraceState = {
   tracesLoaded: boolean;
   tracesLoading: boolean;
   tracesError: string;
+  checkins: Checkin[];
+  checkinsDate: string;
+  checkinsLoaded: boolean;
+  checkinsLoading: boolean;
+  checkinsError: string;
+  checkinTogglingByName: Record<string, boolean>;
   settings: UserSettings;
   settingsLoaded: boolean;
   settingsLoading: boolean;
@@ -39,6 +47,8 @@ type LifeTraceState = {
   loadSettings: () => Promise<void>;
   loadPlans: () => Promise<void>;
   loadTraces: () => Promise<void>;
+  loadCheckins: (date: string) => Promise<void>;
+  toggleHabitCheckin: (date: string, name: string, completed: boolean) => Promise<void>;
   addPlan: (input: NewPlanInput) => Promise<Plan | null>;
   editPlan: (planId: string, input: NewPlanInput) => Promise<Plan | null>;
   addTrace: (input: NewTraceInput) => Promise<Trace | null>;
@@ -98,6 +108,12 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       tracesLoaded: false,
       tracesLoading: false,
       tracesError: '',
+      checkins: [],
+      checkinsDate: '',
+      checkinsLoaded: false,
+      checkinsLoading: false,
+      checkinsError: '',
+      checkinTogglingByName: {},
       settings: defaultSettings,
       settingsLoaded: false,
       settingsLoading: false,
@@ -213,6 +229,81 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             tracesLoaded: true,
             tracesError: error instanceof Error ? error.message : '获取踪迹失败',
           });
+        }
+      },
+      loadCheckins: async (date) => {
+        const token = getToken();
+        if (!token) {
+          set({
+            checkins: [],
+            checkinsDate: date,
+            checkinsLoaded: true,
+            checkinsLoading: false,
+            checkinsError: '',
+          });
+          return;
+        }
+
+        set({ checkinsLoading: true, checkinsError: '', checkinsDate: date });
+        try {
+          const { list } = await listCheckins(token, date);
+          set({
+            checkins: list,
+            checkinsDate: date,
+            checkinsLoaded: true,
+            checkinsLoading: false,
+            checkinsError: '',
+          });
+        } catch (error) {
+          set({
+            checkinsLoading: false,
+            checkinsLoaded: true,
+            checkinsError: error instanceof Error ? error.message : '获取打卡失败',
+          });
+        }
+      },
+      toggleHabitCheckin: async (date, name, completed) => {
+        const token = getToken();
+        if (!token) {
+          set({ checkinsError: '请先登录后再打卡' });
+          return;
+        }
+        if (get().checkinTogglingByName[name]) {
+          return;
+        }
+
+        set((state) => ({
+          checkinTogglingByName: { ...state.checkinTogglingByName, [name]: true },
+          checkinsError: '',
+        }));
+        try {
+          const updated = await toggleCheckin(token, { date, name, completed });
+          set((state) => {
+            const exists = state.checkins.some((item) => item.name === name && item.date === date);
+            return {
+              checkinsDate: date,
+              checkins: exists
+                ? state.checkins.map((item) =>
+                    item.name === name && item.date === date ? updated : item,
+                  )
+                : [...state.checkins, updated],
+              checkinsError: '',
+              aiActions: [
+                {
+                  id: createActionId(),
+                  title: `${completed ? '完成' : '取消'}了「${name}」打卡`,
+                  timeLabel: '刚刚',
+                },
+                ...getAiActions(state),
+              ],
+            };
+          });
+        } catch (error) {
+          set({ checkinsError: error instanceof Error ? error.message : '保存打卡失败' });
+        } finally {
+          set((state) => ({
+            checkinTogglingByName: { ...state.checkinTogglingByName, [name]: false },
+          }));
         }
       },
       addPlan: async (input) => {
@@ -438,6 +529,12 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           tracesLoaded,
           tracesLoading,
           tracesError,
+          checkins,
+          checkinsDate,
+          checkinsLoaded,
+          checkinsLoading,
+          checkinsError,
+          checkinTogglingByName,
           settingsLoaded,
           settingsLoading,
           settingsSaving,
@@ -456,6 +553,12 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         void tracesLoaded;
         void tracesLoading;
         void tracesError;
+        void checkins;
+        void checkinsDate;
+        void checkinsLoaded;
+        void checkinsLoading;
+        void checkinsError;
+        void checkinTogglingByName;
         void settingsLoaded;
         void settingsLoading;
         void settingsSaving;

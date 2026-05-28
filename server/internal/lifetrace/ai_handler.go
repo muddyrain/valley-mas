@@ -113,8 +113,18 @@ func (h *Handler) GenerateTodayAdvice(c *gin.Context) {
 		return
 	}
 
+	today := time.Now().Format("2006-01-02")
+	var checkins []model.LifeTraceCheckin
+	if err := database.GetDB().
+		Where("user_id = ? AND date = ?", userID, today).
+		Order("created_at ASC").
+		Find(&checkins).Error; err != nil {
+		c.JSON(http.StatusOK, apiResponse{Code: http.StatusInternalServerError, Message: "获取打卡失败"})
+		return
+	}
+
 	weather := h.weather.Fetch(c.Request.Context(), settings.City, false)
-	prompt := buildTodayAdvicePrompt(settings, weather, plans)
+	prompt := buildTodayAdvicePrompt(settings, weather, plans, checkins)
 	cacheKey := buildTodayAdviceCacheKey(userID, aiCfg, prompt)
 	if cached, ok := getCachedTodayAdvice(cacheKey, time.Now()); ok {
 		success(c, gin.H{
@@ -287,6 +297,7 @@ func buildTodayAdvicePrompt(
 	settings model.LifeTraceSettings,
 	weather WeatherResponse,
 	plans []model.LifeTracePlan,
+	checkins []model.LifeTraceCheckin,
 ) string {
 	planLines := make([]string, 0, len(plans))
 	for _, plan := range plans {
@@ -296,12 +307,14 @@ func buildTodayAdvicePrompt(
 		planLines = append(planLines, "- 暂无待完成计划")
 	}
 
+	checkinLines := buildTodayCheckinPromptLines(settings.Habits, checkins)
+
 	return strings.Join([]string{
 		"你是 Life Trace 的生活计划 AI，只输出一个 JSON 对象，不要 Markdown，不要解释。",
 		"JSON 格式：{\"summary\":\"一句今日总建议，32字以内\",\"items\":[{\"id\":\"wear\",\"detail\":\"16字以内建议\"}]}",
 		"items 必须严格包含 6 项，id 顺序固定为 wear, skin, out, commute, health, plan。",
 		"不要输出 title 和 tone，服务端会自动补齐。",
-		"建议要结合天气、通勤、工作时间、习惯和未完成计划，使用简体中文，短促可执行。",
+		"建议要结合天气、通勤、工作时间、习惯、今日打卡和未完成计划，使用简体中文，短促可执行。",
 		"",
 		"用户偏好：",
 		fmt.Sprintf("城市：%s；工作时间：%s-%s；通勤：%s；习惯：%s。", settings.City, settings.WorkStart, settings.WorkEnd, settings.CommuteMethod, strings.Join(settings.Habits, "、")),
@@ -309,9 +322,43 @@ func buildTodayAdvicePrompt(
 		"今日天气：",
 		fmt.Sprintf("天气：%s；气温：%s/%s；体感：%s；湿度：%s；风力：%s；降水：%s；紫外线：%s；空气：%s。", weather.Now.Text, weather.Now.High, weather.Now.Low, weather.Now.FeelsLike, weather.Now.Humidity, weather.Now.WindScale, weather.Now.Precip, weather.Now.UVIndex, weather.Now.AirQuality),
 		"",
+		"今日打卡：",
+		strings.Join(checkinLines, "\n"),
+		"",
 		"未完成计划：",
 		strings.Join(planLines, "\n"),
 	}, "\n")
+}
+
+func buildTodayCheckinPromptLines(habits []string, checkins []model.LifeTraceCheckin) []string {
+	checkedByName := make(map[string]bool, len(checkins))
+	for _, checkin := range checkins {
+		name := strings.TrimSpace(checkin.Name)
+		if name == "" {
+			continue
+		}
+		checkedByName[name] = checkin.Completed
+	}
+
+	seen := map[string]bool{}
+	lines := make([]string, 0, len(habits))
+	for _, habit := range habits {
+		habit = strings.TrimSpace(habit)
+		if habit == "" || seen[habit] {
+			continue
+		}
+		seen[habit] = true
+		status := "未完成"
+		if checkedByName[habit] {
+			status = "已完成"
+		}
+		lines = append(lines, fmt.Sprintf("- %s：%s", habit, status))
+	}
+
+	if len(lines) == 0 {
+		lines = append(lines, "- 暂无打卡项")
+	}
+	return lines
 }
 
 func callLifeTraceTextAI(

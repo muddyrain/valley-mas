@@ -61,6 +61,17 @@ export type Trace = {
 
 export type NewTraceInput = Omit<Trace, 'id' | 'createdAt' | 'updatedAt'>;
 
+export type Checkin = {
+  id: string;
+  userId: string;
+  date: string;
+  name: string;
+  completed: boolean;
+  completedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type AiAction = {
   id: string;
   title: string;

@@ -6,6 +6,7 @@ import {
   Cloud,
   Droplets,
   Heart,
+  LoaderCircle,
   MapPin,
   Plus,
   RefreshCw,
@@ -26,6 +27,7 @@ import { useLifeTraceEntrance } from '@/hooks/useLifeTraceEntrance';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import { gsap, useGSAP } from '@/lib/gsap';
 import { getNextReminder } from '@/lib/planReminder';
+import { getLocalISODate } from '@/lib/planSchedule';
 import { buildWeatherBrief, buildWeatherDrivenAdvice } from '@/lib/weatherAdvice';
 import { readWeatherCache, writeWeatherCache } from '@/lib/weatherCache';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -69,10 +71,10 @@ const adviceIconMap = {
 };
 
 const AI_ADVICE_CACHE_KEY = 'life-trace-ai-advice-cache';
-const AI_ADVICE_VISIBLE_LOADING_MS = 1200;
 
 type CachedAdvice = {
   contextVersion: string;
+  summary?: string;
   list: AdvicePayload[];
   cachedAt: number;
 };
@@ -143,17 +145,26 @@ export function TodayPage() {
   const plans = useLifeTraceStore((state) => state.plans);
   const plansLoaded = useLifeTraceStore((state) => state.plansLoaded);
   const planCreating = useLifeTraceStore((state) => state.planCreating);
+  const checkins = useLifeTraceStore((state) => state.checkins);
+  const checkinsDate = useLifeTraceStore((state) => state.checkinsDate);
+  const checkinsLoading = useLifeTraceStore((state) => state.checkinsLoading);
+  const checkinsError = useLifeTraceStore((state) => state.checkinsError);
+  const checkinTogglingByName = useLifeTraceStore((state) => state.checkinTogglingByName);
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const setActiveTab = useLifeTraceStore((state) => state.setActiveTab);
   const addPlan = useLifeTraceStore((state) => state.addPlan);
+  const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
+  const toggleHabitCheckin = useLifeTraceStore((state) => state.toggleHabitCheckin);
   const token = useAuthStore((state) => state.token);
   const [weather, setWeather] = useState<WeatherApiResponse>({
     ...fallbackWeather,
     city: settings.city,
   });
+  const [weatherReady, setWeatherReady] = useState(false);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [remoteAdvice, setRemoteAdvice] = useState<AdvicePayload[] | null>(null);
+  const [remoteAdviceSummary, setRemoteAdviceSummary] = useState('');
   const [adviceLoading, setAdviceLoading] = useState(false);
   const [planToast, setPlanToast] = useState('');
   const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
@@ -162,25 +173,60 @@ export function TodayPage() {
     () => plans.map((plan) => `${plan.id}:${plan.completed}:${plan.updatedAt ?? ''}`).join('|'),
     [plans],
   );
+  const todayDate = useMemo(() => getLocalISODate(new Date()), []);
+  const todayLabel = useMemo(
+    () =>
+      new Intl.DateTimeFormat('zh-CN', {
+        month: 'numeric',
+        day: 'numeric',
+        weekday: 'short',
+      }).format(new Date()),
+    [],
+  );
+  const habitNames =
+    settings.habits.length > 0 ? settings.habits : ['喝水', '休息', '运动', '护肤'];
+  const todayCheckins = checkinsDate === todayDate ? checkins : [];
+  const checkinFingerprint = useMemo(
+    () =>
+      todayCheckins
+        .map((item) => `${item.name}:${item.completed}:${item.updatedAt ?? ''}`)
+        .sort()
+        .join('|'),
+    [todayCheckins],
+  );
   const adviceContextVersion = [
     settings.city,
     settings.workStart,
     settings.workEnd,
     settings.commuteMethod,
+    settings.habits.join('、'),
     openPlanCount,
     planFingerprint,
+    checkinFingerprint,
   ].join('|');
-  const localAdvice = settings.aiPersonalization
-    ? []
-    : buildWeatherDrivenAdvice({ weather, settings, openPlanCount });
+  const localAdvice =
+    settings.aiPersonalization || !weatherReady
+      ? []
+      : buildWeatherDrivenAdvice({ weather, settings, openPlanCount });
   const advice = (remoteAdvice ?? localAdvice).map((item) => ({
     ...item,
     icon: adviceIconMap[item.id as keyof typeof adviceIconMap] ?? Sparkles,
   }));
-  const showAdviceSkeleton = settings.aiPersonalization && adviceLoading && !remoteAdvice;
+  const showWeatherSkeleton = !weatherReady;
+  const showAdviceSkeleton =
+    (!weatherReady && !remoteAdvice) ||
+    (settings.aiPersonalization && adviceLoading && !remoteAdvice);
   const showAdviceEmpty = settings.aiPersonalization && !adviceLoading && !remoteAdvice;
-  const brief = buildWeatherBrief(weather, settings);
+  const localBrief = buildWeatherBrief(weather, settings);
+  const shouldWaitForAiBrief = Boolean(token) && (!settingsLoaded || settings.aiPersonalization);
+  const showBriefSkeleton = !remoteAdviceSummary && (!weatherReady || shouldWaitForAiBrief);
+  const aiBriefTitle = remoteAdviceSummary ? 'AI 已读今日状态' : localBrief.title;
+  const aiBriefDetail = remoteAdviceSummary || localBrief.detail;
   const nextReminder = getNextReminder(plans);
+  const completedHabitCount = habitNames.filter((name) =>
+    todayCheckins.some((item) => item.name === name && item.completed),
+  ).length;
+  const habitProgress = `${completedHabitCount}/${habitNames.length}`;
 
   useLifeTraceEntrance(pageRef, {
     selector: '[data-today-entrance], [data-today-stagger]',
@@ -246,7 +292,10 @@ export function TodayPage() {
 
       return () => mm.revert();
     },
-    { scope: pageRef, dependencies: [brief.title, brief.detail], revertOnUpdate: true },
+    {
+      scope: pageRef,
+      dependencies: [],
+    },
   );
 
   useGSAP(
@@ -310,18 +359,33 @@ export function TodayPage() {
     const cached = readWeatherCache(window.localStorage, settings.city);
     if (cached) {
       setWeather(cached);
+      setWeatherReady(true);
+      setWeatherLoading(false);
       return () => controller.abort();
     }
 
+    setWeatherReady(false);
     setWeatherLoading(true);
 
     fetchLifeTraceWeather(settings.city, { signal: controller.signal })
       .then((resp) => {
+        if (controller.signal.aborted) {
+          return;
+        }
         setWeather(resp);
         writeWeatherCache(window.localStorage, settings.city, resp);
       })
-      .catch(() => setWeather({ ...fallbackWeather, city: settings.city }))
-      .finally(() => setWeatherLoading(false));
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setWeather({ ...fallbackWeather, city: settings.city });
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setWeatherReady(true);
+          setWeatherLoading(false);
+        }
+      });
 
     return () => controller.abort();
   }, [settings.city]);
@@ -329,21 +393,21 @@ export function TodayPage() {
   useEffect(() => {
     if (!token || !settings.aiPersonalization || !settingsLoaded || !plansLoaded) {
       setRemoteAdvice(null);
+      setRemoteAdviceSummary('');
       setAdviceLoading(false);
       return;
     }
 
     const controller = new AbortController();
-    const cached = readCachedAdvice(adviceContextVersion) ?? readCachedAdvice();
+    const cached = readCachedAdvice(adviceContextVersion);
     if (cached) {
       setRemoteAdvice(cached.list);
+      setRemoteAdviceSummary(cached.summary ?? '');
     } else {
       setRemoteAdvice(null);
+      setRemoteAdviceSummary('');
     }
     setAdviceLoading(!cached);
-    const visibleLoadingTimer = cached
-      ? undefined
-      : window.setTimeout(() => setAdviceLoading(false), AI_ADVICE_VISIBLE_LOADING_MS);
 
     const timer = window.setTimeout(() => {
       if (!cached) {
@@ -353,8 +417,10 @@ export function TodayPage() {
       generateTodayAdvice(token, { signal: controller.signal })
         .then((resp) => {
           setRemoteAdvice(resp.list);
+          setRemoteAdviceSummary(resp.summary);
           writeCachedAdvice({
             contextVersion: adviceContextVersion,
+            summary: resp.summary,
             list: resp.list,
             cachedAt: Date.now(),
           });
@@ -362,6 +428,7 @@ export function TodayPage() {
         .catch(() => {
           if (!cached) {
             setRemoteAdvice(null);
+            setRemoteAdviceSummary('');
           }
         })
         .finally(() => {
@@ -372,13 +439,18 @@ export function TodayPage() {
     }, 250);
 
     return () => {
-      if (visibleLoadingTimer) {
-        window.clearTimeout(visibleLoadingTimer);
-      }
       window.clearTimeout(timer);
       controller.abort();
     };
   }, [token, settings.aiPersonalization, settingsLoaded, plansLoaded, adviceContextVersion]);
+
+  useEffect(() => {
+    if (!token || !settingsLoaded) {
+      return;
+    }
+
+    void loadCheckins(todayDate);
+  }, [loadCheckins, settingsLoaded, todayDate, token]);
 
   const handleAddAdvicePlan = async (item: Advice) => {
     if (hasAdvicePlan(plans, item.id)) {
@@ -410,11 +482,17 @@ export function TodayPage() {
     fetchLifeTraceWeather(settings.city, { refresh: true })
       .then((resp) => {
         setWeather(resp);
+        setWeatherReady(true);
         writeWeatherCache(window.localStorage, settings.city, resp);
         setPlanToast(resp.refreshLimited ? '刚刚刷新过，已使用缓存天气' : '天气已刷新');
       })
       .catch(() => setPlanToast('天气刷新失败，稍后再试'))
       .finally(() => setWeatherLoading(false));
+  };
+
+  const handleToggleCheckin = (name: string) => {
+    const current = todayCheckins.find((item) => item.name === name);
+    void toggleHabitCheckin(todayDate, name, !current?.completed);
   };
 
   useEffect(() => {
@@ -433,9 +511,9 @@ export function TodayPage() {
           <h1 className="text-3xl font-bold tracking-tight">Life Trace</h1>
           <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="size-4" />
-            <span>{weather.city || settings.city}</span>
+            <span>{weatherReady ? weather.city || settings.city : settings.city}</span>
             <span>·</span>
-            <span>5月26日周二</span>
+            <span>{todayLabel}</span>
           </div>
         </div>
         <button
@@ -448,94 +526,144 @@ export function TodayPage() {
       </header>
 
       <Card className="p-5" data-today-entrance>
-        <div className="mb-7 flex items-center justify-between">
-          <div className="flex items-center gap-4" data-today-stagger>
-            <div className="grid size-16 place-items-center rounded-2xl bg-life-weather/10 text-life-weather">
-              <Cloud className="size-9" />
-            </div>
-            <div>
-              <div className="text-6xl font-light leading-none tracking-[-0.04em]">
-                {weather.now.temp}°
-              </div>
-              <div className="mt-2 text-lg text-muted-foreground">{weather.now.text}</div>
-            </div>
-          </div>
-          <div className="text-right" data-today-stagger>
-            <div className="text-xl font-semibold">
-              {weather.now.high}° /{' '}
-              <span className="text-muted-foreground">{weather.now.low}°</span>
-            </div>
-            <div className="mt-1 text-sm text-muted-foreground">
-              {weather.city || settings.city}
-            </div>
-            <div className="mt-1 flex items-center justify-end gap-2 text-xs text-muted-foreground">
-              <span>
-                {weatherLoading
-                  ? '更新中'
-                  : weather.source === 'qweather'
-                    ? weather.cached
-                      ? 'QWeather · 缓存'
-                      : 'QWeather'
-                    : 'Mock'}
-              </span>
-              <button
-                type="button"
-                className="grid size-7 cursor-pointer place-items-center rounded-full bg-secondary text-muted-foreground transition hover:text-foreground disabled:cursor-default disabled:opacity-60"
-                aria-label="刷新天气"
-                disabled={weatherLoading}
-                onClick={handleRefreshWeather}
-              >
-                <RefreshCw className={`size-3.5 ${weatherLoading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          {weather.metrics.map((metric) => {
-            const Icon = metricIconMap[metric.label as keyof typeof metricIconMap] ?? Cloud;
-            const tone = metricToneClasses[metric.tone] ?? 'text-muted-foreground';
-
-            return (
-              <div
-                key={metric.label}
-                data-today-stagger
-                className="flex min-w-0 items-center justify-between rounded-2xl bg-secondary px-3 py-3"
-              >
-                <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
-                  <Icon className={`size-5 shrink-0 ${tone}`} />
-                  <span className="truncate text-sm">{metric.label}</span>
+        {showWeatherSkeleton ? (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="size-16 animate-pulse rounded-2xl bg-life-weather/10" />
+                <div>
+                  <div className="h-14 w-24 animate-pulse rounded-2xl bg-secondary" />
+                  <div className="mt-3 h-5 w-16 animate-pulse rounded-full bg-secondary" />
                 </div>
-                <span className="text-sm font-semibold">{metric.value}</span>
               </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-5 flex gap-3 overflow-x-auto pb-1" data-today-stagger>
-          {weather.hourly.map((item) => {
-            const Icon = item.text.includes('晴') ? Sun : Cloud;
-
-            return (
-              <div
-                key={item.time}
-                className={`flex min-w-14 flex-col items-center gap-2 rounded-2xl px-3 py-3 ${
-                  item.active
-                    ? 'bg-life-weather/15 text-life-weather'
-                    : 'bg-secondary text-muted-foreground'
-                }`}
-              >
-                <span className="text-xs font-medium">{item.time}</span>
-                <Icon className="size-5" />
-                <span className="text-base font-semibold text-foreground">{item.temp}</span>
+              <div className="flex flex-col items-end">
+                <div className="h-6 w-20 animate-pulse rounded-full bg-secondary" />
+                <div className="mt-3 h-4 w-14 animate-pulse rounded-full bg-secondary" />
+                <div className="mt-3 flex items-center gap-2">
+                  <div className="h-3 w-12 animate-pulse rounded-full bg-secondary" />
+                  <div className="size-7 animate-pulse rounded-full bg-secondary" />
+                </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={`weather-metric-skeleton-${index}`}
+                  className="flex items-center justify-between rounded-2xl bg-secondary px-3 py-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="size-5 animate-pulse rounded-full bg-muted" />
+                    <div className="h-4 w-12 animate-pulse rounded-full bg-muted" />
+                  </div>
+                  <div className="h-4 w-10 animate-pulse rounded-full bg-muted" />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 overflow-hidden pb-1">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div
+                  key={`weather-hour-skeleton-${index}`}
+                  className="flex min-w-14 flex-col items-center gap-2 rounded-2xl bg-secondary px-3 py-3"
+                >
+                  <div className="h-3 w-8 animate-pulse rounded-full bg-muted" />
+                  <div className="size-5 animate-pulse rounded-full bg-muted" />
+                  <div className="h-5 w-7 animate-pulse rounded-full bg-muted" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="mb-7 flex items-center justify-between">
+              <div className="flex items-center gap-4" data-today-stagger>
+                <div className="grid size-16 place-items-center rounded-2xl bg-life-weather/10 text-life-weather">
+                  <Cloud className="size-9" />
+                </div>
+                <div>
+                  <div className="text-6xl font-light leading-none tracking-[-0.04em]">
+                    {weather.now.temp}°
+                  </div>
+                  <div className="mt-2 text-lg text-muted-foreground">{weather.now.text}</div>
+                </div>
+              </div>
+              <div className="text-right" data-today-stagger>
+                <div className="text-xl font-semibold">
+                  {weather.now.high}° /{' '}
+                  <span className="text-muted-foreground">{weather.now.low}°</span>
+                </div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  {weather.city || settings.city}
+                </div>
+                <div className="mt-1 flex items-center justify-end gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {weatherLoading
+                      ? '更新中'
+                      : weather.source === 'qweather'
+                        ? weather.cached
+                          ? 'QWeather · 缓存'
+                          : 'QWeather'
+                        : 'Mock'}
+                  </span>
+                  <button
+                    type="button"
+                    className="grid size-7 cursor-pointer place-items-center rounded-full bg-secondary text-muted-foreground transition hover:text-foreground disabled:cursor-default disabled:opacity-60"
+                    aria-label="刷新天气"
+                    disabled={weatherLoading}
+                    onClick={handleRefreshWeather}
+                  >
+                    <RefreshCw className={`size-3.5 ${weatherLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {weather.metrics.map((metric) => {
+                const Icon = metricIconMap[metric.label as keyof typeof metricIconMap] ?? Cloud;
+                const tone = metricToneClasses[metric.tone] ?? 'text-muted-foreground';
+
+                return (
+                  <div
+                    key={metric.label}
+                    data-today-stagger
+                    className="flex min-w-0 items-center justify-between rounded-2xl bg-secondary px-3 py-3"
+                  >
+                    <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                      <Icon className={`size-5 shrink-0 ${tone}`} />
+                      <span className="truncate text-sm">{metric.label}</span>
+                    </div>
+                    <span className="text-sm font-semibold">{metric.value}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 flex gap-3 overflow-x-auto pb-1" data-today-stagger>
+              {weather.hourly.map((item) => {
+                const Icon = item.text.includes('晴') ? Sun : Cloud;
+
+                return (
+                  <div
+                    key={item.time}
+                    className={`flex min-w-14 flex-col items-center gap-2 rounded-2xl px-3 py-3 ${
+                      item.active
+                        ? 'bg-life-weather/15 text-life-weather'
+                        : 'bg-secondary text-muted-foreground'
+                    }`}
+                  >
+                    <span className="text-xs font-medium">{item.time}</span>
+                    <Icon className="size-5" />
+                    <span className="text-base font-semibold text-foreground">{item.temp}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </Card>
 
       <Card
-        className="relative overflow-hidden border-life-ai/20 p-5 shadow-[0_18px_70px_rgba(6,182,212,0.08)]"
+        className="relative min-h-[168px] overflow-hidden border-life-ai/20 p-5 shadow-[0_18px_70px_rgba(6,182,212,0.08)]"
         data-ai-brief-card
         data-today-entrance
       >
@@ -550,18 +678,94 @@ export function TodayPage() {
           >
             <Sparkles className="size-6" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div data-ai-brief-copy>
               <Badge tone="ai">AI 今日简报</Badge>
             </div>
-            <h2 className="mt-3 text-xl font-semibold" data-ai-brief-copy>
-              {brief.title}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground" data-ai-brief-copy>
-              {brief.detail}
-            </p>
+            <div className="mt-3 min-h-[96px]">
+              {showBriefSkeleton ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-medium text-life-ai">
+                    <ActionLoadingIcon className="size-3.5" tone="ai" />
+                    <span>正在生成今日简报</span>
+                  </div>
+                  <div className="h-6 w-44 animate-pulse rounded-full bg-life-ai/15" />
+                  <div className="space-y-2">
+                    <div className="h-3.5 w-full animate-pulse rounded-full bg-secondary" />
+                    <div className="h-3.5 w-4/5 animate-pulse rounded-full bg-secondary" />
+                  </div>
+                </div>
+              ) : (
+                <div className="animate-in fade-in duration-300 motion-reduce:animate-none">
+                  <h2 className="line-clamp-1 text-xl font-semibold">{aiBriefTitle}</h2>
+                  <p className="mt-2 line-clamp-3 min-h-[72px] text-sm leading-6 text-muted-foreground">
+                    {aiBriefDetail}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
+      </Card>
+
+      <Card className="p-4" data-today-entrance>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Badge tone="trace">今日打卡</Badge>
+              {checkinsLoading ? <ActionLoadingIcon className="size-3.5" tone="trace" /> : null}
+            </div>
+            <h2 className="mt-2 text-lg font-semibold">保持一点生活节奏</h2>
+          </div>
+          <div className="rounded-2xl border border-life-trace/25 bg-life-trace/10 px-3 py-2 text-sm font-bold text-life-trace">
+            {habitProgress}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {habitNames.map((name) => {
+            const checkin = todayCheckins.find((item) => item.name === name);
+            const completed = Boolean(checkin?.completed);
+            const toggling = Boolean(checkinTogglingByName[name]);
+
+            return (
+              <button
+                type="button"
+                key={name}
+                disabled={toggling}
+                className={`flex min-h-12 cursor-pointer items-center justify-between gap-2 rounded-2xl border px-3 text-left text-sm font-semibold transition disabled:cursor-default disabled:opacity-70 ${
+                  completed
+                    ? 'border-life-trace/40 bg-life-trace/10 text-life-trace'
+                    : 'border-border bg-secondary text-muted-foreground hover:text-foreground'
+                }`}
+                onClick={() => handleToggleCheckin(name)}
+              >
+                <span className="truncate">{name}</span>
+                <span
+                  className={`grid size-6 shrink-0 place-items-center rounded-full border transition ${
+                    toggling
+                      ? 'border-life-trace/40 bg-transparent text-life-trace'
+                      : completed
+                        ? 'border-life-trace bg-life-trace text-background'
+                        : 'border-border bg-transparent'
+                  }`}
+                >
+                  {toggling ? (
+                    <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" />
+                  ) : completed ? (
+                    <Check className="size-3.5" />
+                  ) : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {checkinsError ? (
+          <p className="mt-3 text-sm text-life-alert">{checkinsError}</p>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground">
+            打卡会同步到账号，后续会进入 AI 今日建议和每周回顾。
+          </p>
+        )}
       </Card>
 
       <Card
@@ -629,7 +833,7 @@ export function TodayPage() {
                   : '基础建议'}
           </Badge>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid min-h-[360px] grid-cols-2 gap-3">
           {showAdviceSkeleton
             ? Array.from({ length: 6 }).map((_, index) => (
                 <Card
@@ -646,8 +850,8 @@ export function TodayPage() {
               ))
             : null}
           {showAdviceEmpty ? (
-            <Card className="col-span-2 p-5 text-sm leading-6 text-muted-foreground">
-              AI 建议正在后台生成，完成后会自动替换到这里。为了避免混淆，未完成前不会显示临时建议。
+            <Card className="col-span-2 min-h-[360px] p-5 text-sm leading-6 text-muted-foreground">
+              AI 建议正在生成，完成后会自动替换到这里。为了避免混淆，未完成前不会显示临时建议。
             </Card>
           ) : null}
           {advice.map((item) => {

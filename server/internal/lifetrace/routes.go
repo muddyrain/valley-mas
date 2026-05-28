@@ -31,6 +31,13 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			traces.DELETE("/:id", handler.DeleteTrace)
 		}
 
+		checkins := group.Group("/checkins")
+		checkins.Use(auth)
+		{
+			checkins.GET("", handler.ListCheckins)
+			checkins.PUT("", handler.ToggleCheckin)
+		}
+
 		settings := group.Group("/settings")
 		settings.Use(auth)
 		{
