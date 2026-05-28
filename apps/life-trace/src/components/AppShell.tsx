@@ -37,9 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         ref={contentRef}
         className="mx-auto h-dvh w-full max-w-[430px] overflow-y-auto overflow-x-hidden px-4 pb-44 pt-8"
       >
-        <div key={activeTab} data-page-entrance>
-          {children}
-        </div>
+        <div>{children}</div>
       </main>
       <div
         aria-hidden="true"

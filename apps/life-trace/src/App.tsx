@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { Sparkles } from 'lucide-react';
+import { type ReactElement, useEffect } from 'react';
 import { AppReminderToast } from '@/components/AppReminderToast';
 import { AppShell } from '@/components/AppShell';
 import { AiPage } from '@/pages/AiPage';
@@ -18,6 +19,8 @@ const pages = {
   traces: <TracesPage />,
   profile: <ProfilePage />,
 };
+
+const pageEntries = Object.entries(pages) as Array<[AppTab, ReactElement]>;
 
 export default function App() {
   const activeTab = useLifeTraceStore((state) => state.activeTab);
@@ -53,8 +56,15 @@ export default function App() {
     return (
       <main className="grid min-h-dvh place-items-center bg-background px-6 text-foreground">
         <div className="text-center">
-          <div className="mx-auto mb-4 size-10 animate-pulse rounded-2xl bg-life-ai" />
-          <p className="text-sm text-muted-foreground">正在确认登录状态</p>
+          <div className="relative mx-auto mb-5 grid size-16 place-items-center">
+            <div className="absolute inset-0 animate-ping rounded-3xl bg-life-ai/15 motion-reduce:animate-none" />
+            <div className="absolute inset-1 rounded-3xl border border-life-ai/25 bg-life-ai/10 shadow-[0_0_42px_rgba(6,182,212,0.18)]" />
+            <div className="relative grid size-11 animate-pulse place-items-center rounded-2xl bg-life-ai text-background motion-reduce:animate-none">
+              <Sparkles className="size-5" />
+            </div>
+          </div>
+          <p className="text-sm font-semibold text-foreground">Life Trace</p>
+          <p className="mt-2 text-sm text-muted-foreground">正在确认登录状态</p>
         </div>
       </main>
     );
@@ -66,7 +76,17 @@ export default function App() {
 
   return (
     <>
-      <AppShell>{pages[activeTab]}</AppShell>
+      <AppShell>
+        {pageEntries.map(([tab, page]) => (
+          <section
+            key={tab}
+            hidden={activeTab !== tab}
+            data-page-entrance={activeTab === tab ? '' : undefined}
+          >
+            {page}
+          </section>
+        ))}
+      </AppShell>
       <AppReminderToast />
     </>
   );

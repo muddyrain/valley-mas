@@ -2,6 +2,8 @@ import {
   Bot,
   CalendarDays,
   Check,
+  ChevronDown,
+  ChevronUp,
   Clock,
   CloudSun,
   Image,
@@ -9,6 +11,7 @@ import {
   Plus,
   Send,
   Sparkles,
+  Trash2,
   UserRound,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -22,10 +25,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { aiQuickActions, suggestedPrompts } from '@/data/mock';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
-import { buildPlanSchedule, getLocalISODate } from '@/lib/planSchedule';
+import { buildPlanSchedule, getLocalISODate, type PlanDateOption } from '@/lib/planSchedule';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { AdvicePayload, NewPlanInput } from '@/types';
+import type { AdvicePayload, NewPlanInput, PlanType } from '@/types';
 
 type AiResult = {
   title: string;
@@ -37,13 +40,17 @@ type AssistantMessage = LifeAssistantMessage & {
   id: string;
 };
 
-type AssistantReminderDraft = {
+type AssistantPlanDraft = {
   title: string;
+  type: PlanType;
   scheduledTime: string;
-  dateOption: '今天' | '明天';
+  dateOption: PlanDateOption;
+  notePrefix: string;
 };
 
 const reminderIntentPattern = /(提醒我|提醒|记得|别忘|预约|叫我|提示我)/;
+const planIntentPattern =
+  /(计划|安排|提醒我|提醒|记得|别忘|预约|看电影|电影|吃饭|吃|运动|跑步|健身|阅读|看书|聚会|见朋友|喝咖啡)/;
 
 function normalizeClockTime(raw: string) {
   const match = raw.match(/([01]?\d|2[0-3])[:：点时]([0-5]\d)?/);
@@ -56,51 +63,189 @@ function normalizeClockTime(raw: string) {
   return `${hour}:${minute}`;
 }
 
-function buildAssistantReminderDraft(message: string): AssistantReminderDraft | null {
-  const text = message.trim();
-  if (!reminderIntentPattern.test(text)) {
-    return null;
+function inferPlanType(text: string): PlanType {
+  if (/电影|观影|影院/.test(text)) {
+    return '电影';
   }
+  if (/吃饭|吃|餐厅|火锅|咖啡|午饭|晚饭|早餐|午餐|晚餐/.test(text)) {
+    return '吃饭';
+  }
+  if (/运动|跑步|健身|瑜伽|骑行|游泳/.test(text)) {
+    return '运动';
+  }
+  if (/阅读|看书|读书/.test(text)) {
+    return '阅读';
+  }
+  if (/聚会|见朋友|约朋友|约会/.test(text)) {
+    return '聚会';
+  }
+  return '普通事项';
+}
 
-  const dateOption = /明天|明早|明晚/.test(text) ? '明天' : '今天';
-  const scheduledTime =
+function inferPlanDateOption(text: string): PlanDateOption {
+  if (/明天|明早|明晚/.test(text)) {
+    return '明天';
+  }
+  if (/周日|星期日/.test(text)) {
+    return '周日';
+  }
+  if (/周六|星期六|周末/.test(text)) {
+    return '周六';
+  }
+  if (/周五|星期五/.test(text)) {
+    return '周五';
+  }
+  return '今天';
+}
+
+function inferPlanTime(text: string, type: PlanType) {
+  return (
     normalizeClockTime(text) ||
-    (/早上|上午/.test(text)
+    (/早上|上午|明早/.test(text)
       ? '09:00'
-      : /中午/.test(text)
+      : /中午|午饭|午餐/.test(text)
         ? '12:00'
         : /下午/.test(text)
           ? '15:00'
           : /下班/.test(text)
             ? '18:30'
-            : '20:00');
-  const title =
-    text
-      .replace(/今天|今晚|晚上|明天|明早|明晚|早上|上午|中午|下午|下班后?/g, '')
-      .replace(/([01]?\d|2[0-3])[:：点时]([0-5]\d)?/g, '')
-      .replace(/提醒我|提醒|记得|别忘了?|叫我|提示我/g, '')
-      .replace(/[，。,.、\s]+/g, '')
-      .trim() || '生活提醒';
+            : /晚上|今晚|明晚|晚饭|晚餐/.test(text)
+              ? '19:30'
+              : type === '吃饭'
+                ? '12:00'
+                : type === '电影' || type === '运动' || type === '聚会'
+                  ? '19:30'
+                  : '20:00')
+  );
+}
+
+function buildAssistantPlanTitle(text: string, type: PlanType) {
+  const fallbackByType: Record<PlanType, string> = {
+    电影: '看电影',
+    吃饭: '吃饭',
+    运动: '运动',
+    阅读: '阅读',
+    聚会: '聚会',
+    普通事项: '生活计划',
+  };
+  const title = text
+    .replace(/今天|今晚|晚上|明天|明早|明晚|周末|周五|周六|周日|星期五|星期六|星期日/g, '')
+    .replace(/早上|上午|中午|下午|下班后?/g, '')
+    .replace(/([01]?\d|2[0-3])[:：点时]([0-5]\d)?/g, '')
+    .replace(/提醒我|提醒|记得|别忘了?|叫我|提示我/g, '')
+    .replace(/帮我|我要|想要|想|计划|安排|一下|去/g, '')
+    .replace(/[，。,.、\s]+/g, '')
+    .trim();
+
+  return title || fallbackByType[type];
+}
+
+function buildAssistantPlanDraft(message: string): AssistantPlanDraft | null {
+  const text = message.trim();
+  if (!planIntentPattern.test(text)) {
+    return null;
+  }
+
+  const type = inferPlanType(text);
+  const title = buildAssistantPlanTitle(text, type);
 
   return {
+    type,
     title,
-    scheduledTime,
-    dateOption,
+    scheduledTime: inferPlanTime(text, type),
+    dateOption: inferPlanDateOption(text),
+    notePrefix: reminderIntentPattern.test(text) ? '来自生活助理提醒' : '来自生活助理计划',
   };
 }
 
-function createPlanFromAssistantReminder(draft: AssistantReminderDraft): NewPlanInput {
+function buildAssistantPlanMarker(draft: AssistantPlanDraft) {
+  return `#assistant-plan:${draft.dateOption}-${draft.scheduledTime}-${draft.type}-${draft.title}`;
+}
+
+function createPlanFromAssistantDraft(draft: AssistantPlanDraft): NewPlanInput {
   return {
     title: draft.title,
-    type: '普通事项',
+    type: draft.type,
     ...buildPlanSchedule({
       dateOption: draft.dateOption,
       time: draft.scheduledTime,
     }),
     reminder: true,
     source: 'ai_advice',
-    note: `来自生活助理提醒：${draft.title}。#assistant-reminder:${draft.dateOption}-${draft.scheduledTime}-${draft.title}`,
+    note: `${draft.notePrefix}：${draft.title}。${buildAssistantPlanMarker(draft)}`,
   };
+}
+
+const ASSISTANT_MESSAGES_KEY = 'life-trace-assistant-messages';
+const ASSISTANT_PENDING_PLAN_KEY = 'life-trace-assistant-pending-plan';
+const ASSISTANT_RESULT_KEY = 'life-trace-assistant-result';
+const COLLAPSED_ASSISTANT_MESSAGE_COUNT = 4;
+const confirmPlanPattern = /^(可以|可以的|好|好的|确定|确认|没问题|就这样|行|安排|创建|加入计划)/;
+
+function readAssistantMessages() {
+  try {
+    const raw = localStorage.getItem(ASSISTANT_MESSAGES_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as AssistantMessage[];
+    return Array.isArray(parsed)
+      ? parsed.filter(
+          (item) =>
+            (item.role === 'user' || item.role === 'assistant') &&
+            typeof item.id === 'string' &&
+            typeof item.content === 'string',
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function readPendingAssistantPlan() {
+  try {
+    const raw = localStorage.getItem(ASSISTANT_PENDING_PLAN_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as AssistantPlanDraft;
+    if (
+      typeof parsed?.title === 'string' &&
+      typeof parsed?.scheduledTime === 'string' &&
+      typeof parsed?.dateOption === 'string' &&
+      typeof parsed?.type === 'string'
+    ) {
+      return parsed;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function readAssistantResult() {
+  try {
+    const raw = localStorage.getItem(ASSISTANT_RESULT_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as AiResult;
+    if (
+      typeof parsed?.title === 'string' &&
+      typeof parsed?.detail === 'string' &&
+      ['ai', 'plan', 'trace', 'health', 'alert'].includes(parsed.tone)
+    ) {
+      return parsed;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 export function AiPage() {
@@ -122,10 +267,15 @@ export function AiPage() {
   const token = useAuthStore((state) => state.token);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false);
-  const [result, setResult] = useState<AiResult | null>(null);
+  const [result, setResult] = useState<AiResult | null>(readAssistantResult);
   const [adviceCards, setAdviceCards] = useState<AdvicePayload[]>([]);
   const [assistantInput, setAssistantInput] = useState('');
-  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
+  const [assistantMessages, setAssistantMessages] =
+    useState<AssistantMessage[]>(readAssistantMessages);
+  const [pendingAssistantPlan, setPendingAssistantPlan] = useState<AssistantPlanDraft | null>(
+    readPendingAssistantPlan,
+  );
+  const [showAllAssistantMessages, setShowAllAssistantMessages] = useState(false);
   const [assistantStreaming, setAssistantStreaming] = useState(false);
   const [assistantModel, setAssistantModel] = useState('');
   const [quickActionLoading, setQuickActionLoading] = useState<string | null>(null);
@@ -138,6 +288,13 @@ export function AiPage() {
   const completedCheckinCount = todayCheckins.filter((item) => item.completed).length;
   const activeHabitCount = settings.habits.length;
   const latestTrace = traces[0];
+  const visibleAssistantMessages = showAllAssistantMessages
+    ? assistantMessages
+    : assistantMessages.slice(-COLLAPSED_ASSISTANT_MESSAGE_COUNT);
+  const hiddenAssistantMessageCount = Math.max(
+    0,
+    assistantMessages.length - visibleAssistantMessages.length,
+  );
 
   const placeholder = useMemo(
     () => `${settings.city} · ${settings.commuteMethod}通勤 · ${openPlanCount} 个待完成计划`,
@@ -151,6 +308,63 @@ export function AiPage() {
 
     void loadCheckins(todayDate);
   }, [loadCheckins, settingsLoaded, todayDate, token]);
+
+  useEffect(() => {
+    localStorage.setItem(ASSISTANT_MESSAGES_KEY, JSON.stringify(assistantMessages.slice(-20)));
+  }, [assistantMessages]);
+
+  useEffect(() => {
+    if (pendingAssistantPlan) {
+      localStorage.setItem(ASSISTANT_PENDING_PLAN_KEY, JSON.stringify(pendingAssistantPlan));
+      return;
+    }
+
+    localStorage.removeItem(ASSISTANT_PENDING_PLAN_KEY);
+  }, [pendingAssistantPlan]);
+
+  useEffect(() => {
+    if (result) {
+      localStorage.setItem(ASSISTANT_RESULT_KEY, JSON.stringify(result));
+      return;
+    }
+
+    localStorage.removeItem(ASSISTANT_RESULT_KEY);
+  }, [result]);
+
+  const createAssistantPlan = async (draft: AssistantPlanDraft) => {
+    setResult({
+      title: '正在创建生活计划',
+      detail: `生活助理已回复，正在把「${draft.title}」加入计划。`,
+      tone: 'plan',
+    });
+
+    const marker = buildAssistantPlanMarker(draft);
+    const existing = plans.some((plan) => plan.note.includes(marker));
+    if (existing) {
+      setResult({
+        title: '计划已存在',
+        detail: `「${draft.title}」已经在计划里。删除后可回复“创建”重新加入。`,
+        tone: 'plan',
+      });
+      return;
+    }
+
+    const plan = await addPlan(createPlanFromAssistantDraft(draft));
+    setPendingAssistantPlan(null);
+    setResult(
+      plan
+        ? {
+            title: '已创建生活计划',
+            detail: `「${draft.title}」已加入计划，会在 ${plan.timeLabel} 提醒。`,
+            tone: 'plan',
+          }
+        : {
+            title: '生活计划未保存',
+            detail: '生活助理已回复，但计划保存失败，请稍后再试。',
+            tone: 'alert',
+          },
+    );
+  };
 
   const handleQuickAction = async (label: string) => {
     if (label === '创建计划') {
@@ -265,7 +479,13 @@ export function AiPage() {
     setAssistantMessages((items) => [...items, userMessage, assistantMessage]);
 
     let reply = '';
-    const reminderDraft = buildAssistantReminderDraft(message);
+    const confirmedPendingPlan =
+      pendingAssistantPlan && confirmPlanPattern.test(message) ? pendingAssistantPlan : null;
+    const planDraft = confirmedPendingPlan ?? buildAssistantPlanDraft(message);
+    if (planDraft) {
+      setPendingAssistantPlan(planDraft);
+    }
+
     try {
       await streamLifeAssistant(token, {
         message,
@@ -285,39 +505,8 @@ export function AiPage() {
         },
       });
       setAssistantStreaming(false);
-      if (reminderDraft) {
-        setResult({
-          title: '正在创建提醒计划',
-          detail: `生活助理已回复，正在把「${reminderDraft.title}」加入计划。`,
-          tone: 'plan',
-        });
-        const existing = plans.some((plan) =>
-          plan.note.includes(
-            `#assistant-reminder:${reminderDraft.dateOption}-${reminderDraft.scheduledTime}-${reminderDraft.title}`,
-          ),
-        );
-        if (existing) {
-          setResult({
-            title: '提醒已在计划里',
-            detail: `「${reminderDraft.title}」已经存在，不会重复创建。`,
-            tone: 'plan',
-          });
-        } else {
-          const plan = await addPlan(createPlanFromAssistantReminder(reminderDraft));
-          setResult(
-            plan
-              ? {
-                  title: '已创建提醒计划',
-                  detail: `「${reminderDraft.title}」已加入计划，会在 ${plan.timeLabel} 提醒。`,
-                  tone: 'plan',
-                }
-              : {
-                  title: '提醒计划未保存',
-                  detail: '生活助理已回复，但计划保存失败，请稍后再试。',
-                  tone: 'alert',
-                },
-          );
-        }
+      if (planDraft) {
+        await createAssistantPlan(planDraft);
       }
       addAiAction('和生活助理规划了一次安排');
     } catch (error) {
@@ -337,6 +526,14 @@ export function AiPage() {
     } finally {
       setAssistantStreaming(false);
     }
+  };
+
+  const handleClearAssistantMessages = () => {
+    setAssistantMessages([]);
+    setPendingAssistantPlan(null);
+    setResult(null);
+    setAssistantModel('');
+    setShowAllAssistantMessages(false);
   };
 
   const handleAddAdvicePlan = async (item: AdvicePayload) => {
@@ -435,7 +632,7 @@ export function AiPage() {
         </Card>
       </section>
 
-      <Card className="p-4">
+      <Card className="border-life-ai/25 p-4 shadow-[0_0_36px_rgba(6,182,212,0.06)]">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold">生活助理</p>
@@ -451,7 +648,7 @@ export function AiPage() {
           ) : null}
         </div>
         <textarea
-          className="min-h-24 w-full resize-none rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-base leading-7 outline-none transition placeholder:text-muted-foreground focus:border-life-ai/60 focus:bg-secondary"
+          className="min-h-24 w-full resize-none rounded-2xl border border-life-ai/30 bg-secondary/40 px-4 py-3 text-base leading-7 outline-none transition placeholder:text-muted-foreground focus:border-life-ai/70 focus:bg-secondary focus:shadow-[0_0_0_3px_rgba(6,182,212,0.08)]"
           value={assistantInput}
           disabled={assistantStreaming}
           placeholder="例如：帮我安排今天下班后的时间，顺便提醒我该注意什么"
@@ -484,7 +681,44 @@ export function AiPage() {
 
       {assistantMessages.length > 0 ? (
         <section className="space-y-3">
-          {assistantMessages.map((message) => {
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">最近对话</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {showAllAssistantMessages
+                  ? `已展开 ${assistantMessages.length} 条本地记录`
+                  : hiddenAssistantMessageCount
+                    ? `显示最近 ${visibleAssistantMessages.length} 条，已收起 ${hiddenAssistantMessageCount} 条`
+                    : `共 ${assistantMessages.length} 条本地记录`}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {assistantMessages.length > COLLAPSED_ASSISTANT_MESSAGE_COUNT ? (
+                <button
+                  type="button"
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                  onClick={() => setShowAllAssistantMessages((value) => !value)}
+                >
+                  {showAllAssistantMessages ? (
+                    <ChevronUp className="size-3.5" />
+                  ) : (
+                    <ChevronDown className="size-3.5" />
+                  )}
+                  {showAllAssistantMessages ? '收起' : '展开'}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="grid size-9 cursor-pointer place-items-center rounded-full border border-border bg-card text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                aria-label="清空最近对话"
+                onClick={handleClearAssistantMessages}
+              >
+                <Trash2 className="size-4" />
+              </button>
+            </div>
+          </div>
+
+          {visibleAssistantMessages.map((message) => {
             const isUser = message.role === 'user';
             const Icon = isUser ? UserRound : Bot;
 
