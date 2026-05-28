@@ -4,6 +4,7 @@ import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { clearPlanNotificationRecord, showPlanReminderNotification } from '@/lib/planNotifications';
 import { getDueReminder } from '@/lib/planReminder';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 
@@ -70,6 +71,7 @@ export function AppReminderToast() {
       return;
     }
 
+    clearPlanNotificationRecord(dueReminder.plan.id);
     const next = {
       ...snoozedUntilByPlanId,
       [dueReminder.plan.id]: Date.now() + SNOOZE_MINUTES * 60_000,
@@ -86,6 +88,14 @@ export function AppReminderToast() {
     await completePlan(dueReminder.plan.id);
     dismissReminder();
   };
+
+  useEffect(() => {
+    if (!dueReminder) {
+      return;
+    }
+
+    void showPlanReminderNotification(dueReminder);
+  }, [dueReminder]);
 
   if (!dueReminder) {
     return null;

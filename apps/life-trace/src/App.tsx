@@ -9,6 +9,7 @@ import { TodayPage } from '@/pages/TodayPage';
 import { TracesPage } from '@/pages/TracesPage';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
+import type { AppTab } from '@/types';
 
 const pages = {
   today: <TodayPage />,
@@ -20,6 +21,7 @@ const pages = {
 
 export default function App() {
   const activeTab = useLifeTraceStore((state) => state.activeTab);
+  const setActiveTab = useLifeTraceStore((state) => state.setActiveTab);
   const loadSettings = useLifeTraceStore((state) => state.loadSettings);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
   const loadTraces = useLifeTraceStore((state) => state.loadTraces);
@@ -38,6 +40,14 @@ export default function App() {
       void loadTraces();
     }
   }, [loadPlans, loadSettings, loadTraces, status, token]);
+
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab && tab in pages) {
+      setActiveTab(tab as AppTab);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [setActiveTab]);
 
   if ((status === 'checking' && token) || status === 'idle') {
     return (

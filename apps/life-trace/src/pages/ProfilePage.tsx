@@ -22,6 +22,7 @@ import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useNotificationPermission } from '@/hooks/useNotificationPermission';
 import { usePwaStatus } from '@/hooks/usePwaStatus';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -213,6 +214,7 @@ export function ProfilePage() {
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
   const { canInstall, installed, serviceWorkerReady, promptInstall } = usePwaStatus();
+  const notification = useNotificationPermission();
   const profileName = user?.nickname || user?.username || 'Life Trace 用户';
   const enabledSignals =
     Number(settings.weatherAlerts) +
@@ -399,6 +401,26 @@ export function ProfilePage() {
           active={settings.planReminders}
           onToggle={() => update('planReminders', !settings.planReminders)}
         />
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+              <Bell className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold">系统通知</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">{notification.label}</p>
+            </div>
+            <Button
+              type="button"
+              variant={notification.granted ? 'secondary' : 'ai'}
+              size="sm"
+              disabled={!notification.supported || notification.granted}
+              onClick={() => void notification.requestPermission()}
+            >
+              {notification.granted ? '已开启' : '开启'}
+            </Button>
+          </div>
+        </Card>
         <SettingToggle
           label="AI 个性化"
           detail="根据计划、打卡和偏好生成今日建议"
