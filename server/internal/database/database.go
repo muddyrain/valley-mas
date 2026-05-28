@@ -151,6 +151,7 @@ func autoMigrate() error {
 		&model.LifeTraceCheckin{},
 		&model.LifeTraceTrace{},
 		&model.LifeTraceSettings{},
+		&model.LifeTraceWeeklyReview{},
 	); err != nil {
 		return err
 	}

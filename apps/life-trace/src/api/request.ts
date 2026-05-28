@@ -21,11 +21,15 @@ export async function apiRequest<T>(path: string, token: string, init: RequestIn
     credentials: 'include',
   });
 
+  const payload = (await response.json().catch(() => null)) as ApiEnvelope<T> | null;
   if (!response.ok) {
-    throw new Error(`请求失败：${response.status}`);
+    throw new Error(payload?.message || `请求失败：${response.status}`);
   }
 
-  const payload = (await response.json()) as ApiEnvelope<T>;
+  if (!payload) {
+    throw new Error('响应数据为空');
+  }
+
   if (payload.code !== 0) {
     throw new Error(payload.message || '请求失败');
   }

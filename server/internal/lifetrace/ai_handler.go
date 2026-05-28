@@ -21,6 +21,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
 	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
+	"gorm.io/gorm"
 )
 
 type lifeTraceAIAdvice struct {
@@ -33,6 +34,14 @@ type lifeTraceAIAdvice struct {
 type todayAdviceAIResponse struct {
 	Summary string              `json:"summary"`
 	Items   []lifeTraceAIAdvice `json:"items"`
+}
+
+type weeklyReviewAIResponse struct {
+	Summary     string   `json:"summary"`
+	Wins        []string `json:"wins"`
+	Delays      []string `json:"delays"`
+	Insights    []string `json:"insights"`
+	NextActions []string `json:"nextActions"`
 }
 
 type lifeTraceAssistantMessage struct {
@@ -68,6 +77,7 @@ var (
 
 const lifeTraceTodayAdviceDefaultTimeout = 30 * time.Second
 const lifeTraceTodayAdviceCacheTTL = 10 * time.Minute
+const lifeTraceWeeklyReviewMaxTokens = 520
 
 type todayAdviceCacheEntry struct {
 	Response  todayAdviceAIResponse
@@ -189,6 +199,146 @@ func (h *Handler) GenerateTodayAdvice(c *gin.Context) {
 		"model":   modelName,
 		"cached":  false,
 	})
+}
+
+func (h *Handler) GenerateWeeklyReview(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, apiResponse{Code: http.StatusUnauthorized, Message: "未登录"})
+		return
+	}
+
+	aiCfg, errMsg := readLifeTraceAIConfig()
+	if errMsg != "" {
+		c.JSON(http.StatusServiceUnavailable, apiResponse{Code: http.StatusServiceUnavailable, Message: errMsg})
+		return
+	}
+
+	settings, err := findSettings(userID)
+	if err != nil {
+		c.JSON(http.StatusOK, apiResponse{Code: http.StatusInternalServerError, Message: "获取偏好失败"})
+		return
+	}
+
+	now := time.Now()
+	weekStart, weekEnd := currentWeeklyReviewRange(now)
+	var completedPlans []model.LifeTracePlan
+	if err := database.GetDB().
+		Where("user_id = ? AND completed = ? AND completed_at >= ?", userID, true, weekStart).
+		Order("completed_at DESC, updated_at DESC").
+		Limit(12).
+		Find(&completedPlans).Error; err != nil {
+		c.JSON(http.StatusOK, apiResponse{Code: http.StatusInternalServerError, Message: "获取已完成计划失败"})
+		return
+	}
+
+	var openPlans []model.LifeTracePlan
+	if err := database.GetDB().
+		Where("user_id = ? AND completed = ?", userID, false).
+		Order("created_at DESC").
+		Limit(12).
+		Find(&openPlans).Error; err != nil {
+		c.JSON(http.StatusOK, apiResponse{Code: http.StatusInternalServerError, Message: "获取未完成计划失败"})
+		return
+	}
+
+	var traces []model.LifeTraceTrace
+	if err := database.GetDB().
+		Where("user_id = ? AND created_at >= ?", userID, weekStart).
+		Order("created_at DESC").
+		Limit(12).
+		Find(&traces).Error; err != nil {
+		c.JSON(http.StatusOK, apiResponse{Code: http.StatusInternalServerError, Message: "获取踪迹失败"})
+		return
+	}
+
+	var checkins []model.LifeTraceCheckin
+	if err := database.GetDB().
+		Where("user_id = ? AND date >= ?", userID, weekStart.Format("2006-01-02")).
+		Order("date DESC, created_at ASC").
+		Limit(40).
+		Find(&checkins).Error; err != nil {
+		c.JSON(http.StatusOK, apiResponse{Code: http.StatusInternalServerError, Message: "获取打卡失败"})
+		return
+	}
+
+	prompt := buildWeeklyReviewPrompt(settings, weekStart, weekEnd, completedPlans, openPlans, traces, checkins)
+	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
+	defer cancel()
+
+	raw, modelName, err := callLifeTraceAIWithMaxTokens(aiCtx, aiCfg, prompt, lifeTraceWeeklyReviewMaxTokens)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "AI 服务请求失败：" + err.Error()})
+		return
+	}
+
+	parsed, err := parseWeeklyReviewAIResponse(raw)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "AI 周报解析失败：" + err.Error()})
+		return
+	}
+
+	modelName = strings.TrimSpace(modelName)
+	if modelName == "" {
+		modelName = aiCfg.Model
+	}
+	review, err := saveWeeklyReview(userID, weekStart, weekEnd, parsed, aiCfg.Source, modelName)
+	if err != nil {
+		c.JSON(http.StatusOK, apiResponse{Code: http.StatusInternalServerError, Message: weeklyReviewSaveErrorMessage(err)})
+		return
+	}
+
+	success(c, weeklyReviewPayload(review))
+}
+
+func (h *Handler) ListWeeklyReviews(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, apiResponse{Code: http.StatusUnauthorized, Message: "未登录"})
+		return
+	}
+
+	var reviews []model.LifeTraceWeeklyReview
+	if err := database.GetDB().
+		Where("user_id = ?", userID).
+		Order("week_start DESC").
+		Limit(24).
+		Find(&reviews).Error; err != nil {
+		c.JSON(http.StatusOK, apiResponse{Code: http.StatusInternalServerError, Message: "获取每周回顾失败"})
+		return
+	}
+
+	list := make([]gin.H, 0, len(reviews))
+	for _, review := range reviews {
+		list = append(list, weeklyReviewPayload(review))
+	}
+	success(c, gin.H{"list": list})
+}
+
+func (h *Handler) DeleteWeeklyReview(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	var review model.LifeTraceWeeklyReview
+	err := database.GetDB().First(&review, "id = ? AND user_id = ?", c.Param("id"), userID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		fail(c, http.StatusNotFound, "周报不存在")
+		return
+	}
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "读取周报失败")
+		return
+	}
+
+	if err := database.GetDB().Delete(&review).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "删除周报失败")
+		return
+	}
+
+	success(c, gin.H{"id": review.ID})
 }
 
 func (h *Handler) StreamAssistant(c *gin.Context) {
@@ -462,6 +612,173 @@ func buildTodayCheckinPromptLines(habits []string, checkins []model.LifeTraceChe
 	return lines
 }
 
+func buildWeeklyReviewPrompt(
+	settings model.LifeTraceSettings,
+	weekStart time.Time,
+	weekEnd time.Time,
+	completedPlans []model.LifeTracePlan,
+	openPlans []model.LifeTracePlan,
+	traces []model.LifeTraceTrace,
+	checkins []model.LifeTraceCheckin,
+) string {
+	completedPlanLines := buildWeeklyPlanLines(completedPlans, "暂无已完成计划")
+	openPlanLines := buildWeeklyPlanLines(openPlans, "暂无未完成计划")
+	traceLines := make([]string, 0, len(traces))
+	for _, trace := range traces {
+		tags := strings.Join(trace.Tags, "、")
+		traceLines = append(traceLines, fmt.Sprintf("- %s｜%s｜%s｜%s｜%s", trace.Title, trace.Mood, trace.TimeLabel, trace.Source, tags))
+	}
+	if len(traceLines) == 0 {
+		traceLines = append(traceLines, "- 暂无生活踪迹")
+	}
+
+	checkinLines := buildWeeklyCheckinPromptLines(checkins)
+
+	return strings.Join([]string{
+		"你是 Life Trace 的复盘 Agent，只输出一个 JSON 对象，不要 Markdown，不要解释。",
+		"JSON 格式：{\"summary\":\"一句本周复盘，48字以内\",\"wins\":[\"完成事项，24字以内\"],\"delays\":[\"延迟事项，24字以内\"],\"insights\":[\"生活洞察，28字以内\"],\"nextActions\":[\"下周行动，24字以内\"]}",
+		"wins、delays、insights、nextActions 各输出 1-3 条；没有延迟事项时 delays 输出 [\"暂无明显延迟事项\"]。",
+		"复盘要基于计划、踪迹和打卡，不要编造资产、订阅或没有出现过的生活事件。",
+		"语气温暖、克制、可执行，使用简体中文。",
+		"",
+		"用户偏好：",
+		fmt.Sprintf("城市：%s；工作时间：%s-%s；通勤：%s；习惯：%s。", settings.City, settings.WorkStart, settings.WorkEnd, settings.CommuteMethod, strings.Join(settings.Habits, "、")),
+		"",
+		"周报范围：",
+		fmt.Sprintf("%s 至 %s", weekStart.Format("2006-01-02"), weekEnd.Format("2006-01-02")),
+		"",
+		"本周已完成计划：",
+		strings.Join(completedPlanLines, "\n"),
+		"",
+		"当前未完成计划：",
+		strings.Join(openPlanLines, "\n"),
+		"",
+		"本周生活踪迹：",
+		strings.Join(traceLines, "\n"),
+		"",
+		"本周打卡：",
+		strings.Join(checkinLines, "\n"),
+	}, "\n")
+}
+
+func currentWeeklyReviewRange(now time.Time) (time.Time, time.Time) {
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	daysFromMonday := (int(dayStart.Weekday()) + 6) % 7
+	return dayStart.AddDate(0, 0, -daysFromMonday), now
+}
+
+func buildWeeklyPlanLines(plans []model.LifeTracePlan, emptyText string) []string {
+	lines := make([]string, 0, len(plans))
+	for _, plan := range plans {
+		status := "未完成"
+		if plan.Completed {
+			status = "已完成"
+		}
+		lines = append(lines, fmt.Sprintf("- %s｜%s｜%s｜%s", plan.Title, plan.Type, plan.TimeLabel, status))
+	}
+	if len(lines) == 0 {
+		lines = append(lines, "- "+emptyText)
+	}
+	return lines
+}
+
+func buildWeeklyCheckinPromptLines(checkins []model.LifeTraceCheckin) []string {
+	if len(checkins) == 0 {
+		return []string{"- 暂无打卡记录"}
+	}
+
+	lines := make([]string, 0, len(checkins))
+	for _, checkin := range checkins {
+		status := "未完成"
+		if checkin.Completed {
+			status = "已完成"
+		}
+		lines = append(lines, fmt.Sprintf("- %s｜%s：%s", checkin.Date, checkin.Name, status))
+	}
+	return lines
+}
+
+func saveWeeklyReview(
+	userID model.Int64String,
+	weekStart time.Time,
+	weekEnd time.Time,
+	parsed weeklyReviewAIResponse,
+	source string,
+	modelName string,
+) (model.LifeTraceWeeklyReview, error) {
+	review := model.LifeTraceWeeklyReview{
+		UserID:      userID,
+		WeekStart:   weekStart.Format("2006-01-02"),
+		WeekEnd:     weekEnd.Format("2006-01-02"),
+		Summary:     parsed.Summary,
+		Wins:        model.StringList(parsed.Wins),
+		Delays:      model.StringList(parsed.Delays),
+		Insights:    model.StringList(parsed.Insights),
+		NextActions: model.StringList(parsed.NextActions),
+		Source:      source,
+		Model:       modelName,
+	}
+
+	var existing model.LifeTraceWeeklyReview
+	err := database.GetDB().
+		Where("user_id = ? AND week_start = ?", userID, review.WeekStart).
+		First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if err := database.GetDB().Create(&review).Error; err != nil {
+			return model.LifeTraceWeeklyReview{}, err
+		}
+		return review, nil
+	}
+	if err != nil {
+		return model.LifeTraceWeeklyReview{}, err
+	}
+
+	updates := map[string]interface{}{
+		"week_end":     review.WeekEnd,
+		"summary":      review.Summary,
+		"wins":         review.Wins,
+		"delays":       review.Delays,
+		"insights":     review.Insights,
+		"next_actions": review.NextActions,
+		"source":       review.Source,
+		"model":        review.Model,
+	}
+	if err := database.GetDB().Model(&existing).Updates(updates).Error; err != nil {
+		return model.LifeTraceWeeklyReview{}, err
+	}
+	if err := database.GetDB().First(&existing, "id = ?", existing.ID).Error; err != nil {
+		return model.LifeTraceWeeklyReview{}, err
+	}
+	return existing, nil
+}
+
+func weeklyReviewSaveErrorMessage(err error) string {
+	raw := err.Error()
+	normalized := strings.ToLower(raw)
+	if strings.Contains(normalized, "life_trace_weekly_reviews") &&
+		(strings.Contains(normalized, "does not exist") || strings.Contains(normalized, "no such table")) {
+		return "保存每周回顾失败：数据表 life_trace_weekly_reviews 不存在，请在 server 目录运行 air db=true 或执行 029 迁移后重试"
+	}
+	return "保存每周回顾失败：" + trimRunes(raw, 120)
+}
+
+func weeklyReviewPayload(review model.LifeTraceWeeklyReview) gin.H {
+	return gin.H{
+		"id":          review.ID,
+		"weekStart":   review.WeekStart,
+		"weekEnd":     review.WeekEnd,
+		"summary":     review.Summary,
+		"wins":        []string(review.Wins),
+		"delays":      []string(review.Delays),
+		"insights":    []string(review.Insights),
+		"nextActions": []string(review.NextActions),
+		"source":      review.Source,
+		"model":       review.Model,
+		"createdAt":   review.CreatedAt,
+		"updatedAt":   review.UpdatedAt,
+	}
+}
+
 func lifeTraceAssistantSystemPrompt() string {
 	return strings.Join([]string{
 		"你是 Life Trace 的生活助理，不是通用聊天 AI。",
@@ -644,7 +961,16 @@ func callLifeTraceTextAI(
 	modelID string,
 	prompt string,
 ) (string, string, error) {
-	maxTokens := 260
+	return callLifeTraceTextAIWithMaxTokens(ctx, client, modelID, prompt, 260)
+}
+
+func callLifeTraceTextAIWithMaxTokens(
+	ctx context.Context,
+	client *arkruntime.Client,
+	modelID string,
+	prompt string,
+	maxTokens int,
+) (string, string, error) {
 	temperature := float32(0.35)
 	content := strings.TrimSpace(prompt)
 	resp, err := client.CreateChatCompletion(ctx, arkmodel.CreateChatCompletionRequest{
@@ -689,12 +1015,16 @@ func callLifeTraceTextAI(
 }
 
 func callLifeTraceAI(ctx context.Context, cfg lifeTraceAIConfig, prompt string) (string, string, error) {
+	return callLifeTraceAIWithMaxTokens(ctx, cfg, prompt, 260)
+}
+
+func callLifeTraceAIWithMaxTokens(ctx context.Context, cfg lifeTraceAIConfig, prompt string, maxTokens int) (string, string, error) {
 	if cfg.Source == "openai" {
-		return callLifeTraceOpenAI(ctx, cfg, prompt)
+		return callLifeTraceOpenAIWithMaxTokens(ctx, cfg, prompt, maxTokens)
 	}
 
 	client := ensureLifeTraceArkClient(cfg.APIKey, cfg.BaseURL)
-	return callLifeTraceTextAI(ctx, client, cfg.Model, prompt)
+	return callLifeTraceTextAIWithMaxTokens(ctx, client, cfg.Model, prompt, maxTokens)
 }
 
 type lifeTraceOpenAIRequest struct {
@@ -731,6 +1061,10 @@ type lifeTraceOpenAIStreamResponse struct {
 }
 
 func callLifeTraceOpenAI(ctx context.Context, cfg lifeTraceAIConfig, prompt string) (string, string, error) {
+	return callLifeTraceOpenAIWithMaxTokens(ctx, cfg, prompt, 260)
+}
+
+func callLifeTraceOpenAIWithMaxTokens(ctx context.Context, cfg lifeTraceAIConfig, prompt string, maxTokens int) (string, string, error) {
 	body, err := json.Marshal(lifeTraceOpenAIRequest{
 		Model: cfg.Model,
 		Messages: []lifeTraceOpenAIMessage{
@@ -741,7 +1075,7 @@ func callLifeTraceOpenAI(ctx context.Context, cfg lifeTraceAIConfig, prompt stri
 			{Role: "user", Content: prompt},
 		},
 		Temperature: 0.35,
-		MaxTokens:   260,
+		MaxTokens:   maxTokens,
 		ResponseFormat: &lifeTraceResponseFormat{
 			Type: "json_object",
 		},
@@ -971,6 +1305,50 @@ func normalizeTodayAdviceItems(items []lifeTraceAIAdvice) ([]lifeTraceAIAdvice, 
 		result = append(result, item)
 	}
 	return result, nil
+}
+
+func parseWeeklyReviewAIResponse(raw string) (weeklyReviewAIResponse, error) {
+	raw = strings.TrimSpace(raw)
+	start := strings.Index(raw, "{")
+	end := strings.LastIndex(raw, "}")
+	if start < 0 || end <= start {
+		return weeklyReviewAIResponse{}, errors.New("missing JSON object")
+	}
+
+	var parsed weeklyReviewAIResponse
+	if err := json.Unmarshal([]byte(raw[start:end+1]), &parsed); err != nil {
+		return weeklyReviewAIResponse{}, err
+	}
+
+	parsed.Summary = trimRunes(parsed.Summary, 56)
+	if parsed.Summary == "" {
+		parsed.Summary = "本周生活节奏已整理，适合下周继续轻量推进。"
+	}
+	parsed.Wins = normalizeWeeklyReviewList(parsed.Wins, "本周已有可回看的生活记录", 3, 28)
+	parsed.Delays = normalizeWeeklyReviewList(parsed.Delays, "暂无明显延迟事项", 3, 28)
+	parsed.Insights = normalizeWeeklyReviewList(parsed.Insights, "稳定记录能让下周安排更清晰", 3, 32)
+	parsed.NextActions = normalizeWeeklyReviewList(parsed.NextActions, "下周先安排一件轻量计划", 3, 28)
+	return parsed, nil
+}
+
+func normalizeWeeklyReviewList(items []string, fallback string, maxItems int, maxRunes int) []string {
+	result := make([]string, 0, maxItems)
+	seen := map[string]bool{}
+	for _, item := range items {
+		item = trimRunes(item, maxRunes)
+		if item == "" || seen[item] {
+			continue
+		}
+		seen[item] = true
+		result = append(result, item)
+		if len(result) >= maxItems {
+			break
+		}
+	}
+	if len(result) == 0 {
+		result = append(result, fallback)
+	}
+	return result
 }
 
 func trimRunes(text string, max int) string {

@@ -177,3 +177,27 @@ func (settings *LifeTraceSettings) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+type LifeTraceWeeklyReview struct {
+	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID      Int64String    `gorm:"column:user_id;index;not null;uniqueIndex:uidx_life_trace_weekly_review" json:"userId"`
+	WeekStart   string         `gorm:"size:20;not null;index;uniqueIndex:uidx_life_trace_weekly_review" json:"weekStart"`
+	WeekEnd     string         `gorm:"size:20;not null" json:"weekEnd"`
+	Summary     string         `gorm:"size:1000;not null" json:"summary"`
+	Wins        StringList     `gorm:"type:text" json:"wins"`
+	Delays      StringList     `gorm:"type:text" json:"delays"`
+	Insights    StringList     `gorm:"type:text" json:"insights"`
+	NextActions StringList     `gorm:"type:text" json:"nextActions"`
+	Source      string         `gorm:"size:20;not null" json:"source"`
+	Model       string         `gorm:"size:120" json:"model,omitempty"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (review *LifeTraceWeeklyReview) BeforeCreate(tx *gorm.DB) error {
+	if review.ID == 0 {
+		review.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}

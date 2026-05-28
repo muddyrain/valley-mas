@@ -28,6 +28,14 @@ air
 
 air 会监听你配置的文件扩展（默认包含 `.go`），发生改动会自动重新编译并重启服务。
 
+默认情况下，`air` 会尊重 `.env` 里的 `DB_AUTO_MIGRATE` 配置。如果本地刚加了表或字段，需要本次启动自动执行 GORM AutoMigrate，可以运行：
+
+```powershell
+air db=true
+```
+
+这个参数只影响本次本地 Air 启动，会在读取 `.env` 后临时把 `DB_AUTO_MIGRATE` 覆盖为 `true`。
+
 3) 直接运行（不使用热重载）
 
 也可以用 `go run`：

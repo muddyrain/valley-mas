@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
@@ -25,10 +26,13 @@ var (
 	globalHTTP http.Handler
 )
 
+const localAutoMigrateFlagEnv = "VALLEY_LOCAL_DB_AUTO_MIGRATE"
+
 // Init prepares app dependencies once and returns shared HTTP handler.
 func Init() (*config.Config, http.Handler, error) {
 	initOnce.Do(func() {
 		loadEnv()
+		applyLocalEnvOverrides()
 
 		globalCfg = config.Load()
 
@@ -57,6 +61,13 @@ func Init() (*config.Config, http.Handler, error) {
 	})
 
 	return globalCfg, globalHTTP, initErr
+}
+
+func applyLocalEnvOverrides() {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv(localAutoMigrateFlagEnv)), "true") {
+		_ = os.Setenv("DB_AUTO_MIGRATE", "true")
+		log.Println("DB_AUTO_MIGRATE enabled by local startup argument")
+	}
 }
 
 func loadEnv() {

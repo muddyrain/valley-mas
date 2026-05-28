@@ -1,5 +1,7 @@
 import { Camera, ImagePlus, Sparkles, X } from 'lucide-react';
 import { type ChangeEvent, useMemo, useState } from 'react';
+import { analyzeImage, type ImageAnalysisResponse } from '@/api/advice';
+import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { buildPlanSchedule, type PlanDateOption } from '@/lib/planSchedule';
@@ -20,8 +22,11 @@ type ImageAnalysis = {
   };
 };
 
+type ImageAnalysisResult = ImageAnalysis | ImageAnalysisResponse;
+
 type ImageAnalysisDrawerProps = {
   open: boolean;
+  token?: string | null;
   onOpenChange: (open: boolean) => void;
   onCreatePlan: (input: NewPlanInput) => void;
   onCreateTrace: (input: NewTraceInput) => void;
@@ -59,6 +64,7 @@ const analysisByKind: Record<ImageKind, ImageAnalysis> = {
 
 export function ImageAnalysisDrawer({
   open,
+  token,
   onOpenChange,
   onCreatePlan,
   onCreateTrace,
@@ -68,9 +74,13 @@ export function ImageAnalysisDrawer({
   const [localPreview, setLocalPreview] = useState('');
   const [kind, setKind] = useState<ImageKind>('电影海报');
   const [analyzed, setAnalyzed] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<ImageAnalysisResult | null>(null);
+  const [analysisError, setAnalysisError] = useState('');
 
   const previewUrl = localPreview || imageUrl;
-  const analysis = analysisByKind[kind];
+  const fallbackAnalysis = analysisByKind[kind];
+  const analysis = analysisResult ?? fallbackAnalysis;
 
   const defaultSchedule = useMemo(() => buildPlanSchedule(analysis.schedule), [analysis.schedule]);
 
@@ -85,13 +95,45 @@ export function ImageAnalysisDrawer({
     reader.onload = () => {
       setLocalPreview(typeof reader.result === 'string' ? reader.result : '');
       setAnalyzed(false);
+      setAnalysisResult(null);
+      setAnalysisError('');
     };
     reader.readAsDataURL(file);
   };
 
-  const handleAnalyze = () => {
-    setAnalyzed(true);
-    onAnalyzed(`分析了${kind}`);
+  const handleAnalyze = async () => {
+    if (!previewUrl) {
+      setAnalysisError('请先提供一张图片，再开始分析。');
+      return;
+    }
+
+    setAnalyzing(true);
+    setAnalysisError('');
+    try {
+      if (!token) {
+        throw new Error('请先登录后再使用服务端 AI 图片分析');
+      }
+
+      const remoteAnalysis = await analyzeImage(token, {
+        imageUrl: localPreview ? undefined : imageUrl.trim(),
+        imageBase64: localPreview || undefined,
+        kind,
+      });
+      setAnalysisResult(remoteAnalysis);
+      setAnalyzed(true);
+      onAnalyzed(`用服务端 AI 分析了${kind}`);
+    } catch (error) {
+      setAnalysisResult(fallbackAnalysis);
+      setAnalyzed(true);
+      setAnalysisError(
+        `服务端 AI 暂不可用，已使用本地结果：${
+          error instanceof Error ? error.message : '请稍后再试'
+        }`,
+      );
+      onAnalyzed(`分析了${kind}`);
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const handleCreatePlan = () => {
@@ -149,7 +191,7 @@ export function ImageAnalysisDrawer({
           <div>
             <h2 className="text-xl font-semibold">分析图片</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              先用本地 mock 分析，后续接真实视觉 AI。
+              优先使用服务端视觉 AI，失败时保留本地兜底。
             </p>
           </div>
           <Button type="button" variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
@@ -166,6 +208,8 @@ export function ImageAnalysisDrawer({
                 setImageUrl(event.target.value);
                 setLocalPreview('');
                 setAnalyzed(false);
+                setAnalysisResult(null);
+                setAnalysisError('');
               }}
               placeholder="粘贴电影海报、饭菜图或生活照片 URL"
               className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
@@ -199,6 +243,8 @@ export function ImageAnalysisDrawer({
                 onClick={() => {
                   setKind(option);
                   setAnalyzed(false);
+                  setAnalysisResult(null);
+                  setAnalysisError('');
                 }}
               >
                 {option}
@@ -206,10 +252,22 @@ export function ImageAnalysisDrawer({
             ))}
           </div>
 
-          <Button type="button" variant="ai" className="w-full" onClick={handleAnalyze}>
-            <Camera className="size-5" />
-            开始分析
+          <Button
+            type="button"
+            variant="ai"
+            className="w-full"
+            disabled={analyzing}
+            onClick={() => void handleAnalyze()}
+          >
+            {analyzing ? <ActionLoadingIcon className="size-5" /> : <Camera className="size-5" />}
+            {analyzing ? '分析中' : '开始分析'}
           </Button>
+
+          {analysisError ? (
+            <p className="rounded-2xl bg-life-alert/10 px-4 py-3 text-sm leading-6 text-life-alert">
+              {analysisError}
+            </p>
+          ) : null}
 
           {analyzed ? (
             <Card className="border-life-ai/20 p-4">

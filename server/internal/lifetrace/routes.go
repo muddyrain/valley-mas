@@ -11,6 +11,8 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 		ai.Use(auth)
 		{
 			ai.POST("/today-advice", handler.GenerateTodayAdvice)
+			ai.POST("/weekly-review", handler.GenerateWeeklyReview)
+			ai.POST("/image-analysis", handler.AnalyzeImage)
 			ai.POST("/assistant/stream", handler.StreamAssistant)
 		}
 
@@ -30,6 +32,13 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			traces.GET("", handler.ListTraces)
 			traces.POST("", handler.CreateTrace)
 			traces.DELETE("/:id", handler.DeleteTrace)
+		}
+
+		weeklyReviews := group.Group("/weekly-reviews")
+		weeklyReviews.Use(auth)
+		{
+			weeklyReviews.GET("", handler.ListWeeklyReviews)
+			weeklyReviews.DELETE("/:id", handler.DeleteWeeklyReview)
 		}
 
 		checkins := group.Group("/checkins")

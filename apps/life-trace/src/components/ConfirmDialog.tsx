@@ -10,6 +10,7 @@ type ConfirmDialogProps = {
   title: string;
   description: string;
   confirmLabel: string;
+  loadingLabel?: string;
   loading?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -20,6 +21,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  loadingLabel = '删除中',
   loading = false,
   onCancel,
   onConfirm,
@@ -103,7 +105,7 @@ export function ConfirmDialog({
               onClick={onConfirm}
             >
               {loading ? <ActionLoadingIcon tone="alert" /> : null}
-              {loading ? '删除中' : confirmLabel}
+              {loading ? loadingLabel : confirmLabel}
             </Button>
           </div>
         </div>

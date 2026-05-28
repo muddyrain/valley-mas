@@ -1,4 +1,7 @@
 import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
   Bot,
   CalendarDays,
   Check,
@@ -6,7 +9,9 @@ import {
   ChevronUp,
   Clock,
   CloudSun,
+  History,
   Image,
+  Lightbulb,
   ListChecks,
   Plus,
   Send,
@@ -15,9 +20,16 @@ import {
   UserRound,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { generateTodayAdvice } from '@/api/advice';
+import {
+  deleteWeeklyReview,
+  generateTodayAdvice,
+  generateWeeklyReview,
+  listWeeklyReviews,
+  type WeeklyReviewResponse,
+} from '@/api/advice';
 import { type LifeAssistantMessage, streamLifeAssistant } from '@/api/assistant';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { ImageAnalysisDrawer } from '@/components/ImageAnalysisDrawer';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -26,6 +38,12 @@ import { Card } from '@/components/ui/card';
 import { aiQuickActions, suggestedPrompts } from '@/data/mock';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import { buildPlanSchedule, getLocalISODate, type PlanDateOption } from '@/lib/planSchedule';
+import {
+  buildWeeklyReviewActionMarker,
+  createPlanFromWeeklyReviewAction,
+  hasWeeklyReviewActionPlan,
+} from '@/lib/weeklyReviewPlan';
+import { findCurrentWeekReview, toggleExpandedWeeklyReviewId } from '@/lib/weeklyReviews';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { AdvicePayload, NewPlanInput, PlanType } from '@/types';
@@ -34,7 +52,14 @@ type AiResult = {
   title: string;
   detail: string;
   tone: 'ai' | 'plan' | 'trace' | 'health' | 'alert';
+  weeklyReview?: WeeklyReviewDisplay;
 };
+
+type WeeklyReviewDisplay = Pick<
+  WeeklyReviewResponse,
+  'summary' | 'wins' | 'delays' | 'insights' | 'nextActions'
+> &
+  Partial<Pick<WeeklyReviewResponse, 'id' | 'weekStart' | 'weekEnd'>>;
 
 type AssistantMessage = LifeAssistantMessage & {
   id: string;
@@ -248,6 +273,234 @@ function readAssistantResult() {
   return null;
 }
 
+function WeeklyReviewPanel({
+  review,
+  addingActionKey,
+  isNextActionAdded,
+  onAddNextAction,
+}: {
+  review: WeeklyReviewDisplay;
+  addingActionKey?: string | null;
+  isNextActionAdded?: (actionIndex: number) => boolean;
+  onAddNextAction?: (action: string, actionIndex: number) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm leading-6 text-muted-foreground">{review.summary}</p>
+      <div className="grid gap-3">
+        {[
+          {
+            title: '完成事项',
+            items: review.wins,
+            icon: Check,
+            className: 'border-life-trace/25 bg-life-trace/10 text-life-trace',
+          },
+          {
+            title: '延迟事项',
+            items: review.delays,
+            icon: AlertCircle,
+            className: 'border-life-alert/25 bg-life-alert/10 text-life-alert',
+          },
+          {
+            title: '生活洞察',
+            items: review.insights,
+            icon: Lightbulb,
+            className: 'border-life-ai/25 bg-life-ai/10 text-life-ai',
+          },
+          {
+            title: '下周行动',
+            items: review.nextActions,
+            icon: ArrowRight,
+            className: 'border-life-plan/25 bg-life-plan/10 text-life-plan',
+          },
+        ].map((section) => {
+          const Icon = section.icon;
+
+          return (
+            <div key={section.title} className={`rounded-2xl border p-4 ${section.className}`}>
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Icon className="size-4" />
+                {section.title}
+              </div>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-foreground">
+                {section.items.map((item, itemIndex) => {
+                  const canCreatePlan =
+                    section.title === '下周行动' && Boolean(review.id && onAddNextAction);
+                  const added = canCreatePlan ? isNextActionAdded?.(itemIndex) === true : false;
+                  const actionKey =
+                    canCreatePlan && review.id
+                      ? buildWeeklyReviewActionMarker(review.id, itemIndex)
+                      : '';
+                  const adding = addingActionKey === actionKey;
+
+                  return (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-current opacity-70" />
+                      <span className="min-w-0 flex-1">{item}</span>
+                      {canCreatePlan ? (
+                        <button
+                          type="button"
+                          className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-life-plan/10 hover:text-life-plan disabled:cursor-default disabled:opacity-80"
+                          disabled={added || Boolean(addingActionKey)}
+                          onClick={() => onAddNextAction?.(item, itemIndex)}
+                        >
+                          {adding ? (
+                            <ActionLoadingIcon className="size-3.5" />
+                          ) : added ? (
+                            <Check className="size-3.5" />
+                          ) : (
+                            <Plus className="size-3.5" />
+                          )}
+                          {adding ? '加入中' : added ? '已加入' : '加入计划'}
+                        </button>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WeeklyReviewsArchive({
+  reviews,
+  loading,
+  deletingId,
+  expandedId,
+  onBack,
+  onToggleExpanded,
+  onRequestDelete,
+  onAddNextAction,
+  getNextActionAdded,
+  addingActionKey,
+}: {
+  reviews: WeeklyReviewResponse[];
+  loading: boolean;
+  deletingId: string | null;
+  expandedId: string | null;
+  onBack: () => void;
+  onToggleExpanded: (review: WeeklyReviewResponse) => void;
+  onRequestDelete: (review: WeeklyReviewResponse) => void;
+  onAddNextAction: (review: WeeklyReviewResponse, action: string, actionIndex: number) => void;
+  getNextActionAdded: (review: WeeklyReviewResponse, actionIndex: number) => boolean;
+  addingActionKey: string | null;
+}) {
+  return (
+    <div className="space-y-6">
+      <header className="space-y-5">
+        <button
+          type="button"
+          className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+          onClick={onBack}
+        >
+          <ArrowLeft className="size-4" />
+          返回
+        </button>
+        <div className="flex items-center gap-3">
+          <div className="grid size-12 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+            <History className="size-6" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">历史周报</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {loading ? '正在同步已存档周报' : `已存档 ${reviews.length} 篇`}
+            </p>
+          </div>
+        </div>
+      </header>
+
+      {loading ? (
+        <Card className="p-4 text-sm text-muted-foreground">正在同步历史周报...</Card>
+      ) : null}
+
+      {!loading && reviews.length === 0 ? (
+        <Card className="border-life-health/20 p-4 text-sm leading-6 text-muted-foreground">
+          还没有已存档周报。生成“服务端 AI 每周回顾”后，会自动保存到这里。
+        </Card>
+      ) : null}
+
+      <div className="space-y-3">
+        {reviews.map((review) => {
+          const expanded = expandedId === review.id;
+          const archivedTime = review.updatedAt || review.createdAt;
+
+          return (
+            <Card key={review.id} className="border-life-health/20 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 cursor-pointer text-left"
+                  aria-expanded={expanded}
+                  onClick={() => onToggleExpanded(review)}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone="health">
+                      {review.weekStart} - {review.weekEnd}
+                    </Badge>
+                    {archivedTime ? (
+                      <span className="text-xs text-muted-foreground">
+                        更新于 {formatWeeklyReviewDateTime(archivedTime)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <h2 className="mt-3 line-clamp-2 text-base font-semibold leading-snug">
+                    {review.summary}
+                  </h2>
+                  <p className="mt-2 text-xs font-semibold text-life-health">
+                    {expanded ? '收起完整周报' : '查看完整周报'}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full bg-secondary text-muted-foreground transition hover:bg-life-alert/10 hover:text-life-alert disabled:cursor-default disabled:opacity-70"
+                  aria-label={`删除 ${review.weekStart} 至 ${review.weekEnd} 周报`}
+                  disabled={Boolean(deletingId)}
+                  onClick={() => onRequestDelete(review)}
+                >
+                  {deletingId === review.id ? (
+                    <ActionLoadingIcon tone="alert" className="size-4" />
+                  ) : (
+                    <Trash2 className="size-4" />
+                  )}
+                </button>
+              </div>
+              {expanded ? (
+                <div className="mt-4 border-t border-border pt-4">
+                  <WeeklyReviewPanel
+                    review={review}
+                    addingActionKey={addingActionKey}
+                    isNextActionAdded={(actionIndex) => getNextActionAdded(review, actionIndex)}
+                    onAddNextAction={(action, actionIndex) =>
+                      onAddNextAction(review, action, actionIndex)
+                    }
+                  />
+                </div>
+              ) : null}
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function formatWeeklyReviewDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleDateString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function AiPage() {
   const plans = useLifeTraceStore((state) => state.plans);
   const traces = useLifeTraceStore((state) => state.traces);
@@ -280,6 +533,16 @@ export function AiPage() {
   const [assistantModel, setAssistantModel] = useState('');
   const [quickActionLoading, setQuickActionLoading] = useState<string | null>(null);
   const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
+  const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReviewResponse[]>([]);
+  const [weeklyReviewsLoading, setWeeklyReviewsLoading] = useState(false);
+  const [weeklyReviewArchiveOpen, setWeeklyReviewArchiveOpen] = useState(false);
+  const [weeklyReviewRegenerateTarget, setWeeklyReviewRegenerateTarget] =
+    useState<WeeklyReviewResponse | null>(null);
+  const [weeklyReviewDeleteTarget, setWeeklyReviewDeleteTarget] =
+    useState<WeeklyReviewResponse | null>(null);
+  const [deletingWeeklyReviewId, setDeletingWeeklyReviewId] = useState<string | null>(null);
+  const [expandedWeeklyReviewId, setExpandedWeeklyReviewId] = useState<string | null>(null);
+  const [addingWeeklyActionKey, setAddingWeeklyActionKey] = useState<string | null>(null);
 
   const openPlanCount = plans.filter((plan) => !plan.completed).length;
   const completedPlanCount = plans.length - openPlanCount;
@@ -295,6 +558,8 @@ export function AiPage() {
     0,
     assistantMessages.length - visibleAssistantMessages.length,
   );
+  const latestWeeklyReview = weeklyReviews[0];
+  const currentWeekReview = findCurrentWeekReview(weeklyReviews);
 
   const placeholder = useMemo(
     () => `${settings.city} · ${settings.commuteMethod}通勤 · ${openPlanCount} 个待完成计划`,
@@ -308,6 +573,19 @@ export function AiPage() {
 
     void loadCheckins(todayDate);
   }, [loadCheckins, settingsLoaded, todayDate, token]);
+
+  useEffect(() => {
+    if (!token) {
+      setWeeklyReviews([]);
+      return;
+    }
+
+    setWeeklyReviewsLoading(true);
+    listWeeklyReviews(token)
+      .then((data) => setWeeklyReviews(data.list))
+      .catch(() => setWeeklyReviews([]))
+      .finally(() => setWeeklyReviewsLoading(false));
+  }, [token]);
 
   useEffect(() => {
     localStorage.setItem(ASSISTANT_MESSAGES_KEY, JSON.stringify(assistantMessages.slice(-20)));
@@ -364,6 +642,84 @@ export function AiPage() {
             tone: 'alert',
           },
     );
+  };
+
+  const runWeeklyReview = async () => {
+    setQuickActionLoading('每周回顾');
+    try {
+      if (!token) {
+        throw new Error('请先登录后再生成服务端 AI 每周回顾');
+      }
+      if (!settings.aiPersonalization) {
+        throw new Error('“我的”页的 AI 个性化开关未开启');
+      }
+
+      const review = await generateWeeklyReview(token);
+      setResult({
+        title: '服务端 AI 每周回顾已生成',
+        detail: review.summary,
+        tone: 'health',
+        weeklyReview: {
+          id: review.id,
+          weekStart: review.weekStart,
+          weekEnd: review.weekEnd,
+          summary: review.summary,
+          wins: review.wins,
+          delays: review.delays,
+          insights: review.insights,
+          nextActions: review.nextActions,
+        },
+      });
+      setWeeklyReviews((items) => [review, ...items.filter((item) => item.id !== review.id)]);
+    } catch (error) {
+      const habits = settings.habits ?? [];
+      const reason = error instanceof Error ? error.message : '服务端 AI 暂时不可用';
+      const detail = `未存档原因：${reason}。这次只生成本地回顾，不会进入历史周报。本周已有 ${traces.length} 条生活踪迹、${completedPlanCount} 个已完成计划。你最稳定的节奏是：${habits.slice(0, 3).join('、') || '保持记录'}。`;
+      setResult({ title: '本地每周回顾（未存档）', detail, tone: 'health' });
+    } finally {
+      setQuickActionLoading(null);
+    }
+    addAiAction('生成了每周生活回顾');
+  };
+
+  const handleDeleteWeeklyReview = async () => {
+    if (!weeklyReviewDeleteTarget) {
+      return;
+    }
+    if (!token) {
+      setResult({
+        title: '请先登录',
+        detail: '登录后才能删除已存档周报。',
+        tone: 'alert',
+      });
+      return;
+    }
+
+    const target = weeklyReviewDeleteTarget;
+    setDeletingWeeklyReviewId(target.id);
+    try {
+      await deleteWeeklyReview(token, target.id);
+      setWeeklyReviews((items) => items.filter((item) => item.id !== target.id));
+      setExpandedWeeklyReviewId((current) => (current === target.id ? null : current));
+      setResult((previous) =>
+        previous?.weeklyReview?.id === target.id
+          ? {
+              title: '历史周报已删除',
+              detail: `${target.weekStart} 至 ${target.weekEnd} 的周报已从历史中删除。`,
+              tone: 'health',
+            }
+          : previous,
+      );
+      setWeeklyReviewDeleteTarget(null);
+    } catch (error) {
+      setResult({
+        title: '删除周报失败',
+        detail: error instanceof Error ? error.message : '请稍后再试。',
+        tone: 'alert',
+      });
+    } finally {
+      setDeletingWeeklyReviewId(null);
+    }
   };
 
   const handleQuickAction = async (label: string) => {
@@ -426,10 +782,11 @@ export function AiPage() {
     }
 
     if (label === '每周回顾') {
-      const habits = settings.habits ?? [];
-      const detail = `本周已有 ${traces.length} 条生活踪迹、${completedPlanCount} 个已完成计划。你最稳定的节奏是：${habits.slice(0, 3).join('、') || '保持记录'}。`;
-      setResult({ title: '每周回顾已生成', detail, tone: 'health' });
-      addAiAction('生成了每周生活回顾');
+      if (currentWeekReview) {
+        setWeeklyReviewRegenerateTarget(currentWeekReview);
+        return;
+      }
+      await runWeeklyReview();
       return;
     }
 
@@ -573,6 +930,88 @@ export function AiPage() {
       setAddingAdviceId(null);
     }
   };
+
+  const handleAddWeeklyReviewActionPlan = async (
+    review: WeeklyReviewResponse,
+    action: string,
+    actionIndex: number,
+  ) => {
+    if (hasWeeklyReviewActionPlan(plans, review.id, actionIndex)) {
+      setResult({
+        title: '计划已存在',
+        detail: `「${action}」已经加入过计划，不需要重复添加。`,
+        tone: 'plan',
+      });
+      return;
+    }
+
+    const actionKey = buildWeeklyReviewActionMarker(review.id, actionIndex);
+    setAddingWeeklyActionKey(actionKey);
+    try {
+      const plan = await addPlan(
+        createPlanFromWeeklyReviewAction({
+          reviewId: review.id,
+          action,
+          actionIndex,
+        }),
+      );
+      setResult(
+        plan
+          ? {
+              title: '已加入下周计划',
+              detail: `「${action}」已加入计划，会在 ${plan.timeLabel} 提醒。`,
+              tone: 'plan',
+            }
+          : {
+              title: '计划保存失败',
+              detail: '刚才的下周行动没有保存成功，请稍后再试。',
+              tone: 'alert',
+            },
+      );
+    } finally {
+      setAddingWeeklyActionKey(null);
+    }
+  };
+
+  if (weeklyReviewArchiveOpen) {
+    return (
+      <>
+        <WeeklyReviewsArchive
+          reviews={weeklyReviews}
+          loading={weeklyReviewsLoading}
+          deletingId={deletingWeeklyReviewId}
+          expandedId={expandedWeeklyReviewId}
+          onBack={() => setWeeklyReviewArchiveOpen(false)}
+          onToggleExpanded={(review) =>
+            setExpandedWeeklyReviewId((current) => toggleExpandedWeeklyReviewId(current, review.id))
+          }
+          onRequestDelete={setWeeklyReviewDeleteTarget}
+          onAddNextAction={handleAddWeeklyReviewActionPlan}
+          getNextActionAdded={(review, actionIndex) =>
+            hasWeeklyReviewActionPlan(plans, review.id, actionIndex)
+          }
+          addingActionKey={addingWeeklyActionKey}
+        />
+        <ConfirmDialog
+          open={Boolean(weeklyReviewDeleteTarget)}
+          title="删除这篇周报？"
+          description={
+            weeklyReviewDeleteTarget
+              ? `${weeklyReviewDeleteTarget.weekStart} 至 ${weeklyReviewDeleteTarget.weekEnd} 的周报删除后不会再出现在历史里。`
+              : ''
+          }
+          confirmLabel="确认删除"
+          loading={Boolean(deletingWeeklyReviewId)}
+          onCancel={() => {
+            if (!deletingWeeklyReviewId) {
+              setWeeklyReviewDeleteTarget(null);
+            }
+          }}
+          onConfirm={() => void handleDeleteWeeklyReview()}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="space-y-7">
@@ -763,9 +1202,42 @@ export function AiPage() {
             <Badge tone={result.tone}>Life AI</Badge>
           </div>
           <h2 className="text-lg font-semibold">{result.title}</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{result.detail}</p>
+          {result.weeklyReview ? (
+            <div className="mt-4">
+              <WeeklyReviewPanel review={result.weeklyReview} />
+            </div>
+          ) : (
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{result.detail}</p>
+          )}
         </Card>
       ) : null}
+
+      <section>
+        <SectionHeader
+          title="历史周报"
+          meta={weeklyReviewsLoading ? '同步中' : `${weeklyReviews.length} 篇`}
+        />
+        <button
+          type="button"
+          className="flex w-full cursor-pointer items-center gap-4 rounded-[1.25rem] border border-life-health/20 bg-card p-4 text-left transition hover:bg-secondary"
+          onClick={() => setWeeklyReviewArchiveOpen(true)}
+        >
+          <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+            <History className="size-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-base font-semibold">查看历史周报</h2>
+            <p className="mt-1 truncate text-sm text-muted-foreground">
+              {weeklyReviewsLoading
+                ? '正在同步已存档周报'
+                : latestWeeklyReview
+                  ? `${latestWeeklyReview.weekStart} - ${latestWeeklyReview.weekEnd}`
+                  : '生成服务端 AI 每周回顾后会保存到这里'}
+            </p>
+          </div>
+          <ArrowRight className="size-5 shrink-0 text-muted-foreground" />
+        </button>
+      </section>
 
       {adviceCards.length > 0 ? (
         <section>
@@ -896,6 +1368,7 @@ export function AiPage() {
       <CreatePlanDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
       <ImageAnalysisDrawer
         open={imageDrawerOpen}
+        token={token}
         onOpenChange={setImageDrawerOpen}
         onCreatePlan={(input) => {
           void addPlan(input);
@@ -923,6 +1396,24 @@ export function AiPage() {
           });
         }}
         onAnalyzed={(title) => addAiAction(title)}
+      />
+      <ConfirmDialog
+        open={Boolean(weeklyReviewRegenerateTarget)}
+        title="重新生成本周周报？"
+        description={
+          weeklyReviewRegenerateTarget
+            ? `${weeklyReviewRegenerateTarget.weekStart} 至 ${weeklyReviewRegenerateTarget.weekEnd} 已有周报，重新生成会覆盖本周存档内容。`
+            : ''
+        }
+        confirmLabel="重新生成"
+        loadingLabel="生成中"
+        loading={quickActionLoading === '每周回顾'}
+        onCancel={() => {
+          if (quickActionLoading !== '每周回顾') {
+            setWeeklyReviewRegenerateTarget(null);
+          }
+        }}
+        onConfirm={() => void runWeeklyReview().then(() => setWeeklyReviewRegenerateTarget(null))}
       />
     </div>
   );
