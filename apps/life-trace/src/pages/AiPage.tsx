@@ -2,11 +2,8 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  Bot,
   CalendarDays,
   Check,
-  ChevronDown,
-  ChevronUp,
   Clock,
   CloudSun,
   History,
@@ -17,9 +14,9 @@ import {
   Send,
   Sparkles,
   Trash2,
-  UserRound,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   deleteWeeklyReview,
   generateTodayAdvice,
@@ -27,10 +24,18 @@ import {
   listWeeklyReviews,
   type WeeklyReviewResponse,
 } from '@/api/advice';
-import { type LifeAssistantMessage, streamLifeAssistant } from '@/api/assistant';
+import {
+  clearLifeAssistantConversation,
+  getLifeAssistantConversation,
+  type LifeAssistantMessage,
+  saveLifeAssistantMessage,
+  streamLifeAssistant,
+} from '@/api/assistant';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { AssistantMessageCard } from '@/components/AssistantMessageCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
+import { EmptyState } from '@/components/EmptyState';
 import { ImageAnalysisDrawer } from '@/components/ImageAnalysisDrawer';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +68,7 @@ type WeeklyReviewDisplay = Pick<
 
 type AssistantMessage = LifeAssistantMessage & {
   id: string;
+  createdAt?: string;
 };
 
 type AssistantPlanDraft = {
@@ -206,6 +212,87 @@ const ASSISTANT_PENDING_PLAN_KEY = 'life-trace-assistant-pending-plan';
 const ASSISTANT_RESULT_KEY = 'life-trace-assistant-result';
 const COLLAPSED_ASSISTANT_MESSAGE_COUNT = 4;
 const confirmPlanPattern = /^(可以|可以的|好|好的|确定|确认|没问题|就这样|行|安排|创建|加入计划)/;
+
+function normalizeAssistantMessage(message: LifeAssistantMessage, index: number): AssistantMessage {
+  return {
+    id: message.id || `${message.role}-${message.createdAt || Date.now()}-${index}`,
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt,
+  };
+}
+
+function getAssistantMessageDate(message: AssistantMessage) {
+  if (message.createdAt) {
+    const date = new Date(message.createdAt);
+    if (!Number.isNaN(date.getTime())) {
+      return date;
+    }
+  }
+
+  const timestamp = message.id.match(/(?:user|assistant)-(\d+)/)?.[1];
+  if (timestamp) {
+    const date = new Date(Number(timestamp));
+    if (!Number.isNaN(date.getTime())) {
+      return date;
+    }
+  }
+
+  return null;
+}
+
+function formatAssistantMessageTime(message: AssistantMessage) {
+  const date = getAssistantMessageDate(message);
+  if (!date) {
+    return '';
+  }
+
+  return date.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getAssistantHistoryGroupLabel(message: AssistantMessage, now = new Date()) {
+  const date = getAssistantMessageDate(message);
+  if (!date) {
+    return '更早';
+  }
+
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfMessageDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const dayDiff = Math.round((startOfToday - startOfMessageDay) / 86400000);
+
+  if (dayDiff === 0) {
+    return '今天';
+  }
+  if (dayDiff === 1) {
+    return '昨天';
+  }
+  if (dayDiff < 7) {
+    return `${dayDiff} 天前`;
+  }
+  return date.toLocaleDateString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
+function groupAssistantMessages(messages: AssistantMessage[]) {
+  const groups: Array<{ label: string; messages: AssistantMessage[] }> = [];
+
+  for (const message of messages) {
+    const label = getAssistantHistoryGroupLabel(message);
+    const latestGroup = groups[groups.length - 1];
+    if (latestGroup?.label === label) {
+      latestGroup.messages.push(message);
+    } else {
+      groups.push({ label, messages: [message] });
+    }
+  }
+
+  return groups;
+}
 
 function readAssistantMessages() {
   try {
@@ -418,9 +505,13 @@ function WeeklyReviewsArchive({
       ) : null}
 
       {!loading && reviews.length === 0 ? (
-        <Card className="border-life-health/20 p-4 text-sm leading-6 text-muted-foreground">
-          还没有已存档周报。生成“服务端 AI 每周回顾”后，会自动保存到这里。
-        </Card>
+        <EmptyState
+          title="还没有历史周报"
+          description="生成“服务端 AI 每周回顾”后，会自动保存到这里。"
+          eyebrow="周报归档"
+          icon={ListChecks}
+          tone="health"
+        />
       ) : null}
 
       <div className="space-y-3">
@@ -488,6 +579,116 @@ function WeeklyReviewsArchive({
   );
 }
 
+function AssistantHistoryPage({
+  messages,
+  loading,
+  streaming,
+  onBack,
+  onRequestClear,
+  notice,
+}: {
+  messages: AssistantMessage[];
+  loading: boolean;
+  streaming: boolean;
+  onBack: () => void;
+  onRequestClear: () => void;
+  notice?: string;
+}) {
+  const groups = groupAssistantMessages(messages);
+
+  return (
+    <div className="space-y-6">
+      <header className="space-y-5">
+        <button
+          type="button"
+          className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+          onClick={onBack}
+        >
+          <ArrowLeft className="size-4" />
+          返回
+        </button>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="grid size-11 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+                <History className="size-5" />
+              </div>
+              <span className="text-2xl font-bold">对话历史</span>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              {loading ? '正在同步云端对话' : `${messages.length} 条生活助理记录`}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-full border border-border bg-card text-muted-foreground transition hover:bg-life-alert/10 hover:text-life-alert disabled:cursor-default disabled:opacity-50"
+            aria-label="清空对话历史"
+            disabled={loading || messages.length === 0}
+            onClick={onRequestClear}
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </div>
+      </header>
+
+      {notice ? (
+        <Card className="border-life-trace/20 bg-life-trace/10 p-4 text-sm font-semibold text-life-trace">
+          {notice}
+        </Card>
+      ) : null}
+
+      <section>
+        <SectionHeader title="全部对话" meta={loading ? '同步中' : `${messages.length} 条`} />
+        {loading && messages.length === 0 ? (
+          <div className="space-y-3">
+            {[0, 1, 2].map((item) => (
+              <Card key={item} className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="size-9 animate-pulse rounded-full bg-secondary motion-reduce:animate-none" />
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div className="h-3 w-24 animate-pulse rounded-full bg-secondary motion-reduce:animate-none" />
+                    <div className="h-3 w-full animate-pulse rounded-full bg-secondary motion-reduce:animate-none" />
+                    <div className="h-3 w-2/3 animate-pulse rounded-full bg-secondary motion-reduce:animate-none" />
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : groups.length > 0 ? (
+          <div className="space-y-5">
+            {groups.map((group) => (
+              <div key={group.label} className="space-y-3">
+                <div className="sticky top-0 z-10 -mx-1 bg-background/80 px-1 py-1 backdrop-blur">
+                  <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
+                    {group.label}
+                  </span>
+                </div>
+                {group.messages.map((message) => (
+                  <AssistantMessageCard
+                    key={message.id}
+                    message={message}
+                    meta={formatAssistantMessageTime(message)}
+                    streaming={streaming && message.id === messages[messages.length - 1]?.id}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="还没有对话"
+            description="回到 Life AI，说一句“帮我安排今天晚上”，生活助理会把对话记录同步到这里。"
+            eyebrow="生活助理"
+            icon={History}
+            tone="ai"
+            align="center"
+          />
+        )}
+      </section>
+    </div>
+  );
+}
+
 function formatWeeklyReviewDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -518,6 +719,8 @@ export function AiPage() {
     (state) => state.generateTraceFromLatestPlan,
   );
   const token = useAuthStore((state) => state.token);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false);
   const [result, setResult] = useState<AiResult | null>(readAssistantResult);
@@ -528,14 +731,16 @@ export function AiPage() {
   const [pendingAssistantPlan, setPendingAssistantPlan] = useState<AssistantPlanDraft | null>(
     readPendingAssistantPlan,
   );
-  const [showAllAssistantMessages, setShowAllAssistantMessages] = useState(false);
+  const [assistantClearConfirmOpen, setAssistantClearConfirmOpen] = useState(false);
+  const [assistantClearing, setAssistantClearing] = useState(false);
+  const [assistantHistoryNotice, setAssistantHistoryNotice] = useState('');
   const [assistantStreaming, setAssistantStreaming] = useState(false);
+  const [assistantHistoryLoading, setAssistantHistoryLoading] = useState(false);
   const [assistantModel, setAssistantModel] = useState('');
   const [quickActionLoading, setQuickActionLoading] = useState<string | null>(null);
   const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
   const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReviewResponse[]>([]);
   const [weeklyReviewsLoading, setWeeklyReviewsLoading] = useState(false);
-  const [weeklyReviewArchiveOpen, setWeeklyReviewArchiveOpen] = useState(false);
   const [weeklyReviewRegenerateTarget, setWeeklyReviewRegenerateTarget] =
     useState<WeeklyReviewResponse | null>(null);
   const [weeklyReviewDeleteTarget, setWeeklyReviewDeleteTarget] =
@@ -551,15 +756,11 @@ export function AiPage() {
   const completedCheckinCount = todayCheckins.filter((item) => item.completed).length;
   const activeHabitCount = settings.habits.length;
   const latestTrace = traces[0];
-  const visibleAssistantMessages = showAllAssistantMessages
-    ? assistantMessages
-    : assistantMessages.slice(-COLLAPSED_ASSISTANT_MESSAGE_COUNT);
-  const hiddenAssistantMessageCount = Math.max(
-    0,
-    assistantMessages.length - visibleAssistantMessages.length,
-  );
+  const latestAssistantMessages = assistantMessages.slice(-COLLAPSED_ASSISTANT_MESSAGE_COUNT);
   const latestWeeklyReview = weeklyReviews[0];
   const currentWeekReview = findCurrentWeekReview(weeklyReviews);
+  const assistantHistoryOpen = location.pathname === '/ai/history';
+  const weeklyReviewArchiveOpen = location.pathname === '/ai/weekly-reviews';
 
   const placeholder = useMemo(
     () => `${settings.city} · ${settings.commuteMethod}通勤 · ${openPlanCount} 个待完成计划`,
@@ -576,6 +777,7 @@ export function AiPage() {
 
   useEffect(() => {
     if (!token) {
+      setAssistantMessages(readAssistantMessages());
       setWeeklyReviews([]);
       return;
     }
@@ -585,6 +787,38 @@ export function AiPage() {
       .then((data) => setWeeklyReviews(data.list))
       .catch(() => setWeeklyReviews([]))
       .finally(() => setWeeklyReviewsLoading(false));
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      setAssistantHistoryLoading(false);
+      return;
+    }
+
+    let alive = true;
+    setAssistantHistoryLoading(true);
+    getLifeAssistantConversation(token)
+      .then((data) => {
+        if (!alive) {
+          return;
+        }
+        setAssistantMessages(data.messages.map(normalizeAssistantMessage));
+      })
+      .catch(() => {
+        if (!alive) {
+          return;
+        }
+        setAssistantMessages(readAssistantMessages());
+      })
+      .finally(() => {
+        if (alive) {
+          setAssistantHistoryLoading(false);
+        }
+      });
+
+    return () => {
+      alive = false;
+    };
   }, [token]);
 
   useEffect(() => {
@@ -608,6 +842,20 @@ export function AiPage() {
 
     localStorage.removeItem(ASSISTANT_RESULT_KEY);
   }, [result]);
+
+  const saveAssistantMessageToServer = async (
+    message: Pick<LifeAssistantMessage, 'role' | 'content'>,
+  ) => {
+    if (!token || !message.content.trim()) {
+      return;
+    }
+
+    try {
+      await saveLifeAssistantMessage(token, message);
+    } catch {
+      // Keep the conversation usable even when persistence is temporarily unavailable.
+    }
+  };
 
   const createAssistantPlan = async (draft: AssistantPlanDraft) => {
     setResult({
@@ -821,12 +1069,14 @@ export function AiPage() {
       id: `user-${Date.now()}`,
       role: 'user',
       content: message,
+      createdAt: new Date().toISOString(),
     };
     const assistantId = `assistant-${Date.now()}`;
     const assistantMessage: AssistantMessage = {
       id: assistantId,
       role: 'assistant',
       content: '',
+      createdAt: new Date().toISOString(),
     };
 
     setAssistantInput('');
@@ -834,6 +1084,7 @@ export function AiPage() {
     setAssistantModel('');
     setAssistantStreaming(true);
     setAssistantMessages((items) => [...items, userMessage, assistantMessage]);
+    void saveAssistantMessageToServer({ role: 'user', content: message });
 
     let reply = '';
     const confirmedPendingPlan =
@@ -862,6 +1113,7 @@ export function AiPage() {
         },
       });
       setAssistantStreaming(false);
+      void saveAssistantMessageToServer({ role: 'assistant', content: reply });
       if (planDraft) {
         await createAssistantPlan(planDraft);
       }
@@ -880,17 +1132,36 @@ export function AiPage() {
             : item,
         ),
       );
+      if (reply.trim()) {
+        void saveAssistantMessageToServer({ role: 'assistant', content: reply });
+      }
     } finally {
       setAssistantStreaming(false);
     }
   };
 
-  const handleClearAssistantMessages = () => {
+  const handleClearAssistantMessages = async () => {
+    setAssistantClearing(true);
+    if (token) {
+      try {
+        await clearLifeAssistantConversation(token);
+      } catch {
+        setResult({
+          title: '清空对话失败',
+          detail: '服务端暂时没有清空成功，请稍后重试。',
+          tone: 'alert',
+        });
+        setAssistantClearing(false);
+        return;
+      }
+    }
     setAssistantMessages([]);
     setPendingAssistantPlan(null);
     setResult(null);
     setAssistantModel('');
-    setShowAllAssistantMessages(false);
+    setAssistantClearConfirmOpen(false);
+    setAssistantClearing(false);
+    setAssistantHistoryNotice('对话历史已清空');
   };
 
   const handleAddAdvicePlan = async (item: AdvicePayload) => {
@@ -973,6 +1244,35 @@ export function AiPage() {
     }
   };
 
+  if (assistantHistoryOpen) {
+    return (
+      <>
+        <AssistantHistoryPage
+          messages={assistantMessages}
+          loading={assistantHistoryLoading}
+          streaming={assistantStreaming}
+          notice={assistantHistoryNotice}
+          onBack={() => navigate('/ai')}
+          onRequestClear={() => setAssistantClearConfirmOpen(true)}
+        />
+        <ConfirmDialog
+          open={assistantClearConfirmOpen}
+          title="清空对话历史？"
+          description="清空后，这个账号的生活助理对话记录会从云端删除。"
+          confirmLabel="确认清空"
+          loadingLabel="清空中"
+          loading={assistantClearing}
+          onCancel={() => {
+            if (!assistantClearing) {
+              setAssistantClearConfirmOpen(false);
+            }
+          }}
+          onConfirm={() => void handleClearAssistantMessages()}
+        />
+      </>
+    );
+  }
+
   if (weeklyReviewArchiveOpen) {
     return (
       <>
@@ -981,7 +1281,7 @@ export function AiPage() {
           loading={weeklyReviewsLoading}
           deletingId={deletingWeeklyReviewId}
           expandedId={expandedWeeklyReviewId}
-          onBack={() => setWeeklyReviewArchiveOpen(false)}
+          onBack={() => navigate('/ai')}
           onToggleExpanded={(review) =>
             setExpandedWeeklyReviewId((current) => toggleExpandedWeeklyReviewId(current, review.id))
           }
@@ -1124,74 +1424,36 @@ export function AiPage() {
             <div className="min-w-0">
               <p className="text-sm font-semibold">最近对话</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {showAllAssistantMessages
-                  ? `已展开 ${assistantMessages.length} 条本地记录`
-                  : hiddenAssistantMessageCount
-                    ? `显示最近 ${visibleAssistantMessages.length} 条，已收起 ${hiddenAssistantMessageCount} 条`
-                    : `共 ${assistantMessages.length} 条本地记录`}
+                {assistantHistoryLoading
+                  ? '正在同步云端对话'
+                  : `最近 ${latestAssistantMessages.length} 条 / 共 ${assistantMessages.length} 条`}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {assistantMessages.length > COLLAPSED_ASSISTANT_MESSAGE_COUNT ? (
-                <button
-                  type="button"
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-                  onClick={() => setShowAllAssistantMessages((value) => !value)}
-                >
-                  {showAllAssistantMessages ? (
-                    <ChevronUp className="size-3.5" />
-                  ) : (
-                    <ChevronDown className="size-3.5" />
-                  )}
-                  {showAllAssistantMessages ? '收起' : '展开'}
-                </button>
-              ) : null}
               <button
                 type="button"
-                className="grid size-9 cursor-pointer place-items-center rounded-full border border-border bg-card text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-                aria-label="清空最近对话"
-                onClick={handleClearAssistantMessages}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                onClick={() => {
+                  setAssistantHistoryNotice('');
+                  navigate('/ai/history');
+                }}
               >
-                <Trash2 className="size-4" />
+                <History className="size-3.5" />
+                历史
               </button>
             </div>
           </div>
 
-          {visibleAssistantMessages.map((message) => {
-            const isUser = message.role === 'user';
-            const Icon = isUser ? UserRound : Bot;
-
-            return (
-              <Card
-                key={message.id}
-                className={`p-4 ${isUser ? 'border-border bg-card/80' : 'border-life-ai/20 bg-life-ai/5'}`}
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`grid size-9 shrink-0 place-items-center rounded-full ${
-                      isUser ? 'bg-secondary text-foreground' : 'bg-life-ai/15 text-life-ai'
-                    }`}
-                  >
-                    <Icon className="size-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-muted-foreground">
-                      {isUser ? '你' : 'Life Trace 生活助理'}
-                    </p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
-                      {message.content ||
-                        (assistantStreaming ? '正在结合今日状态整理安排...' : '暂无回复')}
-                      {!isUser &&
-                      assistantStreaming &&
-                      message.id === assistantMessages[assistantMessages.length - 1]?.id ? (
-                        <span className="ml-1 inline-block h-4 w-1 animate-pulse rounded-full bg-life-ai align-[-2px]" />
-                      ) : null}
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+          {latestAssistantMessages.map((message) => (
+            <AssistantMessageCard
+              key={message.id}
+              message={message}
+              streaming={
+                assistantStreaming &&
+                message.id === assistantMessages[assistantMessages.length - 1]?.id
+              }
+            />
+          ))}
         </section>
       ) : null}
 
@@ -1220,7 +1482,7 @@ export function AiPage() {
         <button
           type="button"
           className="flex w-full cursor-pointer items-center gap-4 rounded-[1.25rem] border border-life-health/20 bg-card p-4 text-left transition hover:bg-secondary"
-          onClick={() => setWeeklyReviewArchiveOpen(true)}
+          onClick={() => navigate('/ai/weekly-reviews')}
         >
           <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
             <History className="size-6" />

@@ -14,6 +14,9 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			ai.POST("/weekly-review", handler.GenerateWeeklyReview)
 			ai.POST("/image-analysis", handler.AnalyzeImage)
 			ai.POST("/assistant/stream", handler.StreamAssistant)
+			ai.GET("/conversation", handler.GetAssistantConversation)
+			ai.POST("/conversation/messages", handler.CreateAssistantMessage)
+			ai.DELETE("/conversation", handler.ClearAssistantConversation)
 		}
 
 		plans := group.Group("/plans")

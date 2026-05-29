@@ -1,8 +1,23 @@
-import { API_BASE } from '@/api/request';
+import { API_BASE, apiRequest } from '@/api/request';
 
 export type LifeAssistantMessage = {
+  id?: string;
   role: 'user' | 'assistant';
   content: string;
+  createdAt?: string;
+};
+
+export type LifeAssistantConversation = {
+  id: string;
+  title: string;
+  status: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type LifeAssistantConversationResponse = {
+  conversation: LifeAssistantConversation;
+  messages: LifeAssistantMessage[];
 };
 
 type AssistantStreamChunk = {
@@ -91,4 +106,26 @@ export async function streamLifeAssistant(token: string, options: StreamOptions)
   if (buffer.trim()) {
     handleEvent(buffer);
   }
+}
+
+export function getLifeAssistantConversation(token: string) {
+  return apiRequest<LifeAssistantConversationResponse>('/life-trace/ai/conversation', token, {
+    method: 'GET',
+  });
+}
+
+export function saveLifeAssistantMessage(
+  token: string,
+  message: Pick<LifeAssistantMessage, 'role' | 'content'>,
+) {
+  return apiRequest<LifeAssistantMessage>('/life-trace/ai/conversation/messages', token, {
+    method: 'POST',
+    body: JSON.stringify(message),
+  });
+}
+
+export function clearLifeAssistantConversation(token: string) {
+  return apiRequest<{ conversationId: string }>('/life-trace/ai/conversation', token, {
+    method: 'DELETE',
+  });
 }

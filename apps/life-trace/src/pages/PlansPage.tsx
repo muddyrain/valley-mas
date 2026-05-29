@@ -1,9 +1,11 @@
 import { Bell, BellOff, Check, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
+import { EmptyState } from '@/components/EmptyState';
 import { PlanDetailDrawer } from '@/components/PlanDetailDrawer';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
@@ -61,10 +63,11 @@ export function PlansPage() {
     completePlan,
     removePlan,
   } = useLifeTraceStore();
+  const navigate = useNavigate();
+  const { planId } = useParams<{ planId?: string }>();
   const pageRef = useRef<HTMLDivElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<PlanFilter>('all');
   const [deleteTarget, setDeleteTarget] = useState<Plan | null>(null);
   const filteredPlans = filterPlans(plans, activeFilter);
@@ -76,10 +79,14 @@ export function PlansPage() {
     { title: '今日计划', plans: filteredGroups.todayPlans },
     { title: '其他计划', plans: filteredGroups.otherPlans },
   ].filter((group) => group.plans.length > 0);
-  const selectedPlan = selectedPlanId
-    ? (plans.find((plan) => plan.id === selectedPlanId) ?? null)
-    : null;
+  const selectedPlan = planId ? (plans.find((plan) => plan.id === planId) ?? null) : null;
   const deletePending = deleteTarget ? Boolean(planDeletingById[deleteTarget.id]) : false;
+
+  useEffect(() => {
+    if (planId && !plansLoading && plans.length > 0 && !selectedPlan) {
+      navigate('/plans', { replace: true });
+    }
+  }, [navigate, planId, plans.length, plansLoading, selectedPlan]);
 
   useGSAP(
     () => {
@@ -133,11 +140,11 @@ export function PlansPage() {
         role="button"
         tabIndex={0}
         data-plan-card
-        onClick={() => setSelectedPlanId(plan.id)}
+        onClick={() => navigate(`/plans/${plan.id}`)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
-            setSelectedPlanId(plan.id);
+            navigate(`/plans/${plan.id}`);
           }
         }}
       >
@@ -299,18 +306,25 @@ export function PlansPage() {
           </section>
         ))}
         {!plansLoading && planGroups.length === 0 ? (
-          <Card className="space-y-2 p-5 text-sm text-muted-foreground">
-            <p>{activeFilterConfig.emptyText}</p>
-            {activeFilter !== 'all' && plans.length > 0 ? (
-              <button
-                type="button"
-                className="cursor-pointer text-life-ai transition hover:text-life-ai/80"
-                onClick={() => setActiveFilter('all')}
-              >
-                查看全部计划
-              </button>
-            ) : null}
-          </Card>
+          <EmptyState
+            title={activeFilter === 'all' ? '还没有计划' : '暂无匹配计划'}
+            description={activeFilterConfig.emptyText}
+            eyebrow={activeFilterConfig.label}
+            icon={Plus}
+            tone="plan"
+            action={
+              activeFilter !== 'all' && plans.length > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActiveFilter('all')}
+                >
+                  查看全部计划
+                </Button>
+              ) : null
+            }
+          />
         ) : null}
       </div>
 
@@ -348,15 +362,15 @@ export function PlansPage() {
         plan={selectedPlan}
         completing={selectedPlan ? Boolean(planCompletingById[selectedPlan.id]) : false}
         deleting={selectedPlan ? Boolean(planDeletingById[selectedPlan.id]) : false}
-        onClose={() => setSelectedPlanId(null)}
+        onClose={() => navigate('/plans')}
         onComplete={(plan) => void completePlan(plan.id)}
         onEdit={(plan) => {
-          setSelectedPlanId(null);
+          navigate('/plans');
           setEditingPlan(plan);
           setDrawerOpen(true);
         }}
         onDelete={(plan) => {
-          setSelectedPlanId(null);
+          navigate('/plans');
           setDeleteTarget(plan);
         }}
       />

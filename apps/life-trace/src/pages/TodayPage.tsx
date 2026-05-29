@@ -17,6 +17,7 @@ import {
   Wind,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { generateTodayAdvice } from '@/api/advice';
 import { fetchLifeTraceWeather, type WeatherApiResponse } from '@/api/weather';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
@@ -152,11 +153,11 @@ export function TodayPage() {
   const checkinTogglingByName = useLifeTraceStore((state) => state.checkinTogglingByName);
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
-  const setActiveTab = useLifeTraceStore((state) => state.setActiveTab);
   const addPlan = useLifeTraceStore((state) => state.addPlan);
   const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
   const toggleHabitCheckin = useLifeTraceStore((state) => state.toggleHabitCheckin);
   const token = useAuthStore((state) => state.token);
+  const navigate = useNavigate();
   const [weather, setWeather] = useState<WeatherApiResponse>({
     ...fallbackWeather,
     city: settings.city,
@@ -519,7 +520,7 @@ export function TodayPage() {
         <button
           type="button"
           className="rounded-full p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-          onClick={() => setActiveTab('profile')}
+          onClick={() => navigate('/profile')}
         >
           <Settings className="size-5" />
         </button>
@@ -809,7 +810,7 @@ export function TodayPage() {
           <button
             type="button"
             className="shrink-0 cursor-pointer rounded-full bg-secondary px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
-            onClick={() => setActiveTab('plans')}
+            onClick={() => navigate('/plans')}
           >
             查看
           </button>

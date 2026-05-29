@@ -1,5 +1,6 @@
 import { Sparkles } from 'lucide-react';
-import { type ReactElement, useEffect } from 'react';
+import { useEffect } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AppReminderToast } from '@/components/AppReminderToast';
 import { AppShell } from '@/components/AppShell';
 import { AiPage } from '@/pages/AiPage';
@@ -12,23 +13,21 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { AppTab } from '@/types';
 
-const pages = {
-  today: <TodayPage />,
-  plans: <PlansPage />,
-  ai: <AiPage />,
-  traces: <TracesPage />,
-  profile: <ProfilePage />,
+const tabRoutes: Record<AppTab, string> = {
+  today: '/today',
+  plans: '/plans',
+  ai: '/ai',
+  traces: '/traces',
+  profile: '/profile',
 };
 
-const pageEntries = Object.entries(pages) as Array<[AppTab, ReactElement]>;
-
-export default function App() {
-  const activeTab = useLifeTraceStore((state) => state.activeTab);
-  const setActiveTab = useLifeTraceStore((state) => state.setActiveTab);
+function AppContent() {
   const loadSettings = useLifeTraceStore((state) => state.loadSettings);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
   const loadTraces = useLifeTraceStore((state) => state.loadTraces);
   const { status, token, verifySession } = useAuthStore();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (status === 'idle') {
@@ -46,11 +45,10 @@ export default function App() {
 
   useEffect(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
-    if (tab && tab in pages) {
-      setActiveTab(tab as AppTab);
-      window.history.replaceState({}, '', window.location.pathname);
+    if (tab && tab in tabRoutes) {
+      navigate(tabRoutes[tab as AppTab], { replace: true });
     }
-  }, [setActiveTab]);
+  }, [navigate]);
 
   if ((status === 'checking' && token) || status === 'idle') {
     return (
@@ -77,17 +75,27 @@ export default function App() {
   return (
     <>
       <AppShell>
-        {pageEntries.map(([tab, page]) => (
-          <section
-            key={tab}
-            hidden={activeTab !== tab}
-            data-page-entrance={activeTab === tab ? '' : undefined}
-          >
-            {page}
-          </section>
-        ))}
+        <Routes location={location}>
+          <Route path="/" element={<Navigate to="/today" replace />} />
+          <Route path="/today" element={<TodayPage />} />
+          <Route path="/plans/:planId?" element={<PlansPage />} />
+          <Route path="/ai" element={<AiPage />} />
+          <Route path="/ai/history" element={<AiPage />} />
+          <Route path="/ai/weekly-reviews" element={<AiPage />} />
+          <Route path="/traces/:traceId?" element={<TracesPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="*" element={<Navigate to="/today" replace />} />
+        </Routes>
       </AppShell>
       <AppReminderToast />
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
   );
 }

@@ -28,6 +28,8 @@ func setupTraceTestRouter(t *testing.T, userID model.Int64String) *gin.Engine {
 		&model.LifeTraceTrace{},
 		&model.LifeTraceSettings{},
 		&model.LifeTraceWeeklyReview{},
+		&model.LifeTraceAIConversation{},
+		&model.LifeTraceAIMessage{},
 	); err != nil {
 		t.Fatalf("migrate test db: %v", err)
 	}

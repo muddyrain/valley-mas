@@ -201,3 +201,43 @@ func (review *LifeTraceWeeklyReview) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+type LifeTraceAIConversation struct {
+	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID    Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	Title     string         `gorm:"size:120;not null;default:'生活助理对话'" json:"title"`
+	Status    string         `gorm:"size:20;not null;default:'active';index" json:"status"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (conversation *LifeTraceAIConversation) BeforeCreate(tx *gorm.DB) error {
+	if conversation.ID == 0 {
+		conversation.ID = Int64String(utils.GenerateID())
+	}
+	if conversation.Title == "" {
+		conversation.Title = "生活助理对话"
+	}
+	if conversation.Status == "" {
+		conversation.Status = "active"
+	}
+	return nil
+}
+
+type LifeTraceAIMessage struct {
+	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID         Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	ConversationID Int64String    `gorm:"column:conversation_id;index;not null" json:"conversationId"`
+	Role           string         `gorm:"size:20;not null;index" json:"role"`
+	Content        string         `gorm:"type:text;not null" json:"content"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (message *LifeTraceAIMessage) BeforeCreate(tx *gorm.DB) error {
+	if message.ID == 0 {
+		message.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
