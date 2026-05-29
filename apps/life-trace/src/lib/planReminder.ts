@@ -1,5 +1,5 @@
 import type { Plan } from '@/types';
-import { getPlanScheduledDateTime, parseClockTime } from './planSchedule';
+import { buildScheduledDateTime, getPlanScheduledDateTime, parseClockTime } from './planSchedule';
 
 const weekdayMap: Record<string, number> = {
   周日: 0,
@@ -48,13 +48,8 @@ function getDaysUntilWeekday(base: Date, targetWeekday: number) {
   return diff === 0 ? 7 : diff;
 }
 
-export function parsePlanReminderDate(plan: Plan, now = new Date()) {
-  const scheduledDateTime = getPlanScheduledDateTime(plan);
-  if (scheduledDateTime) {
-    return scheduledDateTime;
-  }
-
-  const [datePart, timePart] = plan.timeLabel.trim().split(/\s+/);
+function parseTimeLabelDate(timeLabel: string, now: Date) {
+  const [datePart, timePart] = timeLabel.trim().split(/\s+/);
   if (!datePart || !timePart) {
     return null;
   }
@@ -79,6 +74,66 @@ export function parsePlanReminderDate(plan: Plan, now = new Date()) {
   }
 
   return null;
+}
+
+export function parsePlanReminderDate(plan: Plan, now = new Date()) {
+  const scheduledDateTime = getPlanScheduledDateTime(plan);
+  if (scheduledDateTime) {
+    return scheduledDateTime;
+  }
+
+  return parseTimeLabelDate(plan.timeLabel, now);
+}
+
+export function formatReminderDateText(dueAt: Date, now = new Date()) {
+  const base = new Date(now);
+  base.setHours(0, 0, 0, 0);
+  const target = new Date(dueAt);
+  target.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((target.getTime() - base.getTime()) / 86_400_000);
+
+  if (diffDays === -2) {
+    return '前天';
+  }
+  if (diffDays === -1) {
+    return '昨天';
+  }
+  if (diffDays === 0) {
+    return '今天';
+  }
+  if (diffDays === 1) {
+    return '明天';
+  }
+  if (diffDays === 2) {
+    return '后天';
+  }
+
+  return dueAt.toLocaleDateString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
+export function formatReminderTimeText(dueAt: Date) {
+  return dueAt.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function getPlanDisplayTimeParts(
+  plan: Pick<Plan, 'scheduledDate' | 'scheduledTime' | 'timeLabel'>,
+  now = new Date(),
+) {
+  const scheduledDateTime = buildScheduledDateTime(plan.scheduledDate, plan.scheduledTime);
+  if (scheduledDateTime) {
+    return {
+      dateText: formatReminderDateText(scheduledDateTime, now),
+      timeText: formatReminderTimeText(scheduledDateTime),
+    };
+  }
+
+  return splitPlanTimeLabel(plan.timeLabel);
 }
 
 export function getReminderRelativeText(dueAt: Date, now = new Date()) {
@@ -112,11 +167,10 @@ export function getNextReminder(plans: Plan[], now = new Date()): NextReminder |
     return null;
   }
 
-  const { dateText, timeText } = splitPlanTimeLabel(next.plan.timeLabel);
   return {
     ...next,
-    dateText,
-    timeText,
+    dateText: formatReminderDateText(next.dueAt, now),
+    timeText: formatReminderTimeText(next.dueAt),
     relativeText: getReminderRelativeText(next.dueAt, now),
   };
 }
@@ -158,6 +212,7 @@ export function getDueReminder(
 
   return {
     ...due,
-    ...splitPlanTimeLabel(due.plan.timeLabel),
+    dateText: formatReminderDateText(due.dueAt, now),
+    timeText: formatReminderTimeText(due.dueAt),
   };
 }

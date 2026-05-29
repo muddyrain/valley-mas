@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   Bell,
   CalendarDays,
   Car,
@@ -29,7 +30,11 @@ import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import { gsap, useGSAP } from '@/lib/gsap';
 import { getNextReminder } from '@/lib/planReminder';
 import { getLocalISODate } from '@/lib/planSchedule';
-import { buildWeatherBrief, buildWeatherDrivenAdvice } from '@/lib/weatherAdvice';
+import {
+  buildWeatherAlerts,
+  buildWeatherBrief,
+  buildWeatherDrivenAdvice,
+} from '@/lib/weatherAdvice';
 import { readWeatherCache, writeWeatherCache } from '@/lib/weatherCache';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -164,9 +169,11 @@ export function TodayPage() {
   });
   const [weatherReady, setWeatherReady] = useState(false);
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState('');
   const [remoteAdvice, setRemoteAdvice] = useState<AdvicePayload[] | null>(null);
   const [remoteAdviceSummary, setRemoteAdviceSummary] = useState('');
   const [adviceLoading, setAdviceLoading] = useState(false);
+  const [adviceRefreshing, setAdviceRefreshing] = useState(false);
   const [planToast, setPlanToast] = useState('');
   const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -219,6 +226,8 @@ export function TodayPage() {
     (settings.aiPersonalization && adviceLoading && !remoteAdvice);
   const showAdviceEmpty = settings.aiPersonalization && !adviceLoading && !remoteAdvice;
   const localBrief = buildWeatherBrief(weather, settings);
+  const weatherAlerts = useMemo(() => buildWeatherAlerts(weather), [weather]);
+  const weatherNotice = weatherError || weather.warning || '';
   const shouldWaitForAiBrief = Boolean(token) && (!settingsLoaded || settings.aiPersonalization);
   const showBriefSkeleton = !remoteAdviceSummary && (!weatherReady || shouldWaitForAiBrief);
   const aiBriefTitle = remoteAdviceSummary ? 'AI 已读今日状态' : localBrief.title;
@@ -228,6 +237,20 @@ export function TodayPage() {
     todayCheckins.some((item) => item.name === name && item.completed),
   ).length;
   const habitProgress = `${completedHabitCount}/${habitNames.length}`;
+  const checkinAdviceText = adviceLoading
+    ? '正在结合今日打卡刷新建议。'
+    : completedHabitCount > 0
+      ? `已完成 ${completedHabitCount} 项，AI 建议会优先避开重复提醒。`
+      : '先完成一个小打卡，AI 建议会更贴近今天的真实状态。';
+  const adviceStatusText = remoteAdvice
+    ? adviceRefreshing
+      ? 'AI 刷新中'
+      : 'AI 建议'
+    : adviceLoading
+      ? '生成中'
+      : settings.aiPersonalization
+        ? '等待 AI'
+        : '基础建议';
 
   useLifeTraceEntrance(pageRef, {
     selector: '[data-today-entrance], [data-today-stagger]',
@@ -362,11 +385,13 @@ export function TodayPage() {
       setWeather(cached);
       setWeatherReady(true);
       setWeatherLoading(false);
+      setWeatherError(cached.warning ?? '');
       return () => controller.abort();
     }
 
     setWeatherReady(false);
     setWeatherLoading(true);
+    setWeatherError('');
 
     fetchLifeTraceWeather(settings.city, { signal: controller.signal })
       .then((resp) => {
@@ -374,11 +399,13 @@ export function TodayPage() {
           return;
         }
         setWeather(resp);
+        setWeatherError(resp.warning ?? '');
         writeWeatherCache(window.localStorage, settings.city, resp);
       })
       .catch(() => {
         if (!controller.signal.aborted) {
           setWeather({ ...fallbackWeather, city: settings.city });
+          setWeatherError('天气加载失败，已显示本地参考天气');
         }
       })
       .finally(() => {
@@ -396,6 +423,7 @@ export function TodayPage() {
       setRemoteAdvice(null);
       setRemoteAdviceSummary('');
       setAdviceLoading(false);
+      setAdviceRefreshing(false);
       return;
     }
 
@@ -409,14 +437,20 @@ export function TodayPage() {
       setRemoteAdviceSummary('');
     }
     setAdviceLoading(!cached);
+    setAdviceRefreshing(Boolean(cached));
 
     const timer = window.setTimeout(() => {
       if (!cached) {
         setAdviceLoading(true);
+      } else {
+        setAdviceRefreshing(true);
       }
 
       generateTodayAdvice(token, { signal: controller.signal })
         .then((resp) => {
+          if (controller.signal.aborted) {
+            return;
+          }
           setRemoteAdvice(resp.list);
           setRemoteAdviceSummary(resp.summary);
           writeCachedAdvice({
@@ -435,6 +469,7 @@ export function TodayPage() {
         .finally(() => {
           if (!controller.signal.aborted) {
             setAdviceLoading(false);
+            setAdviceRefreshing(false);
           }
         });
     }, 250);
@@ -480,14 +515,19 @@ export function TodayPage() {
     }
 
     setWeatherLoading(true);
+    setWeatherError('');
     fetchLifeTraceWeather(settings.city, { refresh: true })
       .then((resp) => {
         setWeather(resp);
         setWeatherReady(true);
+        setWeatherError(resp.warning ?? '');
         writeWeatherCache(window.localStorage, settings.city, resp);
         setPlanToast(resp.refreshLimited ? '刚刚刷新过，已使用缓存天气' : '天气已刷新');
       })
-      .catch(() => setPlanToast('天气刷新失败，稍后再试'))
+      .catch(() => {
+        setWeatherError('天气刷新失败，已保留当前天气');
+        setPlanToast('天气刷新失败，稍后再试');
+      })
       .finally(() => setWeatherLoading(false));
   };
 
@@ -639,6 +679,52 @@ export function TodayPage() {
               })}
             </div>
 
+            {weatherNotice ? (
+              <div className="mt-4 rounded-2xl border border-life-alert/25 bg-life-alert/10 px-3 py-3 text-sm leading-6 text-life-alert">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                    <span>{weatherNotice}</span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={weatherLoading}
+                    className="shrink-0 cursor-pointer rounded-full bg-background/70 px-3 py-1 text-xs font-semibold text-life-alert transition hover:bg-background disabled:cursor-default disabled:opacity-60"
+                    onClick={handleRefreshWeather}
+                  >
+                    {weatherLoading ? '重试中' : '重试'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {weatherAlerts.length > 0 ? (
+              <div className="mt-4 grid gap-2" data-today-stagger>
+                {weatherAlerts.map((alert) => {
+                  const tone = adviceToneClasses[alert.tone];
+
+                  return (
+                    <div
+                      key={alert.id}
+                      className={`rounded-2xl border px-3 py-3 ${tone.bg} ${
+                        alert.tone === 'alert'
+                          ? 'border-life-alert/25'
+                          : alert.tone === 'health'
+                            ? 'border-life-health/25'
+                            : 'border-life-weather/25'
+                      }`}
+                    >
+                      <div className={`flex items-center gap-2 text-sm font-semibold ${tone.text}`}>
+                        <AlertTriangle className="size-4" />
+                        {alert.title}
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{alert.detail}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+
             <div className="mt-5 flex gap-3 overflow-x-auto pb-1" data-today-stagger>
               {weather.hourly.map((item) => {
                 const Icon = item.text.includes('晴') ? Sun : Cloud;
@@ -763,9 +849,7 @@ export function TodayPage() {
         {checkinsError ? (
           <p className="mt-3 text-sm text-life-alert">{checkinsError}</p>
         ) : (
-          <p className="mt-3 text-xs text-muted-foreground">
-            打卡会同步到账号，后续会进入 AI 今日建议和每周回顾。
-          </p>
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">{checkinAdviceText}</p>
         )}
       </Card>
 
@@ -824,16 +908,15 @@ export function TodayPage() {
             tone={remoteAdvice ? 'ai' : 'default'}
             className="min-w-[92px] justify-center gap-1.5"
           >
-            {adviceLoading && !remoteAdvice ? <ActionLoadingIcon className="size-3.5" /> : null}
-            {remoteAdvice
-              ? 'AI 建议'
-              : adviceLoading
-                ? '生成中'
-                : settings.aiPersonalization
-                  ? '等待 AI'
-                  : '基础建议'}
+            {adviceLoading || adviceRefreshing ? <ActionLoadingIcon className="size-3.5" /> : null}
+            {adviceStatusText}
           </Badge>
         </div>
+        {adviceRefreshing ? (
+          <p className="mb-3 text-xs leading-5 text-muted-foreground">
+            正在根据最新天气、计划和打卡后台刷新，当前卡片先保持可用。
+          </p>
+        ) : null}
         <div className="grid min-h-[360px] grid-cols-2 gap-3">
           {showAdviceSkeleton
             ? Array.from({ length: 6 }).map((_, index) => (

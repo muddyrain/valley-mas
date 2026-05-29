@@ -1,8 +1,28 @@
 import { apiRequest } from '@/api/request';
-import type { NewPlanInput, Plan } from '@/types';
+import type { ListPagination, NewPlanInput, Plan } from '@/types';
 
-export function listPlans(token: string) {
-  return apiRequest<{ list: Plan[] }>('/life-trace/plans', token);
+export type ListPlansOptions = {
+  page?: number;
+  pageSize?: number;
+};
+
+function buildListQuery(options: ListPlansOptions = {}) {
+  const params = new URLSearchParams();
+  if (options.page) {
+    params.set('page', String(options.page));
+  }
+  if (options.pageSize) {
+    params.set('pageSize', String(options.pageSize));
+  }
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
+
+export function listPlans(token: string, options: ListPlansOptions = {}) {
+  return apiRequest<{ list: Plan[]; pagination?: ListPagination }>(
+    `/life-trace/plans${buildListQuery(options)}`,
+    token,
+  );
 }
 
 export function createPlan(token: string, input: NewPlanInput) {

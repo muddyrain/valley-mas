@@ -3,6 +3,8 @@ package lifetrace
 import (
 	"errors"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"valley-server/internal/database"
@@ -37,6 +39,13 @@ type updatePlanStatusRequest struct {
 	Completed bool `json:"completed"`
 }
 
+type listPagination struct {
+	Page     int   `json:"page"`
+	PageSize int   `json:"pageSize"`
+	Total    int64 `json:"total"`
+	HasMore  bool  `json:"hasMore"`
+}
+
 var validPlanTypes = map[string]bool{
 	"电影":   true,
 	"吃饭":   true,
@@ -52,6 +61,8 @@ var validPlanSources = map[string]bool{
 	"ai_advice":      true,
 	"image_ai":       true,
 }
+
+var planInternalMarkerPattern = regexp.MustCompile(`\s*#(?:assistant-plan|assistant-reminder|advice):[^\s。；;，,]+`)
 
 func success(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, apiResponse{Code: 0, Message: "success", Data: data})
@@ -96,6 +107,10 @@ func normalizePlanType(planType string) string {
 	return planType
 }
 
+func sanitizePlanNote(note string) string {
+	return strings.TrimSpace(planInternalMarkerPattern.ReplaceAllString(strings.TrimSpace(note), ""))
+}
+
 func normalizePlanSchedule(date string, clock string, timezone string) (string, string, string, bool) {
 	date = strings.TrimSpace(date)
 	clock = strings.TrimSpace(clock)
@@ -123,6 +138,36 @@ func normalizePlanSchedule(date string, clock string, timezone string) (string, 
 	return date, clock, timezone, true
 }
 
+func parseListPagination(c *gin.Context) (page int, pageSize int) {
+	page = parsePositiveQueryInt(c, "page", 1)
+	pageSize = parsePositiveQueryInt(c, "pageSize", 20)
+	if pageSize > 50 {
+		pageSize = 50
+	}
+	return page, pageSize
+}
+
+func parsePositiveQueryInt(c *gin.Context, key string, fallback int) int {
+	raw := strings.TrimSpace(c.Query(key))
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		return fallback
+	}
+	return value
+}
+
+func buildListPagination(page int, pageSize int, total int64) listPagination {
+	return listPagination{
+		Page:     page,
+		PageSize: pageSize,
+		Total:    total,
+		HasMore:  int64(page*pageSize) < total,
+	}
+}
+
 func (h *Handler) ListPlans(c *gin.Context) {
 	userID, ok := currentUserID(c)
 	if !ok {
@@ -130,16 +175,32 @@ func (h *Handler) ListPlans(c *gin.Context) {
 		return
 	}
 
+	page, pageSize := parseListPagination(c)
+	offset := (page - 1) * pageSize
+	var total int64
+	if err := database.GetDB().
+		Model(&model.LifeTracePlan{}).
+		Where("user_id = ?", userID).
+		Count(&total).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "获取计划失败")
+		return
+	}
+
 	var plans []model.LifeTracePlan
 	if err := database.GetDB().
 		Where("user_id = ?", userID).
 		Order("completed ASC, created_at DESC").
+		Limit(pageSize).
+		Offset(offset).
 		Find(&plans).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "获取计划失败")
 		return
 	}
 
-	success(c, gin.H{"list": plans})
+	success(c, gin.H{
+		"list":       plans,
+		"pagination": buildListPagination(page, pageSize, total),
+	})
 }
 
 func (h *Handler) CreatePlan(c *gin.Context) {
@@ -183,7 +244,7 @@ func (h *Handler) CreatePlan(c *gin.Context) {
 		Reminder:      req.Reminder,
 		ImageURL:      strings.TrimSpace(req.ImageURL),
 		Location:      strings.TrimSpace(req.Location),
-		Note:          strings.TrimSpace(req.Note),
+		Note:          sanitizePlanNote(req.Note),
 		Source:        normalizePlanSource(req.Source),
 	}
 
@@ -191,10 +252,19 @@ func (h *Handler) CreatePlan(c *gin.Context) {
 		plan.Note = "由 Life Trace 创建的新生活计划。"
 	}
 
-	if err := database.GetDB().Create(&plan).Error; err != nil {
+	db := database.GetDB()
+	if err := db.Create(&plan).Error; err != nil {
 		logger.Log.WithField("error", err).Error("LifeTrace CreatePlan insert failed")
 		fail(c, http.StatusInternalServerError, "创建计划失败")
 		return
+	}
+	if !req.Reminder {
+		if err := db.Model(&plan).Update("reminder", false).Error; err != nil {
+			logger.Log.WithField("error", err).Error("LifeTrace CreatePlan reminder update failed")
+			fail(c, http.StatusInternalServerError, "创建计划失败")
+			return
+		}
+		plan.Reminder = false
 	}
 
 	success(c, plan)
@@ -286,7 +356,7 @@ func (h *Handler) UpdatePlan(c *gin.Context) {
 		"reminder":       req.Reminder,
 		"image_url":      strings.TrimSpace(req.ImageURL),
 		"location":       strings.TrimSpace(req.Location),
-		"note":           strings.TrimSpace(req.Note),
+		"note":           sanitizePlanNote(req.Note),
 		"source":         normalizePlanSource(req.Source),
 	}
 	if updates["note"] == "" {

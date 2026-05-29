@@ -29,7 +29,6 @@ export type WeeklyReviewListResponse = {
 
 export type ImageAnalysisRequest = {
   imageUrl?: string;
-  imageBase64?: string;
   kind: string;
 };
 

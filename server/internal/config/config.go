@@ -63,6 +63,8 @@ type QWeatherConfig struct {
 	RefreshCooldownSeconds int
 }
 
+const defaultJWTExpireHours int64 = 24 * 365 * 10
+
 func Load() *Config {
 	env := getEnv("ENV", "development")
 	qWeatherAPIHost := normalizeURL(getEnv("QWEATHER_API_HOST", getEnv("QWEATHER_HOST", "")))
@@ -95,7 +97,7 @@ func Load() *Config {
 		},
 		JWT: JWTConfig{
 			Secret: getEnv("JWT_SECRET", "valley-secret-key"),
-			Expire: 24 * 7,
+			Expire: int64(getEnvInt("JWT_EXPIRE_HOURS", int(defaultJWTExpireHours))),
 		},
 		SMTP: SMTPConfig{
 			Host:        getEnv("SMTP_HOST", ""),

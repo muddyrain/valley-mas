@@ -11,7 +11,8 @@ export async function apiRequest<T>(path: string, token: string, init: RequestIn
   headers.set('Accept', 'application/json');
   headers.set('Authorization', `Bearer ${token}`);
 
-  if (init.body && !headers.has('Content-Type')) {
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  if (init.body && !headers.has('Content-Type') && !isFormData) {
     headers.set('Content-Type', 'application/json');
   }
 

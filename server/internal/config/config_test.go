@@ -44,3 +44,23 @@ func TestQWeatherHostAddsHTTPSScheme(t *testing.T) {
 		t.Fatalf("expected Geo host to reuse HTTPS API host, got %q", cfg.QWeather.GeoHost)
 	}
 }
+
+func TestJWTExpireDefaultsToLongLogin(t *testing.T) {
+	t.Setenv("JWT_EXPIRE_HOURS", "")
+
+	cfg := Load()
+
+	if cfg.JWT.Expire != defaultJWTExpireHours {
+		t.Fatalf("expected default JWT expiry %d hours, got %d", defaultJWTExpireHours, cfg.JWT.Expire)
+	}
+}
+
+func TestJWTExpireCanBeOverridden(t *testing.T) {
+	t.Setenv("JWT_EXPIRE_HOURS", "720")
+
+	cfg := Load()
+
+	if cfg.JWT.Expire != 720 {
+		t.Fatalf("expected overridden JWT expiry 720 hours, got %d", cfg.JWT.Expire)
+	}
+}

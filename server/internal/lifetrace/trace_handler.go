@@ -83,16 +83,32 @@ func (h *Handler) ListTraces(c *gin.Context) {
 		return
 	}
 
+	page, pageSize := parseListPagination(c)
+	offset := (page - 1) * pageSize
+	var total int64
+	if err := database.GetDB().
+		Model(&model.LifeTraceTrace{}).
+		Where("user_id = ?", userID).
+		Count(&total).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "获取踪迹失败")
+		return
+	}
+
 	var traces []model.LifeTraceTrace
 	if err := database.GetDB().
 		Where("user_id = ?", userID).
 		Order("created_at DESC").
+		Limit(pageSize).
+		Offset(offset).
 		Find(&traces).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "获取踪迹失败")
 		return
 	}
 
-	success(c, gin.H{"list": traces})
+	success(c, gin.H{
+		"list":       traces,
+		"pagination": buildListPagination(page, pageSize, total),
+	})
 }
 
 func (h *Handler) CreateTrace(c *gin.Context) {
@@ -137,6 +153,64 @@ func (h *Handler) CreateTrace(c *gin.Context) {
 
 	if err := database.GetDB().Create(&trace).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "创建踪迹失败")
+		return
+	}
+
+	success(c, trace)
+}
+
+func (h *Handler) UpdateTrace(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	trace, found := findTrace(c.Param("id"), userID)
+	if !found {
+		fail(c, http.StatusNotFound, "踪迹不存在")
+		return
+	}
+
+	var req createTraceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+
+	title := strings.TrimSpace(req.Title)
+	summary := strings.TrimSpace(req.Summary)
+	timeLabel := strings.TrimSpace(req.TimeLabel)
+	if title == "" || summary == "" || timeLabel == "" {
+		fail(c, http.StatusBadRequest, "踪迹标题、内容和时间不能为空")
+		return
+	}
+
+	planID, valid := parseOptionalPlanID(req.PlanID)
+	if !valid {
+		fail(c, http.StatusBadRequest, "计划 ID 不合法")
+		return
+	}
+
+	updates := map[string]interface{}{
+		"plan_id":    planID,
+		"title":      title,
+		"summary":    summary,
+		"time_label": timeLabel,
+		"location":   strings.TrimSpace(req.Location),
+		"image_url":  strings.TrimSpace(req.ImageURL),
+		"mood":       normalizeTraceMood(req.Mood),
+		"tags":       normalizeTraceTags(req.Tags),
+		"source":     normalizeTraceSource(req.Source),
+	}
+
+	if err := database.GetDB().Model(&trace).Updates(updates).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "更新踪迹失败")
+		return
+	}
+
+	if err := database.GetDB().First(&trace, "id = ? AND user_id = ?", trace.ID, userID).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "读取踪迹失败")
 		return
 	}
 

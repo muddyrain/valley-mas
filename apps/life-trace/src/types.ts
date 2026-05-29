@@ -30,6 +30,13 @@ export type NewPlanInput = Omit<
 
 export type PlanSource = 'manual' | 'weather_advice' | 'ai_advice' | 'image_ai';
 
+export type ListPagination = {
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+};
+
 export type CommuteMethod = '开车' | '地铁' | '步行' | '骑行' | '远程';
 
 export type UserSettings = {

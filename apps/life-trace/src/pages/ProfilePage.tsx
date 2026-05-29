@@ -13,17 +13,21 @@ import {
   MapPin,
   MoonStar,
   Route,
+  Settings2,
   ShieldCheck,
+  Smartphone,
   Sparkles,
   Wifi,
   Zap,
 } from 'lucide-react';
+import { useRef } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useNotificationPermission } from '@/hooks/useNotificationPermission';
 import { usePwaStatus } from '@/hooks/usePwaStatus';
+import { gsap, useGSAP } from '@/lib/gsap';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -206,6 +210,7 @@ function SyncStatus({
 }
 
 export function ProfilePage() {
+  const pageRef = useRef<HTMLDivElement>(null);
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoading = useLifeTraceStore((state) => state.settingsLoading);
   const settingsSaving = useLifeTraceStore((state) => state.settingsSaving);
@@ -220,6 +225,48 @@ export function ProfilePage() {
     Number(settings.weatherAlerts) +
     Number(settings.planReminders) +
     Number(settings.aiPersonalization);
+  const signalProgress = Math.round((enabledSignals / 3) * 100);
+
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        const timeline = gsap.timeline();
+
+        timeline
+          .from('[data-profile-hero]', {
+            autoAlpha: 0,
+            y: 18,
+            scale: 0.985,
+            duration: 0.48,
+          })
+          .from(
+            '[data-profile-card]',
+            {
+              autoAlpha: 0,
+              y: 16,
+              scale: 0.985,
+              stagger: 0.06,
+              duration: 0.42,
+            },
+            '-=0.24',
+          );
+
+        gsap.to('[data-profile-pulse]', {
+          scale: 1.08,
+          autoAlpha: 0.68,
+          duration: 1.8,
+          repeat: -1,
+          yoyo: true,
+          ease: 'sine.inOut',
+        });
+      });
+
+      return () => mm.revert();
+    },
+    { scope: pageRef },
+  );
 
   const update = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
     updateSettings({ [key]: value });
@@ -234,8 +281,11 @@ export function ProfilePage() {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[2rem] border border-life-ai/20 bg-card p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+    <div ref={pageRef} className="space-y-6">
+      <section
+        data-profile-hero
+        className="relative overflow-hidden rounded-[2rem] border border-life-ai/20 bg-card p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
+      >
         <div
           aria-hidden="true"
           className="absolute inset-x-0 top-0 h-24 bg-[linear-gradient(135deg,rgba(6,182,212,0.24),rgba(16,185,129,0.14),rgba(139,92,246,0.18))]"
@@ -247,7 +297,10 @@ export function ProfilePage() {
         <div className="relative space-y-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 pr-2">
-              <p className="text-sm font-semibold text-life-ai">Life Trace Profile</p>
+              <p className="inline-flex items-center gap-2 rounded-full border border-life-ai/25 bg-life-ai/10 px-3 py-1 text-xs font-semibold text-life-ai">
+                <Settings2 className="size-3.5" />
+                Life Trace Settings
+              </p>
               <h1 className="mt-3 text-3xl font-bold leading-tight">我的生活参数</h1>
               <p className="mt-4 max-w-[24ch] text-sm leading-7 text-muted-foreground">
                 城市、通勤、提醒和习惯会组成你的每日简报。
@@ -278,7 +331,10 @@ export function ProfilePage() {
                   {profileName.slice(0, 1).toUpperCase()}
                 </div>
               )}
-              <span className="absolute -right-1 -bottom-1 grid size-6 place-items-center rounded-full border border-background bg-life-trace text-background">
+              <span
+                data-profile-pulse
+                className="absolute -right-1 -bottom-1 grid size-6 place-items-center rounded-full border border-background bg-life-trace text-background"
+              >
                 <ShieldCheck className="size-3.5" />
               </span>
             </div>
@@ -320,7 +376,42 @@ export function ProfilePage() {
         </div>
       </section>
 
-      <section className="space-y-3">
+      <section data-profile-card className="grid grid-cols-3 gap-2">
+        <div className="rounded-[1.35rem] border border-life-ai/20 bg-life-ai/10 p-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <Sparkles className="size-4 text-life-ai" />
+            <span className="text-xs font-semibold text-life-ai">{signalProgress}%</span>
+          </div>
+          <p className="text-sm font-semibold">智能建议</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">{enabledSignals} 项开启</p>
+        </div>
+        <div className="rounded-[1.35rem] border border-life-health/20 bg-life-health/10 p-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <Bell className="size-4 text-life-health" />
+            <span className="text-xs font-semibold text-life-health">
+              {notification.granted ? 'ON' : 'OFF'}
+            </span>
+          </div>
+          <p className="text-sm font-semibold">系统通知</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {notification.granted ? '已授权' : '待开启'}
+          </p>
+        </div>
+        <div className="rounded-[1.35rem] border border-life-plan/20 bg-life-plan/10 p-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <Smartphone className="size-4 text-life-plan" />
+            <span className="text-xs font-semibold text-life-plan">
+              {installed ? 'APP' : 'WEB'}
+            </span>
+          </div>
+          <p className="text-sm font-semibold">使用模式</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {installed ? '桌面应用' : '浏览器'}
+          </p>
+        </div>
+      </section>
+
+      <section data-profile-card className="space-y-3">
         <SectionHeader title="生活偏好" meta="云端同步" />
         <SettingInput
           label="天气城市"
@@ -358,7 +449,7 @@ export function ProfilePage() {
         />
       </section>
 
-      <section className="space-y-3">
+      <section data-profile-card className="space-y-3">
         <SectionHeader title="通勤方式" meta={settings.commuteMethod} />
         <div className="grid grid-cols-5 gap-2">
           {commuteMethods.map((method) => {
@@ -385,7 +476,7 @@ export function ProfilePage() {
         </div>
       </section>
 
-      <section className="space-y-3">
+      <section data-profile-card className="space-y-3">
         <SectionHeader title="提醒偏好" meta={`${enabledSignals} 项开启`} />
         <SettingToggle
           label="天气风险提醒"
@@ -430,7 +521,7 @@ export function ProfilePage() {
         />
       </section>
 
-      <section className="space-y-3">
+      <section data-profile-card className="space-y-3">
         <SectionHeader title="每日打卡" meta={`${settings.habits.length} 项已开启`} />
         <div className="grid grid-cols-2 gap-3">
           {habitOptions.map((habit) => {
@@ -471,7 +562,7 @@ export function ProfilePage() {
         </div>
       </section>
 
-      <section className="space-y-3">
+      <section data-profile-card className="space-y-3">
         <SectionHeader title="安装体验" />
         <Card className="relative overflow-hidden border-life-ai/20 bg-card/90 p-4">
           <div

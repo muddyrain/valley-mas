@@ -9,6 +9,7 @@ import type {
   AiAction,
   AppTab,
   Checkin,
+  ListPagination,
   NewPlanInput,
   NewTraceInput,
   Plan,
@@ -21,7 +22,9 @@ type LifeTraceState = {
   plans: Plan[];
   plansLoaded: boolean;
   plansLoading: boolean;
+  plansLoadingMore: boolean;
   plansError: string;
+  plansPagination: ListPagination;
   planCreating: boolean;
   planUpdatingById: Record<string, boolean>;
   planCompletingById: Record<string, boolean>;
@@ -29,7 +32,9 @@ type LifeTraceState = {
   traces: Trace[];
   tracesLoaded: boolean;
   tracesLoading: boolean;
+  tracesLoadingMore: boolean;
   tracesError: string;
+  tracesPagination: ListPagination;
   traceCreating: boolean;
   traceUpdatingById: Record<string, boolean>;
   traceDeletingById: Record<string, boolean>;
@@ -49,7 +54,9 @@ type LifeTraceState = {
   updateSettings: (settings: Partial<UserSettings>) => void;
   loadSettings: () => Promise<void>;
   loadPlans: () => Promise<void>;
+  loadMorePlans: () => Promise<void>;
   loadTraces: () => Promise<void>;
+  loadMoreTraces: () => Promise<void>;
   loadCheckins: (date: string) => Promise<void>;
   toggleHabitCheckin: (date: string, name: string, completed: boolean) => Promise<void>;
   addPlan: (input: NewPlanInput) => Promise<Plan | null>;
@@ -74,6 +81,13 @@ const defaultSettings: UserSettings = {
   planReminders: true,
   aiPersonalization: true,
   habits: ['喝水', '休息', '运动', '护肤'],
+};
+
+const defaultPagination: ListPagination = {
+  page: 1,
+  pageSize: 20,
+  total: 0,
+  hasMore: false,
 };
 
 function formatTraceRecordedTime(value?: string) {
@@ -125,7 +139,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       plans: [],
       plansLoaded: false,
       plansLoading: false,
+      plansLoadingMore: false,
       plansError: '',
+      plansPagination: defaultPagination,
       planCreating: false,
       planUpdatingById: {},
       planCompletingById: {},
@@ -133,7 +149,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       traces: [],
       tracesLoaded: false,
       tracesLoading: false,
+      tracesLoadingMore: false,
       tracesError: '',
+      tracesPagination: defaultPagination,
       traceCreating: false,
       traceUpdatingById: {},
       traceDeletingById: {},
@@ -225,14 +243,31 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       loadPlans: async () => {
         const token = getToken();
         if (!token) {
-          set({ plans: [], plansLoaded: true, plansLoading: false, plansError: '' });
+          set({
+            plans: [],
+            plansLoaded: true,
+            plansLoading: false,
+            plansLoadingMore: false,
+            plansError: '',
+            plansPagination: defaultPagination,
+          });
           return;
         }
 
         set({ plansLoading: true, plansError: '' });
         try {
-          const { list } = await listPlans(token);
-          set({ plans: list, plansLoaded: true, plansLoading: false, plansError: '' });
+          const { list, pagination } = await listPlans(token, { page: 1, pageSize: 20 });
+          set({
+            plans: list,
+            plansPagination: pagination ?? {
+              ...defaultPagination,
+              total: list.length,
+              hasMore: false,
+            },
+            plansLoaded: true,
+            plansLoading: false,
+            plansError: '',
+          });
         } catch (error) {
           set({
             plansLoading: false,
@@ -241,22 +276,111 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           });
         }
       },
+      loadMorePlans: async () => {
+        const token = getToken();
+        const { plansPagination, plansLoading, plansLoadingMore } = get();
+        if (!token || plansLoading || plansLoadingMore || !plansPagination.hasMore) {
+          return;
+        }
+
+        set({ plansLoadingMore: true, plansError: '' });
+        try {
+          const nextPage = plansPagination.page + 1;
+          const { list, pagination } = await listPlans(token, {
+            page: nextPage,
+            pageSize: plansPagination.pageSize,
+          });
+          set((state) => {
+            const existingIds = new Set(state.plans.map((plan) => plan.id));
+            const nextPlans = list.filter((plan) => !existingIds.has(plan.id));
+            return {
+              plans: [...state.plans, ...nextPlans],
+              plansPagination: pagination ?? {
+                page: nextPage,
+                pageSize: plansPagination.pageSize,
+                total: state.plans.length + nextPlans.length,
+                hasMore: false,
+              },
+              plansLoadingMore: false,
+              plansError: '',
+            };
+          });
+        } catch (error) {
+          set({
+            plansLoadingMore: false,
+            plansError: error instanceof Error ? error.message : '加载更多计划失败',
+          });
+        }
+      },
       loadTraces: async () => {
         const token = getToken();
         if (!token) {
-          set({ traces: [], tracesLoaded: true, tracesLoading: false, tracesError: '' });
+          set({
+            traces: [],
+            tracesLoaded: true,
+            tracesLoading: false,
+            tracesLoadingMore: false,
+            tracesError: '',
+            tracesPagination: defaultPagination,
+          });
           return;
         }
 
         set({ tracesLoading: true, tracesError: '' });
         try {
-          const { list } = await listTraces(token);
-          set({ traces: list, tracesLoaded: true, tracesLoading: false, tracesError: '' });
+          const { list, pagination } = await listTraces(token, { page: 1, pageSize: 20 });
+          set({
+            traces: list,
+            tracesPagination: pagination ?? {
+              ...defaultPagination,
+              total: list.length,
+              hasMore: false,
+            },
+            tracesLoaded: true,
+            tracesLoading: false,
+            tracesError: '',
+          });
         } catch (error) {
           set({
             tracesLoading: false,
             tracesLoaded: true,
             tracesError: error instanceof Error ? error.message : '获取踪迹失败',
+          });
+        }
+      },
+      loadMoreTraces: async () => {
+        const token = getToken();
+        const { tracesPagination, tracesLoading, tracesLoadingMore } = get();
+        if (!token || tracesLoading || tracesLoadingMore || !tracesPagination.hasMore) {
+          return;
+        }
+
+        set({ tracesLoadingMore: true, tracesError: '' });
+        try {
+          const nextPage = tracesPagination.page + 1;
+          const { list, pagination } = await listTraces(token, {
+            page: nextPage,
+            pageSize: tracesPagination.pageSize,
+          });
+          set((state) => {
+            const existingIds = new Set(state.traces.map((trace) => trace.id));
+            const nextTraces = list.filter((trace) => !existingIds.has(trace.id));
+            return {
+              traces: [...state.traces, ...nextTraces],
+              tracesPagination: pagination ?? {
+                page: nextPage,
+                pageSize: tracesPagination.pageSize,
+                total: state.traces.length + nextTraces.length,
+                hasMore: false,
+              },
+              tracesLoadingMore: false,
+              tracesError: '',
+            };
+          });
+        } catch (error) {
+          set({
+            tracesLoadingMore: false,
+            tracesError: error instanceof Error ? error.message : '加载更多踪迹失败',
           });
         }
       },
@@ -619,7 +743,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           plans,
           plansLoaded,
           plansLoading,
+          plansLoadingMore,
           plansError,
+          plansPagination,
           planCreating,
           planUpdatingById,
           planCompletingById,
@@ -627,7 +753,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           traces,
           tracesLoaded,
           tracesLoading,
+          tracesLoadingMore,
           tracesError,
+          tracesPagination,
           traceCreating,
           traceUpdatingById,
           traceDeletingById,
@@ -646,7 +774,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         void plans;
         void plansLoaded;
         void plansLoading;
+        void plansLoadingMore;
         void plansError;
+        void plansPagination;
         void planCreating;
         void planUpdatingById;
         void planCompletingById;
@@ -654,7 +784,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         void traces;
         void tracesLoaded;
         void tracesLoading;
+        void tracesLoadingMore;
         void tracesError;
+        void tracesPagination;
         void traceCreating;
         void traceUpdatingById;
         void traceDeletingById;

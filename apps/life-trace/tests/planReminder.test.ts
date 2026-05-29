@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getDueReminder,
   getNextReminder,
+  getPlanDisplayTimeParts,
   parsePlanReminderDate,
   splitPlanTimeLabel,
 } from '../src/lib/planReminder';
@@ -59,6 +60,18 @@ describe('parsePlanReminderDate', () => {
       )?.toISOString(),
     ).toBe(new Date(2026, 4, 27, 20, 0, 0).toISOString());
   });
+
+  it('prefers structured schedule when a stored relative label becomes stale', () => {
+    expect(
+      parsePlanReminderDate(
+        createPlan('conflict', '明天 12:00', {
+          scheduledDate: '2026-05-27',
+          scheduledTime: '12:00',
+        }),
+        now,
+      )?.toISOString(),
+    ).toBe(new Date(2026, 4, 27, 12, 0, 0).toISOString());
+  });
 });
 
 describe('splitPlanTimeLabel', () => {
@@ -74,6 +87,46 @@ describe('splitPlanTimeLabel', () => {
       dateText: '今天',
       timeText: '晚上',
     });
+  });
+});
+
+describe('getPlanDisplayTimeParts', () => {
+  it('renders stored relative labels from structured schedule fields', () => {
+    expect(
+      getPlanDisplayTimeParts(
+        createPlan('stale-label', '明天 12:00', {
+          scheduledDate: '2026-05-29',
+          scheduledTime: '12:00',
+        }),
+        new Date(2026, 4, 29, 10, 0, 0),
+      ),
+    ).toEqual({
+      dateText: '今天',
+      timeText: '12:00',
+    });
+  });
+
+  it('formats nearby dates with relative labels', () => {
+    const now = new Date(2026, 4, 29, 10, 0, 0);
+
+    expect(
+      getPlanDisplayTimeParts(
+        createPlan('yesterday', '2026-05-28 12:00', {
+          scheduledDate: '2026-05-28',
+          scheduledTime: '12:00',
+        }),
+        now,
+      ).dateText,
+    ).toBe('昨天');
+    expect(
+      getPlanDisplayTimeParts(
+        createPlan('after-tomorrow', '2026-05-31 12:00', {
+          scheduledDate: '2026-05-31',
+          scheduledTime: '12:00',
+        }),
+        now,
+      ).dateText,
+    ).toBe('后天');
   });
 });
 
@@ -116,6 +169,20 @@ describe('getDueReminder', () => {
 
     expect(due?.plan.id).toBe('latest');
     expect(due?.timeText).toBe('10:20');
+  });
+
+  it('uses structured schedule for due checks when a relative label is stale', () => {
+    const due = getDueReminder(
+      [
+        createPlan('conflict', '明天 12:00', {
+          scheduledDate: '2026-05-27',
+          scheduledTime: '10:00',
+        }),
+      ],
+      now,
+    );
+
+    expect(due?.plan.id).toBe('conflict');
   });
 
   it('ignores completed, dismissed, snoozed, and stale reminders', () => {

@@ -91,25 +91,22 @@ export function buildPlanSchedule({
   time,
   now = new Date(),
 }: BuildPlanScheduleInput) {
-  const dateText = dateOption === 'custom' ? customDate : dateOption;
   const scheduledDate = resolveScheduledDate(dateOption, customDate, now);
 
   return {
-    timeLabel: `${dateText} ${time}`,
+    timeLabel: `${scheduledDate || (dateOption === 'custom' ? customDate : dateOption)} ${time}`,
     scheduledDate,
     scheduledTime: time,
     timezone: getClientTimezone(),
   };
 }
 
-export function buildTodaySchedule({
-  timeLabel,
-  scheduledTime,
-  now = new Date(),
-}: BuildTodayScheduleInput) {
+export function buildTodaySchedule({ scheduledTime, now = new Date() }: BuildTodayScheduleInput) {
+  const scheduledDate = getLocalISODate(now);
+
   return {
-    timeLabel,
-    scheduledDate: getLocalISODate(now),
+    timeLabel: `${scheduledDate} ${scheduledTime}`,
+    scheduledDate,
     scheduledTime,
     timezone: getClientTimezone(),
   };

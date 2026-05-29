@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { getVisiblePlanNote } from '@/lib/advicePlan';
 import { gsap, useGSAP } from '@/lib/gsap';
-import { splitPlanTimeLabel } from '@/lib/planReminder';
+import { getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { cn } from '@/lib/utils';
 import type { Plan, PlanSource, PlanType } from '@/types';
 
@@ -177,7 +177,7 @@ export function PlanDetailDrawer({
     return null;
   }
 
-  const { dateText, timeText } = splitPlanTimeLabel(renderedPlan.timeLabel);
+  const { dateText, timeText } = getPlanDisplayTimeParts(renderedPlan);
   const ReminderIcon = renderedPlan.reminder ? Bell : BellOff;
   const visibleNote = getVisiblePlanNote(renderedPlan.note);
   const source = sourceLabel[renderedPlan.source ?? 'manual'];

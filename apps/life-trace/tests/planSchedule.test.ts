@@ -27,7 +27,7 @@ describe('planSchedule', () => {
     const schedule = buildPlanSchedule({ dateOption: '明天', time: '08:15', now });
 
     expect(schedule).toMatchObject({
-      timeLabel: '明天 08:15',
+      timeLabel: '2026-05-28 08:15',
       scheduledDate: '2026-05-28',
       scheduledTime: '08:15',
     });
@@ -39,10 +39,10 @@ describe('planSchedule', () => {
     expect(resolveScheduledDate('custom', '2026-06-03', now)).toBe('2026-06-03');
   });
 
-  it('keeps fuzzy advice copy while adding concrete reminder fields', () => {
+  it('stores a stable fallback label for today schedules', () => {
     expect(buildTodaySchedule({ timeLabel: '今天 上班前', scheduledTime: '08:30', now })).toEqual(
       expect.objectContaining({
-        timeLabel: '今天 上班前',
+        timeLabel: '2026-05-27 08:30',
         scheduledDate: '2026-05-27',
         scheduledTime: '08:30',
       }),

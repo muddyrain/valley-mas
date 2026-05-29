@@ -16,7 +16,7 @@ describe('weekly review action plans', () => {
 
     expect(plan.title).toBe('下周先安排一次阅读');
     expect(plan.type).toBe('普通事项');
-    expect(plan.timeLabel).toBe('下周一 20:00');
+    expect(plan.timeLabel).toBe('2026-06-01 20:00');
     expect(plan.scheduledDate).toBe('2026-06-01');
     expect(plan.scheduledTime).toBe('20:00');
     expect(plan.source).toBe('ai_advice');

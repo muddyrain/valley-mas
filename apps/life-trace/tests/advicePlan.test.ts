@@ -12,7 +12,7 @@ describe('createPlanFromAdvice', () => {
 
     expect(plan.title).toBe('通勤提醒：开车通勤，建议提前15分钟');
     expect(plan.type).toBe('普通事项');
-    expect(plan.timeLabel).toBe('今天 上班前');
+    expect(plan.timeLabel).toMatch(/^\d{4}-\d{2}-\d{2} 08:30$/);
     expect(plan.scheduledTime).toBe('08:30');
     expect(plan.reminder).toBe(true);
     expect(plan.note).toContain('杭州');
@@ -29,7 +29,7 @@ describe('createPlanFromAdvice', () => {
 
     expect(plan.title).toBe('健康打卡：湿热感强，注意补水休息');
     expect(plan.type).toBe('运动');
-    expect(plan.timeLabel).toBe('今天 晚上');
+    expect(plan.timeLabel).toMatch(/^\d{4}-\d{2}-\d{2} 20:00$/);
     expect(plan.scheduledTime).toBe('20:00');
     expect(plan.note).toContain('advice:health');
   });

@@ -1,7 +1,8 @@
-import { Camera, ImagePlus, Sparkles, X } from 'lucide-react';
-import { type ChangeEvent, useMemo, useState } from 'react';
+import { Camera, Sparkles, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { analyzeImage, type ImageAnalysisResponse } from '@/api/advice';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { AppImageUploader } from '@/components/AppImageUploader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { buildPlanSchedule, type PlanDateOption } from '@/lib/planSchedule';
@@ -71,39 +72,28 @@ export function ImageAnalysisDrawer({
   onAnalyzed,
 }: ImageAnalysisDrawerProps) {
   const [imageUrl, setImageUrl] = useState('');
-  const [localPreview, setLocalPreview] = useState('');
   const [kind, setKind] = useState<ImageKind>('电影海报');
   const [analyzed, setAnalyzed] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<ImageAnalysisResult | null>(null);
   const [analysisError, setAnalysisError] = useState('');
 
-  const previewUrl = localPreview || imageUrl;
   const fallbackAnalysis = analysisByKind[kind];
   const analysis = analysisResult ?? fallbackAnalysis;
 
   const defaultSchedule = useMemo(() => buildPlanSchedule(analysis.schedule), [analysis.schedule]);
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setLocalPreview(typeof reader.result === 'string' ? reader.result : '');
-      setAnalyzed(false);
-      setAnalysisResult(null);
-      setAnalysisError('');
-    };
-    reader.readAsDataURL(file);
+  const updateImageUrl = (url: string) => {
+    setImageUrl(url);
+    setAnalyzed(false);
+    setAnalysisResult(null);
+    setAnalysisError('');
   };
 
   const handleAnalyze = async () => {
-    if (!previewUrl) {
-      setAnalysisError('请先提供一张图片，再开始分析。');
+    if (!imageUrl) {
+      setAnalysisError('请先上传一张图片，再开始分析。');
       return;
     }
 
@@ -115,8 +105,7 @@ export function ImageAnalysisDrawer({
       }
 
       const remoteAnalysis = await analyzeImage(token, {
-        imageUrl: localPreview ? undefined : imageUrl.trim(),
-        imageBase64: localPreview || undefined,
+        imageUrl: imageUrl.trim(),
         kind,
       });
       setAnalysisResult(remoteAnalysis);
@@ -143,7 +132,7 @@ export function ImageAnalysisDrawer({
       ...defaultSchedule,
       reminder: true,
       source: 'image_ai',
-      imageUrl: previewUrl || undefined,
+      imageUrl: imageUrl || undefined,
       location: '',
       note: analysis.summary,
     });
@@ -155,7 +144,7 @@ export function ImageAnalysisDrawer({
       title: analysis.title,
       summary: analysis.summary,
       timeLabel: '刚刚',
-      imageUrl: previewUrl || undefined,
+      imageUrl: imageUrl || undefined,
       mood: analysis.mood,
       tags: analysis.tags,
       source: '手动',
@@ -191,7 +180,7 @@ export function ImageAnalysisDrawer({
           <div>
             <h2 className="text-xl font-semibold">分析图片</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              优先使用服务端视觉 AI，失败时保留本地兜底。
+              先上传到云端，再交给服务端视觉 AI 分析。
             </p>
           </div>
           <Button type="button" variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
@@ -200,35 +189,14 @@ export function ImageAnalysisDrawer({
         </div>
 
         <div className="space-y-4">
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">图片链接</span>
-            <input
-              value={imageUrl}
-              onChange={(event) => {
-                setImageUrl(event.target.value);
-                setLocalPreview('');
-                setAnalyzed(false);
-                setAnalysisResult(null);
-                setAnalysisError('');
-              }}
-              placeholder="粘贴电影海报、饭菜图或生活照片 URL"
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
-            />
-          </label>
-
-          <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-3 rounded-[1.25rem] border border-dashed border-border bg-secondary p-4 text-center text-sm text-muted-foreground">
-            <ImagePlus className="size-6 text-life-ai" />
-            上传本地图片预览
-            <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-          </label>
-
-          {previewUrl ? (
-            <img
-              src={previewUrl}
-              alt="待分析图片"
-              className="aspect-video w-full rounded-[1.25rem] object-cover"
-            />
-          ) : null}
+          <AppImageUploader
+            value={imageUrl}
+            onChange={updateImageUrl}
+            label="分析图片"
+            description="上传电影海报、美食照片或生活照片后，AI 会基于云端图片分析。"
+            disabled={analyzing}
+            onUploadingChange={setImageUploading}
+          />
 
           <div className="grid grid-cols-3 gap-2">
             {kindOptions.map((option) => (
@@ -256,11 +224,11 @@ export function ImageAnalysisDrawer({
             type="button"
             variant="ai"
             className="w-full"
-            disabled={analyzing}
+            disabled={analyzing || imageUploading}
             onClick={() => void handleAnalyze()}
           >
             {analyzing ? <ActionLoadingIcon className="size-5" /> : <Camera className="size-5" />}
-            {analyzing ? '分析中' : '开始分析'}
+            {imageUploading ? '图片上传中' : analyzing ? '分析中' : '开始分析'}
           </Button>
 
           {analysisError ? (

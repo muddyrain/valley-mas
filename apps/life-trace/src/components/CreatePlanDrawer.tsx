@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { AppImageUploader } from '@/components/AppImageUploader';
 import { Button } from '@/components/ui/button';
 import { splitPlanTimeLabel } from '@/lib/planReminder';
 import {
@@ -86,8 +87,10 @@ export function CreatePlanDrawer({ open, onOpenChange, plan }: CreatePlanDrawerP
   const [customDate, setCustomDate] = useState('');
   const [time, setTime] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
+  const [imageUploading, setImageUploading] = useState(false);
   const editing = Boolean(plan);
-  const submitting = editing ? planUpdating : planCreating;
+  const saving = editing ? planUpdating : planCreating;
+  const submitting = saving || imageUploading;
 
   useEffect(() => {
     if (!open) {
@@ -182,7 +185,7 @@ export function CreatePlanDrawer({ open, onOpenChange, plan }: CreatePlanDrawerP
       />
       <div
         className={cn(
-          'safe-bottom absolute inset-x-0 bottom-0 mx-auto w-full max-w-[430px] rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl transition duration-300',
+          'safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[88dvh] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl transition duration-300',
           open
             ? 'visible translate-y-0 opacity-100'
             : 'invisible translate-y-[calc(100%+2rem)] opacity-0',
@@ -308,15 +311,14 @@ export function CreatePlanDrawer({ open, onOpenChange, plan }: CreatePlanDrawerP
           ) : null}
           {errors.time ? <p className="-mt-2 text-xs text-destructive">{errors.time}</p> : null}
 
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">图片链接</span>
-            <input
-              value={form.imageUrl}
-              onChange={(event) => updateField('imageUrl', event.target.value)}
-              placeholder="可选，先用图片 URL 代替上传"
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
-            />
-          </label>
+          <AppImageUploader
+            value={form.imageUrl}
+            onChange={(url) => updateField('imageUrl', url)}
+            label="计划图片"
+            description="电影封面、餐厅照片或活动图片会上传到 Life Trace 云端。"
+            disabled={saving}
+            onUploadingChange={setImageUploading}
+          />
 
           <div className="grid grid-cols-[1fr_auto] items-end gap-3">
             <label className="block space-y-2">

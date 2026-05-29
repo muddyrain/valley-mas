@@ -7,6 +7,12 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 	{
 		group.GET("/weather", handler.GetWeather)
 
+		uploads := group.Group("/uploads")
+		uploads.Use(auth)
+		{
+			uploads.POST("/image", handler.UploadImage)
+		}
+
 		ai := group.Group("/ai")
 		ai.Use(auth)
 		{
@@ -34,6 +40,7 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 		{
 			traces.GET("", handler.ListTraces)
 			traces.POST("", handler.CreateTrace)
+			traces.PATCH("/:id", handler.UpdateTrace)
 			traces.DELETE("/:id", handler.DeleteTrace)
 		}
 

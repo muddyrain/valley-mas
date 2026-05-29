@@ -7,14 +7,14 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { EmptyState } from '@/components/EmptyState';
 import { PlanDetailDrawer } from '@/components/PlanDetailDrawer';
-import { SectionHeader } from '@/components/SectionHeader';
+import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { getVisiblePlanNote } from '@/lib/advicePlan';
 import { gsap, useGSAP } from '@/lib/gsap';
 import { filterPlans, isAdvicePlan, type PlanFilter, splitPlansByToday } from '@/lib/planGroups';
-import { splitPlanTimeLabel } from '@/lib/planReminder';
+import { getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Plan, PlanType } from '@/types';
@@ -56,11 +56,14 @@ export function PlansPage() {
     plans,
     plansError,
     plansLoading,
+    plansLoadingMore,
+    plansPagination,
     planCreating,
     planUpdatingById,
     planCompletingById,
     planDeletingById,
     completePlan,
+    loadMorePlans,
     removePlan,
   } = useLifeTraceStore();
   const navigate = useNavigate();
@@ -69,9 +72,16 @@ export function PlansPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [activeFilter, setActiveFilter] = useState<PlanFilter>('all');
+  const [showCompletedInAll, setShowCompletedInAll] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Plan | null>(null);
-  const filteredPlans = filterPlans(plans, activeFilter);
+  const filteredPlans = filterPlans(plans, activeFilter).filter(
+    (plan) => activeFilter !== 'all' || showCompletedInAll || !plan.completed,
+  );
   const { todayPlans } = splitPlansByToday(plans);
+  const hiddenCompletedCount =
+    activeFilter === 'all' && !showCompletedInAll
+      ? plans.filter((plan) => plan.completed).length
+      : 0;
   const filteredGroups = splitPlansByToday(filteredPlans);
   const activeFilterConfig =
     planFilters.find((filter) => filter.id === activeFilter) ?? planFilters[0];
@@ -120,7 +130,7 @@ export function PlansPage() {
   );
 
   const renderPlanCard = (plan: Plan) => {
-    const { dateText, timeText } = splitPlanTimeLabel(plan.timeLabel);
+    const { dateText, timeText } = getPlanDisplayTimeParts(plan);
     const ReminderIcon = plan.reminder ? Bell : BellOff;
     const updating = Boolean(planUpdatingById[plan.id]);
     const completing = Boolean(planCompletingById[plan.id]);
@@ -263,7 +273,39 @@ export function PlansPage() {
 
   return (
     <div ref={pageRef} className="space-y-5">
-      <SectionHeader title="计划" meta={`${todayPlans.length} 个今日计划`} />
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">计划</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{todayPlans.length} 个今日计划</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={showCompletedInAll}
+          className={cn(
+            'flex shrink-0 cursor-pointer items-center gap-2 rounded-full border px-2 py-1.5 text-xs font-semibold transition',
+            showCompletedInAll
+              ? 'border-life-health/40 bg-life-health/10 text-life-health'
+              : 'border-border bg-card text-muted-foreground',
+          )}
+          onClick={() => setShowCompletedInAll((current) => !current)}
+        >
+          <span
+            className={cn(
+              'relative h-5 w-9 rounded-full transition',
+              showCompletedInAll ? 'bg-life-health/80' : 'bg-secondary',
+            )}
+          >
+            <span
+              className={cn(
+                'absolute top-0.5 size-4 rounded-full bg-background shadow-sm transition',
+                showCompletedInAll ? 'left-4' : 'left-0.5',
+              )}
+            />
+          </span>
+          显示完成
+        </button>
+      </div>
 
       <div className="grid grid-cols-4 rounded-2xl bg-card p-1 text-sm font-semibold text-muted-foreground">
         {planFilters.map((filter) => {
@@ -292,7 +334,7 @@ export function PlansPage() {
       ) : null}
 
       {plansLoading ? (
-        <Card className="p-5 text-sm text-muted-foreground">正在同步你的计划...</Card>
+        <SyncState title="正在同步你的计划" description="正在从云端刷新计划列表。" tone="plan" />
       ) : null}
 
       <div className="space-y-6">
@@ -325,6 +367,27 @@ export function PlansPage() {
               ) : null
             }
           />
+        ) : null}
+        {hiddenCompletedCount > 0 ? (
+          <p className="px-1 text-center text-xs text-muted-foreground">
+            已隐藏 {hiddenCompletedCount} 个已完成计划，打开右上角开关可查看。
+          </p>
+        ) : null}
+        {plansPagination.hasMore ? (
+          <div className="flex justify-center pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={plansLoadingMore}
+              onClick={() => void loadMorePlans()}
+            >
+              {plansLoadingMore ? <ActionLoadingIcon /> : null}
+              {plansLoadingMore ? '加载中' : `加载更多 · ${plans.length}/${plansPagination.total}`}
+            </Button>
+          </div>
+        ) : plans.length > 0 ? (
+          <p className="text-center text-xs text-muted-foreground">已展示 {plans.length} 个计划</p>
         ) : null}
       </div>
 

@@ -25,6 +25,7 @@ const (
 	UploadTypeWallpaper  UploadType = "wallpaper"   // 资源素材 - 壁纸类型（存 resources/ 目录）
 	UploadTypeCover      UploadType = "cover"       // 封面图（存 resources/ 目录）
 	UploadTypeImageText  UploadType = "image_text"  // 图文生成图（存 image-text/ 目录）
+	UploadTypeLifeTrace  UploadType = "life_trace"  // Life Trace 图片（存 life-trace/ 目录）
 )
 
 // UploadConfig 上传配置
@@ -88,6 +89,11 @@ func GetDefaultConfig(uploadType UploadType) UploadConfig {
 			MaxSize:     30, // 30MB
 			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
 		},
+		UploadTypeLifeTrace: {
+			Type:        UploadTypeLifeTrace,
+			MaxSize:     10, // 10MB
+			AllowedExts: []string{".jpg", ".jpeg", ".png", ".webp"},
+		},
 	}
 
 	config, exists := configs[uploadType]
@@ -108,6 +114,7 @@ func GetDefaultConfig(uploadType UploadType) UploadConfig {
 // - 用户头像：avatars/{userId}/{YYYYMMDD}/{filename}
 // - 用户资源：resources/{userId}/{YYYYMMDD}/{filename}
 // - 匿名用户：anonymous/{YYYYMMDD}/{filename}
+// - Life Trace 图片：life-trace/{userId}/{YYYYMMDD}/{filename}
 // - 自定义路径：{customFolder}/{filename}
 // 注意：资源路径不包含 type 目录，避免修改资源类型后路径与存储不一致
 func (s *UploadService) GenerateStoragePath(config UploadConfig, fileName string) string {

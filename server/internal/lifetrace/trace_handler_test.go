@@ -133,3 +133,85 @@ func TestListTracesOnlyReturnsCurrentUserData(t *testing.T) {
 		t.Fatalf("expected no current user traces, got %+v", list)
 	}
 }
+
+func TestListTracesReturnsPagination(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+	for index := 0; index < 23; index++ {
+		if err := database.GetDB().Create(&model.LifeTraceTrace{
+			UserID:    101,
+			Title:     "分页踪迹",
+			Summary:   "用于分页测试",
+			TimeLabel: "今天 20:00",
+			Mood:      "放松",
+			Tags:      model.StringList{"生活迹"},
+			Source:    "手动",
+		}).Error; err != nil {
+			t.Fatalf("seed trace: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/traces?page=2&pageSize=10", nil)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	list := data["list"].([]interface{})
+	pagination := data["pagination"].(map[string]interface{})
+	if len(list) != 10 {
+		t.Fatalf("expected second page size 10, got %d", len(list))
+	}
+	if pagination["page"] != float64(2) || pagination["pageSize"] != float64(10) {
+		t.Fatalf("expected page metadata, got %+v", pagination)
+	}
+	if pagination["total"] != float64(23) || pagination["hasMore"] != true {
+		t.Fatalf("expected total and hasMore, got %+v", pagination)
+	}
+}
+
+func TestUpdateTraceForCurrentUser(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+	trace := model.LifeTraceTrace{
+		UserID:    101,
+		Title:     "旧标题",
+		Summary:   "旧摘要",
+		TimeLabel: "昨天 19:00",
+		Location:  "旧地点",
+		Mood:      "平静",
+		Tags:      model.StringList{"生活迹"},
+		Source:    "手动",
+	}
+	if err := database.GetDB().Create(&trace).Error; err != nil {
+		t.Fatalf("seed trace: %v", err)
+	}
+
+	body := bytes.NewBufferString(`{
+		"title": "晚饭散步",
+		"summary": "饭后走了二十分钟，状态轻一点。",
+		"timeLabel": "今天 20:10",
+		"location": "小区",
+		"imageUrl": "https://example.com/walk.jpg",
+		"mood": "放松",
+		"tags": ["计划完成", "散步"],
+		"source": "计划"
+	}`)
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/life-trace/traces/"+trace.ID.String(), body)
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	updated := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	if updated["title"] != "晚饭散步" {
+		t.Fatalf("unexpected updated trace: %+v", updated)
+	}
+	if updated["source"] != "计划" {
+		t.Fatalf("expected source 计划, got %+v", updated["source"])
+	}
+	tags := updated["tags"].([]interface{})
+	if len(tags) != 2 || tags[1] != "散步" {
+		t.Fatalf("expected tags to update, got %+v", tags)
+	}
+}

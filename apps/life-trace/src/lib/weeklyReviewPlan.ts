@@ -26,7 +26,7 @@ export function createPlanFromWeeklyReviewAction({
   return {
     title,
     type: '普通事项',
-    timeLabel: `下周一 ${DEFAULT_ACTION_TIME}`,
+    timeLabel: `${scheduledDate} ${DEFAULT_ACTION_TIME}`,
     scheduledDate,
     scheduledTime: DEFAULT_ACTION_TIME,
     timezone: getClientTimezone(),

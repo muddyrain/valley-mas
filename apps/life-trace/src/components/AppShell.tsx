@@ -2,6 +2,7 @@ import { CalendarDays, ClipboardList, MapPinned, Sparkles, UserRound } from 'luc
 import { type ReactNode, useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useLifeTraceEntrance } from '@/hooks/useLifeTraceEntrance';
+import { gsap, useGSAP } from '@/lib/gsap';
 import { cn } from '@/lib/utils';
 import type { AppTab } from '@/types';
 
@@ -33,6 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const activeTab = getActiveTab(location.pathname);
   const contentRef = useRef<HTMLElement>(null);
+  const navRef = useRef<HTMLElement>(null);
 
   useLifeTraceEntrance(contentRef, {
     dependencies: [activeTab],
@@ -47,6 +49,57 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [activeTab]);
 
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        const activeItem = navRef.current?.querySelector('[data-tab-active="true"]');
+        if (!activeItem) {
+          return;
+        }
+
+        gsap.fromTo(
+          activeItem.querySelector('[data-tab-icon]'),
+          { y: 6, scale: 0.86, autoAlpha: 0.76 },
+          {
+            y: 0,
+            scale: 1,
+            autoAlpha: 1,
+            duration: 0.36,
+            ease: 'back.out(1.8)',
+            clearProps: 'transform,opacity,visibility',
+          },
+        );
+        gsap.fromTo(
+          activeItem.querySelector('[data-tab-label]'),
+          { y: 5, autoAlpha: 0.55 },
+          {
+            y: 0,
+            autoAlpha: 1,
+            duration: 0.28,
+            ease: 'power2.out',
+            clearProps: 'transform,opacity,visibility',
+          },
+        );
+        gsap.fromTo(
+          activeItem.querySelector('[data-tab-glow]'),
+          { scale: 0.76, autoAlpha: 0 },
+          {
+            scale: 1,
+            autoAlpha: 1,
+            duration: 0.42,
+            ease: 'power3.out',
+            clearProps: 'transform,opacity,visibility',
+          },
+        );
+      });
+
+      return () => mm.revert();
+    },
+    { scope: navRef, dependencies: [activeTab], revertOnUpdate: true },
+  );
+
   return (
     <div className="h-dvh overflow-hidden bg-background text-foreground">
       <main
@@ -59,8 +112,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         aria-hidden="true"
         className="pointer-events-none fixed inset-x-0 bottom-0 z-20 mx-auto h-44 w-full max-w-[430px] bg-gradient-to-t from-background via-background via-55% to-transparent"
       />
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[430px] border-t border-border bg-card/95 px-4 pt-3 shadow-[0_-18px_50px_rgba(0,0,0,0.30)] backdrop-blur-xl">
-        <div className="grid grid-cols-5 items-end gap-1">
+      <nav
+        ref={navRef}
+        className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[430px] border-t border-white/[0.07] bg-card/88 px-3 pt-3 shadow-[0_-18px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl"
+      >
+        <div className="grid grid-cols-5 items-end gap-1 rounded-[1.65rem] border border-white/[0.04] bg-background/28 p-1.5">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -70,36 +126,45 @@ export function AppShell({ children }: { children: ReactNode }) {
               <NavLink
                 key={tab.id}
                 to={tab.path}
+                data-tab-active={active}
                 className={cn(
-                  'inline-flex h-auto shrink-0 cursor-pointer flex-col items-center justify-center gap-1 whitespace-nowrap rounded-2xl px-1 py-2 text-sm font-medium text-muted-foreground transition hover:bg-secondary/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  active && !isAi && 'bg-secondary/55 text-foreground',
-                  isAi && '-mt-5 hover:bg-transparent',
+                  'group relative inline-flex h-[4.35rem] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 overflow-visible whitespace-nowrap rounded-[1.25rem] px-1 text-sm font-medium text-muted-foreground transition duration-300 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  active && !isAi && 'text-foreground',
+                  isAi && '-mt-6 h-[5.15rem] hover:text-life-ai',
                 )}
               >
+                {active ? (
+                  <span
+                    data-tab-glow
+                    aria-hidden="true"
+                    className={cn(
+                      'absolute inset-x-1.5 bottom-1 top-2 rounded-[1.35rem] border bg-secondary/40 shadow-[0_16px_34px_rgba(0,0,0,0.22)] ring-1 ring-inset',
+                      isAi
+                        ? 'border-life-ai/45 bg-life-ai/[0.08] ring-life-ai/35 shadow-[0_18px_44px_rgba(6,182,212,0.16)]'
+                        : 'border-foreground/18 ring-foreground/10',
+                    )}
+                  />
+                ) : null}
                 <span
+                  data-tab-icon
                   className={cn(
-                    'relative grid size-8 place-items-center rounded-2xl transition',
+                    'relative z-10 grid size-8 place-items-center rounded-2xl transition duration-300 group-hover:-translate-y-0.5 group-hover:bg-secondary/55 group-hover:text-foreground',
                     isAi &&
-                      'size-12 border border-life-ai/35 bg-background text-life-ai shadow-[0_12px_38px_rgba(6,182,212,0.18)]',
+                      'size-12 border border-life-ai/35 bg-background text-life-ai shadow-[0_12px_38px_rgba(6,182,212,0.18)] group-hover:bg-life-ai/10',
                     isAi &&
                       active &&
-                      'border-life-ai/70 bg-life-ai/15 shadow-[0_10px_34px_rgba(6,182,212,0.24),0_0_0_6px_rgba(6,182,212,0.06)]',
+                      'border-life-ai/80 bg-life-ai/15 ring-1 ring-life-ai/40 shadow-[0_10px_34px_rgba(6,182,212,0.24),0_0_0_6px_rgba(6,182,212,0.06)]',
                     active &&
                       !isAi &&
-                      'bg-background text-foreground shadow-[0_8px_22px_rgba(0,0,0,0.22)]',
+                      'border border-foreground/18 bg-background text-foreground ring-1 ring-inset ring-foreground/10 shadow-[0_8px_22px_rgba(0,0,0,0.22)]',
                   )}
                 >
                   <Icon className={cn('size-5', isAi && 'size-6')} />
-                  {isAi && active ? (
-                    <span
-                      aria-hidden="true"
-                      className="absolute -bottom-1 size-1.5 rounded-full bg-life-ai shadow-[0_0_12px_rgba(6,182,212,0.9)]"
-                    />
-                  ) : null}
                 </span>
                 <span
+                  data-tab-label
                   className={cn(
-                    'text-xs font-semibold transition',
+                    'relative z-10 text-xs font-semibold transition duration-300',
                     active ? 'text-foreground' : 'text-muted-foreground',
                     isAi && active && 'text-life-ai',
                   )}
