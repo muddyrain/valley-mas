@@ -121,7 +121,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   active &&
                     !isAi &&
                     'border-white/[0.10] bg-secondary/36 text-foreground shadow-[0_6px_18px_rgba(0,0,0,0.14)]',
-                  isAi && '-mt-2 hover:bg-life-ai/[0.045] hover:text-life-ai',
+                  isAi && '-mt-3 gap-0.5 hover:bg-life-ai/[0.045] hover:text-life-ai',
                   isAi &&
                     active &&
                     'border-life-ai/24 bg-life-ai/[0.045] text-life-ai shadow-[0_6px_20px_rgba(6,182,212,0.08)]',
@@ -132,16 +132,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                   className={cn(
                     'relative z-10 grid size-8 place-items-center rounded-2xl transition duration-300 group-hover:-translate-y-0.5 group-hover:bg-secondary/55 group-hover:text-foreground',
                     isAi &&
-                      'size-10 border border-life-ai/22 bg-background text-life-ai shadow-[0_8px_20px_rgba(6,182,212,0.10)] group-hover:bg-life-ai/10',
-                    isAi &&
-                      active &&
-                      'border-life-ai/42 bg-life-ai/10 shadow-[0_6px_18px_rgba(6,182,212,0.14)]',
+                      'size-11 bg-transparent text-life-ai shadow-none group-hover:bg-life-ai/10',
+                    isAi && active && 'bg-transparent shadow-none group-hover:bg-transparent',
                     active &&
                       !isAi &&
                       'bg-background/72 text-foreground shadow-[0_5px_14px_rgba(0,0,0,0.14)]',
                   )}
                 >
-                  <Icon className={cn('size-5', isAi && 'size-[1.35rem]')} />
+                  <Icon className={cn('size-5', isAi && 'size-7')} />
                 </span>
                 <span
                   data-tab-label
