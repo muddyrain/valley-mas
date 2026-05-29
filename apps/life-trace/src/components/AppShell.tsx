@@ -82,17 +82,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             clearProps: 'transform,opacity,visibility',
           },
         );
-        gsap.fromTo(
-          activeItem.querySelector('[data-tab-glow]'),
-          { scale: 0.76, autoAlpha: 0 },
-          {
-            scale: 1,
-            autoAlpha: 1,
-            duration: 0.42,
-            ease: 'power3.out',
-            clearProps: 'transform,opacity,visibility',
-          },
-        );
       });
 
       return () => mm.revert();
@@ -128,35 +117,28 @@ export function AppShell({ children }: { children: ReactNode }) {
                 to={tab.path}
                 data-tab-active={active}
                 className={cn(
-                  'group relative inline-flex h-[4.35rem] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 overflow-visible whitespace-nowrap rounded-[1.25rem] px-1 text-sm font-medium text-muted-foreground transition duration-300 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  active && !isAi && 'text-foreground',
-                  isAi && '-mt-6 h-[5.15rem] hover:text-life-ai',
+                  'group relative inline-flex h-[4.35rem] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 overflow-visible whitespace-nowrap rounded-[1.25rem] border border-transparent px-1 text-sm font-medium text-muted-foreground transition duration-300 hover:bg-secondary/35 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  active &&
+                    !isAi &&
+                    'border-white/[0.12] bg-secondary/45 text-foreground shadow-[0_8px_22px_rgba(0,0,0,0.18)]',
+                  isAi && '-mt-6 h-[5.15rem] hover:bg-life-ai/[0.06] hover:text-life-ai',
+                  isAi &&
+                    active &&
+                    'border-life-ai/35 bg-life-ai/[0.07] text-life-ai shadow-[0_10px_28px_rgba(6,182,212,0.10)]',
                 )}
               >
-                {active ? (
-                  <span
-                    data-tab-glow
-                    aria-hidden="true"
-                    className={cn(
-                      'absolute inset-x-1.5 bottom-1 top-2 rounded-[1.35rem] border bg-secondary/40 shadow-[0_16px_34px_rgba(0,0,0,0.22)] ring-1 ring-inset',
-                      isAi
-                        ? 'border-life-ai/45 bg-life-ai/[0.08] ring-life-ai/35 shadow-[0_18px_44px_rgba(6,182,212,0.16)]'
-                        : 'border-foreground/18 ring-foreground/10',
-                    )}
-                  />
-                ) : null}
                 <span
                   data-tab-icon
                   className={cn(
                     'relative z-10 grid size-8 place-items-center rounded-2xl transition duration-300 group-hover:-translate-y-0.5 group-hover:bg-secondary/55 group-hover:text-foreground',
                     isAi &&
-                      'size-12 border border-life-ai/35 bg-background text-life-ai shadow-[0_12px_38px_rgba(6,182,212,0.18)] group-hover:bg-life-ai/10',
+                      'size-12 border border-life-ai/25 bg-background text-life-ai shadow-[0_10px_28px_rgba(6,182,212,0.14)] group-hover:bg-life-ai/10',
                     isAi &&
                       active &&
-                      'border-life-ai/80 bg-life-ai/15 ring-1 ring-life-ai/40 shadow-[0_10px_34px_rgba(6,182,212,0.24),0_0_0_6px_rgba(6,182,212,0.06)]',
+                      'border-life-ai/55 bg-life-ai/12 shadow-[0_8px_24px_rgba(6,182,212,0.18)]',
                     active &&
                       !isAi &&
-                      'border border-foreground/18 bg-background text-foreground ring-1 ring-inset ring-foreground/10 shadow-[0_8px_22px_rgba(0,0,0,0.22)]',
+                      'bg-background/80 text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.18)]',
                   )}
                 >
                   <Icon className={cn('size-5', isAi && 'size-6')} />
