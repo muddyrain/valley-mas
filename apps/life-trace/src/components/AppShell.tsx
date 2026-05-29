@@ -120,11 +120,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                   'group relative inline-flex h-[4.35rem] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 overflow-visible whitespace-nowrap rounded-[1.25rem] border border-transparent px-1 text-sm font-medium text-muted-foreground transition duration-300 hover:bg-secondary/35 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   active &&
                     !isAi &&
-                    'border-white/[0.12] bg-secondary/45 text-foreground shadow-[0_8px_22px_rgba(0,0,0,0.18)]',
-                  isAi && '-mt-6 h-[5.15rem] hover:bg-life-ai/[0.06] hover:text-life-ai',
+                    'border-white/[0.10] bg-secondary/36 text-foreground shadow-[0_6px_18px_rgba(0,0,0,0.14)]',
+                  isAi && '-mt-2 hover:bg-life-ai/[0.045] hover:text-life-ai',
                   isAi &&
                     active &&
-                    'border-life-ai/35 bg-life-ai/[0.07] text-life-ai shadow-[0_10px_28px_rgba(6,182,212,0.10)]',
+                    'border-life-ai/24 bg-life-ai/[0.045] text-life-ai shadow-[0_6px_20px_rgba(6,182,212,0.08)]',
                 )}
               >
                 <span
@@ -132,16 +132,16 @@ export function AppShell({ children }: { children: ReactNode }) {
                   className={cn(
                     'relative z-10 grid size-8 place-items-center rounded-2xl transition duration-300 group-hover:-translate-y-0.5 group-hover:bg-secondary/55 group-hover:text-foreground',
                     isAi &&
-                      'size-12 border border-life-ai/25 bg-background text-life-ai shadow-[0_10px_28px_rgba(6,182,212,0.14)] group-hover:bg-life-ai/10',
+                      'size-10 border border-life-ai/22 bg-background text-life-ai shadow-[0_8px_20px_rgba(6,182,212,0.10)] group-hover:bg-life-ai/10',
                     isAi &&
                       active &&
-                      'border-life-ai/55 bg-life-ai/12 shadow-[0_8px_24px_rgba(6,182,212,0.18)]',
+                      'border-life-ai/42 bg-life-ai/10 shadow-[0_6px_18px_rgba(6,182,212,0.14)]',
                     active &&
                       !isAi &&
-                      'bg-background/80 text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.18)]',
+                      'bg-background/72 text-foreground shadow-[0_5px_14px_rgba(0,0,0,0.14)]',
                   )}
                 >
-                  <Icon className={cn('size-5', isAi && 'size-6')} />
+                  <Icon className={cn('size-5', isAi && 'size-[1.35rem]')} />
                 </span>
                 <span
                   data-tab-label
