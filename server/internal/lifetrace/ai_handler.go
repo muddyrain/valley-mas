@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -55,11 +56,12 @@ type lifeTraceAssistantRequest struct {
 }
 
 type lifeTraceAssistantStreamChunk struct {
-	Chunk  string `json:"chunk,omitempty"`
-	Done   bool   `json:"done,omitempty"`
-	Error  string `json:"error,omitempty"`
-	Source string `json:"source,omitempty"`
-	Model  string `json:"model,omitempty"`
+	Chunk  string                         `json:"chunk,omitempty"`
+	Done   bool                           `json:"done,omitempty"`
+	Error  string                         `json:"error,omitempty"`
+	Source string                         `json:"source,omitempty"`
+	Model  string                         `json:"model,omitempty"`
+	Plan   *lifeTraceAssistantPlanPayload `json:"plan,omitempty"`
 }
 
 type lifeTraceAIConfig struct {
@@ -70,6 +72,21 @@ type lifeTraceAIConfig struct {
 	Timeout time.Duration
 }
 
+type lifeTraceAssistantPlanDraft struct {
+	Title         string
+	Type          string
+	ScheduledDate string
+	ScheduledTime string
+	Timezone      string
+	NotePrefix    string
+}
+
+type lifeTraceAssistantPlanPayload struct {
+	Status  string               `json:"status"`
+	Message string               `json:"message"`
+	Plan    *model.LifeTracePlan `json:"plan,omitempty"`
+}
+
 var (
 	lifeTraceArkClientOnce sync.Once
 	lifeTraceArkClient     *arkruntime.Client
@@ -78,6 +95,13 @@ var (
 const lifeTraceTodayAdviceDefaultTimeout = 30 * time.Second
 const lifeTraceTodayAdviceCacheTTL = 10 * time.Minute
 const lifeTraceWeeklyReviewMaxTokens = 520
+
+var (
+	assistantPlanIntentPattern     = regexp.MustCompile(`计划|安排|提醒我|提醒|记得|别忘|预约|看电影|电影|吃饭|午饭|晚饭|早餐|午餐|晚餐|餐厅|火锅|咖啡|运动|跑步|健身|阅读|看书|聚会|见朋友|喝咖啡`)
+	assistantReminderIntentPattern = regexp.MustCompile(`提醒我|提醒|记得|别忘|预约|叫我|提示我`)
+	assistantClockPattern          = regexp.MustCompile(`([01]?\d|2[0-3])[:：点时]([0-5]\d)?`)
+	assistantPlanTitleNoise        = regexp.MustCompile(`今天|今晚|晚上|明天|明早|明晚|周末|周五|周六|周日|星期五|星期六|星期日|早上|上午|中午|下午|下班后?|([01]?\d|2[0-3])[:：点时]([0-5]\d)?|提醒我|提醒|记得|别忘了?|叫我|提示我|帮我|我要|想要|想|计划|安排|一下|去|，|。|,|、|\s+`)
+)
 
 type todayAdviceCacheEntry struct {
 	Response  todayAdviceAIResponse
@@ -406,20 +430,212 @@ func (h *Handler) StreamAssistant(c *gin.Context) {
 	weather := h.weather.Fetch(c.Request.Context(), settings.City, false)
 	systemPrompt := lifeTraceAssistantSystemPrompt()
 	userPrompt := buildLifeTraceAssistantPrompt(settings, weather, plans, checkins, traces, req)
+	planDraft := buildLifeTraceAssistantPlanDraft(req.Message, time.Now())
+	planEventSent := false
+	sendPlanEvent := func(send func(lifeTraceAssistantStreamChunk)) {
+		if planEventSent || planDraft == nil {
+			return
+		}
+		planEventSent = true
+		send(lifeTraceAssistantStreamChunk{
+			Plan: h.createAssistantPlanFromDraft(userID, *planDraft),
+		})
+	}
 
 	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
 	defer cancel()
 
 	if aiCfg.Source == "openai" {
-		if err := streamLifeTraceAssistantOpenAI(c, aiCtx, aiCfg, systemPrompt, userPrompt); err != nil {
+		if err := streamLifeTraceAssistantOpenAI(c, aiCtx, aiCfg, systemPrompt, userPrompt, sendPlanEvent); err != nil {
 			c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "AI 服务请求失败：" + err.Error()})
 		}
 		return
 	}
 
 	client := ensureLifeTraceArkClient(aiCfg.APIKey, aiCfg.BaseURL)
-	if err := streamLifeTraceAssistantARK(c, aiCtx, client, aiCfg.Model, systemPrompt, userPrompt); err != nil {
+	if err := streamLifeTraceAssistantARK(c, aiCtx, client, aiCfg.Model, systemPrompt, userPrompt, sendPlanEvent); err != nil {
 		c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "AI 服务请求失败：" + err.Error()})
+	}
+}
+
+func buildLifeTraceAssistantPlanDraft(message string, now time.Time) *lifeTraceAssistantPlanDraft {
+	text := strings.TrimSpace(message)
+	if text == "" || !assistantPlanIntentPattern.MatchString(text) {
+		return nil
+	}
+
+	planType := inferLifeTraceAssistantPlanType(text)
+	title := buildLifeTraceAssistantPlanTitle(text, planType)
+	scheduledTime := inferLifeTraceAssistantPlanTime(text, planType)
+	scheduledDate := inferLifeTraceAssistantPlanDate(text, now)
+	notePrefix := "来自生活助理计划"
+	if assistantReminderIntentPattern.MatchString(text) {
+		notePrefix = "来自生活助理提醒"
+	}
+
+	return &lifeTraceAssistantPlanDraft{
+		Title:         title,
+		Type:          planType,
+		ScheduledDate: scheduledDate,
+		ScheduledTime: scheduledTime,
+		Timezone:      "Asia/Shanghai",
+		NotePrefix:    notePrefix,
+	}
+}
+
+func inferLifeTraceAssistantPlanType(text string) string {
+	switch {
+	case strings.Contains(text, "电影") || strings.Contains(text, "观影") || strings.Contains(text, "影院"):
+		return "电影"
+	case strings.Contains(text, "吃饭") || strings.Contains(text, "餐厅") || strings.Contains(text, "火锅") || strings.Contains(text, "咖啡") || strings.Contains(text, "午饭") || strings.Contains(text, "晚饭") || strings.Contains(text, "早餐") || strings.Contains(text, "午餐") || strings.Contains(text, "晚餐"):
+		return "吃饭"
+	case strings.Contains(text, "运动") || strings.Contains(text, "跑步") || strings.Contains(text, "健身") || strings.Contains(text, "瑜伽") || strings.Contains(text, "骑行") || strings.Contains(text, "游泳"):
+		return "运动"
+	case strings.Contains(text, "阅读") || strings.Contains(text, "看书") || strings.Contains(text, "读书"):
+		return "阅读"
+	case strings.Contains(text, "聚会") || strings.Contains(text, "见朋友") || strings.Contains(text, "约朋友") || strings.Contains(text, "约会"):
+		return "聚会"
+	default:
+		return "普通事项"
+	}
+}
+
+func buildLifeTraceAssistantPlanTitle(text string, planType string) string {
+	title := strings.TrimSpace(assistantPlanTitleNoise.ReplaceAllString(text, ""))
+	if title != "" {
+		return trimRunes(title, 36)
+	}
+
+	switch planType {
+	case "电影":
+		return "看电影"
+	case "吃饭":
+		return "吃饭"
+	case "运动":
+		return "运动"
+	case "阅读":
+		return "阅读"
+	case "聚会":
+		return "聚会"
+	default:
+		return "生活计划"
+	}
+}
+
+func inferLifeTraceAssistantPlanTime(text string, planType string) string {
+	if match := assistantClockPattern.FindStringSubmatch(text); len(match) >= 2 {
+		hour := match[1]
+		if len(hour) == 1 {
+			hour = "0" + hour
+		}
+		minute := "00"
+		if len(match) >= 3 && match[2] != "" {
+			minute = match[2]
+		}
+		return hour + ":" + minute
+	}
+
+	switch {
+	case strings.Contains(text, "早上") || strings.Contains(text, "上午") || strings.Contains(text, "明早"):
+		return "09:00"
+	case strings.Contains(text, "中午") || strings.Contains(text, "午饭") || strings.Contains(text, "午餐"):
+		return "12:00"
+	case strings.Contains(text, "下午"):
+		return "15:00"
+	case strings.Contains(text, "下班"):
+		return "18:30"
+	case strings.Contains(text, "晚上") || strings.Contains(text, "今晚") || strings.Contains(text, "明晚") || strings.Contains(text, "晚饭") || strings.Contains(text, "晚餐"):
+		return "19:30"
+	case planType == "吃饭":
+		return "12:00"
+	case planType == "电影" || planType == "运动" || planType == "聚会":
+		return "19:30"
+	default:
+		return "20:00"
+	}
+}
+
+func inferLifeTraceAssistantPlanDate(text string, now time.Time) string {
+	base := lifeTraceAssistantLocalDate(now)
+	if strings.Contains(text, "明天") || strings.Contains(text, "明早") || strings.Contains(text, "明晚") {
+		return base.AddDate(0, 0, 1).Format("2006-01-02")
+	}
+	if strings.Contains(text, "周末") || strings.Contains(text, "周六") || strings.Contains(text, "星期六") {
+		return base.AddDate(0, 0, daysUntilWeekday(base, time.Saturday)).Format("2006-01-02")
+	}
+	if strings.Contains(text, "周日") || strings.Contains(text, "星期日") {
+		return base.AddDate(0, 0, daysUntilWeekday(base, time.Sunday)).Format("2006-01-02")
+	}
+	if strings.Contains(text, "周五") || strings.Contains(text, "星期五") {
+		return base.AddDate(0, 0, daysUntilWeekday(base, time.Friday)).Format("2006-01-02")
+	}
+	return base.Format("2006-01-02")
+}
+
+func lifeTraceAssistantLocalDate(now time.Time) time.Time {
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		location = time.Local
+	}
+	localNow := now.In(location)
+	return time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, location)
+}
+
+func daysUntilWeekday(base time.Time, target time.Weekday) int {
+	return (int(target) - int(base.Weekday()) + 7) % 7
+}
+
+func formatLifeTraceAssistantPlanTimeLabel(scheduledDate string, scheduledTime string) string {
+	return strings.TrimSpace(scheduledDate + " " + scheduledTime)
+}
+
+func assistantPlanMarker(draft lifeTraceAssistantPlanDraft) string {
+	return fmt.Sprintf("#assistant-plan:%s-%s-%s-%s", draft.ScheduledDate, draft.ScheduledTime, draft.Type, draft.Title)
+}
+
+func (h *Handler) createAssistantPlanFromDraft(userID model.Int64String, draft lifeTraceAssistantPlanDraft) *lifeTraceAssistantPlanPayload {
+	marker := assistantPlanMarker(draft)
+	var existing model.LifeTracePlan
+	err := database.GetDB().
+		Where("user_id = ? AND title = ? AND scheduled_date = ? AND scheduled_time = ? AND source = ?", userID, draft.Title, draft.ScheduledDate, draft.ScheduledTime, "ai_advice").
+		First(&existing).Error
+	if err == nil {
+		return &lifeTraceAssistantPlanPayload{
+			Status:  "exists",
+			Message: fmt.Sprintf("「%s」已经在计划里了。", draft.Title),
+			Plan:    &existing,
+		}
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return &lifeTraceAssistantPlanPayload{
+			Status:  "error",
+			Message: "生活助理已回复，但检查计划是否存在失败，请稍后再试。",
+		}
+	}
+
+	plan := model.LifeTracePlan{
+		UserID:        userID,
+		Title:         draft.Title,
+		Type:          normalizePlanType(draft.Type),
+		TimeLabel:     formatLifeTraceAssistantPlanTimeLabel(draft.ScheduledDate, draft.ScheduledTime),
+		ScheduledDate: draft.ScheduledDate,
+		ScheduledTime: draft.ScheduledTime,
+		Timezone:      draft.Timezone,
+		Reminder:      true,
+		Note:          sanitizePlanNote(fmt.Sprintf("%s：%s。%s", draft.NotePrefix, draft.Title, marker)),
+		Source:        "ai_advice",
+	}
+	if err := database.GetDB().Create(&plan).Error; err != nil {
+		return &lifeTraceAssistantPlanPayload{
+			Status:  "error",
+			Message: "生活助理已回复，但计划保存失败，请稍后再试。",
+		}
+	}
+
+	return &lifeTraceAssistantPlanPayload{
+		Status:  "created",
+		Message: fmt.Sprintf("「%s」已加入计划，会在 %s 提醒。", plan.Title, plan.TimeLabel),
+		Plan:    &plan,
 	}
 }
 
@@ -880,6 +1096,7 @@ func streamLifeTraceAssistantARK(
 	modelID string,
 	systemPrompt string,
 	userPrompt string,
+	beforeDone func(func(lifeTraceAssistantStreamChunk)),
 ) error {
 	send, ok := prepareLifeTraceSSE(c)
 	if !ok {
@@ -919,6 +1136,9 @@ func streamLifeTraceAssistantARK(
 	for {
 		resp, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
+			if beforeDone != nil {
+				beforeDone(send)
+			}
 			send(lifeTraceAssistantStreamChunk{Source: "ark", Model: modelID, Done: true})
 			return nil
 		}
@@ -949,6 +1169,9 @@ func streamLifeTraceAssistantARK(
 			}
 		}
 		if done {
+			if beforeDone != nil {
+				beforeDone(send)
+			}
 			send(lifeTraceAssistantStreamChunk{Source: "ark", Model: currentModel, Done: true})
 			return nil
 		}
@@ -1128,6 +1351,7 @@ func streamLifeTraceAssistantOpenAI(
 	cfg lifeTraceAIConfig,
 	systemPrompt string,
 	userPrompt string,
+	beforeDone func(func(lifeTraceAssistantStreamChunk)),
 ) error {
 	send, ok := prepareLifeTraceSSE(c)
 	if !ok {
@@ -1190,6 +1414,9 @@ func streamLifeTraceAssistantOpenAI(
 		}
 		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 		if data == "[DONE]" {
+			if beforeDone != nil {
+				beforeDone(send)
+			}
 			send(lifeTraceAssistantStreamChunk{Source: "openai", Model: currentModel, Done: true})
 			return nil
 		}
@@ -1210,6 +1437,9 @@ func streamLifeTraceAssistantOpenAI(
 				})
 			}
 			if choice.FinishReason != "" {
+				if beforeDone != nil {
+					beforeDone(send)
+				}
 				send(lifeTraceAssistantStreamChunk{Source: "openai", Model: currentModel, Done: true})
 				return nil
 			}
@@ -1220,6 +1450,9 @@ func streamLifeTraceAssistantOpenAI(
 		return nil
 	}
 
+	if beforeDone != nil {
+		beforeDone(send)
+	}
 	send(lifeTraceAssistantStreamChunk{Source: "openai", Model: currentModel, Done: true})
 	return nil
 }

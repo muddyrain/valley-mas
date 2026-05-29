@@ -16,7 +16,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   deleteWeeklyReview,
   generateTodayAdvice,
@@ -28,6 +28,7 @@ import {
   clearLifeAssistantConversation,
   getLifeAssistantConversation,
   type LifeAssistantMessage,
+  type LifeAssistantPlanEvent,
   saveLifeAssistantMessage,
   streamLifeAssistant,
 } from '@/api/assistant';
@@ -38,11 +39,13 @@ import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { EmptyState } from '@/components/EmptyState';
 import { ImageAnalysisDrawer } from '@/components/ImageAnalysisDrawer';
 import { SectionHeader } from '@/components/SectionHeader';
+import { MessageSyncSkeleton, SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { aiQuickActions, suggestedPrompts } from '@/data/mock';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
-import { buildPlanSchedule, getLocalISODate, type PlanDateOption } from '@/lib/planSchedule';
+import { getPlanDisplayTimeParts } from '@/lib/planReminder';
+import { getLocalISODate } from '@/lib/planSchedule';
 import {
   buildWeeklyReviewActionMarker,
   createPlanFromWeeklyReviewAction,
@@ -51,7 +54,7 @@ import {
 import { findCurrentWeekReview, toggleExpandedWeeklyReviewId } from '@/lib/weeklyReviews';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { AdvicePayload, NewPlanInput, PlanType } from '@/types';
+import type { AdvicePayload, AiAction, NewPlanInput } from '@/types';
 
 type AiResult = {
   title: string;
@@ -71,147 +74,16 @@ type AssistantMessage = LifeAssistantMessage & {
   createdAt?: string;
 };
 
-type AssistantPlanDraft = {
-  title: string;
-  type: PlanType;
-  scheduledTime: string;
-  dateOption: PlanDateOption;
-  notePrefix: string;
-};
-
-const reminderIntentPattern = /(提醒我|提醒|记得|别忘|预约|叫我|提示我)/;
-const planIntentPattern =
-  /(计划|安排|提醒我|提醒|记得|别忘|预约|看电影|电影|吃饭|吃|运动|跑步|健身|阅读|看书|聚会|见朋友|喝咖啡)/;
-
-function normalizeClockTime(raw: string) {
-  const match = raw.match(/([01]?\d|2[0-3])[:：点时]([0-5]\d)?/);
-  if (!match) {
-    return '';
-  }
-
-  const hour = match[1].padStart(2, '0');
-  const minute = (match[2] ?? '00').padStart(2, '0');
-  return `${hour}:${minute}`;
-}
-
-function inferPlanType(text: string): PlanType {
-  if (/电影|观影|影院/.test(text)) {
-    return '电影';
-  }
-  if (/吃饭|吃|餐厅|火锅|咖啡|午饭|晚饭|早餐|午餐|晚餐/.test(text)) {
-    return '吃饭';
-  }
-  if (/运动|跑步|健身|瑜伽|骑行|游泳/.test(text)) {
-    return '运动';
-  }
-  if (/阅读|看书|读书/.test(text)) {
-    return '阅读';
-  }
-  if (/聚会|见朋友|约朋友|约会/.test(text)) {
-    return '聚会';
-  }
-  return '普通事项';
-}
-
-function inferPlanDateOption(text: string): PlanDateOption {
-  if (/明天|明早|明晚/.test(text)) {
-    return '明天';
-  }
-  if (/周日|星期日/.test(text)) {
-    return '周日';
-  }
-  if (/周六|星期六|周末/.test(text)) {
-    return '周六';
-  }
-  if (/周五|星期五/.test(text)) {
-    return '周五';
-  }
-  return '今天';
-}
-
-function inferPlanTime(text: string, type: PlanType) {
-  return (
-    normalizeClockTime(text) ||
-    (/早上|上午|明早/.test(text)
-      ? '09:00'
-      : /中午|午饭|午餐/.test(text)
-        ? '12:00'
-        : /下午/.test(text)
-          ? '15:00'
-          : /下班/.test(text)
-            ? '18:30'
-            : /晚上|今晚|明晚|晚饭|晚餐/.test(text)
-              ? '19:30'
-              : type === '吃饭'
-                ? '12:00'
-                : type === '电影' || type === '运动' || type === '聚会'
-                  ? '19:30'
-                  : '20:00')
-  );
-}
-
-function buildAssistantPlanTitle(text: string, type: PlanType) {
-  const fallbackByType: Record<PlanType, string> = {
-    电影: '看电影',
-    吃饭: '吃饭',
-    运动: '运动',
-    阅读: '阅读',
-    聚会: '聚会',
-    普通事项: '生活计划',
-  };
-  const title = text
-    .replace(/今天|今晚|晚上|明天|明早|明晚|周末|周五|周六|周日|星期五|星期六|星期日/g, '')
-    .replace(/早上|上午|中午|下午|下班后?/g, '')
-    .replace(/([01]?\d|2[0-3])[:：点时]([0-5]\d)?/g, '')
-    .replace(/提醒我|提醒|记得|别忘了?|叫我|提示我/g, '')
-    .replace(/帮我|我要|想要|想|计划|安排|一下|去/g, '')
-    .replace(/[，。,.、\s]+/g, '')
-    .trim();
-
-  return title || fallbackByType[type];
-}
-
-function buildAssistantPlanDraft(message: string): AssistantPlanDraft | null {
-  const text = message.trim();
-  if (!planIntentPattern.test(text)) {
-    return null;
-  }
-
-  const type = inferPlanType(text);
-  const title = buildAssistantPlanTitle(text, type);
-
-  return {
-    type,
-    title,
-    scheduledTime: inferPlanTime(text, type),
-    dateOption: inferPlanDateOption(text),
-    notePrefix: reminderIntentPattern.test(text) ? '来自生活助理提醒' : '来自生活助理计划',
-  };
-}
-
-function buildAssistantPlanMarker(draft: AssistantPlanDraft) {
-  return `#assistant-plan:${draft.dateOption}-${draft.scheduledTime}-${draft.type}-${draft.title}`;
-}
-
-function createPlanFromAssistantDraft(draft: AssistantPlanDraft): NewPlanInput {
-  return {
-    title: draft.title,
-    type: draft.type,
-    ...buildPlanSchedule({
-      dateOption: draft.dateOption,
-      time: draft.scheduledTime,
-    }),
-    reminder: true,
-    source: 'ai_advice',
-    note: `${draft.notePrefix}：${draft.title}。${buildAssistantPlanMarker(draft)}`,
-  };
+function formatPlanDisplayTime(
+  plan: Pick<NewPlanInput, 'scheduledDate' | 'scheduledTime' | 'timeLabel'>,
+) {
+  const { dateText, timeText } = getPlanDisplayTimeParts(plan);
+  return `${dateText} ${timeText}`;
 }
 
 const ASSISTANT_MESSAGES_KEY = 'life-trace-assistant-messages';
-const ASSISTANT_PENDING_PLAN_KEY = 'life-trace-assistant-pending-plan';
 const ASSISTANT_RESULT_KEY = 'life-trace-assistant-result';
 const COLLAPSED_ASSISTANT_MESSAGE_COUNT = 4;
-const confirmPlanPattern = /^(可以|可以的|好|好的|确定|确认|没问题|就这样|行|安排|创建|加入计划)/;
 
 function normalizeAssistantMessage(message: LifeAssistantMessage, index: number): AssistantMessage {
   return {
@@ -313,29 +185,6 @@ function readAssistantMessages() {
   } catch {
     return [];
   }
-}
-
-function readPendingAssistantPlan() {
-  try {
-    const raw = localStorage.getItem(ASSISTANT_PENDING_PLAN_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as AssistantPlanDraft;
-    if (
-      typeof parsed?.title === 'string' &&
-      typeof parsed?.scheduledTime === 'string' &&
-      typeof parsed?.dateOption === 'string' &&
-      typeof parsed?.type === 'string'
-    ) {
-      return parsed;
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
 }
 
 function readAssistantResult() {
@@ -501,7 +350,11 @@ function WeeklyReviewsArchive({
       </header>
 
       {loading ? (
-        <Card className="p-4 text-sm text-muted-foreground">正在同步历史周报...</Card>
+        <SyncState
+          title="正在同步历史周报"
+          description="正在读取已存档的每周回顾。"
+          tone="health"
+        />
       ) : null}
 
       {!loading && reviews.length === 0 ? (
@@ -640,20 +493,7 @@ function AssistantHistoryPage({
       <section>
         <SectionHeader title="全部对话" meta={loading ? '同步中' : `${messages.length} 条`} />
         {loading && messages.length === 0 ? (
-          <div className="space-y-3">
-            {[0, 1, 2].map((item) => (
-              <Card key={item} className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className="size-9 animate-pulse rounded-full bg-secondary motion-reduce:animate-none" />
-                  <div className="min-w-0 flex-1 space-y-3">
-                    <div className="h-3 w-24 animate-pulse rounded-full bg-secondary motion-reduce:animate-none" />
-                    <div className="h-3 w-full animate-pulse rounded-full bg-secondary motion-reduce:animate-none" />
-                    <div className="h-3 w-2/3 animate-pulse rounded-full bg-secondary motion-reduce:animate-none" />
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+          <MessageSyncSkeleton />
         ) : groups.length > 0 ? (
           <div className="space-y-5">
             {groups.map((group) => (
@@ -689,6 +529,74 @@ function AssistantHistoryPage({
   );
 }
 
+function AiActionCard({ action }: { action: AiAction }) {
+  const Icon = action.title.includes('计划')
+    ? CalendarDays
+    : action.title.includes('图片')
+      ? Image
+      : Sparkles;
+
+  return (
+    <Card className="flex items-center gap-4 p-4">
+      <div className="grid size-10 shrink-0 place-items-center rounded-full bg-life-trace/10 text-life-trace">
+        <Icon className="size-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <h3 className="line-clamp-2 font-semibold">{action.title}</h3>
+        <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+          <Clock className="size-3" />
+          {action.timeLabel}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function AiActionsArchive({ actions, onBack }: { actions: AiAction[]; onBack: () => void }) {
+  return (
+    <div className="space-y-6">
+      <header className="space-y-5">
+        <button
+          type="button"
+          className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+          onClick={onBack}
+        >
+          <ArrowLeft className="size-4" />
+          返回
+        </button>
+        <div className="flex items-center gap-3">
+          <div className="grid size-12 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+            <Sparkles className="size-6" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">AI 操作历史</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              共 {actions.length} 条 Life AI 记录
+            </p>
+          </div>
+        </div>
+      </header>
+
+      {actions.length > 0 ? (
+        <div className="space-y-3">
+          {actions.map((action) => (
+            <AiActionCard key={action.id} action={action} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          title="还没有 AI 操作"
+          description="生成建议、分析图片、创建计划后，这里会沉淀最近的 AI 操作。"
+          eyebrow="Life AI"
+          icon={Sparkles}
+          tone="ai"
+          align="center"
+        />
+      )}
+    </div>
+  );
+}
+
 function formatWeeklyReviewDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -702,7 +610,7 @@ function formatWeeklyReviewDateTime(value: string) {
   });
 }
 
-export function AiPage() {
+function useAiPageState() {
   const plans = useLifeTraceStore((state) => state.plans);
   const traces = useLifeTraceStore((state) => state.traces);
   const checkins = useLifeTraceStore((state) => state.checkins);
@@ -713,13 +621,13 @@ export function AiPage() {
   const aiActions = useLifeTraceStore((state) => state.aiActions ?? []);
   const addAiAction = useLifeTraceStore((state) => state.addAiAction);
   const addPlan = useLifeTraceStore((state) => state.addPlan);
+  const receiveServerPlan = useLifeTraceStore((state) => state.receiveServerPlan);
   const addTrace = useLifeTraceStore((state) => state.addTrace);
   const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
   const generateTraceFromLatestPlan = useLifeTraceStore(
     (state) => state.generateTraceFromLatestPlan,
   );
   const token = useAuthStore((state) => state.token);
-  const location = useLocation();
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false);
@@ -728,9 +636,6 @@ export function AiPage() {
   const [assistantInput, setAssistantInput] = useState('');
   const [assistantMessages, setAssistantMessages] =
     useState<AssistantMessage[]>(readAssistantMessages);
-  const [pendingAssistantPlan, setPendingAssistantPlan] = useState<AssistantPlanDraft | null>(
-    readPendingAssistantPlan,
-  );
   const [assistantClearConfirmOpen, setAssistantClearConfirmOpen] = useState(false);
   const [assistantClearing, setAssistantClearing] = useState(false);
   const [assistantHistoryNotice, setAssistantHistoryNotice] = useState('');
@@ -759,9 +664,6 @@ export function AiPage() {
   const latestAssistantMessages = assistantMessages.slice(-COLLAPSED_ASSISTANT_MESSAGE_COUNT);
   const latestWeeklyReview = weeklyReviews[0];
   const currentWeekReview = findCurrentWeekReview(weeklyReviews);
-  const assistantHistoryOpen = location.pathname === '/ai/history';
-  const weeklyReviewArchiveOpen = location.pathname === '/ai/weekly-reviews';
-
   const placeholder = useMemo(
     () => `${settings.city} · ${settings.commuteMethod}通勤 · ${openPlanCount} 个待完成计划`,
     [openPlanCount, settings.city, settings.commuteMethod],
@@ -826,15 +728,6 @@ export function AiPage() {
   }, [assistantMessages]);
 
   useEffect(() => {
-    if (pendingAssistantPlan) {
-      localStorage.setItem(ASSISTANT_PENDING_PLAN_KEY, JSON.stringify(pendingAssistantPlan));
-      return;
-    }
-
-    localStorage.removeItem(ASSISTANT_PENDING_PLAN_KEY);
-  }, [pendingAssistantPlan]);
-
-  useEffect(() => {
     if (result) {
       localStorage.setItem(ASSISTANT_RESULT_KEY, JSON.stringify(result));
       return;
@@ -857,39 +750,29 @@ export function AiPage() {
     }
   };
 
-  const createAssistantPlan = async (draft: AssistantPlanDraft) => {
-    setResult({
-      title: '正在创建生活计划',
-      detail: `生活助理已回复，正在把「${draft.title}」加入计划。`,
-      tone: 'plan',
-    });
-
-    const marker = buildAssistantPlanMarker(draft);
-    const existing = plans.some((plan) => plan.note.includes(marker));
-    if (existing) {
-      setResult({
-        title: '计划已存在',
-        detail: `「${draft.title}」已经在计划里。删除后可回复“创建”重新加入。`,
-        tone: 'plan',
-      });
-      return;
+  const handleAssistantPlanEvent = (event: LifeAssistantPlanEvent) => {
+    if (event.plan) {
+      receiveServerPlan(
+        event.plan,
+        event.status === 'created'
+          ? `生活助理创建了「${event.plan.title}」计划`
+          : `生活助理识别到「${event.plan.title}」计划`,
+      );
     }
 
-    const plan = await addPlan(createPlanFromAssistantDraft(draft));
-    setPendingAssistantPlan(null);
-    setResult(
-      plan
-        ? {
-            title: '已创建生活计划',
-            detail: `「${draft.title}」已加入计划，会在 ${plan.timeLabel} 提醒。`,
-            tone: 'plan',
-          }
-        : {
-            title: '生活计划未保存',
-            detail: '生活助理已回复，但计划保存失败，请稍后再试。',
-            tone: 'alert',
-          },
-    );
+    setResult({
+      title:
+        event.status === 'created'
+          ? '已创建生活计划'
+          : event.status === 'exists'
+            ? '计划已存在'
+            : '生活计划未保存',
+      detail:
+        event.plan && event.status === 'created'
+          ? `「${event.plan.title}」已加入计划，会在 ${formatPlanDisplayTime(event.plan)} 提醒。`
+          : event.message,
+      tone: event.status === 'error' ? 'alert' : 'plan',
+    });
   };
 
   const runWeeklyReview = async () => {
@@ -1087,12 +970,6 @@ export function AiPage() {
     void saveAssistantMessageToServer({ role: 'user', content: message });
 
     let reply = '';
-    const confirmedPendingPlan =
-      pendingAssistantPlan && confirmPlanPattern.test(message) ? pendingAssistantPlan : null;
-    const planDraft = confirmedPendingPlan ?? buildAssistantPlanDraft(message);
-    if (planDraft) {
-      setPendingAssistantPlan(planDraft);
-    }
 
     try {
       await streamLifeAssistant(token, {
@@ -1111,12 +988,10 @@ export function AiPage() {
             ),
           );
         },
+        onPlan: handleAssistantPlanEvent,
       });
       setAssistantStreaming(false);
       void saveAssistantMessageToServer({ role: 'assistant', content: reply });
-      if (planDraft) {
-        await createAssistantPlan(planDraft);
-      }
       addAiAction('和生活助理规划了一次安排');
     } catch (error) {
       const detail = error instanceof Error ? error.message : '生活助理暂时没有回应';
@@ -1156,7 +1031,6 @@ export function AiPage() {
       }
     }
     setAssistantMessages([]);
-    setPendingAssistantPlan(null);
     setResult(null);
     setAssistantModel('');
     setAssistantClearConfirmOpen(false);
@@ -1230,7 +1104,7 @@ export function AiPage() {
         plan
           ? {
               title: '已加入下周计划',
-              detail: `「${action}」已加入计划，会在 ${plan.timeLabel} 提醒。`,
+              detail: `「${action}」已加入计划，会在 ${formatPlanDisplayTime(plan)} 提醒。`,
               tone: 'plan',
             }
           : {
@@ -1244,74 +1118,212 @@ export function AiPage() {
     }
   };
 
-  if (assistantHistoryOpen) {
-    return (
-      <>
-        <AssistantHistoryPage
-          messages={assistantMessages}
-          loading={assistantHistoryLoading}
-          streaming={assistantStreaming}
-          notice={assistantHistoryNotice}
-          onBack={() => navigate('/ai')}
-          onRequestClear={() => setAssistantClearConfirmOpen(true)}
-        />
-        <ConfirmDialog
-          open={assistantClearConfirmOpen}
-          title="清空对话历史？"
-          description="清空后，这个账号的生活助理对话记录会从云端删除。"
-          confirmLabel="确认清空"
-          loadingLabel="清空中"
-          loading={assistantClearing}
-          onCancel={() => {
-            if (!assistantClearing) {
-              setAssistantClearConfirmOpen(false);
-            }
-          }}
-          onConfirm={() => void handleClearAssistantMessages()}
-        />
-      </>
-    );
-  }
+  return {
+    plans,
+    traces,
+    checkinsLoading,
+    settings,
+    aiActions,
+    addAiAction,
+    addPlan,
+    addTrace,
+    token,
+    navigate,
+    drawerOpen,
+    setDrawerOpen,
+    imageDrawerOpen,
+    setImageDrawerOpen,
+    result,
+    setResult,
+    adviceCards,
+    assistantInput,
+    setAssistantInput,
+    assistantMessages,
+    assistantClearConfirmOpen,
+    setAssistantClearConfirmOpen,
+    assistantClearing,
+    assistantHistoryNotice,
+    setAssistantHistoryNotice,
+    assistantStreaming,
+    assistantHistoryLoading,
+    assistantModel,
+    quickActionLoading,
+    addingAdviceId,
+    weeklyReviews,
+    weeklyReviewsLoading,
+    weeklyReviewRegenerateTarget,
+    setWeeklyReviewRegenerateTarget,
+    weeklyReviewDeleteTarget,
+    setWeeklyReviewDeleteTarget,
+    deletingWeeklyReviewId,
+    expandedWeeklyReviewId,
+    setExpandedWeeklyReviewId,
+    addingWeeklyActionKey,
+    openPlanCount,
+    completedPlanCount,
+    completedCheckinCount,
+    activeHabitCount,
+    latestTrace,
+    latestAssistantMessages,
+    latestWeeklyReview,
+    placeholder,
+    handleAssistantSubmit,
+    handleClearAssistantMessages,
+    handleAddAdvicePlan,
+    handleAddWeeklyReviewActionPlan,
+    handleDeleteWeeklyReview,
+    handleQuickAction,
+    runWeeklyReview,
+  };
+}
 
-  if (weeklyReviewArchiveOpen) {
-    return (
-      <>
-        <WeeklyReviewsArchive
-          reviews={weeklyReviews}
-          loading={weeklyReviewsLoading}
-          deletingId={deletingWeeklyReviewId}
-          expandedId={expandedWeeklyReviewId}
-          onBack={() => navigate('/ai')}
-          onToggleExpanded={(review) =>
-            setExpandedWeeklyReviewId((current) => toggleExpandedWeeklyReviewId(current, review.id))
+export function AiHistoryPage() {
+  const {
+    assistantMessages,
+    assistantHistoryLoading,
+    assistantStreaming,
+    assistantHistoryNotice,
+    assistantClearConfirmOpen,
+    setAssistantClearConfirmOpen,
+    assistantClearing,
+    handleClearAssistantMessages,
+    navigate,
+  } = useAiPageState();
+
+  return (
+    <>
+      <AssistantHistoryPage
+        messages={assistantMessages}
+        loading={assistantHistoryLoading}
+        streaming={assistantStreaming}
+        notice={assistantHistoryNotice}
+        onBack={() => navigate('/ai')}
+        onRequestClear={() => setAssistantClearConfirmOpen(true)}
+      />
+      <ConfirmDialog
+        open={assistantClearConfirmOpen}
+        title="清空对话历史？"
+        description="清空后，这个账号的生活助理对话记录会从云端删除。"
+        confirmLabel="确认清空"
+        loadingLabel="清空中"
+        loading={assistantClearing}
+        onCancel={() => {
+          if (!assistantClearing) {
+            setAssistantClearConfirmOpen(false);
           }
-          onRequestDelete={setWeeklyReviewDeleteTarget}
-          onAddNextAction={handleAddWeeklyReviewActionPlan}
-          getNextActionAdded={(review, actionIndex) =>
-            hasWeeklyReviewActionPlan(plans, review.id, actionIndex)
+        }}
+        onConfirm={() => void handleClearAssistantMessages()}
+      />
+    </>
+  );
+}
+
+export function AiActionsPage() {
+  const { aiActions, navigate } = useAiPageState();
+
+  return <AiActionsArchive actions={aiActions} onBack={() => navigate('/ai')} />;
+}
+
+export function AiWeeklyReviewsPage() {
+  const {
+    plans,
+    weeklyReviews,
+    weeklyReviewsLoading,
+    deletingWeeklyReviewId,
+    expandedWeeklyReviewId,
+    setExpandedWeeklyReviewId,
+    setWeeklyReviewDeleteTarget,
+    handleAddWeeklyReviewActionPlan,
+    addingWeeklyActionKey,
+    weeklyReviewDeleteTarget,
+    handleDeleteWeeklyReview,
+    navigate,
+  } = useAiPageState();
+
+  return (
+    <>
+      <WeeklyReviewsArchive
+        reviews={weeklyReviews}
+        loading={weeklyReviewsLoading}
+        deletingId={deletingWeeklyReviewId}
+        expandedId={expandedWeeklyReviewId}
+        onBack={() => navigate('/ai')}
+        onToggleExpanded={(review) =>
+          setExpandedWeeklyReviewId((current) => toggleExpandedWeeklyReviewId(current, review.id))
+        }
+        onRequestDelete={setWeeklyReviewDeleteTarget}
+        onAddNextAction={handleAddWeeklyReviewActionPlan}
+        getNextActionAdded={(review, actionIndex) =>
+          hasWeeklyReviewActionPlan(plans, review.id, actionIndex)
+        }
+        addingActionKey={addingWeeklyActionKey}
+      />
+      <ConfirmDialog
+        open={Boolean(weeklyReviewDeleteTarget)}
+        title="删除这篇周报？"
+        description={
+          weeklyReviewDeleteTarget
+            ? `${weeklyReviewDeleteTarget.weekStart} 至 ${weeklyReviewDeleteTarget.weekEnd} 的周报删除后不会再出现在历史里。`
+            : ''
+        }
+        confirmLabel="确认删除"
+        loading={Boolean(deletingWeeklyReviewId)}
+        onCancel={() => {
+          if (!deletingWeeklyReviewId) {
+            setWeeklyReviewDeleteTarget(null);
           }
-          addingActionKey={addingWeeklyActionKey}
-        />
-        <ConfirmDialog
-          open={Boolean(weeklyReviewDeleteTarget)}
-          title="删除这篇周报？"
-          description={
-            weeklyReviewDeleteTarget
-              ? `${weeklyReviewDeleteTarget.weekStart} 至 ${weeklyReviewDeleteTarget.weekEnd} 的周报删除后不会再出现在历史里。`
-              : ''
-          }
-          confirmLabel="确认删除"
-          loading={Boolean(deletingWeeklyReviewId)}
-          onCancel={() => {
-            if (!deletingWeeklyReviewId) {
-              setWeeklyReviewDeleteTarget(null);
-            }
-          }}
-          onConfirm={() => void handleDeleteWeeklyReview()}
-        />
-      </>
-    );
-  }
+        }}
+        onConfirm={() => void handleDeleteWeeklyReview()}
+      />
+    </>
+  );
+}
+
+export function AiPage() {
+  const {
+    plans,
+    traces,
+    checkinsLoading,
+    settings,
+    aiActions,
+    addAiAction,
+    addPlan,
+    addTrace,
+    token,
+    navigate,
+    drawerOpen,
+    setDrawerOpen,
+    imageDrawerOpen,
+    setImageDrawerOpen,
+    result,
+    setResult,
+    adviceCards,
+    assistantInput,
+    setAssistantInput,
+    assistantMessages,
+    setAssistantHistoryNotice,
+    assistantStreaming,
+    assistantHistoryLoading,
+    assistantModel,
+    quickActionLoading,
+    addingAdviceId,
+    weeklyReviews,
+    weeklyReviewsLoading,
+    weeklyReviewRegenerateTarget,
+    setWeeklyReviewRegenerateTarget,
+    openPlanCount,
+    completedPlanCount,
+    completedCheckinCount,
+    activeHabitCount,
+    latestTrace,
+    latestAssistantMessages,
+    latestWeeklyReview,
+    placeholder,
+    handleAssistantSubmit,
+    handleAddAdvicePlan,
+    handleQuickAction,
+    runWeeklyReview,
+  } = useAiPageState();
 
   return (
     <div className="space-y-7">
@@ -1602,27 +1614,19 @@ export function AiPage() {
       </section>
 
       <section>
-        <SectionHeader title="最近的 AI 操作" meta="查看全部" />
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold">最近的 AI 操作</h2>
+          <button
+            type="button"
+            className="cursor-pointer text-sm font-semibold text-muted-foreground transition hover:text-foreground"
+            onClick={() => navigate('/ai/actions')}
+          >
+            查看全部
+          </button>
+        </div>
         <div className="space-y-3">
           {aiActions.slice(0, 5).map((action) => (
-            <Card key={action.id} className="flex items-center gap-4 p-4">
-              <div className="grid size-10 place-items-center rounded-full bg-life-trace/10 text-life-trace">
-                {action.title.includes('计划') ? (
-                  <CalendarDays className="size-5" />
-                ) : action.title.includes('图片') ? (
-                  <Image className="size-5" />
-                ) : (
-                  <Sparkles className="size-5" />
-                )}
-              </div>
-              <div>
-                <h3 className="font-semibold">{action.title}</h3>
-                <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="size-3" />
-                  {action.timeLabel}
-                </div>
-              </div>
-            </Card>
+            <AiActionCard key={action.id} action={action} />
           ))}
         </div>
       </section>

@@ -1,4 +1,5 @@
 import { API_BASE, apiRequest } from '@/api/request';
+import type { Plan } from '@/types';
 
 export type LifeAssistantMessage = {
   id?: string;
@@ -26,6 +27,13 @@ type AssistantStreamChunk = {
   error?: string;
   source?: 'ark' | 'openai';
   model?: string;
+  plan?: LifeAssistantPlanEvent;
+};
+
+export type LifeAssistantPlanEvent = {
+  status: 'created' | 'exists' | 'error';
+  message: string;
+  plan?: Plan;
 };
 
 type StreamOptions = {
@@ -34,6 +42,7 @@ type StreamOptions = {
   signal?: AbortSignal;
   onChunk: (chunk: string) => void;
   onMeta?: (meta: { source?: 'ark' | 'openai'; model?: string }) => void;
+  onPlan?: (event: LifeAssistantPlanEvent) => void;
 };
 
 export async function streamLifeAssistant(token: string, options: StreamOptions) {
@@ -84,6 +93,9 @@ export async function streamLifeAssistant(token: string, options: StreamOptions)
       }
       if (payload.chunk) {
         options.onChunk(payload.chunk);
+      }
+      if (payload.plan) {
+        options.onPlan?.(payload.plan);
       }
     }
   };

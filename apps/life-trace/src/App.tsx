@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AppReminderToast } from '@/components/AppReminderToast';
 import { AppShell } from '@/components/AppShell';
-import { AiPage } from '@/pages/AiPage';
+import { AiActionsPage, AiHistoryPage, AiPage, AiWeeklyReviewsPage } from '@/pages/AiPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { PlansPage } from '@/pages/PlansPage';
 import { ProfilePage } from '@/pages/ProfilePage';
@@ -80,8 +80,9 @@ function AppContent() {
           <Route path="/today" element={<TodayPage />} />
           <Route path="/plans/:planId?" element={<PlansPage />} />
           <Route path="/ai" element={<AiPage />} />
-          <Route path="/ai/history" element={<AiPage />} />
-          <Route path="/ai/weekly-reviews" element={<AiPage />} />
+          <Route path="/ai/history" element={<AiHistoryPage />} />
+          <Route path="/ai/actions" element={<AiActionsPage />} />
+          <Route path="/ai/weekly-reviews" element={<AiWeeklyReviewsPage />} />
           <Route path="/traces/:traceId?" element={<TracesPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="*" element={<Navigate to="/today" replace />} />

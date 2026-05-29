@@ -72,6 +72,74 @@ func TestAnalyzeImageRequiresAIConfig(t *testing.T) {
 	}
 }
 
+func TestStreamAssistantOpenAIUsesLifeContext(t *testing.T) {
+	var captured lifeTraceOpenAIRequest
+	openAIServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("decode OpenAI stream request: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"model\":\"gpt-test\",\"choices\":[{\"delta\":{\"content\":\"已记下，\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"model\":\"gpt-test\",\"choices\":[{\"delta\":{\"content\":\"建议 18:30 提醒你预约取车。\"},\"finish_reason\":\"stop\"}]}\n\n"))
+	}))
+	defer openAIServer.Close()
+
+	t.Setenv("OPENAI_API_KEY", "test-openai-key")
+	t.Setenv("OPENAI_API_BASE_URL", openAIServer.URL)
+	t.Setenv("OPENAI_API_MODEL", "gpt-test")
+
+	router := setupTraceTestRouter(t, 101)
+	if err := database.GetDB().Create(&model.LifeTraceSettings{
+		UserID:        101,
+		City:          "上海",
+		CommuteMethod: "开车",
+		Habits:        model.StringList{"喝水", "休息"},
+	}).Error; err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+	if err := database.GetDB().Create(&model.LifeTracePlan{
+		UserID:        101,
+		Title:         "晚上跑步",
+		Type:          "运动",
+		TimeLabel:     "今天 20:00",
+		ScheduledDate: "2026-05-29",
+		ScheduledTime: "20:00",
+		Timezone:      "Asia/Shanghai",
+		Reminder:      true,
+		Source:        "manual",
+	}).Error; err != nil {
+		t.Fatalf("seed plan: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/assistant/stream", bytes.NewBufferString(`{
+		"message": "晚上记得提醒我预约取车",
+		"history": [{"role":"assistant","content":"可以，我会帮你安排到计划里。"}]
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if !strings.Contains(resp.Header().Get("Content-Type"), "text/event-stream") {
+		t.Fatalf("expected SSE content type, got %s", resp.Header().Get("Content-Type"))
+	}
+	if !strings.Contains(resp.Body.String(), "建议 18:30 提醒你预约取车") {
+		t.Fatalf("expected streamed assistant content, got %s", resp.Body.String())
+	}
+	if len(captured.Messages) != 2 {
+		t.Fatalf("expected system and user prompt, got %+v", captured.Messages)
+	}
+	userPrompt := captured.Messages[1].Content
+	for _, want := range []string{"晚上记得提醒我预约取车", "晚上跑步", "提醒：true", "生活助理：可以，我会帮你安排到计划里。"} {
+		if !strings.Contains(userPrompt, want) {
+			t.Fatalf("expected assistant prompt to contain %q, got %s", want, userPrompt)
+		}
+	}
+}
+
 func TestParseImageAnalysisAIResponseNormalizesFields(t *testing.T) {
 	parsed, err := parseImageAnalysisAIResponse(`结果如下：
 {"title":"  周五晚餐  ","summary":"这是一张适合安排一次放松晚餐的照片，画面重点是食物和聚餐氛围。","planType":"旅行","mood":"","tags":["美食","","美食","晚餐","朋友","夜晚"],"schedule":{"dateOption":"周一","time":"25:00"}}
@@ -518,6 +586,76 @@ func TestBuildLifeTraceAssistantPromptHandlesReminderBriefly(t *testing.T) {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("expected prompt to contain %q, got %s", want, prompt)
 		}
+	}
+}
+
+func TestBuildLifeTraceAssistantPlanDraftInfersSchedule(t *testing.T) {
+	location, _ := time.LoadLocation("Asia/Shanghai")
+	now := time.Date(2026, 5, 29, 10, 0, 0, 0, location)
+
+	meal := buildLifeTraceAssistantPlanDraft("明天中午吃饭", now)
+	if meal == nil {
+		t.Fatal("expected meal plan draft")
+	}
+	if meal.Title != "吃饭" || meal.Type != "吃饭" {
+		t.Fatalf("expected meal title and type, got %+v", meal)
+	}
+	if meal.ScheduledDate != "2026-05-30" || meal.ScheduledTime != "12:00" {
+		t.Fatalf("expected tomorrow noon schedule, got %+v", meal)
+	}
+
+	reminder := buildLifeTraceAssistantPlanDraft("晚上记得提醒我预约取车", now)
+	if reminder == nil {
+		t.Fatal("expected reminder plan draft")
+	}
+	if reminder.Title != "预约取车" || reminder.Type != "普通事项" {
+		t.Fatalf("expected reminder title and type, got %+v", reminder)
+	}
+	if reminder.ScheduledDate != "2026-05-29" || reminder.ScheduledTime != "19:30" {
+		t.Fatalf("expected tonight schedule, got %+v", reminder)
+	}
+	if reminder.NotePrefix != "来自生活助理提醒" {
+		t.Fatalf("expected reminder note prefix, got %+v", reminder)
+	}
+}
+
+func TestCreateAssistantPlanFromDraftCreatesAndDedupes(t *testing.T) {
+	_ = setupTraceTestRouter(t, 101)
+	var handler Handler
+	draft := lifeTraceAssistantPlanDraft{
+		Title:         "预约取车",
+		Type:          "普通事项",
+		ScheduledDate: "2026-05-29",
+		ScheduledTime: "19:30",
+		Timezone:      "Asia/Shanghai",
+		NotePrefix:    "来自生活助理提醒",
+	}
+
+	created := handler.createAssistantPlanFromDraft(101, draft)
+	if created == nil || created.Status != "created" || created.Plan == nil {
+		t.Fatalf("expected created plan payload, got %+v", created)
+	}
+	if created.Plan.Source != "ai_advice" || !created.Plan.Reminder {
+		t.Fatalf("expected AI advice plan with reminder, got %+v", created.Plan)
+	}
+	if strings.Contains(created.Plan.Note, "#assistant-plan") {
+		t.Fatalf("expected internal marker to be stripped, got %q", created.Plan.Note)
+	}
+
+	exists := handler.createAssistantPlanFromDraft(101, draft)
+	if exists == nil || exists.Status != "exists" || exists.Plan == nil {
+		t.Fatalf("expected duplicate detection, got %+v", exists)
+	}
+
+	var count int64
+	if err := database.GetDB().
+		Model(&model.LifeTracePlan{}).
+		Where("user_id = ? AND title = ?", model.Int64String(101), "预约取车").
+		Count(&count).Error; err != nil {
+		t.Fatalf("count plans: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one plan after duplicate create, got %d", count)
 	}
 }
 

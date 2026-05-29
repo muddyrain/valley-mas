@@ -3,7 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { listCheckins, toggleCheckin } from '@/api/checkins';
 import { createPlan, deletePlan, listPlans, updatePlan, updatePlanStatus } from '@/api/plans';
 import { getSettings, saveSettings } from '@/api/settings';
-import { createTrace, deleteTrace, listTraces } from '@/api/traces';
+import { createTrace, deleteTrace, listTraces, updateTrace } from '@/api/traces';
 import { useAuthStore } from '@/store/useAuthStore';
 import type {
   AiAction,
@@ -30,6 +30,9 @@ type LifeTraceState = {
   tracesLoaded: boolean;
   tracesLoading: boolean;
   tracesError: string;
+  traceCreating: boolean;
+  traceUpdatingById: Record<string, boolean>;
+  traceDeletingById: Record<string, boolean>;
   checkins: Checkin[];
   checkinsDate: string;
   checkinsLoaded: boolean;
@@ -50,8 +53,10 @@ type LifeTraceState = {
   loadCheckins: (date: string) => Promise<void>;
   toggleHabitCheckin: (date: string, name: string, completed: boolean) => Promise<void>;
   addPlan: (input: NewPlanInput) => Promise<Plan | null>;
+  receiveServerPlan: (plan: Plan, actionTitle?: string) => void;
   editPlan: (planId: string, input: NewPlanInput) => Promise<Plan | null>;
   addTrace: (input: NewTraceInput) => Promise<Trace | null>;
+  editTrace: (traceId: string, input: NewTraceInput) => Promise<Trace | null>;
   completePlan: (planId: string) => Promise<void>;
   removePlan: (planId: string) => Promise<void>;
   removeTrace: (traceId: string) => Promise<void>;
@@ -71,11 +76,32 @@ const defaultSettings: UserSettings = {
   habits: ['喝水', '休息', '运动', '护肤'],
 };
 
+function formatTraceRecordedTime(value?: string) {
+  const date = value ? new Date(value) : new Date();
+  const validDate = Number.isNaN(date.getTime()) ? new Date() : date;
+  const now = new Date();
+  const sameDay =
+    validDate.getFullYear() === now.getFullYear() &&
+    validDate.getMonth() === now.getMonth() &&
+    validDate.getDate() === now.getDate();
+  const dateText = sameDay
+    ? '今天'
+    : validDate.toLocaleDateString('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+      });
+  const time = validDate.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `${dateText} ${time}`;
+}
+
 const createTraceFromPlan = (plan: Plan): NewTraceInput => ({
   planId: plan.id,
   title: plan.title.replace(/^周[五六日]晚上?/, '').replace(/^明早\s*/, ''),
   summary: `${plan.title}，已经被记录为一条新的生活踪迹。`,
-  timeLabel: plan.timeLabel,
+  timeLabel: formatTraceRecordedTime(plan.completedAt),
   location: plan.location,
   imageUrl: plan.imageUrl,
   mood: plan.type === '运动' ? '活力' : plan.type === '吃饭' ? '满足' : '放松',
@@ -108,6 +134,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       tracesLoaded: false,
       tracesLoading: false,
       tracesError: '',
+      traceCreating: false,
+      traceUpdatingById: {},
+      traceDeletingById: {},
       checkins: [],
       checkinsDate: '',
       checkinsLoaded: false,
@@ -339,6 +368,26 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           set({ planCreating: false });
         }
       },
+      receiveServerPlan: (plan, actionTitle) =>
+        set((state) => {
+          const exists = state.plans.some((item) => item.id === plan.id);
+          const plans = exists
+            ? state.plans.map((item) => (item.id === plan.id ? plan : item))
+            : [plan, ...state.plans];
+
+          return {
+            plans,
+            plansError: '',
+            aiActions: [
+              {
+                id: createActionId(),
+                title: actionTitle || `创建了「${plan.title}」计划`,
+                timeLabel: '刚刚',
+              },
+              ...getAiActions(state),
+            ],
+          };
+        }),
       editPlan: async (planId, input) => {
         const token = getToken();
         if (!token) {
@@ -384,6 +433,11 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           return null;
         }
 
+        if (get().traceCreating) {
+          return null;
+        }
+
+        set({ traceCreating: true, tracesError: '' });
         try {
           const trace = await createTrace(token, input);
           set((state) => ({
@@ -398,6 +452,43 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         } catch (error) {
           set({ tracesError: error instanceof Error ? error.message : '创建踪迹失败' });
           return null;
+        } finally {
+          set({ traceCreating: false });
+        }
+      },
+      editTrace: async (traceId, input) => {
+        const token = getToken();
+        if (!token) {
+          set({ tracesError: '请先登录后再编辑踪迹' });
+          return null;
+        }
+
+        if (get().traceUpdatingById[traceId]) {
+          return null;
+        }
+
+        set((state) => ({
+          traceUpdatingById: { ...state.traceUpdatingById, [traceId]: true },
+          tracesError: '',
+        }));
+        try {
+          const updated = await updateTrace(token, traceId, input);
+          set((state) => ({
+            traces: state.traces.map((trace) => (trace.id === traceId ? updated : trace)),
+            tracesError: '',
+            aiActions: [
+              { id: createActionId(), title: `更新了「${updated.title}」踪迹`, timeLabel: '刚刚' },
+              ...getAiActions(state),
+            ],
+          }));
+          return updated;
+        } catch (error) {
+          set({ tracesError: error instanceof Error ? error.message : '编辑踪迹失败' });
+          return null;
+        } finally {
+          set((state) => ({
+            traceUpdatingById: { ...state.traceUpdatingById, [traceId]: false },
+          }));
         }
       },
       completePlan: async (planId) => {
@@ -476,10 +567,14 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       },
       removeTrace: async (traceId) => {
         const token = getToken();
-        if (!token) {
+        if (!token || get().traceDeletingById[traceId]) {
           return;
         }
 
+        set((state) => ({
+          traceDeletingById: { ...state.traceDeletingById, [traceId]: true },
+          tracesError: '',
+        }));
         try {
           await deleteTrace(token, traceId);
           set((state) => ({
@@ -488,6 +583,10 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           }));
         } catch (error) {
           set({ tracesError: error instanceof Error ? error.message : '删除踪迹失败' });
+        } finally {
+          set((state) => ({
+            traceDeletingById: { ...state.traceDeletingById, [traceId]: false },
+          }));
         }
       },
       addAiAction: (title) =>
@@ -529,6 +628,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           tracesLoaded,
           tracesLoading,
           tracesError,
+          traceCreating,
+          traceUpdatingById,
+          traceDeletingById,
           checkins,
           checkinsDate,
           checkinsLoaded,
@@ -553,6 +655,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         void tracesLoaded;
         void tracesLoading;
         void tracesError;
+        void traceCreating;
+        void traceUpdatingById;
+        void traceDeletingById;
         void checkins;
         void checkinsDate;
         void checkinsLoaded;
