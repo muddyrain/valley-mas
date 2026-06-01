@@ -728,7 +728,8 @@ export class WorldScene extends Phaser.Scene {
       WorldProjection['territory'][number] & { color: number; alpha: number; selected: boolean }
     >,
   ) {
-    const visibleChunkKeys = getVisibleChunkKeys(territoryTiles, TERRAIN_RENDER_CHUNK_TILES);
+    const visibleFillTiles = territoryTiles.filter((tile) => tile.alpha > 0);
+    const visibleChunkKeys = getVisibleChunkKeys(visibleFillTiles, TERRAIN_RENDER_CHUNK_TILES);
 
     for (const [key, texture] of this.territoryFillChunkTextures) {
       texture.setVisible(visibleChunkKeys.has(key));
@@ -738,8 +739,8 @@ export class WorldScene extends Phaser.Scene {
       this.ensureTerritoryFillChunkTexture(key, projection);
     }
 
-    const tilesByChunk = new Map<string, typeof territoryTiles>();
-    for (const tile of territoryTiles) {
+    const tilesByChunk = new Map<string, typeof visibleFillTiles>();
+    for (const tile of visibleFillTiles) {
       const key = getChunkKeyForTile(tile.x, tile.y, TERRAIN_RENDER_CHUNK_TILES);
       const chunkTiles = tilesByChunk.get(key);
       if (chunkTiles) {

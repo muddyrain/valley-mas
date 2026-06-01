@@ -347,6 +347,23 @@ describe('world inspection helpers', () => {
     );
   });
 
+  it('keeps local capital labels from overlapping duplicate kingdom labels', () => {
+    const projection = createProjection();
+
+    const labels = buildMapLabels(projection, { detailLevel: 'local' });
+
+    expect(labels.some((label) => label.id === 'village:village-1')).toBe(true);
+    expect(labels.some((label) => label.id === 'kingdom:kingdom-1')).toBe(false);
+  });
+
+  it('keeps overview kingdom labels for macro map context', () => {
+    const projection = createProjection();
+
+    const labels = buildMapLabels(projection, { detailLevel: 'overview' });
+
+    expect(labels.some((label) => label.id === 'kingdom:kingdom-1')).toBe(true);
+  });
+
   it('limits overview map labels to capitals and unstable villages first', () => {
     const projection = createProjection();
 
@@ -681,21 +698,14 @@ describe('world inspection helpers', () => {
     );
   });
 
-  it('builds territory borders only around exposed edges', () => {
+  it('omits unselected territory exterior borders to avoid grid clutter', () => {
     const projection = createProjection();
     const segments = buildTerritoryBorderSegments(projection, { type: 'none' });
 
-    expect(segments).toHaveLength(6);
-    expect(segments.every((segment) => segment.alpha === 0.42 && segment.width === 1)).toBe(true);
-    expect(
-      segments.some(
-        (segment) =>
-          segment.x1 === 19 && segment.y1 === 18 && segment.x2 === 19 && segment.y2 === 19,
-      ),
-    ).toBe(false);
+    expect(segments).toHaveLength(0);
   });
 
-  it('does not draw an internal border between land and water territory for the same owner', () => {
+  it('keeps unselected borders only between different kingdoms', () => {
     const projection = createProjection();
 
     projection.territory.push({
@@ -703,22 +713,39 @@ describe('world inspection helpers', () => {
       y: 18,
       villageId: 'village-1',
       kingdomId: 'kingdom-1',
-      surface: 'water',
+      surface: 'land',
       source: 'settlement_core',
+    });
+    projection.territory.push({
+      x: 20,
+      y: 18,
+      villageId: 'village-2',
+      kingdomId: 'kingdom-2',
+      surface: 'land',
+      source: 'settlement_core',
+    });
+    projection.kingdoms.push({
+      ...projection.kingdoms[0],
+      id: 'kingdom-2',
+      capitalVillageId: 'village-2',
+      color: 0x29adff,
     });
 
     const segments = buildTerritoryBorderSegments(projection, { type: 'none' });
+    const selectedSegments = buildTerritoryBorderSegments(projection, {
+      type: 'village',
+      id: 'village-2',
+    });
+    const sharedKingdomEdge = (segment: (typeof segments)[number]) =>
+      segment.x1 === 20 && segment.y1 === 18 && segment.x2 === 20 && segment.y2 === 19;
 
-    expect(segments.some((segment) => segment.alpha === 0.28 && segment.width === 1)).toBe(true);
-    expect(
-      segments.some(
-        (segment) =>
-          segment.x1 === 20 && segment.y1 === 18 && segment.x2 === 20 && segment.y2 === 19,
-      ),
-    ).toBe(false);
+    expect(segments.filter(sharedKingdomEdge)).toHaveLength(1);
+    expect(segments.every((segment) => segment.alpha <= 0.22 && segment.width === 1)).toBe(true);
+    expect(selectedSegments.filter(sharedKingdomEdge)).toHaveLength(1);
+    expect(selectedSegments.find(sharedKingdomEdge)?.selected).toBe(true);
   });
 
-  it('closes selected village borders against adjacent same-kingdom villages', () => {
+  it('does not draw selected village borders against adjacent same-kingdom villages', () => {
     const projection = createProjection();
 
     projection.territory.push({
@@ -739,17 +766,18 @@ describe('world inspection helpers', () => {
       segment.x1 === 20 && segment.y1 === 18 && segment.x2 === 20 && segment.y2 === 19;
 
     expect(unselectedSegments.some(sharedVillageEdge)).toBe(false);
-    expect(selectedSegments.some((segment) => sharedVillageEdge(segment) && segment.selected)).toBe(
-      true,
-    );
+    expect(selectedSegments.some(sharedVillageEdge)).toBe(false);
   });
 
-  it('keeps selected territory borders prominent', () => {
+  it('keeps selected territory borders visible but restrained', () => {
     const projection = createProjection();
-    const segments = buildTerritoryBorderSegments(projection, { type: 'village', id: 'village-1' });
+    const segments = buildTerritoryBorderSegments(projection, {
+      type: 'village',
+      id: 'village-1',
+    });
 
     expect(segments.every((segment) => segment.selected)).toBe(true);
-    expect(segments.every((segment) => segment.alpha === 0.95 && segment.width === 2)).toBe(true);
+    expect(segments.every((segment) => segment.alpha <= 0.72 && segment.width === 1.5)).toBe(true);
   });
 
   it('filters recent events to the selected story context', () => {
@@ -976,12 +1004,6 @@ describe('world inspection helpers', () => {
         text: '河湾村 · Lv.2',
         position: { x: 30, y: 28.4 },
         color: '#f4f4f4',
-      },
-      {
-        id: 'kingdom:kingdom-1',
-        text: '王国 1',
-        position: { x: 20, y: 16.8 },
-        color: '#ffcd75',
       },
     ]);
   });

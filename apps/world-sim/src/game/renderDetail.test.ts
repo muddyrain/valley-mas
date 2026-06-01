@@ -56,7 +56,7 @@ describe('render detail helpers', () => {
     ).toBe('local');
   });
 
-  it('keeps selected territory mostly outline-led instead of blocky filled', () => {
+  it('keeps selected territory outline-led without visible fill bands', () => {
     expect(
       getTerritoryFillAlpha({
         surface: 'land',
@@ -64,7 +64,7 @@ describe('render detail helpers', () => {
         hasKingdom: true,
         selected: true,
       }),
-    ).toBeLessThan(0.2);
+    ).toBe(0);
     expect(
       getTerritoryFillAlpha({
         surface: 'water',
@@ -72,10 +72,37 @@ describe('render detail helpers', () => {
         hasKingdom: true,
         selected: true,
       }),
-    ).toBeLessThan(0.12);
+    ).toBe(0);
   });
 
-  it('keeps frontier territory subtler than settlement core territory', () => {
+  it('keeps territory fill invisible so it cannot create map banding', () => {
+    expect(
+      getTerritoryFillAlpha({
+        surface: 'land',
+        source: 'settlement_core',
+        hasKingdom: true,
+        selected: false,
+      }),
+    ).toBe(0);
+    expect(
+      getTerritoryFillAlpha({
+        surface: 'water',
+        source: 'settlement_core',
+        hasKingdom: true,
+        selected: false,
+      }),
+    ).toBe(0);
+    expect(
+      getTerritoryFillAlpha({
+        surface: 'land',
+        source: 'frontier',
+        hasKingdom: true,
+        selected: false,
+      }),
+    ).toBe(0);
+  });
+
+  it('keeps frontier territory no stronger than settlement core territory', () => {
     const core = getTerritoryFillAlpha({
       surface: 'land',
       source: 'settlement_core',
@@ -89,6 +116,6 @@ describe('render detail helpers', () => {
       selected: false,
     });
 
-    expect(frontier).toBeLessThan(core);
+    expect(frontier).toBeLessThanOrEqual(core);
   });
 });

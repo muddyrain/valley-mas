@@ -62,29 +62,6 @@ export function shouldDrawBuildingAtDetail(
 }
 
 export function getTerritoryFillAlpha(input: TerritoryFillAlphaInput) {
-  const surfaceBase = getTerritorySurfaceBaseAlpha(input);
-  return surfaceBase * getTerritorySourceAlphaMultiplier(input.source);
-}
-
-function getTerritorySurfaceBaseAlpha(input: TerritoryFillAlphaInput) {
-  if (input.selected) {
-    return input.surface === 'water' ? 0.08 : 0.14;
-  }
-
-  if (input.surface === 'water') {
-    return input.hasKingdom ? 0.11 : 0.04;
-  }
-
-  return input.hasKingdom ? 0.2 : 0.07;
-}
-
-function getTerritorySourceAlphaMultiplier(source: TerritorySource) {
-  switch (source) {
-    case 'frontier':
-      return 0.45;
-    case 'work_site':
-      return 0.55;
-    default:
-      return 1;
-  }
+  void input;
+  return 0;
 }

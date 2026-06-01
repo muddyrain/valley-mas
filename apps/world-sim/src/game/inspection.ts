@@ -638,8 +638,26 @@ export function buildMapLabels(
       }),
     };
   });
+  const visibleVillageLabels = villageLabels
+    .sort((left, right) => right.score - left.score || left.label.id.localeCompare(right.label.id))
+    .slice(0, mapVillageLabelLimit(detailLevel))
+    .map((candidate) => candidate.label);
+  const activeCapitalVillageIds = new Set(
+    projection.kingdoms
+      .filter((kingdom) => kingdom.status !== 'fallen')
+      .map((kingdom) => kingdom.capitalVillageId),
+  );
+  const visibleCapitalVillageIds = new Set(
+    visibleVillageLabels
+      .map((label) => (label.id.startsWith('village:') ? label.id.slice('village:'.length) : ''))
+      .filter((id) => activeCapitalVillageIds.has(id)),
+  );
   const kingdomLabels = projection.kingdoms
     .filter((kingdom) => kingdom.status !== 'fallen')
+    .filter(
+      (kingdom) =>
+        detailLevel === 'overview' || !visibleCapitalVillageIds.has(kingdom.capitalVillageId),
+    )
     .map((kingdom) => {
       const capital = projection.villages.find(
         (village) => village.id === kingdom.capitalVillageId,
@@ -656,15 +674,7 @@ export function buildMapLabels(
       };
     });
 
-  return [
-    ...villageLabels
-      .sort(
-        (left, right) => right.score - left.score || left.label.id.localeCompare(right.label.id),
-      )
-      .slice(0, mapVillageLabelLimit(detailLevel))
-      .map((candidate) => candidate.label),
-    ...kingdomLabels,
-  ];
+  return [...visibleVillageLabels, ...kingdomLabels];
 }
 
 function buildConflictFocusVillageIds(projection: WorldProjection) {
@@ -1719,30 +1729,52 @@ function makeBorderSegment(
   selection: WorldSelection,
 ) {
   const neighbor = findAdjacentTerritoryTile(territoryByPosition, tile.x, tile.y, edge);
+  const ownerKey = territoryOwnerKey(tile);
+  const neighborOwnerKey = neighbor ? territoryOwnerKey(neighbor) : undefined;
+  const neighborSelected = neighbor
+    ? isTerritoryTileMatchedBySelection(selection, neighbor)
+    : false;
 
-  if (
-    selection.type === 'village' &&
-    tile.villageId !== selection.id &&
-    neighbor?.villageId === selection.id
-  ) {
-    return undefined;
-  }
+  if (selected) {
+    if (neighborSelected) {
+      return undefined;
+    }
 
-  if (neighbor && territoryOwnerKey(neighbor) === territoryOwnerKey(tile)) {
-    const selectedVillageNeighbor =
-      selection.type === 'village' && selected && neighbor.villageId !== tile.villageId;
-
-    if (!selectedVillageNeighbor) {
+    if (
+      selection.type === 'village' &&
+      neighbor?.kingdomId &&
+      neighbor.kingdomId === tile.kingdomId
+    ) {
+      return undefined;
+    }
+  } else {
+    if (
+      !neighbor ||
+      neighborSelected ||
+      !neighborOwnerKey ||
+      ownerKey === neighborOwnerKey ||
+      ownerKey > neighborOwnerKey
+    ) {
       return undefined;
     }
   }
 
-  const alpha = selected ? 0.95 : tile.surface === 'water' ? 0.28 : 0.42;
-  const width = selected ? 2 : 1;
+  const hasWaterEdge = tile.surface === 'water' || neighbor?.surface === 'water';
+  const alpha = selected ? 0.72 : hasWaterEdge ? 0.12 : 0.22;
+  const width = selected ? 1.5 : 1;
 
   switch (edge) {
     case 'top':
-      return { x1: tile.x, y1: tile.y, x2: tile.x + 1, y2: tile.y, color, selected, alpha, width };
+      return {
+        x1: tile.x,
+        y1: tile.y,
+        x2: tile.x + 1,
+        y2: tile.y,
+        color,
+        selected,
+        alpha,
+        width,
+      };
     case 'right':
       return {
         x1: tile.x + 1,
@@ -1768,6 +1800,18 @@ function makeBorderSegment(
     case 'left':
       return { x1: tile.x, y1: tile.y, x2: tile.x, y2: tile.y + 1, color, selected, alpha, width };
   }
+}
+
+function isTerritoryTileMatchedBySelection(selection: WorldSelection, tile: TerritoryTile) {
+  if (selection.type === 'village') {
+    return tile.villageId === selection.id;
+  }
+
+  if (selection.type === 'kingdom') {
+    return tile.kingdomId === selection.id;
+  }
+
+  return false;
 }
 
 function findAdjacentTerritoryTile(
