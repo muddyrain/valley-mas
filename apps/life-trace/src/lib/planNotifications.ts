@@ -1,6 +1,7 @@
 import type { DueReminder } from '@/lib/planReminder';
 
 const NOTIFIED_KEY = 'life-trace-reminder-notified';
+const MAX_NOTIFICATION_RECORDS = 120;
 
 function readNotifiedIds() {
   try {
@@ -12,21 +13,35 @@ function readNotifiedIds() {
 }
 
 function writeNotifiedIds(ids: string[]) {
-  window.localStorage.setItem(NOTIFIED_KEY, JSON.stringify(ids.slice(-80)));
+  window.localStorage.setItem(NOTIFIED_KEY, JSON.stringify(ids.slice(-MAX_NOTIFICATION_RECORDS)));
+}
+
+function buildNotificationRecordId(reminder: Pick<DueReminder, 'plan' | 'dueAt'>) {
+  return `${reminder.plan.id}:${reminder.dueAt.getTime()}`;
 }
 
 export function clearPlanNotificationRecord(planId: string) {
-  const next = readNotifiedIds().filter((id) => id !== planId);
+  const next = readNotifiedIds().filter((id) => id !== planId && !id.startsWith(`${planId}:`));
   writeNotifiedIds(next);
 }
 
+export function hasPlanNotificationRecord(reminder: Pick<DueReminder, 'plan' | 'dueAt'>) {
+  const recordId = buildNotificationRecordId(reminder);
+  return readNotifiedIds().includes(recordId);
+}
+
 export async function showPlanReminderNotification(reminder: DueReminder) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') {
+  if (
+    !window.isSecureContext ||
+    !('Notification' in window) ||
+    Notification.permission !== 'granted'
+  ) {
     return false;
   }
 
   const notifiedIds = readNotifiedIds();
-  if (notifiedIds.includes(reminder.plan.id)) {
+  const recordId = buildNotificationRecordId(reminder);
+  if (notifiedIds.includes(recordId)) {
     return false;
   }
 
@@ -51,7 +66,7 @@ export async function showPlanReminderNotification(reminder: DueReminder) {
       new Notification(title, options);
     }
 
-    writeNotifiedIds([...notifiedIds, reminder.plan.id]);
+    writeNotifiedIds([...notifiedIds, recordId]);
     return true;
   } catch {
     return false;

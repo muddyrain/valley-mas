@@ -90,12 +90,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="h-dvh overflow-hidden bg-background text-foreground">
+    <div className="h-dvh w-screen overflow-hidden bg-background text-foreground">
       <main
         ref={contentRef}
-        className="mx-auto h-dvh w-full max-w-[430px] overflow-y-auto overflow-x-hidden px-4 pb-44 pt-8"
+        className="mx-auto h-dvh w-full max-w-[430px] overflow-y-auto overflow-x-hidden px-4 pb-44 pt-8 max-[360px]:px-3"
       >
-        <div data-page-entrance>{children}</div>
+        <div className="min-w-0 overflow-x-hidden" data-page-entrance>
+          {children}
+        </div>
       </main>
       <div
         aria-hidden="true"
@@ -103,7 +105,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       />
       <nav
         ref={navRef}
-        className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[430px] border-t border-white/[0.07] bg-card/88 px-3 pt-3 shadow-[0_-18px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl"
+        className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[430px] border-t border-white/[0.07] bg-card/88 px-3 pt-3 shadow-[0_-18px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl max-[360px]:px-2"
       >
         <div className="grid grid-cols-5 items-end gap-1 rounded-[1.65rem] border border-white/[0.04] bg-background/28 p-1.5">
           {tabs.map((tab) => {
@@ -117,7 +119,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 to={tab.path}
                 data-tab-active={active}
                 className={cn(
-                  'group relative inline-flex h-[4.35rem] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 overflow-visible whitespace-nowrap rounded-[1.25rem] border border-transparent px-1 text-sm font-medium text-muted-foreground transition duration-300 hover:bg-secondary/35 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  'group relative inline-flex h-[4.35rem] min-w-0 shrink cursor-pointer flex-col items-center justify-center gap-1 overflow-visible whitespace-nowrap rounded-[1.25rem] border border-transparent px-1 text-sm font-medium text-muted-foreground transition duration-300 hover:bg-secondary/35 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[360px]:h-[4rem]',
                   active &&
                     !isAi &&
                     'border-white/[0.10] bg-secondary/36 text-foreground shadow-[0_6px_18px_rgba(0,0,0,0.14)]',
@@ -144,7 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <span
                   data-tab-label
                   className={cn(
-                    'relative z-10 text-xs font-semibold transition duration-300',
+                    'relative z-10 max-w-full truncate text-xs font-semibold transition duration-300',
                     active ? 'text-foreground' : 'text-muted-foreground',
                     isAi && active && 'text-life-ai',
                   )}

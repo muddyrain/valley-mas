@@ -4,8 +4,12 @@ import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { clearPlanNotificationRecord, showPlanReminderNotification } from '@/lib/planNotifications';
-import { getDueReminder } from '@/lib/planReminder';
+import {
+  clearPlanNotificationRecord,
+  hasPlanNotificationRecord,
+  showPlanReminderNotification,
+} from '@/lib/planNotifications';
+import { getDueReminder, getNextReminder } from '@/lib/planReminder';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 
 const DISMISSED_KEY = 'life-trace-reminder-dismissed';
@@ -55,6 +59,7 @@ export function AppReminderToast() {
       }),
     [dismissedPlanIds, now, plans, snoozedUntilByPlanId],
   );
+  const nextReminder = useMemo(() => getNextReminder(plans, now), [now, plans]);
 
   const dismissReminder = () => {
     if (!dueReminder) {
@@ -96,6 +101,29 @@ export function AppReminderToast() {
 
     void showPlanReminderNotification(dueReminder);
   }, [dueReminder]);
+
+  useEffect(() => {
+    if (!nextReminder || hasPlanNotificationRecord(nextReminder)) {
+      return;
+    }
+
+    const delay = nextReminder.dueAt.getTime() - Date.now();
+    if (delay < 0 || delay > 2_147_483_647) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void showPlanReminderNotification({
+        plan: nextReminder.plan,
+        dueAt: nextReminder.dueAt,
+        dateText: nextReminder.dateText,
+        timeText: nextReminder.timeText,
+      });
+      setNow(new Date());
+    }, delay);
+
+    return () => window.clearTimeout(timer);
+  }, [nextReminder]);
 
   if (!dueReminder) {
     return null;

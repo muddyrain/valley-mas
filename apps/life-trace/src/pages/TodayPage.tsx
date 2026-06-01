@@ -546,15 +546,19 @@ export function TodayPage() {
   }, [planToast]);
 
   return (
-    <div ref={pageRef} className="space-y-5">
-      <header className="flex items-start justify-between" data-today-entrance>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Life Trace</h1>
+    <div ref={pageRef} className="min-w-0 space-y-5 overflow-x-hidden">
+      <header className="flex min-w-0 items-start justify-between gap-3" data-today-entrance>
+        <div className="min-w-0">
+          <h1 className="truncate text-3xl font-bold tracking-tight max-[360px]:text-2xl">
+            Life Trace
+          </h1>
           <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-            <MapPin className="size-4" />
-            <span>{weatherReady ? weather.city || settings.city : settings.city}</span>
+            <MapPin className="size-4 shrink-0" />
+            <span className="truncate">
+              {weatherReady ? weather.city || settings.city : settings.city}
+            </span>
             <span>·</span>
-            <span>{todayLabel}</span>
+            <span className="shrink-0">{todayLabel}</span>
           </div>
         </div>
         <button
@@ -566,7 +570,7 @@ export function TodayPage() {
         </button>
       </header>
 
-      <Card className="p-5" data-today-entrance>
+      <Card className="min-w-0 overflow-hidden p-5 max-[360px]:p-4" data-today-entrance>
         {showWeatherSkeleton ? (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
@@ -615,28 +619,30 @@ export function TodayPage() {
           </div>
         ) : (
           <>
-            <div className="mb-7 flex items-center justify-between">
-              <div className="flex items-center gap-4" data-today-stagger>
-                <div className="grid size-16 place-items-center rounded-2xl bg-life-weather/10 text-life-weather">
-                  <Cloud className="size-9" />
+            <div className="mb-7 flex min-w-0 items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-4 max-[360px]:gap-3" data-today-stagger>
+                <div className="grid size-16 shrink-0 place-items-center rounded-2xl bg-life-weather/10 text-life-weather max-[360px]:size-14">
+                  <Cloud className="size-9 max-[360px]:size-7" />
                 </div>
-                <div>
-                  <div className="text-6xl font-light leading-none tracking-[-0.04em]">
+                <div className="min-w-0">
+                  <div className="text-6xl font-light leading-none tracking-[-0.04em] max-[360px]:text-5xl">
                     {weather.now.temp}°
                   </div>
-                  <div className="mt-2 text-lg text-muted-foreground">{weather.now.text}</div>
+                  <div className="mt-2 truncate text-lg text-muted-foreground max-[360px]:text-base">
+                    {weather.now.text}
+                  </div>
                 </div>
               </div>
-              <div className="text-right" data-today-stagger>
-                <div className="text-xl font-semibold">
+              <div className="min-w-0 max-w-[44%] text-right" data-today-stagger>
+                <div className="truncate text-xl font-semibold max-[360px]:text-base">
                   {weather.now.high}° /{' '}
                   <span className="text-muted-foreground">{weather.now.low}°</span>
                 </div>
-                <div className="mt-1 text-sm text-muted-foreground">
+                <div className="mt-1 truncate text-sm text-muted-foreground">
                   {weather.city || settings.city}
                 </div>
-                <div className="mt-1 flex items-center justify-end gap-2 text-xs text-muted-foreground">
-                  <span>
+                <div className="mt-1 flex min-w-0 items-center justify-end gap-2 text-xs text-muted-foreground">
+                  <span className="min-w-0 truncate">
                     {weatherLoading
                       ? '更新中'
                       : weather.source === 'qweather'
@@ -658,7 +664,7 @@ export function TodayPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
               {weather.metrics.map((metric) => {
                 const Icon = metricIconMap[metric.label as keyof typeof metricIconMap] ?? Cloud;
                 const tone = metricToneClasses[metric.tone] ?? 'text-muted-foreground';
@@ -673,7 +679,7 @@ export function TodayPage() {
                       <Icon className={`size-5 shrink-0 ${tone}`} />
                       <span className="truncate text-sm">{metric.label}</span>
                     </div>
-                    <span className="text-sm font-semibold">{metric.value}</span>
+                    <span className="shrink-0 text-sm font-semibold">{metric.value}</span>
                   </div>
                 );
               })}
@@ -725,14 +731,17 @@ export function TodayPage() {
               </div>
             ) : null}
 
-            <div className="mt-5 flex gap-3 overflow-x-auto pb-1" data-today-stagger>
+            <div
+              className="-mx-1 mt-5 flex max-w-full gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              data-today-stagger
+            >
               {weather.hourly.map((item) => {
                 const Icon = item.text.includes('晴') ? Sun : Cloud;
 
                 return (
                   <div
                     key={item.time}
-                    className={`flex min-w-14 flex-col items-center gap-2 rounded-2xl px-3 py-3 ${
+                    className={`flex min-w-14 shrink-0 flex-col items-center gap-2 rounded-2xl px-3 py-3 ${
                       item.active
                         ? 'bg-life-weather/15 text-life-weather'
                         : 'bg-secondary text-muted-foreground'
@@ -750,7 +759,7 @@ export function TodayPage() {
       </Card>
 
       <Card
-        className="relative min-h-[168px] overflow-hidden border-life-ai/20 p-5 shadow-[0_18px_70px_rgba(6,182,212,0.08)]"
+        className="relative min-h-[168px] min-w-0 overflow-hidden border-life-ai/20 p-5 shadow-[0_18px_70px_rgba(6,182,212,0.08)] max-[360px]:p-4"
         data-ai-brief-card
         data-today-entrance
       >
@@ -758,7 +767,7 @@ export function TodayPage() {
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-ai/70 to-transparent"
         />
-        <div className="relative flex gap-4">
+        <div className="relative flex min-w-0 gap-4 max-[360px]:gap-3">
           <div
             className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai"
             data-ai-brief-orb
@@ -784,7 +793,9 @@ export function TodayPage() {
                 </div>
               ) : (
                 <div className="animate-in fade-in duration-300 motion-reduce:animate-none">
-                  <h2 className="line-clamp-1 text-xl font-semibold">{aiBriefTitle}</h2>
+                  <h2 className="line-clamp-2 text-xl font-semibold max-[360px]:text-lg">
+                    {aiBriefTitle}
+                  </h2>
                   <p className="mt-2 line-clamp-3 min-h-[72px] text-sm leading-6 text-muted-foreground">
                     {aiBriefDetail}
                   </p>

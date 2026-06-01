@@ -20,9 +20,10 @@ import {
   Wifi,
   Zap,
 } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { SectionHeader } from '@/components/SectionHeader';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useNotificationPermission } from '@/hooks/useNotificationPermission';
@@ -211,6 +212,8 @@ function SyncStatus({
 
 export function ProfilePage() {
   const pageRef = useRef<HTMLDivElement>(null);
+  const [notificationTesting, setNotificationTesting] = useState(false);
+  const [notificationTestMessage, setNotificationTestMessage] = useState('');
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoading = useLifeTraceStore((state) => state.settingsLoading);
   const settingsSaving = useLifeTraceStore((state) => state.settingsSaving);
@@ -226,6 +229,28 @@ export function ProfilePage() {
     Number(settings.planReminders) +
     Number(settings.aiPersonalization);
   const signalProgress = Math.round((enabledSignals / 3) * 100);
+  const notificationDiagnostics = [
+    { label: 'HTTPS', ok: notification.secureContext },
+    { label: 'PWA', ok: installed },
+    { label: 'SW', ok: serviceWorkerReady },
+    { label: '权限', ok: notification.granted },
+  ];
+
+  const handleTestNotification = async () => {
+    setNotificationTesting(true);
+    setNotificationTestMessage('');
+
+    try {
+      const sent = await notification.showTestNotification();
+      setNotificationTestMessage(
+        sent ? '测试通知已发送，请查看系统通知。' : '当前环境还不能发送通知。',
+      );
+    } catch (error) {
+      setNotificationTestMessage(error instanceof Error ? error.message : '测试通知发送失败');
+    } finally {
+      setNotificationTesting(false);
+    }
+  };
 
   useGSAP(
     () => {
@@ -493,14 +518,29 @@ export function ProfilePage() {
           onToggle={() => update('planReminders', !settings.planReminders)}
         />
         <Card className="p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-start gap-3">
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
               <Bell className="size-5" />
             </div>
             <div className="min-w-0 flex-1">
               <h3 className="font-semibold">系统通知</h3>
               <p className="mt-1 text-sm leading-5 text-muted-foreground">{notification.label}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {notificationDiagnostics.map((item) => (
+                  <Badge key={item.label} tone={item.ok ? 'trace' : 'default'}>
+                    {item.label} {item.ok ? 'OK' : '待确认'}
+                  </Badge>
+                ))}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                iPhone 需要通过 HTTPS 打开并添加到主屏幕后，从桌面图标进入再开启通知。
+              </p>
+              {notificationTestMessage ? (
+                <p className="mt-2 text-xs leading-5 text-life-ai">{notificationTestMessage}</p>
+              ) : null}
             </div>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
             <Button
               type="button"
               variant={notification.granted ? 'secondary' : 'ai'}
@@ -508,8 +548,32 @@ export function ProfilePage() {
               disabled={!notification.supported || notification.granted}
               onClick={() => void notification.requestPermission()}
             >
-              {notification.granted ? '已开启' : '开启'}
+              {notification.granted ? '已开启' : '开启通知'}
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!notification.granted || notificationTesting}
+              onClick={() => void handleTestNotification()}
+            >
+              {notificationTesting ? <ActionLoadingIcon tone="ai" /> : <Bell className="size-4" />}
+              测试
+            </Button>
+          </div>
+        </Card>
+        <Card className="border-life-ai/15 bg-life-ai/5 p-4">
+          <div className="flex items-start gap-3">
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+              <Smartphone className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold">真机提醒验收</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                先用 HTTPS preview 在手机上完成安装和授权，再创建一个 1-2
+                分钟后到期的计划，等待系统通知并点击回到计划页。
+              </p>
+            </div>
           </div>
         </Card>
         <SettingToggle

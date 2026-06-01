@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:host": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "check": "biome check src/",
     "lint": "biome lint src/",
     "format": "biome format --write src/",
     "preview": "vite preview",
+    "preview:host": "vite preview --host 0.0.0.0 --port 4178",
     "clean": "rm -rf dist"
   },
   "dependencies": {
