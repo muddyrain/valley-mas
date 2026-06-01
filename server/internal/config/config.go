@@ -14,6 +14,7 @@ type Config struct {
 	JWT      JWTConfig
 	SMTP     SMTPConfig
 	QWeather QWeatherConfig
+	WebPush  WebPushConfig
 }
 
 type DatabaseConfig struct {
@@ -61,6 +62,15 @@ type QWeatherConfig struct {
 	CacheTTLMinutes        int
 	TimeoutSeconds         int
 	RefreshCooldownSeconds int
+}
+
+type WebPushConfig struct {
+	PublicKey           string
+	PrivateKey          string
+	Subject             string
+	Enabled             bool
+	ScanIntervalSeconds int
+	ReminderWindowMin   int
 }
 
 const defaultJWTExpireHours int64 = 24 * 365 * 10
@@ -114,6 +124,14 @@ func Load() *Config {
 			CacheTTLMinutes:        getEnvInt("QWEATHER_CACHE_TTL_MINUTES", 30),
 			TimeoutSeconds:         getEnvInt("QWEATHER_TIMEOUT_SECONDS", 5),
 			RefreshCooldownSeconds: getEnvInt("QWEATHER_REFRESH_COOLDOWN_SECONDS", 300),
+		},
+		WebPush: WebPushConfig{
+			PublicKey:           strings.TrimSpace(getEnv("WEB_PUSH_PUBLIC_KEY", "")),
+			PrivateKey:          strings.TrimSpace(getEnv("WEB_PUSH_PRIVATE_KEY", "")),
+			Subject:             strings.TrimSpace(getEnv("WEB_PUSH_SUBJECT", "mailto:admin@example.com")),
+			Enabled:             getEnvBool("WEB_PUSH_ENABLED", true),
+			ScanIntervalSeconds: getEnvInt("WEB_PUSH_SCAN_INTERVAL_SECONDS", 60),
+			ReminderWindowMin:   getEnvInt("WEB_PUSH_REMINDER_WINDOW_MINUTES", 10),
 		},
 	}
 }

@@ -171,10 +171,10 @@ export function PlansPage() {
             className="h-32 w-full object-cover opacity-80"
           />
         ) : null}
-        <div className="relative z-10 grid grid-cols-[4.75rem_1fr] gap-4 p-4">
+        <div className="relative z-10 grid grid-cols-[4.75rem_1fr] gap-4 p-4 max-[360px]:grid-cols-1 max-[360px]:gap-3 max-[360px]:p-3">
           <div
             className={cn(
-              'flex h-20 flex-col items-center justify-center rounded-2xl border text-center',
+              'flex h-20 flex-col items-center justify-center rounded-2xl border text-center max-[360px]:h-auto max-[360px]:min-h-14 max-[360px]:flex-row max-[360px]:gap-2',
               plan.reminder
                 ? 'border-life-health/30 bg-life-health/10 text-life-health'
                 : 'border-border bg-secondary text-muted-foreground',
@@ -182,7 +182,9 @@ export function PlansPage() {
             data-plan-time-block
           >
             <span className="text-xs font-semibold">{dateText}</span>
-            <span className="mt-1 text-xl font-bold tracking-tight">{timeText}</span>
+            <span className="mt-1 text-xl font-bold tracking-tight max-[360px]:mt-0">
+              {timeText}
+            </span>
           </div>
           <div className="min-w-0 space-y-3">
             <div className="flex items-start justify-between gap-3">
@@ -211,7 +213,7 @@ export function PlansPage() {
             <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">
               {getVisiblePlanNote(plan.note)}
             </p>
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <Button
                 type="button"
                 variant={plan.completed ? 'secondary' : 'outline'}
@@ -272,9 +274,9 @@ export function PlansPage() {
   };
 
   return (
-    <div ref={pageRef} className="space-y-5">
+    <div ref={pageRef} className="min-w-0 space-y-5 overflow-x-hidden">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold tracking-tight">计划</h2>
           <p className="mt-1 text-sm text-muted-foreground">{todayPlans.length} 个今日计划</p>
         </div>
@@ -307,7 +309,7 @@ export function PlansPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-4 rounded-2xl bg-card p-1 text-sm font-semibold text-muted-foreground">
+      <div className="grid grid-cols-4 rounded-2xl bg-card p-1 text-sm font-semibold text-muted-foreground max-[360px]:text-xs">
         {planFilters.map((filter) => {
           const active = activeFilter === filter.id;
 
@@ -315,7 +317,7 @@ export function PlansPage() {
             <button
               type="button"
               key={filter.id}
-              className={`rounded-xl py-3 transition ${
+              className={`min-h-11 rounded-xl px-1 py-3 transition ${
                 active ? 'bg-secondary text-foreground shadow-sm' : 'hover:text-foreground'
               }`}
               onClick={() => setActiveFilter(filter.id)}
@@ -340,7 +342,7 @@ export function PlansPage() {
       <div className="space-y-6">
         {planGroups.map((group) => (
           <section key={group.title} className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">{group.title}</h2>
               <span className="text-xs text-muted-foreground">{group.plans.length} 个</span>
             </div>
@@ -396,7 +398,7 @@ export function PlansPage() {
             <Button
               type="button"
               variant="ai"
-              className="fixed bottom-28 left-1/2 z-40 -translate-x-1/2 px-6"
+              className="fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] left-1/2 z-40 -translate-x-1/2 px-6"
               disabled={planCreating}
               onClick={() => {
                 setEditingPlan(null);

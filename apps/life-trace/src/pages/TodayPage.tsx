@@ -590,7 +590,7 @@ export function TodayPage() {
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
               {Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={`weather-metric-skeleton-${index}`}
@@ -619,7 +619,7 @@ export function TodayPage() {
           </div>
         ) : (
           <>
-            <div className="mb-7 flex min-w-0 items-center justify-between gap-3">
+            <div className="mb-7 flex min-w-0 items-center justify-between gap-3 max-[360px]:items-start">
               <div className="flex min-w-0 items-center gap-4 max-[360px]:gap-3" data-today-stagger>
                 <div className="grid size-16 shrink-0 place-items-center rounded-2xl bg-life-weather/10 text-life-weather max-[360px]:size-14">
                   <Cloud className="size-9 max-[360px]:size-7" />
@@ -633,7 +633,10 @@ export function TodayPage() {
                   </div>
                 </div>
               </div>
-              <div className="min-w-0 max-w-[44%] text-right" data-today-stagger>
+              <div
+                className="min-w-0 max-w-[44%] text-right max-[360px]:max-w-[42%]"
+                data-today-stagger
+              >
                 <div className="truncate text-xl font-semibold max-[360px]:text-base">
                   {weather.now.high}° /{' '}
                   <span className="text-muted-foreground">{weather.now.low}°</span>
@@ -819,7 +822,7 @@ export function TodayPage() {
             {habitProgress}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 max-[340px]:grid-cols-1">
           {habitNames.map((name) => {
             const checkin = todayCheckins.find((item) => item.name === name);
             const completed = Boolean(checkin?.completed);
@@ -876,7 +879,7 @@ export function TodayPage() {
           aria-hidden="true"
           className="pointer-events-none absolute -top-12 right-8 size-24 rounded-full bg-life-health/10 blur-3xl"
         />
-        <div className="relative flex items-center justify-between gap-4">
+        <div className="relative flex items-center justify-between gap-4 max-[360px]:items-start">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl border border-life-health/20 bg-life-health/10 text-life-health shadow-[0_10px_35px_rgba(34,197,94,0.10)]">
               <Bell className="size-5" />
@@ -904,7 +907,7 @@ export function TodayPage() {
           </div>
           <button
             type="button"
-            className="shrink-0 cursor-pointer rounded-full bg-secondary px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
+            className="shrink-0 cursor-pointer rounded-full bg-secondary px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground max-[360px]:px-2.5"
             onClick={() => navigate('/plans')}
           >
             查看
@@ -928,7 +931,7 @@ export function TodayPage() {
             正在根据最新天气、计划和打卡后台刷新，当前卡片先保持可用。
           </p>
         ) : null}
-        <div className="grid min-h-[360px] grid-cols-2 gap-3">
+        <div className="grid min-h-[360px] grid-cols-2 gap-3 max-[360px]:grid-cols-1">
           {showAdviceSkeleton
             ? Array.from({ length: 6 }).map((_, index) => (
                 <Card
@@ -945,7 +948,7 @@ export function TodayPage() {
               ))
             : null}
           {showAdviceEmpty ? (
-            <Card className="col-span-2 min-h-[360px] p-5 text-sm leading-6 text-muted-foreground">
+            <Card className="col-span-2 min-h-[360px] p-5 text-sm leading-6 text-muted-foreground max-[360px]:col-span-1">
               AI 建议正在生成，完成后会自动替换到这里。为了避免混淆，未完成前不会显示临时建议。
             </Card>
           ) : null}
@@ -958,7 +961,7 @@ export function TodayPage() {
             return (
               <Card
                 key={item.id}
-                className="group relative h-28 overflow-hidden border-border/80 p-4 transition-colors hover:border-foreground/20"
+                className="group relative h-28 overflow-hidden border-border/80 p-4 transition-colors hover:border-foreground/20 max-[360px]:h-auto max-[360px]:min-h-28"
                 data-advice-card
               >
                 <div
@@ -999,7 +1002,7 @@ export function TodayPage() {
         </div>
       </section>
       {planToast ? (
-        <div className="fixed right-6 bottom-28 left-6 z-30 mx-auto max-w-[360px] rounded-2xl border border-life-trace/30 bg-card px-4 py-3 text-center text-sm font-medium text-life-trace shadow-2xl">
+        <div className="fixed right-4 bottom-[calc(7rem+env(safe-area-inset-bottom))] left-4 z-30 mx-auto max-w-[360px] rounded-2xl border border-life-trace/30 bg-card px-4 py-3 text-center text-sm font-medium text-life-trace shadow-2xl">
           {planToast}
         </div>
       ) : null}

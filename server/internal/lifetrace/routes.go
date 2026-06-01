@@ -64,5 +64,14 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			settings.GET("", handler.GetSettings)
 			settings.PUT("", handler.UpdateSettings)
 		}
+
+		push := group.Group("/push")
+		push.Use(auth)
+		{
+			push.GET("/config", handler.GetPushConfig)
+			push.PUT("/subscription", handler.SavePushSubscription)
+			push.DELETE("/subscription", handler.DeletePushSubscription)
+			push.POST("/test", handler.TestPush)
+		}
 	}
 }

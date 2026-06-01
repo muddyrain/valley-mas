@@ -185,14 +185,14 @@ export function CreatePlanDrawer({ open, onOpenChange, plan }: CreatePlanDrawerP
       />
       <div
         className={cn(
-          'safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[88dvh] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl transition duration-300',
+          'safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-0.75rem)] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl transition duration-300 max-[360px]:p-4',
           open
             ? 'visible translate-y-0 opacity-100'
             : 'invisible translate-y-[calc(100%+2rem)] opacity-0',
         )}
       >
-        <div className="mb-5 flex items-center justify-between">
-          <div>
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="text-xl font-semibold">{editing ? '编辑计划' : '创建计划'}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {editing ? '调整时间、地点和提醒，让计划更准确。' : '先计划生活，完成后留下踪迹。'}
@@ -226,7 +226,7 @@ export function CreatePlanDrawer({ open, onOpenChange, plan }: CreatePlanDrawerP
 
           <div className="space-y-2">
             <span className="text-sm font-medium">类型</span>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-2">
               {planTypes.map((type) => {
                 const active = form.type === type;
 
@@ -249,7 +249,7 @@ export function CreatePlanDrawer({ open, onOpenChange, plan }: CreatePlanDrawerP
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
             <label className="block space-y-2">
               <span className="text-sm font-medium">
                 日期 <span className="text-life-alert">*</span>
@@ -320,7 +320,7 @@ export function CreatePlanDrawer({ open, onOpenChange, plan }: CreatePlanDrawerP
             onUploadingChange={setImageUploading}
           />
 
-          <div className="grid grid-cols-[1fr_auto] items-end gap-3">
+          <div className="grid grid-cols-[1fr_auto] items-end gap-3 max-[360px]:grid-cols-1">
             <label className="block space-y-2">
               <span className="text-sm font-medium">地点</span>
               <input
@@ -360,7 +360,7 @@ export function CreatePlanDrawer({ open, onOpenChange, plan }: CreatePlanDrawerP
             </div>
           ) : null}
 
-          <div className="grid grid-cols-2 gap-3 pt-2">
+          <div className="grid grid-cols-2 gap-3 pt-2 max-[360px]:grid-cols-1">
             <Button
               type="button"
               variant="secondary"

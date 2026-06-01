@@ -36,7 +36,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 		lifeTraceWeatherService := lifetrace.NewWeatherService(cfg.QWeather)
 		lifetrace.RegisterRoutes(
 			api,
-			lifetrace.NewHandler(lifeTraceWeatherService),
+			lifetrace.NewHandler(lifeTraceWeatherService, cfg.WebPush),
 			middleware.Auth(cfg),
 		)
 

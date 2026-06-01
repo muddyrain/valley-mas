@@ -195,7 +195,7 @@ func TestGenerateWeeklyReviewUsesCloudLifeContext(t *testing.T) {
 
 	router := setupTraceTestRouter(t, 101)
 	now := time.Now()
-	completedAt := now.AddDate(0, 0, -1)
+	completedAt := now
 	if err := database.GetDB().Create(&model.LifeTraceSettings{
 		UserID:        101,
 		City:          "上海",

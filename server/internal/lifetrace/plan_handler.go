@@ -301,6 +301,7 @@ func (h *Handler) UpdatePlanStatus(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "更新计划失败")
 		return
 	}
+	resetPushDeliveriesForPlan(database.GetDB(), plan.ID)
 
 	if err := database.GetDB().First(&plan, "id = ? AND user_id = ?", plan.ID, userID).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "读取计划失败")
@@ -368,6 +369,7 @@ func (h *Handler) UpdatePlan(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "更新计划失败")
 		return
 	}
+	resetPushDeliveriesForPlan(database.GetDB(), plan.ID)
 
 	if err := database.GetDB().First(&plan, "id = ? AND user_id = ?", plan.ID, userID).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "读取计划失败")
@@ -394,6 +396,7 @@ func (h *Handler) DeletePlan(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "删除计划失败")
 		return
 	}
+	resetPushDeliveriesForPlan(database.GetDB(), plan.ID)
 
 	success(c, gin.H{"id": plan.ID})
 }

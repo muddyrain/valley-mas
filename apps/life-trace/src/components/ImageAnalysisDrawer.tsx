@@ -170,14 +170,14 @@ export function ImageAnalysisDrawer({
       />
       <div
         className={cn(
-          'safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[88dvh] w-full max-w-[430px] overflow-y-auto rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl transition duration-300',
+          'safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-0.75rem)] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl transition duration-300 max-[360px]:p-4',
           open
             ? 'visible translate-y-0 opacity-100'
             : 'invisible translate-y-[calc(100%+2rem)] opacity-0',
         )}
       >
-        <div className="mb-5 flex items-center justify-between">
-          <div>
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="text-xl font-semibold">分析图片</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               先上传到云端，再交给服务端视觉 AI 分析。
@@ -198,7 +198,7 @@ export function ImageAnalysisDrawer({
             onUploadingChange={setImageUploading}
           />
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-2">
             {kindOptions.map((option) => (
               <button
                 key={option}
@@ -245,7 +245,7 @@ export function ImageAnalysisDrawer({
               </div>
               <h3 className="font-semibold">{analysis.title}</h3>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">{analysis.summary}</p>
-              <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="mt-4 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
                 <Button type="button" variant="secondary" onClick={handleCreatePlan}>
                   生成计划
                 </Button>

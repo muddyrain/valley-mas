@@ -154,6 +154,8 @@ func autoMigrate() error {
 		&model.LifeTraceWeeklyReview{},
 		&model.LifeTraceAIConversation{},
 		&model.LifeTraceAIMessage{},
+		&model.LifeTracePushSubscription{},
+		&model.LifeTracePushDelivery{},
 	); err != nil {
 		return err
 	}

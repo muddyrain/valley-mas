@@ -132,7 +132,7 @@ export function AppReminderToast() {
   const completing = Boolean(planCompletingById[dueReminder.plan.id]);
 
   return (
-    <div className="fixed inset-x-0 bottom-24 z-50 mx-auto w-full max-w-[430px] px-4">
+    <div className="fixed inset-x-0 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-50 mx-auto w-full max-w-[430px] px-4">
       <Card className="relative overflow-hidden border-life-health/30 bg-card/95 p-4 shadow-[0_18px_70px_rgba(34,197,94,0.16)] backdrop-blur">
         <div
           aria-hidden="true"
@@ -159,7 +159,7 @@ export function AppReminderToast() {
               <Clock3 className="size-4 text-life-health" />
               {dueReminder.dateText} {dueReminder.timeText}
             </p>
-            <div className="mt-4 grid grid-cols-[1fr_auto_auto] gap-2">
+            <div className="mt-4 grid grid-cols-[1fr_auto_auto] gap-2 max-[360px]:grid-cols-1">
               <Button
                 type="button"
                 variant="ai"

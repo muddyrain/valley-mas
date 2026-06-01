@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"sync"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
+	"valley-server/internal/lifetrace"
 	"valley-server/internal/logger"
 	"valley-server/internal/router"
 	"valley-server/internal/utils"
@@ -56,6 +58,8 @@ func Init() (*config.Config, http.Handler, error) {
 			initErr = err
 			return
 		}
+
+		lifetrace.StartPushReminderWorker(context.Background(), globalCfg.WebPush)
 
 		globalHTTP = router.Setup(globalCfg)
 	})

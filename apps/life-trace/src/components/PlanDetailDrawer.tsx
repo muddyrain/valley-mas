@@ -198,7 +198,7 @@ export function PlanDetailDrawer({
         aria-modal="true"
         aria-labelledby={titleId}
         ref={sheetRef}
-        className="safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl will-change-transform"
+        className="safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-0.75rem)] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl will-change-transform max-[360px]:p-4"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="mb-5 flex items-start justify-between gap-4" data-plan-detail-item>
@@ -249,7 +249,7 @@ export function PlanDetailDrawer({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3" data-plan-detail-item>
+        <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1" data-plan-detail-item>
           <Card className="p-4">
             <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
               <CalendarDays className="size-4" />
@@ -266,7 +266,7 @@ export function PlanDetailDrawer({
           </Card>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-3" data-plan-detail-item>
+        <div className="mt-3 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1" data-plan-detail-item>
           <Card className="p-4">
             <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
               <ReminderIcon className={cn('size-4', renderedPlan.reminder && 'text-life-health')} />
@@ -302,7 +302,7 @@ export function PlanDetailDrawer({
           </p>
         </Card>
 
-        <div className="mt-5 grid grid-cols-2 gap-3" data-plan-detail-item>
+        <div className="mt-5 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1" data-plan-detail-item>
           <Button
             type="button"
             variant={renderedPlan.completed ? 'secondary' : 'outline'}

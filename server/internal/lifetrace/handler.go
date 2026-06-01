@@ -2,16 +2,22 @@ package lifetrace
 
 import (
 	"net/http"
+	"valley-server/internal/config"
 
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
 	weather *WeatherService
+	push    *PushService
 }
 
-func NewHandler(weather *WeatherService) *Handler {
-	return &Handler{weather: weather}
+func NewHandler(weather *WeatherService, webPush ...config.WebPushConfig) *Handler {
+	var pushConfig config.WebPushConfig
+	if len(webPush) > 0 {
+		pushConfig = webPush[0]
+	}
+	return &Handler{weather: weather, push: NewPushService(pushConfig)}
 }
 
 func (h *Handler) GetWeather(c *gin.Context) {

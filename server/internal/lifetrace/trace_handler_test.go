@@ -15,7 +15,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func setupTraceTestRouter(t *testing.T, userID model.Int64String) *gin.Engine {
+func setupTraceTestRouter(t *testing.T, userID model.Int64String, webPush ...config.WebPushConfig) *gin.Engine {
 	t.Helper()
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -30,6 +30,8 @@ func setupTraceTestRouter(t *testing.T, userID model.Int64String) *gin.Engine {
 		&model.LifeTraceWeeklyReview{},
 		&model.LifeTraceAIConversation{},
 		&model.LifeTraceAIMessage{},
+		&model.LifeTracePushSubscription{},
+		&model.LifeTracePushDelivery{},
 	); err != nil {
 		t.Fatalf("migrate test db: %v", err)
 	}
@@ -46,7 +48,11 @@ func setupTraceTestRouter(t *testing.T, userID model.Int64String) *gin.Engine {
 		c.Set("userId", userID)
 		c.Next()
 	}
-	RegisterRoutes(router.Group("/api/v1"), NewHandler(NewWeatherService(config.QWeatherConfig{})), auth)
+	handlerArgs := []config.WebPushConfig{}
+	if len(webPush) > 0 {
+		handlerArgs = append(handlerArgs, webPush[0])
+	}
+	RegisterRoutes(router.Group("/api/v1"), NewHandler(NewWeatherService(config.QWeatherConfig{}), handlerArgs...), auth)
 	return router
 }
 

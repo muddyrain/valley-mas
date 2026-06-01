@@ -42,11 +42,11 @@ export function LoginPage() {
   return (
     <main
       ref={pageRef}
-      className="h-dvh overflow-y-auto overflow-x-hidden bg-background px-5 py-6 text-foreground"
+      className="safe-top safe-x h-dvh overflow-y-auto overflow-x-hidden bg-background pb-6 text-foreground"
     >
-      <div className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full max-w-[430px] flex-col justify-between gap-8">
-        <header className="pt-8" data-login-entrance>
-          <div className="mb-8 flex items-center justify-between">
+      <div className="mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-[430px] flex-col justify-between gap-8">
+        <header className="pt-5" data-login-entrance>
+          <div className="mb-8 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="grid size-11 place-items-center rounded-2xl bg-primary text-primary-foreground">
                 <Sparkles className="size-5" />
@@ -56,7 +56,7 @@ export function LoginPage() {
                 <h1 className="text-xl font-bold">生活迹</h1>
               </div>
             </div>
-            <div className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted-foreground">
+            <div className="shrink-0 rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted-foreground max-[360px]:hidden">
               私人生活助理
             </div>
           </div>
@@ -66,7 +66,7 @@ export function LoginPage() {
               <CloudSun className="size-4" />
               天气、计划、提醒都绑定到你的账号
             </div>
-            <h2 className="max-w-[12ch] text-4xl font-bold leading-tight tracking-tight">
+            <h2 className="max-w-[12ch] text-4xl font-bold leading-tight tracking-tight max-[360px]:text-3xl">
               登录后进入你的今日生活简报
             </h2>
             <p className="max-w-sm text-sm leading-6 text-muted-foreground">
@@ -93,7 +93,7 @@ export function LoginPage() {
                   autoComplete="email"
                   inputMode="email"
                   placeholder="you@example.com"
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                  className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
                   onChange={(event) => setEmail(event.target.value)}
                 />
               </span>
@@ -108,7 +108,7 @@ export function LoginPage() {
                   type="password"
                   autoComplete="current-password"
                   placeholder="输入密码"
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                  className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
                   onChange={(event) => setPassword(event.target.value)}
                 />
               </span>

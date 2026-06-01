@@ -213,16 +213,18 @@ function SyncStatus({
 export function ProfilePage() {
   const pageRef = useRef<HTMLDivElement>(null);
   const [notificationTesting, setNotificationTesting] = useState(false);
+  const [serverPushTesting, setServerPushTesting] = useState(false);
   const [notificationTestMessage, setNotificationTestMessage] = useState('');
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoading = useLifeTraceStore((state) => state.settingsLoading);
   const settingsSaving = useLifeTraceStore((state) => state.settingsSaving);
   const settingsError = useLifeTraceStore((state) => state.settingsError);
   const updateSettings = useLifeTraceStore((state) => state.updateSettings);
+  const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
   const { canInstall, installed, serviceWorkerReady, promptInstall } = usePwaStatus();
-  const notification = useNotificationPermission();
+  const notification = useNotificationPermission(token);
   const profileName = user?.nickname || user?.username || 'Life Trace 用户';
   const enabledSignals =
     Number(settings.weatherAlerts) +
@@ -234,6 +236,7 @@ export function ProfilePage() {
     { label: 'PWA', ok: installed },
     { label: 'SW', ok: serviceWorkerReady },
     { label: '权限', ok: notification.granted },
+    { label: '服务端', ok: notification.serverPushReady },
   ];
 
   const handleTestNotification = async () => {
@@ -249,6 +252,32 @@ export function ProfilePage() {
       setNotificationTestMessage(error instanceof Error ? error.message : '测试通知发送失败');
     } finally {
       setNotificationTesting(false);
+    }
+  };
+
+  const handleEnableServerPush = async () => {
+    setServerPushTesting(true);
+    setNotificationTestMessage('');
+
+    try {
+      const bound = await notification.enableServerPush();
+      setNotificationTestMessage(
+        bound ? '服务端推送已绑定，计划到点后即使应用关闭也能提醒。' : '暂时无法绑定服务端推送。',
+      );
+    } finally {
+      setServerPushTesting(false);
+    }
+  };
+
+  const handleTestServerPush = async () => {
+    setServerPushTesting(true);
+    setNotificationTestMessage('');
+
+    try {
+      const sent = await notification.showServerTestNotification();
+      setNotificationTestMessage(sent ? '服务端测试推送已发送。' : '服务端测试推送未发送。');
+    } finally {
+      setServerPushTesting(false);
     }
   };
 
@@ -309,7 +338,7 @@ export function ProfilePage() {
     <div ref={pageRef} className="space-y-6">
       <section
         data-profile-hero
-        className="relative overflow-hidden rounded-[2rem] border border-life-ai/20 bg-card p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
+        className="relative overflow-hidden rounded-[2rem] border border-life-ai/20 bg-card p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)] max-[360px]:p-4"
       >
         <div
           aria-hidden="true"
@@ -326,7 +355,9 @@ export function ProfilePage() {
                 <Settings2 className="size-3.5" />
                 Life Trace Settings
               </p>
-              <h1 className="mt-3 text-3xl font-bold leading-tight">我的生活参数</h1>
+              <h1 className="mt-3 text-3xl font-bold leading-tight max-[360px]:text-2xl">
+                我的生活参数
+              </h1>
               <p className="mt-4 max-w-[24ch] text-sm leading-7 text-muted-foreground">
                 城市、通勤、提醒和习惯会组成你的每日简报。
               </p>
@@ -371,7 +402,7 @@ export function ProfilePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
             <div className="rounded-2xl border border-foreground/10 bg-background/35 p-3 backdrop-blur">
               <CloudSun className="mb-2 size-4 text-life-weather" />
               <p className="truncate text-sm font-semibold">{settings.city}</p>
@@ -401,7 +432,7 @@ export function ProfilePage() {
         </div>
       </section>
 
-      <section data-profile-card className="grid grid-cols-3 gap-2">
+      <section data-profile-card className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
         <div className="rounded-[1.35rem] border border-life-ai/20 bg-life-ai/10 p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
             <Sparkles className="size-4 text-life-ai" />
@@ -446,7 +477,7 @@ export function ProfilePage() {
           placeholder="例如：上海"
           onChange={(value) => update('city', value)}
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
           <SettingInput
             label="上班时间"
             value={settings.workStart}
@@ -476,7 +507,7 @@ export function ProfilePage() {
 
       <section data-profile-card className="space-y-3">
         <SectionHeader title="通勤方式" meta={settings.commuteMethod} />
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-5 gap-2 max-[390px]:grid-cols-3">
           {commuteMethods.map((method) => {
             const Icon = commuteIcons[method];
             const active = settings.commuteMethod === method;
@@ -486,7 +517,7 @@ export function ProfilePage() {
                 key={method}
                 type="button"
                 className={cn(
-                  'group grid min-h-20 place-items-center rounded-[1.25rem] border px-2 py-3 text-xs font-semibold transition duration-300',
+                  'group grid min-h-20 place-items-center rounded-[1.25rem] border px-2 py-3 text-xs font-semibold transition duration-300 max-[390px]:min-h-16',
                   active
                     ? 'border-life-ai/50 bg-life-ai text-background shadow-[0_18px_50px_rgba(6,182,212,0.16)]'
                     : 'border-border bg-card/80 text-muted-foreground hover:border-foreground/20 hover:bg-card',
@@ -518,13 +549,16 @@ export function ProfilePage() {
           onToggle={() => update('planReminders', !settings.planReminders)}
         />
         <Card className="p-4">
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 max-[360px]:gap-2">
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
               <Bell className="size-5" />
             </div>
             <div className="min-w-0 flex-1">
               <h3 className="font-semibold">系统通知</h3>
               <p className="mt-1 text-sm leading-5 text-muted-foreground">{notification.label}</p>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                {notification.serverPushLabel}
+              </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {notificationDiagnostics.map((item) => (
                   <Badge key={item.label} tone={item.ok ? 'trace' : 'default'}>
@@ -540,7 +574,7 @@ export function ProfilePage() {
               ) : null}
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2 max-[360px]:grid-cols-1">
             <Button
               type="button"
               variant={notification.granted ? 'secondary' : 'ai'}
@@ -558,7 +592,35 @@ export function ProfilePage() {
               onClick={() => void handleTestNotification()}
             >
               {notificationTesting ? <ActionLoadingIcon tone="ai" /> : <Bell className="size-4" />}
-              测试
+              本地测试
+            </Button>
+            <Button
+              type="button"
+              variant={notification.serverPushReady ? 'secondary' : 'ai'}
+              size="sm"
+              disabled={!notification.pushSupported || serverPushTesting}
+              onClick={() => void handleEnableServerPush()}
+            >
+              {serverPushTesting && !notification.serverPushReady ? (
+                <ActionLoadingIcon tone="ai" />
+              ) : (
+                <Wifi className="size-4" />
+              )}
+              {notification.serverPushReady ? '已绑定' : '绑定推送'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!notification.serverPushReady || serverPushTesting}
+              onClick={() => void handleTestServerPush()}
+            >
+              {serverPushTesting && notification.serverPushReady ? (
+                <ActionLoadingIcon tone="ai" />
+              ) : (
+                <Bell className="size-4" />
+              )}
+              服务端测试
             </Button>
           </div>
         </Card>
@@ -587,7 +649,7 @@ export function ProfilePage() {
 
       <section data-profile-card className="space-y-3">
         <SectionHeader title="每日打卡" meta={`${settings.habits.length} 项已开启`} />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
           {habitOptions.map((habit) => {
             const active = settings.habits.includes(habit);
 
@@ -652,10 +714,12 @@ export function ProfilePage() {
               </p>
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-secondary/70 px-3 py-2 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2">
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-secondary/70 px-3 py-2 text-sm text-muted-foreground max-[360px]:items-start">
+            <span className="flex min-w-0 items-center gap-2">
               <MoonStar className="size-4 text-life-plan" />
-              {serviceWorkerReady ? '离线缓存已准备好' : '离线缓存准备中'}
+              <span className="truncate">
+                {serviceWorkerReady ? '离线缓存已准备好' : '离线缓存准备中'}
+              </span>
             </span>
             {canInstall ? (
               <Button type="button" variant="ai" size="sm" onClick={promptInstall}>

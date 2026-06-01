@@ -90,10 +90,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="h-dvh w-screen overflow-hidden bg-background text-foreground">
+    <div className="h-dvh w-full overflow-hidden bg-background text-foreground">
       <main
         ref={contentRef}
-        className="mx-auto h-dvh w-full max-w-[430px] overflow-y-auto overflow-x-hidden px-4 pb-44 pt-8 max-[360px]:px-3"
+        className="safe-top safe-x mx-auto h-dvh w-full max-w-[430px] overflow-y-auto overflow-x-hidden pb-[calc(10rem+env(safe-area-inset-bottom))] max-[360px]:px-3"
       >
         <div className="min-w-0 overflow-x-hidden" data-page-entrance>
           {children}
@@ -101,13 +101,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       </main>
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-20 mx-auto h-44 w-full max-w-[430px] bg-gradient-to-t from-background via-background via-55% to-transparent"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-20 mx-auto h-[calc(11rem+env(safe-area-inset-bottom))] w-full max-w-[430px] bg-gradient-to-t from-background via-background via-55% to-transparent"
       />
       <nav
         ref={navRef}
         className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[430px] border-t border-white/[0.07] bg-card/88 px-3 pt-3 shadow-[0_-18px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl max-[360px]:px-2"
       >
-        <div className="grid grid-cols-5 items-end gap-1 rounded-[1.65rem] border border-white/[0.04] bg-background/28 p-1.5">
+        <div className="grid grid-cols-5 items-end gap-1 rounded-[1.65rem] border border-white/[0.04] bg-background/28 p-1.5 max-[360px]:gap-0.5 max-[360px]:p-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -147,6 +147,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   data-tab-label
                   className={cn(
                     'relative z-10 max-w-full truncate text-xs font-semibold transition duration-300',
+                    'max-[360px]:text-[11px]',
                     active ? 'text-foreground' : 'text-muted-foreground',
                     isAi && active && 'text-life-ai',
                   )}

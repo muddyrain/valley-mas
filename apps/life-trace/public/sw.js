@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-trace-shell-v2';
+const CACHE_NAME = 'life-trace-shell-v3';
 const SHELL_ASSETS = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -52,6 +52,37 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => caches.match('/'));
+    }),
+  );
+});
+
+self.addEventListener('push', (event) => {
+  const fallback = {
+    title: 'Life Trace 提醒',
+    body: '你有一项生活计划需要处理。',
+    url: '/plans',
+    tag: 'life-trace-push',
+  };
+  let payload = fallback;
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch {
+      payload = fallback;
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title || fallback.title, {
+      body: payload.body || fallback.body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: payload.tag || fallback.tag,
+      renotify: true,
+      data: {
+        url: payload.url || fallback.url,
+        planId: payload.planId,
+      },
     }),
   );
 });

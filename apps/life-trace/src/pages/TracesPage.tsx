@@ -180,7 +180,7 @@ function ImagePreviewDialog({ trace, onClose }: { trace: Trace | null; onClose: 
       aria-label={`${trace.title} 图片预览`}
       onMouseDown={onClose}
     >
-      <div className="mx-auto flex h-full max-w-[430px] flex-col justify-center gap-4">
+      <div className="safe-top safe-bottom mx-auto flex h-full max-w-[430px] flex-col justify-center gap-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{trace.title}</p>
@@ -237,7 +237,7 @@ function TraceDetailDrawer({
       <div
         role="dialog"
         aria-modal="true"
-        className="safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl"
+        className="safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-0.75rem)] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl max-[360px]:p-4"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="mb-5 flex items-start justify-between gap-4">
@@ -285,7 +285,7 @@ function TraceDetailDrawer({
           <p className="text-sm leading-6 text-foreground">{trace.summary}</p>
         </Card>
 
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="mt-3 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
           <Card className="p-4">
             <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
               <Clock className="size-4" />
@@ -318,7 +318,7 @@ function TraceDetailDrawer({
           ))}
         </div>
 
-        <div className="mt-6 grid grid-cols-3 gap-3">
+        <div className="mt-6 grid grid-cols-3 gap-3 max-[360px]:grid-cols-1">
           <Button type="button" variant="secondary" disabled={deleting} onClick={onClose}>
             <ArrowLeft className="size-4" />
             返回
@@ -417,9 +417,9 @@ export function TracesPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5 overflow-x-hidden">
       <div className="flex items-center justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold tracking-tight">踪迹</h2>
           <p className="mt-1 text-sm text-muted-foreground">{traces.length} 条记录</p>
         </div>
@@ -429,7 +429,7 @@ export function TracesPage() {
         </Button>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {traceFilters.map((filter) => {
           const active = activeFilter === filter.id;
 
@@ -438,7 +438,7 @@ export function TracesPage() {
               type="button"
               key={filter.id}
               className={cn(
-                'shrink-0 cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition',
+                'min-h-10 shrink-0 cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition',
                 active ? 'bg-life-trace text-background' : 'bg-card text-muted-foreground',
               )}
               onClick={() => setActiveFilter(filter.id)}
@@ -451,14 +451,14 @@ export function TracesPage() {
       </div>
 
       <div className="rounded-[1.25rem] border border-border/80 bg-card/55 p-3 shadow-[0_14px_50px_rgba(0,0,0,0.08)]">
-        <div className="flex items-center justify-between gap-3">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">标签筛选</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {activeTag === '全部' ? `共 ${traceTags.length} 个标签` : `正在查看「${activeTag}」`}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
             {activeTag !== '全部' ? (
               <button
                 type="button"
@@ -525,7 +525,7 @@ export function TracesPage() {
 
       <div className="space-y-7">
         {filteredTraces.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
             <Card className="border-life-trace/20 bg-life-trace/5 p-3">
               <p className="text-lg font-semibold">{filteredTraces.length}</p>
               <p className="mt-1 text-xs text-muted-foreground">当前踪迹</p>
@@ -545,21 +545,21 @@ export function TracesPage() {
 
         {monthGroups.map((group) => (
           <section key={group.key} className="space-y-3">
-            <div className="sticky top-0 z-10 -mx-1 flex items-center justify-between bg-background/85 px-1 py-2 backdrop-blur">
-              <div>
+            <div className="sticky top-0 z-10 -mx-1 flex items-center justify-between gap-3 bg-background/85 px-1 py-2 backdrop-blur">
+              <div className="min-w-0">
                 <h3 className="text-lg font-semibold">{group.label}</h3>
                 <p className="mt-1 text-xs text-muted-foreground">{group.traces.length} 条记录</p>
               </div>
-              <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
+              <span className="shrink-0 rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
                 {group.traces.filter((trace) => trace.imageUrl).length} 张图片
               </span>
             </div>
 
-            <div className="relative space-y-5 pl-8">
+            <div className="relative space-y-5 pl-8 max-[360px]:pl-6">
               <div className="absolute bottom-0 left-3 top-1 w-px bg-gradient-to-b from-life-trace/60 via-border to-transparent" />
               {group.traces.map((trace, index) => (
                 <article key={trace.id} className="relative">
-                  <span className="absolute -left-[1.55rem] top-5 grid size-5 place-items-center rounded-full border border-life-trace/40 bg-background shadow-[0_0_0_5px_rgba(16,185,129,0.06)]">
+                  <span className="absolute -left-[1.55rem] top-5 grid size-5 place-items-center rounded-full border border-life-trace/40 bg-background shadow-[0_0_0_5px_rgba(16,185,129,0.06)] max-[360px]:-left-[1.3rem]">
                     <span className="size-2 rounded-full bg-life-trace" />
                   </span>
                   <Card

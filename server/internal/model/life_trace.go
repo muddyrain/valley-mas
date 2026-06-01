@@ -241,3 +241,50 @@ func (message *LifeTraceAIMessage) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+type LifeTracePushSubscription struct {
+	ID         Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID     Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	Endpoint   string         `gorm:"type:text;not null" json:"endpoint"`
+	P256DH     string         `gorm:"column:p256dh;type:text;not null" json:"p256dh"`
+	Auth       string         `gorm:"type:text;not null" json:"auth"`
+	Status     string         `gorm:"size:20;not null;default:'active';index" json:"status"`
+	UserAgent  string         `gorm:"size:500" json:"userAgent,omitempty"`
+	LastError  string         `gorm:"size:500" json:"lastError,omitempty"`
+	LastSentAt *time.Time     `json:"lastSentAt,omitempty"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	UpdatedAt  time.Time      `json:"updatedAt"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (subscription *LifeTracePushSubscription) BeforeCreate(tx *gorm.DB) error {
+	if subscription.ID == 0 {
+		subscription.ID = Int64String(utils.GenerateID())
+	}
+	if subscription.Status == "" {
+		subscription.Status = "active"
+	}
+	return nil
+}
+
+type LifeTracePushDelivery struct {
+	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID         Int64String    `gorm:"column:user_id;index;not null;uniqueIndex:uidx_life_trace_push_delivery" json:"userId"`
+	PlanID         Int64String    `gorm:"column:plan_id;index;not null;uniqueIndex:uidx_life_trace_push_delivery" json:"planId"`
+	DueAt          time.Time      `gorm:"not null;index;uniqueIndex:uidx_life_trace_push_delivery" json:"dueAt"`
+	SubscriptionID Int64String    `gorm:"column:subscription_id;index;not null;uniqueIndex:uidx_life_trace_push_delivery" json:"subscriptionId"`
+	Status         string         `gorm:"size:20;not null;default:'sent';index" json:"status"`
+	Error          string         `gorm:"size:500" json:"error,omitempty"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (delivery *LifeTracePushDelivery) BeforeCreate(tx *gorm.DB) error {
+	if delivery.ID == 0 {
+		delivery.ID = Int64String(utils.GenerateID())
+	}
+	if delivery.Status == "" {
+		delivery.Status = "sent"
+	}
+	return nil
+}

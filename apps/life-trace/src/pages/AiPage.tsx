@@ -326,7 +326,7 @@ function WeeklyReviewsArchive({
   addingActionKey: string | null;
 }) {
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6 overflow-x-hidden">
       <header className="space-y-5">
         <button
           type="button"
@@ -340,8 +340,8 @@ function WeeklyReviewsArchive({
           <div className="grid size-12 place-items-center rounded-2xl bg-life-health/10 text-life-health">
             <History className="size-6" />
           </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">历史周报</h1>
+          <div className="min-w-0">
+            <h1 className="text-3xl font-bold tracking-tight max-[360px]:text-2xl">历史周报</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {loading ? '正在同步已存档周报' : `已存档 ${reviews.length} 篇`}
             </p>
@@ -450,7 +450,7 @@ function AssistantHistoryPage({
   const groups = groupAssistantMessages(messages);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6 overflow-x-hidden">
       <header className="space-y-5">
         <button
           type="button"
@@ -461,12 +461,12 @@ function AssistantHistoryPage({
           返回
         </button>
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-3">
               <div className="grid size-11 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
                 <History className="size-5" />
               </div>
-              <span className="text-2xl font-bold">对话历史</span>
+              <span className="text-2xl font-bold max-[360px]:text-xl">对话历史</span>
             </div>
             <p className="mt-3 text-sm text-muted-foreground">
               {loading ? '正在同步云端对话' : `${messages.length} 条生活助理记录`}
@@ -554,7 +554,7 @@ function AiActionCard({ action }: { action: AiAction }) {
 
 function AiActionsArchive({ actions, onBack }: { actions: AiAction[]; onBack: () => void }) {
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6 overflow-x-hidden">
       <header className="space-y-5">
         <button
           type="button"
@@ -568,8 +568,8 @@ function AiActionsArchive({ actions, onBack }: { actions: AiAction[]; onBack: ()
           <div className="grid size-12 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
             <Sparkles className="size-6" />
           </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">AI 操作历史</h1>
+          <div className="min-w-0">
+            <h1 className="text-3xl font-bold tracking-tight max-[360px]:text-2xl">AI 操作历史</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               共 {actions.length} 条 Life AI 记录
             </p>
@@ -1326,7 +1326,7 @@ export function AiPage() {
   } = useAiPageState();
 
   return (
-    <div className="space-y-7">
+    <div className="min-w-0 space-y-7 overflow-x-hidden">
       <header className="space-y-5">
         <div className="flex items-center gap-3">
           <div className="grid size-12 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
@@ -1335,12 +1335,14 @@ export function AiPage() {
           <span className="text-2xl font-bold">Life AI</span>
         </div>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">今天想怎么安排生活?</h1>
+          <h1 className="text-3xl font-bold tracking-tight max-[360px]:text-2xl">
+            今天想怎么安排生活?
+          </h1>
           <p className="mt-2 text-muted-foreground">{placeholder}</p>
         </div>
       </header>
 
-      <section className="grid grid-cols-2 gap-3">
+      <section className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
         <Card className="p-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
             <CloudSun className="size-4 text-life-weather" />
@@ -1417,7 +1419,7 @@ export function AiPage() {
           </p>
           <button
             type="button"
-            className="grid size-12 cursor-pointer place-items-center rounded-2xl bg-life-ai text-background transition hover:bg-life-ai/90 disabled:cursor-default disabled:opacity-80"
+            className="grid size-12 shrink-0 cursor-pointer place-items-center rounded-2xl bg-life-ai text-background transition hover:bg-life-ai/90 disabled:cursor-default disabled:opacity-80"
             disabled={assistantStreaming || !assistantInput.trim()}
             onClick={() => void handleAssistantSubmit()}
           >
@@ -1516,7 +1518,7 @@ export function AiPage() {
       {adviceCards.length > 0 ? (
         <section>
           <SectionHeader title="AI 生成的今日建议" meta={`${adviceCards.length} 条`} />
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-3 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
             {adviceCards.map((item) => {
               const added = hasAdvicePlan(plans, item.id);
               const adding = addingAdviceId === item.id;
@@ -1557,7 +1559,7 @@ export function AiPage() {
 
       <section className="pb-4">
         <SectionHeader title="快捷操作" />
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 max-[360px]:gap-2">
           {aiQuickActions.map((action) => {
             const Icon = action.icon;
             const loading = quickActionLoading === action.label;
@@ -1566,7 +1568,7 @@ export function AiPage() {
               <button
                 type="button"
                 key={action.label}
-                className="flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-4 py-3 text-sm font-semibold transition hover:bg-secondary disabled:cursor-default disabled:opacity-70"
+                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-4 py-3 text-sm font-semibold transition hover:bg-secondary disabled:cursor-default disabled:opacity-70 max-[360px]:px-3"
                 disabled={Boolean(quickActionLoading)}
                 onClick={() => void handleQuickAction(action.label)}
               >
@@ -1615,7 +1617,7 @@ export function AiPage() {
 
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold">最近的 AI 操作</h2>
+          <h2 className="min-w-0 text-xl font-semibold">最近的 AI 操作</h2>
           <button
             type="button"
             className="cursor-pointer text-sm font-semibold text-muted-foreground transition hover:text-foreground"
