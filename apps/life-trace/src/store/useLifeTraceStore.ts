@@ -1,7 +1,14 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { listCheckins, toggleCheckin } from '@/api/checkins';
-import { createPlan, deletePlan, listPlans, updatePlan, updatePlanStatus } from '@/api/plans';
+import {
+  createPlan,
+  deletePlan,
+  type ListPlansOptions,
+  listPlans,
+  updatePlan,
+  updatePlanStatus,
+} from '@/api/plans';
 import { getSettings, saveSettings } from '@/api/settings';
 import { createTrace, deleteTrace, listTraces, updateTrace } from '@/api/traces';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -25,6 +32,7 @@ type LifeTraceState = {
   plansLoadingMore: boolean;
   plansError: string;
   plansPagination: ListPagination;
+  plansListOptions: ListPlansOptions;
   planCreating: boolean;
   planUpdatingById: Record<string, boolean>;
   planCompletingById: Record<string, boolean>;
@@ -53,7 +61,7 @@ type LifeTraceState = {
   setActiveTab: (tab: AppTab) => void;
   updateSettings: (settings: Partial<UserSettings>) => void;
   loadSettings: () => Promise<void>;
-  loadPlans: () => Promise<void>;
+  loadPlans: (options?: ListPlansOptions) => Promise<void>;
   loadMorePlans: () => Promise<void>;
   loadTraces: () => Promise<void>;
   loadMoreTraces: () => Promise<void>;
@@ -162,6 +170,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       plansLoadingMore: false,
       plansError: '',
       plansPagination: defaultPagination,
+      plansListOptions: { page: 1, pageSize: 20 },
       planCreating: false,
       planUpdatingById: {},
       planCompletingById: {},
@@ -260,8 +269,14 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           });
         }
       },
-      loadPlans: async () => {
+      loadPlans: async (options = {}) => {
         const token = getToken();
+        const nextOptions = {
+          ...get().plansListOptions,
+          ...options,
+          page: 1,
+          pageSize: options.pageSize ?? get().plansListOptions.pageSize ?? 20,
+        };
         if (!token) {
           set({
             plans: [],
@@ -270,13 +285,14 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             plansLoadingMore: false,
             plansError: '',
             plansPagination: defaultPagination,
+            plansListOptions: nextOptions,
           });
           return;
         }
 
-        set({ plansLoading: true, plansError: '' });
+        set({ plansLoading: true, plansError: '', plansListOptions: nextOptions });
         try {
-          const { list, pagination } = await listPlans(token, { page: 1, pageSize: 20 });
+          const { list, pagination } = await listPlans(token, nextOptions);
           set({
             plans: list,
             plansPagination: pagination ?? {
@@ -298,7 +314,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       },
       loadMorePlans: async () => {
         const token = getToken();
-        const { plansPagination, plansLoading, plansLoadingMore } = get();
+        const { plansListOptions, plansPagination, plansLoading, plansLoadingMore } = get();
         if (!token || plansLoading || plansLoadingMore || !plansPagination.hasMore) {
           return;
         }
@@ -307,6 +323,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         try {
           const nextPage = plansPagination.page + 1;
           const { list, pagination } = await listPlans(token, {
+            ...plansListOptions,
             page: nextPage,
             pageSize: plansPagination.pageSize,
           });
@@ -766,6 +783,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           plansLoadingMore,
           plansError,
           plansPagination,
+          plansListOptions,
           planCreating,
           planUpdatingById,
           planCompletingById,
@@ -797,6 +815,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         void plansLoadingMore;
         void plansError;
         void plansPagination;
+        void plansListOptions;
         void planCreating;
         void planUpdatingById;
         void planCompletingById;

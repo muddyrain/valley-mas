@@ -1,9 +1,15 @@
 import { apiRequest } from '@/api/request';
-import type { ListPagination, NewPlanInput, Plan } from '@/types';
+import type { ListPagination, NewPlanInput, Plan, PlanType } from '@/types';
 
 export type ListPlansOptions = {
   page?: number;
   pageSize?: number;
+  status?: 'all' | 'open' | 'completed';
+  q?: string;
+  type?: PlanType | 'all';
+  reminder?: boolean;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 function buildListQuery(options: ListPlansOptions = {}) {
@@ -13,6 +19,24 @@ function buildListQuery(options: ListPlansOptions = {}) {
   }
   if (options.pageSize) {
     params.set('pageSize', String(options.pageSize));
+  }
+  if (options.status && options.status !== 'all') {
+    params.set('status', options.status);
+  }
+  if (options.q?.trim()) {
+    params.set('q', options.q.trim());
+  }
+  if (options.type && options.type !== 'all') {
+    params.set('type', options.type);
+  }
+  if (typeof options.reminder === 'boolean') {
+    params.set('reminder', String(options.reminder));
+  }
+  if (options.dateFrom) {
+    params.set('dateFrom', options.dateFrom);
+  }
+  if (options.dateTo) {
+    params.set('dateTo', options.dateTo);
   }
   const query = params.toString();
   return query ? `?${query}` : '';

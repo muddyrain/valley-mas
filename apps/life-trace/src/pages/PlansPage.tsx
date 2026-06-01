@@ -1,5 +1,15 @@
-import { Bell, BellOff, Check, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import {
+  AlertTriangle,
+  Bell,
+  BellOff,
+  Check,
+  Filter,
+  Plus,
+  RotateCcw,
+  Search,
+  X,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
@@ -13,33 +23,54 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { getVisiblePlanNote } from '@/lib/advicePlan';
 import { gsap, useGSAP } from '@/lib/gsap';
-import { filterPlans, isAdvicePlan, type PlanFilter, splitPlansByToday } from '@/lib/planGroups';
+import {
+  filterPlans,
+  filterPlansByKeywordAndType,
+  isAdvicePlan,
+  isOverduePlan,
+  type PlanFilter,
+  splitPlansByTimeline,
+  splitPlansByToday,
+} from '@/lib/planGroups';
 import { getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Plan, PlanType } from '@/types';
 
-const planFilters: Array<{ id: PlanFilter; label: string; emptyText: string }> = [
-  {
-    id: 'all',
-    label: '全部',
-    emptyText: '还没有计划。先创建一个今日计划，Life Trace 会帮你持续记录。',
-  },
+const primaryPlanFilters: Array<{ id: PlanFilter; label: string; emptyText: string }> = [
   {
     id: 'today',
     label: '今天',
     emptyText: '今天还没有计划。可以先添加一个喝水、通勤或下班后的安排。',
   },
   {
-    id: 'weekend',
-    label: '周末',
-    emptyText: '周末还没有安排。可以先计划一部电影、一顿饭或一次放松活动。',
+    id: 'upcoming',
+    label: '未来',
+    emptyText: '未来还没有安排。可以先把周末电影、饭局或运动计划放进来。',
   },
   {
-    id: 'reminded',
-    label: '已提醒',
-    emptyText: '还没有设置提醒的计划。创建计划时打开提醒，就会出现在这里。',
+    id: 'completed',
+    label: '已完成',
+    emptyText: '还没有完成的计划。完成一个计划后，它会沉淀成生活踪迹。',
   },
+];
+
+const planTypeOptions: Array<PlanType | 'all'> = [
+  'all',
+  '电影',
+  '吃饭',
+  '运动',
+  '阅读',
+  '聚会',
+  '普通事项',
+];
+
+type QuickPlanFilter = 'all' | 'weekend' | 'reminded';
+
+const quickFilterOptions: Array<{ id: QuickPlanFilter; label: string }> = [
+  { id: 'all', label: '全部计划' },
+  { id: 'weekend', label: '只看周末' },
+  { id: 'reminded', label: '只看提醒' },
 ];
 
 const typeTone: Record<PlanType, 'plan' | 'health' | 'trace' | 'weather' | 'ai' | 'alert'> = {
@@ -63,6 +94,7 @@ export function PlansPage() {
     planCompletingById,
     planDeletingById,
     completePlan,
+    loadPlans,
     loadMorePlans,
     removePlan,
   } = useLifeTraceStore();
@@ -71,23 +103,67 @@ export function PlansPage() {
   const pageRef = useRef<HTMLDivElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
-  const [activeFilter, setActiveFilter] = useState<PlanFilter>('all');
-  const [showCompletedInAll, setShowCompletedInAll] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<PlanFilter>('today');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<PlanType | 'all'>('all');
+  const [quickFilter, setQuickFilter] = useState<QuickPlanFilter>('all');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Plan | null>(null);
-  const filteredPlans = filterPlans(plans, activeFilter).filter(
-    (plan) => activeFilter !== 'all' || showCompletedInAll || !plan.completed,
+  const now = useMemo(() => new Date(), []);
+  const listOptions = useMemo(
+    () => ({
+      pageSize: 20,
+      status: activeFilter === 'completed' ? ('completed' as const) : ('open' as const),
+      q: searchQuery,
+      type: typeFilter,
+      reminder: quickFilter === 'reminded' ? true : undefined,
+    }),
+    [activeFilter, quickFilter, searchQuery, typeFilter],
   );
+  const visibleBasePlans = useMemo(() => {
+    let nextPlans = plans;
+    if (quickFilter === 'weekend') {
+      nextPlans = filterPlans(nextPlans, 'weekend');
+    }
+    if (quickFilter === 'reminded') {
+      nextPlans = filterPlans(nextPlans, 'reminded');
+    }
+    if (activeFilter !== 'completed') {
+      nextPlans = nextPlans.filter((plan) => !plan.completed);
+    }
+    return nextPlans;
+  }, [activeFilter, plans, quickFilter]);
+  const viewPlans =
+    activeFilter === 'today'
+      ? visibleBasePlans
+      : activeFilter === 'upcoming'
+        ? filterPlans(visibleBasePlans, 'upcoming')
+        : activeFilter === 'completed'
+          ? filterPlans(visibleBasePlans, 'completed')
+          : filterPlans(visibleBasePlans, activeFilter);
+  const filteredPlans = filterPlansByKeywordAndType(viewPlans, searchQuery, typeFilter);
   const { todayPlans } = splitPlansByToday(plans);
-  const hiddenCompletedCount =
-    activeFilter === 'all' && !showCompletedInAll
-      ? plans.filter((plan) => plan.completed).length
-      : 0;
-  const filteredGroups = splitPlansByToday(filteredPlans);
+  const timelineGroups = splitPlansByTimeline(filteredPlans, now);
+  const overdueCount = splitPlansByTimeline(plans, now).overduePlans.length;
   const activeFilterConfig =
-    planFilters.find((filter) => filter.id === activeFilter) ?? planFilters[0];
+    primaryPlanFilters.find((filter) => filter.id === activeFilter) ?? primaryPlanFilters[0];
   const planGroups = [
-    { title: '今日计划', plans: filteredGroups.todayPlans },
-    { title: '其他计划', plans: filteredGroups.otherPlans },
+    ...(activeFilter === 'today'
+      ? [
+          { title: '已逾期', plans: timelineGroups.overduePlans, tone: 'text-life-alert' },
+          { title: '今日计划', plans: timelineGroups.todayPlans, tone: '' },
+          {
+            title: '未排期',
+            plans: timelineGroups.unscheduledPlans,
+            tone: 'text-muted-foreground',
+          },
+        ]
+      : []),
+    ...(activeFilter === 'upcoming'
+      ? [{ title: '未来安排', plans: timelineGroups.upcomingPlans, tone: 'text-life-ai' }]
+      : []),
+    { title: '已完成', plans: timelineGroups.completedPlans, tone: 'text-life-trace' },
   ].filter((group) => group.plans.length > 0);
   const selectedPlan = planId ? (plans.find((plan) => plan.id === planId) ?? null) : null;
   const deletePending = deleteTarget ? Boolean(planDeletingById[deleteTarget.id]) : false;
@@ -97,6 +173,13 @@ export function PlansPage() {
       navigate('/plans', { replace: true });
     }
   }, [navigate, planId, plans.length, plansLoading, selectedPlan]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadPlans(listOptions);
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [listOptions, loadPlans]);
 
   useGSAP(
     () => {
@@ -126,16 +209,19 @@ export function PlansPage() {
 
       return () => mm.revert();
     },
-    { scope: pageRef, dependencies: [activeFilter, filteredPlans.length], revertOnUpdate: true },
+    {
+      scope: pageRef,
+      dependencies: [activeFilter, filteredPlans.length, searchQuery, typeFilter],
+      revertOnUpdate: true,
+    },
   );
 
   const renderPlanCard = (plan: Plan) => {
     const { dateText, timeText } = getPlanDisplayTimeParts(plan);
     const ReminderIcon = plan.reminder ? Bell : BellOff;
-    const updating = Boolean(planUpdatingById[plan.id]);
     const completing = Boolean(planCompletingById[plan.id]);
     const deleting = Boolean(planDeletingById[plan.id]);
-    const busy = updating || completing || deleting;
+    const busy = completing || deleting || Boolean(planUpdatingById[plan.id]);
 
     return (
       <Card
@@ -192,6 +278,7 @@ export function PlansPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={typeTone[plan.type]}>{plan.type}</Badge>
                   {isAdvicePlan(plan) ? <Badge tone="ai">今日建议</Badge> : null}
+                  {isOverduePlan(plan) ? <Badge tone="alert">已逾期</Badge> : null}
                   {plan.completed ? <Badge tone="trace">已完成</Badge> : null}
                 </div>
                 <h2 className="mt-2 line-clamp-2 text-lg font-semibold leading-snug">
@@ -213,7 +300,8 @@ export function PlansPage() {
             <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">
               {getVisiblePlanNote(plan.note)}
             </p>
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">点开查看详情和更多操作</p>
               <Button
                 type="button"
                 variant={plan.completed ? 'secondary' : 'outline'}
@@ -233,39 +321,6 @@ export function PlansPage() {
                 )}
                 {completing ? '更新中' : plan.completed ? '取消完成' : '完成'}
               </Button>
-              {!plan.completed ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="px-3 text-muted-foreground"
-                  aria-label={`编辑${plan.title}`}
-                  disabled={busy}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setEditingPlan(plan);
-                    setDrawerOpen(true);
-                  }}
-                >
-                  {updating ? <ActionLoadingIcon /> : <Pencil className="size-4" />}
-                  {updating ? '保存中' : null}
-                </Button>
-              ) : null}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="px-3 text-muted-foreground"
-                aria-label={`删除${plan.title}`}
-                disabled={busy}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setDeleteTarget(plan);
-                }}
-              >
-                {deleting ? <ActionLoadingIcon tone="alert" /> : <Trash2 className="size-4" />}
-                {deleting ? '删除中' : null}
-              </Button>
             </div>
           </div>
         </div>
@@ -278,39 +333,62 @@ export function PlansPage() {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-xl font-semibold tracking-tight">计划</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{todayPlans.length} 个今日计划</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {todayPlans.length} 个今日计划
+            {overdueCount > 0 ? ` · ${overdueCount} 个逾期` : ''}
+          </p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={showCompletedInAll}
-          className={cn(
-            'flex shrink-0 cursor-pointer items-center gap-2 rounded-full border px-2 py-1.5 text-xs font-semibold transition',
-            showCompletedInAll
-              ? 'border-life-health/40 bg-life-health/10 text-life-health'
-              : 'border-border bg-card text-muted-foreground',
-          )}
-          onClick={() => setShowCompletedInAll((current) => !current)}
-        >
-          <span
-            className={cn(
-              'relative h-5 w-9 rounded-full transition',
-              showCompletedInAll ? 'bg-life-health/80' : 'bg-secondary',
-            )}
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            aria-label={searchOpen ? '关闭搜索' : '搜索计划'}
+            onClick={() => setSearchOpen((current) => !current)}
           >
-            <span
-              className={cn(
-                'absolute top-0.5 size-4 rounded-full bg-background shadow-sm transition',
-                showCompletedInAll ? 'left-4' : 'left-0.5',
-              )}
-            />
-          </span>
-          显示完成
-        </button>
+            {searchOpen ? <X className="size-5" /> : <Search className="size-5" />}
+          </Button>
+          <Button
+            type="button"
+            variant={filterOpen ? 'ai' : 'secondary'}
+            size="icon"
+            aria-label={filterOpen ? '关闭筛选' : '筛选计划'}
+            onClick={() => setFilterOpen((current) => !current)}
+          >
+            <Filter className="size-5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ai"
+            size="icon"
+            aria-label="创建计划"
+            disabled={planCreating}
+            onClick={() => {
+              setEditingPlan(null);
+              setDrawerOpen(true);
+            }}
+          >
+            {planCreating ? <ActionLoadingIcon /> : <Plus className="size-5" />}
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-4 rounded-2xl bg-card p-1 text-sm font-semibold text-muted-foreground max-[360px]:text-xs">
-        {planFilters.map((filter) => {
+      {overdueCount > 0 && activeFilter !== 'completed' ? (
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-life-alert/30 bg-life-alert/10 px-4 py-3 text-left text-life-alert"
+          onClick={() => setActiveFilter('today')}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <AlertTriangle className="size-4 shrink-0" />
+            <span className="text-sm font-semibold">有 {overdueCount} 个计划已经过期</span>
+          </span>
+          <span className="text-xs font-semibold">处理</span>
+        </button>
+      ) : null}
+
+      <div className="grid grid-cols-3 rounded-2xl bg-card p-1 text-sm font-semibold text-muted-foreground">
+        {primaryPlanFilters.map((filter) => {
           const active = activeFilter === filter.id;
 
           return (
@@ -329,6 +407,87 @@ export function PlansPage() {
         })}
       </div>
 
+      {searchOpen ? (
+        <Card className="p-3">
+          <label className="flex min-h-11 items-center gap-2 rounded-2xl border border-border bg-secondary px-3 text-sm">
+            <Search className="size-4 shrink-0 text-muted-foreground" />
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="搜索标题、备注、地点"
+              className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+            />
+          </label>
+        </Card>
+      ) : null}
+
+      {filterOpen ? (
+        <Card className="space-y-4 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">筛选</p>
+              <p className="mt-1 text-xs text-muted-foreground">适合计划变多时快速收窄列表</p>
+            </div>
+            {(typeFilter !== 'all' || quickFilter !== 'all') && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setTypeFilter('all');
+                  setQuickFilter('all');
+                }}
+              >
+                清空
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {quickFilterOptions.map((filter) => {
+              const active = quickFilter === filter.id;
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  className={cn(
+                    'h-9 shrink-0 rounded-full border px-3 text-xs font-semibold transition',
+                    active
+                      ? 'border-life-health/40 bg-life-health/10 text-life-health'
+                      : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
+                  )}
+                  onClick={() => setQuickFilter(filter.id)}
+                >
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex shrink-0 items-center gap-1 text-xs font-semibold text-muted-foreground">
+              类型
+            </div>
+            {planTypeOptions.map((type) => {
+              const active = typeFilter === type;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  className={cn(
+                    'h-9 shrink-0 rounded-full border px-3 text-xs font-semibold transition',
+                    active
+                      ? 'border-life-ai/40 bg-life-ai/10 text-life-ai'
+                      : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
+                  )}
+                  onClick={() => setTypeFilter(type)}
+                >
+                  {type === 'all' ? '全部类型' : type}
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+      ) : null}
+
       {plansError ? (
         <Card className="border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
           {plansError}
@@ -343,7 +502,7 @@ export function PlansPage() {
         {planGroups.map((group) => (
           <section key={group.title} className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">{group.title}</h2>
+              <h2 className={cn('text-lg font-semibold', group.tone)}>{group.title}</h2>
               <span className="text-xs text-muted-foreground">{group.plans.length} 个</span>
             </div>
             <div className="space-y-4">{group.plans.map(renderPlanCard)}</div>
@@ -362,18 +521,13 @@ export function PlansPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setActiveFilter('all')}
+                  onClick={() => setActiveFilter('today')}
                 >
-                  查看全部计划
+                  查看今日计划
                 </Button>
               ) : null
             }
           />
-        ) : null}
-        {hiddenCompletedCount > 0 ? (
-          <p className="px-1 text-center text-xs text-muted-foreground">
-            已隐藏 {hiddenCompletedCount} 个已完成计划，打开右上角开关可查看。
-          </p>
         ) : null}
         {plansPagination.hasMore ? (
           <div className="flex justify-center pt-1">
@@ -393,20 +547,21 @@ export function PlansPage() {
         ) : null}
       </div>
 
-      {!drawerOpen
+      {!drawerOpen && plans.length > 0
         ? createPortal(
             <Button
               type="button"
               variant="ai"
-              className="fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] left-1/2 z-40 -translate-x-1/2 px-6"
+              size="icon"
+              className="fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] right-[max(1rem,calc((100vw-430px)/2+1rem))] z-40 size-14 rounded-2xl shadow-2xl"
               disabled={planCreating}
+              aria-label="创建计划"
               onClick={() => {
                 setEditingPlan(null);
                 setDrawerOpen(true);
               }}
             >
-              {planCreating ? <ActionLoadingIcon /> : <Plus className="size-5" />}
-              {planCreating ? '创建中' : '创建计划'}
+              {planCreating ? <ActionLoadingIcon /> : <Plus className="size-6" />}
             </Button>,
             document.body,
           )

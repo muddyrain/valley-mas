@@ -28,8 +28,10 @@ import { hourlyWeather, weatherMetrics } from '@/data/mock';
 import { useLifeTraceEntrance } from '@/hooks/useLifeTraceEntrance';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import { gsap, useGSAP } from '@/lib/gsap';
-import { getNextReminder } from '@/lib/planReminder';
+import { isOverduePlan, isTodayPlan } from '@/lib/planGroups';
+import { getNextReminder, getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { getLocalISODate } from '@/lib/planSchedule';
+import { cn } from '@/lib/utils';
 import {
   buildWeatherAlerts,
   buildWeatherBrief,
@@ -159,6 +161,7 @@ export function TodayPage() {
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const addPlan = useLifeTraceStore((state) => state.addPlan);
+  const loadPlans = useLifeTraceStore((state) => state.loadPlans);
   const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
   const toggleHabitCheckin = useLifeTraceStore((state) => state.toggleHabitCheckin);
   const token = useAuthStore((state) => state.token);
@@ -233,6 +236,22 @@ export function TodayPage() {
   const aiBriefTitle = remoteAdviceSummary ? 'AI 已读今日状态' : localBrief.title;
   const aiBriefDetail = remoteAdviceSummary || localBrief.detail;
   const nextReminder = getNextReminder(plans);
+  const todayOpenPlans = useMemo(
+    () => plans.filter((plan) => !plan.completed && isTodayPlan(plan)),
+    [plans],
+  );
+  const overduePlans = useMemo(
+    () => plans.filter((plan) => !plan.completed && isOverduePlan(plan)),
+    [plans],
+  );
+  const previewPlans =
+    overduePlans.length > 0 ? overduePlans.slice(0, 3) : todayOpenPlans.slice(0, 3);
+  const planPulseText =
+    overduePlans.length > 0
+      ? `${overduePlans.length} 个计划已过时间，建议先处理一个。`
+      : todayOpenPlans.length > 0
+        ? `今天还有 ${todayOpenPlans.length} 个计划，完成后会自动沉淀为踪迹。`
+        : '今天还没有未完成计划，可以从建议卡片快速添加。';
   const completedHabitCount = habitNames.filter((name) =>
     todayCheckins.some((item) => item.name === name && item.completed),
   ).length;
@@ -487,6 +506,14 @@ export function TodayPage() {
 
     void loadCheckins(todayDate);
   }, [loadCheckins, settingsLoaded, todayDate, token]);
+
+  useEffect(() => {
+    if (!token || !settingsLoaded) {
+      return;
+    }
+
+    void loadPlans({ status: 'open', pageSize: 20 });
+  }, [loadPlans, settingsLoaded, token]);
 
   const handleAddAdvicePlan = async (item: Advice) => {
     if (hasAdvicePlan(plans, item.id)) {
@@ -913,6 +940,79 @@ export function TodayPage() {
             查看
           </button>
         </div>
+      </Card>
+
+      <Card className="p-4" data-today-entrance>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <Badge tone={overduePlans.length > 0 ? 'alert' : 'plan'}>今日计划</Badge>
+            <h2 className="mt-2 text-lg font-semibold">
+              {overduePlans.length > 0 ? '先处理逾期计划' : '今天要推进什么'}
+            </h2>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">{planPulseText}</p>
+          </div>
+          <button
+            type="button"
+            className="shrink-0 cursor-pointer rounded-full bg-secondary px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
+            onClick={() => navigate('/plans')}
+          >
+            管理
+          </button>
+        </div>
+        {plansLoaded ? (
+          previewPlans.length > 0 ? (
+            <div className="space-y-2">
+              {previewPlans.map((plan) => {
+                const { dateText, timeText } = getPlanDisplayTimeParts(plan);
+                const overdue = isOverduePlan(plan);
+
+                return (
+                  <button
+                    type="button"
+                    key={plan.id}
+                    className={cn(
+                      'flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border px-3 py-3 text-left transition hover:border-foreground/20',
+                      overdue
+                        ? 'border-life-alert/30 bg-life-alert/10'
+                        : 'border-border bg-secondary',
+                    )}
+                    onClick={() => navigate(`/plans/${plan.id}`)}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{plan.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {dateText} {timeText}
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
+                        overdue
+                          ? 'bg-life-alert/15 text-life-alert'
+                          : 'bg-life-plan/10 text-life-plan',
+                      )}
+                    >
+                      {overdue ? '逾期' : plan.type}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border px-4 py-5 text-sm leading-6 text-muted-foreground">
+              今天还没有计划。你可以从下方 AI 建议添加一个，或者进入计划页手动创建。
+            </div>
+          )
+        ) : (
+          <div className="space-y-2">
+            {Array.from({ length: 2 }).map((_, index) => (
+              <div
+                key={`today-plan-skeleton-${index}`}
+                className="h-16 animate-pulse rounded-2xl bg-secondary"
+              />
+            ))}
+          </div>
+        )}
       </Card>
 
       <section>

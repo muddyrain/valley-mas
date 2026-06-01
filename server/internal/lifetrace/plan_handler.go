@@ -168,6 +168,47 @@ func buildListPagination(page int, pageSize int, total int64) listPagination {
 	}
 }
 
+func applyPlanListFilters(query *gorm.DB, c *gin.Context) *gorm.DB {
+	status := strings.TrimSpace(c.Query("status"))
+	switch status {
+	case "open":
+		query = query.Where("completed = ?", false)
+	case "completed":
+		query = query.Where("completed = ?", true)
+	}
+
+	planType := strings.TrimSpace(c.Query("type"))
+	if planType != "" && validPlanTypes[planType] {
+		query = query.Where("type = ?", planType)
+	}
+
+	keyword := strings.TrimSpace(c.Query("q"))
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		query = query.Where("(title LIKE ? OR note LIKE ? OR location LIKE ?)", like, like, like)
+	}
+
+	if reminder := strings.TrimSpace(c.Query("reminder")); reminder == "true" || reminder == "false" {
+		query = query.Where("reminder = ?", reminder == "true")
+	}
+
+	dateFrom := strings.TrimSpace(c.Query("dateFrom"))
+	if dateFrom != "" {
+		if _, err := time.Parse("2006-01-02", dateFrom); err == nil {
+			query = query.Where("scheduled_date >= ?", dateFrom)
+		}
+	}
+
+	dateTo := strings.TrimSpace(c.Query("dateTo"))
+	if dateTo != "" {
+		if _, err := time.Parse("2006-01-02", dateTo); err == nil {
+			query = query.Where("scheduled_date <= ?", dateTo)
+		}
+	}
+
+	return query
+}
+
 func (h *Handler) ListPlans(c *gin.Context) {
 	userID, ok := currentUserID(c)
 	if !ok {
@@ -177,19 +218,20 @@ func (h *Handler) ListPlans(c *gin.Context) {
 
 	page, pageSize := parseListPagination(c)
 	offset := (page - 1) * pageSize
-	var total int64
-	if err := database.GetDB().
+	baseQuery := database.GetDB().
 		Model(&model.LifeTracePlan{}).
-		Where("user_id = ?", userID).
-		Count(&total).Error; err != nil {
+		Where("user_id = ?", userID)
+	baseQuery = applyPlanListFilters(baseQuery, c)
+
+	var total int64
+	if err := baseQuery.Count(&total).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "获取计划失败")
 		return
 	}
 
 	var plans []model.LifeTracePlan
-	if err := database.GetDB().
-		Where("user_id = ?", userID).
-		Order("completed ASC, created_at DESC").
+	if err := baseQuery.
+		Order("completed ASC, scheduled_date ASC, scheduled_time ASC, created_at DESC").
 		Limit(pageSize).
 		Offset(offset).
 		Find(&plans).Error; err != nil {

@@ -265,6 +265,77 @@ func TestListPlansReturnsPagination(t *testing.T) {
 	}
 }
 
+func TestListPlansAppliesFilters(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+	seedPlans := []model.LifeTracePlan{
+		{
+			UserID:        101,
+			Title:         "周末看电影",
+			Type:          "电影",
+			TimeLabel:     "周六 20:00",
+			ScheduledDate: "2026-05-30",
+			ScheduledTime: "20:00",
+			Timezone:      "Asia/Shanghai",
+			Reminder:      true,
+			Location:      "万象影城",
+			Note:          "提前买票",
+			Source:        "manual",
+		},
+		{
+			UserID:        101,
+			Title:         "今晚跑步",
+			Type:          "运动",
+			TimeLabel:     "今天 20:00",
+			ScheduledDate: "2026-05-29",
+			ScheduledTime: "20:00",
+			Timezone:      "Asia/Shanghai",
+			Reminder:      false,
+			Note:          "轻松跑",
+			Source:        "manual",
+		},
+		{
+			UserID:        101,
+			Title:         "已完成饭局",
+			Type:          "吃饭",
+			TimeLabel:     "昨天 19:00",
+			ScheduledDate: "2026-05-28",
+			ScheduledTime: "19:00",
+			Timezone:      "Asia/Shanghai",
+			Reminder:      true,
+			Completed:     true,
+			Note:          "火锅",
+			Source:        "manual",
+		},
+	}
+	if err := database.GetDB().Select("*").Create(&seedPlans).Error; err != nil {
+		t.Fatalf("seed plans: %v", err)
+	}
+	if err := database.GetDB().
+		Model(&model.LifeTracePlan{}).
+		Where("user_id = ? AND title = ?", model.Int64String(101), "今晚跑步").
+		Update("reminder", false).Error; err != nil {
+		t.Fatalf("seed reminder false: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/plans?status=open&type=电影&reminder=true&q=影城&dateFrom=2026-05-30&dateTo=2026-05-30", nil)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	list := data["list"].([]interface{})
+	pagination := data["pagination"].(map[string]interface{})
+	if len(list) != 1 {
+		t.Fatalf("expected one filtered plan, got %+v", list)
+	}
+	plan := list[0].(map[string]interface{})
+	if plan["title"] != "周末看电影" {
+		t.Fatalf("expected movie plan, got %+v", plan)
+	}
+	if pagination["total"] != float64(1) {
+		t.Fatalf("expected filtered total 1, got %+v", pagination)
+	}
+}
+
 func TestCreatePlanFromAIAdviceSanitizesInternalMarkers(t *testing.T) {
 	router := setupTraceTestRouter(t, 101)
 
