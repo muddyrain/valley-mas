@@ -15,6 +15,7 @@ type Config struct {
 	SMTP     SMTPConfig
 	QWeather QWeatherConfig
 	WebPush  WebPushConfig
+	Holiday  HolidaySyncConfig
 }
 
 type DatabaseConfig struct {
@@ -71,6 +72,14 @@ type WebPushConfig struct {
 	Enabled             bool
 	ScanIntervalSeconds int
 	ReminderWindowMin   int
+}
+
+type HolidaySyncConfig struct {
+	Enabled           bool
+	APIURLTemplate    string
+	SyncIntervalHours int
+	FutureYears       int
+	TimeoutSeconds    int
 }
 
 const defaultJWTExpireHours int64 = 24 * 365 * 10
@@ -132,6 +141,13 @@ func Load() *Config {
 			Enabled:             getEnvBool("WEB_PUSH_ENABLED", true),
 			ScanIntervalSeconds: getEnvInt("WEB_PUSH_SCAN_INTERVAL_SECONDS", 60),
 			ReminderWindowMin:   getEnvInt("WEB_PUSH_REMINDER_WINDOW_MINUTES", 10),
+		},
+		Holiday: HolidaySyncConfig{
+			Enabled:           getEnvBool("HOLIDAY_SYNC_ENABLED", true),
+			APIURLTemplate:    strings.TrimSpace(getEnv("HOLIDAY_SYNC_API_URL_TEMPLATE", "https://timor.tech/api/holiday/year/{year}")),
+			SyncIntervalHours: getEnvInt("HOLIDAY_SYNC_INTERVAL_HOURS", 168),
+			FutureYears:       getEnvInt("HOLIDAY_SYNC_FUTURE_YEARS", 1),
+			TimeoutSeconds:    getEnvInt("HOLIDAY_SYNC_TIMEOUT_SECONDS", 8),
 		},
 	}
 }

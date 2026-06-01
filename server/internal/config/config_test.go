@@ -88,3 +88,23 @@ func TestWebPushConfigLoadsFromEnv(t *testing.T) {
 		t.Fatalf("expected configured scan timing, got %+v", cfg.WebPush)
 	}
 }
+
+func TestHolidaySyncConfigLoadsFromEnv(t *testing.T) {
+	t.Setenv("HOLIDAY_SYNC_ENABLED", "false")
+	t.Setenv("HOLIDAY_SYNC_API_URL_TEMPLATE", " https://example.com/holiday/{year} ")
+	t.Setenv("HOLIDAY_SYNC_INTERVAL_HOURS", "24")
+	t.Setenv("HOLIDAY_SYNC_FUTURE_YEARS", "2")
+	t.Setenv("HOLIDAY_SYNC_TIMEOUT_SECONDS", "3")
+
+	cfg := Load()
+
+	if cfg.Holiday.Enabled {
+		t.Fatal("expected holiday sync to be disabled")
+	}
+	if cfg.Holiday.APIURLTemplate != "https://example.com/holiday/{year}" {
+		t.Fatalf("expected trimmed API URL template, got %q", cfg.Holiday.APIURLTemplate)
+	}
+	if cfg.Holiday.SyncIntervalHours != 24 || cfg.Holiday.FutureYears != 2 || cfg.Holiday.TimeoutSeconds != 3 {
+		t.Fatalf("expected configured holiday sync timing, got %+v", cfg.Holiday)
+	}
+}

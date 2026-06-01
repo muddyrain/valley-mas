@@ -39,12 +39,21 @@ export type ListPagination = {
 
 export type CommuteMethod = '开车' | '地铁' | '步行' | '骑行' | '远程';
 
+export type WorkdayMode = 'legal' | 'custom' | 'daily';
+
 export type UserSettings = {
   city: string;
   workStart: string;
   workEnd: string;
   commuteMethod: CommuteMethod;
   dailyBriefTime: string;
+  workdayMode: WorkdayMode;
+  workdays: string[];
+  holidaySync: boolean;
+  weekendReminders: boolean;
+  planReminderLeadMinutes: number;
+  quietStart: string;
+  quietEnd: string;
   weatherAlerts: boolean;
   planReminders: boolean;
   aiPersonalization: boolean;

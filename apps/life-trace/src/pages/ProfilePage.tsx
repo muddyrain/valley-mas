@@ -1,6 +1,7 @@
 import {
   Bell,
   BriefcaseBusiness,
+  CalendarCheck,
   Car,
   CheckCircle2,
   Clock,
@@ -17,6 +18,7 @@ import {
   ShieldCheck,
   Smartphone,
   Sparkles,
+  TimerReset,
   Wifi,
   Zap,
 } from 'lucide-react';
@@ -32,10 +34,25 @@ import { gsap, useGSAP } from '@/lib/gsap';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { CommuteMethod, UserSettings } from '@/types';
+import type { CommuteMethod, UserSettings, WorkdayMode } from '@/types';
 
 const commuteMethods: CommuteMethod[] = ['开车', '地铁', '步行', '骑行', '远程'];
 const habitOptions = ['喝水', '休息', '运动', '护肤', '早睡', '吃药'];
+const weekdayOptions = [
+  { value: '1', label: '一' },
+  { value: '2', label: '二' },
+  { value: '3', label: '三' },
+  { value: '4', label: '四' },
+  { value: '5', label: '五' },
+  { value: '6', label: '六' },
+  { value: '7', label: '日' },
+];
+const workdayModeOptions: Array<{ value: WorkdayMode; label: string; detail: string }> = [
+  { value: 'legal', label: '法定', detail: '跟随节假日' },
+  { value: 'custom', label: '自定义', detail: '按周选择' },
+  { value: 'daily', label: '每天', detail: '每日生效' },
+];
+const reminderLeadOptions = [0, 5, 10, 15, 30, 60];
 
 const commuteIcons: Record<CommuteMethod, LucideIcon> = {
   开车: Car,
@@ -169,6 +186,39 @@ function SettingToggle({
   );
 }
 
+function SegmentedOption<T extends string>({
+  value,
+  label,
+  detail,
+  active,
+  onSelect,
+}: {
+  value: T;
+  label: string;
+  detail?: string;
+  active: boolean;
+  onSelect: (value: T) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        'min-h-16 rounded-[1.1rem] border px-3 py-2 text-left transition duration-300',
+        active
+          ? 'border-life-ai/45 bg-life-ai/10 text-life-ai shadow-[0_14px_42px_rgba(6,182,212,0.08)]'
+          : 'border-border bg-card/80 text-muted-foreground hover:border-foreground/20 hover:bg-card',
+      )}
+      aria-pressed={active}
+      onClick={() => onSelect(value)}
+    >
+      <span className="block text-sm font-semibold">{label}</span>
+      {detail ? (
+        <span className="mt-1 block text-xs leading-4 text-muted-foreground">{detail}</span>
+      ) : null}
+    </button>
+  );
+}
+
 function SyncStatus({
   loading,
   saving,
@@ -231,6 +281,16 @@ export function ProfilePage() {
     Number(settings.planReminders) +
     Number(settings.aiPersonalization);
   const signalProgress = Math.round((enabledSignals / 3) * 100);
+  const selectedWorkdayLabels = weekdayOptions
+    .filter((option) => settings.workdays.includes(option.value))
+    .map((option) => option.label)
+    .join('、');
+  const workdayMeta =
+    settings.workdayMode === 'legal'
+      ? '法定工作日'
+      : settings.workdayMode === 'daily'
+        ? '每天生效'
+        : selectedWorkdayLabels || '未选择';
   const notificationDiagnostics = [
     { label: 'HTTPS', ok: notification.secureContext },
     { label: 'PWA', ok: installed },
@@ -332,6 +392,14 @@ export function ProfilePage() {
       : [...settings.habits, habit];
 
     update('habits', nextHabits);
+  };
+
+  const toggleWorkday = (day: string) => {
+    const nextWorkdays = settings.workdays.includes(day)
+      ? settings.workdays.filter((item) => item !== day)
+      : [...settings.workdays, day].sort();
+
+    update('workdays', nextWorkdays.length > 0 ? nextWorkdays : ['1', '2', '3', '4', '5']);
   };
 
   return (
@@ -502,6 +570,143 @@ export function ProfilePage() {
           tone="trace"
           placeholder="08:10"
           onChange={(value) => update('dailyBriefTime', value)}
+        />
+      </section>
+
+      <section data-profile-card className="space-y-3">
+        <SectionHeader title="工作日与提醒策略" meta={workdayMeta} />
+        <Card className="space-y-4 p-4">
+          <div className="flex items-start gap-3">
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-plan/10 text-life-plan">
+              <CalendarCheck className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold">工作日规则</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                用来决定通勤、上班提醒和每日简报的默认节奏。
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
+            {workdayModeOptions.map((option) => (
+              <SegmentedOption
+                key={option.value}
+                value={option.value}
+                label={option.label}
+                detail={option.detail}
+                active={settings.workdayMode === option.value}
+                onSelect={(value) => update('workdayMode', value)}
+              />
+            ))}
+          </div>
+          {settings.workdayMode === 'custom' ? (
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">自定义上班日</p>
+                <span className="text-xs text-muted-foreground">{selectedWorkdayLabels}</span>
+              </div>
+              <div className="grid grid-cols-7 gap-1.5">
+                {weekdayOptions.map((option) => {
+                  const active = settings.workdays.includes(option.value);
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={cn(
+                        'grid min-h-10 place-items-center rounded-xl border text-sm font-semibold transition',
+                        active
+                          ? 'border-life-plan/45 bg-life-plan/10 text-life-plan'
+                          : 'border-border bg-secondary text-muted-foreground',
+                      )}
+                      aria-pressed={active}
+                      onClick={() => toggleWorkday(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+        </Card>
+
+        <Card className="space-y-4 p-4">
+          <div className="flex items-start gap-3">
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+              <TimerReset className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold">提醒节奏</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                后续计划提醒、每日简报和天气预警都会优先读取这里。
+              </p>
+            </div>
+          </div>
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold">计划提前提醒</p>
+              <span className="text-xs text-muted-foreground">
+                {settings.planReminderLeadMinutes === 0
+                  ? '准点提醒'
+                  : `提前 ${settings.planReminderLeadMinutes} 分钟`}
+              </span>
+            </div>
+            <div className="grid grid-cols-6 gap-1.5 max-[390px]:grid-cols-3">
+              {reminderLeadOptions.map((minutes) => {
+                const active = settings.planReminderLeadMinutes === minutes;
+
+                return (
+                  <button
+                    key={minutes}
+                    type="button"
+                    className={cn(
+                      'min-h-10 rounded-xl border px-2 text-sm font-semibold transition',
+                      active
+                        ? 'border-life-health/45 bg-life-health/10 text-life-health'
+                        : 'border-border bg-secondary text-muted-foreground',
+                    )}
+                    aria-pressed={active}
+                    onClick={() => update('planReminderLeadMinutes', minutes)}
+                  >
+                    {minutes === 0 ? '准点' : `${minutes}m`}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+            <SettingInput
+              label="勿扰开始"
+              value={settings.quietStart}
+              icon={MoonStar}
+              tone="plan"
+              placeholder="22:30"
+              onChange={(value) => update('quietStart', value)}
+            />
+            <SettingInput
+              label="勿扰结束"
+              value={settings.quietEnd}
+              icon={Clock}
+              tone="health"
+              placeholder="07:30"
+              onChange={(value) => update('quietEnd', value)}
+            />
+          </div>
+        </Card>
+        <SettingToggle
+          label="同步法定节假日"
+          detail="已内置 2026 年中国法定节假日与调休，上班提醒会优先读取。"
+          icon={CalendarCheck}
+          active={settings.holidaySync}
+          onToggle={() => update('holidaySync', !settings.holidaySync)}
+        />
+        <SettingToggle
+          label="周末也提醒"
+          detail="适合周末仍需要计划、运动或家庭事务提醒。"
+          icon={Bell}
+          active={settings.weekendReminders}
+          onToggle={() => update('weekendReminders', !settings.weekendReminders)}
         />
       </section>
 

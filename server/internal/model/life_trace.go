@@ -137,20 +137,27 @@ func (trace *LifeTraceTrace) BeforeCreate(tx *gorm.DB) error {
 }
 
 type LifeTraceSettings struct {
-	ID                Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID            Int64String    `gorm:"column:user_id;uniqueIndex;not null" json:"userId"`
-	City              string         `gorm:"size:80;not null;default:'上海'" json:"city"`
-	WorkStart         string         `gorm:"size:20;not null;default:'09:30'" json:"workStart"`
-	WorkEnd           string         `gorm:"size:20;not null;default:'18:30'" json:"workEnd"`
-	CommuteMethod     string         `gorm:"size:20;not null;default:'开车'" json:"commuteMethod"`
-	DailyBriefTime    string         `gorm:"size:20;not null;default:'08:10'" json:"dailyBriefTime"`
-	WeatherAlerts     bool           `gorm:"default:true" json:"weatherAlerts"`
-	PlanReminders     bool           `gorm:"default:true" json:"planReminders"`
-	AIPersonalization bool           `gorm:"column:ai_personalization;default:true" json:"aiPersonalization"`
-	Habits            StringList     `gorm:"type:text" json:"habits"`
-	CreatedAt         time.Time      `json:"createdAt"`
-	UpdatedAt         time.Time      `json:"updatedAt"`
-	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                      Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID                  Int64String    `gorm:"column:user_id;uniqueIndex;not null" json:"userId"`
+	City                    string         `gorm:"size:80;not null;default:'上海'" json:"city"`
+	WorkStart               string         `gorm:"size:20;not null;default:'09:30'" json:"workStart"`
+	WorkEnd                 string         `gorm:"size:20;not null;default:'18:30'" json:"workEnd"`
+	CommuteMethod           string         `gorm:"size:20;not null;default:'开车'" json:"commuteMethod"`
+	DailyBriefTime          string         `gorm:"size:20;not null;default:'08:10'" json:"dailyBriefTime"`
+	WorkdayMode             string         `gorm:"size:20;not null;default:'legal'" json:"workdayMode"`
+	Workdays                StringList     `gorm:"type:text" json:"workdays"`
+	HolidaySync             bool           `gorm:"default:true" json:"holidaySync"`
+	WeekendReminders        bool           `gorm:"default:false" json:"weekendReminders"`
+	PlanReminderLeadMinutes int            `gorm:"default:10" json:"planReminderLeadMinutes"`
+	QuietStart              string         `gorm:"size:20;not null;default:'22:30'" json:"quietStart"`
+	QuietEnd                string         `gorm:"size:20;not null;default:'07:30'" json:"quietEnd"`
+	WeatherAlerts           bool           `gorm:"default:true" json:"weatherAlerts"`
+	PlanReminders           bool           `gorm:"default:true" json:"planReminders"`
+	AIPersonalization       bool           `gorm:"column:ai_personalization;default:true" json:"aiPersonalization"`
+	Habits                  StringList     `gorm:"type:text" json:"habits"`
+	CreatedAt               time.Time      `json:"createdAt"`
+	UpdatedAt               time.Time      `json:"updatedAt"`
+	DeletedAt               gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (settings *LifeTraceSettings) BeforeCreate(tx *gorm.DB) error {
@@ -171,6 +178,21 @@ func (settings *LifeTraceSettings) BeforeCreate(tx *gorm.DB) error {
 	}
 	if settings.DailyBriefTime == "" {
 		settings.DailyBriefTime = "08:10"
+	}
+	if settings.WorkdayMode == "" {
+		settings.WorkdayMode = "legal"
+	}
+	if settings.Workdays == nil {
+		settings.Workdays = StringList{"1", "2", "3", "4", "5"}
+	}
+	if settings.PlanReminderLeadMinutes <= 0 {
+		settings.PlanReminderLeadMinutes = 10
+	}
+	if settings.QuietStart == "" {
+		settings.QuietStart = "22:30"
+	}
+	if settings.QuietEnd == "" {
+		settings.QuietEnd = "07:30"
 	}
 	if settings.Habits == nil {
 		settings.Habits = StringList{"喝水", "休息", "运动", "护肤"}
@@ -285,6 +307,36 @@ func (delivery *LifeTracePushDelivery) BeforeCreate(tx *gorm.DB) error {
 	}
 	if delivery.Status == "" {
 		delivery.Status = "sent"
+	}
+	return nil
+}
+
+type LifeTraceHolidayCalendar struct {
+	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	Country       string         `gorm:"size:8;not null;uniqueIndex:uidx_life_trace_holiday_calendar" json:"country"`
+	Year          int            `gorm:"not null;uniqueIndex:uidx_life_trace_holiday_calendar" json:"year"`
+	SourceName    string         `gorm:"size:160" json:"sourceName,omitempty"`
+	SourceURL     string         `gorm:"size:500" json:"sourceUrl,omitempty"`
+	Payload       string         `gorm:"type:text;not null" json:"payload"`
+	SyncedAt      time.Time      `json:"syncedAt"`
+	LastCheckedAt time.Time      `json:"lastCheckedAt"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (calendar *LifeTraceHolidayCalendar) BeforeCreate(tx *gorm.DB) error {
+	if calendar.ID == 0 {
+		calendar.ID = Int64String(utils.GenerateID())
+	}
+	if calendar.Country == "" {
+		calendar.Country = "CN"
+	}
+	if calendar.SyncedAt.IsZero() {
+		calendar.SyncedAt = time.Now()
+	}
+	if calendar.LastCheckedAt.IsZero() {
+		calendar.LastCheckedAt = calendar.SyncedAt
 	}
 	return nil
 }

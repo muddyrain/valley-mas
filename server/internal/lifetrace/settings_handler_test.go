@@ -22,6 +22,9 @@ func TestGetSettingsCreatesDefaultForCurrentUser(t *testing.T) {
 	if settings["commuteMethod"] != "开车" {
 		t.Fatalf("expected default commute method 开车, got %+v", settings)
 	}
+	if settings["workdayMode"] != "legal" || settings["planReminderLeadMinutes"] != float64(10) {
+		t.Fatalf("expected default workday settings, got %+v", settings)
+	}
 	habits := settings["habits"].([]interface{})
 	if len(habits) != 4 || habits[0] != "喝水" {
 		t.Fatalf("expected default habits, got %+v", habits)
@@ -37,6 +40,13 @@ func TestUpdateSettingsPersistsCurrentUserPreferences(t *testing.T) {
 		"workEnd": "19:00",
 		"commuteMethod": "地铁",
 		"dailyBriefTime": "08:40",
+		"workdayMode": "custom",
+		"workdays": ["1", "3", "5", "3"],
+		"holidaySync": true,
+		"weekendReminders": true,
+		"planReminderLeadMinutes": 30,
+		"quietStart": "23:00",
+		"quietEnd": "07:45",
 		"weatherAlerts": false,
 		"planReminders": true,
 		"aiPersonalization": false,
@@ -56,6 +66,13 @@ func TestUpdateSettingsPersistsCurrentUserPreferences(t *testing.T) {
 	}
 	if settings["weatherAlerts"] != false || settings["aiPersonalization"] != false {
 		t.Fatalf("expected boolean preferences to persist, got %+v", settings)
+	}
+	if settings["workdayMode"] != "custom" || settings["planReminderLeadMinutes"] != float64(30) {
+		t.Fatalf("expected reminder strategy to persist, got %+v", settings)
+	}
+	workdays := settings["workdays"].([]interface{})
+	if len(workdays) != 3 || workdays[1] != "3" {
+		t.Fatalf("expected deduplicated workdays, got %+v", workdays)
 	}
 	habits := settings["habits"].([]interface{})
 	if len(habits) != 2 || habits[1] != "早睡" {

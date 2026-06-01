@@ -12,15 +12,22 @@ import (
 )
 
 type updateSettingsRequest struct {
-	City              string   `json:"city"`
-	WorkStart         string   `json:"workStart"`
-	WorkEnd           string   `json:"workEnd"`
-	CommuteMethod     string   `json:"commuteMethod"`
-	DailyBriefTime    string   `json:"dailyBriefTime"`
-	WeatherAlerts     bool     `json:"weatherAlerts"`
-	PlanReminders     bool     `json:"planReminders"`
-	AIPersonalization bool     `json:"aiPersonalization"`
-	Habits            []string `json:"habits"`
+	City                    string   `json:"city"`
+	WorkStart               string   `json:"workStart"`
+	WorkEnd                 string   `json:"workEnd"`
+	CommuteMethod           string   `json:"commuteMethod"`
+	DailyBriefTime          string   `json:"dailyBriefTime"`
+	WorkdayMode             string   `json:"workdayMode"`
+	Workdays                []string `json:"workdays"`
+	HolidaySync             bool     `json:"holidaySync"`
+	WeekendReminders        bool     `json:"weekendReminders"`
+	PlanReminderLeadMinutes int      `json:"planReminderLeadMinutes"`
+	QuietStart              string   `json:"quietStart"`
+	QuietEnd                string   `json:"quietEnd"`
+	WeatherAlerts           bool     `json:"weatherAlerts"`
+	PlanReminders           bool     `json:"planReminders"`
+	AIPersonalization       bool     `json:"aiPersonalization"`
+	Habits                  []string `json:"habits"`
 }
 
 var validCommuteMethods = map[string]bool{
@@ -31,18 +38,41 @@ var validCommuteMethods = map[string]bool{
 	"远程": true,
 }
 
+var validWorkdayModes = map[string]bool{
+	"legal":  true,
+	"custom": true,
+	"daily":  true,
+}
+
+var validWorkdays = map[string]bool{
+	"1": true,
+	"2": true,
+	"3": true,
+	"4": true,
+	"5": true,
+	"6": true,
+	"7": true,
+}
+
 func defaultSettings(userID model.Int64String) model.LifeTraceSettings {
 	return model.LifeTraceSettings{
-		UserID:            userID,
-		City:              "上海",
-		WorkStart:         "09:30",
-		WorkEnd:           "18:30",
-		CommuteMethod:     "开车",
-		DailyBriefTime:    "08:10",
-		WeatherAlerts:     true,
-		PlanReminders:     true,
-		AIPersonalization: true,
-		Habits:            model.StringList{"喝水", "休息", "运动", "护肤"},
+		UserID:                  userID,
+		City:                    "上海",
+		WorkStart:               "09:30",
+		WorkEnd:                 "18:30",
+		CommuteMethod:           "开车",
+		DailyBriefTime:          "08:10",
+		WorkdayMode:             "legal",
+		Workdays:                model.StringList{"1", "2", "3", "4", "5"},
+		HolidaySync:             true,
+		WeekendReminders:        false,
+		PlanReminderLeadMinutes: 10,
+		QuietStart:              "22:30",
+		QuietEnd:                "07:30",
+		WeatherAlerts:           true,
+		PlanReminders:           true,
+		AIPersonalization:       true,
+		Habits:                  model.StringList{"喝水", "休息", "运动", "护肤"},
 	}
 }
 
@@ -54,12 +84,54 @@ func normalizeCommuteMethod(method string) string {
 	return method
 }
 
+func normalizeWorkdayMode(mode string) string {
+	mode = strings.TrimSpace(mode)
+	if !validWorkdayModes[mode] {
+		return "legal"
+	}
+	return mode
+}
+
 func normalizeText(value string, fallback string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return fallback
 	}
 	return value
+}
+
+func normalizeTimeText(value string, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func normalizePlanReminderLeadMinutes(value int) int {
+	switch value {
+	case 0, 5, 10, 15, 30, 60:
+		return value
+	default:
+		return 10
+	}
+}
+
+func normalizeWorkdays(days []string) model.StringList {
+	seen := map[string]bool{}
+	result := model.StringList{}
+	for _, day := range days {
+		day = strings.TrimSpace(day)
+		if !validWorkdays[day] || seen[day] {
+			continue
+		}
+		seen[day] = true
+		result = append(result, day)
+	}
+	if len(result) == 0 {
+		return model.StringList{"1", "2", "3", "4", "5"}
+	}
+	return result
 }
 
 func normalizeHabits(habits []string) model.StringList {
@@ -85,6 +157,13 @@ func applySettingsRequest(settings *model.LifeTraceSettings, req updateSettingsR
 	settings.WorkEnd = normalizeText(req.WorkEnd, "18:30")
 	settings.CommuteMethod = normalizeCommuteMethod(req.CommuteMethod)
 	settings.DailyBriefTime = normalizeText(req.DailyBriefTime, "08:10")
+	settings.WorkdayMode = normalizeWorkdayMode(req.WorkdayMode)
+	settings.Workdays = normalizeWorkdays(req.Workdays)
+	settings.HolidaySync = req.HolidaySync
+	settings.WeekendReminders = req.WeekendReminders
+	settings.PlanReminderLeadMinutes = normalizePlanReminderLeadMinutes(req.PlanReminderLeadMinutes)
+	settings.QuietStart = normalizeTimeText(req.QuietStart, "22:30")
+	settings.QuietEnd = normalizeTimeText(req.QuietEnd, "07:30")
 	settings.WeatherAlerts = req.WeatherAlerts
 	settings.PlanReminders = req.PlanReminders
 	settings.AIPersonalization = req.AIPersonalization

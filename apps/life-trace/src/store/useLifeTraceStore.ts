@@ -77,6 +77,13 @@ const defaultSettings: UserSettings = {
   workEnd: '18:30',
   commuteMethod: '开车',
   dailyBriefTime: '08:10',
+  workdayMode: 'legal',
+  workdays: ['1', '2', '3', '4', '5'],
+  holidaySync: true,
+  weekendReminders: false,
+  planReminderLeadMinutes: 10,
+  quietStart: '22:30',
+  quietEnd: '07:30',
   weatherAlerts: true,
   planReminders: true,
   aiPersonalization: true,
@@ -132,6 +139,19 @@ const getToken = () => useAuthStore.getState().token;
 
 let settingsSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
+function normalizeSettings(settings: Partial<UserSettings>): UserSettings {
+  return {
+    ...defaultSettings,
+    ...settings,
+    habits: settings.habits?.length ? settings.habits : defaultSettings.habits,
+    workdays: settings.workdays?.length ? settings.workdays : defaultSettings.workdays,
+    planReminderLeadMinutes:
+      typeof settings.planReminderLeadMinutes === 'number'
+        ? settings.planReminderLeadMinutes
+        : defaultSettings.planReminderLeadMinutes,
+  };
+}
+
 export const useLifeTraceStore = create<LifeTraceState>()(
   persist(
     (set, get) => ({
@@ -173,7 +193,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       ],
       setActiveTab: (tab) => set({ activeTab: tab }),
       updateSettings: (settings) => {
-        const nextSettings = { ...get().settings, ...settings };
+        const nextSettings = normalizeSettings({ ...get().settings, ...settings });
         const token = getToken();
 
         set({
@@ -201,7 +221,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
 
             try {
               const saved = await saveSettings(latestToken, get().settings);
-              set({ settings: saved, settingsSaving: false, settingsError: '' });
+              set({ settings: normalizeSettings(saved), settingsSaving: false, settingsError: '' });
             } catch (error) {
               set({
                 settingsSaving: false,
@@ -227,7 +247,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         try {
           const settings = await getSettings(token);
           set({
-            settings,
+            settings: normalizeSettings(settings),
             settingsLoaded: true,
             settingsLoading: false,
             settingsError: '',

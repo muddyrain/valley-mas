@@ -59,6 +59,7 @@ func Init() (*config.Config, http.Handler, error) {
 			return
 		}
 
+		lifetrace.StartHolidayCalendarSyncWorker(context.Background(), globalCfg.Holiday)
 		lifetrace.StartPushReminderWorker(context.Background(), globalCfg.WebPush)
 
 		globalHTTP = router.Setup(globalCfg)
