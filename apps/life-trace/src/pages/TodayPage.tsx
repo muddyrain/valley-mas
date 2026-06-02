@@ -28,6 +28,14 @@ import { hourlyWeather, weatherMetrics } from '@/data/mock';
 import { useLifeTraceEntrance } from '@/hooks/useLifeTraceEntrance';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import { gsap, useGSAP } from '@/lib/gsap';
+import {
+  getPantryCoverUrl,
+  getPantryExpiryText,
+  getPantryOverview,
+  getPantryStatusTone,
+  resolvePantryStatus,
+  sortPantryItems,
+} from '@/lib/pantry';
 import { isOverduePlan, isTodayPlan } from '@/lib/planGroups';
 import { getNextReminder, getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { getLocalISODate } from '@/lib/planSchedule';
@@ -160,6 +168,7 @@ export function TodayPage() {
   const checkinTogglingByName = useLifeTraceStore((state) => state.checkinTogglingByName);
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
+  const pantryItems = useLifeTraceStore((state) => state.pantryItems);
   const addPlan = useLifeTraceStore((state) => state.addPlan);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
   const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
@@ -197,6 +206,17 @@ export function TodayPage() {
   const habitNames =
     settings.habits.length > 0 ? settings.habits : ['喝水', '休息', '运动', '护肤'];
   const todayCheckins = checkinsDate === todayDate ? checkins : [];
+  const pantryOverview = useMemo(() => getPantryOverview(pantryItems), [pantryItems]);
+  const pantryPreviewItems = useMemo(
+    () =>
+      sortPantryItems(pantryItems)
+        .filter((item) => {
+          const status = resolvePantryStatus(item);
+          return status === 'expiring' || status === 'expired';
+        })
+        .slice(0, 3),
+    [pantryItems],
+  );
   const checkinFingerprint = useMemo(
     () =>
       todayCheckins
@@ -836,6 +856,81 @@ export function TodayPage() {
         </div>
       </Card>
 
+      <Card
+        className="relative overflow-hidden border-life-health/20 p-4 shadow-[0_18px_64px_rgba(34,197,94,0.08)]"
+        data-today-entrance
+      >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-health/70 to-transparent"
+        />
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Badge tone={pantryOverview.expired > 0 ? 'alert' : 'health'}>家中临期</Badge>
+              {pantryOverview.expired > 0 ? (
+                <span className="text-xs text-life-alert">{pantryOverview.expired} 件已过期</span>
+              ) : null}
+            </div>
+            <h2 className="mt-2 text-lg font-semibold">今天该先处理哪几样</h2>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {pantryOverview.expiring || pantryOverview.expired
+                ? `${pantryOverview.expiring} 件临期，${pantryOverview.expired} 件已过期。点进去可以拍照、补图和改提醒。`
+                : '目前没有临期或过期条目，可以先把家里的食品和用品收进库存。'}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="shrink-0 cursor-pointer rounded-full bg-secondary px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
+            onClick={() => navigate('/pantry')}
+          >
+            查看
+          </button>
+        </div>
+        {pantryPreviewItems.length > 0 ? (
+          <div className="space-y-2">
+            {pantryPreviewItems.map((item) => {
+              const status = resolvePantryStatus(item);
+              const coverUrl = getPantryCoverUrl(item);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-2xl border border-border bg-secondary px-3 py-3 text-left transition hover:border-foreground/20"
+                  onClick={() => navigate('/pantry')}
+                >
+                  {coverUrl ? (
+                    <img
+                      src={coverUrl}
+                      alt={item.name}
+                      className="size-12 shrink-0 rounded-2xl object-cover"
+                    />
+                  ) : (
+                    <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+                      <AlertTriangle className="size-5" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{item.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {item.location} · {getPantryExpiryText(item)}
+                    </p>
+                  </div>
+                  <Badge tone={getPantryStatusTone(status)}>
+                    {status === 'expired' ? '过期' : '临期'}
+                  </Badge>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border px-4 py-5 text-sm leading-6 text-muted-foreground">
+            先从冰箱里最常忘的一样开始，比如牛奶、鸡蛋或生菜。列表页会优先展示真实图片，没有实拍图时再用
+            AI 缩略图补位。
+          </div>
+        )}
+      </Card>
+
       <Card className="p-4" data-today-entrance>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
@@ -1000,7 +1095,7 @@ export function TodayPage() {
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-border px-4 py-5 text-sm leading-6 text-muted-foreground">
-              今天还没有计划。你可以从下方 AI 建议添加一个，或者进入计划页手动创建。
+              今天还没有计划。可以进入计划页手动创建，或在 AI 给出明确事项时加入计划。
             </div>
           )
         ) : (
@@ -1055,8 +1150,9 @@ export function TodayPage() {
           {advice.map((item) => {
             const Icon = item.icon;
             const tone = adviceToneClasses[item.tone];
-            const isAdded = hasAdvicePlan(plans, item.id);
-            const adding = addingAdviceId === item.id && planCreating;
+            const canAddPlan = item.id === 'plan';
+            const isAdded = canAddPlan && hasAdvicePlan(plans, item.id);
+            const adding = canAddPlan && addingAdviceId === item.id && planCreating;
 
             return (
               <Card
@@ -1068,23 +1164,25 @@ export function TodayPage() {
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-foreground/20 to-transparent opacity-70"
                 />
-                <button
-                  type="button"
-                  disabled={isAdded || planCreating}
-                  className="absolute top-3 right-3 z-10 grid size-8 cursor-pointer place-items-center rounded-full bg-secondary text-foreground transition duration-200 hover:scale-105 hover:bg-accent active:scale-95 disabled:cursor-default disabled:text-life-trace disabled:opacity-100 disabled:hover:scale-100"
-                  aria-label={isAdded ? '已添加计划' : `添加${item.title}计划`}
-                  onClick={() => void handleAddAdvicePlan(item)}
-                  data-advice-action
-                >
-                  {adding ? (
-                    <ActionLoadingIcon className="size-4" />
-                  ) : isAdded ? (
-                    <Check className="size-4" />
-                  ) : (
-                    <Plus className="size-4" />
-                  )}
-                </button>
-                <div className="flex items-center gap-2 pr-10">
+                {canAddPlan ? (
+                  <button
+                    type="button"
+                    disabled={isAdded || planCreating}
+                    className="absolute top-3 right-3 z-10 grid size-8 cursor-pointer place-items-center rounded-full bg-secondary text-foreground transition duration-200 hover:scale-105 hover:bg-accent active:scale-95 disabled:cursor-default disabled:text-life-trace disabled:opacity-100 disabled:hover:scale-100"
+                    aria-label={isAdded ? '已添加计划' : `添加${item.title}计划`}
+                    onClick={() => void handleAddAdvicePlan(item)}
+                    data-advice-action
+                  >
+                    {adding ? (
+                      <ActionLoadingIcon className="size-4" />
+                    ) : isAdded ? (
+                      <Check className="size-4" />
+                    ) : (
+                      <Plus className="size-4" />
+                    )}
+                  </button>
+                ) : null}
+                <div className={cn('flex items-center gap-2', canAddPlan ? 'pr-10' : '')}>
                   <div
                     className={`grid size-8 shrink-0 place-items-center rounded-xl ${tone.bg}`}
                     data-advice-icon

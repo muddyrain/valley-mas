@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { listCheckins, toggleCheckin } from '@/api/checkins';
 import {
+  listPantry,
+  createPantryItem as requestCreatePantryItem,
+  deletePantryItem as requestDeletePantryItem,
+  updatePantryItem as requestUpdatePantryItem,
+  updatePantryItemStatus as requestUpdatePantryItemStatus,
+} from '@/api/pantry';
+import {
   createPlan,
   deletePlan,
   type ListPlansOptions,
@@ -11,14 +18,19 @@ import {
 } from '@/api/plans';
 import { getSettings, saveSettings } from '@/api/settings';
 import { createTrace, deleteTrace, listTraces, updateTrace } from '@/api/traces';
+import { resolvePantryStatus } from '@/lib/pantry';
 import { useAuthStore } from '@/store/useAuthStore';
 import type {
   AiAction,
   AppTab,
   Checkin,
   ListPagination,
+  NewPantryItemInput,
   NewPlanInput,
   NewTraceInput,
+  PantryItem,
+  PantryItemStatus,
+  PantryPreferences,
   Plan,
   Trace,
   UserSettings,
@@ -57,10 +69,17 @@ type LifeTraceState = {
   settingsLoading: boolean;
   settingsSaving: boolean;
   settingsError: string;
+  pantryItems: PantryItem[];
+  pantryLoaded: boolean;
+  pantryLoading: boolean;
+  pantryError: string;
+  pantryPreferences: PantryPreferences;
   aiActions: AiAction[];
   setActiveTab: (tab: AppTab) => void;
   updateSettings: (settings: Partial<UserSettings>) => void;
+  updatePantryPreferences: (preferences: Partial<PantryPreferences>) => void;
   loadSettings: () => Promise<void>;
+  loadPantry: () => Promise<void>;
   loadPlans: (options?: ListPlansOptions) => Promise<void>;
   loadMorePlans: () => Promise<void>;
   loadTraces: () => Promise<void>;
@@ -68,6 +87,10 @@ type LifeTraceState = {
   loadCheckins: (date: string) => Promise<void>;
   toggleHabitCheckin: (date: string, name: string, completed: boolean) => Promise<void>;
   addPlan: (input: NewPlanInput) => Promise<Plan | null>;
+  addPantryItem: (input: NewPantryItemInput) => Promise<PantryItem | null>;
+  editPantryItem: (itemId: string, input: NewPantryItemInput) => Promise<PantryItem | null>;
+  updatePantryItemStatus: (itemId: string, status: PantryItemStatus) => Promise<PantryItem | null>;
+  removePantryItem: (itemId: string) => Promise<void>;
   receiveServerPlan: (plan: Plan, actionTitle?: string) => void;
   editPlan: (planId: string, input: NewPlanInput) => Promise<Plan | null>;
   addTrace: (input: NewTraceInput) => Promise<Trace | null>;
@@ -96,6 +119,9 @@ const defaultSettings: UserSettings = {
   planReminders: true,
   aiPersonalization: true,
   habits: ['喝水', '休息', '运动', '护肤'],
+  pantryReminderEnabled: true,
+  pantryReminderRules: ['7d', '3d', 'same-day', 'expired'],
+  pantryReminderTime: '09:00',
 };
 
 const defaultPagination: ListPagination = {
@@ -103,6 +129,12 @@ const defaultPagination: ListPagination = {
   pageSize: 20,
   total: 0,
   hasMore: false,
+};
+
+const defaultPantryPreferences: PantryPreferences = {
+  defaultReminderEnabled: true,
+  defaultReminderRules: ['7d', '3d', 'same-day', 'expired'],
+  defaultReminderTime: '09:00',
 };
 
 function formatTraceRecordedTime(value?: string) {
@@ -153,10 +185,82 @@ function normalizeSettings(settings: Partial<UserSettings>): UserSettings {
     ...settings,
     habits: settings.habits?.length ? settings.habits : defaultSettings.habits,
     workdays: settings.workdays?.length ? settings.workdays : defaultSettings.workdays,
+    pantryReminderRules: settings.pantryReminderRules?.length
+      ? settings.pantryReminderRules
+      : defaultSettings.pantryReminderRules,
     planReminderLeadMinutes:
       typeof settings.planReminderLeadMinutes === 'number'
         ? settings.planReminderLeadMinutes
         : defaultSettings.planReminderLeadMinutes,
+  };
+}
+
+function normalizePantryPreferences(preferences?: Partial<PantryPreferences>): PantryPreferences {
+  return {
+    ...defaultPantryPreferences,
+    ...preferences,
+    defaultReminderRules: preferences?.defaultReminderRules?.length
+      ? preferences.defaultReminderRules
+      : defaultPantryPreferences.defaultReminderRules,
+  };
+}
+
+function normalizePantryItem(item: PantryItem): PantryItem {
+  return {
+    ...item,
+    quantity: Number.isFinite(item.quantity) && item.quantity > 0 ? item.quantity : 1,
+    unit: item.unit || '件',
+    note: item.note || '',
+    reminder: {
+      enabled: item.reminder?.enabled ?? true,
+      useDefault: item.reminder?.useDefault ?? true,
+      rules:
+        item.reminder?.rules?.length > 0
+          ? item.reminder.rules
+          : defaultPantryPreferences.defaultReminderRules,
+      reminderTime: item.reminder?.reminderTime || defaultPantryPreferences.defaultReminderTime,
+    },
+    status: resolvePantryStatus(item),
+  };
+}
+
+function pantryPreferencesFromSettings(settings: UserSettings): PantryPreferences {
+  return normalizePantryPreferences({
+    defaultReminderEnabled: settings.pantryReminderEnabled,
+    defaultReminderRules: settings.pantryReminderRules,
+    defaultReminderTime: settings.pantryReminderTime,
+  });
+}
+
+function settingsFromPantryPreferences(
+  preferences: PantryPreferences,
+): Pick<UserSettings, 'pantryReminderEnabled' | 'pantryReminderRules' | 'pantryReminderTime'> {
+  return {
+    pantryReminderEnabled: preferences.defaultReminderEnabled,
+    pantryReminderRules: preferences.defaultReminderRules,
+    pantryReminderTime: preferences.defaultReminderTime,
+  };
+}
+
+function pantryInputFromItem(item: PantryItem): NewPantryItemInput {
+  return {
+    name: item.name,
+    category: item.category,
+    quantity: item.quantity,
+    unit: item.unit,
+    location: item.location,
+    expiresAt: item.expiresAt,
+    openedAt: item.openedAt,
+    note: item.note,
+    imageUrl: item.imageUrl,
+    thumbnailUrl: item.thumbnailUrl,
+    status: item.status,
+    reminder: {
+      enabled: item.reminder.enabled,
+      useDefault: item.reminder.useDefault,
+      rules: item.reminder.rules,
+      reminderTime: item.reminder.reminderTime,
+    },
   };
 }
 
@@ -195,18 +299,32 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       settingsLoading: false,
       settingsSaving: false,
       settingsError: '',
+      pantryItems: [],
+      pantryLoaded: false,
+      pantryLoading: false,
+      pantryError: '',
+      pantryPreferences: defaultPantryPreferences,
       aiActions: [
         { id: 'ai-initial-plan', title: '创建了「周六看电影」计划', timeLabel: '2小时前' },
         { id: 'ai-initial-reminder', title: '设置了晚餐提醒', timeLabel: '昨天' },
         { id: 'ai-initial-trace', title: '生成了「咖啡店下午茶」踪迹', timeLabel: '昨天' },
       ],
       setActiveTab: (tab) => set({ activeTab: tab }),
+      updatePantryPreferences: (preferences) => {
+        const nextPreferences = normalizePantryPreferences({
+          ...get().pantryPreferences,
+          ...preferences,
+        });
+        set({ pantryPreferences: nextPreferences });
+        get().updateSettings(settingsFromPantryPreferences(nextPreferences));
+      },
       updateSettings: (settings) => {
         const nextSettings = normalizeSettings({ ...get().settings, ...settings });
         const token = getToken();
 
         set({
           settings: nextSettings,
+          pantryPreferences: pantryPreferencesFromSettings(nextSettings),
           settingsSaving: Boolean(token),
           settingsError: '',
         });
@@ -230,7 +348,13 @@ export const useLifeTraceStore = create<LifeTraceState>()(
 
             try {
               const saved = await saveSettings(latestToken, get().settings);
-              set({ settings: normalizeSettings(saved), settingsSaving: false, settingsError: '' });
+              const nextSettings = normalizeSettings(saved);
+              set({
+                settings: nextSettings,
+                pantryPreferences: pantryPreferencesFromSettings(nextSettings),
+                settingsSaving: false,
+                settingsError: '',
+              });
             } catch (error) {
               set({
                 settingsSaving: false,
@@ -254,9 +378,10 @@ export const useLifeTraceStore = create<LifeTraceState>()(
 
         set({ settingsLoading: true, settingsError: '' });
         try {
-          const settings = await getSettings(token);
+          const settings = normalizeSettings(await getSettings(token));
           set({
-            settings: normalizeSettings(settings),
+            settings,
+            pantryPreferences: pantryPreferencesFromSettings(settings),
             settingsLoaded: true,
             settingsLoading: false,
             settingsError: '',
@@ -266,6 +391,46 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             settingsLoaded: true,
             settingsLoading: false,
             settingsError: error instanceof Error ? error.message : '获取偏好失败',
+          });
+        }
+      },
+      loadPantry: async () => {
+        const token = getToken();
+        if (!token) {
+          set({
+            pantryLoaded: true,
+            pantryLoading: false,
+            pantryError: '',
+          });
+          return;
+        }
+
+        if (get().pantryLoading) {
+          return;
+        }
+
+        const localItems = get().pantryItems.map(normalizePantryItem);
+        set({ pantryLoading: true, pantryError: '' });
+        try {
+          let { list } = await listPantry(token, { page: 1, pageSize: 200 });
+          if (list.length === 0 && localItems.length > 0) {
+            for (const item of localItems) {
+              await requestCreatePantryItem(token, pantryInputFromItem(item));
+            }
+            ({ list } = await listPantry(token, { page: 1, pageSize: 200 }));
+          }
+
+          set({
+            pantryItems: list.map(normalizePantryItem),
+            pantryLoaded: true,
+            pantryLoading: false,
+            pantryError: '',
+          });
+        } catch (error) {
+          set({
+            pantryLoaded: true,
+            pantryLoading: false,
+            pantryError: error instanceof Error ? error.message : '获取库存失败',
           });
         }
       },
@@ -529,6 +694,109 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           set({ planCreating: false });
         }
       },
+      addPantryItem: async (input) => {
+        const token = getToken();
+        if (!token) {
+          set({ pantryError: '请先登录后再添加库存' });
+          return null;
+        }
+
+        try {
+          const item = normalizePantryItem(await requestCreatePantryItem(token, input));
+          set((state) => ({
+            pantryItems: [item, ...state.pantryItems],
+            pantryError: '',
+            aiActions: [
+              { id: createActionId(), title: `收进了「${item.name}」`, timeLabel: '刚刚' },
+              ...getAiActions(state),
+            ],
+          }));
+          return item;
+        } catch (error) {
+          set({ pantryError: error instanceof Error ? error.message : '添加库存失败' });
+          return null;
+        }
+      },
+      editPantryItem: async (itemId, input) => {
+        const token = getToken();
+        if (!token) {
+          set({ pantryError: '请先登录后再编辑库存' });
+          return null;
+        }
+
+        try {
+          const updatedItem = normalizePantryItem(
+            await requestUpdatePantryItem(token, itemId, input),
+          );
+          set((state) => ({
+            pantryItems: state.pantryItems.map((item) => (item.id === itemId ? updatedItem : item)),
+            pantryError: '',
+            aiActions: [
+              {
+                id: createActionId(),
+                title: `更新了「${updatedItem.name}」库存`,
+                timeLabel: '刚刚',
+              },
+              ...getAiActions(state),
+            ],
+          }));
+          return updatedItem;
+        } catch (error) {
+          set({ pantryError: error instanceof Error ? error.message : '编辑库存失败' });
+          return null;
+        }
+      },
+      updatePantryItemStatus: async (itemId, status) => {
+        const token = getToken();
+        if (!token) {
+          set({ pantryError: '请先登录后再更新库存状态' });
+          return null;
+        }
+
+        try {
+          const updatedItem = normalizePantryItem(
+            await requestUpdatePantryItemStatus(token, itemId, status),
+          );
+          set((state) => ({
+            pantryItems: state.pantryItems.map((item) => (item.id === itemId ? updatedItem : item)),
+            pantryError: '',
+            aiActions: [
+              {
+                id: createActionId(),
+                title:
+                  status === 'used-up'
+                    ? '记录了一件已用完'
+                    : status === 'discarded'
+                      ? '记录了一件已丢弃'
+                      : '更新了库存状态',
+                timeLabel: '刚刚',
+              },
+              ...getAiActions(state),
+            ],
+          }));
+          return updatedItem;
+        } catch (error) {
+          set({ pantryError: error instanceof Error ? error.message : '更新库存状态失败' });
+          return null;
+        }
+      },
+      removePantryItem: async (itemId) => {
+        const token = getToken();
+        if (!token) {
+          set({ pantryError: '请先登录后再删除库存' });
+          return;
+        }
+
+        try {
+          await requestDeletePantryItem(token, itemId);
+          set((state) => ({
+            pantryItems: state.pantryItems.filter((item) => item.id !== itemId),
+            pantryError: '',
+          }));
+        } catch (error) {
+          set({ pantryError: error instanceof Error ? error.message : '删除库存失败' });
+        }
+      },
       receiveServerPlan: (plan, actionTitle) =>
         set((state) => {
           const exists = state.plans.some((item) => item.id === plan.id);
@@ -768,10 +1036,12 @@ export const useLifeTraceStore = create<LifeTraceState>()(
     }),
     {
       name: 'life-trace-state',
-      version: 2,
+      version: 4,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         settings: state.settings,
+        pantryItems: state.pantryItems,
+        pantryPreferences: state.pantryPreferences,
         aiActions: state.aiActions,
       }),
       migrate: (persistedState) => {
@@ -807,6 +1077,11 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           settingsLoading,
           settingsSaving,
           settingsError,
+          pantryItems,
+          pantryLoaded,
+          pantryLoading,
+          pantryError,
+          pantryPreferences,
           ...rest
         } = state;
         void plans;
@@ -839,7 +1114,18 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         void settingsLoading;
         void settingsSaving;
         void settingsError;
-        return rest;
+        void pantryLoaded;
+        void pantryLoading;
+        void pantryError;
+        return {
+          ...rest,
+          pantryItems: Array.isArray(pantryItems)
+            ? pantryItems.map((item) => normalizePantryItem(item as PantryItem))
+            : [],
+          pantryPreferences: normalizePantryPreferences(
+            pantryPreferences as Partial<PantryPreferences> | undefined,
+          ),
+        };
       },
     },
   ),

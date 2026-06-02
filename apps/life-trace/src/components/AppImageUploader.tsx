@@ -14,6 +14,7 @@ type AppImageUploaderProps = {
   disabled?: boolean;
   className?: string;
   onUploadingChange?: (uploading: boolean) => void;
+  cameraAndLibrary?: boolean;
 };
 
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -34,9 +35,11 @@ export function AppImageUploader({
   disabled = false,
   className,
   onUploadingChange,
+  cameraAndLibrary = false,
 }: AppImageUploaderProps) {
   const token = useAuthStore((state) => state.token);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [fileMeta, setFileMeta] = useState('');
@@ -112,6 +115,40 @@ export function AppImageUploader({
         <div className="overflow-hidden rounded-[1.25rem] border border-border bg-secondary">
           <img src={value} alt="已上传图片" className="aspect-video w-full object-cover" />
         </div>
+      ) : cameraAndLibrary ? (
+        <div className="space-y-3 rounded-[1.25rem] border border-dashed border-border bg-secondary p-4">
+          <div className="flex min-h-24 flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground">
+            <span className="grid size-11 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+              {uploading ? <ActionLoadingIcon tone="ai" /> : <ImagePlus className="size-5" />}
+            </span>
+            <span className="font-semibold text-foreground">
+              {uploading ? '正在上传到云端' : '上传生活图片'}
+            </span>
+            <span className="text-xs">可以直接拍照，或从相册选择。</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="ai"
+              size="sm"
+              disabled={disabled || uploading}
+              onClick={() => cameraInputRef.current?.click()}
+            >
+              <ImagePlus className="size-4" />
+              拍照
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={disabled || uploading}
+              onClick={() => inputRef.current?.click()}
+            >
+              <UploadCloud className="size-4" />
+              相册
+            </Button>
+          </div>
+        </div>
       ) : (
         <button
           type="button"
@@ -151,6 +188,17 @@ export function AppImageUploader({
         disabled={disabled || uploading}
         onChange={handleFileChange}
       />
+      {cameraAndLibrary ? (
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          capture="environment"
+          className="hidden"
+          disabled={disabled || uploading}
+          onChange={handleFileChange}
+        />
+      ) : null}
 
       {fileMeta ? <p className="text-xs text-muted-foreground">{fileMeta}</p> : null}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}

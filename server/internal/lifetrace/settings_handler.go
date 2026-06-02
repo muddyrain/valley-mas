@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 
@@ -28,6 +29,9 @@ type updateSettingsRequest struct {
 	PlanReminders           bool     `json:"planReminders"`
 	AIPersonalization       bool     `json:"aiPersonalization"`
 	Habits                  []string `json:"habits"`
+	PantryReminderEnabled   bool     `json:"pantryReminderEnabled"`
+	PantryReminderRules     []string `json:"pantryReminderRules"`
+	PantryReminderTime      string   `json:"pantryReminderTime"`
 }
 
 var validCommuteMethods = map[string]bool{
@@ -73,6 +77,9 @@ func defaultSettings(userID model.Int64String) model.LifeTraceSettings {
 		PlanReminders:           true,
 		AIPersonalization:       true,
 		Habits:                  model.StringList{"喝水", "休息", "运动", "护肤"},
+		PantryReminderEnabled:   true,
+		PantryReminderRules:     model.StringList{"7d", "3d", "same-day", "expired"},
+		PantryReminderTime:      "09:00",
 	}
 }
 
@@ -102,10 +109,15 @@ func normalizeText(value string, fallback string) string {
 
 func normalizeTimeText(value string, fallback string) string {
 	value = strings.TrimSpace(value)
-	if value == "" {
+	if value == "" || !isValidClockText(value) {
 		return fallback
 	}
 	return value
+}
+
+func isValidClockText(value string) bool {
+	_, err := time.Parse("15:04", strings.TrimSpace(value))
+	return err == nil
 }
 
 func normalizePlanReminderLeadMinutes(value int) int {
@@ -151,12 +163,36 @@ func normalizeHabits(habits []string) model.StringList {
 	return result
 }
 
+var validPantryReminderRules = map[string]bool{
+	"7d":       true,
+	"3d":       true,
+	"same-day": true,
+	"expired":  true,
+}
+
+func normalizePantryReminderRules(rules []string) model.StringList {
+	seen := map[string]bool{}
+	result := model.StringList{}
+	for _, rule := range rules {
+		rule = strings.TrimSpace(rule)
+		if !validPantryReminderRules[rule] || seen[rule] {
+			continue
+		}
+		seen[rule] = true
+		result = append(result, rule)
+	}
+	if len(result) == 0 {
+		return model.StringList{"7d", "3d", "same-day", "expired"}
+	}
+	return result
+}
+
 func applySettingsRequest(settings *model.LifeTraceSettings, req updateSettingsRequest) {
 	settings.City = normalizeText(req.City, "上海")
-	settings.WorkStart = normalizeText(req.WorkStart, "09:30")
-	settings.WorkEnd = normalizeText(req.WorkEnd, "18:30")
+	settings.WorkStart = normalizeTimeText(req.WorkStart, "09:30")
+	settings.WorkEnd = normalizeTimeText(req.WorkEnd, "18:30")
 	settings.CommuteMethod = normalizeCommuteMethod(req.CommuteMethod)
-	settings.DailyBriefTime = normalizeText(req.DailyBriefTime, "08:10")
+	settings.DailyBriefTime = normalizeTimeText(req.DailyBriefTime, "08:10")
 	settings.WorkdayMode = normalizeWorkdayMode(req.WorkdayMode)
 	settings.Workdays = normalizeWorkdays(req.Workdays)
 	settings.HolidaySync = req.HolidaySync
@@ -168,6 +204,9 @@ func applySettingsRequest(settings *model.LifeTraceSettings, req updateSettingsR
 	settings.PlanReminders = req.PlanReminders
 	settings.AIPersonalization = req.AIPersonalization
 	settings.Habits = normalizeHabits(req.Habits)
+	settings.PantryReminderEnabled = req.PantryReminderEnabled
+	settings.PantryReminderRules = normalizePantryReminderRules(req.PantryReminderRules)
+	settings.PantryReminderTime = normalizeTimeText(req.PantryReminderTime, "09:00")
 }
 
 func (h *Handler) GetSettings(c *gin.Context) {

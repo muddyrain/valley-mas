@@ -59,8 +59,9 @@ func Init() (*config.Config, http.Handler, error) {
 			return
 		}
 
+		lifetraceWeatherService := lifetrace.NewWeatherService(globalCfg.QWeather)
 		lifetrace.StartHolidayCalendarSyncWorker(context.Background(), globalCfg.Holiday)
-		lifetrace.StartPushReminderWorker(context.Background(), globalCfg.WebPush)
+		lifetrace.StartPushReminderWorker(context.Background(), globalCfg.WebPush, lifetraceWeatherService)
 
 		globalHTTP = router.Setup(globalCfg)
 	})

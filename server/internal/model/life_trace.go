@@ -136,6 +136,57 @@ func (trace *LifeTraceTrace) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+type LifeTracePantryItem struct {
+	ID                 Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID             Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	Name               string         `gorm:"size:160;not null" json:"name"`
+	Category           string         `gorm:"size:30;not null;default:'食品';index" json:"category"`
+	Quantity           int            `gorm:"not null;default:1" json:"quantity"`
+	Unit               string         `gorm:"size:20;not null;default:'件'" json:"unit"`
+	Location           string         `gorm:"size:30;not null;default:'冷藏';index" json:"location"`
+	ExpiresAt          string         `gorm:"size:20;index" json:"expiresAt,omitempty"`
+	OpenedAt           string         `gorm:"size:20" json:"openedAt,omitempty"`
+	Note               string         `gorm:"size:1000" json:"note"`
+	ImageURL           string         `gorm:"size:800" json:"imageUrl,omitempty"`
+	ThumbnailURL       string         `gorm:"type:text" json:"thumbnailUrl,omitempty"`
+	Status             string         `gorm:"size:20;not null;default:'normal';index" json:"status"`
+	ReminderEnabled    bool           `gorm:"column:reminder_enabled;default:true" json:"reminderEnabled"`
+	ReminderUseDefault bool           `gorm:"column:reminder_use_default;default:true" json:"reminderUseDefault"`
+	ReminderRules      StringList     `gorm:"type:text" json:"reminderRules"`
+	ReminderTime       string         `gorm:"size:20;not null;default:'09:00'" json:"reminderTime"`
+	CreatedAt          time.Time      `json:"createdAt"`
+	UpdatedAt          time.Time      `json:"updatedAt"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (item *LifeTracePantryItem) BeforeCreate(tx *gorm.DB) error {
+	if item.ID == 0 {
+		item.ID = Int64String(utils.GenerateID())
+	}
+	if item.Category == "" {
+		item.Category = "食品"
+	}
+	if item.Quantity <= 0 {
+		item.Quantity = 1
+	}
+	if item.Unit == "" {
+		item.Unit = "件"
+	}
+	if item.Location == "" {
+		item.Location = "冷藏"
+	}
+	if item.Status == "" {
+		item.Status = "normal"
+	}
+	if item.ReminderRules == nil {
+		item.ReminderRules = StringList{"7d", "3d", "same-day", "expired"}
+	}
+	if item.ReminderTime == "" {
+		item.ReminderTime = "09:00"
+	}
+	return nil
+}
+
 type LifeTraceSettings struct {
 	ID                      Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID                  Int64String    `gorm:"column:user_id;uniqueIndex;not null" json:"userId"`
@@ -155,6 +206,9 @@ type LifeTraceSettings struct {
 	PlanReminders           bool           `gorm:"default:true" json:"planReminders"`
 	AIPersonalization       bool           `gorm:"column:ai_personalization;default:true" json:"aiPersonalization"`
 	Habits                  StringList     `gorm:"type:text" json:"habits"`
+	PantryReminderEnabled   bool           `gorm:"column:pantry_reminder_enabled;default:true" json:"pantryReminderEnabled"`
+	PantryReminderRules     StringList     `gorm:"type:text" json:"pantryReminderRules"`
+	PantryReminderTime      string         `gorm:"size:20;not null;default:'09:00'" json:"pantryReminderTime"`
 	CreatedAt               time.Time      `json:"createdAt"`
 	UpdatedAt               time.Time      `json:"updatedAt"`
 	DeletedAt               gorm.DeletedAt `gorm:"index" json:"-"`
@@ -196,6 +250,12 @@ func (settings *LifeTraceSettings) BeforeCreate(tx *gorm.DB) error {
 	}
 	if settings.Habits == nil {
 		settings.Habits = StringList{"喝水", "休息", "运动", "护肤"}
+	}
+	if settings.PantryReminderRules == nil {
+		settings.PantryReminderRules = StringList{"7d", "3d", "same-day", "expired"}
+	}
+	if settings.PantryReminderTime == "" {
+		settings.PantryReminderTime = "09:00"
 	}
 	return nil
 }
@@ -302,6 +362,51 @@ type LifeTracePushDelivery struct {
 }
 
 func (delivery *LifeTracePushDelivery) BeforeCreate(tx *gorm.DB) error {
+	if delivery.ID == 0 {
+		delivery.ID = Int64String(utils.GenerateID())
+	}
+	if delivery.Status == "" {
+		delivery.Status = "sent"
+	}
+	return nil
+}
+
+type LifeTraceDailyBriefDelivery struct {
+	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID         Int64String    `gorm:"column:user_id;index;not null;uniqueIndex:uidx_life_trace_daily_brief_delivery" json:"userId"`
+	BriefDate      string         `gorm:"column:brief_date;size:20;not null;index;uniqueIndex:uidx_life_trace_daily_brief_delivery" json:"briefDate"`
+	ScheduledAt    time.Time      `gorm:"not null;index" json:"scheduledAt"`
+	SubscriptionID Int64String    `gorm:"column:subscription_id;index;not null;uniqueIndex:uidx_life_trace_daily_brief_delivery" json:"subscriptionId"`
+	Status         string         `gorm:"size:20;not null;default:'sent';index" json:"status"`
+	Error          string         `gorm:"size:500" json:"error,omitempty"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (delivery *LifeTraceDailyBriefDelivery) BeforeCreate(tx *gorm.DB) error {
+	if delivery.ID == 0 {
+		delivery.ID = Int64String(utils.GenerateID())
+	}
+	if delivery.Status == "" {
+		delivery.Status = "sent"
+	}
+	return nil
+}
+
+type LifeTracePantryReminderDelivery struct {
+	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID         Int64String    `gorm:"column:user_id;index;not null;uniqueIndex:uidx_life_trace_pantry_delivery" json:"userId"`
+	PantryItemID   Int64String    `gorm:"column:pantry_item_id;index;not null;uniqueIndex:uidx_life_trace_pantry_delivery" json:"pantryItemId"`
+	Rule           string         `gorm:"size:20;not null;uniqueIndex:uidx_life_trace_pantry_delivery" json:"rule"`
+	DueAt          time.Time      `gorm:"not null;index;uniqueIndex:uidx_life_trace_pantry_delivery" json:"dueAt"`
+	SubscriptionID Int64String    `gorm:"column:subscription_id;index;not null;uniqueIndex:uidx_life_trace_pantry_delivery" json:"subscriptionId"`
+	Status         string         `gorm:"size:20;not null;default:'sent';index" json:"status"`
+	Error          string         `gorm:"size:500" json:"error,omitempty"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (delivery *LifeTracePantryReminderDelivery) BeforeCreate(tx *gorm.DB) error {
 	if delivery.ID == 0 {
 		delivery.ID = Int64String(utils.GenerateID())
 	}

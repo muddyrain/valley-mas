@@ -58,6 +58,50 @@ export type UserSettings = {
   planReminders: boolean;
   aiPersonalization: boolean;
   habits: string[];
+  pantryReminderEnabled: boolean;
+  pantryReminderRules: PantryReminderRule[];
+  pantryReminderTime: string;
+};
+
+export type PantryCategory = '食品' | '日用品' | '药品' | '宠物' | '其他';
+
+export type PantryLocation = '冷藏' | '冷冻' | '厨房' | '储物柜' | '卫生间' | '玄关' | '其他';
+
+export type PantryReminderRule = '7d' | '3d' | 'same-day' | 'expired';
+
+export type PantryItemStatus = 'normal' | 'expiring' | 'expired' | 'used-up' | 'discarded';
+
+export type PantryReminderConfig = {
+  enabled: boolean;
+  useDefault: boolean;
+  rules: PantryReminderRule[];
+  reminderTime: string;
+};
+
+export type PantryItem = {
+  id: string;
+  name: string;
+  category: PantryCategory;
+  quantity: number;
+  unit: string;
+  location: PantryLocation;
+  expiresAt?: string;
+  openedAt?: string;
+  note: string;
+  imageUrl?: string;
+  thumbnailUrl?: string;
+  status: PantryItemStatus;
+  reminder: PantryReminderConfig;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type NewPantryItemInput = Omit<PantryItem, 'id' | 'createdAt' | 'updatedAt'>;
+
+export type PantryPreferences = {
+  defaultReminderEnabled: boolean;
+  defaultReminderRules: PantryReminderRule[];
+  defaultReminderTime: string;
 };
 
 export type Trace = {

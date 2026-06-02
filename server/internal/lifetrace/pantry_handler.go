@@ -1,0 +1,400 @@
+package lifetrace
+
+import (
+	"errors"
+	"net/http"
+	"strings"
+	"time"
+	"valley-server/internal/database"
+	"valley-server/internal/model"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+type pantryReminderPayload struct {
+	Enabled      bool     `json:"enabled"`
+	UseDefault   bool     `json:"useDefault"`
+	Rules        []string `json:"rules"`
+	ReminderTime string   `json:"reminderTime"`
+}
+
+type createPantryItemRequest struct {
+	Name         string                `json:"name"`
+	Category     string                `json:"category"`
+	Quantity     int                   `json:"quantity"`
+	Unit         string                `json:"unit"`
+	Location     string                `json:"location"`
+	ExpiresAt    string                `json:"expiresAt"`
+	OpenedAt     string                `json:"openedAt"`
+	Note         string                `json:"note"`
+	ImageURL     string                `json:"imageUrl"`
+	ThumbnailURL string                `json:"thumbnailUrl"`
+	Status       string                `json:"status"`
+	Reminder     pantryReminderPayload `json:"reminder"`
+}
+
+type updatePantryStatusRequest struct {
+	Status string `json:"status"`
+}
+
+var validPantryCategories = map[string]bool{
+	"食品":  true,
+	"日用品": true,
+	"药品":  true,
+	"宠物":  true,
+	"其他":  true,
+}
+
+var validPantryLocations = map[string]bool{
+	"冷藏":  true,
+	"冷冻":  true,
+	"厨房":  true,
+	"储物柜": true,
+	"卫生间": true,
+	"玄关":  true,
+	"其他":  true,
+}
+
+var validPantryStatuses = map[string]bool{
+	"normal":    true,
+	"expiring":  true,
+	"expired":   true,
+	"used-up":   true,
+	"discarded": true,
+}
+
+func normalizePantryCategory(category string) string {
+	category = strings.TrimSpace(category)
+	if !validPantryCategories[category] {
+		return "食品"
+	}
+	return category
+}
+
+func normalizePantryLocation(location string) string {
+	location = strings.TrimSpace(location)
+	if !validPantryLocations[location] {
+		return "冷藏"
+	}
+	return location
+}
+
+func normalizePantryStatus(status string) string {
+	status = strings.TrimSpace(status)
+	if !validPantryStatuses[status] {
+		return "normal"
+	}
+	return status
+}
+
+func normalizePantryDate(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if _, err := time.Parse("2006-01-02", value); err != nil {
+		return ""
+	}
+	return value
+}
+
+func normalizePantryUnit(unit string) string {
+	unit = strings.TrimSpace(unit)
+	if unit == "" {
+		return "件"
+	}
+	return unit
+}
+
+func normalizePantryQuantity(quantity int) int {
+	if quantity <= 0 {
+		return 1
+	}
+	return quantity
+}
+
+func normalizePantryReminder(payload pantryReminderPayload) (bool, bool, model.StringList, string) {
+	return payload.Enabled, payload.UseDefault, normalizePantryReminderRules(payload.Rules), normalizeTimeText(payload.ReminderTime, "09:00")
+}
+
+func pantryDerivedDateBounds(now time.Time) (string, string) {
+	today := now.Format("2006-01-02")
+	expiringDeadline := now.AddDate(0, 0, 7).Format("2006-01-02")
+	return today, expiringDeadline
+}
+
+func applyPantryListFilters(query *gorm.DB, c *gin.Context) *gorm.DB {
+	status := strings.TrimSpace(c.Query("status"))
+	if validPantryStatuses[status] {
+		today, expiringDeadline := pantryDerivedDateBounds(time.Now())
+		switch status {
+		case "used-up", "discarded":
+			query = query.Where("status = ?", status)
+		case "expired":
+			query = query.
+				Where("status NOT IN ?", []string{"used-up", "discarded"}).
+				Where("expires_at <> '' AND expires_at < ?", today)
+		case "expiring":
+			query = query.
+				Where("status NOT IN ?", []string{"used-up", "discarded"}).
+				Where("expires_at <> '' AND expires_at >= ? AND expires_at <= ?", today, expiringDeadline)
+		default:
+			query = query.
+				Where("status NOT IN ?", []string{"used-up", "discarded"}).
+				Where("(expires_at = '' OR expires_at IS NULL OR expires_at > ?)", expiringDeadline)
+		}
+	}
+
+	category := strings.TrimSpace(c.Query("category"))
+	if validPantryCategories[category] {
+		query = query.Where("category = ?", category)
+	}
+
+	keyword := strings.TrimSpace(c.Query("q"))
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		query = query.Where("(name LIKE ? OR note LIKE ? OR location LIKE ?)", like, like, like)
+	}
+
+	return query
+}
+
+func applyPantryListOrdering(query *gorm.DB, now time.Time) *gorm.DB {
+	today, expiringDeadline := pantryDerivedDateBounds(now)
+	priorityExpr := clause.Expr{
+		SQL: `
+CASE
+	WHEN status = 'used-up' THEN 3
+	WHEN status = 'discarded' THEN 4
+	WHEN expires_at <> '' AND expires_at < ? THEN 0
+	WHEN expires_at <> '' AND expires_at >= ? AND expires_at <= ? THEN 1
+	ELSE 2
+END
+`,
+		Vars: []interface{}{today, today, expiringDeadline},
+	}
+
+	return query.
+		Order(priorityExpr).
+		Order(clause.Expr{SQL: "CASE WHEN expires_at = '' OR expires_at IS NULL THEN 1 ELSE 0 END"}).
+		Order("expires_at ASC").
+		Order("updated_at DESC").
+		Order("created_at DESC")
+}
+
+func (h *Handler) ListPantryItems(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	page, pageSize := parseListPagination(c)
+	offset := (page - 1) * pageSize
+	baseQuery := database.GetDB().Model(&model.LifeTracePantryItem{}).Where("user_id = ?", userID)
+	baseQuery = applyPantryListFilters(baseQuery, c)
+
+	var total int64
+	if err := baseQuery.Count(&total).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "获取库存失败")
+		return
+	}
+
+	var items []model.LifeTracePantryItem
+	if err := applyPantryListOrdering(baseQuery, time.Now()).
+		Limit(pageSize).
+		Offset(offset).
+		Find(&items).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "获取库存失败")
+		return
+	}
+
+	success(c, gin.H{
+		"list":       items,
+		"pagination": buildListPagination(page, pageSize, total),
+	})
+}
+
+func (h *Handler) CreatePantryItem(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	var req createPantryItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		fail(c, http.StatusBadRequest, "商品名称不能为空")
+		return
+	}
+
+	reminderEnabled, reminderUseDefault, reminderRules, reminderTime := normalizePantryReminder(req.Reminder)
+	item := model.LifeTracePantryItem{
+		UserID:             userID,
+		Name:               name,
+		Category:           normalizePantryCategory(req.Category),
+		Quantity:           normalizePantryQuantity(req.Quantity),
+		Unit:               normalizePantryUnit(req.Unit),
+		Location:           normalizePantryLocation(req.Location),
+		ExpiresAt:          normalizePantryDate(req.ExpiresAt),
+		OpenedAt:           normalizePantryDate(req.OpenedAt),
+		Note:               strings.TrimSpace(req.Note),
+		ImageURL:           strings.TrimSpace(req.ImageURL),
+		ThumbnailURL:       strings.TrimSpace(req.ThumbnailURL),
+		Status:             normalizePantryStatus(req.Status),
+		ReminderEnabled:    reminderEnabled,
+		ReminderUseDefault: reminderUseDefault,
+		ReminderRules:      reminderRules,
+		ReminderTime:       reminderTime,
+	}
+
+	if err := database.GetDB().Create(&item).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "创建库存失败")
+		return
+	}
+
+	success(c, item)
+}
+
+func (h *Handler) UpdatePantryItem(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	item, found := findPantryItem(c.Param("id"), userID)
+	if !found {
+		fail(c, http.StatusNotFound, "库存不存在")
+		return
+	}
+
+	var req createPantryItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		fail(c, http.StatusBadRequest, "商品名称不能为空")
+		return
+	}
+
+	reminderEnabled, reminderUseDefault, reminderRules, reminderTime := normalizePantryReminder(req.Reminder)
+	updates := map[string]interface{}{
+		"name":                 name,
+		"category":             normalizePantryCategory(req.Category),
+		"quantity":             normalizePantryQuantity(req.Quantity),
+		"unit":                 normalizePantryUnit(req.Unit),
+		"location":             normalizePantryLocation(req.Location),
+		"expires_at":           normalizePantryDate(req.ExpiresAt),
+		"opened_at":            normalizePantryDate(req.OpenedAt),
+		"note":                 strings.TrimSpace(req.Note),
+		"image_url":            strings.TrimSpace(req.ImageURL),
+		"thumbnail_url":        strings.TrimSpace(req.ThumbnailURL),
+		"status":               normalizePantryStatus(req.Status),
+		"reminder_enabled":     reminderEnabled,
+		"reminder_use_default": reminderUseDefault,
+		"reminder_rules":       reminderRules,
+		"reminder_time":        reminderTime,
+	}
+
+	if err := database.GetDB().Model(&item).Updates(updates).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "更新库存失败")
+		return
+	}
+	resetPantryReminderDeliveries(nil, item.ID)
+
+	if err := database.GetDB().First(&item, "id = ? AND user_id = ?", item.ID, userID).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "读取库存失败")
+		return
+	}
+
+	success(c, item)
+}
+
+func (h *Handler) UpdatePantryItemStatus(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	item, found := findPantryItem(c.Param("id"), userID)
+	if !found {
+		fail(c, http.StatusNotFound, "库存不存在")
+		return
+	}
+
+	var req updatePantryStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+
+	status := normalizePantryStatus(req.Status)
+	if err := database.GetDB().Model(&item).Update("status", status).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "更新库存状态失败")
+		return
+	}
+	resetPantryReminderDeliveries(nil, item.ID)
+
+	if err := database.GetDB().First(&item, "id = ? AND user_id = ?", item.ID, userID).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "读取库存失败")
+		return
+	}
+
+	success(c, item)
+}
+
+func (h *Handler) DeletePantryItem(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	item, found := findPantryItem(c.Param("id"), userID)
+	if !found {
+		fail(c, http.StatusNotFound, "库存不存在")
+		return
+	}
+
+	if err := database.GetDB().Delete(&item).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "删除库存失败")
+		return
+	}
+	resetPantryReminderDeliveries(nil, item.ID)
+
+	success(c, gin.H{"id": item.ID})
+}
+
+func findPantryItem(id string, userID model.Int64String) (model.LifeTracePantryItem, bool) {
+	var item model.LifeTracePantryItem
+	err := database.GetDB().First(&item, "id = ? AND user_id = ?", id, userID).Error
+	if err == nil {
+		return item, true
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return item, false
+	}
+	return item, false
+}
+
+func resetPantryReminderDeliveries(tx *gorm.DB, pantryItemID model.Int64String) {
+	if tx == nil {
+		tx = database.GetDB()
+	}
+	_ = tx.Unscoped().
+		Where("pantry_item_id = ?", pantryItemID).
+		Delete(&model.LifeTracePantryReminderDelivery{}).Error
+}

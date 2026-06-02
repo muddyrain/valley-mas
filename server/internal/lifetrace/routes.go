@@ -19,6 +19,7 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			ai.POST("/today-advice", handler.GenerateTodayAdvice)
 			ai.POST("/weekly-review", handler.GenerateWeeklyReview)
 			ai.POST("/image-analysis", handler.AnalyzeImage)
+			ai.POST("/pantry-thumbnail", handler.GeneratePantryThumbnail)
 			ai.POST("/assistant/stream", handler.StreamAssistant)
 			ai.GET("/conversation", handler.GetAssistantConversation)
 			ai.POST("/conversation/messages", handler.CreateAssistantMessage)
@@ -42,6 +43,16 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			traces.POST("", handler.CreateTrace)
 			traces.PATCH("/:id", handler.UpdateTrace)
 			traces.DELETE("/:id", handler.DeleteTrace)
+		}
+
+		pantry := group.Group("/pantry")
+		pantry.Use(auth)
+		{
+			pantry.GET("", handler.ListPantryItems)
+			pantry.POST("", handler.CreatePantryItem)
+			pantry.PATCH("/:id", handler.UpdatePantryItem)
+			pantry.PATCH("/:id/status", handler.UpdatePantryItemStatus)
+			pantry.DELETE("/:id", handler.DeletePantryItem)
 		}
 
 		weeklyReviews := group.Group("/weekly-reviews")

@@ -29,6 +29,13 @@ func TestGetSettingsCreatesDefaultForCurrentUser(t *testing.T) {
 	if len(habits) != 4 || habits[0] != "喝水" {
 		t.Fatalf("expected default habits, got %+v", habits)
 	}
+	pantryRules := settings["pantryReminderRules"].([]interface{})
+	if settings["pantryReminderEnabled"] != true || settings["pantryReminderTime"] != "09:00" {
+		t.Fatalf("expected default pantry reminder settings, got %+v", settings)
+	}
+	if len(pantryRules) != 4 || pantryRules[0] != "7d" {
+		t.Fatalf("expected default pantry reminder rules, got %+v", pantryRules)
+	}
 }
 
 func TestUpdateSettingsPersistsCurrentUserPreferences(t *testing.T) {
@@ -50,7 +57,10 @@ func TestUpdateSettingsPersistsCurrentUserPreferences(t *testing.T) {
 		"weatherAlerts": false,
 		"planReminders": true,
 		"aiPersonalization": false,
-		"habits": ["喝水", "早睡", "喝水"]
+		"habits": ["喝水", "早睡", "喝水"],
+		"pantryReminderEnabled": true,
+		"pantryReminderRules": ["3d", "same-day", "same-day"],
+		"pantryReminderTime": "08:45"
 	}`)
 	updateReq := httptest.NewRequest(http.MethodPut, "/api/v1/life-trace/settings", body)
 	updateReq.Header.Set("Content-Type", "application/json")
@@ -78,13 +88,20 @@ func TestUpdateSettingsPersistsCurrentUserPreferences(t *testing.T) {
 	if len(habits) != 2 || habits[1] != "早睡" {
 		t.Fatalf("expected deduplicated habits, got %+v", habits)
 	}
+	pantryRules := settings["pantryReminderRules"].([]interface{})
+	if len(pantryRules) != 2 || pantryRules[0] != "3d" {
+		t.Fatalf("expected pantry reminder rules to persist, got %+v", pantryRules)
+	}
+	if settings["pantryReminderTime"] != "08:45" {
+		t.Fatalf("expected pantry reminder time to persist, got %+v", settings)
+	}
 
 	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/settings", nil)
 	getResp := httptest.NewRecorder()
 	router.ServeHTTP(getResp, getReq)
 
 	persisted := decodeTracePayload(t, getResp)["data"].(map[string]interface{})
-	if persisted["city"] != "杭州" || persisted["workStart"] != "10:00" {
+	if persisted["city"] != "杭州" || persisted["workStart"] != "10:00" || persisted["pantryReminderTime"] != "08:45" {
 		t.Fatalf("expected settings to persist, got %+v", persisted)
 	}
 }

@@ -31,10 +31,11 @@ import { Card } from '@/components/ui/card';
 import { useNotificationPermission } from '@/hooks/useNotificationPermission';
 import { usePwaStatus } from '@/hooks/usePwaStatus';
 import { gsap, useGSAP } from '@/lib/gsap';
+import { pantryReminderRuleLabels } from '@/lib/pantry';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { CommuteMethod, UserSettings, WorkdayMode } from '@/types';
+import type { CommuteMethod, PantryReminderRule, UserSettings, WorkdayMode } from '@/types';
 
 const commuteMethods: CommuteMethod[] = ['开车', '地铁', '步行', '骑行', '远程'];
 const habitOptions = ['喝水', '休息', '运动', '护肤', '早睡', '吃药'];
@@ -53,6 +54,7 @@ const workdayModeOptions: Array<{ value: WorkdayMode; label: string; detail: str
   { value: 'daily', label: '每天', detail: '每日生效' },
 ];
 const reminderLeadOptions = [0, 5, 10, 15, 30, 60];
+const pantryReminderRuleOptions: PantryReminderRule[] = ['7d', '3d', 'same-day', 'expired'];
 
 const commuteIcons: Record<CommuteMethod, LucideIcon> = {
   开车: Car,
@@ -68,6 +70,7 @@ type SettingInputProps = {
   icon: LucideIcon;
   tone: 'ai' | 'trace' | 'health' | 'plan';
   placeholder?: string;
+  type?: 'text' | 'time';
   onChange: (value: string) => void;
 };
 
@@ -98,6 +101,7 @@ function SettingInput({
   icon: Icon,
   tone,
   placeholder,
+  type = 'text',
   onChange,
 }: SettingInputProps) {
   return (
@@ -119,12 +123,29 @@ function SettingInput({
         </span>
         <span className="min-w-0">
           <span className="block text-xs font-semibold text-muted-foreground">{label}</span>
-          <input
-            value={value}
-            placeholder={placeholder}
-            onChange={(event) => onChange(event.target.value)}
-            className="mt-1 h-7 w-full bg-transparent text-base font-semibold text-foreground outline-none placeholder:text-muted-foreground"
-          />
+          {type === 'time' ? (
+            <span className="relative mt-1 block h-7">
+              <span className="block h-7 truncate text-base font-semibold text-foreground">
+                {value || placeholder}
+              </span>
+              <input
+                type="time"
+                value={value}
+                placeholder={placeholder}
+                onChange={(event) => onChange(event.target.value)}
+                step={60}
+                className="absolute inset-0 h-7 w-full cursor-pointer opacity-0"
+              />
+            </span>
+          ) : (
+            <input
+              type={type}
+              value={value}
+              placeholder={placeholder}
+              onChange={(event) => onChange(event.target.value)}
+              className="mt-1 h-7 w-full bg-transparent text-base font-semibold text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          )}
         </span>
       </span>
     </label>
@@ -269,7 +290,9 @@ export function ProfilePage() {
   const settingsLoading = useLifeTraceStore((state) => state.settingsLoading);
   const settingsSaving = useLifeTraceStore((state) => state.settingsSaving);
   const settingsError = useLifeTraceStore((state) => state.settingsError);
+  const pantryPreferences = useLifeTraceStore((state) => state.pantryPreferences);
   const updateSettings = useLifeTraceStore((state) => state.updateSettings);
+  const updatePantryPreferences = useLifeTraceStore((state) => state.updatePantryPreferences);
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
@@ -552,6 +575,7 @@ export function ProfilePage() {
             icon={BriefcaseBusiness}
             tone="plan"
             placeholder="09:30"
+            type="time"
             onChange={(value) => update('workStart', value)}
           />
           <SettingInput
@@ -560,6 +584,7 @@ export function ProfilePage() {
             icon={Clock}
             tone="health"
             placeholder="18:30"
+            type="time"
             onChange={(value) => update('workEnd', value)}
           />
         </div>
@@ -569,6 +594,7 @@ export function ProfilePage() {
           icon={Bell}
           tone="trace"
           placeholder="08:10"
+          type="time"
           onChange={(value) => update('dailyBriefTime', value)}
         />
       </section>
@@ -682,6 +708,7 @@ export function ProfilePage() {
               icon={MoonStar}
               tone="plan"
               placeholder="22:30"
+              type="time"
               onChange={(value) => update('quietStart', value)}
             />
             <SettingInput
@@ -690,6 +717,7 @@ export function ProfilePage() {
               icon={Clock}
               tone="health"
               placeholder="07:30"
+              type="time"
               onChange={(value) => update('quietEnd', value)}
             />
           </div>
@@ -773,6 +801,7 @@ export function ProfilePage() {
               </div>
               <p className="mt-3 text-xs leading-5 text-muted-foreground">
                 iPhone 需要通过 HTTPS 打开并添加到主屏幕后，从桌面图标进入再开启通知。
+                远程测试用于确认服务端能主动推送，不是当前页面本地弹窗。
               </p>
               {notificationTestMessage ? (
                 <p className="mt-2 text-xs leading-5 text-life-ai">{notificationTestMessage}</p>
@@ -825,7 +854,7 @@ export function ProfilePage() {
               ) : (
                 <Bell className="size-4" />
               )}
-              服务端测试
+              远程测试
             </Button>
           </div>
         </Card>
@@ -850,6 +879,82 @@ export function ProfilePage() {
           active={settings.aiPersonalization}
           onToggle={() => update('aiPersonalization', !settings.aiPersonalization)}
         />
+      </section>
+
+      <section data-profile-card className="space-y-3">
+        <SectionHeader title="家庭库存提醒" meta="本机默认" />
+        <Card className="space-y-4 p-4">
+          <div className="flex items-start gap-3">
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+              <Bell className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold">库存默认提醒</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                新增商品时会先继承这里。单个商品仍然可以在编辑页覆盖。
+              </p>
+            </div>
+          </div>
+          <SettingToggle
+            label="默认开启库存提醒"
+            detail="默认会在临期、到期和已过期时提醒你。"
+            icon={Bell}
+            active={pantryPreferences.defaultReminderEnabled}
+            onToggle={() =>
+              updatePantryPreferences({
+                defaultReminderEnabled: !pantryPreferences.defaultReminderEnabled,
+              })
+            }
+          />
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold">默认提醒节点</p>
+              <span className="text-xs text-muted-foreground">
+                {pantryPreferences.defaultReminderRules
+                  .map((rule) => pantryReminderRuleLabels[rule])
+                  .join(' / ')}
+              </span>
+            </div>
+            <div className="grid grid-cols-4 gap-2 max-[360px]:grid-cols-2">
+              {pantryReminderRuleOptions.map((rule) => {
+                const active = pantryPreferences.defaultReminderRules.includes(rule);
+                return (
+                  <button
+                    key={rule}
+                    type="button"
+                    className={cn(
+                      'h-10 rounded-2xl border px-2 text-sm font-semibold transition',
+                      active
+                        ? 'border-life-health/45 bg-life-health/10 text-life-health'
+                        : 'border-border bg-secondary text-muted-foreground',
+                    )}
+                    onClick={() =>
+                      updatePantryPreferences({
+                        defaultReminderRules: active
+                          ? pantryPreferences.defaultReminderRules.filter((item) => item !== rule)
+                          : [...pantryPreferences.defaultReminderRules, rule],
+                      })
+                    }
+                  >
+                    {pantryReminderRuleLabels[rule]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <SettingInput
+            label="库存提醒时间"
+            value={pantryPreferences.defaultReminderTime}
+            icon={TimerReset}
+            tone="health"
+            placeholder="09:00"
+            type="time"
+            onChange={(value) => updatePantryPreferences({ defaultReminderTime: value })}
+          />
+          <p className="text-xs leading-5 text-muted-foreground">
+            这组库存规则会跟随 Life Trace 账户同步，新设备登录后也能继续沿用。
+          </p>
+        </Card>
       </section>
 
       <section data-profile-card className="space-y-3">

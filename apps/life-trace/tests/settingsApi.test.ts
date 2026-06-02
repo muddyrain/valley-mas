@@ -10,10 +10,20 @@ const settings: UserSettings = {
   workEnd: '19:00',
   commuteMethod: '地铁',
   dailyBriefTime: '08:40',
+  workdayMode: 'legal',
+  workdays: ['1', '2', '3', '4', '5'],
+  holidaySync: true,
+  weekendReminders: false,
+  planReminderLeadMinutes: 10,
+  quietStart: '23:00',
+  quietEnd: '07:00',
   weatherAlerts: false,
   planReminders: true,
   aiPersonalization: false,
   habits: ['喝水', '早睡'],
+  pantryReminderEnabled: true,
+  pantryReminderRules: ['7d', 'same-day'],
+  pantryReminderTime: '09:15',
 };
 
 afterEach(() => {

@@ -5,6 +5,7 @@ import { AppReminderToast } from '@/components/AppReminderToast';
 import { AppShell } from '@/components/AppShell';
 import { AiActionsPage, AiHistoryPage, AiPage, AiWeeklyReviewsPage } from '@/pages/AiPage';
 import { LoginPage } from '@/pages/LoginPage';
+import { PantryPage } from '@/pages/PantryPage';
 import { PlansPage } from '@/pages/PlansPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { TodayPage } from '@/pages/TodayPage';
@@ -23,6 +24,7 @@ const tabRoutes: Record<AppTab, string> = {
 
 function AppContent() {
   const loadSettings = useLifeTraceStore((state) => state.loadSettings);
+  const loadPantry = useLifeTraceStore((state) => state.loadPantry);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
   const loadTraces = useLifeTraceStore((state) => state.loadTraces);
   const { status, token, verifySession } = useAuthStore();
@@ -38,10 +40,11 @@ function AppContent() {
   useEffect(() => {
     if (status === 'authenticated' && token) {
       void loadSettings();
+      void loadPantry();
       void loadPlans();
       void loadTraces();
     }
-  }, [loadPlans, loadSettings, loadTraces, status, token]);
+  }, [loadPantry, loadPlans, loadSettings, loadTraces, status, token]);
 
   useEffect(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
@@ -78,6 +81,7 @@ function AppContent() {
         <Routes location={location}>
           <Route path="/" element={<Navigate to="/today" replace />} />
           <Route path="/today" element={<TodayPage />} />
+          <Route path="/pantry" element={<PantryPage />} />
           <Route path="/plans/:planId?" element={<PlansPage />} />
           <Route path="/ai" element={<AiPage />} />
           <Route path="/ai/history" element={<AiHistoryPage />} />

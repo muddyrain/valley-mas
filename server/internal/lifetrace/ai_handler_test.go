@@ -2,11 +2,13 @@ package lifetrace
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"valley-server/internal/database"
@@ -69,6 +71,102 @@ func TestAnalyzeImageRequiresAIConfig(t *testing.T) {
 	}
 	if !strings.Contains(resp.Body.String(), "ARK_API_KEY") {
 		t.Fatalf("expected config message, got %s", resp.Body.String())
+	}
+}
+
+func TestGeneratePantryThumbnailRequiresAIConfig(t *testing.T) {
+	t.Setenv("ARK_API_KEY", "")
+	t.Setenv("ARK_IMAGE_MODEL", "")
+
+	router := setupTraceTestRouter(t, 101)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/pantry-thumbnail", bytes.NewBufferString(`{"name":"鲜牛奶","category":"食品","location":"冷藏"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if !strings.Contains(resp.Body.String(), "ARK_API_KEY") {
+		t.Fatalf("expected config message, got %s", resp.Body.String())
+	}
+}
+
+func TestGeneratePantryThumbnailUsesARKImageModel(t *testing.T) {
+	lifeTraceArkClient = nil
+	lifeTraceArkClientOnce = sync.Once{}
+	originalUpload := uploadGeneratedPantryThumbnailToTOS
+	uploadGeneratedPantryThumbnailToTOS = func(
+		_ context.Context,
+		userID interface{ String() string },
+		image generatedPantryThumbnail,
+	) (pantryThumbnailUploadResult, error) {
+		if userID.String() != "101" {
+			t.Fatalf("expected upload userID 101, got %s", userID.String())
+		}
+		if string(image.Bytes) != "abc" {
+			t.Fatalf("expected decoded AI image bytes, got %q", string(image.Bytes))
+		}
+		if image.MIMEType != "image/jpeg" {
+			t.Fatalf("expected jpeg mime type, got %s", image.MIMEType)
+		}
+		return pantryThumbnailUploadResult{
+			URL: "https://example.com/pantry-thumb.jpg",
+			Key: "life-trace/101/20260602/pantry-thumb.jpg",
+		}, nil
+	}
+	defer func() {
+		uploadGeneratedPantryThumbnailToTOS = originalUpload
+	}()
+
+	var captured map[string]any
+	imageServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("decode image generation request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000000,"data":[{"b64_json":"YWJj"}]}`))
+	}))
+	defer imageServer.Close()
+
+	t.Setenv("ARK_API_KEY", "test-ark-key")
+	t.Setenv("ARK_BASE_URL", imageServer.URL)
+	t.Setenv("ARK_IMAGE_MODEL", "ep-image")
+
+	router := setupTraceTestRouter(t, 101)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/pantry-thumbnail", bytes.NewBufferString(`{
+		"name":"鲜牛奶",
+		"category":"食品",
+		"location":"冷藏",
+		"note":"早餐优先喝掉"
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	if data["thumbnailUrl"] != "https://example.com/pantry-thumb.jpg" {
+		t.Fatalf("expected generated thumbnail url, got %+v", data)
+	}
+	if data["storageKey"] != "life-trace/101/20260602/pantry-thumb.jpg" {
+		t.Fatalf("expected storage key in response, got %+v", data)
+	}
+	if data["model"] != "ep-image" {
+		t.Fatalf("expected image model to round-trip, got %+v", data)
+	}
+	if captured["model"] != "ep-image" {
+		t.Fatalf("expected image generation request to use ep-image, got %+v", captured)
+	}
+	if captured["size"] != "1280x720" {
+		t.Fatalf("expected fast thumbnail size 1280x720, got %+v", captured["size"])
+	}
+	if !strings.Contains(captured["prompt"].(string), "鲜牛奶") {
+		t.Fatalf("expected prompt to mention pantry item, got %+v", captured["prompt"])
 	}
 }
 
