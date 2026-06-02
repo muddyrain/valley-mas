@@ -42,6 +42,9 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 	if created["name"] != "鲜牛奶" {
 		t.Fatalf("unexpected pantry item: %+v", created)
 	}
+	if created["householdId"] == nil || created["createdBy"] != "101" || created["updatedBy"] != "101" {
+		t.Fatalf("expected pantry item to bind personal household and operator, got %+v", created)
+	}
 	if created["unit"] != "盒" || created["location"] != "冷藏" {
 		t.Fatalf("expected persisted pantry metadata, got %+v", created)
 	}
@@ -60,6 +63,9 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 	list := decodeTracePayload(t, listResp)["data"].(map[string]interface{})["list"].([]interface{})
 	if len(list) != 1 {
 		t.Fatalf("expected one pantry item, got %+v", list)
+	}
+	if list[0].(map[string]interface{})["householdId"] != created["householdId"] {
+		t.Fatalf("expected list response to stay in same household, got %+v", list[0])
 	}
 	if list[0].(map[string]interface{})["thumbnailUrl"] != thumbnailURL {
 		t.Fatalf("expected list response to keep long thumbnail url, got %+v", list[0])
@@ -98,6 +104,9 @@ func TestUpdatePantryItemStatusAndDelete(t *testing.T) {
 	if updated["status"] != "used-up" {
 		t.Fatalf("expected status used-up, got %+v", updated)
 	}
+	if updated["householdId"] == nil || updated["updatedBy"] != "101" {
+		t.Fatalf("expected update to backfill household/operator, got %+v", updated)
+	}
 
 	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/life-trace/pantry/"+item.ID.String(), nil)
 	deleteResp := httptest.NewRecorder()
@@ -133,6 +142,76 @@ func TestListPantryOnlyReturnsCurrentUserData(t *testing.T) {
 	list := decodeTracePayload(t, resp)["data"].(map[string]interface{})["list"].([]interface{})
 	if len(list) != 0 {
 		t.Fatalf("expected no current user pantry items, got %+v", list)
+	}
+}
+
+func TestPantrySupportsSharedHouseholdSelection(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+
+	sharedHousehold := model.Household{
+		Name:        "三口之家",
+		Kind:        householdKindShared,
+		OwnerUserID: 101,
+		Status:      householdStatusActive,
+	}
+	if err := database.GetDB().Create(&sharedHousehold).Error; err != nil {
+		t.Fatalf("create shared household: %v", err)
+	}
+	if err := database.GetDB().Create(&model.HouseholdMember{
+		HouseholdID: sharedHousehold.ID,
+		UserID:      101,
+		Role:        householdRoleOwner,
+		Status:      householdMemberStatusActive,
+	}).Error; err != nil {
+		t.Fatalf("create owner membership: %v", err)
+	}
+	if err := database.GetDB().Create(&model.HouseholdMember{
+		HouseholdID: sharedHousehold.ID,
+		UserID:      202,
+		Role:        householdRoleMember,
+		Status:      householdMemberStatusActive,
+	}).Error; err != nil {
+		t.Fatalf("create member membership: %v", err)
+	}
+	if err := database.GetDB().Create(&model.LifeTracePantryItem{
+		UserID:             202,
+		HouseholdID:        sharedHousehold.ID,
+		CreatedBy:          202,
+		UpdatedBy:          202,
+		Name:               "家庭牛排",
+		Category:           "食品",
+		Quantity:           2,
+		Unit:               "份",
+		Location:           "冷冻",
+		Status:             "normal",
+		ReminderEnabled:    true,
+		ReminderUseDefault: true,
+		ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+		ReminderTime:       "09:00",
+	}).Error; err != nil {
+		t.Fatalf("create shared pantry item: %v", err)
+	}
+
+	personalReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry", nil)
+	personalResp := httptest.NewRecorder()
+	router.ServeHTTP(personalResp, personalReq)
+
+	personalList := decodeTracePayload(t, personalResp)["data"].(map[string]interface{})["list"].([]interface{})
+	if len(personalList) != 0 {
+		t.Fatalf("expected personal pantry to stay isolated, got %+v", personalList)
+	}
+
+	sharedReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?householdId="+sharedHousehold.ID.String(), nil)
+	sharedResp := httptest.NewRecorder()
+	router.ServeHTTP(sharedResp, sharedReq)
+
+	sharedData := decodeTracePayload(t, sharedResp)["data"].(map[string]interface{})
+	sharedList := sharedData["list"].([]interface{})
+	if len(sharedList) != 1 || sharedList[0].(map[string]interface{})["name"] != "家庭牛排" {
+		t.Fatalf("expected shared household pantry item, got %+v", sharedList)
+	}
+	if sharedData["householdId"] != sharedHousehold.ID.String() {
+		t.Fatalf("expected selected household id, got %+v", sharedData["householdId"])
 	}
 }
 
@@ -186,6 +265,20 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 			ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
 			ReminderTime:       "09:00",
 		},
+		{
+			UserID:             101,
+			Name:               "已丢弃牛奶",
+			Category:           "食品",
+			Quantity:           1,
+			Unit:               "盒",
+			Location:           "冷藏",
+			ExpiresAt:          normalDate,
+			Status:             "discarded",
+			ReminderEnabled:    true,
+			ReminderUseDefault: true,
+			ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+			ReminderTime:       "09:00",
+		},
 	}
 	for _, item := range seedItems {
 		if err := database.GetDB().Create(&item).Error; err != nil {
@@ -201,6 +294,16 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 	expiredList := expiredData["list"].([]interface{})
 	if len(expiredList) != 1 || expiredList[0].(map[string]interface{})["name"] != "过期酸奶" {
 		t.Fatalf("expected derived expired filter to return only expired item, got %+v", expiredList)
+	}
+
+	discardedReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?status=discarded&page=1&pageSize=10", nil)
+	discardedResp := httptest.NewRecorder()
+	router.ServeHTTP(discardedResp, discardedReq)
+
+	discardedData := decodeTracePayload(t, discardedResp)["data"].(map[string]interface{})
+	discardedList := discardedData["list"].([]interface{})
+	if len(discardedList) != 1 || discardedList[0].(map[string]interface{})["name"] != "已丢弃牛奶" {
+		t.Fatalf("expected discarded filter to return only discarded item, got %+v", discardedList)
 	}
 
 	pageReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?page=1&pageSize=2", nil)

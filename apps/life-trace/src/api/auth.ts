@@ -25,6 +25,20 @@ type RequestOptions = {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
+export class AuthRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = 'AuthRequestError';
+  }
+}
+
+export function isConfirmedAuthFailure(error: unknown) {
+  return error instanceof AuthRequestError && (error.status === 401 || error.status === 403);
+}
+
 async function request<T>(path: string, init: RequestInit = {}, options: RequestOptions = {}) {
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
@@ -43,17 +57,21 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
     credentials: 'include',
   });
 
+  const payload = (await response.json().catch(() => null)) as ApiEnvelope<T> | null;
   if (!response.ok) {
-    throw new Error(`请求失败：${response.status}`);
+    throw new AuthRequestError(payload?.message || `请求失败：${response.status}`, response.status);
   }
 
-  const payload = (await response.json()) as ApiEnvelope<T>;
+  if (!payload) {
+    throw new AuthRequestError('响应数据为空');
+  }
+
   if (payload.code !== 0) {
-    throw new Error(payload.message || '请求失败');
+    throw new AuthRequestError(payload.message || '请求失败', payload.code);
   }
 
   if (payload.data === undefined) {
-    throw new Error('响应数据为空');
+    throw new AuthRequestError('响应数据为空');
   }
 
   return payload.data;

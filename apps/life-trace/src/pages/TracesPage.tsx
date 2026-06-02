@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EditTraceDrawer } from '@/components/EditTraceDrawer';
 import { EmptyState } from '@/components/EmptyState';
@@ -225,126 +226,118 @@ function TraceDetailDrawer({
     return null;
   }
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[60] bg-background/70 backdrop-blur-sm"
-      onMouseDown={() => {
-        if (!deleting) {
+  return (
+    <BottomSheet
+      open={Boolean(trace)}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
           onClose();
         }
       }}
+      overlayLabel="关闭踪迹详情"
+      closeDisabled={deleting}
+      zIndexClassName="z-[60]"
+      portal
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-0.75rem)] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl max-[360px]:p-4"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge tone={sourceTone[trace.source]}>{trace.source}</Badge>
-              <Badge tone="trace">{trace.mood}</Badge>
-            </div>
-            <h2 className="mt-3 text-2xl font-semibold leading-tight">{trace.title}</h2>
-            {trace.createdAt ? (
-              <p className="mt-2 text-sm text-muted-foreground">
-                记录于 {formatTraceDateTime(trace.createdAt)}
-              </p>
-            ) : null}
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={sourceTone[trace.source]}>{trace.source}</Badge>
+            <Badge tone="trace">{trace.mood}</Badge>
           </div>
-          <Button type="button" variant="ghost" size="icon" disabled={deleting} onClick={onClose}>
-            <X className="size-5" />
-          </Button>
+          <h2 className="mt-3 text-2xl font-semibold leading-tight">{trace.title}</h2>
+          {trace.createdAt ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              记录于 {formatTraceDateTime(trace.createdAt)}
+            </p>
+          ) : null}
         </div>
-
-        {trace.imageUrl ? (
-          <button
-            type="button"
-            className="mb-5 block w-full cursor-zoom-in overflow-hidden rounded-2xl border border-border bg-secondary text-left"
-            onClick={() => onPreviewImage(trace)}
-          >
-            <img
-              src={trace.imageUrl}
-              alt={trace.title}
-              className="w-full object-cover opacity-90"
-            />
-          </button>
-        ) : (
-          <div className="mb-5 flex min-h-24 items-center gap-3 rounded-2xl border border-border bg-secondary px-4 text-muted-foreground">
-            <Image className="size-5 text-life-trace" />
-            <p className="text-sm">这条踪迹还没有图片。之后可以从图片分析生成更丰富的记录。</p>
-          </div>
-        )}
-
-        <Card className="p-4">
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <Sparkles className="size-4 text-life-ai" />
-            生活摘要
-          </div>
-          <p className="text-sm leading-6 text-foreground">{trace.summary}</p>
-        </Card>
-
-        <div className="mt-3 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-          <Card className="p-4">
-            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-              <Clock className="size-4" />
-              时间
-            </div>
-            <p className="mt-2 text-sm font-semibold">{trace.timeLabel}</p>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-              <CalendarDays className="size-4" />
-              来源
-            </div>
-            <p className="mt-2 text-sm font-semibold">{trace.source}</p>
-          </Card>
-        </div>
-
-        {trace.location ? (
-          <Card className="mt-3 p-4">
-            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-              <MapPin className="size-4" />
-              地点
-            </div>
-            <p className="mt-2 text-sm font-semibold">{trace.location}</p>
-          </Card>
-        ) : null}
-
-        <div className="mt-5 flex flex-wrap gap-2">
-          {trace.tags.map((tag) => (
-            <Badge key={tag}>{tag}</Badge>
-          ))}
-        </div>
-
-        <div className="mt-6 grid grid-cols-3 gap-3 max-[360px]:grid-cols-1">
-          <Button type="button" variant="secondary" disabled={deleting} onClick={onClose}>
-            <ArrowLeft className="size-4" />
-            返回
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={deleting}
-            onClick={() => onRequestEdit(trace)}
-          >
-            <Pencil className="size-4" />
-            编辑
-          </Button>
-          <Button
-            type="button"
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            disabled={deleting}
-            onClick={() => onRequestDelete(trace)}
-          >
-            {deleting ? <ActionLoadingIcon tone="alert" /> : <Trash2 className="size-4" />}
-            {deleting ? '删除中' : '删除'}
-          </Button>
-        </div>
+        <Button type="button" variant="ghost" size="icon" disabled={deleting} onClick={onClose}>
+          <X className="size-5" />
+        </Button>
       </div>
-    </div>,
-    document.body,
+
+      {trace.imageUrl ? (
+        <button
+          type="button"
+          className="mb-5 block w-full cursor-zoom-in overflow-hidden rounded-2xl border border-border bg-secondary text-left"
+          onClick={() => onPreviewImage(trace)}
+        >
+          <img src={trace.imageUrl} alt={trace.title} className="w-full object-cover opacity-90" />
+        </button>
+      ) : (
+        <div className="mb-5 flex min-h-24 items-center gap-3 rounded-2xl border border-border bg-secondary px-4 text-muted-foreground">
+          <Image className="size-5 text-life-trace" />
+          <p className="text-sm">这条踪迹还没有图片。之后可以从图片分析生成更丰富的记录。</p>
+        </div>
+      )}
+
+      <Card className="p-4">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+          <Sparkles className="size-4 text-life-ai" />
+          生活摘要
+        </div>
+        <p className="text-sm leading-6 text-foreground">{trace.summary}</p>
+      </Card>
+
+      <div className="mt-3 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+        <Card className="p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+            <Clock className="size-4" />
+            时间
+          </div>
+          <p className="mt-2 text-sm font-semibold">{trace.timeLabel}</p>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+            <CalendarDays className="size-4" />
+            来源
+          </div>
+          <p className="mt-2 text-sm font-semibold">{trace.source}</p>
+        </Card>
+      </div>
+
+      {trace.location ? (
+        <Card className="mt-3 p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+            <MapPin className="size-4" />
+            地点
+          </div>
+          <p className="mt-2 text-sm font-semibold">{trace.location}</p>
+        </Card>
+      ) : null}
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        {trace.tags.map((tag) => (
+          <Badge key={tag}>{tag}</Badge>
+        ))}
+      </div>
+
+      <div className="mt-6 grid grid-cols-3 gap-3 max-[360px]:grid-cols-1">
+        <Button type="button" variant="secondary" disabled={deleting} onClick={onClose}>
+          <ArrowLeft className="size-4" />
+          返回
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={deleting}
+          onClick={() => onRequestEdit(trace)}
+        >
+          <Pencil className="size-4" />
+          编辑
+        </Button>
+        <Button
+          type="button"
+          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          disabled={deleting}
+          onClick={() => onRequestDelete(trace)}
+        >
+          {deleting ? <ActionLoadingIcon tone="alert" /> : <Trash2 className="size-4" />}
+          {deleting ? '删除中' : '删除'}
+        </Button>
+      </div>
+    </BottomSheet>
   );
 }
 

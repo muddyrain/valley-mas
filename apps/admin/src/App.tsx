@@ -1,4 +1,5 @@
 import { message } from 'antd';
+import axios from 'axios';
 import { useEffect, useRef } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { reqGetCurrentUser } from './api/auth';
@@ -15,6 +16,11 @@ import Login from './pages/Login';
 import Records from './pages/Records';
 import Resources from './pages/Resources';
 import Users from './pages/Users';
+
+const isConfirmedAuthFailure = (error: unknown) => {
+  if (!axios.isAxiosError(error)) return false;
+  return error.response?.status === 401 || error.response?.status === 403;
+};
 
 // 路由守卫：检查是否已登录
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -41,6 +47,9 @@ function TokenValidator() {
       await reqGetCurrentUser();
     } catch (error: unknown) {
       console.error('Token 验证失败:', error);
+      if (!isConfirmedAuthFailure(error)) {
+        return;
+      }
       localStorage.removeItem('admin_token');
       localStorage.removeItem('userInfo');
       message.warning('登录已过期，请重新登录');

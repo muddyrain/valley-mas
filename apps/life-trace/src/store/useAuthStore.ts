@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { LifeTraceUser } from '@/api/auth';
-import { getCurrentUser, loginWithPassword, logout as requestLogout } from '@/api/auth';
+import {
+  getCurrentUser,
+  isConfirmedAuthFailure,
+  loginWithPassword,
+  logout as requestLogout,
+} from '@/api/auth';
 
 type AuthStatus = 'idle' | 'checking' | 'authenticated' | 'unauthenticated';
 
@@ -50,8 +55,12 @@ export const useAuthStore = create<AuthState>()(
         try {
           const user = await getCurrentUser(token);
           set({ user, status: 'authenticated', error: '' });
-        } catch {
-          set({ token: null, user: null, status: 'unauthenticated', error: '' });
+        } catch (error) {
+          if (isConfirmedAuthFailure(error)) {
+            set({ token: null, user: null, status: 'unauthenticated', error: '' });
+            return;
+          }
+          set({ status: 'authenticated', error: '暂时无法验证登录状态，请稍后重试' });
         }
       },
       signOut: async () => {

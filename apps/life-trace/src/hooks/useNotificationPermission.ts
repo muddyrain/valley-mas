@@ -57,6 +57,15 @@ function normalizeSubscription(subscription: PushSubscription): PushSubscription
   return { endpoint, keys: { p256dh, auth } };
 }
 
+async function getExistingPushSubscriptionPayload() {
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    return null;
+  }
+  return normalizeSubscription(subscription);
+}
+
 export function useNotificationPermission(token?: string | null) {
   const [permission, setPermission] = useState<NotificationPermissionState>(() =>
     getNotificationPermission(),
@@ -98,12 +107,17 @@ export function useNotificationPermission(token?: string | null) {
         return;
       }
 
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      setServerPushStatus(subscription ? 'subscribed' : 'unbound');
+      const payload = await getExistingPushSubscriptionPayload();
+      if (!payload) {
+        setServerPushStatus('unbound');
+        return;
+      }
+
+      await savePushSubscription(token, payload);
+      setServerPushStatus('subscribed');
     } catch (error) {
       setServerPushStatus('error');
-      setServerPushError(error instanceof Error ? error.message : '读取服务端推送状态失败');
+      setServerPushError(error instanceof Error ? error.message : '服务端推送待确认');
     }
   }, [pushSupported, token]);
 
@@ -191,6 +205,7 @@ export function useNotificationPermission(token?: string | null) {
       }
 
       await savePushSubscription(token, payload);
+      await refreshServerPushState();
       setServerPushStatus('subscribed');
       return true;
     } catch (error) {
@@ -198,7 +213,7 @@ export function useNotificationPermission(token?: string | null) {
       setServerPushError(error instanceof Error ? error.message : '服务端推送绑定失败');
       return false;
     }
-  }, [pushConfig, pushSupported, token]);
+  }, [pushConfig, pushSupported, refreshServerPushState, token]);
 
   const showServerTestNotification = useCallback(async () => {
     if (!token) {

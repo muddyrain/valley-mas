@@ -1,3 +1,5 @@
+import { API_BASE } from '@/api/request';
+
 export type WeatherApiMetric = {
   label: string;
   value: string;
@@ -53,7 +55,7 @@ export async function fetchLifeTraceWeather(city: string, options: FetchWeatherO
     params.set('refresh', 'true');
   }
 
-  const response = await fetch(`/api/v1/life-trace/weather?${params.toString()}`, {
+  const response = await fetch(`${API_BASE}/life-trace/weather?${params.toString()}`, {
     signal: options.signal,
     headers: {
       Accept: 'application/json',

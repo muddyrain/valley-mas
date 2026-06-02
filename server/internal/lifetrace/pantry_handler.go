@@ -127,7 +127,9 @@ func pantryDerivedDateBounds(now time.Time) (string, string) {
 
 func applyPantryListFilters(query *gorm.DB, c *gin.Context) *gorm.DB {
 	status := strings.TrimSpace(c.Query("status"))
-	if validPantryStatuses[status] {
+	if status == "" || status == "all" {
+		query = query.Where("status NOT IN ?", []string{"used-up", "discarded"})
+	} else if validPantryStatuses[status] {
 		today, expiringDeadline := pantryDerivedDateBounds(time.Now())
 		switch status {
 		case "used-up", "discarded":
@@ -191,9 +193,14 @@ func (h *Handler) ListPantryItems(c *gin.Context) {
 		return
 	}
 
+	householdCtx, ok := readHouseholdContext(c, userID)
+	if !ok {
+		return
+	}
+
 	page, pageSize := parseListPagination(c)
 	offset := (page - 1) * pageSize
-	baseQuery := database.GetDB().Model(&model.LifeTracePantryItem{}).Where("user_id = ?", userID)
+	baseQuery := database.GetDB().Model(&model.LifeTracePantryItem{}).Where("household_id = ?", householdCtx.Household.ID)
 	baseQuery = applyPantryListFilters(baseQuery, c)
 
 	var total int64
@@ -212,8 +219,9 @@ func (h *Handler) ListPantryItems(c *gin.Context) {
 	}
 
 	success(c, gin.H{
-		"list":       items,
-		"pagination": buildListPagination(page, pageSize, total),
+		"householdId": householdCtx.Household.ID,
+		"list":        items,
+		"pagination":  buildListPagination(page, pageSize, total),
 	})
 }
 
@@ -236,9 +244,15 @@ func (h *Handler) CreatePantryItem(c *gin.Context) {
 		return
 	}
 
+	householdCtx, ok := readHouseholdContext(c, userID)
+	if !ok {
+		return
+	}
+
 	reminderEnabled, reminderUseDefault, reminderRules, reminderTime := normalizePantryReminder(req.Reminder)
 	item := model.LifeTracePantryItem{
 		UserID:             userID,
+		HouseholdID:        householdCtx.Household.ID,
 		Name:               name,
 		Category:           normalizePantryCategory(req.Category),
 		Quantity:           normalizePantryQuantity(req.Quantity),
@@ -250,6 +264,8 @@ func (h *Handler) CreatePantryItem(c *gin.Context) {
 		ImageURL:           strings.TrimSpace(req.ImageURL),
 		ThumbnailURL:       strings.TrimSpace(req.ThumbnailURL),
 		Status:             normalizePantryStatus(req.Status),
+		CreatedBy:          userID,
+		UpdatedBy:          userID,
 		ReminderEnabled:    reminderEnabled,
 		ReminderUseDefault: reminderUseDefault,
 		ReminderRules:      reminderRules,
@@ -271,7 +287,12 @@ func (h *Handler) UpdatePantryItem(c *gin.Context) {
 		return
 	}
 
-	item, found := findPantryItem(c.Param("id"), userID)
+	householdCtx, ok := readHouseholdContext(c, userID)
+	if !ok {
+		return
+	}
+
+	item, found := findPantryItem(c.Param("id"), householdCtx.Household.ID)
 	if !found {
 		fail(c, http.StatusNotFound, "库存不存在")
 		return
@@ -302,6 +323,7 @@ func (h *Handler) UpdatePantryItem(c *gin.Context) {
 		"image_url":            strings.TrimSpace(req.ImageURL),
 		"thumbnail_url":        strings.TrimSpace(req.ThumbnailURL),
 		"status":               normalizePantryStatus(req.Status),
+		"updated_by":           userID,
 		"reminder_enabled":     reminderEnabled,
 		"reminder_use_default": reminderUseDefault,
 		"reminder_rules":       reminderRules,
@@ -314,7 +336,7 @@ func (h *Handler) UpdatePantryItem(c *gin.Context) {
 	}
 	resetPantryReminderDeliveries(nil, item.ID)
 
-	if err := database.GetDB().First(&item, "id = ? AND user_id = ?", item.ID, userID).Error; err != nil {
+	if err := database.GetDB().First(&item, "id = ? AND household_id = ?", item.ID, householdCtx.Household.ID).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "读取库存失败")
 		return
 	}
@@ -329,7 +351,12 @@ func (h *Handler) UpdatePantryItemStatus(c *gin.Context) {
 		return
 	}
 
-	item, found := findPantryItem(c.Param("id"), userID)
+	householdCtx, ok := readHouseholdContext(c, userID)
+	if !ok {
+		return
+	}
+
+	item, found := findPantryItem(c.Param("id"), householdCtx.Household.ID)
 	if !found {
 		fail(c, http.StatusNotFound, "库存不存在")
 		return
@@ -342,13 +369,16 @@ func (h *Handler) UpdatePantryItemStatus(c *gin.Context) {
 	}
 
 	status := normalizePantryStatus(req.Status)
-	if err := database.GetDB().Model(&item).Update("status", status).Error; err != nil {
+	if err := database.GetDB().Model(&item).Updates(map[string]interface{}{
+		"status":     status,
+		"updated_by": userID,
+	}).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "更新库存状态失败")
 		return
 	}
 	resetPantryReminderDeliveries(nil, item.ID)
 
-	if err := database.GetDB().First(&item, "id = ? AND user_id = ?", item.ID, userID).Error; err != nil {
+	if err := database.GetDB().First(&item, "id = ? AND household_id = ?", item.ID, householdCtx.Household.ID).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "读取库存失败")
 		return
 	}
@@ -363,7 +393,12 @@ func (h *Handler) DeletePantryItem(c *gin.Context) {
 		return
 	}
 
-	item, found := findPantryItem(c.Param("id"), userID)
+	householdCtx, ok := readHouseholdContext(c, userID)
+	if !ok {
+		return
+	}
+
+	item, found := findPantryItem(c.Param("id"), householdCtx.Household.ID)
 	if !found {
 		fail(c, http.StatusNotFound, "库存不存在")
 		return
@@ -378,9 +413,9 @@ func (h *Handler) DeletePantryItem(c *gin.Context) {
 	success(c, gin.H{"id": item.ID})
 }
 
-func findPantryItem(id string, userID model.Int64String) (model.LifeTracePantryItem, bool) {
+func findPantryItem(id string, householdID model.Int64String) (model.LifeTracePantryItem, bool) {
 	var item model.LifeTracePantryItem
-	err := database.GetDB().First(&item, "id = ? AND user_id = ?", id, userID).Error
+	err := database.GetDB().First(&item, "id = ? AND household_id = ?", id, householdID).Error
 	if err == nil {
 		return item, true
 	}

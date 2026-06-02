@@ -2,6 +2,7 @@ import { X } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
+import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -141,200 +142,179 @@ export function EditTraceDrawer({ open, trace, onOpenChange, onSaved }: EditTrac
   };
 
   return (
-    <div
-      className={cn(
-        'fixed inset-0 z-[70] transition',
-        open ? 'pointer-events-auto' : 'pointer-events-none',
-      )}
+    <BottomSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      overlayLabel={editing ? '关闭编辑踪迹' : '关闭新建踪迹'}
+      closeDisabled={submitting}
+      zIndexClassName="z-[70]"
     >
-      <button
-        type="button"
-        aria-label={editing ? '关闭编辑踪迹' : '关闭新建踪迹'}
-        className={cn(
-          'absolute inset-0 bg-background/70 backdrop-blur-sm transition-opacity',
-          open ? 'opacity-100' : 'opacity-0',
-        )}
-        onClick={() => {
-          if (!submitting) {
-            onOpenChange(false);
-          }
-        }}
-      />
-      <div
-        className={cn(
-          'safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-0.75rem)] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl transition duration-300 max-[360px]:p-4',
-          open
-            ? 'visible translate-y-0 opacity-100'
-            : 'invisible translate-y-[calc(100%+2rem)] opacity-0',
-        )}
-      >
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-xl font-semibold">{editing ? '编辑踪迹' : '新建踪迹'}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {editing
-                ? '补充照片、地点、心情和标签，让这条记录更完整。'
-                : '不用等计划完成，也可以直接记录今天值得留下的片段。'}
-            </p>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold">{editing ? '编辑踪迹' : '新建踪迹'}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {editing
+              ? '补充照片、地点、心情和标签，让这条记录更完整。'
+              : '不用等计划完成，也可以直接记录今天值得留下的片段。'}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          disabled={submitting}
+          onClick={() => onOpenChange(false)}
+        >
+          <X className="size-5" />
+        </Button>
+      </div>
+
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <label className="block space-y-2">
+          <span className="text-sm font-medium">
+            标题 <span className="text-life-alert">*</span>
+          </span>
+          <input
+            value={form.title}
+            onChange={(event) => {
+              updateField('title', event.target.value);
+              setErrors((current) => ({ ...current, title: undefined }));
+            }}
+            aria-invalid={Boolean(errors.title)}
+            placeholder="例如：晚饭后散步"
+            className={cn(
+              'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
+              errors.title ? 'border-destructive' : 'border-border',
+            )}
+          />
+          {errors.title ? <p className="text-xs text-destructive">{errors.title}</p> : null}
+        </label>
+
+        <label className="block space-y-2">
+          <span className="text-sm font-medium">
+            生活摘要 <span className="text-life-alert">*</span>
+          </span>
+          <textarea
+            value={form.summary}
+            onChange={(event) => {
+              updateField('summary', event.target.value);
+              setErrors((current) => ({ ...current, summary: undefined }));
+            }}
+            aria-invalid={Boolean(errors.summary)}
+            placeholder="记录这件事发生了什么、当时的感受或值得记住的细节。"
+            className={cn(
+              'min-h-24 w-full resize-none rounded-2xl border bg-secondary px-4 py-3 text-sm outline-none transition focus:border-ring',
+              errors.summary ? 'border-destructive' : 'border-border',
+            )}
+          />
+          {errors.summary ? <p className="text-xs text-destructive">{errors.summary}</p> : null}
+        </label>
+
+        <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+          <label className="block space-y-2">
+            <span className="text-sm font-medium">
+              时间 <span className="text-life-alert">*</span>
+            </span>
+            <input
+              value={form.timeLabel}
+              onChange={(event) => {
+                updateField('timeLabel', event.target.value);
+                setErrors((current) => ({ ...current, timeLabel: undefined }));
+              }}
+              aria-invalid={Boolean(errors.timeLabel)}
+              placeholder="今天 20:10"
+              className={cn(
+                'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
+                errors.timeLabel ? 'border-destructive' : 'border-border',
+              )}
+            />
+          </label>
+          <label className="block space-y-2">
+            <span className="text-sm font-medium">来源</span>
+            <select
+              value={form.source}
+              onChange={(event) => updateField('source', event.target.value as Trace['source'])}
+              className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
+            >
+              {traceSources.map((source) => (
+                <option key={source} value={source}>
+                  {source}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {errors.timeLabel ? (
+          <p className="-mt-2 text-xs text-destructive">{errors.timeLabel}</p>
+        ) : null}
+
+        <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+          <label className="block space-y-2">
+            <span className="text-sm font-medium">心情</span>
+            <select
+              value={form.mood}
+              onChange={(event) => updateField('mood', event.target.value)}
+              className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
+            >
+              {visibleMoods.map((mood) => (
+                <option key={mood} value={mood}>
+                  {mood}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-2">
+            <span className="text-sm font-medium">地点</span>
+            <input
+              value={form.location}
+              onChange={(event) => updateField('location', event.target.value)}
+              placeholder="可选"
+              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+            />
+          </label>
+        </div>
+
+        <AppImageUploader
+          value={form.imageUrl}
+          onChange={(url) => updateField('imageUrl', url)}
+          label="踪迹图片"
+          description="上传生活照片后，会作为这条踪迹的封面展示。"
+          disabled={saving}
+          onUploadingChange={setImageUploading}
+        />
+
+        <label className="block space-y-2">
+          <span className="text-sm font-medium">标签</span>
+          <input
+            value={tagText}
+            onChange={(event) => setTagText(event.target.value)}
+            placeholder="例如：计划完成、散步、生活迹"
+            className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+          />
+          <p className="text-xs text-muted-foreground">可用顿号、逗号或换行分隔多个标签。</p>
+        </label>
+
+        {tracesError ? (
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {tracesError}
           </div>
+        ) : null}
+
+        <div className="grid grid-cols-2 gap-3 pt-2 max-[360px]:grid-cols-1">
           <Button
             type="button"
-            variant="ghost"
-            size="icon"
+            variant="secondary"
             disabled={submitting}
             onClick={() => onOpenChange(false)}
           >
-            <X className="size-5" />
+            取消
+          </Button>
+          <Button type="submit" variant="ai" disabled={submitting}>
+            {submitting ? <ActionLoadingIcon /> : null}
+            {submitting ? '保存中' : editing ? '保存修改' : '保存踪迹'}
           </Button>
         </div>
-
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">
-              标题 <span className="text-life-alert">*</span>
-            </span>
-            <input
-              value={form.title}
-              onChange={(event) => {
-                updateField('title', event.target.value);
-                setErrors((current) => ({ ...current, title: undefined }));
-              }}
-              aria-invalid={Boolean(errors.title)}
-              placeholder="例如：晚饭后散步"
-              className={cn(
-                'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
-                errors.title ? 'border-destructive' : 'border-border',
-              )}
-            />
-            {errors.title ? <p className="text-xs text-destructive">{errors.title}</p> : null}
-          </label>
-
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">
-              生活摘要 <span className="text-life-alert">*</span>
-            </span>
-            <textarea
-              value={form.summary}
-              onChange={(event) => {
-                updateField('summary', event.target.value);
-                setErrors((current) => ({ ...current, summary: undefined }));
-              }}
-              aria-invalid={Boolean(errors.summary)}
-              placeholder="记录这件事发生了什么、当时的感受或值得记住的细节。"
-              className={cn(
-                'min-h-24 w-full resize-none rounded-2xl border bg-secondary px-4 py-3 text-sm outline-none transition focus:border-ring',
-                errors.summary ? 'border-destructive' : 'border-border',
-              )}
-            />
-            {errors.summary ? <p className="text-xs text-destructive">{errors.summary}</p> : null}
-          </label>
-
-          <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-            <label className="block space-y-2">
-              <span className="text-sm font-medium">
-                时间 <span className="text-life-alert">*</span>
-              </span>
-              <input
-                value={form.timeLabel}
-                onChange={(event) => {
-                  updateField('timeLabel', event.target.value);
-                  setErrors((current) => ({ ...current, timeLabel: undefined }));
-                }}
-                aria-invalid={Boolean(errors.timeLabel)}
-                placeholder="今天 20:10"
-                className={cn(
-                  'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
-                  errors.timeLabel ? 'border-destructive' : 'border-border',
-                )}
-              />
-            </label>
-            <label className="block space-y-2">
-              <span className="text-sm font-medium">来源</span>
-              <select
-                value={form.source}
-                onChange={(event) => updateField('source', event.target.value as Trace['source'])}
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
-              >
-                {traceSources.map((source) => (
-                  <option key={source} value={source}>
-                    {source}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          {errors.timeLabel ? (
-            <p className="-mt-2 text-xs text-destructive">{errors.timeLabel}</p>
-          ) : null}
-
-          <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-            <label className="block space-y-2">
-              <span className="text-sm font-medium">心情</span>
-              <select
-                value={form.mood}
-                onChange={(event) => updateField('mood', event.target.value)}
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
-              >
-                {visibleMoods.map((mood) => (
-                  <option key={mood} value={mood}>
-                    {mood}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block space-y-2">
-              <span className="text-sm font-medium">地点</span>
-              <input
-                value={form.location}
-                onChange={(event) => updateField('location', event.target.value)}
-                placeholder="可选"
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
-              />
-            </label>
-          </div>
-
-          <AppImageUploader
-            value={form.imageUrl}
-            onChange={(url) => updateField('imageUrl', url)}
-            label="踪迹图片"
-            description="上传生活照片后，会作为这条踪迹的封面展示。"
-            disabled={saving}
-            onUploadingChange={setImageUploading}
-          />
-
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">标签</span>
-            <input
-              value={tagText}
-              onChange={(event) => setTagText(event.target.value)}
-              placeholder="例如：计划完成、散步、生活迹"
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
-            />
-            <p className="text-xs text-muted-foreground">可用顿号、逗号或换行分隔多个标签。</p>
-          </label>
-
-          {tracesError ? (
-            <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {tracesError}
-            </div>
-          ) : null}
-
-          <div className="grid grid-cols-2 gap-3 pt-2 max-[360px]:grid-cols-1">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={submitting}
-              onClick={() => onOpenChange(false)}
-            >
-              取消
-            </Button>
-            <Button type="submit" variant="ai" disabled={submitting}>
-              {submitting ? <ActionLoadingIcon /> : null}
-              {submitting ? '保存中' : editing ? '保存修改' : '保存踪迹'}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </BottomSheet>
   );
 }

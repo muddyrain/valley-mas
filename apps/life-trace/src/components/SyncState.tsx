@@ -12,6 +12,7 @@ type SyncStateProps = {
   tone?: SyncStateTone;
   variant?: SyncStateVariant;
   rows?: number;
+  showRail?: boolean;
   className?: string;
 };
 
@@ -56,6 +57,7 @@ export function SyncState({
   tone = 'default',
   variant = 'card',
   rows = 3,
+  showRail = true,
   className,
 }: SyncStateProps) {
   const toneClass = toneClassName[tone];
@@ -65,7 +67,9 @@ export function SyncState({
       <div className={cn('space-y-3', className)} aria-live="polite" aria-busy="true">
         {Array.from({ length: rows }, (_, index) => (
           <Card key={index} className={cn('relative overflow-hidden p-4', toneClass.card)}>
-            <div className={cn('absolute inset-x-4 top-0 h-px', toneClass.rail)} />
+            {showRail ? (
+              <div className={cn('absolute inset-x-4 top-0 h-px', toneClass.rail)} />
+            ) : null}
             <div className="flex items-start gap-3">
               <div
                 className={cn(
@@ -102,7 +106,7 @@ export function SyncState({
       aria-live="polite"
       aria-busy="true"
     >
-      <div className={cn('absolute inset-x-4 top-0 h-px', toneClass.rail)} />
+      {showRail ? <div className={cn('absolute inset-x-4 top-0 h-px', toneClass.rail)} /> : null}
       <div className="flex items-center gap-3">
         <div className={cn('grid size-10 shrink-0 place-items-center rounded-2xl', toneClass.icon)}>
           <ActionLoadingIcon tone={getLoadingTone(tone)} />

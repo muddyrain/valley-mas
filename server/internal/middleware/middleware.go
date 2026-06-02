@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,7 +15,22 @@ import (
 	"gorm.io/gorm"
 )
 
-var errInactiveUser = errors.New("inactive user")
+var (
+	errInactiveUser     = errors.New("inactive user")
+	errAuthUserNotFound = errors.New("auth user not found")
+)
+
+type authDependencyError struct {
+	err error
+}
+
+func (e *authDependencyError) Error() string {
+	return e.err.Error()
+}
+
+func (e *authDependencyError) Unwrap() error {
+	return e.err
+}
 
 // Cors 跨域中间件
 func Cors() gin.HandlerFunc {
@@ -59,11 +75,14 @@ func loadAuthUserFromToken(token string, cfg *config.Config) (int64, string, str
 
 	var user model.User
 	db := database.GetDB()
+	if db == nil {
+		return 0, "", "", &authDependencyError{err: errors.New("database is not initialized")}
+	}
 	if err := db.Select("id", "username", "role", "is_active").First(&user, userID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, "", "", errors.New("user not found")
+			return 0, "", "", errAuthUserNotFound
 		}
-		return 0, "", "", err
+		return 0, "", "", &authDependencyError{err: err}
 	}
 
 	if !user.IsActive {
@@ -87,6 +106,13 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 		if err != nil {
 			if errors.Is(err, errInactiveUser) {
 				c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "账号已被禁用"})
+				c.Abort()
+				return
+			}
+			var dependencyErr *authDependencyError
+			if errors.As(err, &dependencyErr) {
+				log.Printf("auth dependency unavailable: %v", dependencyErr)
+				c.JSON(http.StatusServiceUnavailable, gin.H{"code": 503, "message": "认证服务暂时不可用，请稍后重试"})
 				c.Abort()
 				return
 			}

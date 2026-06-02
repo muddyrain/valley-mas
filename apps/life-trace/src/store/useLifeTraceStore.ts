@@ -87,10 +87,18 @@ type LifeTraceState = {
   loadCheckins: (date: string) => Promise<void>;
   toggleHabitCheckin: (date: string, name: string, completed: boolean) => Promise<void>;
   addPlan: (input: NewPlanInput) => Promise<Plan | null>;
-  addPantryItem: (input: NewPantryItemInput) => Promise<PantryItem | null>;
-  editPantryItem: (itemId: string, input: NewPantryItemInput) => Promise<PantryItem | null>;
-  updatePantryItemStatus: (itemId: string, status: PantryItemStatus) => Promise<PantryItem | null>;
-  removePantryItem: (itemId: string) => Promise<void>;
+  addPantryItem: (input: NewPantryItemInput, householdId?: string) => Promise<PantryItem | null>;
+  editPantryItem: (
+    itemId: string,
+    input: NewPantryItemInput,
+    householdId?: string,
+  ) => Promise<PantryItem | null>;
+  updatePantryItemStatus: (
+    itemId: string,
+    status: PantryItemStatus,
+    householdId?: string,
+  ) => Promise<PantryItem | null>;
+  removePantryItem: (itemId: string, householdId?: string) => Promise<void>;
   receiveServerPlan: (plan: Plan, actionTitle?: string) => void;
   editPlan: (planId: string, input: NewPlanInput) => Promise<Plan | null>;
   addTrace: (input: NewTraceInput) => Promise<Trace | null>;
@@ -694,7 +702,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           set({ planCreating: false });
         }
       },
-      addPantryItem: async (input) => {
+      addPantryItem: async (input, householdId) => {
         const token = getToken();
         if (!token) {
           set({ pantryError: '请先登录后再添加库存' });
@@ -702,7 +710,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         }
 
         try {
-          const item = normalizePantryItem(await requestCreatePantryItem(token, input));
+          const item = normalizePantryItem(
+            await requestCreatePantryItem(token, input, householdId),
+          );
           set((state) => ({
             pantryItems: [item, ...state.pantryItems],
             pantryError: '',
@@ -717,7 +727,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           return null;
         }
       },
-      editPantryItem: async (itemId, input) => {
+      editPantryItem: async (itemId, input, householdId) => {
         const token = getToken();
         if (!token) {
           set({ pantryError: '请先登录后再编辑库存' });
@@ -726,7 +736,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
 
         try {
           const updatedItem = normalizePantryItem(
-            await requestUpdatePantryItem(token, itemId, input),
+            await requestUpdatePantryItem(token, itemId, input, householdId),
           );
           set((state) => ({
             pantryItems: state.pantryItems.map((item) => (item.id === itemId ? updatedItem : item)),
@@ -746,7 +756,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           return null;
         }
       },
-      updatePantryItemStatus: async (itemId, status) => {
+      updatePantryItemStatus: async (itemId, status, householdId) => {
         const token = getToken();
         if (!token) {
           set({ pantryError: '请先登录后再更新库存状态' });
@@ -755,7 +765,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
 
         try {
           const updatedItem = normalizePantryItem(
-            await requestUpdatePantryItemStatus(token, itemId, status),
+            await requestUpdatePantryItemStatus(token, itemId, status, householdId),
           );
           set((state) => ({
             pantryItems: state.pantryItems.map((item) => (item.id === itemId ? updatedItem : item)),
@@ -780,7 +790,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           return null;
         }
       },
-      removePantryItem: async (itemId) => {
+      removePantryItem: async (itemId, householdId) => {
         const token = getToken();
         if (!token) {
           set({ pantryError: '请先登录后再删除库存' });
@@ -788,7 +798,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         }
 
         try {
-          await requestDeletePantryItem(token, itemId);
+          await requestDeletePantryItem(token, itemId, householdId);
           set((state) => ({
             pantryItems: state.pantryItems.filter((item) => item.id !== itemId),
             pantryError: '',

@@ -3,10 +3,10 @@ import { useMemo, useState } from 'react';
 import { analyzeImage, type ImageAnalysisResponse } from '@/api/advice';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
+import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { buildPlanSchedule, type PlanDateOption } from '@/lib/planSchedule';
-import { cn } from '@/lib/utils';
 import type { NewPlanInput, NewTraceInput, PlanType } from '@/types';
 
 type ImageKind = '电影海报' | '美食照片' | '生活照片';
@@ -153,110 +153,92 @@ export function ImageAnalysisDrawer({
   };
 
   return (
-    <div
-      className={cn(
-        'fixed inset-0 z-40 transition',
-        open ? 'pointer-events-auto' : 'pointer-events-none',
-      )}
+    <BottomSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      overlayLabel="关闭图片分析"
+      zIndexClassName="z-40"
     >
-      <button
-        type="button"
-        aria-label="关闭图片分析"
-        className={cn(
-          'absolute inset-0 bg-background/70 backdrop-blur-sm transition-opacity',
-          open ? 'opacity-100' : 'opacity-0',
-        )}
-        onClick={() => onOpenChange(false)}
-      />
-      <div
-        className={cn(
-          'safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-0.75rem)] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl transition duration-300 max-[360px]:p-4',
-          open
-            ? 'visible translate-y-0 opacity-100'
-            : 'invisible translate-y-[calc(100%+2rem)] opacity-0',
-        )}
-      >
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-xl font-semibold">分析图片</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              先上传到云端，再交给服务端视觉 AI 分析。
-            </p>
-          </div>
-          <Button type="button" variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
-            <X className="size-5" />
-          </Button>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold">分析图片</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            先上传到云端，再交给服务端视觉 AI 分析。
+          </p>
         </div>
-
-        <div className="space-y-4">
-          <AppImageUploader
-            value={imageUrl}
-            onChange={updateImageUrl}
-            label="分析图片"
-            description="上传电影海报、美食照片或生活照片后，AI 会基于云端图片分析。"
-            disabled={analyzing}
-            onUploadingChange={setImageUploading}
-          />
-
-          <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-2">
-            {kindOptions.map((option) => (
-              <button
-                key={option}
-                type="button"
-                className={`rounded-xl px-2 py-2 text-xs font-semibold transition ${
-                  kind === option
-                    ? 'bg-life-ai text-background'
-                    : 'bg-secondary text-muted-foreground'
-                }`}
-                onClick={() => {
-                  setKind(option);
-                  setAnalyzed(false);
-                  setAnalysisResult(null);
-                  setAnalysisError('');
-                }}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-
-          <Button
-            type="button"
-            variant="ai"
-            className="w-full"
-            disabled={analyzing || imageUploading}
-            onClick={() => void handleAnalyze()}
-          >
-            {analyzing ? <ActionLoadingIcon className="size-5" /> : <Camera className="size-5" />}
-            {imageUploading ? '图片上传中' : analyzing ? '分析中' : '开始分析'}
-          </Button>
-
-          {analysisError ? (
-            <p className="rounded-2xl bg-life-alert/10 px-4 py-3 text-sm leading-6 text-life-alert">
-              {analysisError}
-            </p>
-          ) : null}
-
-          {analyzed ? (
-            <Card className="border-life-ai/20 p-4">
-              <div className="mb-3 flex items-center gap-2 text-life-ai">
-                <Sparkles className="size-5" />
-                <span className="text-sm font-semibold">AI 分析结果</span>
-              </div>
-              <h3 className="font-semibold">{analysis.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">{analysis.summary}</p>
-              <div className="mt-4 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-                <Button type="button" variant="secondary" onClick={handleCreatePlan}>
-                  生成计划
-                </Button>
-                <Button type="button" variant="ai" onClick={handleCreateTrace}>
-                  生成踪迹
-                </Button>
-              </div>
-            </Card>
-          ) : null}
-        </div>
+        <Button type="button" variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
+          <X className="size-5" />
+        </Button>
       </div>
-    </div>
+
+      <div className="space-y-4">
+        <AppImageUploader
+          value={imageUrl}
+          onChange={updateImageUrl}
+          label="分析图片"
+          description="上传电影海报、美食照片或生活照片后，AI 会基于云端图片分析。"
+          disabled={analyzing}
+          onUploadingChange={setImageUploading}
+        />
+
+        <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-2">
+          {kindOptions.map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={`rounded-xl px-2 py-2 text-xs font-semibold transition ${
+                kind === option
+                  ? 'bg-life-ai text-background'
+                  : 'bg-secondary text-muted-foreground'
+              }`}
+              onClick={() => {
+                setKind(option);
+                setAnalyzed(false);
+                setAnalysisResult(null);
+                setAnalysisError('');
+              }}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+
+        <Button
+          type="button"
+          variant="ai"
+          className="w-full"
+          disabled={analyzing || imageUploading}
+          onClick={() => void handleAnalyze()}
+        >
+          {analyzing ? <ActionLoadingIcon className="size-5" /> : <Camera className="size-5" />}
+          {imageUploading ? '图片上传中' : analyzing ? '分析中' : '开始分析'}
+        </Button>
+
+        {analysisError ? (
+          <p className="rounded-2xl bg-life-alert/10 px-4 py-3 text-sm leading-6 text-life-alert">
+            {analysisError}
+          </p>
+        ) : null}
+
+        {analyzed ? (
+          <Card className="border-life-ai/20 p-4">
+            <div className="mb-3 flex items-center gap-2 text-life-ai">
+              <Sparkles className="size-5" />
+              <span className="text-sm font-semibold">AI 分析结果</span>
+            </div>
+            <h3 className="font-semibold">{analysis.title}</h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{analysis.summary}</p>
+            <div className="mt-4 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+              <Button type="button" variant="secondary" onClick={handleCreatePlan}>
+                生成计划
+              </Button>
+              <Button type="button" variant="ai" onClick={handleCreateTrace}>
+                生成踪迹
+              </Button>
+            </div>
+          </Card>
+        ) : null}
+      </div>
+    </BottomSheet>
   );
 }

@@ -23,15 +23,21 @@ func setupTraceTestRouter(t *testing.T, userID model.Int64String, webPush ...con
 		t.Fatalf("open sqlite db: %v", err)
 	}
 	if err := db.AutoMigrate(
+		&model.Household{},
+		&model.HouseholdMember{},
+		&model.HouseholdInvite{},
 		&model.LifeTracePlan{},
 		&model.LifeTraceCheckin{},
 		&model.LifeTraceTrace{},
+		&model.LifeTracePantryItem{},
 		&model.LifeTraceSettings{},
 		&model.LifeTraceWeeklyReview{},
 		&model.LifeTraceAIConversation{},
 		&model.LifeTraceAIMessage{},
 		&model.LifeTracePushSubscription{},
 		&model.LifeTracePushDelivery{},
+		&model.LifeTraceDailyBriefDelivery{},
+		&model.LifeTracePantryReminderDelivery{},
 		&model.LifeTraceHolidayCalendar{},
 	); err != nil {
 		t.Fatalf("migrate test db: %v", err)

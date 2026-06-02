@@ -38,11 +38,16 @@ interface AuthState {
 
 // ---------- 自定义 Cookie Storage（适配 zustand persist） ----------
 const COOKIE_KEY = 'valley_auth';
-const COOKIE_EXPIRES = 7; // 天
+const COOKIE_EXPIRES = 365; // 天
+const COOKIE_OPTIONS = { expires: COOKIE_EXPIRES, sameSite: 'Lax' as const };
 
 const cookieStorage: StateStorage = {
-  getItem: (name) => Cookies.get(name) ?? null,
-  setItem: (name, value) => Cookies.set(name, value, { expires: COOKIE_EXPIRES, sameSite: 'Lax' }),
+  getItem: (name) => {
+    const value = Cookies.get(name) ?? null;
+    if (value) Cookies.set(name, value, COOKIE_OPTIONS);
+    return value;
+  },
+  setItem: (name, value) => Cookies.set(name, value, COOKIE_OPTIONS),
   removeItem: (name) => Cookies.remove(name),
 };
 

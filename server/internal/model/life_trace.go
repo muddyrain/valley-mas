@@ -139,6 +139,7 @@ func (trace *LifeTraceTrace) BeforeCreate(tx *gorm.DB) error {
 type LifeTracePantryItem struct {
 	ID                 Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID             Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	HouseholdID        Int64String    `gorm:"column:household_id;index" json:"householdId,omitempty"`
 	Name               string         `gorm:"size:160;not null" json:"name"`
 	Category           string         `gorm:"size:30;not null;default:'食品';index" json:"category"`
 	Quantity           int            `gorm:"not null;default:1" json:"quantity"`
@@ -150,6 +151,8 @@ type LifeTracePantryItem struct {
 	ImageURL           string         `gorm:"size:800" json:"imageUrl,omitempty"`
 	ThumbnailURL       string         `gorm:"type:text" json:"thumbnailUrl,omitempty"`
 	Status             string         `gorm:"size:20;not null;default:'normal';index" json:"status"`
+	CreatedBy          Int64String    `gorm:"column:created_by;index" json:"createdBy,omitempty"`
+	UpdatedBy          Int64String    `gorm:"column:updated_by;index" json:"updatedBy,omitempty"`
 	ReminderEnabled    bool           `gorm:"column:reminder_enabled;default:true" json:"reminderEnabled"`
 	ReminderUseDefault bool           `gorm:"column:reminder_use_default;default:true" json:"reminderUseDefault"`
 	ReminderRules      StringList     `gorm:"type:text" json:"reminderRules"`

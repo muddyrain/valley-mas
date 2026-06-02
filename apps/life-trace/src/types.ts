@@ -80,6 +80,7 @@ export type PantryReminderConfig = {
 
 export type PantryItem = {
   id: string;
+  householdId?: string;
   name: string;
   category: PantryCategory;
   quantity: number;
@@ -102,6 +103,41 @@ export type PantryPreferences = {
   defaultReminderEnabled: boolean;
   defaultReminderRules: PantryReminderRule[];
   defaultReminderTime: string;
+};
+
+export type HouseholdKind = 'personal' | 'shared';
+
+export type HouseholdStatus = 'active' | 'dissolved';
+
+export type HouseholdRole = 'owner' | 'admin' | 'member';
+
+export type HouseholdMemberStatus = 'active' | 'left' | 'removed';
+
+export type HouseholdSummary = {
+  id: string;
+  name: string;
+  kind: HouseholdKind;
+  status: HouseholdStatus;
+  ownerUserId: string;
+  role: HouseholdRole;
+  memberCount: number;
+};
+
+export type HouseholdMember = {
+  id: string;
+  householdId: string;
+  userId: string;
+  role: HouseholdRole;
+  status: HouseholdMemberStatus;
+  joinedAt?: string;
+  leftAt?: string;
+};
+
+export type HouseholdInvitePayload = {
+  householdId: string;
+  inviteCode: string;
+  expiresAt?: string;
+  status: 'pending' | 'accepted' | 'expired' | 'revoked';
 };
 
 export type Trace = {

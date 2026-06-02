@@ -1,0 +1,33 @@
+<svg width="960" height="280" viewBox="0 0 960 280" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Life Trace logo</title>
+  <desc id="desc">Life Trace horizontal logo using the app icon mark and a clean wordmark.</desc>
+  <rect width="960" height="280" fill="#FAFAF8"/>
+  <defs>
+    <linearGradient id="bg" x1="40" y1="28" x2="224" y2="242" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827"/>
+      <stop offset="0.52" stop-color="#09090B"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="trace" x1="73" y1="60" x2="199" y2="201" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6EE7B7"/>
+      <stop offset="0.52" stop-color="#10B981"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(56 36)">
+    <rect width="208" height="208" rx="46" fill="url(#bg)"/>
+    <circle cx="104" cy="104" r="69" fill="#10B981" opacity="0.08"/>
+    <path d="M64 63C81 43 113 41 136 56C159 71 166 100 152 123C138 146 106 154 82 140C63 129 57 108 67 93C78 78 99 76 113 89C126 101 125 120 113 131"
+      stroke="url(#trace)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M64 63C81 43 113 41 136 56C159 71 166 100 152 123C138 146 106 154 82 140C63 129 57 108 67 93C78 78 99 76 113 89C126 101 125 120 113 131"
+      stroke="#FAFAFA" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" opacity="0.96"/>
+    <circle cx="64" cy="63" r="15" fill="#09090B" stroke="url(#trace)" stroke-width="8"/>
+    <circle cx="113" cy="131" r="15" fill="#09090B" stroke="#FAFAFA" stroke-width="8"/>
+    <circle cx="117" cy="107" r="24" fill="#09090B" stroke="url(#trace)" stroke-width="8"/>
+    <circle cx="117" cy="107" r="7" fill="#06B6D4"/>
+  </g>
+  <g transform="translate(312 80)">
+    <text x="0" y="72" fill="#09090B" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="72" font-weight="760" letter-spacing="0">Life Trace</text>
+    <text x="4" y="116" fill="#747474" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="22" font-weight="500" letter-spacing="0">AI organized life memory</text>
+  </g>
+</svg>

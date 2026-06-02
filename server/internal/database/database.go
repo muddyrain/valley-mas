@@ -125,6 +125,9 @@ func initPostgres(cfg *config.Config) (gorm.Dialector, error) {
 func autoMigrate() error {
 	if err := DB.AutoMigrate(
 		&model.User{},
+		&model.Household{},
+		&model.HouseholdMember{},
+		&model.HouseholdInvite{},
 		&model.Creator{},
 		&model.CreatorSpace{},
 		&model.Resource{},

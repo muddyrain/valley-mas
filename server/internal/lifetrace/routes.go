@@ -55,6 +55,20 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			pantry.DELETE("/:id", handler.DeletePantryItem)
 		}
 
+		households := group.Group("/households")
+		households.Use(auth)
+		{
+			households.GET("", handler.ListHouseholds)
+			households.POST("", handler.CreateHousehold)
+			households.GET("/:householdId", handler.GetHousehold)
+			households.GET("/:householdId/members", handler.ListHouseholdMembers)
+			households.POST("/:householdId/invites", handler.CreateHouseholdInvite)
+			households.POST("/join", handler.JoinHousehold)
+			households.POST("/:householdId/transfer-owner", handler.TransferHouseholdOwner)
+			households.POST("/:householdId/leave", handler.LeaveHousehold)
+			households.POST("/:householdId/dissolve", handler.DissolveHousehold)
+		}
+
 		weeklyReviews := group.Group("/weekly-reviews")
 		weeklyReviews.Use(auth)
 		{

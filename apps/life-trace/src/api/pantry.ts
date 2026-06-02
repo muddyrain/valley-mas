@@ -4,6 +4,7 @@ import type { ListPagination, NewPantryItemInput, PantryItem, PantryItemStatus }
 export type ListPantryOptions = {
   page?: number;
   pageSize?: number;
+  householdId?: string;
   status?: PantryItemStatus | 'all';
   category?: PantryItem['category'] | 'all';
   q?: string;
@@ -36,6 +37,9 @@ function buildListQuery(options: ListPantryOptions = {}) {
   }
   if (options.pageSize) {
     params.set('pageSize', String(options.pageSize));
+  }
+  if (options.householdId) {
+    params.set('householdId', options.householdId);
   }
   if (options.status && options.status !== 'all') {
     params.set('status', options.status);
@@ -87,40 +91,75 @@ function deserializePantryItem(item: PantryItemResponse): PantryItem {
 }
 
 export function listPantry(token: string, options: ListPantryOptions = {}) {
-  return apiRequest<{ list: PantryItemResponse[]; pagination?: ListPagination }>(
-    `/life-trace/pantry${buildListQuery(options)}`,
-    token,
-  ).then((data) => ({
+  return apiRequest<{
+    householdId?: string;
+    list: PantryItemResponse[];
+    pagination?: ListPagination;
+  }>(`/life-trace/pantry${buildListQuery(options)}`, token).then((data) => ({
     ...data,
     list: data.list.map(deserializePantryItem),
   }));
 }
 
-export function createPantryItem(token: string, input: NewPantryItemInput) {
-  return apiRequest<PantryItemResponse>('/life-trace/pantry', token, {
-    method: 'POST',
-    body: JSON.stringify(serializePantryItemInput(input)),
-  }).then(deserializePantryItem);
+function buildHouseholdPath(path: string, householdId?: string) {
+  if (!householdId) {
+    return path;
+  }
+  const separator = path.includes('?') ? '&' : '?';
+  return `${path}${separator}householdId=${encodeURIComponent(householdId)}`;
 }
 
-export function updatePantryItem(token: string, id: string, input: NewPantryItemInput) {
-  return apiRequest<PantryItemResponse>(`/life-trace/pantry/${id}`, token, {
-    method: 'PATCH',
-    body: JSON.stringify(serializePantryItemInput(input)),
-  }).then(deserializePantryItem);
+export function createPantryItem(token: string, input: NewPantryItemInput, householdId?: string) {
+  return apiRequest<PantryItemResponse>(
+    buildHouseholdPath('/life-trace/pantry', householdId),
+    token,
+    {
+      method: 'POST',
+      body: JSON.stringify(serializePantryItemInput(input)),
+    },
+  ).then(deserializePantryItem);
 }
 
-export function updatePantryItemStatus(token: string, id: string, status: PantryItemStatus) {
-  return apiRequest<PantryItemResponse>(`/life-trace/pantry/${id}/status`, token, {
-    method: 'PATCH',
-    body: JSON.stringify({ status }),
-  }).then(deserializePantryItem);
+export function updatePantryItem(
+  token: string,
+  id: string,
+  input: NewPantryItemInput,
+  householdId?: string,
+) {
+  return apiRequest<PantryItemResponse>(
+    buildHouseholdPath(`/life-trace/pantry/${id}`, householdId),
+    token,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(serializePantryItemInput(input)),
+    },
+  ).then(deserializePantryItem);
 }
 
-export function deletePantryItem(token: string, id: string) {
-  return apiRequest<{ id: string }>(`/life-trace/pantry/${id}`, token, {
-    method: 'DELETE',
-  });
+export function updatePantryItemStatus(
+  token: string,
+  id: string,
+  status: PantryItemStatus,
+  householdId?: string,
+) {
+  return apiRequest<PantryItemResponse>(
+    buildHouseholdPath(`/life-trace/pantry/${id}/status`, householdId),
+    token,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    },
+  ).then(deserializePantryItem);
+}
+
+export function deletePantryItem(token: string, id: string, householdId?: string) {
+  return apiRequest<{ id: string }>(
+    buildHouseholdPath(`/life-trace/pantry/${id}`, householdId),
+    token,
+    {
+      method: 'DELETE',
+    },
+  );
 }
 
 export function generatePantryThumbnail(

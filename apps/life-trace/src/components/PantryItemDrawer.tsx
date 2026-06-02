@@ -56,12 +56,21 @@ type PantryItemDrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item?: PantryItem | null;
+  householdId?: string;
+  householdName?: string;
   onSaved?: (message: string) => void;
 };
 
 type PantryFormErrors = Partial<Record<'name' | 'quantity', string>>;
 
-export function PantryItemDrawer({ open, onOpenChange, item, onSaved }: PantryItemDrawerProps) {
+export function PantryItemDrawer({
+  open,
+  onOpenChange,
+  item,
+  householdId,
+  householdName,
+  onSaved,
+}: PantryItemDrawerProps) {
   const token = useAuthStore((state) => state.token);
   const pantryPreferences = useLifeTraceStore((state) => state.pantryPreferences);
   const addPantryItem = useLifeTraceStore((state) => state.addPantryItem);
@@ -172,7 +181,9 @@ export function PantryItemDrawer({ open, onOpenChange, item, onSaved }: PantryIt
     async (payload: NewPantryItemInput) => {
       setSubmitting(true);
       try {
-        const saved = item ? await editPantryItem(item.id, payload) : await addPantryItem(payload);
+        const saved = item
+          ? await editPantryItem(item.id, payload, householdId)
+          : await addPantryItem(payload, householdId);
         if (saved) {
           queuedPayloadRef.current = null;
           setSaveQueuedAfterThumbnail(false);
@@ -183,7 +194,7 @@ export function PantryItemDrawer({ open, onOpenChange, item, onSaved }: PantryIt
         setSubmitting(false);
       }
     },
-    [addPantryItem, editPantryItem, editing, item, onOpenChange, onSaved],
+    [addPantryItem, editPantryItem, editing, householdId, item, onOpenChange, onSaved],
   );
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -268,6 +279,9 @@ export function PantryItemDrawer({ open, onOpenChange, item, onSaved }: PantryIt
             <p className="mt-1 text-sm text-muted-foreground">
               给家里的商品留一张图，再决定何时提醒你处理。
             </p>
+            {householdName ? (
+              <p className="mt-2 text-xs font-medium text-life-ai">保存到：{householdName}</p>
+            ) : null}
           </div>
           <Button type="button" variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
             <X className="size-5" />
@@ -386,16 +400,14 @@ export function PantryItemDrawer({ open, onOpenChange, item, onSaved }: PantryIt
             onUploadingChange={setImageUploading}
             cameraAndLibrary
             label="真实图片"
-            description="列表页会优先展示真实图片，没有真实图时再回退到 AI 缩略图。"
+            description="给这件库存留一张更好辨认的照片。"
           />
 
           <div className="space-y-3 rounded-[1.25rem] border border-border bg-secondary/60 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-medium">AI 缩略图</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  真实图缺席时，用它给列表页补一个封面。
-                </p>
+                <p className="mt-1 text-xs text-muted-foreground">补一张更整洁的封面图。</p>
               </div>
               {form.thumbnailUrl ? (
                 <Button
@@ -441,9 +453,7 @@ export function PantryItemDrawer({ open, onOpenChange, item, onSaved }: PantryIt
               </div>
             ) : null}
             {form.thumbnailUrl ? (
-              <p className="text-xs text-muted-foreground">
-                已生成封面，保存后会在列表页优先作为补位缩略图展示。
-              </p>
+              <p className="text-xs text-muted-foreground">封面已准备好，保存后就会生效。</p>
             ) : null}
             {saveQueuedAfterThumbnail ? (
               <p className="text-xs text-life-trace">AI 缩略图生成中，完成后会自动继续保存。</p>

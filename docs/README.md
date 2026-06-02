@@ -6,6 +6,7 @@
 
 - [项目指南](./PROJECT_GUIDE.md)：说明项目定位、技术栈、模块地图、开发命令与环境变量。
 - [Harness Engineering](./HARNESS_ENGINEERING.md)：说明 AI coding agent 在本仓库中的上下文入口、工具边界、验证命令、评审回路和回归证据。
+- [家庭空间与家庭库存设计](./HOUSEHOLD_PANTRY_DESIGN.md)：记录通用 household 模型、家庭库存归属方案、解散/退出规则与 Pantry 改造路线。
 
 ---
 

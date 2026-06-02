@@ -925,8 +925,7 @@ export function TodayPage() {
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-border px-4 py-5 text-sm leading-6 text-muted-foreground">
-            先从冰箱里最常忘的一样开始，比如牛奶、鸡蛋或生菜。列表页会优先展示真实图片，没有实拍图时再用
-            AI 缩略图补位。
+            先从冰箱里最常忘的一样开始，比如牛奶、鸡蛋或生菜，补一张图会更容易一眼认出来。
           </div>
         )}
       </Card>

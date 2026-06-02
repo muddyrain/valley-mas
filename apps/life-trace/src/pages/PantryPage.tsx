@@ -4,18 +4,33 @@ import {
   BadgeAlert,
   Camera,
   ClipboardList,
+  Home,
   Milk,
   PackagePlus,
   Pill,
   Search,
+  Settings2,
   Sparkles,
   Trash2,
+  Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  createHousehold,
+  createHouseholdInvite,
+  dissolveHousehold,
+  joinHousehold,
+  leaveHousehold,
+  listHouseholdMembers,
+  listHouseholds,
+  transferHouseholdOwner,
+} from '@/api/household';
 import { listPantry } from '@/api/pantry';
 import { EmptyState } from '@/components/EmptyState';
+import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
 import { PantryItemDrawer } from '@/components/PantryItemDrawer';
+import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -30,10 +45,18 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { ListPagination, PantryCategory, PantryItem, PantryItemStatus } from '@/types';
+import type {
+  HouseholdInvitePayload,
+  HouseholdMember,
+  HouseholdSummary,
+  ListPagination,
+  PantryCategory,
+  PantryItem,
+  PantryItemStatus,
+} from '@/types';
 
 const statusFilters: Array<{ id: PantryItemStatus | 'all'; label: string }> = [
-  { id: 'all', label: '全部' },
+  { id: 'all', label: '在库' },
   { id: 'expiring', label: '临期' },
   { id: 'expired', label: '已过期' },
   { id: 'used-up', label: '已用完' },
@@ -58,6 +81,7 @@ const categoryIconMap = {
 } satisfies Record<PantryCategory, typeof Apple>;
 
 const PANTRY_PAGE_SIZE = 20;
+
 const emptyPagination: ListPagination = {
   page: 1,
   pageSize: PANTRY_PAGE_SIZE,
@@ -72,18 +96,108 @@ type PantryOverviewState = {
   active: number;
 };
 
+const householdKindLabel = {
+  personal: '个人空间',
+  shared: '共享家庭',
+} satisfies Record<HouseholdSummary['kind'], string>;
+
+function readStatusFilter(params: URLSearchParams): PantryItemStatus | 'all' {
+  const value = params.get('status');
+  if (value && statusFilters.some((item) => item.id === value)) {
+    return value as PantryItemStatus | 'all';
+  }
+  return 'all';
+}
+
+function readCategoryFilter(params: URLSearchParams): PantryCategory | 'all' {
+  const value = params.get('category');
+  if (value && categoryFilters.includes(value as PantryCategory | 'all')) {
+    return value as PantryCategory | 'all';
+  }
+  return 'all';
+}
+
+function readQueryText(params: URLSearchParams) {
+  return params.get('q')?.trim() ?? '';
+}
+
+function readHouseholdId(params: URLSearchParams) {
+  return params.get('householdId')?.trim() ?? '';
+}
+
+function updateSearchParams(
+  current: URLSearchParams,
+  updates: {
+    status?: PantryItemStatus | 'all';
+    category?: PantryCategory | 'all';
+    q?: string;
+    householdId?: string;
+  },
+) {
+  const next = new URLSearchParams(current);
+
+  if (updates.status !== undefined) {
+    if (updates.status === 'all') {
+      next.delete('status');
+    } else {
+      next.set('status', updates.status);
+    }
+  }
+
+  if (updates.category !== undefined) {
+    if (updates.category === 'all') {
+      next.delete('category');
+    } else {
+      next.set('category', updates.category);
+    }
+  }
+
+  if (updates.q !== undefined) {
+    const value = updates.q.trim();
+    if (value) {
+      next.set('q', value);
+    } else {
+      next.delete('q');
+    }
+  }
+
+  if (updates.householdId !== undefined) {
+    const value = updates.householdId.trim();
+    if (value) {
+      next.set('householdId', value);
+    } else {
+      next.delete('householdId');
+    }
+  }
+
+  return next;
+}
+
 export function PantryPage() {
   const token = useAuthStore((state) => state.token);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const addTrace = useLifeTraceStore((state) => state.addTrace);
   const pantryError = useLifeTraceStore((state) => state.pantryError);
   const updatePantryItemStatus = useLifeTraceStore((state) => state.updatePantryItemStatus);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PantryItem | null>(null);
-  const [statusFilter, setStatusFilter] = useState<PantryItemStatus | 'all'>('all');
-  const [categoryFilter, setCategoryFilter] = useState<PantryCategory | 'all'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<PantryItemStatus | 'all'>(() =>
+    readStatusFilter(new URLSearchParams(window.location.search)),
+  );
+  const [categoryFilter, setCategoryFilter] = useState<PantryCategory | 'all'>(() =>
+    readCategoryFilter(new URLSearchParams(window.location.search)),
+  );
+  const [searchQuery, setSearchQuery] = useState(() =>
+    readQueryText(new URLSearchParams(window.location.search)),
+  );
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(() =>
+    readQueryText(new URLSearchParams(window.location.search)),
+  );
+  const [selectedHouseholdId, setSelectedHouseholdId] = useState(() =>
+    readHouseholdId(new URLSearchParams(window.location.search)),
+  );
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState('');
   const [pantryList, setPantryList] = useState<PantryItem[]>([]);
@@ -98,16 +212,58 @@ export function PantryPage() {
     expired: 0,
     active: 0,
   });
+  const [households, setHouseholds] = useState<HouseholdSummary[]>([]);
+  const [householdsLoading, setHouseholdsLoading] = useState(false);
+  const [householdError, setHouseholdError] = useState('');
+  const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
+  const [householdMembersLoading, setHouseholdMembersLoading] = useState(false);
+  const [invitePayload, setInvitePayload] = useState<HouseholdInvitePayload | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const pantryRequestIdRef = useRef(0);
+  const previousSelectedHouseholdIdRef = useRef(selectedHouseholdId);
+  const pendingHouseholdSwitchIdRef = useRef<string | null>(null);
+  const [householdSwitchLoading, setHouseholdSwitchLoading] = useState(false);
+  const currentHousehold = useMemo(
+    () => households.find((item) => item.id === selectedHouseholdId) ?? households[0] ?? null,
+    [households, selectedHouseholdId],
+  );
+
+  const syncUrlState = useCallback(
+    (updates: {
+      status?: PantryItemStatus | 'all';
+      category?: PantryCategory | 'all';
+      q?: string;
+      householdId?: string;
+    }) => {
+      const next = updateSearchParams(searchParams, updates);
+      if (next.toString() !== searchParams.toString()) {
+        setSearchParams(next, { replace: true });
+      }
+    },
+    [searchParams, setSearchParams],
+  );
+
+  useEffect(() => {
+    const nextStatus = readStatusFilter(searchParams);
+    const nextCategory = readCategoryFilter(searchParams);
+    const nextQuery = readQueryText(searchParams);
+    const nextHouseholdId = readHouseholdId(searchParams);
+
+    setStatusFilter((current) => (current === nextStatus ? current : nextStatus));
+    setCategoryFilter((current) => (current === nextCategory ? current : nextCategory));
+    setSearchQuery((current) => (current === nextQuery ? current : nextQuery));
+    setDebouncedSearchQuery((current) => (current === nextQuery ? current : nextQuery));
+    setSelectedHouseholdId((current) => (current === nextHouseholdId ? current : nextHouseholdId));
+  }, [searchParams]);
 
   const pantryQueryOptions = useMemo(
     () => ({
+      householdId: selectedHouseholdId || undefined,
       status: statusFilter,
       category: categoryFilter,
       q: debouncedSearchQuery.trim() || undefined,
     }),
-    [categoryFilter, debouncedSearchQuery, statusFilter],
+    [categoryFilter, debouncedSearchQuery, selectedHouseholdId, statusFilter],
   );
 
   const loadPantryPage = useCallback(
@@ -119,10 +275,13 @@ export function PantryPage() {
         setPantryLoadingMore(false);
         setPantryListError('');
         setPantryPagination(emptyPagination);
+        pendingHouseholdSwitchIdRef.current = null;
+        setHouseholdSwitchLoading(false);
         return;
       }
 
       const requestId = ++pantryRequestIdRef.current;
+      const requestHouseholdId = pantryQueryOptions.householdId ?? '';
       if (mode === 'append') {
         setPantryLoadingMore(true);
       } else {
@@ -166,6 +325,14 @@ export function PantryPage() {
         if (requestId === pantryRequestIdRef.current) {
           setPantryLoading(false);
           setPantryLoadingMore(false);
+          if (
+            mode === 'replace' &&
+            pendingHouseholdSwitchIdRef.current !== null &&
+            pendingHouseholdSwitchIdRef.current === requestHouseholdId
+          ) {
+            pendingHouseholdSwitchIdRef.current = null;
+            setHouseholdSwitchLoading(false);
+          }
         }
       }
     },
@@ -179,10 +346,11 @@ export function PantryPage() {
     }
 
     try {
+      const baseOptions = { householdId: selectedHouseholdId || undefined, page: 1, pageSize: 1 };
       const [allResult, expiringResult, expiredResult] = await Promise.all([
-        listPantry(token, { page: 1, pageSize: 1 }),
-        listPantry(token, { page: 1, pageSize: 1, status: 'expiring' }),
-        listPantry(token, { page: 1, pageSize: 1, status: 'expired' }),
+        listPantry(token, baseOptions),
+        listPantry(token, { ...baseOptions, status: 'expiring' }),
+        listPantry(token, { ...baseOptions, status: 'expired' }),
       ]);
 
       const total = allResult.pagination?.total ?? allResult.list.length;
@@ -197,7 +365,81 @@ export function PantryPage() {
     } catch {
       // Ignore overview refresh failures and keep the last successful snapshot.
     }
-  }, [token]);
+  }, [selectedHouseholdId, token]);
+
+  const loadHouseholdMembersFor = useCallback(
+    async (householdId: string) => {
+      if (!token || !householdId) {
+        setHouseholdMembers([]);
+        return;
+      }
+
+      setHouseholdMembersLoading(true);
+      try {
+        const response = await listHouseholdMembers(token, householdId);
+        setHouseholdMembers(response.list);
+      } catch (error) {
+        throw new Error(error instanceof Error ? error.message : '读取家庭成员失败');
+      } finally {
+        setHouseholdMembersLoading(false);
+      }
+    },
+    [token],
+  );
+
+  const loadHouseholds = useCallback(
+    async (preferredHouseholdId?: string) => {
+      if (!token) {
+        setHouseholds([]);
+        setHouseholdMembers([]);
+        setInvitePayload(null);
+        setHouseholdError('');
+        return;
+      }
+
+      setHouseholdsLoading(true);
+      setHouseholdError('');
+      try {
+        const response = await listHouseholds(token);
+        setHouseholds(response.list);
+
+        const requestedId = preferredHouseholdId ?? selectedHouseholdId;
+        const hasRequested = requestedId && response.list.some((item) => item.id === requestedId);
+        const fallbackId =
+          (response.currentHouseholdId &&
+            response.list.some((item) => item.id === response.currentHouseholdId) &&
+            response.currentHouseholdId) ||
+          response.list[0]?.id ||
+          '';
+        const nextSelectedHouseholdId = hasRequested ? requestedId : fallbackId;
+
+        if (nextSelectedHouseholdId !== selectedHouseholdId) {
+          setSelectedHouseholdId(nextSelectedHouseholdId);
+          syncUrlState({ householdId: nextSelectedHouseholdId });
+        }
+
+        if (!response.list.some((item) => item.id === invitePayload?.householdId)) {
+          setInvitePayload(null);
+        }
+
+        if (householdSheetOpen && nextSelectedHouseholdId) {
+          await loadHouseholdMembersFor(nextSelectedHouseholdId);
+        }
+      } catch (error) {
+        setHouseholdError(error instanceof Error ? error.message : '读取家庭空间失败');
+      } finally {
+        setHouseholdsLoading(false);
+      }
+    },
+    [
+      householdSheetOpen,
+      invitePayload?.householdId,
+      loadHouseholdMembersFor,
+      selectedHouseholdId,
+      syncUrlState,
+      token,
+    ],
+  );
 
   const loadMorePantryItems = useCallback(async () => {
     if (pantryLoading || pantryLoadingMore || !pantryPagination.hasMore) {
@@ -214,22 +456,133 @@ export function PantryPage() {
 
     setPendingActionId(`${item.id}:${status}`);
     try {
-      const updated = await updatePantryItemStatus(item.id, status);
+      const updated = await updatePantryItemStatus(
+        item.id,
+        status,
+        selectedHouseholdId || undefined,
+      );
       if (!updated) {
         return;
       }
       await addTrace(buildPantryTraceInput(updated, status));
-      void loadPantryPage(1, 'replace');
-      void refreshOverview();
+      setPantryList((current) => current.filter((entry) => entry.id !== updated.id));
+      setPantryPagination((current) => ({
+        ...current,
+        total: Math.max(current.total - 1, 0),
+      }));
+      await refreshOverview();
     } finally {
       setPendingActionId(null);
     }
   };
 
+  const handleCreateHousehold = useCallback(
+    async (name: string) => {
+      if (!token) {
+        throw new Error('请先登录后再创建家庭');
+      }
+
+      const created = await createHousehold(token, name);
+      setSaveMessage(`已创建共享家庭「${created.name}」`);
+      setInvitePayload(null);
+      await loadHouseholds(created.id);
+      await loadHouseholdMembersFor(created.id);
+    },
+    [loadHouseholdMembersFor, loadHouseholds, token],
+  );
+
+  const handleJoinHousehold = useCallback(
+    async (inviteCode: string) => {
+      if (!token) {
+        throw new Error('请先登录后再加入家庭');
+      }
+
+      const joined = await joinHousehold(token, inviteCode);
+      setSaveMessage(`已加入「${joined.name}」`);
+      setInvitePayload(null);
+      await loadHouseholds(joined.id);
+      await loadHouseholdMembersFor(joined.id);
+    },
+    [loadHouseholdMembersFor, loadHouseholds, token],
+  );
+
+  const handleCreateInvite = useCallback(
+    async (householdId: string) => {
+      if (!token) {
+        throw new Error('请先登录后再生成邀请码');
+      }
+
+      const payload = await createHouseholdInvite(token, householdId);
+      setInvitePayload(payload);
+    },
+    [token],
+  );
+
+  const handleLeaveHousehold = useCallback(
+    async (householdId: string) => {
+      if (!token) {
+        throw new Error('请先登录后再退出家庭');
+      }
+
+      await leaveHousehold(token, householdId);
+      setInvitePayload(null);
+      setHouseholdMembers([]);
+      await loadHouseholds();
+      setSaveMessage('已退出共享家庭');
+    },
+    [loadHouseholds, token],
+  );
+
+  const handleTransferOwner = useCallback(
+    async (householdId: string, targetUserId: string) => {
+      if (!token) {
+        throw new Error('请先登录后再转移家庭所有者');
+      }
+
+      const updated = await transferHouseholdOwner(token, householdId, targetUserId);
+      setSaveMessage(`已将「${updated.name}」的所有者转交给成员 #${targetUserId}`);
+      await loadHouseholds(householdId);
+      await loadHouseholdMembersFor(householdId);
+    },
+    [loadHouseholdMembersFor, loadHouseholds, token],
+  );
+
+  const handleDissolveHousehold = useCallback(
+    async (householdId: string) => {
+      if (!token) {
+        throw new Error('请先登录后再解散家庭');
+      }
+
+      await dissolveHousehold(token, householdId);
+      setInvitePayload(null);
+      setHouseholdMembers([]);
+      await loadHouseholds();
+      setSaveMessage('共享家庭已解散');
+    },
+    [loadHouseholds, token],
+  );
+
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearchQuery(searchQuery), 240);
+    const timer = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      syncUrlState({ q: searchQuery });
+    }, 240);
     return () => window.clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, syncUrlState]);
+
+  useEffect(() => {
+    void loadHouseholds();
+  }, [loadHouseholds]);
+
+  useEffect(() => {
+    if (previousSelectedHouseholdIdRef.current === selectedHouseholdId) {
+      return;
+    }
+
+    previousSelectedHouseholdIdRef.current = selectedHouseholdId;
+    pendingHouseholdSwitchIdRef.current = selectedHouseholdId;
+    setHouseholdSwitchLoading(true);
+  }, [selectedHouseholdId]);
 
   useEffect(() => {
     void loadPantryPage(1, 'replace');
@@ -240,11 +593,18 @@ export function PantryPage() {
   }, [refreshOverview]);
 
   useEffect(() => {
+    if (!householdSheetOpen || !currentHousehold?.id) {
+      return;
+    }
+    void loadHouseholdMembersFor(currentHousehold.id);
+  }, [currentHousehold?.id, householdSheetOpen, loadHouseholdMembersFor]);
+
+  useEffect(() => {
     if (!saveMessage) {
       return;
     }
 
-    const timer = window.setTimeout(() => setSaveMessage(''), 1800);
+    const timer = window.setTimeout(() => setSaveMessage(''), 2200);
     return () => window.clearTimeout(timer);
   }, [saveMessage]);
 
@@ -271,7 +631,7 @@ export function PantryPage() {
     return () => observer.disconnect();
   }, [loadMorePantryItems, pantryLoading, pantryLoadingMore, pantryPagination.hasMore]);
 
-  const activePantryError = pantryListError || pantryError;
+  const activePantryError = pantryListError || pantryError || householdError;
 
   return (
     <div className="space-y-5">
@@ -286,7 +646,7 @@ export function PantryPage() {
           </button>
           <h1 className="mt-2 text-3xl font-bold tracking-tight max-[360px]:text-2xl">家庭库存</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            先看临期，再决定今晚该吃什么、该补什么。
+            先切到正确空间，再看临期、补货和今晚该优先吃什么。
           </p>
         </div>
         <Button
@@ -303,6 +663,79 @@ export function PantryPage() {
         </Button>
       </header>
 
+      <Card className="space-y-4 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={currentHousehold?.kind === 'personal' ? 'trace' : 'ai'}>
+                {currentHousehold ? householdKindLabel[currentHousehold.kind] : '空间同步中'}
+              </Badge>
+              {currentHousehold ? (
+                <Badge tone="default">
+                  {currentHousehold.memberCount}{' '}
+                  {currentHousehold.kind === 'personal' ? '位成员' : '人协作'}
+                </Badge>
+              ) : null}
+            </div>
+            <h2 className="mt-2 truncate text-xl font-semibold">
+              {currentHousehold?.name || '正在同步库存空间'}
+            </h2>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {currentHousehold?.kind === 'personal'
+                ? '你的个人库存会一直保留，不会因为加入共享家庭而消失。'
+                : '当前展示的是共享家庭库存，成员看到的是同一份列表。'}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setHouseholdSheetOpen(true)}
+          >
+            <Settings2 className="size-4" />
+            管理
+          </Button>
+        </div>
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {households.length > 0 ? (
+            households.map((household) => {
+              const active = currentHousehold?.id === household.id;
+              return (
+                <button
+                  key={household.id}
+                  type="button"
+                  className={cn(
+                    'flex h-10 shrink-0 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition',
+                    active
+                      ? 'border-life-ai/45 bg-life-ai/10 text-life-ai'
+                      : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
+                  )}
+                  onClick={() => {
+                    setSelectedHouseholdId(household.id);
+                    syncUrlState({ householdId: household.id });
+                    setInvitePayload((current) =>
+                      current?.householdId === household.id ? current : null,
+                    );
+                  }}
+                  aria-pressed={active}
+                >
+                  {household.kind === 'personal' ? (
+                    <Home className="size-3.5" />
+                  ) : (
+                    <Users className="size-3.5" />
+                  )}
+                  <span>{household.name}</span>
+                </button>
+              );
+            })
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              {householdsLoading ? '正在同步空间...' : '暂无可用空间'}
+            </span>
+          )}
+        </div>
+      </Card>
+
       <section className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
         <Card className="border-life-health/20 bg-life-health/10 p-4">
           <p className="text-sm font-semibold text-life-health">临期</p>
@@ -315,13 +748,13 @@ export function PantryPage() {
           <p className="mt-1 text-xs text-muted-foreground">需要尽快确认</p>
         </Card>
         <Card className="border-life-ai/20 bg-life-ai/10 p-4">
-          <p className="text-sm font-semibold text-life-ai">库存总数</p>
+          <p className="text-sm font-semibold text-life-ai">在库总数</p>
           <p className="mt-2 text-2xl font-bold">{overview.total}</p>
-          <p className="mt-1 text-xs text-muted-foreground">当前可管理条目</p>
+          <p className="mt-1 text-xs text-muted-foreground">当前空间仍在管理中的条目</p>
         </Card>
       </section>
 
-      <Card className="space-y-3 p-4">
+      <Card className="space-y-4 p-4">
         <label className="relative block">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -335,7 +768,9 @@ export function PantryPage() {
           <div className="min-w-0">
             <p className="text-sm font-semibold">筛选</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {statusFilter === 'all' ? '全部状态' : `状态：${getPantryStatusLabel(statusFilter)}`}
+              {statusFilter === 'all'
+                ? '只看在库条目'
+                : `状态：${getPantryStatusLabel(statusFilter)}`}
               {categoryFilter === 'all' ? ' · 全部分类' : ` · 分类：${categoryFilter}`}
             </p>
           </div>
@@ -348,62 +783,73 @@ export function PantryPage() {
                 setStatusFilter('all');
                 setCategoryFilter('all');
                 setSearchQuery('');
+                setDebouncedSearchQuery('');
+                syncUrlState({ status: 'all', category: 'all', q: '' });
               }}
             >
               清空
             </Button>
           ) : null}
         </div>
-        <div className="grid grid-cols-3 rounded-2xl bg-secondary p-1 text-sm font-semibold text-muted-foreground max-[360px]:grid-cols-2">
-          {statusFilters.map((filter) => {
-            const active = statusFilter === filter.id;
-            return (
-              <button
-                key={filter.id}
-                type="button"
-                className={cn(
-                  'min-h-10 rounded-xl px-2 py-2 transition',
-                  active ? 'bg-card text-foreground shadow-sm' : 'hover:text-foreground',
-                )}
-                onClick={() => setStatusFilter(filter.id)}
-                aria-pressed={active}
-              >
-                {filter.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <span className="shrink-0 text-xs font-semibold text-muted-foreground">分类</span>
-          {categoryFilters.map((category) => {
-            const active = categoryFilter === category;
-            return (
-              <button
-                key={category}
-                type="button"
-                className={cn(
-                  'h-9 shrink-0 rounded-full border px-3 text-xs font-semibold transition',
-                  active
-                    ? 'border-life-plan/45 bg-life-plan/10 text-life-plan'
-                    : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
-                )}
-                onClick={() => setCategoryFilter(category)}
-                aria-pressed={active}
-              >
-                {category === 'all' ? '全部分类' : category}
-              </button>
-            );
-          })}
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <span className="shrink-0 text-xs font-semibold text-muted-foreground">状态</span>
+            {statusFilters.map((filter) => {
+              const active = statusFilter === filter.id;
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  className={cn(
+                    'h-9 shrink-0 rounded-full border px-3 text-xs font-semibold transition',
+                    active
+                      ? 'border-life-ai/45 bg-life-ai/10 text-life-ai'
+                      : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
+                  )}
+                  onClick={() => {
+                    setStatusFilter(filter.id);
+                    syncUrlState({ status: filter.id });
+                  }}
+                  aria-pressed={active}
+                >
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <span className="shrink-0 text-xs font-semibold text-muted-foreground">分类</span>
+            {categoryFilters.map((category) => {
+              const active = categoryFilter === category;
+              return (
+                <button
+                  key={category}
+                  type="button"
+                  className={cn(
+                    'h-9 shrink-0 rounded-full border px-3 text-xs font-semibold transition',
+                    active
+                      ? 'border-life-plan/45 bg-life-plan/10 text-life-plan'
+                      : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
+                  )}
+                  onClick={() => {
+                    setCategoryFilter(category);
+                    syncUrlState({ category });
+                  }}
+                  aria-pressed={active}
+                >
+                  {category === 'all' ? '全部分类' : category}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </Card>
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-xl font-semibold tracking-tight">库存列表</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              列表优先展示真实图片，没有 `imageUrl` 才会回退到 AI 缩略图。
-            </p>
           </div>
           <div className="inline-flex min-w-[4.5rem] shrink-0 items-center justify-center rounded-full bg-secondary px-3 py-2 text-sm font-semibold whitespace-nowrap text-foreground">
             <span>{pantryPagination.total}</span>
@@ -417,18 +863,38 @@ export function PantryPage() {
           </Card>
         ) : null}
 
-        {pantryLoading && !pantryLoaded ? (
-          <Card className="p-5 text-sm text-muted-foreground">正在同步家庭库存...</Card>
+        {householdSwitchLoading ? (
+          <div className="space-y-3">
+            <SyncState
+              title={`正在切换到${currentHousehold?.name || '所选空间'}`}
+              description="库存列表马上刷新出来。"
+              tone="ai"
+              showRail={false}
+            />
+            <SyncState
+              title="正在同步库存列表"
+              tone="default"
+              variant="skeleton-list"
+              rows={2}
+              showRail={false}
+            />
+          </div>
+        ) : pantryLoading && !pantryLoaded ? (
+          <Card className="p-5 text-sm text-muted-foreground">
+            正在同步{currentHousehold?.name || '当前空间'}库存...
+          </Card>
         ) : pantryList.length === 0 ? (
           <EmptyState
             title={
               statusFilter === 'all' && categoryFilter === 'all' && !debouncedSearchQuery
-                ? '还没有库存条目'
+                ? '这个空间还没有在库条目'
                 : '暂无匹配库存'
             }
             description={
               statusFilter === 'all' && categoryFilter === 'all' && !debouncedSearchQuery
-                ? '先加一盒牛奶、一袋生菜或一瓶洗衣液，Life Trace 才能开始提醒你。'
+                ? currentHousehold?.kind === 'shared'
+                  ? '先把这次采购补进去，家里的其他成员就能看到同一份库存。'
+                  : '先加一盒牛奶、一袋生菜或一瓶洗衣液，Life Trace 才能开始提醒你。'
                 : '换个筛选条件，或者把搜索词放宽一点试试。'
             }
             eyebrow={
@@ -448,6 +914,8 @@ export function PantryPage() {
                     setStatusFilter('all');
                     setCategoryFilter('all');
                     setSearchQuery('');
+                    setDebouncedSearchQuery('');
+                    syncUrlState({ status: 'all', category: 'all', q: '' });
                   }}
                 >
                   清空筛选
@@ -478,12 +946,25 @@ export function PantryPage() {
               const usedUpPending = pendingActionId === `${item.id}:used-up`;
               const discardedPending = pendingActionId === `${item.id}:discarded`;
               const actionPending = usedUpPending || discardedPending;
+              const terminalStatus = status === 'used-up' || status === 'discarded';
+              const usedUpDisabled = actionPending || terminalStatus;
+              const discardedDisabled = actionPending || terminalStatus;
 
               return (
-                <Card key={item.id} className="overflow-hidden p-0">
+                <Card
+                  key={item.id}
+                  className={cn(
+                    'overflow-hidden p-0',
+                    status === 'discarded' && 'border-border/70 bg-secondary/20',
+                    status === 'used-up' && 'border-border/80 bg-secondary/10',
+                  )}
+                >
                   <button
                     type="button"
-                    className="flex w-full items-stretch gap-0 text-left"
+                    className={cn(
+                      'flex w-full items-stretch gap-0 text-left',
+                      status === 'discarded' && 'opacity-80',
+                    )}
                     onClick={() => {
                       setEditingItem(item);
                       setDrawerOpen(true);
@@ -549,21 +1030,31 @@ export function PantryPage() {
                   <div className="grid grid-cols-3 gap-px border-t border-border bg-border/60">
                     <button
                       type="button"
-                      disabled={actionPending}
-                      className="flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold text-life-trace transition hover:bg-life-trace/10 disabled:cursor-not-allowed disabled:opacity-60"
-                      onClick={() => handleStatusAction(item, 'used-up')}
+                      disabled={usedUpDisabled}
+                      className={cn(
+                        'flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
+                        status === 'used-up'
+                          ? 'text-muted-foreground'
+                          : 'text-life-trace hover:bg-life-trace/10',
+                      )}
+                      onClick={() => void handleStatusAction(item, 'used-up')}
                     >
                       <BadgeAlert className="size-4" />
-                      {usedUpPending ? '处理中...' : '用完'}
+                      {usedUpPending ? '处理中...' : status === 'used-up' ? '已用完' : '用完'}
                     </button>
                     <button
                       type="button"
-                      disabled={actionPending}
-                      className="flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold text-life-alert transition hover:bg-life-alert/10 disabled:cursor-not-allowed disabled:opacity-60"
-                      onClick={() => handleStatusAction(item, 'discarded')}
+                      disabled={discardedDisabled}
+                      className={cn(
+                        'flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
+                        status === 'discarded'
+                          ? 'text-muted-foreground'
+                          : 'text-life-alert hover:bg-life-alert/10',
+                      )}
+                      onClick={() => void handleStatusAction(item, 'discarded')}
                     >
                       <Trash2 className="size-4" />
-                      {discardedPending ? '处理中...' : '丢弃'}
+                      {discardedPending ? '处理中...' : status === 'discarded' ? '已丢弃' : '丢弃'}
                     </button>
                     <button
                       type="button"
@@ -611,11 +1102,35 @@ export function PantryPage() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         item={editingItem}
+        householdId={currentHousehold?.id}
+        householdName={currentHousehold?.name}
         onSaved={(message) => {
           setSaveMessage(message);
           void loadPantryPage(1, 'replace');
           void refreshOverview();
         }}
+      />
+      <PantryHouseholdSheet
+        open={householdSheetOpen}
+        onOpenChange={setHouseholdSheetOpen}
+        households={households}
+        selectedHouseholdId={currentHousehold?.id}
+        members={householdMembers}
+        membersLoading={householdMembersLoading}
+        householdsLoading={householdsLoading}
+        invitePayload={invitePayload}
+        onSelectHousehold={(householdId) => {
+          setSelectedHouseholdId(householdId);
+          syncUrlState({ householdId });
+          setInvitePayload((current) => (current?.householdId === householdId ? current : null));
+        }}
+        onCreateHousehold={handleCreateHousehold}
+        onJoinHousehold={handleJoinHousehold}
+        onCreateInvite={handleCreateInvite}
+        onRefreshMembers={loadHouseholdMembersFor}
+        onTransferOwner={handleTransferOwner}
+        onLeaveHousehold={handleLeaveHousehold}
+        onDissolveHousehold={handleDissolveHousehold}
       />
       {saveMessage ? (
         <div className="fixed right-4 bottom-[calc(7rem+env(safe-area-inset-bottom))] left-4 z-30 mx-auto max-w-[360px] rounded-2xl border border-life-trace/30 bg-card px-4 py-3 text-center text-sm font-medium text-life-trace shadow-2xl">
