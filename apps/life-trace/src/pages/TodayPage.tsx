@@ -21,6 +21,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateTodayAdvice } from '@/api/advice';
+import { listHouseholds } from '@/api/household';
 import {
   fetchLifeTraceWeather,
   type WeatherApiDay,
@@ -37,7 +38,6 @@ import { gsap, useGSAP } from '@/lib/gsap';
 import {
   getPantryCoverUrl,
   getPantryExpiryText,
-  getPantryOverview,
   getPantryStatusTone,
   resolvePantryStatus,
   sortPantryItems,
@@ -281,7 +281,13 @@ export function TodayPage() {
   const checkinTogglingByName = useLifeTraceStore((state) => state.checkinTogglingByName);
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
-  const pantryItems = useLifeTraceStore((state) => state.pantryItems);
+  const preferredPantryHouseholdId = useLifeTraceStore((state) => state.preferredPantryHouseholdId);
+  const pantryListItems = useLifeTraceStore((state) => state.pantryListItems);
+  const pantryListSummary = useLifeTraceStore((state) => state.pantryListSummary);
+  const pantryListResolvedHouseholdId = useLifeTraceStore(
+    (state) => state.pantryListResolvedHouseholdId,
+  );
+  const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const addPlan = useLifeTraceStore((state) => state.addPlan);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
   const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
@@ -302,6 +308,7 @@ export function TodayPage() {
   const [adviceRefreshing, setAdviceRefreshing] = useState(false);
   const [planToast, setPlanToast] = useState('');
   const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
+  const [pantryHouseholdName, setPantryHouseholdName] = useState('');
   const pageRef = useRef<HTMLDivElement>(null);
   const planFingerprint = useMemo(
     () => plans.map((plan) => `${plan.id}:${plan.completed}:${plan.updatedAt ?? ''}`).join('|'),
@@ -320,16 +327,17 @@ export function TodayPage() {
   const habitNames =
     settings.habits.length > 0 ? settings.habits : ['喝水', '休息', '运动', '护肤'];
   const todayCheckins = checkinsDate === todayDate ? checkins : [];
-  const pantryOverview = useMemo(() => getPantryOverview(pantryItems), [pantryItems]);
+  const effectivePantryHouseholdId = pantryListResolvedHouseholdId || preferredPantryHouseholdId;
+  const pantryOverview = pantryListSummary;
   const pantryPreviewItems = useMemo(
     () =>
-      sortPantryItems(pantryItems)
+      sortPantryItems(pantryListItems)
         .filter((item) => {
           const status = resolvePantryStatus(item);
           return status === 'expiring' || status === 'expired';
         })
         .slice(0, 3),
-    [pantryItems],
+    [pantryListItems],
   );
   const checkinFingerprint = useMemo(
     () =>
@@ -739,6 +747,57 @@ export function TodayPage() {
 
     void loadPlans({ status: 'open', pageSize: 20 });
   }, [loadPlans, settingsLoaded, token]);
+
+  useEffect(() => {
+    if (!token) {
+      setPantryHouseholdName('');
+      return;
+    }
+
+    void loadPantryList({
+      householdId: preferredPantryHouseholdId || undefined,
+      status: 'all',
+      category: 'all',
+      q: '',
+      pageSize: 20,
+    });
+  }, [loadPantryList, preferredPantryHouseholdId, token]);
+
+  useEffect(() => {
+    if (!token) {
+      setPantryHouseholdName('');
+      return;
+    }
+
+    let alive = true;
+    listHouseholds(token)
+      .then((response) => {
+        if (!alive) {
+          return;
+        }
+        const targetId =
+          effectivePantryHouseholdId ||
+          preferredPantryHouseholdId ||
+          response.currentHouseholdId ||
+          '';
+        const matched =
+          response.list.find((item) => item.id === targetId) ?? response.list[0] ?? null;
+        setPantryHouseholdName(matched?.name ?? '');
+      })
+      .catch(() => {
+        if (alive) {
+          setPantryHouseholdName('');
+        }
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [effectivePantryHouseholdId, preferredPantryHouseholdId, token]);
+
+  const pantryPageHref = effectivePantryHouseholdId
+    ? `/pantry?householdId=${encodeURIComponent(effectivePantryHouseholdId)}`
+    : '/pantry';
 
   const handleAddAdvicePlan = async (item: Advice) => {
     if (hasAdvicePlan(plans, item.id)) {
@@ -1173,6 +1232,11 @@ export function TodayPage() {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Badge tone={pantryOverview.expired > 0 ? 'alert' : 'health'}>家中临期</Badge>
+              {pantryHouseholdName ? (
+                <span className="text-xs text-muted-foreground">
+                  当前空间：{pantryHouseholdName}
+                </span>
+              ) : null}
               {pantryOverview.expired > 0 ? (
                 <span className="text-xs text-life-alert">{pantryOverview.expired} 件已过期</span>
               ) : null}
@@ -1187,7 +1251,7 @@ export function TodayPage() {
           <button
             type="button"
             className="shrink-0 cursor-pointer rounded-full bg-secondary px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
-            onClick={() => navigate('/pantry')}
+            onClick={() => navigate(pantryPageHref)}
           >
             查看
           </button>
@@ -1202,7 +1266,7 @@ export function TodayPage() {
                   key={item.id}
                   type="button"
                   className="flex w-full items-center gap-3 rounded-2xl border border-border bg-secondary px-3 py-3 text-left transition hover:border-foreground/20"
-                  onClick={() => navigate('/pantry')}
+                  onClick={() => navigate(pantryPageHref)}
                 >
                   {coverUrl ? (
                     <img
