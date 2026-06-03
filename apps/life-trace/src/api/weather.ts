@@ -8,9 +8,17 @@ export type WeatherApiMetric = {
 
 export type WeatherApiHour = {
   time: string;
+  dateTime?: string;
   temp: string;
   text: string;
   active?: boolean;
+};
+
+export type WeatherApiDay = {
+  date: string;
+  high: string;
+  low: string;
+  textDay: string;
 };
 
 export type WeatherApiIndex = {
@@ -37,6 +45,7 @@ export type WeatherApiResponse = {
   };
   metrics: WeatherApiMetric[];
   hourly: WeatherApiHour[];
+  daily: WeatherApiDay[];
   indices: WeatherApiIndex[];
   cached: boolean;
   refreshLimited?: boolean;

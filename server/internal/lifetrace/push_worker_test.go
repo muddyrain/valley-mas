@@ -36,6 +36,39 @@ func TestDailyBriefDueAtMatchesWindow(t *testing.T) {
 	}
 }
 
+func TestPlanReminderDueAtRespectsLeadMinutes(t *testing.T) {
+	dueAt, ok := planReminderDueAt(model.LifeTracePlan{
+		ScheduledDate: "2026-06-03",
+		ScheduledTime: "09:30",
+		Timezone:      "Asia/Shanghai",
+	}, model.LifeTraceSettings{
+		PlanReminderLeadMinutes: 30,
+	})
+	if !ok {
+		t.Fatal("expected valid plan reminder due time")
+	}
+	if dueAt.Format("15:04") != "09:00" {
+		t.Fatalf("expected reminder due at 09:00, got %s", dueAt.Format(time.RFC3339))
+	}
+}
+
+func TestIsQuietHoursSupportsCrossMidnightWindow(t *testing.T) {
+	settings := model.LifeTraceSettings{QuietStart: "22:30", QuietEnd: "07:30"}
+	lateNight := time.Date(2026, 6, 3, 23, 10, 0, 0, time.Local)
+	earlyMorning := time.Date(2026, 6, 4, 7, 10, 0, 0, time.Local)
+	dayTime := time.Date(2026, 6, 4, 10, 0, 0, 0, time.Local)
+
+	if !isQuietHours(settings, lateNight) {
+		t.Fatal("expected late night time to be inside quiet hours")
+	}
+	if !isQuietHours(settings, earlyMorning) {
+		t.Fatal("expected early morning time to be inside quiet hours")
+	}
+	if isQuietHours(settings, dayTime) {
+		t.Fatal("expected day time to be outside quiet hours")
+	}
+}
+
 func TestShouldSendDailyBriefOnDateRespectsWorkdayRules(t *testing.T) {
 	saturday := time.Date(2026, 6, 6, 8, 10, 0, 0, time.Local)
 
@@ -247,6 +280,77 @@ func TestSendDuePantryPushRemindersUsesDefaultRulesAndSkipsHandledItems(t *testi
 	}
 	if sender.payloads[0].Title != "库存到期提醒：酸奶" {
 		t.Fatalf("expected same-day pantry title, got %+v", sender.payloads[0])
+	}
+}
+
+func TestSendDuePlanPushRemindersUsesLeadMinutesAndQuietHours(t *testing.T) {
+	_ = setupTraceTestRouter(t, 303)
+
+	if err := database.GetDB().Create(&model.LifeTraceSettings{
+		UserID:                  model.Int64String(303),
+		PlanReminders:           true,
+		PlanReminderLeadMinutes: 30,
+		QuietStart:              "22:30",
+		QuietEnd:                "07:30",
+	}).Error; err != nil {
+		t.Fatalf("create settings: %v", err)
+	}
+	if err := database.GetDB().Create(&model.LifeTracePushSubscription{
+		UserID:    model.Int64String(303),
+		Endpoint:  "https://push.example/plan-lead",
+		P256DH:    "p256dh-key",
+		Auth:      "auth-key",
+		Status:    "active",
+		UserAgent: "test",
+	}).Error; err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+	if err := database.GetDB().Create(&model.LifeTracePlan{
+		UserID:        model.Int64String(303),
+		Title:         "早会",
+		Type:          "普通事项",
+		TimeLabel:     "2026-06-03 09:30",
+		ScheduledDate: "2026-06-03",
+		ScheduledTime: "09:30",
+		Timezone:      "Asia/Shanghai",
+		Reminder:      true,
+		Note:          "测试计划提醒",
+	}).Error; err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+
+	sender := &fakePushSender{}
+	now := time.Date(2026, 6, 3, 9, 5, 0, 0, time.Local)
+	if err := sendDuePlanPushRemindersAt(context.Background(), sender, 10, now); err != nil {
+		t.Fatalf("send lead-time plan push: %v", err)
+	}
+	if len(sender.payloads) != 1 {
+		t.Fatalf("expected one lead-time plan push, got %d", len(sender.payloads))
+	}
+	if !strings.Contains(sender.payloads[0].Body, "09:00") {
+		t.Fatalf("expected plan reminder body to use lead time, got %+v", sender.payloads[0])
+	}
+
+	sender.payloads = nil
+	if err := database.GetDB().Create(&model.LifeTracePlan{
+		UserID:        model.Int64String(303),
+		Title:         "深夜计划",
+		Type:          "普通事项",
+		TimeLabel:     "2026-06-03 23:30",
+		ScheduledDate: "2026-06-03",
+		ScheduledTime: "23:30",
+		Timezone:      "Asia/Shanghai",
+		Reminder:      true,
+		Note:          "测试勿扰",
+	}).Error; err != nil {
+		t.Fatalf("create quiet-hour plan: %v", err)
+	}
+	quietNow := time.Date(2026, 6, 3, 23, 5, 0, 0, time.Local)
+	if err := sendDuePlanPushRemindersAt(context.Background(), sender, 10, quietNow); err != nil {
+		t.Fatalf("send quiet-hour plan push: %v", err)
+	}
+	if len(sender.payloads) != 0 {
+		t.Fatalf("expected quiet hours to skip plan push, got %d", len(sender.payloads))
 	}
 }
 

@@ -102,8 +102,12 @@ func sendDuePlanPushRemindersAt(
 	}
 
 	for _, plan := range plans {
-		dueAt, ok := parsePlanDueAt(plan)
-		if !ok || !isWithinReminderWindow(dueAt, now, windowMinutes) {
+		settings, ok := resolvePushSettingsForUser(plan.UserID)
+		if !ok || !settings.PlanReminders {
+			continue
+		}
+		dueAt, ok := planReminderDueAt(plan, settings)
+		if !ok || isQuietHours(settings, dueAt) || !isWithinReminderWindow(dueAt, now, windowMinutes) {
 			continue
 		}
 		if err := sendPlanPushReminder(ctx, sender, plan, dueAt); err != nil {
@@ -160,6 +164,9 @@ func sendDuePantryPushRemindersAt(
 
 	for _, item := range items {
 		settings := settingsByUser[item.UserID]
+		if isQuietHours(settings, now) {
+			continue
+		}
 		if err := sendPantryPushReminder(ctx, sender, item, settings, now, windowMinutes); err != nil {
 			logger.Log.WithFields(map[string]interface{}{
 				"pantryItemId": item.ID,
@@ -198,7 +205,7 @@ func sendDueDailyBriefPushesAt(
 
 	for _, settings := range settingsList {
 		dueAt, ok := dailyBriefDueAt(settings, now, windowMinutes)
-		if !ok || !shouldSendDailyBriefOnDate(settings, dueAt) {
+		if !ok || isQuietHours(settings, dueAt) || !shouldSendDailyBriefOnDate(settings, dueAt) {
 			continue
 		}
 		if err := sendDailyBriefPush(ctx, sender, weather, settings, dueAt); err != nil {
@@ -743,6 +750,38 @@ func dailyBriefDueAt(settings model.LifeTraceSettings, now time.Time, windowMinu
 	return dueAt, true
 }
 
+func resolvePushSettingsForUser(userID model.Int64String) (model.LifeTraceSettings, bool) {
+	var settings model.LifeTraceSettings
+	if err := database.GetDB().Where("user_id = ?", userID).First(&settings).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return model.LifeTraceSettings{
+				UserID:                  userID,
+				PlanReminders:           true,
+				PlanReminderLeadMinutes: 10,
+				QuietStart:              "22:30",
+				QuietEnd:                "07:30",
+			}, true
+		}
+		return model.LifeTraceSettings{}, false
+	}
+	return settings, true
+}
+
+func planReminderDueAt(plan model.LifeTracePlan, settings model.LifeTraceSettings) (time.Time, bool) {
+	dueAt, ok := parsePlanDueAt(plan)
+	if !ok {
+		return time.Time{}, false
+	}
+
+	leadMinutes := settings.PlanReminderLeadMinutes
+	switch leadMinutes {
+	case 0, 5, 10, 15, 30, 60:
+	default:
+		leadMinutes = 10
+	}
+	return dueAt.Add(-time.Duration(leadMinutes) * time.Minute), true
+}
+
 func parseClockOnDate(clock string, base time.Time) (time.Time, bool) {
 	clock = strings.TrimSpace(clock)
 	if clock == "" {
@@ -770,6 +809,29 @@ func isWithinReminderWindow(dueAt time.Time, now time.Time, windowMinutes int) b
 	}
 	windowStart := now.Add(-time.Duration(windowMinutes) * time.Minute)
 	return !dueAt.After(now) && !dueAt.Before(windowStart)
+}
+
+func isQuietHours(settings model.LifeTraceSettings, dueAt time.Time) bool {
+	quietStart, ok := parseClockOnDate(normalizeTimeText(settings.QuietStart, "22:30"), dueAt)
+	if !ok {
+		return false
+	}
+	quietEnd, ok := parseClockOnDate(normalizeTimeText(settings.QuietEnd, "07:30"), dueAt)
+	if !ok {
+		return false
+	}
+
+	currentMinutes := dueAt.Hour()*60 + dueAt.Minute()
+	startMinutes := quietStart.Hour()*60 + quietStart.Minute()
+	endMinutes := quietEnd.Hour()*60 + quietEnd.Minute()
+
+	if startMinutes == endMinutes {
+		return false
+	}
+	if startMinutes < endMinutes {
+		return currentMinutes >= startMinutes && currentMinutes < endMinutes
+	}
+	return currentMinutes >= startMinutes || currentMinutes < endMinutes
 }
 
 func shouldSendDailyBriefOnDate(settings model.LifeTraceSettings, date time.Time) bool {

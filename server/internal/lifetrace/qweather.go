@@ -117,14 +117,12 @@ func normalizeQWeather(
 
 func normalizeHourly(resp qWeatherHourlyResponse, nowTemp string, nowText string) []WeatherHour {
 	hours := []WeatherHour{{Time: "现在", Temp: degree(nowTemp), Text: nowText, Active: true}}
-	for index, item := range resp.Hourly {
-		if index >= 7 {
-			break
-		}
+	for _, item := range resp.Hourly {
 		hours = append(hours, WeatherHour{
-			Time: formatHour(item.FxTime),
-			Temp: degree(item.Temp),
-			Text: item.Text,
+			Time:     formatHour(item.FxTime),
+			DateTime: item.FxTime,
+			Temp:     degree(item.Temp),
+			Text:     item.Text,
 		})
 	}
 	return hours

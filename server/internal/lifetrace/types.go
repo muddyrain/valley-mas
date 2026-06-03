@@ -35,10 +35,11 @@ type WeatherMetric struct {
 }
 
 type WeatherHour struct {
-	Time   string `json:"time"`
-	Temp   string `json:"temp"`
-	Text   string `json:"text"`
-	Active bool   `json:"active,omitempty"`
+	Time     string `json:"time"`
+	DateTime string `json:"dateTime,omitempty"`
+	Temp     string `json:"temp"`
+	Text     string `json:"text"`
+	Active   bool   `json:"active,omitempty"`
 }
 
 type WeatherDay struct {

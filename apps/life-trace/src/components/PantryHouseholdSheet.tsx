@@ -310,7 +310,7 @@ export function PantryHouseholdSheet({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold">当前空间详情</p>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
                   {currentHousehold.kind === 'personal'
                     ? '个人空间不可解散，也不需要邀请成员。'
                     : '邀请家人后，大家会共享同一份库存列表。'}
@@ -404,7 +404,10 @@ export function PantryHouseholdSheet({
                     {sharedHousehold ? '谁在一起维护这份家庭库存' : '个人空间只有你自己'}
                   </p>
                 </div>
-                <Badge tone={sharedHousehold ? 'ai' : 'trace'}>
+                <Badge
+                  tone={sharedHousehold ? 'ai' : 'trace'}
+                  className="shrink-0 whitespace-nowrap"
+                >
                   {currentHousehold.memberCount} 人
                 </Badge>
               </div>
@@ -415,7 +418,7 @@ export function PantryHouseholdSheet({
                   {members.map((member) => (
                     <div
                       key={member.id}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-secondary/50 px-4 py-3"
+                      className="flex items-start justify-between gap-3 rounded-2xl border border-border bg-secondary/50 px-4 py-3"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-foreground">
@@ -427,8 +430,11 @@ export function PantryHouseholdSheet({
                             : '已加入'}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge tone={member.role === 'owner' ? 'ai' : 'default'}>
+                      <div className="flex shrink-0 items-center gap-2 self-start pl-2">
+                        <Badge
+                          tone={member.role === 'owner' ? 'ai' : 'default'}
+                          className="shrink-0 whitespace-nowrap"
+                        >
                           {member.role === 'owner' ? (
                             <Crown className="mr-1 size-3.5" />
                           ) : member.role === 'admin' ? (

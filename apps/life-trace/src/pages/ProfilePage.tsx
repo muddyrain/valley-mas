@@ -450,7 +450,7 @@ export function ProfilePage() {
                 我的生活参数
               </h1>
               <p className="mt-4 max-w-[24ch] text-sm leading-7 text-muted-foreground">
-                城市、通勤、提醒和习惯会组成你的每日简报。
+                城市、通勤、提醒和习惯会组成你的今日建议和每日简报。
               </p>
             </div>
             <Button
@@ -609,7 +609,7 @@ export function ProfilePage() {
             <div className="min-w-0">
               <h3 className="font-semibold">工作日规则</h3>
               <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                用来决定通勤、上班提醒和每日简报的默认节奏。
+                用来决定 AI 建议、通勤文案和每日简报的默认节奏。
               </p>
             </div>
           </div>
@@ -665,7 +665,7 @@ export function ProfilePage() {
             <div className="min-w-0">
               <h3 className="font-semibold">提醒节奏</h3>
               <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                后续计划提醒、每日简报和天气预警都会优先读取这里。
+                计划提醒、每日简报和库存提醒会参考这里的时间策略。
               </p>
             </div>
           </div>

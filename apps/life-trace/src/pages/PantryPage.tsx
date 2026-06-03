@@ -178,7 +178,6 @@ export function PantryPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const addTrace = useLifeTraceStore((state) => state.addTrace);
-  const pantryError = useLifeTraceStore((state) => state.pantryError);
   const updatePantryItemStatus = useLifeTraceStore((state) => state.updatePantryItemStatus);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PantryItem | null>(null);
@@ -631,7 +630,8 @@ export function PantryPage() {
     return () => observer.disconnect();
   }, [loadMorePantryItems, pantryLoading, pantryLoadingMore, pantryPagination.hasMore]);
 
-  const activePantryError = pantryListError || pantryError || householdError;
+  const listRefreshing = pantryLoading && pantryLoaded && !householdSwitchLoading;
+  const activePantryError = pantryListError || householdError;
 
   return (
     <div className="space-y-5">
@@ -873,6 +873,22 @@ export function PantryPage() {
             />
             <SyncState
               title="正在同步库存列表"
+              tone="default"
+              variant="skeleton-list"
+              rows={2}
+              showRail={false}
+            />
+          </div>
+        ) : listRefreshing ? (
+          <div className="space-y-3">
+            <SyncState
+              title="正在更新库存列表"
+              description="新的筛选结果马上出来。"
+              tone="default"
+              showRail={false}
+            />
+            <SyncState
+              title="正在刷新筛选结果"
               tone="default"
               variant="skeleton-list"
               rows={2}

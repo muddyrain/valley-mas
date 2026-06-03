@@ -9,6 +9,7 @@ import {
   Heart,
   LoaderCircle,
   MapPin,
+  MoonStar,
   Plus,
   RefreshCw,
   Settings,
@@ -20,11 +21,16 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateTodayAdvice } from '@/api/advice';
-import { fetchLifeTraceWeather, type WeatherApiResponse } from '@/api/weather';
+import {
+  fetchLifeTraceWeather,
+  type WeatherApiDay,
+  type WeatherApiHour,
+  type WeatherApiResponse,
+} from '@/api/weather';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { hourlyWeather, weatherMetrics } from '@/data/mock';
+import { weatherMetrics } from '@/data/mock';
 import { useLifeTraceEntrance } from '@/hooks/useLifeTraceEntrance';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import { gsap, useGSAP } from '@/lib/gsap';
@@ -88,6 +94,8 @@ const adviceIconMap = {
 
 const AI_ADVICE_CACHE_KEY = 'life-trace-ai-advice-cache';
 
+type WeatherDayTab = 'today' | 'tomorrow';
+
 type CachedAdvice = {
   contextVersion: string;
   summary?: string;
@@ -144,15 +152,96 @@ const fallbackWeather: WeatherApiResponse = {
     value: metric.value,
     tone: metric.label === '风力' ? 'muted' : metric.label === '紫外线' ? 'health' : 'weather',
   })),
-  hourly: hourlyWeather.map((hour) => ({
-    time: hour.time,
-    temp: hour.temp,
-    text: hour.time === '现在' ? '多云' : '多云',
-    active: hour.active,
-  })),
+  hourly: buildFallbackHourlyWeather(),
+  daily: buildFallbackDailyWeather(),
   indices: [],
   cached: false,
 };
+
+function buildFallbackHourlyWeather(): WeatherApiHour[] {
+  const now = new Date();
+  const upcoming = [
+    { offsetHours: 1, temp: '24°', text: '晴' },
+    { offsetHours: 2, temp: '25°', text: '晴' },
+    { offsetHours: 3, temp: '26°', text: '多云' },
+    { offsetHours: 4, temp: '24°', text: '多云' },
+    { offsetHours: 5, temp: '22°', text: '多云' },
+    { offsetHours: 6, temp: '20°', text: '多云' },
+    { offsetHours: 7, temp: '19°', text: '阴' },
+    { offsetHours: 8, temp: '18°', text: '阴' },
+    { offsetHours: 9, temp: '18°', text: '阴' },
+    { offsetHours: 10, temp: '17°', text: '小雨' },
+    { offsetHours: 11, temp: '17°', text: '小雨' },
+    { offsetHours: 12, temp: '17°', text: '小雨' },
+    { offsetHours: 17, temp: '18°', text: '小雨' },
+    { offsetHours: 20, temp: '21°', text: '小雨' },
+    { offsetHours: 23, temp: '24°', text: '阴' },
+  ];
+
+  return [
+    { time: '现在', temp: '22°', text: '多云', active: true },
+    ...upcoming.map((item) => {
+      const date = new Date(now.getTime() + item.offsetHours * 60 * 60 * 1000);
+      return {
+        time: `${String(date.getHours()).padStart(2, '0')}时`,
+        dateTime: date.toISOString(),
+        temp: item.temp,
+        text: item.text,
+      };
+    }),
+  ];
+}
+
+function buildFallbackDailyWeather(): WeatherApiDay[] {
+  const today = new Date();
+  return [
+    {
+      date: formatDateKey(today),
+      high: '26°',
+      low: '17°',
+      textDay: '多云',
+    },
+    {
+      date: formatDateKey(new Date(today.getTime() + 24 * 60 * 60 * 1000)),
+      high: '25°',
+      low: '18°',
+      textDay: '小雨',
+    },
+    {
+      date: formatDateKey(new Date(today.getTime() + 48 * 60 * 60 * 1000)),
+      high: '27°',
+      low: '19°',
+      textDay: '晴',
+    },
+  ];
+}
+
+function formatDateKey(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseWeatherHourDateTime(dateTime?: string) {
+  if (!dateTime) {
+    return null;
+  }
+  const parsed = new Date(dateTime);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function buildWeatherDayLabel(dateText: string, fallbackLabel: string) {
+  const parsed = new Date(`${dateText}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return fallbackLabel;
+  }
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+  }).format(parsed);
+}
 
 export function TodayPage() {
   const openPlanCount = useLifeTraceStore(
@@ -182,6 +271,7 @@ export function TodayPage() {
   const [weatherReady, setWeatherReady] = useState(false);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState('');
+  const [selectedWeatherDay, setSelectedWeatherDay] = useState<WeatherDayTab>('today');
   const [remoteAdvice, setRemoteAdvice] = useState<AdvicePayload[] | null>(null);
   const [remoteAdviceSummary, setRemoteAdviceSummary] = useState('');
   const [adviceLoading, setAdviceLoading] = useState(false);
@@ -250,6 +340,56 @@ export function TodayPage() {
   const showAdviceEmpty = settings.aiPersonalization && !adviceLoading && !remoteAdvice;
   const localBrief = buildWeatherBrief(weather, settings);
   const weatherAlerts = useMemo(() => buildWeatherAlerts(weather), [weather]);
+  const todayDateKey = useMemo(() => formatDateKey(new Date()), []);
+  const tomorrowDateKey = useMemo(
+    () => formatDateKey(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+    [],
+  );
+  const todayWeather = useMemo(
+    () => weather.daily.find((item) => item.date === todayDateKey) ?? weather.daily[0] ?? null,
+    [todayDateKey, weather.daily],
+  );
+  const tomorrowWeather = useMemo(
+    () =>
+      weather.daily.find((item) => item.date === tomorrowDateKey) ??
+      weather.daily.find((item) => item.date !== todayWeather?.date) ??
+      weather.daily[1] ??
+      null,
+    [todayWeather?.date, tomorrowDateKey, weather.daily],
+  );
+  const todayHourlyWeather = useMemo(
+    () =>
+      weather.hourly.filter((item) => {
+        if (item.active) {
+          return true;
+        }
+        const parsed = parseWeatherHourDateTime(item.dateTime);
+        return parsed ? formatDateKey(parsed) === todayDateKey : true;
+      }),
+    [todayDateKey, weather.hourly],
+  );
+  const tomorrowHourlyWeather = useMemo(
+    () =>
+      weather.hourly.filter((item) => {
+        const parsed = parseWeatherHourDateTime(item.dateTime);
+        return parsed ? formatDateKey(parsed) === tomorrowDateKey : false;
+      }),
+    [tomorrowDateKey, weather.hourly],
+  );
+  const displayedHourlyWeather =
+    selectedWeatherDay === 'tomorrow' && tomorrowHourlyWeather.length > 0
+      ? tomorrowHourlyWeather
+      : todayHourlyWeather;
+  const tomorrowWeatherSummary = useMemo(() => {
+    if (!tomorrowWeather) {
+      return null;
+    }
+    const rainy = tomorrowHourlyWeather.some((item) => item.text.includes('雨'));
+    return {
+      label: buildWeatherDayLabel(tomorrowWeather.date, '明天'),
+      detail: rainy ? '明天有降雨信号，出门记得带伞。' : `明天以${tomorrowWeather.textDay}为主。`,
+    };
+  }, [tomorrowHourlyWeather, tomorrowWeather]);
   const weatherNotice = weatherError || weather.warning || '';
   const shouldWaitForAiBrief = Boolean(token) && (!settingsLoaded || settings.aiPersonalization);
   const showBriefSkeleton = !remoteAdviceSummary && (!weatherReady || shouldWaitForAiBrief);
@@ -754,55 +894,136 @@ export function TodayPage() {
               </div>
             ) : null}
 
-            {weatherAlerts.length > 0 ? (
-              <div className="mt-4 grid gap-2" data-today-stagger>
-                {weatherAlerts.map((alert) => {
-                  const tone = adviceToneClasses[alert.tone];
+            <div className="mt-4 grid gap-3 min-[720px]:grid-cols-[1.4fr_1fr]" data-today-stagger>
+              {weatherAlerts.length > 0 ? (
+                <div className="grid gap-2">
+                  {weatherAlerts.map((alert) => {
+                    const tone = adviceToneClasses[alert.tone];
+
+                    return (
+                      <div
+                        key={alert.id}
+                        className={`rounded-2xl border px-3 py-3 ${tone.bg} ${
+                          alert.tone === 'alert'
+                            ? 'border-life-alert/25'
+                            : alert.tone === 'health'
+                              ? 'border-life-health/25'
+                              : 'border-life-weather/25'
+                        }`}
+                      >
+                        <div
+                          className={`flex items-center gap-2 text-sm font-semibold ${tone.text}`}
+                        >
+                          <AlertTriangle className="size-4" />
+                          {alert.title}
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          {alert.detail}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-life-weather/20 bg-life-weather/5 px-3 py-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-life-weather">
+                    <Sun className="size-4" />
+                    今日天气平稳
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    当前没有明显风险提醒，按正常节奏安排出门和通勤就好。
+                  </p>
+                </div>
+              )}
+
+              {tomorrowWeatherSummary && tomorrowWeather ? (
+                <div className="rounded-2xl border border-border bg-secondary/40 px-3 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <MoonStar className="size-4 text-life-plan" />
+                        明日天气
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {tomorrowWeatherSummary.label}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-foreground">
+                        {tomorrowWeather.high} /{' '}
+                        <span className="text-muted-foreground">{tomorrowWeather.low}</span>
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {tomorrowWeather.textDay}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                    {tomorrowWeatherSummary.detail}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-5" data-today-stagger>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">小时天气</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {selectedWeatherDay === 'today'
+                      ? '查看今天剩余的逐小时天气变化'
+                      : '查看明天可用的逐小时天气预报'}
+                  </p>
+                </div>
+                <div className="inline-flex rounded-2xl bg-secondary p-1">
+                  <button
+                    type="button"
+                    className={cn(
+                      'rounded-xl px-3 py-2 text-xs font-semibold transition',
+                      selectedWeatherDay === 'today'
+                        ? 'bg-card text-foreground shadow-sm'
+                        : 'text-muted-foreground',
+                    )}
+                    onClick={() => setSelectedWeatherDay('today')}
+                  >
+                    今日
+                  </button>
+                  <button
+                    type="button"
+                    disabled={tomorrowHourlyWeather.length === 0}
+                    className={cn(
+                      'rounded-xl px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
+                      selectedWeatherDay === 'tomorrow'
+                        ? 'bg-card text-foreground shadow-sm'
+                        : 'text-muted-foreground',
+                    )}
+                    onClick={() => setSelectedWeatherDay('tomorrow')}
+                  >
+                    明日
+                  </button>
+                </div>
+              </div>
+              <div className="-mx-1 flex max-w-full gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {displayedHourlyWeather.map((item, index) => {
+                  const Icon = item.text.includes('晴') ? Sun : Cloud;
 
                   return (
                     <div
-                      key={alert.id}
-                      className={`rounded-2xl border px-3 py-3 ${tone.bg} ${
-                        alert.tone === 'alert'
-                          ? 'border-life-alert/25'
-                          : alert.tone === 'health'
-                            ? 'border-life-health/25'
-                            : 'border-life-weather/25'
-                      }`}
+                      key={`${item.dateTime || item.time}-${index}`}
+                      className={cn(
+                        'flex min-w-16 shrink-0 flex-col items-center gap-2 rounded-2xl px-3 py-3',
+                        item.active && selectedWeatherDay === 'today'
+                          ? 'bg-life-weather/15 text-life-weather'
+                          : 'bg-secondary text-muted-foreground',
+                      )}
                     >
-                      <div className={`flex items-center gap-2 text-sm font-semibold ${tone.text}`}>
-                        <AlertTriangle className="size-4" />
-                        {alert.title}
-                      </div>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{alert.detail}</p>
+                      <span className="text-xs font-medium">{item.time}</span>
+                      <Icon className="size-5" />
+                      <span className="text-base font-semibold text-foreground">{item.temp}</span>
                     </div>
                   );
                 })}
               </div>
-            ) : null}
-
-            <div
-              className="-mx-1 mt-5 flex max-w-full gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              data-today-stagger
-            >
-              {weather.hourly.map((item) => {
-                const Icon = item.text.includes('晴') ? Sun : Cloud;
-
-                return (
-                  <div
-                    key={item.time}
-                    className={`flex min-w-14 shrink-0 flex-col items-center gap-2 rounded-2xl px-3 py-3 ${
-                      item.active
-                        ? 'bg-life-weather/15 text-life-weather'
-                        : 'bg-secondary text-muted-foreground'
-                    }`}
-                  >
-                    <span className="text-xs font-medium">{item.time}</span>
-                    <Icon className="size-5" />
-                    <span className="text-base font-semibold text-foreground">{item.temp}</span>
-                  </div>
-                );
-              })}
             </div>
           </>
         )}
