@@ -360,12 +360,13 @@ func TestBuildDailyBriefPushPayloadUsesWeekendTone(t *testing.T) {
 		WorkdayMode:      "legal",
 		HolidaySync:      true,
 		WeekendReminders: true,
+		WeatherAlerts:    true,
 		Habits:           model.StringList{"喝水", "休息"},
 	}
 	dueAt := time.Date(2026, 6, 6, 8, 10, 0, 0, time.Local)
 
 	payload := buildDailyBriefPushPayload(settings, WeatherResponse{}, nil, nil, dueAt)
-	if payload.Title != "Life Trace 周末简报" {
+	if payload.Title != "Life Trace 周末天气" {
 		t.Fatalf("expected weekend title, got %+v", payload)
 	}
 	if payload.Body == "" || !containsAny(payload.Body, []string{"放松一点", "自己的节奏"}) {
@@ -375,9 +376,10 @@ func TestBuildDailyBriefPushPayloadUsesWeekendTone(t *testing.T) {
 
 func TestBuildDailyBriefPushPayloadPrioritizesWeatherRisk(t *testing.T) {
 	settings := model.LifeTraceSettings{
-		City:        "上海",
-		WorkdayMode: "daily",
-		Habits:      model.StringList{"喝水", "运动"},
+		City:          "上海",
+		WorkdayMode:   "daily",
+		WeatherAlerts: true,
+		Habits:        model.StringList{"喝水", "运动"},
 	}
 	weather := WeatherResponse{}
 	weather.Now.Temp = "33"
@@ -392,6 +394,32 @@ func TestBuildDailyBriefPushPayloadPrioritizesWeatherRisk(t *testing.T) {
 	}
 	if !containsAny(payload.Body, []string{"体感偏热", "补水"}) {
 		t.Fatalf("expected heat-focused body, got %+v", payload)
+	}
+}
+
+func TestBuildDailyBriefPushPayloadKeepsDailyWeatherWhenRiskAlertsDisabled(t *testing.T) {
+	settings := model.LifeTraceSettings{
+		City:          "上海",
+		WorkdayMode:   "daily",
+		WeatherAlerts: false,
+		Habits:        model.StringList{"喝水", "运动"},
+	}
+	weather := WeatherResponse{}
+	weather.Now.Temp = "33"
+	weather.Now.High = "36"
+	weather.Now.Low = "27"
+	weather.Now.Text = "晴"
+	dueAt := time.Date(2026, 6, 2, 8, 10, 0, 0, time.Local)
+
+	payload := buildDailyBriefPushPayload(settings, weather, nil, nil, dueAt)
+	if payload.Title != "Life Trace 每日天气" {
+		t.Fatalf("expected daily weather title when alerts are disabled, got %+v", payload)
+	}
+	if !containsAny(payload.Body, []string{"上海", "33°", "晴"}) {
+		t.Fatalf("expected daily weather summary in body, got %+v", payload)
+	}
+	if containsAny(payload.Body, []string{"补水", "暴晒", "降雨信号", "分层穿衣"}) {
+		t.Fatalf("expected risk wording to be suppressed when alerts are disabled, got %+v", payload)
 	}
 }
 

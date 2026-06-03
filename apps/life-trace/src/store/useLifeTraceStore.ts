@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { listCheckins, toggleCheckin } from '@/api/checkins';
 import {
+  type ListPantryOptions,
   listPantry,
   createPantryItem as requestCreatePantryItem,
   deletePantryItem as requestDeletePantryItem,
@@ -73,6 +74,13 @@ type LifeTraceState = {
   pantryLoaded: boolean;
   pantryLoading: boolean;
   pantryError: string;
+  pantryListItems: PantryItem[];
+  pantryListLoaded: boolean;
+  pantryListLoading: boolean;
+  pantryListLoadingMore: boolean;
+  pantryListError: string;
+  pantryListPagination: ListPagination;
+  pantryListOptions: ListPantryOptions;
   pantryPreferences: PantryPreferences;
   aiActions: AiAction[];
   setActiveTab: (tab: AppTab) => void;
@@ -80,6 +88,8 @@ type LifeTraceState = {
   updatePantryPreferences: (preferences: Partial<PantryPreferences>) => void;
   loadSettings: () => Promise<void>;
   loadPantry: () => Promise<void>;
+  loadPantryList: (options?: ListPantryOptions) => Promise<void>;
+  loadMorePantryList: () => Promise<void>;
   loadPlans: (options?: ListPlansOptions) => Promise<void>;
   loadMorePlans: () => Promise<void>;
   loadTraces: () => Promise<void>;
@@ -145,6 +155,13 @@ const defaultPantryPreferences: PantryPreferences = {
   defaultReminderTime: '09:00',
 };
 
+const defaultPantryListOptions: ListPantryOptions = {
+  page: 1,
+  pageSize: 20,
+  status: 'all',
+  category: 'all',
+};
+
 function formatTraceRecordedTime(value?: string) {
   const date = value ? new Date(value) : new Date();
   const validDate = Number.isNaN(date.getTime()) ? new Date() : date;
@@ -186,6 +203,7 @@ const getAiActions = (state: Pick<LifeTraceState, 'aiActions'>) => state.aiActio
 const getToken = () => useAuthStore.getState().token;
 
 let settingsSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let pantryListRequestId = 0;
 
 function normalizeSettings(settings: Partial<UserSettings>): UserSettings {
   return {
@@ -272,6 +290,24 @@ function pantryInputFromItem(item: PantryItem): NewPantryItemInput {
   };
 }
 
+function normalizePantryListOptions(
+  options: ListPantryOptions = {},
+  current: ListPantryOptions = defaultPantryListOptions,
+): ListPantryOptions {
+  const householdId = options.householdId?.trim();
+  const q = options.q?.trim();
+  return {
+    ...current,
+    ...options,
+    page: options.page ?? current.page ?? 1,
+    pageSize: options.pageSize ?? current.pageSize ?? defaultPantryListOptions.pageSize ?? 20,
+    householdId: householdId || undefined,
+    status: options.status ?? current.status ?? 'all',
+    category: options.category ?? current.category ?? 'all',
+    q: q || undefined,
+  };
+}
+
 export const useLifeTraceStore = create<LifeTraceState>()(
   persist(
     (set, get) => ({
@@ -311,6 +347,16 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       pantryLoaded: false,
       pantryLoading: false,
       pantryError: '',
+      pantryListItems: [],
+      pantryListLoaded: false,
+      pantryListLoading: false,
+      pantryListLoadingMore: false,
+      pantryListError: '',
+      pantryListPagination: {
+        ...defaultPagination,
+        pageSize: defaultPantryListOptions.pageSize ?? 20,
+      },
+      pantryListOptions: defaultPantryListOptions,
       pantryPreferences: defaultPantryPreferences,
       aiActions: [
         { id: 'ai-initial-plan', title: '创建了「周六看电影」计划', timeLabel: '2小时前' },
@@ -439,6 +485,129 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             pantryLoaded: true,
             pantryLoading: false,
             pantryError: error instanceof Error ? error.message : '获取库存失败',
+          });
+        }
+      },
+      loadPantryList: async (options = {}) => {
+        const token = getToken();
+        const nextOptions = normalizePantryListOptions(
+          {
+            ...get().pantryListOptions,
+            ...options,
+            page: 1,
+            pageSize:
+              options.pageSize ??
+              get().pantryListOptions.pageSize ??
+              defaultPantryListOptions.pageSize,
+          },
+          get().pantryListOptions,
+        );
+
+        if (!token) {
+          set({
+            pantryListItems: [],
+            pantryListLoaded: true,
+            pantryListLoading: false,
+            pantryListLoadingMore: false,
+            pantryListError: '',
+            pantryListPagination: {
+              ...defaultPagination,
+              pageSize: nextOptions.pageSize ?? defaultPantryListOptions.pageSize ?? 20,
+            },
+            pantryListOptions: nextOptions,
+          });
+          return;
+        }
+
+        const requestId = ++pantryListRequestId;
+        set({
+          pantryListLoading: true,
+          pantryListLoadingMore: false,
+          pantryListError: '',
+          pantryListOptions: nextOptions,
+        });
+        try {
+          const { list, pagination } = await listPantry(token, nextOptions);
+          if (requestId !== pantryListRequestId) {
+            return;
+          }
+          set({
+            pantryListItems: list.map(normalizePantryItem),
+            pantryListPagination: pagination ?? {
+              ...defaultPagination,
+              pageSize: nextOptions.pageSize ?? defaultPantryListOptions.pageSize ?? 20,
+              total: list.length,
+              hasMore: false,
+            },
+            pantryListLoaded: true,
+            pantryListLoading: false,
+            pantryListLoadingMore: false,
+            pantryListError: '',
+          });
+        } catch (error) {
+          if (requestId !== pantryListRequestId) {
+            return;
+          }
+          set({
+            pantryListLoaded: true,
+            pantryListLoading: false,
+            pantryListLoadingMore: false,
+            pantryListError: error instanceof Error ? error.message : '获取库存失败',
+          });
+        }
+      },
+      loadMorePantryList: async () => {
+        const token = getToken();
+        const {
+          pantryListItems,
+          pantryListLoading,
+          pantryListLoadingMore,
+          pantryListOptions,
+          pantryListPagination,
+        } = get();
+        if (!token || pantryListLoading || pantryListLoadingMore || !pantryListPagination.hasMore) {
+          return;
+        }
+
+        const nextPage = pantryListPagination.page + 1;
+        const nextOptions = normalizePantryListOptions(
+          {
+            ...pantryListOptions,
+            page: nextPage,
+            pageSize: pantryListPagination.pageSize,
+          },
+          pantryListOptions,
+        );
+
+        const requestId = ++pantryListRequestId;
+        set({ pantryListLoadingMore: true, pantryListError: '' });
+        try {
+          const { list, pagination } = await listPantry(token, nextOptions);
+          if (requestId !== pantryListRequestId) {
+            return;
+          }
+          const existingIds = new Set(pantryListItems.map((item) => item.id));
+          const nextItems = list
+            .map(normalizePantryItem)
+            .filter((item) => !existingIds.has(item.id));
+          set((state) => ({
+            pantryListItems: [...state.pantryListItems, ...nextItems],
+            pantryListPagination: pagination ?? {
+              page: nextPage,
+              pageSize: pantryListPagination.pageSize,
+              total: state.pantryListItems.length + nextItems.length,
+              hasMore: false,
+            },
+            pantryListLoadingMore: false,
+            pantryListError: '',
+          }));
+        } catch (error) {
+          if (requestId !== pantryListRequestId) {
+            return;
+          }
+          set({
+            pantryListLoadingMore: false,
+            pantryListError: error instanceof Error ? error.message : '加载更多库存失败',
           });
         }
       },
@@ -713,14 +882,19 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           const item = normalizePantryItem(
             await requestCreatePantryItem(token, input, householdId),
           );
+          const activeHouseholdId = get().pantryListOptions.householdId ?? '';
+          const targetHouseholdId = householdId?.trim() ?? '';
           set((state) => ({
-            pantryItems: [item, ...state.pantryItems],
+            pantryItems: targetHouseholdId ? state.pantryItems : [item, ...state.pantryItems],
             pantryError: '',
             aiActions: [
               { id: createActionId(), title: `收进了「${item.name}」`, timeLabel: '刚刚' },
               ...getAiActions(state),
             ],
           }));
+          if (get().pantryListLoaded && activeHouseholdId === targetHouseholdId) {
+            void get().loadPantryList(get().pantryListOptions);
+          }
           return item;
         } catch (error) {
           set({ pantryError: error instanceof Error ? error.message : '添加库存失败' });
@@ -738,8 +912,12 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           const updatedItem = normalizePantryItem(
             await requestUpdatePantryItem(token, itemId, input, householdId),
           );
+          const activeHouseholdId = get().pantryListOptions.householdId ?? '';
+          const targetHouseholdId = householdId?.trim() ?? '';
           set((state) => ({
-            pantryItems: state.pantryItems.map((item) => (item.id === itemId ? updatedItem : item)),
+            pantryItems: targetHouseholdId
+              ? state.pantryItems
+              : state.pantryItems.map((item) => (item.id === itemId ? updatedItem : item)),
             pantryError: '',
             aiActions: [
               {
@@ -750,6 +928,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               ...getAiActions(state),
             ],
           }));
+          if (get().pantryListLoaded && activeHouseholdId === targetHouseholdId) {
+            void get().loadPantryList(get().pantryListOptions);
+          }
           return updatedItem;
         } catch (error) {
           set({ pantryError: error instanceof Error ? error.message : '编辑库存失败' });
@@ -767,8 +948,12 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           const updatedItem = normalizePantryItem(
             await requestUpdatePantryItemStatus(token, itemId, status, householdId),
           );
+          const activeHouseholdId = get().pantryListOptions.householdId ?? '';
+          const targetHouseholdId = householdId?.trim() ?? '';
           set((state) => ({
-            pantryItems: state.pantryItems.map((item) => (item.id === itemId ? updatedItem : item)),
+            pantryItems: targetHouseholdId
+              ? state.pantryItems
+              : state.pantryItems.map((item) => (item.id === itemId ? updatedItem : item)),
             pantryError: '',
             aiActions: [
               {
@@ -784,6 +969,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               ...getAiActions(state),
             ],
           }));
+          if (get().pantryListLoaded && activeHouseholdId === targetHouseholdId) {
+            void get().loadPantryList(get().pantryListOptions);
+          }
           return updatedItem;
         } catch (error) {
           set({ pantryError: error instanceof Error ? error.message : '更新库存状态失败' });
@@ -799,10 +987,17 @@ export const useLifeTraceStore = create<LifeTraceState>()(
 
         try {
           await requestDeletePantryItem(token, itemId, householdId);
+          const activeHouseholdId = get().pantryListOptions.householdId ?? '';
+          const targetHouseholdId = householdId?.trim() ?? '';
           set((state) => ({
-            pantryItems: state.pantryItems.filter((item) => item.id !== itemId),
+            pantryItems: targetHouseholdId
+              ? state.pantryItems
+              : state.pantryItems.filter((item) => item.id !== itemId),
             pantryError: '',
           }));
+          if (get().pantryListLoaded && activeHouseholdId === targetHouseholdId) {
+            void get().loadPantryList(get().pantryListOptions);
+          }
         } catch (error) {
           set({ pantryError: error instanceof Error ? error.message : '删除库存失败' });
         }
@@ -1046,7 +1241,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
     }),
     {
       name: 'life-trace-state',
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         settings: state.settings,
@@ -1091,6 +1286,13 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           pantryLoaded,
           pantryLoading,
           pantryError,
+          pantryListItems,
+          pantryListLoaded,
+          pantryListLoading,
+          pantryListLoadingMore,
+          pantryListError,
+          pantryListPagination,
+          pantryListOptions,
           pantryPreferences,
           ...rest
         } = state;
@@ -1127,6 +1329,13 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         void pantryLoaded;
         void pantryLoading;
         void pantryError;
+        void pantryListItems;
+        void pantryListLoaded;
+        void pantryListLoading;
+        void pantryListLoadingMore;
+        void pantryListError;
+        void pantryListPagination;
+        void pantryListOptions;
         return {
           ...rest,
           pantryItems: Array.isArray(pantryItems)

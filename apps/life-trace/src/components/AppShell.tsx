@@ -30,24 +30,37 @@ function getActiveTab(pathname: string): AppTab {
   return 'today';
 }
 
+function getScrollRouteKey(pathname: string) {
+  if (pathname === '/plans' || pathname.startsWith('/plans/')) {
+    return '/plans';
+  }
+  if (pathname === '/traces' || pathname.startsWith('/traces/')) {
+    return '/traces';
+  }
+  return pathname;
+}
+
+function scrollContentToTop(element: HTMLElement | null, _routeKey: string) {
+  element?.scrollTo({ top: 0, behavior: 'instant' });
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const activeTab = getActiveTab(location.pathname);
+  const scrollRouteKey = getScrollRouteKey(location.pathname);
   const contentRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
 
   useLifeTraceEntrance(contentRef, {
-    dependencies: [activeTab],
+    dependencies: [scrollRouteKey],
     selector: '[data-page-entrance]',
     y: 10,
     stagger: 0.035,
   });
 
   useEffect(() => {
-    if (activeTab) {
-      contentRef.current?.scrollTo({ top: 0, behavior: 'instant' });
-    }
-  }, [activeTab]);
+    scrollContentToTop(contentRef.current, scrollRouteKey);
+  }, [scrollRouteKey]);
 
   useGSAP(
     () => {
@@ -93,7 +106,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="h-dvh w-full overflow-hidden bg-background text-foreground">
       <main
         ref={contentRef}
-        className="safe-top safe-x mx-auto h-dvh w-full max-w-[430px] overflow-y-auto overflow-x-hidden pb-[calc(10rem+env(safe-area-inset-bottom))] max-[360px]:px-3"
+        className="safe-top safe-x mx-auto h-dvh w-full max-w-[430px] overflow-y-auto overflow-x-hidden overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-[calc(10rem+env(safe-area-inset-bottom))] max-[360px]:px-3"
       >
         <div className="min-w-0 overflow-x-hidden" data-page-entrance>
           {children}
@@ -107,7 +120,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         ref={navRef}
         className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[430px] border-t border-white/[0.07] bg-card/88 px-3 pt-3 shadow-[0_-18px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl max-[360px]:px-2"
       >
-        <div className="grid grid-cols-5 items-end gap-1 rounded-[1.65rem] border border-white/[0.04] bg-background/28 p-1.5 max-[360px]:gap-0.5 max-[360px]:p-1">
+        <div className="grid grid-cols-5 items-stretch gap-1 rounded-[1.65rem] border border-white/[0.04] bg-background/28 p-1.5 max-[360px]:gap-0.5 max-[360px]:p-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -119,11 +132,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                 to={tab.path}
                 data-tab-active={active}
                 className={cn(
-                  'group relative inline-flex h-[4.35rem] min-w-0 shrink cursor-pointer flex-col items-center justify-center gap-1 overflow-visible whitespace-nowrap rounded-[1.25rem] border border-transparent px-1 text-sm font-medium text-muted-foreground transition duration-300 hover:bg-secondary/35 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[360px]:h-[4rem]',
+                  'group relative inline-flex h-[4.1rem] min-w-0 shrink cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-[1.25rem] border border-transparent px-1 text-sm font-medium text-muted-foreground transition duration-300 hover:bg-secondary/35 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[360px]:h-[3.85rem]',
                   active &&
                     !isAi &&
                     'border-white/[0.10] bg-secondary/36 text-foreground shadow-[0_6px_18px_rgba(0,0,0,0.14)]',
-                  isAi && '-mt-3 gap-0.5 hover:bg-life-ai/[0.045] hover:text-life-ai',
+                  isAi && 'hover:bg-life-ai/[0.045] hover:text-life-ai',
                   isAi &&
                     active &&
                     'border-life-ai/24 bg-life-ai/[0.045] text-life-ai shadow-[0_6px_20px_rgba(6,182,212,0.08)]',
@@ -133,15 +146,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                   data-tab-icon
                   className={cn(
                     'relative z-10 grid size-8 place-items-center rounded-2xl transition duration-300 group-hover:-translate-y-0.5 group-hover:bg-secondary/55 group-hover:text-foreground',
-                    isAi &&
-                      'size-11 bg-transparent text-life-ai shadow-none group-hover:bg-life-ai/10',
-                    isAi && active && 'bg-transparent shadow-none group-hover:bg-transparent',
+                    isAi && 'text-life-ai group-hover:bg-life-ai/10 group-hover:text-life-ai',
                     active &&
-                      !isAi &&
                       'bg-background/72 text-foreground shadow-[0_5px_14px_rgba(0,0,0,0.14)]',
+                    active && isAi && 'text-life-ai group-hover:bg-background/72',
                   )}
                 >
-                  <Icon className={cn('size-5', isAi && 'size-7')} />
+                  <Icon className="size-5" />
                 </span>
                 <span
                   data-tab-label

@@ -160,36 +160,60 @@ const fallbackWeather: WeatherApiResponse = {
 
 function buildFallbackHourlyWeather(): WeatherApiHour[] {
   const now = new Date();
-  const upcoming = [
-    { offsetHours: 1, temp: '24°', text: '晴' },
-    { offsetHours: 2, temp: '25°', text: '晴' },
-    { offsetHours: 3, temp: '26°', text: '多云' },
-    { offsetHours: 4, temp: '24°', text: '多云' },
-    { offsetHours: 5, temp: '22°', text: '多云' },
-    { offsetHours: 6, temp: '20°', text: '多云' },
-    { offsetHours: 7, temp: '19°', text: '阴' },
-    { offsetHours: 8, temp: '18°', text: '阴' },
-    { offsetHours: 9, temp: '18°', text: '阴' },
-    { offsetHours: 10, temp: '17°', text: '小雨' },
-    { offsetHours: 11, temp: '17°', text: '小雨' },
-    { offsetHours: 12, temp: '17°', text: '小雨' },
-    { offsetHours: 17, temp: '18°', text: '小雨' },
-    { offsetHours: 20, temp: '21°', text: '小雨' },
-    { offsetHours: 23, temp: '24°', text: '阴' },
-  ];
+  const currentHour = new Date(now);
+  currentHour.setMinutes(0, 0, 0);
+  const todayKey = formatDateKey(now);
+  const forecastHours = Array.from({ length: 36 }, (_, index) => {
+    const date = new Date(currentHour.getTime() + (index + 1) * 60 * 60 * 1000);
+    const hour = date.getHours();
+    const isTomorrow = formatDateKey(date) !== todayKey;
+
+    return {
+      time: `${String(hour).padStart(2, '0')}时`,
+      dateTime: date.toISOString(),
+      temp: `${getFallbackHourlyTemp(hour, isTomorrow)}°`,
+      text: getFallbackHourlyText(hour, isTomorrow),
+    };
+  });
 
   return [
-    { time: '现在', temp: '22°', text: '多云', active: true },
-    ...upcoming.map((item) => {
-      const date = new Date(now.getTime() + item.offsetHours * 60 * 60 * 1000);
-      return {
-        time: `${String(date.getHours()).padStart(2, '0')}时`,
-        dateTime: date.toISOString(),
-        temp: item.temp,
-        text: item.text,
-      };
-    }),
+    { time: '现在', dateTime: now.toISOString(), temp: '22°', text: '多云', active: true },
+    ...forecastHours,
   ];
+}
+
+function getFallbackHourlyTemp(hour: number, isTomorrow: boolean) {
+  const timeline = [
+    18, 18, 17, 17, 17, 18, 19, 21, 23, 24, 25, 26, 26, 25, 24, 23, 22, 21, 20, 19, 19, 18, 18, 18,
+  ];
+  const baseTemp = timeline[hour] ?? 22;
+  return isTomorrow ? baseTemp - 1 : baseTemp;
+}
+
+function getFallbackHourlyText(hour: number, isTomorrow: boolean) {
+  if (isTomorrow) {
+    if (hour <= 9) {
+      return '小雨';
+    }
+    if (hour <= 17) {
+      return '阴';
+    }
+    return '多云';
+  }
+
+  if (hour <= 5) {
+    return '阴';
+  }
+  if (hour <= 9) {
+    return '多云';
+  }
+  if (hour <= 16) {
+    return '晴';
+  }
+  if (hour <= 20) {
+    return '多云';
+  }
+  return '阴';
 }
 
 function buildFallbackDailyWeather(): WeatherApiDay[] {
@@ -339,7 +363,10 @@ export function TodayPage() {
     (settings.aiPersonalization && adviceLoading && !remoteAdvice);
   const showAdviceEmpty = settings.aiPersonalization && !adviceLoading && !remoteAdvice;
   const localBrief = buildWeatherBrief(weather, settings);
-  const weatherAlerts = useMemo(() => buildWeatherAlerts(weather), [weather]);
+  const weatherAlertCards = useMemo(
+    () => (settings.weatherAlerts ? buildWeatherAlerts(weather) : []),
+    [settings.weatherAlerts, weather],
+  );
   const todayDateKey = useMemo(() => formatDateKey(new Date()), []);
   const tomorrowDateKey = useMemo(
     () => formatDateKey(new Date(Date.now() + 24 * 60 * 60 * 1000)),
@@ -391,9 +418,15 @@ export function TodayPage() {
     };
   }, [tomorrowHourlyWeather, tomorrowWeather]);
   const weatherNotice = weatherError || weather.warning || '';
+  const showWeatherNotice =
+    Boolean(weatherNotice) &&
+    weather.source !== 'mock' &&
+    !weatherError.includes('已显示本地参考天气') &&
+    !weatherError.includes('已保留当前天气');
   const shouldWaitForAiBrief = Boolean(token) && (!settingsLoaded || settings.aiPersonalization);
   const showBriefSkeleton = !remoteAdviceSummary && (!weatherReady || shouldWaitForAiBrief);
-  const aiBriefTitle = remoteAdviceSummary ? 'AI 已读今日状态' : localBrief.title;
+  const hasAiBrief = Boolean(remoteAdviceSummary);
+  const aiBriefTitle = hasAiBrief ? '今日状态摘要' : localBrief.title;
   const aiBriefDetail = remoteAdviceSummary || localBrief.detail;
   const nextReminder = getNextReminder(plans);
   const todayOpenPlans = useMemo(
@@ -417,10 +450,10 @@ export function TodayPage() {
   ).length;
   const habitProgress = `${completedHabitCount}/${habitNames.length}`;
   const checkinAdviceText = adviceLoading
-    ? '正在结合今日打卡刷新建议。'
+    ? '正在更新今天的打卡节奏。'
     : completedHabitCount > 0
-      ? `已完成 ${completedHabitCount} 项，AI 建议会优先避开重复提醒。`
-      : '先完成一个小打卡，AI 建议会更贴近今天的真实状态。';
+      ? `已完成 ${completedHabitCount} 项，今天继续按这个节奏就很好。`
+      : '先完成一个小打卡，今天会更容易进入状态。';
   const adviceStatusText = remoteAdvice
     ? adviceRefreshing
       ? 'AI 刷新中'
@@ -430,6 +463,38 @@ export function TodayPage() {
       : settings.aiPersonalization
         ? '等待 AI'
         : '基础建议';
+  const aiBriefHighlights = useMemo(() => {
+    const highlights = [
+      weather.now.text.includes('雨')
+        ? `${weather.city || settings.city}今天有雨，出门记得带伞。`
+        : `${weather.city || settings.city}今天以${weather.now.text}为主，按正常节奏出门就好。`,
+      overduePlans.length > 0
+        ? `先处理 ${overduePlans.length} 个超时计划，今天会更轻松。`
+        : todayOpenPlans.length > 0
+          ? `今天还有 ${todayOpenPlans.length} 个计划待完成，先做最容易的一项。`
+          : '今天的计划压力不高，可以留一点空档给自己。',
+      completedHabitCount === 0
+        ? `今日打卡还没开始，先完成 1 项最容易坚持的。`
+        : completedHabitCount >= habitNames.length
+          ? '今日打卡已经全部完成，可以安心收尾。'
+          : `已完成 ${completedHabitCount}/${habitNames.length} 项打卡，保持这个节奏就很好。`,
+    ];
+
+    if (nextReminder) {
+      highlights[2] = `下一条提醒在 ${nextReminder.dateText} ${nextReminder.timeText}。`;
+    }
+
+    return highlights;
+  }, [
+    completedHabitCount,
+    habitNames.length,
+    nextReminder,
+    overduePlans.length,
+    settings.city,
+    todayOpenPlans.length,
+    weather.city,
+    weather.now.text,
+  ]);
 
   useLifeTraceEntrance(pageRef, {
     selector: '[data-today-entrance], [data-today-stagger]',
@@ -839,7 +904,7 @@ export function TodayPage() {
                         ? weather.cached
                           ? 'QWeather · 缓存'
                           : 'QWeather'
-                        : 'Mock'}
+                        : '参考天气'}
                   </span>
                   <button
                     type="button"
@@ -875,7 +940,7 @@ export function TodayPage() {
               })}
             </div>
 
-            {weatherNotice ? (
+            {showWeatherNotice ? (
               <div className="mt-4 rounded-2xl border border-life-alert/25 bg-life-alert/10 px-3 py-3 text-sm leading-6 text-life-alert">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-2">
@@ -894,47 +959,55 @@ export function TodayPage() {
               </div>
             ) : null}
 
-            <div className="mt-4 grid gap-3 min-[720px]:grid-cols-[1.4fr_1fr]" data-today-stagger>
-              {weatherAlerts.length > 0 ? (
-                <div className="grid gap-2">
-                  {weatherAlerts.map((alert) => {
-                    const tone = adviceToneClasses[alert.tone];
-
-                    return (
-                      <div
-                        key={alert.id}
-                        className={`rounded-2xl border px-3 py-3 ${tone.bg} ${
-                          alert.tone === 'alert'
-                            ? 'border-life-alert/25'
-                            : alert.tone === 'health'
-                              ? 'border-life-health/25'
-                              : 'border-life-weather/25'
-                        }`}
-                      >
-                        <div
-                          className={`flex items-center gap-2 text-sm font-semibold ${tone.text}`}
-                        >
-                          <AlertTriangle className="size-4" />
-                          {alert.title}
-                        </div>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          {alert.detail}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-life-weather/20 bg-life-weather/5 px-3 py-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-life-weather">
-                    <Sun className="size-4" />
-                    今日天气平稳
-                  </div>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    当前没有明显风险提醒，按正常节奏安排出门和通勤就好。
-                  </p>
-                </div>
+            <div
+              className={cn(
+                'mt-4 grid gap-3',
+                settings.weatherAlerts && 'min-[720px]:grid-cols-[1.4fr_1fr]',
               )}
+              data-today-stagger
+            >
+              {settings.weatherAlerts ? (
+                weatherAlertCards.length > 0 ? (
+                  <div className="grid gap-2">
+                    {weatherAlertCards.map((alert) => {
+                      const tone = adviceToneClasses[alert.tone];
+
+                      return (
+                        <div
+                          key={alert.id}
+                          className={`rounded-2xl border px-3 py-3 ${tone.bg} ${
+                            alert.tone === 'alert'
+                              ? 'border-life-alert/25'
+                              : alert.tone === 'health'
+                                ? 'border-life-health/25'
+                                : 'border-life-weather/25'
+                          }`}
+                        >
+                          <div
+                            className={`flex items-center gap-2 text-sm font-semibold ${tone.text}`}
+                          >
+                            <AlertTriangle className="size-4" />
+                            {alert.title}
+                          </div>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            {alert.detail}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-life-weather/20 bg-life-weather/5 px-3 py-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-life-weather">
+                      <Sun className="size-4" />
+                      今日天气平稳
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      当前没有明显风险提醒，按正常节奏安排出门和通勤就好。
+                    </p>
+                  </div>
+                )
+              ) : null}
 
               {tomorrowWeatherSummary && tomorrowWeather ? (
                 <div className="rounded-2xl border border-border bg-secondary/40 px-3 py-3">
@@ -1046,15 +1119,15 @@ export function TodayPage() {
             <Sparkles className="size-6" />
           </div>
           <div className="min-w-0 flex-1">
-            <div data-ai-brief-copy>
-              <Badge tone="ai">AI 今日简报</Badge>
+            <div className="flex flex-wrap items-center gap-2" data-ai-brief-copy>
+              <Badge tone="ai">今日简报</Badge>
             </div>
             <div className="mt-3 min-h-[96px]">
               {showBriefSkeleton ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-xs font-medium text-life-ai">
                     <ActionLoadingIcon className="size-3.5" tone="ai" />
-                    <span>正在生成今日简报</span>
+                    <span>正在生成摘要</span>
                   </div>
                   <div className="h-6 w-44 animate-pulse rounded-full bg-life-ai/15" />
                   <div className="space-y-2">
@@ -1064,12 +1137,23 @@ export function TodayPage() {
                 </div>
               ) : (
                 <div className="animate-in fade-in duration-300 motion-reduce:animate-none">
-                  <h2 className="line-clamp-2 text-xl font-semibold max-[360px]:text-lg">
+                  <h2 className="line-clamp-2 text-2xl font-semibold max-[360px]:text-xl">
                     {aiBriefTitle}
                   </h2>
-                  <p className="mt-2 line-clamp-3 min-h-[72px] text-sm leading-6 text-muted-foreground">
+                  <p className="mt-3 line-clamp-3 text-base leading-8 text-muted-foreground max-[360px]:text-sm max-[360px]:leading-7">
                     {aiBriefDetail}
                   </p>
+                  <ul className="mt-4 space-y-2.5">
+                    {aiBriefHighlights.map((highlight, index) => (
+                      <li
+                        key={`${highlight}-${index}`}
+                        className="flex items-start gap-3 text-sm leading-6 text-muted-foreground"
+                      >
+                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-life-ai" />
+                        <span>{highlight}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>
@@ -1343,7 +1427,7 @@ export function TodayPage() {
         </div>
         {adviceRefreshing ? (
           <p className="mb-3 text-xs leading-5 text-muted-foreground">
-            正在根据最新天气、计划和打卡后台刷新，当前卡片先保持可用。
+            正在根据最新天气、计划和打卡更新建议，当前内容先保持可用。
           </p>
         ) : null}
         <div className="grid min-h-[360px] grid-cols-2 gap-3 max-[360px]:grid-cols-1">
@@ -1364,7 +1448,7 @@ export function TodayPage() {
             : null}
           {showAdviceEmpty ? (
             <Card className="col-span-2 min-h-[360px] p-5 text-sm leading-6 text-muted-foreground max-[360px]:col-span-1">
-              AI 建议正在生成，完成后会自动替换到这里。为了避免混淆，未完成前不会显示临时建议。
+              稍等一下，今天的建议正在整理中。
             </Card>
           ) : null}
           {advice.map((item) => {

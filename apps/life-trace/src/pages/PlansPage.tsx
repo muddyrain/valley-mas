@@ -82,6 +82,10 @@ const typeTone: Record<PlanType, 'plan' | 'health' | 'trace' | 'weather' | 'ai' 
   普通事项: 'alert',
 };
 
+function isTransientPlansSyncIssue(message: string) {
+  return message.includes('认证服务暂时不可用') || message.includes('暂时无法验证登录状态');
+}
+
 export function PlansPage() {
   const {
     plans,
@@ -167,6 +171,9 @@ export function PlansPage() {
   ].filter((group) => group.plans.length > 0);
   const selectedPlan = planId ? (plans.find((plan) => plan.id === planId) ?? null) : null;
   const deletePending = deleteTarget ? Boolean(planDeletingById[deleteTarget.id]) : false;
+  const plansSyncIssue = plansError && isTransientPlansSyncIssue(plansError) ? plansError : '';
+  const showPlansErrorCard = Boolean(plansError) && !plansSyncIssue;
+  const showPlansSyncFallback = Boolean(plansSyncIssue) && !plansLoading && plans.length === 0;
 
   useEffect(() => {
     if (planId && !plansLoading && plans.length > 0 && !selectedPlan) {
@@ -488,7 +495,21 @@ export function PlansPage() {
         </Card>
       ) : null}
 
-      {plansError ? (
+      {plansSyncIssue && !showPlansSyncFallback ? (
+        <Card className="border-border/70 bg-secondary/40 p-4 text-sm text-muted-foreground">
+          <div className="flex items-start gap-3">
+            <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-secondary text-muted-foreground">
+              <RotateCcw className="size-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-foreground">计划列表刚刚没有同步成功</p>
+              <p className="mt-1 leading-6">{plansSyncIssue}</p>
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
+      {showPlansErrorCard ? (
         <Card className="border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
           {plansError}
         </Card>
@@ -508,7 +529,25 @@ export function PlansPage() {
             <div className="space-y-4">{group.plans.map(renderPlanCard)}</div>
           </section>
         ))}
-        {!plansLoading && planGroups.length === 0 ? (
+        {showPlansSyncFallback ? (
+          <EmptyState
+            title="计划刚刚没有同步下来"
+            description="这次没有顺利从云端拉到计划，稍后再试就好。"
+            eyebrow="同步中断"
+            icon={RotateCcw}
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void loadPlans(listOptions)}
+              >
+                重新加载
+              </Button>
+            }
+          />
+        ) : null}
+        {!plansLoading && planGroups.length === 0 && !showPlansSyncFallback ? (
           <EmptyState
             title={activeFilter === 'all' ? '还没有计划' : '暂无匹配计划'}
             description={activeFilterConfig.emptyText}

@@ -416,18 +416,22 @@ func buildDailyBriefPushPayload(
 }
 
 func buildDailyBriefTitle(settings model.LifeTraceSettings, weather WeatherResponse, dueAt time.Time) string {
-	if riskTitle := buildDailyBriefRiskTitle(weather); riskTitle != "" {
-		return riskTitle
+	if settings.WeatherAlerts {
+		if riskTitle := buildDailyBriefRiskTitle(weather); riskTitle != "" {
+			return riskTitle
+		}
 	}
 	if isRestDay(settings, dueAt) {
-		return "Life Trace 周末简报"
+		return "Life Trace 周末天气"
 	}
-	return "Life Trace 每日简报"
+	return "Life Trace 每日天气"
 }
 
 func buildDailyBriefIntro(settings model.LifeTraceSettings, weather WeatherResponse, dueAt time.Time) string {
-	if riskIntro := buildDailyBriefRiskIntro(weather); riskIntro != "" {
-		return riskIntro
+	if settings.WeatherAlerts {
+		if riskIntro := buildDailyBriefRiskIntro(weather); riskIntro != "" {
+			return riskIntro
+		}
 	}
 
 	city := strings.TrimSpace(settings.City)

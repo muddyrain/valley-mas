@@ -49,7 +49,6 @@ import type {
   HouseholdInvitePayload,
   HouseholdMember,
   HouseholdSummary,
-  ListPagination,
   PantryCategory,
   PantryItem,
   PantryItemStatus,
@@ -81,13 +80,6 @@ const categoryIconMap = {
 } satisfies Record<PantryCategory, typeof Apple>;
 
 const PANTRY_PAGE_SIZE = 20;
-
-const emptyPagination: ListPagination = {
-  page: 1,
-  pageSize: PANTRY_PAGE_SIZE,
-  total: 0,
-  hasMore: false,
-};
 
 type PantryOverviewState = {
   total: number;
@@ -178,6 +170,14 @@ export function PantryPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const addTrace = useLifeTraceStore((state) => state.addTrace);
+  const pantryList = useLifeTraceStore((state) => state.pantryListItems);
+  const pantryLoaded = useLifeTraceStore((state) => state.pantryListLoaded);
+  const pantryLoading = useLifeTraceStore((state) => state.pantryListLoading);
+  const pantryLoadingMore = useLifeTraceStore((state) => state.pantryListLoadingMore);
+  const pantryListError = useLifeTraceStore((state) => state.pantryListError);
+  const pantryPagination = useLifeTraceStore((state) => state.pantryListPagination);
+  const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
+  const loadMorePantryList = useLifeTraceStore((state) => state.loadMorePantryList);
   const updatePantryItemStatus = useLifeTraceStore((state) => state.updatePantryItemStatus);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PantryItem | null>(null);
@@ -199,12 +199,6 @@ export function PantryPage() {
   );
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState('');
-  const [pantryList, setPantryList] = useState<PantryItem[]>([]);
-  const [pantryLoaded, setPantryLoaded] = useState(false);
-  const [pantryLoading, setPantryLoading] = useState(false);
-  const [pantryLoadingMore, setPantryLoadingMore] = useState(false);
-  const [pantryListError, setPantryListError] = useState('');
-  const [pantryPagination, setPantryPagination] = useState<ListPagination>(emptyPagination);
   const [overview, setOverview] = useState<PantryOverviewState>({
     total: 0,
     expiring: 0,
@@ -218,7 +212,6 @@ export function PantryPage() {
   const [householdMembersLoading, setHouseholdMembersLoading] = useState(false);
   const [invitePayload, setInvitePayload] = useState<HouseholdInvitePayload | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const pantryRequestIdRef = useRef(0);
   const previousSelectedHouseholdIdRef = useRef(selectedHouseholdId);
   const pendingHouseholdSwitchIdRef = useRef<string | null>(null);
   const [householdSwitchLoading, setHouseholdSwitchLoading] = useState(false);
@@ -263,79 +256,6 @@ export function PantryPage() {
       q: debouncedSearchQuery.trim() || undefined,
     }),
     [categoryFilter, debouncedSearchQuery, selectedHouseholdId, statusFilter],
-  );
-
-  const loadPantryPage = useCallback(
-    async (page: number, mode: 'replace' | 'append') => {
-      if (!token) {
-        setPantryList([]);
-        setPantryLoaded(true);
-        setPantryLoading(false);
-        setPantryLoadingMore(false);
-        setPantryListError('');
-        setPantryPagination(emptyPagination);
-        pendingHouseholdSwitchIdRef.current = null;
-        setHouseholdSwitchLoading(false);
-        return;
-      }
-
-      const requestId = ++pantryRequestIdRef.current;
-      const requestHouseholdId = pantryQueryOptions.householdId ?? '';
-      if (mode === 'append') {
-        setPantryLoadingMore(true);
-      } else {
-        setPantryLoading(true);
-      }
-      setPantryListError('');
-
-      try {
-        const { list, pagination } = await listPantry(token, {
-          page,
-          pageSize: PANTRY_PAGE_SIZE,
-          ...pantryQueryOptions,
-        });
-        if (requestId !== pantryRequestIdRef.current) {
-          return;
-        }
-
-        const nextPagination = pagination ?? {
-          page,
-          pageSize: PANTRY_PAGE_SIZE,
-          total: list.length,
-          hasMore: false,
-        };
-
-        setPantryLoaded(true);
-        setPantryPagination(nextPagination);
-        setPantryList((current) => {
-          if (mode === 'replace') {
-            return list;
-          }
-          const existingIds = new Set(current.map((item) => item.id));
-          return [...current, ...list.filter((item) => !existingIds.has(item.id))];
-        });
-      } catch (error) {
-        if (requestId !== pantryRequestIdRef.current) {
-          return;
-        }
-        setPantryLoaded(true);
-        setPantryListError(error instanceof Error ? error.message : '获取库存失败');
-      } finally {
-        if (requestId === pantryRequestIdRef.current) {
-          setPantryLoading(false);
-          setPantryLoadingMore(false);
-          if (
-            mode === 'replace' &&
-            pendingHouseholdSwitchIdRef.current !== null &&
-            pendingHouseholdSwitchIdRef.current === requestHouseholdId
-          ) {
-            pendingHouseholdSwitchIdRef.current = null;
-            setHouseholdSwitchLoading(false);
-          }
-        }
-      }
-    },
-    [pantryQueryOptions, token],
   );
 
   const refreshOverview = useCallback(async () => {
@@ -445,8 +365,8 @@ export function PantryPage() {
       return;
     }
 
-    await loadPantryPage(pantryPagination.page + 1, 'append');
-  }, [loadPantryPage, pantryLoading, pantryLoadingMore, pantryPagination]);
+    await loadMorePantryList();
+  }, [loadMorePantryList, pantryLoading, pantryLoadingMore, pantryPagination.hasMore]);
 
   const handleStatusAction = async (item: PantryItem, status: 'used-up' | 'discarded') => {
     if (pendingActionId) {
@@ -464,11 +384,6 @@ export function PantryPage() {
         return;
       }
       await addTrace(buildPantryTraceInput(updated, status));
-      setPantryList((current) => current.filter((entry) => entry.id !== updated.id));
-      setPantryPagination((current) => ({
-        ...current,
-        total: Math.max(current.total - 1, 0),
-      }));
       await refreshOverview();
     } finally {
       setPendingActionId(null);
@@ -584,8 +499,11 @@ export function PantryPage() {
   }, [selectedHouseholdId]);
 
   useEffect(() => {
-    void loadPantryPage(1, 'replace');
-  }, [loadPantryPage]);
+    void loadPantryList({
+      ...pantryQueryOptions,
+      pageSize: PANTRY_PAGE_SIZE,
+    });
+  }, [loadPantryList, pantryQueryOptions]);
 
   useEffect(() => {
     void refreshOverview();
@@ -629,6 +547,18 @@ export function PantryPage() {
     observer.observe(target);
     return () => observer.disconnect();
   }, [loadMorePantryItems, pantryLoading, pantryLoadingMore, pantryPagination.hasMore]);
+
+  useEffect(() => {
+    if (
+      householdSwitchLoading &&
+      pendingHouseholdSwitchIdRef.current === (selectedHouseholdId || '') &&
+      pantryLoaded &&
+      !pantryLoading
+    ) {
+      pendingHouseholdSwitchIdRef.current = null;
+      setHouseholdSwitchLoading(false);
+    }
+  }, [householdSwitchLoading, pantryLoaded, pantryLoading, selectedHouseholdId]);
 
   const listRefreshing = pantryLoading && pantryLoaded && !householdSwitchLoading;
   const activePantryError = pantryListError || householdError;
@@ -1122,7 +1052,6 @@ export function PantryPage() {
         householdName={currentHousehold?.name}
         onSaved={(message) => {
           setSaveMessage(message);
-          void loadPantryPage(1, 'replace');
           void refreshOverview();
         }}
       />
