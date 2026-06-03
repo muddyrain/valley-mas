@@ -419,10 +419,9 @@ export function TodayPage() {
       }),
     [tomorrowDateKey, weather.hourly],
   );
+  const hasTomorrowHourlyWeather = tomorrowHourlyWeather.length > 0;
   const displayedHourlyWeather =
-    selectedWeatherDay === 'tomorrow' && tomorrowHourlyWeather.length > 0
-      ? tomorrowHourlyWeather
-      : todayHourlyWeather;
+    selectedWeatherDay === 'tomorrow' ? tomorrowHourlyWeather : todayHourlyWeather;
   const tomorrowWeatherSummary = useMemo(() => {
     if (!tomorrowWeather) {
       return null;
@@ -1097,12 +1096,13 @@ export function TodayPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={tomorrowHourlyWeather.length === 0}
                     className={cn(
-                      'rounded-xl px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
+                      'rounded-xl px-3 py-2 text-xs font-semibold transition',
                       selectedWeatherDay === 'tomorrow'
                         ? 'bg-card text-foreground shadow-sm'
-                        : 'text-muted-foreground',
+                        : hasTomorrowHourlyWeather
+                          ? 'text-muted-foreground'
+                          : 'text-muted-foreground/80',
                     )}
                     onClick={() => setSelectedWeatherDay('tomorrow')}
                   >
@@ -1110,27 +1110,33 @@ export function TodayPage() {
                   </button>
                 </div>
               </div>
-              <div className="-mx-1 flex max-w-full gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {displayedHourlyWeather.map((item, index) => {
-                  const Icon = item.text.includes('晴') ? Sun : Cloud;
+              {selectedWeatherDay === 'tomorrow' && !hasTomorrowHourlyWeather ? (
+                <div className="rounded-2xl border border-dashed border-border px-4 py-4 text-sm leading-6 text-muted-foreground">
+                  明日逐小时天气还没返回，先看上面的明日天气概览，稍后再来会更完整。
+                </div>
+              ) : (
+                <div className="-mx-1 flex max-w-full gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {displayedHourlyWeather.map((item, index) => {
+                    const Icon = item.text.includes('晴') ? Sun : Cloud;
 
-                  return (
-                    <div
-                      key={`${item.dateTime || item.time}-${index}`}
-                      className={cn(
-                        'flex min-w-16 shrink-0 flex-col items-center gap-2 rounded-2xl px-3 py-3',
-                        item.active && selectedWeatherDay === 'today'
-                          ? 'bg-life-weather/15 text-life-weather'
-                          : 'bg-secondary text-muted-foreground',
-                      )}
-                    >
-                      <span className="text-xs font-medium">{item.time}</span>
-                      <Icon className="size-5" />
-                      <span className="text-base font-semibold text-foreground">{item.temp}</span>
-                    </div>
-                  );
-                })}
-              </div>
+                    return (
+                      <div
+                        key={`${item.dateTime || item.time}-${index}`}
+                        className={cn(
+                          'flex min-w-16 shrink-0 flex-col items-center gap-2 rounded-2xl px-3 py-3',
+                          item.active && selectedWeatherDay === 'today'
+                            ? 'bg-life-weather/15 text-life-weather'
+                            : 'bg-secondary text-muted-foreground',
+                        )}
+                      >
+                        <span className="text-xs font-medium">{item.time}</span>
+                        <Icon className="size-5" />
+                        <span className="text-base font-semibold text-foreground">{item.temp}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </>
         )}
