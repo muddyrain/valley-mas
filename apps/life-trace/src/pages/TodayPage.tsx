@@ -21,7 +21,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateTodayAdvice } from '@/api/advice';
-import { listHouseholds } from '@/api/household';
 import {
   fetchLifeTraceWeather,
   type WeatherApiDay,
@@ -29,6 +28,7 @@ import {
   type WeatherApiResponse,
 } from '@/api/weather';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { weatherMetrics } from '@/data/mock';
@@ -283,9 +283,14 @@ export function TodayPage() {
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const preferredPantryHouseholdId = useLifeTraceStore((state) => state.preferredPantryHouseholdId);
   const pantryListItems = useLifeTraceStore((state) => state.pantryListItems);
+  const pantryListLoaded = useLifeTraceStore((state) => state.pantryListLoaded);
+  const pantryListLoading = useLifeTraceStore((state) => state.pantryListLoading);
   const pantryListSummary = useLifeTraceStore((state) => state.pantryListSummary);
   const pantryListResolvedHouseholdId = useLifeTraceStore(
     (state) => state.pantryListResolvedHouseholdId,
+  );
+  const pantryListResolvedHouseholdName = useLifeTraceStore(
+    (state) => state.pantryListResolvedHouseholdName,
   );
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const addPlan = useLifeTraceStore((state) => state.addPlan);
@@ -308,7 +313,6 @@ export function TodayPage() {
   const [adviceRefreshing, setAdviceRefreshing] = useState(false);
   const [planToast, setPlanToast] = useState('');
   const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
-  const [pantryHouseholdName, setPantryHouseholdName] = useState('');
   const pageRef = useRef<HTMLDivElement>(null);
   const planFingerprint = useMemo(
     () => plans.map((plan) => `${plan.id}:${plan.completed}:${plan.updatedAt ?? ''}`).join('|'),
@@ -328,7 +332,10 @@ export function TodayPage() {
     settings.habits.length > 0 ? settings.habits : ['喝水', '休息', '运动', '护肤'];
   const todayCheckins = checkinsDate === todayDate ? checkins : [];
   const effectivePantryHouseholdId = pantryListResolvedHouseholdId || preferredPantryHouseholdId;
+  const pantryHouseholdName = pantryListResolvedHouseholdName;
   const pantryOverview = pantryListSummary;
+  const pantryCardLoading =
+    Boolean(token) && (!settingsLoaded || !pantryListLoaded || pantryListLoading);
   const pantryPreviewItems = useMemo(
     () =>
       sortPantryItems(pantryListItems)
@@ -369,7 +376,8 @@ export function TodayPage() {
   const showAdviceSkeleton =
     (!weatherReady && !remoteAdvice) ||
     (settings.aiPersonalization && adviceLoading && !remoteAdvice);
-  const showAdviceEmpty = settings.aiPersonalization && !adviceLoading && !remoteAdvice;
+  const showAdvicePlaceholder =
+    showAdviceSkeleton || (settings.aiPersonalization && !adviceLoading && !remoteAdvice);
   const localBrief = buildWeatherBrief(weather, settings);
   const weatherAlertCards = useMemo(
     () => (settings.weatherAlerts ? buildWeatherAlerts(weather) : []),
@@ -749,8 +757,7 @@ export function TodayPage() {
   }, [loadPlans, settingsLoaded, token]);
 
   useEffect(() => {
-    if (!token) {
-      setPantryHouseholdName('');
+    if (!token || !settingsLoaded) {
       return;
     }
 
@@ -761,39 +768,7 @@ export function TodayPage() {
       q: '',
       pageSize: 20,
     });
-  }, [loadPantryList, preferredPantryHouseholdId, token]);
-
-  useEffect(() => {
-    if (!token) {
-      setPantryHouseholdName('');
-      return;
-    }
-
-    let alive = true;
-    listHouseholds(token)
-      .then((response) => {
-        if (!alive) {
-          return;
-        }
-        const targetId =
-          effectivePantryHouseholdId ||
-          preferredPantryHouseholdId ||
-          response.currentHouseholdId ||
-          '';
-        const matched =
-          response.list.find((item) => item.id === targetId) ?? response.list[0] ?? null;
-        setPantryHouseholdName(matched?.name ?? '');
-      })
-      .catch(() => {
-        if (alive) {
-          setPantryHouseholdName('');
-        }
-      });
-
-    return () => {
-      alive = false;
-    };
-  }, [effectivePantryHouseholdId, preferredPantryHouseholdId, token]);
+  }, [loadPantryList, preferredPantryHouseholdId, settingsLoaded, token]);
 
   const pantryPageHref = effectivePantryHouseholdId
     ? `/pantry?householdId=${encodeURIComponent(effectivePantryHouseholdId)}`
@@ -1232,20 +1207,22 @@ export function TodayPage() {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Badge tone={pantryOverview.expired > 0 ? 'alert' : 'health'}>家中临期</Badge>
-              {pantryHouseholdName ? (
+              {pantryHouseholdName && !pantryCardLoading ? (
                 <span className="text-xs text-muted-foreground">
                   当前空间：{pantryHouseholdName}
                 </span>
               ) : null}
-              {pantryOverview.expired > 0 ? (
+              {pantryOverview.expired > 0 && !pantryCardLoading ? (
                 <span className="text-xs text-life-alert">{pantryOverview.expired} 件已过期</span>
               ) : null}
             </div>
             <h2 className="mt-2 text-lg font-semibold">今天该先处理哪几样</h2>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              {pantryOverview.expiring || pantryOverview.expired
-                ? `${pantryOverview.expiring} 件临期，${pantryOverview.expired} 件已过期。点进去可以拍照、补图和改提醒。`
-                : '目前没有临期或过期条目，可以先把家里的食品和用品收进库存。'}
+              {pantryCardLoading
+                ? '正在同步当前空间和库存，马上就能看到今天该优先处理的条目。'
+                : pantryOverview.expiring || pantryOverview.expired
+                  ? `${pantryOverview.expiring} 件临期，${pantryOverview.expired} 件已过期。点进去可以拍照、补图和改提醒。`
+                  : '目前没有临期或过期条目，可以先把家里的食品和用品收进库存。'}
             </p>
           </div>
           <button
@@ -1256,7 +1233,23 @@ export function TodayPage() {
             查看
           </button>
         </div>
-        {pantryPreviewItems.length > 0 ? (
+        {pantryCardLoading ? (
+          <div className="space-y-3">
+            <SyncState
+              title="正在同步当前空间库存"
+              description="临期和过期条目马上出来。"
+              tone="health"
+              showRail={false}
+            />
+            <SyncState
+              title="正在加载库存条目"
+              tone="health"
+              variant="skeleton-list"
+              rows={2}
+              showRail={false}
+            />
+          </div>
+        ) : pantryPreviewItems.length > 0 ? (
           <div className="space-y-2">
             {pantryPreviewItems.map((item) => {
               const status = resolvePantryStatus(item);
@@ -1495,7 +1488,7 @@ export function TodayPage() {
           </p>
         ) : null}
         <div className="grid min-h-[360px] grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-          {showAdviceSkeleton
+          {showAdvicePlaceholder
             ? Array.from({ length: 6 }).map((_, index) => (
                 <Card
                   key={`advice-skeleton-${index}`}
@@ -1510,11 +1503,6 @@ export function TodayPage() {
                 </Card>
               ))
             : null}
-          {showAdviceEmpty ? (
-            <Card className="col-span-2 min-h-[360px] p-5 text-sm leading-6 text-muted-foreground max-[360px]:col-span-1">
-              稍等一下，今天的建议正在整理中。
-            </Card>
-          ) : null}
           {advice.map((item) => {
             const Icon = item.icon;
             const tone = adviceToneClasses[item.tone];

@@ -84,6 +84,7 @@ type LifeTraceState = {
   pantryListPagination: ListPagination;
   pantryListOptions: ListPantryOptions;
   pantryListResolvedHouseholdId: string;
+  pantryListResolvedHouseholdName: string;
   pantryListSummary: PantryOverview;
   pantryPreferences: PantryPreferences;
   aiActions: AiAction[];
@@ -380,6 +381,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       },
       pantryListOptions: defaultPantryListOptions,
       pantryListResolvedHouseholdId: '',
+      pantryListResolvedHouseholdName: '',
       pantryListSummary: defaultPantryOverview,
       pantryPreferences: defaultPantryPreferences,
       aiActions: [
@@ -542,6 +544,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             },
             pantryListOptions: nextOptions,
             pantryListResolvedHouseholdId: '',
+            pantryListResolvedHouseholdName: '',
             pantryListSummary: defaultPantryOverview,
           });
           return;
@@ -555,7 +558,10 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           pantryListOptions: nextOptions,
         });
         try {
-          const { householdId, list, pagination, summary } = await listPantry(token, nextOptions);
+          const { householdId, householdName, list, pagination, summary } = await listPantry(
+            token,
+            nextOptions,
+          );
           if (requestId !== pantryListRequestId) {
             return;
           }
@@ -572,6 +578,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             pantryListLoadingMore: false,
             pantryListError: '',
             pantryListResolvedHouseholdId: normalizeHouseholdScopeId(householdId),
+            pantryListResolvedHouseholdName: householdName?.trim() ?? '',
             pantryListSummary: summary ?? defaultPantryOverview,
           });
         } catch (error) {
@@ -612,7 +619,10 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         const requestId = ++pantryListRequestId;
         set({ pantryListLoadingMore: true, pantryListError: '' });
         try {
-          const { householdId, list, pagination, summary } = await listPantry(token, nextOptions);
+          const { householdId, householdName, list, pagination, summary } = await listPantry(
+            token,
+            nextOptions,
+          );
           if (requestId !== pantryListRequestId) {
             return;
           }
@@ -631,6 +641,8 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             pantryListLoadingMore: false,
             pantryListError: '',
             pantryListResolvedHouseholdId: normalizeHouseholdScopeId(householdId),
+            pantryListResolvedHouseholdName:
+              householdName?.trim() ?? state.pantryListResolvedHouseholdName,
             pantryListSummary: summary ?? state.pantryListSummary,
           }));
         } catch (error) {
@@ -1369,6 +1381,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           pantryListPagination,
           pantryListOptions,
           pantryListResolvedHouseholdId,
+          pantryListResolvedHouseholdName,
           pantryListSummary,
           pantryPreferences,
           ...rest
@@ -1424,6 +1437,10 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           pantryListResolvedHouseholdId: normalizeHouseholdScopeId(
             pantryListResolvedHouseholdId as string | undefined,
           ),
+          pantryListResolvedHouseholdName:
+            typeof pantryListResolvedHouseholdName === 'string'
+              ? pantryListResolvedHouseholdName.trim()
+              : '',
           pantryListSummary:
             typeof pantryListSummary === 'object' && pantryListSummary
               ? {

@@ -99,6 +99,7 @@ function deserializePantryItem(item: PantryItemResponse): PantryItem {
 export function listPantry(token: string, options: ListPantryOptions = {}) {
   return apiRequest<{
     householdId?: string;
+    householdName?: string;
     list: PantryItemResponse[];
     pagination?: ListPagination;
     summary?: PantryOverview;

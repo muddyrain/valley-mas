@@ -43,6 +43,7 @@ export type LifeAssistantPlanEvent = LifeAssistantActionBase & {
 
 export type LifeAssistantPantryEvent = LifeAssistantActionBase & {
   type: 'create_pantry_item';
+  householdName?: string;
   pantryItem?: PantryItem;
 };
 

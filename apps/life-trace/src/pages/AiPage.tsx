@@ -56,7 +56,7 @@ import {
 import { findCurrentWeekReview, toggleExpandedWeeklyReviewId } from '@/lib/weeklyReviews';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { AdvicePayload, AiAction, NewPlanInput, PantryItem } from '@/types';
+import type { AdvicePayload, AiAction, NewPlanInput } from '@/types';
 
 type AiResult = {
   title: string;
@@ -110,14 +110,6 @@ function formatPlanDisplayTime(
   return `${dateText} ${timeText}`;
 }
 
-function formatPantryDisplay(item: PantryItem) {
-  const parts: string[] = [item.location];
-  if (item.expiresAt) {
-    parts.push(`保质期到 ${item.expiresAt}`);
-  }
-  return parts.join(' · ');
-}
-
 function formatAssistantActionMessage(event: LifeAssistantActionEvent) {
   if (event.type === 'create_plan') {
     if (event.plan && event.status === 'created') {
@@ -129,16 +121,9 @@ function formatAssistantActionMessage(event: LifeAssistantActionEvent) {
     return event.message;
   }
 
-  if (event.pantryItem && event.status === 'created') {
-    return `已经帮你收进库存了，${event.pantryItem.name} ${formatPantryDisplay(event.pantryItem)}。`;
-  }
-  if (event.pantryItem && event.status === 'exists') {
-    return `这件库存已经在当前空间里了：${event.pantryItem.name}。`;
-  }
   return event.message;
 }
 
-const ASSISTANT_MESSAGES_KEY = 'life-trace-assistant-messages';
 const ASSISTANT_RESULT_KEY = 'life-trace-assistant-result';
 const COLLAPSED_ASSISTANT_MESSAGE_COUNT = 4;
 
@@ -221,27 +206,6 @@ function groupAssistantMessages(messages: AssistantMessage[]) {
   }
 
   return groups;
-}
-
-function readAssistantMessages() {
-  try {
-    const raw = localStorage.getItem(ASSISTANT_MESSAGES_KEY);
-    if (!raw) {
-      return [];
-    }
-
-    const parsed = JSON.parse(raw) as AssistantMessage[];
-    return Array.isArray(parsed)
-      ? parsed.filter(
-          (item) =>
-            (item.role === 'user' || item.role === 'assistant') &&
-            typeof item.id === 'string' &&
-            typeof item.content === 'string',
-        )
-      : [];
-  } catch {
-    return [];
-  }
 }
 
 function readAssistantResult() {
@@ -693,8 +657,7 @@ function useAiPageState() {
   const [result, setResult] = useState<AiResult | null>(readAssistantResult);
   const [adviceCards, setAdviceCards] = useState<AdvicePayload[]>([]);
   const [assistantInput, setAssistantInput] = useState('');
-  const [assistantMessages, setAssistantMessages] =
-    useState<AssistantMessage[]>(readAssistantMessages);
+  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
   const [assistantClearConfirmOpen, setAssistantClearConfirmOpen] = useState(false);
   const [assistantClearing, setAssistantClearing] = useState(false);
   const [assistantHistoryNotice, setAssistantHistoryNotice] = useState('');
@@ -743,7 +706,7 @@ function useAiPageState() {
 
   useEffect(() => {
     if (!token) {
-      setAssistantMessages(readAssistantMessages());
+      setAssistantMessages([]);
       setWeeklyReviews([]);
       return;
     }
@@ -758,6 +721,7 @@ function useAiPageState() {
   useEffect(() => {
     if (!token) {
       setAssistantHistoryLoading(false);
+      setAssistantMessages([]);
       return;
     }
 
@@ -768,13 +732,15 @@ function useAiPageState() {
         if (!alive) {
           return;
         }
+        setAssistantHistoryNotice('');
         setAssistantMessages(data.messages.map(normalizeAssistantMessage));
       })
       .catch(() => {
         if (!alive) {
           return;
         }
-        setAssistantMessages(readAssistantMessages());
+        setAssistantMessages([]);
+        setAssistantHistoryNotice('云端对话暂时同步失败，请稍后重试。');
       })
       .finally(() => {
         if (alive) {
@@ -786,10 +752,6 @@ function useAiPageState() {
       alive = false;
     };
   }, [token]);
-
-  useEffect(() => {
-    localStorage.setItem(ASSISTANT_MESSAGES_KEY, JSON.stringify(assistantMessages.slice(-20)));
-  }, [assistantMessages]);
 
   useEffect(() => {
     if (result) {
@@ -932,10 +894,7 @@ function useAiPageState() {
             : event.status === 'need_more_info'
               ? '还差一点信息'
               : '库存未保存',
-      detail:
-        event.pantryItem && event.status === 'created'
-          ? `「${event.pantryItem.name}」已收进库存，${formatPantryDisplay(event.pantryItem)}。`
-          : event.message,
+      detail: event.message,
       tone: event.status === 'error' ? 'alert' : event.status === 'need_more_info' ? 'ai' : 'trace',
     });
   };

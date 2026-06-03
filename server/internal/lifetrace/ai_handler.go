@@ -97,6 +97,7 @@ type lifeTraceAssistantActionPayload struct {
 	Status             string                     `json:"status"`
 	Message            string                     `json:"message"`
 	NeedMoreInfoFields []string                   `json:"needMoreInfoFields,omitempty"`
+	HouseholdName      string                     `json:"householdName,omitempty"`
 	Plan               *model.LifeTracePlan       `json:"plan,omitempty"`
 	PantryItem         *model.LifeTracePantryItem `json:"pantryItem,omitempty"`
 }
@@ -1256,10 +1257,11 @@ func (h *Handler) createAssistantPantryItemFromDraft(c *gin.Context, userID mode
 		First(&existing).Error
 	if err == nil {
 		return &lifeTraceAssistantActionPayload{
-			Type:       "create_pantry_item",
-			Status:     "exists",
-			Message:    fmt.Sprintf("「%s」已经在当前库存里了。", draft.Name),
-			PantryItem: &existing,
+			Type:          "create_pantry_item",
+			Status:        "exists",
+			Message:       fmt.Sprintf("「%s」已经在「%s」里了，位置在%s，保质期到 %s。", draft.Name, householdCtx.Household.Name, existing.Location, existing.ExpiresAt),
+			HouseholdName: householdCtx.Household.Name,
+			PantryItem:    &existing,
 		}
 	}
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -1298,10 +1300,11 @@ func (h *Handler) createAssistantPantryItemFromDraft(c *gin.Context, userID mode
 	}
 
 	return &lifeTraceAssistantActionPayload{
-		Type:       "create_pantry_item",
-		Status:     "created",
-		Message:    fmt.Sprintf("「%s」已加入当前库存，保质期到 %s。", item.Name, item.ExpiresAt),
-		PantryItem: &item,
+		Type:          "create_pantry_item",
+		Status:        "created",
+		Message:       fmt.Sprintf("已经帮你把「%s」收进「%s」了，放在%s，保质期到 %s。", item.Name, householdCtx.Household.Name, item.Location, item.ExpiresAt),
+		HouseholdName: householdCtx.Household.Name,
+		PantryItem:    &item,
 	}
 }
 
@@ -1879,7 +1882,14 @@ func (h *Handler) resolveLifeTraceAssistantStructuredAction(
 	fallbackPantryDraft *lifeTraceAssistantPantryDraft,
 ) *lifeTraceAssistantActionPayload {
 	if action == nil {
-		return nil
+		switch {
+		case fallbackPantryDraft != nil:
+			return h.createAssistantPantryItemFromDraft(c, userID, *fallbackPantryDraft)
+		case fallbackPlanDraft != nil:
+			return h.createAssistantPlanFromDraft(userID, *fallbackPlanDraft)
+		default:
+			return nil
+		}
 	}
 
 	switch action.Type {

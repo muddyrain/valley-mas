@@ -255,10 +255,11 @@ func (h *Handler) ListPantryItems(c *gin.Context) {
 	}
 
 	success(c, gin.H{
-		"householdId": householdCtx.Household.ID,
-		"list":        items,
-		"pagination":  buildListPagination(page, pageSize, total),
-		"summary":     summary,
+		"householdId":   householdCtx.Household.ID,
+		"householdName": householdCtx.Household.Name,
+		"list":          items,
+		"pagination":    buildListPagination(page, pageSize, total),
+		"summary":       summary,
 	})
 }
 

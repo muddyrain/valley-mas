@@ -1012,6 +1012,9 @@ func TestStreamAssistantStructuredResponseCreatesPantryItem(t *testing.T) {
 	if !strings.Contains(resp.Body.String(), `"name":"饼干"`) {
 		t.Fatalf("expected pantry item payload in SSE body, got %s", resp.Body.String())
 	}
+	if !strings.Contains(resp.Body.String(), `"householdName":"我的空间"`) {
+		t.Fatalf("expected pantry payload to include household name, got %s", resp.Body.String())
+	}
 
 	var count int64
 	if err := database.GetDB().
@@ -1022,6 +1025,59 @@ func TestStreamAssistantStructuredResponseCreatesPantryItem(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("expected structured stream to create pantry item, got %d", count)
+	}
+}
+
+func TestStreamAssistantStructuredResponseFallsBackToPantryDraftWhenActionMissing(t *testing.T) {
+	openAIServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		content := `{"reply":"好的，已帮你将辣条加入厨房库存，保质期30天。","action":null}`
+		_, _ = fmt.Fprintf(w, `{"model":"gpt-test","choices":[{"message":{"role":"assistant","content":%q}}]}`, content)
+	}))
+	defer openAIServer.Close()
+
+	t.Setenv("OPENAI_API_KEY", "test-openai-key")
+	t.Setenv("OPENAI_API_BASE_URL", openAIServer.URL)
+	t.Setenv("OPENAI_API_MODEL", "gpt-test")
+
+	router := setupTraceTestRouter(t, 101)
+	if err := database.GetDB().Create(&model.LifeTraceSettings{
+		UserID:        101,
+		City:          "上海",
+		CommuteMethod: "开车",
+		Habits:        model.StringList{"喝水"},
+	}).Error; err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/assistant/stream", bytes.NewBufferString(`{
+		"message":"我这边有一包辣条它是我昨天买的但是它的保质期只有30天",
+		"history":[]
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if !strings.Contains(resp.Body.String(), `"status":"need_more_info"`) {
+		t.Fatalf("expected missing-expiry fallback action, got %s", resp.Body.String())
+	}
+	if !strings.Contains(resp.Body.String(), `保质期或到期时间`) {
+		t.Fatalf("expected follow-up question in SSE body, got %s", resp.Body.String())
+	}
+
+	var count int64
+	if err := database.GetDB().
+		Model(&model.LifeTracePantryItem{}).
+		Where("user_id = ? AND name = ?", model.Int64String(101), "辣条").
+		Count(&count).Error; err != nil {
+		t.Fatalf("count pantry items: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected no pantry item saved without absolute expiry, got %d", count)
 	}
 }
 

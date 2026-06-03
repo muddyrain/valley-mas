@@ -70,6 +70,9 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 	if list[0].(map[string]interface{})["thumbnailUrl"] != thumbnailURL {
 		t.Fatalf("expected list response to keep long thumbnail url, got %+v", list[0])
 	}
+	if decodeTracePayload(t, listResp)["data"].(map[string]interface{})["householdName"] != "我的空间" {
+		t.Fatalf("expected list response to include household name, got %+v", decodeTracePayload(t, listResp)["data"])
+	}
 	summary := decodeTracePayload(t, listResp)["data"].(map[string]interface{})["summary"].(map[string]interface{})
 	if summary["total"] != float64(1) || summary["expiring"] != float64(1) || summary["expired"] != float64(0) || summary["active"] != float64(1) {
 		t.Fatalf("expected pantry summary for one active item, got %+v", summary)
