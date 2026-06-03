@@ -10,12 +10,14 @@ import {
   Image,
   Lightbulb,
   ListChecks,
+  Mic,
+  MicOff,
   Plus,
   Send,
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   deleteWeeklyReview,
@@ -27,8 +29,8 @@ import {
 import {
   clearLifeAssistantConversation,
   getLifeAssistantConversation,
+  type LifeAssistantActionEvent,
   type LifeAssistantMessage,
-  type LifeAssistantPlanEvent,
   saveLifeAssistantMessage,
   streamLifeAssistant,
 } from '@/api/assistant';
@@ -54,7 +56,7 @@ import {
 import { findCurrentWeekReview, toggleExpandedWeeklyReviewId } from '@/lib/weeklyReviews';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { AdvicePayload, AiAction, NewPlanInput } from '@/types';
+import type { AdvicePayload, AiAction, NewPlanInput, PantryItem } from '@/types';
 
 type AiResult = {
   title: string;
@@ -74,11 +76,66 @@ type AssistantMessage = LifeAssistantMessage & {
   createdAt?: string;
 };
 
+type AssistantSpeechResult = {
+  0: {
+    transcript: string;
+  };
+  isFinal?: boolean;
+  length: number;
+};
+
+type AssistantSpeechEvent = {
+  resultIndex: number;
+  results: ArrayLike<AssistantSpeechResult>;
+};
+
+type AssistantSpeechRecognition = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onresult: ((event: AssistantSpeechEvent) => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type AssistantSpeechRecognitionCtor = new () => AssistantSpeechRecognition;
+
 function formatPlanDisplayTime(
   plan: Pick<NewPlanInput, 'scheduledDate' | 'scheduledTime' | 'timeLabel'>,
 ) {
   const { dateText, timeText } = getPlanDisplayTimeParts(plan);
   return `${dateText} ${timeText}`;
+}
+
+function formatPantryDisplay(item: PantryItem) {
+  const parts: string[] = [item.location];
+  if (item.expiresAt) {
+    parts.push(`保质期到 ${item.expiresAt}`);
+  }
+  return parts.join(' · ');
+}
+
+function formatAssistantActionMessage(event: LifeAssistantActionEvent) {
+  if (event.type === 'create_plan') {
+    if (event.plan && event.status === 'created') {
+      return `已经帮你加进计划了，${event.plan.title} 会在 ${formatPlanDisplayTime(event.plan)} 提醒。`;
+    }
+    if (event.plan && event.status === 'exists') {
+      return `这个计划已经在列表里了：${event.plan.title}。`;
+    }
+    return event.message;
+  }
+
+  if (event.pantryItem && event.status === 'created') {
+    return `已经帮你收进库存了，${event.pantryItem.name} ${formatPantryDisplay(event.pantryItem)}。`;
+  }
+  if (event.pantryItem && event.status === 'exists') {
+    return `这件库存已经在当前空间里了：${event.pantryItem.name}。`;
+  }
+  return event.message;
 }
 
 const ASSISTANT_MESSAGES_KEY = 'life-trace-assistant-messages';
@@ -611,6 +668,7 @@ function formatWeeklyReviewDateTime(value: string) {
 }
 
 function useAiPageState() {
+  const preferredPantryHouseholdId = useLifeTraceStore((state) => state.preferredPantryHouseholdId);
   const plans = useLifeTraceStore((state) => state.plans);
   const traces = useLifeTraceStore((state) => state.traces);
   const checkins = useLifeTraceStore((state) => state.checkins);
@@ -622,6 +680,7 @@ function useAiPageState() {
   const addAiAction = useLifeTraceStore((state) => state.addAiAction);
   const addPlan = useLifeTraceStore((state) => state.addPlan);
   const receiveServerPlan = useLifeTraceStore((state) => state.receiveServerPlan);
+  const receiveServerPantryItem = useLifeTraceStore((state) => state.receiveServerPantryItem);
   const addTrace = useLifeTraceStore((state) => state.addTrace);
   const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
   const generateTraceFromLatestPlan = useLifeTraceStore(
@@ -642,6 +701,9 @@ function useAiPageState() {
   const [assistantStreaming, setAssistantStreaming] = useState(false);
   const [assistantHistoryLoading, setAssistantHistoryLoading] = useState(false);
   const [assistantModel, setAssistantModel] = useState('');
+  const [assistantSpeechSupported, setAssistantSpeechSupported] = useState(false);
+  const [assistantListening, setAssistantListening] = useState(false);
+  const [assistantSpeechError, setAssistantSpeechError] = useState('');
   const [quickActionLoading, setQuickActionLoading] = useState<string | null>(null);
   const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
   const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReviewResponse[]>([]);
@@ -653,6 +715,8 @@ function useAiPageState() {
   const [deletingWeeklyReviewId, setDeletingWeeklyReviewId] = useState<string | null>(null);
   const [expandedWeeklyReviewId, setExpandedWeeklyReviewId] = useState<string | null>(null);
   const [addingWeeklyActionKey, setAddingWeeklyActionKey] = useState<string | null>(null);
+  const assistantRecognitionRef = useRef<AssistantSpeechRecognition | null>(null);
+  const assistantSpeechBaseRef = useRef('');
 
   const openPlanCount = plans.filter((plan) => !plan.completed).length;
   const completedPlanCount = plans.length - openPlanCount;
@@ -736,6 +800,61 @@ function useAiPageState() {
     localStorage.removeItem(ASSISTANT_RESULT_KEY);
   }, [result]);
 
+  useEffect(() => {
+    const speechWindow = globalThis as typeof globalThis & {
+      SpeechRecognition?: AssistantSpeechRecognitionCtor;
+      webkitSpeechRecognition?: AssistantSpeechRecognitionCtor;
+    };
+    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      setAssistantSpeechSupported(false);
+      return;
+    }
+
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'zh-CN';
+    recognition.onstart = () => {
+      setAssistantListening(true);
+      setAssistantSpeechError('');
+    };
+    recognition.onend = () => {
+      setAssistantListening(false);
+    };
+    recognition.onerror = (event) => {
+      setAssistantListening(false);
+      setAssistantSpeechError(
+        event.error === 'not-allowed'
+          ? '没有拿到麦克风权限，请检查系统授权。'
+          : '语音听写暂时不可用，请稍后重试。',
+      );
+    };
+    recognition.onresult = (event) => {
+      let transcript = '';
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        if (!result?.length) {
+          continue;
+        }
+        transcript += result[0]?.transcript ?? '';
+      }
+      const nextValue = `${assistantSpeechBaseRef.current}${transcript}`.trim();
+      setAssistantInput(nextValue);
+    };
+
+    assistantRecognitionRef.current = recognition;
+    setAssistantSpeechSupported(true);
+    return () => {
+      recognition.onstart = null;
+      recognition.onend = null;
+      recognition.onerror = null;
+      recognition.onresult = null;
+      recognition.stop();
+      assistantRecognitionRef.current = null;
+    };
+  }, []);
+
   const saveAssistantMessageToServer = async (
     message: Pick<LifeAssistantMessage, 'role' | 'content'>,
   ) => {
@@ -750,29 +869,99 @@ function useAiPageState() {
     }
   };
 
-  const handleAssistantPlanEvent = (event: LifeAssistantPlanEvent) => {
-    if (event.plan) {
-      receiveServerPlan(
-        event.plan,
+  const handleAssistantActionEvent = (event: LifeAssistantActionEvent) => {
+    const assistantActionMessage = formatAssistantActionMessage(event);
+    setAssistantMessages((items) => {
+      const targetIndex = [...items]
+        .map((item, index) => ({ item, index }))
+        .reverse()
+        .find((entry) => entry.item.role === 'assistant')?.index;
+      if (targetIndex === undefined) {
+        return items;
+      }
+
+      return items.map((item, index) =>
+        index === targetIndex ? { ...item, content: assistantActionMessage } : item,
+      );
+    });
+
+    if (event.type === 'create_plan') {
+      if (event.plan) {
+        receiveServerPlan(
+          event.plan,
+          event.status === 'created'
+            ? `生活助理创建了「${event.plan.title}」计划`
+            : `生活助理识别到「${event.plan.title}」计划`,
+        );
+      }
+
+      setResult({
+        title:
+          event.status === 'created'
+            ? '已创建生活计划'
+            : event.status === 'exists'
+              ? '计划已存在'
+              : event.status === 'need_more_info'
+                ? '还差一点信息'
+                : '生活计划未保存',
+        detail:
+          event.plan && event.status === 'created'
+            ? `「${event.plan.title}」已加入计划，会在 ${formatPlanDisplayTime(event.plan)} 提醒。`
+            : event.message,
+        tone:
+          event.status === 'error' ? 'alert' : event.status === 'need_more_info' ? 'ai' : 'plan',
+      });
+      return;
+    }
+
+    if (event.pantryItem) {
+      receiveServerPantryItem(
+        event.pantryItem,
         event.status === 'created'
-          ? `生活助理创建了「${event.plan.title}」计划`
-          : `生活助理识别到「${event.plan.title}」计划`,
+          ? `生活助理收进了「${event.pantryItem.name}」`
+          : `生活助理识别到「${event.pantryItem.name}」库存`,
       );
     }
 
     setResult({
       title:
         event.status === 'created'
-          ? '已创建生活计划'
+          ? '已加入库存'
           : event.status === 'exists'
-            ? '计划已存在'
-            : '生活计划未保存',
+            ? '库存已存在'
+            : event.status === 'need_more_info'
+              ? '还差一点信息'
+              : '库存未保存',
       detail:
-        event.plan && event.status === 'created'
-          ? `「${event.plan.title}」已加入计划，会在 ${formatPlanDisplayTime(event.plan)} 提醒。`
+        event.pantryItem && event.status === 'created'
+          ? `「${event.pantryItem.name}」已收进库存，${formatPantryDisplay(event.pantryItem)}。`
           : event.message,
-      tone: event.status === 'error' ? 'alert' : 'plan',
+      tone: event.status === 'error' ? 'alert' : event.status === 'need_more_info' ? 'ai' : 'trace',
     });
+  };
+
+  const toggleAssistantListening = () => {
+    if (assistantStreaming) {
+      return;
+    }
+
+    if (!assistantSpeechSupported || !assistantRecognitionRef.current) {
+      setAssistantSpeechError('当前浏览器暂不支持语音听写。');
+      return;
+    }
+
+    if (assistantListening) {
+      assistantRecognitionRef.current.stop();
+      return;
+    }
+
+    assistantSpeechBaseRef.current = assistantInput.trim() ? `${assistantInput.trim()} ` : '';
+    setAssistantSpeechError('');
+    try {
+      assistantRecognitionRef.current.start();
+    } catch {
+      setAssistantSpeechError('语音听写启动失败，请稍后再试。');
+    }
   };
 
   const runWeeklyReview = async () => {
@@ -944,6 +1133,10 @@ function useAiPageState() {
       return;
     }
 
+    if (assistantListening) {
+      assistantRecognitionRef.current?.stop();
+    }
+
     const history = assistantMessages
       .filter((item) => item.content.trim())
       .slice(-6)
@@ -970,11 +1163,14 @@ function useAiPageState() {
     void saveAssistantMessageToServer({ role: 'user', content: message });
 
     let reply = '';
+    let hasAssistantAction = false;
+    let actionReply = '';
 
     try {
       await streamLifeAssistant(token, {
         message,
         history,
+        householdId: preferredPantryHouseholdId || undefined,
         onMeta: (meta) => {
           if (meta.model) {
             setAssistantModel(meta.model);
@@ -988,11 +1184,17 @@ function useAiPageState() {
             ),
           );
         },
-        onPlan: handleAssistantPlanEvent,
+        onAction: (event) => {
+          hasAssistantAction = true;
+          actionReply = formatAssistantActionMessage(event);
+          handleAssistantActionEvent(event);
+        },
       });
       setAssistantStreaming(false);
-      void saveAssistantMessageToServer({ role: 'assistant', content: reply });
-      addAiAction('和生活助理规划了一次安排');
+      void saveAssistantMessageToServer({ role: 'assistant', content: actionReply || reply });
+      if (!hasAssistantAction) {
+        addAiAction('和生活助理聊了一次安排');
+      }
     } catch (error) {
       const detail = error instanceof Error ? error.message : '生活助理暂时没有回应';
       setAssistantMessages((items) =>
@@ -1147,6 +1349,10 @@ function useAiPageState() {
     assistantStreaming,
     assistantHistoryLoading,
     assistantModel,
+    assistantSpeechSupported,
+    assistantListening,
+    assistantSpeechError,
+    preferredPantryHouseholdId,
     quickActionLoading,
     addingAdviceId,
     weeklyReviews,
@@ -1168,6 +1374,7 @@ function useAiPageState() {
     latestWeeklyReview,
     placeholder,
     handleAssistantSubmit,
+    toggleAssistantListening,
     handleClearAssistantMessages,
     handleAddAdvicePlan,
     handleAddWeeklyReviewActionPlan,
@@ -1304,7 +1511,9 @@ export function AiPage() {
     setAssistantHistoryNotice,
     assistantStreaming,
     assistantHistoryLoading,
-    assistantModel,
+    assistantSpeechSupported,
+    assistantListening,
+    assistantSpeechError,
     quickActionLoading,
     addingAdviceId,
     weeklyReviews,
@@ -1320,6 +1529,7 @@ export function AiPage() {
     latestWeeklyReview,
     placeholder,
     handleAssistantSubmit,
+    toggleAssistantListening,
     handleAddAdvicePlan,
     handleQuickAction,
     runWeeklyReview,
@@ -1414,21 +1624,44 @@ export function AiPage() {
           }}
         />
         <div className="mt-3 flex items-center justify-between gap-3">
-          <p className="min-w-0 truncate text-xs text-muted-foreground">
-            {assistantModel ? `当前由生活助理生成` : '输入后会流式生成，不用等待整段返回'}
-          </p>
-          <button
-            type="button"
-            className="grid size-12 shrink-0 cursor-pointer place-items-center rounded-2xl bg-life-ai text-background transition hover:bg-life-ai/90 disabled:cursor-default disabled:opacity-80"
-            disabled={assistantStreaming || !assistantInput.trim()}
-            onClick={() => void handleAssistantSubmit()}
-          >
-            {assistantStreaming ? (
-              <ActionLoadingIcon className="text-background" />
-            ) : (
-              <Send className="size-5" />
-            )}
-          </button>
+          <div className="min-w-0">
+            <p className="truncate text-xs text-muted-foreground">
+              {assistantListening
+                ? '正在听写，停下后可以直接发送'
+                : assistantStreaming
+                  ? '生活助理正在结合你的上下文整理回复'
+                  : '输入后会流式生成，不用等待整段返回'}
+            </p>
+            {assistantSpeechError ? (
+              <p className="mt-1 text-xs text-life-alert">{assistantSpeechError}</p>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              className={`grid size-12 place-items-center rounded-2xl border transition ${
+                assistantListening
+                  ? 'border-life-ai bg-life-ai/10 text-life-ai'
+                  : 'border-life-ai/25 bg-card text-muted-foreground hover:bg-life-ai/5 hover:text-life-ai'
+              } disabled:cursor-default disabled:opacity-60`}
+              disabled={assistantStreaming || !assistantSpeechSupported}
+              onClick={toggleAssistantListening}
+            >
+              {assistantListening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+            </button>
+            <button
+              type="button"
+              className="grid size-12 shrink-0 cursor-pointer place-items-center rounded-2xl bg-life-ai text-background transition hover:bg-life-ai/90 disabled:cursor-default disabled:opacity-80"
+              disabled={assistantStreaming || !assistantInput.trim()}
+              onClick={() => void handleAssistantSubmit()}
+            >
+              {assistantStreaming ? (
+                <ActionLoadingIcon className="text-background" />
+              ) : (
+                <Send className="size-5" />
+              )}
+            </button>
+          </div>
         </div>
       </Card>
 

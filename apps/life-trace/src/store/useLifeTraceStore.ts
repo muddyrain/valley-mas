@@ -31,6 +31,7 @@ import type {
   NewTraceInput,
   PantryItem,
   PantryItemStatus,
+  PantryOverview,
   PantryPreferences,
   Plan,
   Trace,
@@ -39,6 +40,7 @@ import type {
 
 type LifeTraceState = {
   activeTab: AppTab;
+  preferredPantryHouseholdId: string;
   plans: Plan[];
   plansLoaded: boolean;
   plansLoading: boolean;
@@ -81,9 +83,12 @@ type LifeTraceState = {
   pantryListError: string;
   pantryListPagination: ListPagination;
   pantryListOptions: ListPantryOptions;
+  pantryListResolvedHouseholdId: string;
+  pantryListSummary: PantryOverview;
   pantryPreferences: PantryPreferences;
   aiActions: AiAction[];
   setActiveTab: (tab: AppTab) => void;
+  setPreferredPantryHouseholdId: (householdId?: string) => void;
   updateSettings: (settings: Partial<UserSettings>) => void;
   updatePantryPreferences: (preferences: Partial<PantryPreferences>) => void;
   loadSettings: () => Promise<void>;
@@ -108,8 +113,9 @@ type LifeTraceState = {
     status: PantryItemStatus,
     householdId?: string,
   ) => Promise<PantryItem | null>;
-  removePantryItem: (itemId: string, householdId?: string) => Promise<void>;
+  removePantryItem: (itemId: string, householdId?: string) => Promise<boolean>;
   receiveServerPlan: (plan: Plan, actionTitle?: string) => void;
+  receiveServerPantryItem: (item: PantryItem, actionTitle?: string) => void;
   editPlan: (planId: string, input: NewPlanInput) => Promise<Plan | null>;
   addTrace: (input: NewTraceInput) => Promise<Trace | null>;
   editTrace: (traceId: string, input: NewTraceInput) => Promise<Trace | null>;
@@ -153,6 +159,13 @@ const defaultPantryPreferences: PantryPreferences = {
   defaultReminderEnabled: true,
   defaultReminderRules: ['7d', '3d', 'same-day', 'expired'],
   defaultReminderTime: '09:00',
+};
+
+const defaultPantryOverview: PantryOverview = {
+  total: 0,
+  expiring: 0,
+  expired: 0,
+  active: 0,
 };
 
 const defaultPantryListOptions: ListPantryOptions = {
@@ -308,10 +321,19 @@ function normalizePantryListOptions(
   };
 }
 
+function normalizeHouseholdScopeId(householdId?: string) {
+  const trimmed = householdId?.trim() ?? '';
+  if (!trimmed || trimmed.startsWith('-')) {
+    return '';
+  }
+  return trimmed;
+}
+
 export const useLifeTraceStore = create<LifeTraceState>()(
   persist(
     (set, get) => ({
       activeTab: 'today',
+      preferredPantryHouseholdId: '',
       plans: [],
       plansLoaded: false,
       plansLoading: false,
@@ -357,6 +379,8 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         pageSize: defaultPantryListOptions.pageSize ?? 20,
       },
       pantryListOptions: defaultPantryListOptions,
+      pantryListResolvedHouseholdId: '',
+      pantryListSummary: defaultPantryOverview,
       pantryPreferences: defaultPantryPreferences,
       aiActions: [
         { id: 'ai-initial-plan', title: '创建了「周六看电影」计划', timeLabel: '2小时前' },
@@ -364,6 +388,8 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         { id: 'ai-initial-trace', title: '生成了「咖啡店下午茶」踪迹', timeLabel: '昨天' },
       ],
       setActiveTab: (tab) => set({ activeTab: tab }),
+      setPreferredPantryHouseholdId: (householdId) =>
+        set({ preferredPantryHouseholdId: normalizeHouseholdScopeId(householdId) }),
       updatePantryPreferences: (preferences) => {
         const nextPreferences = normalizePantryPreferences({
           ...get().pantryPreferences,
@@ -515,6 +541,8 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               pageSize: nextOptions.pageSize ?? defaultPantryListOptions.pageSize ?? 20,
             },
             pantryListOptions: nextOptions,
+            pantryListResolvedHouseholdId: '',
+            pantryListSummary: defaultPantryOverview,
           });
           return;
         }
@@ -527,7 +555,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           pantryListOptions: nextOptions,
         });
         try {
-          const { list, pagination } = await listPantry(token, nextOptions);
+          const { householdId, list, pagination, summary } = await listPantry(token, nextOptions);
           if (requestId !== pantryListRequestId) {
             return;
           }
@@ -543,6 +571,8 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             pantryListLoading: false,
             pantryListLoadingMore: false,
             pantryListError: '',
+            pantryListResolvedHouseholdId: normalizeHouseholdScopeId(householdId),
+            pantryListSummary: summary ?? defaultPantryOverview,
           });
         } catch (error) {
           if (requestId !== pantryListRequestId) {
@@ -582,7 +612,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         const requestId = ++pantryListRequestId;
         set({ pantryListLoadingMore: true, pantryListError: '' });
         try {
-          const { list, pagination } = await listPantry(token, nextOptions);
+          const { householdId, list, pagination, summary } = await listPantry(token, nextOptions);
           if (requestId !== pantryListRequestId) {
             return;
           }
@@ -600,6 +630,8 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             },
             pantryListLoadingMore: false,
             pantryListError: '',
+            pantryListResolvedHouseholdId: normalizeHouseholdScopeId(householdId),
+            pantryListSummary: summary ?? state.pantryListSummary,
           }));
         } catch (error) {
           if (requestId !== pantryListRequestId) {
@@ -882,8 +914,8 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           const item = normalizePantryItem(
             await requestCreatePantryItem(token, input, householdId),
           );
-          const activeHouseholdId = get().pantryListOptions.householdId ?? '';
-          const targetHouseholdId = householdId?.trim() ?? '';
+          const activeHouseholdId = normalizeHouseholdScopeId(get().pantryListOptions.householdId);
+          const targetHouseholdId = normalizeHouseholdScopeId(householdId);
           set((state) => ({
             pantryItems: targetHouseholdId ? state.pantryItems : [item, ...state.pantryItems],
             pantryError: '',
@@ -912,8 +944,8 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           const updatedItem = normalizePantryItem(
             await requestUpdatePantryItem(token, itemId, input, householdId),
           );
-          const activeHouseholdId = get().pantryListOptions.householdId ?? '';
-          const targetHouseholdId = householdId?.trim() ?? '';
+          const activeHouseholdId = normalizeHouseholdScopeId(get().pantryListOptions.householdId);
+          const targetHouseholdId = normalizeHouseholdScopeId(householdId);
           set((state) => ({
             pantryItems: targetHouseholdId
               ? state.pantryItems
@@ -948,8 +980,8 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           const updatedItem = normalizePantryItem(
             await requestUpdatePantryItemStatus(token, itemId, status, householdId),
           );
-          const activeHouseholdId = get().pantryListOptions.householdId ?? '';
-          const targetHouseholdId = householdId?.trim() ?? '';
+          const activeHouseholdId = normalizeHouseholdScopeId(get().pantryListOptions.householdId);
+          const targetHouseholdId = normalizeHouseholdScopeId(householdId);
           set((state) => ({
             pantryItems: targetHouseholdId
               ? state.pantryItems
@@ -982,24 +1014,37 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         const token = getToken();
         if (!token) {
           set({ pantryError: '请先登录后再删除库存' });
-          return;
+          return false;
         }
 
         try {
           await requestDeletePantryItem(token, itemId, householdId);
-          const activeHouseholdId = get().pantryListOptions.householdId ?? '';
-          const targetHouseholdId = householdId?.trim() ?? '';
+          const activeHouseholdId = normalizeHouseholdScopeId(get().pantryListOptions.householdId);
+          const targetHouseholdId = normalizeHouseholdScopeId(householdId);
           set((state) => ({
             pantryItems: targetHouseholdId
               ? state.pantryItems
               : state.pantryItems.filter((item) => item.id !== itemId),
+            pantryListItems:
+              activeHouseholdId === targetHouseholdId
+                ? state.pantryListItems.filter((item) => item.id !== itemId)
+                : state.pantryListItems,
+            pantryListPagination:
+              activeHouseholdId === targetHouseholdId
+                ? {
+                    ...state.pantryListPagination,
+                    total: Math.max(state.pantryListPagination.total - 1, 0),
+                  }
+                : state.pantryListPagination,
             pantryError: '',
           }));
           if (get().pantryListLoaded && activeHouseholdId === targetHouseholdId) {
             void get().loadPantryList(get().pantryListOptions);
           }
+          return true;
         } catch (error) {
           set({ pantryError: error instanceof Error ? error.message : '删除库存失败' });
+          return false;
         }
       },
       receiveServerPlan: (plan, actionTitle) =>
@@ -1016,6 +1061,36 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               {
                 id: createActionId(),
                 title: actionTitle || `创建了「${plan.title}」计划`,
+                timeLabel: '刚刚',
+              },
+              ...getAiActions(state),
+            ],
+          };
+        }),
+      receiveServerPantryItem: (item, actionTitle) =>
+        set((state) => {
+          const normalizedItem = normalizePantryItem(item);
+          const targetHouseholdId = normalizeHouseholdScopeId(normalizedItem.householdId);
+          const activeHouseholdId = normalizeHouseholdScopeId(state.pantryListOptions.householdId);
+          const pantryItems = targetHouseholdId
+            ? state.pantryItems
+            : state.pantryItems.some((current) => current.id === normalizedItem.id)
+              ? state.pantryItems.map((current) =>
+                  current.id === normalizedItem.id ? normalizedItem : current,
+                )
+              : [normalizedItem, ...state.pantryItems];
+
+          if (state.pantryListLoaded && activeHouseholdId === targetHouseholdId) {
+            void get().loadPantryList(state.pantryListOptions);
+          }
+
+          return {
+            pantryItems,
+            pantryError: '',
+            aiActions: [
+              {
+                id: createActionId(),
+                title: actionTitle || `收进了「${normalizedItem.name}」`,
                 timeLabel: '刚刚',
               },
               ...getAiActions(state),
@@ -1293,6 +1368,8 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           pantryListError,
           pantryListPagination,
           pantryListOptions,
+          pantryListResolvedHouseholdId,
+          pantryListSummary,
           pantryPreferences,
           ...rest
         } = state;
@@ -1344,6 +1421,18 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           pantryPreferences: normalizePantryPreferences(
             pantryPreferences as Partial<PantryPreferences> | undefined,
           ),
+          pantryListResolvedHouseholdId: normalizeHouseholdScopeId(
+            pantryListResolvedHouseholdId as string | undefined,
+          ),
+          pantryListSummary:
+            typeof pantryListSummary === 'object' && pantryListSummary
+              ? {
+                  total: Number(pantryListSummary.total) || 0,
+                  expiring: Number(pantryListSummary.expiring) || 0,
+                  expired: Number(pantryListSummary.expired) || 0,
+                  active: Number(pantryListSummary.active) || 0,
+                }
+              : defaultPantryOverview,
         };
       },
     },

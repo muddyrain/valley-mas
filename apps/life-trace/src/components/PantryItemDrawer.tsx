@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } fro
 import { generatePantryThumbnail } from '@/api/pantry';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { OptionPickerSheet } from '@/components/OptionPickerSheet';
 import { Button } from '@/components/ui/button';
 import { formatPantryReminderSummary, getPantryCoverUrl } from '@/lib/pantry';
@@ -75,12 +76,15 @@ export function PantryItemDrawer({
   const pantryPreferences = useLifeTraceStore((state) => state.pantryPreferences);
   const addPantryItem = useLifeTraceStore((state) => state.addPantryItem);
   const editPantryItem = useLifeTraceStore((state) => state.editPantryItem);
+  const removePantryItem = useLifeTraceStore((state) => state.removePantryItem);
   const [form, setForm] = useState<NewPantryItemInput>(() => defaultPantryForm(pantryPreferences));
   const [errors, setErrors] = useState<PantryFormErrors>({});
   const [thumbnailGenerating, setThumbnailGenerating] = useState(false);
   const [thumbnailError, setThumbnailError] = useState('');
   const [imageUploading, setImageUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [saveQueuedAfterThumbnail, setSaveQueuedAfterThumbnail] = useState(false);
   const [activePicker, setActivePicker] = useState<'category' | 'location' | null>(null);
   const queuedPayloadRef = useRef<NewPantryItemInput | null>(null);
@@ -113,6 +117,8 @@ export function PantryItemDrawer({
     }
     setErrors({});
     setSubmitting(false);
+    setDeleteConfirmOpen(false);
+    setDeleting(false);
     setThumbnailGenerating(false);
     setThumbnailError('');
     setSaveQueuedAfterThumbnail(false);
@@ -242,6 +248,23 @@ export function PantryItemDrawer({
     } finally {
       setThumbnailGenerating(false);
     }
+  };
+
+  const handleDelete = async () => {
+    if (!item || deleting) {
+      return;
+    }
+
+    setDeleting(true);
+    const removed = await removePantryItem(item.id, householdId);
+    setDeleting(false);
+    if (!removed) {
+      return;
+    }
+
+    setDeleteConfirmOpen(false);
+    onOpenChange(false);
+    onSaved?.(`已删除「${item.name}」库存`);
   };
 
   useEffect(() => {
@@ -559,11 +582,30 @@ export function PantryItemDrawer({
             />
           </label>
 
-          <div className="flex items-center justify-end gap-2">
+          <div
+            className={cn(
+              'flex gap-2',
+              editing
+                ? 'items-stretch justify-between max-[360px]:flex-col'
+                : 'items-center justify-end',
+            )}
+          >
+            {editing ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                disabled={submitting || deleting}
+                onClick={() => setDeleteConfirmOpen(true)}
+              >
+                <Trash2 className="size-4" />
+                删除库存
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="ghost"
-              disabled={submitting}
+              disabled={submitting || deleting}
               onClick={() => onOpenChange(false)}
             >
               取消
@@ -571,7 +613,7 @@ export function PantryItemDrawer({
             <Button
               type="submit"
               variant="ai"
-              disabled={imageUploading || submitting || saveQueuedAfterThumbnail}
+              disabled={imageUploading || submitting || deleting || saveQueuedAfterThumbnail}
             >
               {submitting
                 ? '保存中...'
@@ -601,6 +643,24 @@ export function PantryItemDrawer({
         options={locationPickerOptions}
         onOpenChange={(nextOpen) => setActivePicker(nextOpen ? 'location' : null)}
         onSelect={(value) => updateField('location', value)}
+      />
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="删除这条库存？"
+        description={
+          item
+            ? `删除后「${item.name}」会立刻从当前空间消失，这次不会保留回退。`
+            : '删除后这条库存会立刻从当前空间消失。'
+        }
+        confirmLabel="确认删除"
+        loadingLabel="删除中"
+        loading={deleting}
+        onCancel={() => {
+          if (!deleting) {
+            setDeleteConfirmOpen(false);
+          }
+        }}
+        onConfirm={() => void handleDelete()}
       />
     </>
   );

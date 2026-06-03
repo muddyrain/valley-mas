@@ -18,6 +18,7 @@
 | `task-completion-guard` | 多步骤任务、计划后实施、需要验证或容易停在口头承诺的任务。 |
 | `component-reuse-guard` | 发现重复 JSX、重复 handler、重复弹窗/表单/上传/列表逻辑时，先复用或抽取。 |
 | `conventional-commit-guard` | 生成 commit message、执行 `git commit`，或用户说“提交/提交吧/提交代码/帮我提交”。 |
+| `delivery-reporting` | 用户要求分阶段汇报“本次完成、影响范围、已验证、下一步”或希望每次实现后都同步当前改动与后续计划时。 |
 | `gsap-core` | 使用或评审 GSAP 基础动画、tween、stagger、ease、响应式与 reduced-motion 动画时。 |
 | `gsap-react` | 在 React/Next.js 中接入 GSAP 动画、`useGSAP`、refs、scope 和组件卸载清理时。 |
 | `gsap-timeline` | 需要多个动效步骤按时间轴编排、暂停、反转或复用动画序列时。 |

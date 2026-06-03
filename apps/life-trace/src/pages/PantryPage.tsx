@@ -26,7 +26,6 @@ import {
   listHouseholds,
   transferHouseholdOwner,
 } from '@/api/household';
-import { listPantry } from '@/api/pantry';
 import { EmptyState } from '@/components/EmptyState';
 import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
 import { PantryItemDrawer } from '@/components/PantryItemDrawer';
@@ -80,13 +79,6 @@ const categoryIconMap = {
 } satisfies Record<PantryCategory, typeof Apple>;
 
 const PANTRY_PAGE_SIZE = 20;
-
-type PantryOverviewState = {
-  total: number;
-  expiring: number;
-  expired: number;
-  active: number;
-};
 
 const householdKindLabel = {
   personal: '个人空间',
@@ -169,6 +161,10 @@ export function PantryPage() {
   const token = useAuthStore((state) => state.token);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const preferredPantryHouseholdId = useLifeTraceStore((state) => state.preferredPantryHouseholdId);
+  const setPreferredPantryHouseholdId = useLifeTraceStore(
+    (state) => state.setPreferredPantryHouseholdId,
+  );
   const addTrace = useLifeTraceStore((state) => state.addTrace);
   const pantryList = useLifeTraceStore((state) => state.pantryListItems);
   const pantryLoaded = useLifeTraceStore((state) => state.pantryListLoaded);
@@ -176,6 +172,10 @@ export function PantryPage() {
   const pantryLoadingMore = useLifeTraceStore((state) => state.pantryListLoadingMore);
   const pantryListError = useLifeTraceStore((state) => state.pantryListError);
   const pantryPagination = useLifeTraceStore((state) => state.pantryListPagination);
+  const pantryResolvedHouseholdId = useLifeTraceStore(
+    (state) => state.pantryListResolvedHouseholdId,
+  );
+  const pantrySummary = useLifeTraceStore((state) => state.pantryListSummary);
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const loadMorePantryList = useLifeTraceStore((state) => state.loadMorePantryList);
   const updatePantryItemStatus = useLifeTraceStore((state) => state.updatePantryItemStatus);
@@ -194,17 +194,12 @@ export function PantryPage() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(() =>
     readQueryText(new URLSearchParams(window.location.search)),
   );
-  const [selectedHouseholdId, setSelectedHouseholdId] = useState(() =>
-    readHouseholdId(new URLSearchParams(window.location.search)),
+  const [selectedHouseholdId, setSelectedHouseholdId] = useState(
+    () =>
+      readHouseholdId(new URLSearchParams(window.location.search)) || preferredPantryHouseholdId,
   );
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState('');
-  const [overview, setOverview] = useState<PantryOverviewState>({
-    total: 0,
-    expiring: 0,
-    expired: 0,
-    active: 0,
-  });
   const [households, setHouseholds] = useState<HouseholdSummary[]>([]);
   const [householdsLoading, setHouseholdsLoading] = useState(false);
   const [householdError, setHouseholdError] = useState('');
@@ -213,11 +208,16 @@ export function PantryPage() {
   const [invitePayload, setInvitePayload] = useState<HouseholdInvitePayload | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const previousSelectedHouseholdIdRef = useRef(selectedHouseholdId);
+  const selectedHouseholdIdRef = useRef(selectedHouseholdId);
   const pendingHouseholdSwitchIdRef = useRef<string | null>(null);
+  const latestSearchParamsRef = useRef(searchParams);
+  const householdSheetOpenRef = useRef(householdSheetOpen);
+  const invitePayloadRef = useRef(invitePayload);
   const [householdSwitchLoading, setHouseholdSwitchLoading] = useState(false);
+  const effectiveHouseholdId = selectedHouseholdId || pantryResolvedHouseholdId;
   const currentHousehold = useMemo(
-    () => households.find((item) => item.id === selectedHouseholdId) ?? households[0] ?? null,
-    [households, selectedHouseholdId],
+    () => households.find((item) => item.id === effectiveHouseholdId) ?? households[0] ?? null,
+    [effectiveHouseholdId, households],
   );
 
   const syncUrlState = useCallback(
@@ -227,64 +227,53 @@ export function PantryPage() {
       q?: string;
       householdId?: string;
     }) => {
-      const next = updateSearchParams(searchParams, updates);
-      if (next.toString() !== searchParams.toString()) {
+      const current = latestSearchParamsRef.current;
+      const next = updateSearchParams(current, updates);
+      if (next.toString() !== current.toString()) {
         setSearchParams(next, { replace: true });
       }
     },
-    [searchParams, setSearchParams],
+    [setSearchParams],
   );
+
+  useEffect(() => {
+    latestSearchParamsRef.current = searchParams;
+  }, [searchParams]);
+
+  useEffect(() => {
+    householdSheetOpenRef.current = householdSheetOpen;
+  }, [householdSheetOpen]);
+
+  useEffect(() => {
+    invitePayloadRef.current = invitePayload;
+  }, [invitePayload]);
 
   useEffect(() => {
     const nextStatus = readStatusFilter(searchParams);
     const nextCategory = readCategoryFilter(searchParams);
     const nextQuery = readQueryText(searchParams);
-    const nextHouseholdId = readHouseholdId(searchParams);
+    const nextHouseholdId = readHouseholdId(searchParams) || preferredPantryHouseholdId;
 
     setStatusFilter((current) => (current === nextStatus ? current : nextStatus));
     setCategoryFilter((current) => (current === nextCategory ? current : nextCategory));
     setSearchQuery((current) => (current === nextQuery ? current : nextQuery));
     setDebouncedSearchQuery((current) => (current === nextQuery ? current : nextQuery));
     setSelectedHouseholdId((current) => (current === nextHouseholdId ? current : nextHouseholdId));
-  }, [searchParams]);
+  }, [preferredPantryHouseholdId, searchParams]);
+
+  useEffect(() => {
+    selectedHouseholdIdRef.current = selectedHouseholdId;
+  }, [selectedHouseholdId]);
 
   const pantryQueryOptions = useMemo(
     () => ({
-      householdId: selectedHouseholdId || undefined,
+      householdId: effectiveHouseholdId || undefined,
       status: statusFilter,
       category: categoryFilter,
       q: debouncedSearchQuery.trim() || undefined,
     }),
-    [categoryFilter, debouncedSearchQuery, selectedHouseholdId, statusFilter],
+    [categoryFilter, debouncedSearchQuery, effectiveHouseholdId, statusFilter],
   );
-
-  const refreshOverview = useCallback(async () => {
-    if (!token) {
-      setOverview({ total: 0, expiring: 0, expired: 0, active: 0 });
-      return;
-    }
-
-    try {
-      const baseOptions = { householdId: selectedHouseholdId || undefined, page: 1, pageSize: 1 };
-      const [allResult, expiringResult, expiredResult] = await Promise.all([
-        listPantry(token, baseOptions),
-        listPantry(token, { ...baseOptions, status: 'expiring' }),
-        listPantry(token, { ...baseOptions, status: 'expired' }),
-      ]);
-
-      const total = allResult.pagination?.total ?? allResult.list.length;
-      const expiring = expiringResult.pagination?.total ?? expiringResult.list.length;
-      const expired = expiredResult.pagination?.total ?? expiredResult.list.length;
-      setOverview({
-        total,
-        expiring,
-        expired,
-        active: Math.max(total - expired, 0),
-      });
-    } catch {
-      // Ignore overview refresh failures and keep the last successful snapshot.
-    }
-  }, [selectedHouseholdId, token]);
 
   const loadHouseholdMembersFor = useCallback(
     async (householdId: string) => {
@@ -322,7 +311,11 @@ export function PantryPage() {
         const response = await listHouseholds(token);
         setHouseholds(response.list);
 
-        const requestedId = preferredHouseholdId ?? selectedHouseholdId;
+        const requestedId =
+          preferredHouseholdId ||
+          readHouseholdId(latestSearchParamsRef.current) ||
+          selectedHouseholdIdRef.current ||
+          pantryResolvedHouseholdId;
         const hasRequested = requestedId && response.list.some((item) => item.id === requestedId);
         const fallbackId =
           (response.currentHouseholdId &&
@@ -332,16 +325,17 @@ export function PantryPage() {
           '';
         const nextSelectedHouseholdId = hasRequested ? requestedId : fallbackId;
 
-        if (nextSelectedHouseholdId !== selectedHouseholdId) {
+        if (nextSelectedHouseholdId !== selectedHouseholdIdRef.current) {
           setSelectedHouseholdId(nextSelectedHouseholdId);
-          syncUrlState({ householdId: nextSelectedHouseholdId });
         }
+        setPreferredPantryHouseholdId(nextSelectedHouseholdId);
+        syncUrlState({ householdId: nextSelectedHouseholdId });
 
-        if (!response.list.some((item) => item.id === invitePayload?.householdId)) {
+        if (!response.list.some((item) => item.id === invitePayloadRef.current?.householdId)) {
           setInvitePayload(null);
         }
 
-        if (householdSheetOpen && nextSelectedHouseholdId) {
+        if (householdSheetOpenRef.current && nextSelectedHouseholdId) {
           await loadHouseholdMembersFor(nextSelectedHouseholdId);
         }
       } catch (error) {
@@ -351,13 +345,22 @@ export function PantryPage() {
       }
     },
     [
-      householdSheetOpen,
-      invitePayload?.householdId,
       loadHouseholdMembersFor,
-      selectedHouseholdId,
+      pantryResolvedHouseholdId,
+      setPreferredPantryHouseholdId,
       syncUrlState,
       token,
     ],
+  );
+
+  const handleSelectHousehold = useCallback(
+    (householdId: string) => {
+      setSelectedHouseholdId(householdId);
+      setPreferredPantryHouseholdId(householdId);
+      syncUrlState({ householdId });
+      setInvitePayload((current) => (current?.householdId === householdId ? current : null));
+    },
+    [setPreferredPantryHouseholdId, syncUrlState],
   );
 
   const loadMorePantryItems = useCallback(async () => {
@@ -378,13 +381,12 @@ export function PantryPage() {
       const updated = await updatePantryItemStatus(
         item.id,
         status,
-        selectedHouseholdId || undefined,
+        effectiveHouseholdId || undefined,
       );
       if (!updated) {
         return;
       }
       await addTrace(buildPantryTraceInput(updated, status));
-      await refreshOverview();
     } finally {
       setPendingActionId(null);
     }
@@ -489,14 +491,14 @@ export function PantryPage() {
   }, [loadHouseholds]);
 
   useEffect(() => {
-    if (previousSelectedHouseholdIdRef.current === selectedHouseholdId) {
+    if (previousSelectedHouseholdIdRef.current === effectiveHouseholdId) {
       return;
     }
 
-    previousSelectedHouseholdIdRef.current = selectedHouseholdId;
-    pendingHouseholdSwitchIdRef.current = selectedHouseholdId;
+    previousSelectedHouseholdIdRef.current = effectiveHouseholdId;
+    pendingHouseholdSwitchIdRef.current = effectiveHouseholdId;
     setHouseholdSwitchLoading(true);
-  }, [selectedHouseholdId]);
+  }, [effectiveHouseholdId]);
 
   useEffect(() => {
     void loadPantryList({
@@ -504,10 +506,6 @@ export function PantryPage() {
       pageSize: PANTRY_PAGE_SIZE,
     });
   }, [loadPantryList, pantryQueryOptions]);
-
-  useEffect(() => {
-    void refreshOverview();
-  }, [refreshOverview]);
 
   useEffect(() => {
     if (!householdSheetOpen || !currentHousehold?.id) {
@@ -551,14 +549,14 @@ export function PantryPage() {
   useEffect(() => {
     if (
       householdSwitchLoading &&
-      pendingHouseholdSwitchIdRef.current === (selectedHouseholdId || '') &&
+      pendingHouseholdSwitchIdRef.current === (effectiveHouseholdId || '') &&
       pantryLoaded &&
       !pantryLoading
     ) {
       pendingHouseholdSwitchIdRef.current = null;
       setHouseholdSwitchLoading(false);
     }
-  }, [householdSwitchLoading, pantryLoaded, pantryLoading, selectedHouseholdId]);
+  }, [effectiveHouseholdId, householdSwitchLoading, pantryLoaded, pantryLoading]);
 
   const listRefreshing = pantryLoading && pantryLoaded && !householdSwitchLoading;
   const activePantryError = pantryListError || householdError;
@@ -640,13 +638,7 @@ export function PantryPage() {
                       ? 'border-life-ai/45 bg-life-ai/10 text-life-ai'
                       : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
                   )}
-                  onClick={() => {
-                    setSelectedHouseholdId(household.id);
-                    syncUrlState({ householdId: household.id });
-                    setInvitePayload((current) =>
-                      current?.householdId === household.id ? current : null,
-                    );
-                  }}
+                  onClick={() => handleSelectHousehold(household.id)}
                   aria-pressed={active}
                 >
                   {household.kind === 'personal' ? (
@@ -669,17 +661,17 @@ export function PantryPage() {
       <section className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
         <Card className="border-life-health/20 bg-life-health/10 p-4">
           <p className="text-sm font-semibold text-life-health">临期</p>
-          <p className="mt-2 text-2xl font-bold">{overview.expiring}</p>
+          <p className="mt-2 text-2xl font-bold">{pantrySummary.expiring}</p>
           <p className="mt-1 text-xs text-muted-foreground">7 天内需要处理</p>
         </Card>
         <Card className="border-life-alert/20 bg-life-alert/10 p-4">
           <p className="text-sm font-semibold text-life-alert">已过期</p>
-          <p className="mt-2 text-2xl font-bold">{overview.expired}</p>
+          <p className="mt-2 text-2xl font-bold">{pantrySummary.expired}</p>
           <p className="mt-1 text-xs text-muted-foreground">需要尽快确认</p>
         </Card>
         <Card className="border-life-ai/20 bg-life-ai/10 p-4">
           <p className="text-sm font-semibold text-life-ai">在库总数</p>
-          <p className="mt-2 text-2xl font-bold">{overview.total}</p>
+          <p className="mt-2 text-2xl font-bold">{pantrySummary.total}</p>
           <p className="mt-1 text-xs text-muted-foreground">当前空间仍在管理中的条目</p>
         </Card>
       </section>
@@ -1048,11 +1040,10 @@ export function PantryPage() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         item={editingItem}
-        householdId={currentHousehold?.id}
+        householdId={effectiveHouseholdId || currentHousehold?.id}
         householdName={currentHousehold?.name}
         onSaved={(message) => {
           setSaveMessage(message);
-          void refreshOverview();
         }}
       />
       <PantryHouseholdSheet
@@ -1065,9 +1056,7 @@ export function PantryPage() {
         householdsLoading={householdsLoading}
         invitePayload={invitePayload}
         onSelectHousehold={(householdId) => {
-          setSelectedHouseholdId(householdId);
-          syncUrlState({ householdId });
-          setInvitePayload((current) => (current?.householdId === householdId ? current : null));
+          handleSelectHousehold(householdId);
         }}
         onCreateHousehold={handleCreateHousehold}
         onJoinHousehold={handleJoinHousehold}

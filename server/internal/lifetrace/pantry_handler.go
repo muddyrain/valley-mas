@@ -39,6 +39,13 @@ type updatePantryStatusRequest struct {
 	Status string `json:"status"`
 }
 
+type pantryListSummary struct {
+	Total    int64 `json:"total"`
+	Expiring int64 `json:"expiring"`
+	Expired  int64 `json:"expired"`
+	Active   int64 `json:"active"`
+}
+
 var validPantryCategories = map[string]bool{
 	"食品":  true,
 	"日用品": true,
@@ -186,6 +193,28 @@ END
 		Order("created_at DESC")
 }
 
+func buildPantryListSummary(householdID model.Int64String, now time.Time) (pantryListSummary, error) {
+	today, expiringDeadline := pantryDerivedDateBounds(now)
+	var summary pantryListSummary
+	err := database.GetDB().
+		Model(&model.LifeTracePantryItem{}).
+		Where("household_id = ?", householdID).
+		Select(`
+COUNT(CASE WHEN status NOT IN ('used-up', 'discarded') THEN 1 END) AS total,
+COUNT(CASE WHEN status NOT IN ('used-up', 'discarded') AND expires_at <> '' AND expires_at >= ? AND expires_at <= ? THEN 1 END) AS expiring,
+COUNT(CASE WHEN status NOT IN ('used-up', 'discarded') AND expires_at <> '' AND expires_at < ? THEN 1 END) AS expired
+`, today, expiringDeadline, today).
+		Scan(&summary).Error
+	if err != nil {
+		return pantryListSummary{}, err
+	}
+	summary.Active = summary.Total - summary.Expired
+	if summary.Active < 0 {
+		summary.Active = 0
+	}
+	return summary, nil
+}
+
 func (h *Handler) ListPantryItems(c *gin.Context) {
 	userID, ok := currentUserID(c)
 	if !ok {
@@ -202,6 +231,7 @@ func (h *Handler) ListPantryItems(c *gin.Context) {
 	offset := (page - 1) * pageSize
 	baseQuery := database.GetDB().Model(&model.LifeTracePantryItem{}).Where("household_id = ?", householdCtx.Household.ID)
 	baseQuery = applyPantryListFilters(baseQuery, c)
+	now := time.Now()
 
 	var total int64
 	if err := baseQuery.Count(&total).Error; err != nil {
@@ -210,10 +240,16 @@ func (h *Handler) ListPantryItems(c *gin.Context) {
 	}
 
 	var items []model.LifeTracePantryItem
-	if err := applyPantryListOrdering(baseQuery, time.Now()).
+	if err := applyPantryListOrdering(baseQuery, now).
 		Limit(pageSize).
 		Offset(offset).
 		Find(&items).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "获取库存失败")
+		return
+	}
+
+	summary, err := buildPantryListSummary(householdCtx.Household.ID, now)
+	if err != nil {
 		fail(c, http.StatusInternalServerError, "获取库存失败")
 		return
 	}
@@ -222,6 +258,7 @@ func (h *Handler) ListPantryItems(c *gin.Context) {
 		"householdId": householdCtx.Household.ID,
 		"list":        items,
 		"pagination":  buildListPagination(page, pageSize, total),
+		"summary":     summary,
 	})
 }
 

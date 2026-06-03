@@ -43,6 +43,7 @@
 
 - IF 出现重复 JSX、重复 handler、重复弹窗/表单/上传/列表逻辑 → `component-reuse-guard`。
 - IF 生成 commit message、执行 `git commit`，或用户要求提交 → `conventional-commit-guard`。
+- IF 用户要求“每次告诉我改了什么 / 下一步做什么 / 详细汇报阶段进展” → `delivery-reporting`。
 - IF 修改中文、Markdown、skill、配置示例或非 ASCII 文本 → `encoding-guard`。
 - IF 任务包含多步骤执行、计划后实施或需要验证 → `task-completion-guard`。
 - IF 本回合启用了任何 skill → 按 `skill-usage-disclosure` 做简短披露。

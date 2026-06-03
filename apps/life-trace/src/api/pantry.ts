@@ -1,5 +1,11 @@
 import { apiRequest } from '@/api/request';
-import type { ListPagination, NewPantryItemInput, PantryItem, PantryItemStatus } from '@/types';
+import type {
+  ListPagination,
+  NewPantryItemInput,
+  PantryItem,
+  PantryItemStatus,
+  PantryOverview,
+} from '@/types';
 
 export type ListPantryOptions = {
   page?: number;
@@ -95,6 +101,7 @@ export function listPantry(token: string, options: ListPantryOptions = {}) {
     householdId?: string;
     list: PantryItemResponse[];
     pagination?: ListPagination;
+    summary?: PantryOverview;
   }>(`/life-trace/pantry${buildListQuery(options)}`, token).then((data) => ({
     ...data,
     list: data.list.map(deserializePantryItem),

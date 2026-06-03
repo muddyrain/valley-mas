@@ -78,6 +78,13 @@ export type PantryReminderConfig = {
   reminderTime: string;
 };
 
+export type PantryOverview = {
+  total: number;
+  expiring: number;
+  expired: number;
+  active: number;
+};
+
 export type PantryItem = {
   id: string;
   householdId?: string;

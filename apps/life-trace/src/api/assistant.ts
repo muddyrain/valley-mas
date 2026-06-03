@@ -1,5 +1,5 @@
 import { API_BASE, apiRequest } from '@/api/request';
-import type { Plan } from '@/types';
+import type { PantryItem, Plan } from '@/types';
 
 export type LifeAssistantMessage = {
   id?: string;
@@ -27,26 +27,42 @@ type AssistantStreamChunk = {
   error?: string;
   source?: 'ark' | 'openai';
   model?: string;
-  plan?: LifeAssistantPlanEvent;
+  action?: LifeAssistantActionEvent;
 };
 
-export type LifeAssistantPlanEvent = {
-  status: 'created' | 'exists' | 'error';
+type LifeAssistantActionBase = {
+  status: 'created' | 'exists' | 'error' | 'need_more_info';
   message: string;
+  needMoreInfoFields?: string[];
+};
+
+export type LifeAssistantPlanEvent = LifeAssistantActionBase & {
+  type: 'create_plan';
   plan?: Plan;
 };
+
+export type LifeAssistantPantryEvent = LifeAssistantActionBase & {
+  type: 'create_pantry_item';
+  pantryItem?: PantryItem;
+};
+
+export type LifeAssistantActionEvent = LifeAssistantPlanEvent | LifeAssistantPantryEvent;
 
 type StreamOptions = {
   message: string;
   history: LifeAssistantMessage[];
+  householdId?: string;
   signal?: AbortSignal;
   onChunk: (chunk: string) => void;
   onMeta?: (meta: { source?: 'ark' | 'openai'; model?: string }) => void;
-  onPlan?: (event: LifeAssistantPlanEvent) => void;
+  onAction?: (event: LifeAssistantActionEvent) => void;
 };
 
 export async function streamLifeAssistant(token: string, options: StreamOptions) {
-  const response = await fetch(`${API_BASE}/life-trace/ai/assistant/stream`, {
+  const query = options.householdId?.trim()
+    ? `?householdId=${encodeURIComponent(options.householdId.trim())}`
+    : '';
+  const response = await fetch(`${API_BASE}/life-trace/ai/assistant/stream${query}`, {
     method: 'POST',
     headers: {
       Accept: 'text/event-stream',
@@ -94,8 +110,8 @@ export async function streamLifeAssistant(token: string, options: StreamOptions)
       if (payload.chunk) {
         options.onChunk(payload.chunk);
       }
-      if (payload.plan) {
-        options.onPlan?.(payload.plan);
+      if (payload.action) {
+        options.onAction?.(payload.action);
       }
     }
   };

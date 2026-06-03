@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,8 @@ import (
 	"time"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
+
+	"github.com/gin-gonic/gin"
 )
 
 func TestGenerateTodayAdviceRequiresAIConfig(t *testing.T) {
@@ -717,6 +720,35 @@ func TestBuildLifeTraceAssistantPlanDraftInfersSchedule(t *testing.T) {
 	}
 }
 
+func TestBuildLifeTraceAssistantPantryDraftInfersInventoryFields(t *testing.T) {
+	draft := buildLifeTraceAssistantPantryDraft("我这边有2盒酸奶，生产日期是2026-06-01，保质期是7天，放在冰箱里")
+	if draft == nil {
+		t.Fatal("expected pantry draft")
+	}
+	if draft.Name != "酸奶" {
+		t.Fatalf("expected normalized pantry name, got %+v", draft)
+	}
+	if draft.Quantity != 2 || draft.Unit != "盒" {
+		t.Fatalf("expected quantity and unit, got %+v", draft)
+	}
+	if draft.Location != "冷藏" || draft.Category != "食品" {
+		t.Fatalf("expected refrigerated food defaults, got %+v", draft)
+	}
+	if draft.ExpiresAt != "2026-06-08" {
+		t.Fatalf("expected derived expiry date, got %+v", draft)
+	}
+}
+
+func TestBuildLifeTraceAssistantPantryDraftKeepsNameWhenExpiryMissing(t *testing.T) {
+	draft := buildLifeTraceAssistantPantryDraft("我有一盒牛奶，想加到库存里")
+	if draft == nil {
+		t.Fatal("expected pantry draft even when expiry is missing")
+	}
+	if draft.Name != "牛奶" || draft.ExpiresAt != "" {
+		t.Fatalf("expected pantry draft to preserve name and missing expiry, got %+v", draft)
+	}
+}
+
 func TestCreateAssistantPlanFromDraftCreatesAndDedupes(t *testing.T) {
 	_ = setupTraceTestRouter(t, 101)
 	var handler Handler
@@ -754,6 +786,305 @@ func TestCreateAssistantPlanFromDraftCreatesAndDedupes(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("expected one plan after duplicate create, got %d", count)
+	}
+}
+
+func TestCreateAssistantPlanFromDraftNeedsMoreInfoWhenScheduleMissing(t *testing.T) {
+	_ = setupTraceTestRouter(t, 101)
+	var handler Handler
+
+	payload := handler.createAssistantPlanFromDraft(101, lifeTraceAssistantPlanDraft{
+		Title:         "预约取车",
+		Type:          "普通事项",
+		ScheduledDate: "2026-06-03",
+		ScheduledTime: "",
+		Timezone:      "Asia/Shanghai",
+		NotePrefix:    "来自生活助理提醒",
+	})
+	if payload == nil || payload.Status != "need_more_info" {
+		t.Fatalf("expected need_more_info payload, got %+v", payload)
+	}
+	if payload.Type != "create_plan" {
+		t.Fatalf("expected create_plan action type, got %+v", payload)
+	}
+	if len(payload.NeedMoreInfoFields) != 1 || payload.NeedMoreInfoFields[0] != "scheduledTime" {
+		t.Fatalf("expected scheduledTime missing field, got %+v", payload)
+	}
+	if !strings.Contains(payload.Message, "几点") {
+		t.Fatalf("expected follow-up to ask for time, got %+v", payload)
+	}
+}
+
+func TestCreateAssistantPantryItemFromDraftCreatesAndDedupes(t *testing.T) {
+	_ = setupTraceTestRouter(t, 101)
+	var handler Handler
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/assistant/stream", nil)
+	draft := lifeTraceAssistantPantryDraft{
+		Name:      "酸奶",
+		Category:  "食品",
+		Quantity:  2,
+		Unit:      "盒",
+		Location:  "冷藏",
+		ExpiresAt: "2026-06-08",
+		Note:      "我这边有2盒酸奶，生产日期是2026-06-01，保质期是7天。",
+	}
+
+	created := handler.createAssistantPantryItemFromDraft(ctx, 101, draft)
+	if created == nil || created.Status != "created" || created.PantryItem == nil {
+		t.Fatalf("expected created pantry payload, got %+v", created)
+	}
+	if created.PantryItem.Name != "酸奶" || created.PantryItem.Quantity != 2 {
+		t.Fatalf("expected saved pantry item fields, got %+v", created.PantryItem)
+	}
+
+	exists := handler.createAssistantPantryItemFromDraft(ctx, 101, draft)
+	if exists == nil || exists.Status != "exists" || exists.PantryItem == nil {
+		t.Fatalf("expected duplicate pantry detection, got %+v", exists)
+	}
+
+	var count int64
+	if err := database.GetDB().
+		Model(&model.LifeTracePantryItem{}).
+		Where("user_id = ? AND name = ?", model.Int64String(101), "酸奶").
+		Count(&count).Error; err != nil {
+		t.Fatalf("count pantry items: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one pantry item after duplicate create, got %d", count)
+	}
+}
+
+func TestCreateAssistantPantryItemFromDraftNeedsMoreInfoWhenExpiryMissing(t *testing.T) {
+	_ = setupTraceTestRouter(t, 101)
+	var handler Handler
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/assistant/stream", nil)
+	draft := lifeTraceAssistantPantryDraft{
+		Name:     "牛奶",
+		Category: "食品",
+		Quantity: 1,
+		Unit:     "盒",
+		Location: "冷藏",
+		Note:     "我有一盒牛奶，想加到库存里。",
+	}
+
+	payload := handler.createAssistantPantryItemFromDraft(ctx, 101, draft)
+	if payload == nil || payload.Status != "need_more_info" {
+		t.Fatalf("expected need_more_info payload, got %+v", payload)
+	}
+	if len(payload.NeedMoreInfoFields) != 1 || payload.NeedMoreInfoFields[0] != "expiresAt" {
+		t.Fatalf("expected expiresAt missing field, got %+v", payload)
+	}
+	if !strings.Contains(payload.Message, "保质期") {
+		t.Fatalf("expected expiry follow-up message, got %+v", payload)
+	}
+}
+
+func TestParseLifeTraceAssistantStructuredResponseSupportsNeedMoreInfo(t *testing.T) {
+	raw := `{
+		"reply":"要把牛奶收进库存，我还差一个保质期。",
+		"action":{
+			"type":"create_pantry_item",
+			"message":"要把牛奶收进库存，我还差一个保质期。",
+			"needMoreInfoFields":["expiresAt"],
+			"pantry":{"name":"牛奶","category":"食品","quantity":1,"unit":"盒","location":"冷藏"}
+		}
+	}`
+
+	parsed, err := parseLifeTraceAssistantStructuredResponse(raw)
+	if err != nil {
+		t.Fatalf("parse structured response: %v", err)
+	}
+	if parsed.Reply == "" || parsed.Action == nil {
+		t.Fatalf("expected structured action, got %+v", parsed)
+	}
+	if parsed.Action.Type != "create_pantry_item" {
+		t.Fatalf("expected pantry action, got %+v", parsed.Action)
+	}
+	if len(parsed.Action.NeedMoreInfoFields) != 1 || parsed.Action.NeedMoreInfoFields[0] != "expiresAt" {
+		t.Fatalf("expected need-more-info fields, got %+v", parsed.Action)
+	}
+	if parsed.Action.Pantry == nil || parsed.Action.Pantry.Name != "牛奶" {
+		t.Fatalf("expected pantry draft payload, got %+v", parsed.Action.Pantry)
+	}
+}
+
+func TestBuildLifeTraceAssistantPantryFollowUpDraftUsesRecentDraft(t *testing.T) {
+	now := time.Date(2026, time.June, 3, 10, 0, 0, 0, time.FixedZone("CST", 8*3600))
+	base := &lifeTraceAssistantPantryDraft{
+		Name:     "牛奶",
+		Category: "食品",
+		Quantity: 1,
+		Unit:     "盒",
+		Location: "冷藏",
+		Note:     "我有一盒牛奶，想加到库存里",
+	}
+
+	draft := buildLifeTraceAssistantPantryFollowUpDraft("保质期7天", base, now)
+	if draft == nil {
+		t.Fatal("expected pantry follow-up draft")
+	}
+	if draft.Name != "牛奶" {
+		t.Fatalf("expected pantry name to be preserved, got %+v", draft)
+	}
+	if draft.ExpiresAt != "2026-06-10" {
+		t.Fatalf("expected follow-up shelf life to derive expiry, got %+v", draft)
+	}
+}
+
+func TestBuildLifeTraceAssistantPlanFollowUpDraftUsesRecentDraft(t *testing.T) {
+	now := time.Date(2026, time.June, 3, 10, 0, 0, 0, time.FixedZone("CST", 8*3600))
+	base := &lifeTraceAssistantPlanDraft{
+		Title:         "预约取车",
+		Type:          "普通事项",
+		ScheduledDate: "2026-06-03",
+		ScheduledTime: "20:00",
+		Timezone:      "Asia/Shanghai",
+		NotePrefix:    "来自生活助理提醒",
+	}
+
+	draft := buildLifeTraceAssistantPlanFollowUpDraft("明天下午三点", base, now)
+	if draft == nil {
+		t.Fatal("expected plan follow-up draft")
+	}
+	if draft.Title != "预约取车" {
+		t.Fatalf("expected title to stay the same, got %+v", draft)
+	}
+	if draft.ScheduledDate != "2026-06-04" || draft.ScheduledTime != "15:00" {
+		t.Fatalf("expected date/time to be updated from follow-up, got %+v", draft)
+	}
+}
+
+func TestStreamAssistantStructuredResponseCreatesPantryItem(t *testing.T) {
+	var captured []lifeTraceOpenAIRequest
+	openAIServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req lifeTraceOpenAIRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode OpenAI request: %v", err)
+		}
+		captured = append(captured, req)
+		w.Header().Set("Content-Type", "application/json")
+		toolArgs := `{"reply":"已经帮你收进库存了。","action":{"type":"create_pantry_item","message":"已经帮你收进库存了。","pantry":{"name":"饼干","category":"食品","quantity":1,"unit":"包","location":"厨房","expiresAt":"2026-06-10","note":"我有一包饼干，保质期7天"}}}`
+		_, _ = fmt.Fprintf(w, `{"model":"gpt-test","choices":[{"message":{"role":"assistant","tool_calls":[{"id":"call_1","type":"function","function":{"name":"%s","arguments":%q}}]}}]}`, lifeTraceAssistantToolName, toolArgs)
+	}))
+	defer openAIServer.Close()
+
+	t.Setenv("OPENAI_API_KEY", "test-openai-key")
+	t.Setenv("OPENAI_API_BASE_URL", openAIServer.URL)
+	t.Setenv("OPENAI_API_MODEL", "gpt-test")
+
+	router := setupTraceTestRouter(t, 101)
+	if err := database.GetDB().Create(&model.LifeTraceSettings{
+		UserID:        101,
+		City:          "上海",
+		CommuteMethod: "开车",
+		Habits:        model.StringList{"喝水"},
+	}).Error; err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/assistant/stream", bytes.NewBufferString(`{
+		"message":"我有一包饼干，保质期7天",
+		"history":[]
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if len(captured) != 1 {
+		t.Fatalf("expected one structured OpenAI request, got %d", len(captured))
+	}
+	if len(captured[0].Tools) != 1 || captured[0].Tools[0].Function == nil || captured[0].Tools[0].Function.Name != lifeTraceAssistantToolName {
+		t.Fatalf("expected native tool definition in request, got %+v", captured[0].Tools)
+	}
+	toolChoice, ok := captured[0].ToolChoice.(map[string]interface{})
+	if !ok || toolChoice["type"] != "function" {
+		t.Fatalf("expected function tool_choice, got %+v", captured[0].ToolChoice)
+	}
+	if !strings.Contains(resp.Body.String(), `"action":{"type":"create_pantry_item"`) {
+		t.Fatalf("expected SSE action payload, got %s", resp.Body.String())
+	}
+	if !strings.Contains(resp.Body.String(), `"name":"饼干"`) {
+		t.Fatalf("expected pantry item payload in SSE body, got %s", resp.Body.String())
+	}
+
+	var count int64
+	if err := database.GetDB().
+		Model(&model.LifeTracePantryItem{}).
+		Where("user_id = ? AND name = ?", model.Int64String(101), "饼干").
+		Count(&count).Error; err != nil {
+		t.Fatalf("count pantry items: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected structured stream to create pantry item, got %d", count)
+	}
+}
+
+func TestStreamAssistantStructuredResponseFallsBackWhenToolsUnsupported(t *testing.T) {
+	requestCount := 0
+	var captured []map[string]interface{}
+	openAIServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount += 1
+		var payload map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode OpenAI request: %v", err)
+		}
+		captured = append(captured, payload)
+
+		w.Header().Set("Content-Type", "application/json")
+		if requestCount == 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"tools is not supported by this model","param":"tools"}}`))
+			return
+		}
+
+		content := `{"reply":"要把牛奶收进库存，我还差一个保质期。","action":{"type":"create_pantry_item","message":"要把牛奶收进库存，我还差一个保质期。","needMoreInfoFields":["expiresAt"],"pantry":{"name":"牛奶","category":"食品","quantity":1,"unit":"盒","location":"冷藏"}}}`
+		_, _ = fmt.Fprintf(w, `{"model":"gpt-test","choices":[{"message":{"role":"assistant","content":%q}}]}`, content)
+	}))
+	defer openAIServer.Close()
+
+	t.Setenv("OPENAI_API_KEY", "test-openai-key")
+	t.Setenv("OPENAI_API_BASE_URL", openAIServer.URL)
+	t.Setenv("OPENAI_API_MODEL", "gpt-test")
+
+	router := setupTraceTestRouter(t, 101)
+	if err := database.GetDB().Create(&model.LifeTraceSettings{
+		UserID:        101,
+		City:          "上海",
+		CommuteMethod: "开车",
+		Habits:        model.StringList{"喝水"},
+	}).Error; err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/assistant/stream", bytes.NewBufferString(`{
+		"message":"我有一盒牛奶，想加到库存里",
+		"history":[]
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if requestCount != 2 {
+		t.Fatalf("expected tool attempt + json fallback, got %d requests", requestCount)
+	}
+	if _, ok := captured[0]["tools"]; !ok {
+		t.Fatalf("expected first request to carry tools, got %+v", captured[0])
+	}
+	if _, ok := captured[1]["response_format"]; !ok {
+		t.Fatalf("expected second request to fall back to response_format json, got %+v", captured[1])
+	}
+	if !strings.Contains(resp.Body.String(), `"status":"need_more_info"`) {
+		t.Fatalf("expected fallback SSE to keep need_more_info action, got %s", resp.Body.String())
 	}
 }
 
