@@ -18,6 +18,7 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EditTraceDrawer } from '@/components/EditTraceDrawer';
 import { EmptyState } from '@/components/EmptyState';
+import { LoadErrorState } from '@/components/LoadErrorState';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -347,6 +348,7 @@ export function TracesPage() {
   const tracesLoadingMore = useLifeTraceStore((state) => state.tracesLoadingMore);
   const tracesPagination = useLifeTraceStore((state) => state.tracesPagination);
   const tracesError = useLifeTraceStore((state) => state.tracesError);
+  const loadTraces = useLifeTraceStore((state) => state.loadTraces);
   const loadMoreTraces = useLifeTraceStore((state) => state.loadMoreTraces);
   const removeTrace = useLifeTraceStore((state) => state.removeTrace);
   const traceDeletingById = useLifeTraceStore((state) => state.traceDeletingById);
@@ -382,6 +384,8 @@ export function TracesPage() {
     }
     return sourceFiltered.filter((trace) => trace.tags.includes(activeTag));
   }, [activeFilter, activeTag, traces]);
+  const showTracesErrorFallback =
+    Boolean(tracesError) && !tracesLoading && filteredTraces.length === 0;
   const monthGroups = useMemo(() => groupTracesByMonth(filteredTraces), [filteredTraces]);
   const selectedTrace = traceId ? (traces.find((trace) => trace.id === traceId) ?? null) : null;
   const activeFilterConfig =
@@ -506,7 +510,7 @@ export function TracesPage() {
         </div>
       </div>
 
-      {tracesError ? (
+      {tracesError && !showTracesErrorFallback ? (
         <Card className="border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
           {tracesError}
         </Card>
@@ -651,7 +655,15 @@ export function TracesPage() {
         ))}
       </div>
 
-      {!tracesLoading && filteredTraces.length === 0 ? (
+      {showTracesErrorFallback ? (
+        <LoadErrorState
+          title="踪迹列表加载失败"
+          description="这次生活踪迹没有顺利从云端同步下来，重新加载后会再拉一次最新记录。"
+          error={tracesError}
+          retrying={tracesLoading}
+          onRetry={() => void loadTraces()}
+        />
+      ) : !tracesLoading && filteredTraces.length === 0 ? (
         <EmptyState
           title={activeFilter === 'all' ? '还没有踪迹' : '暂无匹配踪迹'}
           description={activeFilterConfig.emptyText}

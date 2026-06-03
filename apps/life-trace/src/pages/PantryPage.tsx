@@ -4,7 +4,6 @@ import {
   BadgeAlert,
   Camera,
   ClipboardList,
-  Home,
   Milk,
   PackagePlus,
   Pill,
@@ -12,22 +11,11 @@ import {
   Settings2,
   Sparkles,
   Trash2,
-  Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  createHousehold,
-  createHouseholdInvite,
-  dissolveHousehold,
-  joinHousehold,
-  leaveHousehold,
-  listHouseholdMembers,
-  listHouseholds,
-  transferHouseholdOwner,
-} from '@/api/household';
 import { EmptyState } from '@/components/EmptyState';
-import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
+import { LoadErrorState } from '@/components/LoadErrorState';
 import { PantryItemDrawer } from '@/components/PantryItemDrawer';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
@@ -42,16 +30,9 @@ import {
   resolvePantryStatus,
 } from '@/lib/pantry';
 import { cn } from '@/lib/utils';
-import { useAuthStore } from '@/store/useAuthStore';
+import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type {
-  HouseholdInvitePayload,
-  HouseholdMember,
-  HouseholdSummary,
-  PantryCategory,
-  PantryItem,
-  PantryItemStatus,
-} from '@/types';
+import type { PantryCategory, PantryItem, PantryItemStatus } from '@/types';
 
 const statusFilters: Array<{ id: PantryItemStatus | 'all'; label: string }> = [
   { id: 'all', label: '在库' },
@@ -80,11 +61,6 @@ const categoryIconMap = {
 
 const PANTRY_PAGE_SIZE = 20;
 
-const householdKindLabel = {
-  personal: '个人空间',
-  shared: '共享家庭',
-} satisfies Record<HouseholdSummary['kind'], string>;
-
 function readStatusFilter(params: URLSearchParams): PantryItemStatus | 'all' {
   const value = params.get('status');
   if (value && statusFilters.some((item) => item.id === value)) {
@@ -105,17 +81,12 @@ function readQueryText(params: URLSearchParams) {
   return params.get('q')?.trim() ?? '';
 }
 
-function readHouseholdId(params: URLSearchParams) {
-  return params.get('householdId')?.trim() ?? '';
-}
-
 function updateSearchParams(
   current: URLSearchParams,
   updates: {
     status?: PantryItemStatus | 'all';
     category?: PantryCategory | 'all';
     q?: string;
-    householdId?: string;
   },
 ) {
   const next = new URLSearchParams(current);
@@ -145,26 +116,17 @@ function updateSearchParams(
     }
   }
 
-  if (updates.householdId !== undefined) {
-    const value = updates.householdId.trim();
-    if (value) {
-      next.set('householdId', value);
-    } else {
-      next.delete('householdId');
-    }
-  }
-
   return next;
 }
 
 export function PantryPage() {
-  const token = useAuthStore((state) => state.token);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const preferredPantryHouseholdId = useLifeTraceStore((state) => state.preferredPantryHouseholdId);
-  const setPreferredPantryHouseholdId = useLifeTraceStore(
-    (state) => state.setPreferredPantryHouseholdId,
+  const preferredPantryHouseholdName = useLifeTraceStore(
+    (state) => state.preferredPantryHouseholdName,
   );
+  const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const addTrace = useLifeTraceStore((state) => state.addTrace);
   const pantryList = useLifeTraceStore((state) => state.pantryListItems);
   const pantryLoaded = useLifeTraceStore((state) => state.pantryListLoaded);
@@ -175,13 +137,15 @@ export function PantryPage() {
   const pantryResolvedHouseholdId = useLifeTraceStore(
     (state) => state.pantryListResolvedHouseholdId,
   );
+  const pantryResolvedHouseholdName = useLifeTraceStore(
+    (state) => state.pantryListResolvedHouseholdName,
+  );
   const pantrySummary = useLifeTraceStore((state) => state.pantryListSummary);
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const loadMorePantryList = useLifeTraceStore((state) => state.loadMorePantryList);
   const updatePantryItemStatus = useLifeTraceStore((state) => state.updatePantryItemStatus);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PantryItem | null>(null);
-  const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<PantryItemStatus | 'all'>(() =>
     readStatusFilter(new URLSearchParams(window.location.search)),
   );
@@ -194,38 +158,19 @@ export function PantryPage() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(() =>
     readQueryText(new URLSearchParams(window.location.search)),
   );
-  const [selectedHouseholdId, setSelectedHouseholdId] = useState(
-    () =>
-      readHouseholdId(new URLSearchParams(window.location.search)) || preferredPantryHouseholdId,
-  );
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
-  const [saveMessage, setSaveMessage] = useState('');
-  const [households, setHouseholds] = useState<HouseholdSummary[]>([]);
-  const [householdsLoading, setHouseholdsLoading] = useState(false);
-  const [householdError, setHouseholdError] = useState('');
-  const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
-  const [householdMembersLoading, setHouseholdMembersLoading] = useState(false);
-  const [invitePayload, setInvitePayload] = useState<HouseholdInvitePayload | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const previousSelectedHouseholdIdRef = useRef(selectedHouseholdId);
-  const selectedHouseholdIdRef = useRef(selectedHouseholdId);
-  const pendingHouseholdSwitchIdRef = useRef<string | null>(null);
   const latestSearchParamsRef = useRef(searchParams);
-  const householdSheetOpenRef = useRef(householdSheetOpen);
-  const invitePayloadRef = useRef(invitePayload);
-  const [householdSwitchLoading, setHouseholdSwitchLoading] = useState(false);
-  const effectiveHouseholdId = selectedHouseholdId || pantryResolvedHouseholdId;
-  const currentHousehold = useMemo(
-    () => households.find((item) => item.id === effectiveHouseholdId) ?? households[0] ?? null,
-    [effectiveHouseholdId, households],
-  );
+  const showToast = useFeedbackToastStore((state) => state.showToast);
+  const effectiveHouseholdId = preferredPantryHouseholdId || pantryResolvedHouseholdId;
+  const currentHouseholdName =
+    pantryResolvedHouseholdName || preferredPantryHouseholdName || '当前空间';
 
   const syncUrlState = useCallback(
     (updates: {
       status?: PantryItemStatus | 'all';
       category?: PantryCategory | 'all';
       q?: string;
-      householdId?: string;
     }) => {
       const current = latestSearchParamsRef.current;
       const next = updateSearchParams(current, updates);
@@ -241,29 +186,25 @@ export function PantryPage() {
   }, [searchParams]);
 
   useEffect(() => {
-    householdSheetOpenRef.current = householdSheetOpen;
-  }, [householdSheetOpen]);
-
-  useEffect(() => {
-    invitePayloadRef.current = invitePayload;
-  }, [invitePayload]);
-
-  useEffect(() => {
     const nextStatus = readStatusFilter(searchParams);
     const nextCategory = readCategoryFilter(searchParams);
     const nextQuery = readQueryText(searchParams);
-    const nextHouseholdId = readHouseholdId(searchParams) || preferredPantryHouseholdId;
 
     setStatusFilter((current) => (current === nextStatus ? current : nextStatus));
     setCategoryFilter((current) => (current === nextCategory ? current : nextCategory));
     setSearchQuery((current) => (current === nextQuery ? current : nextQuery));
     setDebouncedSearchQuery((current) => (current === nextQuery ? current : nextQuery));
-    setSelectedHouseholdId((current) => (current === nextHouseholdId ? current : nextHouseholdId));
-  }, [preferredPantryHouseholdId, searchParams]);
+  }, [searchParams]);
 
   useEffect(() => {
-    selectedHouseholdIdRef.current = selectedHouseholdId;
-  }, [selectedHouseholdId]);
+    if (!searchParams.has('householdId')) {
+      return;
+    }
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('householdId');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const pantryQueryOptions = useMemo(
     () => ({
@@ -273,94 +214,6 @@ export function PantryPage() {
       q: debouncedSearchQuery.trim() || undefined,
     }),
     [categoryFilter, debouncedSearchQuery, effectiveHouseholdId, statusFilter],
-  );
-
-  const loadHouseholdMembersFor = useCallback(
-    async (householdId: string) => {
-      if (!token || !householdId) {
-        setHouseholdMembers([]);
-        return;
-      }
-
-      setHouseholdMembersLoading(true);
-      try {
-        const response = await listHouseholdMembers(token, householdId);
-        setHouseholdMembers(response.list);
-      } catch (error) {
-        throw new Error(error instanceof Error ? error.message : '读取家庭成员失败');
-      } finally {
-        setHouseholdMembersLoading(false);
-      }
-    },
-    [token],
-  );
-
-  const loadHouseholds = useCallback(
-    async (preferredHouseholdId?: string) => {
-      if (!token) {
-        setHouseholds([]);
-        setHouseholdMembers([]);
-        setInvitePayload(null);
-        setHouseholdError('');
-        return;
-      }
-
-      setHouseholdsLoading(true);
-      setHouseholdError('');
-      try {
-        const response = await listHouseholds(token);
-        setHouseholds(response.list);
-
-        const requestedId =
-          preferredHouseholdId ||
-          readHouseholdId(latestSearchParamsRef.current) ||
-          selectedHouseholdIdRef.current ||
-          pantryResolvedHouseholdId;
-        const hasRequested = requestedId && response.list.some((item) => item.id === requestedId);
-        const fallbackId =
-          (response.currentHouseholdId &&
-            response.list.some((item) => item.id === response.currentHouseholdId) &&
-            response.currentHouseholdId) ||
-          response.list[0]?.id ||
-          '';
-        const nextSelectedHouseholdId = hasRequested ? requestedId : fallbackId;
-
-        if (nextSelectedHouseholdId !== selectedHouseholdIdRef.current) {
-          setSelectedHouseholdId(nextSelectedHouseholdId);
-        }
-        setPreferredPantryHouseholdId(nextSelectedHouseholdId);
-        syncUrlState({ householdId: nextSelectedHouseholdId });
-
-        if (!response.list.some((item) => item.id === invitePayloadRef.current?.householdId)) {
-          setInvitePayload(null);
-        }
-
-        if (householdSheetOpenRef.current && nextSelectedHouseholdId) {
-          await loadHouseholdMembersFor(nextSelectedHouseholdId);
-        }
-      } catch (error) {
-        setHouseholdError(error instanceof Error ? error.message : '读取家庭空间失败');
-      } finally {
-        setHouseholdsLoading(false);
-      }
-    },
-    [
-      loadHouseholdMembersFor,
-      pantryResolvedHouseholdId,
-      setPreferredPantryHouseholdId,
-      syncUrlState,
-      token,
-    ],
-  );
-
-  const handleSelectHousehold = useCallback(
-    (householdId: string) => {
-      setSelectedHouseholdId(householdId);
-      setPreferredPantryHouseholdId(householdId);
-      syncUrlState({ householdId });
-      setInvitePayload((current) => (current?.householdId === householdId ? current : null));
-    },
-    [setPreferredPantryHouseholdId, syncUrlState],
   );
 
   const loadMorePantryItems = useCallback(async () => {
@@ -392,92 +245,6 @@ export function PantryPage() {
     }
   };
 
-  const handleCreateHousehold = useCallback(
-    async (name: string) => {
-      if (!token) {
-        throw new Error('请先登录后再创建家庭');
-      }
-
-      const created = await createHousehold(token, name);
-      setSaveMessage(`已创建共享家庭「${created.name}」`);
-      setInvitePayload(null);
-      await loadHouseholds(created.id);
-      await loadHouseholdMembersFor(created.id);
-    },
-    [loadHouseholdMembersFor, loadHouseholds, token],
-  );
-
-  const handleJoinHousehold = useCallback(
-    async (inviteCode: string) => {
-      if (!token) {
-        throw new Error('请先登录后再加入家庭');
-      }
-
-      const joined = await joinHousehold(token, inviteCode);
-      setSaveMessage(`已加入「${joined.name}」`);
-      setInvitePayload(null);
-      await loadHouseholds(joined.id);
-      await loadHouseholdMembersFor(joined.id);
-    },
-    [loadHouseholdMembersFor, loadHouseholds, token],
-  );
-
-  const handleCreateInvite = useCallback(
-    async (householdId: string) => {
-      if (!token) {
-        throw new Error('请先登录后再生成邀请码');
-      }
-
-      const payload = await createHouseholdInvite(token, householdId);
-      setInvitePayload(payload);
-    },
-    [token],
-  );
-
-  const handleLeaveHousehold = useCallback(
-    async (householdId: string) => {
-      if (!token) {
-        throw new Error('请先登录后再退出家庭');
-      }
-
-      await leaveHousehold(token, householdId);
-      setInvitePayload(null);
-      setHouseholdMembers([]);
-      await loadHouseholds();
-      setSaveMessage('已退出共享家庭');
-    },
-    [loadHouseholds, token],
-  );
-
-  const handleTransferOwner = useCallback(
-    async (householdId: string, targetUserId: string) => {
-      if (!token) {
-        throw new Error('请先登录后再转移家庭所有者');
-      }
-
-      const updated = await transferHouseholdOwner(token, householdId, targetUserId);
-      setSaveMessage(`已将「${updated.name}」的所有者转交给成员 #${targetUserId}`);
-      await loadHouseholds(householdId);
-      await loadHouseholdMembersFor(householdId);
-    },
-    [loadHouseholdMembersFor, loadHouseholds, token],
-  );
-
-  const handleDissolveHousehold = useCallback(
-    async (householdId: string) => {
-      if (!token) {
-        throw new Error('请先登录后再解散家庭');
-      }
-
-      await dissolveHousehold(token, householdId);
-      setInvitePayload(null);
-      setHouseholdMembers([]);
-      await loadHouseholds();
-      setSaveMessage('共享家庭已解散');
-    },
-    [loadHouseholds, token],
-  );
-
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
@@ -487,41 +254,15 @@ export function PantryPage() {
   }, [searchQuery, syncUrlState]);
 
   useEffect(() => {
-    void loadHouseholds();
-  }, [loadHouseholds]);
-
-  useEffect(() => {
-    if (previousSelectedHouseholdIdRef.current === effectiveHouseholdId) {
+    if (!settingsLoaded) {
       return;
     }
 
-    previousSelectedHouseholdIdRef.current = effectiveHouseholdId;
-    pendingHouseholdSwitchIdRef.current = effectiveHouseholdId;
-    setHouseholdSwitchLoading(true);
-  }, [effectiveHouseholdId]);
-
-  useEffect(() => {
     void loadPantryList({
       ...pantryQueryOptions,
       pageSize: PANTRY_PAGE_SIZE,
     });
-  }, [loadPantryList, pantryQueryOptions]);
-
-  useEffect(() => {
-    if (!householdSheetOpen || !currentHousehold?.id) {
-      return;
-    }
-    void loadHouseholdMembersFor(currentHousehold.id);
-  }, [currentHousehold?.id, householdSheetOpen, loadHouseholdMembersFor]);
-
-  useEffect(() => {
-    if (!saveMessage) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => setSaveMessage(''), 2200);
-    return () => window.clearTimeout(timer);
-  }, [saveMessage]);
+  }, [loadPantryList, pantryQueryOptions, settingsLoaded]);
 
   useEffect(() => {
     if (pantryLoading || pantryLoadingMore || !pantryPagination.hasMore) {
@@ -546,20 +287,17 @@ export function PantryPage() {
     return () => observer.disconnect();
   }, [loadMorePantryItems, pantryLoading, pantryLoadingMore, pantryPagination.hasMore]);
 
-  useEffect(() => {
-    if (
-      householdSwitchLoading &&
-      pendingHouseholdSwitchIdRef.current === (effectiveHouseholdId || '') &&
-      pantryLoaded &&
-      !pantryLoading
-    ) {
-      pendingHouseholdSwitchIdRef.current = null;
-      setHouseholdSwitchLoading(false);
-    }
-  }, [effectiveHouseholdId, householdSwitchLoading, pantryLoaded, pantryLoading]);
+  const listRefreshing = pantryLoading && pantryLoaded;
+  const activePantryError = pantryListError;
+  const showPantryErrorFallback =
+    Boolean(activePantryError) && !listRefreshing && !pantryLoading && pantryList.length === 0;
 
-  const listRefreshing = pantryLoading && pantryLoaded && !householdSwitchLoading;
-  const activePantryError = pantryListError || householdError;
+  const handleRetryPantryLoad = useCallback(() => {
+    void loadPantryList({
+      ...pantryQueryOptions,
+      pageSize: PANTRY_PAGE_SIZE,
+    });
+  }, [loadPantryList, pantryQueryOptions]);
 
   return (
     <div className="space-y-5">
@@ -574,7 +312,7 @@ export function PantryPage() {
           </button>
           <h1 className="mt-2 text-3xl font-bold tracking-tight max-[360px]:text-2xl">家庭库存</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            先切到正确空间，再看临期、补货和今晚该优先吃什么。
+            直接跟随你在我的页设置的当前空间，打开就能看临期、补货和今晚该先处理什么。
           </p>
         </div>
         <Button
@@ -594,67 +332,20 @@ export function PantryPage() {
       <Card className="space-y-4 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge tone={currentHousehold?.kind === 'personal' ? 'trace' : 'ai'}>
-                {currentHousehold ? householdKindLabel[currentHousehold.kind] : '空间同步中'}
-              </Badge>
-              {currentHousehold ? (
-                <Badge tone="default">
-                  {currentHousehold.memberCount}{' '}
-                  {currentHousehold.kind === 'personal' ? '位成员' : '人协作'}
-                </Badge>
-              ) : null}
-            </div>
+            <Badge tone="ai">当前空间</Badge>
             <h2 className="mt-2 truncate text-xl font-semibold">
-              {currentHousehold?.name || '正在同步库存空间'}
+              {pantryLoading && !pantryLoaded ? '正在同步当前空间' : currentHouseholdName}
             </h2>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              {currentHousehold?.kind === 'personal'
-                ? '你的个人库存会一直保留，不会因为加入共享家庭而消失。'
-                : '当前展示的是共享家庭库存，成员看到的是同一份列表。'}
-            </p>
           </div>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => setHouseholdSheetOpen(true)}
+            onClick={() => navigate('/profile#space-management')}
           >
             <Settings2 className="size-4" />
-            管理
+            去设置
           </Button>
-        </div>
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {households.length > 0 ? (
-            households.map((household) => {
-              const active = currentHousehold?.id === household.id;
-              return (
-                <button
-                  key={household.id}
-                  type="button"
-                  className={cn(
-                    'flex h-10 shrink-0 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition',
-                    active
-                      ? 'border-life-ai/45 bg-life-ai/10 text-life-ai'
-                      : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
-                  )}
-                  onClick={() => handleSelectHousehold(household.id)}
-                  aria-pressed={active}
-                >
-                  {household.kind === 'personal' ? (
-                    <Home className="size-3.5" />
-                  ) : (
-                    <Users className="size-3.5" />
-                  )}
-                  <span>{household.name}</span>
-                </button>
-              );
-            })
-          ) : (
-            <span className="text-xs text-muted-foreground">
-              {householdsLoading ? '正在同步空间...' : '暂无可用空间'}
-            </span>
-          )}
         </div>
       </Card>
 
@@ -779,33 +470,17 @@ export function PantryPage() {
           </div>
         </div>
 
-        {activePantryError ? (
+        {activePantryError && !showPantryErrorFallback ? (
           <Card className="border-life-alert/20 bg-life-alert/10 p-4 text-sm text-life-alert">
             {activePantryError}
           </Card>
         ) : null}
 
-        {householdSwitchLoading ? (
-          <div className="space-y-3">
-            <SyncState
-              title={`正在切换到${currentHousehold?.name || '所选空间'}`}
-              description="库存列表马上刷新出来。"
-              tone="ai"
-              showRail={false}
-            />
-            <SyncState
-              title="正在同步库存列表"
-              tone="default"
-              variant="skeleton-list"
-              rows={2}
-              showRail={false}
-            />
-          </div>
-        ) : listRefreshing ? (
+        {listRefreshing ? (
           <div className="space-y-3">
             <SyncState
               title="正在更新库存列表"
-              description="新的筛选结果马上出来。"
+              description={`正在同步${currentHouseholdName}的最新库存。`}
               tone="default"
               showRail={false}
             />
@@ -819,8 +494,16 @@ export function PantryPage() {
           </div>
         ) : pantryLoading && !pantryLoaded ? (
           <Card className="p-5 text-sm text-muted-foreground">
-            正在同步{currentHousehold?.name || '当前空间'}库存...
+            正在同步{currentHouseholdName}库存...
           </Card>
+        ) : showPantryErrorFallback ? (
+          <LoadErrorState
+            title="库存列表加载失败"
+            description="这次库存没有顺利从云端同步下来，重新加载后会再拉一次当前空间的数据。"
+            error={activePantryError}
+            retrying={pantryLoading || pantryLoadingMore}
+            onRetry={handleRetryPantryLoad}
+          />
         ) : pantryList.length === 0 ? (
           <EmptyState
             title={
@@ -830,9 +513,7 @@ export function PantryPage() {
             }
             description={
               statusFilter === 'all' && categoryFilter === 'all' && !debouncedSearchQuery
-                ? currentHousehold?.kind === 'shared'
-                  ? '先把这次采购补进去，家里的其他成员就能看到同一份库存。'
-                  : '先加一盒牛奶、一袋生菜或一瓶洗衣液，Life Trace 才能开始提醒你。'
+                ? '先加一盒牛奶、一袋生菜或一瓶洗衣液，Life Trace 才能开始提醒你。'
                 : '换个筛选条件，或者把搜索词放宽一点试试。'
             }
             eyebrow={
@@ -1040,37 +721,12 @@ export function PantryPage() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         item={editingItem}
-        householdId={effectiveHouseholdId || currentHousehold?.id}
-        householdName={currentHousehold?.name}
+        householdId={effectiveHouseholdId || undefined}
+        householdName={currentHouseholdName}
         onSaved={(message) => {
-          setSaveMessage(message);
+          showToast(message);
         }}
       />
-      <PantryHouseholdSheet
-        open={householdSheetOpen}
-        onOpenChange={setHouseholdSheetOpen}
-        households={households}
-        selectedHouseholdId={currentHousehold?.id}
-        members={householdMembers}
-        membersLoading={householdMembersLoading}
-        householdsLoading={householdsLoading}
-        invitePayload={invitePayload}
-        onSelectHousehold={(householdId) => {
-          handleSelectHousehold(householdId);
-        }}
-        onCreateHousehold={handleCreateHousehold}
-        onJoinHousehold={handleJoinHousehold}
-        onCreateInvite={handleCreateInvite}
-        onRefreshMembers={loadHouseholdMembersFor}
-        onTransferOwner={handleTransferOwner}
-        onLeaveHousehold={handleLeaveHousehold}
-        onDissolveHousehold={handleDissolveHousehold}
-      />
-      {saveMessage ? (
-        <div className="fixed right-4 bottom-[calc(7rem+env(safe-area-inset-bottom))] left-4 z-30 mx-auto max-w-[360px] rounded-2xl border border-life-trace/30 bg-card px-4 py-3 text-center text-sm font-medium text-life-trace shadow-2xl">
-          {saveMessage}
-        </div>
-      ) : null}
     </div>
   );
 }

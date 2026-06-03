@@ -42,6 +42,7 @@ export type CommuteMethod = '开车' | '地铁' | '步行' | '骑行' | '远程'
 export type WorkdayMode = 'legal' | 'custom' | 'daily';
 
 export type UserSettings = {
+  activePantryHouseholdId?: string;
   city: string;
   workStart: string;
   workEnd: string;

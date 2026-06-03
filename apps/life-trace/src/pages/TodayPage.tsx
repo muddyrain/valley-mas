@@ -9,7 +9,6 @@ import {
   Heart,
   LoaderCircle,
   MapPin,
-  MoonStar,
   Plus,
   RefreshCw,
   Settings,
@@ -28,6 +27,8 @@ import {
   type WeatherApiResponse,
 } from '@/api/weather';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { AnimatedWeatherIcon } from '@/components/AnimatedWeatherIcon';
+import { LocationPicker } from '@/components/LocationPicker';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -35,6 +36,7 @@ import { weatherMetrics } from '@/data/mock';
 import { useLifeTraceEntrance } from '@/hooks/useLifeTraceEntrance';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import { gsap, useGSAP } from '@/lib/gsap';
+import { formatLocationDisplay, getWeatherLocationLabel } from '@/lib/location';
 import {
   getPantryCoverUrl,
   getPantryExpiryText,
@@ -53,6 +55,7 @@ import {
 } from '@/lib/weatherAdvice';
 import { readWeatherCache, writeWeatherCache } from '@/lib/weatherCache';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Advice, AdvicePayload } from '@/types';
 
@@ -282,16 +285,17 @@ export function TodayPage() {
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const preferredPantryHouseholdId = useLifeTraceStore((state) => state.preferredPantryHouseholdId);
+  const preferredPantryHouseholdName = useLifeTraceStore(
+    (state) => state.preferredPantryHouseholdName,
+  );
   const pantryListItems = useLifeTraceStore((state) => state.pantryListItems);
   const pantryListLoaded = useLifeTraceStore((state) => state.pantryListLoaded);
   const pantryListLoading = useLifeTraceStore((state) => state.pantryListLoading);
   const pantryListSummary = useLifeTraceStore((state) => state.pantryListSummary);
-  const pantryListResolvedHouseholdId = useLifeTraceStore(
-    (state) => state.pantryListResolvedHouseholdId,
-  );
   const pantryListResolvedHouseholdName = useLifeTraceStore(
     (state) => state.pantryListResolvedHouseholdName,
   );
+  const updateSettings = useLifeTraceStore((state) => state.updateSettings);
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const addPlan = useLifeTraceStore((state) => state.addPlan);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
@@ -311,9 +315,9 @@ export function TodayPage() {
   const [remoteAdviceSummary, setRemoteAdviceSummary] = useState('');
   const [adviceLoading, setAdviceLoading] = useState(false);
   const [adviceRefreshing, setAdviceRefreshing] = useState(false);
-  const [planToast, setPlanToast] = useState('');
   const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+  const showToast = useFeedbackToastStore((state) => state.showToast);
   const planFingerprint = useMemo(
     () => plans.map((plan) => `${plan.id}:${plan.completed}:${plan.updatedAt ?? ''}`).join('|'),
     [plans],
@@ -328,11 +332,9 @@ export function TodayPage() {
       }).format(new Date()),
     [],
   );
-  const habitNames =
-    settings.habits.length > 0 ? settings.habits : ['喝水', '休息', '运动', '护肤'];
+  const habitNames = settings.habits;
   const todayCheckins = checkinsDate === todayDate ? checkins : [];
-  const effectivePantryHouseholdId = pantryListResolvedHouseholdId || preferredPantryHouseholdId;
-  const pantryHouseholdName = pantryListResolvedHouseholdName;
+  const pantryHouseholdName = pantryListResolvedHouseholdName || preferredPantryHouseholdName;
   const pantryOverview = pantryListSummary;
   const pantryCardLoading =
     Boolean(token) && (!settingsLoaded || !pantryListLoaded || pantryListLoading);
@@ -354,6 +356,8 @@ export function TodayPage() {
         .join('|'),
     [todayCheckins],
   );
+  const weatherLocationLabel = getWeatherLocationLabel(weather.city, settings.city);
+  const profileLocationLabel = formatLocationDisplay(settings.city) || settings.city;
   const adviceContextVersion = [
     settings.city,
     settings.workStart,
@@ -463,12 +467,16 @@ export function TodayPage() {
   const completedHabitCount = habitNames.filter((name) =>
     todayCheckins.some((item) => item.name === name && item.completed),
   ).length;
-  const habitProgress = `${completedHabitCount}/${habitNames.length}`;
-  const checkinAdviceText = adviceLoading
-    ? '正在更新今天的打卡节奏。'
-    : completedHabitCount > 0
-      ? `已完成 ${completedHabitCount} 项，今天继续按这个节奏就很好。`
-      : '先完成一个小打卡，今天会更容易进入状态。';
+  const habitProgress =
+    habitNames.length > 0 ? `${completedHabitCount}/${habitNames.length}` : '未设置';
+  const checkinAdviceText =
+    habitNames.length === 0
+      ? '先去我的页添加自定义打卡，比如喝药、维生素或饭后散步。'
+      : adviceLoading
+        ? '正在更新今天的打卡节奏。'
+        : completedHabitCount > 0
+          ? `已完成 ${completedHabitCount} 项，今天继续按这个节奏就很好。`
+          : '先完成一个小打卡，今天会更容易进入状态。';
   const adviceStatusText = remoteAdvice
     ? adviceRefreshing
       ? 'AI 刷新中'
@@ -478,21 +486,24 @@ export function TodayPage() {
       : settings.aiPersonalization
         ? '等待 AI'
         : '基础建议';
+  const todayLocationAdviceLabel = weatherLocationLabel || profileLocationLabel;
   const aiBriefHighlights = useMemo(() => {
     const highlights = [
       weather.now.text.includes('雨')
-        ? `${weather.city || settings.city}今天有雨，出门记得带伞。`
-        : `${weather.city || settings.city}今天以${weather.now.text}为主，按正常节奏出门就好。`,
+        ? `${todayLocationAdviceLabel}今天有雨，出门记得带伞。`
+        : `${todayLocationAdviceLabel}今天以${weather.now.text}为主，按正常节奏出门就好。`,
       overduePlans.length > 0
         ? `先处理 ${overduePlans.length} 个超时计划，今天会更轻松。`
         : todayOpenPlans.length > 0
           ? `今天还有 ${todayOpenPlans.length} 个计划待完成，先做最容易的一项。`
           : '今天的计划压力不高，可以留一点空档给自己。',
-      completedHabitCount === 0
-        ? `今日打卡还没开始，先完成 1 项最容易坚持的。`
-        : completedHabitCount >= habitNames.length
-          ? '今日打卡已经全部完成，可以安心收尾。'
-          : `已完成 ${completedHabitCount}/${habitNames.length} 项打卡，保持这个节奏就很好。`,
+      habitNames.length === 0
+        ? '还没有设置自定义打卡，可以补上喝药、营养品或固定习惯。'
+        : completedHabitCount === 0
+          ? `今日打卡还没开始，先完成 1 项最容易坚持的。`
+          : completedHabitCount >= habitNames.length
+            ? '今日打卡已经全部完成，可以安心收尾。'
+            : `已完成 ${completedHabitCount}/${habitNames.length} 项打卡，保持这个节奏就很好。`,
     ];
 
     if (nextReminder) {
@@ -505,9 +516,8 @@ export function TodayPage() {
     habitNames.length,
     nextReminder,
     overduePlans.length,
-    settings.city,
     todayOpenPlans.length,
-    weather.city,
+    todayLocationAdviceLabel,
     weather.now.text,
   ]);
 
@@ -769,13 +779,11 @@ export function TodayPage() {
     });
   }, [loadPantryList, preferredPantryHouseholdId, settingsLoaded, token]);
 
-  const pantryPageHref = effectivePantryHouseholdId
-    ? `/pantry?householdId=${encodeURIComponent(effectivePantryHouseholdId)}`
-    : '/pantry';
+  const pantryPageHref = '/pantry';
 
   const handleAddAdvicePlan = async (item: Advice) => {
     if (hasAdvicePlan(plans, item.id)) {
-      setPlanToast('这个建议已经在今日计划里');
+      showToast('这个建议已经在今日计划里', 'info');
       return;
     }
 
@@ -789,7 +797,7 @@ export function TodayPage() {
           city: weather.city || settings.city,
         }),
       );
-      setPlanToast(plan ? '已加入今日计划' : '计划保存失败，稍后再试');
+      showToast(plan ? '已加入今日计划' : '计划保存失败，稍后再试', plan ? 'success' : 'warning');
     } finally {
       setAddingAdviceId(null);
     }
@@ -807,11 +815,11 @@ export function TodayPage() {
         setWeatherReady(true);
         setWeatherError(resp.warning ?? '');
         writeWeatherCache(window.localStorage, settings.city, resp);
-        setPlanToast(resp.refreshLimited ? '刚刚刷新过，已使用缓存天气' : '天气已刷新');
+        showToast(resp.refreshLimited ? '刚刚刷新过，已使用缓存天气' : '天气已刷新', 'info');
       })
       .catch(() => {
         setWeatherError('天气刷新失败，已保留当前天气');
-        setPlanToast('天气刷新失败，稍后再试');
+        showToast('天气刷新失败，稍后再试', 'warning');
       })
       .finally(() => setWeatherLoading(false));
   };
@@ -821,15 +829,6 @@ export function TodayPage() {
     void toggleHabitCheckin(todayDate, name, !current?.completed);
   };
 
-  useEffect(() => {
-    if (!planToast) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => setPlanToast(''), 1800);
-    return () => window.clearTimeout(timer);
-  }, [planToast]);
-
   return (
     <div ref={pageRef} className="min-w-0 space-y-5 overflow-x-hidden">
       <header className="flex min-w-0 items-start justify-between gap-3" data-today-entrance>
@@ -838,10 +837,23 @@ export function TodayPage() {
             Life Trace
           </h1>
           <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-            <MapPin className="size-4 shrink-0" />
-            <span className="truncate">
-              {weatherReady ? weather.city || settings.city : settings.city}
-            </span>
+            <LocationPicker
+              value={settings.city}
+              onChange={(value) => updateSettings({ city: value })}
+            >
+              {({ displayValue, openPicker }) => (
+                <button
+                  type="button"
+                  className="flex min-w-0 items-center gap-2 rounded-full px-1 py-0.5 text-left transition hover:text-foreground"
+                  onClick={openPicker}
+                >
+                  <MapPin className="size-4 shrink-0" />
+                  <span className="truncate">
+                    {weatherReady ? weatherLocationLabel : displayValue || profileLocationLabel}
+                  </span>
+                </button>
+              )}
+            </LocationPicker>
             <span>·</span>
             <span className="shrink-0">{todayLabel}</span>
           </div>
@@ -907,7 +919,7 @@ export function TodayPage() {
             <div className="mb-7 flex min-w-0 items-center justify-between gap-3 max-[360px]:items-start">
               <div className="flex min-w-0 items-center gap-4 max-[360px]:gap-3" data-today-stagger>
                 <div className="grid size-16 shrink-0 place-items-center rounded-2xl bg-life-weather/10 text-life-weather max-[360px]:size-14">
-                  <Cloud className="size-9 max-[360px]:size-7" />
+                  <AnimatedWeatherIcon text={weather.now.text} size="hero" />
                 </div>
                 <div className="min-w-0">
                   <div className="text-6xl font-light leading-none tracking-[-0.04em] max-[360px]:text-5xl">
@@ -927,7 +939,7 @@ export function TodayPage() {
                   <span className="text-muted-foreground">{weather.now.low}°</span>
                 </div>
                 <div className="mt-1 truncate text-sm text-muted-foreground">
-                  {weather.city || settings.city}
+                  {weatherLocationLabel}
                 </div>
                 <div className="mt-1 flex min-w-0 items-center justify-end gap-2 text-xs text-muted-foreground">
                   <span className="min-w-0 truncate">
@@ -1047,7 +1059,11 @@ export function TodayPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                        <MoonStar className="size-4 text-life-plan" />
+                        <AnimatedWeatherIcon
+                          text={tomorrowWeather.textDay}
+                          size="compact"
+                          className="text-life-plan"
+                        />
                         明日天气
                       </div>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -1116,25 +1132,21 @@ export function TodayPage() {
                 </div>
               ) : (
                 <div className="-mx-1 flex max-w-full gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {displayedHourlyWeather.map((item, index) => {
-                    const Icon = item.text.includes('晴') ? Sun : Cloud;
-
-                    return (
-                      <div
-                        key={`${item.dateTime || item.time}-${index}`}
-                        className={cn(
-                          'flex min-w-16 shrink-0 flex-col items-center gap-2 rounded-2xl px-3 py-3',
-                          item.active && selectedWeatherDay === 'today'
-                            ? 'bg-life-weather/15 text-life-weather'
-                            : 'bg-secondary text-muted-foreground',
-                        )}
-                      >
-                        <span className="text-xs font-medium">{item.time}</span>
-                        <Icon className="size-5" />
-                        <span className="text-base font-semibold text-foreground">{item.temp}</span>
-                      </div>
-                    );
-                  })}
+                  {displayedHourlyWeather.map((item, index) => (
+                    <div
+                      key={`${item.dateTime || item.time}-${index}`}
+                      className={cn(
+                        'flex min-w-16 shrink-0 flex-col items-center gap-2 rounded-2xl px-3 py-3',
+                        item.active && selectedWeatherDay === 'today'
+                          ? 'bg-life-weather/15 text-life-weather'
+                          : 'bg-secondary text-muted-foreground',
+                      )}
+                    >
+                      <span className="text-xs font-medium">{item.time}</span>
+                      <AnimatedWeatherIcon text={item.text} size="hourly" />
+                      <span className="text-base font-semibold text-foreground">{item.temp}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1311,44 +1323,59 @@ export function TodayPage() {
             {habitProgress}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 max-[340px]:grid-cols-1">
-          {habitNames.map((name) => {
-            const checkin = todayCheckins.find((item) => item.name === name);
-            const completed = Boolean(checkin?.completed);
-            const toggling = Boolean(checkinTogglingByName[name]);
+        {habitNames.length > 0 ? (
+          <div className="grid grid-cols-2 gap-2 max-[340px]:grid-cols-1">
+            {habitNames.map((name) => {
+              const checkin = todayCheckins.find((item) => item.name === name);
+              const completed = Boolean(checkin?.completed);
+              const toggling = Boolean(checkinTogglingByName[name]);
 
-            return (
-              <button
-                type="button"
-                key={name}
-                disabled={toggling}
-                className={`flex min-h-12 cursor-pointer items-center justify-between gap-2 rounded-2xl border px-3 text-left text-sm font-semibold transition disabled:cursor-default disabled:opacity-70 ${
-                  completed
-                    ? 'border-life-trace/40 bg-life-trace/10 text-life-trace'
-                    : 'border-border bg-secondary text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => handleToggleCheckin(name)}
-              >
-                <span className="truncate">{name}</span>
-                <span
-                  className={`grid size-6 shrink-0 place-items-center rounded-full border transition ${
-                    toggling
-                      ? 'border-life-trace/40 bg-transparent text-life-trace'
-                      : completed
-                        ? 'border-life-trace bg-life-trace text-background'
-                        : 'border-border bg-transparent'
+              return (
+                <button
+                  type="button"
+                  key={name}
+                  disabled={toggling}
+                  className={`flex min-h-12 cursor-pointer items-center justify-between gap-2 rounded-2xl border px-3 text-left text-sm font-semibold transition disabled:cursor-default disabled:opacity-70 ${
+                    completed
+                      ? 'border-life-trace/40 bg-life-trace/10 text-life-trace'
+                      : 'border-border bg-secondary text-muted-foreground hover:text-foreground'
                   }`}
+                  onClick={() => handleToggleCheckin(name)}
                 >
-                  {toggling ? (
-                    <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" />
-                  ) : completed ? (
-                    <Check className="size-3.5" />
-                  ) : null}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                  <span className="truncate">{name}</span>
+                  <span
+                    className={`grid size-6 shrink-0 place-items-center rounded-full border transition ${
+                      toggling
+                        ? 'border-life-trace/40 bg-transparent text-life-trace'
+                        : completed
+                          ? 'border-life-trace bg-life-trace text-background'
+                          : 'border-border bg-transparent'
+                    }`}
+                  >
+                    {toggling ? (
+                      <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" />
+                    ) : completed ? (
+                      <Check className="size-3.5" />
+                    ) : null}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border px-4 py-4">
+            <p className="text-sm leading-6 text-muted-foreground">
+              还没有设置今天要坚持的打卡项。去我的页新增后，这里就会直接按云端清单展示。
+            </p>
+            <button
+              type="button"
+              className="mt-3 inline-flex h-9 items-center rounded-xl bg-secondary px-3 text-sm font-semibold text-foreground transition hover:bg-secondary/80"
+              onClick={() => navigate('/profile')}
+            >
+              去设置打卡
+            </button>
+          </div>
+        )}
         {checkinsError ? (
           <p className="mt-3 text-sm text-life-alert">{checkinsError}</p>
         ) : (
@@ -1561,11 +1588,6 @@ export function TodayPage() {
           })}
         </div>
       </section>
-      {planToast ? (
-        <div className="fixed right-4 bottom-[calc(7rem+env(safe-area-inset-bottom))] left-4 z-30 mx-auto max-w-[360px] rounded-2xl border border-life-trace/30 bg-card px-4 py-3 text-center text-sm font-medium text-life-trace shadow-2xl">
-          {planToast}
-        </div>
-      ) : null}
     </div>
   );
 }

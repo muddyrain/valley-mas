@@ -46,6 +46,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { aiQuickActions, suggestedPrompts } from '@/data/mock';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
+import { formatLocationDisplay } from '@/lib/location';
 import { getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { getLocalISODate } from '@/lib/planSchedule';
 import {
@@ -124,7 +125,6 @@ function formatAssistantActionMessage(event: LifeAssistantActionEvent) {
   return event.message;
 }
 
-const ASSISTANT_RESULT_KEY = 'life-trace-assistant-result';
 const COLLAPSED_ASSISTANT_MESSAGE_COUNT = 4;
 
 function normalizeAssistantMessage(message: LifeAssistantMessage, index: number): AssistantMessage {
@@ -206,28 +206,6 @@ function groupAssistantMessages(messages: AssistantMessage[]) {
   }
 
   return groups;
-}
-
-function readAssistantResult() {
-  try {
-    const raw = localStorage.getItem(ASSISTANT_RESULT_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as AiResult;
-    if (
-      typeof parsed?.title === 'string' &&
-      typeof parsed?.detail === 'string' &&
-      ['ai', 'plan', 'trace', 'health', 'alert'].includes(parsed.tone)
-    ) {
-      return parsed;
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
 }
 
 function WeeklyReviewPanel({
@@ -654,7 +632,7 @@ function useAiPageState() {
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false);
-  const [result, setResult] = useState<AiResult | null>(readAssistantResult);
+  const [result, setResult] = useState<AiResult | null>(null);
   const [adviceCards, setAdviceCards] = useState<AdvicePayload[]>([]);
   const [assistantInput, setAssistantInput] = useState('');
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
@@ -691,9 +669,10 @@ function useAiPageState() {
   const latestAssistantMessages = assistantMessages.slice(-COLLAPSED_ASSISTANT_MESSAGE_COUNT);
   const latestWeeklyReview = weeklyReviews[0];
   const currentWeekReview = findCurrentWeekReview(weeklyReviews);
+  const locationLabel = formatLocationDisplay(settings.city) || settings.city;
   const placeholder = useMemo(
-    () => `${settings.city} · ${settings.commuteMethod}通勤 · ${openPlanCount} 个待完成计划`,
-    [openPlanCount, settings.city, settings.commuteMethod],
+    () => `${locationLabel} · ${settings.commuteMethod}通勤 · ${openPlanCount} 个待完成计划`,
+    [locationLabel, openPlanCount, settings.commuteMethod],
   );
 
   useEffect(() => {
@@ -752,15 +731,6 @@ function useAiPageState() {
       alive = false;
     };
   }, [token]);
-
-  useEffect(() => {
-    if (result) {
-      localStorage.setItem(ASSISTANT_RESULT_KEY, JSON.stringify(result));
-      return;
-    }
-
-    localStorage.removeItem(ASSISTANT_RESULT_KEY);
-  }, [result]);
 
   useEffect(() => {
     const speechWindow = globalThis as typeof globalThis & {
@@ -1331,6 +1301,7 @@ function useAiPageState() {
     latestTrace,
     latestAssistantMessages,
     latestWeeklyReview,
+    locationLabel,
     placeholder,
     handleAssistantSubmit,
     toggleAssistantListening,
@@ -1486,6 +1457,7 @@ export function AiPage() {
     latestTrace,
     latestAssistantMessages,
     latestWeeklyReview,
+    locationLabel,
     placeholder,
     handleAssistantSubmit,
     toggleAssistantListening,
@@ -1517,7 +1489,7 @@ export function AiPage() {
             <CloudSun className="size-4 text-life-weather" />
             今日上下文
           </div>
-          <p className="mt-2 text-lg font-semibold">{settings.city}</p>
+          <p className="mt-2 text-lg font-semibold">{locationLabel}</p>
           <p className="mt-1 text-sm text-muted-foreground">{settings.commuteMethod}通勤</p>
         </Card>
         <Card className="p-4">

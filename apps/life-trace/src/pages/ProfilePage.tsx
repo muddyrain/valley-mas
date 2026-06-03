@@ -14,33 +14,42 @@ import {
   type LucideIcon,
   MapPin,
   MoonStar,
+  Plus,
   Route,
   Settings2,
   ShieldCheck,
   Smartphone,
   Sparkles,
   TimerReset,
+  Users,
   Wifi,
+  X,
   Zap,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { LocationPicker } from '@/components/LocationPicker';
+import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
 import { ProfileAvatarSheet } from '@/components/ProfileAvatarSheet';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useNotificationPermission } from '@/hooks/useNotificationPermission';
+import { usePantryHouseholdManager } from '@/hooks/usePantryHouseholdManager';
 import { usePwaStatus } from '@/hooks/usePwaStatus';
 import { gsap, useGSAP } from '@/lib/gsap';
+import { formatLocationDisplay } from '@/lib/location';
 import { pantryReminderRuleLabels } from '@/lib/pantry';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { CommuteMethod, PantryReminderRule, UserSettings, WorkdayMode } from '@/types';
 
 const commuteMethods: CommuteMethod[] = ['开车', '地铁', '步行', '骑行', '远程'];
-const habitOptions = ['喝水', '休息', '运动', '护肤', '早睡', '吃药'];
+const suggestedHabitOptions = ['喝水', '休息', '运动', '护肤', '早睡', '吃药'];
 const weekdayOptions = [
   { value: '1', label: '一' },
   { value: '2', label: '二' },
@@ -285,9 +294,11 @@ function SyncStatus({
 
 export function ProfilePage() {
   const pageRef = useRef<HTMLDivElement>(null);
-  const saveMessageTimerRef = useRef<number | null>(null);
+  const navigate = useNavigate();
   const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
+  const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
+  const [habitDraft, setHabitDraft] = useState('');
+  const [habitDraftError, setHabitDraftError] = useState('');
   const [notificationTesting, setNotificationTesting] = useState(false);
   const [serverPushTesting, setServerPushTesting] = useState(false);
   const [notificationTestMessage, setNotificationTestMessage] = useState('');
@@ -295,6 +306,9 @@ export function ProfilePage() {
   const settingsLoading = useLifeTraceStore((state) => state.settingsLoading);
   const settingsSaving = useLifeTraceStore((state) => state.settingsSaving);
   const settingsError = useLifeTraceStore((state) => state.settingsError);
+  const preferredPantryHouseholdName = useLifeTraceStore(
+    (state) => state.preferredPantryHouseholdName,
+  );
   const pantryPreferences = useLifeTraceStore((state) => state.pantryPreferences);
   const updateSettings = useLifeTraceStore((state) => state.updateSettings);
   const updatePantryPreferences = useLifeTraceStore((state) => state.updatePantryPreferences);
@@ -304,6 +318,26 @@ export function ProfilePage() {
   const signOut = useAuthStore((state) => state.signOut);
   const { canInstall, installed, serviceWorkerReady, promptInstall } = usePwaStatus();
   const notification = useNotificationPermission(token);
+  const showToast = useFeedbackToastStore((state) => state.showToast);
+  const {
+    households,
+    householdsLoaded,
+    householdsLoading,
+    householdError,
+    householdMembers,
+    householdMembersLoading,
+    invitePayload,
+    currentHousehold,
+    loadHouseholds,
+    loadHouseholdMembersFor,
+    handleSelectHousehold,
+    handleCreateHousehold,
+    handleJoinHousehold,
+    handleCreateInvite,
+    handleLeaveHousehold,
+    handleTransferOwner,
+    handleDissolveHousehold,
+  } = usePantryHouseholdManager();
   const profileName = user?.nickname || user?.username || 'Life Trace 用户';
   const enabledSignals =
     Number(settings.weatherAlerts) +
@@ -327,6 +361,32 @@ export function ProfilePage() {
     { label: '权限', ok: notification.granted },
     { label: '服务端', ok: notification.serverPushReady },
   ];
+  const locationLabel = formatLocationDisplay(settings.city) || settings.city;
+  const activePantrySpaceName = currentHousehold?.name || preferredPantryHouseholdName || '未设置';
+  const activePantrySpaceMeta = currentHousehold
+    ? currentHousehold.kind === 'personal'
+      ? '个人空间'
+      : `${currentHousehold.memberCount} 人共享`
+    : '今日页和库存页会跟随这里';
+
+  useEffect(() => {
+    if (!householdSheetOpen) {
+      return;
+    }
+
+    void (async () => {
+      const nextSelectedHouseholdId = await loadHouseholds();
+      if (!nextSelectedHouseholdId) {
+        return;
+      }
+
+      try {
+        await loadHouseholdMembersFor(nextSelectedHouseholdId);
+      } catch {
+        // 成员同步失败时由弹层内部状态提示，无需打断打开流程
+      }
+    })();
+  }, [householdSheetOpen, loadHouseholdMembersFor, loadHouseholds]);
 
   const handleTestNotification = async () => {
     setNotificationTesting(true);
@@ -416,22 +476,35 @@ export function ProfilePage() {
   };
 
   const pushSaveMessage = (message: string) => {
-    setSaveMessage(message);
-    if (saveMessageTimerRef.current) {
-      window.clearTimeout(saveMessageTimerRef.current);
-    }
-    saveMessageTimerRef.current = window.setTimeout(() => {
-      setSaveMessage('');
-      saveMessageTimerRef.current = null;
-    }, 2200);
+    showToast(message);
   };
 
-  const toggleHabit = (habit: string) => {
-    const nextHabits = settings.habits.includes(habit)
-      ? settings.habits.filter((item) => item !== habit)
-      : [...settings.habits, habit];
+  const addHabit = (rawValue: string) => {
+    const nextHabit = rawValue.trim();
+    if (!nextHabit) {
+      setHabitDraftError('先输入一个打卡项');
+      return;
+    }
+    if (nextHabit.length > 40) {
+      setHabitDraftError('打卡项最多 40 个字');
+      return;
+    }
+    if (settings.habits.includes(nextHabit)) {
+      setHabitDraftError('这个打卡项已经存在了');
+      return;
+    }
 
-    update('habits', nextHabits);
+    update('habits', [...settings.habits, nextHabit]);
+    setHabitDraft('');
+    setHabitDraftError('');
+  };
+
+  const removeHabit = (habit: string) => {
+    update(
+      'habits',
+      settings.habits.filter((item) => item !== habit),
+    );
+    setHabitDraftError('');
   };
 
   const toggleWorkday = (day: string) => {
@@ -527,17 +600,25 @@ export function ProfilePage() {
                 </button>
               </div>
               <p className="mt-1 truncate text-sm text-muted-foreground">
-                {settings.city} · {settings.commuteMethod}通勤 · {settings.dailyBriefTime} 简报
+                {locationLabel} · {settings.commuteMethod}通勤 · {settings.dailyBriefTime} 简报
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
-            <div className="rounded-2xl border border-foreground/10 bg-background/35 p-3 backdrop-blur">
-              <CloudSun className="mb-2 size-4 text-life-weather" />
-              <p className="truncate text-sm font-semibold">{settings.city}</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">天气城市</p>
-            </div>
+            <LocationPicker value={settings.city} onChange={(value) => update('city', value)}>
+              {({ displayValue, openPicker }) => (
+                <button
+                  type="button"
+                  className="rounded-2xl border border-foreground/10 bg-background/35 p-3 text-left backdrop-blur transition hover:border-life-ai/25 hover:bg-background/45"
+                  onClick={openPicker}
+                >
+                  <CloudSun className="mb-2 size-4 text-life-weather" />
+                  <p className="truncate text-sm font-semibold">{displayValue}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">天气城市</p>
+                </button>
+              )}
+            </LocationPicker>
             <div className="rounded-2xl border border-foreground/10 bg-background/35 p-3 backdrop-blur">
               <Bell className="mb-2 size-4 text-life-ai" />
               <p className="truncate text-sm font-semibold">{settings.dailyBriefTime}</p>
@@ -599,14 +680,33 @@ export function ProfilePage() {
 
       <section data-profile-card className="space-y-3">
         <SectionHeader title="生活偏好" meta="云端同步" />
-        <SettingInput
-          label="天气城市"
-          value={settings.city}
-          icon={MapPin}
-          tone="ai"
-          placeholder="例如：上海"
-          onChange={(value) => update('city', value)}
-        />
+        <LocationPicker value={settings.city} onChange={(value) => update('city', value)}>
+          {({ displayValue, openPicker }) => (
+            <button
+              type="button"
+              className={cn(
+                'group flex w-full items-center justify-between gap-3 rounded-[1.35rem] border border-border bg-card/80 p-4 text-left transition duration-300',
+                'hover:border-foreground/20 hover:bg-card',
+              )}
+              onClick={openPicker}
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai transition group-hover:scale-105">
+                  <MapPin className="size-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold text-muted-foreground">
+                    天气城市
+                  </span>
+                  <span className="mt-1 block truncate text-base font-semibold text-foreground">
+                    {displayValue}
+                  </span>
+                </span>
+              </span>
+              <span className="text-xs font-semibold text-muted-foreground">可改区县</span>
+            </button>
+          )}
+        </LocationPicker>
         <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
           <SettingInput
             label="上班时间"
@@ -921,6 +1021,59 @@ export function ProfilePage() {
       </section>
 
       <section data-profile-card className="space-y-3">
+        <SectionHeader title="空间管理" meta={activePantrySpaceName} />
+        <Card id="space-management" className="space-y-4 p-4">
+          <div className="flex items-start gap-3">
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+              <Users className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold">统一设置当前库存空间</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                在这里选好个人空间或共享家庭后，Today
+                页的库存提醒和库存列表都会直接跟随，不需要每次进去再切。
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-[1.35rem] border border-life-ai/20 bg-life-ai/5 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-life-ai">当前激活空间</p>
+                <p className="mt-2 truncate text-lg font-semibold text-foreground">
+                  {activePantrySpaceName}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  {householdsLoaded || currentHousehold
+                    ? activePantrySpaceMeta
+                    : '打开空间管理后会同步完整空间信息。'}
+                </p>
+              </div>
+              {householdsLoading ? <Badge tone="ai">同步中</Badge> : null}
+            </div>
+          </div>
+
+          {householdError ? (
+            <p className="text-sm text-life-alert">{householdError}</p>
+          ) : (
+            <p className="text-xs leading-5 text-muted-foreground">
+              创建家庭、加入家庭、邀请家人和切换当前空间，都统一放在这个入口里。
+            </p>
+          )}
+
+          <div className="grid grid-cols-2 gap-2 max-[360px]:grid-cols-1">
+            <Button type="button" variant="ai" onClick={() => setHouseholdSheetOpen(true)}>
+              <Users className="size-4" />
+              管理空间
+            </Button>
+            <Button type="button" variant="outline" onClick={() => navigate('/pantry')}>
+              查看当前库存
+            </Button>
+          </div>
+        </Card>
+      </section>
+
+      <section data-profile-card className="space-y-3">
         <SectionHeader title="家庭库存提醒" meta="本机默认" />
         <Card className="space-y-4 p-4">
           <div className="flex items-start gap-3">
@@ -998,43 +1151,96 @@ export function ProfilePage() {
 
       <section data-profile-card className="space-y-3">
         <SectionHeader title="每日打卡" meta={`${settings.habits.length} 项已开启`} />
-        <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-          {habitOptions.map((habit) => {
-            const active = settings.habits.includes(habit);
+        <Card className="space-y-4 p-4">
+          <div className="flex items-start gap-3">
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-trace/10 text-life-trace">
+              <Heart className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold">自定义你的今日打卡</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                这里保存的是云端打卡清单。像喝药、维生素、遛狗、拉伸这类个人节奏，都可以自己加。
+              </p>
+            </div>
+          </div>
 
-            return (
-              <button
-                key={habit}
-                type="button"
-                className={cn(
-                  'group relative min-h-20 overflow-hidden rounded-[1.35rem] border p-4 text-left transition duration-300',
-                  active
-                    ? 'border-life-trace/35 bg-life-trace/10 text-life-trace shadow-[0_16px_45px_rgba(16,185,129,0.08)]'
-                    : 'border-border bg-card/80 text-muted-foreground hover:border-foreground/20 hover:bg-card',
-                )}
-                onClick={() => toggleHabit(habit)}
-              >
-                <span className="relative flex items-center justify-between gap-3">
-                  <span className="font-semibold">{habit}</span>
-                  <Heart
-                    className={cn(
-                      'size-4 transition group-hover:scale-110 motion-reduce:transition-none',
-                      active ? 'fill-current' : '',
-                    )}
-                  />
+          <div className="flex gap-2 max-[360px]:flex-col">
+            <input
+              type="text"
+              value={habitDraft}
+              maxLength={40}
+              placeholder="例如：晚饭后吃维生素D"
+              className="h-11 flex-1 rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-life-trace/50"
+              onChange={(event) => {
+                setHabitDraft(event.target.value);
+                if (habitDraftError) {
+                  setHabitDraftError('');
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  addHabit(habitDraft);
+                }
+              }}
+            />
+            <Button type="button" variant="ai" onClick={() => addHabit(habitDraft)}>
+              <Plus className="size-4" />
+              添加
+            </Button>
+          </div>
+
+          {habitDraftError ? (
+            <p className="text-sm text-life-alert">{habitDraftError}</p>
+          ) : (
+            <p className="text-xs leading-5 text-muted-foreground">
+              新增或删除后会自动同步到云端，Today 页和 AI 简报会直接用这份清单。
+            </p>
+          )}
+
+          {settings.habits.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {settings.habits.map((habit) => (
+                <span
+                  key={habit}
+                  className="inline-flex items-center gap-2 rounded-full border border-life-trace/25 bg-life-trace/10 px-3 py-2 text-sm font-medium text-life-trace"
+                >
+                  <span className="max-w-[16rem] truncate">{habit}</span>
+                  <button
+                    type="button"
+                    className="grid size-5 place-items-center rounded-full bg-background/60 text-life-trace transition hover:bg-background"
+                    aria-label={`删除 ${habit}`}
+                    onClick={() => removeHabit(habit)}
+                  >
+                    <X className="size-3" />
+                  </button>
                 </span>
-                <span className="relative mt-3 block h-1 overflow-hidden rounded-full bg-secondary">
-                  <span
-                    className={cn(
-                      'block h-full rounded-full transition-all duration-500',
-                      active ? 'w-full bg-life-trace' : 'w-1/3 bg-muted-foreground/30',
-                    )}
-                  />
-                </span>
-              </button>
-            );
-          })}
-        </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border px-4 py-4 text-sm leading-6 text-muted-foreground">
+              还没有自定义打卡项。先加一个最容易坚持的，比如喝药、喝水或睡前拉伸。
+            </div>
+          )}
+
+          <div>
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">快速添加</p>
+            <div className="flex flex-wrap gap-2">
+              {suggestedHabitOptions
+                .filter((habit) => !settings.habits.includes(habit))
+                .map((habit) => (
+                  <button
+                    key={habit}
+                    type="button"
+                    className="rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-life-trace/30 hover:text-foreground"
+                    onClick={() => addHabit(habit)}
+                  >
+                    + {habit}
+                  </button>
+                ))}
+            </div>
+          </div>
+        </Card>
       </section>
 
       <section data-profile-card className="space-y-3">
@@ -1091,11 +1297,33 @@ export function ProfilePage() {
         }}
         onMessage={pushSaveMessage}
       />
-      {saveMessage ? (
-        <div className="fixed right-4 bottom-[calc(7rem+env(safe-area-inset-bottom))] left-4 z-30 mx-auto max-w-[360px] rounded-2xl border border-life-trace/30 bg-card px-4 py-3 text-center text-sm font-medium text-life-trace shadow-2xl">
-          {saveMessage}
-        </div>
-      ) : null}
+      <PantryHouseholdSheet
+        open={householdSheetOpen}
+        onOpenChange={setHouseholdSheetOpen}
+        households={households}
+        selectedHouseholdId={currentHousehold?.id}
+        members={householdMembers}
+        membersLoading={householdMembersLoading}
+        householdsLoading={householdsLoading}
+        invitePayload={invitePayload}
+        onSelectHousehold={(householdId) => {
+          handleSelectHousehold(householdId);
+          void loadHouseholdMembersFor(householdId);
+        }}
+        onCreateHousehold={async (name) => {
+          await handleCreateHousehold(name);
+        }}
+        onJoinHousehold={async (inviteCode) => {
+          await handleJoinHousehold(inviteCode);
+        }}
+        onCreateInvite={async (householdId) => {
+          await handleCreateInvite(householdId);
+        }}
+        onRefreshMembers={loadHouseholdMembersFor}
+        onTransferOwner={handleTransferOwner}
+        onLeaveHousehold={handleLeaveHousehold}
+        onDissolveHousehold={handleDissolveHousehold}
+      />
     </div>
   );
 }

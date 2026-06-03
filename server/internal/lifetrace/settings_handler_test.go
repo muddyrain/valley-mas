@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"valley-server/internal/database"
+	"valley-server/internal/model"
 )
 
 func TestGetSettingsCreatesDefaultForCurrentUser(t *testing.T) {
@@ -36,12 +38,35 @@ func TestGetSettingsCreatesDefaultForCurrentUser(t *testing.T) {
 	if len(pantryRules) != 4 || pantryRules[0] != "7d" {
 		t.Fatalf("expected default pantry reminder rules, got %+v", pantryRules)
 	}
+	if settings["activePantryHouseholdId"] != nil {
+		t.Fatalf("expected default active pantry household id to be empty, got %+v", settings)
+	}
 }
 
 func TestUpdateSettingsPersistsCurrentUserPreferences(t *testing.T) {
 	router := setupTraceTestRouter(t, 101)
+	sharedHousehold := model.Household{
+		ID:          301,
+		Name:        "开心家庭",
+		Kind:        householdKindShared,
+		OwnerUserID: 101,
+		Status:      householdStatusActive,
+	}
+	sharedMember := model.HouseholdMember{
+		HouseholdID: 301,
+		UserID:      101,
+		Role:        householdRoleOwner,
+		Status:      householdMemberStatusActive,
+	}
+	if err := database.GetDB().Create(&sharedHousehold).Error; err != nil {
+		t.Fatalf("create household failed: %v", err)
+	}
+	if err := database.GetDB().Create(&sharedMember).Error; err != nil {
+		t.Fatalf("create household member failed: %v", err)
+	}
 
 	body := bytes.NewBufferString(`{
+		"activePantryHouseholdId": "301",
 		"city": "杭州",
 		"workStart": "10:00",
 		"workEnd": "19:00",
@@ -95,13 +120,52 @@ func TestUpdateSettingsPersistsCurrentUserPreferences(t *testing.T) {
 	if settings["pantryReminderTime"] != "08:45" {
 		t.Fatalf("expected pantry reminder time to persist, got %+v", settings)
 	}
+	if settings["activePantryHouseholdId"] != "301" {
+		t.Fatalf("expected active pantry household id to persist, got %+v", settings)
+	}
 
 	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/settings", nil)
 	getResp := httptest.NewRecorder()
 	router.ServeHTTP(getResp, getReq)
 
 	persisted := decodeTracePayload(t, getResp)["data"].(map[string]interface{})
-	if persisted["city"] != "杭州" || persisted["workStart"] != "10:00" || persisted["pantryReminderTime"] != "08:45" {
+	if persisted["city"] != "杭州" || persisted["workStart"] != "10:00" || persisted["pantryReminderTime"] != "08:45" || persisted["activePantryHouseholdId"] != "301" {
 		t.Fatalf("expected settings to persist, got %+v", persisted)
+	}
+}
+
+func TestUpdateSettingsAllowsEmptyHabits(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+
+	body := bytes.NewBufferString(`{
+		"city": "杭州",
+		"workStart": "09:30",
+		"workEnd": "18:30",
+		"commuteMethod": "开车",
+		"dailyBriefTime": "08:10",
+		"workdayMode": "legal",
+		"workdays": ["1", "2", "3", "4", "5"],
+		"holidaySync": true,
+		"weekendReminders": false,
+		"planReminderLeadMinutes": 10,
+		"quietStart": "22:30",
+		"quietEnd": "07:30",
+		"weatherAlerts": true,
+		"planReminders": true,
+		"aiPersonalization": true,
+		"habits": [],
+		"pantryReminderEnabled": true,
+		"pantryReminderRules": ["7d", "3d", "same-day", "expired"],
+		"pantryReminderTime": "09:00"
+	}`)
+	updateReq := httptest.NewRequest(http.MethodPut, "/api/v1/life-trace/settings", body)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp := httptest.NewRecorder()
+	router.ServeHTTP(updateResp, updateReq)
+
+	settings := decodeTracePayload(t, updateResp)["data"].(map[string]interface{})
+	habits := settings["habits"].([]interface{})
+	if len(habits) != 0 {
+		t.Fatalf("expected empty habits to persist, got %+v", habits)
 	}
 }

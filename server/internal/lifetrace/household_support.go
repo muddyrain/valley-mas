@@ -286,6 +286,50 @@ func resolveRequestedHouseholdID(c *gin.Context) model.Int64String {
 	return model.Int64String(value)
 }
 
+func normalizePreferredPantryHouseholdID(userID model.Int64String, raw string) model.Int64String {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || value <= 0 {
+		return 0
+	}
+
+	preferredID := model.Int64String(value)
+	if preferredID == personalHouseholdID(userID) {
+		return 0
+	}
+
+	var household model.Household
+	if err := database.GetDB().
+		Where("id = ? AND status = ?", preferredID, householdStatusActive).
+		First(&household).Error; err != nil {
+		return 0
+	}
+
+	var member model.HouseholdMember
+	if err := database.GetDB().
+		Where("household_id = ? AND user_id = ? AND status = ?", preferredID, userID, householdMemberStatusActive).
+		First(&member).Error; err != nil {
+		return 0
+	}
+
+	return preferredID
+}
+
+func loadPreferredPantryHouseholdID(userID model.Int64String) model.Int64String {
+	settings, err := findSettings(userID)
+	if err != nil {
+		return 0
+	}
+	if settings.ActivePantryHouseholdID <= 0 {
+		return 0
+	}
+	return settings.ActivePantryHouseholdID
+}
+
 func resolveHouseholdContext(c *gin.Context, userID model.Int64String) (householdContext, error) {
 	personalHousehold, personalMember, err := ensurePersonalHousehold(userID)
 	if err != nil {
@@ -293,6 +337,10 @@ func resolveHouseholdContext(c *gin.Context, userID model.Int64String) (househol
 	}
 
 	requestedID := resolveRequestedHouseholdID(c)
+	explicitRequest := requestedID != 0
+	if requestedID == 0 {
+		requestedID = loadPreferredPantryHouseholdID(userID)
+	}
 	if requestedID == 0 || requestedID == personalHousehold.ID {
 		return householdContext{
 			Household: personalHousehold,
@@ -305,6 +353,12 @@ func resolveHouseholdContext(c *gin.Context, userID model.Int64String) (househol
 		Where("id = ? AND status = ?", requestedID, householdStatusActive).
 		First(&household).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if !explicitRequest {
+				return householdContext{
+					Household: personalHousehold,
+					Member:    personalMember,
+				}, nil
+			}
 			return householdContext{}, fmt.Errorf("%w: 家庭不存在或不可访问", errHouseholdNotAccessible)
 		}
 		return householdContext{}, err
@@ -315,6 +369,12 @@ func resolveHouseholdContext(c *gin.Context, userID model.Int64String) (househol
 		Where("household_id = ? AND user_id = ? AND status = ?", household.ID, userID, householdMemberStatusActive).
 		First(&member).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if !explicitRequest {
+				return householdContext{
+					Household: personalHousehold,
+					Member:    personalMember,
+				}, nil
+			}
 			return householdContext{}, fmt.Errorf("%w: 家庭不存在或不可访问", errHouseholdNotAccessible)
 		}
 		return householdContext{}, err

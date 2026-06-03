@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  deletePushSubscription,
   getPushConfig,
   type PushConfig,
   type PushSubscriptionPayload,
@@ -64,6 +65,24 @@ async function getExistingPushSubscriptionPayload() {
     return null;
   }
   return normalizeSubscription(subscription);
+}
+
+async function createFreshPushSubscription(token: string, publicKey: string) {
+  const registration = await navigator.serviceWorker.ready;
+  const existing = await registration.pushManager.getSubscription();
+
+  if (existing) {
+    const existingPayload = normalizeSubscription(existing);
+    if (existingPayload) {
+      await deletePushSubscription(token, existingPayload.endpoint).catch(() => undefined);
+    }
+    await existing.unsubscribe().catch(() => undefined);
+  }
+
+  return registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey),
+  });
 }
 
 export function useNotificationPermission(token?: string | null) {
@@ -191,14 +210,7 @@ export function useNotificationPermission(token?: string | null) {
         return false;
       }
 
-      const registration = await navigator.serviceWorker.ready;
-      const existing = await registration.pushManager.getSubscription();
-      const subscription =
-        existing ??
-        (await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(config.publicKey),
-        }));
+      const subscription = await createFreshPushSubscription(token, config.publicKey);
       const payload = normalizeSubscription(subscription);
       if (!payload) {
         throw new Error('浏览器没有返回完整的推送订阅信息');

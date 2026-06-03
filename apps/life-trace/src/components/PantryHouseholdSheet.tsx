@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import type { HouseholdInvitePayload, HouseholdMember, HouseholdSummary } from '@/types';
 
 type PantryHouseholdSheetProps = {
@@ -76,7 +77,7 @@ export function PantryHouseholdSheet({
     'create' | 'join' | 'invite' | 'leave' | 'dissolve' | 'refresh' | 'transfer' | null
   >(null);
   const [sheetError, setSheetError] = useState('');
-  const [sheetNotice, setSheetNotice] = useState('');
+  const showToast = useFeedbackToastStore((state) => state.showToast);
   const currentHousehold = useMemo(
     () => households.find((item) => item.id === selectedHouseholdId) ?? households[0] ?? null,
     [households, selectedHouseholdId],
@@ -85,7 +86,6 @@ export function PantryHouseholdSheet({
   useEffect(() => {
     if (!open) {
       setSheetError('');
-      setSheetNotice('');
       setSubmittingAction(null);
       setCreateName('');
       setJoinCode('');
@@ -99,7 +99,7 @@ export function PantryHouseholdSheet({
 
     try {
       await navigator.clipboard.writeText(invitePayload.inviteCode);
-      setSheetNotice('邀请码已复制，可以直接发给家人。');
+      showToast('邀请码已复制，可以直接发给家人。');
       setSheetError('');
     } catch {
       setSheetError('当前环境暂时无法复制邀请码，请手动复制。');
@@ -135,12 +135,6 @@ export function PantryHouseholdSheet({
           {sheetError}
         </Card>
       ) : null}
-      {sheetNotice ? (
-        <Card className="mb-4 border-life-trace/20 bg-life-trace/10 p-4 text-sm text-life-trace">
-          {sheetNotice}
-        </Card>
-      ) : null}
-
       <div className="space-y-4">
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3">
@@ -246,7 +240,7 @@ export function PantryHouseholdSheet({
                 try {
                   await onCreateHousehold(name);
                   setCreateName('');
-                  setSheetNotice(`已创建共享家庭「${name}」。`);
+                  showToast(`已创建共享家庭「${name}」`);
                 } catch (error) {
                   setSheetError(error instanceof Error ? error.message : '创建家庭失败');
                 } finally {
@@ -291,7 +285,7 @@ export function PantryHouseholdSheet({
                 try {
                   await onJoinHousehold(code);
                   setJoinCode('');
-                  setSheetNotice('已加入新的共享家庭。');
+                  showToast('已加入新的共享家庭');
                 } catch (error) {
                   setSheetError(error instanceof Error ? error.message : '加入家庭失败');
                 } finally {
@@ -351,7 +345,7 @@ export function PantryHouseholdSheet({
                       setSheetError('');
                       try {
                         await onCreateInvite(currentHousehold.id);
-                        setSheetNotice('已生成新的邀请码。');
+                        showToast('已生成新的邀请码');
                       } catch (error) {
                         setSheetError(error instanceof Error ? error.message : '创建邀请码失败');
                       } finally {
@@ -462,7 +456,7 @@ export function PantryHouseholdSheet({
                               setSheetError('');
                               try {
                                 await onTransferOwner(currentHousehold.id, member.userId);
-                                setSheetNotice(`已将家庭所有者转交给成员 #${member.userId}。`);
+                                showToast(`已将家庭所有者转交给成员 #${member.userId}`);
                               } catch (error) {
                                 setSheetError(
                                   error instanceof Error ? error.message : '转移所有者失败',
@@ -497,7 +491,7 @@ export function PantryHouseholdSheet({
                     setSheetError('');
                     try {
                       await onLeaveHousehold(currentHousehold.id);
-                      setSheetNotice(`已退出「${currentHousehold.name}」。`);
+                      showToast(`已退出「${currentHousehold.name}」`);
                     } catch (error) {
                       setSheetError(error instanceof Error ? error.message : '退出家庭失败');
                     } finally {
@@ -525,7 +519,7 @@ export function PantryHouseholdSheet({
                     setSheetError('');
                     try {
                       await onDissolveHousehold(currentHousehold.id);
-                      setSheetNotice(`已解散「${currentHousehold.name}」。`);
+                      showToast(`已解散「${currentHousehold.name}」`);
                     } catch (error) {
                       setSheetError(error instanceof Error ? error.message : '解散家庭失败');
                     } finally {

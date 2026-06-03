@@ -33,6 +33,18 @@ export function BottomSheet({
   const pointerIdRef = useRef<number | null>(null);
   const closeThreshold = 84;
 
+  const shouldIgnoreDragTarget = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    return Boolean(
+      target.closest(
+        'button, input, textarea, select, option, a, label, [role="button"], [contenteditable="true"], [data-sheet-drag-ignore="true"]',
+      ),
+    );
+  };
+
   useEffect(() => {
     if (!open) {
       setDragOffset(0);
@@ -52,6 +64,10 @@ export function BottomSheet({
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!open || closeDisabled) {
+      return;
+    }
+
+    if (shouldIgnoreDragTarget(event.target)) {
       return;
     }
 
@@ -146,15 +162,15 @@ export function BottomSheet({
           touchAction: 'pan-y',
           transform: open ? `translateY(${dragOffset}px)` : undefined,
         }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
       >
         {showHandle ? (
           <div
             className="mb-4 flex cursor-grab justify-center active:cursor-grabbing"
             style={{ touchAction: dragging ? 'none' : 'pan-y' }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerEnd}
-            onPointerCancel={handlePointerEnd}
           >
             <div className="h-1.5 w-11 rounded-full bg-muted-foreground/25" />
           </div>

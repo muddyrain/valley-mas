@@ -1,6 +1,7 @@
 import { Sparkles } from 'lucide-react';
 import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { AppFeedbackToast } from '@/components/AppFeedbackToast';
 import { AppReminderToast } from '@/components/AppReminderToast';
 import { AppShell } from '@/components/AppShell';
 import { AiActionsPage, AiHistoryPage, AiPage, AiWeeklyReviewsPage } from '@/pages/AiPage';
@@ -92,6 +93,7 @@ function AppContent() {
           <Route path="*" element={<Navigate to="/today" replace />} />
         </Routes>
       </AppShell>
+      <AppFeedbackToast />
       <AppReminderToast />
     </>
   );

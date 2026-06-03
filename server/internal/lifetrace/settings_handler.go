@@ -13,6 +13,7 @@ import (
 )
 
 type updateSettingsRequest struct {
+	ActivePantryHouseholdID string   `json:"activePantryHouseholdId"`
 	City                    string   `json:"city"`
 	WorkStart               string   `json:"workStart"`
 	WorkEnd                 string   `json:"workEnd"`
@@ -157,9 +158,6 @@ func normalizeHabits(habits []string) model.StringList {
 		seen[habit] = true
 		result = append(result, habit)
 	}
-	if len(result) == 0 {
-		return model.StringList{"喝水", "休息", "运动", "护肤"}
-	}
 	return result
 }
 
@@ -188,6 +186,10 @@ func normalizePantryReminderRules(rules []string) model.StringList {
 }
 
 func applySettingsRequest(settings *model.LifeTraceSettings, req updateSettingsRequest) {
+	settings.ActivePantryHouseholdID = normalizePreferredPantryHouseholdID(
+		settings.UserID,
+		req.ActivePantryHouseholdID,
+	)
 	settings.City = normalizeText(req.City, "上海")
 	settings.WorkStart = normalizeTimeText(req.WorkStart, "09:30")
 	settings.WorkEnd = normalizeTimeText(req.WorkEnd, "18:30")

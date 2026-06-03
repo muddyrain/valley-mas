@@ -193,6 +193,7 @@ func (item *LifeTracePantryItem) BeforeCreate(tx *gorm.DB) error {
 type LifeTraceSettings struct {
 	ID                      Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID                  Int64String    `gorm:"column:user_id;uniqueIndex;not null" json:"userId"`
+	ActivePantryHouseholdID Int64String    `gorm:"column:active_pantry_household_id;index" json:"activePantryHouseholdId,omitempty"`
 	City                    string         `gorm:"size:80;not null;default:'上海'" json:"city"`
 	WorkStart               string         `gorm:"size:20;not null;default:'09:30'" json:"workStart"`
 	WorkEnd                 string         `gorm:"size:20;not null;default:'18:30'" json:"workEnd"`

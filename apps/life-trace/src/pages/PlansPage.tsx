@@ -16,6 +16,7 @@ import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { EmptyState } from '@/components/EmptyState';
+import { LoadErrorState } from '@/components/LoadErrorState';
 import { PlanDetailDrawer } from '@/components/PlanDetailDrawer';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
@@ -174,6 +175,7 @@ export function PlansPage() {
   const plansSyncIssue = plansError && isTransientPlansSyncIssue(plansError) ? plansError : '';
   const showPlansErrorCard = Boolean(plansError) && !plansSyncIssue;
   const showPlansSyncFallback = Boolean(plansSyncIssue) && !plansLoading && plans.length === 0;
+  const showPlansErrorFallback = showPlansErrorCard && !plansLoading && plans.length === 0;
 
   useEffect(() => {
     if (planId && !plansLoading && plans.length > 0 && !selectedPlan) {
@@ -509,7 +511,7 @@ export function PlansPage() {
         </Card>
       ) : null}
 
-      {showPlansErrorCard ? (
+      {showPlansErrorCard && !showPlansErrorFallback ? (
         <Card className="border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
           {plansError}
         </Card>
@@ -546,8 +548,19 @@ export function PlansPage() {
               </Button>
             }
           />
+        ) : showPlansErrorFallback ? (
+          <LoadErrorState
+            title="计划列表加载失败"
+            description="这次计划没有顺利从云端同步下来，重新加载后会再拉一次当前筛选下的计划列表。"
+            error={plansError}
+            retrying={plansLoading}
+            onRetry={() => void loadPlans(listOptions)}
+          />
         ) : null}
-        {!plansLoading && planGroups.length === 0 && !showPlansSyncFallback ? (
+        {!plansLoading &&
+        planGroups.length === 0 &&
+        !showPlansSyncFallback &&
+        !showPlansErrorFallback ? (
           <EmptyState
             title={activeFilter === 'all' ? '还没有计划' : '暂无匹配计划'}
             description={activeFilterConfig.emptyText}

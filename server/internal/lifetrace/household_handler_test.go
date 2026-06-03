@@ -67,6 +67,61 @@ func TestListHouseholdsCreatesPersonalHouseholdAndAllowsCreateSharedHousehold(t 
 	}
 }
 
+func TestListHouseholdsUsesUserPreferredActiveHousehold(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+
+	sharedHousehold := model.Household{
+		ID:          301,
+		Name:        "开心家庭",
+		Kind:        householdKindShared,
+		OwnerUserID: 101,
+		Status:      householdStatusActive,
+	}
+	sharedMember := model.HouseholdMember{
+		HouseholdID: 301,
+		UserID:      101,
+		Role:        householdRoleOwner,
+		Status:      householdMemberStatusActive,
+	}
+	settings := model.LifeTraceSettings{
+		UserID:                  101,
+		ActivePantryHouseholdID: 301,
+		City:                    "上海",
+		WorkStart:               "09:30",
+		WorkEnd:                 "18:30",
+		CommuteMethod:           "开车",
+		DailyBriefTime:          "08:10",
+		WorkdayMode:             "legal",
+		Workdays:                model.StringList{"1", "2", "3", "4", "5"},
+		HolidaySync:             true,
+		PlanReminders:           true,
+		WeatherAlerts:           true,
+		AIPersonalization:       true,
+		Habits:                  model.StringList{"喝水"},
+		PantryReminderEnabled:   true,
+		PantryReminderRules:     model.StringList{"7d", "3d", "same-day", "expired"},
+		PantryReminderTime:      "09:00",
+	}
+	if err := database.GetDB().Create(&sharedHousehold).Error; err != nil {
+		t.Fatalf("create household failed: %v", err)
+	}
+	if err := database.GetDB().Create(&sharedMember).Error; err != nil {
+		t.Fatalf("create household member failed: %v", err)
+	}
+	if err := database.GetDB().Create(&settings).Error; err != nil {
+		t.Fatalf("create settings failed: %v", err)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/households", nil)
+	listResp := httptest.NewRecorder()
+	router.ServeHTTP(listResp, listReq)
+
+	data := decodeTracePayload(t, listResp)["data"].(map[string]interface{})
+	if data["currentHouseholdId"] != "301" {
+		t.Fatalf("expected current household id to use user preferred household, got %+v", data)
+	}
+}
+
 func TestHouseholdInviteJoinLeaveAndDissolveFlow(t *testing.T) {
 	router101 := setupTraceTestRouter(t, 101)
 
