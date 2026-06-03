@@ -2,6 +2,7 @@ import {
   Bell,
   BriefcaseBusiness,
   CalendarCheck,
+  Camera,
   Car,
   CheckCircle2,
   Clock,
@@ -24,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { ProfileAvatarSheet } from '@/components/ProfileAvatarSheet';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -283,6 +285,9 @@ function SyncStatus({
 
 export function ProfilePage() {
   const pageRef = useRef<HTMLDivElement>(null);
+  const saveMessageTimerRef = useRef<number | null>(null);
+  const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
   const [notificationTesting, setNotificationTesting] = useState(false);
   const [serverPushTesting, setServerPushTesting] = useState(false);
   const [notificationTestMessage, setNotificationTestMessage] = useState('');
@@ -295,6 +300,7 @@ export function ProfilePage() {
   const updatePantryPreferences = useLifeTraceStore((state) => state.updatePantryPreferences);
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
+  const updateUser = useAuthStore((state) => state.updateUser);
   const signOut = useAuthStore((state) => state.signOut);
   const { canInstall, installed, serviceWorkerReady, promptInstall } = usePwaStatus();
   const notification = useNotificationPermission(token);
@@ -409,6 +415,17 @@ export function ProfilePage() {
     updateSettings({ [key]: value });
   };
 
+  const pushSaveMessage = (message: string) => {
+    setSaveMessage(message);
+    if (saveMessageTimerRef.current) {
+      window.clearTimeout(saveMessageTimerRef.current);
+    }
+    saveMessageTimerRef.current = window.setTimeout(() => {
+      setSaveMessage('');
+      saveMessageTimerRef.current = null;
+    }, 2200);
+  };
+
   const toggleHabit = (habit: string) => {
     const nextHabits = settings.habits.includes(habit)
       ? settings.habits.filter((item) => item !== habit)
@@ -466,15 +483,19 @@ export function ProfilePage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="relative">
+            <button
+              type="button"
+              className="group relative shrink-0 text-left"
+              onClick={() => setAvatarSheetOpen(true)}
+            >
               {user?.avatar ? (
                 <img
                   src={user.avatar}
                   alt={profileName}
-                  className="size-16 rounded-[1.4rem] border border-foreground/10 object-cover shadow-[0_16px_40px_rgba(0,0,0,0.24)]"
+                  className="size-16 rounded-[1.4rem] border border-foreground/10 object-cover shadow-[0_16px_40px_rgba(0,0,0,0.24)] transition duration-300 group-hover:scale-[1.03]"
                 />
               ) : (
-                <div className="grid size-16 place-items-center rounded-[1.4rem] border border-life-ai/20 bg-life-ai text-2xl font-bold text-background shadow-[0_16px_40px_rgba(6,182,212,0.18)]">
+                <div className="grid size-16 place-items-center rounded-[1.4rem] border border-life-ai/20 bg-life-ai text-2xl font-bold text-background shadow-[0_16px_40px_rgba(6,182,212,0.18)] transition duration-300 group-hover:scale-[1.03]">
                   {profileName.slice(0, 1).toUpperCase()}
                 </div>
               )}
@@ -484,9 +505,27 @@ export function ProfilePage() {
               >
                 <ShieldCheck className="size-3.5" />
               </span>
-            </div>
+              <span className="absolute -top-1 -left-1 grid size-6 place-items-center rounded-full border border-background bg-background/90 text-life-ai shadow-lg backdrop-blur">
+                <Camera className="size-3.5" />
+              </span>
+            </button>
             <div className="min-w-0 flex-1">
-              <h2 className="truncate text-xl font-semibold">{profileName}</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="min-w-0 truncate text-left text-xl font-semibold transition hover:text-life-ai"
+                  onClick={() => setAvatarSheetOpen(true)}
+                >
+                  {profileName}
+                </button>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-full border border-life-ai/20 bg-life-ai/10 px-2.5 py-1 text-[11px] font-semibold text-life-ai transition hover:bg-life-ai/15"
+                  onClick={() => setAvatarSheetOpen(true)}
+                >
+                  编辑资料
+                </button>
+              </div>
               <p className="mt-1 truncate text-sm text-muted-foreground">
                 {settings.city} · {settings.commuteMethod}通勤 · {settings.dailyBriefTime} 简报
               </p>
@@ -1040,6 +1079,23 @@ export function ProfilePage() {
           </div>
         </Card>
       </section>
+
+      <ProfileAvatarSheet
+        open={avatarSheetOpen}
+        token={token}
+        userName={profileName}
+        avatarUrl={user?.avatar}
+        onOpenChange={setAvatarSheetOpen}
+        onProfileUpdated={(profile) => {
+          updateUser(profile);
+        }}
+        onMessage={pushSaveMessage}
+      />
+      {saveMessage ? (
+        <div className="fixed right-4 bottom-[calc(7rem+env(safe-area-inset-bottom))] left-4 z-30 mx-auto max-w-[360px] rounded-2xl border border-life-trace/30 bg-card px-4 py-3 text-center text-sm font-medium text-life-trace shadow-2xl">
+          {saveMessage}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -19,6 +19,12 @@ type LoginResponse = {
   userInfo: LifeTraceUser;
 };
 
+export type AvatarHistoryItem = {
+  id: string;
+  avatarUrl: string;
+  createdAt: string;
+};
+
 type RequestOptions = {
   token?: string | null;
 };
@@ -43,7 +49,8 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
 
-  if (init.body && !headers.has('Content-Type')) {
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  if (init.body && !headers.has('Content-Type') && !isFormData) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -94,4 +101,50 @@ export function getCurrentUser(token: string) {
 
 export function logout(token: string | null) {
   return request<{ message: string }>('/logout', { method: 'POST' }, { token });
+}
+
+export function updateUserProfile(
+  token: string,
+  input: {
+    nickname?: string;
+    avatar?: string;
+    email?: string;
+    phone?: string;
+  },
+) {
+  return request<LifeTraceUser>(
+    '/user/profile',
+    {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    },
+    { token },
+  );
+}
+
+export function uploadUserAvatar(token: string, formData: FormData) {
+  return request<{ avatarUrl: string }>(
+    '/user/avatar',
+    {
+      method: 'POST',
+      body: formData,
+    },
+    { token },
+  );
+}
+
+export function getUserAvatarHistory(token: string, pageSize = 12) {
+  return request<AvatarHistoryItem[]>(`/user/avatar/history?pageSize=${pageSize}`, undefined, {
+    token,
+  });
+}
+
+export function useAvatarHistory(token: string, historyId: string) {
+  return request<{ avatarUrl: string }>(
+    `/user/avatar/history/${historyId}/use`,
+    {
+      method: 'POST',
+    },
+    { token },
+  );
 }

@@ -16,6 +16,9 @@ type AuthState = {
   status: AuthStatus;
   error: string;
   setError: (error: string) => void;
+  updateUser: (
+    updater: Partial<LifeTraceUser> | ((current: LifeTraceUser | null) => LifeTraceUser | null),
+  ) => void;
   signIn: (input: { email: string; password: string }) => Promise<void>;
   verifySession: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -29,6 +32,17 @@ export const useAuthStore = create<AuthState>()(
       status: 'idle',
       error: '',
       setError: (error) => set({ error }),
+      updateUser: (updater) =>
+        set((state) => {
+          const nextUser =
+            typeof updater === 'function'
+              ? updater(state.user)
+              : state.user
+                ? { ...state.user, ...updater }
+                : null;
+
+          return { user: nextUser };
+        }),
       signIn: async (input) => {
         set({ error: '' });
         try {
