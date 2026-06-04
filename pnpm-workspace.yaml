@@ -36,6 +36,5 @@ catalogs:
     axios: ^1.7.0
     clsx: ^2.1.1
     lucide-react: ^0.460.0
-    react-easy-crop: ^5.5.7
     react-router-dom: ^7.1.0
     zustand: ^5.0.0

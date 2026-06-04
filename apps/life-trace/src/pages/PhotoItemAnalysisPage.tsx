@@ -1,5 +1,3 @@
-import Cropper, { type Area } from 'react-easy-crop';
-import 'react-easy-crop/react-easy-crop.css';
 import {
   ArrowLeft,
   Camera,
@@ -11,14 +9,18 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ChangeEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listHouseholds } from '@/api/household';
-import {
-  analyzePantryPhoto,
-  type PantryPhotoAnalysisResponse,
-  type PantryPhotoCropBox,
-} from '@/api/pantry';
+import { analyzePantryPhoto, type PantryPhotoAnalysisResponse } from '@/api/pantry';
 import { uploadLifeTraceImage } from '@/api/upload';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
@@ -27,11 +29,11 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { buildDefaultPantryReminder } from '@/lib/pantry';
+import { buildPhotoItemPantryInput, type PhotoItemDraftForm } from '@/lib/photoItemAnalysis';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { HouseholdSummary, NewPantryItemInput, PantryCategory, PantryLocation } from '@/types';
+import type { HouseholdSummary, PantryCategory, PantryLocation } from '@/types';
 
 type CaptureState =
   | 'idle'
@@ -44,18 +46,7 @@ type CaptureState =
   | 'done'
   | 'error';
 
-type DraftForm = {
-  name: string;
-  category: PantryCategory;
-  quantity: string;
-  unit: string;
-  location: PantryLocation;
-  expiresAt: string;
-  openedAt: string;
-  note: string;
-  householdId: string;
-  reminderEnabled: boolean;
-};
+type DraftForm = PhotoItemDraftForm;
 
 const pantryCategories: PantryCategory[] = ['食品', '日用品', '药品', '宠物', '其他'];
 const pantryLocations: PantryLocation[] = [
@@ -84,37 +75,6 @@ const initialForm: DraftForm = {
   reminderEnabled: true,
 };
 
-function getTodayISODate() {
-  const now = new Date();
-  const month = `${now.getMonth() + 1}`.padStart(2, '0');
-  const day = `${now.getDate()}`.padStart(2, '0');
-  return `${now.getFullYear()}-${month}-${day}`;
-}
-
-function normalizeCropBox(box?: PantryPhotoCropBox): PantryPhotoCropBox {
-  if (!box || box.width <= 0 || box.height <= 0) {
-    return { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
-  }
-  const width = Math.min(1, Math.max(0.1, box.width));
-  const height = Math.min(1, Math.max(0.1, box.height));
-  return {
-    x: Math.min(1 - width, Math.max(0, box.x)),
-    y: Math.min(1 - height, Math.max(0, box.y)),
-    width,
-    height,
-  };
-}
-
-function cropBoxToInitialPercentages(box?: PantryPhotoCropBox): Area {
-  const normalized = normalizeCropBox(box);
-  return {
-    x: normalized.x * 100,
-    y: normalized.y * 100,
-    width: normalized.width * 100,
-    height: normalized.height * 100,
-  };
-}
-
 function buildAnalysisNote(result: PantryPhotoAnalysisResponse) {
   const parts = [
     result.summary,
@@ -123,53 +83,6 @@ function buildAnalysisNote(result: PantryPhotoAnalysisResponse) {
     result.tags?.length ? `标签：${result.tags.join('、')}` : '',
   ].filter(Boolean);
   return parts.join('\n');
-}
-
-function createImage(src: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.addEventListener('load', () => resolve(image));
-    image.addEventListener('error', () => reject(new Error('图片读取失败')));
-    image.src = src;
-  });
-}
-
-async function createCroppedImageFile(imageSrc: string, cropPixels: Area) {
-  const image = await createImage(imageSrc);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(cropPixels.width));
-  canvas.height = Math.max(1, Math.round(cropPixels.height));
-  const context = canvas.getContext('2d');
-  if (!context) {
-    throw new Error('当前浏览器不支持图片裁剪');
-  }
-  context.drawImage(
-    image,
-    cropPixels.x,
-    cropPixels.y,
-    cropPixels.width,
-    cropPixels.height,
-    0,
-    0,
-    canvas.width,
-    canvas.height,
-  );
-
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (value) => {
-        if (!value) {
-          reject(new Error('裁剪图片生成失败'));
-          return;
-        }
-        resolve(value);
-      },
-      'image/jpeg',
-      0.88,
-    );
-  });
-
-  return new File([blob], `pantry-item-${Date.now()}.jpg`, { type: 'image/jpeg' });
 }
 
 function getFallbackFileName(file: File) {
@@ -187,6 +100,62 @@ function resolveSelectableHouseholdId(
   return households.some((household) => household.kind === 'shared' && household.id === normalized)
     ? normalized
     : '';
+}
+
+type ClearableDateFieldProps = {
+  id: string;
+  label: string;
+  value: string;
+  disabled: boolean;
+  caption?: ReactNode;
+  onChange: (value: string) => void;
+  onClear?: () => void;
+};
+
+function ClearableDateField({
+  id,
+  label,
+  value,
+  disabled,
+  caption,
+  onChange,
+  onClear,
+}: ClearableDateFieldProps) {
+  return (
+    <div className="block min-w-0 space-y-2">
+      <label htmlFor={id} className="flex min-w-0 items-center justify-between gap-3">
+        <span className="text-sm font-medium">{label}</span>
+        {caption}
+      </label>
+      <div className="relative min-w-0">
+        <input
+          id={id}
+          type="date"
+          value={value}
+          disabled={disabled}
+          className="h-11 min-w-0 w-full appearance-none rounded-2xl border border-border bg-secondary px-4 pr-11 text-sm text-foreground outline-none transition focus:border-ring disabled:opacity-60"
+          onChange={(event) => onChange(event.target.value)}
+        />
+        {value ? (
+          <button
+            type="button"
+            aria-label={`清空${label}`}
+            disabled={disabled}
+            className="absolute top-1/2 right-2 grid size-7 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:bg-background/70 hover:text-foreground disabled:opacity-50"
+            onClick={() => {
+              if (onClear) {
+                onClear();
+                return;
+              }
+              onChange('');
+            }}
+          >
+            <X className="size-4" />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export function PhotoItemAnalysisPage() {
@@ -208,12 +177,8 @@ export function PhotoItemAnalysisPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const [uploadedImageUrl, setUploadedImageUrl] = useState('');
-  const [croppedImageUrl, setCroppedImageUrl] = useState('');
   const [analysis, setAnalysis] = useState<PantryPhotoAnalysisResponse | null>(null);
   const [form, setForm] = useState<DraftForm>(initialForm);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [households, setHouseholds] = useState<HouseholdSummary[]>([]);
   const [householdsLoading, setHouseholdsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -337,12 +302,8 @@ export function PhotoItemAnalysisPage() {
     setImageFile(file);
     setImagePreviewUrl(URL.createObjectURL(file));
     setUploadedImageUrl('');
-    setCroppedImageUrl('');
     setAnalysis(null);
     setReviewSheetOpen(false);
-    setCrop({ x: 0, y: 0 });
-    setZoom(1);
-    setCroppedAreaPixels(null);
     setError('');
     setState('captured');
   };
@@ -446,16 +407,13 @@ export function PhotoItemAnalysisPage() {
         quantity: String(result.quantity || 1),
         unit: result.unit || current.unit,
         location: result.storageLocation || current.location,
-        expiresAt: result.expiresAt || '',
-        openedAt: result.purchaseDate || getTodayISODate(),
+        expiresAt: '',
+        openedAt: '',
         note: buildAnalysisNote(result),
         householdId:
           resolveSelectableHouseholdId(result.householdId, households) || current.householdId,
-        reminderEnabled: Boolean(result.expiresAt) && pantryPreferences.defaultReminderEnabled,
+        reminderEnabled: false,
       }));
-      setCrop({ x: 0, y: 0 });
-      setZoom(1);
-      setCroppedAreaPixels(null);
       setState('reviewing');
       setReviewSheetOpen(true);
       showToast('商品识别完成，请确认后入库。', 'success');
@@ -476,34 +434,11 @@ export function PhotoItemAnalysisPage() {
     setState('saving');
     setError('');
     try {
-      let thumbnailUrl = croppedImageUrl;
-      if (token && imagePreviewUrl && croppedAreaPixels) {
-        const croppedFile = await createCroppedImageFile(imagePreviewUrl, croppedAreaPixels);
-        const upload = await uploadLifeTraceImage(token, croppedFile);
-        thumbnailUrl = upload.url;
-        setCroppedImageUrl(upload.url);
-      }
-
-      const expiresAt = form.expiresAt.trim();
-      const openedAt = form.openedAt.trim();
-      const input: NewPantryItemInput = {
-        householdId: form.householdId || undefined,
-        name: form.name.trim(),
-        category: form.category,
-        quantity: Number.parseInt(form.quantity, 10) || 1,
-        unit: form.unit.trim() || '件',
-        location: form.location,
-        expiresAt: expiresAt || undefined,
-        openedAt: openedAt || undefined,
-        note: form.note.trim(),
-        imageUrl: uploadedImageUrl || undefined,
-        thumbnailUrl: thumbnailUrl || uploadedImageUrl || undefined,
-        status: 'normal',
-        reminder: buildDefaultPantryReminder(
-          pantryPreferences,
-          Boolean(expiresAt) && form.reminderEnabled,
-        ),
-      };
+      const input = buildPhotoItemPantryInput({
+        form,
+        pantryPreferences,
+        uploadedImageUrl,
+      });
 
       const item = await addPantryItem(input, form.householdId || undefined);
       if (!item) {
@@ -533,7 +468,6 @@ export function PhotoItemAnalysisPage() {
     setImageFile(null);
     setImagePreviewUrl('');
     setUploadedImageUrl('');
-    setCroppedImageUrl('');
     setAnalysis(null);
     setReviewSheetOpen(false);
     setActivePicker(null);
@@ -542,9 +476,6 @@ export function PhotoItemAnalysisPage() {
       householdId: current.householdId,
       reminderEnabled: pantryPreferences.defaultReminderEnabled,
     }));
-    setCrop({ x: 0, y: 0 });
-    setZoom(1);
-    setCroppedAreaPixels(null);
     setError('');
   };
 
@@ -777,39 +708,6 @@ export function PhotoItemAnalysisPage() {
         </section>
       ) : null}
 
-      {analysis && imagePreviewUrl ? (
-        <section>
-          <SectionHeader title="裁剪商品封面" meta="可拖动缩放" />
-          <Card className="space-y-4 p-4">
-            <div className="relative h-72 overflow-hidden rounded-[1.25rem] border border-border bg-black">
-              <Cropper
-                image={imagePreviewUrl}
-                crop={crop}
-                zoom={zoom}
-                aspect={1}
-                showGrid={false}
-                initialCroppedAreaPercentages={cropBoxToInitialPercentages(analysis.cropBox)}
-                onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onCropComplete={(_, areaPixels) => setCroppedAreaPixels(areaPixels)}
-              />
-            </div>
-            <label className="block space-y-2 text-sm">
-              <span className="text-muted-foreground">缩放</span>
-              <input
-                type="range"
-                min="1"
-                max="3"
-                step="0.05"
-                value={zoom}
-                className="w-full accent-life-ai"
-                onChange={(event) => setZoom(Number(event.target.value))}
-              />
-            </label>
-          </Card>
-        </section>
-      ) : null}
-
       {analysis ? (
         <section>
           <SectionHeader title="确认入库信息" meta={selectedHouseholdName} />
@@ -867,6 +765,29 @@ export function PhotoItemAnalysisPage() {
             <X className="size-5" />
           </Button>
         </div>
+
+        {imagePreviewUrl ? (
+          <div className="sticky top-0 z-10 mb-4 rounded-[1.25rem] border border-border bg-card/95 p-3 shadow-lg shadow-background/35 backdrop-blur">
+            <div className="flex items-center gap-3">
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-background">
+                <img
+                  src={imagePreviewUrl}
+                  alt={form.name || analysis?.name || '商品图片'}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">当前编辑图片</p>
+                <p className="mt-1 truncate text-sm font-semibold">
+                  {form.name || analysis?.name || '待确认商品'}
+                </p>
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                  {imageFile ? getFallbackFileName(imageFile) : '商品图片'}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <form
           className="space-y-4"
@@ -946,58 +867,44 @@ export function PhotoItemAnalysisPage() {
             </label>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 max-[520px]:grid-cols-1">
-            <label className="block space-y-2">
-              <span className="text-sm font-medium">购买</span>
-              <input
-                type="date"
-                value={form.openedAt}
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, openedAt: event.target.value }))
-                }
-              />
-            </label>
-            <label className="block space-y-2">
-              <span className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium">保质期</span>
-                {form.expiresAt ? (
-                  <button
-                    type="button"
-                    className="text-xs font-semibold text-life-ai"
-                    disabled={state === 'saving'}
-                    onClick={() =>
-                      setForm((current) => ({
-                        ...current,
-                        expiresAt: '',
-                        reminderEnabled: false,
-                      }))
-                    }
-                  >
-                    无保质期
-                  </button>
+          <div className="grid min-w-0 grid-cols-1 gap-3">
+            <ClearableDateField
+              id="photo-item-purchase-date"
+              label="购买"
+              value={form.openedAt}
+              disabled={state === 'saving'}
+              caption={<span className="text-xs text-muted-foreground">可不填</span>}
+              onChange={(value) => setForm((current) => ({ ...current, openedAt: value }))}
+            />
+            <ClearableDateField
+              id="photo-item-expiry-date"
+              label="保质期"
+              value={form.expiresAt}
+              disabled={state === 'saving'}
+              caption={
+                form.expiresAt ? (
+                  <span className="text-xs font-semibold text-life-ai">可清空</span>
                 ) : (
                   <span className="text-xs text-muted-foreground">可不填</span>
-                )}
-              </span>
-              <input
-                type="date"
-                value={form.expiresAt}
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
-                onChange={(event) =>
-                  setForm((current) => {
-                    const nextExpiresAt = event.target.value;
-                    return {
-                      ...current,
-                      expiresAt: nextExpiresAt,
-                      reminderEnabled: nextExpiresAt
-                        ? current.reminderEnabled || pantryPreferences.defaultReminderEnabled
-                        : false,
-                    };
-                  })
-                }
-              />
-            </label>
+                )
+              }
+              onChange={(value) =>
+                setForm((current) => ({
+                  ...current,
+                  expiresAt: value,
+                  reminderEnabled: value
+                    ? current.reminderEnabled || pantryPreferences.defaultReminderEnabled
+                    : false,
+                }))
+              }
+              onClear={() =>
+                setForm((current) => ({
+                  ...current,
+                  expiresAt: '',
+                  reminderEnabled: false,
+                }))
+              }
+            />
           </div>
 
           <label className="block space-y-2">

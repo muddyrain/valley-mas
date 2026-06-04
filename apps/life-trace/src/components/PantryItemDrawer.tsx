@@ -7,11 +7,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { OptionPickerSheet } from '@/components/OptionPickerSheet';
 import { Button } from '@/components/ui/button';
 import { getLifeTraceErrorMessage } from '@/lib/error';
-import {
-  formatPantryReminderSummary,
-  getPantryCoverUrl,
-  getPantryPersistedStatus,
-} from '@/lib/pantry';
+import { formatPantryReminderSummary, getPantryPersistedStatus } from '@/lib/pantry';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -291,7 +287,7 @@ export function PantryItemDrawer({
     void submitPayload(payload);
   }, [form.thumbnailUrl, saveQueuedAfterThumbnail, submitting, submitPayload, thumbnailGenerating]);
 
-  const effectiveCover = getPantryCoverUrl(form as PantryItem);
+  const aiThumbnailPreview = form.thumbnailUrl?.trim();
 
   return (
     <>
@@ -316,7 +312,7 @@ export function PantryItemDrawer({
           </Button>
         </div>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="min-w-0 space-y-4" onSubmit={handleSubmit}>
           <label className="block space-y-2">
             <span className="text-sm font-medium">
               名称 <span className="text-life-alert">*</span>
@@ -337,14 +333,14 @@ export function PantryItemDrawer({
             {errors.name ? <p className="text-xs text-destructive">{errors.name}</p> : null}
           </label>
 
-          <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-            <div className="block space-y-2">
+          <div className="grid min-w-0 grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+            <div className="block min-w-0 space-y-2">
               <span className="text-sm font-medium">分类</span>
               <button
                 type="button"
                 disabled={submitting}
                 onClick={() => setActivePicker('category')}
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+                className="h-11 min-w-0 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
               >
                 <span className="flex items-center justify-between gap-3">
                   <span>{form.category}</span>
@@ -352,13 +348,13 @@ export function PantryItemDrawer({
                 </span>
               </button>
             </div>
-            <div className="block space-y-2">
+            <div className="block min-w-0 space-y-2">
               <span className="text-sm font-medium">位置</span>
               <button
                 type="button"
                 disabled={submitting}
                 onClick={() => setActivePicker('location')}
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+                className="h-11 min-w-0 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
               >
                 <span className="flex items-center justify-between gap-3">
                   <span>{form.location}</span>
@@ -368,8 +364,8 @@ export function PantryItemDrawer({
             </div>
           </div>
 
-          <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-3 max-[360px]:grid-cols-1">
-            <label className="block space-y-2">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_7.5rem] gap-3 max-[360px]:grid-cols-1">
+            <label className="block min-w-0 space-y-2">
               <span className="text-sm font-medium">
                 数量 <span className="text-life-alert">*</span>
               </span>
@@ -384,7 +380,7 @@ export function PantryItemDrawer({
                 }}
                 aria-invalid={Boolean(errors.quantity)}
                 className={cn(
-                  'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
+                  'h-11 min-w-0 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
                   errors.quantity ? 'border-destructive' : 'border-border',
                 )}
               />
@@ -392,34 +388,34 @@ export function PantryItemDrawer({
                 <p className="text-xs text-destructive">{errors.quantity}</p>
               ) : null}
             </label>
-            <label className="block space-y-2">
+            <label className="block min-w-0 space-y-2">
               <span className="text-sm font-medium">单位</span>
               <input
                 value={form.unit}
                 onChange={(event) => updateField('unit', event.target.value)}
                 placeholder="件"
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+                className="h-11 min-w-0 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
               />
             </label>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 max-[520px]:grid-cols-1">
-            <label className="block space-y-2">
+          <div className="grid min-w-0 grid-cols-2 gap-3 max-[520px]:grid-cols-1">
+            <label className="block min-w-0 space-y-2">
               <span className="text-sm font-medium">开封</span>
               <input
                 type="date"
                 value={form.openedAt || ''}
                 onChange={(event) => updateField('openedAt', event.target.value)}
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+                className="h-11 min-w-0 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
               />
             </label>
-            <label className="block space-y-2">
+            <label className="block min-w-0 space-y-2">
               <span className="text-sm font-medium">过期日期</span>
               <input
                 type="date"
                 value={form.expiresAt || ''}
                 onChange={(event) => updateField('expiresAt', event.target.value)}
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+                className="h-11 min-w-0 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
               />
             </label>
           </div>
@@ -473,10 +469,10 @@ export function PantryItemDrawer({
                 用实拍图做封面
               </Button>
             </div>
-            {effectiveCover ? (
+            {aiThumbnailPreview ? (
               <div className="overflow-hidden rounded-[1.1rem] border border-border bg-card">
                 <img
-                  src={effectiveCover}
+                  src={aiThumbnailPreview}
                   alt={form.name || '库存图片预览'}
                   className="aspect-video w-full object-cover"
                 />

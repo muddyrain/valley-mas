@@ -1,5 +1,11 @@
 import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import {
+  BOTTOM_SHEET_CLOSE_THRESHOLD,
+  getBottomSheetDragOffset,
+  shouldCloseBottomSheetByDrag,
+  shouldStartBottomSheetDrag,
+} from '@/lib/bottomSheetGesture';
 import { cn } from '@/lib/utils';
 
 type BottomSheetProps = {
@@ -29,9 +35,8 @@ export function BottomSheet({
   const [dragOffset, setDragOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
   const startYRef = useRef(0);
-  const startScrollTopRef = useRef(0);
+  const dragStartYRef = useRef(0);
   const pointerIdRef = useRef<number | null>(null);
-  const closeThreshold = 84;
 
   const shouldIgnoreDragTarget = (target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) {
@@ -50,7 +55,7 @@ export function BottomSheet({
       setDragOffset(0);
       setDragging(false);
       startYRef.current = 0;
-      startScrollTopRef.current = 0;
+      dragStartYRef.current = 0;
       pointerIdRef.current = null;
     }
   }, [open]);
@@ -63,17 +68,19 @@ export function BottomSheet({
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (!open || closeDisabled) {
-      return;
-    }
-
-    if (shouldIgnoreDragTarget(event.target)) {
+    if (
+      !shouldStartBottomSheetDrag({
+        open,
+        closeDisabled,
+        targetIsInteractive: shouldIgnoreDragTarget(event.target),
+      })
+    ) {
       return;
     }
 
     pointerIdRef.current = event.pointerId;
     startYRef.current = event.clientY;
-    startScrollTopRef.current = sheetRef.current?.scrollTop ?? 0;
+    dragStartYRef.current = event.clientY;
     setDragging(false);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -83,21 +90,28 @@ export function BottomSheet({
       return;
     }
 
-    const nextOffset = Math.max(0, event.clientY - startYRef.current);
     const sheet = sheetRef.current;
-    const atTop = (sheet?.scrollTop ?? 0) <= 0 && startScrollTopRef.current <= 0;
+    const currentScrollTop = sheet?.scrollTop ?? 0;
 
-    if (!dragging) {
-      if (!atTop || nextOffset < 8) {
-        return;
-      }
-      setDragging(true);
-    }
-
-    if (!atTop) {
+    if (!dragging && currentScrollTop > 0) {
+      dragStartYRef.current = event.clientY;
       return;
     }
 
+    const nextOffset = getBottomSheetDragOffset({
+      startY: startYRef.current,
+      currentY: event.clientY,
+      currentScrollTop,
+      dragging,
+      dragStartY: dragStartYRef.current,
+    });
+    if (nextOffset === null) {
+      return;
+    }
+
+    if (!dragging) {
+      setDragging(true);
+    }
     if (event.cancelable) {
       event.preventDefault();
     }
@@ -115,9 +129,15 @@ export function BottomSheet({
 
     pointerIdRef.current = null;
 
-    const finalOffset = Math.max(0, event.clientY - startYRef.current);
+    const finalOffset = Math.max(0, event.clientY - dragStartYRef.current);
     setDragging(false);
-    if (finalOffset >= closeThreshold && !closeDisabled) {
+    if (
+      shouldCloseBottomSheetByDrag({
+        finalOffset,
+        closeDisabled,
+        closeThreshold: BOTTOM_SHEET_CLOSE_THRESHOLD,
+      })
+    ) {
       setDragOffset(0);
       onOpenChange(false);
       return;
@@ -151,7 +171,7 @@ export function BottomSheet({
         role="dialog"
         aria-modal="true"
         className={cn(
-          'safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-0.75rem)] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl max-[360px]:p-4',
+          'safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-0.75rem)] w-full max-w-[430px] overflow-x-hidden overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl max-[360px]:p-4',
           dragging ? 'transition-none' : 'transition duration-300',
           open
             ? 'visible translate-y-0 opacity-100'
