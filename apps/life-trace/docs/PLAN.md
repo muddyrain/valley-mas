@@ -520,6 +520,8 @@ POST /api/v1/life-trace/ai/pantry-photo-analysis
 - 已提供 `manifest.webmanifest`。
 - 已生成 192px / 512px 应用图标。
 - 已注册 service worker，并缓存应用壳、manifest 和图标；manifest 与图标采用网络优先刷新，降低应用名称或图标变更后继续使用旧缓存的概率。
+- service worker 导航请求遇到托管平台 404 时会回退到应用壳，避免用户在 `/today`、`/profile` 等子路由点击“立即更新”后看到 `404: NOT_FOUND`。
+- Vercel 部署配置已补 SPA rewrite，直接打开或分享子路由时统一返回 `index.html`。
 - 已在全局应用壳提供安装和新版本提示；支持一键安装的浏览器可直接安装，不支持的 iPhone/Safari 仍提示通过系统分享菜单添加到主屏幕。
 - 我的页提供 PWA 控制台，展示安装状态、离线缓存状态、更新状态、分享能力，并提供安装、检查更新、立即更新和分享应用入口。
 - 应用分享优先使用系统分享面板，失败时回退为复制应用链接。

@@ -1,5 +1,11 @@
-const CACHE_NAME = 'life-trace-shell-v4';
-const SHELL_ASSETS = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+const CACHE_NAME = 'life-trace-shell-v5';
+const APP_SHELL_URL = '/';
+const SHELL_ASSETS = [
+  APP_SHELL_URL,
+  '/manifest.webmanifest',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+];
 const NETWORK_FIRST_PATHS = new Set([
   '/',
   '/manifest.webmanifest',
@@ -22,6 +28,33 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+function isCacheableResponse(response) {
+  return response && response.status === 200 && response.type !== 'opaque';
+}
+
+async function cacheResponse(request, response) {
+  if (!isCacheableResponse(response)) {
+    return;
+  }
+
+  const cache = await caches.open(CACHE_NAME);
+  await cache.put(request, response.clone());
+}
+
+async function getAppShellResponse() {
+  try {
+    const response = await fetch(APP_SHELL_URL);
+    if (isCacheableResponse(response)) {
+      await cacheResponse(APP_SHELL_URL, response);
+      return response;
+    }
+  } catch {
+    // Network failures fall through to the cached shell below.
+  }
+
+  return caches.match(APP_SHELL_URL);
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') {
     return;
@@ -34,12 +67,15 @@ self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
+        .then(async (response) => {
+          if (!response || !response.ok) {
+            return (await getAppShellResponse()) || response;
+          }
+
+          await cacheResponse(APP_SHELL_URL, response);
           return response;
         })
-        .catch(() => caches.match('/')),
+        .catch(() => caches.match(APP_SHELL_URL)),
     );
     return;
   }
@@ -48,12 +84,11 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          if (!response || response.status !== 200 || response.type === 'opaque') {
+          if (!isCacheableResponse(response)) {
             return response;
           }
 
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          cacheResponse(event.request, response);
           return response;
         })
         .catch(() => caches.match(event.request)),
@@ -69,15 +104,14 @@ self.addEventListener('fetch', (event) => {
 
       return fetch(event.request)
         .then((response) => {
-          if (!response || response.status !== 200 || response.type === 'opaque') {
+          if (!isCacheableResponse(response)) {
             return response;
           }
 
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          cacheResponse(event.request, response);
           return response;
         })
-        .catch(() => caches.match('/'));
+        .catch(() => caches.match(APP_SHELL_URL));
     }),
   );
 });
