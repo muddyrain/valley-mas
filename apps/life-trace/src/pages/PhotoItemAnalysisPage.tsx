@@ -225,6 +225,7 @@ export function PhotoItemAnalysisPage() {
   const busy = state === 'uploading' || state === 'analyzing' || state === 'saving';
   const reviewReady = Boolean(analysis);
   const scannerStatusLabel = state === 'done' ? '已入库' : busy ? '处理中' : '待确认';
+  const hasExpiryDate = Boolean(form.expiresAt.trim());
   const selectedHouseholdName = useMemo(() => {
     if (!form.householdId) {
       return '我的空间';
@@ -241,7 +242,7 @@ export function PhotoItemAnalysisPage() {
     setForm((current) => ({
       ...current,
       householdId: preferredPantryHouseholdId,
-      reminderEnabled: pantryPreferences.defaultReminderEnabled,
+      reminderEnabled: current.expiresAt ? pantryPreferences.defaultReminderEnabled : false,
     }));
   }, [pantryPreferences.defaultReminderEnabled, preferredPantryHouseholdId]);
 
@@ -450,6 +451,7 @@ export function PhotoItemAnalysisPage() {
         note: buildAnalysisNote(result),
         householdId:
           resolveSelectableHouseholdId(result.householdId, households) || current.householdId,
+        reminderEnabled: Boolean(result.expiresAt) && pantryPreferences.defaultReminderEnabled,
       }));
       setCrop({ x: 0, y: 0 });
       setZoom(1);
@@ -482,6 +484,9 @@ export function PhotoItemAnalysisPage() {
         setCroppedImageUrl(upload.url);
       }
 
+      const expiresAt = form.expiresAt.trim();
+      const openedAt = form.openedAt.trim();
+      const shouldPersistActiveHousehold = form.householdId !== preferredPantryHouseholdId;
       const input: NewPantryItemInput = {
         householdId: form.householdId || undefined,
         name: form.name.trim(),
@@ -489,23 +494,29 @@ export function PhotoItemAnalysisPage() {
         quantity: Number.parseInt(form.quantity, 10) || 1,
         unit: form.unit.trim() || '件',
         location: form.location,
-        expiresAt: form.expiresAt,
-        openedAt: form.openedAt,
+        expiresAt: expiresAt || undefined,
+        openedAt: openedAt || undefined,
         note: form.note.trim(),
         imageUrl: uploadedImageUrl || undefined,
         thumbnailUrl: thumbnailUrl || uploadedImageUrl || undefined,
         status: 'normal',
-        reminder: buildDefaultPantryReminder(pantryPreferences, form.reminderEnabled),
+        reminder: buildDefaultPantryReminder(
+          pantryPreferences,
+          Boolean(expiresAt) && form.reminderEnabled,
+        ),
       };
 
       const item = await addPantryItem(input, form.householdId || undefined);
       if (!item) {
         throw new Error('入库失败，请稍后重试。');
       }
-      void setActivePantryHousehold(
-        form.householdId || '',
-        form.householdId ? selectedHouseholdName : '',
-      );
+      if (shouldPersistActiveHousehold) {
+        void setActivePantryHousehold(
+          form.householdId || '',
+          form.householdId ? selectedHouseholdName : '',
+          { silent: true },
+        );
+      }
       setState('done');
       setReviewSheetOpen(true);
       showToast(`「${item.name}」已加入${selectedHouseholdName}`, 'success');
@@ -951,13 +962,42 @@ export function PhotoItemAnalysisPage() {
               />
             </label>
             <label className="block space-y-2">
-              <span className="text-sm font-medium">保质期</span>
+              <span className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium">保质期</span>
+                {form.expiresAt ? (
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-life-ai"
+                    disabled={state === 'saving'}
+                    onClick={() =>
+                      setForm((current) => ({
+                        ...current,
+                        expiresAt: '',
+                        reminderEnabled: false,
+                      }))
+                    }
+                  >
+                    无保质期
+                  </button>
+                ) : (
+                  <span className="text-xs text-muted-foreground">可不填</span>
+                )}
+              </span>
               <input
                 type="date"
                 value={form.expiresAt}
                 className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, expiresAt: event.target.value }))
+                  setForm((current) => {
+                    const nextExpiresAt = event.target.value;
+                    return {
+                      ...current,
+                      expiresAt: nextExpiresAt,
+                      reminderEnabled: nextExpiresAt
+                        ? current.reminderEnabled || pantryPreferences.defaultReminderEnabled
+                        : false,
+                    };
+                  })
                 }
               />
             </label>
@@ -988,14 +1028,16 @@ export function PhotoItemAnalysisPage() {
             <span>
               <span className="block font-semibold text-foreground">使用默认到期提醒</span>
               <span className="mt-1 block text-xs text-muted-foreground">
-                入库后按 Pantry 默认规则提醒。
+                {hasExpiryDate
+                  ? '入库后按 Pantry 默认规则提醒。'
+                  : '未设置保质期时，仅作为普通物品记录。'}
               </span>
             </span>
             <input
               type="checkbox"
-              checked={form.reminderEnabled}
+              checked={hasExpiryDate && form.reminderEnabled}
               className="size-5 accent-life-ai"
-              disabled={state === 'saving'}
+              disabled={state === 'saving' || !hasExpiryDate}
               onChange={(event) =>
                 setForm((current) => ({ ...current, reminderEnabled: event.target.checked }))
               }

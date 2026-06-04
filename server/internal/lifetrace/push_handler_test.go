@@ -104,11 +104,6 @@ func TestPushSubscriptionInvalidDetectsExpiredSubscriptionErrors(t *testing.T) {
 			err:        errors.New("subscription gone"),
 		},
 		{
-			name:       "bad jwt token",
-			statusCode: http.StatusBadRequest,
-			err:        errors.New(`web push failed: {"reason":"BadJwtToken"}`),
-		},
-		{
 			name:       "expired subscription",
 			statusCode: 0,
 			err:        errors.New("ExpiredSubscription"),
@@ -124,7 +119,58 @@ func TestPushSubscriptionInvalidDetectsExpiredSubscriptionErrors(t *testing.T) {
 	}
 }
 
-func TestMarkPushSubscriptionErrorDisablesInvalidJwtSubscription(t *testing.T) {
+func TestPushVapidKeyInvalidDetectsJwtErrors(t *testing.T) {
+	cases := []error{
+		errors.New(`web push failed: {"reason":"BadJwtToken"}`),
+		errors.New("invalid jwt signature"),
+		errors.New("invalid token"),
+		errors.New("vapid jwt rejected"),
+	}
+
+	for _, err := range cases {
+		t.Run(err.Error(), func(t *testing.T) {
+			if !isPushVapidKeyInvalid(err) {
+				t.Fatalf("expected VAPID key diagnostic for %v", err)
+			}
+			if isPushSubscriptionInvalid(http.StatusForbidden, err) {
+				t.Fatalf("expected VAPID key diagnostic to stay separate from subscription invalid")
+			}
+		})
+	}
+}
+
+func TestMarkPushSubscriptionErrorDisablesExpiredSubscription(t *testing.T) {
+	_ = setupTraceTestRouter(t, 101, testWebPushConfig())
+	subscription := model.LifeTracePushSubscription{
+		UserID:   101,
+		Endpoint: "https://push.example/device",
+		P256DH:   "p256dh-key",
+		Auth:     "auth-key",
+		Status:   "active",
+	}
+	if err := database.GetDB().Create(&subscription).Error; err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+
+	markPushSubscriptionError(
+		subscription.ID,
+		http.StatusGone,
+		errors.New("subscription gone"),
+	)
+
+	var persisted model.LifeTracePushSubscription
+	if err := database.GetDB().First(&persisted, "id = ?", subscription.ID).Error; err != nil {
+		t.Fatalf("read subscription: %v", err)
+	}
+	if persisted.Status != "disabled" {
+		t.Fatalf("expected subscription to be disabled, got %s", persisted.Status)
+	}
+	if persisted.LastError == "" {
+		t.Fatalf("expected last error to be persisted")
+	}
+}
+
+func TestMarkPushSubscriptionErrorKeepsVapidJwtSubscriptionActive(t *testing.T) {
 	_ = setupTraceTestRouter(t, 101, testWebPushConfig())
 	subscription := model.LifeTracePushSubscription{
 		UserID:   101,
@@ -147,8 +193,8 @@ func TestMarkPushSubscriptionErrorDisablesInvalidJwtSubscription(t *testing.T) {
 	if err := database.GetDB().First(&persisted, "id = ?", subscription.ID).Error; err != nil {
 		t.Fatalf("read subscription: %v", err)
 	}
-	if persisted.Status != "disabled" {
-		t.Fatalf("expected subscription to be disabled, got %s", persisted.Status)
+	if persisted.Status != "active" {
+		t.Fatalf("expected subscription to stay active, got %s", persisted.Status)
 	}
 	if persisted.LastError == "" {
 		t.Fatalf("expected last error to be persisted")

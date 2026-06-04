@@ -15,6 +15,7 @@ import (
 )
 
 const pushErrorCodeRebindRequired = "PUSH_REBIND_REQUIRED"
+const pushErrorCodeVapidKeyInvalid = "PUSH_VAPID_KEY_INVALID"
 
 type pushSubscriptionRequest struct {
 	Endpoint string          `json:"endpoint"`
@@ -156,11 +157,20 @@ func (h *Handler) TestPush(c *gin.Context) {
 	})
 	if err != nil {
 		markPushSubscriptionError(subscription.ID, statusCode, err)
+		if isPushVapidKeyInvalid(err) {
+			failWithErrorCode(
+				c,
+				http.StatusBadGateway,
+				"VAPID 公私钥不匹配或线上环境变量未生效，请检查 WEB_PUSH_PUBLIC_KEY / WEB_PUSH_PRIVATE_KEY",
+				pushErrorCodeVapidKeyInvalid,
+			)
+			return
+		}
 		if isPushSubscriptionInvalid(statusCode, err) {
 			failWithErrorCode(
 				c,
 				http.StatusBadGateway,
-				"推送密钥或设备订阅已失效，请重新绑定推送",
+				"设备推送订阅已失效，请重新绑定推送",
 				pushErrorCodeRebindRequired,
 			)
 			return
@@ -190,6 +200,10 @@ func pushTestFailureMessage(statusCode int, err error) string {
 }
 
 func isPushSubscriptionInvalid(statusCode int, err error) bool {
+	if isPushVapidKeyInvalid(err) {
+		return false
+	}
+
 	if statusCode == http.StatusForbidden ||
 		statusCode == http.StatusGone ||
 		statusCode == http.StatusNotFound {
@@ -201,8 +215,17 @@ func isPushSubscriptionInvalid(statusCode int, err error) bool {
 	}
 
 	detail := strings.ToLower(err.Error())
+	return strings.Contains(detail, "expiredsubscription")
+}
+
+func isPushVapidKeyInvalid(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	detail := strings.ToLower(err.Error())
 	return strings.Contains(detail, "badjwttoken") ||
 		strings.Contains(detail, "invalid jwt") ||
 		strings.Contains(detail, "invalid token") ||
-		strings.Contains(detail, "expiredsubscription")
+		(strings.Contains(detail, "vapid") && strings.Contains(detail, "jwt"))
 }

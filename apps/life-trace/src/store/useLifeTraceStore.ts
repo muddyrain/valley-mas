@@ -96,7 +96,11 @@ type LifeTraceState = {
   aiActions: AiAction[];
   setActiveTab: (tab: AppTab) => void;
   setPreferredPantryHouseholdId: (householdId?: string, householdName?: string) => void;
-  setActivePantryHousehold: (householdId?: string, householdName?: string) => Promise<void>;
+  setActivePantryHousehold: (
+    householdId?: string,
+    householdName?: string,
+    options?: { silent?: boolean },
+  ) => Promise<void>;
   updateSettings: (settings: Partial<UserSettings>) => void;
   updatePantryPreferences: (preferences: Partial<PantryPreferences>) => void;
   loadSettings: () => Promise<void>;
@@ -420,7 +424,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               : '',
           };
         }),
-      setActivePantryHousehold: async (householdId, householdName) => {
+      setActivePantryHousehold: async (householdId, householdName, options = {}) => {
         const nextHouseholdId = normalizeHouseholdScopeId(householdId);
         const trimmedHouseholdName = householdName?.trim() ?? '';
         const nextSettings = normalizeSettings({
@@ -453,7 +457,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         }
 
         try {
-          const saved = await saveSettings(token, nextSettings);
+          const saved = await saveSettings(token, nextSettings, {
+            suppressErrorToast: options.silent,
+          });
           const persistedSettings = normalizeSettings(saved);
           const persistedHouseholdId = normalizeHouseholdScopeId(
             persistedSettings.activePantryHouseholdId,
@@ -474,7 +480,11 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         } catch (error) {
           set({
             settingsSaving: false,
-            settingsError: error instanceof Error ? error.message : '保存偏好失败',
+            settingsError: options.silent
+              ? ''
+              : error instanceof Error
+                ? error.message
+                : '保存偏好失败',
           });
         }
       },

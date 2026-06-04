@@ -7,6 +7,7 @@ import {
   isAuthDependencyMessage,
   isNetworkFailureMessage,
   isPushRebindRequired,
+  isPushVapidKeyInvalid,
   LIFE_TRACE_ERROR_CODES,
 } from '../src/lib/error';
 
@@ -46,10 +47,20 @@ describe('life trace error helpers', () => {
     });
 
     expect(isPushRebindRequired(codedError)).toBe(true);
+    expect(getLifeTraceDiagnosticMessage(codedError)).toBe('设备推送订阅已失效，请重新绑定推送');
+    expect(isPushRebindRequired(new Error('web push failed: BadJwtToken'))).toBe(false);
+  });
+
+  it('detects VAPID diagnostics separately from device rebind failures', () => {
+    const codedError = Object.assign(new Error('推送失败'), {
+      errorCode: LIFE_TRACE_ERROR_CODES.PUSH_VAPID_KEY_INVALID,
+    });
+
+    expect(isPushVapidKeyInvalid(codedError)).toBe(true);
+    expect(isPushVapidKeyInvalid(new Error('web push failed: BadJwtToken'))).toBe(true);
     expect(getLifeTraceDiagnosticMessage(codedError)).toBe(
-      '推送密钥或设备订阅已失效，请重新绑定推送',
+      'VAPID 公私钥不匹配或线上环境变量未生效，请检查 Vercel 的 WEB_PUSH_PUBLIC_KEY / WEB_PUSH_PRIVATE_KEY',
     );
-    expect(isPushRebindRequired(new Error('web push failed: BadJwtToken'))).toBe(true);
   });
 
   it('preserves domain errors and falls back for unknown failures', () => {

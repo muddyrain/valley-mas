@@ -28,6 +28,14 @@
 cd server && go test ./...
 ```
 
+一次性补齐当前 GORM model 对应的缺失表和字段：
+
+```bash
+cd server && go run ./cmd/sync-schema --apply
+```
+
+`sync-schema` 是开发和共享测试环境的应急同步命令，不是完整迁移执行器。它不会记录 SQL 文件是否已执行，也不会替代生产环境的审查、回滚和分阶段发布流程。
+
 使用本地自动迁移验证模型：
 
 ```bash

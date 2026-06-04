@@ -240,12 +240,41 @@ export function useNotificationPermission(token?: string | null) {
       setServerPushStatus('subscribed');
       return { sent: true };
     } catch (error) {
+      if (isPushRebindRequired(error)) {
+        setServerPushStatus('syncing');
+        setServerPushError('推送订阅已失效，正在重新绑定设备...');
+
+        const rebound = await enableServerPush();
+        if (!rebound) {
+          const message = '推送订阅已失效，自动重新绑定失败，请重新点一次“绑定推送”。';
+          setServerPushStatus('unbound');
+          setServerPushError(message);
+          return { sent: false, error: message, rebound: true };
+        }
+
+        try {
+          await testServerPush(token);
+          setServerPushStatus('subscribed');
+          setServerPushError('');
+          return { sent: true, rebound: true };
+        } catch (retryError) {
+          const message = getLifeTraceDiagnosticMessage(retryError, '服务端测试推送失败');
+          setServerPushStatus(isPushRebindRequired(retryError) ? 'unbound' : 'error');
+          setServerPushError(message);
+          return {
+            sent: false,
+            error: `已重新绑定设备，但服务端测试仍失败：${message}`,
+            rebound: true,
+          };
+        }
+      }
+
       const message = getLifeTraceDiagnosticMessage(error, '服务端测试推送失败');
-      setServerPushStatus(isPushRebindRequired(error) ? 'unbound' : 'error');
+      setServerPushStatus('error');
       setServerPushError(message);
       return { sent: false, error: message };
     }
-  }, [token]);
+  }, [enableServerPush, token]);
 
   const label = useMemo(() => {
     if (permission === 'granted') {

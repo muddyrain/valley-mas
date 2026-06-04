@@ -54,11 +54,23 @@ cd server && go test ./internal/mindarena ./internal/ai
 cd server && go test ./internal/lifetrace
 ```
 
+## 数据库结构同步
+
+如果本地或共享测试库因为历史迁移遗漏字段，出现类似“保存偏好失败”“字段不存在”的问题，可以单独运行一次 schema sync 命令，让 GORM 按当前 model 补齐缺失表和字段：
+
+```bash
+cd server && go run ./cmd/sync-schema --apply
+```
+
+默认不加 `--apply` 时只打印目标库信息，不会连接或修改数据库。`ENV=production` 时还必须额外传入 `--allow-production`，生产环境仍建议优先使用 `migrations/` 下可审查的 SQL 迁移。
+
+该命令复用 `database.Init` 的 AutoMigrate 路径，因此除了补齐字段，也会执行当前 AutoMigrate 后置的资源外键修复和默认博客分类初始化。
+
 ## 常见问题
 
 - 端口被占用：检查是否已有服务监听 `:8080`，或通过 `PORT` 改端口。
 - 环境变量缺失：对照 `server/.env.example` 补齐本地 `.env`。
-- 数据库结构不一致：确认当前环境是否允许 `DB_AUTO_MIGRATE=true`，生产环境应使用明确的迁移流程。
+- 数据库结构不一致：本地可使用 `go run ./cmd/sync-schema --apply` 或确认当前环境是否允许 `DB_AUTO_MIGRATE=true`，生产环境应使用明确的迁移流程。
 - AI 调用失败：确认 `ARK_*` 或 `AI_*` 配置；AI Mind Arena 配置缺失或上游失败时应回退 mock。
 
 ## 相关入口

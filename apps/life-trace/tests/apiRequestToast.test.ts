@@ -146,7 +146,7 @@ describe('api request error toast', () => {
         ok: true,
         json: async () => ({
           code: 502,
-          message: '推送密钥或设备订阅已失效，请重新绑定推送',
+          message: '设备推送订阅已失效，请重新绑定推送',
           errorCode: 'PUSH_REBIND_REQUIRED',
         }),
       }),
@@ -157,8 +157,36 @@ describe('api request error toast', () => {
       throw new Error('expected request to fail');
     } catch (error) {
       expect(error).toBeInstanceOf(ApiRequestError);
-      expect((error as ApiRequestError).message).toBe('推送密钥或设备订阅已失效，请重新绑定推送');
+      expect((error as ApiRequestError).message).toBe('设备推送订阅已失效，请重新绑定推送');
       expect((error as ApiRequestError).errorCode).toBe('PUSH_REBIND_REQUIRED');
+    }
+
+    expect(useFeedbackToastStore.getState().current).toBeNull();
+  });
+
+  it('preserves VAPID diagnostic error codes from Life Trace envelopes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          code: 502,
+          message:
+            'VAPID 公私钥不匹配或线上环境变量未生效，请检查 WEB_PUSH_PUBLIC_KEY / WEB_PUSH_PRIVATE_KEY',
+          errorCode: 'PUSH_VAPID_KEY_INVALID',
+        }),
+      }),
+    );
+
+    try {
+      await apiRequest('/life-trace/push/test', token, { suppressErrorToast: true });
+      throw new Error('expected request to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApiRequestError);
+      expect((error as ApiRequestError).message).toBe(
+        'VAPID 公私钥不匹配或线上环境变量未生效，请检查 WEB_PUSH_PUBLIC_KEY / WEB_PUSH_PRIVATE_KEY',
+      );
+      expect((error as ApiRequestError).errorCode).toBe('PUSH_VAPID_KEY_INVALID');
     }
 
     expect(useFeedbackToastStore.getState().current).toBeNull();

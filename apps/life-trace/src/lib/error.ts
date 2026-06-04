@@ -1,11 +1,14 @@
 const AUTH_DEPENDENCY_MESSAGE = '云端登录校验暂时不可用，请重新加载重试';
 const NETWORK_FAILURE_MESSAGE = '网络连接失败，请检查网络后重试';
-export const PUSH_REBIND_REQUIRED_MESSAGE = '推送密钥或设备订阅已失效，请重新绑定推送';
+export const PUSH_REBIND_REQUIRED_MESSAGE = '设备推送订阅已失效，请重新绑定推送';
+export const PUSH_VAPID_KEY_INVALID_MESSAGE =
+  'VAPID 公私钥不匹配或线上环境变量未生效，请检查 Vercel 的 WEB_PUSH_PUBLIC_KEY / WEB_PUSH_PRIVATE_KEY';
 
 export const LIFE_TRACE_ERROR_CODES = {
   AUTH_DB_UNAVAILABLE: 'AUTH_DB_UNAVAILABLE',
   AUTH_USER_QUERY_FAILED: 'AUTH_USER_QUERY_FAILED',
   PUSH_REBIND_REQUIRED: 'PUSH_REBIND_REQUIRED',
+  PUSH_VAPID_KEY_INVALID: 'PUSH_VAPID_KEY_INVALID',
 } as const;
 
 export type LifeTraceErrorCode =
@@ -51,7 +54,22 @@ export function isPushRebindRequired(error: unknown) {
   }
 
   const message = error instanceof Error ? error.message : '';
-  return message.includes('重新绑定推送') || message.toLowerCase().includes('badjwttoken');
+  return message.includes('重新绑定推送');
+}
+
+export function isPushVapidKeyInvalid(error: unknown) {
+  const code = getLifeTraceErrorCode(error);
+  if (code === LIFE_TRACE_ERROR_CODES.PUSH_VAPID_KEY_INVALID) {
+    return true;
+  }
+
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+  return (
+    message.includes('badjwttoken') ||
+    message.includes('invalid jwt') ||
+    message.includes('invalid token') ||
+    (message.includes('vapid') && message.includes('jwt'))
+  );
 }
 
 export function getLifeTraceDiagnosticMessage(error: unknown, fallback = '操作失败，请稍后重试') {
@@ -64,6 +82,9 @@ export function getLifeTraceDiagnosticMessage(error: unknown, fallback = '操作
   }
   if (code === LIFE_TRACE_ERROR_CODES.PUSH_REBIND_REQUIRED) {
     return PUSH_REBIND_REQUIRED_MESSAGE;
+  }
+  if (code === LIFE_TRACE_ERROR_CODES.PUSH_VAPID_KEY_INVALID || isPushVapidKeyInvalid(error)) {
+    return PUSH_VAPID_KEY_INVALID_MESSAGE;
   }
 
   return getLifeTraceErrorMessage(error, fallback);
