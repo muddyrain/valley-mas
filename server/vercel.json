@@ -1,4 +1,4 @@
 {
   "regions": ["hnd1"],
-  "buildCommand": "if [ -d server ]; then cd server; fi; go build -o $VERCEL_OUTPUT_FILE ./cmd/server"
+  "buildCommand": null
 }
