@@ -79,6 +79,38 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 	}
 }
 
+func TestCreatePantryItemDisablesReminderWithoutExpiry(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+
+	body := bytes.NewBufferString(`{
+		"name": "马克杯",
+		"category": "日用品",
+		"quantity": 1,
+		"unit": "个",
+		"location": "厨房",
+		"expiresAt": "",
+		"status": "normal",
+		"reminder": {
+			"enabled": true,
+			"useDefault": false,
+			"rules": ["3d", "same-day"],
+			"reminderTime": "08:30"
+		}
+	}`)
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/pantry", body)
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp := httptest.NewRecorder()
+	router.ServeHTTP(createResp, createReq)
+
+	created := decodeTracePayload(t, createResp)["data"].(map[string]interface{})
+	if expiresAt, ok := created["expiresAt"]; ok && expiresAt != "" {
+		t.Fatalf("expected empty expiry to round-trip, got %+v", created)
+	}
+	if created["reminderEnabled"] != false {
+		t.Fatalf("expected reminder disabled without expiry, got %+v", created)
+	}
+}
+
 func TestUpdatePantryItemStatusAndDelete(t *testing.T) {
 	router := setupTraceTestRouter(t, 101)
 	item := model.LifeTracePantryItem{

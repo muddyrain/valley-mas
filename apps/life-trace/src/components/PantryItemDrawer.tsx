@@ -5,6 +5,7 @@ import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { OptionPickerSheet } from '@/components/OptionPickerSheet';
+import { PantryExpiryDateField } from '@/components/PantryExpiryDateField';
 import { Button } from '@/components/ui/button';
 import { getLifeTraceErrorMessage } from '@/lib/error';
 import { formatPantryReminderSummary, getPantryPersistedStatus } from '@/lib/pantry';
@@ -163,23 +164,31 @@ export function PantryItemDrawer({
       return null;
     }
 
-    return {
-      ...form,
-      name: form.name.trim(),
-      unit: form.unit.trim() || '件',
-      expiresAt: form.expiresAt || undefined,
-      openedAt: form.openedAt || undefined,
-      imageUrl: form.imageUrl?.trim() || undefined,
-      thumbnailUrl: form.thumbnailUrl?.trim() || undefined,
-      note: form.note.trim(),
-      reminder: form.reminder.useDefault
+    const expiresAt = form.expiresAt || '';
+    const reminder = expiresAt
+      ? form.reminder.useDefault
         ? {
             enabled: pantryPreferences.defaultReminderEnabled,
             useDefault: true,
             rules: pantryPreferences.defaultReminderRules,
             reminderTime: pantryPreferences.defaultReminderTime,
           }
-        : form.reminder,
+        : form.reminder
+      : {
+          ...form.reminder,
+          enabled: false,
+        };
+
+    return {
+      ...form,
+      name: form.name.trim(),
+      unit: form.unit.trim() || '件',
+      expiresAt: expiresAt || undefined,
+      openedAt: form.openedAt || undefined,
+      imageUrl: form.imageUrl?.trim() || undefined,
+      thumbnailUrl: form.thumbnailUrl?.trim() || undefined,
+      note: form.note.trim(),
+      reminder,
       status: getPantryPersistedStatus(form.status),
     };
   };
@@ -399,25 +408,24 @@ export function PantryItemDrawer({
             </label>
           </div>
 
-          <div className="grid min-w-0 grid-cols-2 gap-3 max-[520px]:grid-cols-1">
+          <div className="grid min-w-0 grid-cols-1 gap-3">
             <label className="block min-w-0 space-y-2">
-              <span className="text-sm font-medium">开封</span>
-              <input
-                type="date"
-                value={form.openedAt || ''}
-                onChange={(event) => updateField('openedAt', event.target.value)}
-                className="h-11 min-w-0 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
-              />
+              <span className="text-sm font-medium">开封日期</span>
+              <span className="block min-w-0 max-w-full overflow-hidden rounded-2xl">
+                <input
+                  type="date"
+                  value={form.openedAt || ''}
+                  onChange={(event) => updateField('openedAt', event.target.value)}
+                  className="block h-11 min-w-0 max-w-full w-full appearance-none rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+                />
+              </span>
             </label>
-            <label className="block min-w-0 space-y-2">
-              <span className="text-sm font-medium">过期日期</span>
-              <input
-                type="date"
-                value={form.expiresAt || ''}
-                onChange={(event) => updateField('expiresAt', event.target.value)}
-                className="h-11 min-w-0 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
-              />
-            </label>
+            <PantryExpiryDateField
+              idPrefix="pantry-item"
+              expiresAt={form.expiresAt || ''}
+              disabled={submitting}
+              onExpiresAtChange={(value) => updateField('expiresAt', value)}
+            />
           </div>
 
           <AppImageUploader

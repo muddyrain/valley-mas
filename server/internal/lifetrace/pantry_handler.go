@@ -287,7 +287,11 @@ func (h *Handler) CreatePantryItem(c *gin.Context) {
 		return
 	}
 
+	expiresAt := normalizePantryDate(req.ExpiresAt)
 	reminderEnabled, reminderUseDefault, reminderRules, reminderTime := normalizePantryReminder(req.Reminder)
+	if expiresAt == "" {
+		reminderEnabled = false
+	}
 	item := model.LifeTracePantryItem{
 		UserID:             userID,
 		HouseholdID:        householdCtx.Household.ID,
@@ -296,7 +300,7 @@ func (h *Handler) CreatePantryItem(c *gin.Context) {
 		Quantity:           normalizePantryQuantity(req.Quantity),
 		Unit:               normalizePantryUnit(req.Unit),
 		Location:           normalizePantryLocation(req.Location),
-		ExpiresAt:          normalizePantryDate(req.ExpiresAt),
+		ExpiresAt:          expiresAt,
 		OpenedAt:           normalizePantryDate(req.OpenedAt),
 		Note:               strings.TrimSpace(req.Note),
 		ImageURL:           strings.TrimSpace(req.ImageURL),
@@ -313,6 +317,13 @@ func (h *Handler) CreatePantryItem(c *gin.Context) {
 	if err := database.GetDB().Create(&item).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "创建库存失败")
 		return
+	}
+	if !reminderEnabled {
+		if err := database.GetDB().Model(&item).UpdateColumn("reminder_enabled", false).Error; err != nil {
+			fail(c, http.StatusInternalServerError, "创建库存失败")
+			return
+		}
+		item.ReminderEnabled = false
 	}
 
 	success(c, item)
@@ -348,14 +359,18 @@ func (h *Handler) UpdatePantryItem(c *gin.Context) {
 		return
 	}
 
+	expiresAt := normalizePantryDate(req.ExpiresAt)
 	reminderEnabled, reminderUseDefault, reminderRules, reminderTime := normalizePantryReminder(req.Reminder)
+	if expiresAt == "" {
+		reminderEnabled = false
+	}
 	updates := map[string]interface{}{
 		"name":                 name,
 		"category":             normalizePantryCategory(req.Category),
 		"quantity":             normalizePantryQuantity(req.Quantity),
 		"unit":                 normalizePantryUnit(req.Unit),
 		"location":             normalizePantryLocation(req.Location),
-		"expires_at":           normalizePantryDate(req.ExpiresAt),
+		"expires_at":           expiresAt,
 		"opened_at":            normalizePantryDate(req.OpenedAt),
 		"note":                 strings.TrimSpace(req.Note),
 		"image_url":            strings.TrimSpace(req.ImageURL),

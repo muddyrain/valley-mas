@@ -268,7 +268,7 @@ func TestParseImageAnalysisAIResponseNormalizesFields(t *testing.T) {
 
 func TestParsePantryPhotoAnalysisAIResponseNormalizesFields(t *testing.T) {
 	parsed, err := parsePantryPhotoAnalysisAIResponse(`商品结果：
-{"name":"  鲜牛奶  ","category":"饮料","brand":"示例品牌","spec":"250ml","quantity":0,"unit":"","storageLocation":"冰箱","expiresAt":"not-date","purchaseDate":"2026-06-04","tags":["冷藏","","冷藏","早餐","牛奶","家庭","补货"],"confidence":1.4,"warnings":["保质期不可见","保质期不可见","请确认规格"],"cropBox":{"x":0.9,"y":-0.2,"width":0.4,"height":1.2},"summary":"适合加入家庭库存。"}
+{"name":"  鲜牛奶  ","category":"饮料","brand":"示例品牌","spec":"250ml","quantity":0,"unit":"","storageLocation":"冰箱","expiresAt":"not-date","productionDate":"2026-06-01","purchaseDate":"2026-06-04","shelfLifeDays":180,"tags":["冷藏","","冷藏","早餐","牛奶","家庭","补货"],"confidence":1.4,"warnings":["保质期不可见","保质期不可见","请确认规格"],"cropBox":{"x":0.9,"y":-0.2,"width":0.4,"height":1.2},"summary":"适合加入家庭库存。"}
 `)
 	if err != nil {
 		t.Fatalf("parse pantry photo analysis: %v", err)
@@ -286,7 +286,7 @@ func TestParsePantryPhotoAnalysisAIResponseNormalizesFields(t *testing.T) {
 	if parsed.StorageLocation != "冷藏" {
 		t.Fatalf("expected fallback location, got %s", parsed.StorageLocation)
 	}
-	if parsed.ExpiresAt != "" || parsed.PurchaseDate != "2026-06-04" {
+	if parsed.ExpiresAt != "2026-11-28" || parsed.ProductionDate != "2026-06-01" || parsed.PurchaseDate != "2026-06-04" || parsed.ShelfLifeDays != 180 {
 		t.Fatalf("expected normalized dates, got %+v", parsed)
 	}
 	if parsed.Confidence != 1 {
@@ -300,6 +300,28 @@ func TestParsePantryPhotoAnalysisAIResponseNormalizesFields(t *testing.T) {
 	}
 	if parsed.CropBox.X != 0.6 || parsed.CropBox.Y != 0 || parsed.CropBox.Width != 0.4 || parsed.CropBox.Height != 1 {
 		t.Fatalf("expected normalized crop box, got %+v", parsed.CropBox)
+	}
+}
+
+func TestParsePantryPhotoAnalysisAIResponseWarnsWhenShelfLifeMissingProductionDate(t *testing.T) {
+	parsed, err := parsePantryPhotoAnalysisAIResponse(`{
+		"name":"饼干",
+		"category":"食品",
+		"quantity":1,
+		"unit":"包",
+		"storageLocation":"厨房",
+		"shelfLifeDays":90,
+		"warnings":[]
+	}`)
+	if err != nil {
+		t.Fatalf("parse pantry photo analysis: %v", err)
+	}
+
+	if parsed.ExpiresAt != "" || parsed.ProductionDate != "" || parsed.ShelfLifeDays != 90 {
+		t.Fatalf("expected shelf life without calculated expiry, got %+v", parsed)
+	}
+	if len(parsed.Warnings) != 1 || !strings.Contains(parsed.Warnings[0], "生产日期") {
+		t.Fatalf("expected missing production date warning, got %+v", parsed.Warnings)
 	}
 }
 
@@ -774,6 +796,11 @@ func TestBuildLifeTraceAssistantPantryDraftInfersInventoryFields(t *testing.T) {
 	if draft.ExpiresAt != "2026-06-08" {
 		t.Fatalf("expected derived expiry date, got %+v", draft)
 	}
+
+	reversed := buildLifeTraceAssistantPantryDraft("我有一包饼干，生产日期是2026-06-01，180天保质期")
+	if reversed == nil || reversed.ExpiresAt != "2026-11-28" {
+		t.Fatalf("expected reversed shelf life wording to derive expiry date, got %+v", reversed)
+	}
 }
 
 func TestBuildLifeTraceAssistantPantryDraftKeepsNameWhenExpiryMissing(t *testing.T) {
@@ -892,7 +919,7 @@ func TestCreateAssistantPantryItemFromDraftCreatesAndDedupes(t *testing.T) {
 	}
 }
 
-func TestCreateAssistantPantryItemFromDraftNeedsMoreInfoWhenExpiryMissing(t *testing.T) {
+func TestCreateAssistantPantryItemFromDraftAllowsInventoryWithoutExpiry(t *testing.T) {
 	_ = setupTraceTestRouter(t, 101)
 	var handler Handler
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
@@ -907,14 +934,43 @@ func TestCreateAssistantPantryItemFromDraftNeedsMoreInfoWhenExpiryMissing(t *tes
 	}
 
 	payload := handler.createAssistantPantryItemFromDraft(ctx, 101, draft)
+	if payload == nil || payload.Status != "created" || payload.PantryItem == nil {
+		t.Fatalf("expected created payload, got %+v", payload)
+	}
+	if payload.PantryItem.ExpiresAt != "" {
+		t.Fatalf("expected empty expiry, got %+v", payload.PantryItem)
+	}
+	if payload.PantryItem.ReminderEnabled {
+		t.Fatalf("expected reminder disabled without expiry, got %+v", payload.PantryItem)
+	}
+	if strings.Contains(payload.Message, "保质期到") {
+		t.Fatalf("expected created message without expiry suffix, got %+v", payload.Message)
+	}
+}
+
+func TestCreateAssistantPantryItemFromDraftAsksProductionDateWhenOnlyShelfLifeProvided(t *testing.T) {
+	_ = setupTraceTestRouter(t, 101)
+	var handler Handler
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/assistant/stream", nil)
+	draft := lifeTraceAssistantPantryDraft{
+		Name:     "牛奶",
+		Category: "食品",
+		Quantity: 1,
+		Unit:     "盒",
+		Location: "冷藏",
+		Note:     "我有一盒牛奶，保质期180天。",
+	}
+
+	payload := handler.createAssistantPantryItemFromDraft(ctx, 101, draft)
 	if payload == nil || payload.Status != "need_more_info" {
 		t.Fatalf("expected need_more_info payload, got %+v", payload)
 	}
 	if len(payload.NeedMoreInfoFields) != 1 || payload.NeedMoreInfoFields[0] != "expiresAt" {
 		t.Fatalf("expected expiresAt missing field, got %+v", payload)
 	}
-	if !strings.Contains(payload.Message, "保质期") {
-		t.Fatalf("expected expiry follow-up message, got %+v", payload)
+	if !strings.Contains(payload.Message, "生产日期") {
+		t.Fatalf("expected production date follow-up message, got %+v", payload)
 	}
 }
 
@@ -948,25 +1004,24 @@ func TestParseLifeTraceAssistantStructuredResponseSupportsNeedMoreInfo(t *testin
 }
 
 func TestBuildLifeTraceAssistantPantryFollowUpDraftUsesRecentDraft(t *testing.T) {
-	now := time.Date(2026, time.June, 3, 10, 0, 0, 0, time.FixedZone("CST", 8*3600))
 	base := &lifeTraceAssistantPantryDraft{
 		Name:     "牛奶",
 		Category: "食品",
 		Quantity: 1,
 		Unit:     "盒",
 		Location: "冷藏",
-		Note:     "我有一盒牛奶，想加到库存里",
+		Note:     "我有一盒牛奶，保质期7天，想加到库存里",
 	}
 
-	draft := buildLifeTraceAssistantPantryFollowUpDraft("保质期7天", base, now)
+	draft := buildLifeTraceAssistantPantryFollowUpDraft("生产日期是2026-06-01", base)
 	if draft == nil {
 		t.Fatal("expected pantry follow-up draft")
 	}
 	if draft.Name != "牛奶" {
 		t.Fatalf("expected pantry name to be preserved, got %+v", draft)
 	}
-	if draft.ExpiresAt != "2026-06-10" {
-		t.Fatalf("expected follow-up shelf life to derive expiry, got %+v", draft)
+	if draft.ExpiresAt != "2026-06-08" {
+		t.Fatalf("expected follow-up production date to derive expiry, got %+v", draft)
 	}
 }
 
@@ -1102,7 +1157,7 @@ func TestStreamAssistantStructuredResponseFallsBackToPantryDraftWhenActionMissin
 	if !strings.Contains(resp.Body.String(), `"status":"need_more_info"`) {
 		t.Fatalf("expected missing-expiry fallback action, got %s", resp.Body.String())
 	}
-	if !strings.Contains(resp.Body.String(), `保质期或到期时间`) {
+	if !strings.Contains(resp.Body.String(), `生产日期`) {
 		t.Fatalf("expected follow-up question in SSE body, got %s", resp.Body.String())
 	}
 
@@ -1176,8 +1231,11 @@ func TestStreamAssistantStructuredResponseFallsBackWhenToolsUnsupported(t *testi
 	if _, ok := captured[1]["response_format"]; !ok {
 		t.Fatalf("expected second request to fall back to response_format json, got %+v", captured[1])
 	}
-	if !strings.Contains(resp.Body.String(), `"status":"need_more_info"`) {
-		t.Fatalf("expected fallback SSE to keep need_more_info action, got %s", resp.Body.String())
+	if !strings.Contains(resp.Body.String(), `"status":"created"`) {
+		t.Fatalf("expected fallback SSE to create ordinary pantry item, got %s", resp.Body.String())
+	}
+	if !strings.Contains(resp.Body.String(), `"reminderEnabled":false`) {
+		t.Fatalf("expected ordinary pantry item without expiry to disable reminder, got %s", resp.Body.String())
 	}
 }
 

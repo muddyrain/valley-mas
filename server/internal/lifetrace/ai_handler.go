@@ -140,7 +140,7 @@ var (
 	assistantDatePattern           = regexp.MustCompile(`(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?`)
 	assistantProductionDatePattern = regexp.MustCompile(`(?:生产日期|生产日)[:：是 ]*(\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?)`)
 	assistantExpiryDatePattern     = regexp.MustCompile(`(?:到期日|过期日|有效期至|保质期至|截止日期|截止到)[:：是 ]*(\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?)`)
-	assistantShelfLifePattern      = regexp.MustCompile(`(?:保质期|有效期)[:：是 ]*(\d+)\s*(天|日|个月|月|年)`)
+	assistantShelfLifePattern      = regexp.MustCompile(`(?:保质期|有效期)[^0-9]{0,8}(\d+)\s*(天|日|个月|月|年)|(\d+)\s*(天|日|个月|月|年)\s*(?:保质期|有效期)`)
 	assistantOpenedAtPattern       = regexp.MustCompile(`(?:开封日期|开封于|开封)[:：是 ]*(\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?)`)
 	assistantPantryQuantityPattern = regexp.MustCompile(`(\d+)\s*(瓶|盒|袋|包|罐|个|件|桶|支|片|听|杯|箱|条|份)`)
 	assistantPantryLeadingCount    = regexp.MustCompile(`^(?:一|1|一个|一件)?\s*(瓶|盒|袋|包|罐|个|件|桶|支|片|听|杯|箱|条|份)\s*`)
@@ -481,7 +481,7 @@ func (h *Handler) StreamAssistant(c *gin.Context) {
 		planDraft = buildLifeTraceAssistantPlanFollowUpDraft(req.Message, findRecentAssistantPlanDraft(req.History, now), now)
 	}
 	if pantryDraft == nil {
-		pantryDraft = buildLifeTraceAssistantPantryFollowUpDraft(req.Message, findRecentAssistantPantryDraft(req.History), now)
+		pantryDraft = buildLifeTraceAssistantPantryFollowUpDraft(req.Message, findRecentAssistantPantryDraft(req.History))
 	}
 	actionEventSent := false
 	sendActionEvent := func(send func(lifeTraceAssistantStreamChunk)) {
@@ -892,7 +892,6 @@ func cleanLifeTraceAssistantPantryName(raw string) string {
 func buildLifeTraceAssistantPantryFollowUpDraft(
 	message string,
 	base *lifeTraceAssistantPantryDraft,
-	now time.Time,
 ) *lifeTraceAssistantPantryDraft {
 	if base == nil {
 		return nil
@@ -909,8 +908,8 @@ func buildLifeTraceAssistantPantryFollowUpDraft(
 		productionDate = inferLifeTraceAssistantProductionDate(base.Note)
 	}
 	expiresAt := inferLifeTraceAssistantExpiryDate(text, productionDate)
-	if expiresAt == "" && assistantShelfLifePattern.MatchString(text) {
-		expiresAt = inferLifeTraceAssistantExpiryDate(text, lifeTraceAssistantLocalDate(now).Format("2006-01-02"))
+	if expiresAt == "" && productionDate != "" && assistantShelfLifePattern.MatchString(base.Note) {
+		expiresAt = inferLifeTraceAssistantExpiryDate(base.Note, productionDate)
 	}
 	if expiresAt == "" {
 		expiresAt = extractAssistantStandaloneDate(text)
@@ -1005,16 +1004,12 @@ func inferLifeTraceAssistantExpiryDate(text string, productionDate string) strin
 	if productionDate == "" {
 		return ""
 	}
-	if match := assistantShelfLifePattern.FindStringSubmatch(text); len(match) >= 3 {
-		days, err := strconv.Atoi(strings.TrimSpace(match[1]))
-		if err != nil || days <= 0 {
-			return ""
-		}
+	if days, unit := inferLifeTraceAssistantShelfLife(text); days > 0 {
 		base, err := time.Parse("2006-01-02", productionDate)
 		if err != nil {
 			return ""
 		}
-		switch strings.TrimSpace(match[2]) {
+		switch unit {
 		case "天", "日":
 			return base.AddDate(0, 0, days).Format("2006-01-02")
 		case "个月", "月":
@@ -1024,6 +1019,28 @@ func inferLifeTraceAssistantExpiryDate(text string, productionDate string) strin
 		}
 	}
 	return ""
+}
+
+func inferLifeTraceAssistantShelfLife(text string) (int, string) {
+	match := assistantShelfLifePattern.FindStringSubmatch(text)
+	if len(match) == 0 {
+		return 0, ""
+	}
+
+	dayText := ""
+	unit := ""
+	if len(match) >= 3 && strings.TrimSpace(match[1]) != "" {
+		dayText = match[1]
+		unit = match[2]
+	} else if len(match) >= 5 && strings.TrimSpace(match[3]) != "" {
+		dayText = match[3]
+		unit = match[4]
+	}
+	days, err := strconv.Atoi(strings.TrimSpace(dayText))
+	if err != nil || days <= 0 {
+		return 0, ""
+	}
+	return days, strings.TrimSpace(unit)
 }
 
 func inferLifeTraceAssistantOpenedDate(text string) string {
@@ -1115,9 +1132,16 @@ func normalizeAssistantNeedMoreInfoFields(fields []string) []string {
 
 func buildAssistantPantryNeedMoreInfoMessage(name string) string {
 	if strings.TrimSpace(name) == "" {
-		return "想帮你加入库存的话，我还需要商品名和保质期或到期时间。"
+		return "想帮你加入库存的话，我还需要商品名。"
 	}
-	return fmt.Sprintf("要把「%s」收进库存，我还差一个保质期或到期时间。你告诉我保质期多久，或者直接说到期日也行。", name)
+	return fmt.Sprintf("要把「%s」收进库存，我还差一个生产日期或到期日。你告诉我生产日期，我就能按保质期算到期日。", name)
+}
+
+func assistantPantryNeedsProductionDate(draft lifeTraceAssistantPantryDraft) bool {
+	if normalizePantryDate(draft.ExpiresAt) != "" {
+		return false
+	}
+	return assistantShelfLifePattern.MatchString(draft.Note)
 }
 
 func buildAssistantNeedMoreInfoPayload(actionType string, message string, fields []string) *lifeTraceAssistantActionPayload {
@@ -1233,7 +1257,8 @@ func (h *Handler) createAssistantPantryItemFromDraft(c *gin.Context, userID mode
 			Message: "库存信息还不够完整，至少需要商品名。",
 		}
 	}
-	if normalizePantryDate(draft.ExpiresAt) == "" {
+	expiresAt := normalizePantryDate(draft.ExpiresAt)
+	if assistantPantryNeedsProductionDate(draft) {
 		return buildAssistantNeedMoreInfoPayload(
 			"create_pantry_item",
 			buildAssistantPantryNeedMoreInfoMessage(draft.Name),
@@ -1252,14 +1277,18 @@ func (h *Handler) createAssistantPantryItemFromDraft(c *gin.Context, userID mode
 
 	var existing model.LifeTracePantryItem
 	err = database.GetDB().
-		Where("household_id = ? AND name = ? AND expires_at = ? AND status NOT IN ?", householdCtx.Household.ID, draft.Name, draft.ExpiresAt, []string{"used-up", "discarded"}).
+		Where("household_id = ? AND name = ? AND expires_at = ? AND status NOT IN ?", householdCtx.Household.ID, draft.Name, expiresAt, []string{"used-up", "discarded"}).
 		Order("updated_at DESC").
 		First(&existing).Error
 	if err == nil {
+		message := fmt.Sprintf("「%s」已经在「%s」里了，位置在%s。", draft.Name, householdCtx.Household.Name, existing.Location)
+		if existing.ExpiresAt != "" {
+			message = fmt.Sprintf("「%s」已经在「%s」里了，位置在%s，保质期到 %s。", draft.Name, householdCtx.Household.Name, existing.Location, existing.ExpiresAt)
+		}
 		return &lifeTraceAssistantActionPayload{
 			Type:          "create_pantry_item",
 			Status:        "exists",
-			Message:       fmt.Sprintf("「%s」已经在「%s」里了，位置在%s，保质期到 %s。", draft.Name, householdCtx.Household.Name, existing.Location, existing.ExpiresAt),
+			Message:       message,
 			HouseholdName: householdCtx.Household.Name,
 			PantryItem:    &existing,
 		}
@@ -1280,13 +1309,13 @@ func (h *Handler) createAssistantPantryItemFromDraft(c *gin.Context, userID mode
 		Quantity:           normalizePantryQuantity(draft.Quantity),
 		Unit:               normalizePantryUnit(draft.Unit),
 		Location:           normalizePantryLocation(draft.Location),
-		ExpiresAt:          normalizePantryDate(draft.ExpiresAt),
+		ExpiresAt:          expiresAt,
 		OpenedAt:           normalizePantryDate(draft.OpenedAt),
 		Note:               trimRunes(strings.TrimSpace(draft.Note), 180),
 		Status:             "normal",
 		CreatedBy:          userID,
 		UpdatedBy:          userID,
-		ReminderEnabled:    true,
+		ReminderEnabled:    expiresAt != "",
 		ReminderUseDefault: true,
 		ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
 		ReminderTime:       "09:00",
@@ -1298,11 +1327,26 @@ func (h *Handler) createAssistantPantryItemFromDraft(c *gin.Context, userID mode
 			Message: "生活助理已回复，但库存保存失败，请稍后再试。",
 		}
 	}
+	if item.ExpiresAt == "" {
+		if err := database.GetDB().Model(&item).UpdateColumn("reminder_enabled", false).Error; err != nil {
+			return &lifeTraceAssistantActionPayload{
+				Type:    "create_pantry_item",
+				Status:  "error",
+				Message: "生活助理已回复，但库存保存失败，请稍后再试。",
+			}
+		}
+		item.ReminderEnabled = false
+	}
+
+	message := fmt.Sprintf("已经帮你把「%s」收进「%s」了，放在%s。", item.Name, householdCtx.Household.Name, item.Location)
+	if item.ExpiresAt != "" {
+		message = fmt.Sprintf("已经帮你把「%s」收进「%s」了，放在%s，保质期到 %s。", item.Name, householdCtx.Household.Name, item.Location, item.ExpiresAt)
+	}
 
 	return &lifeTraceAssistantActionPayload{
 		Type:          "create_pantry_item",
 		Status:        "created",
-		Message:       fmt.Sprintf("已经帮你把「%s」收进「%s」了，放在%s，保质期到 %s。", item.Name, householdCtx.Household.Name, item.Location, item.ExpiresAt),
+		Message:       message,
 		HouseholdName: householdCtx.Household.Name,
 		PantryItem:    &item,
 	}
@@ -1780,8 +1824,9 @@ func buildLifeTraceAssistantStructuredPrompt(
 		"- 如果要创建计划，reply 直接写成已处理结果；action.type=create_plan，并尽量补齐 plan 字段。",
 		"- 如果要创建库存，reply 直接写成已处理结果；action.type=create_pantry_item，并尽量补齐 pantry 字段。",
 		"- 如果用户这轮是在补充上一轮你追问的信息，要结合最近对话，把同一件计划/库存补齐后继续完成，不要重新从头问。",
-		"- 如果识别到用户想入库，而且已经知道商品名，但缺少保质期/到期时间，仍然返回 action.type=create_pantry_item。",
-		"- 上一条场景里，reply 和 action.message 都要只追问一个必要问题；needMoreInfoFields 必须包含 expiresAt；不要伪造保质期。",
+		"- 如果用户只是在记录库存，没有提供保质期、生产日期或到期日，仍然创建普通库存；expiresAt 留空，不要追问。",
+		"- 如果用户提供了生产日期和 180天/90天/7天等保质期，必须计算 expiresAt。",
+		"- 如果用户只提供了保质期天数但没有生产日期或到期日，仍然返回 action.type=create_pantry_item；reply 和 action.message 只追问生产日期；needMoreInfoFields 包含 expiresAt；不要按今天或购买日期伪造到期日。",
 		"- 日期必须输出绝对日期 YYYY-MM-DD；时间必须输出 HH:MM。",
 		"- reply 140 字以内；涉及提醒/记事/入库时尽量控制在 60 字以内。",
 		fmt.Sprintf("- 当前时间基准：%s（Asia/Shanghai）。", now.Format("2006-01-02 15:04")),
@@ -1925,7 +1970,7 @@ func (h *Handler) resolveLifeTraceAssistantStructuredAction(
 			}
 			draft = fallbackPantryDraft
 		}
-		if len(action.NeedMoreInfoFields) > 0 || normalizePantryDate(draft.ExpiresAt) == "" {
+		if assistantPantryNeedsProductionDate(*draft) {
 			message := action.Message
 			if strings.TrimSpace(message) == "" {
 				message = buildAssistantPantryNeedMoreInfoMessage(draft.Name)

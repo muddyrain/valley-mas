@@ -58,7 +58,9 @@ type pantryPhotoAnalysisAIResponse struct {
 	Unit            string       `json:"unit"`
 	StorageLocation string       `json:"storageLocation"`
 	ExpiresAt       string       `json:"expiresAt"`
+	ProductionDate  string       `json:"productionDate"`
 	PurchaseDate    string       `json:"purchaseDate"`
+	ShelfLifeDays   int          `json:"shelfLifeDays"`
 	Tags            []string     `json:"tags"`
 	Confidence      float64      `json:"confidence"`
 	Warnings        []string     `json:"warnings"`
@@ -250,7 +252,9 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 		"unit":            parsed.Unit,
 		"storageLocation": parsed.StorageLocation,
 		"expiresAt":       parsed.ExpiresAt,
+		"productionDate":  parsed.ProductionDate,
 		"purchaseDate":    parsed.PurchaseDate,
+		"shelfLifeDays":   parsed.ShelfLifeDays,
 		"tags":            parsed.Tags,
 		"confidence":      parsed.Confidence,
 		"warnings":        parsed.Warnings,
@@ -328,10 +332,13 @@ func buildPantryPhotoAnalysisPrompt(hint string, householdName string, useVision
 
 	return strings.Join([]string{
 		"你是 Life Trace 的家庭库存商品识别 AI，只输出一个 JSON 对象，不要 Markdown，不要解释。",
-		"JSON 格式：{\"name\":\"商品名称\",\"category\":\"食品|日用品|药品|宠物|其他\",\"brand\":\"品牌或空字符串\",\"spec\":\"规格或空字符串\",\"quantity\":1,\"unit\":\"件|瓶|盒|袋|个|包|罐|支\",\"storageLocation\":\"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他\",\"expiresAt\":\"YYYY-MM-DD 或空字符串\",\"purchaseDate\":\"YYYY-MM-DD 或空字符串\",\"tags\":[\"标签\"],\"confidence\":0.0,\"warnings\":[\"需要用户确认的事项\"],\"cropBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.8,\"height\":0.8},\"summary\":\"60字以内说明\"}",
+		"JSON 格式：{\"name\":\"商品名称\",\"category\":\"食品|日用品|药品|宠物|其他\",\"brand\":\"品牌或空字符串\",\"spec\":\"规格或空字符串\",\"quantity\":1,\"unit\":\"件|瓶|盒|袋|个|包|罐|支\",\"storageLocation\":\"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他\",\"expiresAt\":\"YYYY-MM-DD 或空字符串\",\"productionDate\":\"YYYY-MM-DD 或空字符串\",\"purchaseDate\":\"YYYY-MM-DD 或空字符串\",\"shelfLifeDays\":0,\"tags\":[\"标签\"],\"confidence\":0.0,\"warnings\":[\"需要用户确认的事项\"],\"cropBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.8,\"height\":0.8},\"summary\":\"60字以内说明\"}",
 		"category 和 storageLocation 必须从候选值中选择。",
 		"cropBox 使用 0-1 比例坐标，表示主体建议裁剪框；如果不确定，返回居中 0.1/0.1/0.8/0.8。",
-		"不要编造看不清的品牌、规格或保质期；保质期不可见时 expiresAt 返回空字符串，并在 warnings 说明。",
+		"如果包装或用户补充中同时出现生产日期和 180天/90天/7天等保质期，填写 productionDate、shelfLifeDays，并计算 expiresAt。",
+		"如果只看到保质期天数但没有生产日期，expiresAt 返回空字符串，并在 warnings 提示缺少生产日期，无法计算到期日。",
+		"如果保质期和生产日期都没有出现，不要提示缺少保质期，expiresAt、productionDate 和 shelfLifeDays 返回空值或 0。",
+		"不要编造看不清的品牌、规格、生产日期或保质期。",
 		"如果图片中有多个商品，只识别主体最大或最清晰的一件。",
 		"药品、保健品、婴幼儿食品等敏感品类只做库存记录，不给医疗、安全或食用建议。",
 		"tags 输出 2-5 个简体中文短标签。",
@@ -478,7 +485,15 @@ func parsePantryPhotoAnalysisAIResponse(raw string) (pantryPhotoAnalysisAIRespon
 	parsed.Unit = trimRunes(normalizePantryUnit(parsed.Unit), 8)
 	parsed.StorageLocation = normalizePantryLocation(parsed.StorageLocation)
 	parsed.ExpiresAt = normalizePantryDate(parsed.ExpiresAt)
+	parsed.ProductionDate = normalizePantryDate(parsed.ProductionDate)
 	parsed.PurchaseDate = normalizePantryDate(parsed.PurchaseDate)
+	parsed.ShelfLifeDays = normalizePantryShelfLifeDays(parsed.ShelfLifeDays)
+	if parsed.ExpiresAt == "" && parsed.ProductionDate != "" && parsed.ShelfLifeDays > 0 {
+		parsed.ExpiresAt = addDaysToPantryDate(parsed.ProductionDate, parsed.ShelfLifeDays)
+	}
+	if parsed.ExpiresAt == "" && parsed.ProductionDate == "" && parsed.ShelfLifeDays > 0 {
+		parsed.Warnings = append(parsed.Warnings, "识别到保质期但缺少生产日期，无法计算到期日")
+	}
 	parsed.Tags = normalizePantryPhotoTags(parsed.Tags)
 	parsed.Confidence = normalizePantryPhotoConfidence(parsed.Confidence)
 	parsed.Warnings = normalizePantryPhotoWarnings(parsed.Warnings)
@@ -488,6 +503,24 @@ func parsePantryPhotoAnalysisAIResponse(raw string) (pantryPhotoAnalysisAIRespon
 		parsed.Summary = "已生成商品入库草稿，请确认名称、数量和保质期后再入库。"
 	}
 	return parsed, nil
+}
+
+func normalizePantryShelfLifeDays(value int) int {
+	if value <= 0 {
+		return 0
+	}
+	if value > 3650 {
+		return 3650
+	}
+	return value
+}
+
+func addDaysToPantryDate(dateText string, days int) string {
+	base, err := time.Parse("2006-01-02", dateText)
+	if err != nil || days <= 0 {
+		return ""
+	}
+	return base.AddDate(0, 0, days).Format("2006-01-02")
 }
 
 func normalizePantryPhotoConfidence(value float64) float64 {

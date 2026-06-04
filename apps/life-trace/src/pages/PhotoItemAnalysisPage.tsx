@@ -9,15 +9,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import {
-  type ChangeEvent,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listHouseholds } from '@/api/household';
 import { analyzePantryPhoto, type PantryPhotoAnalysisResponse } from '@/api/pantry';
@@ -25,6 +17,7 @@ import { uploadLifeTraceImage } from '@/api/upload';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { OptionPickerSheet } from '@/components/OptionPickerSheet';
+import { PantryExpiryDateField } from '@/components/PantryExpiryDateField';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -102,62 +95,6 @@ function resolveSelectableHouseholdId(
     : '';
 }
 
-type ClearableDateFieldProps = {
-  id: string;
-  label: string;
-  value: string;
-  disabled: boolean;
-  caption?: ReactNode;
-  onChange: (value: string) => void;
-  onClear?: () => void;
-};
-
-function ClearableDateField({
-  id,
-  label,
-  value,
-  disabled,
-  caption,
-  onChange,
-  onClear,
-}: ClearableDateFieldProps) {
-  return (
-    <div className="block min-w-0 space-y-2">
-      <label htmlFor={id} className="flex min-w-0 items-center justify-between gap-3">
-        <span className="text-sm font-medium">{label}</span>
-        {caption}
-      </label>
-      <div className="relative min-w-0">
-        <input
-          id={id}
-          type="date"
-          value={value}
-          disabled={disabled}
-          className="h-11 min-w-0 w-full appearance-none rounded-2xl border border-border bg-secondary px-4 pr-11 text-sm text-foreground outline-none transition focus:border-ring disabled:opacity-60"
-          onChange={(event) => onChange(event.target.value)}
-        />
-        {value ? (
-          <button
-            type="button"
-            aria-label={`清空${label}`}
-            disabled={disabled}
-            className="absolute top-1/2 right-2 grid size-7 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:bg-background/70 hover:text-foreground disabled:opacity-50"
-            onClick={() => {
-              if (onClear) {
-                onClear();
-                return;
-              }
-              onChange('');
-            }}
-          >
-            <X className="size-4" />
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 export function PhotoItemAnalysisPage() {
   const navigate = useNavigate();
   const token = useAuthStore((state) => state.token);
@@ -185,6 +122,7 @@ export function PhotoItemAnalysisPage() {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [reviewSheetOpen, setReviewSheetOpen] = useState(false);
   const [activePicker, setActivePicker] = useState<'category' | 'location' | null>(null);
+  const [expiryBaseDate, setExpiryBaseDate] = useState('');
 
   const cameraActive = state === 'camera-ready';
   const busy = state === 'uploading' || state === 'analyzing' || state === 'saving';
@@ -407,13 +345,14 @@ export function PhotoItemAnalysisPage() {
         quantity: String(result.quantity || 1),
         unit: result.unit || current.unit,
         location: result.storageLocation || current.location,
-        expiresAt: '',
+        expiresAt: result.expiresAt || '',
         openedAt: '',
         note: buildAnalysisNote(result),
         householdId:
           resolveSelectableHouseholdId(result.householdId, households) || current.householdId,
-        reminderEnabled: false,
+        reminderEnabled: result.expiresAt ? pantryPreferences.defaultReminderEnabled : false,
       }));
+      setExpiryBaseDate(result.productionDate || result.purchaseDate || '');
       setState('reviewing');
       setReviewSheetOpen(true);
       showToast('商品识别完成，请确认后入库。', 'success');
@@ -471,6 +410,7 @@ export function PhotoItemAnalysisPage() {
     setAnalysis(null);
     setReviewSheetOpen(false);
     setActivePicker(null);
+    setExpiryBaseDate('');
     setForm((current) => ({
       ...initialForm,
       householdId: current.householdId,
@@ -868,40 +808,31 @@ export function PhotoItemAnalysisPage() {
           </div>
 
           <div className="grid min-w-0 grid-cols-1 gap-3">
-            <ClearableDateField
-              id="photo-item-purchase-date"
-              label="购买"
-              value={form.openedAt}
+            <label className="block min-w-0 space-y-2">
+              <span className="text-sm font-medium">开封日期</span>
+              <input
+                type="date"
+                value={form.openedAt}
+                disabled={state === 'saving'}
+                className="h-11 min-w-0 w-full appearance-none rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring disabled:opacity-60"
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, openedAt: event.target.value }))
+                }
+              />
+            </label>
+            <PantryExpiryDateField
+              idPrefix="photo-item"
+              expiresAt={form.expiresAt}
+              initialBaseDate={expiryBaseDate}
               disabled={state === 'saving'}
-              caption={<span className="text-xs text-muted-foreground">可不填</span>}
-              onChange={(value) => setForm((current) => ({ ...current, openedAt: value }))}
-            />
-            <ClearableDateField
-              id="photo-item-expiry-date"
-              label="保质期"
-              value={form.expiresAt}
-              disabled={state === 'saving'}
-              caption={
-                form.expiresAt ? (
-                  <span className="text-xs font-semibold text-life-ai">可清空</span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">可不填</span>
-                )
-              }
-              onChange={(value) =>
+              onBaseDateChange={setExpiryBaseDate}
+              onExpiresAtChange={(value) =>
                 setForm((current) => ({
                   ...current,
                   expiresAt: value,
                   reminderEnabled: value
                     ? current.reminderEnabled || pantryPreferences.defaultReminderEnabled
                     : false,
-                }))
-              }
-              onClear={() =>
-                setForm((current) => ({
-                  ...current,
-                  expiresAt: '',
-                  reminderEnabled: false,
                 }))
               }
             />

@@ -58,7 +58,9 @@ export type PantryPhotoAnalysisResponse = {
   unit: string;
   storageLocation: PantryItem['location'];
   expiresAt?: string;
+  productionDate?: string;
   purchaseDate?: string;
+  shelfLifeDays?: number;
   tags: string[];
   confidence: number;
   warnings: string[];
