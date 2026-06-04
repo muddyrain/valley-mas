@@ -486,7 +486,6 @@ export function PhotoItemAnalysisPage() {
 
       const expiresAt = form.expiresAt.trim();
       const openedAt = form.openedAt.trim();
-      const shouldPersistActiveHousehold = form.householdId !== preferredPantryHouseholdId;
       const input: NewPantryItemInput = {
         householdId: form.householdId || undefined,
         name: form.name.trim(),
@@ -510,13 +509,11 @@ export function PhotoItemAnalysisPage() {
       if (!item) {
         throw new Error('入库失败，请稍后重试。');
       }
-      if (shouldPersistActiveHousehold) {
-        void setActivePantryHousehold(
-          form.householdId || '',
-          form.householdId ? selectedHouseholdName : '',
-          { silent: true },
-        );
-      }
+      void setActivePantryHousehold(
+        form.householdId || '',
+        form.householdId ? selectedHouseholdName : '',
+        { silent: true },
+      );
       setState('done');
       setReviewSheetOpen(true);
       showToast(`「${item.name}」已加入${selectedHouseholdName}`, 'success');

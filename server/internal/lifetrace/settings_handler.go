@@ -2,7 +2,9 @@ package lifetrace
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"valley-server/internal/database"
@@ -34,6 +36,8 @@ type updateSettingsRequest struct {
 	PantryReminderRules     []string `json:"pantryReminderRules"`
 	PantryReminderTime      string   `json:"pantryReminderTime"`
 }
+
+var errPreferredPantryHouseholdInaccessible = errors.New("preferred pantry household inaccessible")
 
 var validCommuteMethods = map[string]bool{
 	"开车": true,
@@ -185,11 +189,48 @@ func normalizePantryReminderRules(rules []string) model.StringList {
 	return result
 }
 
-func applySettingsRequest(settings *model.LifeTraceSettings, req updateSettingsRequest) {
-	settings.ActivePantryHouseholdID = normalizePreferredPantryHouseholdID(
+func resolvePreferredPantryHouseholdID(userID model.Int64String, raw string) (model.Int64String, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, nil
+	}
+
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || value <= 0 {
+		return 0, fmt.Errorf("%w: invalid id", errPreferredPantryHouseholdInaccessible)
+	}
+
+	preferredID := model.Int64String(value)
+	if preferredID == personalHouseholdID(userID) {
+		return 0, nil
+	}
+
+	var household model.Household
+	if err := database.GetDB().
+		Where("id = ? AND status = ?", preferredID, householdStatusActive).
+		First(&household).Error; err != nil {
+		return 0, fmt.Errorf("%w: household not active", errPreferredPantryHouseholdInaccessible)
+	}
+
+	var member model.HouseholdMember
+	if err := database.GetDB().
+		Where("household_id = ? AND user_id = ? AND status = ?", preferredID, userID, householdMemberStatusActive).
+		First(&member).Error; err != nil {
+		return 0, fmt.Errorf("%w: member not active", errPreferredPantryHouseholdInaccessible)
+	}
+
+	return preferredID, nil
+}
+
+func applySettingsRequest(settings *model.LifeTraceSettings, req updateSettingsRequest) error {
+	activePantryHouseholdID, err := resolvePreferredPantryHouseholdID(
 		settings.UserID,
 		req.ActivePantryHouseholdID,
 	)
+	if err != nil {
+		return err
+	}
+	settings.ActivePantryHouseholdID = activePantryHouseholdID
 	settings.City = normalizeText(req.City, "上海")
 	settings.WorkStart = normalizeTimeText(req.WorkStart, "09:30")
 	settings.WorkEnd = normalizeTimeText(req.WorkEnd, "18:30")
@@ -209,6 +250,7 @@ func applySettingsRequest(settings *model.LifeTraceSettings, req updateSettingsR
 	settings.PantryReminderEnabled = req.PantryReminderEnabled
 	settings.PantryReminderRules = normalizePantryReminderRules(req.PantryReminderRules)
 	settings.PantryReminderTime = normalizeTimeText(req.PantryReminderTime, "09:00")
+	return nil
 }
 
 func (h *Handler) GetSettings(c *gin.Context) {
@@ -246,7 +288,14 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	applySettingsRequest(&settings, req)
+	if err := applySettingsRequest(&settings, req); err != nil {
+		if errors.Is(err, errPreferredPantryHouseholdInaccessible) {
+			fail(c, http.StatusForbidden, "家庭空间不存在或不可访问")
+			return
+		}
+		fail(c, http.StatusInternalServerError, "保存偏好失败")
+		return
+	}
 	if err := database.GetDB().Save(&settings).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "保存偏好失败")
 		return

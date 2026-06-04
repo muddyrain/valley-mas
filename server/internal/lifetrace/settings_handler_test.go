@@ -2,6 +2,7 @@ package lifetrace
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -41,6 +42,19 @@ func TestGetSettingsCreatesDefaultForCurrentUser(t *testing.T) {
 	if settings["activePantryHouseholdId"] != nil {
 		t.Fatalf("expected default active pantry household id to be empty, got %+v", settings)
 	}
+}
+
+func decodeTraceFailurePayload(t *testing.T, recorder *httptest.ResponseRecorder) map[string]interface{} {
+	t.Helper()
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v\nbody: %s", err, recorder.Body.String())
+	}
+	if payload["code"].(float64) == 0 {
+		t.Fatalf("expected failure response, got %+v", payload)
+	}
+	return payload
 }
 
 func TestUpdateSettingsPersistsCurrentUserPreferences(t *testing.T) {
@@ -131,6 +145,61 @@ func TestUpdateSettingsPersistsCurrentUserPreferences(t *testing.T) {
 	persisted := decodeTracePayload(t, getResp)["data"].(map[string]interface{})
 	if persisted["city"] != "杭州" || persisted["workStart"] != "10:00" || persisted["pantryReminderTime"] != "08:45" || persisted["activePantryHouseholdId"] != "301" {
 		t.Fatalf("expected settings to persist, got %+v", persisted)
+	}
+}
+
+func TestUpdateSettingsRejectsInaccessibleActivePantryHousehold(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+	sharedHousehold := model.Household{
+		ID:          301,
+		Name:        "别人家",
+		Kind:        householdKindShared,
+		OwnerUserID: 202,
+		Status:      householdStatusActive,
+	}
+	if err := database.GetDB().Create(&sharedHousehold).Error; err != nil {
+		t.Fatalf("create household failed: %v", err)
+	}
+
+	body := bytes.NewBufferString(`{
+		"activePantryHouseholdId": "301",
+		"city": "杭州",
+		"workStart": "09:30",
+		"workEnd": "18:30",
+		"commuteMethod": "开车",
+		"dailyBriefTime": "08:10",
+		"workdayMode": "legal",
+		"workdays": ["1", "2", "3", "4", "5"],
+		"holidaySync": true,
+		"weekendReminders": false,
+		"planReminderLeadMinutes": 10,
+		"quietStart": "22:30",
+		"quietEnd": "07:30",
+		"weatherAlerts": true,
+		"planReminders": true,
+		"aiPersonalization": true,
+		"habits": ["喝水"],
+		"pantryReminderEnabled": true,
+		"pantryReminderRules": ["7d", "3d", "same-day", "expired"],
+		"pantryReminderTime": "09:00"
+	}`)
+	updateReq := httptest.NewRequest(http.MethodPut, "/api/v1/life-trace/settings", body)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp := httptest.NewRecorder()
+	router.ServeHTTP(updateResp, updateReq)
+
+	payload := decodeTraceFailurePayload(t, updateResp)
+	if payload["code"] != float64(http.StatusForbidden) || payload["message"] != "家庭空间不存在或不可访问" {
+		t.Fatalf("expected inaccessible household failure, got %+v", payload)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/settings", nil)
+	getResp := httptest.NewRecorder()
+	router.ServeHTTP(getResp, getReq)
+
+	settings := decodeTracePayload(t, getResp)["data"].(map[string]interface{})
+	if settings["activePantryHouseholdId"] != nil {
+		t.Fatalf("expected inaccessible active household not to be silently persisted, got %+v", settings)
 	}
 }
 
