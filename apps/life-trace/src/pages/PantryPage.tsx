@@ -22,7 +22,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
-  buildPantryTraceInput,
   getPantryCoverUrl,
   getPantryExpiryText,
   getPantryStatusLabel,
@@ -127,7 +126,6 @@ export function PantryPage() {
     (state) => state.preferredPantryHouseholdName,
   );
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
-  const addTrace = useLifeTraceStore((state) => state.addTrace);
   const pantryList = useLifeTraceStore((state) => state.pantryListItems);
   const pantryLoaded = useLifeTraceStore((state) => state.pantryListLoaded);
   const pantryLoading = useLifeTraceStore((state) => state.pantryListLoading);
@@ -159,6 +157,7 @@ export function PantryPage() {
     readQueryText(new URLSearchParams(window.location.search)),
   );
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
+  const statusActionInFlightRef = useRef<Set<string>>(new Set());
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const latestSearchParamsRef = useRef(searchParams);
   const showToast = useFeedbackToastStore((state) => state.showToast);
@@ -225,26 +224,34 @@ export function PantryPage() {
   }, [loadMorePantryList, pantryLoading, pantryLoadingMore, pantryPagination.hasMore]);
 
   const handleStatusAction = async (item: PantryItem, status: 'used-up' | 'discarded') => {
-    if (pendingActionId) {
+    const actionKey = `${item.id}:${status}`;
+    if (pendingActionId || statusActionInFlightRef.current.has(item.id)) {
       return;
     }
 
-    setPendingActionId(`${item.id}:${status}`);
+    statusActionInFlightRef.current.add(item.id);
+    setPendingActionId(actionKey);
     try {
       const updated = await updatePantryItemStatus(
         item.id,
         status,
         effectiveHouseholdId || undefined,
       );
-      if (!updated) {
-        return;
-      }
-      const trace = await addTrace(buildPantryTraceInput(updated, status));
-      if (!trace) {
-        showToast('库存状态已更新，但生活踪迹没有生成成功，可以稍后手动补记。', 'warning');
+      if (updated) {
+        let actionLabel = '丢弃';
+        if (status === 'used-up') {
+          actionLabel = '用完';
+        }
+        showToast(`已记录${actionLabel}`, 'success');
       }
     } finally {
-      setPendingActionId(null);
+      statusActionInFlightRef.current.delete(item.id);
+      setPendingActionId((current) => {
+        if (current === actionKey) {
+          return null;
+        }
+        return current;
+      });
     }
   };
 

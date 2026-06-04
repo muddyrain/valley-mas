@@ -777,6 +777,14 @@ func TestBuildLifeTraceAssistantPlanDraftInfersSchedule(t *testing.T) {
 	if reminder.NotePrefix != "来自生活助理提醒" {
 		t.Fatalf("expected reminder note prefix, got %+v", reminder)
 	}
+
+	relativeReminder := buildLifeTraceAssistantPlanDraft("5分钟后提醒我喝水", now)
+	if relativeReminder == nil {
+		t.Fatal("expected relative reminder plan draft")
+	}
+	if relativeReminder.ScheduledDate != "2026-05-29" || relativeReminder.ScheduledTime != "10:05" {
+		t.Fatalf("expected five-minute relative reminder schedule, got %+v", relativeReminder)
+	}
 }
 
 func TestBuildLifeTraceAssistantPantryDraftInfersInventoryFields(t *testing.T) {
@@ -1045,6 +1053,42 @@ func TestBuildLifeTraceAssistantPlanFollowUpDraftUsesRecentDraft(t *testing.T) {
 	}
 	if draft.ScheduledDate != "2026-06-04" || draft.ScheduledTime != "15:00" {
 		t.Fatalf("expected date/time to be updated from follow-up, got %+v", draft)
+	}
+
+	relativeDraft := buildLifeTraceAssistantPlanFollowUpDraft("5分钟后", base, now)
+	if relativeDraft == nil {
+		t.Fatal("expected relative plan follow-up draft")
+	}
+	if relativeDraft.ScheduledDate != "2026-06-03" || relativeDraft.ScheduledTime != "10:05" {
+		t.Fatalf("expected relative follow-up schedule to be updated, got %+v", relativeDraft)
+	}
+}
+
+func TestMergeAssistantPlanDraftKeepsLocalRelativeSchedule(t *testing.T) {
+	primary := &lifeTraceAssistantPlanDraft{
+		Title:         "喝水",
+		Type:          "普通事项",
+		ScheduledDate: "2026-06-03",
+		ScheduledTime: "20:00",
+		Timezone:      "Asia/Shanghai",
+		NotePrefix:    "来自生活助理提醒",
+	}
+	fallback := &lifeTraceAssistantPlanDraft{
+		Title:            "喝水",
+		Type:             "普通事项",
+		ScheduledDate:    "2026-06-03",
+		ScheduledTime:    "10:05",
+		Timezone:         "Asia/Shanghai",
+		NotePrefix:       "来自生活助理提醒",
+		RelativeSchedule: true,
+	}
+
+	merged := mergeAssistantPlanDraft(primary, fallback)
+	if merged == nil {
+		t.Fatal("expected merged plan draft")
+	}
+	if merged.ScheduledDate != "2026-06-03" || merged.ScheduledTime != "10:05" {
+		t.Fatalf("expected local relative schedule to win over model schedule, got %+v", merged)
 	}
 }
 

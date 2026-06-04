@@ -73,12 +73,13 @@ type lifeTraceAIConfig struct {
 }
 
 type lifeTraceAssistantPlanDraft struct {
-	Title         string `json:"title"`
-	Type          string `json:"type"`
-	ScheduledDate string `json:"scheduledDate"`
-	ScheduledTime string `json:"scheduledTime"`
-	Timezone      string `json:"timezone"`
-	NotePrefix    string `json:"notePrefix"`
+	Title            string `json:"title"`
+	Type             string `json:"type"`
+	ScheduledDate    string `json:"scheduledDate"`
+	ScheduledTime    string `json:"scheduledTime"`
+	Timezone         string `json:"timezone"`
+	NotePrefix       string `json:"notePrefix"`
+	RelativeSchedule bool   `json:"-"`
 }
 
 type lifeTraceAssistantPantryDraft struct {
@@ -131,19 +132,20 @@ const lifeTraceWeeklyReviewMaxTokens = 520
 const lifeTraceAssistantToolName = "submit_life_trace_response"
 
 var (
-	assistantPlanIntentPattern     = regexp.MustCompile(`计划|安排|提醒我|提醒|记得|别忘|预约|看电影|电影|吃饭|午饭|晚饭|早餐|午餐|晚餐|餐厅|火锅|咖啡|运动|跑步|健身|阅读|看书|聚会|见朋友|喝咖啡`)
-	assistantReminderIntentPattern = regexp.MustCompile(`提醒我|提醒|记得|别忘|预约|叫我|提示我`)
-	assistantClockPattern          = regexp.MustCompile(`([01]?\d|2[0-3])[:：点时]([0-5]\d)?`)
-	assistantPlanTitleNoise        = regexp.MustCompile(`今天|今晚|晚上|明天|明早|明晚|周末|周五|周六|周日|星期五|星期六|星期日|早上|上午|中午|下午|下班后?|([01]?\d|2[0-3])[:：点时]([0-5]\d)?|提醒我|提醒|记得|别忘了?|叫我|提示我|帮我|我要|想要|想|计划|安排|一下|去|，|。|,|、|\s+`)
-	assistantPantryIntentPattern   = regexp.MustCompile(`库存|保质期|生产日期|生产日|有效期|到期|过期|临期|我这边有|我有|家里有|买了|刚买了|新买了|收到|入库|加到库存|添加库存`)
-	assistantPantryNamePattern     = regexp.MustCompile(`(?:我这边有|我有|家里有|买了|刚买了|新买了|收到|入库|加到库存(?:里)?|添加库存(?:里)?|库存里有)\s*(?:一|1|一个|一件|一盒|一瓶|一袋|一包|一桶|一支|一罐|一杯|一份|一条|一箱|\d+\s*(?:瓶|盒|袋|包|罐|个|件|桶|支|片|听|杯|箱|条|份))?\s*([^，。,；;]+?)\s*(?:生产日期|生产日|保质期|有效期|到期|过期|开封|放在|放到|存放在|，|。|,|;|；|$)`)
-	assistantDatePattern           = regexp.MustCompile(`(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?`)
-	assistantProductionDatePattern = regexp.MustCompile(`(?:生产日期|生产日)[:：是 ]*(\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?)`)
-	assistantExpiryDatePattern     = regexp.MustCompile(`(?:到期日|过期日|有效期至|保质期至|截止日期|截止到)[:：是 ]*(\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?)`)
-	assistantShelfLifePattern      = regexp.MustCompile(`(?:保质期|有效期)[^0-9]{0,8}(\d+)\s*(天|日|个月|月|年)|(\d+)\s*(天|日|个月|月|年)\s*(?:保质期|有效期)`)
-	assistantOpenedAtPattern       = regexp.MustCompile(`(?:开封日期|开封于|开封)[:：是 ]*(\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?)`)
-	assistantPantryQuantityPattern = regexp.MustCompile(`(\d+)\s*(瓶|盒|袋|包|罐|个|件|桶|支|片|听|杯|箱|条|份)`)
-	assistantPantryLeadingCount    = regexp.MustCompile(`^(?:一|1|一个|一件)?\s*(瓶|盒|袋|包|罐|个|件|桶|支|片|听|杯|箱|条|份)\s*`)
+	assistantPlanIntentPattern       = regexp.MustCompile(`计划|安排|提醒我|提醒|记得|别忘|预约|看电影|电影|吃饭|午饭|晚饭|早餐|午餐|晚餐|餐厅|火锅|咖啡|运动|跑步|健身|阅读|看书|聚会|见朋友|喝咖啡`)
+	assistantReminderIntentPattern   = regexp.MustCompile(`提醒我|提醒|记得|别忘|预约|叫我|提示我`)
+	assistantClockPattern            = regexp.MustCompile(`([01]?\d|2[0-3])[:：点时]([0-5]\d)?`)
+	assistantRelativeDurationPattern = regexp.MustCompile(`(?:(\d+)\s*(?:个)?小时\s*(?:(\d+)\s*分钟?)?后|(\d+)\s*分钟?后)`)
+	assistantPlanTitleNoise          = regexp.MustCompile(`今天|今晚|晚上|明天|明早|明晚|周末|周五|周六|周日|星期五|星期六|星期日|早上|上午|中午|下午|下班后?|(?:(\d+)\s*(?:个)?小时\s*(?:(\d+)\s*分钟?)?后|(\d+)\s*分钟?后)|([01]?\d|2[0-3])[:：点时]([0-5]\d)?|提醒我|提醒|记得|别忘了?|叫我|提示我|帮我|我要|想要|想|计划|安排|一下|去|，|。|,|、|\s+`)
+	assistantPantryIntentPattern     = regexp.MustCompile(`库存|保质期|生产日期|生产日|有效期|到期|过期|临期|我这边有|我有|家里有|买了|刚买了|新买了|收到|入库|加到库存|添加库存`)
+	assistantPantryNamePattern       = regexp.MustCompile(`(?:我这边有|我有|家里有|买了|刚买了|新买了|收到|入库|加到库存(?:里)?|添加库存(?:里)?|库存里有)\s*(?:一|1|一个|一件|一盒|一瓶|一袋|一包|一桶|一支|一罐|一杯|一份|一条|一箱|\d+\s*(?:瓶|盒|袋|包|罐|个|件|桶|支|片|听|杯|箱|条|份))?\s*([^，。,；;]+?)\s*(?:生产日期|生产日|保质期|有效期|到期|过期|开封|放在|放到|存放在|，|。|,|;|；|$)`)
+	assistantDatePattern             = regexp.MustCompile(`(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?`)
+	assistantProductionDatePattern   = regexp.MustCompile(`(?:生产日期|生产日)[:：是 ]*(\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?)`)
+	assistantExpiryDatePattern       = regexp.MustCompile(`(?:到期日|过期日|有效期至|保质期至|截止日期|截止到)[:：是 ]*(\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?)`)
+	assistantShelfLifePattern        = regexp.MustCompile(`(?:保质期|有效期)[^0-9]{0,8}(\d+)\s*(天|日|个月|月|年)|(\d+)\s*(天|日|个月|月|年)\s*(?:保质期|有效期)`)
+	assistantOpenedAtPattern         = regexp.MustCompile(`(?:开封日期|开封于|开封)[:：是 ]*(\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?)`)
+	assistantPantryQuantityPattern   = regexp.MustCompile(`(\d+)\s*(瓶|盒|袋|包|罐|个|件|桶|支|片|听|杯|箱|条|份)`)
+	assistantPantryLeadingCount      = regexp.MustCompile(`^(?:一|1|一个|一件)?\s*(瓶|盒|袋|包|罐|个|件|桶|支|片|听|杯|箱|条|份)\s*`)
 )
 
 type todayAdviceCacheEntry struct {
@@ -531,20 +533,24 @@ func buildLifeTraceAssistantPlanDraft(message string, now time.Time) *lifeTraceA
 
 	planType := inferLifeTraceAssistantPlanType(text)
 	title := buildLifeTraceAssistantPlanTitle(text, planType)
-	scheduledTime := inferLifeTraceAssistantPlanTime(text, planType)
-	scheduledDate := inferLifeTraceAssistantPlanDate(text, now)
+	scheduledDate, scheduledTime, relativeSchedule := inferLifeTraceAssistantRelativeSchedule(text, now)
+	if !relativeSchedule {
+		scheduledTime = inferLifeTraceAssistantPlanTime(text, planType)
+		scheduledDate = inferLifeTraceAssistantPlanDate(text, now)
+	}
 	notePrefix := "来自生活助理计划"
 	if assistantReminderIntentPattern.MatchString(text) {
 		notePrefix = "来自生活助理提醒"
 	}
 
 	return &lifeTraceAssistantPlanDraft{
-		Title:         title,
-		Type:          planType,
-		ScheduledDate: scheduledDate,
-		ScheduledTime: scheduledTime,
-		Timezone:      "Asia/Shanghai",
-		NotePrefix:    notePrefix,
+		Title:            title,
+		Type:             planType,
+		ScheduledDate:    scheduledDate,
+		ScheduledTime:    scheduledTime,
+		Timezone:         "Asia/Shanghai",
+		NotePrefix:       notePrefix,
+		RelativeSchedule: relativeSchedule,
 	}
 }
 
@@ -618,6 +624,50 @@ func inferLifeTraceAssistantPlanTime(text string, planType string) string {
 	default:
 		return "20:00"
 	}
+}
+
+func inferLifeTraceAssistantRelativeSchedule(text string, now time.Time) (string, string, bool) {
+	match := assistantRelativeDurationPattern.FindStringSubmatch(strings.TrimSpace(text))
+	if len(match) < 3 {
+		return "", "", false
+	}
+
+	hours := 0
+	minutes := 0
+	if match[1] != "" {
+		parsedHours, err := strconv.Atoi(match[1])
+		if err != nil {
+			return "", "", false
+		}
+		hours = parsedHours
+	}
+	if match[2] != "" {
+		parsedMinutes, err := strconv.Atoi(match[2])
+		if err != nil {
+			return "", "", false
+		}
+		minutes = parsedMinutes
+	}
+	if match[3] != "" {
+		parsedMinutes, err := strconv.Atoi(match[3])
+		if err != nil {
+			return "", "", false
+		}
+		minutes = parsedMinutes
+	}
+	if hours <= 0 && minutes <= 0 {
+		return "", "", false
+	}
+
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		location = time.Local
+	}
+	dueAt := now.In(location).Add(time.Duration(hours)*time.Hour + time.Duration(minutes)*time.Minute)
+	if dueAt.Second() > 0 || dueAt.Nanosecond() > 0 {
+		dueAt = dueAt.Truncate(time.Minute).Add(time.Minute)
+	}
+	return dueAt.Format("2006-01-02"), dueAt.Format("15:04"), true
 }
 
 func inferLifeTraceAssistantPlanDate(text string, now time.Time) string {
@@ -820,7 +870,11 @@ func buildLifeTraceAssistantPlanFollowUpDraft(
 
 	next := *base
 	changed := false
-	if assistantClockPattern.MatchString(text) ||
+	if scheduledDate, scheduledTime, ok := inferLifeTraceAssistantRelativeSchedule(text, now); ok {
+		next.ScheduledDate = scheduledDate
+		next.ScheduledTime = scheduledTime
+		changed = true
+	} else if assistantClockPattern.MatchString(text) ||
 		strings.Contains(text, "早上") ||
 		strings.Contains(text, "上午") ||
 		strings.Contains(text, "中午") ||
@@ -1179,11 +1233,13 @@ func mergeAssistantPlanDraft(primary *lifeTraceAssistantPlanDraft, fallback *lif
 	if planType := normalizePlanType(primary.Type); planType != "" {
 		merged.Type = planType
 	}
-	if date := normalizeAssistantDate(primary.ScheduledDate); date != "" {
-		merged.ScheduledDate = date
-	}
-	if timeText := normalizeTimeText(primary.ScheduledTime, ""); timeText != "" {
-		merged.ScheduledTime = timeText
+	if !merged.RelativeSchedule {
+		if date := normalizeAssistantDate(primary.ScheduledDate); date != "" {
+			merged.ScheduledDate = date
+		}
+		if timeText := normalizeTimeText(primary.ScheduledTime, ""); timeText != "" {
+			merged.ScheduledTime = timeText
+		}
 	}
 	if timezone := strings.TrimSpace(primary.Timezone); timezone != "" {
 		merged.Timezone = timezone

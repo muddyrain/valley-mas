@@ -41,6 +41,7 @@ import { Card } from '@/components/ui/card';
 import { useNotificationPermission } from '@/hooks/useNotificationPermission';
 import { usePantryHouseholdManager } from '@/hooks/usePantryHouseholdManager';
 import { usePwaStatus } from '@/hooks/usePwaStatus';
+import { APP_VERSION_LABEL } from '@/lib/appVersion';
 import { gsap, useGSAP } from '@/lib/gsap';
 import { formatLocationDisplay } from '@/lib/location';
 import { pantryReminderRuleLabels } from '@/lib/pantry';
@@ -1399,6 +1400,10 @@ export function ProfilePage() {
           </div>
         </Card>
       </section>
+
+      <p className="pb-2 text-center text-xs font-medium text-muted-foreground/70">
+        当前版本 {APP_VERSION_LABEL}
+      </p>
 
       <ProfileAvatarSheet
         open={avatarSheetOpen}

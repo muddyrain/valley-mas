@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WeatherApiResponse } from '../src/api/weather';
-import { buildWeatherDrivenAdvice } from '../src/lib/weatherAdvice';
-import type { UserSettings } from '../src/types';
+import { buildWeatherAlerts } from '../src/lib/weatherAdvice';
 
 const baseWeather: WeatherApiResponse = {
   source: 'qweather',
@@ -28,32 +27,12 @@ const baseWeather: WeatherApiResponse = {
   cached: false,
 };
 
-const settings: UserSettings = {
-  city: '上海',
-  workStart: '09:30',
-  workEnd: '18:30',
-  commuteMethod: '开车',
-  dailyBriefTime: '08:10',
-  weatherAlerts: true,
-  planReminders: true,
-  aiPersonalization: true,
-  habits: ['喝水', '休息', '运动'],
-};
+describe('buildWeatherAlerts', () => {
+  it('keeps weather risk alerts available for the home page', () => {
+    const alerts = buildWeatherAlerts(baseWeather);
 
-describe('buildWeatherDrivenAdvice', () => {
-  it('generates rain, temperature gap, skincare and commute advice from real weather', () => {
-    const advice = buildWeatherDrivenAdvice({
-      weather: baseWeather,
-      settings,
-      openPlanCount: 2,
-    });
-
-    expect(advice).toHaveLength(6);
-    expect(advice.find((item) => item.id === 'wear')?.detail).toContain('分层');
-    expect(advice.find((item) => item.id === 'skin')?.detail).toContain('防晒');
-    expect(advice.find((item) => item.id === 'out')?.detail).toContain('带伞');
-    expect(advice.find((item) => item.id === 'commute')?.detail).toContain('开车');
-    expect(advice.find((item) => item.id === 'commute')?.detail).toContain('提前');
-    expect(advice.find((item) => item.id === 'plan')?.detail).toContain('2个');
+    expect(alerts).toHaveLength(3);
+    expect(alerts.map((item) => item.id)).toEqual(['temp-gap', 'rain', 'uv']);
+    expect(alerts.find((item) => item.id === 'rain')?.detail).toContain('带伞');
   });
 });

@@ -229,6 +229,7 @@ const getAiActions = (state: Pick<LifeTraceState, 'aiActions'>) => state.aiActio
 const getToken = () => useAuthStore.getState().token;
 
 let settingsSaveTimer: ReturnType<typeof setTimeout> | null = null;
+const pantryStatusUpdateInFlightKeys = new Set<string>();
 let pantryListRequestId = 0;
 
 function recordPantryTrace(
@@ -1111,6 +1112,12 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           return null;
         }
 
+        const statusUpdateKey = `${normalizeHouseholdScopeId(householdId) || 'personal'}:${itemId}`;
+        if (pantryStatusUpdateInFlightKeys.has(statusUpdateKey)) {
+          return null;
+        }
+
+        pantryStatusUpdateInFlightKeys.add(statusUpdateKey);
         try {
           const updatedItem = normalizePantryItem(
             await requestUpdatePantryItemStatus(token, itemId, status, householdId),
@@ -1153,6 +1160,8 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         } catch (error) {
           set({ pantryError: getLifeTraceErrorMessage(error, '更新库存状态失败') });
           return null;
+        } finally {
+          pantryStatusUpdateInFlightKeys.delete(statusUpdateKey);
         }
       },
       removePantryItem: async (itemId, householdId) => {

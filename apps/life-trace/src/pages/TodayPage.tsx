@@ -1,25 +1,18 @@
 import {
   AlertTriangle,
   Bell,
-  CalendarDays,
-  Car,
   Check,
   Cloud,
   Droplets,
-  Heart,
   LoaderCircle,
   MapPin,
-  Plus,
   RefreshCw,
   Settings,
-  Shirt,
-  Sparkles,
   Sun,
   Wind,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { generateTodayAdvice } from '@/api/advice';
 import {
   fetchLifeTraceWeather,
   type WeatherApiDay,
@@ -34,8 +27,6 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { weatherMetrics } from '@/data/mock';
 import { useLifeTraceEntrance } from '@/hooks/useLifeTraceEntrance';
-import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
-import { gsap, useGSAP } from '@/lib/gsap';
 import { formatLocationDisplay, getWeatherLocationLabel } from '@/lib/location';
 import {
   getPantryCoverUrl,
@@ -48,25 +39,11 @@ import { isOverduePlan, isTodayPlan } from '@/lib/planGroups';
 import { getNextReminder, getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { getLocalISODate } from '@/lib/planSchedule';
 import { cn } from '@/lib/utils';
-import {
-  buildWeatherAlerts,
-  buildWeatherBrief,
-  buildWeatherDrivenAdvice,
-} from '@/lib/weatherAdvice';
+import { buildWeatherAlerts } from '@/lib/weatherAdvice';
 import { readWeatherCache, writeWeatherCache } from '@/lib/weatherCache';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { Advice, AdvicePayload } from '@/types';
-
-const adviceToneClasses: Record<Advice['tone'], { bg: string; text: string }> = {
-  weather: { bg: 'bg-life-weather/10', text: 'text-life-weather' },
-  ai: { bg: 'bg-life-ai/10', text: 'text-life-ai' },
-  plan: { bg: 'bg-life-plan/10', text: 'text-life-plan' },
-  trace: { bg: 'bg-life-trace/10', text: 'text-life-trace' },
-  health: { bg: 'bg-life-health/10', text: 'text-life-health' },
-  alert: { bg: 'bg-life-alert/10', text: 'text-life-alert' },
-};
 
 const metricIconMap = {
   降水: Droplets,
@@ -86,53 +63,13 @@ const metricToneClasses = {
   alert: 'text-life-alert',
 };
 
-const adviceIconMap = {
-  wear: Shirt,
-  skin: Droplets,
-  out: Cloud,
-  commute: Car,
-  health: Heart,
-  plan: CalendarDays,
+const weatherAlertToneClasses = {
+  weather: { bg: 'bg-life-weather/10', text: 'text-life-weather' },
+  health: { bg: 'bg-life-health/10', text: 'text-life-health' },
+  alert: { bg: 'bg-life-alert/10', text: 'text-life-alert' },
 };
-
-const AI_ADVICE_CACHE_KEY = 'life-trace-ai-advice-cache';
 
 type WeatherDayTab = 'today' | 'tomorrow';
-
-type CachedAdvice = {
-  contextVersion: string;
-  summary?: string;
-  list: AdvicePayload[];
-  cachedAt: number;
-};
-
-function readCachedAdvice(contextVersion?: string) {
-  try {
-    const raw = window.localStorage.getItem(AI_ADVICE_CACHE_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const cached = JSON.parse(raw) as CachedAdvice;
-    if (!Array.isArray(cached.list)) {
-      return null;
-    }
-    if (contextVersion && cached.contextVersion !== contextVersion) {
-      return null;
-    }
-    return cached;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedAdvice(cached: CachedAdvice) {
-  try {
-    window.localStorage.setItem(AI_ADVICE_CACHE_KEY, JSON.stringify(cached));
-  } catch {
-    // Stored advice should never block the page.
-  }
-}
 
 const fallbackWeather: WeatherApiResponse = {
   source: 'mock',
@@ -271,12 +208,8 @@ function buildWeatherDayLabel(dateText: string, fallbackLabel: string) {
 }
 
 export function TodayPage() {
-  const openPlanCount = useLifeTraceStore(
-    (state) => state.plans.filter((plan) => !plan.completed).length,
-  );
   const plans = useLifeTraceStore((state) => state.plans);
   const plansLoaded = useLifeTraceStore((state) => state.plansLoaded);
-  const planCreating = useLifeTraceStore((state) => state.planCreating);
   const checkins = useLifeTraceStore((state) => state.checkins);
   const checkinsDate = useLifeTraceStore((state) => state.checkinsDate);
   const checkinsLoading = useLifeTraceStore((state) => state.checkinsLoading);
@@ -297,7 +230,6 @@ export function TodayPage() {
   );
   const updateSettings = useLifeTraceStore((state) => state.updateSettings);
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
-  const addPlan = useLifeTraceStore((state) => state.addPlan);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
   const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
   const toggleHabitCheckin = useLifeTraceStore((state) => state.toggleHabitCheckin);
@@ -311,17 +243,8 @@ export function TodayPage() {
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState('');
   const [selectedWeatherDay, setSelectedWeatherDay] = useState<WeatherDayTab>('today');
-  const [remoteAdvice, setRemoteAdvice] = useState<AdvicePayload[] | null>(null);
-  const [remoteAdviceSummary, setRemoteAdviceSummary] = useState('');
-  const [adviceLoading, setAdviceLoading] = useState(false);
-  const [adviceRefreshing, setAdviceRefreshing] = useState(false);
-  const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const showToast = useFeedbackToastStore((state) => state.showToast);
-  const planFingerprint = useMemo(
-    () => plans.map((plan) => `${plan.id}:${plan.completed}:${plan.updatedAt ?? ''}`).join('|'),
-    [plans],
-  );
   const todayDate = useMemo(() => getLocalISODate(new Date()), []);
   const todayLabel = useMemo(
     () =>
@@ -348,41 +271,9 @@ export function TodayPage() {
         .slice(0, 3),
     [pantryListItems],
   );
-  const checkinFingerprint = useMemo(
-    () =>
-      todayCheckins
-        .map((item) => `${item.name}:${item.completed}:${item.updatedAt ?? ''}`)
-        .sort()
-        .join('|'),
-    [todayCheckins],
-  );
   const weatherLocationLabel = getWeatherLocationLabel(weather.city, settings.city);
   const profileLocationLabel = formatLocationDisplay(settings.city) || settings.city;
-  const adviceContextVersion = [
-    settings.city,
-    settings.workStart,
-    settings.workEnd,
-    settings.commuteMethod,
-    settings.habits.join('、'),
-    openPlanCount,
-    planFingerprint,
-    checkinFingerprint,
-  ].join('|');
-  const localAdvice =
-    settings.aiPersonalization || !weatherReady
-      ? []
-      : buildWeatherDrivenAdvice({ weather, settings, openPlanCount });
-  const advice = (remoteAdvice ?? localAdvice).map((item) => ({
-    ...item,
-    icon: adviceIconMap[item.id as keyof typeof adviceIconMap] ?? Sparkles,
-  }));
   const showWeatherSkeleton = !weatherReady;
-  const showAdviceSkeleton =
-    (!weatherReady && !remoteAdvice) ||
-    (settings.aiPersonalization && adviceLoading && !remoteAdvice);
-  const showAdvicePlaceholder =
-    showAdviceSkeleton || (settings.aiPersonalization && !adviceLoading && !remoteAdvice);
-  const localBrief = buildWeatherBrief(weather, settings);
   const weatherAlertCards = useMemo(
     () => (settings.weatherAlerts ? buildWeatherAlerts(weather) : []),
     [settings.weatherAlerts, weather],
@@ -442,11 +333,6 @@ export function TodayPage() {
     weather.source !== 'mock' &&
     !weatherError.includes('已显示本地参考天气') &&
     !weatherError.includes('已保留当前天气');
-  const shouldWaitForAiBrief = Boolean(token) && (!settingsLoaded || settings.aiPersonalization);
-  const showBriefSkeleton = !remoteAdviceSummary && (!weatherReady || shouldWaitForAiBrief);
-  const hasAiBrief = Boolean(remoteAdviceSummary);
-  const aiBriefTitle = hasAiBrief ? '今日状态摘要' : localBrief.title;
-  const aiBriefDetail = remoteAdviceSummary || localBrief.detail;
   const nextReminder = getNextReminder(plans);
   const todayOpenPlans = useMemo(
     () => plans.filter((plan) => !plan.completed && isTodayPlan(plan)),
@@ -463,7 +349,7 @@ export function TodayPage() {
       ? `${overduePlans.length} 个计划已过时间，建议先处理一个。`
       : todayOpenPlans.length > 0
         ? `今天还有 ${todayOpenPlans.length} 个计划，完成后会自动沉淀为踪迹。`
-        : '今天还没有未完成计划，可以从建议卡片快速添加。';
+        : '今天还没有未完成计划，可以进入计划页手动创建。';
   const completedHabitCount = habitNames.filter((name) =>
     todayCheckins.some((item) => item.name === name && item.completed),
   ).length;
@@ -472,54 +358,9 @@ export function TodayPage() {
   const checkinAdviceText =
     habitNames.length === 0
       ? '先去我的页添加自定义打卡，比如喝药、维生素或饭后散步。'
-      : adviceLoading
-        ? '正在更新今天的打卡节奏。'
-        : completedHabitCount > 0
-          ? `已完成 ${completedHabitCount} 项，今天继续按这个节奏就很好。`
-          : '先完成一个小打卡，今天会更容易进入状态。';
-  const adviceStatusText = remoteAdvice
-    ? adviceRefreshing
-      ? 'AI 刷新中'
-      : 'AI 建议'
-    : adviceLoading
-      ? '生成中'
-      : settings.aiPersonalization
-        ? '等待 AI'
-        : '基础建议';
-  const todayLocationAdviceLabel = weatherLocationLabel || profileLocationLabel;
-  const aiBriefHighlights = useMemo(() => {
-    const highlights = [
-      weather.now.text.includes('雨')
-        ? `${todayLocationAdviceLabel}今天有雨，出门记得带伞。`
-        : `${todayLocationAdviceLabel}今天以${weather.now.text}为主，按正常节奏出门就好。`,
-      overduePlans.length > 0
-        ? `先处理 ${overduePlans.length} 个超时计划，今天会更轻松。`
-        : todayOpenPlans.length > 0
-          ? `今天还有 ${todayOpenPlans.length} 个计划待完成，先做最容易的一项。`
-          : '今天的计划压力不高，可以留一点空档给自己。',
-      habitNames.length === 0
-        ? '还没有设置自定义打卡，可以补上喝药、营养品或固定习惯。'
-        : completedHabitCount === 0
-          ? `今日打卡还没开始，先完成 1 项最容易坚持的。`
-          : completedHabitCount >= habitNames.length
-            ? '今日打卡已经全部完成，可以安心收尾。'
-            : `已完成 ${completedHabitCount}/${habitNames.length} 项打卡，保持这个节奏就很好。`,
-    ];
-
-    if (nextReminder) {
-      highlights[2] = `下一条提醒在 ${nextReminder.dateText} ${nextReminder.timeText}。`;
-    }
-
-    return highlights;
-  }, [
-    completedHabitCount,
-    habitNames.length,
-    nextReminder,
-    overduePlans.length,
-    todayOpenPlans.length,
-    todayLocationAdviceLabel,
-    weather.now.text,
-  ]);
+      : completedHabitCount > 0
+        ? `已完成 ${completedHabitCount} 项，今天继续按这个节奏就很好。`
+        : '先完成一个小打卡，今天会更容易进入状态。';
 
   useLifeTraceEntrance(pageRef, {
     selector: '[data-today-entrance], [data-today-stagger]',
@@ -530,122 +371,6 @@ export function TodayPage() {
     duration: 0.62,
     ease: 'power3.out',
   });
-
-  useGSAP(
-    () => {
-      const mm = gsap.matchMedia();
-
-      mm.add('(prefers-reduced-motion: no-preference)', () => {
-        const timeline = gsap.timeline({ delay: 0.42 });
-
-        timeline
-          .from('[data-ai-brief-card]', {
-            boxShadow: '0 0 0 rgba(6,182,212,0)',
-            duration: 0.42,
-            ease: 'power2.out',
-          })
-          .from(
-            '[data-ai-brief-orb]',
-            {
-              autoAlpha: 0,
-              scale: 0.72,
-              rotation: -12,
-              duration: 0.58,
-              ease: 'back.out(1.8)',
-              clearProps: 'transform,opacity,visibility',
-            },
-            '<',
-          )
-          .from(
-            '[data-ai-brief-copy]',
-            {
-              autoAlpha: 0,
-              y: 10,
-              duration: 0.48,
-              stagger: 0.055,
-              ease: 'power2.out',
-              clearProps: 'transform,opacity,visibility',
-            },
-            '-=0.24',
-          )
-          .to(
-            '[data-ai-brief-orb]',
-            {
-              y: -3,
-              scale: 1.04,
-              duration: 0.72,
-              ease: 'sine.inOut',
-              yoyo: true,
-              repeat: 1,
-              clearProps: 'transform',
-            },
-            '-=0.18',
-          );
-      });
-
-      return () => mm.revert();
-    },
-    {
-      scope: pageRef,
-      dependencies: [],
-    },
-  );
-
-  useGSAP(
-    () => {
-      const mm = gsap.matchMedia();
-
-      mm.add('(prefers-reduced-motion: no-preference)', () => {
-        const timeline = gsap.timeline({ delay: 0.56 });
-
-        timeline
-          .from('[data-advice-card]', {
-            autoAlpha: 0,
-            y: 18,
-            scale: 0.97,
-            duration: 0.52,
-            stagger: 0.07,
-            ease: 'power3.out',
-            clearProps: 'transform,opacity,visibility',
-          })
-          .from(
-            '[data-advice-icon]',
-            {
-              autoAlpha: 0,
-              scale: 0.72,
-              rotation: -8,
-              duration: 0.34,
-              stagger: 0.055,
-              ease: 'back.out(1.9)',
-              clearProps: 'transform,opacity,visibility',
-            },
-            '-=0.36',
-          )
-          .from(
-            '[data-advice-action]',
-            {
-              autoAlpha: 0,
-              scale: 0.72,
-              y: -4,
-              duration: 0.32,
-              stagger: 0.045,
-              ease: 'back.out(2)',
-              clearProps: 'transform,opacity,visibility',
-            },
-            '-=0.3',
-          );
-      });
-
-      mm.add('(prefers-reduced-motion: reduce)', () => {
-        gsap.set('[data-advice-card], [data-advice-icon], [data-advice-action]', {
-          clearProps: 'all',
-        });
-      });
-
-      return () => mm.revert();
-    },
-    { scope: pageRef, dependencies: [advice.length], revertOnUpdate: true },
-  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -688,68 +413,6 @@ export function TodayPage() {
   }, [settings.city]);
 
   useEffect(() => {
-    if (!token || !settings.aiPersonalization || !settingsLoaded || !plansLoaded) {
-      setRemoteAdvice(null);
-      setRemoteAdviceSummary('');
-      setAdviceLoading(false);
-      setAdviceRefreshing(false);
-      return;
-    }
-
-    const controller = new AbortController();
-    const cached = readCachedAdvice(adviceContextVersion);
-    if (cached) {
-      setRemoteAdvice(cached.list);
-      setRemoteAdviceSummary(cached.summary ?? '');
-    } else {
-      setRemoteAdvice(null);
-      setRemoteAdviceSummary('');
-    }
-    setAdviceLoading(!cached);
-    setAdviceRefreshing(Boolean(cached));
-
-    const timer = window.setTimeout(() => {
-      if (!cached) {
-        setAdviceLoading(true);
-      } else {
-        setAdviceRefreshing(true);
-      }
-
-      generateTodayAdvice(token, { signal: controller.signal })
-        .then((resp) => {
-          if (controller.signal.aborted) {
-            return;
-          }
-          setRemoteAdvice(resp.list);
-          setRemoteAdviceSummary(resp.summary);
-          writeCachedAdvice({
-            contextVersion: adviceContextVersion,
-            summary: resp.summary,
-            list: resp.list,
-            cachedAt: Date.now(),
-          });
-        })
-        .catch(() => {
-          if (!cached) {
-            setRemoteAdvice(null);
-            setRemoteAdviceSummary('');
-          }
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) {
-            setAdviceLoading(false);
-            setAdviceRefreshing(false);
-          }
-        });
-    }, 250);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [token, settings.aiPersonalization, settingsLoaded, plansLoaded, adviceContextVersion]);
-
-  useEffect(() => {
     if (!token || !settingsLoaded) {
       return;
     }
@@ -781,27 +444,6 @@ export function TodayPage() {
 
   const pantryPageHref = '/pantry';
 
-  const handleAddAdvicePlan = async (item: Advice) => {
-    if (hasAdvicePlan(plans, item.id)) {
-      showToast('这个建议已经在今日计划里', 'info');
-      return;
-    }
-
-    setAddingAdviceId(item.id);
-    try {
-      const plan = await addPlan(
-        createPlanFromAdvice({
-          id: item.id,
-          title: item.title,
-          detail: item.detail,
-          city: weather.city || settings.city,
-        }),
-      );
-      showToast(plan ? '已加入今日计划' : '计划保存失败，稍后再试', plan ? 'success' : 'warning');
-    } finally {
-      setAddingAdviceId(null);
-    }
-  };
   const handleRefreshWeather = () => {
     if (weatherLoading) {
       return;
@@ -1015,7 +657,7 @@ export function TodayPage() {
                 weatherAlertCards.length > 0 ? (
                   <div className="grid gap-2">
                     {weatherAlertCards.map((alert) => {
-                      const tone = adviceToneClasses[alert.tone];
+                      const tone = weatherAlertToneClasses[alert.tone];
 
                       return (
                         <div
@@ -1167,65 +809,6 @@ export function TodayPage() {
             </div>
           </>
         )}
-      </Card>
-
-      <Card
-        className="relative min-h-[168px] min-w-0 overflow-hidden border-life-ai/20 p-5 shadow-[0_18px_70px_rgba(6,182,212,0.08)] max-[360px]:p-4"
-        data-ai-brief-card
-        data-today-entrance
-      >
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-ai/70 to-transparent"
-        />
-        <div className="relative flex min-w-0 gap-4 max-[360px]:gap-3">
-          <div
-            className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai"
-            data-ai-brief-orb
-          >
-            <Sparkles className="size-6" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2" data-ai-brief-copy>
-              <Badge tone="ai">今日简报</Badge>
-            </div>
-            <div className="mt-3 min-h-[96px]">
-              {showBriefSkeleton ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-medium text-life-ai">
-                    <ActionLoadingIcon className="size-3.5" tone="ai" />
-                    <span>正在生成摘要</span>
-                  </div>
-                  <div className="h-6 w-44 animate-pulse rounded-full bg-life-ai/15" />
-                  <div className="space-y-2">
-                    <div className="h-3.5 w-full animate-pulse rounded-full bg-secondary" />
-                    <div className="h-3.5 w-4/5 animate-pulse rounded-full bg-secondary" />
-                  </div>
-                </div>
-              ) : (
-                <div className="animate-in fade-in duration-300 motion-reduce:animate-none">
-                  <h2 className="line-clamp-2 text-2xl font-semibold max-[360px]:text-xl">
-                    {aiBriefTitle}
-                  </h2>
-                  <p className="mt-3 line-clamp-3 text-base leading-8 text-muted-foreground max-[360px]:text-sm max-[360px]:leading-7">
-                    {aiBriefDetail}
-                  </p>
-                  <ul className="mt-4 space-y-2.5">
-                    {aiBriefHighlights.map((highlight, index) => (
-                      <li
-                        key={`${highlight}-${index}`}
-                        className="flex items-start gap-3 text-sm leading-6 text-muted-foreground"
-                      >
-                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-life-ai" />
-                        <span>{highlight}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
       </Card>
 
       <Card
@@ -1518,91 +1101,6 @@ export function TodayPage() {
           </div>
         )}
       </Card>
-
-      <section>
-        <div className="mb-3 flex min-h-8 items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">今日建议</h2>
-          <Badge
-            tone={remoteAdvice ? 'ai' : 'default'}
-            className="min-w-[92px] justify-center gap-1.5"
-          >
-            {adviceLoading || adviceRefreshing ? <ActionLoadingIcon className="size-3.5" /> : null}
-            {adviceStatusText}
-          </Badge>
-        </div>
-        {adviceRefreshing ? (
-          <p className="mb-3 text-xs leading-5 text-muted-foreground">
-            正在根据最新天气、计划和打卡更新建议，当前内容先保持可用。
-          </p>
-        ) : null}
-        <div className="grid min-h-[360px] grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-          {showAdvicePlaceholder
-            ? Array.from({ length: 6 }).map((_, index) => (
-                <Card
-                  key={`advice-skeleton-${index}`}
-                  className="relative h-28 overflow-hidden border-border/70 p-4"
-                >
-                  <div className="flex items-center gap-2 pr-10">
-                    <div className="size-8 shrink-0 animate-pulse rounded-xl bg-secondary" />
-                    <div className="h-4 w-16 animate-pulse rounded-full bg-secondary" />
-                  </div>
-                  <div className="mt-4 h-3 w-full animate-pulse rounded-full bg-secondary" />
-                  <div className="mt-2 h-3 w-3/4 animate-pulse rounded-full bg-secondary" />
-                </Card>
-              ))
-            : null}
-          {advice.map((item) => {
-            const Icon = item.icon;
-            const tone = adviceToneClasses[item.tone];
-            const canAddPlan = item.id === 'plan';
-            const isAdded = canAddPlan && hasAdvicePlan(plans, item.id);
-            const adding = canAddPlan && addingAdviceId === item.id && planCreating;
-
-            return (
-              <Card
-                key={item.id}
-                className="group relative h-28 overflow-hidden border-border/80 p-4 transition-colors hover:border-foreground/20 max-[360px]:h-auto max-[360px]:min-h-28"
-                data-advice-card
-              >
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-foreground/20 to-transparent opacity-70"
-                />
-                {canAddPlan ? (
-                  <button
-                    type="button"
-                    disabled={isAdded || planCreating}
-                    className="absolute top-3 right-3 z-10 grid size-8 cursor-pointer place-items-center rounded-full bg-secondary text-foreground transition duration-200 hover:scale-105 hover:bg-accent active:scale-95 disabled:cursor-default disabled:text-life-trace disabled:opacity-100 disabled:hover:scale-100"
-                    aria-label={isAdded ? '已添加计划' : `添加${item.title}计划`}
-                    onClick={() => void handleAddAdvicePlan(item)}
-                    data-advice-action
-                  >
-                    {adding ? (
-                      <ActionLoadingIcon className="size-4" />
-                    ) : isAdded ? (
-                      <Check className="size-4" />
-                    ) : (
-                      <Plus className="size-4" />
-                    )}
-                  </button>
-                ) : null}
-                <div className={cn('flex items-center gap-2', canAddPlan ? 'pr-10' : '')}>
-                  <div
-                    className={`grid size-8 shrink-0 place-items-center rounded-xl ${tone.bg}`}
-                    data-advice-icon
-                  >
-                    <Icon className={`size-4.5 ${tone.text}`} />
-                  </div>
-                  <h3 className="min-w-0 truncate text-base font-semibold">{item.title}</h3>
-                </div>
-                <p className="mt-3 line-clamp-2 text-sm leading-5 text-muted-foreground">
-                  {item.detail}
-                </p>
-              </Card>
-            );
-          })}
-        </div>
-      </section>
     </div>
   );
 }

@@ -1,4 +1,6 @@
-const CACHE_NAME = 'life-trace-shell-v5';
+const APP_VERSION = '__LIFE_TRACE_APP_VERSION__';
+const BUILD_ID = '__LIFE_TRACE_BUILD_ID__';
+const CACHE_NAME = `life-trace-shell-${APP_VERSION}-${BUILD_ID}`;
 const APP_SHELL_URL = '/';
 const SHELL_ASSETS = [
   APP_SHELL_URL,
