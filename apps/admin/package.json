@@ -21,24 +21,24 @@
     "@valley/shared-request": "workspace:*",
     "@valley/shared": "workspace:*",
     "antd": "^6.3.1",
-    "axios": "^1.7.0",
+    "axios": "catalog:shared-runtime",
     "dayjs": "^1.11.13",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-router-dom": "^7.1.0",
+    "react": "catalog:react-19",
+    "react-dom": "catalog:react-19",
+    "react-router-dom": "catalog:shared-runtime",
     "recharts": "^3.7.0",
     "tslib": "^2.8.1",
-    "zustand": "^5.0.0"
+    "zustand": "catalog:shared-runtime"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
+    "@types/node": "catalog:node-22",
+    "@types/react": "catalog:react-19",
+    "@types/react-dom": "catalog:react-19",
     "@vitejs/plugin-react-swc": "catalog:vite-6",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.0",
+    "autoprefixer": "catalog:tailwind-3",
+    "postcss": "catalog:tailwind-3",
+    "tailwindcss": "catalog:tailwind-3",
+    "typescript": "catalog:ts-tooling",
     "vite": "catalog:vite-6"
   }
 }

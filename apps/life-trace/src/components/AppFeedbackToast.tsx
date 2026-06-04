@@ -6,12 +6,14 @@ const toneClassMap = {
   success: 'border-life-trace/30 bg-card text-life-trace',
   info: 'border-life-ai/30 bg-card text-life-ai',
   warning: 'border-life-alert/30 bg-card text-life-alert',
+  error: 'border-life-alert/35 bg-card text-life-alert',
 } as const;
 
 const toneIconMap = {
   success: CheckCircle2,
   info: Info,
   warning: AlertTriangle,
+  error: AlertTriangle,
 } as const;
 
 export function AppFeedbackToast() {

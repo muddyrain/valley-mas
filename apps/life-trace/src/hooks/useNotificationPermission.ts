@@ -230,18 +230,19 @@ export function useNotificationPermission(token?: string | null) {
   const showServerTestNotification = useCallback(async () => {
     if (!token) {
       setServerPushStatus('unbound');
-      return false;
+      return { sent: false, error: '未登录，无法发送服务端测试推送' };
     }
 
     setServerPushError('');
     try {
       await testServerPush(token);
       setServerPushStatus('subscribed');
-      return true;
+      return { sent: true };
     } catch (error) {
+      const message = error instanceof Error ? error.message : '服务端测试推送失败';
       setServerPushStatus('error');
-      setServerPushError(error instanceof Error ? error.message : '服务端测试推送失败');
-      return false;
+      setServerPushError(message);
+      return { sent: false, error: message };
     }
   }, [token]);
 

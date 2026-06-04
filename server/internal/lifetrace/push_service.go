@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -77,14 +78,34 @@ func (s *PushService) Send(ctx context.Context, subscription model.LifeTracePush
 	}
 	if err != nil {
 		if resp != nil {
-			return resp.StatusCode, err
+			return resp.StatusCode, withPushResponseDetail(resp, err)
 		}
 		return 0, err
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		return resp.StatusCode, fmt.Errorf("push endpoint returned %d", resp.StatusCode)
+		return resp.StatusCode, withPushResponseDetail(
+			resp,
+			fmt.Errorf("push endpoint returned %d", resp.StatusCode),
+		)
 	}
 	return resp.StatusCode, nil
+}
+
+func withPushResponseDetail(resp *http.Response, err error) error {
+	if resp == nil || resp.Body == nil {
+		return err
+	}
+
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, 500))
+	if readErr != nil {
+		return err
+	}
+
+	detail := strings.TrimSpace(string(body))
+	if detail == "" {
+		return err
+	}
+	return fmt.Errorf("%w: %s", err, detail)
 }
 
 func truncatePushTopic(topic string) string {

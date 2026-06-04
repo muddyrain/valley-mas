@@ -4,10 +4,28 @@
 
 ## 核心文档
 
-- [项目指南](./PROJECT_GUIDE.md)：说明项目定位、技术栈、模块地图、开发命令与环境变量。
-- [Harness Engineering](./HARNESS_ENGINEERING.md)：说明 AI coding agent 在本仓库中的上下文入口、工具边界、验证命令、评审回路和回归证据。
-- [家庭空间与家庭库存设计](./HOUSEHOLD_PANTRY_DESIGN.md)：记录通用 household 模型、家庭库存归属方案、解散/退出规则与 Pantry 改造路线。
+- [项目指南](./PROJECT_GUIDE.md)：项目定位、技术栈、模块地图、开发命令、端口和环境变量。
+- [Harness Engineering](./HARNESS_ENGINEERING.md)：AI coding agent 在本仓库中的上下文入口、工具边界、验证命令、评审回路和回归证据。
+- [家庭空间与家庭库存设计](./HOUSEHOLD_PANTRY_DESIGN.md)：Life Trace 家庭空间、家庭库存归属、成员退出/解散和 Pantry 改造路线。
+
+## 子项目文档
+
+- Web 前台：`apps/web/AGENTS.md`。
+- Admin 后台：`apps/admin/AGENTS.md`。
+- Go 服务端：`server/AGENTS.md`、`server/README.md`、`server/migrations/README.md`。
+- Life Trace：`apps/life-trace/README.md`、`apps/life-trace/docs/MVP_PLAN.md`。
+- AI Mind Arena：`apps/ai-mind-arena/AGENTS.md`、`apps/ai-mind-arena/README.md`。
+- WorldSim：`apps/world-sim/AGENTS.md`、`apps/world-sim/docs/*`。
+- Toy Climb Arena：`apps/toy-climb-arena/AGENTS.md`、`apps/toy-climb-arena/docs/*`。
+- Scratch Legend：`apps/scratch-legend/AGENTS.md`、`apps/scratch-legend/docs/*`。
+
+## 维护规则
+
+- 根入口优先更新 `README.md`、`QUICK_START.md` 和本索引。
+- 项目级技术栈、端口、环境变量统一更新 [项目指南](./PROJECT_GUIDE.md)。
+- 子项目玩法、设计、局部协作规则放回对应 `apps/*` 目录。
+- 过期的临时任务清单和流水账不要继续扩写；确实需要保留时，应标明“历史参考”。
 
 ---
 
-_保持项目整洁，从文档开始。_
+保持项目整洁，从文档开始。

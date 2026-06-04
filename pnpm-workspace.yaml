@@ -5,9 +5,36 @@ packages:
 autoInstallPeers: true
 
 catalogs:
+  react-19:
+    react: ^19.0.0
+    react-dom: ^19.0.0
+    "@types/react": ^19.0.0
+    "@types/react-dom": ^19.0.0
+  node-22:
+    "@types/node": ^22.10.0
+  ts-tooling:
+    typescript: ^5.7.0
+    tsup: ^8.3.0
   vite-6:
     vite: 6.3.5
     vite-plugin-dts: 4.3.0
     vite-plugin-no-bundle: 4.0.0
     vite-plugin-svgr: 4.3.0
     "@vitejs/plugin-react-swc": 3.7.0
+  tailwind-3:
+    tailwindcss: ^3.4.17
+    postcss: ^8.4.49
+    autoprefixer: ^10.4.20
+  tailwind-4:
+    tailwindcss: ^4.0.0
+    "@tailwindcss/postcss": ^4.0.0
+  next-15:
+    next: ^15.5.0
+  test:
+    vitest: ^4.1.6
+  shared-runtime:
+    axios: ^1.7.0
+    clsx: ^2.1.1
+    lucide-react: ^0.460.0
+    react-router-dom: ^7.1.0
+    zustand: ^5.0.0

@@ -300,6 +300,7 @@ export function ProfilePage() {
   const [habitDraft, setHabitDraft] = useState('');
   const [habitDraftError, setHabitDraftError] = useState('');
   const [notificationTesting, setNotificationTesting] = useState(false);
+  const [serverPushBinding, setServerPushBinding] = useState(false);
   const [serverPushTesting, setServerPushTesting] = useState(false);
   const [notificationTestMessage, setNotificationTestMessage] = useState('');
   const settings = useLifeTraceStore((state) => state.settings);
@@ -354,12 +355,23 @@ export function ProfilePage() {
       : settings.workdayMode === 'daily'
         ? '每天生效'
         : selectedWorkdayLabels || '未选择';
+  const serverPushBusy = serverPushBinding || serverPushTesting;
   const notificationDiagnostics = [
     { label: 'HTTPS', ok: notification.secureContext },
     { label: 'PWA', ok: installed },
     { label: 'SW', ok: serviceWorkerReady },
     { label: '权限', ok: notification.granted },
-    { label: '服务端', ok: notification.serverPushReady },
+    {
+      label: '服务端',
+      ok: notification.serverPushReady && !serverPushBusy,
+      status: serverPushBinding
+        ? '同步中'
+        : serverPushTesting
+          ? '测试中'
+          : notification.serverPushReady
+            ? 'OK'
+            : '待确认',
+    },
   ];
   const locationLabel = formatLocationDisplay(settings.city) || settings.city;
   const activePantrySpaceName = currentHousehold?.name || preferredPantryHouseholdName || '未设置';
@@ -405,7 +417,7 @@ export function ProfilePage() {
   };
 
   const handleEnableServerPush = async () => {
-    setServerPushTesting(true);
+    setServerPushBinding(true);
     setNotificationTestMessage('');
 
     try {
@@ -414,7 +426,7 @@ export function ProfilePage() {
         bound ? '服务端推送已绑定，计划到点后即使应用关闭也能提醒。' : '暂时无法绑定服务端推送。',
       );
     } finally {
-      setServerPushTesting(false);
+      setServerPushBinding(false);
     }
   };
 
@@ -423,8 +435,10 @@ export function ProfilePage() {
     setNotificationTestMessage('');
 
     try {
-      const sent = await notification.showServerTestNotification();
-      setNotificationTestMessage(sent ? '服务端测试推送已发送。' : '服务端测试推送未发送。');
+      const result = await notification.showServerTestNotification();
+      setNotificationTestMessage(
+        result.sent ? '服务端测试推送已发送。' : result.error || '服务端测试推送未发送。',
+      );
     } finally {
       setServerPushTesting(false);
     }
@@ -934,7 +948,7 @@ export function ProfilePage() {
               <div className="mt-3 flex flex-wrap gap-2">
                 {notificationDiagnostics.map((item) => (
                   <Badge key={item.label} tone={item.ok ? 'trace' : 'default'}>
-                    {item.label} {item.ok ? 'OK' : '待确认'}
+                    {item.label} {item.status ?? (item.ok ? 'OK' : '待确认')}
                   </Badge>
                 ))}
               </div>
@@ -971,29 +985,21 @@ export function ProfilePage() {
               type="button"
               variant={notification.serverPushReady ? 'secondary' : 'ai'}
               size="sm"
-              disabled={!notification.pushSupported || serverPushTesting}
+              disabled={!notification.pushSupported || serverPushBusy}
               onClick={() => void handleEnableServerPush()}
             >
-              {serverPushTesting && !notification.serverPushReady ? (
-                <ActionLoadingIcon tone="ai" />
-              ) : (
-                <Wifi className="size-4" />
-              )}
-              {notification.serverPushReady ? '已绑定' : '绑定推送'}
+              {serverPushBinding ? <ActionLoadingIcon tone="ai" /> : <Wifi className="size-4" />}
+              {serverPushBinding ? '绑定中' : notification.serverPushReady ? '已绑定' : '绑定推送'}
             </Button>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              disabled={!notification.serverPushReady || serverPushTesting}
+              disabled={!notification.serverPushReady || serverPushBusy}
               onClick={() => void handleTestServerPush()}
             >
-              {serverPushTesting && notification.serverPushReady ? (
-                <ActionLoadingIcon tone="ai" />
-              ) : (
-                <Bell className="size-4" />
-              )}
-              远程测试
+              {serverPushTesting ? <ActionLoadingIcon tone="ai" /> : <Bell className="size-4" />}
+              {serverPushTesting ? '发送中' : '远程测试'}
             </Button>
           </div>
         </Card>

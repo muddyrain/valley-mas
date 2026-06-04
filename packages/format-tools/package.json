@@ -21,7 +21,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "tsup": "^8.3.0",
-    "typescript": "^5.7.0"
+    "tsup": "catalog:ts-tooling",
+    "typescript": "catalog:ts-tooling"
   }
 }

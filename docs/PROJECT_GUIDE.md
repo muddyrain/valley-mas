@@ -4,23 +4,27 @@
 
 ## 项目定位
 
-- Valley MAS 是一个面向个人内容展示、创作者空间与内容管理的全栈项目。
-- 当前核心能力包括首页展示、创作者主页、资源库、博客/图文、留言、通知、AI 辅助生成与管理后台。
-- 前台用户侧主要在 `apps/web`，管理后台在 `apps/admin`，服务端 API 在 `server`，共享类型/工具在 `packages`。
-- UI 主题以暖金、奶油色、柔和纸感为主；紫色只作为少量功能点缀，不应把页面改成独立紫蓝橙粉色系。
+- Valley MAS 是一个包含个人内容展示、创作者空间、内容管理、生活记录、AI 辅助能力和实验应用的 monorepo。
+- 用户侧主站在 `apps/web`，管理后台在 `apps/admin`，Go API 服务在 `server`。
+- Life Trace、AI Mind Arena、WorldSim、Toy Climb Arena、Scratch Legend 是当前仓库内的独立产品或实验应用。
+- 共享类型、请求、路由和格式化能力放在 `packages/*`。
 
 ## 技术栈地图
 
 | 区域 | 路径 | 说明 |
 | --- | --- | --- |
-| Web 前台 | `apps/web` | React 19 + Vite 6 + React Router 7 + Tailwind 4，包含首页、创作者、资源、博客、我的空间等用户侧页面。 |
-| Admin 后台 | `apps/admin` | React 19 + Vite 6 + Ant Design 6 + Pro Components，包含用户、创作者、资源、博客、记录与审核管理。 |
-| Toy Climb Arena | `apps/toy-climb-arena` | Vite 6 + TypeScript + Three.js，玩具世界攀爬跳跃游戏，开发端口 5175。详见 `apps/toy-climb-arena/AGENTS.md`。 |
-| WorldSim | `apps/world-sim` | Phaser 3 + TypeScript + Vite 的沙盒文明模拟游戏，设计文档与协作入口见 `apps/world-sim/AGENTS.md`。 |
+| Web 前台 | `apps/web` | React 19 + Vite 6 + React Router 7 + Tailwind 4，用户侧内容站点。 |
+| Admin 后台 | `apps/admin` | React 19 + Vite 6 + Ant Design 6 + Pro Components，运营管理后台。 |
+| Life Trace | `apps/life-trace` | React 19 + Vite 6 + Tailwind 4，生活计划、踪迹、提醒和 PWA 能力。 |
+| AI Mind Arena | `apps/ai-mind-arena` | Next.js 15 + React 19 + Tailwind 3，多人格辩论决策应用，默认端口 5175。 |
+| Scratch Legend | `apps/scratch-legend` | Next.js + React，刮刮卡增量游戏实验，默认端口 5176。 |
+| Toy Climb Arena | `apps/toy-climb-arena` | Vite 6 + TypeScript + Three.js，玩具世界攀爬游戏，默认端口 5175。 |
+| WorldSim | `apps/world-sim` | Phaser 3 + TypeScript + Vite，沙盒文明模拟游戏。 |
 | Go 服务端 | `server` | Gin + GORM，入口在 `server/cmd/server`，路由集中在 `server/internal/router/router.go`。 |
 | 共享包 | `packages/*` | `shared`、`shared-request`、`shared-router`、`shared-format`、`format-tools` 等 workspace 包。 |
-| 文档 | `docs` | 沉淀长期有价值文档；Harness Engineering 是仓库级 AI coding 协作体系，不属于某个业务 app 页面。 |
-| Unity 实验 | `apps/unity-dungeon` | Unity 相关实验资产，除非任务明确涉及，不主动改动。 |
+| 文档 | `docs` | 长期项目文档；临时分析不要自动沉淀到这里。 |
+
+`apps/ai-mind-arena` 和 `apps/toy-climb-arena` 都使用 `5175` 作为默认开发端口，不能同时用默认端口启动。
 
 ## 关键业务模块
 
@@ -28,7 +32,9 @@
 - 创作者与创作空间：`apps/web/src/pages/Creator*`、`apps/web/src/pages/MySpace`、`apps/admin/src/pages/Creator*`、`server/internal/handler/creator*.go`。
 - 资源库：`apps/web/src/pages/Resources`、`apps/web/src/pages/ResourceDetail`、`apps/web/src/components/ResourceCard.tsx`、`server/internal/handler/*resource*.go`。
 - 博客与图文：`apps/web/src/pages/blog`、`apps/web/src/pages/BlogCreate`、`apps/web/src/components/blog`、`apps/admin/src/pages/Blog*`、`server/internal/handler/blog*.go`。
-- AI 能力：`server/internal/handler/*ai*.go`、`apps/web/src/api/ai.ts`，当前主要接入火山 ARK 文本、视觉与图片模型。
+- Life Trace：`apps/life-trace/src`、`server/internal/lifetrace`。
+- AI Mind Arena：`apps/ai-mind-arena`、`server/internal/mindarena`、`server/internal/ai`。
+- AI 能力：`server/internal/ai`、`server/internal/handler/*ai*.go`、`apps/web/src/api/ai.ts`。
 - 登录与用户状态：`apps/web/src/stores/useAuthStore.ts`、`apps/*/src/utils/request.ts`、`server/internal/middleware`、`server/internal/utils/jwt.go`。
 
 ## 本地开发命令
@@ -40,38 +46,66 @@ pnpm install
 # 启动全部前端任务
 pnpm dev
 
-# 启动 Web
-cd apps/web && pnpm dev
+# 启动 Web / Admin / Life Trace
+pnpm --filter @valley/web dev
+pnpm --filter @valley/admin dev
+pnpm --filter @valley/life-trace dev
 
-# 启动 Admin
-cd apps/admin && pnpm dev
+# 启动 AI Mind Arena / Scratch Legend
+pnpm --filter @valley/ai-mind-arena dev
+pnpm --filter @valley/scratch-legend dev
 
-# 启动 Toy Climb Arena（玩具世界攀爬游戏）
-cd apps/toy-climb-arena && pnpm dev
-# 或：pnpm --filter @valley/toy-climb-arena dev
-# 访问 http://localhost:5175
-
-# 启动 WorldSim
-cd apps/world-sim && pnpm dev
-# 或：pnpm --filter @valley/world-sim dev
+# 启动 Toy Climb Arena / WorldSim
+pnpm --filter @valley/toy-climb-arena dev
+pnpm --filter @valley/world-sim dev
 
 # 启动 Go 服务
 cd server && go run ./cmd/server
 ```
 
+## 端口速查
+
+| 服务 | 默认端口 |
+| --- | --- |
+| Go API | 8080 |
+| Web | 5174 |
+| Admin | 3000 |
+| Life Trace | 5178 |
+| Life Trace preview | 4178 |
+| AI Mind Arena | 5175 |
+| Toy Climb Arena | 5175 |
+| Scratch Legend | 5176 |
+
 ## 环境变量与外部服务
 
 - Web/Admin API 地址读取 `VITE_API_BASE_URL`，示例分别在 `apps/web/.env.example` 与 `apps/admin/.env.example`。
-- Server 示例配置在 `server/.env.example`，包括 `DB_*`、`JWT_SECRET`、`SMTP_*`、`TOS_*`、`ARK_*`。
+- Life Trace 本地默认通过 Vite `/api` 代理访问 Go 服务，示例见 `apps/life-trace/.env.example`。
+- AI Mind Arena 前端读取 `NEXT_PUBLIC_API_BASE_URL`，示例见 `apps/ai-mind-arena/.env.example`。
+- Server 示例配置在 `server/.env.example`，包括 `DB_*`、`JWT_SECRET`、`SMTP_*`、`TOS_*`、`ARK_*`、`AI_*`、`QWEATHER_*`、`WEB_PUSH_*`。
 - TOS 上传依赖 `TOS_ACCESS_KEY`、`TOS_SECRET_KEY`、`TOS_BUCKET`、`TOS_ENDPOINT`、`TOS_REGION`。
-- AI 能力依赖 `ARK_API_KEY`、`ARK_BASE_URL`、`ARK_TEXT_MODEL`、`ARK_VISION_MODEL`、`ARK_IMAGE_MODEL`，模型接入点通常应为 `ep-` 开头。
+- Valley AI Chat 依赖 `ARK_API_KEY`、`ARK_BASE_URL`、`ARK_TEXT_MODEL`、`ARK_VISION_MODEL`、`ARK_IMAGE_MODEL`。
+- AI Mind Arena 后端依赖 `AI_PROVIDER`、`AI_BASE_URL`、`AI_API_KEY`、`AI_MODEL`，配置不完整或上游失败时应回退 mock。
 
 ## 常用定位入口
 
 - Web 路由：`apps/web/src/App.tsx`。
 - Admin 路由：`apps/admin/src/App.tsx`。
+- Life Trace 路由：`apps/life-trace/src/App.tsx`。
+- AI Mind Arena 页面：`apps/ai-mind-arena/app`。
 - 服务端路由：`server/internal/router/router.go`。
 - 服务端配置：`server/internal/config/config.go`。
 - 数据模型：`server/internal/model`。
 - Web API 封装：`apps/web/src/api`。
 - Admin API 封装：`apps/admin/src/api`。
+
+## 常用校验
+
+```bash
+pnpm --filter @valley/web exec tsc --noEmit
+pnpm --filter @valley/admin exec tsc --noEmit
+pnpm --filter @valley/life-trace check
+pnpm --filter @valley/ai-mind-arena typecheck
+pnpm --filter @valley/world-sim typecheck
+pnpm --filter @valley/toy-climb-arena typecheck
+cd server && go test ./...
+```

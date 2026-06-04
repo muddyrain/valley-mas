@@ -1,5 +1,7 @@
 # LifeTrace Agent Design Brief
 
+> 历史参考：本文是 Life Trace 早期产品设计简报，不再作为仓库级设计入口。当前开发命令和实现状态见 `apps/life-trace/README.md`，阶段规划见 `apps/life-trace/docs/MVP_PLAN.md`，家庭空间与 Pantry 方案见 `docs/HOUSEHOLD_PANTRY_DESIGN.md`。
+
 ## 1. 产品定位
 
 LifeTrace Agent 是一个以 Agent 为主导的个人生活记录 App。它不是让用户手动维护多个记录工具，而是把日程、倒数日、生日、资产、订阅、习惯、日记、照片、计划清单和生活碎片统一收纳到一个地方，再由多个智能体自动整理、提醒、复盘和给出建议。

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"valley-server/internal/database"
@@ -153,7 +154,7 @@ func (h *Handler) TestPush(c *gin.Context) {
 	})
 	if err != nil {
 		markPushSubscriptionError(subscription.ID, statusCode, err)
-		fail(c, http.StatusBadGateway, "测试推送发送失败")
+		fail(c, http.StatusBadGateway, pushTestFailureMessage(statusCode, err))
 		return
 	}
 
@@ -163,4 +164,16 @@ func (h *Handler) TestPush(c *gin.Context) {
 		"last_error":   "",
 	}).Error
 	success(c, gin.H{"sent": true})
+}
+
+func pushTestFailureMessage(statusCode int, err error) string {
+	detail := strings.TrimSpace(err.Error())
+	if detail == "" {
+		return "测试推送发送失败"
+	}
+
+	if statusCode > 0 {
+		return "测试推送发送失败（状态 " + strconv.Itoa(statusCode) + "）：" + detail
+	}
+	return "测试推送发送失败：" + detail
 }

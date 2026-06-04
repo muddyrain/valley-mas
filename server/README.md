@@ -1,70 +1,69 @@
-开发者快速指南 — server
+# Server 开发指南
 
-目的：提供本地开发时的热重载（类似 Node 的 nodemon）配置与启动说明。
+`server` 是 Valley MAS 的 Go API 服务，技术栈为 Gin + GORM。服务入口在 `cmd/server/main.go`，本地辅助入口在 `cmd/local/main.go`，路由集中在 `internal/router/router.go`。
 
-1) 安装 air（推荐）
+## 环境配置
 
-- 推荐（使用 go install，Go 1.17+）：
+复制或参考 `server/.env.example` 配置本地环境变量。
 
-```powershell
-Set-Location d:\my-code\valley-mas\server
-go install github.com/cosmtrek/air@latest
+常用配置：
+
+- `PORT`：默认 `8080`。
+- `DB_DRIVER`、`DB_DSN`、`DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME`：数据库配置。
+- `DB_AUTO_MIGRATE`：是否启用 GORM AutoMigrate，本地按需开启，生产默认应保持关闭。
+- `JWT_SECRET`、`SMTP_*`、`TOS_*`、`ARK_*`、`AI_*`、`QWEATHER_*`、`WEB_PUSH_*`：业务能力配置。
+
+不要在文档、示例、日志或测试中写入真实密钥、真实 token、真实云资源标识或个人账号凭据。
+
+## 启动服务
+
+直接启动：
+
+```bash
+cd server && go run ./cmd/server
 ```
 
-注：确保 `$(go env GOPATH)\bin` 或 `%USERPROFILE%\go\bin` 在你的 PATH 中，这样能直接运行 `air`。
+热重载启动：
 
-在 Windows 上也可以使用 Scoop/Chocolatey 安装（可选）：
-- scoop: `scoop install air`
-- choco: `choco install air`
-
-2) 启动项目（开发）
-
-在 `server` 目录下运行：
-
-```powershell
-Set-Location d:\my-code\valley-mas\server
-air
+```bash
+cd server && air
 ```
 
-air 会监听你配置的文件扩展（默认包含 `.go`），发生改动会自动重新编译并重启服务。
+`.air.toml` 当前会构建 `./cmd/local`，用于本地开发时读取额外启动参数。例如临时开启自动迁移：
 
-默认情况下，`air` 会尊重 `.env` 里的 `DB_AUTO_MIGRATE` 配置。如果本地刚加了表或字段，需要本次启动自动执行 GORM AutoMigrate，可以运行：
-
-```powershell
-air db=true
+```bash
+cd server && air db=true
 ```
 
-这个参数只影响本次本地 Air 启动，会在读取 `.env` 后临时把 `DB_AUTO_MIGRATE` 覆盖为 `true`。
+## 常用校验
 
-3) 直接运行（不使用热重载）
-
-也可以用 `go run`：
-
-```powershell
-Set-Location d:\my-code\valley-mas\server
-go run .\main.go
+```bash
+cd server && go test ./...
+cd server && go build ./cmd/server
 ```
 
-注意 `go run` 不会监听文件变化，也不会自动重启。
+只改 AI Mind Arena 服务端逻辑时，可先跑相关包：
 
-4) 常见启动失败排查（Exit Code 1）
-
-- 端口被占用：确认没有其他程序（或上一次的服务）占用 `:8080`。
-- 环境配置缺失：检查 `internal/config` 是否需要环境变量或 `.env`；参考项目根目录是否提供 `.env.example`。
-- 编译错误：查看终端输出的具体错误并修复代码中的语法或 import 问题。
-
-5) 我已经为你添加了 `.air.toml`（位于本目录），推荐直接使用 `air` 运行以获得自动重启体验。
-
-如果你愿意，我可以接着为你添加一个 PowerShell 启动脚本（例如 `dev.ps1`），方便一键启动。
-
-
-## ssh 连接 google-cloud
-
-```powershell
-gcloud compute ssh "instance-20251220-041132" --zone "us-west1-b" --project "alert-synapse-481804-j8"
+```bash
+cd server && go test ./internal/mindarena ./internal/ai
 ```
-## 部署发布至google-cloud
 
-```powershell
-gcloud compute scp ./valley-server-linux instance-20251220-041132:/opt/go-project/ --zone "us-west1-b" --project "alert-synapse-481804-j8"
+只改 Life Trace 服务端逻辑时，可先跑：
+
+```bash
+cd server && go test ./internal/lifetrace
 ```
+
+## 常见问题
+
+- 端口被占用：检查是否已有服务监听 `:8080`，或通过 `PORT` 改端口。
+- 环境变量缺失：对照 `server/.env.example` 补齐本地 `.env`。
+- 数据库结构不一致：确认当前环境是否允许 `DB_AUTO_MIGRATE=true`，生产环境应使用明确的迁移流程。
+- AI 调用失败：确认 `ARK_*` 或 `AI_*` 配置；AI Mind Arena 配置缺失或上游失败时应回退 mock。
+
+## 相关入口
+
+- 协作规则：`server/AGENTS.md`。
+- 路由注册：`internal/router/router.go`。
+- 配置读取：`internal/config/config.go`。
+- 迁移说明：`migrations/README.md`。

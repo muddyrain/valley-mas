@@ -49,5 +49,6 @@ export function deletePushSubscription(token: string, endpoint: string) {
 export function testServerPush(token: string) {
   return apiRequest<{ sent: boolean }>('/life-trace/push/test', token, {
     method: 'POST',
+    suppressErrorToast: true,
   });
 }

@@ -21,12 +21,12 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "react": "^19.0.0",
-    "react-router-dom": "^7.0.0"
+    "react": "catalog:react-19",
+    "react-router-dom": "catalog:shared-runtime"
   },
   "devDependencies": {
-    "@types/react": "^19.0.0",
-    "tsup": "^8.3.0",
-    "typescript": "^5.7.0"
+    "@types/react": "catalog:react-19",
+    "tsup": "catalog:ts-tooling",
+    "typescript": "catalog:ts-tooling"
   }
 }

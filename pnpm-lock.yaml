@@ -5,6 +5,71 @@ settings:
   excludeLinksFromLockfile: false
 
 catalogs:
+  next-15:
+    next:
+      specifier: ^15.5.0
+      version: 15.5.15
+  node-22:
+    '@types/node':
+      specifier: ^22.10.0
+      version: 22.19.13
+  react-19:
+    '@types/react':
+      specifier: ^19.0.0
+      version: 19.2.14
+    '@types/react-dom':
+      specifier: ^19.0.0
+      version: 19.2.3
+    react:
+      specifier: ^19.0.0
+      version: 19.2.4
+    react-dom:
+      specifier: ^19.0.0
+      version: 19.2.4
+  shared-runtime:
+    axios:
+      specifier: ^1.7.0
+      version: 1.13.6
+    clsx:
+      specifier: ^2.1.1
+      version: 2.1.1
+    lucide-react:
+      specifier: ^0.460.0
+      version: 0.460.0
+    react-router-dom:
+      specifier: ^7.1.0
+      version: 7.13.1
+    zustand:
+      specifier: ^5.0.0
+      version: 5.0.11
+  tailwind-3:
+    autoprefixer:
+      specifier: ^10.4.20
+      version: 10.4.27
+    postcss:
+      specifier: ^8.4.49
+      version: 8.5.10
+    tailwindcss:
+      specifier: ^3.4.17
+      version: 3.4.19
+  tailwind-4:
+    '@tailwindcss/postcss':
+      specifier: ^4.0.0
+      version: 4.2.1
+    tailwindcss:
+      specifier: ^4.0.0
+      version: 4.2.1
+  test:
+    vitest:
+      specifier: ^4.1.6
+      version: 4.1.6
+  ts-tooling:
+    tsup:
+      specifier: ^8.3.0
+      version: 8.5.1
+    typescript:
+      specifier: ^5.7.0
+      version: 5.9.3
   vite-6:
     '@vitejs/plugin-react-swc':
       specifier: 3.7.0
@@ -30,7 +95,7 @@ importers:
         specifier: ^2.4.0
         version: 2.8.12
       typescript:
-        specifier: ^5.7.0
+        specifier: catalog:ts-tooling
         version: 5.9.3
 
   apps/admin:
@@ -60,19 +125,19 @@ importers:
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       axios:
-        specifier: ^1.7.0
+        specifier: catalog:shared-runtime
         version: 1.13.6
       dayjs:
         specifier: ^1.11.13
         version: 1.11.19
       react:
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.4
       react-dom:
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.4(react@19.2.4)
       react-router-dom:
-        specifier: ^7.1.0
+        specifier: catalog:shared-runtime
         version: 7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       recharts:
         specifier: ^3.7.0
@@ -81,78 +146,78 @@ importers:
         specifier: ^2.8.1
         version: 2.8.1
       zustand:
-        specifier: ^5.0.0
+        specifier: catalog:shared-runtime
         version: 5.0.11(@types/react@19.2.14)(immer@11.1.4)(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
     devDependencies:
       '@types/node':
-        specifier: ^22.10.0
+        specifier: catalog:node-22
         version: 22.19.13
       '@types/react':
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.14
       '@types/react-dom':
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.3(@types/react@19.2.14)
       '@vitejs/plugin-react-swc':
         specifier: catalog:vite-6
-        version: 3.7.0(vite@6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
+        version: 3.7.0(vite@6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
       autoprefixer:
-        specifier: ^10.4.20
-        version: 10.4.27(postcss@8.5.6)
+        specifier: catalog:tailwind-3
+        version: 10.4.27(postcss@8.5.10)
       postcss:
-        specifier: ^8.4.49
-        version: 8.5.6
+        specifier: catalog:tailwind-3
+        version: 8.5.10
       tailwindcss:
-        specifier: ^3.4.17
+        specifier: catalog:tailwind-3
         version: 3.4.19(yaml@2.8.2)
       typescript:
-        specifier: ^5.7.0
+        specifier: catalog:ts-tooling
         version: 5.9.3
       vite:
         specifier: catalog:vite-6
-        version: 6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
+        version: 6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
 
   apps/ai-mind-arena:
     dependencies:
       clsx:
-        specifier: ^2.1.1
+        specifier: catalog:shared-runtime
         version: 2.1.1
       html2canvas:
         specifier: ^1.4.1
         version: 1.4.1
       lucide-react:
-        specifier: ^0.460.0
+        specifier: catalog:shared-runtime
         version: 0.460.0(react@19.2.4)
       next:
-        specifier: ^15.5.0
+        specifier: catalog:next-15
         version: 15.5.15(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3)
       react:
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.4
       react-dom:
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.4(react@19.2.4)
     devDependencies:
       '@types/node':
-        specifier: ^22.10.0
+        specifier: catalog:node-22
         version: 22.19.13
       '@types/react':
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.14
       '@types/react-dom':
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.3(@types/react@19.2.14)
       autoprefixer:
-        specifier: ^10.4.20
+        specifier: catalog:tailwind-3
         version: 10.4.27(postcss@8.5.10)
       postcss:
-        specifier: ^8.4.49
+        specifier: catalog:tailwind-3
         version: 8.5.10
       tailwindcss:
-        specifier: ^3.4.17
+        specifier: catalog:tailwind-3
         version: 3.4.19(yaml@2.8.2)
       typescript:
-        specifier: ^5.7.0
+        specifier: catalog:ts-tooling
         version: 5.9.3
 
   apps/life-trace:
@@ -164,7 +229,7 @@ importers:
         specifier: ^0.7.1
         version: 0.7.1
       clsx:
-        specifier: ^2.1.1
+        specifier: catalog:shared-runtime
         version: 2.1.1
       gsap:
         specifier: ^3.15.0
@@ -173,16 +238,16 @@ importers:
         specifier: ^2.4.1
         version: 2.4.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       lucide-react:
-        specifier: ^0.460.0
+        specifier: catalog:shared-runtime
         version: 0.460.0(react@19.2.4)
       react:
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.4
       react-dom:
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.4(react@19.2.4)
       react-router-dom:
-        specifier: ^7.1.0
+        specifier: catalog:shared-runtime
         version: 7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       tailwind-merge:
         specifier: ^2.6.1
@@ -191,103 +256,103 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0
       zustand:
-        specifier: ^5.0.0
+        specifier: catalog:shared-runtime
         version: 5.0.11(@types/react@19.2.14)(immer@11.1.4)(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
     devDependencies:
       '@tailwindcss/postcss':
-        specifier: ^4.0.0
+        specifier: catalog:tailwind-4
         version: 4.2.1
       '@types/node':
-        specifier: ^22.10.0
+        specifier: catalog:node-22
         version: 22.19.13
       '@types/react':
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.14
       '@types/react-dom':
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.3(@types/react@19.2.14)
       '@vitejs/plugin-react-swc':
         specifier: catalog:vite-6
         version: 3.7.0(vite@6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
       tailwindcss:
-        specifier: ^4.0.0
+        specifier: catalog:tailwind-4
         version: 4.2.1
       typescript:
-        specifier: ^5.7.0
+        specifier: catalog:ts-tooling
         version: 5.9.3
       vite:
         specifier: catalog:vite-6
         version: 6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
       vitest:
-        specifier: ^4.1.6
+        specifier: catalog:test
         version: 4.1.6(@types/node@22.19.13)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
 
   apps/scratch-legend:
     dependencies:
       next:
-        specifier: ^15.5.0
+        specifier: catalog:next-15
         version: 15.5.15(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3)
       react:
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.4
       react-dom:
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.4(react@19.2.4)
       zustand:
-        specifier: ^5.0.0
+        specifier: catalog:shared-runtime
         version: 5.0.11(@types/react@19.2.14)(immer@11.1.4)(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
     devDependencies:
       '@types/node':
-        specifier: ^22.10.0
+        specifier: catalog:node-22
         version: 22.19.13
       '@types/react':
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.14
       '@types/react-dom':
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.3(@types/react@19.2.14)
       autoprefixer:
-        specifier: ^10.4.20
+        specifier: catalog:tailwind-3
         version: 10.4.27(postcss@8.5.10)
       postcss:
-        specifier: ^8.4.49
+        specifier: catalog:tailwind-3
         version: 8.5.10
       tailwindcss:
-        specifier: ^3.4.17
+        specifier: catalog:tailwind-3
         version: 3.4.19(yaml@2.8.2)
       typescript:
-        specifier: ^5.7.0
+        specifier: catalog:ts-tooling
         version: 5.9.3
 
   apps/toy-climb-arena:
     dependencies:
       react:
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.4
       react-dom:
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.4(react@19.2.4)
       three:
         specifier: ^0.180.0
         version: 0.180.0
     devDependencies:
       '@types/react':
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.14
       '@types/react-dom':
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.3(@types/react@19.2.14)
       '@types/three':
         specifier: ^0.180.0
         version: 0.180.0
       '@vitejs/plugin-react-swc':
-        specifier: 3.7.0
+        specifier: catalog:vite-6
         version: 3.7.0(vite@6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
       typescript:
-        specifier: ^5.7.0
+        specifier: catalog:ts-tooling
         version: 5.9.3
       vite:
-        specifier: 6.3.5
+        specifier: catalog:vite-6
         version: 6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
 
   apps/web:
@@ -335,31 +400,31 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared-router
       axios:
-        specifier: ^1.7.0
+        specifier: catalog:shared-runtime
         version: 1.13.6
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
       clsx:
-        specifier: ^2.1.1
+        specifier: catalog:shared-runtime
         version: 2.1.1
       dayjs:
         specifier: ^1.11.13
         version: 1.11.19
       lucide-react:
-        specifier: ^0.460.0
+        specifier: catalog:shared-runtime
         version: 0.460.0(react@19.2.4)
       marked:
         specifier: ^17.0.4
         version: 17.0.4
       react:
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.4
       react-dom:
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.4(react@19.2.4)
       react-router-dom:
-        specifier: ^7.1.0
+        specifier: catalog:shared-runtime
         version: 7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       shadcn:
         specifier: ^4.0.5
@@ -377,23 +442,23 @@ importers:
         specifier: ^4.7.1
         version: 4.7.1
       zustand:
-        specifier: ^5.0.0
+        specifier: catalog:shared-runtime
         version: 5.0.11(@types/react@19.2.14)(immer@11.1.4)(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
     devDependencies:
       '@tailwindcss/postcss':
-        specifier: ^4.0.0
+        specifier: catalog:tailwind-4
         version: 4.2.1
       '@types/js-cookie':
         specifier: ^3.0.6
         version: 3.0.6
       '@types/node':
-        specifier: ^22.10.0
+        specifier: catalog:node-22
         version: 22.19.13
       '@types/react':
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.14
       '@types/react-dom':
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.3(@types/react@19.2.14)
       '@vitejs/plugin-react-swc':
         specifier: catalog:vite-6
@@ -402,10 +467,10 @@ importers:
         specifier: ^3.0.5
         version: 3.0.5
       tailwindcss:
-        specifier: ^4.0.0
+        specifier: catalog:tailwind-4
         version: 4.2.1
       typescript:
-        specifier: ^5.7.0
+        specifier: catalog:ts-tooling
         version: 5.9.3
       vite:
         specifier: catalog:vite-6
@@ -418,78 +483,78 @@ importers:
         version: 3.90.0
     devDependencies:
       '@types/node':
-        specifier: ^22.10.0
+        specifier: catalog:node-22
         version: 22.19.13
       jsdom:
         specifier: ^29.1.1
         version: 29.1.1(@noble/hashes@1.8.0)
       typescript:
-        specifier: ^5.7.0
+        specifier: catalog:ts-tooling
         version: 5.9.3
       vite:
-        specifier: 6.3.5
+        specifier: catalog:vite-6
         version: 6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
       vitest:
-        specifier: ^4.1.6
+        specifier: catalog:test
         version: 4.1.6(@types/node@22.19.13)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.12.10(@types/node@22.19.13)(typescript@5.9.3))(vite@6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))
 
   packages/format-tools:
     devDependencies:
       tsup:
-        specifier: ^8.3.0
+        specifier: catalog:ts-tooling
         version: 8.5.1(@swc/core@1.15.17)(jiti@2.6.1)(postcss@8.5.10)(typescript@5.9.3)(yaml@2.8.2)
       typescript:
-        specifier: ^5.7.0
+        specifier: catalog:ts-tooling
         version: 5.9.3
 
   packages/shared:
     devDependencies:
       tsup:
-        specifier: ^8.3.0
+        specifier: catalog:ts-tooling
         version: 8.5.1(@swc/core@1.15.17)(jiti@2.6.1)(postcss@8.5.10)(typescript@5.9.3)(yaml@2.8.2)
       typescript:
-        specifier: ^5.7.0
+        specifier: catalog:ts-tooling
         version: 5.9.3
 
   packages/shared-format:
     devDependencies:
       tsup:
-        specifier: ^8.3.0
+        specifier: catalog:ts-tooling
         version: 8.5.1(@swc/core@1.15.17)(jiti@2.6.1)(postcss@8.5.10)(typescript@5.9.3)(yaml@2.8.2)
       typescript:
-        specifier: ^5.7.0
+        specifier: catalog:ts-tooling
         version: 5.9.3
 
   packages/shared-request:
     dependencies:
       axios:
-        specifier: ^1.7.0
+        specifier: catalog:shared-runtime
         version: 1.13.6
     devDependencies:
       tsup:
-        specifier: ^8.3.0
+        specifier: catalog:ts-tooling
         version: 8.5.1(@swc/core@1.15.17)(jiti@2.6.1)(postcss@8.5.10)(typescript@5.9.3)(yaml@2.8.2)
       typescript:
-        specifier: ^5.7.0
+        specifier: catalog:ts-tooling
         version: 5.9.3
 
   packages/shared-router:
     dependencies:
       react:
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.4
       react-router-dom:
-        specifier: ^7.0.0
+        specifier: catalog:shared-runtime
         version: 7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
     devDependencies:
       '@types/react':
-        specifier: ^19.0.0
+        specifier: catalog:react-19
         version: 19.2.14
       tsup:
-        specifier: ^8.3.0
+        specifier: catalog:ts-tooling
         version: 8.5.1(@swc/core@1.15.17)(jiti@2.6.1)(postcss@8.5.10)(typescript@5.9.3)(yaml@2.8.2)
       typescript:
-        specifier: ^5.7.0
+        specifier: catalog:ts-tooling
         version: 5.9.3
 
 packages:
@@ -5027,10 +5092,6 @@ packages:
     resolution: {integrity: sha512-pMMHxBOZKFU6HgAZ4eyGnwXF/EvPGGqUr0MnZ5+99485wwW41kW91A4LOGxSHhgugZmSChL5AlElNdwlNgcnLQ==}
     engines: {node: ^10 || ^12 || >=14}
 
-  postcss@8.5.6:
-    resolution: {integrity: sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg==}
-    engines: {node: ^10 || ^12 || >=14}
-
   powershell-utils@0.1.0:
     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
     engines: {node: '>=20'}
@@ -8986,6 +9047,13 @@ snapshots:
 
   '@ungap/structured-clone@1.3.0': {}
 
+  '@vitejs/plugin-react-swc@3.7.0(vite@6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))':
+    dependencies:
+      '@swc/core': 1.15.17
+      vite: 6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2)
+    transitivePeerDependencies:
+      - '@swc/helpers'
+
   '@vitejs/plugin-react-swc@3.7.0(vite@6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2))':
     dependencies:
       '@swc/core': 1.15.17
@@ -9315,15 +9383,6 @@ snapshots:
       fraction.js: 5.3.4
       picocolors: 1.1.1
       postcss: 8.5.10
-      postcss-value-parser: 4.2.0
-
-  autoprefixer@10.4.27(postcss@8.5.6):
-    dependencies:
-      browserslist: 4.28.1
-      caniuse-lite: 1.0.30001774
-      fraction.js: 5.3.4
-      picocolors: 1.1.1
-      postcss: 8.5.6
       postcss-value-parser: 4.2.0
 
   axios@1.13.6:
@@ -11408,24 +11467,24 @@ snapshots:
       mlly: 1.8.0
       pathe: 2.0.3
 
-  postcss-import@15.1.0(postcss@8.5.6):
+  postcss-import@15.1.0(postcss@8.5.10):
     dependencies:
-      postcss: 8.5.6
+      postcss: 8.5.10
       postcss-value-parser: 4.2.0
       read-cache: 1.0.0
       resolve: 1.22.11
 
-  postcss-js@4.1.0(postcss@8.5.6):
+  postcss-js@4.1.0(postcss@8.5.10):
     dependencies:
       camelcase-css: 2.0.1
-      postcss: 8.5.6
+      postcss: 8.5.10
 
-  postcss-load-config@6.0.1(jiti@1.21.7)(postcss@8.5.6)(yaml@2.8.2):
+  postcss-load-config@6.0.1(jiti@1.21.7)(postcss@8.5.10)(yaml@2.8.2):
     dependencies:
       lilconfig: 3.1.3
     optionalDependencies:
       jiti: 1.21.7
-      postcss: 8.5.6
+      postcss: 8.5.10
       yaml: 2.8.2
 
   postcss-load-config@6.0.1(jiti@2.6.1)(postcss@8.5.10)(yaml@2.8.2):
@@ -11436,9 +11495,9 @@ snapshots:
       postcss: 8.5.10
       yaml: 2.8.2
 
-  postcss-nested@6.2.0(postcss@8.5.6):
+  postcss-nested@6.2.0(postcss@8.5.10):
     dependencies:
-      postcss: 8.5.6
+      postcss: 8.5.10
       postcss-selector-parser: 6.1.2
 
   postcss-selector-parser@6.1.2:
@@ -11466,12 +11525,6 @@ snapshots:
       source-map-js: 1.2.1
 
   postcss@8.5.10:
-    dependencies:
-      nanoid: 3.3.11
-      picocolors: 1.1.1
-      source-map-js: 1.2.1
-
-  postcss@8.5.6:
     dependencies:
       nanoid: 3.3.11
       picocolors: 1.1.1
@@ -12368,11 +12421,11 @@ snapshots:
       normalize-path: 3.0.0
       object-hash: 3.0.0
       picocolors: 1.1.1
-      postcss: 8.5.6
-      postcss-import: 15.1.0(postcss@8.5.6)
-      postcss-js: 4.1.0(postcss@8.5.6)
-      postcss-load-config: 6.0.1(jiti@1.21.7)(postcss@8.5.6)(yaml@2.8.2)
-      postcss-nested: 6.2.0(postcss@8.5.6)
+      postcss: 8.5.10
+      postcss-import: 15.1.0(postcss@8.5.10)
+      postcss-js: 4.1.0(postcss@8.5.10)
+      postcss-load-config: 6.0.1(jiti@1.21.7)(postcss@8.5.10)(yaml@2.8.2)
+      postcss-nested: 6.2.0(postcss@8.5.10)
       postcss-selector-parser: 6.1.2
       resolve: 1.22.11
       sucrase: 3.35.1
@@ -12669,6 +12722,25 @@ snapshots:
       d3-shape: 3.2.0
       d3-time: 3.1.0
       d3-timer: 3.0.1
+
+  vite@6.3.5(@types/node@22.19.13)(jiti@1.21.7)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2):
+    dependencies:
+      esbuild: 0.25.12
+      fdir: 6.5.0(picomatch@4.0.3)
+      picomatch: 4.0.3
+      postcss: 8.5.10
+      rollup: 4.59.0
+      tinyglobby: 0.2.15
+    optionalDependencies:
+      '@types/node': 22.19.13
+      fsevents: 2.3.3
+      jiti: 1.21.7
+      less: 3.13.1
+      lightningcss: 1.31.1
+      sass: 1.97.3
+      stylus: 0.64.0
+      terser: 5.46.0
+      yaml: 2.8.2
 
   vite@6.3.5(@types/node@22.19.13)(jiti@2.6.1)(less@3.13.1)(lightningcss@1.31.1)(sass@1.97.3)(stylus@0.64.0)(terser@5.46.0)(yaml@2.8.2):
     dependencies:

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type FeedbackToastTone = 'success' | 'info' | 'warning';
+export type FeedbackToastTone = 'success' | 'info' | 'warning' | 'error';
 
 export type FeedbackToast = {
   id: string;
@@ -23,7 +23,7 @@ export const useFeedbackToastStore = create<FeedbackToastState>((set, get) => ({
   showToast: (message, tone = 'success', durationMs = DEFAULT_DURATION_MS) => {
     const activeTimer = get().timer;
     if (activeTimer) {
-      window.clearTimeout(activeTimer);
+      globalThis.clearTimeout(activeTimer);
     }
 
     const nextToast: FeedbackToast = {
@@ -32,7 +32,7 @@ export const useFeedbackToastStore = create<FeedbackToastState>((set, get) => ({
       tone,
     };
 
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       set({ current: null, timer: null });
     }, durationMs);
 
@@ -44,7 +44,7 @@ export const useFeedbackToastStore = create<FeedbackToastState>((set, get) => ({
   dismissToast: () => {
     const activeTimer = get().timer;
     if (activeTimer) {
-      window.clearTimeout(activeTimer);
+      globalThis.clearTimeout(activeTimer);
     }
     set({ current: null, timer: null });
   },
