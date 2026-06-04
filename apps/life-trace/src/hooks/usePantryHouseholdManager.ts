@@ -10,6 +10,7 @@ import {
   transferHouseholdOwner,
 } from '@/api/household';
 import { getLifeTraceErrorMessage } from '@/lib/error';
+import { findHouseholdById, resolveHouseholdSelection } from '@/lib/householdSelection';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { HouseholdInvitePayload, HouseholdMember, HouseholdSummary } from '@/types';
@@ -28,7 +29,9 @@ export function usePantryHouseholdManager() {
   const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
   const [householdMembersLoading, setHouseholdMembersLoading] = useState(false);
   const [invitePayload, setInvitePayload] = useState<HouseholdInvitePayload | null>(null);
+  const [activeHouseholdId, setActiveHouseholdId] = useState('');
   const invitePayloadRef = useRef(invitePayload);
+  const pendingActiveHouseholdIdRef = useRef('');
 
   useEffect(() => {
     invitePayloadRef.current = invitePayload;
@@ -46,12 +49,13 @@ export function usePantryHouseholdManager() {
     setHouseholdMembers([]);
     setHouseholdMembersLoading(false);
     setInvitePayload(null);
+    setActiveHouseholdId('');
+    pendingActiveHouseholdIdRef.current = '';
   }, [token]);
 
   const currentHousehold = useMemo(
-    () =>
-      households.find((item) => item.id === preferredPantryHouseholdId) ?? households[0] ?? null,
-    [households, preferredPantryHouseholdId],
+    () => findHouseholdById(households, activeHouseholdId),
+    [activeHouseholdId, households],
   );
 
   const loadHouseholdMembersFor = useCallback(
@@ -74,6 +78,18 @@ export function usePantryHouseholdManager() {
     [token],
   );
 
+  const persistActiveHousehold = useCallback(
+    (householdId: string, householdName?: string) => {
+      pendingActiveHouseholdIdRef.current = householdId;
+      return setActivePantryHousehold(householdId, householdName).finally(() => {
+        if (pendingActiveHouseholdIdRef.current === householdId) {
+          pendingActiveHouseholdIdRef.current = '';
+        }
+      });
+    },
+    [setActivePantryHousehold],
+  );
+
   const loadHouseholds = useCallback(
     async (preferredHouseholdId?: string) => {
       if (!token) {
@@ -92,20 +108,21 @@ export function usePantryHouseholdManager() {
         setHouseholds(response.list);
         setHouseholdsLoaded(true);
 
-        const requestedId = preferredHouseholdId || preferredPantryHouseholdId;
-        const hasRequested = requestedId && response.list.some((item) => item.id === requestedId);
-        const fallbackId =
-          (response.currentHouseholdId &&
-            response.list.some((item) => item.id === response.currentHouseholdId) &&
-            response.currentHouseholdId) ||
-          response.list[0]?.id ||
-          '';
-        const nextSelectedHouseholdId = hasRequested ? requestedId : fallbackId;
-        const nextSelectedHousehold = response.list.find(
-          (item) => item.id === nextSelectedHouseholdId,
-        );
+        const nextSelectedHouseholdId = resolveHouseholdSelection({
+          households: response.list,
+          explicitHouseholdId: preferredHouseholdId,
+          optimisticHouseholdId: pendingActiveHouseholdIdRef.current,
+          serverCurrentHouseholdId: response.currentHouseholdId,
+          preferredHouseholdId: preferredPantryHouseholdId,
+        });
+        const nextSelectedHousehold = findHouseholdById(response.list, nextSelectedHouseholdId);
 
-        setPreferredPantryHouseholdId(nextSelectedHouseholdId, nextSelectedHousehold?.name);
+        setActiveHouseholdId(nextSelectedHouseholdId);
+        if (nextSelectedHousehold?.kind === 'shared') {
+          setPreferredPantryHouseholdId(nextSelectedHousehold.id, nextSelectedHousehold.name);
+        } else {
+          setPreferredPantryHouseholdId('', nextSelectedHousehold?.name);
+        }
 
         if (!response.list.some((item) => item.id === invitePayloadRef.current?.householdId)) {
           setInvitePayload(null);
@@ -126,11 +143,15 @@ export function usePantryHouseholdManager() {
   const handleSelectHousehold = useCallback(
     (householdId: string) => {
       const household = households.find((item) => item.id === householdId);
-      setPreferredPantryHouseholdId(householdId, household?.name);
-      void setActivePantryHousehold(householdId, household?.name);
+      setActiveHouseholdId(householdId);
+      setPreferredPantryHouseholdId(
+        household?.kind === 'shared' ? householdId : '',
+        household?.name,
+      );
+      void persistActiveHousehold(householdId, household?.name);
       setInvitePayload((current) => (current?.householdId === householdId ? current : null));
     },
-    [households, setActivePantryHousehold, setPreferredPantryHouseholdId],
+    [households, persistActiveHousehold, setPreferredPantryHouseholdId],
   );
 
   const handleCreateHousehold = useCallback(
@@ -143,12 +164,12 @@ export function usePantryHouseholdManager() {
       setInvitePayload(null);
       const nextSelectedHouseholdId = await loadHouseholds(created.id);
       if (nextSelectedHouseholdId) {
-        void setActivePantryHousehold(nextSelectedHouseholdId, created.name);
+        void persistActiveHousehold(nextSelectedHouseholdId, created.name);
         await loadHouseholdMembersFor(nextSelectedHouseholdId);
       }
       return created;
     },
-    [loadHouseholdMembersFor, loadHouseholds, setActivePantryHousehold, token],
+    [loadHouseholdMembersFor, loadHouseholds, persistActiveHousehold, token],
   );
 
   const handleJoinHousehold = useCallback(
@@ -161,12 +182,12 @@ export function usePantryHouseholdManager() {
       setInvitePayload(null);
       const nextSelectedHouseholdId = await loadHouseholds(joined.id);
       if (nextSelectedHouseholdId) {
-        void setActivePantryHousehold(nextSelectedHouseholdId, joined.name);
+        void persistActiveHousehold(nextSelectedHouseholdId, joined.name);
         await loadHouseholdMembersFor(nextSelectedHouseholdId);
       }
       return joined;
     },
-    [loadHouseholdMembersFor, loadHouseholds, setActivePantryHousehold, token],
+    [loadHouseholdMembersFor, loadHouseholds, persistActiveHousehold, token],
   );
 
   const handleCreateInvite = useCallback(
@@ -192,12 +213,12 @@ export function usePantryHouseholdManager() {
       setInvitePayload(null);
       setHouseholdMembers([]);
       const nextSelectedHouseholdId = await loadHouseholds();
-      void setActivePantryHousehold(nextSelectedHouseholdId);
+      void persistActiveHousehold(nextSelectedHouseholdId);
       if (nextSelectedHouseholdId) {
         await loadHouseholdMembersFor(nextSelectedHouseholdId);
       }
     },
-    [loadHouseholdMembersFor, loadHouseholds, setActivePantryHousehold, token],
+    [loadHouseholdMembersFor, loadHouseholds, persistActiveHousehold, token],
   );
 
   const handleTransferOwner = useCallback(
@@ -208,10 +229,10 @@ export function usePantryHouseholdManager() {
 
       await transferHouseholdOwner(token, householdId, targetUserId);
       const nextSelectedHouseholdId = await loadHouseholds(householdId);
-      void setActivePantryHousehold(nextSelectedHouseholdId || householdId);
+      void persistActiveHousehold(nextSelectedHouseholdId || householdId);
       await loadHouseholdMembersFor(nextSelectedHouseholdId || householdId);
     },
-    [loadHouseholdMembersFor, loadHouseholds, setActivePantryHousehold, token],
+    [loadHouseholdMembersFor, loadHouseholds, persistActiveHousehold, token],
   );
 
   const handleDissolveHousehold = useCallback(
@@ -224,12 +245,12 @@ export function usePantryHouseholdManager() {
       setInvitePayload(null);
       setHouseholdMembers([]);
       const nextSelectedHouseholdId = await loadHouseholds();
-      void setActivePantryHousehold(nextSelectedHouseholdId);
+      void persistActiveHousehold(nextSelectedHouseholdId);
       if (nextSelectedHouseholdId) {
         await loadHouseholdMembersFor(nextSelectedHouseholdId);
       }
     },
-    [loadHouseholdMembersFor, loadHouseholds, setActivePantryHousehold, token],
+    [loadHouseholdMembersFor, loadHouseholds, persistActiveHousehold, token],
   );
 
   return {
@@ -240,6 +261,7 @@ export function usePantryHouseholdManager() {
     householdMembers,
     householdMembersLoading,
     invitePayload,
+    activeHouseholdId,
     currentHousehold,
     loadHouseholds,
     loadHouseholdMembersFor,

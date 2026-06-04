@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Camera,
   Check,
+  ChevronDown,
   ImagePlus,
   PackageCheck,
   RefreshCcw,
@@ -20,10 +21,13 @@ import {
 } from '@/api/pantry';
 import { uploadLifeTraceImage } from '@/api/upload';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { BottomSheet } from '@/components/BottomSheet';
+import { OptionPickerSheet } from '@/components/OptionPickerSheet';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { buildDefaultPantryReminder } from '@/lib/pantry';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -63,6 +67,8 @@ const pantryLocations: PantryLocation[] = [
   '玄关',
   '其他',
 ];
+const categoryPickerOptions = pantryCategories.map((option) => ({ label: option, value: option }));
+const locationPickerOptions = pantryLocations.map((option) => ({ label: option, value: option }));
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
 const initialForm: DraftForm = {
@@ -192,6 +198,7 @@ export function PhotoItemAnalysisPage() {
   const preferredPantryHouseholdName = useLifeTraceStore(
     (state) => state.preferredPantryHouseholdName,
   );
+  const setActivePantryHousehold = useLifeTraceStore((state) => state.setActivePantryHousehold);
   const showToast = useFeedbackToastStore((state) => state.showToast);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -210,14 +217,25 @@ export function PhotoItemAnalysisPage() {
   const [households, setHouseholds] = useState<HouseholdSummary[]>([]);
   const [householdsLoading, setHouseholdsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [reviewSheetOpen, setReviewSheetOpen] = useState(false);
+  const [activePicker, setActivePicker] = useState<'category' | 'location' | null>(null);
 
   const cameraActive = state === 'camera-ready';
   const busy = state === 'uploading' || state === 'analyzing' || state === 'saving';
+  const reviewReady = Boolean(analysis);
   const scannerStatusLabel = state === 'done' ? '已入库' : busy ? '处理中' : '待确认';
   const selectedHouseholdName = useMemo(() => {
+    if (!form.householdId) {
+      return '我的空间';
+    }
     const selected = households.find((item) => item.id === form.householdId);
-    return selected?.name || preferredPantryHouseholdName || '我的空间';
-  }, [form.householdId, households, preferredPantryHouseholdName]);
+    return (
+      selected?.name ||
+      (preferredPantryHouseholdId === form.householdId ? preferredPantryHouseholdName : '') ||
+      '共享空间'
+    );
+  }, [form.householdId, households, preferredPantryHouseholdId, preferredPantryHouseholdName]);
 
   useEffect(() => {
     setForm((current) => ({
@@ -261,6 +279,12 @@ export function PhotoItemAnalysisPage() {
   }, [imagePreviewUrl]);
 
   const stopCamera = useCallback(() => {
+    setCameraStream((current) => {
+      current?.getTracks().forEach((track) => {
+        track.stop();
+      });
+      return null;
+    });
     const stream = videoRef.current?.srcObject;
     if (stream instanceof MediaStream) {
       stream.getTracks().forEach((track) => {
@@ -274,6 +298,37 @@ export function PhotoItemAnalysisPage() {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
+  useEffect(() => {
+    if (!cameraActive || !cameraStream || !videoRef.current) {
+      return;
+    }
+
+    const video = videoRef.current;
+    let cancelled = false;
+    if (video.srcObject !== cameraStream) {
+      video.srcObject = cameraStream;
+    }
+
+    void video.play().catch(() => {
+      if (cancelled) {
+        return;
+      }
+      cameraStream.getTracks().forEach((track) => {
+        track.stop();
+      });
+      if (video.srcObject === cameraStream) {
+        video.srcObject = null;
+      }
+      setCameraStream(null);
+      setCameraError('摄像头画面启动失败，可以关闭后重试或改用相册上传。');
+      setState('error');
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cameraActive, cameraStream]);
+
   const updateImageFile = (file: File) => {
     if (imagePreviewUrl) {
       URL.revokeObjectURL(imagePreviewUrl);
@@ -283,6 +338,7 @@ export function PhotoItemAnalysisPage() {
     setUploadedImageUrl('');
     setCroppedImageUrl('');
     setAnalysis(null);
+    setReviewSheetOpen(false);
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setCroppedAreaPixels(null);
@@ -300,14 +356,12 @@ export function PhotoItemAnalysisPage() {
     setCameraError('');
     setError('');
     try {
+      stopCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
         audio: false,
       });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
+      setCameraStream(stream);
       setState('camera-ready');
     } catch (cameraAccessError) {
       setCameraError(
@@ -401,6 +455,7 @@ export function PhotoItemAnalysisPage() {
       setZoom(1);
       setCroppedAreaPixels(null);
       setState('reviewing');
+      setReviewSheetOpen(true);
       showToast('商品识别完成，请确认后入库。', 'success');
     } catch (analysisError) {
       setState('captured');
@@ -440,19 +495,19 @@ export function PhotoItemAnalysisPage() {
         imageUrl: uploadedImageUrl || undefined,
         thumbnailUrl: thumbnailUrl || uploadedImageUrl || undefined,
         status: 'normal',
-        reminder: {
-          enabled: form.reminderEnabled,
-          useDefault: true,
-          rules: pantryPreferences.defaultReminderRules,
-          reminderTime: pantryPreferences.defaultReminderTime,
-        },
+        reminder: buildDefaultPantryReminder(pantryPreferences, form.reminderEnabled),
       };
 
       const item = await addPantryItem(input, form.householdId || undefined);
       if (!item) {
         throw new Error('入库失败，请稍后重试。');
       }
+      void setActivePantryHousehold(
+        form.householdId || '',
+        form.householdId ? selectedHouseholdName : '',
+      );
       setState('done');
+      setReviewSheetOpen(true);
       showToast(`「${item.name}」已加入${selectedHouseholdName}`, 'success');
     } catch (saveError) {
       setState('reviewing');
@@ -472,6 +527,8 @@ export function PhotoItemAnalysisPage() {
     setUploadedImageUrl('');
     setCroppedImageUrl('');
     setAnalysis(null);
+    setReviewSheetOpen(false);
+    setActivePicker(null);
     setForm((current) => ({
       ...initialForm,
       householdId: current.householdId,
@@ -613,12 +670,16 @@ export function PhotoItemAnalysisPage() {
                 onClick={() => void analyzePhoto()}
               >
                 {busy ? (
-                  <ActionLoadingIcon className="size-4 shrink-0" />
+                  <ActionLoadingIcon className="size-4 shrink-0 text-background" />
                 ) : (
                   <Sparkles className="size-4 shrink-0" />
                 )}
                 <span className="whitespace-nowrap">
-                  {state === 'uploading' ? '上传中' : state === 'analyzing' ? '分析中' : '开始分析'}
+                  {state === 'uploading'
+                    ? '上传中...'
+                    : state === 'analyzing'
+                      ? '分析中...'
+                      : '开始分析'}
                 </span>
               </Button>
             </div>
@@ -745,188 +806,258 @@ export function PhotoItemAnalysisPage() {
         <section>
           <SectionHeader title="确认入库信息" meta={selectedHouseholdName} />
           <Card className="space-y-4 p-4">
-            <label className="block space-y-2 text-sm">
-              <span className="text-muted-foreground">商品名称</span>
-              <input
-                value={form.name}
-                className="h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground outline-none focus:border-life-ai"
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, name: event.target.value }))
-                }
-              />
-            </label>
-
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block space-y-2 text-sm">
-                <span className="text-muted-foreground">分类</span>
-                <select
-                  value={form.category}
-                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground outline-none focus:border-life-ai"
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      category: event.target.value as PantryCategory,
-                    }))
-                  }
-                >
-                  {pantryCategories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block space-y-2 text-sm">
-                <span className="text-muted-foreground">存放位置</span>
-                <select
-                  value={form.location}
-                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground outline-none focus:border-life-ai"
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      location: event.target.value as PantryLocation,
-                    }))
-                  }
-                >
-                  {pantryLocations.map((location) => (
-                    <option key={location} value={location}>
-                      {location}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="grid grid-cols-[1fr_0.8fr] gap-3">
-              <label className="block space-y-2 text-sm">
-                <span className="text-muted-foreground">数量</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={form.quantity}
-                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground outline-none focus:border-life-ai"
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, quantity: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="block space-y-2 text-sm">
-                <span className="text-muted-foreground">单位</span>
-                <input
-                  value={form.unit}
-                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground outline-none focus:border-life-ai"
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, unit: event.target.value }))
-                  }
-                />
-              </label>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block space-y-2 text-sm">
-                <span className="text-muted-foreground">购买日期</span>
-                <input
-                  type="date"
-                  value={form.openedAt}
-                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground outline-none focus:border-life-ai"
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, openedAt: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="block space-y-2 text-sm">
-                <span className="text-muted-foreground">保质期</span>
-                <input
-                  type="date"
-                  value={form.expiresAt}
-                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground outline-none focus:border-life-ai"
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, expiresAt: event.target.value }))
-                  }
-                />
-              </label>
-            </div>
-
-            <label className="block space-y-2 text-sm">
-              <span className="text-muted-foreground">家庭空间</span>
-              <select
-                value={form.householdId}
-                disabled={householdsLoading}
-                className="h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground outline-none focus:border-life-ai disabled:opacity-60"
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, householdId: event.target.value }))
-                }
-              >
-                <option value="">我的空间</option>
-                {households
-                  .filter((household) => household.kind === 'shared')
-                  .map((household) => (
-                    <option key={household.id} value={household.id}>
-                      {household.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-
-            <label className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-secondary/50 px-4 py-3 text-sm">
-              <span>
-                <span className="block font-semibold text-foreground">使用默认到期提醒</span>
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  入库后按 Pantry 默认规则提醒。
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={form.reminderEnabled}
-                className="size-5 accent-life-ai"
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, reminderEnabled: event.target.checked }))
-                }
-              />
-            </label>
-
-            <label className="block space-y-2 text-sm">
-              <span className="text-muted-foreground">备注</span>
-              <textarea
-                value={form.note}
-                rows={5}
-                className="w-full resize-none rounded-xl border border-border bg-background px-3 py-3 text-foreground outline-none focus:border-life-ai"
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, note: event.target.value }))
-                }
-              />
-            </label>
-
-            {state === 'done' ? (
-              <div className="grid grid-cols-2 gap-3">
-                <Button type="button" variant="outline" onClick={resetFlow}>
-                  <Camera className="size-4" />
-                  继续拍
-                </Button>
-                <Button type="button" variant="ai" onClick={() => navigate('/pantry')}>
-                  <PackageCheck className="size-4" />
-                  查看库存
-                </Button>
+            <div className="grid gap-3 text-sm sm:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-secondary/60 px-4 py-3">
+                <p className="text-xs text-muted-foreground">商品</p>
+                <p className="mt-1 truncate font-semibold">{form.name || analysis.name}</p>
               </div>
-            ) : (
-              <Button
-                type="button"
-                variant="ai"
-                className="w-full"
-                disabled={state === 'saving'}
-                onClick={() => void savePantryItem()}
-              >
-                {state === 'saving' ? (
-                  <ActionLoadingIcon className="size-4" />
-                ) : (
-                  <Check className="size-4" />
-                )}
-                确认入库
-              </Button>
-            )}
+              <div className="rounded-2xl border border-border bg-secondary/60 px-4 py-3">
+                <p className="text-xs text-muted-foreground">数量 / 位置</p>
+                <p className="mt-1 truncate font-semibold">
+                  {form.quantity || '1'} {form.unit || '件'} · {form.location}
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="ai"
+              className="h-12 w-full whitespace-nowrap"
+              onClick={() => setReviewSheetOpen(true)}
+            >
+              <Check className="size-4 shrink-0" />
+              <span className="whitespace-nowrap">
+                {state === 'done' ? '查看入库结果' : '打开入库确认'}
+              </span>
+            </Button>
           </Card>
         </section>
       ) : null}
+
+      <BottomSheet
+        open={reviewSheetOpen && reviewReady}
+        onOpenChange={setReviewSheetOpen}
+        overlayLabel="关闭入库确认"
+        zIndexClassName="z-50"
+        closeDisabled={state === 'saving'}
+        portal
+      >
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-xl font-semibold">确认入库</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              AI 已经填好草稿，你可以改完再保存到库存。
+            </p>
+            <p className="mt-2 text-xs font-medium text-life-ai">保存到：{selectedHouseholdName}</p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled={state === 'saving'}
+            onClick={() => setReviewSheetOpen(false)}
+          >
+            <X className="size-5" />
+          </Button>
+        </div>
+
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (state !== 'done') {
+              void savePantryItem();
+            }
+          }}
+        >
+          <label className="block space-y-2">
+            <span className="text-sm font-medium">
+              商品名称 <span className="text-life-alert">*</span>
+            </span>
+            <input
+              value={form.name}
+              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
+              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+            />
+          </label>
+
+          <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+            <div className="block space-y-2">
+              <span className="text-sm font-medium">分类</span>
+              <button
+                type="button"
+                disabled={state === 'saving'}
+                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+                onClick={() => setActivePicker('category')}
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span>{form.category}</span>
+                  <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+                </span>
+              </button>
+            </div>
+            <div className="block space-y-2">
+              <span className="text-sm font-medium">位置</span>
+              <button
+                type="button"
+                disabled={state === 'saving'}
+                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+                onClick={() => setActivePicker('location')}
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span>{form.location}</span>
+                  <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-3 max-[360px]:grid-cols-1">
+            <label className="block space-y-2">
+              <span className="text-sm font-medium">
+                数量 <span className="text-life-alert">*</span>
+              </span>
+              <input
+                type="number"
+                min="1"
+                value={form.quantity}
+                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, quantity: event.target.value }))
+                }
+              />
+            </label>
+            <label className="block space-y-2">
+              <span className="text-sm font-medium">单位</span>
+              <input
+                value={form.unit}
+                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, unit: event.target.value }))
+                }
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 max-[520px]:grid-cols-1">
+            <label className="block space-y-2">
+              <span className="text-sm font-medium">购买</span>
+              <input
+                type="date"
+                value={form.openedAt}
+                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, openedAt: event.target.value }))
+                }
+              />
+            </label>
+            <label className="block space-y-2">
+              <span className="text-sm font-medium">保质期</span>
+              <input
+                type="date"
+                value={form.expiresAt}
+                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, expiresAt: event.target.value }))
+                }
+              />
+            </label>
+          </div>
+
+          <label className="block space-y-2">
+            <span className="text-sm font-medium">家庭空间</span>
+            <select
+              value={form.householdId}
+              disabled={householdsLoading || state === 'saving'}
+              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring disabled:opacity-60"
+              onChange={(event) =>
+                setForm((current) => ({ ...current, householdId: event.target.value }))
+              }
+            >
+              <option value="">我的空间</option>
+              {households
+                .filter((household) => household.kind === 'shared')
+                .map((household) => (
+                  <option key={household.id} value={household.id}>
+                    {household.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+
+          <label className="flex items-center justify-between gap-3 rounded-[1.25rem] border border-border bg-secondary/60 px-4 py-3 text-sm">
+            <span>
+              <span className="block font-semibold text-foreground">使用默认到期提醒</span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                入库后按 Pantry 默认规则提醒。
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={form.reminderEnabled}
+              className="size-5 accent-life-ai"
+              disabled={state === 'saving'}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, reminderEnabled: event.target.checked }))
+              }
+            />
+          </label>
+
+          <label className="block space-y-2">
+            <span className="text-sm font-medium">备注</span>
+            <textarea
+              value={form.note}
+              rows={4}
+              className="w-full resize-none rounded-2xl border border-border bg-secondary px-4 py-3 text-sm text-foreground outline-none transition focus:border-ring"
+              onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))}
+            />
+          </label>
+
+          {state === 'done' ? (
+            <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+              <Button type="button" variant="outline" onClick={resetFlow}>
+                <Camera className="size-4 shrink-0" />
+                <span className="whitespace-nowrap">继续拍</span>
+              </Button>
+              <Button type="button" variant="ai" onClick={() => navigate('/pantry')}>
+                <PackageCheck className="size-4 shrink-0" />
+                <span className="whitespace-nowrap">查看库存</span>
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="submit"
+              variant="ai"
+              className="h-12 w-full whitespace-nowrap disabled:opacity-80"
+              disabled={state === 'saving'}
+            >
+              {state === 'saving' ? (
+                <ActionLoadingIcon className="size-4 shrink-0 text-background" />
+              ) : (
+                <Check className="size-4 shrink-0" />
+              )}
+              <span className="whitespace-nowrap">
+                {state === 'saving' ? '入库中...' : '确认入库'}
+              </span>
+            </Button>
+          )}
+        </form>
+      </BottomSheet>
+      <OptionPickerSheet<PantryCategory>
+        open={activePicker === 'category'}
+        title="选择分类"
+        value={form.category}
+        options={categoryPickerOptions}
+        onOpenChange={(nextOpen) => setActivePicker(nextOpen ? 'category' : null)}
+        onSelect={(value) => setForm((current) => ({ ...current, category: value }))}
+      />
+      <OptionPickerSheet<PantryLocation>
+        open={activePicker === 'location'}
+        title="选择位置"
+        value={form.location}
+        options={locationPickerOptions}
+        onOpenChange={(nextOpen) => setActivePicker(nextOpen ? 'location' : null)}
+        onSelect={(value) => setForm((current) => ({ ...current, location: value }))}
+      />
     </div>
   );
 }

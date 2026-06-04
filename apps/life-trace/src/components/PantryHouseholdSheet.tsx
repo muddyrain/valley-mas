@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { getLifeTraceErrorMessage } from '@/lib/error';
+import { findHouseholdById } from '@/lib/householdSelection';
 import { cn } from '@/lib/utils';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import type { HouseholdInvitePayload, HouseholdMember, HouseholdSummary } from '@/types';
@@ -80,7 +81,7 @@ export function PantryHouseholdSheet({
   const [sheetError, setSheetError] = useState('');
   const showToast = useFeedbackToastStore((state) => state.showToast);
   const currentHousehold = useMemo(
-    () => households.find((item) => item.id === selectedHouseholdId) ?? households[0] ?? null,
+    () => findHouseholdById(households, selectedHouseholdId),
     [households, selectedHouseholdId],
   );
 
@@ -126,7 +127,18 @@ export function PantryHouseholdSheet({
             切换库存空间，也可以在这里创建、邀请或加入共享家庭。
           </p>
         </div>
-        <Button type="button" variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="关闭家庭空间管理"
+          data-sheet-drag-ignore="true"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onOpenChange(false);
+          }}
+        >
           <X className="size-5" />
         </Button>
       </div>
@@ -158,7 +170,7 @@ export function PantryHouseholdSheet({
           ) : (
             <div className="space-y-2">
               {households.map((household) => {
-                const selected = household.id === currentHousehold?.id;
+                const selected = household.id === selectedHouseholdId;
                 return (
                   <button
                     key={household.id}

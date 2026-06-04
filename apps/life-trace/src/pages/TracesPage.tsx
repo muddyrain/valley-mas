@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Trace } from '@/types';
 
-type TraceFilter = 'all' | 'plan' | 'checkin' | 'manual' | 'with-image';
+type TraceFilter = 'all' | 'plan' | 'checkin' | 'pantry' | 'manual' | 'with-image';
 
 const traceFilters: Array<{ id: TraceFilter; label: string; emptyText: string }> = [
   {
@@ -46,6 +46,11 @@ const traceFilters: Array<{ id: TraceFilter; label: string; emptyText: string }>
     emptyText: '还没有打卡类踪迹。后续完成关键打卡后可以沉淀成生活记录。',
   },
   {
+    id: 'pantry',
+    label: '库存',
+    emptyText: '还没有库存类踪迹。拍照入库、用完或丢弃库存后会沉淀到这里。',
+  },
+  {
     id: 'manual',
     label: '手动',
     emptyText: '还没有手动记录的踪迹。可以从图片分析或计划完成后开始积累。',
@@ -60,6 +65,7 @@ const traceFilters: Array<{ id: TraceFilter; label: string; emptyText: string }>
 const sourceTone: Record<Trace['source'], 'plan' | 'health' | 'trace'> = {
   计划: 'plan',
   打卡: 'health',
+  库存: 'trace',
   手动: 'trace',
 };
 
@@ -77,6 +83,9 @@ function filterTraces(traces: Trace[], filter: TraceFilter) {
   }
   if (filter === 'checkin') {
     return traces.filter((trace) => trace.source === '打卡');
+  }
+  if (filter === 'pantry') {
+    return traces.filter((trace) => trace.source === '库存');
   }
   if (filter === 'manual') {
     return traces.filter((trace) => trace.source === '手动');

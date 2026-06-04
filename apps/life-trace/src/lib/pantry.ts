@@ -2,6 +2,7 @@ import type {
   NewTraceInput,
   PantryItem,
   PantryItemStatus,
+  PantryPreferences,
   PantryReminderConfig,
   PantryReminderRule,
 } from '@/types';
@@ -116,6 +117,18 @@ export function formatPantryReminderSummary(reminder: PantryReminderConfig) {
   return labels.join(' / ');
 }
 
+export function buildDefaultPantryReminder(
+  preferences: PantryPreferences,
+  enabled = preferences.defaultReminderEnabled,
+): PantryReminderConfig {
+  return {
+    enabled,
+    useDefault: true,
+    rules: preferences.defaultReminderRules,
+    reminderTime: preferences.defaultReminderTime,
+  };
+}
+
 export function sortPantryItems(items: PantryItem[], now = new Date()) {
   const priority = {
     expired: 0,
@@ -210,6 +223,20 @@ export function buildPantryTraceInput(
     imageUrl: item.imageUrl || item.thumbnailUrl,
     mood: action === 'used-up' ? '踏实' : '提醒',
     tags: [item.category, '家庭库存', actionLabel],
-    source: '手动',
+    source: '库存',
+  };
+}
+
+export function buildPantryCreatedTraceInput(item: PantryItem, now = new Date()): NewTraceInput {
+  const expiryText = item.expiresAt ? `，保质期记录到 ${item.expiresAt}` : '';
+  return {
+    title: `新增库存：${item.name}`,
+    summary: `Life Trace 已将「${item.name}」加入家庭库存，数量为 ${item.quantity}${item.unit}${expiryText}。`,
+    timeLabel: formatPantryTraceTime(now),
+    location: item.location,
+    imageUrl: item.imageUrl || item.thumbnailUrl,
+    mood: '踏实',
+    tags: [item.category, '家庭库存', '新增库存'],
+    source: '库存',
   };
 }

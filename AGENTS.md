@@ -2,7 +2,7 @@
 
 本文件是 AI 在 Valley MAS 仓库内工作的调度入口。详细项目定位、技术栈、模块地图、启动命令与环境变量以 `docs/PROJECT_GUIDE.md` 为准；文档索引见 `docs/README.md`；AI coding Harness Engineering 约定见 `docs/HARNESS_ENGINEERING.md`。
 
-默认使用中文沟通与输出。进入任务后先读取 `.codex/skills/INDEX.md`，再按任务范围读取相关代码和文档。
+默认使用中文沟通与输出。进入任务后先读取 `.agents/skills/INDEX.md`，再按任务范围读取相关代码和文档。`.codex/skills`、`.claude/skills`、`.codebase/skills`、`.trae/skills` 均作为兼容入口软链接到 `.agents/skills`。
 
 ## 项目定位
 
@@ -12,7 +12,7 @@
 
 ## 必读资料
 
-1. 读取 `.codex/skills/INDEX.md`，确认是否需要启用项目 skill。
+1. 读取 `.agents/skills/INDEX.md`，确认是否需要启用项目 skill。
 2. 按任务范围读取 `docs/PROJECT_GUIDE.md` 的相关章节。
 3. 涉及 AI 协作流程、agent 工作方式、验证闭环或任务执行可靠性时，读取 `docs/HARNESS_ENGINEERING.md`。
 4. 读取当前任务相关目录下的 `README.md`、`.env.example`、package scripts、Go 路由或 handler。
@@ -42,9 +42,9 @@
 
 ## Skills 使用流程
 
-1. 开始任务前读取 `.codex/skills/INDEX.md`。
+1. 开始任务前读取 `.agents/skills/INDEX.md`。
 2. 按“Skill 选择路由”选择需要启用的通用 skill，项目专属 skill 只在对应子项目 `AGENTS.md` 内声明。
-3. 启用 skill 后读取对应 `.codex/skills/<skill>/SKILL.md`。
+3. 启用 skill 后读取对应 `.agents/skills/<skill>/SKILL.md`；工具只识别 `.codex/skills` 等入口时，通过软链接访问同一份内容。
 4. 按 skill 内的流程、约束和校验执行。
 5. 回复中简短说明本次用了哪些 skills 以及原因。
 6. 不确定是否需要 skill 时，先读取 INDEX 和候选 SKILL.md，再决定。
@@ -145,7 +145,7 @@ cd server && go run ./cmd/server
 - [ ] AI Mind Arena 改动：`pnpm --filter @valley/ai-mind-arena typecheck`
 - [ ] WorldSim 改动：`pnpm --filter @valley/world-sim typecheck`
 - [ ] 共享包改动：对应包的 `pnpm --filter <package> typecheck` 或 `pnpm --filter <package> build`
-- [ ] 中文文案、Markdown、skill 或配置示例改动：`python3 .codex/skills/encoding-guard/scripts/check_mojibake.py <相关文件>`
+- [ ] 中文文案、Markdown、skill 或配置示例改动：`python3 .agents/skills/encoding-guard/scripts/check_mojibake.py <相关文件>`
 - [ ] 只改协作规则或文档：至少运行 encoding 检查，并说明未运行应用级编译的原因
 - [ ] 无法运行必要校验：说明原因、影响范围和剩余风险
 

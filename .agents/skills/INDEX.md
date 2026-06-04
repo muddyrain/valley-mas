@@ -4,10 +4,11 @@
 
 ## 使用约定
 
-- 任务开始前，先按场景判断是否需要启用 `.codex/skills/*/SKILL.md` 中的项目 skills。
+- 任务开始前，先按场景判断是否需要启用 `.agents/skills/*/SKILL.md` 中的项目 skills。
 - 只要本回合启用了任何 skill，就按 `skill-usage-disclosure` 简短说明使用了哪些以及原因。
 - 涉及中文、Markdown、skill、配置示例或任何非 ASCII 文本改动时，使用 `encoding-guard` 做前后检查。
-- 不要引用已经不存在的 skill；以本索引和实际 `.codex/skills/*/SKILL.md` 为准。
+- 不要引用已经不存在的 skill；以本索引和实际 `.agents/skills/*/SKILL.md` 为准。
+- `.codex/skills`、`.claude/skills`、`.codebase/skills`、`.trae/skills` 仅作为兼容入口，均应软链接到 `.agents/skills`，不要维护多份副本。
 
 ## Skills
 

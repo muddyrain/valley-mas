@@ -25,6 +25,11 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			ai.GET("/conversation", handler.GetAssistantConversation)
 			ai.POST("/conversation/messages", handler.CreateAssistantMessage)
 			ai.DELETE("/conversation", handler.ClearAssistantConversation)
+			ai.GET("/conversations", handler.ListAssistantConversations)
+			ai.POST("/conversations", handler.CreateAssistantConversation)
+			ai.GET("/conversations/:conversationId", handler.GetAssistantConversationByID)
+			ai.POST("/conversations/:conversationId/messages", handler.CreateAssistantMessageInConversation)
+			ai.DELETE("/conversations/:conversationId", handler.DeleteAssistantConversation)
 		}
 
 		plans := group.Group("/plans")

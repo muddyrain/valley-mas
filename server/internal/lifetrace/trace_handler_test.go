@@ -123,6 +123,33 @@ func TestCreateAndListTracesForCurrentUser(t *testing.T) {
 	}
 }
 
+func TestCreateTraceAcceptsPantrySource(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+
+	body := bytes.NewBufferString(`{
+		"title": "新增库存：牛奶",
+		"summary": "Life Trace 已将牛奶加入家庭库存。",
+		"timeLabel": "今天 10:00",
+		"location": "冷藏",
+		"mood": "踏实",
+		"tags": ["食品", "家庭库存", "新增库存"],
+		"source": "库存"
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/traces", body)
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	created := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	if created["source"] != "库存" {
+		t.Fatalf("expected source 库存, got %+v", created["source"])
+	}
+}
+
 func TestListTracesOnlyReturnsCurrentUserData(t *testing.T) {
 	router := setupTraceTestRouter(t, 101)
 	if err := database.GetDB().Create(&model.LifeTraceTrace{

@@ -158,7 +158,7 @@ export type Trace = {
   imageUrl?: string;
   mood: string;
   tags: string[];
-  source: '计划' | '打卡' | '手动';
+  source: '计划' | '打卡' | '库存' | '手动';
   createdAt?: string;
   updatedAt?: string;
 };

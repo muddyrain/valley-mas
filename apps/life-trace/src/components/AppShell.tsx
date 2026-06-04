@@ -1,10 +1,24 @@
-import { CalendarDays, ClipboardList, MapPinned, Sparkles, UserRound } from 'lucide-react';
-import { type ReactNode, useEffect, useRef } from 'react';
+import {
+  CalendarDays,
+  ClipboardList,
+  Download,
+  MapPinned,
+  RefreshCw,
+  Share2,
+  Sparkles,
+  UserRound,
+  X,
+} from 'lucide-react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useLifeTraceEntrance } from '@/hooks/useLifeTraceEntrance';
+import { usePwaStatus } from '@/hooks/usePwaStatus';
 import { gsap, useGSAP } from '@/lib/gsap';
+import { getPwaShareFeedback } from '@/lib/pwa';
 import { cn } from '@/lib/utils';
+import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import type { AppTab } from '@/types';
+import { Button } from './ui/button';
 
 const tabs: Array<{ id: AppTab; label: string; path: string; icon: typeof CalendarDays }> = [
   { id: 'today', label: '今日', path: '/today', icon: CalendarDays },
@@ -44,10 +58,102 @@ function scrollContentToTop(element: HTMLElement | null, _routeKey: string) {
   element?.scrollTo({ top: 0, behavior: 'instant' });
 }
 
+function PwaActionBanner({ hidden }: { hidden: boolean }) {
+  const [dismissedKey, setDismissedKey] = useState('');
+  const {
+    canInstall,
+    installed,
+    iosInstallHint,
+    refreshing,
+    serviceWorkerReady,
+    updateAvailable,
+    promptInstall,
+    refreshApp,
+    shareApp,
+  } = usePwaStatus();
+  const showToast = useFeedbackToastStore((state) => state.showToast);
+  const bannerKey = updateAvailable ? 'update' : canInstall && !installed ? 'install' : '';
+
+  if (hidden || !bannerKey || dismissedKey === bannerKey) {
+    return null;
+  }
+
+  const handleShare = async () => {
+    try {
+      const result = await shareApp();
+      const feedback = getPwaShareFeedback(result);
+      showToast(feedback.message, feedback.tone);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '分享失败，请稍后再试', 'error');
+    }
+  };
+
+  return (
+    <div className="safe-x pointer-events-none fixed inset-x-0 bottom-[calc(6.9rem+env(safe-area-inset-bottom))] z-40 mx-auto w-full max-w-[430px]">
+      <div className="pointer-events-auto rounded-[1.35rem] border border-life-ai/20 bg-card/95 p-3 shadow-[0_-18px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
+        <div className="flex items-start gap-3">
+          <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+            {updateAvailable ? <RefreshCw className="size-5" /> : <Download className="size-5" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">
+              {updateAvailable ? 'Life Trace 有新版本' : '安装 Life Trace'}
+            </p>
+            <p className="mt-1 text-sm leading-5 text-muted-foreground">
+              {updateAvailable
+                ? '刷新后可使用最新内容、应用名称和图标缓存。'
+                : iosInstallHint
+                  ? '当前设备可添加到主屏幕，后续从桌面图标打开。'
+                  : '添加到桌面后，计划提醒和离线入口更稳定。'}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="grid size-8 shrink-0 place-items-center rounded-xl text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+            aria-label="暂时关闭"
+            onClick={() => setDismissedKey(bannerKey)}
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 max-[360px]:grid-cols-1">
+          {updateAvailable ? (
+            <Button
+              type="button"
+              variant="ai"
+              size="sm"
+              disabled={refreshing}
+              onClick={() => void refreshApp()}
+            >
+              <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
+              {refreshing ? '刷新中' : '立即更新'}
+            </Button>
+          ) : (
+            <Button type="button" variant="ai" size="sm" onClick={() => void promptInstall()}>
+              <Download className="size-4" />
+              一键安装
+            </Button>
+          )}
+          <Button type="button" variant="outline" size="sm" onClick={() => void handleShare()}>
+            <Share2 className="size-4" />
+            分享应用
+          </Button>
+        </div>
+        {!serviceWorkerReady ? (
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            离线缓存还在准备，稍后会自动完成。
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const activeTab = getActiveTab(location.pathname);
   const scrollRouteKey = getScrollRouteKey(location.pathname);
+  const isAgentChatRoute = location.pathname === '/ai';
   const contentRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
 
@@ -106,16 +212,27 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="h-dvh w-full overflow-hidden bg-background text-foreground">
       <main
         ref={contentRef}
-        className="safe-top safe-x mx-auto h-dvh w-full max-w-[430px] overflow-y-auto overflow-x-hidden overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-[calc(10rem+env(safe-area-inset-bottom))] max-[360px]:px-3"
+        className={cn(
+          'safe-top mx-auto h-dvh w-full max-w-[430px] overflow-x-hidden overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          isAgentChatRoute
+            ? 'overflow-hidden px-0 pb-0'
+            : 'safe-x overflow-y-auto pb-[calc(10rem+env(safe-area-inset-bottom))] max-[360px]:px-3',
+        )}
       >
-        <div className="min-w-0 overflow-x-hidden" data-page-entrance>
+        <div
+          className={cn('min-w-0 overflow-x-hidden', isAgentChatRoute && 'h-full')}
+          data-page-entrance
+        >
           {children}
         </div>
       </main>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-20 mx-auto h-[calc(11rem+env(safe-area-inset-bottom))] w-full max-w-[430px] bg-gradient-to-t from-background via-background via-55% to-transparent"
-      />
+      {isAgentChatRoute ? null : (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-20 mx-auto h-[calc(11rem+env(safe-area-inset-bottom))] w-full max-w-[430px] bg-gradient-to-t from-background via-background via-55% to-transparent"
+        />
+      )}
+      <PwaActionBanner hidden={isAgentChatRoute} />
       <nav
         ref={navRef}
         className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[430px] border-t border-white/[0.07] bg-card/88 px-3 pt-3 shadow-[0_-18px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl max-[360px]:px-2"

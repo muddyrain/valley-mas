@@ -120,3 +120,72 @@ func TestClearAssistantConversationDeletesOnlyCurrentUserMessages(t *testing.T) 
 		t.Fatalf("expected other messages to remain, got %d", otherCount)
 	}
 }
+
+func TestAssistantConversationsCanCreateSwitchAndDeleteTopics(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+
+	createTopicReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/life-trace/ai/conversations",
+		bytes.NewBufferString(`{"title":"库存咨询"}`),
+	)
+	createTopicReq.Header.Set("Content-Type", "application/json")
+	createTopicResp := httptest.NewRecorder()
+	router.ServeHTTP(createTopicResp, createTopicReq)
+
+	topic := decodeTracePayload(t, createTopicResp)["data"].(map[string]interface{})
+	topicID := topic["id"].(string)
+	if topic["title"] != "库存咨询" || topicID == "" {
+		t.Fatalf("unexpected topic: %+v", topic)
+	}
+
+	createMessageReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/life-trace/ai/conversations/"+topicID+"/messages",
+		bytes.NewBufferString(`{"role":"user","content":"饼干保质期 7 天"}`),
+	)
+	createMessageReq.Header.Set("Content-Type", "application/json")
+	createMessageResp := httptest.NewRecorder()
+	router.ServeHTTP(createMessageResp, createMessageReq)
+	createdMessage := decodeTracePayload(t, createMessageResp)["data"].(map[string]interface{})
+	if createdMessage["conversationId"] != topicID {
+		t.Fatalf("expected message in topic %s, got %+v", topicID, createdMessage)
+	}
+
+	getTopicReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/ai/conversations/"+topicID, nil)
+	getTopicResp := httptest.NewRecorder()
+	router.ServeHTTP(getTopicResp, getTopicReq)
+	topicData := decodeTracePayload(t, getTopicResp)["data"].(map[string]interface{})
+	messages := topicData["messages"].([]interface{})
+	if len(messages) != 1 || messages[0].(map[string]interface{})["content"] != "饼干保质期 7 天" {
+		t.Fatalf("unexpected topic messages: %+v", messages)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/ai/conversations", nil)
+	listResp := httptest.NewRecorder()
+	router.ServeHTTP(listResp, listReq)
+	listData := decodeTracePayload(t, listResp)["data"].(map[string]interface{})
+	conversations := listData["list"].([]interface{})
+	if len(conversations) == 0 {
+		t.Fatalf("expected at least one conversation, got %+v", listData)
+	}
+
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/life-trace/ai/conversations/"+topicID, nil)
+	deleteResp := httptest.NewRecorder()
+	router.ServeHTTP(deleteResp, deleteReq)
+	deleteData := decodeTracePayload(t, deleteResp)["data"].(map[string]interface{})
+	if deleteData["deletedId"] != topicID || deleteData["nextConversationId"] == "" {
+		t.Fatalf("unexpected delete payload: %+v", deleteData)
+	}
+
+	var messageCount int64
+	if err := database.GetDB().
+		Model(&model.LifeTraceAIMessage{}).
+		Where("user_id = ? AND conversation_id = ?", model.Int64String(101), topicID).
+		Count(&messageCount).Error; err != nil {
+		t.Fatalf("count deleted topic messages: %v", err)
+	}
+	if messageCount != 0 {
+		t.Fatalf("expected topic messages deleted, got %d", messageCount)
+	}
+}

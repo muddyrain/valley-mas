@@ -15,8 +15,10 @@ import {
   MapPin,
   MoonStar,
   Plus,
+  RefreshCw,
   Route,
   Settings2,
+  Share2,
   ShieldCheck,
   Smartphone,
   Sparkles,
@@ -42,6 +44,7 @@ import { usePwaStatus } from '@/hooks/usePwaStatus';
 import { gsap, useGSAP } from '@/lib/gsap';
 import { formatLocationDisplay } from '@/lib/location';
 import { pantryReminderRuleLabels } from '@/lib/pantry';
+import { getPwaShareFeedback } from '@/lib/pwa';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
@@ -304,6 +307,7 @@ export function ProfilePage() {
   const [serverPushTesting, setServerPushTesting] = useState(false);
   const [notificationTestMessage, setNotificationTestMessage] = useState('');
   const settings = useLifeTraceStore((state) => state.settings);
+  const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const settingsLoading = useLifeTraceStore((state) => state.settingsLoading);
   const settingsSaving = useLifeTraceStore((state) => state.settingsSaving);
   const settingsError = useLifeTraceStore((state) => state.settingsError);
@@ -317,7 +321,21 @@ export function ProfilePage() {
   const user = useAuthStore((state) => state.user);
   const updateUser = useAuthStore((state) => state.updateUser);
   const signOut = useAuthStore((state) => state.signOut);
-  const { canInstall, installed, serviceWorkerReady, promptInstall } = usePwaStatus();
+  const {
+    canInstall,
+    checkingUpdate,
+    clipboardSupported,
+    installed,
+    iosInstallHint,
+    refreshing,
+    shareSupported,
+    serviceWorkerReady,
+    updateAvailable,
+    checkForUpdate,
+    promptInstall,
+    refreshApp,
+    shareApp,
+  } = usePwaStatus();
   const notification = useNotificationPermission(token);
   const showToast = useFeedbackToastStore((state) => state.showToast);
   const {
@@ -328,6 +346,7 @@ export function ProfilePage() {
     householdMembers,
     householdMembersLoading,
     invitePayload,
+    activeHouseholdId,
     currentHousehold,
     loadHouseholds,
     loadHouseholdMembersFor,
@@ -380,6 +399,14 @@ export function ProfilePage() {
       ? '个人空间'
       : `${currentHousehold.memberCount} 人共享`
     : '今日页和库存页会跟随这里';
+
+  useEffect(() => {
+    if (!token || !settingsLoaded || householdsLoaded || householdsLoading) {
+      return;
+    }
+
+    void loadHouseholds();
+  }, [householdsLoaded, householdsLoading, loadHouseholds, settingsLoaded, token]);
 
   useEffect(() => {
     if (!householdSheetOpen) {
@@ -441,6 +468,28 @@ export function ProfilePage() {
       );
     } finally {
       setServerPushTesting(false);
+    }
+  };
+
+  const handleCheckPwaUpdate = async () => {
+    try {
+      const found = await checkForUpdate();
+      showToast(
+        found ? '发现新版本，可以立即更新' : '当前已经是最新版本',
+        found ? 'info' : 'success',
+      );
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '检查更新失败，请稍后再试', 'error');
+    }
+  };
+
+  const handleShareApp = async () => {
+    try {
+      const result = await shareApp();
+      const feedback = getPwaShareFeedback(result);
+      showToast(feedback.message, feedback.tone);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '分享失败，请稍后再试', 'error');
     }
   };
 
@@ -1250,7 +1299,10 @@ export function ProfilePage() {
       </section>
 
       <section data-profile-card className="space-y-3">
-        <SectionHeader title="安装体验" />
+        <SectionHeader
+          title="应用安装与分享"
+          meta={updateAvailable ? '有新版本' : installed ? '已安装' : '可安装'}
+        />
         <Card className="relative overflow-hidden border-life-ai/20 bg-card/90 p-4">
           <div
             aria-hidden="true"
@@ -1258,36 +1310,92 @@ export function ProfilePage() {
           />
           <div className="flex items-center gap-3">
             <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
-              {serviceWorkerReady ? (
-                <Wifi className="size-5" />
+              {updateAvailable ? (
+                <RefreshCw className="size-5" />
+              ) : serviceWorkerReady ? (
+                <Smartphone className="size-5" />
               ) : (
                 <LoaderCircle className="size-5 animate-spin" />
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold">添加到手机桌面</h3>
+              <h3 className="font-semibold">Life Trace PWA 控制台</h3>
               <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                {installed
-                  ? '当前已以应用模式运行。'
-                  : canInstall
-                    ? '当前浏览器支持一键安装。'
-                    : 'iPhone 可通过浏览器分享菜单添加到主屏幕。'}
+                {updateAvailable
+                  ? '开发者已发布新内容，刷新后会同步最新页面、名称和图标缓存。'
+                  : installed
+                    ? '当前已以应用模式运行，可继续检查更新或分享给其他用户。'
+                    : canInstall
+                      ? '当前浏览器支持一键安装，不必再从分享菜单里找入口。'
+                      : iosInstallHint
+                        ? 'iPhone 需要从浏览器分享菜单添加到主屏幕，安装后可在这里检查更新。'
+                        : '当前浏览器可使用分享或复制链接把应用发给其他用户。'}
               </p>
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-secondary/70 px-3 py-2 text-sm text-muted-foreground max-[360px]:items-start">
-            <span className="flex min-w-0 items-center gap-2">
-              <MoonStar className="size-4 text-life-plan" />
-              <span className="truncate">
-                {serviceWorkerReady ? '离线缓存已准备好' : '离线缓存准备中'}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Badge tone={installed ? 'trace' : 'default'}>
+              {installed ? '已安装' : '浏览器模式'}
+            </Badge>
+            <Badge tone={serviceWorkerReady ? 'trace' : 'default'}>
+              {serviceWorkerReady ? '离线缓存 OK' : '缓存准备中'}
+            </Badge>
+            <Badge tone={updateAvailable ? 'ai' : 'default'}>
+              {updateAvailable ? '发现更新' : '暂无更新'}
+            </Badge>
+            <Badge tone={shareSupported || clipboardSupported ? 'trace' : 'default'}>
+              {shareSupported ? '系统分享' : clipboardSupported ? '可复制链接' : '分享受限'}
+            </Badge>
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2 max-[390px]:grid-cols-1">
+            {canInstall && !installed ? (
+              <Button type="button" variant="ai" size="sm" onClick={() => void promptInstall()}>
+                <Download className="size-4" />
+                一键安装
+              </Button>
+            ) : (
+              <Button type="button" variant="secondary" size="sm" disabled={installed}>
+                <Smartphone className="size-4" />
+                {installed ? '已安装' : '添加桌面'}
+              </Button>
+            )}
+            {updateAvailable ? (
+              <Button
+                type="button"
+                variant="ai"
+                size="sm"
+                disabled={refreshing}
+                onClick={() => void refreshApp()}
+              >
+                <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
+                {refreshing ? '刷新中' : '立即更新'}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={checkingUpdate}
+                onClick={() => void handleCheckPwaUpdate()}
+              >
+                <RefreshCw className={cn('size-4', checkingUpdate && 'animate-spin')} />
+                {checkingUpdate ? '检查中' : '检查更新'}
+              </Button>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={() => void handleShareApp()}>
+              <Share2 className="size-4" />
+              分享应用
+            </Button>
+          </div>
+          <div className="mt-4 rounded-2xl bg-secondary/70 px-3 py-2 text-sm text-muted-foreground">
+            <span className="flex min-w-0 items-start gap-2">
+              <MoonStar className="mt-0.5 size-4 shrink-0 text-life-plan" />
+              <span className="min-w-0 leading-5">
+                {iosInstallHint && !canInstall
+                  ? 'iPhone 安装仍受 Safari/系统限制：点浏览器分享按钮，再选择“添加到主屏幕”。'
+                  : '图标或应用名称变更后，点“检查更新/立即更新”可优先刷新 manifest 与图标缓存。'}
               </span>
             </span>
-            {canInstall ? (
-              <Button type="button" variant="ai" size="sm" onClick={promptInstall}>
-                <Download className="size-4" />
-                安装
-              </Button>
-            ) : null}
           </div>
         </Card>
       </section>
@@ -1307,7 +1415,7 @@ export function ProfilePage() {
         open={householdSheetOpen}
         onOpenChange={setHouseholdSheetOpen}
         households={households}
-        selectedHouseholdId={currentHousehold?.id}
+        selectedHouseholdId={activeHouseholdId}
         members={householdMembers}
         membersLoading={householdMembersLoading}
         householdsLoading={householdsLoading}

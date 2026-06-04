@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { NewTraceInput, Trace } from '@/types';
 
-const traceSources: Trace['source'][] = ['计划', '打卡', '手动'];
+const traceSources: Trace['source'][] = ['计划', '打卡', '库存', '手动'];
 const traceMoods = ['放松', '满足', '活力', '平静', '开心', '专注'];
 
 type TraceFormErrors = Partial<Record<'title' | 'summary' | 'timeLabel', string>>;

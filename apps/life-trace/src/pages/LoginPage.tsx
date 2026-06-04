@@ -1,5 +1,6 @@
-import { ArrowRight, CloudSun, LockKeyhole, Mail, Sparkles } from 'lucide-react';
+import { ArrowRight, CloudSun, LockKeyhole, Mail } from 'lucide-react';
 import { type FormEvent, useRef, useState } from 'react';
+import { LifeTraceBrandMark } from '@/components/LifeTraceBrandMark';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useLifeTraceEntrance } from '@/hooks/useLifeTraceEntrance';
@@ -48,9 +49,7 @@ export function LoginPage() {
         <header className="pt-5" data-login-entrance>
           <div className="mb-8 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="grid size-11 place-items-center rounded-2xl bg-primary text-primary-foreground">
-                <Sparkles className="size-5" />
-              </div>
+              <LifeTraceBrandMark className="size-11 rounded-2xl" />
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Life Trace</p>
                 <h1 className="text-xl font-bold">生活迹</h1>

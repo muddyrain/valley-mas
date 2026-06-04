@@ -19,19 +19,19 @@ This skill now protects against two failure modes:
 Run this from the repo root before editing:
 
 ```bash
-python .codex/skills/encoding-guard/scripts/check_mojibake.py
+python .agents/skills/encoding-guard/scripts/check_mojibake.py
 ```
 
 Run it again after editing:
 
 ```bash
-python .codex/skills/encoding-guard/scripts/check_mojibake.py
+python .agents/skills/encoding-guard/scripts/check_mojibake.py
 ```
 
 You can also target specific files:
 
 ```bash
-python .codex/skills/encoding-guard/scripts/check_mojibake.py path\to\file1.ts path\to\file2.tsx
+python .agents/skills/encoding-guard/scripts/check_mojibake.py path\to\file1.ts path\to\file2.tsx
 ```
 
 ## What The Script Checks

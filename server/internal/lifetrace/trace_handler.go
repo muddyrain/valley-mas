@@ -27,6 +27,7 @@ type createTraceRequest struct {
 var validTraceSources = map[string]bool{
 	"计划": true,
 	"打卡": true,
+	"库存": true,
 	"手动": true,
 }
 

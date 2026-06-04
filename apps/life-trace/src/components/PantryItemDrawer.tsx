@@ -368,7 +368,7 @@ export function PantryItemDrawer({
             </div>
           </div>
 
-          <div className="grid grid-cols-[1fr_6.5rem_5.5rem] gap-3 max-[360px]:grid-cols-1">
+          <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-3 max-[360px]:grid-cols-1">
             <label className="block space-y-2">
               <span className="text-sm font-medium">
                 数量 <span className="text-life-alert">*</span>
@@ -401,6 +401,9 @@ export function PantryItemDrawer({
                 className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
               />
             </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 max-[520px]:grid-cols-1">
             <label className="block space-y-2">
               <span className="text-sm font-medium">开封</span>
               <input
@@ -410,17 +413,16 @@ export function PantryItemDrawer({
                 className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
               />
             </label>
+            <label className="block space-y-2">
+              <span className="text-sm font-medium">过期日期</span>
+              <input
+                type="date"
+                value={form.expiresAt || ''}
+                onChange={(event) => updateField('expiresAt', event.target.value)}
+                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+              />
+            </label>
           </div>
-
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">过期日期</span>
-            <input
-              type="date"
-              value={form.expiresAt || ''}
-              onChange={(event) => updateField('expiresAt', event.target.value)}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
-            />
-          </label>
 
           <AppImageUploader
             value={form.imageUrl}

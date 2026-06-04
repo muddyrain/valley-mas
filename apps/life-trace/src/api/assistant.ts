@@ -3,6 +3,7 @@ import type { PantryItem, Plan } from '@/types';
 
 export type LifeAssistantMessage = {
   id?: string;
+  conversationId?: string;
   role: 'user' | 'assistant';
   content: string;
   createdAt?: string;
@@ -19,6 +20,11 @@ export type LifeAssistantConversation = {
 export type LifeAssistantConversationResponse = {
   conversation: LifeAssistantConversation;
   messages: LifeAssistantMessage[];
+};
+
+export type LifeAssistantConversationsResponse = {
+  activeConversationId: string;
+  list: LifeAssistantConversation[];
 };
 
 type AssistantStreamChunk = {
@@ -143,18 +149,62 @@ export function getLifeAssistantConversation(token: string) {
   });
 }
 
+export function listLifeAssistantConversations(token: string) {
+  return apiRequest<LifeAssistantConversationsResponse>('/life-trace/ai/conversations', token, {
+    method: 'GET',
+  });
+}
+
+export function createLifeAssistantConversation(token: string, title = '新话题') {
+  return apiRequest<LifeAssistantConversation>('/life-trace/ai/conversations', token, {
+    method: 'POST',
+    body: JSON.stringify({ title }),
+  });
+}
+
+export function getLifeAssistantConversationById(token: string, conversationId: string) {
+  return apiRequest<LifeAssistantConversationResponse>(
+    `/life-trace/ai/conversations/${encodeURIComponent(conversationId)}`,
+    token,
+    {
+      method: 'GET',
+    },
+  );
+}
+
 export function saveLifeAssistantMessage(
   token: string,
   message: Pick<LifeAssistantMessage, 'role' | 'content'>,
+  conversationId?: string,
 ) {
-  return apiRequest<LifeAssistantMessage>('/life-trace/ai/conversation/messages', token, {
+  const path = conversationId
+    ? `/life-trace/ai/conversations/${encodeURIComponent(conversationId)}/messages`
+    : '/life-trace/ai/conversation/messages';
+  return apiRequest<LifeAssistantMessage>(path, token, {
     method: 'POST',
     body: JSON.stringify(message),
   });
 }
 
-export function clearLifeAssistantConversation(token: string) {
-  return apiRequest<{ conversationId: string }>('/life-trace/ai/conversation', token, {
-    method: 'DELETE',
-  });
+export function clearLifeAssistantConversation(token: string, conversationId?: string) {
+  const path = conversationId
+    ? `/life-trace/ai/conversations/${encodeURIComponent(conversationId)}`
+    : '/life-trace/ai/conversation';
+  return apiRequest<{ conversationId?: string; deletedId?: string; nextConversationId?: string }>(
+    path,
+    token,
+    {
+      method: 'DELETE',
+    },
+  );
+}
+
+export function deleteLifeAssistantConversation(token: string, conversationId: string) {
+  return apiRequest<{ deletedId: string; nextConversationId: string }>(
+    `/life-trace/ai/conversations/${encodeURIComponent(conversationId)}`,
+    token,
+    {
+      method: 'DELETE',
+    },
+  );
 }

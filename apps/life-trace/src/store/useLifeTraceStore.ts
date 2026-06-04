@@ -20,7 +20,11 @@ import {
 import { getSettings, saveSettings } from '@/api/settings';
 import { createTrace, deleteTrace, listTraces, updateTrace } from '@/api/traces';
 import { getLifeTraceErrorMessage } from '@/lib/error';
-import { resolvePantryStatus } from '@/lib/pantry';
+import {
+  buildPantryCreatedTraceInput,
+  buildPantryTraceInput,
+  resolvePantryStatus,
+} from '@/lib/pantry';
 import { useAuthStore } from '@/store/useAuthStore';
 import type {
   AiAction,
@@ -222,6 +226,33 @@ const getToken = () => useAuthStore.getState().token;
 
 let settingsSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let pantryListRequestId = 0;
+
+function recordPantryTrace(
+  token: string,
+  input: NewTraceInput,
+  actionTitle: string,
+  setState: (
+    partial:
+      | LifeTraceState
+      | Partial<LifeTraceState>
+      | ((state: LifeTraceState) => LifeTraceState | Partial<LifeTraceState>),
+  ) => void,
+) {
+  void createTrace(token, input)
+    .then((trace) => {
+      setState((state) => ({
+        traces: [trace, ...state.traces],
+        tracesError: '',
+        aiActions: [
+          { id: createActionId(), title: actionTitle, timeLabel: '刚刚' },
+          ...getAiActions(state),
+        ],
+      }));
+    })
+    .catch(() => {
+      // Pantry operations should not fail just because trace journaling is temporarily unavailable.
+    });
+}
 
 function normalizeSettings(settings: Partial<UserSettings>): UserSettings {
   const habits = Array.isArray(settings.habits)
@@ -1015,6 +1046,12 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           if (get().pantryListLoaded && activeHouseholdId === targetHouseholdId) {
             void get().loadPantryList(get().pantryListOptions);
           }
+          recordPantryTrace(
+            token,
+            buildPantryCreatedTraceInput(item),
+            `沉淀了「${item.name}」库存踪迹`,
+            set,
+          );
           return item;
         } catch (error) {
           set({ pantryError: getLifeTraceErrorMessage(error, '添加库存失败') });
@@ -1091,6 +1128,16 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           }));
           if (get().pantryListLoaded && activeHouseholdId === targetHouseholdId) {
             void get().loadPantryList(get().pantryListOptions);
+          }
+          if (status === 'used-up' || status === 'discarded') {
+            recordPantryTrace(
+              token,
+              buildPantryTraceInput(updatedItem, status),
+              status === 'used-up'
+                ? `沉淀了「${updatedItem.name}」用完记录`
+                : `沉淀了「${updatedItem.name}」丢弃记录`,
+              set,
+            );
           }
           return updatedItem;
         } catch (error) {

@@ -5,11 +5,12 @@ import {
   CalendarDays,
   Check,
   Clock,
-  CloudSun,
   History,
   Image,
   Lightbulb,
   ListChecks,
+  Menu,
+  MessageSquareText,
   Mic,
   MicOff,
   Plus,
@@ -28,18 +29,24 @@ import {
 } from '@/api/advice';
 import {
   clearLifeAssistantConversation,
-  getLifeAssistantConversation,
+  createLifeAssistantConversation,
+  deleteLifeAssistantConversation,
+  getLifeAssistantConversationById,
   type LifeAssistantActionEvent,
+  type LifeAssistantConversation,
   type LifeAssistantMessage,
+  listLifeAssistantConversations,
   saveLifeAssistantMessage,
   streamLifeAssistant,
 } from '@/api/assistant';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AssistantMessageCard } from '@/components/AssistantMessageCard';
+import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { EmptyState } from '@/components/EmptyState';
 import { ImageAnalysisDrawer } from '@/components/ImageAnalysisDrawer';
+import { LifeTraceBrandMark } from '@/components/LifeTraceBrandMark';
 import { SectionHeader } from '@/components/SectionHeader';
 import { MessageSyncSkeleton, SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
@@ -57,7 +64,7 @@ import {
 import { findCurrentWeekReview, toggleExpandedWeeklyReviewId } from '@/lib/weeklyReviews';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { AdvicePayload, AiAction, NewPlanInput } from '@/types';
+import type { AdvicePayload, AiAction, NewPlanInput, Plan } from '@/types';
 
 type AiResult = {
   title: string;
@@ -125,8 +132,6 @@ function formatAssistantActionMessage(event: LifeAssistantActionEvent) {
   return event.message;
 }
 
-const COLLAPSED_ASSISTANT_MESSAGE_COUNT = 4;
-
 function normalizeAssistantMessage(message: LifeAssistantMessage, index: number): AssistantMessage {
   return {
     id: message.id || `${message.role}-${message.createdAt || Date.now()}-${index}`,
@@ -162,6 +167,20 @@ function formatAssistantMessageTime(message: AssistantMessage) {
   }
 
   return date.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatConversationTime(conversation: LifeAssistantConversation) {
+  const value = conversation.updatedAt || conversation.createdAt;
+  if (!value) {
+    return '';
+  }
+
+  return new Date(value).toLocaleDateString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -596,6 +615,459 @@ function AiActionsArchive({ actions, onBack }: { actions: AiAction[]; onBack: ()
   );
 }
 
+function AssistantConversationSheet({
+  open,
+  conversations,
+  activeConversationId,
+  loading,
+  creating,
+  deletingId,
+  onOpenChange,
+  onCreate,
+  onSelect,
+  onDelete,
+}: {
+  open: boolean;
+  conversations: LifeAssistantConversation[];
+  activeConversationId: string;
+  loading: boolean;
+  creating: boolean;
+  deletingId: string | null;
+  onOpenChange: (open: boolean) => void;
+  onCreate: () => void;
+  onSelect: (conversation: LifeAssistantConversation) => void;
+  onDelete: (conversation: LifeAssistantConversation) => void;
+}) {
+  return (
+    <BottomSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      overlayLabel="关闭话题列表"
+      className="space-y-4"
+      portal
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-lg font-semibold">聊天话题</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            切换不同主题，避免所有内容挤在一条对话里。
+          </p>
+        </div>
+        <button
+          type="button"
+          className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full bg-life-ai px-4 py-2 text-sm font-semibold text-background transition hover:bg-life-ai/90 disabled:opacity-70"
+          disabled={creating}
+          onClick={onCreate}
+        >
+          {creating ? (
+            <ActionLoadingIcon className="size-4 text-background" />
+          ) : (
+            <Plus className="size-4" />
+          )}
+          新话题
+        </button>
+      </div>
+
+      <div className="max-h-[58dvh] space-y-2 overflow-y-auto pr-1">
+        {loading && conversations.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
+            正在同步话题...
+          </div>
+        ) : conversations.length > 0 ? (
+          conversations.map((conversation) => {
+            const active = conversation.id === activeConversationId;
+            const deleting = deletingId === conversation.id;
+
+            return (
+              <div
+                key={conversation.id}
+                className={`flex items-center gap-2 rounded-2xl border p-2 ${
+                  active ? 'border-life-ai/35 bg-life-ai/10' : 'border-border bg-card'
+                }`}
+              >
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-secondary/60"
+                  onClick={() => onSelect(conversation)}
+                >
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground">
+                    {active ? (
+                      <Check className="size-4 text-life-ai" />
+                    ) : (
+                      <MessageSquareText className="size-4" />
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">
+                      {conversation.title || '新话题'}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {formatConversationTime(conversation) || '刚刚'}
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-life-alert/10 hover:text-life-alert disabled:opacity-50"
+                  aria-label={`删除${conversation.title || '话题'}`}
+                  disabled={deleting || conversations.length <= 1}
+                  onClick={() => onDelete(conversation)}
+                >
+                  {deleting ? (
+                    <ActionLoadingIcon className="size-4" />
+                  ) : (
+                    <Trash2 className="size-4" />
+                  )}
+                </button>
+              </div>
+            );
+          })
+        ) : (
+          <div className="rounded-2xl border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
+            还没有话题，点“新话题”开始。
+          </div>
+        )}
+      </div>
+    </BottomSheet>
+  );
+}
+
+function AgentConversationPanel({
+  conversation,
+  messages,
+  loading,
+  streaming,
+  model,
+  input,
+  result,
+  adviceCards,
+  plans,
+  addingAdviceId,
+  weeklyReviews,
+  weeklyReviewsLoading,
+  latestWeeklyReview,
+  quickActions,
+  quickActionLoading,
+  aiActions,
+  speechSupported,
+  listening,
+  speechError,
+  onInputChange,
+  onSubmit,
+  onPrompt,
+  onToggleListening,
+  onOpenConversations,
+  onCreateConversation,
+  onOpenWeeklyReviews,
+  onOpenActions,
+  onAddAdvicePlan,
+  onQuickAction,
+}: {
+  conversation: LifeAssistantConversation | null;
+  messages: AssistantMessage[];
+  loading: boolean;
+  streaming: boolean;
+  model: string;
+  input: string;
+  result: AiResult | null;
+  adviceCards: AdvicePayload[];
+  plans: Plan[];
+  addingAdviceId: string | null;
+  weeklyReviews: WeeklyReviewResponse[];
+  weeklyReviewsLoading: boolean;
+  latestWeeklyReview?: WeeklyReviewResponse;
+  quickActions: typeof aiQuickActions;
+  quickActionLoading: string | null;
+  aiActions: AiAction[];
+  speechSupported: boolean;
+  listening: boolean;
+  speechError: string;
+  onInputChange: (value: string) => void;
+  onSubmit: () => void;
+  onPrompt: (prompt: (typeof suggestedPrompts)[number]) => void;
+  onToggleListening: () => void;
+  onOpenConversations: () => void;
+  onCreateConversation: () => void;
+  onOpenWeeklyReviews: () => void;
+  onOpenActions: () => void;
+  onAddAdvicePlan: (item: AdvicePayload) => void;
+  onQuickAction: (label: string) => void;
+}) {
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const latestMessage = messages[messages.length - 1];
+  const canSend = Boolean(input.trim()) && !streaming;
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  });
+
+  return (
+    <div className="flex h-[calc(100dvh_-_8.75rem_-_env(safe-area-inset-bottom))] min-h-0 flex-col overflow-hidden bg-background max-[360px]:h-[calc(100dvh_-_8.35rem_-_env(safe-area-inset-bottom))]">
+      <div className="grid shrink-0 grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2 px-3 py-2">
+        <button
+          type="button"
+          className="grid size-10 place-items-center rounded-full text-foreground transition hover:bg-secondary"
+          aria-label="打开话题列表"
+          onClick={onOpenConversations}
+        >
+          <Menu className="size-6" />
+        </button>
+        <div className="min-w-0 text-center">
+          <div className="flex min-w-0 items-center justify-center gap-1">
+            <p className="truncate text-base font-semibold">
+              {conversation?.title || 'Life Trace Agent'}
+            </p>
+            {streaming ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-life-ai/10 px-2 py-0.5 text-xs font-semibold text-life-ai">
+                <ActionLoadingIcon className="size-3" />
+                思考中
+              </span>
+            ) : null}
+          </div>
+          <p className="truncate text-xs text-muted-foreground">
+            {streaming
+              ? '正在流式输出'
+              : loading
+                ? '正在同步云端对话'
+                : model
+                  ? `模型 ${model}`
+                  : '内容由 AI 生成'}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="grid size-10 place-items-center rounded-full text-foreground transition hover:bg-secondary disabled:opacity-50"
+          aria-label="新话题"
+          disabled={streaming}
+          onClick={onCreateConversation}
+        >
+          <Plus className="size-6" />
+        </button>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="shrink-0 border-b border-border bg-secondary/20 px-3 py-2">
+          <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+              const loadingAction = quickActionLoading === action.label;
+
+              return (
+                <button
+                  type="button"
+                  key={action.label}
+                  className="inline-flex min-h-9 shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-semibold transition hover:bg-secondary disabled:cursor-default disabled:opacity-70 max-[360px]:text-xs"
+                  disabled={Boolean(quickActionLoading)}
+                  onClick={() => onQuickAction(action.label)}
+                >
+                  {loadingAction ? (
+                    <ActionLoadingIcon className="size-4" />
+                  ) : (
+                    <Icon className={`size-4 ${action.tone}`} />
+                  )}
+                  {action.label}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              className="inline-flex min-h-9 shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full border border-life-health/20 bg-card px-3.5 py-1.5 text-sm font-semibold text-life-health transition hover:bg-secondary max-[360px]:text-xs"
+              onClick={onOpenWeeklyReviews}
+            >
+              <History className="size-4" />
+              {weeklyReviewsLoading
+                ? '周报同步中'
+                : latestWeeklyReview
+                  ? '历史周报'
+                  : `${weeklyReviews.length} 篇周报`}
+            </button>
+            <button
+              type="button"
+              className="inline-flex min-h-9 shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full border border-life-ai/20 bg-card px-3.5 py-1.5 text-sm font-semibold text-life-ai transition hover:bg-secondary max-[360px]:text-xs"
+              onClick={onOpenActions}
+            >
+              <Sparkles className="size-4" />
+              AI 操作 {aiActions.length}
+            </button>
+          </div>
+        </div>
+
+        <section className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {result ? (
+              <div className="mb-3 rounded-2xl border border-life-ai/20 bg-life-ai/5 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Sparkles className="size-4 text-life-ai" />
+                  <Badge tone={result.tone}>Agent 结果</Badge>
+                  <h2 className="min-w-0 flex-1 text-sm font-semibold">{result.title}</h2>
+                </div>
+                {result.weeklyReview ? (
+                  <div className="mt-3">
+                    <WeeklyReviewPanel review={result.weeklyReview} />
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{result.detail}</p>
+                )}
+              </div>
+            ) : null}
+
+            {adviceCards.length > 0 ? (
+              <div className="mb-3 grid gap-2">
+                {adviceCards.map((item) => {
+                  const added = hasAdvicePlan(plans, item.id);
+                  const adding = addingAdviceId === item.id;
+
+                  return (
+                    <div key={item.id} className="rounded-2xl border border-border bg-card p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <Badge tone={item.tone}>{item.title}</Badge>
+                        <button
+                          type="button"
+                          disabled={added || Boolean(addingAdviceId)}
+                          className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full bg-secondary text-foreground transition hover:bg-accent disabled:cursor-default disabled:text-life-trace disabled:opacity-100"
+                          aria-label={added ? '已加入计划' : `添加${item.title}计划`}
+                          onClick={() => onAddAdvicePlan(item)}
+                        >
+                          {adding ? (
+                            <ActionLoadingIcon className="size-4" />
+                          ) : added ? (
+                            <Check className="size-4" />
+                          ) : (
+                            <Plus className="size-4" />
+                          )}
+                        </button>
+                      </div>
+                      <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">
+                        {item.detail}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {loading && messages.length === 0 ? (
+              <div className="space-y-3">
+                <MessageSyncSkeleton />
+                <div className="rounded-2xl border border-life-ai/20 bg-life-ai/5 p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-life-ai">
+                    <ActionLoadingIcon className="size-4" />
+                    正在载入对话
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    正在把云端记录同步到当前设备。
+                  </p>
+                </div>
+              </div>
+            ) : messages.length > 0 ? (
+              <div className="space-y-2.5">
+                {messages.map((message) => (
+                  <AssistantMessageCard
+                    key={message.id}
+                    message={message}
+                    meta={formatAssistantMessageTime(message)}
+                    streaming={streaming && message.id === latestMessage?.id}
+                  />
+                ))}
+                <div ref={bottomRef} />
+              </div>
+            ) : (
+              <div className="flex min-h-full flex-col justify-center gap-5 py-8">
+                <div className="mx-auto grid size-28 place-items-center rounded-[2rem] bg-life-ai/10 shadow-[0_18px_60px_rgba(6,182,212,0.12)]">
+                  <LifeTraceBrandMark className="size-20 rounded-[1.6rem]" />
+                </div>
+                <div className="mx-2 rounded-[1.4rem] bg-secondary/70 px-5 py-4">
+                  <p className="text-base leading-8">
+                    嗨，我是 Life Trace
+                    Agent。可以帮你安排计划、记录踪迹、分析库存和整理生活建议。今天有什么可以帮你的吗？
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 px-1">
+                  {suggestedPrompts.slice(0, 4).map((prompt) => {
+                    const Icon = prompt.icon;
+
+                    return (
+                      <button
+                        key={prompt.title}
+                        type="button"
+                        className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-left text-sm font-semibold transition hover:bg-secondary"
+                        onClick={() => onPrompt(prompt)}
+                      >
+                        <Icon className="size-4 shrink-0 text-life-ai" />
+                        <span className="min-w-0 truncate">{prompt.title}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="shrink-0 border-t border-border bg-background/88 p-2 backdrop-blur">
+            <div className="rounded-[1.1rem] border border-life-ai/25 bg-secondary/40 p-2 transition focus-within:border-life-ai/60 focus-within:bg-secondary focus-within:shadow-[0_0_0_3px_rgba(6,182,212,0.08)]">
+              <textarea
+                className="max-h-28 min-h-12 w-full resize-none bg-transparent px-3 py-1.5 text-base leading-7 outline-none placeholder:text-muted-foreground"
+                value={input}
+                disabled={streaming}
+                placeholder="输入消息，按 Enter 发送，Shift + Enter 换行"
+                onChange={(event) => onInputChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    onSubmit();
+                  }
+                }}
+              />
+              <div className="flex items-center justify-between gap-3 px-1 pb-1">
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">
+                    {listening
+                      ? '正在听写，停下后可以直接发送'
+                      : streaming
+                        ? '生活助理正在流式输出'
+                        : '所有工具都会在当前 chat 内完成'}
+                  </p>
+                  {speechError ? (
+                    <p className="mt-1 text-xs text-life-alert">{speechError}</p>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    className={`grid size-10 place-items-center rounded-2xl border transition ${
+                      listening
+                        ? 'border-life-ai bg-life-ai/10 text-life-ai'
+                        : 'border-life-ai/20 bg-card text-muted-foreground hover:bg-life-ai/5 hover:text-life-ai'
+                    } disabled:cursor-default disabled:opacity-60`}
+                    disabled={streaming || !speechSupported}
+                    aria-label={listening ? '停止听写' : '开始语音听写'}
+                    onClick={onToggleListening}
+                  >
+                    {listening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+                  </button>
+                  <button
+                    type="button"
+                    className="grid size-10 cursor-pointer place-items-center rounded-2xl bg-life-ai text-background transition hover:bg-life-ai/90 disabled:cursor-default disabled:opacity-70"
+                    disabled={!canSend}
+                    aria-label="发送消息"
+                    onClick={onSubmit}
+                  >
+                    {streaming ? (
+                      <ActionLoadingIcon className="text-background" />
+                    ) : (
+                      <Send className="size-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function formatWeeklyReviewDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -636,6 +1108,16 @@ function useAiPageState() {
   const [adviceCards, setAdviceCards] = useState<AdvicePayload[]>([]);
   const [assistantInput, setAssistantInput] = useState('');
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
+  const [assistantConversations, setAssistantConversations] = useState<LifeAssistantConversation[]>(
+    [],
+  );
+  const [activeAssistantConversationId, setActiveAssistantConversationId] = useState('');
+  const [assistantConversationSheetOpen, setAssistantConversationSheetOpen] = useState(false);
+  const [assistantConversationsLoading, setAssistantConversationsLoading] = useState(false);
+  const [assistantConversationCreating, setAssistantConversationCreating] = useState(false);
+  const [deletingAssistantConversationId, setDeletingAssistantConversationId] = useState<
+    string | null
+  >(null);
   const [assistantClearConfirmOpen, setAssistantClearConfirmOpen] = useState(false);
   const [assistantClearing, setAssistantClearing] = useState(false);
   const [assistantHistoryNotice, setAssistantHistoryNotice] = useState('');
@@ -666,9 +1148,10 @@ function useAiPageState() {
   const completedCheckinCount = todayCheckins.filter((item) => item.completed).length;
   const activeHabitCount = settings.habits.length;
   const latestTrace = traces[0];
-  const latestAssistantMessages = assistantMessages.slice(-COLLAPSED_ASSISTANT_MESSAGE_COUNT);
   const latestWeeklyReview = weeklyReviews[0];
   const currentWeekReview = findCurrentWeekReview(weeklyReviews);
+  const activeAssistantConversation =
+    assistantConversations.find((item) => item.id === activeAssistantConversationId) ?? null;
   const locationLabel = formatLocationDisplay(settings.city) || settings.city;
   const placeholder = useMemo(
     () => `${locationLabel} · ${settings.commuteMethod}通勤 · ${openPlanCount} 个待完成计划`,
@@ -701,17 +1184,38 @@ function useAiPageState() {
     if (!token) {
       setAssistantHistoryLoading(false);
       setAssistantMessages([]);
+      setAssistantConversations([]);
+      setActiveAssistantConversationId('');
       return;
     }
 
     let alive = true;
+    setAssistantConversationsLoading(true);
     setAssistantHistoryLoading(true);
-    getLifeAssistantConversation(token)
+    listLifeAssistantConversations(token)
       .then((data) => {
         if (!alive) {
           return;
         }
+        const conversationId = data.activeConversationId || data.list[0]?.id || '';
+        setAssistantConversations(data.list);
+        setActiveAssistantConversationId(conversationId);
+        if (!conversationId) {
+          setAssistantMessages([]);
+          return null;
+        }
+        return getLifeAssistantConversationById(token, conversationId);
+      })
+      .then((data) => {
+        if (!alive || !data) {
+          return;
+        }
         setAssistantHistoryNotice('');
+        setAssistantConversations((items) => [
+          data.conversation,
+          ...items.filter((item) => item.id !== data.conversation.id),
+        ]);
+        setActiveAssistantConversationId(data.conversation.id);
         setAssistantMessages(data.messages.map(normalizeAssistantMessage));
       })
       .catch(() => {
@@ -719,10 +1223,13 @@ function useAiPageState() {
           return;
         }
         setAssistantMessages([]);
+        setAssistantConversations([]);
+        setActiveAssistantConversationId('');
         setAssistantHistoryNotice('云端对话暂时同步失败，请稍后重试。');
       })
       .finally(() => {
         if (alive) {
+          setAssistantConversationsLoading(false);
           setAssistantHistoryLoading(false);
         }
       });
@@ -789,15 +1296,129 @@ function useAiPageState() {
 
   const saveAssistantMessageToServer = async (
     message: Pick<LifeAssistantMessage, 'role' | 'content'>,
+    conversationId = activeAssistantConversationId,
   ) => {
-    if (!token || !message.content.trim()) {
+    if (!token || !message.content.trim() || !conversationId) {
       return;
     }
 
     try {
-      await saveLifeAssistantMessage(token, message);
+      const saved = await saveLifeAssistantMessage(token, message, conversationId);
+      if (message.role === 'user') {
+        const title = message.content.trim().slice(0, 32);
+        setAssistantConversations((items) =>
+          items.map((item) =>
+            item.id === saved.conversationId
+              ? { ...item, title, updatedAt: saved.createdAt }
+              : item,
+          ),
+        );
+      }
     } catch {
       // Keep the conversation usable even when persistence is temporarily unavailable.
+    }
+  };
+
+  const handleSelectAssistantConversation = async (conversation: LifeAssistantConversation) => {
+    if (!token || assistantStreaming) {
+      return;
+    }
+    if (conversation.id === activeAssistantConversationId) {
+      setAssistantConversationSheetOpen(false);
+      return;
+    }
+
+    setAssistantHistoryLoading(true);
+    try {
+      const data = await getLifeAssistantConversationById(token, conversation.id);
+      setActiveAssistantConversationId(data.conversation.id);
+      setAssistantConversations((items) => [
+        data.conversation,
+        ...items.filter((item) => item.id !== data.conversation.id),
+      ]);
+      setAssistantMessages(data.messages.map(normalizeAssistantMessage));
+      setResult(null);
+      setAdviceCards([]);
+      setAssistantModel('');
+      setAssistantHistoryNotice('');
+      setAssistantConversationSheetOpen(false);
+    } catch {
+      setAssistantHistoryNotice('切换话题失败，请稍后重试。');
+    } finally {
+      setAssistantHistoryLoading(false);
+    }
+  };
+
+  const createAssistantConversationLocally = async ({ resetInput = false } = {}) => {
+    if (!token) {
+      throw new Error('请先登录');
+    }
+
+    const conversation = await createLifeAssistantConversation(token);
+    setAssistantConversations((items) => [
+      conversation,
+      ...items.filter((item) => item.id !== conversation.id),
+    ]);
+    setActiveAssistantConversationId(conversation.id);
+    setAssistantMessages([]);
+    setResult(null);
+    setAdviceCards([]);
+    setAssistantModel('');
+    if (resetInput) {
+      setAssistantInput('');
+    }
+    setAssistantHistoryNotice('');
+    setAssistantConversationSheetOpen(false);
+    return conversation;
+  };
+
+  const handleCreateAssistantConversation = async () => {
+    if (!token || assistantStreaming) {
+      return;
+    }
+
+    setAssistantConversationCreating(true);
+    try {
+      await createAssistantConversationLocally({ resetInput: true });
+    } catch {
+      setAssistantHistoryNotice('新话题创建失败，请稍后重试。');
+    } finally {
+      setAssistantConversationCreating(false);
+    }
+  };
+
+  const handleDeleteAssistantConversation = async (conversation: LifeAssistantConversation) => {
+    if (!token || assistantStreaming || assistantConversations.length <= 1) {
+      return;
+    }
+
+    setDeletingAssistantConversationId(conversation.id);
+    try {
+      const data = await deleteLifeAssistantConversation(token, conversation.id);
+      const remaining = assistantConversations.filter((item) => item.id !== conversation.id);
+      setAssistantConversations(remaining);
+
+      if (conversation.id === activeAssistantConversationId) {
+        const nextId = data.nextConversationId || remaining[0]?.id || '';
+        setActiveAssistantConversationId(nextId);
+        if (nextId) {
+          const next = await getLifeAssistantConversationById(token, nextId);
+          setAssistantConversations((items) => [
+            next.conversation,
+            ...items.filter((item) => item.id !== next.conversation.id),
+          ]);
+          setAssistantMessages(next.messages.map(normalizeAssistantMessage));
+        } else {
+          setAssistantMessages([]);
+        }
+        setResult(null);
+        setAdviceCards([]);
+        setAssistantModel('');
+      }
+    } catch {
+      setAssistantHistoryNotice('删除话题失败，请稍后重试。');
+    } finally {
+      setDeletingAssistantConversationId(null);
     }
   };
 
@@ -1071,6 +1692,21 @@ function useAiPageState() {
       assistantRecognitionRef.current?.stop();
     }
 
+    let conversationId = activeAssistantConversationId;
+    if (!conversationId) {
+      try {
+        const conversation = await createAssistantConversationLocally();
+        conversationId = conversation.id;
+      } catch {
+        setResult({
+          title: '话题创建失败',
+          detail: '暂时无法创建新的聊天话题，请稍后重试。',
+          tone: 'alert',
+        });
+        return;
+      }
+    }
+
     const history = assistantMessages
       .filter((item) => item.content.trim())
       .slice(-6)
@@ -1094,7 +1730,7 @@ function useAiPageState() {
     setAssistantModel('');
     setAssistantStreaming(true);
     setAssistantMessages((items) => [...items, userMessage, assistantMessage]);
-    void saveAssistantMessageToServer({ role: 'user', content: message });
+    void saveAssistantMessageToServer({ role: 'user', content: message }, conversationId);
 
     let reply = '';
     let hasAssistantAction = false;
@@ -1125,7 +1761,10 @@ function useAiPageState() {
         },
       });
       setAssistantStreaming(false);
-      void saveAssistantMessageToServer({ role: 'assistant', content: actionReply || reply });
+      void saveAssistantMessageToServer(
+        { role: 'assistant', content: actionReply || reply },
+        conversationId,
+      );
       if (!hasAssistantAction) {
         addAiAction('和生活助理聊了一次安排');
       }
@@ -1144,7 +1783,7 @@ function useAiPageState() {
         ),
       );
       if (reply.trim()) {
-        void saveAssistantMessageToServer({ role: 'assistant', content: reply });
+        void saveAssistantMessageToServer({ role: 'assistant', content: reply }, conversationId);
       }
     } finally {
       setAssistantStreaming(false);
@@ -1275,6 +1914,14 @@ function useAiPageState() {
     assistantInput,
     setAssistantInput,
     assistantMessages,
+    assistantConversations,
+    activeAssistantConversationId,
+    activeAssistantConversation,
+    assistantConversationSheetOpen,
+    setAssistantConversationSheetOpen,
+    assistantConversationsLoading,
+    assistantConversationCreating,
+    deletingAssistantConversationId,
     assistantClearConfirmOpen,
     setAssistantClearConfirmOpen,
     assistantClearing,
@@ -1304,10 +1951,12 @@ function useAiPageState() {
     completedCheckinCount,
     activeHabitCount,
     latestTrace,
-    latestAssistantMessages,
     latestWeeklyReview,
     locationLabel,
     placeholder,
+    handleSelectAssistantConversation,
+    handleCreateAssistantConversation,
+    handleDeleteAssistantConversation,
     handleAssistantSubmit,
     toggleAssistantListening,
     handleClearAssistantMessages,
@@ -1424,9 +2073,6 @@ export function AiWeeklyReviewsPage() {
 export function AiPage() {
   const {
     plans,
-    traces,
-    checkinsLoading,
-    settings,
     aiActions,
     addAiAction,
     addPlan,
@@ -1443,9 +2089,17 @@ export function AiPage() {
     assistantInput,
     setAssistantInput,
     assistantMessages,
-    setAssistantHistoryNotice,
+    assistantConversations,
+    activeAssistantConversationId,
+    activeAssistantConversation,
+    assistantConversationSheetOpen,
+    setAssistantConversationSheetOpen,
+    assistantConversationsLoading,
+    assistantConversationCreating,
+    deletingAssistantConversationId,
     assistantStreaming,
     assistantHistoryLoading,
+    assistantModel,
     assistantSpeechSupported,
     assistantListening,
     assistantSpeechError,
@@ -1455,15 +2109,10 @@ export function AiPage() {
     weeklyReviewsLoading,
     weeklyReviewRegenerateTarget,
     setWeeklyReviewRegenerateTarget,
-    openPlanCount,
-    completedPlanCount,
-    completedCheckinCount,
-    activeHabitCount,
-    latestTrace,
-    latestAssistantMessages,
     latestWeeklyReview,
-    locationLabel,
-    placeholder,
+    handleSelectAssistantConversation,
+    handleCreateAssistantConversation,
+    handleDeleteAssistantConversation,
     handleAssistantSubmit,
     toggleAssistantListening,
     handleAddAdvicePlan,
@@ -1472,335 +2121,53 @@ export function AiPage() {
   } = useAiPageState();
 
   return (
-    <div className="min-w-0 space-y-7 overflow-x-hidden">
-      <header className="space-y-5">
-        <div className="flex items-center gap-3">
-          <div className="grid size-12 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
-            <Sparkles className="size-6" />
-          </div>
-          <span className="text-2xl font-bold">Life AI</span>
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight max-[360px]:text-2xl">
-            今天想怎么安排生活?
-          </h1>
-          <p className="mt-2 text-muted-foreground">{placeholder}</p>
-        </div>
-      </header>
+    <div className="h-full min-w-0 overflow-hidden">
+      <AgentConversationPanel
+        conversation={activeAssistantConversation}
+        messages={assistantMessages}
+        loading={assistantHistoryLoading}
+        streaming={assistantStreaming}
+        model={assistantModel}
+        input={assistantInput}
+        result={result}
+        adviceCards={adviceCards}
+        plans={plans}
+        addingAdviceId={addingAdviceId}
+        weeklyReviews={weeklyReviews}
+        weeklyReviewsLoading={weeklyReviewsLoading}
+        latestWeeklyReview={latestWeeklyReview}
+        quickActions={aiQuickActions}
+        quickActionLoading={quickActionLoading}
+        aiActions={aiActions}
+        speechSupported={assistantSpeechSupported}
+        listening={assistantListening}
+        speechError={assistantSpeechError}
+        onInputChange={setAssistantInput}
+        onSubmit={() => void handleAssistantSubmit()}
+        onPrompt={(prompt) =>
+          prompt.type === '计划' ? setDrawerOpen(true) : void handleAssistantSubmit(prompt.title)
+        }
+        onToggleListening={toggleAssistantListening}
+        onOpenConversations={() => setAssistantConversationSheetOpen(true)}
+        onCreateConversation={() => void handleCreateAssistantConversation()}
+        onOpenWeeklyReviews={() => navigate('/ai/weekly-reviews')}
+        onOpenActions={() => navigate('/ai/actions')}
+        onAddAdvicePlan={(item) => void handleAddAdvicePlan(item)}
+        onQuickAction={(label) => void handleQuickAction(label)}
+      />
 
-      <section className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-        <Card className="p-4">
-          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <CloudSun className="size-4 text-life-weather" />
-            今日上下文
-          </div>
-          <p className="mt-2 text-lg font-semibold">{locationLabel}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{settings.commuteMethod}通勤</p>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <CalendarDays className="size-4 text-life-plan" />
-            待完成计划
-          </div>
-          <p className="mt-2 text-lg font-semibold">{openPlanCount} 个</p>
-          <p className="mt-1 text-sm text-muted-foreground">{completedPlanCount} 个已完成</p>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <ListChecks className="size-4 text-life-trace" />
-            今日打卡
-          </div>
-          <p className="mt-2 text-lg font-semibold">
-            {checkinsLoading ? '同步中' : `${completedCheckinCount}/${activeHabitCount || 0}`}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {activeHabitCount ? settings.habits.slice(0, 3).join('、') : '还未设置打卡项'}
-          </p>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <Sparkles className="size-4 text-life-ai" />
-            最近踪迹
-          </div>
-          <p className="mt-2 line-clamp-1 text-lg font-semibold">
-            {latestTrace ? latestTrace.title : `${traces.length} 条`}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {latestTrace ? latestTrace.mood : '完成计划后自动沉淀'}
-          </p>
-        </Card>
-      </section>
-
-      <Card className="border-life-ai/25 p-4 shadow-[0_0_36px_rgba(6,182,212,0.06)]">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold">生活助理</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              会结合天气、计划、打卡和最近踪迹回答
-            </p>
-          </div>
-          {assistantStreaming ? (
-            <span className="inline-flex items-center gap-2 text-xs text-life-ai">
-              <ActionLoadingIcon className="size-3.5" />
-              正在安排
-            </span>
-          ) : null}
-        </div>
-        <textarea
-          className="min-h-24 w-full resize-none rounded-2xl border border-life-ai/30 bg-secondary/40 px-4 py-3 text-base leading-7 outline-none transition placeholder:text-muted-foreground focus:border-life-ai/70 focus:bg-secondary focus:shadow-[0_0_0_3px_rgba(6,182,212,0.08)]"
-          value={assistantInput}
-          disabled={assistantStreaming}
-          placeholder="例如：帮我安排今天下班后的时间，顺便提醒我该注意什么"
-          onChange={(event) => setAssistantInput(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              void handleAssistantSubmit();
-            }
-          }}
-        />
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate text-xs text-muted-foreground">
-              {assistantListening
-                ? '正在听写，停下后可以直接发送'
-                : assistantStreaming
-                  ? '生活助理正在结合你的上下文整理回复'
-                  : '输入后会流式生成，不用等待整段返回'}
-            </p>
-            {assistantSpeechError ? (
-              <p className="mt-1 text-xs text-life-alert">{assistantSpeechError}</p>
-            ) : null}
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              className={`grid size-12 place-items-center rounded-2xl border transition ${
-                assistantListening
-                  ? 'border-life-ai bg-life-ai/10 text-life-ai'
-                  : 'border-life-ai/25 bg-card text-muted-foreground hover:bg-life-ai/5 hover:text-life-ai'
-              } disabled:cursor-default disabled:opacity-60`}
-              disabled={assistantStreaming || !assistantSpeechSupported}
-              onClick={toggleAssistantListening}
-            >
-              {assistantListening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
-            </button>
-            <button
-              type="button"
-              className="grid size-12 shrink-0 cursor-pointer place-items-center rounded-2xl bg-life-ai text-background transition hover:bg-life-ai/90 disabled:cursor-default disabled:opacity-80"
-              disabled={assistantStreaming || !assistantInput.trim()}
-              onClick={() => void handleAssistantSubmit()}
-            >
-              {assistantStreaming ? (
-                <ActionLoadingIcon className="text-background" />
-              ) : (
-                <Send className="size-5" />
-              )}
-            </button>
-          </div>
-        </div>
-      </Card>
-
-      {assistantMessages.length > 0 ? (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">最近对话</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {assistantHistoryLoading
-                  ? '正在同步云端对话'
-                  : `最近 ${latestAssistantMessages.length} 条 / 共 ${assistantMessages.length} 条`}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-                onClick={() => {
-                  setAssistantHistoryNotice('');
-                  navigate('/ai/history');
-                }}
-              >
-                <History className="size-3.5" />
-                历史
-              </button>
-            </div>
-          </div>
-
-          {latestAssistantMessages.map((message) => (
-            <AssistantMessageCard
-              key={message.id}
-              message={message}
-              streaming={
-                assistantStreaming &&
-                message.id === assistantMessages[assistantMessages.length - 1]?.id
-              }
-            />
-          ))}
-        </section>
-      ) : null}
-
-      {result ? (
-        <Card className="border-life-ai/20 p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Sparkles className="size-5 text-life-ai" />
-            <Badge tone={result.tone}>Life AI</Badge>
-          </div>
-          <h2 className="text-lg font-semibold">{result.title}</h2>
-          {result.weeklyReview ? (
-            <div className="mt-4">
-              <WeeklyReviewPanel review={result.weeklyReview} />
-            </div>
-          ) : (
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{result.detail}</p>
-          )}
-        </Card>
-      ) : null}
-
-      <section>
-        <SectionHeader
-          title="历史周报"
-          meta={weeklyReviewsLoading ? '同步中' : `${weeklyReviews.length} 篇`}
-        />
-        <button
-          type="button"
-          className="flex w-full cursor-pointer items-center gap-4 rounded-[1.25rem] border border-life-health/20 bg-card p-4 text-left transition hover:bg-secondary"
-          onClick={() => navigate('/ai/weekly-reviews')}
-        >
-          <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
-            <History className="size-6" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-base font-semibold">查看历史周报</h2>
-            <p className="mt-1 truncate text-sm text-muted-foreground">
-              {weeklyReviewsLoading
-                ? '正在同步已存档周报'
-                : latestWeeklyReview
-                  ? `${latestWeeklyReview.weekStart} - ${latestWeeklyReview.weekEnd}`
-                  : '生成服务端 AI 每周回顾后会保存到这里'}
-            </p>
-          </div>
-          <ArrowRight className="size-5 shrink-0 text-muted-foreground" />
-        </button>
-      </section>
-
-      {adviceCards.length > 0 ? (
-        <section>
-          <SectionHeader title="AI 生成的今日建议" meta={`${adviceCards.length} 条`} />
-          <div className="mt-3 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-            {adviceCards.map((item) => {
-              const added = hasAdvicePlan(plans, item.id);
-              const adding = addingAdviceId === item.id;
-
-              return (
-                <Card key={item.id} className="relative min-h-36 overflow-hidden p-4">
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-life-ai/40 to-transparent"
-                  />
-                  <div className="flex items-start justify-between gap-3">
-                    <Badge tone={item.tone}>{item.title}</Badge>
-                    <button
-                      type="button"
-                      disabled={added || Boolean(addingAdviceId)}
-                      className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full bg-secondary text-foreground transition hover:bg-accent disabled:cursor-default disabled:text-life-trace disabled:opacity-100"
-                      aria-label={added ? '已加入计划' : `添加${item.title}计划`}
-                      onClick={() => void handleAddAdvicePlan(item)}
-                    >
-                      {adding ? (
-                        <ActionLoadingIcon className="size-4" />
-                      ) : added ? (
-                        <Check className="size-4" />
-                      ) : (
-                        <Plus className="size-4" />
-                      )}
-                    </button>
-                  </div>
-                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted-foreground">
-                    {item.detail}
-                  </p>
-                </Card>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-
-      <section className="pb-4">
-        <SectionHeader title="快捷操作" />
-        <div className="flex flex-wrap gap-3 max-[360px]:gap-2">
-          {aiQuickActions.map((action) => {
-            const Icon = action.icon;
-            const loading = quickActionLoading === action.label;
-
-            return (
-              <button
-                type="button"
-                key={action.label}
-                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-4 py-3 text-sm font-semibold transition hover:bg-secondary disabled:cursor-default disabled:opacity-70 max-[360px]:px-3"
-                disabled={Boolean(quickActionLoading)}
-                onClick={() => void handleQuickAction(action.label)}
-              >
-                {loading ? (
-                  <ActionLoadingIcon className="size-4" />
-                ) : (
-                  <Icon className={`size-4 ${action.tone}`} />
-                )}
-                {action.label}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section>
-        <SectionHeader title="试试这样说" />
-        <div className="space-y-3">
-          {suggestedPrompts.map((prompt) => {
-            const Icon = prompt.icon;
-
-            return (
-              <button
-                key={prompt.title}
-                type="button"
-                className="flex w-full cursor-pointer items-center gap-4 rounded-[1.25rem] border border-border bg-card p-4 text-left transition hover:bg-secondary"
-                onClick={() =>
-                  prompt.type === '计划'
-                    ? setDrawerOpen(true)
-                    : void handleAssistantSubmit(prompt.title)
-                }
-              >
-                <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
-                  <Icon className="size-6" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-base font-semibold">{prompt.title}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">{prompt.type}</p>
-                </div>
-                <span className="text-muted-foreground">›</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="min-w-0 text-xl font-semibold">最近的 AI 操作</h2>
-          <button
-            type="button"
-            className="cursor-pointer text-sm font-semibold text-muted-foreground transition hover:text-foreground"
-            onClick={() => navigate('/ai/actions')}
-          >
-            查看全部
-          </button>
-        </div>
-        <div className="space-y-3">
-          {aiActions.slice(0, 5).map((action) => (
-            <AiActionCard key={action.id} action={action} />
-          ))}
-        </div>
-      </section>
+      <AssistantConversationSheet
+        open={assistantConversationSheetOpen}
+        conversations={assistantConversations}
+        activeConversationId={activeAssistantConversationId}
+        loading={assistantConversationsLoading}
+        creating={assistantConversationCreating}
+        deletingId={deletingAssistantConversationId}
+        onOpenChange={setAssistantConversationSheetOpen}
+        onCreate={() => void handleCreateAssistantConversation()}
+        onSelect={(conversation) => void handleSelectAssistantConversation(conversation)}
+        onDelete={(conversation) => void handleDeleteAssistantConversation(conversation)}
+      />
 
       <CreatePlanDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
       <ImageAnalysisDrawer

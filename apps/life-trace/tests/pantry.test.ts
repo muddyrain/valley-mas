@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildDefaultPantryReminder,
+  buildPantryCreatedTraceInput,
   buildPantryTraceInput,
   generatePantryThumbnailDataUrl,
   getPantryCoverUrl,
@@ -101,5 +103,44 @@ describe('pantry helpers', () => {
     expect(trace.location).toBe('冷藏');
     expect(trace.imageUrl).toBe('https://example.com/milk.jpg');
     expect(trace.tags).toContain('家庭库存');
+    expect(trace.source).toBe('库存');
+  });
+
+  it('builds a trace payload when pantry item is created', () => {
+    const item = createItem('milk', {
+      name: '牛奶',
+      quantity: 2,
+      unit: '盒',
+      location: '冷藏',
+      expiresAt: '2026-06-10',
+      thumbnailUrl: 'https://example.com/milk-thumb.jpg',
+    });
+    const trace = buildPantryCreatedTraceInput(item, now);
+
+    expect(trace.title).toBe('新增库存：牛奶');
+    expect(trace.summary).toContain('数量为 2盒');
+    expect(trace.summary).toContain('2026-06-10');
+    expect(trace.location).toBe('冷藏');
+    expect(trace.imageUrl).toBe('https://example.com/milk-thumb.jpg');
+    expect(trace.tags).toEqual(['食品', '家庭库存', '新增库存']);
+    expect(trace.source).toBe('库存');
+  });
+
+  it('builds default pantry reminder payload from preferences', () => {
+    const reminder = buildDefaultPantryReminder(
+      {
+        defaultReminderEnabled: true,
+        defaultReminderRules: ['3d', 'same-day'],
+        defaultReminderTime: '08:30',
+      },
+      false,
+    );
+
+    expect(reminder).toEqual({
+      enabled: false,
+      useDefault: true,
+      rules: ['3d', 'same-day'],
+      reminderTime: '08:30',
+    });
   });
 });

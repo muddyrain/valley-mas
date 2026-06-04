@@ -1,9 +1,9 @@
-import { Sparkles } from 'lucide-react';
 import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AppFeedbackToast } from '@/components/AppFeedbackToast';
 import { AppReminderToast } from '@/components/AppReminderToast';
 import { AppShell } from '@/components/AppShell';
+import { LifeTraceBrandMark } from '@/components/LifeTraceBrandMark';
 import { AiActionsPage, AiHistoryPage, AiPage, AiWeeklyReviewsPage } from '@/pages/AiPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { PantryPage } from '@/pages/PantryPage';
@@ -62,9 +62,7 @@ function AppContent() {
           <div className="relative mx-auto mb-5 grid size-16 place-items-center">
             <div className="absolute inset-0 animate-ping rounded-3xl bg-life-ai/15 motion-reduce:animate-none" />
             <div className="absolute inset-1 rounded-3xl border border-life-ai/25 bg-life-ai/10 shadow-[0_0_42px_rgba(6,182,212,0.18)]" />
-            <div className="relative grid size-11 animate-pulse place-items-center rounded-2xl bg-life-ai text-background motion-reduce:animate-none">
-              <Sparkles className="size-5" />
-            </div>
+            <LifeTraceBrandMark className="relative size-11 animate-pulse motion-reduce:animate-none" />
           </div>
           <p className="text-sm font-semibold text-foreground">Life Trace</p>
           <p className="mt-2 text-sm text-muted-foreground">正在确认登录状态</p>
