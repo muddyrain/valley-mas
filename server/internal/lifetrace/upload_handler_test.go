@@ -3,6 +3,7 @@ package lifetrace
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -65,5 +66,26 @@ func TestUploadImageReportsUnconfiguredStorage(t *testing.T) {
 	}
 	if !strings.Contains(payload["message"].(string), "文件上传服务未配置") {
 		t.Fatalf("expected actionable TOS config failure, got %+v", payload)
+	}
+}
+
+func TestPublicLifeTraceUploadErrorMessageHidesTOSDetails(t *testing.T) {
+	raw := `文件上传失败: failed to upload to TOS: tos: request error: Message=Put "https://valley-resources.tos-cn-beijing.volces.com/life-trace/101/20260604/photo.jpg": dial tcp 120.255.0.186:443: i/o timeout, RequestID=abc`
+	message := publicLifeTraceUploadErrorMessage(errors.New(raw))
+
+	if message != "图片上传失败，请检查网络后重试。" {
+		t.Fatalf("unexpected public message: %s", message)
+	}
+	for _, leaked := range []string{"https://", "120.255.0.186", "RequestID", "tos-cn-beijing"} {
+		if strings.Contains(message, leaked) {
+			t.Fatalf("public message leaked internal detail %q: %s", leaked, message)
+		}
+	}
+}
+
+func TestPublicLifeTraceUploadErrorMessageKeepsValidationDetails(t *testing.T) {
+	message := publicLifeTraceUploadErrorMessage(errors.New("文件过大，最大支持 10MB"))
+	if message != "文件过大，最大支持 10MB" {
+		t.Fatalf("expected validation message to pass through, got %s", message)
 	}
 }

@@ -36,7 +36,7 @@ export function getBottomSheetDragOffset({
   dragging,
   dragStartY,
 }: BottomSheetDragOffsetInput) {
-  if (currentScrollTop > 0) {
+  if (!dragging && currentScrollTop > 0) {
     return null;
   }
 

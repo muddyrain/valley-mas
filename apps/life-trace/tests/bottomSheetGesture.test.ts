@@ -38,6 +38,18 @@ describe('bottom sheet gesture helpers', () => {
     ).toBeNull();
   });
 
+  it('continues an active sheet drag even when the full-height sheet still has scroll position', () => {
+    expect(
+      getBottomSheetDragOffset({
+        startY: 100,
+        currentY: 190,
+        currentScrollTop: 12,
+        dragging: true,
+        dragStartY: 100,
+      }),
+    ).toBe(90);
+  });
+
   it('closes only after the drag crosses the threshold and closing is allowed', () => {
     expect(shouldCloseBottomSheetByDrag({ finalOffset: 83, closeDisabled: false })).toBe(false);
     expect(shouldCloseBottomSheetByDrag({ finalOffset: 84, closeDisabled: false })).toBe(true);

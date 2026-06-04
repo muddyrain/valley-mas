@@ -767,7 +767,7 @@ export function PhotoItemAnalysisPage() {
         </div>
 
         {imagePreviewUrl ? (
-          <div className="sticky top-0 z-10 mb-4 rounded-[1.25rem] border border-border bg-card/95 p-3 shadow-lg shadow-background/35 backdrop-blur">
+          <div className="mb-4 rounded-[1.25rem] border border-border bg-card/95 p-3 shadow-lg shadow-background/35">
             <div className="flex items-center gap-3">
               <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-background">
                 <img
