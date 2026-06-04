@@ -3,7 +3,6 @@ package lifetrace
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -944,7 +943,7 @@ func markPushSubscriptionSent(subscription model.LifeTracePushSubscription) {
 
 func markPushSubscriptionError(subscriptionID model.Int64String, statusCode int, err error) {
 	status := "active"
-	if statusCode == http.StatusGone || statusCode == http.StatusNotFound {
+	if isPushSubscriptionInvalid(statusCode, err) {
 		status = "disabled"
 	}
 

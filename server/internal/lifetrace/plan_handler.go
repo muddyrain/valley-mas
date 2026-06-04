@@ -16,9 +16,10 @@ import (
 )
 
 type apiResponse struct {
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
+	Code      int         `json:"code"`
+	Message   string      `json:"message"`
+	Data      interface{} `json:"data,omitempty"`
+	ErrorCode string      `json:"errorCode,omitempty"`
 }
 
 type createPlanRequest struct {
@@ -70,6 +71,10 @@ func success(c *gin.Context, data interface{}) {
 
 func fail(c *gin.Context, code int, message string) {
 	c.JSON(http.StatusOK, apiResponse{Code: code, Message: message})
+}
+
+func failWithErrorCode(c *gin.Context, code int, message string, errorCode string) {
+	c.JSON(http.StatusOK, apiResponse{Code: code, Message: message, ErrorCode: errorCode})
 }
 
 func currentUserID(c *gin.Context) (model.Int64String, bool) {

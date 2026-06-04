@@ -14,6 +14,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const pushErrorCodeRebindRequired = "PUSH_REBIND_REQUIRED"
+
 type pushSubscriptionRequest struct {
 	Endpoint string          `json:"endpoint"`
 	Keys     pushKeysRequest `json:"keys"`
@@ -154,6 +156,15 @@ func (h *Handler) TestPush(c *gin.Context) {
 	})
 	if err != nil {
 		markPushSubscriptionError(subscription.ID, statusCode, err)
+		if isPushSubscriptionInvalid(statusCode, err) {
+			failWithErrorCode(
+				c,
+				http.StatusBadGateway,
+				"推送密钥或设备订阅已失效，请重新绑定推送",
+				pushErrorCodeRebindRequired,
+			)
+			return
+		}
 		fail(c, http.StatusBadGateway, pushTestFailureMessage(statusCode, err))
 		return
 	}
@@ -176,4 +187,22 @@ func pushTestFailureMessage(statusCode int, err error) string {
 		return "测试推送发送失败（状态 " + strconv.Itoa(statusCode) + "）：" + detail
 	}
 	return "测试推送发送失败：" + detail
+}
+
+func isPushSubscriptionInvalid(statusCode int, err error) bool {
+	if statusCode == http.StatusForbidden ||
+		statusCode == http.StatusGone ||
+		statusCode == http.StatusNotFound {
+		return true
+	}
+
+	if err == nil {
+		return false
+	}
+
+	detail := strings.ToLower(err.Error())
+	return strings.Contains(detail, "badjwttoken") ||
+		strings.Contains(detail, "invalid jwt") ||
+		strings.Contains(detail, "invalid token") ||
+		strings.Contains(detail, "expiredsubscription")
 }

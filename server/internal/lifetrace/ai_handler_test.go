@@ -266,6 +266,43 @@ func TestParseImageAnalysisAIResponseNormalizesFields(t *testing.T) {
 	}
 }
 
+func TestParsePantryPhotoAnalysisAIResponseNormalizesFields(t *testing.T) {
+	parsed, err := parsePantryPhotoAnalysisAIResponse(`商品结果：
+{"name":"  鲜牛奶  ","category":"饮料","brand":"示例品牌","spec":"250ml","quantity":0,"unit":"","storageLocation":"冰箱","expiresAt":"not-date","purchaseDate":"2026-06-04","tags":["冷藏","","冷藏","早餐","牛奶","家庭","补货"],"confidence":1.4,"warnings":["保质期不可见","保质期不可见","请确认规格"],"cropBox":{"x":0.9,"y":-0.2,"width":0.4,"height":1.2},"summary":"适合加入家庭库存。"}
+`)
+	if err != nil {
+		t.Fatalf("parse pantry photo analysis: %v", err)
+	}
+
+	if parsed.Name != "鲜牛奶" {
+		t.Fatalf("expected trimmed name, got %s", parsed.Name)
+	}
+	if parsed.Category != "食品" {
+		t.Fatalf("expected fallback category, got %s", parsed.Category)
+	}
+	if parsed.Quantity != 1 || parsed.Unit != "件" {
+		t.Fatalf("expected normalized quantity and unit, got %+v", parsed)
+	}
+	if parsed.StorageLocation != "冷藏" {
+		t.Fatalf("expected fallback location, got %s", parsed.StorageLocation)
+	}
+	if parsed.ExpiresAt != "" || parsed.PurchaseDate != "2026-06-04" {
+		t.Fatalf("expected normalized dates, got %+v", parsed)
+	}
+	if parsed.Confidence != 1 {
+		t.Fatalf("expected capped confidence, got %v", parsed.Confidence)
+	}
+	if len(parsed.Tags) != 5 || parsed.Tags[0] != "冷藏" || parsed.Tags[1] != "早餐" {
+		t.Fatalf("unexpected normalized tags: %+v", parsed.Tags)
+	}
+	if len(parsed.Warnings) != 2 {
+		t.Fatalf("expected deduped warnings, got %+v", parsed.Warnings)
+	}
+	if parsed.CropBox.X != 0.6 || parsed.CropBox.Y != 0 || parsed.CropBox.Width != 0.4 || parsed.CropBox.Height != 1 {
+		t.Fatalf("expected normalized crop box, got %+v", parsed.CropBox)
+	}
+}
+
 func TestGenerateWeeklyReviewUsesCloudLifeContext(t *testing.T) {
 	var capturedPrompt string
 	openAIServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

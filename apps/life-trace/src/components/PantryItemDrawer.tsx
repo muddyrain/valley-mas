@@ -6,7 +6,12 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { OptionPickerSheet } from '@/components/OptionPickerSheet';
 import { Button } from '@/components/ui/button';
-import { formatPantryReminderSummary, getPantryCoverUrl } from '@/lib/pantry';
+import { getLifeTraceErrorMessage } from '@/lib/error';
+import {
+  formatPantryReminderSummary,
+  getPantryCoverUrl,
+  getPantryPersistedStatus,
+} from '@/lib/pantry';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -179,7 +184,7 @@ export function PantryItemDrawer({
             reminderTime: pantryPreferences.defaultReminderTime,
           }
         : form.reminder,
-      status: 'normal',
+      status: getPantryPersistedStatus(form.status),
     };
   };
 
@@ -244,7 +249,7 @@ export function PantryItemDrawer({
       });
       updateField('thumbnailUrl', result.thumbnailUrl);
     } catch (error) {
-      setThumbnailError(error instanceof Error ? error.message : 'AI 缩略图生成失败，请稍后再试。');
+      setThumbnailError(getLifeTraceErrorMessage(error, 'AI 缩略图生成失败，请稍后再试。'));
     } finally {
       setThumbnailGenerating(false);
     }

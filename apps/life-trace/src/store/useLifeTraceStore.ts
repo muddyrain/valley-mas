@@ -19,6 +19,7 @@ import {
 } from '@/api/plans';
 import { getSettings, saveSettings } from '@/api/settings';
 import { createTrace, deleteTrace, listTraces, updateTrace } from '@/api/traces';
+import { getLifeTraceErrorMessage } from '@/lib/error';
 import { resolvePantryStatus } from '@/lib/pantry';
 import { useAuthStore } from '@/store/useAuthStore';
 import type {
@@ -582,7 +583,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           set({
             pantryLoaded: true,
             pantryLoading: false,
-            pantryError: error instanceof Error ? error.message : '获取库存失败',
+            pantryError: getLifeTraceErrorMessage(error, '获取库存失败'),
           });
         }
       },
@@ -651,9 +652,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             pantryListError: '',
             pantryListResolvedHouseholdId: resolvedHouseholdId,
             pantryListResolvedHouseholdName: resolvedHouseholdName,
-            preferredPantryHouseholdId: resolvedHouseholdId || get().preferredPantryHouseholdId,
-            preferredPantryHouseholdName:
-              resolvedHouseholdName || get().preferredPantryHouseholdName,
             pantryListSummary: summary ?? defaultPantryOverview,
           });
         } catch (error) {
@@ -664,7 +662,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             pantryListLoaded: true,
             pantryListLoading: false,
             pantryListLoadingMore: false,
-            pantryListError: error instanceof Error ? error.message : '获取库存失败',
+            pantryListError: getLifeTraceErrorMessage(error, '获取库存失败'),
           });
         }
       },
@@ -721,9 +719,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               resolvedHouseholdId || state.pantryListResolvedHouseholdId,
             pantryListResolvedHouseholdName:
               resolvedHouseholdName || state.pantryListResolvedHouseholdName,
-            preferredPantryHouseholdId: resolvedHouseholdId || state.preferredPantryHouseholdId,
-            preferredPantryHouseholdName:
-              resolvedHouseholdName || state.preferredPantryHouseholdName,
             pantryListSummary: summary ?? state.pantryListSummary,
           }));
         } catch (error) {
@@ -732,7 +727,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           }
           set({
             pantryListLoadingMore: false,
-            pantryListError: error instanceof Error ? error.message : '加载更多库存失败',
+            pantryListError: getLifeTraceErrorMessage(error, '加载更多库存失败'),
           });
         }
       },
@@ -1022,7 +1017,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           }
           return item;
         } catch (error) {
-          set({ pantryError: error instanceof Error ? error.message : '添加库存失败' });
+          set({ pantryError: getLifeTraceErrorMessage(error, '添加库存失败') });
           return null;
         }
       },
@@ -1058,7 +1053,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           }
           return updatedItem;
         } catch (error) {
-          set({ pantryError: error instanceof Error ? error.message : '编辑库存失败' });
+          set({ pantryError: getLifeTraceErrorMessage(error, '编辑库存失败') });
           return null;
         }
       },
@@ -1099,7 +1094,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           }
           return updatedItem;
         } catch (error) {
-          set({ pantryError: error instanceof Error ? error.message : '更新库存状态失败' });
+          set({ pantryError: getLifeTraceErrorMessage(error, '更新库存状态失败') });
           return null;
         }
       },
@@ -1136,7 +1131,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           }
           return true;
         } catch (error) {
-          set({ pantryError: error instanceof Error ? error.message : '删除库存失败' });
+          set({ pantryError: getLifeTraceErrorMessage(error, '删除库存失败') });
           return false;
         }
       },

@@ -208,12 +208,12 @@ export function PantryPage() {
 
   const pantryQueryOptions = useMemo(
     () => ({
-      householdId: effectiveHouseholdId || undefined,
+      householdId: preferredPantryHouseholdId || undefined,
       status: statusFilter,
       category: categoryFilter,
       q: debouncedSearchQuery.trim() || undefined,
     }),
-    [categoryFilter, debouncedSearchQuery, effectiveHouseholdId, statusFilter],
+    [categoryFilter, debouncedSearchQuery, preferredPantryHouseholdId, statusFilter],
   );
 
   const loadMorePantryItems = useCallback(async () => {
@@ -239,7 +239,10 @@ export function PantryPage() {
       if (!updated) {
         return;
       }
-      await addTrace(buildPantryTraceInput(updated, status));
+      const trace = await addTrace(buildPantryTraceInput(updated, status));
+      if (!trace) {
+        showToast('库存状态已更新，但生活踪迹没有生成成功，可以稍后手动补记。', 'warning');
+      }
     } finally {
       setPendingActionId(null);
     }

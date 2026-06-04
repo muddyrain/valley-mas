@@ -1,5 +1,14 @@
 import Lottie from 'lottie-react';
-import { Cloud, CloudLightning, CloudRain, CloudSnow, type LucideIcon, Sun } from 'lucide-react';
+import {
+  Cloud,
+  CloudDrizzle,
+  CloudLightning,
+  CloudRain,
+  CloudRainWind,
+  CloudSnow,
+  type LucideIcon,
+  Sun,
+} from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import { cn } from '@/lib/utils';
 import { type WeatherMotionKind, weatherLottieMap } from '@/lib/weatherLottie';
@@ -32,6 +41,12 @@ function resolveWeatherMotionKind(text: string): WeatherMotionKind {
     return 'snow';
   }
   if (normalized.includes('雨')) {
+    if (/[暴大强]|特大|大到暴|强降雨|倾盆/.test(normalized)) {
+      return 'heavyRain';
+    }
+    if (/小雨|毛毛雨|细雨|零星|弱|微/.test(normalized)) {
+      return 'lightRain';
+    }
     return 'rain';
   }
   if (normalized.includes('晴')) {
@@ -68,13 +83,17 @@ function FallbackIcon({
   const Icon: LucideIcon =
     kind === 'sunny'
       ? Sun
-      : kind === 'rain'
-        ? CloudRain
-        : kind === 'snow'
-          ? CloudSnow
-          : kind === 'storm'
-            ? CloudLightning
-            : Cloud;
+      : kind === 'lightRain'
+        ? CloudDrizzle
+        : kind === 'heavyRain'
+          ? CloudRainWind
+          : kind === 'rain'
+            ? CloudRain
+            : kind === 'snow'
+              ? CloudSnow
+              : kind === 'storm'
+                ? CloudLightning
+                : Cloud;
 
   return <Icon className={cn(fallbackSizeClassMap[size], className)} />;
 }

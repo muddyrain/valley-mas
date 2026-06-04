@@ -56,6 +56,10 @@ export function resolvePantryStatus(item: PantryItem, now = new Date()): PantryI
   return 'normal';
 }
 
+export function getPantryPersistedStatus(status: PantryItemStatus): PantryItemStatus {
+  return status === 'used-up' || status === 'discarded' ? status : 'normal';
+}
+
 export function getPantryStatusLabel(status: PantryItemStatus) {
   switch (status) {
     case 'expiring':

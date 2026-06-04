@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { getVisiblePlanNote } from '@/lib/advicePlan';
+import { isAuthDependencyMessage } from '@/lib/error';
 import { gsap, useGSAP } from '@/lib/gsap';
 import {
   filterPlans,
@@ -82,10 +83,6 @@ const typeTone: Record<PlanType, 'plan' | 'health' | 'trace' | 'weather' | 'ai' 
   聚会: 'ai',
   普通事项: 'alert',
 };
-
-function isTransientPlansSyncIssue(message: string) {
-  return message.includes('认证服务暂时不可用') || message.includes('暂时无法验证登录状态');
-}
 
 export function PlansPage() {
   const {
@@ -172,7 +169,7 @@ export function PlansPage() {
   ].filter((group) => group.plans.length > 0);
   const selectedPlan = planId ? (plans.find((plan) => plan.id === planId) ?? null) : null;
   const deletePending = deleteTarget ? Boolean(planDeletingById[deleteTarget.id]) : false;
-  const plansSyncIssue = plansError && isTransientPlansSyncIssue(plansError) ? plansError : '';
+  const plansSyncIssue = plansError && isAuthDependencyMessage(plansError) ? plansError : '';
   const showPlansErrorCard = Boolean(plansError) && !plansSyncIssue;
   const showPlansSyncFallback = Boolean(plansSyncIssue) && !plansLoading && plans.length === 0;
   const showPlansErrorFallback = showPlansErrorCard && !plansLoading && plans.length === 0;

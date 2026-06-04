@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { getLifeTraceErrorMessage } from '@/lib/error';
 import { cn } from '@/lib/utils';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import type { HouseholdInvitePayload, HouseholdMember, HouseholdSummary } from '@/types';
@@ -242,7 +243,7 @@ export function PantryHouseholdSheet({
                   setCreateName('');
                   showToast(`已创建共享家庭「${name}」`);
                 } catch (error) {
-                  setSheetError(error instanceof Error ? error.message : '创建家庭失败');
+                  setSheetError(getLifeTraceErrorMessage(error, '创建家庭失败'));
                 } finally {
                   setSubmittingAction(null);
                 }
@@ -287,7 +288,7 @@ export function PantryHouseholdSheet({
                   setJoinCode('');
                   showToast('已加入新的共享家庭');
                 } catch (error) {
-                  setSheetError(error instanceof Error ? error.message : '加入家庭失败');
+                  setSheetError(getLifeTraceErrorMessage(error, '加入家庭失败'));
                 } finally {
                   setSubmittingAction(null);
                 }
@@ -323,7 +324,7 @@ export function PantryHouseholdSheet({
                       try {
                         await onRefreshMembers(currentHousehold.id);
                       } catch (error) {
-                        setSheetError(error instanceof Error ? error.message : '刷新成员失败');
+                        setSheetError(getLifeTraceErrorMessage(error, '刷新成员失败'));
                       } finally {
                         setSubmittingAction(null);
                       }
@@ -347,7 +348,7 @@ export function PantryHouseholdSheet({
                         await onCreateInvite(currentHousehold.id);
                         showToast('已生成新的邀请码');
                       } catch (error) {
-                        setSheetError(error instanceof Error ? error.message : '创建邀请码失败');
+                        setSheetError(getLifeTraceErrorMessage(error, '创建邀请码失败'));
                       } finally {
                         setSubmittingAction(null);
                       }
@@ -458,9 +459,7 @@ export function PantryHouseholdSheet({
                                 await onTransferOwner(currentHousehold.id, member.userId);
                                 showToast(`已将家庭所有者转交给成员 #${member.userId}`);
                               } catch (error) {
-                                setSheetError(
-                                  error instanceof Error ? error.message : '转移所有者失败',
-                                );
+                                setSheetError(getLifeTraceErrorMessage(error, '转移所有者失败'));
                               } finally {
                                 setSubmittingAction(null);
                               }
@@ -493,7 +492,7 @@ export function PantryHouseholdSheet({
                       await onLeaveHousehold(currentHousehold.id);
                       showToast(`已退出「${currentHousehold.name}」`);
                     } catch (error) {
-                      setSheetError(error instanceof Error ? error.message : '退出家庭失败');
+                      setSheetError(getLifeTraceErrorMessage(error, '退出家庭失败'));
                     } finally {
                       setSubmittingAction(null);
                     }
@@ -521,7 +520,7 @@ export function PantryHouseholdSheet({
                       await onDissolveHousehold(currentHousehold.id);
                       showToast(`已解散「${currentHousehold.name}」`);
                     } catch (error) {
-                      setSheetError(error instanceof Error ? error.message : '解散家庭失败');
+                      setSheetError(getLifeTraceErrorMessage(error, '解散家庭失败'));
                     } finally {
                       setSubmittingAction(null);
                     }

@@ -7,6 +7,7 @@ import { AppShell } from '@/components/AppShell';
 import { AiActionsPage, AiHistoryPage, AiPage, AiWeeklyReviewsPage } from '@/pages/AiPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { PantryPage } from '@/pages/PantryPage';
+import { PhotoItemAnalysisPage } from '@/pages/PhotoItemAnalysisPage';
 import { PlansPage } from '@/pages/PlansPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { TodayPage } from '@/pages/TodayPage';
@@ -87,6 +88,7 @@ function AppContent() {
           <Route path="/ai" element={<AiPage />} />
           <Route path="/ai/history" element={<AiHistoryPage />} />
           <Route path="/ai/actions" element={<AiActionsPage />} />
+          <Route path="/ai/photo-item-analysis" element={<PhotoItemAnalysisPage />} />
           <Route path="/ai/weekly-reviews" element={<AiWeeklyReviewsPage />} />
           <Route path="/traces/:traceId?" element={<TracesPage />} />
           <Route path="/profile" element={<ProfilePage />} />

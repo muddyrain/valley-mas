@@ -1,13 +1,25 @@
+import { getLifeTraceErrorMessage, getLifeTraceHttpErrorMessage } from '@/lib/error';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 
 type ApiEnvelope<T> = {
   code: number;
   message: string;
   data?: T;
+  errorCode?: string;
 };
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 const DEFAULT_TRANSIENT_RETRY_DELAY_MS = 350;
+
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly errorCode?: string,
+  ) {
+    super(message);
+    this.name = 'ApiRequestError';
+  }
+}
 
 export type ApiRequestInit = RequestInit & {
   suppressErrorToast?: boolean;
@@ -22,47 +34,6 @@ function showErrorToast(message: string, init: ApiRequestInit) {
   }
 
   useFeedbackToastStore.getState().showToast(init.errorToastMessage || message, 'error', 3200);
-}
-
-function isAuthDependencyMessage(message: string) {
-  return message.includes('认证服务暂时不可用') || message.includes('暂时无法验证登录状态');
-}
-
-function isNetworkFailureMessage(message: string) {
-  const normalized = message.toLowerCase();
-  return (
-    normalized === 'load failed' ||
-    normalized.includes('failed to fetch') ||
-    normalized.includes('networkerror') ||
-    normalized.includes('network request failed')
-  );
-}
-
-function resolveNetworkErrorMessage(error: unknown) {
-  const message = error instanceof Error ? error.message : '';
-  if (!message || isNetworkFailureMessage(message)) {
-    return '网络连接失败，请检查网络后重试';
-  }
-  return message;
-}
-
-function resolveRequestErrorMessage(status?: number, backendMessage?: string) {
-  if (backendMessage && isAuthDependencyMessage(backendMessage)) {
-    return '云端登录校验暂时不可用，请重新加载重试';
-  }
-  if (backendMessage) {
-    return backendMessage;
-  }
-
-  if (status === 401) return '登录状态已失效，请重新登录';
-  if (status === 403) return '没有权限执行此操作';
-  if (status === 404) return '请求的内容不存在';
-  if (status === 500) return '服务器内部错误';
-  if (status === 502) return '网关错误，请稍后重试';
-  if (status === 503) return '云端服务暂时不可用，请稍后重试';
-  if (status === 504) return '云端响应超时，请稍后重试';
-  if (status && status >= 500) return '服务端发生错误，请稍后重试';
-  return '请求失败，请稍后重试';
 }
 
 function getRequestMethod(init: RequestInit) {
@@ -87,6 +58,18 @@ function wait(ms: number) {
   return new Promise((resolve) => {
     globalThis.setTimeout(resolve, ms);
   });
+}
+
+function isAbortError(error: unknown, signal?: AbortSignal | null) {
+  if (signal?.aborted) {
+    return true;
+  }
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return error.name === 'AbortError' || message.includes('abort') || message.includes('aborted');
 }
 
 export async function apiRequest<T>(path: string, token: string, init: ApiRequestInit = {}) {
@@ -123,14 +106,18 @@ export async function apiRequest<T>(path: string, token: string, init: ApiReques
         credentials: 'include',
       });
     } catch (error) {
+      if (isAbortError(error, requestInit.signal)) {
+        throw error;
+      }
+
       if (shouldRetryTransientFailure(retryOptions, attempt)) {
         await wait(retryDelayMs);
         continue;
       }
 
-      const message = resolveNetworkErrorMessage(error);
+      const message = getLifeTraceErrorMessage(error, '网络连接失败，请检查网络后重试');
       showErrorToast(message, requestOptions);
-      throw new Error(message);
+      throw new ApiRequestError(message);
     }
 
     const payload = (await response.json().catch(() => null)) as ApiEnvelope<T> | null;
@@ -140,27 +127,27 @@ export async function apiRequest<T>(path: string, token: string, init: ApiReques
         continue;
       }
 
-      const message = resolveRequestErrorMessage(response.status, payload?.message);
+      const message = getLifeTraceHttpErrorMessage(response.status, payload?.message);
       showErrorToast(message, requestOptions);
-      throw new Error(message);
+      throw new ApiRequestError(message, payload?.errorCode);
     }
 
     if (!payload) {
       const message = '响应数据为空';
       showErrorToast(message, requestOptions);
-      throw new Error(message);
+      throw new ApiRequestError(message);
     }
 
     if (payload.code !== 0) {
-      const message = resolveRequestErrorMessage(undefined, payload.message || '请求失败');
+      const message = getLifeTraceHttpErrorMessage(undefined, payload.message || '请求失败');
       showErrorToast(message, requestOptions);
-      throw new Error(message);
+      throw new ApiRequestError(message, payload.errorCode);
     }
 
     if (payload.data === undefined) {
       const message = '响应数据为空';
       showErrorToast(message, requestOptions);
-      throw new Error(message);
+      throw new ApiRequestError(message);
     }
 
     return payload.data;
@@ -168,5 +155,5 @@ export async function apiRequest<T>(path: string, token: string, init: ApiReques
 
   const message = '请求失败，请稍后重试';
   showErrorToast(message, requestOptions);
-  throw new Error(message);
+  throw new ApiRequestError(message);
 }

@@ -5,6 +5,7 @@ import {
   getPantryCoverUrl,
   getPantryDaysUntilExpiry,
   getPantryExpiryText,
+  getPantryPersistedStatus,
   resolvePantryStatus,
   sortPantryItems,
 } from '../src/lib/pantry';
@@ -48,6 +49,14 @@ describe('pantry helpers', () => {
 
     expect(resolvePantryStatus(usedUp, now)).toBe('used-up');
     expect(resolvePantryStatus(discarded, now)).toBe('discarded');
+  });
+
+  it('only persists manual terminal statuses when editing pantry items', () => {
+    expect(getPantryPersistedStatus('used-up')).toBe('used-up');
+    expect(getPantryPersistedStatus('discarded')).toBe('discarded');
+    expect(getPantryPersistedStatus('normal')).toBe('normal');
+    expect(getPantryPersistedStatus('expiring')).toBe('normal');
+    expect(getPantryPersistedStatus('expired')).toBe('normal');
   });
 
   it('builds cover fallback from real image to thumbnail', () => {

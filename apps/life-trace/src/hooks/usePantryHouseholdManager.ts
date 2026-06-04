@@ -9,6 +9,7 @@ import {
   listHouseholds,
   transferHouseholdOwner,
 } from '@/api/household';
+import { getLifeTraceErrorMessage } from '@/lib/error';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { HouseholdInvitePayload, HouseholdMember, HouseholdSummary } from '@/types';
@@ -65,7 +66,7 @@ export function usePantryHouseholdManager() {
         const response = await listHouseholdMembers(token, householdId);
         setHouseholdMembers(response.list);
       } catch (error) {
-        throw new Error(error instanceof Error ? error.message : '读取家庭成员失败');
+        throw new Error(getLifeTraceErrorMessage(error, '读取家庭成员失败'));
       } finally {
         setHouseholdMembersLoading(false);
       }
@@ -112,7 +113,7 @@ export function usePantryHouseholdManager() {
 
         return nextSelectedHouseholdId;
       } catch (error) {
-        setHouseholdError(error instanceof Error ? error.message : '读取家庭空间失败');
+        setHouseholdError(getLifeTraceErrorMessage(error, '读取家庭空间失败'));
         setHouseholdsLoaded(true);
         return '';
       } finally {

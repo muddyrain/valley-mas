@@ -3,6 +3,7 @@ package lifetrace
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -83,5 +84,73 @@ func TestSavePushSubscriptionUpsertsByEndpoint(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("expected one subscription, got %d", count)
+	}
+}
+
+func TestPushSubscriptionInvalidDetectsExpiredSubscriptionErrors(t *testing.T) {
+	cases := []struct {
+		name       string
+		statusCode int
+		err        error
+	}{
+		{
+			name:       "forbidden",
+			statusCode: http.StatusForbidden,
+			err:        errors.New("web push rejected"),
+		},
+		{
+			name:       "gone",
+			statusCode: http.StatusGone,
+			err:        errors.New("subscription gone"),
+		},
+		{
+			name:       "bad jwt token",
+			statusCode: http.StatusBadRequest,
+			err:        errors.New(`web push failed: {"reason":"BadJwtToken"}`),
+		},
+		{
+			name:       "expired subscription",
+			statusCode: 0,
+			err:        errors.New("ExpiredSubscription"),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if !isPushSubscriptionInvalid(tc.statusCode, tc.err) {
+				t.Fatalf("expected invalid subscription for status %d and error %v", tc.statusCode, tc.err)
+			}
+		})
+	}
+}
+
+func TestMarkPushSubscriptionErrorDisablesInvalidJwtSubscription(t *testing.T) {
+	_ = setupTraceTestRouter(t, 101, testWebPushConfig())
+	subscription := model.LifeTracePushSubscription{
+		UserID:   101,
+		Endpoint: "https://push.example/device",
+		P256DH:   "p256dh-key",
+		Auth:     "auth-key",
+		Status:   "active",
+	}
+	if err := database.GetDB().Create(&subscription).Error; err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+
+	markPushSubscriptionError(
+		subscription.ID,
+		http.StatusForbidden,
+		errors.New(`web push failed: {"reason":"BadJwtToken"}`),
+	)
+
+	var persisted model.LifeTracePushSubscription
+	if err := database.GetDB().First(&persisted, "id = ?", subscription.ID).Error; err != nil {
+		t.Fatalf("read subscription: %v", err)
+	}
+	if persisted.Status != "disabled" {
+		t.Fatalf("expected subscription to be disabled, got %s", persisted.Status)
+	}
+	if persisted.LastError == "" {
+		t.Fatalf("expected last error to be persisted")
 	}
 }

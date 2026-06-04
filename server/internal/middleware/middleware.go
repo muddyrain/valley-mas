@@ -20,8 +20,14 @@ var (
 	errAuthUserNotFound = errors.New("auth user not found")
 )
 
+const (
+	authErrorCodeDBUnavailable   = "AUTH_DB_UNAVAILABLE"
+	authErrorCodeUserQueryFailed = "AUTH_USER_QUERY_FAILED"
+)
+
 type authDependencyError struct {
-	err error
+	code string
+	err  error
 }
 
 func (e *authDependencyError) Error() string {
@@ -76,13 +82,16 @@ func loadAuthUserFromToken(token string, cfg *config.Config) (int64, string, str
 	var user model.User
 	db := database.GetDB()
 	if db == nil {
-		return 0, "", "", &authDependencyError{err: errors.New("database is not initialized")}
+		return 0, "", "", &authDependencyError{
+			code: authErrorCodeDBUnavailable,
+			err:  errors.New("database is not initialized"),
+		}
 	}
 	if err := db.Select("id", "username", "role", "is_active").First(&user, userID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, "", "", errAuthUserNotFound
 		}
-		return 0, "", "", &authDependencyError{err: err}
+		return 0, "", "", &authDependencyError{code: authErrorCodeUserQueryFailed, err: err}
 	}
 
 	if !user.IsActive {
@@ -112,7 +121,11 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 			var dependencyErr *authDependencyError
 			if errors.As(err, &dependencyErr) {
 				log.Printf("auth dependency unavailable: %v", dependencyErr)
-				c.JSON(http.StatusServiceUnavailable, gin.H{"code": 503, "message": "认证服务暂时不可用，请稍后重试"})
+				c.JSON(http.StatusServiceUnavailable, gin.H{
+					"code":      503,
+					"message":   "认证服务暂时不可用，请稍后重试",
+					"errorCode": dependencyErr.code,
+				})
 				c.Abort()
 				return
 			}

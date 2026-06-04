@@ -1,4 +1,11 @@
-export type WeatherMotionKind = 'sunny' | 'rain' | 'snow' | 'storm' | 'cloud';
+export type WeatherMotionKind =
+  | 'sunny'
+  | 'lightRain'
+  | 'rain'
+  | 'heavyRain'
+  | 'snow'
+  | 'storm'
+  | 'cloud';
 
 type Point = [number, number];
 type Scalar = number | number[];
@@ -303,7 +310,29 @@ function buildCloudAnimation() {
   ]);
 }
 
-function dropLayer(index: number, x: number, delay: number) {
+function dropLayer({
+  index,
+  x,
+  delay,
+  top = 60,
+  bottom = 76,
+  width = 3,
+  length = 8,
+  slant = 0,
+  color = '#38bdf8',
+  opacity = 100,
+}: {
+  index: number;
+  x: number;
+  delay: number;
+  top?: number;
+  bottom?: number;
+  width?: number;
+  length?: number;
+  slant?: number;
+  color?: string;
+  opacity?: number;
+}) {
   const start = delay;
   const middle = Math.min(delay + 22, DURATION);
   const fade = Math.min(delay + 30, DURATION);
@@ -317,16 +346,16 @@ function dropLayer(index: number, x: number, delay: number) {
     index,
     name: `Rain Drop ${index}`,
     position: animated([
-      { t: 0, s: [x, 60, 0] },
-      { t: start, s: [x, 60, 0], e: [x, 76, 0] },
-      { t: middle, s: [x, 76, 0], e: [x, 60, 0] },
-      { t: fade, s: [x, 60, 0], e: [x, 76, 0] },
-      { t: secondStart, s: [x, 60, 0], e: [x, 76, 0] },
-      { t: secondMiddle, s: [x, 76, 0], e: [x, 60, 0] },
-      { t: secondFade, s: [x, 60, 0], e: [x, 76, 0] },
-      { t: finalStart, s: [x, 60, 0], e: [x, 76, 0] },
-      { t: finalMiddle, s: [x, 76, 0] },
-      { t: DURATION, s: [x, 60, 0] },
+      { t: 0, s: [x, top, 0] },
+      { t: start, s: [x, top, 0], e: [x, bottom, 0] },
+      { t: middle, s: [x, bottom, 0], e: [x, top, 0] },
+      { t: fade, s: [x, top, 0], e: [x, bottom, 0] },
+      { t: secondStart, s: [x, top, 0], e: [x, bottom, 0] },
+      { t: secondMiddle, s: [x, bottom, 0], e: [x, top, 0] },
+      { t: secondFade, s: [x, top, 0], e: [x, bottom, 0] },
+      { t: finalStart, s: [x, top, 0], e: [x, bottom, 0] },
+      { t: finalMiddle, s: [x, bottom, 0] },
+      { t: DURATION, s: [x, top, 0] },
     ]),
     opacity: animated([
       { t: 0, s: 0 },
@@ -344,33 +373,108 @@ function dropLayer(index: number, x: number, delay: number) {
       group('Drop', [
         path(
           [
-            [0, -4],
-            [0, 4],
+            [slant, -length / 2],
+            [-slant, length / 2],
           ],
           false,
         ),
-        stroke('#38bdf8', 3),
+        stroke(color, width, opacity),
       ]),
     ],
   });
 }
 
-function buildRainAnimation() {
-  return animation('Rainy', [
-    shapeLayer({
-      index: 1,
-      name: 'Cloud',
-      position: animated([
-        { t: 0, s: [48, 43, 0], e: [48, 39, 0] },
-        { t: 60, s: [48, 39, 0], e: [48, 43, 0] },
-        { t: DURATION, s: [48, 43, 0] },
+type RainIntensity = 'light' | 'medium' | 'heavy';
+
+const rainDropConfigs: Record<
+  RainIntensity,
+  Array<{
+    x: number;
+    delay: number;
+  }>
+> = {
+  light: [
+    { x: 36, delay: 8 },
+    { x: 58, delay: 44 },
+  ],
+  medium: [
+    { x: 28, delay: 0 },
+    { x: 42, delay: 12 },
+    { x: 56, delay: 24 },
+    { x: 70, delay: 36 },
+  ],
+  heavy: [
+    { x: 20, delay: 0 },
+    { x: 32, delay: 7 },
+    { x: 44, delay: 14 },
+    { x: 56, delay: 21 },
+    { x: 68, delay: 28 },
+    { x: 80, delay: 35 },
+  ],
+};
+
+function rainSplashLayer(index: number, intensity: RainIntensity) {
+  const isHeavy = intensity === 'heavy';
+
+  return shapeLayer({
+    index,
+    name: 'Rain Splash',
+    position: [48, isHeavy ? 82 : 78, 0],
+    scale: animated([
+      { t: 0, s: [88, 88, 100], e: [108, 108, 100] },
+      { t: 40, s: [108, 108, 100], e: [92, 92, 100] },
+      { t: 80, s: [92, 92, 100], e: [108, 108, 100] },
+      { t: DURATION, s: [88, 88, 100] },
+    ]),
+    opacity: animated([
+      { t: 0, s: isHeavy ? 72 : 46, e: isHeavy ? 96 : 64 },
+      { t: 40, s: isHeavy ? 96 : 64, e: isHeavy ? 58 : 38 },
+      { t: 80, s: isHeavy ? 58 : 38, e: isHeavy ? 88 : 58 },
+      { t: DURATION, s: isHeavy ? 72 : 46 },
+    ]),
+    shapes: [
+      group('Splash', [
+        ellipse([isHeavy ? 42 : 28, isHeavy ? 8 : 6]),
+        stroke(isHeavy ? '#0284c7' : '#38bdf8', isHeavy ? 3 : 2, isHeavy ? 88 : 72),
       ]),
-      shapes: buildCloudShape(),
-    }),
-    dropLayer(2, 32, 0),
-    dropLayer(3, 48, 14),
-    dropLayer(4, 64, 28),
-  ]);
+    ],
+  });
+}
+
+function buildRainAnimation(intensity: RainIntensity) {
+  const isHeavy = intensity === 'heavy';
+  const isLight = intensity === 'light';
+
+  return animation(
+    intensity === 'light' ? 'Light Rain' : intensity === 'heavy' ? 'Heavy Rain' : 'Rainy',
+    [
+      shapeLayer({
+        index: 1,
+        name: 'Cloud',
+        position: animated([
+          { t: 0, s: [48, 43, 0], e: [48, 39, 0] },
+          { t: 60, s: [48, 39, 0], e: [48, 43, 0] },
+          { t: DURATION, s: [48, 43, 0] },
+        ]),
+        shapes: buildCloudShape(),
+      }),
+      ...rainDropConfigs[intensity].map((drop, index) =>
+        dropLayer({
+          index: index + 2,
+          x: drop.x,
+          delay: drop.delay,
+          top: isHeavy ? 56 : 60,
+          bottom: isHeavy ? 84 : isLight ? 74 : 80,
+          width: isHeavy ? 4.4 : isLight ? 2.8 : 3.6,
+          length: isHeavy ? 18 : isLight ? 11 : 15,
+          slant: isHeavy ? 3.2 : isLight ? 1.2 : 2.2,
+          color: isHeavy ? '#0284c7' : isLight ? '#7dd3fc' : '#0ea5e9',
+          opacity: isLight ? 92 : 100,
+        }),
+      ),
+      ...(isLight ? [] : [rainSplashLayer(rainDropConfigs[intensity].length + 2, intensity)]),
+    ],
+  );
 }
 
 function snowLayer(index: number, x: number, delay: number) {
@@ -474,7 +578,9 @@ function buildStormAnimation() {
 
 export const weatherLottieMap: Record<WeatherMotionKind, LottieAnimationData> = {
   sunny: buildSunnyAnimation(),
-  rain: buildRainAnimation(),
+  lightRain: buildRainAnimation('light'),
+  rain: buildRainAnimation('medium'),
+  heavyRain: buildRainAnimation('heavy'),
   snow: buildSnowAnimation(),
   storm: buildStormAnimation(),
   cloud: buildCloudAnimation(),

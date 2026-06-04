@@ -36,6 +36,40 @@ export type PantryThumbnailResponse = {
   model?: string;
 };
 
+export type PantryPhotoCropBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type PantryPhotoAnalysisRequest = {
+  imageUrl: string;
+  householdId?: string;
+  hint?: string;
+};
+
+export type PantryPhotoAnalysisResponse = {
+  name: string;
+  category: PantryItem['category'];
+  brand?: string;
+  spec?: string;
+  quantity: number;
+  unit: string;
+  storageLocation: PantryItem['location'];
+  expiresAt?: string;
+  purchaseDate?: string;
+  tags: string[];
+  confidence: number;
+  warnings: string[];
+  cropBox: PantryPhotoCropBox;
+  summary: string;
+  householdId?: string;
+  householdName?: string;
+  source: 'ark';
+  model?: string;
+};
+
 function buildListQuery(options: ListPantryOptions = {}) {
   const params = new URLSearchParams();
   if (options.page) {
@@ -184,4 +218,11 @@ export function generatePantryThumbnail(
     body: JSON.stringify(input),
     signal: controller.signal,
   }).finally(() => globalThis.clearTimeout(timeout));
+}
+
+export function analyzePantryPhoto(token: string, input: PantryPhotoAnalysisRequest) {
+  return apiRequest<PantryPhotoAnalysisResponse>('/life-trace/ai/pantry-photo-analysis', token, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }

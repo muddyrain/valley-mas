@@ -138,6 +138,7 @@ export const initialTraces: Trace[] = [
 export const aiQuickActions = [
   { label: '生成今日建议', icon: Sun, tone: 'text-life-health' },
   { label: '创建计划', icon: CalendarDays, tone: 'text-life-plan' },
+  { label: '拍照分析商品', icon: Camera, tone: 'text-life-ai' },
   { label: '分析图片', icon: Camera, tone: 'text-life-trace' },
   { label: '生成踪迹', icon: Sparkles, tone: 'text-life-ai' },
   { label: '每周回顾', icon: CheckCircle2, tone: 'text-life-weather' },

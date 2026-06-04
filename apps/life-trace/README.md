@@ -130,4 +130,4 @@ QWEATHER_API_HOST=和风控制台里的 API Host
 - AI 页图片分析支持图片 URL / 本地图片预览，优先调用服务端视觉 AI，并可生成计划或踪迹。
 - PWA 已补充应用图标、基础离线缓存和安装状态提示。
 
-更多阶段规划见 `docs/MVP_PLAN.md`。家庭空间和 Pantry 设计见仓库级文档 `../../docs/HOUSEHOLD_PANTRY_DESIGN.md`。
+更多阶段规划、家庭空间、Pantry 设计和 AI 拍照分析计划见 `docs/PLAN.md`。

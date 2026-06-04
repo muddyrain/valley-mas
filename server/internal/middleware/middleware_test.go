@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -53,6 +54,52 @@ func TestAuthReturnsServiceUnavailableWhenDatabaseFails(t *testing.T) {
 
 	if resp.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusServiceUnavailable, resp.Code, resp.Body.String())
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload["errorCode"] != authErrorCodeUserQueryFailed {
+		t.Fatalf("expected errorCode %s, got %+v", authErrorCodeUserQueryFailed, payload)
+	}
+}
+
+func TestAuthReturnsDatabaseUnavailableCodeWhenDatabaseIsMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	previousDB := database.DB
+	database.DB = nil
+	t.Cleanup(func() {
+		database.DB = previousDB
+	})
+
+	cfg := &config.Config{JWT: config.JWTConfig{Secret: "test-secret"}}
+	token, err := utils.GenerateToken("123", "tester", "user", cfg.JWT.Secret, 1)
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+
+	router := gin.New()
+	router.GET("/private", Auth(cfg), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/private", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusServiceUnavailable, resp.Code, resp.Body.String())
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload["errorCode"] != authErrorCodeDBUnavailable {
+		t.Fatalf("expected errorCode %s, got %+v", authErrorCodeDBUnavailable, payload)
 	}
 }
 

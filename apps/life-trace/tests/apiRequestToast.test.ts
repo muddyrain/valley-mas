@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { apiRequest } from '../src/api/request';
+import { ApiRequestError, apiRequest } from '../src/api/request';
 import { useFeedbackToastStore } from '../src/store/useFeedbackToastStore';
 
 const token = 'test-token';
@@ -92,6 +92,22 @@ describe('api request error toast', () => {
     });
   });
 
+  it('does not show a global error toast for intentionally aborted requests', async () => {
+    const controller = new AbortController();
+    const abortError = new DOMException('signal is aborted without reason', 'AbortError');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(abortError));
+    controller.abort();
+
+    await expect(
+      apiRequest('/life-trace/ai/today-advice', token, {
+        method: 'POST',
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow('signal is aborted without reason');
+
+    expect(useFeedbackToastStore.getState().current).toBeNull();
+  });
+
   it('normalizes auth dependency failures from protected endpoints', async () => {
     vi.stubGlobal(
       'fetch',
@@ -101,20 +117,51 @@ describe('api request error toast', () => {
         json: async () => ({
           code: 503,
           message: '认证服务暂时不可用，请稍后重试',
+          errorCode: 'AUTH_USER_QUERY_FAILED',
         }),
       }),
     );
 
-    await expect(
-      apiRequest('/life-trace/traces', token, {
+    try {
+      await apiRequest('/life-trace/traces', token, {
         retryOnTransientFailure: false,
-      }),
-    ).rejects.toThrow('云端登录校验暂时不可用，请重新加载重试');
+      });
+      throw new Error('expected request to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApiRequestError);
+      expect((error as ApiRequestError).message).toBe('云端登录校验暂时不可用，请重新加载重试');
+      expect((error as ApiRequestError).errorCode).toBe('AUTH_USER_QUERY_FAILED');
+    }
 
     expect(useFeedbackToastStore.getState().current).toMatchObject({
       message: '云端登录校验暂时不可用，请重新加载重试',
       tone: 'error',
     });
+  });
+
+  it('preserves response error codes from Life Trace envelopes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          code: 502,
+          message: '推送密钥或设备订阅已失效，请重新绑定推送',
+          errorCode: 'PUSH_REBIND_REQUIRED',
+        }),
+      }),
+    );
+
+    try {
+      await apiRequest('/life-trace/push/test', token, { suppressErrorToast: true });
+      throw new Error('expected request to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApiRequestError);
+      expect((error as ApiRequestError).message).toBe('推送密钥或设备订阅已失效，请重新绑定推送');
+      expect((error as ApiRequestError).errorCode).toBe('PUSH_REBIND_REQUIRED');
+    }
+
+    expect(useFeedbackToastStore.getState().current).toBeNull();
   });
 
   it('retries transient GET failures once before surfacing an error', async () => {

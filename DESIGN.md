@@ -1,6 +1,6 @@
 # LifeTrace Agent Design Brief
 
-> 历史参考：本文是 Life Trace 早期产品设计简报，不再作为仓库级设计入口。当前开发命令和实现状态见 `apps/life-trace/README.md`，阶段规划见 `apps/life-trace/docs/MVP_PLAN.md`，家庭空间与 Pantry 方案见 `docs/HOUSEHOLD_PANTRY_DESIGN.md`。
+> 历史参考：本文是 Life Trace 早期产品设计简报，不再作为仓库级设计入口。当前开发命令和实现状态见 `apps/life-trace/README.md`，阶段规划、家庭空间、Pantry 方案和 AI 拍照分析计划见 `apps/life-trace/docs/PLAN.md`。
 
 ## 1. 产品定位
 

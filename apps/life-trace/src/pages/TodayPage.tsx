@@ -1132,21 +1132,36 @@ export function TodayPage() {
                 </div>
               ) : (
                 <div className="-mx-1 flex max-w-full gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {displayedHourlyWeather.map((item, index) => (
-                    <div
-                      key={`${item.dateTime || item.time}-${index}`}
-                      className={cn(
-                        'flex min-w-16 shrink-0 flex-col items-center gap-2 rounded-2xl px-3 py-3',
-                        item.active && selectedWeatherDay === 'today'
-                          ? 'bg-life-weather/15 text-life-weather'
-                          : 'bg-secondary text-muted-foreground',
-                      )}
-                    >
-                      <span className="text-xs font-medium">{item.time}</span>
-                      <AnimatedWeatherIcon text={item.text} size="hourly" />
-                      <span className="text-base font-semibold text-foreground">{item.temp}</span>
-                    </div>
-                  ))}
+                  {displayedHourlyWeather.map((item, index) => {
+                    const isActiveHour = item.active && selectedWeatherDay === 'today';
+
+                    return (
+                      <div
+                        key={`${item.dateTime || item.time}-${index}`}
+                        className={cn(
+                          'flex min-w-20 shrink-0 flex-col items-center gap-1.5 rounded-2xl px-3 py-3',
+                          isActiveHour
+                            ? 'bg-life-weather/15 text-life-weather'
+                            : 'bg-secondary text-muted-foreground',
+                        )}
+                      >
+                        <span className="text-xs font-medium">{item.time}</span>
+                        <AnimatedWeatherIcon text={item.text} size="hourly" />
+                        <span className="text-base font-semibold leading-none text-foreground">
+                          {item.temp}
+                        </span>
+                        <span
+                          className={cn(
+                            'max-w-16 truncate text-[11px] font-medium leading-none',
+                            isActiveHour ? 'text-life-weather' : 'text-muted-foreground',
+                          )}
+                          title={item.text}
+                        >
+                          {item.text}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

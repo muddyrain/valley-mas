@@ -7,6 +7,7 @@ import {
   savePushSubscription,
   testServerPush,
 } from '@/api/push';
+import { getLifeTraceDiagnosticMessage, isPushRebindRequired } from '@/lib/error';
 
 export type NotificationPermissionState =
   | NotificationPermission
@@ -136,7 +137,7 @@ export function useNotificationPermission(token?: string | null) {
       setServerPushStatus('subscribed');
     } catch (error) {
       setServerPushStatus('error');
-      setServerPushError(error instanceof Error ? error.message : '服务端推送待确认');
+      setServerPushError(getLifeTraceDiagnosticMessage(error, '服务端推送待确认'));
     }
   }, [pushSupported, token]);
 
@@ -221,8 +222,8 @@ export function useNotificationPermission(token?: string | null) {
       setServerPushStatus('subscribed');
       return true;
     } catch (error) {
-      setServerPushStatus('error');
-      setServerPushError(error instanceof Error ? error.message : '服务端推送绑定失败');
+      setServerPushStatus(isPushRebindRequired(error) ? 'unbound' : 'error');
+      setServerPushError(getLifeTraceDiagnosticMessage(error, '服务端推送绑定失败'));
       return false;
     }
   }, [pushConfig, pushSupported, refreshServerPushState, token]);
@@ -239,8 +240,8 @@ export function useNotificationPermission(token?: string | null) {
       setServerPushStatus('subscribed');
       return { sent: true };
     } catch (error) {
-      const message = error instanceof Error ? error.message : '服务端测试推送失败';
-      setServerPushStatus('error');
+      const message = getLifeTraceDiagnosticMessage(error, '服务端测试推送失败');
+      setServerPushStatus(isPushRebindRequired(error) ? 'unbound' : 'error');
       setServerPushError(message);
       return { sent: false, error: message };
     }
@@ -280,6 +281,9 @@ export function useNotificationPermission(token?: string | null) {
     }
     if (serverPushStatus === 'error') {
       return serverPushError || '服务端推送异常';
+    }
+    if (serverPushError) {
+      return serverPushError;
     }
     return '可绑定服务端推送';
   }, [pushSupported, serverPushError, serverPushStatus]);

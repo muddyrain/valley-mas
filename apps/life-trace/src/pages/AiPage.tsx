@@ -982,6 +982,11 @@ function useAiPageState() {
       return;
     }
 
+    if (label === '拍照分析商品') {
+      navigate('/ai/photo-item-analysis');
+      return;
+    }
+
     if (label === '生成今日建议') {
       setQuickActionLoading(label);
       try {

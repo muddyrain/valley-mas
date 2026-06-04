@@ -6,14 +6,13 @@
 
 - [项目指南](./PROJECT_GUIDE.md)：项目定位、技术栈、模块地图、开发命令、端口和环境变量。
 - [Harness Engineering](./HARNESS_ENGINEERING.md)：AI coding agent 在本仓库中的上下文入口、工具边界、验证命令、评审回路和回归证据。
-- [家庭空间与家庭库存设计](./HOUSEHOLD_PANTRY_DESIGN.md)：Life Trace 家庭空间、家庭库存归属、成员退出/解散和 Pantry 改造路线。
 
 ## 子项目文档
 
 - Web 前台：`apps/web/AGENTS.md`。
 - Admin 后台：`apps/admin/AGENTS.md`。
 - Go 服务端：`server/AGENTS.md`、`server/README.md`、`server/migrations/README.md`。
-- Life Trace：`apps/life-trace/README.md`、`apps/life-trace/docs/MVP_PLAN.md`。
+- Life Trace：`apps/life-trace/README.md`、`apps/life-trace/docs/PLAN.md`。
 - AI Mind Arena：`apps/ai-mind-arena/AGENTS.md`、`apps/ai-mind-arena/README.md`。
 - WorldSim：`apps/world-sim/AGENTS.md`、`apps/world-sim/docs/*`。
 - Toy Climb Arena：`apps/toy-climb-arena/AGENTS.md`、`apps/toy-climb-arena/docs/*`。
