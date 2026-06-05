@@ -45,13 +45,11 @@ function getActiveTab(pathname: string): AppTab {
 }
 
 function getScrollRouteKey(pathname: string) {
-  if (pathname === '/plans' || pathname.startsWith('/plans/')) {
-    return '/plans';
-  }
-  if (pathname === '/traces' || pathname.startsWith('/traces/')) {
-    return '/traces';
-  }
   return pathname;
+}
+
+function isTabRoute(pathname: string) {
+  return tabs.some((tab) => tab.path === pathname);
 }
 
 function scrollContentToTop(element: HTMLElement | null, _routeKey: string) {
@@ -154,6 +152,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const activeTab = getActiveTab(location.pathname);
   const scrollRouteKey = getScrollRouteKey(location.pathname);
   const isAgentChatRoute = location.pathname === '/ai';
+  const showBottomNavigation = isTabRoute(location.pathname);
+  const showBottomOverlay = showBottomNavigation && !isAgentChatRoute;
   const contentRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
 
@@ -216,7 +216,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           'safe-top mx-auto h-dvh w-full max-w-[430px] overflow-x-hidden overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
           isAgentChatRoute
             ? 'overflow-hidden px-0 pb-0'
-            : 'safe-x overflow-y-auto pb-[calc(10rem+env(safe-area-inset-bottom))] max-[360px]:px-3',
+            : showBottomNavigation
+              ? 'safe-x overflow-y-auto pb-[calc(10rem+env(safe-area-inset-bottom))] max-[360px]:px-3'
+              : 'safe-x overflow-y-auto pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-[360px]:px-3',
         )}
       >
         <div
@@ -226,67 +228,69 @@ export function AppShell({ children }: { children: ReactNode }) {
           {children}
         </div>
       </main>
-      {isAgentChatRoute ? null : (
+      {showBottomOverlay ? (
         <div
           aria-hidden="true"
           className="pointer-events-none fixed inset-x-0 bottom-0 z-20 mx-auto h-[calc(11rem+env(safe-area-inset-bottom))] w-full max-w-[430px] bg-gradient-to-t from-background via-background via-55% to-transparent"
         />
-      )}
-      <PwaActionBanner hidden={isAgentChatRoute} />
-      <nav
-        ref={navRef}
-        className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[430px] border-t border-white/[0.07] bg-card/88 px-3 pt-3 shadow-[0_-18px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl max-[360px]:px-2"
-      >
-        <div className="grid grid-cols-5 items-stretch gap-1 rounded-[1.65rem] border border-white/[0.04] bg-background/28 p-1.5 max-[360px]:gap-0.5 max-[360px]:p-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
-            const isAi = tab.id === 'ai';
+      ) : null}
+      <PwaActionBanner hidden={!showBottomOverlay} />
+      {showBottomNavigation ? (
+        <nav
+          ref={navRef}
+          className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[430px] border-t border-white/[0.07] bg-card/88 px-3 pt-3 shadow-[0_-18px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl max-[360px]:px-2"
+        >
+          <div className="grid grid-cols-5 items-stretch gap-1 rounded-[1.65rem] border border-white/[0.04] bg-background/28 p-1.5 max-[360px]:gap-0.5 max-[360px]:p-1">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.id;
+              const isAi = tab.id === 'ai';
 
-            return (
-              <NavLink
-                key={tab.id}
-                to={tab.path}
-                data-tab-active={active}
-                className={cn(
-                  'group relative inline-flex h-[4.1rem] min-w-0 shrink cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-[1.25rem] border border-transparent px-1 text-sm font-medium text-muted-foreground transition duration-300 hover:bg-secondary/35 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[360px]:h-[3.85rem]',
-                  active &&
-                    !isAi &&
-                    'border-white/[0.10] bg-secondary/36 text-foreground shadow-[0_6px_18px_rgba(0,0,0,0.14)]',
-                  isAi && 'hover:bg-life-ai/[0.045] hover:text-life-ai',
-                  isAi &&
-                    active &&
-                    'border-life-ai/24 bg-life-ai/[0.045] text-life-ai shadow-[0_6px_20px_rgba(6,182,212,0.08)]',
-                )}
-              >
-                <span
-                  data-tab-icon
+              return (
+                <NavLink
+                  key={tab.id}
+                  to={tab.path}
+                  data-tab-active={active}
                   className={cn(
-                    'relative z-10 grid size-8 place-items-center rounded-2xl transition duration-300 group-hover:-translate-y-0.5 group-hover:bg-secondary/55 group-hover:text-foreground',
-                    isAi && 'text-life-ai group-hover:bg-life-ai/10 group-hover:text-life-ai',
+                    'group relative inline-flex h-[4.1rem] min-w-0 shrink cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-[1.25rem] border border-transparent px-1 text-sm font-medium text-muted-foreground transition duration-300 hover:bg-secondary/35 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[360px]:h-[3.85rem]',
                     active &&
-                      'bg-background/72 text-foreground shadow-[0_5px_14px_rgba(0,0,0,0.14)]',
-                    active && isAi && 'text-life-ai group-hover:bg-background/72',
+                      !isAi &&
+                      'border-white/[0.10] bg-secondary/36 text-foreground shadow-[0_6px_18px_rgba(0,0,0,0.14)]',
+                    isAi && 'hover:bg-life-ai/[0.045] hover:text-life-ai',
+                    isAi &&
+                      active &&
+                      'border-life-ai/24 bg-life-ai/[0.045] text-life-ai shadow-[0_6px_20px_rgba(6,182,212,0.08)]',
                   )}
                 >
-                  <Icon className="size-5" />
-                </span>
-                <span
-                  data-tab-label
-                  className={cn(
-                    'relative z-10 max-w-full truncate text-xs font-semibold transition duration-300',
-                    'max-[360px]:text-[11px]',
-                    active ? 'text-foreground' : 'text-muted-foreground',
-                    isAi && active && 'text-life-ai',
-                  )}
-                >
-                  {tab.label}
-                </span>
-              </NavLink>
-            );
-          })}
-        </div>
-      </nav>
+                  <span
+                    data-tab-icon
+                    className={cn(
+                      'relative z-10 grid size-8 place-items-center rounded-2xl transition duration-300 group-hover:-translate-y-0.5 group-hover:bg-secondary/55 group-hover:text-foreground',
+                      isAi && 'text-life-ai group-hover:bg-life-ai/10 group-hover:text-life-ai',
+                      active &&
+                        'bg-background/72 text-foreground shadow-[0_5px_14px_rgba(0,0,0,0.14)]',
+                      active && isAi && 'text-life-ai group-hover:bg-background/72',
+                    )}
+                  >
+                    <Icon className="size-5" />
+                  </span>
+                  <span
+                    data-tab-label
+                    className={cn(
+                      'relative z-10 max-w-full truncate text-xs font-semibold transition duration-300',
+                      'max-[360px]:text-[11px]',
+                      active ? 'text-foreground' : 'text-muted-foreground',
+                      isAi && active && 'text-life-ai',
+                    )}
+                  >
+                    {tab.label}
+                  </span>
+                </NavLink>
+              );
+            })}
+          </div>
+        </nav>
+      ) : null}
     </div>
   );
 }

@@ -8,6 +8,8 @@ import {
   PackageCheck,
   RefreshCcw,
   Sparkles,
+  ThumbsDown,
+  ThumbsUp,
   X,
 } from 'lucide-react';
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -25,11 +27,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
+  buildPhotoItemAnalysisSmartSuggestions,
+  buildPhotoItemMergedPantryInput,
   buildPhotoItemPantryInput,
   createPhotoItemAnalysisHistoryId,
+  findPhotoItemAnalysisDuplicateCandidates,
   getLatestPhotoItemAnalysisDraft,
+  getPhotoItemAnalysisReviewIssues,
+  markPhotoItemAnalysisQualityFeedback,
   markPhotoItemAnalysisSaved,
   type PhotoItemAnalysisHistoryItem,
+  type PhotoItemAnalysisQualityRating,
+  type PhotoItemAnalysisReviewIssue,
+  type PhotoItemAnalysisSmartSuggestion,
   type PhotoItemDraftForm,
   readPhotoItemAnalysisHistory,
   removePhotoItemAnalysisHistory,
@@ -90,6 +100,14 @@ function buildAnalysisNote(result: PantryPhotoAnalysisResponse) {
   return parts.join('\n');
 }
 
+function appendUniqueNoteLine(note: string, line: string) {
+  const trimmed = note.trim();
+  if (trimmed.includes(line)) {
+    return note;
+  }
+  return [trimmed, line].filter(Boolean).join('\n');
+}
+
 function getFallbackFileName(file: File) {
   return file.name || `pantry-photo-${Date.now()}.jpg`;
 }
@@ -124,11 +142,17 @@ export function PhotoItemAnalysisPage() {
   const navigate = useNavigate();
   const token = useAuthStore((state) => state.token);
   const addPantryItem = useLifeTraceStore((state) => state.addPantryItem);
+  const editPantryItem = useLifeTraceStore((state) => state.editPantryItem);
+  const pantryItems = useLifeTraceStore((state) => state.pantryItems);
+  const pantryListItems = useLifeTraceStore((state) => state.pantryListItems);
+  const pantryLoaded = useLifeTraceStore((state) => state.pantryLoaded);
+  const pantryLoading = useLifeTraceStore((state) => state.pantryLoading);
   const pantryPreferences = useLifeTraceStore((state) => state.pantryPreferences);
   const preferredPantryHouseholdId = useLifeTraceStore((state) => state.preferredPantryHouseholdId);
   const preferredPantryHouseholdName = useLifeTraceStore(
     (state) => state.preferredPantryHouseholdName,
   );
+  const loadPantry = useLifeTraceStore((state) => state.loadPantry);
   const setActivePantryHousehold = useLifeTraceStore((state) => state.setActivePantryHousehold);
   const showToast = useFeedbackToastStore((state) => state.showToast);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -166,6 +190,55 @@ export function PhotoItemAnalysisPage() {
           getLatestPhotoItemAnalysisDraft()),
     [currentHistoryId, historyItems],
   );
+  const currentHistoryItem = useMemo(
+    () => historyItems.find((item) => item.id === currentHistoryId) ?? null,
+    [currentHistoryId, historyItems],
+  );
+  const reviewIssues = useMemo(
+    () => (analysis ? getPhotoItemAnalysisReviewIssues(analysis, form) : []),
+    [analysis, form],
+  );
+  const pantryHistoryItems = useMemo(() => {
+    const byId = new Map(pantryItems.map((item) => [item.id, item]));
+    pantryListItems.forEach((item) => {
+      byId.set(item.id, item);
+    });
+    return [...byId.values()];
+  }, [pantryItems, pantryListItems]);
+  const smartSuggestions = useMemo(
+    () =>
+      analysis
+        ? buildPhotoItemAnalysisSmartSuggestions({
+            analysis,
+            form,
+            pantryItems: pantryHistoryItems,
+            pantryPreferences,
+            preferredHouseholdId: preferredPantryHouseholdId,
+            preferredHouseholdName: preferredPantryHouseholdName,
+          })
+        : [],
+    [
+      analysis,
+      form,
+      pantryHistoryItems,
+      pantryPreferences,
+      preferredPantryHouseholdId,
+      preferredPantryHouseholdName,
+    ],
+  );
+  const duplicateCandidates = useMemo(
+    () =>
+      analysis
+        ? findPhotoItemAnalysisDuplicateCandidates({
+            analysis,
+            form,
+            pantryItems: pantryHistoryItems,
+          })
+        : [],
+    [analysis, form, pantryHistoryItems],
+  );
+  const primaryDuplicateCandidate = duplicateCandidates[0] ?? null;
+  const qualityRating = currentHistoryItem?.qualityFeedback?.rating;
   const selectedHouseholdName = useMemo(() => {
     if (!form.householdId) {
       return '我的空间';
@@ -212,6 +285,13 @@ export function PhotoItemAnalysisPage() {
   }, [token]);
 
   useEffect(() => {
+    if (!token || !analysis || pantryLoaded || pantryLoading) {
+      return;
+    }
+    void loadPantry();
+  }, [analysis, loadPantry, pantryLoaded, pantryLoading, token]);
+
+  useEffect(() => {
     return () => {
       if (imagePreviewUrl) {
         URL.revokeObjectURL(imagePreviewUrl);
@@ -237,6 +317,7 @@ export function PhotoItemAnalysisPage() {
       status: 'draft',
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
+      qualityFeedback: existing?.qualityFeedback,
     });
     setHistoryItems(readPhotoItemAnalysisHistory());
   }, [
@@ -449,7 +530,7 @@ export function PhotoItemAnalysisPage() {
     }
   };
 
-  const savePantryItem = async () => {
+  const savePantryItem = async (mode: 'create' | 'merge' = 'create') => {
     if (!form.name.trim()) {
       setError('请先确认商品名称。');
       return;
@@ -458,13 +539,24 @@ export function PhotoItemAnalysisPage() {
     setState('saving');
     setError('');
     try {
-      const input = buildPhotoItemPantryInput({
-        form,
-        pantryPreferences,
-        uploadedImageUrl,
-      });
-
-      const item = await addPantryItem(input, form.householdId || undefined);
+      const mergeCandidate = mode === 'merge' ? primaryDuplicateCandidate : null;
+      const item = mergeCandidate
+        ? await editPantryItem(
+            mergeCandidate.item.id,
+            buildPhotoItemMergedPantryInput({
+              existingItem: mergeCandidate.item,
+              form,
+            }),
+            form.householdId || undefined,
+          )
+        : await addPantryItem(
+            buildPhotoItemPantryInput({
+              form,
+              pantryPreferences,
+              uploadedImageUrl,
+            }),
+            form.householdId || undefined,
+          );
       if (!item) {
         throw new Error('入库失败，请稍后重试。');
       }
@@ -479,7 +571,12 @@ export function PhotoItemAnalysisPage() {
       }
       setState('done');
       setReviewSheetOpen(true);
-      showToast(`「${item.name}」已加入${selectedHouseholdName}`, 'success');
+      showToast(
+        mergeCandidate
+          ? `已把数量合并到「${item.name}」。`
+          : `「${item.name}」已加入${selectedHouseholdName}`,
+        'success',
+      );
     } catch (saveError) {
       setState('reviewing');
       setError(saveError instanceof Error ? saveError.message : '入库失败，请稍后再试。');
@@ -531,6 +628,59 @@ export function PhotoItemAnalysisPage() {
   const dismissDraft = (draftId: string) => {
     removePhotoItemAnalysisHistory(draftId);
     setHistoryItems(readPhotoItemAnalysisHistory());
+  };
+
+  const handleReviewIssueAction = (issue: PhotoItemAnalysisReviewIssue) => {
+    if (issue.action === 'open-sheet') {
+      setReviewSheetOpen(true);
+      return;
+    }
+
+    if (issue.action === 'clear-expiry') {
+      setExpiryBaseDate('');
+      setForm((current) => ({
+        ...current,
+        expiresAt: '',
+        reminderEnabled: false,
+        note: appendUniqueNoteLine(current.note, '用户复核：不记录保质期。'),
+      }));
+      showToast('已按普通物品处理，不记录保质期。', 'success');
+      return;
+    }
+
+    if (issue.action === 'mark-brand-unknown') {
+      setForm((current) => ({
+        ...current,
+        note: appendUniqueNoteLine(current.note, '用户复核：品牌未知。'),
+      }));
+      showToast('已标记品牌未知。', 'success');
+      return;
+    }
+
+    if (issue.action === 'mark-spec-unknown') {
+      setForm((current) => ({
+        ...current,
+        note: appendUniqueNoteLine(current.note, '用户复核：规格不记录。'),
+      }));
+      showToast('已标记规格不记录。', 'success');
+    }
+  };
+
+  const handleQualityFeedback = (rating: PhotoItemAnalysisQualityRating) => {
+    if (!currentHistoryId) {
+      return;
+    }
+    markPhotoItemAnalysisQualityFeedback(currentHistoryId, rating);
+    setHistoryItems(readPhotoItemAnalysisHistory());
+    showToast(rating === 'accurate' ? '已记录：识别准确。' : '已记录：识别不准确。', 'success');
+  };
+
+  const handleSmartSuggestion = (suggestion: PhotoItemAnalysisSmartSuggestion) => {
+    setForm((current) => ({
+      ...current,
+      ...suggestion.patch,
+    }));
+    showToast(`已应用${suggestion.label}。`, 'success');
   };
 
   return (
@@ -795,6 +945,136 @@ export function PhotoItemAnalysisPage() {
                 ))}
               </div>
             ) : null}
+            {smartSuggestions.length > 0 ? (
+              <div className="rounded-[1.25rem] border border-life-ai/20 bg-life-ai/5 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-life-ai">智能建议</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      根据当前家庭空间和历史库存，推荐更常用的入库字段。
+                    </p>
+                  </div>
+                  <Badge tone="ai" className="shrink-0">
+                    {smartSuggestions.length} 项
+                  </Badge>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {smartSuggestions.map((suggestion) => (
+                    <div
+                      key={suggestion.id}
+                      className="rounded-2xl border border-border bg-card/80 p-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold">{suggestion.label}</p>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            {suggestion.description}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="shrink-0 rounded-full border border-life-ai/25 bg-life-ai/10 px-3 py-1.5 text-xs font-semibold text-life-ai transition hover:bg-life-ai/15"
+                          onClick={() => handleSmartSuggestion(suggestion)}
+                        >
+                          {suggestion.actionLabel}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {primaryDuplicateCandidate ? (
+              <div className="rounded-[1.25rem] border border-life-trace/25 bg-life-trace/5 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-life-trace">可能已有相同库存</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      {primaryDuplicateCandidate.item.name} · 现有{' '}
+                      {primaryDuplicateCandidate.item.quantity}{' '}
+                      {primaryDuplicateCandidate.item.unit}，{primaryDuplicateCandidate.reason}。
+                    </p>
+                  </div>
+                  <Badge tone="trace" className="shrink-0">
+                    可合并
+                  </Badge>
+                </div>
+              </div>
+            ) : null}
+            {reviewIssues.length > 0 ? (
+              <div className="rounded-[1.25rem] border border-life-alert/20 bg-life-alert/5 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-life-alert">需要复核</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      这些字段不确定，保存前建议确认。
+                    </p>
+                  </div>
+                  <Badge tone="alert" className="shrink-0">
+                    {reviewIssues.length} 项
+                  </Badge>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {reviewIssues.map((issue) => (
+                    <div key={issue.id} className="rounded-2xl border border-border bg-card/80 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold">{issue.label}</p>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            {issue.description}
+                          </p>
+                        </div>
+                        {issue.actionLabel ? (
+                          <button
+                            type="button"
+                            className="shrink-0 rounded-full border border-life-alert/25 bg-life-alert/10 px-3 py-1.5 text-xs font-semibold text-life-alert transition hover:bg-life-alert/15"
+                            onClick={() => handleReviewIssueAction(issue)}
+                          >
+                            {issue.actionLabel}
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="rounded-[1.25rem] border border-border bg-secondary/45 p-3">
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">本次识别是否准确</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    反馈会保存在本机识别历史里，后续用于优化提示词和字段兜底。
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  className={`inline-flex h-10 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-semibold transition ${
+                    qualityRating === 'accurate'
+                      ? 'border-life-trace/40 bg-life-trace/10 text-life-trace'
+                      : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  }`}
+                  onClick={() => handleQualityFeedback('accurate')}
+                >
+                  <ThumbsUp className="size-4" />
+                  准确
+                </button>
+                <button
+                  type="button"
+                  className={`inline-flex h-10 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-semibold transition ${
+                    qualityRating === 'inaccurate'
+                      ? 'border-life-alert/40 bg-life-alert/10 text-life-alert'
+                      : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  }`}
+                  onClick={() => handleQualityFeedback('inaccurate')}
+                >
+                  <ThumbsDown className="size-4" />
+                  不准确
+                </button>
+              </div>
+            </div>
           </Card>
         </section>
       ) : null}
@@ -877,6 +1157,59 @@ export function PhotoItemAnalysisPage() {
                 </p>
               </div>
             </div>
+          </div>
+        ) : null}
+
+        {reviewIssues.length > 0 && state !== 'done' ? (
+          <div className="mb-4 rounded-[1.25rem] border border-life-alert/20 bg-life-alert/5 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-life-alert">保存前还有字段建议复核</p>
+              <Badge tone="alert" className="shrink-0">
+                {reviewIssues.length} 项
+              </Badge>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              已经可以入库，但建议先处理名称、品牌、规格或保质期的不确定项。
+            </p>
+          </div>
+        ) : null}
+
+        {smartSuggestions.length > 0 && state !== 'done' ? (
+          <div className="mb-4 rounded-[1.25rem] border border-life-ai/20 bg-life-ai/5 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-life-ai">可套用智能建议</p>
+              <Badge tone="ai" className="shrink-0">
+                {smartSuggestions.length} 项
+              </Badge>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {smartSuggestions.map((suggestion) => (
+                <button
+                  key={suggestion.id}
+                  type="button"
+                  className="rounded-full border border-life-ai/25 bg-life-ai/10 px-3 py-1.5 text-xs font-semibold text-life-ai transition hover:bg-life-ai/15"
+                  onClick={() => handleSmartSuggestion(suggestion)}
+                >
+                  {suggestion.actionLabel}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {primaryDuplicateCandidate && state !== 'done' ? (
+          <div className="mb-4 rounded-[1.25rem] border border-life-trace/25 bg-life-trace/5 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-life-trace">检测到相似库存</p>
+              <Badge tone="trace" className="shrink-0">
+                {duplicateCandidates.length} 项
+              </Badge>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {primaryDuplicateCandidate.item.name} 当前数量为{' '}
+              {primaryDuplicateCandidate.item.quantity} {primaryDuplicateCandidate.item.unit}。
+              可以把本次数量追加到已有库存，也可以创建新条目。
+            </p>
           </div>
         ) : null}
 
@@ -1037,6 +1370,35 @@ export function PhotoItemAnalysisPage() {
               <Button type="button" variant="ai" onClick={() => navigate('/pantry')}>
                 <PackageCheck className="size-4 shrink-0" />
                 <span className="whitespace-nowrap">查看库存</span>
+              </Button>
+            </div>
+          ) : primaryDuplicateCandidate ? (
+            <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 whitespace-nowrap"
+                disabled={state === 'saving'}
+                onClick={() => void savePantryItem('create')}
+              >
+                <Check className="size-4 shrink-0" />
+                <span className="whitespace-nowrap">创建新条目</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ai"
+                className="h-12 whitespace-nowrap disabled:opacity-80"
+                disabled={state === 'saving'}
+                onClick={() => void savePantryItem('merge')}
+              >
+                {state === 'saving' ? (
+                  <ActionLoadingIcon className="size-4 shrink-0 text-background" />
+                ) : (
+                  <PackageCheck className="size-4 shrink-0" />
+                )}
+                <span className="whitespace-nowrap">
+                  {state === 'saving' ? '合并中...' : '合并数量'}
+                </span>
               </Button>
             </div>
           ) : (

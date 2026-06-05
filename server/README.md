@@ -12,6 +12,7 @@
 - `DB_DRIVER`、`DB_DSN`、`DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME`：数据库配置。
 - `DB_AUTO_MIGRATE`：是否启用 GORM AutoMigrate，本地按需开启，生产默认应保持关闭。
 - `JWT_SECRET`、`SMTP_*`、`TOS_*`、`ARK_*`、`AI_*`、`QWEATHER_*`、`WEB_PUSH_*`：业务能力配置。
+- `WEB_PUSH_WORKER_ENABLED`：是否启动服务进程内置 Web Push 扫描 worker。Vercel + 外部 Cron 场景建议设为 `false`，避免冷启动 worker 和 cron-job.org 重复扫描；长驻服务器或本地开发可保留 `true`。
 
 不要在文档、示例、日志或测试中写入真实密钥、真实 token、真实云资源标识或个人账号凭据。
 

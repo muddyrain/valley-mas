@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   CalendarDays,
   Clock,
   Image,
@@ -14,11 +13,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
-import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EditTraceDrawer } from '@/components/EditTraceDrawer';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadErrorState } from '@/components/LoadErrorState';
+import { SubPageShell } from '@/components/SubPageShell';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -217,17 +216,15 @@ function ImagePreviewDialog({ trace, onClose }: { trace: Trace | null; onClose: 
   );
 }
 
-function TraceDetailDrawer({
+function TraceDetailContent({
   trace,
   deleting,
-  onClose,
   onRequestEdit,
   onRequestDelete,
   onPreviewImage,
 }: {
   trace: Trace | null;
   deleting: boolean;
-  onClose: () => void;
   onRequestEdit: (trace: Trace) => void;
   onRequestDelete: (trace: Trace) => void;
   onPreviewImage: (trace: Trace) => void;
@@ -237,19 +234,8 @@ function TraceDetailDrawer({
   }
 
   return (
-    <BottomSheet
-      open={Boolean(trace)}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          onClose();
-        }
-      }}
-      overlayLabel="关闭踪迹详情"
-      closeDisabled={deleting}
-      zIndexClassName="z-[60]"
-      portal
-    >
-      <div className="mb-5 flex items-start justify-between gap-4">
+    <div className="min-w-0 space-y-5 overflow-x-hidden">
+      <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={sourceTone[trace.source]}>{trace.source}</Badge>
@@ -262,21 +248,18 @@ function TraceDetailDrawer({
             </p>
           ) : null}
         </div>
-        <Button type="button" variant="ghost" size="icon" disabled={deleting} onClick={onClose}>
-          <X className="size-5" />
-        </Button>
       </div>
 
       {trace.imageUrl ? (
         <button
           type="button"
-          className="mb-5 block w-full cursor-zoom-in overflow-hidden rounded-2xl border border-border bg-secondary text-left"
+          className="block w-full cursor-zoom-in overflow-hidden rounded-2xl border border-border bg-secondary text-left"
           onClick={() => onPreviewImage(trace)}
         >
           <img src={trace.imageUrl} alt={trace.title} className="w-full object-cover opacity-90" />
         </button>
       ) : (
-        <div className="mb-5 flex min-h-24 items-center gap-3 rounded-2xl border border-border bg-secondary px-4 text-muted-foreground">
+        <div className="flex min-h-24 items-center gap-3 rounded-2xl border border-border bg-secondary px-4 text-muted-foreground">
           <Image className="size-5 text-life-trace" />
           <p className="text-sm">这条踪迹还没有图片。之后可以从图片分析生成更丰富的记录。</p>
         </div>
@@ -290,7 +273,7 @@ function TraceDetailDrawer({
         <p className="text-sm leading-6 text-foreground">{trace.summary}</p>
       </Card>
 
-      <div className="mt-3 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+      <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
         <Card className="p-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
             <Clock className="size-4" />
@@ -308,7 +291,7 @@ function TraceDetailDrawer({
       </div>
 
       {trace.location ? (
-        <Card className="mt-3 p-4">
+        <Card className="p-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
             <MapPin className="size-4" />
             地点
@@ -317,17 +300,13 @@ function TraceDetailDrawer({
         </Card>
       ) : null}
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
         {trace.tags.map((tag) => (
           <Badge key={tag}>{tag}</Badge>
         ))}
       </div>
 
-      <div className="mt-6 grid grid-cols-3 gap-3 max-[360px]:grid-cols-1">
-        <Button type="button" variant="secondary" disabled={deleting} onClick={onClose}>
-          <ArrowLeft className="size-4" />
-          返回
-        </Button>
+      <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
         <Button
           type="button"
           variant="outline"
@@ -347,7 +326,7 @@ function TraceDetailDrawer({
           {deleting ? '删除中' : '删除'}
         </Button>
       </div>
-    </BottomSheet>
+    </div>
   );
 }
 
@@ -421,6 +400,60 @@ export function TracesPage() {
       navigate('/traces');
     }
   };
+
+  if (traceId) {
+    return (
+      <SubPageShell title="踪迹详情" eyebrow="踪迹" backTo="/traces">
+        {selectedTrace ? (
+          <TraceDetailContent
+            trace={selectedTrace}
+            deleting={Boolean(traceDeletingById[selectedTrace.id])}
+            onRequestEdit={setEditTarget}
+            onRequestDelete={requestDeleteTrace}
+            onPreviewImage={setPreviewTrace}
+          />
+        ) : tracesLoading ? (
+          <SyncState title="正在同步踪迹详情" tone="trace" variant="skeleton-list" />
+        ) : (
+          <LoadErrorState
+            title="没有找到这条踪迹"
+            description="它可能已经被删除，或当前列表还没有同步到。"
+            error={tracesError}
+            retrying={tracesLoading}
+            onRetry={() => void loadTraces()}
+          />
+        )}
+        <ImagePreviewDialog trace={previewTrace} onClose={() => setPreviewTrace(null)} />
+        <EditTraceDrawer
+          open={Boolean(editTarget)}
+          trace={editTarget}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditTarget(null);
+            }
+          }}
+          onSaved={(trace) => setEditTarget(trace)}
+        />
+        <ConfirmDialog
+          open={Boolean(deleteTarget)}
+          title="删除这条踪迹？"
+          description={
+            deleteTarget
+              ? `「${deleteTarget.title}」删除后不会再出现在踪迹流中，关联计划不会被删除。`
+              : ''
+          }
+          confirmLabel="确认删除"
+          loading={deleteTarget ? Boolean(traceDeletingById[deleteTarget.id]) : false}
+          onCancel={() => {
+            if (!deleteTarget || !traceDeletingById[deleteTarget.id]) {
+              setDeleteTarget(null);
+            }
+          }}
+          onConfirm={() => void confirmDeleteTrace()}
+        />
+      </SubPageShell>
+    );
+  }
 
   return (
     <div className="min-w-0 space-y-5 overflow-x-hidden">
@@ -722,14 +755,6 @@ export function TracesPage() {
         <p className="text-center text-xs text-muted-foreground">已展示 {traces.length} 条踪迹</p>
       ) : null}
 
-      <TraceDetailDrawer
-        trace={selectedTrace}
-        deleting={selectedTrace ? Boolean(traceDeletingById[selectedTrace.id]) : false}
-        onClose={() => navigate('/traces')}
-        onRequestEdit={setEditTarget}
-        onRequestDelete={requestDeleteTrace}
-        onPreviewImage={setPreviewTrace}
-      />
       <ImagePreviewDialog trace={previewTrace} onClose={() => setPreviewTrace(null)} />
       <EditTraceDrawer open={createOpen} trace={null} onOpenChange={setCreateOpen} />
       <EditTraceDrawer

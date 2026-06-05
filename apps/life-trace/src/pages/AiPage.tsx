@@ -150,6 +150,15 @@ function formatPhotoItemHistoryTime(value: string) {
   });
 }
 
+function formatPhotoItemQualityFeedback(item: PhotoItemAnalysisHistoryItem) {
+  if (!item.qualityFeedback) {
+    return null;
+  }
+  return item.qualityFeedback.rating === 'accurate'
+    ? { label: '准确', tone: 'trace' as const }
+    : { label: '不准确', tone: 'alert' as const };
+}
+
 function normalizeAssistantMessage(message: LifeAssistantMessage, index: number): AssistantMessage {
   return {
     id: message.id || `${message.role}-${message.createdAt || Date.now()}-${index}`,
@@ -987,38 +996,47 @@ function AgentConversationPanel({
                   </button>
                 </div>
                 <div className="mt-3 grid gap-2">
-                  {photoItemHistory.slice(0, 3).map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className="flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-secondary/45 p-2 text-left transition hover:bg-secondary"
-                      onClick={onOpenPhotoAnalysis}
-                    >
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.form.name || item.analysis.name || '商品识别图片'}
-                          className="size-12 shrink-0 rounded-xl object-cover"
-                        />
-                      ) : (
-                        <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-background text-life-ai">
-                          <Image className="size-5" />
+                  {photoItemHistory.slice(0, 3).map((item) => {
+                    const qualityFeedback = formatPhotoItemQualityFeedback(item);
+
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-secondary/45 p-2 text-left transition hover:bg-secondary"
+                        onClick={onOpenPhotoAnalysis}
+                      >
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.form.name || item.analysis.name || '商品识别图片'}
+                            className="size-12 shrink-0 rounded-xl object-cover"
+                          />
+                        ) : (
+                          <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-background text-life-ai">
+                            <Image className="size-5" />
+                          </span>
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold">
+                            {item.form.name || item.analysis.name || '待确认商品'}
+                          </span>
+                          <span className="mt-1 block truncate text-xs text-muted-foreground">
+                            {formatPhotoItemHistoryTime(item.updatedAt)} ·{' '}
+                            {item.householdName || '我的空间'}
+                          </span>
                         </span>
-                      )}
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">
-                          {item.form.name || item.analysis.name || '待确认商品'}
+                        <span className="flex shrink-0 flex-col items-end gap-1">
+                          <Badge tone={item.status === 'draft' ? 'ai' : 'trace'}>
+                            {item.status === 'draft' ? '草稿' : '已入库'}
+                          </Badge>
+                          {qualityFeedback ? (
+                            <Badge tone={qualityFeedback.tone}>{qualityFeedback.label}</Badge>
+                          ) : null}
                         </span>
-                        <span className="mt-1 block truncate text-xs text-muted-foreground">
-                          {formatPhotoItemHistoryTime(item.updatedAt)} ·{' '}
-                          {item.householdName || '我的空间'}
-                        </span>
-                      </span>
-                      <Badge tone={item.status === 'draft' ? 'ai' : 'trace'}>
-                        {item.status === 'draft' ? '草稿' : '已入库'}
-                      </Badge>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ) : null}

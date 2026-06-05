@@ -67,6 +67,7 @@ func TestJWTExpireCanBeOverridden(t *testing.T) {
 
 func TestWebPushConfigLoadsFromEnv(t *testing.T) {
 	t.Setenv("WEB_PUSH_ENABLED", "true")
+	t.Setenv("WEB_PUSH_WORKER_ENABLED", "false")
 	t.Setenv("WEB_PUSH_PUBLIC_KEY", " public-key ")
 	t.Setenv("WEB_PUSH_PRIVATE_KEY", " private-key ")
 	t.Setenv("WEB_PUSH_SUBJECT", "mailto:life@example.com")
@@ -78,6 +79,9 @@ func TestWebPushConfigLoadsFromEnv(t *testing.T) {
 
 	if !cfg.WebPush.Enabled {
 		t.Fatal("expected Web Push to be enabled")
+	}
+	if cfg.WebPush.WorkerEnabled {
+		t.Fatal("expected Web Push worker to be disabled")
 	}
 	if cfg.WebPush.PublicKey != "public-key" || cfg.WebPush.PrivateKey != "private-key" {
 		t.Fatalf("expected trimmed VAPID keys, got %+v", cfg.WebPush)

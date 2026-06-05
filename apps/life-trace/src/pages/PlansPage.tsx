@@ -17,7 +17,8 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadErrorState } from '@/components/LoadErrorState';
-import { PlanDetailDrawer } from '@/components/PlanDetailDrawer';
+import { PlanDetailContent } from '@/components/PlanDetailDrawer';
+import { SubPageShell } from '@/components/SubPageShell';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -334,6 +335,72 @@ export function PlansPage() {
     );
   };
 
+  if (planId) {
+    return (
+      <SubPageShell title="计划详情" eyebrow="计划" backTo="/plans">
+        {selectedPlan ? (
+          <PlanDetailContent
+            plan={selectedPlan}
+            completing={Boolean(planCompletingById[selectedPlan.id])}
+            deleting={Boolean(planDeletingById[selectedPlan.id])}
+            onComplete={(plan) => void completePlan(plan.id)}
+            onEdit={(plan) => {
+              navigate('/plans');
+              setEditingPlan(plan);
+              setDrawerOpen(true);
+            }}
+            onDelete={(plan) => setDeleteTarget(plan)}
+          />
+        ) : plansLoading ? (
+          <SyncState title="正在同步计划详情" description="正在从云端刷新计划列表。" tone="plan" />
+        ) : (
+          <LoadErrorState
+            title="没有找到这个计划"
+            description="它可能已经被删除，或当前筛选下暂时没有同步到。"
+            error={plansError}
+            retrying={plansLoading}
+            onRetry={() => void loadPlans({ pageSize: 20 })}
+          />
+        )}
+        <CreatePlanDrawer
+          open={drawerOpen}
+          plan={editingPlan}
+          onOpenChange={(nextOpen) => {
+            setDrawerOpen(nextOpen);
+            if (!nextOpen) {
+              setEditingPlan(null);
+            }
+          }}
+        />
+        <ConfirmDialog
+          open={Boolean(deleteTarget)}
+          title="删除这个计划？"
+          description={
+            deleteTarget
+              ? `「${deleteTarget.title}」删除后不会再出现在今日计划里，已生成的踪迹不会被删除。`
+              : ''
+          }
+          confirmLabel="确认删除"
+          loading={deletePending}
+          onCancel={() => {
+            if (!deletePending) {
+              setDeleteTarget(null);
+            }
+          }}
+          onConfirm={() => {
+            if (!deleteTarget) {
+              return;
+            }
+            void removePlan(deleteTarget.id).then(() => {
+              setDeleteTarget(null);
+              navigate('/plans');
+            });
+          }}
+        />
+      </SubPageShell>
+    );
+  }
+
   return (
     <div ref={pageRef} className="min-w-0 space-y-5 overflow-x-hidden">
       <div className="flex items-start justify-between gap-3">
@@ -624,23 +691,6 @@ export function PlansPage() {
           if (!nextOpen) {
             setEditingPlan(null);
           }
-        }}
-      />
-      <PlanDetailDrawer
-        open={Boolean(selectedPlan)}
-        plan={selectedPlan}
-        completing={selectedPlan ? Boolean(planCompletingById[selectedPlan.id]) : false}
-        deleting={selectedPlan ? Boolean(planDeletingById[selectedPlan.id]) : false}
-        onClose={() => navigate('/plans')}
-        onComplete={(plan) => void completePlan(plan.id)}
-        onEdit={(plan) => {
-          navigate('/plans');
-          setEditingPlan(plan);
-          setDrawerOpen(true);
-        }}
-        onDelete={(plan) => {
-          navigate('/plans');
-          setDeleteTarget(plan);
         }}
       />
       <ConfirmDialog

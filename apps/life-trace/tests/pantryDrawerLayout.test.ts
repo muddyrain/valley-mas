@@ -52,7 +52,9 @@ describe('pantry drawer mobile layout guards', () => {
     expect(photoItemAnalysisSource).toContain('className="shrink-0 whitespace-nowrap"');
     expect(photoItemAnalysisSource).toContain('<FormItem label="商品名称" required>');
     expect(expiryDateFieldSource).toContain('<FormItem label="生产/购买日期">');
+    expect(expiryDateFieldSource).toContain('[&::-webkit-date-and-time-value]:min-h-11');
     expect(expiryDateFieldSource).toContain("value ? 'pr-[4.25rem]' : 'pr-10'");
+    expect(expiryDateFieldSource).toContain('whitespace-nowrap');
     expect(expiryDateFieldSource).toContain('cursor-pointer border-life-health/35');
     expect(expiryDateFieldSource).toContain('cursor-not-allowed border-border');
     expect(expiryDateFieldSource).toContain('aria-label={clearLabel}');

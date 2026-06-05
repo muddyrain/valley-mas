@@ -9,9 +9,8 @@ import {
   RotateCcw,
   Sparkles,
   Trash2,
-  X,
 } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useId } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { Badge } from '@/components/ui/badge';
@@ -56,134 +55,77 @@ function formatDateTime(value?: string) {
   }).format(date);
 }
 
-type PlanDetailDrawerProps = {
-  open: boolean;
+type PlanDetailContentProps = {
   plan: Plan | null;
   completing?: boolean;
   deleting?: boolean;
-  onClose: () => void;
   onComplete: (plan: Plan) => void;
   onEdit: (plan: Plan) => void;
   onDelete: (plan: Plan) => void;
 };
 
-export function PlanDetailDrawer({
-  open,
+type PlanDetailDrawerProps = PlanDetailContentProps & {
+  open: boolean;
+  onClose: () => void;
+};
+
+export function PlanDetailContent({
   plan,
   completing = false,
   deleting = false,
-  onClose,
   onComplete,
   onEdit,
   onDelete,
-}: PlanDetailDrawerProps) {
+}: PlanDetailContentProps) {
   const titleId = useId();
-  const [renderedPlan, setRenderedPlan] = useState<Plan | null>(plan);
   const busy = completing || deleting;
 
-  useEffect(() => {
-    if (open && plan) {
-      setRenderedPlan(plan);
-      return;
-    }
-
-    if (!open) {
-      setRenderedPlan(null);
-    }
-  }, [open, plan]);
-
-  useEffect(() => {
-    if (!open || busy) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [busy, onClose, open]);
-
-  if (!renderedPlan) {
+  if (!plan) {
     return null;
   }
 
-  const { dateText, timeText } = getPlanDisplayTimeParts(renderedPlan);
-  const ReminderIcon = renderedPlan.reminder ? Bell : BellOff;
-  const visibleNote = getVisiblePlanNote(renderedPlan.note);
-  const source = sourceLabel[renderedPlan.source ?? 'manual'];
-  const completedText = formatDateTime(renderedPlan.completedAt);
+  const { dateText, timeText } = getPlanDisplayTimeParts(plan);
+  const ReminderIcon = plan.reminder ? Bell : BellOff;
+  const visibleNote = getVisiblePlanNote(plan.note);
+  const source = sourceLabel[plan.source ?? 'manual'];
+  const completedText = formatDateTime(plan.completedAt);
 
   return (
-    <BottomSheet
-      open={Boolean(renderedPlan)}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          setRenderedPlan(null);
-          onClose();
-        }
-      }}
-      overlayLabel="关闭计划详情"
-      closeDisabled={busy}
-      zIndexClassName="z-[60]"
-      portal
-      className="will-change-transform"
-    >
-      <div className="mb-5 flex items-start justify-between gap-4" data-plan-detail-item>
+    <div className="min-w-0 space-y-5 overflow-x-hidden">
+      <div className="flex items-start justify-between gap-4" data-plan-detail-item>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={typeTone[renderedPlan.type]}>{renderedPlan.type}</Badge>
-            <Badge tone={renderedPlan.reminder ? 'health' : 'default'}>
-              {renderedPlan.reminder ? '已提醒' : '未提醒'}
+            <Badge tone={typeTone[plan.type]}>{plan.type}</Badge>
+            <Badge tone={plan.reminder ? 'health' : 'default'}>
+              {plan.reminder ? '已提醒' : '未提醒'}
             </Badge>
-            {renderedPlan.completed ? <Badge tone="trace">已完成</Badge> : null}
+            {plan.completed ? <Badge tone="trace">已完成</Badge> : null}
           </div>
           <h2 id={titleId} className="mt-3 text-2xl font-semibold leading-tight">
-            {renderedPlan.title}
+            {plan.title}
           </h2>
-          {renderedPlan.completed && completedText ? (
+          {plan.completed && completedText ? (
             <p className="mt-2 text-sm text-muted-foreground">完成于 {completedText}</p>
           ) : null}
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          disabled={busy}
-          onClick={() => {
-            setRenderedPlan(null);
-            onClose();
-          }}
-        >
-          <X className="size-5" />
-        </Button>
       </div>
 
-      {renderedPlan.imageUrl ? (
-        <div
-          className="mb-5 overflow-hidden rounded-2xl border border-border bg-secondary"
-          data-plan-detail-item
-        >
+      {plan.imageUrl ? (
+        <div className="overflow-hidden rounded-2xl border border-border bg-secondary">
           <img
-            src={renderedPlan.imageUrl}
-            alt={renderedPlan.title}
-            className="h-40 w-full object-cover opacity-90"
+            src={plan.imageUrl}
+            alt={plan.title}
+            className="h-44 w-full object-cover opacity-90"
           />
         </div>
       ) : (
-        <div
-          className="mb-5 flex min-h-24 items-center gap-3 rounded-2xl border border-border bg-secondary px-4 text-muted-foreground"
-          data-plan-detail-item
-        >
+        <div className="flex min-h-24 items-center gap-3 rounded-2xl border border-border bg-secondary px-4 text-muted-foreground">
           <Sparkles className="size-5 text-life-ai" />
           <p className="text-sm">还没有封面。后续可以为电影、饭局或活动补充图片。</p>
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1" data-plan-detail-item>
+      <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
         <Card className="p-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
             <CalendarDays className="size-4" />
@@ -200,15 +142,13 @@ export function PlanDetailDrawer({
         </Card>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1" data-plan-detail-item>
+      <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
         <Card className="p-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <ReminderIcon className={cn('size-4', renderedPlan.reminder && 'text-life-health')} />
+            <ReminderIcon className={cn('size-4', plan.reminder && 'text-life-health')} />
             提醒状态
           </div>
-          <p className="mt-2 text-sm font-semibold">
-            {renderedPlan.reminder ? '会提醒你' : '未开启提醒'}
-          </p>
+          <p className="mt-2 text-sm font-semibold">{plan.reminder ? '会提醒你' : '未开启提醒'}</p>
         </Card>
         <Card className="p-4">
           <div className="text-xs font-semibold text-muted-foreground">来源</div>
@@ -219,41 +159,41 @@ export function PlanDetailDrawer({
         </Card>
       </div>
 
-      {renderedPlan.location ? (
-        <Card className="mt-3 p-4" data-plan-detail-item>
+      {plan.location ? (
+        <Card className="p-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
             <MapPin className="size-4" />
             地点
           </div>
-          <p className="mt-2 text-sm font-semibold">{renderedPlan.location}</p>
+          <p className="mt-2 text-sm font-semibold">{plan.location}</p>
         </Card>
       ) : null}
 
-      <Card className="mt-3 p-4" data-plan-detail-item>
+      <Card className="p-4">
         <div className="text-xs font-semibold text-muted-foreground">备注</div>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           {visibleNote || '还没有备注。可以编辑计划，补充期待、地址或需要准备的东西。'}
         </p>
       </Card>
 
-      <div className="mt-5 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1" data-plan-detail-item>
+      <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
         <Button
           type="button"
-          variant={renderedPlan.completed ? 'secondary' : 'outline'}
+          variant={plan.completed ? 'secondary' : 'outline'}
           disabled={busy}
-          onClick={() => onComplete(renderedPlan)}
+          onClick={() => onComplete(plan)}
         >
           {completing ? (
             <ActionLoadingIcon tone="trace" />
-          ) : renderedPlan.completed ? (
+          ) : plan.completed ? (
             <RotateCcw className="size-4" />
           ) : (
             <Check className="size-4" />
           )}
-          {completing ? '更新中' : renderedPlan.completed ? '取消完成' : '完成计划'}
+          {completing ? '更新中' : plan.completed ? '取消完成' : '完成计划'}
         </Button>
-        {!renderedPlan.completed ? (
-          <Button type="button" variant="ai" disabled={busy} onClick={() => onEdit(renderedPlan)}>
+        {!plan.completed ? (
+          <Button type="button" variant="ai" disabled={busy} onClick={() => onEdit(plan)}>
             <Pencil className="size-4" />
             编辑计划
           </Button>
@@ -267,14 +207,49 @@ export function PlanDetailDrawer({
       <Button
         type="button"
         variant="ghost"
-        className="mt-3 w-full text-life-alert hover:bg-life-alert/10 hover:text-life-alert"
+        className="w-full text-life-alert hover:bg-life-alert/10 hover:text-life-alert"
         disabled={busy}
-        onClick={() => onDelete(renderedPlan)}
-        data-plan-detail-item
+        onClick={() => onDelete(plan)}
       >
         {deleting ? <ActionLoadingIcon tone="alert" /> : <Trash2 className="size-4" />}
         {deleting ? '删除中' : '删除计划'}
       </Button>
+    </div>
+  );
+}
+
+export function PlanDetailDrawer({
+  open,
+  plan,
+  completing = false,
+  deleting = false,
+  onClose,
+  onComplete,
+  onEdit,
+  onDelete,
+}: PlanDetailDrawerProps) {
+  return (
+    <BottomSheet
+      open={open && Boolean(plan)}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          onClose();
+        }
+      }}
+      overlayLabel="关闭计划详情"
+      closeDisabled={completing || deleting}
+      zIndexClassName="z-[60]"
+      portal
+      className="will-change-transform"
+    >
+      <PlanDetailContent
+        plan={plan}
+        completing={completing}
+        deleting={deleting}
+        onComplete={onComplete}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
     </BottomSheet>
   );
 }

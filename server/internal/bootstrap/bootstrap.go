@@ -61,7 +61,11 @@ func Init() (*config.Config, http.Handler, error) {
 
 		lifetraceWeatherService := lifetrace.NewWeatherService(globalCfg.QWeather)
 		lifetrace.StartHolidayCalendarSyncWorker(context.Background(), globalCfg.Holiday)
-		lifetrace.StartPushReminderWorker(context.Background(), globalCfg.WebPush, lifetraceWeatherService)
+		if globalCfg.WebPush.WorkerEnabled {
+			lifetrace.StartPushReminderWorker(context.Background(), globalCfg.WebPush, lifetraceWeatherService)
+		} else {
+			logger.Log.Info("LifeTrace Web Push worker disabled by WEB_PUSH_WORKER_ENABLED")
+		}
 
 		globalHTTP = router.Setup(globalCfg)
 	})

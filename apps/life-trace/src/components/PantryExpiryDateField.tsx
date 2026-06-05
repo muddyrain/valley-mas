@@ -60,7 +60,7 @@ function DateInputWithClear({
         value={value}
         disabled={disabled}
         className={cn(
-          'block h-11 min-w-0 w-full appearance-none rounded-2xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:opacity-60',
+          'block h-11 min-w-0 w-full appearance-none rounded-2xl border border-border bg-background px-4 text-sm leading-[2.75rem] outline-none transition focus:border-ring disabled:opacity-60 [&::-webkit-date-and-time-value]:min-h-11 [&::-webkit-date-and-time-value]:text-left',
           value ? 'pr-[4.25rem]' : 'pr-10',
           value
             ? '[&::-webkit-calendar-picker-indicator]:right-9'
@@ -158,7 +158,7 @@ export function PantryExpiryDateField({
             type="button"
             disabled={!canCalculate}
             className={cn(
-              'h-10 rounded-2xl border px-2 text-sm font-semibold transition',
+              'h-10 min-w-0 whitespace-nowrap rounded-2xl border px-1.5 text-[13px] font-semibold leading-none transition min-[390px]:px-2 min-[390px]:text-sm',
               canCalculate
                 ? 'cursor-pointer border-life-health/35 bg-life-health/10 text-life-health shadow-[0_8px_24px_rgba(245,158,11,0.08)] hover:border-life-health/60 hover:bg-life-health/15 hover:shadow-[0_10px_28px_rgba(245,158,11,0.12)]'
                 : 'cursor-not-allowed border-border bg-background text-muted-foreground opacity-45',
