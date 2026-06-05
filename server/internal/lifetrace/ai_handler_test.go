@@ -56,6 +56,180 @@ func TestGenerateWeeklyReviewRequiresAIConfig(t *testing.T) {
 	}
 }
 
+func TestGenerateRecipeSuggestionsRequiresAIConfigWhenPantryHasFood(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("ARK_API_KEY", "")
+	t.Setenv("ARK_TEXT_MODEL", "")
+
+	router := setupTraceTestRouter(t, 101)
+	if err := database.GetDB().Create(&model.LifeTracePantryItem{
+		UserID:      101,
+		HouseholdID: personalHouseholdID(101),
+		Name:        "番茄",
+		Category:    "食品",
+		Quantity:    2,
+		Unit:        "个",
+		Location:    "冷藏",
+		ExpiresAt:   time.Now().AddDate(0, 0, 3).Format("2006-01-02"),
+		Status:      "normal",
+	}).Error; err != nil {
+		t.Fatalf("seed pantry item: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/recipes", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if !strings.Contains(resp.Body.String(), "ARK_API_KEY") {
+		t.Fatalf("expected config message, got %s", resp.Body.String())
+	}
+}
+
+func TestGenerateRecipeSuggestionsReturnsEmptyWhenNoUsableFood(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+	if err := database.GetDB().Create(&model.LifeTracePantryItem{
+		UserID:      101,
+		HouseholdID: personalHouseholdID(101),
+		Name:        "过期牛奶",
+		Category:    "食品",
+		Quantity:    1,
+		Unit:        "瓶",
+		Location:    "冷藏",
+		ExpiresAt:   time.Now().AddDate(0, 0, -1).Format("2006-01-02"),
+		Status:      "normal",
+	}).Error; err != nil {
+		t.Fatalf("seed expired pantry item: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/recipes", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	if data["source"] != "local" {
+		t.Fatalf("expected local empty response, got %+v", data)
+	}
+	if len(data["recipes"].([]interface{})) != 0 {
+		t.Fatalf("expected no recipes, got %+v", data["recipes"])
+	}
+	if !strings.Contains(fmt.Sprint(data["warnings"]), "过期牛奶") {
+		t.Fatalf("expected expired warning, got %+v", data["warnings"])
+	}
+}
+
+func TestGenerateRecipeSuggestionsUsesUsablePantryContext(t *testing.T) {
+	var captured lifeTraceOpenAIRequest
+	openAIServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("decode OpenAI recipe request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"model":"gpt-recipe",
+			"choices":[{"message":{"content":"{\"summary\":\"优先消耗番茄和鸡蛋。\",\"recipes\":[{\"title\":\"番茄炒蛋\",\"reason\":\"番茄临期，搭配鸡蛋最快手。\",\"usedItems\":[\"番茄\",\"鸡蛋\"],\"missingItems\":[\"葱，可省略\"],\"timeMinutes\":15,\"difficulty\":\"简单\",\"servings\":2,\"steps\":[\"番茄切块\",\"鸡蛋炒散\",\"合炒调味\"],\"tags\":[\"临期优先\",\"快手\"],\"planTitle\":\"晚餐做番茄炒蛋\",\"planNote\":\"优先用掉临期番茄，做完后确认库存消耗。\"}],\"warnings\":[\"确认鸡蛋状态后再烹饪。\"]}"}}]
+		}`))
+	}))
+	defer openAIServer.Close()
+
+	t.Setenv("OPENAI_API_KEY", "test-openai-key")
+	t.Setenv("OPENAI_API_BASE_URL", openAIServer.URL)
+	t.Setenv("OPENAI_API_MODEL", "gpt-recipe")
+
+	router := setupTraceTestRouter(t, 101)
+	for _, item := range []model.LifeTracePantryItem{
+		{
+			UserID:      101,
+			HouseholdID: personalHouseholdID(101),
+			Name:        "番茄",
+			Category:    "食品",
+			Quantity:    2,
+			Unit:        "个",
+			Location:    "冷藏",
+			ExpiresAt:   time.Now().AddDate(0, 0, 2).Format("2006-01-02"),
+			Status:      "normal",
+		},
+		{
+			UserID:      101,
+			HouseholdID: personalHouseholdID(101),
+			Name:        "鸡蛋",
+			Category:    "食品",
+			Quantity:    6,
+			Unit:        "个",
+			Location:    "厨房",
+			Status:      "normal",
+		},
+		{
+			UserID:      101,
+			HouseholdID: personalHouseholdID(101),
+			Name:        "过期面包",
+			Category:    "食品",
+			Quantity:    1,
+			Unit:        "袋",
+			Location:    "厨房",
+			ExpiresAt:   time.Now().AddDate(0, 0, -1).Format("2006-01-02"),
+			Status:      "normal",
+		},
+		{
+			UserID:      101,
+			HouseholdID: personalHouseholdID(101),
+			Name:        "洗衣液",
+			Category:    "日用品",
+			Quantity:    1,
+			Unit:        "瓶",
+			Location:    "卫生间",
+			Status:      "normal",
+		},
+	} {
+		if err := database.GetDB().Create(&item).Error; err != nil {
+			t.Fatalf("seed pantry item %s: %v", item.Name, err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/recipes", bytes.NewBufferString(`{"meal":"晚餐","servings":2,"maxMinutes":20}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	recipes := data["recipes"].([]interface{})
+	if len(recipes) != 1 {
+		t.Fatalf("expected one recipe, got %+v", recipes)
+	}
+	recipe := recipes[0].(map[string]interface{})
+	if recipe["title"] != "番茄炒蛋" || recipe["planTitle"] != "晚餐做番茄炒蛋" {
+		t.Fatalf("unexpected recipe payload: %+v", recipe)
+	}
+	if data["source"] != "openai" || data["model"] != "gpt-recipe" {
+		t.Fatalf("expected OpenAI metadata, got %+v", data)
+	}
+
+	userPrompt := captured.Messages[1].Content
+	for _, want := range []string{"可用食品库存", "番茄", "鸡蛋", "优先消耗"} {
+		if !strings.Contains(userPrompt, want) {
+			t.Fatalf("expected recipe prompt to contain %q, got %s", want, userPrompt)
+		}
+	}
+	for _, notWant := range []string{"洗衣液", "过期面包｜"} {
+		if strings.Contains(userPrompt, notWant) {
+			t.Fatalf("expected recipe prompt to exclude %q, got %s", notWant, userPrompt)
+		}
+	}
+}
+
 func TestAnalyzeImageRequiresAIConfig(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "")
 	t.Setenv("ARK_API_KEY", "")

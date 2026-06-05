@@ -18,14 +18,18 @@ import {
   Send,
   Sparkles,
   Trash2,
+  Utensils,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   deleteWeeklyReview,
+  generateRecipeSuggestions,
   generateTodayAdvice,
   generateWeeklyReview,
   listWeeklyReviews,
+  type RecipeSuggestionItem,
+  type RecipeSuggestionResponse,
   type WeeklyReviewResponse,
 } from '@/api/advice';
 import {
@@ -122,6 +126,20 @@ function formatPlanDisplayTime(
 ) {
   const { dateText, timeText } = getPlanDisplayTimeParts(plan);
   return `${dateText} ${timeText}`;
+}
+
+function createPlanFromRecipe(recipe: RecipeSuggestionItem): NewPlanInput {
+  return {
+    title: recipe.planTitle || recipe.title,
+    type: '吃饭',
+    timeLabel: '今天 19:00',
+    scheduledDate: getLocalISODate(new Date()),
+    scheduledTime: '19:00',
+    timezone: 'Asia/Shanghai',
+    reminder: true,
+    note: `${recipe.planNote}\n消耗库存：${recipe.usedItems.join('、') || '按实际食材确认'}。`,
+    source: 'ai_advice',
+  };
 }
 
 function formatAssistantActionMessage(event: LifeAssistantActionEvent) {
@@ -344,6 +362,125 @@ function WeeklyReviewPanel({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function RecipeSuggestionPanel({
+  result,
+  addingRecipeId,
+  onAddRecipePlan,
+}: {
+  result: RecipeSuggestionResponse;
+  addingRecipeId: string | null;
+  onAddRecipePlan: (recipe: RecipeSuggestionItem) => void;
+}) {
+  return (
+    <div className="mb-3 space-y-3">
+      <div className="rounded-2xl border border-life-health/25 bg-life-health/10 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Utensils className="size-4 text-life-health" />
+          <Badge tone="health">库存优先</Badge>
+          <p className="min-w-0 flex-1 text-sm font-semibold">
+            {result.householdName ? `${result.householdName} · ` : ''}
+            {result.summary}
+          </p>
+        </div>
+        {result.warnings.length > 0 ? (
+          <div className="mt-3 space-y-1.5">
+            {result.warnings.map((warning) => (
+              <p key={warning} className="text-xs leading-5 text-muted-foreground">
+                {warning}
+              </p>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      {result.recipes.length > 0 ? (
+        <div className="space-y-3">
+          {result.recipes.map((recipe) => {
+            const adding = addingRecipeId === recipe.id;
+
+            return (
+              <Card key={recipe.id} className="border-life-health/20 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone="health">{recipe.timeMinutes} 分钟</Badge>
+                      <Badge tone="ai">{recipe.difficulty}</Badge>
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        {recipe.servings} 人份
+                      </span>
+                    </div>
+                    <h3 className="mt-3 text-base font-semibold leading-snug">{recipe.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{recipe.reason}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-life-plan px-3 py-1.5 text-xs font-semibold text-background transition hover:bg-life-plan/90 disabled:cursor-default disabled:opacity-70"
+                    disabled={Boolean(addingRecipeId)}
+                    onClick={() => onAddRecipePlan(recipe)}
+                  >
+                    {adding ? (
+                      <ActionLoadingIcon className="size-3.5 text-background" />
+                    ) : (
+                      <Plus className="size-3.5" />
+                    )}
+                    {adding ? '加入中' : '加入计划'}
+                  </button>
+                </div>
+
+                <div className="mt-3 grid gap-2 text-xs leading-5 text-muted-foreground">
+                  <p>
+                    <span className="font-semibold text-foreground">消耗：</span>
+                    {recipe.usedItems.length > 0 ? recipe.usedItems.join('、') : '按现有食材确认'}
+                  </p>
+                  {recipe.missingItems.length > 0 ? (
+                    <p>
+                      <span className="font-semibold text-foreground">可能缺：</span>
+                      {recipe.missingItems.join('、')}
+                    </p>
+                  ) : null}
+                </div>
+
+                <ol className="mt-3 space-y-2 text-sm leading-6">
+                  {recipe.steps.map((step, stepIndex) => (
+                    <li key={`${recipe.id}-${step}`} className="flex gap-2">
+                      <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-secondary text-xs font-semibold text-life-health">
+                        {stepIndex + 1}
+                      </span>
+                      <span className="min-w-0">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+
+                {recipe.tags.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {recipe.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-muted-foreground"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState
+          title="暂时没有可用食材"
+          description="去 Pantry 补充食品或切换家庭空间后，再让 Life AI 生成菜谱。"
+          eyebrow="智能菜谱"
+          icon={Utensils}
+          tone="health"
+          align="center"
+        />
+      )}
     </div>
   );
 }
@@ -768,9 +905,11 @@ function AgentConversationPanel({
   model,
   input,
   result,
+  recipeResult,
   adviceCards,
   plans,
   addingAdviceId,
+  addingRecipeId,
   weeklyReviews,
   weeklyReviewsLoading,
   latestWeeklyReview,
@@ -793,6 +932,7 @@ function AgentConversationPanel({
   onRemovePhotoItemDraft,
   onOpenActions,
   onAddAdvicePlan,
+  onAddRecipePlan,
   onQuickAction,
 }: {
   conversation: LifeAssistantConversation | null;
@@ -802,9 +942,11 @@ function AgentConversationPanel({
   model: string;
   input: string;
   result: AiResult | null;
+  recipeResult: RecipeSuggestionResponse | null;
   adviceCards: AdvicePayload[];
   plans: Plan[];
   addingAdviceId: string | null;
+  addingRecipeId: string | null;
   weeklyReviews: WeeklyReviewResponse[];
   weeklyReviewsLoading: boolean;
   latestWeeklyReview?: WeeklyReviewResponse;
@@ -827,6 +969,7 @@ function AgentConversationPanel({
   onRemovePhotoItemDraft: (draftId: string) => void;
   onOpenActions: () => void;
   onAddAdvicePlan: (item: AdvicePayload) => void;
+  onAddRecipePlan: (recipe: RecipeSuggestionItem) => void;
   onQuickAction: (label: string) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -1060,6 +1203,14 @@ function AgentConversationPanel({
               </div>
             ) : null}
 
+            {recipeResult ? (
+              <RecipeSuggestionPanel
+                result={recipeResult}
+                addingRecipeId={addingRecipeId}
+                onAddRecipePlan={onAddRecipePlan}
+              />
+            ) : null}
+
             {loading && messages.length === 0 ? (
               <div className="space-y-3">
                 <MessageSyncSkeleton />
@@ -1219,6 +1370,7 @@ function useAiPageState() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false);
   const [result, setResult] = useState<AiResult | null>(null);
+  const [recipeResult, setRecipeResult] = useState<RecipeSuggestionResponse | null>(null);
   const [adviceCards, setAdviceCards] = useState<AdvicePayload[]>([]);
   const [assistantInput, setAssistantInput] = useState('');
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
@@ -1246,6 +1398,7 @@ function useAiPageState() {
     readPhotoItemAnalysisHistory(),
   );
   const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
+  const [addingRecipeId, setAddingRecipeId] = useState<string | null>(null);
   const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReviewResponse[]>([]);
   const [weeklyReviewsLoading, setWeeklyReviewsLoading] = useState(false);
   const [weeklyReviewRegenerateTarget, setWeeklyReviewRegenerateTarget] =
@@ -1484,6 +1637,7 @@ function useAiPageState() {
       ]);
       setAssistantMessages(data.messages.map(normalizeAssistantMessage));
       setResult(null);
+      setRecipeResult(null);
       setAdviceCards([]);
       setAssistantModel('');
       setAssistantHistoryNotice('');
@@ -1508,6 +1662,7 @@ function useAiPageState() {
     setActiveAssistantConversationId(conversation.id);
     setAssistantMessages([]);
     setResult(null);
+    setRecipeResult(null);
     setAdviceCards([]);
     setAssistantModel('');
     if (resetInput) {
@@ -1558,6 +1713,7 @@ function useAiPageState() {
           setAssistantMessages([]);
         }
         setResult(null);
+        setRecipeResult(null);
         setAdviceCards([]);
         setAssistantModel('');
       }
@@ -1662,6 +1818,7 @@ function useAiPageState() {
 
   const runWeeklyReview = async () => {
     setQuickActionLoading('每周回顾');
+    setRecipeResult(null);
     try {
       if (!token) {
         throw new Error('请先登录后再生成服务端 AI 每周回顾');
@@ -1741,6 +1898,7 @@ function useAiPageState() {
   const handleQuickAction = async (label: string) => {
     if (label === '创建计划') {
       setDrawerOpen(true);
+      setRecipeResult(null);
       setResult({
         title: '准备创建计划',
         detail: '填写标题、时间和提醒后，Life Trace 会把它加入计划列表。',
@@ -1754,8 +1912,47 @@ function useAiPageState() {
       return;
     }
 
+    if (label === '智能菜谱') {
+      setQuickActionLoading(label);
+      setAdviceCards([]);
+      setRecipeResult(null);
+      try {
+        if (!token) {
+          throw new Error('请先登录后再生成智能菜谱');
+        }
+        if (!settings.aiPersonalization) {
+          throw new Error('“我的”页的 AI 个性化开关未开启');
+        }
+
+        const recipes = await generateRecipeSuggestions(token, {
+          meal: '晚餐',
+          servings: 2,
+          maxMinutes: 30,
+          householdId: preferredPantryHouseholdId || undefined,
+        });
+        setRecipeResult(recipes);
+        setResult({
+          title: recipes.recipes.length > 0 ? '智能菜谱已生成' : '暂时没有可用菜谱',
+          detail: recipes.summary,
+          tone: recipes.recipes.length > 0 ? 'health' : 'alert',
+        });
+      } catch (error) {
+        setResult({
+          title: '智能菜谱生成失败',
+          detail:
+            error instanceof Error ? error.message : '请稍后再试，或先检查 Pantry 是否有食品库存。',
+          tone: 'alert',
+        });
+      } finally {
+        setQuickActionLoading(null);
+      }
+      addAiAction('生成了库存优先智能菜谱');
+      return;
+    }
+
     if (label === '生成今日建议') {
       setQuickActionLoading(label);
+      setRecipeResult(null);
       try {
         if (!token || !settings.aiPersonalization) {
           throw new Error('use local advice');
@@ -1784,6 +1981,7 @@ function useAiPageState() {
     }
 
     if (label === '生成踪迹') {
+      setRecipeResult(null);
       const trace = await generateTraceFromLatestPlan();
 
       setResult(
@@ -1812,6 +2010,7 @@ function useAiPageState() {
     }
 
     setImageDrawerOpen(true);
+    setRecipeResult(null);
     setResult({
       title: '准备分析图片',
       detail: '上传图片或粘贴图片链接后，可以生成生活计划或直接生成踪迹。',
@@ -1873,6 +2072,7 @@ function useAiPageState() {
 
     setAssistantInput('');
     setAdviceCards([]);
+    setRecipeResult(null);
     setAssistantModel('');
     setAssistantStreaming(true);
     setAssistantMessages((items) => [...items, userMessage, assistantMessage]);
@@ -1953,6 +2153,7 @@ function useAiPageState() {
     }
     setAssistantMessages([]);
     setResult(null);
+    setRecipeResult(null);
     setAssistantModel('');
     setAssistantClearConfirmOpen(false);
     setAssistantClearing(false);
@@ -1994,6 +2195,42 @@ function useAiPageState() {
       );
     } finally {
       setAddingAdviceId(null);
+    }
+  };
+
+  const handleAddRecipePlan = async (recipe: RecipeSuggestionItem) => {
+    const planTitle = recipe.planTitle || recipe.title;
+    if (
+      plans.some(
+        (plan) => !plan.completed && plan.title === planTitle && plan.source === 'ai_advice',
+      )
+    ) {
+      setResult({
+        title: '菜谱计划已存在',
+        detail: `「${planTitle}」已经在计划里了，不需要重复添加。`,
+        tone: 'plan',
+      });
+      return;
+    }
+
+    setAddingRecipeId(recipe.id);
+    try {
+      const plan = await addPlan(createPlanFromRecipe(recipe));
+      setResult(
+        plan
+          ? {
+              title: '已加入晚餐计划',
+              detail: `「${plan.title}」已经加入计划，做完后可以再确认库存消耗。`,
+              tone: 'plan',
+            }
+          : {
+              title: '计划保存失败',
+              detail: '刚才的菜谱没有保存成计划，请稍后再试。',
+              tone: 'alert',
+            },
+      );
+    } finally {
+      setAddingRecipeId(null);
     }
   };
 
@@ -2056,6 +2293,7 @@ function useAiPageState() {
     setImageDrawerOpen,
     result,
     setResult,
+    recipeResult,
     adviceCards,
     assistantInput,
     setAssistantInput,
@@ -2082,6 +2320,7 @@ function useAiPageState() {
     preferredPantryHouseholdId,
     quickActionLoading,
     addingAdviceId,
+    addingRecipeId,
     weeklyReviews,
     weeklyReviewsLoading,
     weeklyReviewRegenerateTarget,
@@ -2109,6 +2348,7 @@ function useAiPageState() {
     toggleAssistantListening,
     handleClearAssistantMessages,
     handleAddAdvicePlan,
+    handleAddRecipePlan,
     handleAddWeeklyReviewActionPlan,
     handleDeleteWeeklyReview,
     handleQuickAction,
@@ -2233,6 +2473,7 @@ export function AiPage() {
     setImageDrawerOpen,
     result,
     setResult,
+    recipeResult,
     adviceCards,
     assistantInput,
     setAssistantInput,
@@ -2253,6 +2494,7 @@ export function AiPage() {
     assistantSpeechError,
     quickActionLoading,
     addingAdviceId,
+    addingRecipeId,
     weeklyReviews,
     weeklyReviewsLoading,
     weeklyReviewRegenerateTarget,
@@ -2266,6 +2508,7 @@ export function AiPage() {
     handleAssistantSubmit,
     toggleAssistantListening,
     handleAddAdvicePlan,
+    handleAddRecipePlan,
     handleQuickAction,
     runWeeklyReview,
   } = useAiPageState();
@@ -2280,9 +2523,11 @@ export function AiPage() {
         model={assistantModel}
         input={assistantInput}
         result={result}
+        recipeResult={recipeResult}
         adviceCards={adviceCards}
         plans={plans}
         addingAdviceId={addingAdviceId}
+        addingRecipeId={addingRecipeId}
         weeklyReviews={weeklyReviews}
         weeklyReviewsLoading={weeklyReviewsLoading}
         latestWeeklyReview={latestWeeklyReview}
@@ -2309,6 +2554,7 @@ export function AiPage() {
         onRemovePhotoItemDraft={handleRemovePhotoItemDraft}
         onOpenActions={() => navigate('/ai/actions')}
         onAddAdvicePlan={(item) => void handleAddAdvicePlan(item)}
+        onAddRecipePlan={(recipe) => void handleAddRecipePlan(recipe)}
         onQuickAction={(label) => void handleQuickAction(label)}
       />
 
