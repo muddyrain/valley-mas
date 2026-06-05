@@ -15,7 +15,11 @@ import {
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listHouseholds } from '@/api/household';
-import { analyzePantryPhoto, type PantryPhotoAnalysisResponse } from '@/api/pantry';
+import {
+  analyzePantryPhoto,
+  type PantryPhotoAnalysisResponse,
+  type PantryPhotoCropBox,
+} from '@/api/pantry';
 import { uploadLifeTraceImage } from '@/api/upload';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
@@ -36,6 +40,7 @@ import {
   getPhotoItemAnalysisReviewIssues,
   markPhotoItemAnalysisQualityFeedback,
   markPhotoItemAnalysisSaved,
+  type PhotoItemAnalysisCoverMode,
   type PhotoItemAnalysisHistoryItem,
   type PhotoItemAnalysisQualityRating,
   type PhotoItemAnalysisReviewIssue,
@@ -62,6 +67,13 @@ type CaptureState =
   | 'error';
 
 type DraftForm = PhotoItemDraftForm;
+
+type CoverModeSelectorProps = {
+  value: PhotoItemAnalysisCoverMode;
+  disabled?: boolean;
+  size?: 'md' | 'sm';
+  onChange: (value: PhotoItemAnalysisCoverMode) => void;
+};
 
 const pantryCategories: PantryCategory[] = ['食品', '日用品', '药品', '宠物', '其他'];
 const pantryLocations: PantryLocation[] = [
@@ -110,6 +122,176 @@ function appendUniqueNoteLine(note: string, line: string) {
 
 function getFallbackFileName(file: File) {
   return file.name || `pantry-photo-${Date.now()}.jpg`;
+}
+
+function CoverModeSelector({
+  value,
+  disabled = false,
+  size = 'md',
+  onChange,
+}: CoverModeSelectorProps) {
+  const buttonClassName =
+    size === 'sm'
+      ? 'min-h-12 rounded-2xl border px-3 py-2 text-xs font-semibold transition'
+      : 'min-h-14 rounded-2xl border px-3 py-2 text-sm font-semibold transition';
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <button
+        type="button"
+        className={`${buttonClassName} flex flex-col items-center justify-center gap-0.5 ${
+          value === 'crop'
+            ? 'border-life-trace/40 bg-life-trace/10 text-life-trace'
+            : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
+        }`}
+        disabled={disabled}
+        onClick={() => onChange('crop')}
+      >
+        <span className="whitespace-nowrap">裁剪主体</span>
+        <span className="whitespace-nowrap text-[10px] font-medium opacity-75">生成封面</span>
+      </button>
+      <button
+        type="button"
+        className={`${buttonClassName} flex flex-col items-center justify-center gap-0.5 ${
+          value === 'original'
+            ? 'border-life-ai/35 bg-life-ai/10 text-life-ai'
+            : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
+        }`}
+        disabled={disabled}
+        onClick={() => onChange('original')}
+      >
+        <span className="whitespace-nowrap">不裁剪</span>
+        <span className="whitespace-nowrap text-[10px] font-medium opacity-75">使用原图</span>
+      </button>
+    </div>
+  );
+}
+
+function clampRatio(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, value));
+}
+
+function normalizeCropBox(cropBox: PantryPhotoCropBox | undefined) {
+  if (!cropBox) {
+    return null;
+  }
+
+  const x = clampRatio(cropBox.x);
+  const y = clampRatio(cropBox.y);
+  const width = Math.min(1 - x, Math.max(0, cropBox.width));
+  const height = Math.min(1 - y, Math.max(0, cropBox.height));
+  if (width < 0.12 || height < 0.12) {
+    return null;
+  }
+  return { x, y, width, height };
+}
+
+function isMeaningfulCropBox(cropBox: PantryPhotoCropBox | undefined) {
+  const normalized = normalizeCropBox(cropBox);
+  if (!normalized) {
+    return false;
+  }
+  const area = normalized.width * normalized.height;
+  const isGenericFallback =
+    Math.abs(normalized.x - 0.1) < 0.035 &&
+    Math.abs(normalized.y - 0.1) < 0.035 &&
+    Math.abs(normalized.width - 0.8) < 0.05 &&
+    Math.abs(normalized.height - 0.8) < 0.05;
+
+  return (
+    !isGenericFallback && area <= 0.58 && normalized.width <= 0.86 && normalized.height <= 0.86
+  );
+}
+
+function buildCropBoxStyle(cropBox: PantryPhotoCropBox | undefined) {
+  const normalized = normalizeCropBox(cropBox);
+  if (!normalized) {
+    return null;
+  }
+  return {
+    left: `${normalized.x * 100}%`,
+    top: `${normalized.y * 100}%`,
+    width: `${normalized.width * 100}%`,
+    height: `${normalized.height * 100}%`,
+  };
+}
+
+function loadImageFromFile(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('裁剪预览生成失败，请保留原图后再保存。'));
+    };
+    image.src = url;
+  });
+}
+
+async function createCroppedCoverFile(file: File, cropBox: PantryPhotoCropBox) {
+  const normalized = normalizeCropBox(cropBox);
+  if (!normalized) {
+    throw new Error('AI 没有返回可用的主体裁剪区域。');
+  }
+
+  const image = await loadImageFromFile(file);
+  const sourceX = Math.round(normalized.x * image.naturalWidth);
+  const sourceY = Math.round(normalized.y * image.naturalHeight);
+  const sourceWidth = Math.max(1, Math.round(normalized.width * image.naturalWidth));
+  const sourceHeight = Math.max(1, Math.round(normalized.height * image.naturalHeight));
+  const scale = Math.min(1, 960 / Math.max(sourceWidth, sourceHeight));
+  const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+  const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('当前浏览器不支持生成裁剪封面。');
+  }
+  context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    sourceWidth,
+    sourceHeight,
+    0,
+    0,
+    targetWidth,
+    targetHeight,
+  );
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, 'image/jpeg', 0.88);
+  });
+  if (!blob) {
+    throw new Error('裁剪封面生成失败，请保留原图后再保存。');
+  }
+  return new File([blob], `pantry-cover-${Date.now()}.jpg`, { type: 'image/jpeg' });
+}
+
+async function loadCoverSourceFile(imageFile: File | null, imageUrl: string) {
+  if (imageFile) {
+    return imageFile;
+  }
+  if (!imageUrl) {
+    throw new Error('缺少原图，无法生成建议封面。');
+  }
+  const response = await fetch(imageUrl);
+  if (!response.ok) {
+    throw new Error('原图读取失败，请改用原图保存。');
+  }
+  const blob = await response.blob();
+  return new File([blob], `pantry-photo-source-${Date.now()}.jpg`, {
+    type: blob.type || 'image/jpeg',
+  });
 }
 
 function resolveSelectableHouseholdId(
@@ -172,6 +354,7 @@ export function PhotoItemAnalysisPage() {
   const [reviewSheetOpen, setReviewSheetOpen] = useState(false);
   const [activePicker, setActivePicker] = useState<'category' | 'location' | null>(null);
   const [expiryBaseDate, setExpiryBaseDate] = useState('');
+  const [coverMode, setCoverMode] = useState<PhotoItemAnalysisCoverMode>('original');
   const [historyItems, setHistoryItems] = useState<PhotoItemAnalysisHistoryItem[]>(() =>
     readPhotoItemAnalysisHistory(),
   );
@@ -185,6 +368,12 @@ export function PhotoItemAnalysisPage() {
   const visionStageLabel =
     state === 'uploading' ? '正在同步影像' : state === 'analyzing' ? '正在解析商品' : '视觉待命';
   const hasExpiryDate = Boolean(form.expiresAt.trim());
+  const hasCropSuggestion = Boolean(normalizeCropBox(analysis?.cropBox));
+  const hasMeaningfulCropSuggestion = isMeaningfulCropBox(analysis?.cropBox);
+  const cropBoxStyle = useMemo(
+    () => (hasMeaningfulCropSuggestion ? buildCropBoxStyle(analysis?.cropBox) : null),
+    [analysis?.cropBox, hasMeaningfulCropSuggestion],
+  );
   const latestDraft = useMemo(
     () =>
       currentHistoryId
@@ -320,12 +509,14 @@ export function PhotoItemAnalysisPage() {
       status: 'draft',
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
+      coverMode,
       qualityFeedback: existing?.qualityFeedback,
     });
     setHistoryItems(readPhotoItemAnalysisHistory());
   }, [
     analysis,
     currentHistoryId,
+    coverMode,
     expiryBaseDate,
     form,
     selectedHouseholdName,
@@ -392,6 +583,7 @@ export function PhotoItemAnalysisPage() {
     setImagePreviewUrl(URL.createObjectURL(file));
     setUploadedImageUrl('');
     setAnalysis(null);
+    setCoverMode('original');
     setCurrentHistoryId('');
     setReviewSheetOpen(false);
     setError('');
@@ -505,9 +697,13 @@ export function PhotoItemAnalysisPage() {
       };
       const nextExpiryBaseDate = result.productionDate || result.purchaseDate || '';
       const historyId = createPhotoItemAnalysisHistoryId();
+      const nextCoverMode: PhotoItemAnalysisCoverMode = isMeaningfulCropBox(result.cropBox)
+        ? 'crop'
+        : 'original';
       setAnalysis(result);
       setForm(nextForm);
       setExpiryBaseDate(nextExpiryBaseDate);
+      setCoverMode(nextCoverMode);
       setCurrentHistoryId(historyId);
       upsertPhotoItemAnalysisHistory({
         id: historyId,
@@ -520,6 +716,7 @@ export function PhotoItemAnalysisPage() {
         status: 'draft',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        coverMode: nextCoverMode,
       });
       setHistoryItems(readPhotoItemAnalysisHistory());
       setState('reviewing');
@@ -543,6 +740,13 @@ export function PhotoItemAnalysisPage() {
     setError('');
     try {
       const mergeCandidate = mode === 'merge' ? primaryDuplicateCandidate : null;
+      let thumbnailUrl = '';
+      if (!mergeCandidate && token && analysis && coverMode === 'crop') {
+        const sourceFile = await loadCoverSourceFile(imageFile, uploadedImageUrl);
+        const coverFile = await createCroppedCoverFile(sourceFile, analysis.cropBox);
+        const coverUpload = await uploadLifeTraceImage(token, coverFile);
+        thumbnailUrl = coverUpload.url;
+      }
       const item = mergeCandidate
         ? await editPantryItem(
             mergeCandidate.item.id,
@@ -557,6 +761,7 @@ export function PhotoItemAnalysisPage() {
               form,
               pantryPreferences,
               uploadedImageUrl,
+              thumbnailUrl,
             }),
             form.householdId || undefined,
           );
@@ -597,6 +802,7 @@ export function PhotoItemAnalysisPage() {
     setImagePreviewUrl('');
     setUploadedImageUrl('');
     setAnalysis(null);
+    setCoverMode('original');
     setCurrentHistoryId('');
     setReviewSheetOpen(false);
     setActivePicker(null);
@@ -620,6 +826,11 @@ export function PhotoItemAnalysisPage() {
     setAnalysis(draft.analysis);
     setForm(draft.form);
     setExpiryBaseDate(draft.expiryBaseDate || draft.analysis.productionDate || '');
+    setCoverMode(
+      draft.coverMode === 'crop' && isMeaningfulCropBox(draft.analysis.cropBox)
+        ? 'crop'
+        : 'original',
+    );
     setCurrentHistoryId(draft.id);
     setState('reviewing');
     setReviewSheetOpen(true);
@@ -826,15 +1037,27 @@ export function PhotoItemAnalysisPage() {
                 className="aspect-[4/3] w-full object-cover sm:aspect-[16/10]"
               />
             ) : imagePreviewUrl ? (
-              <img
-                src={imagePreviewUrl}
-                alt="商品预览"
-                className={`aspect-[4/3] w-full object-cover transition duration-500 sm:aspect-[16/10] ${
-                  visionProcessing
-                    ? 'animate-[life-vision-drift_2.4s_ease-in-out_infinite] brightness-90 saturate-125 motion-reduce:animate-none'
-                    : ''
-                }`}
-              />
+              <>
+                <img
+                  src={imagePreviewUrl}
+                  alt="商品预览"
+                  className={`aspect-[4/3] w-full object-contain transition duration-500 sm:aspect-[16/10] ${
+                    visionProcessing
+                      ? 'animate-[life-vision-drift_2.4s_ease-in-out_infinite] brightness-90 saturate-125 motion-reduce:animate-none'
+                      : ''
+                  }`}
+                />
+                {cropBoxStyle ? (
+                  <div
+                    className="pointer-events-none absolute z-30 rounded-[1rem] border-2 border-life-trace shadow-[0_0_0_9999px_rgba(0,0,0,0.36),0_0_28px_rgba(16,185,129,0.75)]"
+                    style={cropBoxStyle}
+                  >
+                    <span className="absolute -top-8 left-0 rounded-full border border-life-trace/30 bg-background/65 px-2.5 py-1 text-[10px] font-semibold text-life-trace backdrop-blur">
+                      建议封面
+                    </span>
+                  </div>
+                ) : null}
+              </>
             ) : (
               <div className="grid aspect-[4/3] place-items-center px-5 py-10 text-center sm:aspect-[16/10]">
                 <div className="max-w-xs space-y-6">
@@ -892,6 +1115,33 @@ export function PhotoItemAnalysisPage() {
               </div>
             ) : null}
           </div>
+
+          {analysis && hasCropSuggestion ? (
+            <div className="rounded-[1.25rem] border border-life-trace/25 bg-life-trace/5 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-life-trace">AI 已定位商品主体</p>
+                  <p className="mt-1 truncate text-xs leading-5 text-muted-foreground">
+                    {hasMeaningfulCropSuggestion
+                      ? '可裁剪主体做封面；原图完整保留。'
+                      : '主体框接近原图，默认不裁剪。'}
+                  </p>
+                </div>
+                <Badge tone="trace" className="shrink-0 whitespace-nowrap">
+                  {hasMeaningfulCropSuggestion
+                    ? coverMode === 'crop'
+                      ? '裁剪主体'
+                      : '不裁剪'
+                    : '接近原图'}
+                </Badge>
+              </div>
+              {hasMeaningfulCropSuggestion ? (
+                <div className="mt-3">
+                  <CoverModeSelector value={coverMode} onChange={setCoverMode} />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {cameraActive ? (
             <div className="grid grid-cols-2 gap-3">
@@ -1237,15 +1487,46 @@ export function PhotoItemAnalysisPage() {
                 />
               </div>
               <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">当前编辑图片</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs text-muted-foreground">当前编辑图片</p>
+                  {hasCropSuggestion ? (
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                        coverMode === 'crop' && hasMeaningfulCropSuggestion
+                          ? 'border-life-trace/30 bg-life-trace/10 text-life-trace'
+                          : 'border-life-ai/25 bg-life-ai/10 text-life-ai'
+                      }`}
+                    >
+                      {coverMode === 'crop' && hasMeaningfulCropSuggestion
+                        ? '封面：裁剪主体'
+                        : hasMeaningfulCropSuggestion
+                          ? '封面：不裁剪'
+                          : '主体框接近原图'}
+                    </span>
+                  ) : null}
+                </div>
                 <p className="mt-1 truncate text-sm font-semibold">
                   {form.name || analysis?.name || '待确认商品'}
                 </p>
-                <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                  {imageFile ? getFallbackFileName(imageFile) : '商品图片'}
+                <p className="mt-1 truncate text-xs leading-5 text-muted-foreground">
+                  {coverMode === 'crop' && hasMeaningfulCropSuggestion
+                    ? '保存时生成主体封面，原图保留。'
+                    : imageFile
+                      ? getFallbackFileName(imageFile)
+                      : '商品图片'}
                 </p>
               </div>
             </div>
+            {hasMeaningfulCropSuggestion && state !== 'done' ? (
+              <div className="mt-3">
+                <CoverModeSelector
+                  value={coverMode}
+                  size="sm"
+                  disabled={state === 'saving'}
+                  onChange={setCoverMode}
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
 

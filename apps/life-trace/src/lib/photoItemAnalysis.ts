@@ -25,6 +25,8 @@ export type PhotoItemAnalysisHistoryStatus = 'draft' | 'saved';
 
 export type PhotoItemAnalysisQualityRating = 'accurate' | 'inaccurate';
 
+export type PhotoItemAnalysisCoverMode = 'original' | 'crop';
+
 export type PhotoItemAnalysisQualityFeedback = {
   rating: PhotoItemAnalysisQualityRating;
   createdAt: string;
@@ -72,6 +74,7 @@ export type PhotoItemAnalysisHistoryItem = {
   updatedAt: string;
   savedAt?: string;
   savedItemId?: string;
+  coverMode?: PhotoItemAnalysisCoverMode;
   qualityFeedback?: PhotoItemAnalysisQualityFeedback;
 };
 
@@ -79,6 +82,7 @@ type BuildPhotoItemPantryInputOptions = {
   form: PhotoItemDraftForm;
   pantryPreferences: PantryPreferences;
   uploadedImageUrl: string;
+  thumbnailUrl?: string;
 };
 
 type BuildPhotoItemAnalysisSmartSuggestionsOptions = {
@@ -144,6 +148,7 @@ function normalizeHistoryItem(item: unknown): PhotoItemAnalysisHistoryItem | nul
     updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : candidate.createdAt,
     savedAt: typeof candidate.savedAt === 'string' ? candidate.savedAt : undefined,
     savedItemId: typeof candidate.savedItemId === 'string' ? candidate.savedItemId : undefined,
+    coverMode: candidate.coverMode === 'crop' ? 'crop' : 'original',
     qualityFeedback:
       candidate.qualityFeedback?.rating === 'accurate' ||
       candidate.qualityFeedback?.rating === 'inaccurate'
@@ -432,7 +437,7 @@ export function buildPhotoItemAnalysisSmartSuggestions({
       id: 'household',
       label: '家庭空间建议',
       description: `当前常用库存空间是「${preferredHouseholdName || '共享空间'}」，可以直接保存到这个空间。`,
-      actionLabel: '使用该空间',
+      actionLabel: `使用「${preferredHouseholdName || '共享空间'}」`,
       source: 'preference',
       patch: { householdId: normalizedPreferredHouseholdId },
     });
@@ -451,7 +456,7 @@ export function buildPhotoItemAnalysisSmartSuggestions({
         topLocation[1] > 1
           ? `相似库存里有 ${topLocation[1]} 件常放在「${topLocation[0]}」。`
           : `相似库存常放在「${topLocation[0]}」。`,
-      actionLabel: `使用${topLocation[0]}`,
+      actionLabel: `使用「${topLocation[0]}」`,
       source: 'history',
       patch: { location: topLocation[0] },
     });
@@ -466,7 +471,7 @@ export function buildPhotoItemAnalysisSmartSuggestions({
         topUnit[1] > 1
           ? `相似库存里有 ${topUnit[1]} 件使用「${topUnit[0]}」作为单位。`
           : `相似库存使用「${topUnit[0]}」作为单位。`,
-      actionLabel: `使用${topUnit[0]}`,
+      actionLabel: `使用「${topUnit[0]}」`,
       source: 'history',
       patch: { unit: topUnit[0] },
     });
@@ -598,6 +603,7 @@ export function buildPhotoItemPantryInput({
   form,
   pantryPreferences,
   uploadedImageUrl,
+  thumbnailUrl = '',
 }: BuildPhotoItemPantryInputOptions): NewPantryItemInput {
   const expiresAt = form.expiresAt.trim();
   const openedAt = form.openedAt.trim();
@@ -613,7 +619,7 @@ export function buildPhotoItemPantryInput({
     openedAt: openedAt || undefined,
     note: form.note.trim(),
     imageUrl: uploadedImageUrl || undefined,
-    thumbnailUrl: undefined,
+    thumbnailUrl: thumbnailUrl || undefined,
     status: 'normal',
     reminder: buildDefaultPantryReminder(
       pantryPreferences,
