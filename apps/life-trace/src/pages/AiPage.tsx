@@ -58,6 +58,7 @@ import { formatLocationDisplay } from '@/lib/location';
 import {
   type PhotoItemAnalysisHistoryItem,
   readPhotoItemAnalysisHistory,
+  removePhotoItemAnalysisHistory,
 } from '@/lib/photoItemAnalysis';
 import { getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { getLocalISODate } from '@/lib/planSchedule';
@@ -788,6 +789,8 @@ function AgentConversationPanel({
   onCreateConversation,
   onOpenWeeklyReviews,
   onOpenPhotoAnalysis,
+  onOpenPhotoItemDraft,
+  onRemovePhotoItemDraft,
   onOpenActions,
   onAddAdvicePlan,
   onQuickAction,
@@ -820,6 +823,8 @@ function AgentConversationPanel({
   onCreateConversation: () => void;
   onOpenWeeklyReviews: () => void;
   onOpenPhotoAnalysis: () => void;
+  onOpenPhotoItemDraft: (draftId: string) => void;
+  onRemovePhotoItemDraft: (draftId: string) => void;
   onOpenActions: () => void;
   onAddAdvicePlan: (item: AdvicePayload) => void;
   onQuickAction: (label: string) => void;
@@ -1000,41 +1005,55 @@ function AgentConversationPanel({
                     const qualityFeedback = formatPhotoItemQualityFeedback(item);
 
                     return (
-                      <button
+                      <div
                         key={item.id}
-                        type="button"
                         className="flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-secondary/45 p-2 text-left transition hover:bg-secondary"
-                        onClick={onOpenPhotoAnalysis}
                       >
-                        {item.imageUrl ? (
-                          <img
-                            src={item.imageUrl}
-                            alt={item.form.name || item.analysis.name || '商品识别图片'}
-                            className="size-12 shrink-0 rounded-xl object-cover"
-                          />
-                        ) : (
-                          <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-background text-life-ai">
-                            <Image className="size-5" />
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left outline-none transition focus-visible:ring-2 focus-visible:ring-life-ai/40"
+                          onClick={() => onOpenPhotoItemDraft(item.id)}
+                        >
+                          {item.imageUrl ? (
+                            <img
+                              src={item.imageUrl}
+                              alt={item.form.name || item.analysis.name || '商品识别图片'}
+                              className="size-12 shrink-0 rounded-xl object-cover"
+                            />
+                          ) : (
+                            <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-background text-life-ai">
+                              <Image className="size-5" />
+                            </span>
+                          )}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold">
+                              {item.form.name || item.analysis.name || '待确认商品'}
+                            </span>
+                            <span className="mt-1 block truncate text-xs text-muted-foreground">
+                              {formatPhotoItemHistoryTime(item.updatedAt)} ·{' '}
+                              {item.householdName || '我的空间'}
+                            </span>
                           </span>
-                        )}
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold">
-                            {item.form.name || item.analysis.name || '待确认商品'}
+                          <span className="flex shrink-0 flex-col items-end gap-1">
+                            <Badge tone={item.status === 'draft' ? 'ai' : 'trace'}>
+                              {item.status === 'draft' ? '草稿' : '已入库'}
+                            </Badge>
+                            {qualityFeedback ? (
+                              <Badge tone={qualityFeedback.tone}>{qualityFeedback.label}</Badge>
+                            ) : null}
                           </span>
-                          <span className="mt-1 block truncate text-xs text-muted-foreground">
-                            {formatPhotoItemHistoryTime(item.updatedAt)} ·{' '}
-                            {item.householdName || '我的空间'}
-                          </span>
-                        </span>
-                        <span className="flex shrink-0 flex-col items-end gap-1">
-                          <Badge tone={item.status === 'draft' ? 'ai' : 'trace'}>
-                            {item.status === 'draft' ? '草稿' : '已入库'}
-                          </Badge>
-                          {qualityFeedback ? (
-                            <Badge tone={qualityFeedback.tone}>{qualityFeedback.label}</Badge>
-                          ) : null}
-                        </span>
-                      </button>
+                        </button>
+                        {item.status === 'draft' ? (
+                          <button
+                            type="button"
+                            className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-xl border border-life-alert/15 bg-background/70 text-life-alert transition hover:border-life-alert/35 hover:bg-life-alert/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-life-alert/30"
+                            aria-label={`移除${item.form.name || item.analysis.name || '商品'}草稿`}
+                            onClick={() => onRemovePhotoItemDraft(item.id)}
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        ) : null}
+                      </div>
                     );
                   })}
                 </div>
@@ -1281,6 +1300,17 @@ function useAiPageState() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
+
+  const handleRemovePhotoItemDraft = (draftId: string) => {
+    const draft = photoItemHistory.find((item) => item.id === draftId);
+    removePhotoItemAnalysisHistory(draftId);
+    setPhotoItemHistory(readPhotoItemAnalysisHistory());
+    setResult({
+      title: '已移除拍照草稿',
+      detail: `「${draft?.form.name || draft?.analysis.name || '未入库商品'}」不会再出现在最近识别里。`,
+      tone: 'trace',
+    });
+  };
 
   useEffect(() => {
     if (!token) {
@@ -2069,6 +2099,7 @@ function useAiPageState() {
     latestTrace,
     latestWeeklyReview,
     photoItemHistory,
+    handleRemovePhotoItemDraft,
     locationLabel,
     placeholder,
     handleSelectAssistantConversation,
@@ -2228,6 +2259,7 @@ export function AiPage() {
     setWeeklyReviewRegenerateTarget,
     latestWeeklyReview,
     photoItemHistory,
+    handleRemovePhotoItemDraft,
     handleSelectAssistantConversation,
     handleCreateAssistantConversation,
     handleDeleteAssistantConversation,
@@ -2271,6 +2303,10 @@ export function AiPage() {
         onCreateConversation={() => void handleCreateAssistantConversation()}
         onOpenWeeklyReviews={() => navigate('/ai/weekly-reviews')}
         onOpenPhotoAnalysis={() => navigate('/ai/photo-item-analysis')}
+        onOpenPhotoItemDraft={(draftId) =>
+          navigate(`/ai/photo-item-analysis?draftId=${encodeURIComponent(draftId)}`)
+        }
+        onRemovePhotoItemDraft={handleRemovePhotoItemDraft}
         onOpenActions={() => navigate('/ai/actions')}
         onAddAdvicePlan={(item) => void handleAddAdvicePlan(item)}
         onQuickAction={(label) => void handleQuickAction(label)}

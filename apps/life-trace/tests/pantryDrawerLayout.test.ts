@@ -14,6 +14,7 @@ const photoItemAnalysisSource = readFileSync(
   resolve(__dirname, '../src/pages/PhotoItemAnalysisPage.tsx'),
   'utf8',
 );
+const aiPageSource = readFileSync(resolve(__dirname, '../src/pages/AiPage.tsx'), 'utf8');
 const expiryDateFieldSource = readFileSync(
   resolve(__dirname, '../src/components/PantryExpiryDateField.tsx'),
   'utf8',
@@ -60,5 +61,29 @@ describe('pantry drawer mobile layout guards', () => {
     expect(expiryDateFieldSource).toContain('aria-label={clearLabel}');
     expect(expiryDateFieldSource).toContain('clearLabel="清空生产或购买日期"');
     expect(expiryDateFieldSource).toContain('clearLabel="清空过期日期"');
+  });
+
+  it('does not auto-open the inventory edit sheet when entering a requested photo draft', () => {
+    expect(photoItemAnalysisSource).toContain(
+      'restoreDraft(requestedDraft, { openSheet: false, silent: true })',
+    );
+    expect(photoItemAnalysisSource).toContain('handledRequestedDraftIdRef');
+    expect(photoItemAnalysisSource).not.toContain('setSearchParams');
+    expect(photoItemAnalysisSource).toContain('onClick={() => restoreDraft(latestDraft)}');
+  });
+
+  it('keeps the photo analysis back action explicit and easy to tap', () => {
+    expect(photoItemAnalysisSource).toContain("navigate('/ai', { replace: true })");
+    expect(photoItemAnalysisSource).toContain('aria-label="返回 AI 页"');
+    expect(photoItemAnalysisSource).toContain('className="-ml-2 h-12 min-w-16 rounded-2xl px-3"');
+  });
+
+  it('keeps photo analysis drafts removable from both AI and draft review entry points', () => {
+    expect(aiPageSource).toContain('onRemovePhotoItemDraft');
+    expect(aiPageSource).toContain('handleRemovePhotoItemDraft');
+    expect(aiPageSource).toContain('aria-label={`移除${item.form.name');
+    expect(photoItemAnalysisSource).toContain('const removeCurrentDraft = () =>');
+    expect(photoItemAnalysisSource).toContain('canRemoveCurrentDraft');
+    expect(photoItemAnalysisSource).toContain('移除草稿');
   });
 });

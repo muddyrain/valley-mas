@@ -186,6 +186,11 @@ export function readPhotoItemAnalysisHistory(
     return parsed
       .map(normalizeHistoryItem)
       .filter((item): item is PhotoItemAnalysisHistoryItem => Boolean(item))
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+      .filter(
+        (item, index, history) =>
+          history.findIndex((candidate) => candidate.id === item.id) === index,
+      )
       .slice(0, MAX_PHOTO_ITEM_ANALYSIS_HISTORY);
   } catch {
     return [];
@@ -203,10 +208,15 @@ export function writePhotoItemAnalysisHistory(
   const normalized = items
     .map(normalizeHistoryItem)
     .filter((item): item is PhotoItemAnalysisHistoryItem => Boolean(item))
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  const deduped = normalized
+    .filter(
+      (item, index, history) =>
+        history.findIndex((candidate) => candidate.id === item.id) === index,
+    )
     .slice(0, MAX_PHOTO_ITEM_ANALYSIS_HISTORY);
 
-  storage.setItem(PHOTO_ITEM_ANALYSIS_HISTORY_KEY, JSON.stringify(normalized));
+  storage.setItem(PHOTO_ITEM_ANALYSIS_HISTORY_KEY, JSON.stringify(deduped));
 }
 
 export function upsertPhotoItemAnalysisHistory(
@@ -224,6 +234,17 @@ export function getLatestPhotoItemAnalysisDraft(
   storage: HistoryStorage | null = getPhotoItemAnalysisStorage(),
 ) {
   return readPhotoItemAnalysisHistory(storage).find((item) => item.status === 'draft') ?? null;
+}
+
+export function getPhotoItemAnalysisDraftById(
+  id: string,
+  storage: HistoryStorage | null = getPhotoItemAnalysisStorage(),
+) {
+  return (
+    readPhotoItemAnalysisHistory(storage).find(
+      (item) => item.id === id && item.status === 'draft',
+    ) ?? null
+  );
 }
 
 export function markPhotoItemAnalysisSaved(

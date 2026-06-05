@@ -10,10 +10,11 @@ import {
   Sparkles,
   ThumbsDown,
   ThumbsUp,
+  Trash2,
   X,
 } from 'lucide-react';
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { listHouseholds } from '@/api/household';
 import {
   analyzePantryPhoto,
@@ -37,6 +38,7 @@ import {
   createPhotoItemAnalysisHistoryId,
   findPhotoItemAnalysisDuplicateCandidates,
   getLatestPhotoItemAnalysisDraft,
+  getPhotoItemAnalysisDraftById,
   getPhotoItemAnalysisReviewIssues,
   markPhotoItemAnalysisQualityFeedback,
   markPhotoItemAnalysisSaved,
@@ -322,6 +324,8 @@ function formatDraftUpdatedAt(value: string) {
 
 export function PhotoItemAnalysisPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedDraftId = searchParams.get('draftId') || '';
   const token = useAuthStore((state) => state.token);
   const addPantryItem = useLifeTraceStore((state) => state.addPantryItem);
   const editPantryItem = useLifeTraceStore((state) => state.editPantryItem);
@@ -340,6 +344,7 @@ export function PhotoItemAnalysisPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
+  const handledRequestedDraftIdRef = useRef('');
   const [state, setState] = useState<CaptureState>('idle');
   const [cameraError, setCameraError] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -376,16 +381,25 @@ export function PhotoItemAnalysisPage() {
   );
   const latestDraft = useMemo(
     () =>
-      currentHistoryId
+      currentHistoryId || requestedDraftId
         ? null
         : (historyItems.find((item) => item.status === 'draft') ??
           getLatestPhotoItemAnalysisDraft()),
-    [currentHistoryId, historyItems],
+    [currentHistoryId, historyItems, requestedDraftId],
+  );
+  const requestedDraft = useMemo(
+    () =>
+      requestedDraftId
+        ? (historyItems.find((item) => item.id === requestedDraftId && item.status === 'draft') ??
+          getPhotoItemAnalysisDraftById(requestedDraftId))
+        : null,
+    [historyItems, requestedDraftId],
   );
   const currentHistoryItem = useMemo(
     () => historyItems.find((item) => item.id === currentHistoryId) ?? null,
     [currentHistoryId, historyItems],
   );
+  const canRemoveCurrentDraft = currentHistoryItem?.status === 'draft';
   const reviewIssues = useMemo(
     () => (analysis ? getPhotoItemAnalysisReviewIssues(analysis, form) : []),
     [analysis, form],
@@ -815,33 +829,71 @@ export function PhotoItemAnalysisPage() {
     setError('');
   };
 
-  const restoreDraft = (draft: PhotoItemAnalysisHistoryItem) => {
-    stopCamera();
-    if (imagePreviewUrl) {
-      URL.revokeObjectURL(imagePreviewUrl);
+  const restoreDraft = useCallback(
+    (
+      draft: PhotoItemAnalysisHistoryItem,
+      options: { openSheet?: boolean; silent?: boolean } = {},
+    ) => {
+      const shouldOpenSheet = options.openSheet ?? true;
+      stopCamera();
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+      setImageFile(null);
+      setImagePreviewUrl(draft.imageUrl);
+      setUploadedImageUrl(draft.imageUrl);
+      setAnalysis(draft.analysis);
+      setForm(draft.form);
+      setExpiryBaseDate(draft.expiryBaseDate || draft.analysis.productionDate || '');
+      setCoverMode(
+        draft.coverMode === 'crop' && isMeaningfulCropBox(draft.analysis.cropBox)
+          ? 'crop'
+          : 'original',
+      );
+      setCurrentHistoryId(draft.id);
+      setState('reviewing');
+      setReviewSheetOpen(shouldOpenSheet);
+      setActivePicker(null);
+      setError('');
+      if (!options.silent) {
+        showToast('已恢复上次未入库草稿。', 'success');
+      }
+    },
+    [imagePreviewUrl, showToast, stopCamera],
+  );
+
+  useEffect(() => {
+    if (!requestedDraftId) {
+      return;
     }
-    setImageFile(null);
-    setImagePreviewUrl(draft.imageUrl);
-    setUploadedImageUrl(draft.imageUrl);
-    setAnalysis(draft.analysis);
-    setForm(draft.form);
-    setExpiryBaseDate(draft.expiryBaseDate || draft.analysis.productionDate || '');
-    setCoverMode(
-      draft.coverMode === 'crop' && isMeaningfulCropBox(draft.analysis.cropBox)
-        ? 'crop'
-        : 'original',
-    );
-    setCurrentHistoryId(draft.id);
-    setState('reviewing');
-    setReviewSheetOpen(true);
-    setActivePicker(null);
-    setError('');
-    showToast('已恢复上次未入库草稿。', 'success');
-  };
+
+    if (handledRequestedDraftIdRef.current === requestedDraftId) {
+      return;
+    }
+    handledRequestedDraftIdRef.current = requestedDraftId;
+
+    if (!requestedDraft) {
+      showToast('这个拍照草稿已经不存在或已入库。', 'error');
+      return;
+    }
+
+    restoreDraft(requestedDraft, { openSheet: false, silent: true });
+  }, [requestedDraft, requestedDraftId, restoreDraft, showToast]);
 
   const dismissDraft = (draftId: string) => {
     removePhotoItemAnalysisHistory(draftId);
     setHistoryItems(readPhotoItemAnalysisHistory());
+  };
+
+  const removeCurrentDraft = () => {
+    if (!currentHistoryId || currentHistoryItem?.status !== 'draft') {
+      return;
+    }
+
+    removePhotoItemAnalysisHistory(currentHistoryId);
+    setHistoryItems(readPhotoItemAnalysisHistory());
+    showToast('已移除拍照草稿。', 'success');
+    navigate('/ai', { replace: true });
   };
 
   const handleReviewIssueAction = (issue: PhotoItemAnalysisReviewIssue) => {
@@ -897,11 +949,22 @@ export function PhotoItemAnalysisPage() {
     showToast(`已应用${suggestion.label}。`, 'success');
   };
 
+  const handleBackToAi = () => {
+    navigate('/ai', { replace: true });
+  };
+
   return (
     <div className="space-y-6 pb-2">
       <header className="flex items-center gap-3">
-        <Button type="button" variant="ghost" size="icon" onClick={() => navigate('/ai')}>
-          <ArrowLeft className="size-5" />
+        <Button
+          type="button"
+          variant="ghost"
+          className="-ml-2 h-12 min-w-16 rounded-2xl px-3"
+          aria-label="返回 AI 页"
+          onClick={handleBackToAi}
+        >
+          <ArrowLeft className="size-5 shrink-0" />
+          <span className="text-sm font-semibold">返回</span>
         </Button>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-life-ai">Life AI</p>
@@ -1445,6 +1508,17 @@ export function PhotoItemAnalysisPage() {
                 {state === 'done' ? '查看入库结果' : '打开入库确认'}
               </span>
             </Button>
+            {canRemoveCurrentDraft ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 w-full border-life-alert/25 text-life-alert hover:bg-life-alert/10 hover:text-life-alert"
+                onClick={removeCurrentDraft}
+              >
+                <Trash2 className="size-4 shrink-0" />
+                <span className="whitespace-nowrap">移除草稿</span>
+              </Button>
+            ) : null}
           </Card>
         </section>
       ) : null}

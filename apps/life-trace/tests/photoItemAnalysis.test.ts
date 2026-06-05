@@ -6,6 +6,7 @@ import {
   buildPhotoItemPantryInput,
   findPhotoItemAnalysisDuplicateCandidates,
   getLatestPhotoItemAnalysisDraft,
+  getPhotoItemAnalysisDraftById,
   getPhotoItemAnalysisReviewIssues,
   markPhotoItemAnalysisQualityFeedback,
   markPhotoItemAnalysisSaved,
@@ -170,6 +171,67 @@ describe('photo item analysis helpers', () => {
     const history = readPhotoItemAnalysisHistory(storage);
     expect(history.map((item) => item.id)).toEqual(['latest', 'older']);
     expect(getLatestPhotoItemAnalysisDraft(storage)?.id).toBe('latest');
+  });
+
+  it('reads a requested unsaved draft by id without falling back to latest', () => {
+    const storage = createStorage();
+
+    upsertPhotoItemAnalysisHistory(
+      createHistoryItem({
+        id: 'earphone-case',
+        form: {
+          ...createHistoryItem().form,
+          name: '熊猫造型无线耳机保护套',
+        },
+        updatedAt: '2026-06-05T01:00:00.000Z',
+      }),
+      storage,
+    );
+    upsertPhotoItemAnalysisHistory(
+      createHistoryItem({
+        id: 'floss',
+        form: {
+          ...createHistoryItem().form,
+          name: '青年牙线棒',
+        },
+        updatedAt: '2026-06-05T02:00:00.000Z',
+      }),
+      storage,
+    );
+
+    expect(getLatestPhotoItemAnalysisDraft(storage)?.id).toBe('floss');
+    expect(getPhotoItemAnalysisDraftById('earphone-case', storage)?.form.name).toBe(
+      '熊猫造型无线耳机保护套',
+    );
+  });
+
+  it('deduplicates photo analysis history records with the same id', () => {
+    const storage = createStorage();
+    storage.setItem(
+      'life-trace-photo-item-analysis-history-v1',
+      JSON.stringify([
+        createHistoryItem({
+          id: 'draft-1',
+          form: {
+            ...createHistoryItem().form,
+            name: '青年牙线棒',
+          },
+          updatedAt: '2026-06-05T02:00:00.000Z',
+        }),
+        createHistoryItem({
+          id: 'draft-1',
+          form: {
+            ...createHistoryItem().form,
+            name: '青年牙线棒旧记录',
+          },
+          updatedAt: '2026-06-05T01:00:00.000Z',
+        }),
+      ]),
+    );
+
+    const history = readPhotoItemAnalysisHistory(storage);
+    expect(history).toHaveLength(1);
+    expect(history[0].form.name).toBe('青年牙线棒');
   });
 
   it('marks recovered drafts as saved after pantry creation', () => {
