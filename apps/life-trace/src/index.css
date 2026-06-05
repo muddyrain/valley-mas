@@ -163,3 +163,51 @@
     opacity: 0;
   }
 }
+
+@keyframes life-vision-scan {
+  0% {
+    transform: translateY(-115%);
+    opacity: 0;
+  }
+
+  15% {
+    opacity: 0.95;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 0.95;
+  }
+
+  100% {
+    transform: translateY(115%);
+    opacity: 0;
+  }
+}
+
+@keyframes life-vision-drift {
+  0%,
+  100% {
+    transform: translateY(-0.35rem) scale(1.018);
+  }
+
+  50% {
+    transform: translateY(0.35rem) scale(1.035);
+  }
+}
+
+@keyframes life-vision-pulse {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.32;
+  }
+
+  50% {
+    transform: scale(1.08);
+    opacity: 0.78;
+  }
+}

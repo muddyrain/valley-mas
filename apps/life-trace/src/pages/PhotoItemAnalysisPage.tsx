@@ -179,8 +179,11 @@ export function PhotoItemAnalysisPage() {
 
   const cameraActive = state === 'camera-ready';
   const busy = state === 'uploading' || state === 'analyzing' || state === 'saving';
+  const visionProcessing = state === 'uploading' || state === 'analyzing';
   const reviewReady = Boolean(analysis);
   const scannerStatusLabel = state === 'done' ? '已入库' : busy ? '处理中' : '待确认';
+  const visionStageLabel =
+    state === 'uploading' ? '正在同步影像' : state === 'analyzing' ? '正在解析商品' : '视觉待命';
   const hasExpiryDate = Boolean(form.expiresAt.trim());
   const latestDraft = useMemo(
     () =>
@@ -754,25 +757,66 @@ export function PhotoItemAnalysisPage() {
             </Badge>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground min-[390px]:text-[10px] min-[390px]:tracking-[0.12em]">
-            <span className="truncate whitespace-nowrap rounded-full border border-life-ai/20 bg-background/45 px-2 py-2 text-center text-life-ai min-[390px]:px-2.5">
-              Vision Ready
-            </span>
-            <span className="truncate whitespace-nowrap rounded-full border border-life-trace/20 bg-background/45 px-2 py-2 text-center text-life-trace min-[390px]:px-2.5">
-              Pantry Sync
-            </span>
-            <span className="truncate whitespace-nowrap rounded-full border border-border bg-background/45 px-2 py-2 text-center min-[390px]:px-2.5">
-              Manual Edit
-            </span>
+          <div className="rounded-[1.15rem] border border-white/[0.06] bg-background/35 px-3 py-2.5 backdrop-blur">
+            <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+              <span className="inline-flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap text-life-ai">
+                <span className="size-1.5 shrink-0 rounded-full bg-life-ai shadow-[0_0_12px_rgba(6,182,212,0.9)]" />
+                取景
+              </span>
+              <span className="h-px w-4 bg-border" />
+              <span
+                className={`inline-flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap ${
+                  visionProcessing ? 'text-life-ai' : 'text-muted-foreground'
+                }`}
+              >
+                <span
+                  className={`size-1.5 shrink-0 rounded-full ${
+                    visionProcessing
+                      ? 'animate-pulse bg-life-ai shadow-[0_0_12px_rgba(6,182,212,0.9)] motion-reduce:animate-none'
+                      : 'bg-muted-foreground/45'
+                  }`}
+                />
+                分析
+              </span>
+              <span className="h-px w-4 bg-border" />
+              <span className="inline-flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap text-life-trace">
+                <span className="size-1.5 shrink-0 rounded-full bg-life-trace/80" />
+                入库
+              </span>
+            </div>
           </div>
 
           <div className="relative overflow-hidden rounded-[1.45rem] border border-life-ai/25 bg-background/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
             <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(180deg,transparent,rgba(6,182,212,0.08),transparent)] opacity-70" />
-            <div className="pointer-events-none absolute inset-x-8 top-1/2 z-20 h-px animate-pulse bg-life-ai/80 shadow-[0_0_24px_rgba(6,182,212,0.75)] motion-reduce:animate-none" />
-            <span className="pointer-events-none absolute top-3 left-3 z-20 size-7 border-t-2 border-l-2 border-life-ai" />
-            <span className="pointer-events-none absolute top-3 right-3 z-20 size-7 border-t-2 border-r-2 border-life-ai" />
-            <span className="pointer-events-none absolute bottom-3 left-3 z-20 size-7 border-b-2 border-l-2 border-life-trace" />
-            <span className="pointer-events-none absolute right-3 bottom-3 z-20 size-7 border-r-2 border-b-2 border-life-trace" />
+            <div
+              className={`pointer-events-none absolute inset-x-8 z-20 h-px bg-life-ai/80 shadow-[0_0_24px_rgba(6,182,212,0.75)] motion-reduce:animate-none ${
+                visionProcessing
+                  ? 'top-0 animate-[life-vision-scan_1.9s_ease-in-out_infinite]'
+                  : imagePreviewUrl || cameraActive
+                    ? 'top-1/2 animate-pulse opacity-70'
+                    : 'top-[28%] opacity-35'
+              }`}
+            />
+            <span
+              className={`pointer-events-none absolute top-3 left-3 z-20 size-7 border-t-2 border-l-2 border-life-ai ${
+                visionProcessing ? 'shadow-[0_0_24px_rgba(6,182,212,0.85)]' : ''
+              }`}
+            />
+            <span
+              className={`pointer-events-none absolute top-3 right-3 z-20 size-7 border-t-2 border-r-2 border-life-ai ${
+                visionProcessing ? 'shadow-[0_0_24px_rgba(6,182,212,0.85)]' : ''
+              }`}
+            />
+            <span
+              className={`pointer-events-none absolute bottom-3 left-3 z-20 size-7 border-b-2 border-l-2 border-life-trace ${
+                visionProcessing ? 'shadow-[0_0_24px_rgba(16,185,129,0.75)]' : ''
+              }`}
+            />
+            <span
+              className={`pointer-events-none absolute right-3 bottom-3 z-20 size-7 border-r-2 border-b-2 border-life-trace ${
+                visionProcessing ? 'shadow-[0_0_24px_rgba(16,185,129,0.75)]' : ''
+              }`}
+            />
 
             {cameraActive ? (
               <video
@@ -785,23 +829,68 @@ export function PhotoItemAnalysisPage() {
               <img
                 src={imagePreviewUrl}
                 alt="商品预览"
-                className="aspect-[4/3] w-full object-cover sm:aspect-[16/10]"
+                className={`aspect-[4/3] w-full object-cover transition duration-500 sm:aspect-[16/10] ${
+                  visionProcessing
+                    ? 'animate-[life-vision-drift_2.4s_ease-in-out_infinite] brightness-90 saturate-125 motion-reduce:animate-none'
+                    : ''
+                }`}
               />
             ) : (
-              <div className="grid aspect-[4/3] place-items-center px-5 text-center sm:aspect-[16/10]">
-                <div className="max-w-xs space-y-4">
-                  <div className="mx-auto grid size-16 place-items-center rounded-[1.35rem] border border-life-ai/25 bg-life-ai/10 text-life-ai shadow-[0_0_38px_rgba(6,182,212,0.18)]">
-                    <Camera className="size-8" />
+              <div className="grid aspect-[4/3] place-items-center px-5 py-10 text-center sm:aspect-[16/10]">
+                <div className="max-w-xs space-y-6">
+                  <div className="relative mx-auto grid size-24 place-items-center">
+                    <span className="absolute inset-0 rounded-full border border-life-ai/20 bg-life-ai/5 animate-[life-vision-pulse_3.2s_ease-in-out_infinite] motion-reduce:animate-none" />
+                    <span className="absolute inset-3 rounded-full border border-life-trace/20 bg-life-trace/5 animate-[life-vision-pulse_3.2s_ease-in-out_infinite] [animation-delay:420ms] motion-reduce:animate-none" />
+                    <div className="relative grid size-16 place-items-center rounded-[1.35rem] border border-life-ai/25 bg-background/70 text-life-ai shadow-[0_0_42px_rgba(6,182,212,0.24)] backdrop-blur">
+                      <Camera className="size-8" />
+                    </div>
                   </div>
-                  <div>
+                  <div className="space-y-3">
                     <p className="text-base font-semibold">等待商品进入取景框</p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    <p className="text-sm leading-6 text-muted-foreground">
                       建议让包装正面占据画面中央，减少反光和遮挡。
                     </p>
+                  </div>
+                  <div className="mx-auto flex max-w-[12rem] items-center gap-2 pt-1">
+                    <span className="h-px flex-1 bg-gradient-to-r from-transparent to-life-ai/40" />
+                    <span className="size-1.5 rounded-full bg-life-ai/70 shadow-[0_0_14px_rgba(6,182,212,0.8)]" />
+                    <span className="h-px flex-1 bg-gradient-to-l from-transparent to-life-trace/40" />
                   </div>
                 </div>
               </div>
             )}
+            {visionProcessing ? (
+              <div className="pointer-events-none absolute inset-0 z-30">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_52%,rgba(6,182,212,0.12),transparent_42%),linear-gradient(180deg,rgba(6,182,212,0.05),rgba(16,185,129,0.04))]" />
+                <div className="absolute inset-x-5 top-8 h-16 animate-[life-vision-scan_1.9s_ease-in-out_infinite] rounded-full bg-gradient-to-b from-life-ai/0 via-life-ai/24 to-life-trace/0 blur-md motion-reduce:animate-none" />
+                <div className="absolute inset-x-6 top-1/2 h-px bg-gradient-to-r from-transparent via-life-ai/85 to-transparent shadow-[0_0_30px_rgba(6,182,212,0.85)]" />
+                <div className="absolute inset-x-4 top-4 rounded-2xl border border-life-ai/20 bg-background/35 px-3 py-2.5 shadow-[0_14px_36px_rgba(0,0,0,0.2)] backdrop-blur-xl">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{visionStageLabel}</p>
+                      <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-life-ai/80">
+                        Vision Analysis
+                      </p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-life-trace/25 bg-life-trace/10 px-2.5 py-1 text-[10px] font-semibold text-life-trace">
+                      <span className="size-1.5 animate-pulse rounded-full bg-life-trace shadow-[0_0_12px_rgba(16,185,129,0.9)] motion-reduce:animate-none" />
+                      Live
+                    </span>
+                  </div>
+                  <div className="mt-2 flex gap-1.5 overflow-hidden">
+                    {['主体定位', '字段抽取', '库存匹配'].map((label, index) => (
+                      <span
+                        key={label}
+                        className="min-w-0 flex-1 rounded-full border border-life-ai/20 bg-life-ai/10 px-2 py-1 text-center text-[10px] font-semibold text-life-ai/90"
+                        style={{ animationDelay: `${index * 180}ms` }}
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {cameraActive ? (
