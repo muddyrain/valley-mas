@@ -70,6 +70,7 @@ type WebPushConfig struct {
 	PrivateKey          string
 	Subject             string
 	Enabled             bool
+	CronSecret          string
 	ScanIntervalSeconds int
 	ReminderWindowMin   int
 }
@@ -139,6 +140,7 @@ func Load() *Config {
 			PrivateKey:          strings.TrimSpace(getEnv("WEB_PUSH_PRIVATE_KEY", "")),
 			Subject:             strings.TrimSpace(getEnv("WEB_PUSH_SUBJECT", "mailto:admin@example.com")),
 			Enabled:             getEnvBool("WEB_PUSH_ENABLED", true),
+			CronSecret:          strings.TrimSpace(getEnv("WEB_PUSH_CRON_SECRET", getEnv("CRON_SECRET", ""))),
 			ScanIntervalSeconds: getEnvInt("WEB_PUSH_SCAN_INTERVAL_SECONDS", 60),
 			ReminderWindowMin:   getEnvInt("WEB_PUSH_REMINDER_WINDOW_MINUTES", 10),
 		},

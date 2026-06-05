@@ -2,6 +2,8 @@ package lifetrace
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +25,23 @@ func (f *fakePushSender) Send(_ context.Context, _ model.LifeTracePushSubscripti
 	return 201, nil
 }
 
+type failingPushSender struct {
+	attempts int
+	err      error
+}
+
+func (f *failingPushSender) Enabled() bool {
+	return true
+}
+
+func (f *failingPushSender) Send(_ context.Context, _ model.LifeTracePushSubscription, _ PushPayload) (int, error) {
+	f.attempts += 1
+	if f.err != nil {
+		return http.StatusBadGateway, f.err
+	}
+	return http.StatusBadGateway, errors.New("temporary push upstream failure")
+}
+
 func TestDailyBriefDueAtMatchesWindow(t *testing.T) {
 	settings := model.LifeTraceSettings{DailyBriefTime: "08:10"}
 	now := time.Date(2026, 6, 2, 8, 15, 0, 0, time.Local)
@@ -33,6 +52,39 @@ func TestDailyBriefDueAtMatchesWindow(t *testing.T) {
 	}
 	if dueAt.Format("15:04") != "08:10" {
 		t.Fatalf("expected parsed due time 08:10, got %s", dueAt.Format(time.RFC3339))
+	}
+}
+
+func TestScanPushRemindersUsesShanghaiTimezone(t *testing.T) {
+	_ = setupTraceTestRouter(t, 101)
+
+	if err := database.GetDB().Create(&model.LifeTraceSettings{
+		UserID:           model.Int64String(101),
+		DailyBriefTime:   "08:10",
+		WorkdayMode:      "daily",
+		PlanReminders:    true,
+		WeekendReminders: true,
+	}).Error; err != nil {
+		t.Fatalf("create settings: %v", err)
+	}
+	if err := database.GetDB().Create(&model.LifeTracePushSubscription{
+		UserID:    model.Int64String(101),
+		Endpoint:  "https://push.example/device",
+		P256DH:    "p256dh-key",
+		Auth:      "auth-key",
+		Status:    "active",
+		UserAgent: "test",
+	}).Error; err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+
+	sender := &fakePushSender{}
+	utcNow := time.Date(2026, 6, 2, 0, 15, 0, 0, time.UTC)
+	if err := scanPushReminders(context.Background(), sender, nil, 10, utcNow); err != nil {
+		t.Fatalf("scan push reminders: %v", err)
+	}
+	if len(sender.payloads) != 1 {
+		t.Fatalf("expected UTC input to match Shanghai 08:10 daily brief window, got %d pushes", len(sender.payloads))
 	}
 }
 
@@ -160,6 +212,73 @@ func TestSendDueDailyBriefPushesSendsOnlyOncePerDay(t *testing.T) {
 	}
 	if len(sender.payloads) != 1 {
 		t.Fatalf("expected duplicate scan to be skipped, got %d pushes", len(sender.payloads))
+	}
+}
+
+func TestFailedDailyBriefPushWritesOperationLogAndRetries(t *testing.T) {
+	_ = setupTraceTestRouter(t, 101)
+
+	now := time.Date(2026, 6, 2, 8, 15, 0, 0, time.Local)
+	if err := database.GetDB().Create(&model.LifeTraceSettings{
+		UserID:           model.Int64String(101),
+		DailyBriefTime:   "08:10",
+		WorkdayMode:      "daily",
+		WeekendReminders: true,
+	}).Error; err != nil {
+		t.Fatalf("create settings: %v", err)
+	}
+	if err := database.GetDB().Create(&model.LifeTracePushSubscription{
+		UserID:    model.Int64String(101),
+		Endpoint:  "https://push.example/device",
+		P256DH:    "p256dh-key",
+		Auth:      "auth-key",
+		Status:    "active",
+		UserAgent: "test-agent",
+	}).Error; err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+
+	sender := &failingPushSender{err: errors.New("temporary push upstream failure")}
+	if err := sendDueDailyBriefPushesAt(context.Background(), sender, nil, 10, now); err != nil {
+		t.Fatalf("send daily brief: %v", err)
+	}
+	if err := sendDueDailyBriefPushesAt(context.Background(), sender, nil, 10, now); err != nil {
+		t.Fatalf("retry daily brief: %v", err)
+	}
+	if sender.attempts != 2 {
+		t.Fatalf("expected failed daily brief to retry, got %d attempts", sender.attempts)
+	}
+
+	var delivery model.LifeTraceDailyBriefDelivery
+	if err := database.GetDB().
+		Where("user_id = ? AND brief_date = ?", model.Int64String(101), "2026-06-02").
+		First(&delivery).Error; err != nil {
+		t.Fatalf("read delivery: %v", err)
+	}
+	if delivery.Status != "failed" || !strings.Contains(delivery.Error, "temporary push upstream failure") {
+		t.Fatalf("expected failed delivery with error, got %+v", delivery)
+	}
+
+	var logCount int64
+	if err := database.GetDB().
+		Model(&model.OperationLog{}).
+		Where("method = ? AND user_id = ? AND level = ?", "WEB_PUSH", "101", "error").
+		Count(&logCount).Error; err != nil {
+		t.Fatalf("count operation logs: %v", err)
+	}
+	if logCount != 2 {
+		t.Fatalf("expected one operation log per failed attempt, got %d", logCount)
+	}
+
+	var op model.OperationLog
+	if err := database.GetDB().
+		Where("method = ? AND user_id = ?", "WEB_PUSH", "101").
+		First(&op).Error; err != nil {
+		t.Fatalf("read operation log: %v", err)
+	}
+	if !strings.Contains(op.Query, "temporary+push+upstream+failure") ||
+		!strings.Contains(op.Query, "kind=daily_brief") {
+		t.Fatalf("expected operation log query to include failure detail, got %+v", op)
 	}
 }
 

@@ -3,6 +3,7 @@ package lifetrace
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -10,9 +11,13 @@ import (
 	"valley-server/internal/database"
 	"valley-server/internal/logger"
 	"valley-server/internal/model"
+	"valley-server/internal/utils"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+const lifeTraceReminderTimezone = "Asia/Shanghai"
 
 type pushSender interface {
 	Enabled() bool
@@ -35,7 +40,7 @@ func StartPushReminderWorker(ctx context.Context, cfg config.WebPushConfig, weat
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		if err := scanPushReminders(ctx, service, weather, cfg.ReminderWindowMin, time.Now()); err != nil {
+		if err := scanPushReminders(ctx, service, weather, cfg.ReminderWindowMin, reminderNow()); err != nil {
 			logger.Log.WithField("error", err).Warn("LifeTrace Web Push initial scan failed")
 		}
 
@@ -44,12 +49,24 @@ func StartPushReminderWorker(ctx context.Context, cfg config.WebPushConfig, weat
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if err := scanPushReminders(ctx, service, weather, cfg.ReminderWindowMin, time.Now()); err != nil {
+				if err := scanPushReminders(ctx, service, weather, cfg.ReminderWindowMin, reminderNow()); err != nil {
 					logger.Log.WithField("error", err).Warn("LifeTrace Web Push scan failed")
 				}
 			}
 		}
 	}()
+}
+
+func reminderNow() time.Time {
+	return time.Now().In(reminderLocation())
+}
+
+func reminderLocation() *time.Location {
+	location, err := time.LoadLocation(lifeTraceReminderTimezone)
+	if err != nil {
+		return time.FixedZone("CST", 8*60*60)
+	}
+	return location
 }
 
 func scanPushReminders(
@@ -59,6 +76,7 @@ func scanPushReminders(
 	windowMinutes int,
 	now time.Time,
 ) error {
+	now = now.In(reminderLocation())
 	if err := sendDuePlanPushRemindersAt(ctx, sender, windowMinutes, now); err != nil {
 		return err
 	}
@@ -72,11 +90,11 @@ func scanPushReminders(
 }
 
 func sendDuePlanPushReminders(ctx context.Context, sender pushSender, windowMinutes int) error {
-	return sendDuePlanPushRemindersAt(ctx, sender, windowMinutes, time.Now())
+	return sendDuePlanPushRemindersAt(ctx, sender, windowMinutes, reminderNow())
 }
 
 func sendDuePantryPushReminders(ctx context.Context, sender pushSender, windowMinutes int) error {
-	return sendDuePantryPushRemindersAt(ctx, sender, windowMinutes, time.Now())
+	return sendDuePantryPushRemindersAt(ctx, sender, windowMinutes, reminderNow())
 }
 
 func sendDuePlanPushRemindersAt(
@@ -183,7 +201,7 @@ func sendDueDailyBriefPushes(
 	weather *WeatherService,
 	windowMinutes int,
 ) error {
-	return sendDueDailyBriefPushesAt(ctx, sender, weather, windowMinutes, time.Now())
+	return sendDueDailyBriefPushesAt(ctx, sender, weather, windowMinutes, reminderNow())
 }
 
 func sendDueDailyBriefPushesAt(
@@ -239,15 +257,25 @@ func sendPlanPushReminder(ctx context.Context, sender pushSender, plan model.Lif
 			PlanID: plan.ID.String(),
 		}
 
-		deliveryStatus, errorText := sendPushPayload(ctx, sender, subscription, payload)
-		_ = database.GetDB().Create(&model.LifeTracePushDelivery{
+		deliveryStatus, errorText := sendPushPayload(
+			ctx,
+			sender,
+			subscription,
+			payload,
+			pushFailureContext{
+				kind:     "plan",
+				targetID: plan.ID.String(),
+				dueAt:    dueAt,
+			},
+		)
+		savePlanPushDelivery(model.LifeTracePushDelivery{
 			UserID:         plan.UserID,
 			PlanID:         plan.ID,
 			DueAt:          dueAt,
 			SubscriptionID: subscription.ID,
 			Status:         deliveryStatus,
 			Error:          errorText,
-		}).Error
+		})
 	}
 
 	return nil
@@ -294,8 +322,19 @@ func sendPantryPushReminder(
 				continue
 			}
 
-			deliveryStatus, errorText := sendPushPayload(ctx, sender, subscription, payload)
-			_ = database.GetDB().Create(&model.LifeTracePantryReminderDelivery{
+			deliveryStatus, errorText := sendPushPayload(
+				ctx,
+				sender,
+				subscription,
+				payload,
+				pushFailureContext{
+					kind:     "pantry",
+					targetID: item.ID.String(),
+					rule:     string(rule),
+					dueAt:    dueAt,
+				},
+			)
+			savePantryReminderDelivery(model.LifeTracePantryReminderDelivery{
 				UserID:         item.UserID,
 				PantryItemID:   item.ID,
 				Rule:           string(rule),
@@ -303,7 +342,7 @@ func sendPantryPushReminder(
 				SubscriptionID: subscription.ID,
 				Status:         deliveryStatus,
 				Error:          errorText,
-			}).Error
+			})
 		}
 	}
 
@@ -355,18 +394,35 @@ func sendDailyBriefPush(
 			continue
 		}
 
-		deliveryStatus, errorText := sendPushPayload(ctx, sender, subscription, payload)
-		_ = database.GetDB().Create(&model.LifeTraceDailyBriefDelivery{
+		deliveryStatus, errorText := sendPushPayload(
+			ctx,
+			sender,
+			subscription,
+			payload,
+			pushFailureContext{
+				kind:     "daily_brief",
+				targetID: today,
+				dueAt:    dueAt,
+			},
+		)
+		saveDailyBriefDelivery(model.LifeTraceDailyBriefDelivery{
 			UserID:         settings.UserID,
 			BriefDate:      today,
 			ScheduledAt:    dueAt,
 			SubscriptionID: subscription.ID,
 			Status:         deliveryStatus,
 			Error:          errorText,
-		}).Error
+		})
 	}
 
 	return nil
+}
+
+type pushFailureContext struct {
+	kind     string
+	targetID string
+	rule     string
+	dueAt    time.Time
 }
 
 func sendPushPayload(
@@ -374,6 +430,7 @@ func sendPushPayload(
 	sender pushSender,
 	subscription model.LifeTracePushSubscription,
 	payload PushPayload,
+	failureContext pushFailureContext,
 ) (string, string) {
 	sendCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	statusCode, err := sender.Send(sendCtx, subscription, payload)
@@ -381,6 +438,7 @@ func sendPushPayload(
 
 	if err != nil {
 		markPushSubscriptionError(subscription.ID, statusCode, err)
+		recordPushFailureOperationLog(subscription, payload, failureContext, statusCode, err)
 		return "failed", err.Error()
 	}
 
@@ -891,7 +949,7 @@ func pushDeliveryExists(userID model.Int64String, planID model.Int64String, subs
 	var count int64
 	if err := database.GetDB().
 		Model(&model.LifeTracePushDelivery{}).
-		Where("user_id = ? AND plan_id = ? AND subscription_id = ? AND due_at = ?", userID, planID, subscriptionID, dueAt).
+		Where("user_id = ? AND plan_id = ? AND subscription_id = ? AND due_at = ? AND status = ?", userID, planID, subscriptionID, dueAt, "sent").
 		Count(&count).Error; err != nil {
 		return false
 	}
@@ -902,7 +960,7 @@ func dailyBriefDeliveryExists(userID model.Int64String, briefDate string, subscr
 	var count int64
 	if err := database.GetDB().
 		Model(&model.LifeTraceDailyBriefDelivery{}).
-		Where("user_id = ? AND brief_date = ? AND subscription_id = ?", userID, briefDate, subscriptionID).
+		Where("user_id = ? AND brief_date = ? AND subscription_id = ? AND status = ?", userID, briefDate, subscriptionID, "sent").
 		Count(&count).Error; err != nil {
 		return false
 	}
@@ -920,17 +978,60 @@ func pantryReminderDeliveryExists(
 	if err := database.GetDB().
 		Model(&model.LifeTracePantryReminderDelivery{}).
 		Where(
-			"user_id = ? AND pantry_item_id = ? AND rule = ? AND subscription_id = ? AND due_at = ?",
+			"user_id = ? AND pantry_item_id = ? AND rule = ? AND subscription_id = ? AND due_at = ? AND status = ?",
 			userID,
 			pantryItemID,
 			rule,
 			subscriptionID,
 			dueAt,
+			"sent",
 		).
 		Count(&count).Error; err != nil {
 		return false
 	}
 	return count > 0
+}
+
+func savePlanPushDelivery(delivery model.LifeTracePushDelivery) {
+	_ = database.GetDB().
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "user_id"},
+				{Name: "plan_id"},
+				{Name: "due_at"},
+				{Name: "subscription_id"},
+			},
+			DoUpdates: clause.AssignmentColumns([]string{"status", "error", "created_at"}),
+		}).
+		Create(&delivery).Error
+}
+
+func saveDailyBriefDelivery(delivery model.LifeTraceDailyBriefDelivery) {
+	_ = database.GetDB().
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "user_id"},
+				{Name: "brief_date"},
+				{Name: "subscription_id"},
+			},
+			DoUpdates: clause.AssignmentColumns([]string{"status", "error", "scheduled_at", "created_at"}),
+		}).
+		Create(&delivery).Error
+}
+
+func savePantryReminderDelivery(delivery model.LifeTracePantryReminderDelivery) {
+	_ = database.GetDB().
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "user_id"},
+				{Name: "pantry_item_id"},
+				{Name: "rule"},
+				{Name: "due_at"},
+				{Name: "subscription_id"},
+			},
+			DoUpdates: clause.AssignmentColumns([]string{"status", "error", "created_at"}),
+		}).
+		Create(&delivery).Error
 }
 
 func markPushSubscriptionSent(subscription model.LifeTracePushSubscription) {
@@ -954,6 +1055,59 @@ func markPushSubscriptionError(subscriptionID model.Int64String, statusCode int,
 			"status":     status,
 			"last_error": err.Error(),
 		}).Error
+}
+
+func recordPushFailureOperationLog(
+	subscription model.LifeTracePushSubscription,
+	payload PushPayload,
+	failureContext pushFailureContext,
+	statusCode int,
+	err error,
+) {
+	db := database.GetDB()
+	if db == nil || err == nil {
+		return
+	}
+
+	values := url.Values{}
+	values.Set("kind", failureContext.kind)
+	values.Set("targetId", failureContext.targetID)
+	values.Set("subscriptionId", subscription.ID.String())
+	values.Set("statusCode", strconv.Itoa(statusCode))
+	values.Set("dueAt", failureContext.dueAt.Format(time.RFC3339))
+	values.Set("title", payload.Title)
+	values.Set("tag", payload.Tag)
+	if failureContext.rule != "" {
+		values.Set("rule", failureContext.rule)
+	}
+	values.Set("error", truncateText(err.Error(), 420))
+
+	op := model.OperationLog{
+		ID:        model.Int64String(utils.GenerateID()),
+		LogID:     "push-" + strconv.FormatInt(time.Now().UnixNano(), 10),
+		Method:    "WEB_PUSH",
+		Path:      "/life-trace/push/" + failureContext.kind,
+		Query:     truncateText(values.Encode(), 1024),
+		Status:    statusCode,
+		LatencyMs: 0,
+		IP:        "",
+		UserAgent: truncateText(subscription.UserAgent, 512),
+		UserID:    subscription.UserID.String(),
+		UserRole:  "",
+		Level:     "error",
+		Message:   truncateText("LifeTrace Web Push failed: "+failureContext.kind, 128),
+	}
+
+	if createErr := db.Create(&op).Error; createErr != nil {
+		logger.Log.WithError(createErr).WithField("userId", subscription.UserID.String()).Warn("LifeTrace Web Push failure log write failed")
+	}
+}
+
+func truncateText(value string, maxLength int) string {
+	if maxLength <= 0 || len(value) <= maxLength {
+		return value
+	}
+	return value[:maxLength]
 }
 
 func formatPushDateText(dueAt time.Time) string {

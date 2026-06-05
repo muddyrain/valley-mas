@@ -21,6 +21,57 @@ func testWebPushConfig() config.WebPushConfig {
 	}
 }
 
+func TestScanPushRemindersRequiresCronSecretConfig(t *testing.T) {
+	router := setupTraceTestRouter(t, 101, testWebPushConfig())
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/push/scan", nil)
+	req.Header.Set("X-Cron-Secret", "secret")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 when cron secret is not configured, got %d", resp.Code)
+	}
+}
+
+func TestScanPushRemindersRequiresMatchingCronSecret(t *testing.T) {
+	cfg := testWebPushConfig()
+	cfg.CronSecret = "expected-secret"
+	router := setupTraceTestRouter(t, 101, cfg)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/push/scan", nil)
+	req.Header.Set("X-Cron-Secret", "wrong-secret")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for wrong cron secret, got %d", resp.Code)
+	}
+}
+
+func TestScanPushRemindersRunsWithCronSecret(t *testing.T) {
+	cfg := testWebPushConfig()
+	cfg.CronSecret = "expected-secret"
+	cfg.ReminderWindowMin = 15
+	router := setupTraceTestRouter(t, 101, cfg)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/push/scan", nil)
+	req.Header.Set("Authorization", "Bearer expected-secret")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	if data["scanned"] != true {
+		t.Fatalf("expected scan success, got %+v", data)
+	}
+	if data["timezone"] != lifeTraceReminderTimezone {
+		t.Fatalf("expected reminder timezone %s, got %+v", lifeTraceReminderTimezone, data)
+	}
+	if data["windowMinutes"] != float64(15) {
+		t.Fatalf("expected configured reminder window, got %+v", data)
+	}
+}
+
 func TestGetPushConfig(t *testing.T) {
 	router := setupTraceTestRouter(t, 101, testWebPushConfig())
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/push/config", nil)

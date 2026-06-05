@@ -70,6 +70,7 @@ func TestWebPushConfigLoadsFromEnv(t *testing.T) {
 	t.Setenv("WEB_PUSH_PUBLIC_KEY", " public-key ")
 	t.Setenv("WEB_PUSH_PRIVATE_KEY", " private-key ")
 	t.Setenv("WEB_PUSH_SUBJECT", "mailto:life@example.com")
+	t.Setenv("WEB_PUSH_CRON_SECRET", " scan-secret ")
 	t.Setenv("WEB_PUSH_SCAN_INTERVAL_SECONDS", "45")
 	t.Setenv("WEB_PUSH_REMINDER_WINDOW_MINUTES", "7")
 
@@ -84,8 +85,22 @@ func TestWebPushConfigLoadsFromEnv(t *testing.T) {
 	if cfg.WebPush.Subject != "mailto:life@example.com" {
 		t.Fatalf("expected configured subject, got %q", cfg.WebPush.Subject)
 	}
+	if cfg.WebPush.CronSecret != "scan-secret" {
+		t.Fatalf("expected trimmed cron secret, got %q", cfg.WebPush.CronSecret)
+	}
 	if cfg.WebPush.ScanIntervalSeconds != 45 || cfg.WebPush.ReminderWindowMin != 7 {
 		t.Fatalf("expected configured scan timing, got %+v", cfg.WebPush)
+	}
+}
+
+func TestWebPushCronSecretFallsBackToGenericCronSecret(t *testing.T) {
+	t.Setenv("WEB_PUSH_CRON_SECRET", "")
+	t.Setenv("CRON_SECRET", " generic-secret ")
+
+	cfg := Load()
+
+	if cfg.WebPush.CronSecret != "generic-secret" {
+		t.Fatalf("expected generic cron secret fallback, got %q", cfg.WebPush.CronSecret)
 	}
 }
 

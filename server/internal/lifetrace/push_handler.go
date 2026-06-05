@@ -187,6 +187,76 @@ func (h *Handler) TestPush(c *gin.Context) {
 	success(c, gin.H{"sent": true})
 }
 
+func (h *Handler) ScanPushReminders(c *gin.Context) {
+	secret := strings.TrimSpace(h.pushConfig.CronSecret)
+	if secret == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"code":    http.StatusServiceUnavailable,
+			"message": "WEB_PUSH_CRON_SECRET 未配置",
+		})
+		return
+	}
+	if !cronSecretMatches(c, secret) {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    http.StatusUnauthorized,
+			"message": "定时任务密钥无效",
+		})
+		return
+	}
+	if !h.push.Enabled() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"code":    http.StatusServiceUnavailable,
+			"message": "Web Push 未配置",
+		})
+		return
+	}
+
+	now := reminderNow()
+	if err := scanPushReminders(
+		c.Request.Context(),
+		h.push,
+		h.weather,
+		h.pushConfig.ReminderWindowMin,
+		now,
+	); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    http.StatusInternalServerError,
+			"message": "推送扫描失败",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	success(c, gin.H{
+		"scanned":       true,
+		"now":           now.Format(time.RFC3339),
+		"timezone":      lifeTraceReminderTimezone,
+		"windowMinutes": normalizedReminderWindow(h.pushConfig.ReminderWindowMin),
+	})
+}
+
+func cronSecretMatches(c *gin.Context, expected string) bool {
+	candidates := []string{
+		c.GetHeader("X-Cron-Secret"),
+		c.GetHeader("X-Webhook-Secret"),
+		strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer "),
+		c.Query("secret"),
+	}
+	for _, candidate := range candidates {
+		if strings.TrimSpace(candidate) == expected {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizedReminderWindow(windowMinutes int) int {
+	if windowMinutes <= 0 {
+		return 10
+	}
+	return windowMinutes
+}
+
 func pushTestFailureMessage(statusCode int, err error) string {
 	detail := strings.TrimSpace(err.Error())
 	if detail == "" {

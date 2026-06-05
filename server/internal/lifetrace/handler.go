@@ -8,8 +8,9 @@ import (
 )
 
 type Handler struct {
-	weather *WeatherService
-	push    *PushService
+	weather    *WeatherService
+	push       *PushService
+	pushConfig config.WebPushConfig
 }
 
 func NewHandler(weather *WeatherService, webPush ...config.WebPushConfig) *Handler {
@@ -17,7 +18,7 @@ func NewHandler(weather *WeatherService, webPush ...config.WebPushConfig) *Handl
 	if len(webPush) > 0 {
 		pushConfig = webPush[0]
 	}
-	return &Handler{weather: weather, push: NewPushService(pushConfig)}
+	return &Handler{weather: weather, push: NewPushService(pushConfig), pushConfig: pushConfig}
 }
 
 func (h *Handler) GetWeather(c *gin.Context) {

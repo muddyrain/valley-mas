@@ -97,6 +97,8 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 		}
 
 		push := group.Group("/push")
+		push.POST("/scan", handler.ScanPushReminders)
+
 		push.Use(auth)
 		{
 			push.GET("/config", handler.GetPushConfig)
