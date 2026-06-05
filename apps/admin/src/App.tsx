@@ -12,6 +12,8 @@ import CreatorDashboard from './pages/CreatorDashboard';
 import CreatorSpaces from './pages/CreatorSpaces';
 import Creators from './pages/Creators';
 import Dashboard from './pages/Dashboard';
+import Feedbacks from './pages/Feedbacks';
+import LifeTrace from './pages/LifeTrace';
 import Login from './pages/Login';
 import Records from './pages/Records';
 import Resources from './pages/Resources';
@@ -106,6 +108,8 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="creator-dashboard" element={<CreatorDashboard />} />
           <Route path="users" element={<Users />} />
+          <Route path="feedbacks" element={<Feedbacks />} />
+          <Route path="life-trace" element={<LifeTrace />} />
           <Route path="creators" element={<Creators />} />
           <Route path="creators/:creatorId/spaces" element={<CreatorSpaces />} />
           <Route path="creator-applications" element={<CreatorApplications />} />

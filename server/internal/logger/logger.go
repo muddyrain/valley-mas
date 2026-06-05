@@ -19,6 +19,7 @@ import (
 var Log *logrus.Logger
 
 const skipOperationLogKey = "skip_operation_log"
+const operationLogResponseBodyKey = "operation_log_response_body"
 
 // InitLogger 初始化日志系统
 func InitLogger() {
@@ -184,6 +185,13 @@ func SkipOperationLog(c *gin.Context) {
 	c.Set(skipOperationLogKey, true)
 }
 
+func SetOperationLogResponseBody(c *gin.Context, responseBody string) {
+	if c == nil {
+		return
+	}
+	c.Set(operationLogResponseBodyKey, truncateOperationLogText(responseBody, 4096))
+}
+
 func ShouldPersistOperationLog(c *gin.Context) bool {
 	if c == nil {
 		return true
@@ -230,25 +238,40 @@ func saveOperationLog(
 		}
 	}
 
+	responseBody := ""
+	if body, exists := c.Get(operationLogResponseBodyKey); exists {
+		if value, ok := body.(string); ok {
+			responseBody = value
+		}
+	}
+
 	op := model.OperationLog{
-		ID:        model.Int64String(utils.GenerateID()),
-		LogID:     logID,
-		Method:    c.Request.Method,
-		Path:      c.Request.URL.Path,
-		Query:     c.Request.URL.RawQuery,
-		Status:    statusCode,
-		LatencyMs: latency.Milliseconds(),
-		IP:        c.ClientIP(),
-		UserAgent: c.Request.UserAgent(),
-		UserID:    userID,
-		UserRole:  userRole,
-		Level:     level,
-		Message:   message,
+		ID:           model.Int64String(utils.GenerateID()),
+		LogID:        logID,
+		Method:       c.Request.Method,
+		Path:         c.Request.URL.Path,
+		Query:        c.Request.URL.RawQuery,
+		Status:       statusCode,
+		LatencyMs:    latency.Milliseconds(),
+		IP:           c.ClientIP(),
+		UserAgent:    c.Request.UserAgent(),
+		UserID:       userID,
+		UserRole:     userRole,
+		Level:        level,
+		Message:      message,
+		ResponseBody: responseBody,
 	}
 
 	if err := db.Create(&op).Error; err != nil {
 		Log.WithError(err).WithField("log_id", logID).Warn("写入操作日志表失败")
 	}
+}
+
+func truncateOperationLogText(value string, maxLength int) string {
+	if maxLength <= 0 || len(value) <= maxLength {
+		return value
+	}
+	return value[:maxLength]
 }
 
 // generateLogID 生成带时间戳的 Log ID

@@ -9,10 +9,10 @@ import {
   CloudSun,
   Download,
   Heart,
-  LoaderCircle,
   LogOut,
   type LucideIcon,
   MapPin,
+  MessageSquareText,
   MoonStar,
   Plus,
   RefreshCw,
@@ -31,6 +31,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { FeedbackSheet } from '@/components/FeedbackSheet';
 import { LocationPicker } from '@/components/LocationPicker';
 import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
 import { ProfileAvatarSheet } from '@/components/ProfileAvatarSheet';
@@ -301,11 +302,11 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
   const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
+  const [feedbackSheetOpen, setFeedbackSheetOpen] = useState(false);
   const [habitDraft, setHabitDraft] = useState('');
   const [habitDraftError, setHabitDraftError] = useState('');
   const [notificationTesting, setNotificationTesting] = useState(false);
   const [serverPushBinding, setServerPushBinding] = useState(false);
-  const [serverPushTesting, setServerPushTesting] = useState(false);
   const [notificationTestMessage, setNotificationTestMessage] = useState('');
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
@@ -325,12 +326,9 @@ export function ProfilePage() {
   const {
     canInstall,
     checkingUpdate,
-    clipboardSupported,
     installed,
     iosInstallHint,
     refreshing,
-    shareSupported,
-    serviceWorkerReady,
     updateAvailable,
     checkForUpdate,
     promptInstall,
@@ -364,7 +362,6 @@ export function ProfilePage() {
     Number(settings.weatherAlerts) +
     Number(settings.planReminders) +
     Number(settings.aiPersonalization);
-  const signalProgress = Math.round((enabledSignals / 3) * 100);
   const selectedWorkdayLabels = weekdayOptions
     .filter((option) => settings.workdays.includes(option.value))
     .map((option) => option.label)
@@ -375,24 +372,6 @@ export function ProfilePage() {
       : settings.workdayMode === 'daily'
         ? '每天生效'
         : selectedWorkdayLabels || '未选择';
-  const serverPushBusy = serverPushBinding || serverPushTesting;
-  const notificationDiagnostics = [
-    { label: 'HTTPS', ok: notification.secureContext },
-    { label: 'PWA', ok: installed },
-    { label: 'SW', ok: serviceWorkerReady },
-    { label: '权限', ok: notification.granted },
-    {
-      label: '服务端',
-      ok: notification.serverPushReady && !serverPushBusy,
-      status: serverPushBinding
-        ? '同步中'
-        : serverPushTesting
-          ? '测试中'
-          : notification.serverPushReady
-            ? 'OK'
-            : '待确认',
-    },
-  ];
   const locationLabel = formatLocationDisplay(settings.city) || settings.city;
   const activePantrySpaceName = currentHousehold?.name || preferredPantryHouseholdName || '未设置';
   const activePantrySpaceMeta = currentHousehold
@@ -455,20 +434,6 @@ export function ProfilePage() {
       );
     } finally {
       setServerPushBinding(false);
-    }
-  };
-
-  const handleTestServerPush = async () => {
-    setServerPushTesting(true);
-    setNotificationTestMessage('');
-
-    try {
-      const result = await notification.showServerTestNotification();
-      setNotificationTestMessage(
-        result.sent ? '服务端测试推送已发送。' : result.error || '服务端测试推送未发送。',
-      );
-    } finally {
-      setServerPushTesting(false);
     }
   };
 
@@ -707,43 +672,8 @@ export function ProfilePage() {
         </div>
       </section>
 
-      <section data-profile-card className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
-        <div className="rounded-[1.35rem] border border-life-ai/20 bg-life-ai/10 p-3">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <Sparkles className="size-4 text-life-ai" />
-            <span className="text-xs font-semibold text-life-ai">{signalProgress}%</span>
-          </div>
-          <p className="text-sm font-semibold">智能建议</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">{enabledSignals} 项开启</p>
-        </div>
-        <div className="rounded-[1.35rem] border border-life-health/20 bg-life-health/10 p-3">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <Bell className="size-4 text-life-health" />
-            <span className="text-xs font-semibold text-life-health">
-              {notification.granted ? 'ON' : 'OFF'}
-            </span>
-          </div>
-          <p className="text-sm font-semibold">系统通知</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            {notification.granted ? '已授权' : '待开启'}
-          </p>
-        </div>
-        <div className="rounded-[1.35rem] border border-life-plan/20 bg-life-plan/10 p-3">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <Smartphone className="size-4 text-life-plan" />
-            <span className="text-xs font-semibold text-life-plan">
-              {installed ? 'APP' : 'WEB'}
-            </span>
-          </div>
-          <p className="text-sm font-semibold">使用模式</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            {installed ? '桌面应用' : '浏览器'}
-          </p>
-        </div>
-      </section>
-
       <section data-profile-card className="space-y-3">
-        <SectionHeader title="生活偏好" meta="云端同步" />
+        <SectionHeader title="生活偏好" meta="城市 / 时间 / 通勤" />
         <LocationPicker value={settings.city} onChange={(value) => update('city', value)}>
           {({ displayValue, openPicker }) => (
             <button
@@ -800,149 +730,6 @@ export function ProfilePage() {
           type="time"
           onChange={(value) => update('dailyBriefTime', value)}
         />
-      </section>
-
-      <section data-profile-card className="space-y-3">
-        <SectionHeader title="工作日与提醒策略" meta={workdayMeta} />
-        <Card className="space-y-4 p-4">
-          <div className="flex items-start gap-3">
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-plan/10 text-life-plan">
-              <CalendarCheck className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-semibold">工作日规则</h3>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                用来决定 AI 建议、通勤文案和每日简报的默认节奏。
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
-            {workdayModeOptions.map((option) => (
-              <SegmentedOption
-                key={option.value}
-                value={option.value}
-                label={option.label}
-                detail={option.detail}
-                active={settings.workdayMode === option.value}
-                onSelect={(value) => update('workdayMode', value)}
-              />
-            ))}
-          </div>
-          {settings.workdayMode === 'custom' ? (
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold">自定义上班日</p>
-                <span className="text-xs text-muted-foreground">{selectedWorkdayLabels}</span>
-              </div>
-              <div className="grid grid-cols-7 gap-1.5">
-                {weekdayOptions.map((option) => {
-                  const active = settings.workdays.includes(option.value);
-
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={cn(
-                        'grid min-h-10 place-items-center rounded-xl border text-sm font-semibold transition',
-                        active
-                          ? 'border-life-plan/45 bg-life-plan/10 text-life-plan'
-                          : 'border-border bg-secondary text-muted-foreground',
-                      )}
-                      aria-pressed={active}
-                      onClick={() => toggleWorkday(option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-        </Card>
-
-        <Card className="space-y-4 p-4">
-          <div className="flex items-start gap-3">
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
-              <TimerReset className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-semibold">提醒节奏</h3>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                计划提醒、每日简报和库存提醒会参考这里的时间策略。
-              </p>
-            </div>
-          </div>
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold">计划提前提醒</p>
-              <span className="text-xs text-muted-foreground">
-                {settings.planReminderLeadMinutes === 0
-                  ? '准点提醒'
-                  : `提前 ${settings.planReminderLeadMinutes} 分钟`}
-              </span>
-            </div>
-            <div className="grid grid-cols-6 gap-1.5 max-[390px]:grid-cols-3">
-              {reminderLeadOptions.map((minutes) => {
-                const active = settings.planReminderLeadMinutes === minutes;
-
-                return (
-                  <button
-                    key={minutes}
-                    type="button"
-                    className={cn(
-                      'min-h-10 rounded-xl border px-2 text-sm font-semibold transition',
-                      active
-                        ? 'border-life-health/45 bg-life-health/10 text-life-health'
-                        : 'border-border bg-secondary text-muted-foreground',
-                    )}
-                    aria-pressed={active}
-                    onClick={() => update('planReminderLeadMinutes', minutes)}
-                  >
-                    {minutes === 0 ? '准点' : `${minutes}m`}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-            <SettingInput
-              label="勿扰开始"
-              value={settings.quietStart}
-              icon={MoonStar}
-              tone="plan"
-              placeholder="22:30"
-              type="time"
-              onChange={(value) => update('quietStart', value)}
-            />
-            <SettingInput
-              label="勿扰结束"
-              value={settings.quietEnd}
-              icon={Clock}
-              tone="health"
-              placeholder="07:30"
-              type="time"
-              onChange={(value) => update('quietEnd', value)}
-            />
-          </div>
-        </Card>
-        <SettingToggle
-          label="同步法定节假日"
-          detail="已内置 2026 年中国法定节假日与调休，上班提醒会优先读取。"
-          icon={CalendarCheck}
-          active={settings.holidaySync}
-          onToggle={() => update('holidaySync', !settings.holidaySync)}
-        />
-        <SettingToggle
-          label="周末也提醒"
-          detail="适合周末仍需要计划、运动或家庭事务提醒。"
-          icon={Bell}
-          active={settings.weekendReminders}
-          onToggle={() => update('weekendReminders', !settings.weekendReminders)}
-        />
-      </section>
-
-      <section data-profile-card className="space-y-3">
-        <SectionHeader title="通勤方式" meta={settings.commuteMethod} />
         <div className="grid grid-cols-5 gap-2 max-[390px]:grid-cols-3">
           {commuteMethods.map((method) => {
             const Icon = commuteIcons[method];
@@ -953,19 +740,152 @@ export function ProfilePage() {
                 key={method}
                 type="button"
                 className={cn(
-                  'group grid min-h-20 place-items-center rounded-[1.25rem] border px-2 py-3 text-xs font-semibold transition duration-300 max-[390px]:min-h-16',
+                  'group grid min-h-16 place-items-center rounded-[1.1rem] border px-2 py-2 text-xs font-semibold transition duration-300',
                   active
-                    ? 'border-life-ai/50 bg-life-ai text-background shadow-[0_18px_50px_rgba(6,182,212,0.16)]'
+                    ? 'border-life-ai/50 bg-life-ai text-background shadow-[0_14px_38px_rgba(6,182,212,0.14)]'
                     : 'border-border bg-card/80 text-muted-foreground hover:border-foreground/20 hover:bg-card',
                 )}
+                aria-pressed={active}
                 onClick={() => update('commuteMethod', method)}
               >
-                <Icon className="mb-2 size-5 transition group-hover:-translate-y-0.5 motion-reduce:transition-none" />
+                <Icon className="mb-1.5 size-5 transition group-hover:-translate-y-0.5 motion-reduce:transition-none" />
                 {method}
               </button>
             );
           })}
         </div>
+      </section>
+
+      <section data-profile-card className="space-y-3">
+        <SectionHeader title="高级提醒策略" meta={workdayMeta} />
+        <details className="group rounded-[1.35rem] border border-border bg-card/80 p-4">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-life-plan/10 text-life-plan">
+                <CalendarCheck className="size-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block font-semibold">工作日、提前提醒和勿扰时间</span>
+                <span className="mt-1 block text-sm leading-5 text-muted-foreground">
+                  低频设置收在这里，默认节奏保持 {workdayMeta}。
+                </span>
+              </span>
+            </span>
+            <span className="shrink-0 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
+              展开
+            </span>
+          </summary>
+          <div className="mt-4 space-y-4 border-t border-border pt-4">
+            <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
+              {workdayModeOptions.map((option) => (
+                <SegmentedOption
+                  key={option.value}
+                  value={option.value}
+                  label={option.label}
+                  detail={option.detail}
+                  active={settings.workdayMode === option.value}
+                  onSelect={(value) => update('workdayMode', value)}
+                />
+              ))}
+            </div>
+            {settings.workdayMode === 'custom' ? (
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold">自定义上班日</p>
+                  <span className="text-xs text-muted-foreground">{selectedWorkdayLabels}</span>
+                </div>
+                <div className="grid grid-cols-7 gap-1.5">
+                  {weekdayOptions.map((option) => {
+                    const active = settings.workdays.includes(option.value);
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={cn(
+                          'grid min-h-10 place-items-center rounded-xl border text-sm font-semibold transition',
+                          active
+                            ? 'border-life-plan/45 bg-life-plan/10 text-life-plan'
+                            : 'border-border bg-secondary text-muted-foreground',
+                        )}
+                        aria-pressed={active}
+                        onClick={() => toggleWorkday(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">计划提前提醒</p>
+                <span className="text-xs text-muted-foreground">
+                  {settings.planReminderLeadMinutes === 0
+                    ? '准点提醒'
+                    : `提前 ${settings.planReminderLeadMinutes} 分钟`}
+                </span>
+              </div>
+              <div className="grid grid-cols-6 gap-1.5 max-[390px]:grid-cols-3">
+                {reminderLeadOptions.map((minutes) => {
+                  const active = settings.planReminderLeadMinutes === minutes;
+
+                  return (
+                    <button
+                      key={minutes}
+                      type="button"
+                      className={cn(
+                        'min-h-10 rounded-xl border px-2 text-sm font-semibold transition',
+                        active
+                          ? 'border-life-health/45 bg-life-health/10 text-life-health'
+                          : 'border-border bg-secondary text-muted-foreground',
+                      )}
+                      aria-pressed={active}
+                      onClick={() => update('planReminderLeadMinutes', minutes)}
+                    >
+                      {minutes === 0 ? '准点' : `${minutes}m`}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+              <SettingInput
+                label="勿扰开始"
+                value={settings.quietStart}
+                icon={MoonStar}
+                tone="plan"
+                placeholder="22:30"
+                type="time"
+                onChange={(value) => update('quietStart', value)}
+              />
+              <SettingInput
+                label="勿扰结束"
+                value={settings.quietEnd}
+                icon={Clock}
+                tone="health"
+                placeholder="07:30"
+                type="time"
+                onChange={(value) => update('quietEnd', value)}
+              />
+            </div>
+            <SettingToggle
+              label="同步法定节假日"
+              detail="已内置 2026 年中国法定节假日与调休，上班提醒会优先读取。"
+              icon={CalendarCheck}
+              active={settings.holidaySync}
+              onToggle={() => update('holidaySync', !settings.holidaySync)}
+            />
+            <SettingToggle
+              label="周末也提醒"
+              detail="适合周末仍需要计划、运动或家庭事务提醒。"
+              icon={Bell}
+              active={settings.weekendReminders}
+              onToggle={() => update('weekendReminders', !settings.weekendReminders)}
+            />
+          </div>
+        </details>
       </section>
 
       <section data-profile-card className="space-y-3">
@@ -995,23 +915,15 @@ export function ProfilePage() {
               <p className="mt-1 text-sm leading-5 text-muted-foreground">
                 {notification.serverPushLabel}
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {notificationDiagnostics.map((item) => (
-                  <Badge key={item.label} tone={item.ok ? 'trace' : 'default'}>
-                    {item.label} {item.status ?? (item.ok ? 'OK' : '待确认')}
-                  </Badge>
-                ))}
-              </div>
               <p className="mt-3 text-xs leading-5 text-muted-foreground">
                 iPhone 需要通过 HTTPS 打开并添加到主屏幕后，从桌面图标进入再开启通知。
-                远程测试用于确认服务端能主动推送，不是当前页面本地弹窗。
               </p>
               {notificationTestMessage ? (
                 <p className="mt-2 text-xs leading-5 text-life-ai">{notificationTestMessage}</p>
               ) : null}
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-2 max-[360px]:grid-cols-1">
+          <div className="mt-4 grid grid-cols-3 gap-2 max-[390px]:grid-cols-1">
             <Button
               type="button"
               variant={notification.granted ? 'secondary' : 'ai'}
@@ -1035,36 +947,12 @@ export function ProfilePage() {
               type="button"
               variant={notification.serverPushReady ? 'secondary' : 'ai'}
               size="sm"
-              disabled={!notification.pushSupported || serverPushBusy}
+              disabled={!notification.pushSupported || serverPushBinding}
               onClick={() => void handleEnableServerPush()}
             >
               {serverPushBinding ? <ActionLoadingIcon tone="ai" /> : <Wifi className="size-4" />}
               {serverPushBinding ? '绑定中' : notification.serverPushReady ? '已绑定' : '绑定推送'}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!notification.serverPushReady || serverPushBusy}
-              onClick={() => void handleTestServerPush()}
-            >
-              {serverPushTesting ? <ActionLoadingIcon tone="ai" /> : <Bell className="size-4" />}
-              {serverPushTesting ? '发送中' : '远程测试'}
-            </Button>
-          </div>
-        </Card>
-        <Card className="border-life-ai/15 bg-life-ai/5 p-4">
-          <div className="flex items-start gap-3">
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
-              <Smartphone className="size-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold">真机提醒验收</h3>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                先用 HTTPS preview 在手机上完成安装和授权，再创建一个 1-2
-                分钟后到期的计划，等待系统通知并点击回到计划页。
-              </p>
-            </div>
           </div>
         </Card>
         <SettingToggle
@@ -1077,7 +965,7 @@ export function ProfilePage() {
       </section>
 
       <section data-profile-card className="space-y-3">
-        <SectionHeader title="空间管理" meta={activePantrySpaceName} />
+        <SectionHeader title="库存与家庭" meta={activePantrySpaceName} />
         <Card id="space-management" className="space-y-4 p-4">
           <div className="flex items-start gap-3">
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
@@ -1102,7 +990,7 @@ export function ProfilePage() {
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
                   {householdsLoaded || currentHousehold
                     ? activePantrySpaceMeta
-                    : '打开空间管理后会同步完整空间信息。'}
+                    : '打开家庭设置后会同步完整空间信息。'}
                 </p>
               </div>
               {householdsLoading ? <Badge tone="ai">同步中</Badge> : null}
@@ -1127,10 +1015,7 @@ export function ProfilePage() {
             </Button>
           </div>
         </Card>
-      </section>
 
-      <section data-profile-card className="space-y-3">
-        <SectionHeader title="家庭库存提醒" meta="本机默认" />
         <Card className="space-y-4 p-4">
           <div className="flex items-start gap-3">
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
@@ -1313,24 +1198,22 @@ export function ProfilePage() {
             <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
               {updateAvailable ? (
                 <RefreshCw className="size-5" />
-              ) : serviceWorkerReady ? (
-                <Smartphone className="size-5" />
               ) : (
-                <LoaderCircle className="size-5 animate-spin" />
+                <Smartphone className="size-5" />
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold">Life Trace PWA 控制台</h3>
+              <h3 className="font-semibold">安装和分享 Life Trace</h3>
               <p className="mt-1 text-sm leading-5 text-muted-foreground">
                 {updateAvailable
-                  ? '开发者已发布新内容，刷新后会同步最新页面、名称和图标缓存。'
+                  ? '有新内容可用，刷新后会立即同步到当前设备。'
                   : installed
-                    ? '当前已以应用模式运行，可继续检查更新或分享给其他用户。'
+                    ? '当前已以应用模式运行，可以继续检查更新或分享给其他用户。'
                     : canInstall
-                      ? '当前浏览器支持一键安装，不必再从分享菜单里找入口。'
+                      ? '当前浏览器支持一键安装，可以放到桌面快速打开。'
                       : iosInstallHint
                         ? 'iPhone 需要从浏览器分享菜单添加到主屏幕，安装后可在这里检查更新。'
-                        : '当前浏览器可使用分享或复制链接把应用发给其他用户。'}
+                        : '也可以先用浏览器访问，并把应用分享给其他用户。'}
               </p>
             </div>
           </div>
@@ -1338,14 +1221,8 @@ export function ProfilePage() {
             <Badge tone={installed ? 'trace' : 'default'}>
               {installed ? '已安装' : '浏览器模式'}
             </Badge>
-            <Badge tone={serviceWorkerReady ? 'trace' : 'default'}>
-              {serviceWorkerReady ? '离线缓存 OK' : '缓存准备中'}
-            </Badge>
             <Badge tone={updateAvailable ? 'ai' : 'default'}>
               {updateAvailable ? '发现更新' : '暂无更新'}
-            </Badge>
-            <Badge tone={shareSupported || clipboardSupported ? 'trace' : 'default'}>
-              {shareSupported ? '系统分享' : clipboardSupported ? '可复制链接' : '分享受限'}
             </Badge>
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2 max-[390px]:grid-cols-1">
@@ -1394,11 +1271,35 @@ export function ProfilePage() {
               <span className="min-w-0 leading-5">
                 {iosInstallHint && !canInstall
                   ? 'iPhone 安装仍受 Safari/系统限制：点浏览器分享按钮，再选择“添加到主屏幕”。'
-                  : '图标或应用名称变更后，点“检查更新/立即更新”可优先刷新 manifest 与图标缓存。'}
+                  : '遇到页面内容没有更新时，点“检查更新”或“立即更新”刷新到最新版本。'}
               </span>
             </span>
           </div>
         </Card>
+      </section>
+
+      <section data-profile-card className="space-y-3">
+        <SectionHeader title="反馈" meta="Life Trace" />
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-4 rounded-[1.25rem] border border-border bg-card p-4 text-left transition hover:border-life-ai/35 hover:bg-card/95"
+          onClick={() => setFeedbackSheetOpen(true)}
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+              <MessageSquareText className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block font-semibold">问题反馈</span>
+              <span className="mt-1 block text-sm leading-5 text-muted-foreground">
+                发内容和截图，管理员会在后台处理。
+              </span>
+            </span>
+          </span>
+          <span className="shrink-0 rounded-full border border-life-ai/25 bg-life-ai/10 px-3 py-1 text-xs font-semibold text-life-ai">
+            反馈
+          </span>
+        </button>
       </section>
 
       <p className="pb-2 text-center text-xs font-medium text-muted-foreground/70">
@@ -1443,6 +1344,7 @@ export function ProfilePage() {
         onLeaveHousehold={handleLeaveHousehold}
         onDissolveHousehold={handleDissolveHousehold}
       />
+      <FeedbackSheet open={feedbackSheetOpen} onOpenChange={setFeedbackSheetOpen} />
     </div>
   );
 }

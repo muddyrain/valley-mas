@@ -186,6 +186,13 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.GET("/stats", handler.GetStats)
 				adminOnly.GET("/trends", handler.GetTrends)
 
+				adminOnly.GET("/feedbacks", handler.ListFeedbacks)
+				adminOnly.PATCH("/feedbacks/:id/status", handler.UpdateFeedbackStatus)
+
+				adminOnly.GET("/life-trace/overview", handler.GetAdminLifeTraceOverview)
+				adminOnly.GET("/life-trace/users", handler.ListAdminLifeTraceUsers)
+				adminOnly.GET("/life-trace/records", handler.ListAdminLifeTraceRecords)
+
 				adminOnly.GET("/records/downloads", handler.ListDownloadRecords)
 				adminOnly.GET("/records/downloads/export", handler.ExportDownloadRecords)
 				// 资源标签增删改（仅管理员）

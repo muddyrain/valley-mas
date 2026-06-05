@@ -3,11 +3,13 @@ import {
   BookOutlined,
   CrownOutlined,
   DashboardOutlined,
+  DatabaseOutlined,
   FileTextOutlined,
   FormOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  MessageOutlined,
   PictureOutlined,
   UserOutlined,
 } from '@ant-design/icons';
@@ -20,13 +22,41 @@ import http from '../utils/request';
 const { Header, Sider, Content } = AntLayout;
 
 const adminMenuItems = [
-  { key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' },
-  { key: '/users', icon: <UserOutlined />, label: '用户管理' },
-  { key: '/creators', icon: <CrownOutlined />, label: '创作者管理' },
-  { key: '/creator-applications', icon: <AuditOutlined />, label: '创作者申请审核' },
-  { key: '/resources', icon: <PictureOutlined />, label: '资源管理' },
-  { key: '/records', icon: <FileTextOutlined />, label: '记录管理' },
-  { key: '/blog-posts', icon: <BookOutlined />, label: '博客管理' },
+  {
+    key: 'overview',
+    type: 'group' as const,
+    label: '系统概览',
+    children: [
+      { key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' },
+      { key: '/users', icon: <UserOutlined />, label: '用户管理' },
+    ],
+  },
+  {
+    key: 'life-trace',
+    type: 'group' as const,
+    label: 'Life Trace',
+    children: [
+      { key: '/life-trace', icon: <DatabaseOutlined />, label: 'Life Trace 管理' },
+      { key: '/feedbacks', icon: <MessageOutlined />, label: '问题反馈' },
+    ],
+  },
+  {
+    key: 'creator-content',
+    type: 'group' as const,
+    label: '创作者与内容',
+    children: [
+      { key: '/creators', icon: <CrownOutlined />, label: '创作者管理' },
+      { key: '/creator-applications', icon: <AuditOutlined />, label: '创作者申请审核' },
+      { key: '/resources', icon: <PictureOutlined />, label: '资源管理' },
+      { key: '/blog-posts', icon: <BookOutlined />, label: '博客管理' },
+    ],
+  },
+  {
+    key: 'audit',
+    type: 'group' as const,
+    label: '记录与审计',
+    children: [{ key: '/records', icon: <FileTextOutlined />, label: '下载记录' }],
+  },
 ];
 
 const creatorMenuItems = [
@@ -36,6 +66,13 @@ const creatorMenuItems = [
 ];
 
 const userMenuItems = [{ key: '/apply-creator', icon: <FormOutlined />, label: '申请成为创作者' }];
+
+const resolveSelectedMenuKey = (pathname: string) => {
+  if (pathname.startsWith('/blog-posts')) return '/blog-posts';
+  if (pathname.startsWith('/creators/')) return '/creators';
+  if (pathname.startsWith('/life-trace')) return '/life-trace';
+  return pathname;
+};
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -107,7 +144,7 @@ export default function Layout() {
         </div>
         <Menu
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[resolveSelectedMenuKey(location.pathname)]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
           className="border-r-0"

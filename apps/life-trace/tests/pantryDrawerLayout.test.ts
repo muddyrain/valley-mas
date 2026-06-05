@@ -14,6 +14,10 @@ const photoItemAnalysisSource = readFileSync(
   resolve(__dirname, '../src/pages/PhotoItemAnalysisPage.tsx'),
   'utf8',
 );
+const expiryDateFieldSource = readFileSync(
+  resolve(__dirname, '../src/components/PantryExpiryDateField.tsx'),
+  'utf8',
+);
 
 describe('pantry drawer mobile layout guards', () => {
   it('clips sheet content horizontally instead of exposing a horizontal scrollbar', () => {
@@ -42,5 +46,17 @@ describe('pantry drawer mobile layout guards', () => {
   it('keeps the photo review card in normal document flow while the sheet scrolls', () => {
     expect(photoItemAnalysisSource).toContain('当前编辑图片');
     expect(photoItemAnalysisSource).not.toContain('sticky top-0');
+  });
+
+  it('keeps photo analysis labels and expiry date clearing mobile friendly', () => {
+    expect(photoItemAnalysisSource).toContain('className="shrink-0 whitespace-nowrap"');
+    expect(photoItemAnalysisSource).toContain('<FormItem label="商品名称" required>');
+    expect(expiryDateFieldSource).toContain('<FormItem label="生产/购买日期">');
+    expect(expiryDateFieldSource).toContain("value ? 'pr-[4.25rem]' : 'pr-10'");
+    expect(expiryDateFieldSource).toContain('cursor-pointer border-life-health/35');
+    expect(expiryDateFieldSource).toContain('cursor-not-allowed border-border');
+    expect(expiryDateFieldSource).toContain('aria-label={clearLabel}');
+    expect(expiryDateFieldSource).toContain('clearLabel="清空生产或购买日期"');
+    expect(expiryDateFieldSource).toContain('clearLabel="清空过期日期"');
   });
 });

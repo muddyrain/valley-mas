@@ -2,12 +2,14 @@ package lifetrace
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -190,6 +192,11 @@ func (h *Handler) TestPush(c *gin.Context) {
 func (h *Handler) ScanPushReminders(c *gin.Context) {
 	secret := strings.TrimSpace(h.pushConfig.CronSecret)
 	if secret == "" {
+		setPushScanOperationLogResponse(c, http.StatusServiceUnavailable, "WEB_PUSH_CRON_SECRET 未配置", gin.H{
+			"configured": false,
+			"scanned":    false,
+			"reason":     "WEB_PUSH_CRON_SECRET 未配置",
+		})
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"code":    http.StatusServiceUnavailable,
 			"message": "WEB_PUSH_CRON_SECRET 未配置",
@@ -197,6 +204,11 @@ func (h *Handler) ScanPushReminders(c *gin.Context) {
 		return
 	}
 	if !cronSecretMatches(c, secret) {
+		setPushScanOperationLogResponse(c, http.StatusUnauthorized, "定时任务密钥无效", gin.H{
+			"configured": true,
+			"scanned":    false,
+			"reason":     "定时任务密钥无效",
+		})
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"code":    http.StatusUnauthorized,
 			"message": "定时任务密钥无效",
@@ -204,6 +216,11 @@ func (h *Handler) ScanPushReminders(c *gin.Context) {
 		return
 	}
 	if !h.push.Enabled() {
+		setPushScanOperationLogResponse(c, http.StatusServiceUnavailable, "Web Push 未配置", gin.H{
+			"configured": true,
+			"scanned":    false,
+			"reason":     "Web Push 未配置",
+		})
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"code":    http.StatusServiceUnavailable,
 			"message": "Web Push 未配置",
@@ -219,6 +236,13 @@ func (h *Handler) ScanPushReminders(c *gin.Context) {
 		h.pushConfig.ReminderWindowMin,
 		now,
 	); err != nil {
+		setPushScanOperationLogResponse(c, http.StatusInternalServerError, "推送扫描失败", gin.H{
+			"configured":    true,
+			"scanned":       false,
+			"timezone":      lifeTraceReminderTimezone,
+			"windowMinutes": normalizedReminderWindow(h.pushConfig.ReminderWindowMin),
+			"error":         err.Error(),
+		})
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    http.StatusInternalServerError,
 			"message": "推送扫描失败",
@@ -227,12 +251,28 @@ func (h *Handler) ScanPushReminders(c *gin.Context) {
 		return
 	}
 
-	success(c, gin.H{
+	data := gin.H{
 		"scanned":       true,
 		"now":           now.Format(time.RFC3339),
 		"timezone":      lifeTraceReminderTimezone,
 		"windowMinutes": normalizedReminderWindow(h.pushConfig.ReminderWindowMin),
-	})
+	}
+	setPushScanOperationLogResponse(c, http.StatusOK, "success", data)
+	success(c, data)
+}
+
+func setPushScanOperationLogResponse(c *gin.Context, code int, message string, data gin.H) {
+	payload := gin.H{
+		"code":    code,
+		"message": message,
+		"data":    data,
+	}
+
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+	logger.SetOperationLogResponseBody(c, string(raw))
 }
 
 func cronSecretMatches(c *gin.Context, expected string) bool {

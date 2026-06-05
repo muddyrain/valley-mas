@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CalendarDays,
+  Camera,
   Check,
   Clock,
   History,
@@ -54,6 +55,10 @@ import { Card } from '@/components/ui/card';
 import { aiQuickActions, suggestedPrompts } from '@/data/mock';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import { formatLocationDisplay } from '@/lib/location';
+import {
+  type PhotoItemAnalysisHistoryItem,
+  readPhotoItemAnalysisHistory,
+} from '@/lib/photoItemAnalysis';
 import { getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { getLocalISODate } from '@/lib/planSchedule';
 import {
@@ -130,6 +135,19 @@ function formatAssistantActionMessage(event: LifeAssistantActionEvent) {
   }
 
   return event.message;
+}
+
+function formatPhotoItemHistoryTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '刚刚';
+  }
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function normalizeAssistantMessage(message: LifeAssistantMessage, index: number): AssistantMessage {
@@ -746,6 +764,7 @@ function AgentConversationPanel({
   weeklyReviews,
   weeklyReviewsLoading,
   latestWeeklyReview,
+  photoItemHistory,
   quickActions,
   quickActionLoading,
   aiActions,
@@ -759,6 +778,7 @@ function AgentConversationPanel({
   onOpenConversations,
   onCreateConversation,
   onOpenWeeklyReviews,
+  onOpenPhotoAnalysis,
   onOpenActions,
   onAddAdvicePlan,
   onQuickAction,
@@ -776,6 +796,7 @@ function AgentConversationPanel({
   weeklyReviews: WeeklyReviewResponse[];
   weeklyReviewsLoading: boolean;
   latestWeeklyReview?: WeeklyReviewResponse;
+  photoItemHistory: PhotoItemAnalysisHistoryItem[];
   quickActions: typeof aiQuickActions;
   quickActionLoading: string | null;
   aiActions: AiAction[];
@@ -789,6 +810,7 @@ function AgentConversationPanel({
   onOpenConversations: () => void;
   onCreateConversation: () => void;
   onOpenWeeklyReviews: () => void;
+  onOpenPhotoAnalysis: () => void;
   onOpenActions: () => void;
   onAddAdvicePlan: (item: AdvicePayload) => void;
   onQuickAction: (label: string) => void;
@@ -943,6 +965,61 @@ function AgentConversationPanel({
                     </div>
                   );
                 })}
+              </div>
+            ) : null}
+
+            {photoItemHistory.length > 0 ? (
+              <div className="mb-3 rounded-2xl border border-life-ai/20 bg-card p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">最近商品识别</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      未入库草稿可以回到拍照页继续编辑。
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-life-ai/10 px-3 py-1.5 text-xs font-semibold text-life-ai"
+                    onClick={onOpenPhotoAnalysis}
+                  >
+                    <Camera className="size-3.5" />
+                    继续拍
+                  </button>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {photoItemHistory.slice(0, 3).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-secondary/45 p-2 text-left transition hover:bg-secondary"
+                      onClick={onOpenPhotoAnalysis}
+                    >
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.form.name || item.analysis.name || '商品识别图片'}
+                          className="size-12 shrink-0 rounded-xl object-cover"
+                        />
+                      ) : (
+                        <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-background text-life-ai">
+                          <Image className="size-5" />
+                        </span>
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">
+                          {item.form.name || item.analysis.name || '待确认商品'}
+                        </span>
+                        <span className="mt-1 block truncate text-xs text-muted-foreground">
+                          {formatPhotoItemHistoryTime(item.updatedAt)} ·{' '}
+                          {item.householdName || '我的空间'}
+                        </span>
+                      </span>
+                      <Badge tone={item.status === 'draft' ? 'ai' : 'trace'}>
+                        {item.status === 'draft' ? '草稿' : '已入库'}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : null}
 
@@ -1128,6 +1205,9 @@ function useAiPageState() {
   const [assistantListening, setAssistantListening] = useState(false);
   const [assistantSpeechError, setAssistantSpeechError] = useState('');
   const [quickActionLoading, setQuickActionLoading] = useState<string | null>(null);
+  const [photoItemHistory, setPhotoItemHistory] = useState<PhotoItemAnalysisHistoryItem[]>(() =>
+    readPhotoItemAnalysisHistory(),
+  );
   const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
   const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReviewResponse[]>([]);
   const [weeklyReviewsLoading, setWeeklyReviewsLoading] = useState(false);
@@ -1165,6 +1245,24 @@ function useAiPageState() {
 
     void loadCheckins(todayDate);
   }, [loadCheckins, settingsLoaded, todayDate, token]);
+
+  useEffect(() => {
+    const refreshPhotoItemHistory = () => setPhotoItemHistory(readPhotoItemAnalysisHistory());
+    refreshPhotoItemHistory();
+
+    window.addEventListener('focus', refreshPhotoItemHistory);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshPhotoItemHistory();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', refreshPhotoItemHistory);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (!token) {
@@ -1952,6 +2050,7 @@ function useAiPageState() {
     activeHabitCount,
     latestTrace,
     latestWeeklyReview,
+    photoItemHistory,
     locationLabel,
     placeholder,
     handleSelectAssistantConversation,
@@ -2110,6 +2209,7 @@ export function AiPage() {
     weeklyReviewRegenerateTarget,
     setWeeklyReviewRegenerateTarget,
     latestWeeklyReview,
+    photoItemHistory,
     handleSelectAssistantConversation,
     handleCreateAssistantConversation,
     handleDeleteAssistantConversation,
@@ -2136,6 +2236,7 @@ export function AiPage() {
         weeklyReviews={weeklyReviews}
         weeklyReviewsLoading={weeklyReviewsLoading}
         latestWeeklyReview={latestWeeklyReview}
+        photoItemHistory={photoItemHistory}
         quickActions={aiQuickActions}
         quickActionLoading={quickActionLoading}
         aiActions={aiActions}
@@ -2151,6 +2252,7 @@ export function AiPage() {
         onOpenConversations={() => setAssistantConversationSheetOpen(true)}
         onCreateConversation={() => void handleCreateAssistantConversation()}
         onOpenWeeklyReviews={() => navigate('/ai/weekly-reviews')}
+        onOpenPhotoAnalysis={() => navigate('/ai/photo-item-analysis')}
         onOpenActions={() => navigate('/ai/actions')}
         onAddAdvicePlan={(item) => void handleAddAdvicePlan(item)}
         onQuickAction={(label) => void handleQuickAction(label)}

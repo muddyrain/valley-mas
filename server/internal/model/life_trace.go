@@ -288,6 +288,38 @@ func (review *LifeTraceWeeklyReview) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+type LifeTraceFeedback struct {
+	ID         Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID     Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	App        string         `gorm:"size:60;not null;default:'life-trace';index" json:"app"`
+	Content    string         `gorm:"type:text;not null" json:"content"`
+	ImageURLs  StringList     `gorm:"column:image_urls;type:text" json:"imageUrls"`
+	Status     string         `gorm:"size:20;not null;default:'open';index" json:"status"`
+	ResolvedBy Int64String    `gorm:"column:resolved_by;index" json:"resolvedBy,omitempty"`
+	ResolvedAt *time.Time     `json:"resolvedAt,omitempty"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	UpdatedAt  time.Time      `json:"updatedAt"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+
+	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
+}
+
+func (feedback *LifeTraceFeedback) BeforeCreate(tx *gorm.DB) error {
+	if feedback.ID == 0 {
+		feedback.ID = Int64String(utils.GenerateID())
+	}
+	if feedback.App == "" {
+		feedback.App = "life-trace"
+	}
+	if feedback.Status == "" {
+		feedback.Status = "open"
+	}
+	if feedback.ImageURLs == nil {
+		feedback.ImageURLs = StringList{}
+	}
+	return nil
+}
+
 type LifeTraceAIConversation struct {
 	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID    Int64String    `gorm:"column:user_id;index;not null" json:"userId"`

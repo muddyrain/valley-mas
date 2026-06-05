@@ -13,6 +13,12 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			uploads.POST("/image", handler.UploadImage)
 		}
 
+		feedbacks := group.Group("/feedbacks")
+		feedbacks.Use(auth)
+		{
+			feedbacks.POST("", handler.CreateFeedback)
+		}
+
 		ai := group.Group("/ai")
 		ai.Use(auth)
 		{

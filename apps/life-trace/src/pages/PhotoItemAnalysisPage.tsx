@@ -3,6 +3,7 @@ import {
   Camera,
   Check,
   ChevronDown,
+  History,
   ImagePlus,
   PackageCheck,
   RefreshCcw,
@@ -16,13 +17,24 @@ import { analyzePantryPhoto, type PantryPhotoAnalysisResponse } from '@/api/pant
 import { uploadLifeTraceImage } from '@/api/upload';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
+import { FormItem } from '@/components/FormItem';
 import { OptionPickerSheet } from '@/components/OptionPickerSheet';
 import { PantryExpiryDateField } from '@/components/PantryExpiryDateField';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { buildPhotoItemPantryInput, type PhotoItemDraftForm } from '@/lib/photoItemAnalysis';
+import {
+  buildPhotoItemPantryInput,
+  createPhotoItemAnalysisHistoryId,
+  getLatestPhotoItemAnalysisDraft,
+  markPhotoItemAnalysisSaved,
+  type PhotoItemAnalysisHistoryItem,
+  type PhotoItemDraftForm,
+  readPhotoItemAnalysisHistory,
+  removePhotoItemAnalysisHistory,
+  upsertPhotoItemAnalysisHistory,
+} from '@/lib/photoItemAnalysis';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -95,6 +107,19 @@ function resolveSelectableHouseholdId(
     : '';
 }
 
+function formatDraftUpdatedAt(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '刚刚';
+  }
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function PhotoItemAnalysisPage() {
   const navigate = useNavigate();
   const token = useAuthStore((state) => state.token);
@@ -123,12 +148,24 @@ export function PhotoItemAnalysisPage() {
   const [reviewSheetOpen, setReviewSheetOpen] = useState(false);
   const [activePicker, setActivePicker] = useState<'category' | 'location' | null>(null);
   const [expiryBaseDate, setExpiryBaseDate] = useState('');
+  const [historyItems, setHistoryItems] = useState<PhotoItemAnalysisHistoryItem[]>(() =>
+    readPhotoItemAnalysisHistory(),
+  );
+  const [currentHistoryId, setCurrentHistoryId] = useState('');
 
   const cameraActive = state === 'camera-ready';
   const busy = state === 'uploading' || state === 'analyzing' || state === 'saving';
   const reviewReady = Boolean(analysis);
   const scannerStatusLabel = state === 'done' ? '已入库' : busy ? '处理中' : '待确认';
   const hasExpiryDate = Boolean(form.expiresAt.trim());
+  const latestDraft = useMemo(
+    () =>
+      currentHistoryId
+        ? null
+        : (historyItems.find((item) => item.status === 'draft') ??
+          getLatestPhotoItemAnalysisDraft()),
+    [currentHistoryId, historyItems],
+  );
   const selectedHouseholdName = useMemo(() => {
     if (!form.householdId) {
       return '我的空间';
@@ -144,7 +181,7 @@ export function PhotoItemAnalysisPage() {
   useEffect(() => {
     setForm((current) => ({
       ...current,
-      householdId: preferredPantryHouseholdId,
+      householdId: current.householdId || preferredPantryHouseholdId,
       reminderEnabled: current.expiresAt ? pantryPreferences.defaultReminderEnabled : false,
     }));
   }, [pantryPreferences.defaultReminderEnabled, preferredPantryHouseholdId]);
@@ -181,6 +218,36 @@ export function PhotoItemAnalysisPage() {
       }
     };
   }, [imagePreviewUrl]);
+
+  useEffect(() => {
+    if (!currentHistoryId || !analysis || !uploadedImageUrl || state === 'done') {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const existing = readPhotoItemAnalysisHistory().find((item) => item.id === currentHistoryId);
+    upsertPhotoItemAnalysisHistory({
+      id: currentHistoryId,
+      imageUrl: uploadedImageUrl,
+      imageName: existing?.imageName,
+      analysis,
+      form,
+      expiryBaseDate,
+      householdName: selectedHouseholdName,
+      status: 'draft',
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    });
+    setHistoryItems(readPhotoItemAnalysisHistory());
+  }, [
+    analysis,
+    currentHistoryId,
+    expiryBaseDate,
+    form,
+    selectedHouseholdName,
+    state,
+    uploadedImageUrl,
+  ]);
 
   const stopCamera = useCallback(() => {
     setCameraStream((current) => {
@@ -241,6 +308,7 @@ export function PhotoItemAnalysisPage() {
     setImagePreviewUrl(URL.createObjectURL(file));
     setUploadedImageUrl('');
     setAnalysis(null);
+    setCurrentHistoryId('');
     setReviewSheetOpen(false);
     setError('');
     setState('captured');
@@ -337,22 +405,39 @@ export function PhotoItemAnalysisPage() {
         imageUrl: upload.url,
         householdId: form.householdId || undefined,
       });
-      setAnalysis(result);
-      setForm((current) => ({
-        ...current,
-        name: result.name || current.name,
-        category: result.category || current.category,
+      const nextForm: DraftForm = {
+        ...form,
+        name: result.name || form.name,
+        category: result.category || form.category,
         quantity: String(result.quantity || 1),
-        unit: result.unit || current.unit,
-        location: result.storageLocation || current.location,
+        unit: result.unit || form.unit,
+        location: result.storageLocation || form.location,
         expiresAt: result.expiresAt || '',
         openedAt: '',
         note: buildAnalysisNote(result),
         householdId:
-          resolveSelectableHouseholdId(result.householdId, households) || current.householdId,
+          resolveSelectableHouseholdId(result.householdId, households) || form.householdId,
         reminderEnabled: result.expiresAt ? pantryPreferences.defaultReminderEnabled : false,
-      }));
-      setExpiryBaseDate(result.productionDate || result.purchaseDate || '');
+      };
+      const nextExpiryBaseDate = result.productionDate || result.purchaseDate || '';
+      const historyId = createPhotoItemAnalysisHistoryId();
+      setAnalysis(result);
+      setForm(nextForm);
+      setExpiryBaseDate(nextExpiryBaseDate);
+      setCurrentHistoryId(historyId);
+      upsertPhotoItemAnalysisHistory({
+        id: historyId,
+        imageUrl: upload.url,
+        imageName: getFallbackFileName(imageFile),
+        analysis: result,
+        form: nextForm,
+        expiryBaseDate: nextExpiryBaseDate,
+        householdName: selectedHouseholdName,
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      setHistoryItems(readPhotoItemAnalysisHistory());
       setState('reviewing');
       setReviewSheetOpen(true);
       showToast('商品识别完成，请确认后入库。', 'success');
@@ -388,6 +473,10 @@ export function PhotoItemAnalysisPage() {
         form.householdId ? selectedHouseholdName : '',
         { silent: true },
       );
+      if (currentHistoryId) {
+        markPhotoItemAnalysisSaved(currentHistoryId, item.id);
+        setHistoryItems(readPhotoItemAnalysisHistory());
+      }
       setState('done');
       setReviewSheetOpen(true);
       showToast(`「${item.name}」已加入${selectedHouseholdName}`, 'success');
@@ -408,6 +497,7 @@ export function PhotoItemAnalysisPage() {
     setImagePreviewUrl('');
     setUploadedImageUrl('');
     setAnalysis(null);
+    setCurrentHistoryId('');
     setReviewSheetOpen(false);
     setActivePicker(null);
     setExpiryBaseDate('');
@@ -417,6 +507,30 @@ export function PhotoItemAnalysisPage() {
       reminderEnabled: pantryPreferences.defaultReminderEnabled,
     }));
     setError('');
+  };
+
+  const restoreDraft = (draft: PhotoItemAnalysisHistoryItem) => {
+    stopCamera();
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+    setImageFile(null);
+    setImagePreviewUrl(draft.imageUrl);
+    setUploadedImageUrl(draft.imageUrl);
+    setAnalysis(draft.analysis);
+    setForm(draft.form);
+    setExpiryBaseDate(draft.expiryBaseDate || draft.analysis.productionDate || '');
+    setCurrentHistoryId(draft.id);
+    setState('reviewing');
+    setReviewSheetOpen(true);
+    setActivePicker(null);
+    setError('');
+    showToast('已恢复上次未入库草稿。', 'success');
+  };
+
+  const dismissDraft = (draftId: string) => {
+    removePhotoItemAnalysisHistory(draftId);
+    setHistoryItems(readPhotoItemAnalysisHistory());
   };
 
   return (
@@ -430,6 +544,41 @@ export function PhotoItemAnalysisPage() {
           <h1 className="truncate text-2xl font-semibold tracking-tight">拍照分析商品</h1>
         </div>
       </header>
+
+      {latestDraft ? (
+        <Card className="border-life-ai/25 bg-life-ai/5 p-4">
+          <div className="flex items-start gap-3">
+            <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+              <History className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">发现未入库草稿</p>
+              <p className="mt-1 truncate text-sm text-muted-foreground">
+                {latestDraft.form.name || latestDraft.analysis.name || '待确认商品'} ·{' '}
+                {formatDraftUpdatedAt(latestDraft.updatedAt)}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="ai"
+                  size="sm"
+                  onClick={() => restoreDraft(latestDraft)}
+                >
+                  继续编辑
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => dismissDraft(latestDraft.id)}
+                >
+                  忽略
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      ) : null}
 
       <section className="relative overflow-hidden rounded-[1.75rem] border border-life-ai/20 bg-card p-4 shadow-[0_24px_90px_rgba(0,0,0,0.28)]">
         <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(6,182,212,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.1)_1px,transparent_1px)] [background-size:28px_28px]" />
@@ -625,12 +774,14 @@ export function PhotoItemAnalysisPage() {
         <section>
           <SectionHeader title="AI 识别结果" meta={`${Math.round(analysis.confidence * 100)}%`} />
           <Card className="space-y-4 p-4">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="truncate text-xl font-semibold">{analysis.name}</h2>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">{analysis.summary}</p>
               </div>
-              <Badge tone="plan">{analysis.category}</Badge>
+              <Badge tone="plan" className="shrink-0 whitespace-nowrap">
+                {analysis.category}
+              </Badge>
             </div>
             {analysis.warnings.length > 0 ? (
               <div className="space-y-2">
@@ -738,20 +889,16 @@ export function PhotoItemAnalysisPage() {
             }
           }}
         >
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">
-              商品名称 <span className="text-life-alert">*</span>
-            </span>
+          <FormItem label="商品名称" required>
             <input
               value={form.name}
               className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
               onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
             />
-          </label>
+          </FormItem>
 
           <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-            <div className="block space-y-2">
-              <span className="text-sm font-medium">分类</span>
+            <FormItem label="分类">
               <button
                 type="button"
                 disabled={state === 'saving'}
@@ -763,9 +910,8 @@ export function PhotoItemAnalysisPage() {
                   <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
                 </span>
               </button>
-            </div>
-            <div className="block space-y-2">
-              <span className="text-sm font-medium">位置</span>
+            </FormItem>
+            <FormItem label="位置">
               <button
                 type="button"
                 disabled={state === 'saving'}
@@ -777,14 +923,11 @@ export function PhotoItemAnalysisPage() {
                   <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
                 </span>
               </button>
-            </div>
+            </FormItem>
           </div>
 
           <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-3 max-[360px]:grid-cols-1">
-            <label className="block space-y-2">
-              <span className="text-sm font-medium">
-                数量 <span className="text-life-alert">*</span>
-              </span>
+            <FormItem label="数量" required>
               <input
                 type="number"
                 min="1"
@@ -794,9 +937,8 @@ export function PhotoItemAnalysisPage() {
                   setForm((current) => ({ ...current, quantity: event.target.value }))
                 }
               />
-            </label>
-            <label className="block space-y-2">
-              <span className="text-sm font-medium">单位</span>
+            </FormItem>
+            <FormItem label="单位">
               <input
                 value={form.unit}
                 className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
@@ -804,12 +946,11 @@ export function PhotoItemAnalysisPage() {
                   setForm((current) => ({ ...current, unit: event.target.value }))
                 }
               />
-            </label>
+            </FormItem>
           </div>
 
           <div className="grid min-w-0 grid-cols-1 gap-3">
-            <label className="block min-w-0 space-y-2">
-              <span className="text-sm font-medium">开封日期</span>
+            <FormItem label="开封日期">
               <input
                 type="date"
                 value={form.openedAt}
@@ -819,7 +960,7 @@ export function PhotoItemAnalysisPage() {
                   setForm((current) => ({ ...current, openedAt: event.target.value }))
                 }
               />
-            </label>
+            </FormItem>
             <PantryExpiryDateField
               idPrefix="photo-item"
               expiresAt={form.expiresAt}
@@ -838,8 +979,7 @@ export function PhotoItemAnalysisPage() {
             />
           </div>
 
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">家庭空间</span>
+          <FormItem label="家庭空间">
             <select
               value={form.householdId}
               disabled={householdsLoading || state === 'saving'}
@@ -857,7 +997,7 @@ export function PhotoItemAnalysisPage() {
                   </option>
                 ))}
             </select>
-          </label>
+          </FormItem>
 
           <label className="flex items-center justify-between gap-3 rounded-[1.25rem] border border-border bg-secondary/60 px-4 py-3 text-sm">
             <span>
@@ -879,15 +1019,14 @@ export function PhotoItemAnalysisPage() {
             />
           </label>
 
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">备注</span>
+          <FormItem label="备注">
             <textarea
               value={form.note}
               rows={4}
               className="w-full resize-none rounded-2xl border border-border bg-secondary px-4 py-3 text-sm text-foreground outline-none transition focus:border-ring"
               onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))}
             />
-          </label>
+          </FormItem>
 
           {state === 'done' ? (
             <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">

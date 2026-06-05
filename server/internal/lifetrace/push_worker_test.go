@@ -280,6 +280,10 @@ func TestFailedDailyBriefPushWritesOperationLogAndRetries(t *testing.T) {
 		!strings.Contains(op.Query, "kind=daily_brief") {
 		t.Fatalf("expected operation log query to include failure detail, got %+v", op)
 	}
+	if !strings.Contains(op.ResponseBody, `"kind":"daily_brief"`) ||
+		!strings.Contains(op.ResponseBody, "temporary push upstream failure") {
+		t.Fatalf("expected operation log response body to include failure detail, got %+v", op)
+	}
 }
 
 func TestSendDuePantryPushRemindersUsesCustomRulesAndOnlySendsOnce(t *testing.T) {

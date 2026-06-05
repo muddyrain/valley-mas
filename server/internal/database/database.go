@@ -156,10 +156,12 @@ func autoMigrate() error {
 		&model.LifeTracePantryItem{},
 		&model.LifeTraceSettings{},
 		&model.LifeTraceWeeklyReview{},
+		&model.LifeTraceFeedback{},
 		&model.LifeTraceAIConversation{},
 		&model.LifeTraceAIMessage{},
 		&model.LifeTracePushSubscription{},
 		&model.LifeTracePushDelivery{},
+		&model.LifeTraceDailyBriefDelivery{},
 		&model.LifeTracePantryReminderDelivery{},
 		&model.LifeTraceHolidayCalendar{},
 	); err != nil {

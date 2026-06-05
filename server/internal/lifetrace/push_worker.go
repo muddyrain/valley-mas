@@ -2,6 +2,7 @@ package lifetrace
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -1081,26 +1082,57 @@ func recordPushFailureOperationLog(
 		values.Set("rule", failureContext.rule)
 	}
 	values.Set("error", truncateText(err.Error(), 420))
+	responseBody := marshalPushFailureOperationLogBody(subscription, payload, failureContext, statusCode, err)
 
 	op := model.OperationLog{
-		ID:        model.Int64String(utils.GenerateID()),
-		LogID:     "push-" + strconv.FormatInt(time.Now().UnixNano(), 10),
-		Method:    "WEB_PUSH",
-		Path:      "/life-trace/push/" + failureContext.kind,
-		Query:     truncateText(values.Encode(), 1024),
-		Status:    statusCode,
-		LatencyMs: 0,
-		IP:        "",
-		UserAgent: truncateText(subscription.UserAgent, 512),
-		UserID:    subscription.UserID.String(),
-		UserRole:  "",
-		Level:     "error",
-		Message:   truncateText("LifeTrace Web Push failed: "+failureContext.kind, 128),
+		ID:           model.Int64String(utils.GenerateID()),
+		LogID:        "push-" + strconv.FormatInt(time.Now().UnixNano(), 10),
+		Method:       "WEB_PUSH",
+		Path:         "/life-trace/push/" + failureContext.kind,
+		Query:        truncateText(values.Encode(), 1024),
+		Status:       statusCode,
+		LatencyMs:    0,
+		IP:           "",
+		UserAgent:    truncateText(subscription.UserAgent, 512),
+		UserID:       subscription.UserID.String(),
+		UserRole:     "",
+		Level:        "error",
+		Message:      truncateText("LifeTrace Web Push failed: "+failureContext.kind, 128),
+		ResponseBody: responseBody,
 	}
 
 	if createErr := db.Create(&op).Error; createErr != nil {
 		logger.Log.WithError(createErr).WithField("userId", subscription.UserID.String()).Warn("LifeTrace Web Push failure log write failed")
 	}
+}
+
+func marshalPushFailureOperationLogBody(
+	subscription model.LifeTracePushSubscription,
+	payload PushPayload,
+	failureContext pushFailureContext,
+	statusCode int,
+	err error,
+) string {
+	body := map[string]interface{}{
+		"kind":           failureContext.kind,
+		"targetId":       failureContext.targetID,
+		"subscriptionId": subscription.ID.String(),
+		"userId":         subscription.UserID.String(),
+		"statusCode":     statusCode,
+		"dueAt":          failureContext.dueAt.Format(time.RFC3339),
+		"title":          payload.Title,
+		"tag":            payload.Tag,
+		"error":          err.Error(),
+	}
+	if failureContext.rule != "" {
+		body["rule"] = failureContext.rule
+	}
+
+	raw, marshalErr := json.Marshal(body)
+	if marshalErr != nil {
+		return ""
+	}
+	return truncateText(string(raw), 4096)
 }
 
 func truncateText(value string, maxLength int) string {
