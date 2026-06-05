@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getBottomSheetDragOffset,
+  isBottomSheetInteractiveTarget,
   shouldCloseBottomSheetByDrag,
   shouldStartBottomSheetDrag,
 } from '../src/lib/bottomSheetGesture';
@@ -14,6 +15,14 @@ describe('bottom sheet gesture helpers', () => {
         targetIsInteractive: true,
       }),
     ).toBe(false);
+  });
+
+  it('treats icon descendants inside buttons as interactive targets', () => {
+    const svgLikeTarget = {
+      closest: (selector: string) => (selector.includes('button') ? { tagName: 'BUTTON' } : null),
+    } as unknown as EventTarget;
+
+    expect(isBottomSheetInteractiveTarget(svgLikeTarget)).toBe(true);
   });
 
   it('starts dragging once a downward gesture reaches the top of a scrolled sheet', () => {

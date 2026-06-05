@@ -20,6 +20,14 @@ describe('pantry drawer mobile layout guards', () => {
     expect(bottomSheetSource).toContain('overflow-x-hidden');
   });
 
+  it('keeps sheet drag on the fixed handle instead of the scrollable form content', () => {
+    expect(bottomSheetSource).toContain('data-sheet-drag-handle="true"');
+    expect(bottomSheetSource).toContain(
+      "'safe-bottom min-h-0 flex-1 overflow-x-hidden overflow-y-auto",
+    );
+    expect(bottomSheetSource).toContain("style={{ touchAction: 'none' }}");
+  });
+
   it('allows pantry form grids and date fields to shrink inside the bottom sheet', () => {
     expect(pantryDrawerSource).toContain('form className="min-w-0 space-y-4"');
     expect(pantryDrawerSource).toContain('className="grid min-w-0 grid-cols-2');

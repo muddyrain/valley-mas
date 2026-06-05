@@ -1,4 +1,6 @@
 export const BOTTOM_SHEET_CLOSE_THRESHOLD = 84;
+export const BOTTOM_SHEET_INTERACTIVE_SELECTOR =
+  'button, input, textarea, select, option, a, label, [role="button"], [contenteditable="true"], [data-sheet-drag-ignore="true"]';
 const DRAG_START_THRESHOLD = 8;
 
 type ShouldStartBottomSheetDragInput = {
@@ -27,6 +29,15 @@ export function shouldStartBottomSheetDrag({
   targetIsInteractive,
 }: ShouldStartBottomSheetDragInput) {
   return open && !closeDisabled && !targetIsInteractive;
+}
+
+export function isBottomSheetInteractiveTarget(target: EventTarget | null) {
+  const closest = (target as { closest?: unknown } | null)?.closest;
+  if (typeof closest !== 'function') {
+    return false;
+  }
+
+  return Boolean(closest.call(target, BOTTOM_SHEET_INTERACTIVE_SELECTOR));
 }
 
 export function getBottomSheetDragOffset({

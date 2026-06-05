@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BOTTOM_SHEET_CLOSE_THRESHOLD,
   getBottomSheetDragOffset,
+  isBottomSheetInteractiveTarget,
   shouldCloseBottomSheetByDrag,
   shouldStartBottomSheetDrag,
 } from '@/lib/bottomSheetGesture';
@@ -38,18 +39,6 @@ export function BottomSheet({
   const dragStartYRef = useRef(0);
   const pointerIdRef = useRef<number | null>(null);
 
-  const shouldIgnoreDragTarget = (target: EventTarget | null) => {
-    if (!(target instanceof HTMLElement)) {
-      return false;
-    }
-
-    return Boolean(
-      target.closest(
-        'button, input, textarea, select, option, a, label, [role="button"], [contenteditable="true"], [data-sheet-drag-ignore="true"]',
-      ),
-    );
-  };
-
   useEffect(() => {
     if (!open) {
       setDragOffset(0);
@@ -72,7 +61,7 @@ export function BottomSheet({
       !shouldStartBottomSheetDrag({
         open,
         closeDisabled,
-        targetIsInteractive: shouldIgnoreDragTarget(event.target),
+        targetIsInteractive: isBottomSheetInteractiveTarget(event.target),
       })
     ) {
       return;
@@ -83,6 +72,9 @@ export function BottomSheet({
     dragStartYRef.current = event.clientY;
     setDragging(false);
     event.currentTarget.setPointerCapture(event.pointerId);
+    if (event.cancelable) {
+      event.preventDefault();
+    }
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -90,18 +82,10 @@ export function BottomSheet({
       return;
     }
 
-    const sheet = sheetRef.current;
-    const currentScrollTop = sheet?.scrollTop ?? 0;
-
-    if (!dragging && currentScrollTop > 0) {
-      dragStartYRef.current = event.clientY;
-      return;
-    }
-
     const nextOffset = getBottomSheetDragOffset({
       startY: startYRef.current,
       currentY: event.clientY,
-      currentScrollTop,
+      currentScrollTop: 0,
       dragging,
       dragStartY: dragStartYRef.current,
     });
@@ -171,7 +155,7 @@ export function BottomSheet({
         role="dialog"
         aria-modal="true"
         className={cn(
-          'safe-bottom absolute inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-0.75rem)] w-full max-w-[430px] overflow-x-hidden overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-border bg-card p-5 shadow-2xl max-[360px]:p-4',
+          'absolute inset-x-0 bottom-0 mx-auto flex max-h-[calc(100dvh-0.75rem)] w-full max-w-[430px] flex-col overflow-hidden rounded-t-[1.75rem] border border-border bg-card shadow-2xl',
           dragging ? 'transition-none' : 'transition duration-300',
           open
             ? 'visible translate-y-0 opacity-100'
@@ -179,23 +163,32 @@ export function BottomSheet({
           className,
         )}
         style={{
-          touchAction: 'pan-y',
           transform: open ? `translateY(${dragOffset}px)` : undefined,
         }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerEnd}
       >
         {showHandle ? (
-          <div
-            className="mb-4 flex cursor-grab justify-center active:cursor-grabbing"
-            style={{ touchAction: dragging ? 'none' : 'pan-y' }}
-          >
-            <div className="h-1.5 w-11 rounded-full bg-muted-foreground/25" />
+          <div className="shrink-0 px-5 pt-5 max-[360px]:px-4 max-[360px]:pt-4">
+            <div
+              className="-mx-2 mb-4 flex h-8 touch-none select-none items-center justify-center rounded-full cursor-grab active:cursor-grabbing"
+              data-sheet-drag-handle="true"
+              style={{ touchAction: 'none' }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerEnd}
+              onPointerCancel={handlePointerEnd}
+            >
+              <div className="h-1.5 w-11 rounded-full bg-muted-foreground/25" />
+            </div>
           </div>
         ) : null}
-        {children}
+        <div
+          className={cn(
+            'safe-bottom min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 max-[360px]:px-4',
+            showHandle ? null : 'pt-5 max-[360px]:pt-4',
+          )}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
