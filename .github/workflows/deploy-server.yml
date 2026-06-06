@@ -44,7 +44,12 @@ jobs:
 
       - name: Upload binary
         run: |
-          scp -P "${{ secrets.SERVER_PORT }}" ../valley-server "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/valley-server.new"
+          cat ../valley-server | ssh \
+            -p "${{ secrets.SERVER_PORT }}" \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
+            'cat > /tmp/valley-server.new && chmod 755 /tmp/valley-server.new'
 
       - name: Replace binary and restart service
         run: |
