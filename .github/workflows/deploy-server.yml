@@ -50,5 +50,5 @@ jobs:
             sudo -n /usr/bin/systemctl restart valley-server
 
             echo "[5/5] service status"
-            sudo -n /usr/bin/systemctl status valley-server --no-pager | head -n 20
+            /usr/bin/systemctl status valley-server --no-pager | head -n 20
           EOF
