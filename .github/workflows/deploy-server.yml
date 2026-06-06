@@ -31,15 +31,24 @@ jobs:
             -o ConnectTimeout=20 \
             -o ServerAliveInterval=15 \
             -o ServerAliveCountMax=8 \
-            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" <<EOF
-            set -e
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" 'bash -se' <<EOF
+            set -euo pipefail
+            echo "[1/5] sync code"
             cd /opt/valley-mas
             git fetch --all --prune
             git checkout "${{ github.ref_name }}"
             git pull --ff-only origin "${{ github.ref_name }}"
+
+            echo "[2/5] download modules"
             cd server
             /usr/local/go/bin/go mod download
+
+            echo "[3/5] build server"
             /usr/local/go/bin/go build -o /opt/valley/bin/valley-server ./cmd/server
-            sudo /usr/bin/systemctl restart valley-server
-            sudo /usr/bin/systemctl --no-pager --full status valley-server | head -n 20
+
+            echo "[4/5] restart service"
+            sudo -n /usr/bin/systemctl restart valley-server
+
+            echo "[5/5] service status"
+            sudo -n /usr/bin/systemctl --no-pager --full status valley-server | head -n 20
           EOF
