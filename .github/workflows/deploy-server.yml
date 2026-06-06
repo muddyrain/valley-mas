@@ -3,6 +3,7 @@ name: Deploy Go Server
 on:
   push:
     branches:
+      - master
       - main
     paths:
       - "server/**"
