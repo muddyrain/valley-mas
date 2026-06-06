@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { PantryItemDrawer } from '@/components/PantryItemDrawer';
@@ -578,6 +579,8 @@ export function PantryPage() {
               const terminalStatus = status === 'used-up' || status === 'discarded';
               const usedUpDisabled = actionPending || terminalStatus;
               const discardedDisabled = actionPending || terminalStatus;
+              const StatusActionIcon = BadgeAlert;
+              const DiscardActionIcon = Trash2;
 
               return (
                 <Card
@@ -668,8 +671,14 @@ export function PantryPage() {
                       )}
                       onClick={() => void handleStatusAction(item, 'used-up')}
                     >
-                      <BadgeAlert className="size-4" />
-                      {usedUpPending ? '处理中...' : status === 'used-up' ? '已用完' : '用完'}
+                      {usedUpPending ? (
+                        <ActionLoadingIcon className="size-4" tone="trace" />
+                      ) : (
+                        <StatusActionIcon className="size-4" />
+                      )}
+                      <span className="min-w-10 whitespace-nowrap text-center">
+                        {status === 'used-up' ? '已用完' : '用完'}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -682,8 +691,14 @@ export function PantryPage() {
                       )}
                       onClick={() => void handleStatusAction(item, 'discarded')}
                     >
-                      <Trash2 className="size-4" />
-                      {discardedPending ? '处理中...' : status === 'discarded' ? '已丢弃' : '丢弃'}
+                      {discardedPending ? (
+                        <ActionLoadingIcon className="size-4" tone="alert" />
+                      ) : (
+                        <DiscardActionIcon className="size-4" />
+                      )}
+                      <span className="min-w-10 whitespace-nowrap text-center">
+                        {status === 'discarded' ? '已丢弃' : '丢弃'}
+                      </span>
                     </button>
                     <button
                       type="button"

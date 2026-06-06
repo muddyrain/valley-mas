@@ -99,8 +99,8 @@ func Load() *Config {
 			DSN:                getEnv("DB_DSN", ""),
 			SlowLogMs:          getEnvInt("DB_SLOW_LOG_MS", 100),
 			AutoMigrate:        getEnvBool("DB_AUTO_MIGRATE", getDefaultAutoMigrate(env)),
-			MaxOpenConns:       getEnvInt("DB_MAX_OPEN_CONNS", 5),
-			MaxIdleConns:       getEnvInt("DB_MAX_IDLE_CONNS", 2),
+			MaxOpenConns:       getEnvInt("DB_MAX_OPEN_CONNS", getDefaultDBMaxOpenConns(env)),
+			MaxIdleConns:       getEnvInt("DB_MAX_IDLE_CONNS", getDefaultDBMaxIdleConns(env)),
 			ConnMaxLifetimeMin: getEnvInt("DB_CONN_MAX_LIFETIME_MIN", 30),
 			ConnMaxIdleTimeMin: getEnvInt("DB_CONN_MAX_IDLE_TIME_MIN", 10),
 			Host:               getEnv("DB_HOST", "localhost"),
@@ -174,6 +174,20 @@ func getDefaultAutoMigrate(env string) bool {
 	// 远程 PostgreSQL / Supabase 在开发环境下也不应默认跑自动迁移，
 	// 否则启动时容易放大连接占用和 schema introspection 开销。
 	return false
+}
+
+func getDefaultDBMaxOpenConns(env string) int {
+	if env == "production" {
+		return 1
+	}
+	return 5
+}
+
+func getDefaultDBMaxIdleConns(env string) int {
+	if env == "production" {
+		return 0
+	}
+	return 2
 }
 
 func getEnvInt(key string, defaultValue int) int {

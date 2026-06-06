@@ -33,20 +33,25 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
   buildPhotoItemAnalysisSmartSuggestions,
+  buildPhotoItemCropBoxStyle,
   buildPhotoItemMergedPantryInput,
   buildPhotoItemPantryInput,
+  calculatePhotoItemCropPreviewLayout,
   createPhotoItemAnalysisHistoryId,
   findPhotoItemAnalysisDuplicateCandidates,
   getLatestPhotoItemAnalysisDraft,
   getPhotoItemAnalysisDraftById,
   getPhotoItemAnalysisReviewIssues,
+  isMeaningfulPhotoItemCropBox,
   markPhotoItemAnalysisQualityFeedback,
   markPhotoItemAnalysisSaved,
+  normalizePhotoItemCropBox,
   type PhotoItemAnalysisCoverMode,
   type PhotoItemAnalysisHistoryItem,
   type PhotoItemAnalysisQualityRating,
   type PhotoItemAnalysisReviewIssue,
   type PhotoItemAnalysisSmartSuggestion,
+  type PhotoItemCropPreviewLayout,
   type PhotoItemDraftForm,
   readPhotoItemAnalysisHistory,
   removePhotoItemAnalysisHistory,
@@ -126,6 +131,91 @@ function getFallbackFileName(file: File) {
   return file.name || `pantry-photo-${Date.now()}.jpg`;
 }
 
+type CropPreviewImageProps = {
+  src: string;
+  alt: string;
+  cropBox?: PantryPhotoCropBox;
+  cropEnabled: boolean;
+};
+
+function CropPreviewImage({ src, alt, cropBox, cropEnabled }: CropPreviewImageProps) {
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const cropKey = cropBox ? `${cropBox.x}:${cropBox.y}:${cropBox.width}:${cropBox.height}` : 'none';
+  const previewKey = `${src}:${cropEnabled ? 'crop' : 'original'}:${cropKey}`;
+  const [layoutState, setLayoutState] = useState<{
+    key: string;
+    layout: PhotoItemCropPreviewLayout | null;
+  } | null>(null);
+  const layout = layoutState?.key === previewKey ? layoutState.layout : null;
+
+  const updateCropLayout = useCallback(() => {
+    if (!cropEnabled) {
+      setLayoutState({ key: previewKey, layout: null });
+      return;
+    }
+
+    const frameElement = frameRef.current;
+    const imageElement = imageRef.current;
+    if (!frameElement || !imageElement || !imageElement.naturalWidth) {
+      return;
+    }
+
+    const bounds = frameElement.getBoundingClientRect();
+    setLayoutState({
+      key: previewKey,
+      layout: calculatePhotoItemCropPreviewLayout({
+        containerWidth: bounds.width,
+        containerHeight: bounds.height,
+        naturalWidth: imageElement.naturalWidth,
+        naturalHeight: imageElement.naturalHeight,
+        cropBox,
+      }),
+    });
+  }, [cropBox, cropEnabled, previewKey]);
+
+  useEffect(() => {
+    if (!cropEnabled) {
+      return;
+    }
+
+    updateCropLayout();
+    const frameElement = frameRef.current;
+    if (!frameElement || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new ResizeObserver(updateCropLayout);
+    observer.observe(frameElement);
+    return () => observer.disconnect();
+  }, [cropEnabled, updateCropLayout]);
+
+  const cropStyle = layout
+    ? {
+        width: `${layout.width}px`,
+        height: `${layout.height}px`,
+        transform: `translate3d(${layout.left}px, ${layout.top}px, 0)`,
+      }
+    : undefined;
+
+  return (
+    <div ref={frameRef} className="relative h-full w-full overflow-hidden">
+      <img
+        ref={imageRef}
+        src={src}
+        alt={alt}
+        className={
+          layout
+            ? 'absolute left-0 top-0 max-w-none select-none'
+            : 'h-full w-full select-none object-cover'
+        }
+        style={cropStyle}
+        onLoad={updateCropLayout}
+      />
+    </div>
+  );
+}
+
 function CoverModeSelector({
   value,
   disabled = false,
@@ -169,58 +259,6 @@ function CoverModeSelector({
   );
 }
 
-function clampRatio(value: number) {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-  return Math.min(1, Math.max(0, value));
-}
-
-function normalizeCropBox(cropBox: PantryPhotoCropBox | undefined) {
-  if (!cropBox) {
-    return null;
-  }
-
-  const x = clampRatio(cropBox.x);
-  const y = clampRatio(cropBox.y);
-  const width = Math.min(1 - x, Math.max(0, cropBox.width));
-  const height = Math.min(1 - y, Math.max(0, cropBox.height));
-  if (width < 0.12 || height < 0.12) {
-    return null;
-  }
-  return { x, y, width, height };
-}
-
-function isMeaningfulCropBox(cropBox: PantryPhotoCropBox | undefined) {
-  const normalized = normalizeCropBox(cropBox);
-  if (!normalized) {
-    return false;
-  }
-  const area = normalized.width * normalized.height;
-  const isGenericFallback =
-    Math.abs(normalized.x - 0.1) < 0.035 &&
-    Math.abs(normalized.y - 0.1) < 0.035 &&
-    Math.abs(normalized.width - 0.8) < 0.05 &&
-    Math.abs(normalized.height - 0.8) < 0.05;
-
-  return (
-    !isGenericFallback && area <= 0.58 && normalized.width <= 0.86 && normalized.height <= 0.86
-  );
-}
-
-function buildCropBoxStyle(cropBox: PantryPhotoCropBox | undefined) {
-  const normalized = normalizeCropBox(cropBox);
-  if (!normalized) {
-    return null;
-  }
-  return {
-    left: `${normalized.x * 100}%`,
-    top: `${normalized.y * 100}%`,
-    width: `${normalized.width * 100}%`,
-    height: `${normalized.height * 100}%`,
-  };
-}
-
 function loadImageFromFile(file: File) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -238,7 +276,7 @@ function loadImageFromFile(file: File) {
 }
 
 async function createCroppedCoverFile(file: File, cropBox: PantryPhotoCropBox) {
-  const normalized = normalizeCropBox(cropBox);
+  const normalized = normalizePhotoItemCropBox(cropBox);
   if (!normalized) {
     throw new Error('AI 没有返回可用的主体裁剪区域。');
   }
@@ -373,10 +411,10 @@ export function PhotoItemAnalysisPage() {
   const visionStageLabel =
     state === 'uploading' ? '正在同步影像' : state === 'analyzing' ? '正在解析商品' : '视觉待命';
   const hasExpiryDate = Boolean(form.expiresAt.trim());
-  const hasCropSuggestion = Boolean(normalizeCropBox(analysis?.cropBox));
-  const hasMeaningfulCropSuggestion = isMeaningfulCropBox(analysis?.cropBox);
+  const hasCropSuggestion = Boolean(normalizePhotoItemCropBox(analysis?.cropBox));
+  const hasMeaningfulCropSuggestion = isMeaningfulPhotoItemCropBox(analysis?.cropBox);
   const cropBoxStyle = useMemo(
-    () => (hasMeaningfulCropSuggestion ? buildCropBoxStyle(analysis?.cropBox) : null),
+    () => (hasMeaningfulCropSuggestion ? buildPhotoItemCropBoxStyle(analysis?.cropBox) : null),
     [analysis?.cropBox, hasMeaningfulCropSuggestion],
   );
   const latestDraft = useMemo(
@@ -711,7 +749,7 @@ export function PhotoItemAnalysisPage() {
       };
       const nextExpiryBaseDate = result.productionDate || result.purchaseDate || '';
       const historyId = createPhotoItemAnalysisHistoryId();
-      const nextCoverMode: PhotoItemAnalysisCoverMode = isMeaningfulCropBox(result.cropBox)
+      const nextCoverMode: PhotoItemAnalysisCoverMode = isMeaningfulPhotoItemCropBox(result.cropBox)
         ? 'crop'
         : 'original';
       setAnalysis(result);
@@ -846,7 +884,7 @@ export function PhotoItemAnalysisPage() {
       setForm(draft.form);
       setExpiryBaseDate(draft.expiryBaseDate || draft.analysis.productionDate || '');
       setCoverMode(
-        draft.coverMode === 'crop' && isMeaningfulCropBox(draft.analysis.cropBox)
+        draft.coverMode === 'crop' && isMeaningfulPhotoItemCropBox(draft.analysis.cropBox)
           ? 'crop'
           : 'original',
       );
@@ -1554,10 +1592,11 @@ export function PhotoItemAnalysisPage() {
           <div className="mb-4 rounded-[1.25rem] border border-border bg-card/95 p-3 shadow-lg shadow-background/35">
             <div className="flex items-center gap-3">
               <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-background">
-                <img
+                <CropPreviewImage
                   src={imagePreviewUrl}
                   alt={form.name || analysis?.name || '商品图片'}
-                  className="h-full w-full object-cover"
+                  cropBox={analysis?.cropBox}
+                  cropEnabled={coverMode === 'crop' && hasMeaningfulCropSuggestion}
                 />
               </div>
               <div className="min-w-0">

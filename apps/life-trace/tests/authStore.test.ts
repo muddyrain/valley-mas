@@ -31,6 +31,22 @@ afterEach(() => {
 });
 
 describe('life trace auth store', () => {
+  it('normalizes password login network failures instead of showing Load failed', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Load failed')));
+
+    const { useAuthStore } = await import('../src/store/useAuthStore');
+    await expect(
+      useAuthStore.getState().signIn({ email: 'tester@example.com', password: 'password' }),
+    ).rejects.toThrow('网络连接失败，请检查网络后重试');
+
+    expect(useAuthStore.getState()).toMatchObject({
+      token: null,
+      user: null,
+      status: 'unauthenticated',
+      error: '网络连接失败，请检查网络后重试',
+    });
+  });
+
   it('keeps the token when session verification is temporarily unavailable', async () => {
     vi.stubGlobal(
       'fetch',

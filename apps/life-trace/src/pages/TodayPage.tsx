@@ -981,54 +981,6 @@ export function TodayPage() {
         )}
       </Card>
 
-      <Card
-        className="relative overflow-hidden border-life-health/25 p-4 shadow-[0_18px_64px_rgba(34,197,94,0.08)]"
-        data-today-entrance
-      >
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-health/70 to-transparent"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -top-12 right-8 size-24 rounded-full bg-life-health/10 blur-3xl"
-        />
-        <div className="relative flex items-center justify-between gap-4 max-[360px]:items-start">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl border border-life-health/20 bg-life-health/10 text-life-health shadow-[0_10px_35px_rgba(34,197,94,0.10)]">
-              <Bell className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <Badge tone="health">下一个提醒</Badge>
-                {nextReminder ? (
-                  <span className="text-xs text-muted-foreground">{nextReminder.relativeText}</span>
-                ) : null}
-              </div>
-              {nextReminder ? (
-                <div className="mt-2">
-                  <h2 className="truncate text-base font-semibold">{nextReminder.plan.title}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {nextReminder.dateText} {nextReminder.timeText}
-                  </p>
-                </div>
-              ) : (
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  还没有可提醒的计划。创建计划时打开提醒，首页会自动显示最近一项。
-                </p>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            className="shrink-0 cursor-pointer rounded-full bg-secondary px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground max-[360px]:px-2.5"
-            onClick={() => navigate('/plans')}
-          >
-            查看
-          </button>
-        </div>
-      </Card>
-
       <Card className="p-4" data-today-entrance>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="min-w-0">
@@ -1046,6 +998,29 @@ export function TodayPage() {
             管理
           </button>
         </div>
+        {nextReminder ? (
+          <button
+            type="button"
+            className="mb-3 flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-secondary px-3 py-3 text-left transition hover:bg-secondary/80"
+            onClick={() => navigate(`/plans/${nextReminder.plan.id}`)}
+          >
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-life-health/10 text-life-health">
+              <Bell className="size-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2 text-xs font-semibold text-life-health">
+                <span>下一次提醒</span>
+                <span className="text-muted-foreground">{nextReminder.relativeText}</span>
+              </span>
+              <span className="mt-1 block truncate text-sm font-semibold">
+                {nextReminder.plan.title}
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {nextReminder.dateText} {nextReminder.timeText}
+              </span>
+            </span>
+          </button>
+        ) : null}
         {plansLoaded ? (
           previewPlans.length > 0 ? (
             <div className="space-y-2">

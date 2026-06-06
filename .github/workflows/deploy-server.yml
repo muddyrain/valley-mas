@@ -1,0 +1,56 @@
+name: Deploy Go Server
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - ".github/workflows/deploy-server.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Build linux binary
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../valley-server ./cmd/server
+
+      - name: Prepare SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.SERVER_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Upload binary
+        run: |
+          scp -P "${{ secrets.SERVER_PORT }}" ../valley-server "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/valley-server.new"
+
+      - name: Replace binary and restart service
+        run: |
+          ssh -p "${{ secrets.SERVER_PORT }}" "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" '
+            set -e
+            install -m 755 /tmp/valley-server.new /opt/valley/bin/valley-server
+            rm -f /tmp/valley-server.new
+            sudo /usr/bin/systemctl restart valley-server
+            sudo /usr/bin/systemctl --no-pager --full status valley-server | head -n 20
+          '

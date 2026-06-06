@@ -61,6 +61,21 @@ export type PhotoItemAnalysisDuplicateCandidate = {
   reason: string;
 };
 
+export type PhotoItemCropPreviewLayoutInput = {
+  containerWidth: number;
+  containerHeight: number;
+  naturalWidth: number;
+  naturalHeight: number;
+  cropBox?: PantryPhotoAnalysisResponse['cropBox'];
+};
+
+export type PhotoItemCropPreviewLayout = {
+  width: number;
+  height: number;
+  left: number;
+  top: number;
+};
+
 export type PhotoItemAnalysisHistoryItem = {
   id: string;
   imageUrl: string;
@@ -347,6 +362,92 @@ function getTopFrequencyValue<T extends string>(values: T[]) {
 
 function parseDraftQuantity(value: string) {
   return Number.parseInt(value, 10) || 1;
+}
+
+function clampRatio(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, value));
+}
+
+export function normalizePhotoItemCropBox(
+  cropBox: PantryPhotoAnalysisResponse['cropBox'] | undefined,
+) {
+  if (!cropBox) {
+    return null;
+  }
+
+  const x = clampRatio(cropBox.x);
+  const y = clampRatio(cropBox.y);
+  const width = Math.min(1 - x, Math.max(0, cropBox.width));
+  const height = Math.min(1 - y, Math.max(0, cropBox.height));
+  if (width < 0.12 || height < 0.12) {
+    return null;
+  }
+  return { x, y, width, height };
+}
+
+export function isMeaningfulPhotoItemCropBox(
+  cropBox: PantryPhotoAnalysisResponse['cropBox'] | undefined,
+) {
+  const normalized = normalizePhotoItemCropBox(cropBox);
+  if (!normalized) {
+    return false;
+  }
+  const area = normalized.width * normalized.height;
+  const isGenericFallback =
+    Math.abs(normalized.x - 0.1) < 0.035 &&
+    Math.abs(normalized.y - 0.1) < 0.035 &&
+    Math.abs(normalized.width - 0.8) < 0.05 &&
+    Math.abs(normalized.height - 0.8) < 0.05;
+
+  return (
+    !isGenericFallback && area <= 0.58 && normalized.width <= 0.86 && normalized.height <= 0.86
+  );
+}
+
+export function buildPhotoItemCropBoxStyle(
+  cropBox: PantryPhotoAnalysisResponse['cropBox'] | undefined,
+) {
+  const normalized = normalizePhotoItemCropBox(cropBox);
+  if (!normalized) {
+    return null;
+  }
+  return {
+    left: `${normalized.x * 100}%`,
+    top: `${normalized.y * 100}%`,
+    width: `${normalized.width * 100}%`,
+    height: `${normalized.height * 100}%`,
+  };
+}
+
+export function calculatePhotoItemCropPreviewLayout({
+  containerWidth,
+  containerHeight,
+  naturalWidth,
+  naturalHeight,
+  cropBox,
+}: PhotoItemCropPreviewLayoutInput): PhotoItemCropPreviewLayout | null {
+  const normalized = normalizePhotoItemCropBox(cropBox);
+  if (!normalized || naturalWidth <= 0 || naturalHeight <= 0) {
+    return null;
+  }
+
+  const cropX = normalized.x * naturalWidth;
+  const cropY = normalized.y * naturalHeight;
+  const cropWidth = normalized.width * naturalWidth;
+  const cropHeight = normalized.height * naturalHeight;
+  const scale = Math.max(containerWidth / cropWidth, containerHeight / cropHeight);
+  const width = naturalWidth * scale;
+  const height = naturalHeight * scale;
+
+  return {
+    width: Math.round(width),
+    height: Math.round(height),
+    left: Math.round((containerWidth - cropWidth * scale) / 2 - cropX * scale),
+    top: Math.round((containerHeight - cropHeight * scale) / 2 - cropY * scale),
+  };
 }
 
 function normalizeDuplicateText(value: string) {

@@ -20,4 +20,14 @@ describe('pantry status action guards', () => {
     expect(pantryPageSource).toContain('statusActionInFlightRef.current.has(item.id)');
     expect(lifeTraceStoreSource).toContain('pantryStatusUpdateInFlightKeys');
   });
+
+  it('keeps mobile status action labels stable while the action is pending', () => {
+    expect(pantryPageSource).toContain('const StatusActionIcon = BadgeAlert');
+    expect(pantryPageSource).toContain('const DiscardActionIcon = Trash2');
+    expect(pantryPageSource).toContain('<ActionLoadingIcon className="size-4" tone="trace" />');
+    expect(pantryPageSource).toContain('<ActionLoadingIcon className="size-4" tone="alert" />');
+    expect(pantryPageSource).toContain('min-w-10 whitespace-nowrap text-center');
+    expect(pantryPageSource).not.toContain("usedUpPending ? '处理中...'");
+    expect(pantryPageSource).not.toContain("discardedPending ? '处理中...'");
+  });
 });

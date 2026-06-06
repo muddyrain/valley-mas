@@ -4,6 +4,7 @@ import {
   buildPhotoItemAnalysisSmartSuggestions,
   buildPhotoItemMergedPantryInput,
   buildPhotoItemPantryInput,
+  calculatePhotoItemCropPreviewLayout,
   findPhotoItemAnalysisDuplicateCandidates,
   getLatestPhotoItemAnalysisDraft,
   getPhotoItemAnalysisDraftById,
@@ -121,6 +122,23 @@ describe('photo item analysis helpers', () => {
 
     expect(input.imageUrl).toBe('https://example.com/real-photo.jpg');
     expect(input.thumbnailUrl).toBeUndefined();
+  });
+
+  it('calculates a focused subject preview from the AI crop box', () => {
+    const layout = calculatePhotoItemCropPreviewLayout({
+      containerWidth: 80,
+      containerHeight: 80,
+      naturalWidth: 400,
+      naturalHeight: 300,
+      cropBox: { x: 0.5, y: 0.25, width: 0.25, height: 0.5 },
+    });
+
+    expect(layout).toEqual({
+      width: 320,
+      height: 240,
+      left: -160,
+      top: -80,
+    });
   });
 
   it('only enables pantry expiry reminders when an expiry date exists', () => {

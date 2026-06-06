@@ -1,3 +1,5 @@
+import { getLifeTraceErrorMessage } from '@/lib/error';
+
 export type LifeTraceUser = {
   id: string | number;
   username: string;
@@ -58,11 +60,16 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
     headers.set('Authorization', `Bearer ${options.token}`);
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers,
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers,
+      credentials: 'include',
+    });
+  } catch (error) {
+    throw new AuthRequestError(getLifeTraceErrorMessage(error, '网络连接失败，请检查网络后重试'));
+  }
 
   const payload = (await response.json().catch(() => null)) as ApiEnvelope<T> | null;
   if (!response.ok) {

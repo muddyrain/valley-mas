@@ -65,6 +65,33 @@ func TestJWTExpireCanBeOverridden(t *testing.T) {
 	}
 }
 
+func TestProductionDatabasePoolDefaultsToSingleConnection(t *testing.T) {
+	t.Setenv("ENV", "production")
+	t.Setenv("DB_MAX_OPEN_CONNS", "")
+	t.Setenv("DB_MAX_IDLE_CONNS", "")
+
+	cfg := Load()
+
+	if cfg.Database.MaxOpenConns != 1 {
+		t.Fatalf("expected production max open connections to default to 1, got %d", cfg.Database.MaxOpenConns)
+	}
+	if cfg.Database.MaxIdleConns != 0 {
+		t.Fatalf("expected production max idle connections to default to 0, got %d", cfg.Database.MaxIdleConns)
+	}
+}
+
+func TestDatabasePoolEnvOverridesDefaults(t *testing.T) {
+	t.Setenv("ENV", "production")
+	t.Setenv("DB_MAX_OPEN_CONNS", "3")
+	t.Setenv("DB_MAX_IDLE_CONNS", "1")
+
+	cfg := Load()
+
+	if cfg.Database.MaxOpenConns != 3 || cfg.Database.MaxIdleConns != 1 {
+		t.Fatalf("expected database pool env override, got %+v", cfg.Database)
+	}
+}
+
 func TestWebPushConfigLoadsFromEnv(t *testing.T) {
 	t.Setenv("WEB_PUSH_ENABLED", "true")
 	t.Setenv("WEB_PUSH_WORKER_ENABLED", "false")
