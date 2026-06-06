@@ -14,26 +14,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: server
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: server/go.mod
-
-      - name: Download modules
-        run: go mod download
-
-      - name: Build linux binary
-        run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../valley-server ./cmd/server
-
       - name: Prepare SSH
         run: |
           mkdir -p ~/.ssh
@@ -42,21 +23,23 @@ jobs:
           printf '%s\n' "${{ secrets.SERVER_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
-      - name: Upload binary
+      - name: Deploy on server
         run: |
-          cat ../valley-server | ssh \
+          ssh \
             -p "${{ secrets.SERVER_PORT }}" \
             -o BatchMode=yes \
             -o ConnectTimeout=20 \
-            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
-            'cat > /tmp/valley-server.new && chmod 755 /tmp/valley-server.new'
-
-      - name: Replace binary and restart service
-        run: |
-          ssh -p "${{ secrets.SERVER_PORT }}" "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" '
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=8 \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" <<EOF
             set -e
-            install -m 755 /tmp/valley-server.new /opt/valley/bin/valley-server
-            rm -f /tmp/valley-server.new
+            cd /opt/valley-mas
+            git fetch --all --prune
+            git checkout "${{ github.ref_name }}"
+            git pull --ff-only origin "${{ github.ref_name }}"
+            cd server
+            /usr/local/go/bin/go mod download
+            /usr/local/go/bin/go build -o /opt/valley/bin/valley-server ./cmd/server
             sudo /usr/bin/systemctl restart valley-server
             sudo /usr/bin/systemctl --no-pager --full status valley-server | head -n 20
-          '
+          EOF
