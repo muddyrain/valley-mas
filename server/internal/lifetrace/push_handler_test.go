@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
@@ -135,6 +136,52 @@ func TestSavePushSubscriptionUpsertsByEndpoint(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("expected one subscription, got %d", count)
+	}
+}
+
+func TestPreviewDailyBriefPushBuildsPayload(t *testing.T) {
+	router := setupTraceTestRouter(t, 101, testWebPushConfig())
+	today := reminderNow().Format("2006-01-02")
+
+	if err := database.GetDB().Create(&model.LifeTraceSettings{
+		UserID:         101,
+		City:           "杭州",
+		DailyBriefTime: "08:10",
+		Habits:         model.StringList{"喝水", "拉伸"},
+		WeatherAlerts:  true,
+	}).Error; err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+	if err := database.GetDB().Create(&model.LifeTracePlan{
+		UserID:        101,
+		Title:         "晨间散步",
+		Type:          "运动",
+		ScheduledDate: today,
+		ScheduledTime: "09:30",
+		Reminder:      true,
+	}).Error; err != nil {
+		t.Fatalf("seed plan: %v", err)
+	}
+	if err := database.GetDB().Create(&model.LifeTraceCheckin{
+		UserID:    101,
+		Date:      today,
+		Name:      "喝水",
+		Completed: true,
+	}).Error; err != nil {
+		t.Fatalf("seed checkin: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/push/daily-brief-preview", nil)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	if data["url"] != "/today" {
+		t.Fatalf("expected daily brief preview to route to today, got %+v", data)
+	}
+	body := data["body"].(string)
+	if body == "" || !strings.Contains(body, "晨间散步") || !strings.Contains(body, "今日打卡") {
+		t.Fatalf("expected preview body to include plan and habit summary, got %+v", data)
 	}
 }
 

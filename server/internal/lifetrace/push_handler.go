@@ -189,6 +189,50 @@ func (h *Handler) TestPush(c *gin.Context) {
 	success(c, gin.H{"sent": true})
 }
 
+func (h *Handler) PreviewDailyBriefPush(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	settings, err := findSettings(userID)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "读取简报设置失败")
+		return
+	}
+
+	now := reminderNow()
+	today := now.Format("2006-01-02")
+
+	var plans []model.LifeTracePlan
+	if err := database.GetDB().
+		Where("user_id = ? AND completed = ? AND scheduled_date = ?", userID, false, today).
+		Order("scheduled_time ASC, created_at ASC").
+		Find(&plans).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "读取今日计划失败")
+		return
+	}
+
+	var checkins []model.LifeTraceCheckin
+	if err := database.GetDB().
+		Where("user_id = ? AND date = ?", userID, today).
+		Order("created_at ASC").
+		Find(&checkins).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "读取今日打卡失败")
+		return
+	}
+
+	var weatherResp WeatherResponse
+	if h.weather != nil {
+		weatherResp = h.weather.Fetch(c.Request.Context(), settings.City, false)
+	}
+
+	payload := buildDailyBriefPushPayload(settings, weatherResp, plans, checkins, now)
+	payload.Tag = "life-trace-daily-brief-preview"
+	success(c, payload)
+}
+
 func (h *Handler) ScanPushReminders(c *gin.Context) {
 	secret := strings.TrimSpace(h.pushConfig.CronSecret)
 	if secret == "" {

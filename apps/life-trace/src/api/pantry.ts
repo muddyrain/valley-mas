@@ -72,6 +72,70 @@ export type PantryPhotoAnalysisResponse = {
   model?: string;
 };
 
+export type PantryTransferMode = 'copy' | 'move';
+
+export type PantryTransferConflictPolicy = 'merge' | 'keep-both';
+
+export type PantryTransferItemSummary = {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  location: PantryItem['location'];
+  expiresAt?: string;
+  openedAt?: string;
+};
+
+export type PantryTransferConflict = {
+  sourceItem: PantryTransferItemSummary;
+  targetItem: PantryTransferItemSummary;
+  reason: string;
+};
+
+export type PantryTransferPreviewRequest = {
+  sourceHouseholdId?: string;
+  targetHouseholdId: string;
+  itemIds: string[];
+  mode: PantryTransferMode;
+};
+
+export type PantryTransferPreviewResponse = {
+  sourceHouseholdId: string;
+  sourceHouseholdName: string;
+  targetHouseholdId: string;
+  targetHouseholdName: string;
+  mode: PantryTransferMode;
+  itemCount: number;
+  conflictCount: number;
+  items: PantryTransferItemSummary[];
+  conflicts: PantryTransferConflict[];
+};
+
+export type PantryTransferRequest = PantryTransferPreviewRequest & {
+  conflictPolicy?: PantryTransferConflictPolicy;
+};
+
+export type PantryTransferResultItem = {
+  sourceItemId: string;
+  targetItemId: string;
+  name: string;
+  action: 'created' | 'merged';
+};
+
+export type PantryTransferResponse = {
+  sourceHouseholdId: string;
+  sourceHouseholdName: string;
+  targetHouseholdId: string;
+  targetHouseholdName: string;
+  mode: PantryTransferMode;
+  conflictPolicy?: PantryTransferConflictPolicy;
+  processedCount: number;
+  createdCount: number;
+  mergedCount: number;
+  deletedSourceCount: number;
+  items: PantryTransferResultItem[];
+};
+
 function buildListQuery(options: ListPantryOptions = {}) {
   const params = new URLSearchParams();
   if (options.page) {
@@ -224,6 +288,20 @@ export function generatePantryThumbnail(
 
 export function analyzePantryPhoto(token: string, input: PantryPhotoAnalysisRequest) {
   return apiRequest<PantryPhotoAnalysisResponse>('/life-trace/ai/pantry-photo-analysis', token, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function previewPantryTransfer(token: string, input: PantryTransferPreviewRequest) {
+  return apiRequest<PantryTransferPreviewResponse>('/life-trace/pantry/transfer/preview', token, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function transferPantryItems(token: string, input: PantryTransferRequest) {
+  return apiRequest<PantryTransferResponse>('/life-trace/pantry/transfer', token, {
     method: 'POST',
     body: JSON.stringify(input),
   });

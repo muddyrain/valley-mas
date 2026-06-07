@@ -9,10 +9,11 @@ const lifeTraceStoreSource = readFileSync(
 );
 
 describe('pantry status action guards', () => {
-  it('keeps trace creation centralized in the store after status actions', () => {
+  it('keeps pantry status actions free of extra client trace writes', () => {
     expect(pantryPageSource).not.toContain('buildPantryTraceInput(updated');
     expect(pantryPageSource).not.toContain('addTrace(buildPantryTraceInput');
-    expect(lifeTraceStoreSource).toContain('recordPantryTrace(');
+    expect(lifeTraceStoreSource).not.toContain('recordPantryTrace(');
+    expect(lifeTraceStoreSource).not.toContain("'/api/v1/life-trace/traces'");
   });
 
   it('blocks duplicate status submissions before React disables the tapped button', () => {

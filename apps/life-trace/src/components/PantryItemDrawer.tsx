@@ -1,6 +1,7 @@
-import { Camera, ChevronDown, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowRightLeft, Camera, ChevronDown, Sparkles, Trash2, X } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { generatePantryThumbnail } from '@/api/pantry';
+import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -62,6 +63,8 @@ type PantryItemDrawerProps = {
   householdId?: string;
   householdName?: string;
   onSaved?: (message: string) => void;
+  showTransferAction?: boolean;
+  onRequestTransfer?: (item: PantryItem) => void;
 };
 
 type PantryFormErrors = Partial<Record<'name' | 'quantity', string>>;
@@ -73,6 +76,8 @@ export function PantryItemDrawer({
   householdId,
   householdName,
   onSaved,
+  showTransferAction = false,
+  onRequestTransfer,
 }: PantryItemDrawerProps) {
   const token = useAuthStore((state) => state.token);
   const pantryPreferences = useLifeTraceStore((state) => state.pantryPreferences);
@@ -463,7 +468,11 @@ export function PantryItemDrawer({
                 disabled={thumbnailGenerating || imageUploading || submitting}
                 onClick={() => void handleGenerateThumbnail()}
               >
-                <Sparkles className="size-4" />
+                {thumbnailGenerating ? (
+                  <ActionLoadingIcon className="size-4" tone="ai" />
+                ) : (
+                  <Sparkles className="size-4" />
+                )}
                 {thumbnailGenerating ? '生成中...' : '生成缩略图'}
               </Button>
               <Button
@@ -593,6 +602,22 @@ export function PantryItemDrawer({
             />
           </label>
 
+          {editing && showTransferAction && item && onRequestTransfer ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={imageUploading || submitting || deleting}
+              onClick={() => {
+                onOpenChange(false);
+                onRequestTransfer(item);
+              }}
+            >
+              <ArrowRightLeft className="size-4" />
+              转移到共享家庭
+            </Button>
+          ) : null}
+
           <div
             className={cn(
               'flex gap-2',
@@ -626,6 +651,9 @@ export function PantryItemDrawer({
               variant="ai"
               disabled={imageUploading || submitting || deleting || saveQueuedAfterThumbnail}
             >
+              {submitting || saveQueuedAfterThumbnail ? (
+                <ActionLoadingIcon className="size-4" tone="ai" />
+              ) : null}
               {submitting
                 ? '保存中...'
                 : saveQueuedAfterThumbnail

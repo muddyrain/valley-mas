@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -153,6 +154,16 @@ func (h *Handler) CreateTrace(c *gin.Context) {
 	}
 
 	if err := database.GetDB().Create(&trace).Error; err != nil {
+		if logger.Log != nil {
+			logger.Log.WithFields(map[string]interface{}{
+				"userId":      userID.String(),
+				"planId":      strings.TrimSpace(req.PlanID),
+				"titleLength": len(title),
+				"summarySize": len(summary),
+				"timeLabel":   timeLabel,
+				"source":      trace.Source,
+			}).WithError(err).Error("LifeTrace CreateTrace insert failed")
+		}
 		fail(c, http.StatusInternalServerError, "创建踪迹失败")
 		return
 	}

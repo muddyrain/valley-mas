@@ -18,6 +18,7 @@ import { getPwaShareFeedback } from '@/lib/pwa';
 import { cn } from '@/lib/utils';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import type { AppTab } from '@/types';
+import { ActionLoadingIcon } from './ActionLoadingIcon';
 import { Button } from './ui/button';
 
 const tabs: Array<{ id: AppTab; label: string; path: string; icon: typeof CalendarDays }> = [
@@ -123,7 +124,11 @@ function PwaActionBanner({ hidden }: { hidden: boolean }) {
               disabled={refreshing}
               onClick={() => void refreshApp()}
             >
-              <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
+              {refreshing ? (
+                <ActionLoadingIcon className="size-4" tone="ai" />
+              ) : (
+                <RefreshCw className="size-4" />
+              )}
               {refreshing ? '刷新中' : '立即更新'}
             </Button>
           ) : (

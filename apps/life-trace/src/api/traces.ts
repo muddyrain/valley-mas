@@ -1,4 +1,4 @@
-import { apiRequest } from '@/api/request';
+import { type ApiRequestInit, apiRequest } from '@/api/request';
 import type { ListPagination, NewTraceInput, Trace } from '@/types';
 
 export type ListTracesOptions = {
@@ -25,10 +25,11 @@ export function listTraces(token: string, options: ListTracesOptions = {}) {
   );
 }
 
-export function createTrace(token: string, input: NewTraceInput) {
+export function createTrace(token: string, input: NewTraceInput, init?: ApiRequestInit) {
   return apiRequest<Trace>('/life-trace/traces', token, {
     method: 'POST',
     body: JSON.stringify(input),
+    ...init,
   });
 }
 

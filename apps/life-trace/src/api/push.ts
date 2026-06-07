@@ -24,6 +24,13 @@ export type PushSubscriptionRecord = PushSubscriptionPayload & {
   updatedAt?: string;
 };
 
+export type DailyBriefPreviewPayload = {
+  title: string;
+  body: string;
+  url: string;
+  tag?: string;
+};
+
 export function getPushConfig(token: string) {
   return apiRequest<PushConfig>('/life-trace/push/config', token);
 }
@@ -48,6 +55,13 @@ export function deletePushSubscription(token: string, endpoint: string) {
 
 export function testServerPush(token: string) {
   return apiRequest<{ sent: boolean }>('/life-trace/push/test', token, {
+    method: 'POST',
+    suppressErrorToast: true,
+  });
+}
+
+export function previewDailyBriefPush(token: string) {
+  return apiRequest<DailyBriefPreviewPayload>('/life-trace/push/daily-brief-preview', token, {
     method: 'POST',
     suppressErrorToast: true,
   });

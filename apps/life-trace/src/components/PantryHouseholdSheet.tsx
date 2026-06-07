@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { EmptyState } from '@/components/EmptyState';
 import { Badge } from '@/components/ui/badge';
@@ -261,7 +262,11 @@ export function PantryHouseholdSheet({
                 }
               }}
             >
-              <Plus className="size-4" />
+              {submittingAction === 'create' ? (
+                <ActionLoadingIcon className="size-4" tone="ai" />
+              ) : (
+                <Plus className="size-4" />
+              )}
               {submittingAction === 'create' ? '创建中...' : '创建家庭'}
             </Button>
           </Card>
@@ -306,7 +311,11 @@ export function PantryHouseholdSheet({
                 }
               }}
             >
-              <UserPlus className="size-4" />
+              {submittingAction === 'join' ? (
+                <ActionLoadingIcon className="size-4" tone="ai" />
+              ) : (
+                <UserPlus className="size-4" />
+              )}
               {submittingAction === 'join' ? '加入中...' : '通过邀请码加入'}
             </Button>
           </Card>
@@ -342,8 +351,12 @@ export function PantryHouseholdSheet({
                       }
                     }}
                   >
-                    <RefreshCw className="size-4" />
-                    刷新
+                    {submittingAction === 'refresh' ? (
+                      <ActionLoadingIcon className="size-4" tone="ai" />
+                    ) : (
+                      <RefreshCw className="size-4" />
+                    )}
+                    {submittingAction === 'refresh' ? '刷新中...' : '刷新'}
                   </Button>
                   <Button
                     type="button"
@@ -366,7 +379,11 @@ export function PantryHouseholdSheet({
                       }
                     }}
                   >
-                    <Sparkles className="size-4" />
+                    {submittingAction === 'invite' ? (
+                      <ActionLoadingIcon className="size-4" tone="ai" />
+                    ) : (
+                      <Sparkles className="size-4" />
+                    )}
                     {submittingAction === 'invite' ? '生成中...' : '生成邀请码'}
                   </Button>
                 </div>
@@ -477,7 +494,11 @@ export function PantryHouseholdSheet({
                               }
                             }}
                           >
-                            <Crown className="size-4" />
+                            {submittingAction === 'transfer' ? (
+                              <ActionLoadingIcon className="size-4" tone="ai" />
+                            ) : (
+                              <Crown className="size-4" />
+                            )}
                             转交
                           </Button>
                         ) : null}
@@ -510,7 +531,11 @@ export function PantryHouseholdSheet({
                     }
                   }}
                 >
-                  <LogOut className="size-4" />
+                  {submittingAction === 'leave' ? (
+                    <ActionLoadingIcon className="size-4" tone="ai" />
+                  ) : (
+                    <LogOut className="size-4" />
+                  )}
                   {submittingAction === 'leave' ? '退出中...' : '退出家庭'}
                 </Button>
                 <Button
@@ -538,7 +563,11 @@ export function PantryHouseholdSheet({
                     }
                   }}
                 >
-                  <Trash2 className="size-4" />
+                  {submittingAction === 'dissolve' ? (
+                    <ActionLoadingIcon className="size-4" tone="alert" />
+                  ) : (
+                    <Trash2 className="size-4" />
+                  )}
                   {submittingAction === 'dissolve' ? '解散中...' : '解散家庭'}
                 </Button>
               </div>

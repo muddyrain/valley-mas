@@ -10,6 +10,7 @@ import { PantryPage } from '@/pages/PantryPage';
 import { PhotoItemAnalysisPage } from '@/pages/PhotoItemAnalysisPage';
 import { PlansPage } from '@/pages/PlansPage';
 import { ProfilePage } from '@/pages/ProfilePage';
+import { ReminderSettingsPage } from '@/pages/ReminderSettingsPage';
 import { TodayPage } from '@/pages/TodayPage';
 import { TracesPage } from '@/pages/TracesPage';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -90,6 +91,7 @@ function AppContent() {
           <Route path="/ai/weekly-reviews" element={<AiWeeklyReviewsPage />} />
           <Route path="/traces/:traceId?" element={<TracesPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/profile/reminders" element={<ReminderSettingsPage />} />
           <Route path="*" element={<Navigate to="/today" replace />} />
         </Routes>
       </AppShell>

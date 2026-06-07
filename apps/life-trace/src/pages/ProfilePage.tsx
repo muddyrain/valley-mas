@@ -1,16 +1,13 @@
 import {
   Bell,
   BriefcaseBusiness,
-  CalendarCheck,
   Camera,
   Car,
-  CheckCircle2,
+  ChevronRight,
   Clock,
-  CloudSun,
   Download,
   Heart,
   LogOut,
-  type LucideIcon,
   MapPin,
   MessageSquareText,
   MoonStar,
@@ -22,9 +19,7 @@ import {
   ShieldCheck,
   Smartphone,
   Sparkles,
-  TimerReset,
   Users,
-  Wifi,
   X,
   Zap,
 } from 'lucide-react';
@@ -36,266 +31,32 @@ import { LocationPicker } from '@/components/LocationPicker';
 import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
 import { ProfileAvatarSheet } from '@/components/ProfileAvatarSheet';
 import { SectionHeader } from '@/components/SectionHeader';
+import { SettingInput, SettingToggle, SyncStatus } from '@/components/SettingsControls';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { useNotificationPermission } from '@/hooks/useNotificationPermission';
 import { usePantryHouseholdManager } from '@/hooks/usePantryHouseholdManager';
 import { usePwaStatus } from '@/hooks/usePwaStatus';
 import { APP_VERSION_LABEL } from '@/lib/appVersion';
 import { gsap, useGSAP } from '@/lib/gsap';
-import { formatLocationDisplay } from '@/lib/location';
-import { pantryReminderRuleLabels } from '@/lib/pantry';
 import { getPwaShareFeedback } from '@/lib/pwa';
+import { getWorkdayModeMeta } from '@/lib/reminderSettings';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { CommuteMethod, PantryReminderRule, UserSettings, WorkdayMode } from '@/types';
+import type { CommuteMethod, UserSettings } from '@/types';
 
 const commuteMethods: CommuteMethod[] = ['开车', '地铁', '步行', '骑行', '远程'];
 const suggestedHabitOptions = ['喝水', '休息', '运动', '护肤', '早睡', '吃药'];
-const weekdayOptions = [
-  { value: '1', label: '一' },
-  { value: '2', label: '二' },
-  { value: '3', label: '三' },
-  { value: '4', label: '四' },
-  { value: '5', label: '五' },
-  { value: '6', label: '六' },
-  { value: '7', label: '日' },
-];
-const workdayModeOptions: Array<{ value: WorkdayMode; label: string; detail: string }> = [
-  { value: 'legal', label: '法定', detail: '跟随节假日' },
-  { value: 'custom', label: '自定义', detail: '按周选择' },
-  { value: 'daily', label: '每天', detail: '每日生效' },
-];
-const reminderLeadOptions = [0, 5, 10, 15, 30, 60];
-const pantryReminderRuleOptions: PantryReminderRule[] = ['7d', '3d', 'same-day', 'expired'];
 
-const commuteIcons: Record<CommuteMethod, LucideIcon> = {
+const commuteIcons: Record<CommuteMethod, typeof Car> = {
   开车: Car,
   地铁: Route,
   步行: MapPin,
   骑行: Zap,
   远程: BriefcaseBusiness,
 };
-
-type SettingInputProps = {
-  label: string;
-  value: string;
-  icon: LucideIcon;
-  tone: 'ai' | 'trace' | 'health' | 'plan';
-  placeholder?: string;
-  type?: 'text' | 'time';
-  onChange: (value: string) => void;
-};
-
-const toneClasses = {
-  ai: {
-    icon: 'bg-life-ai/10 text-life-ai',
-    border: 'focus-within:border-life-ai/60 focus-within:shadow-[0_0_28px_rgba(6,182,212,0.12)]',
-  },
-  trace: {
-    icon: 'bg-life-trace/10 text-life-trace',
-    border:
-      'focus-within:border-life-trace/60 focus-within:shadow-[0_0_28px_rgba(16,185,129,0.12)]',
-  },
-  health: {
-    icon: 'bg-life-health/10 text-life-health',
-    border:
-      'focus-within:border-life-health/60 focus-within:shadow-[0_0_28px_rgba(245,158,11,0.12)]',
-  },
-  plan: {
-    icon: 'bg-life-plan/10 text-life-plan',
-    border: 'focus-within:border-life-plan/60 focus-within:shadow-[0_0_28px_rgba(139,92,246,0.12)]',
-  },
-};
-
-function SettingInput({
-  label,
-  value,
-  icon: Icon,
-  tone,
-  placeholder,
-  type = 'text',
-  onChange,
-}: SettingInputProps) {
-  return (
-    <label
-      className={cn(
-        'group block rounded-[1.35rem] border border-border bg-card/80 p-4 transition duration-300',
-        'hover:border-foreground/20 hover:bg-card',
-        toneClasses[tone].border,
-      )}
-    >
-      <span className="flex items-center gap-3">
-        <span
-          className={cn(
-            'grid size-10 shrink-0 place-items-center rounded-2xl transition group-focus-within:scale-105',
-            toneClasses[tone].icon,
-          )}
-        >
-          <Icon className="size-5" />
-        </span>
-        <span className="min-w-0">
-          <span className="block text-xs font-semibold text-muted-foreground">{label}</span>
-          {type === 'time' ? (
-            <span className="relative mt-1 block h-7">
-              <span className="block h-7 truncate text-base font-semibold text-foreground">
-                {value || placeholder}
-              </span>
-              <input
-                type="time"
-                value={value}
-                placeholder={placeholder}
-                onChange={(event) => onChange(event.target.value)}
-                step={60}
-                className="absolute inset-0 h-7 w-full cursor-pointer opacity-0"
-              />
-            </span>
-          ) : (
-            <input
-              type={type}
-              value={value}
-              placeholder={placeholder}
-              onChange={(event) => onChange(event.target.value)}
-              className="mt-1 h-7 w-full bg-transparent text-base font-semibold text-foreground outline-none placeholder:text-muted-foreground"
-            />
-          )}
-        </span>
-      </span>
-    </label>
-  );
-}
-
-function SettingToggle({
-  label,
-  detail,
-  active,
-  icon: Icon,
-  onToggle,
-}: {
-  label: string;
-  detail: string;
-  active: boolean;
-  icon: LucideIcon;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        'group flex w-full items-center justify-between gap-4 rounded-[1.35rem] border p-4 text-left transition duration-300',
-        active
-          ? 'border-life-trace/35 bg-life-trace/10 shadow-[0_18px_52px_rgba(16,185,129,0.08)]'
-          : 'border-border bg-card/80 hover:border-foreground/20 hover:bg-card',
-      )}
-      onClick={onToggle}
-    >
-      <span className="flex min-w-0 items-center gap-3">
-        <span
-          className={cn(
-            'grid size-10 shrink-0 place-items-center rounded-2xl transition duration-300 group-hover:scale-105',
-            active ? 'bg-life-trace text-background' : 'bg-secondary text-muted-foreground',
-          )}
-        >
-          <Icon className="size-5" />
-        </span>
-        <span className="min-w-0">
-          <span className="block font-semibold">{label}</span>
-          <span className="mt-1 block text-sm leading-5 text-muted-foreground">{detail}</span>
-        </span>
-      </span>
-      <span
-        className={cn(
-          'relative h-8 w-14 shrink-0 rounded-full p-1 transition duration-300',
-          active ? 'bg-life-trace' : 'bg-secondary',
-        )}
-      >
-        <span
-          className={cn(
-            'block size-6 rounded-full bg-foreground transition duration-300',
-            active ? 'translate-x-6 bg-background shadow-[0_0_18px_rgba(250,250,250,0.25)]' : '',
-          )}
-        />
-      </span>
-    </button>
-  );
-}
-
-function SegmentedOption<T extends string>({
-  value,
-  label,
-  detail,
-  active,
-  onSelect,
-}: {
-  value: T;
-  label: string;
-  detail?: string;
-  active: boolean;
-  onSelect: (value: T) => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        'min-h-16 rounded-[1.1rem] border px-3 py-2 text-left transition duration-300',
-        active
-          ? 'border-life-ai/45 bg-life-ai/10 text-life-ai shadow-[0_14px_42px_rgba(6,182,212,0.08)]'
-          : 'border-border bg-card/80 text-muted-foreground hover:border-foreground/20 hover:bg-card',
-      )}
-      aria-pressed={active}
-      onClick={() => onSelect(value)}
-    >
-      <span className="block text-sm font-semibold">{label}</span>
-      {detail ? (
-        <span className="mt-1 block text-xs leading-4 text-muted-foreground">{detail}</span>
-      ) : null}
-    </button>
-  );
-}
-
-function SyncStatus({
-  loading,
-  saving,
-  error,
-}: {
-  loading: boolean;
-  saving: boolean;
-  error: string;
-}) {
-  if (!loading && !saving && !error) {
-    return (
-      <div className="flex items-center gap-2 rounded-full border border-life-trace/25 bg-life-trace/10 px-3 py-1.5 text-xs font-semibold text-life-trace">
-        <CheckCircle2 className="size-3.5" />
-        云端已同步
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        'relative overflow-hidden rounded-full border px-3 py-1.5 text-xs font-semibold',
-        error
-          ? 'border-life-alert/35 bg-life-alert/10 text-life-alert'
-          : 'border-life-ai/30 bg-life-ai/10 text-life-ai',
-      )}
-    >
-      {!error ? (
-        <span
-          aria-hidden="true"
-          className="absolute inset-y-0 -left-1/2 w-1/2 animate-[life-profile-sheen_1.5s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-foreground/15 to-transparent motion-reduce:animate-none"
-        />
-      ) : null}
-      <span className="relative flex items-center gap-2">
-        {error ? null : <ActionLoadingIcon tone="ai" />}
-        {error ? error : loading ? '同步云端偏好' : '保存偏好中'}
-      </span>
-    </div>
-  );
-}
 
 export function ProfilePage() {
   const pageRef = useRef<HTMLDivElement>(null);
@@ -305,9 +66,6 @@ export function ProfilePage() {
   const [feedbackSheetOpen, setFeedbackSheetOpen] = useState(false);
   const [habitDraft, setHabitDraft] = useState('');
   const [habitDraftError, setHabitDraftError] = useState('');
-  const [notificationTesting, setNotificationTesting] = useState(false);
-  const [serverPushBinding, setServerPushBinding] = useState(false);
-  const [notificationTestMessage, setNotificationTestMessage] = useState('');
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const settingsLoading = useLifeTraceStore((state) => state.settingsLoading);
@@ -318,7 +76,6 @@ export function ProfilePage() {
   );
   const pantryPreferences = useLifeTraceStore((state) => state.pantryPreferences);
   const updateSettings = useLifeTraceStore((state) => state.updateSettings);
-  const updatePantryPreferences = useLifeTraceStore((state) => state.updatePantryPreferences);
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
   const updateUser = useAuthStore((state) => state.updateUser);
@@ -335,7 +92,6 @@ export function ProfilePage() {
     refreshApp,
     shareApp,
   } = usePwaStatus();
-  const notification = useNotificationPermission(token);
   const showToast = useFeedbackToastStore((state) => state.showToast);
   const {
     households,
@@ -362,23 +118,21 @@ export function ProfilePage() {
     Number(settings.weatherAlerts) +
     Number(settings.planReminders) +
     Number(settings.aiPersonalization);
-  const selectedWorkdayLabels = weekdayOptions
-    .filter((option) => settings.workdays.includes(option.value))
-    .map((option) => option.label)
-    .join('、');
-  const workdayMeta =
-    settings.workdayMode === 'legal'
-      ? '法定工作日'
-      : settings.workdayMode === 'daily'
-        ? '每天生效'
-        : selectedWorkdayLabels || '未选择';
-  const locationLabel = formatLocationDisplay(settings.city) || settings.city;
+  const workdayMeta = getWorkdayModeMeta(settings);
   const activePantrySpaceName = currentHousehold?.name || preferredPantryHouseholdName || '未设置';
   const activePantrySpaceMeta = currentHousehold
     ? currentHousehold.kind === 'personal'
       ? '个人空间'
       : `${currentHousehold.memberCount} 人共享`
     : '今日页和库存页会跟随这里';
+  const ActiveCommuteIcon = commuteIcons[settings.commuteMethod];
+  const planReminderMeta =
+    settings.planReminderLeadMinutes === 0
+      ? '准点提醒'
+      : `提前 ${settings.planReminderLeadMinutes} 分钟`;
+  const pantryReminderMeta = pantryPreferences.defaultReminderEnabled
+    ? `${pantryPreferences.defaultReminderTime} · ${pantryPreferences.defaultReminderRules.length} 个节点`
+    : '已关闭';
 
   useEffect(() => {
     if (!token || !settingsLoaded || householdsLoaded || householdsLoading) {
@@ -406,36 +160,6 @@ export function ProfilePage() {
       }
     })();
   }, [householdSheetOpen, loadHouseholdMembersFor, loadHouseholds]);
-
-  const handleTestNotification = async () => {
-    setNotificationTesting(true);
-    setNotificationTestMessage('');
-
-    try {
-      const sent = await notification.showTestNotification();
-      setNotificationTestMessage(
-        sent ? '测试通知已发送，请查看系统通知。' : '当前环境还不能发送通知。',
-      );
-    } catch (error) {
-      setNotificationTestMessage(error instanceof Error ? error.message : '测试通知发送失败');
-    } finally {
-      setNotificationTesting(false);
-    }
-  };
-
-  const handleEnableServerPush = async () => {
-    setServerPushBinding(true);
-    setNotificationTestMessage('');
-
-    try {
-      const bound = await notification.enableServerPush();
-      setNotificationTestMessage(
-        bound ? '服务端推送已绑定，计划到点后即使应用关闭也能提醒。' : '暂时无法绑定服务端推送。',
-      );
-    } finally {
-      setServerPushBinding(false);
-    }
-  };
 
   const handleCheckPwaUpdate = async () => {
     try {
@@ -536,14 +260,6 @@ export function ProfilePage() {
     setHabitDraftError('');
   };
 
-  const toggleWorkday = (day: string) => {
-    const nextWorkdays = settings.workdays.includes(day)
-      ? settings.workdays.filter((item) => item !== day)
-      : [...settings.workdays, day].sort();
-
-    update('workdays', nextWorkdays.length > 0 ? nextWorkdays : ['1', '2', '3', '4', '5']);
-  };
-
   return (
     <div ref={pageRef} className="space-y-6">
       <section
@@ -629,29 +345,25 @@ export function ProfilePage() {
                 </button>
               </div>
               <p className="mt-1 truncate text-sm text-muted-foreground">
-                {locationLabel} · {settings.commuteMethod}通勤 · {settings.dailyBriefTime} 简报
+                今日建议、AI 对话和简报都会按这套设置生成。
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
-            <LocationPicker value={settings.city} onChange={(value) => update('city', value)}>
-              {({ displayValue, openPicker }) => (
-                <button
-                  type="button"
-                  className="rounded-2xl border border-foreground/10 bg-background/35 p-3 text-left backdrop-blur transition hover:border-life-ai/25 hover:bg-background/45"
-                  onClick={openPicker}
-                >
-                  <CloudSun className="mb-2 size-4 text-life-weather" />
-                  <p className="truncate text-sm font-semibold">{displayValue}</p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">天气城市</p>
-                </button>
-              )}
-            </LocationPicker>
             <div className="rounded-2xl border border-foreground/10 bg-background/35 p-3 backdrop-blur">
-              <Bell className="mb-2 size-4 text-life-ai" />
-              <p className="truncate text-sm font-semibold">{settings.dailyBriefTime}</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">每日简报</p>
+              <ActiveCommuteIcon className="mb-2 size-4 text-life-ai" />
+              <p className="truncate text-sm font-semibold">{settings.commuteMethod}</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">通勤方式</p>
+            </div>
+            <div className="rounded-2xl border border-foreground/10 bg-background/35 p-3 backdrop-blur">
+              <Clock className="mb-2 size-4 text-life-plan" />
+              <p className="text-[13px] font-semibold leading-tight whitespace-nowrap">
+                <span>{settings.workStart}</span>
+                <span className="px-1 text-muted-foreground">-</span>
+                <span>{settings.workEnd}</span>
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">工作时段</p>
             </div>
             <div className="rounded-2xl border border-foreground/10 bg-background/35 p-3 backdrop-blur">
               <Heart className="mb-2 size-4 text-life-trace" />
@@ -690,7 +402,7 @@ export function ProfilePage() {
                 </span>
                 <span className="min-w-0">
                   <span className="block text-xs font-semibold text-muted-foreground">
-                    天气城市
+                    天气与简报定位
                   </span>
                   <span className="mt-1 block truncate text-base font-semibold text-foreground">
                     {displayValue}
@@ -722,7 +434,7 @@ export function ProfilePage() {
           />
         </div>
         <SettingInput
-          label="每日简报"
+          label="简报时间"
           value={settings.dailyBriefTime}
           icon={Bell}
           tone="trace"
@@ -757,204 +469,57 @@ export function ProfilePage() {
       </section>
 
       <section data-profile-card className="space-y-3">
-        <SectionHeader title="高级提醒策略" meta={workdayMeta} />
-        <details className="group rounded-[1.35rem] border border-border bg-card/80 p-4">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-            <span className="flex min-w-0 items-center gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-life-plan/10 text-life-plan">
-                <CalendarCheck className="size-5" />
-              </span>
-              <span className="min-w-0">
-                <span className="block font-semibold">工作日、提前提醒和勿扰时间</span>
-                <span className="mt-1 block text-sm leading-5 text-muted-foreground">
-                  低频设置收在这里，默认节奏保持 {workdayMeta}。
-                </span>
-              </span>
-            </span>
-            <span className="shrink-0 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
-              展开
-            </span>
-          </summary>
-          <div className="mt-4 space-y-4 border-t border-border pt-4">
-            <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
-              {workdayModeOptions.map((option) => (
-                <SegmentedOption
-                  key={option.value}
-                  value={option.value}
-                  label={option.label}
-                  detail={option.detail}
-                  active={settings.workdayMode === option.value}
-                  onSelect={(value) => update('workdayMode', value)}
-                />
-              ))}
+        <SectionHeader title="提醒设置" meta="通知 / 节奏 / Pantry" />
+        <Card className="space-y-4 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">通知、节奏和库存提醒</p>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                统一管理提醒状态和通知方式。
+              </p>
             </div>
-            {settings.workdayMode === 'custom' ? (
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold">自定义上班日</p>
-                  <span className="text-xs text-muted-foreground">{selectedWorkdayLabels}</span>
-                </div>
-                <div className="grid grid-cols-7 gap-1.5">
-                  {weekdayOptions.map((option) => {
-                    const active = settings.workdays.includes(option.value);
-
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={cn(
-                          'grid min-h-10 place-items-center rounded-xl border text-sm font-semibold transition',
-                          active
-                            ? 'border-life-plan/45 bg-life-plan/10 text-life-plan'
-                            : 'border-border bg-secondary text-muted-foreground',
-                        )}
-                        aria-pressed={active}
-                        onClick={() => toggleWorkday(option.value)}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold">计划提前提醒</p>
-                <span className="text-xs text-muted-foreground">
-                  {settings.planReminderLeadMinutes === 0
-                    ? '准点提醒'
-                    : `提前 ${settings.planReminderLeadMinutes} 分钟`}
-                </span>
-              </div>
-              <div className="grid grid-cols-6 gap-1.5 max-[390px]:grid-cols-3">
-                {reminderLeadOptions.map((minutes) => {
-                  const active = settings.planReminderLeadMinutes === minutes;
-
-                  return (
-                    <button
-                      key={minutes}
-                      type="button"
-                      className={cn(
-                        'min-h-10 rounded-xl border px-2 text-sm font-semibold transition',
-                        active
-                          ? 'border-life-health/45 bg-life-health/10 text-life-health'
-                          : 'border-border bg-secondary text-muted-foreground',
-                      )}
-                      aria-pressed={active}
-                      onClick={() => update('planReminderLeadMinutes', minutes)}
-                    >
-                      {minutes === 0 ? '准点' : `${minutes}m`}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-plan/10 text-life-plan">
+              <Bell className="size-5" />
             </div>
-            <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-              <SettingInput
-                label="勿扰开始"
-                value={settings.quietStart}
-                icon={MoonStar}
-                tone="plan"
-                placeholder="22:30"
-                type="time"
-                onChange={(value) => update('quietStart', value)}
-              />
-              <SettingInput
-                label="勿扰结束"
-                value={settings.quietEnd}
-                icon={Clock}
-                tone="health"
-                placeholder="07:30"
-                type="time"
-                onChange={(value) => update('quietEnd', value)}
-              />
-            </div>
-            <SettingToggle
-              label="同步法定节假日"
-              detail="已内置 2026 年中国法定节假日与调休，上班提醒会优先读取。"
-              icon={CalendarCheck}
-              active={settings.holidaySync}
-              onToggle={() => update('holidaySync', !settings.holidaySync)}
-            />
-            <SettingToggle
-              label="周末也提醒"
-              detail="适合周末仍需要计划、运动或家庭事务提醒。"
-              icon={Bell}
-              active={settings.weekendReminders}
-              onToggle={() => update('weekendReminders', !settings.weekendReminders)}
-            />
           </div>
-        </details>
+          <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+            <div className="rounded-[1.15rem] border border-border bg-secondary/55 p-3">
+              <p className="text-xs font-semibold text-muted-foreground">计划提醒</p>
+              <p className="mt-2 text-sm font-semibold text-foreground">
+                {settings.planReminders ? planReminderMeta : '已关闭'}
+              </p>
+            </div>
+            <div className="rounded-[1.15rem] border border-border bg-secondary/55 p-3">
+              <p className="text-xs font-semibold text-muted-foreground">提醒节奏</p>
+              <p className="mt-2 text-sm font-semibold text-foreground">{workdayMeta}</p>
+            </div>
+            <div className="rounded-[1.15rem] border border-border bg-secondary/55 p-3 max-[360px]:col-span-1 sm:col-span-2">
+              <p className="text-xs font-semibold text-muted-foreground">库存默认提醒</p>
+              <p className="mt-2 text-sm font-semibold text-foreground">{pantryReminderMeta}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge tone={settings.weatherAlerts ? 'weather' : 'default'}>
+              {settings.weatherAlerts ? '天气风险开启' : '天气风险关闭'}
+            </Badge>
+            <Badge tone={pantryPreferences.defaultReminderEnabled ? 'health' : 'default'}>
+              {pantryPreferences.defaultReminderEnabled ? '库存提醒开启' : '库存提醒关闭'}
+            </Badge>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={() => navigate('/profile/reminders')}
+          >
+            打开提醒设置
+            <ChevronRight className="size-4" />
+          </Button>
+        </Card>
       </section>
 
       <section data-profile-card className="space-y-3">
-        <SectionHeader title="提醒偏好" meta={`${enabledSignals} 项开启`} />
-        <SettingToggle
-          label="天气风险提醒"
-          detail="降雨、温差、紫外线变化时提醒"
-          icon={CloudSun}
-          active={settings.weatherAlerts}
-          onToggle={() => update('weatherAlerts', !settings.weatherAlerts)}
-        />
-        <SettingToggle
-          label="计划提醒"
-          detail="计划开始前提醒，并可完成后生成踪迹"
-          icon={Bell}
-          active={settings.planReminders}
-          onToggle={() => update('planReminders', !settings.planReminders)}
-        />
-        <Card className="p-4">
-          <div className="flex items-start gap-3 max-[360px]:gap-2">
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
-              <Bell className="size-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold">系统通知</h3>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">{notification.label}</p>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                {notification.serverPushLabel}
-              </p>
-              <p className="mt-3 text-xs leading-5 text-muted-foreground">
-                iPhone 需要通过 HTTPS 打开并添加到主屏幕后，从桌面图标进入再开启通知。
-              </p>
-              {notificationTestMessage ? (
-                <p className="mt-2 text-xs leading-5 text-life-ai">{notificationTestMessage}</p>
-              ) : null}
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2 max-[390px]:grid-cols-1">
-            <Button
-              type="button"
-              variant={notification.granted ? 'secondary' : 'ai'}
-              size="sm"
-              disabled={!notification.supported || notification.granted}
-              onClick={() => void notification.requestPermission()}
-            >
-              {notification.granted ? '已开启' : '开启通知'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!notification.granted || notificationTesting}
-              onClick={() => void handleTestNotification()}
-            >
-              {notificationTesting ? <ActionLoadingIcon tone="ai" /> : <Bell className="size-4" />}
-              本地测试
-            </Button>
-            <Button
-              type="button"
-              variant={notification.serverPushReady ? 'secondary' : 'ai'}
-              size="sm"
-              disabled={!notification.pushSupported || serverPushBinding}
-              onClick={() => void handleEnableServerPush()}
-            >
-              {serverPushBinding ? <ActionLoadingIcon tone="ai" /> : <Wifi className="size-4" />}
-              {serverPushBinding ? '绑定中' : notification.serverPushReady ? '已绑定' : '绑定推送'}
-            </Button>
-          </div>
-        </Card>
+        <SectionHeader title="智能偏好" meta={settings.aiPersonalization ? '已开启' : '已关闭'} />
         <SettingToggle
           label="AI 个性化"
           detail="根据计划、打卡和偏好生成今日建议"
@@ -1014,79 +579,6 @@ export function ProfilePage() {
               查看当前库存
             </Button>
           </div>
-        </Card>
-
-        <Card className="space-y-4 p-4">
-          <div className="flex items-start gap-3">
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
-              <Bell className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-semibold">库存默认提醒</h3>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                新增商品时会先继承这里。单个商品仍然可以在编辑页覆盖。
-              </p>
-            </div>
-          </div>
-          <SettingToggle
-            label="默认开启库存提醒"
-            detail="默认会在临期、到期和已过期时提醒你。"
-            icon={Bell}
-            active={pantryPreferences.defaultReminderEnabled}
-            onToggle={() =>
-              updatePantryPreferences({
-                defaultReminderEnabled: !pantryPreferences.defaultReminderEnabled,
-              })
-            }
-          />
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold">默认提醒节点</p>
-              <span className="text-xs text-muted-foreground">
-                {pantryPreferences.defaultReminderRules
-                  .map((rule) => pantryReminderRuleLabels[rule])
-                  .join(' / ')}
-              </span>
-            </div>
-            <div className="grid grid-cols-4 gap-2 max-[360px]:grid-cols-2">
-              {pantryReminderRuleOptions.map((rule) => {
-                const active = pantryPreferences.defaultReminderRules.includes(rule);
-                return (
-                  <button
-                    key={rule}
-                    type="button"
-                    className={cn(
-                      'h-10 rounded-2xl border px-2 text-sm font-semibold transition',
-                      active
-                        ? 'border-life-health/45 bg-life-health/10 text-life-health'
-                        : 'border-border bg-secondary text-muted-foreground',
-                    )}
-                    onClick={() =>
-                      updatePantryPreferences({
-                        defaultReminderRules: active
-                          ? pantryPreferences.defaultReminderRules.filter((item) => item !== rule)
-                          : [...pantryPreferences.defaultReminderRules, rule],
-                      })
-                    }
-                  >
-                    {pantryReminderRuleLabels[rule]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <SettingInput
-            label="库存提醒时间"
-            value={pantryPreferences.defaultReminderTime}
-            icon={TimerReset}
-            tone="health"
-            placeholder="09:00"
-            type="time"
-            onChange={(value) => updatePantryPreferences({ defaultReminderTime: value })}
-          />
-          <p className="text-xs leading-5 text-muted-foreground">
-            这组库存规则会跟随 Life Trace 账户同步，新设备登录后也能继续沿用。
-          </p>
         </Card>
       </section>
 
@@ -1245,7 +737,11 @@ export function ProfilePage() {
                 disabled={refreshing}
                 onClick={() => void refreshApp()}
               >
-                <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
+                {refreshing ? (
+                  <ActionLoadingIcon className="size-4" tone="ai" />
+                ) : (
+                  <RefreshCw className="size-4" />
+                )}
                 {refreshing ? '刷新中' : '立即更新'}
               </Button>
             ) : (
@@ -1256,7 +752,11 @@ export function ProfilePage() {
                 disabled={checkingUpdate}
                 onClick={() => void handleCheckPwaUpdate()}
               >
-                <RefreshCw className={cn('size-4', checkingUpdate && 'animate-spin')} />
+                {checkingUpdate ? (
+                  <ActionLoadingIcon className="size-4" tone="ai" />
+                ) : (
+                  <RefreshCw className="size-4" />
+                )}
                 {checkingUpdate ? '检查中' : '检查更新'}
               </Button>
             )}

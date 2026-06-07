@@ -47,53 +47,33 @@ describe('pantry store', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/life-trace/pantry?page=1&pageSize=20');
   });
 
-  it('records a pantry trace after creating an item', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          code: 0,
-          message: 'success',
-          data: {
-            id: 'pantry-1',
-            householdId: '',
-            name: '牛奶',
-            category: '食品',
-            quantity: 2,
-            unit: '盒',
-            location: '冷藏',
-            expiresAt: '2026-06-10',
-            openedAt: '2026-06-02',
-            note: '',
-            imageUrl: 'https://example.com/milk.jpg',
-            thumbnailUrl: '',
-            status: 'normal',
-            reminderEnabled: true,
-            reminderUseDefault: true,
-            reminderRules: ['7d', '3d'],
-            reminderTime: '09:00',
-          },
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          code: 0,
-          message: 'success',
-          data: {
-            id: 'trace-1',
-            title: '新增库存：牛奶',
-            summary: 'Life Trace 已将「牛奶」加入家庭库存，数量为 2盒。',
-            timeLabel: '06/02 10:00',
-            location: '冷藏',
-            imageUrl: 'https://example.com/milk.jpg',
-            mood: '踏实',
-            tags: ['食品', '家庭库存', '新增库存'],
-            source: '库存',
-          },
-        }),
-      });
+  it('creates a pantry item without issuing a second client trace request', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        code: 0,
+        message: 'success',
+        data: {
+          id: 'pantry-1',
+          householdId: '',
+          name: '牛奶',
+          category: '食品',
+          quantity: 2,
+          unit: '盒',
+          location: '冷藏',
+          expiresAt: '2026-06-10',
+          openedAt: '2026-06-02',
+          note: '',
+          imageUrl: 'https://example.com/milk.jpg',
+          thumbnailUrl: '',
+          status: 'normal',
+          reminderEnabled: true,
+          reminderUseDefault: true,
+          reminderRules: ['7d', '3d'],
+          reminderTime: '09:00',
+        },
+      }),
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     const { useAuthStore } = await import('../src/store/useAuthStore');
@@ -121,15 +101,8 @@ describe('pantry store', () => {
     });
 
     expect(item?.name).toBe('牛奶');
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/life-trace/pantry');
-    expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/life-trace/traces');
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toMatchObject({
-      title: '新增库存：牛奶',
-      source: '库存',
-      tags: ['食品', '家庭库存', '新增库存'],
-    });
-    await vi.waitFor(() => expect(useLifeTraceStore.getState().traces[0]?.source).toBe('库存'));
   });
 
   it('deduplicates concurrent pantry status updates before creating traces', async () => {
@@ -205,8 +178,7 @@ describe('pantry store', () => {
 
     const updated = await first;
     expect(updated?.status).toBe('discarded');
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(String(fetchMock.mock.calls[1][0])).toBe('/api/v1/life-trace/traces');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the created shared household as the pantry list scope', async () => {
@@ -235,24 +207,6 @@ describe('pantry store', () => {
             reminderUseDefault: true,
             reminderRules: ['7d', '3d', 'same-day'],
             reminderTime: '08:30',
-          },
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          code: 0,
-          message: 'success',
-          data: {
-            id: 'trace-shared-1',
-            title: '新增库存：酸奶',
-            summary: 'Life Trace 已将「酸奶」加入家庭库存，数量为 1盒。',
-            timeLabel: '06/02 10:00',
-            location: '冷藏',
-            imageUrl: '',
-            mood: '踏实',
-            tags: ['食品', '家庭库存', '新增库存'],
-            source: '库存',
           },
         }),
       })
@@ -329,7 +283,7 @@ describe('pantry store', () => {
     expect(item?.householdId).toBe('household-shared');
 
     await useLifeTraceStore.getState().setActivePantryHousehold('household-shared', '家里');
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     await useLifeTraceStore.getState().loadPantryList({
       pageSize: 20,
       householdId: useLifeTraceStore.getState().preferredPantryHouseholdId,
@@ -337,11 +291,11 @@ describe('pantry store', () => {
 
     expect(useLifeTraceStore.getState().preferredPantryHouseholdId).toBe('household-shared');
     expect(useLifeTraceStore.getState().preferredPantryHouseholdName).toBe('家里');
-    expect(fetchMock.mock.calls[2][0]).toBe('/api/v1/life-trace/settings');
-    expect(JSON.parse(fetchMock.mock.calls[2][1].body as string)).toMatchObject({
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/life-trace/settings');
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toMatchObject({
       activePantryHouseholdId: 'household-shared',
     });
-    expect(fetchMock.mock.calls[3][0]).toBe(
+    expect(fetchMock.mock.calls[2][0]).toBe(
       '/api/v1/life-trace/pantry?page=1&pageSize=20&householdId=household-shared',
     );
   });

@@ -63,6 +63,8 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 		{
 			pantry.GET("", handler.ListPantryItems)
 			pantry.POST("", handler.CreatePantryItem)
+			pantry.POST("/transfer/preview", handler.PreviewPantryTransfer)
+			pantry.POST("/transfer", handler.TransferPantryItems)
 			pantry.PATCH("/:id", handler.UpdatePantryItem)
 			pantry.PATCH("/:id/status", handler.UpdatePantryItemStatus)
 			pantry.DELETE("/:id", handler.DeletePantryItem)
@@ -111,6 +113,7 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			push.GET("/config", handler.GetPushConfig)
 			push.PUT("/subscription", handler.SavePushSubscription)
 			push.DELETE("/subscription", handler.DeletePushSubscription)
+			push.POST("/daily-brief-preview", handler.PreviewDailyBriefPush)
 			push.POST("/test", handler.TestPush)
 		}
 	}

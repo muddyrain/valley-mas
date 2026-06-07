@@ -36,6 +36,86 @@ cd server && air
 cd server && air db=true
 ```
 
+## 国内服务器自动部署
+
+当前推荐用于国内云服务器的部署链路：
+
+```text
+本地 git push -> 同时 push GitHub 和 Gitee -> GitHub Actions 触发 ->
+SSH 登录服务器 -> 服务器从 Gitee pull 最新代码 -> 本机 go build ->
+systemctl restart valley-server
+```
+
+这样可以避免服务器直连 GitHub 或 GitHub Actions 直接跨境上传大体积二进制过慢的问题。
+
+### 服务器侧约定
+
+- 代码目录：`/opt/valley-mas`
+- 二进制输出：`/opt/valley/bin/valley-server`
+- 环境变量文件：`/opt/valley/config/server.env`
+- systemd 服务：`valley-server.service`
+- 仓库 `origin` 指向 Gitee，例如：
+
+```bash
+cd /opt/valley-mas
+git remote set-url origin https://gitee.com/muddyrain/valley-mas.git
+```
+
+国内服务器建议预先配置 Go 模块代理：
+
+```bash
+/usr/local/go/bin/go env -w GOPROXY=https://goproxy.cn,direct
+/usr/local/go/bin/go env -w GOSUMDB=sum.golang.google.cn
+```
+
+### 本地双 push 配置
+
+双 push 配置写在当前 clone 的 `.git/config`，不会自动跟随仓库传播；换一台电脑或重新 clone 后，需要重新执行一次。
+
+推荐保留 GitHub 作为 `fetch` 源，只给 `push` 增加 Gitee：
+
+```bash
+git remote set-url --add --push origin git@github.com:muddyrain/valley-mas.git
+git remote set-url --add --push origin git@gitee.com:muddyrain/valley-mas.git
+git remote -v
+```
+
+预期输出类似：
+
+```text
+origin  git@github.com:muddyrain/valley-mas.git (fetch)
+origin  git@github.com:muddyrain/valley-mas.git (push)
+origin  git@gitee.com:muddyrain/valley-mas.git (push)
+```
+
+之后执行一次：
+
+```bash
+git push origin master
+```
+
+会同时推送到 GitHub 和 Gitee。
+
+### 服务重启权限
+
+自动部署依赖 `valley` 用户无密码重启服务，建议单独放在 `/etc/sudoers.d/valley-server`：
+
+```text
+valley ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart valley-server
+```
+
+可用下面命令验证：
+
+```bash
+sudo -n /usr/bin/systemctl restart valley-server
+```
+
+如果需要检查服务状态，可直接执行：
+
+```bash
+/usr/bin/systemctl status valley-server --no-pager | head -n 20
+```
+
 ## 常用校验
 
 ```bash

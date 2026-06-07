@@ -30,7 +30,7 @@ export function BottomSheet({
   className,
   zIndexClassName = 'z-[70]',
   showHandle = true,
-  portal = false,
+  portal = true,
 }: BottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const [dragOffset, setDragOffset] = useState(0);

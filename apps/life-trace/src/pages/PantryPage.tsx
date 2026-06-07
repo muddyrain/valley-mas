@@ -3,6 +3,7 @@ import {
   Archive,
   BadgeAlert,
   Camera,
+  Check,
   ClipboardList,
   Milk,
   PackagePlus,
@@ -17,11 +18,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadErrorState } from '@/components/LoadErrorState';
+import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
 import { PantryItemDrawer } from '@/components/PantryItemDrawer';
+import { PantryTransferSheet } from '@/components/PantryTransferSheet';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { usePantryHouseholdManager } from '@/hooks/usePantryHouseholdManager';
 import {
   getPantryCoverUrl,
   getPantryExpiryText,
@@ -145,6 +149,11 @@ export function PantryPage() {
   const updatePantryItemStatus = useLifeTraceStore((state) => state.updatePantryItemStatus);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PantryItem | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [transferSheetOpen, setTransferSheetOpen] = useState(false);
+  const [transferItems, setTransferItems] = useState<PantryItem[]>([]);
+  const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<PantryItemStatus | 'all'>(() =>
     readStatusFilter(new URLSearchParams(window.location.search)),
   );
@@ -163,8 +172,32 @@ export function PantryPage() {
   const latestSearchParamsRef = useRef(searchParams);
   const showToast = useFeedbackToastStore((state) => state.showToast);
   const effectiveHouseholdId = preferredPantryHouseholdId || pantryResolvedHouseholdId;
+  const isPersonalScope = !preferredPantryHouseholdId;
   const currentHouseholdName =
     pantryResolvedHouseholdName || preferredPantryHouseholdName || '当前空间';
+  const canTransferFromCurrentHousehold = isPersonalScope && Boolean(pantryResolvedHouseholdId);
+  const selectedItems = useMemo(
+    () => pantryList.filter((item) => selectedItemIds.includes(item.id)),
+    [pantryList, selectedItemIds],
+  );
+  const {
+    households,
+    householdsLoading,
+    householdError,
+    householdMembers,
+    householdMembersLoading,
+    invitePayload,
+    activeHouseholdId,
+    loadHouseholds,
+    loadHouseholdMembersFor,
+    handleSelectHousehold,
+    handleCreateHousehold,
+    handleJoinHousehold,
+    handleCreateInvite,
+    handleLeaveHousehold,
+    handleTransferOwner,
+    handleDissolveHousehold,
+  } = usePantryHouseholdManager();
 
   const syncUrlState = useCallback(
     (updates: {
@@ -256,6 +289,43 @@ export function PantryPage() {
     }
   };
 
+  const refreshPantryList = useCallback(async () => {
+    await loadPantryList({
+      ...pantryQueryOptions,
+      pageSize: PANTRY_PAGE_SIZE,
+    });
+  }, [loadPantryList, pantryQueryOptions]);
+
+  const toggleSelectionMode = useCallback(() => {
+    setSelectionMode((current) => {
+      if (current) {
+        setSelectedItemIds([]);
+      }
+      return !current;
+    });
+  }, []);
+
+  const toggleItemSelection = useCallback((itemId: string) => {
+    setSelectedItemIds((current) =>
+      current.includes(itemId) ? current.filter((id) => id !== itemId) : [...current, itemId],
+    );
+  }, []);
+
+  const handleOpenTransferForItems = useCallback((items: PantryItem[]) => {
+    if (!items.length) {
+      return;
+    }
+    setTransferItems(items);
+    setTransferSheetOpen(true);
+  }, []);
+
+  const handleTransferCompleted = useCallback(async () => {
+    await refreshPantryList();
+    setSelectionMode(false);
+    setSelectedItemIds([]);
+    setTransferItems([]);
+  }, [refreshPantryList]);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
@@ -269,11 +339,8 @@ export function PantryPage() {
       return;
     }
 
-    void loadPantryList({
-      ...pantryQueryOptions,
-      pageSize: PANTRY_PAGE_SIZE,
-    });
-  }, [loadPantryList, pantryQueryOptions, settingsLoaded]);
+    void refreshPantryList();
+  }, [refreshPantryList, settingsLoaded]);
 
   useEffect(() => {
     if (pantryLoading || pantryLoadingMore || !pantryPagination.hasMore) {
@@ -297,6 +364,49 @@ export function PantryPage() {
     observer.observe(target);
     return () => observer.disconnect();
   }, [loadMorePantryItems, pantryLoading, pantryLoadingMore, pantryPagination.hasMore]);
+
+  useEffect(() => {
+    const validSelectedIds = selectedItemIds.filter((id) =>
+      pantryList.some((item) => item.id === id),
+    );
+    if (validSelectedIds.length === selectedItemIds.length) {
+      return;
+    }
+    setSelectedItemIds(validSelectedIds);
+    if (validSelectedIds.length === 0) {
+      setSelectionMode(false);
+    }
+  }, [pantryList, selectedItemIds]);
+
+  useEffect(() => {
+    if (canTransferFromCurrentHousehold) {
+      return;
+    }
+
+    setSelectionMode(false);
+    setSelectedItemIds([]);
+    setTransferSheetOpen(false);
+    setTransferItems([]);
+  }, [canTransferFromCurrentHousehold]);
+
+  useEffect(() => {
+    if (!householdSheetOpen) {
+      return;
+    }
+
+    void (async () => {
+      const nextSelectedHouseholdId = await loadHouseholds();
+      if (!nextSelectedHouseholdId) {
+        return;
+      }
+
+      try {
+        await loadHouseholdMembersFor(nextSelectedHouseholdId);
+      } catch {
+        // 错误态在弹层内展示，这里不额外打断流程
+      }
+    })();
+  }, [householdSheetOpen, loadHouseholdMembersFor, loadHouseholds]);
 
   const listRefreshing = pantryLoading && pantryLoaded;
   const activePantryError = pantryListError;
@@ -326,18 +436,25 @@ export function PantryPage() {
             直接跟随你在我的页设置的当前空间，打开就能看临期、补货和今晚该先处理什么。
           </p>
         </div>
-        <Button
-          type="button"
-          variant="ai"
-          size="sm"
-          onClick={() => {
-            setEditingItem(null);
-            setDrawerOpen(true);
-          }}
-        >
-          <PackagePlus className="size-4" />
-          添加
-        </Button>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <Button
+            type="button"
+            variant="ai"
+            size="sm"
+            onClick={() => {
+              setEditingItem(null);
+              setDrawerOpen(true);
+            }}
+          >
+            <PackagePlus className="size-4" />
+            添加
+          </Button>
+          {canTransferFromCurrentHousehold && pantryList.length > 0 ? (
+            <Button type="button" variant="ghost" size="sm" onClick={toggleSelectionMode}>
+              {selectionMode ? '取消批量' : '批量选择'}
+            </Button>
+          ) : null}
+        </div>
       </header>
 
       <Card className="space-y-4 p-4">
@@ -352,10 +469,15 @@ export function PantryPage() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => navigate('/profile#space-management')}
+            disabled={householdsLoading && householdSheetOpen}
+            onClick={() => setHouseholdSheetOpen(true)}
           >
-            <Settings2 className="size-4" />
-            去设置
+            {householdsLoading && householdSheetOpen ? (
+              <ActionLoadingIcon className="size-4" tone="ai" />
+            ) : (
+              <Settings2 className="size-4" />
+            )}
+            切换空间
           </Button>
         </div>
       </Card>
@@ -474,6 +596,11 @@ export function PantryPage() {
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-xl font-semibold tracking-tight">库存列表</h2>
+            {selectionMode ? (
+              <p className="mt-1 text-xs text-life-ai">
+                已选 {selectedItemIds.length} 条，点卡片继续勾选后再一起转到共享家庭。
+              </p>
+            ) : null}
           </div>
           <div className="inline-flex min-w-[4.5rem] shrink-0 items-center justify-center rounded-full bg-secondary px-3 py-2 text-sm font-semibold whitespace-nowrap text-foreground">
             <span>{pantryPagination.total}</span>
@@ -596,8 +723,13 @@ export function PantryPage() {
                     className={cn(
                       'flex w-full items-stretch gap-0 text-left',
                       status === 'discarded' && 'opacity-80',
+                      selectionMode && selectedItemIds.includes(item.id) && 'bg-life-ai/5',
                     )}
                     onClick={() => {
+                      if (selectionMode) {
+                        toggleItemSelection(item.id);
+                        return;
+                      }
                       setEditingItem(item);
                       setDrawerOpen(true);
                     }}
@@ -629,12 +761,26 @@ export function PantryPage() {
                           </div>
                           <h3 className="mt-2 truncate text-base font-semibold">{item.name}</h3>
                         </div>
-                        {!item.imageUrl && item.thumbnailUrl ? (
-                          <Badge tone="ai">
-                            <Sparkles className="mr-1 size-3.5" />
-                            AI 图
-                          </Badge>
-                        ) : null}
+                        <div className="flex shrink-0 items-start gap-2">
+                          {!selectionMode && !item.imageUrl && item.thumbnailUrl ? (
+                            <Badge tone="ai">
+                              <Sparkles className="mr-1 size-3.5" />
+                              AI 图
+                            </Badge>
+                          ) : null}
+                          {selectionMode ? (
+                            <div
+                              className={cn(
+                                'mt-1 grid size-5 place-items-center rounded-md border',
+                                selectedItemIds.includes(item.id)
+                                  ? 'border-life-ai bg-life-ai text-background'
+                                  : 'border-border bg-card text-transparent',
+                              )}
+                            >
+                              <Check className="size-3.5" />
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                       <p className="mt-2 text-sm text-muted-foreground">
                         {item.location} · {item.quantity}
@@ -659,60 +805,68 @@ export function PantryPage() {
                       ) : null}
                     </div>
                   </button>
-                  <div className="grid grid-cols-3 gap-px border-t border-border bg-border/60">
-                    <button
-                      type="button"
-                      disabled={usedUpDisabled}
-                      className={cn(
-                        'flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
-                        status === 'used-up'
-                          ? 'text-muted-foreground'
-                          : 'text-life-trace hover:bg-life-trace/10',
-                      )}
-                      onClick={() => void handleStatusAction(item, 'used-up')}
-                    >
-                      {usedUpPending ? (
-                        <ActionLoadingIcon className="size-4" tone="trace" />
-                      ) : (
-                        <StatusActionIcon className="size-4" />
-                      )}
-                      <span className="min-w-10 whitespace-nowrap text-center">
-                        {status === 'used-up' ? '已用完' : '用完'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={discardedDisabled}
-                      className={cn(
-                        'flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
-                        status === 'discarded'
-                          ? 'text-muted-foreground'
-                          : 'text-life-alert hover:bg-life-alert/10',
-                      )}
-                      onClick={() => void handleStatusAction(item, 'discarded')}
-                    >
-                      {discardedPending ? (
-                        <ActionLoadingIcon className="size-4" tone="alert" />
-                      ) : (
-                        <DiscardActionIcon className="size-4" />
-                      )}
-                      <span className="min-w-10 whitespace-nowrap text-center">
-                        {status === 'discarded' ? '已丢弃' : '丢弃'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={actionPending}
-                      className="flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold text-life-ai transition hover:bg-life-ai/10 disabled:cursor-not-allowed disabled:opacity-60"
-                      onClick={() => {
-                        setEditingItem(item);
-                        setDrawerOpen(true);
-                      }}
-                    >
-                      <Camera className="size-4" />
-                      编辑
-                    </button>
-                  </div>
+                  {selectionMode ? (
+                    <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+                      {selectedItemIds.includes(item.id)
+                        ? '已加入本次批量转移。'
+                        : '点这张卡片即可加入本次批量转移。'}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-px border-t border-border bg-border/60">
+                      <button
+                        type="button"
+                        disabled={usedUpDisabled}
+                        className={cn(
+                          'flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
+                          status === 'used-up'
+                            ? 'text-muted-foreground'
+                            : 'text-life-trace hover:bg-life-trace/10',
+                        )}
+                        onClick={() => void handleStatusAction(item, 'used-up')}
+                      >
+                        {usedUpPending ? (
+                          <ActionLoadingIcon className="size-4" tone="trace" />
+                        ) : (
+                          <StatusActionIcon className="size-4" />
+                        )}
+                        <span className="min-w-10 whitespace-nowrap text-center">
+                          {status === 'used-up' ? '已用完' : '用完'}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={discardedDisabled}
+                        className={cn(
+                          'flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
+                          status === 'discarded'
+                            ? 'text-muted-foreground'
+                            : 'text-life-alert hover:bg-life-alert/10',
+                        )}
+                        onClick={() => void handleStatusAction(item, 'discarded')}
+                      >
+                        {discardedPending ? (
+                          <ActionLoadingIcon className="size-4" tone="alert" />
+                        ) : (
+                          <DiscardActionIcon className="size-4" />
+                        )}
+                        <span className="min-w-10 whitespace-nowrap text-center">
+                          {status === 'discarded' ? '已丢弃' : '丢弃'}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={actionPending}
+                        className="flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold text-life-ai transition hover:bg-life-ai/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        onClick={() => {
+                          setEditingItem(item);
+                          setDrawerOpen(true);
+                        }}
+                      >
+                        <Camera className="size-4" />
+                        编辑
+                      </button>
+                    </div>
+                  )}
                 </Card>
               );
             })}
@@ -730,6 +884,7 @@ export function PantryPage() {
                   disabled={pantryLoadingMore}
                   onClick={() => void loadMorePantryItems()}
                 >
+                  {pantryLoadingMore ? <ActionLoadingIcon className="size-4" tone="ai" /> : null}
                   {pantryLoadingMore ? '加载中...' : '加载更多'}
                 </Button>
               </div>
@@ -742,16 +897,106 @@ export function PantryPage() {
         )}
       </section>
 
+      {selectionMode ? (
+        <div className="sticky bottom-3 z-20">
+          <Card className="border-life-ai/20 bg-card/95 p-3 shadow-[0_18px_50px_rgba(9,9,11,0.42)] backdrop-blur">
+            <div className="flex items-center justify-between gap-3 max-[360px]:flex-col max-[360px]:items-stretch">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">批量转移到共享家庭</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  当前页已选 {selectedItemIds.length} 条库存，可先预览冲突再统一处理。
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2 max-[360px]:grid max-[360px]:grid-cols-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedItemIds(pantryList.map((item) => item.id))}
+                >
+                  全选当前页
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedItemIds([])}
+                >
+                  清空
+                </Button>
+                <Button
+                  type="button"
+                  variant="ai"
+                  size="sm"
+                  disabled={selectedItems.length === 0}
+                  className="max-[360px]:col-span-2"
+                  onClick={() => handleOpenTransferForItems(selectedItems)}
+                >
+                  转移到共享家庭
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
       <PantryItemDrawer
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         item={editingItem}
         householdId={effectiveHouseholdId || undefined}
         householdName={currentHouseholdName}
+        showTransferAction={canTransferFromCurrentHousehold && Boolean(editingItem)}
+        onRequestTransfer={(item) => handleOpenTransferForItems([item])}
         onSaved={(message) => {
           showToast(message);
         }}
       />
+      <PantryTransferSheet
+        open={transferSheetOpen}
+        onOpenChange={(nextOpen) => {
+          setTransferSheetOpen(nextOpen);
+          if (!nextOpen) {
+            setTransferItems([]);
+          }
+        }}
+        items={transferItems}
+        sourceHouseholdId={pantryResolvedHouseholdId}
+        sourceHouseholdName={currentHouseholdName}
+        onTransferred={handleTransferCompleted}
+      />
+      <PantryHouseholdSheet
+        open={householdSheetOpen}
+        onOpenChange={setHouseholdSheetOpen}
+        households={households}
+        selectedHouseholdId={activeHouseholdId}
+        members={householdMembers}
+        membersLoading={householdMembersLoading}
+        householdsLoading={householdsLoading}
+        invitePayload={invitePayload}
+        onSelectHousehold={(householdId) => {
+          handleSelectHousehold(householdId);
+          void loadHouseholdMembersFor(householdId);
+        }}
+        onCreateHousehold={async (name) => {
+          await handleCreateHousehold(name);
+        }}
+        onJoinHousehold={async (inviteCode) => {
+          await handleJoinHousehold(inviteCode);
+        }}
+        onCreateInvite={async (householdId) => {
+          await handleCreateInvite(householdId);
+        }}
+        onRefreshMembers={loadHouseholdMembersFor}
+        onTransferOwner={handleTransferOwner}
+        onLeaveHousehold={handleLeaveHousehold}
+        onDissolveHousehold={handleDissolveHousehold}
+      />
+      {householdError && !householdSheetOpen ? (
+        <Card className="border-life-alert/20 bg-life-alert/10 p-4 text-sm text-life-alert">
+          {householdError}
+        </Card>
+      ) : null}
     </div>
   );
 }

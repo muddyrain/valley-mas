@@ -3,9 +3,11 @@ package lifetrace
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"valley-server/internal/database"
+	"valley-server/internal/logger"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -124,6 +126,78 @@ func normalizePantryQuantity(quantity int) int {
 
 func normalizePantryReminder(payload pantryReminderPayload) (bool, bool, model.StringList, string) {
 	return payload.Enabled, payload.UseDefault, normalizePantryReminderRules(payload.Rules), normalizeTimeText(payload.ReminderTime, "09:00")
+}
+
+func truncatePantryTraceText(value string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+	runes := []rune(strings.TrimSpace(value))
+	if len(runes) <= limit {
+		return string(runes)
+	}
+	return string(runes[:limit])
+}
+
+func formatPantryTraceTime(now time.Time) string {
+	return now.Format("01/02 15:04")
+}
+
+func buildPantryTraceRecord(userID model.Int64String, item model.LifeTracePantryItem, action string, now time.Time) model.LifeTraceTrace {
+	expiryText := ""
+	if item.ExpiresAt != "" {
+		expiryText = "，保质期记录到 " + item.ExpiresAt
+	}
+
+	trace := model.LifeTraceTrace{
+		UserID:    userID,
+		Location:  truncatePantryTraceText(item.Location, 120),
+		ImageURL:  truncatePantryTraceText(item.ImageURL, 800),
+		TimeLabel: formatPantryTraceTime(now),
+		Source:    "库存",
+	}
+
+	switch action {
+	case "used-up":
+		trace.Title = truncatePantryTraceText(item.Name+" 已用完", 160)
+		trace.Summary = truncatePantryTraceText(
+			"Life Trace 记录了「"+item.Name+"」已经处理完成，这次属于家庭库存的正常消耗。",
+			1000,
+		)
+		trace.Mood = "踏实"
+		trace.Tags = normalizeTraceTags([]string{item.Category, "家庭库存", "用完"})
+	case "discarded":
+		trace.Title = truncatePantryTraceText(item.Name+" 已丢弃", 160)
+		trace.Summary = truncatePantryTraceText(
+			"Life Trace 记录了「"+item.Name+"」已经被丢弃，后续可以结合库存提醒减少浪费。",
+			1000,
+		)
+		trace.Mood = "提醒"
+		trace.Tags = normalizeTraceTags([]string{item.Category, "家庭库存", "丢弃"})
+	default:
+		trace.Title = truncatePantryTraceText("新增库存："+item.Name, 160)
+		trace.Summary = truncatePantryTraceText(
+			"Life Trace 已将「"+item.Name+"」加入家庭库存，数量为 "+strconv.Itoa(item.Quantity)+item.Unit+expiryText+"。",
+			1000,
+		)
+		trace.Mood = "踏实"
+		trace.Tags = normalizeTraceTags([]string{item.Category, "家庭库存", "新增库存"})
+	}
+
+	return trace
+}
+
+func writePantryTrace(userID model.Int64String, item model.LifeTracePantryItem, action string) {
+	trace := buildPantryTraceRecord(userID, item, action, time.Now())
+	if err := database.GetDB().Create(&trace).Error; err != nil && logger.Log != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"userId":         userID.String(),
+			"pantryItemId":   item.ID.String(),
+			"pantryAction":   action,
+			"pantryName":     item.Name,
+			"pantryCategory": item.Category,
+		}).WithError(err).Warn("LifeTrace pantry trace journaling failed")
+	}
 }
 
 func pantryDerivedDateBounds(now time.Time) (string, string) {
@@ -325,6 +399,7 @@ func (h *Handler) CreatePantryItem(c *gin.Context) {
 		}
 		item.ReminderEnabled = false
 	}
+	writePantryTrace(userID, item, "created")
 
 	success(c, item)
 }
@@ -393,7 +468,6 @@ func (h *Handler) UpdatePantryItem(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "读取库存失败")
 		return
 	}
-
 	success(c, item)
 }
 
@@ -434,6 +508,9 @@ func (h *Handler) UpdatePantryItemStatus(c *gin.Context) {
 	if err := database.GetDB().First(&item, "id = ? AND household_id = ?", item.ID, householdCtx.Household.ID).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "读取库存失败")
 		return
+	}
+	if status == "used-up" || status == "discarded" {
+		writePantryTrace(userID, item, status)
 	}
 
 	success(c, item)

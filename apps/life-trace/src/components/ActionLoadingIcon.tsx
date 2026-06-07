@@ -17,10 +17,14 @@ export function ActionLoadingIcon({ className, tone = 'ai' }: ActionLoadingIconP
   return (
     <span
       aria-hidden="true"
-      className={cn('relative inline-grid size-4 place-items-center', toneClasses[tone], className)}
+      className={cn(
+        'action-loading-icon relative inline-grid size-4 place-items-center',
+        toneClasses[tone],
+        className,
+      )}
     >
       <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" />
-      <Sparkles className="absolute -top-1 -right-1 size-2.5 animate-pulse motion-reduce:animate-none" />
+      <Sparkles className="absolute inset-0 m-auto size-2.5 animate-pulse motion-reduce:animate-none" />
     </span>
   );
 }

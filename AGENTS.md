@@ -24,6 +24,7 @@
 
 | 子项目 | 局部协作入口 | 适用范围 |
 |---|---|---|
+| Life Trace | `apps/life-trace/AGENTS.md` | Life Trace 的 Today、计划、AI、踪迹、Pantry、提醒、家庭空间和个人设置。 |
 | Web 前台 | `apps/web/AGENTS.md` | 用户侧页面、创作者空间、资源、博客、我的空间、个人状态与 Web API 封装。 |
 | Admin 后台 | `apps/admin/AGENTS.md` | 管理后台页面、审核与管理流程、Ant Design 管理端组件和 Admin API 封装。 |
 | AI Mind Arena | `apps/ai-mind-arena/AGENTS.md` | 脑内会议室 Next.js 前端、多人格辩论 UI、SSE 对战流和分享体验。 |
@@ -56,6 +57,7 @@
 - IF 生成 commit message、执行 `git commit`，或用户要求提交 → `conventional-commit-guard`。
 - IF 用户要求“每次告诉我改了什么 / 下一步做什么 / 详细汇报阶段进展 / 每次更新要同步计划” → `delivery-reporting`。
 - IF 新增、删除或调整产品功能、页面、接口、依赖、数据模型、长期文档或验收标准 → `delivery-reporting`。
+- IF 修改用户可见 UI 文案、设置说明、按钮、副标题、空状态或入口摘要 → `ui-copy-boundary-guard`。
 - IF 修改中文、Markdown、skill、配置示例或非 ASCII 文本 → `encoding-guard`。
 - IF 任务包含多步骤执行、计划后实施或需要验证 → `task-completion-guard`。
 - IF 本回合启用了任何 skill → 按 `skill-usage-disclosure` 做简短披露。
@@ -80,6 +82,7 @@
 
 | 区域 | 路径 | 执行入口 |
 |---|---|---|
+| Life Trace | `apps/life-trace` | 路由看 `apps/life-trace/src/App.tsx`，API 看 `apps/life-trace/src/api`，计划看 `apps/life-trace/docs/PLAN.md`。 |
 | Web 前台 | `apps/web` | 路由看 `apps/web/src/App.tsx`，API 看 `apps/web/src/api`。 |
 | Admin 后台 | `apps/admin` | 路由看 `apps/admin/src/App.tsx`，API 看 `apps/admin/src/api`。 |
 | AI Mind Arena | `apps/ai-mind-arena` | 页面看 `app`，组件看 `components`，接口看 `lib/api.ts`。 |
@@ -101,6 +104,7 @@
 - 修改环境变量时同步检查对应 `.env.example`。
 - 功能、接口、依赖、数据模型、产品方向或验收标准变化时，主动更新对应计划文档；纯临时调试、格式化或不改变计划的微调可不更新，但最终要说明原因。
 - 只在用户明确要求或当前改动影响长期知识时更新 `docs/`；不要把临时总结写入长期文档。
+- Life Trace UI 改动按 `apps/life-trace/AGENTS.md` 的局部规则处理。
 - Web UI 改动按 `apps/web/AGENTS.md` 的局部规则处理。
 - 不要使用 Playwright 做自动验收；涉及前端、游戏或可视交互改动时，最终回复应告知用户清晰的验收标准，并提示由用户自行手动验收。
 

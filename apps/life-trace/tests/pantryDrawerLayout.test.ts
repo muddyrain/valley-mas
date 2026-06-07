@@ -33,6 +33,11 @@ describe('pantry drawer mobile layout guards', () => {
     expect(bottomSheetSource).toContain("style={{ touchAction: 'none' }}");
   });
 
+  it('defaults bottom sheets to portal rendering so they open from the viewport bottom', () => {
+    expect(bottomSheetSource).toContain('portal = true');
+    expect(bottomSheetSource).toContain('createPortal(sheet, document.body)');
+  });
+
   it('allows pantry form grids and date fields to shrink inside the bottom sheet', () => {
     expect(pantryDrawerSource).toContain('form className="min-w-0 space-y-4"');
     expect(pantryDrawerSource).toContain('className="grid min-w-0 grid-cols-2');

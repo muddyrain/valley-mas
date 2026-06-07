@@ -2,6 +2,7 @@ package lifetrace
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -77,6 +78,17 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 	if summary["total"] != float64(1) || summary["expiring"] != float64(1) || summary["expired"] != float64(0) || summary["active"] != float64(1) {
 		t.Fatalf("expected pantry summary for one active item, got %+v", summary)
 	}
+
+	var traces []model.LifeTraceTrace
+	if err := database.GetDB().
+		Where("user_id = ?", 101).
+		Order("created_at DESC").
+		Find(&traces).Error; err != nil {
+		t.Fatalf("list traces: %v", err)
+	}
+	if len(traces) != 1 || traces[0].Source != "库存" || traces[0].Title != "新增库存：鲜牛奶" {
+		t.Fatalf("expected pantry create to write trace, got %+v", traces)
+	}
 }
 
 func TestCreatePantryItemDisablesReminderWithoutExpiry(t *testing.T) {
@@ -145,6 +157,17 @@ func TestUpdatePantryItemStatusAndDelete(t *testing.T) {
 	}
 	if updated["householdId"] == nil || updated["updatedBy"] != "101" {
 		t.Fatalf("expected update to backfill household/operator, got %+v", updated)
+	}
+
+	var traces []model.LifeTraceTrace
+	if err := database.GetDB().
+		Where("user_id = ?", 101).
+		Order("created_at DESC").
+		Find(&traces).Error; err != nil {
+		t.Fatalf("list traces after status update: %v", err)
+	}
+	if len(traces) != 1 || traces[0].Source != "库存" || traces[0].Title != "生菜 已用完" {
+		t.Fatalf("expected pantry status update to write inventory trace, got %+v", traces)
 	}
 
 	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/life-trace/pantry/"+item.ID.String(), nil)
@@ -364,5 +387,310 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 	summary := pageData["summary"].(map[string]interface{})
 	if summary["total"] != float64(3) || summary["expiring"] != float64(1) || summary["expired"] != float64(1) || summary["active"] != float64(2) {
 		t.Fatalf("expected consolidated pantry summary, got %+v", summary)
+	}
+}
+
+func TestPreviewPantryTransferReturnsConflictSummary(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+
+	sharedHousehold := model.Household{
+		Name:        "开心家庭",
+		Kind:        householdKindShared,
+		OwnerUserID: 101,
+		Status:      householdStatusActive,
+	}
+	if err := database.GetDB().Create(&sharedHousehold).Error; err != nil {
+		t.Fatalf("create shared household: %v", err)
+	}
+	if err := database.GetDB().Create(&model.HouseholdMember{
+		HouseholdID: sharedHousehold.ID,
+		UserID:      101,
+		Role:        householdRoleOwner,
+		Status:      householdMemberStatusActive,
+	}).Error; err != nil {
+		t.Fatalf("create shared household member: %v", err)
+	}
+
+	sourceItem := model.LifeTracePantryItem{
+		UserID:             101,
+		HouseholdID:        personalHouseholdID(101),
+		CreatedBy:          101,
+		UpdatedBy:          101,
+		Name:               "鲜牛奶",
+		Category:           "食品",
+		Quantity:           2,
+		Unit:               "盒",
+		Location:           "冷藏",
+		ExpiresAt:          "2026-06-12",
+		Status:             "normal",
+		ReminderEnabled:    true,
+		ReminderUseDefault: true,
+		ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+		ReminderTime:       "09:00",
+	}
+	targetItem := model.LifeTracePantryItem{
+		UserID:             101,
+		HouseholdID:        sharedHousehold.ID,
+		CreatedBy:          101,
+		UpdatedBy:          101,
+		Name:               "鲜牛奶",
+		Category:           "食品",
+		Quantity:           1,
+		Unit:               "盒",
+		Location:           "冷藏",
+		ExpiresAt:          "2026-06-12",
+		Status:             "normal",
+		ReminderEnabled:    true,
+		ReminderUseDefault: true,
+		ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+		ReminderTime:       "09:00",
+	}
+	if err := database.GetDB().Create(&sourceItem).Error; err != nil {
+		t.Fatalf("create source item: %v", err)
+	}
+	if err := database.GetDB().Create(&targetItem).Error; err != nil {
+		t.Fatalf("create target item: %v", err)
+	}
+
+	previewReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/life-trace/pantry/transfer/preview",
+		bytes.NewBufferString(`{
+			"targetHouseholdId":"`+sharedHousehold.ID.String()+`",
+			"itemIds":["`+sourceItem.ID.String()+`"],
+			"mode":"move"
+		}`),
+	)
+	previewReq.Header.Set("Content-Type", "application/json")
+	previewResp := httptest.NewRecorder()
+	router.ServeHTTP(previewResp, previewReq)
+
+	data := decodeTracePayload(t, previewResp)["data"].(map[string]interface{})
+	if data["conflictCount"] != float64(1) || data["itemCount"] != float64(1) {
+		t.Fatalf("expected one conflict preview, got %+v", data)
+	}
+	conflicts := data["conflicts"].([]interface{})
+	if len(conflicts) != 1 {
+		t.Fatalf("expected one conflict detail, got %+v", conflicts)
+	}
+	conflict := conflicts[0].(map[string]interface{})
+	if conflict["reason"] == "" {
+		t.Fatalf("expected conflict reason, got %+v", conflict)
+	}
+}
+
+func TestTransferPantryItemsMoveWithMergeDeletesSourceAndAccumulatesQuantity(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+
+	sharedHousehold := model.Household{
+		Name:        "开心家庭",
+		Kind:        householdKindShared,
+		OwnerUserID: 101,
+		Status:      householdStatusActive,
+	}
+	if err := database.GetDB().Create(&sharedHousehold).Error; err != nil {
+		t.Fatalf("create shared household: %v", err)
+	}
+	if err := database.GetDB().Create(&model.HouseholdMember{
+		HouseholdID: sharedHousehold.ID,
+		UserID:      101,
+		Role:        householdRoleOwner,
+		Status:      householdMemberStatusActive,
+	}).Error; err != nil {
+		t.Fatalf("create shared household member: %v", err)
+	}
+
+	sourceA := model.LifeTracePantryItem{
+		UserID:             101,
+		HouseholdID:        personalHouseholdID(101),
+		CreatedBy:          101,
+		UpdatedBy:          101,
+		Name:               "鲜牛奶",
+		Category:           "食品",
+		Quantity:           2,
+		Unit:               "盒",
+		Location:           "冷藏",
+		ExpiresAt:          "2026-06-12",
+		Status:             "normal",
+		ReminderEnabled:    true,
+		ReminderUseDefault: true,
+		ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+		ReminderTime:       "09:00",
+	}
+	sourceB := model.LifeTracePantryItem{
+		UserID:             101,
+		HouseholdID:        personalHouseholdID(101),
+		CreatedBy:          101,
+		UpdatedBy:          101,
+		Name:               "吐司",
+		Category:           "食品",
+		Quantity:           1,
+		Unit:               "袋",
+		Location:           "厨房",
+		Status:             "normal",
+		ReminderEnabled:    false,
+		ReminderUseDefault: true,
+		ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+		ReminderTime:       "09:00",
+	}
+	target := model.LifeTracePantryItem{
+		UserID:             101,
+		HouseholdID:        sharedHousehold.ID,
+		CreatedBy:          101,
+		UpdatedBy:          101,
+		Name:               "鲜牛奶",
+		Category:           "食品",
+		Quantity:           3,
+		Unit:               "盒",
+		Location:           "冷藏",
+		ExpiresAt:          "2026-06-12",
+		Status:             "normal",
+		ReminderEnabled:    true,
+		ReminderUseDefault: true,
+		ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+		ReminderTime:       "09:00",
+	}
+	for _, item := range []*model.LifeTracePantryItem{&sourceA, &sourceB, &target} {
+		if err := database.GetDB().Create(item).Error; err != nil {
+			t.Fatalf("seed pantry item: %v", err)
+		}
+	}
+
+	transferReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/life-trace/pantry/transfer",
+		bytes.NewBufferString(`{
+			"targetHouseholdId":"`+sharedHousehold.ID.String()+`",
+			"itemIds":["`+sourceA.ID.String()+`","`+sourceB.ID.String()+`"],
+			"mode":"move",
+			"conflictPolicy":"merge"
+		}`),
+	)
+	transferReq.Header.Set("Content-Type", "application/json")
+	transferResp := httptest.NewRecorder()
+	router.ServeHTTP(transferResp, transferReq)
+
+	data := decodeTracePayload(t, transferResp)["data"].(map[string]interface{})
+	if data["processedCount"] != float64(2) || data["mergedCount"] != float64(1) || data["createdCount"] != float64(1) {
+		t.Fatalf("expected one merged and one created item, got %+v", data)
+	}
+	if data["deletedSourceCount"] != float64(2) {
+		t.Fatalf("expected both source items deleted after move, got %+v", data)
+	}
+
+	var merged model.LifeTracePantryItem
+	if err := database.GetDB().First(&merged, "id = ?", target.ID).Error; err != nil {
+		t.Fatalf("reload merged item: %v", err)
+	}
+	if merged.Quantity != 5 {
+		t.Fatalf("expected merged quantity 5, got %+v", merged)
+	}
+
+	var personalCount int64
+	if err := database.GetDB().
+		Model(&model.LifeTracePantryItem{}).
+		Where("household_id = ?", personalHouseholdID(101)).
+		Count(&personalCount).Error; err != nil {
+		t.Fatalf("count personal items: %v", err)
+	}
+	if personalCount != 0 {
+		t.Fatalf("expected personal household emptied after move, got %d", personalCount)
+	}
+
+	var sharedCount int64
+	if err := database.GetDB().
+		Model(&model.LifeTracePantryItem{}).
+		Where("household_id = ?", sharedHousehold.ID).
+		Count(&sharedCount).Error; err != nil {
+		t.Fatalf("count shared items: %v", err)
+	}
+	if sharedCount != 2 {
+		t.Fatalf("expected two shared items after move, got %d", sharedCount)
+	}
+}
+
+func TestTransferPantryItemsRequiresConflictPolicyWhenDuplicateExists(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+
+	sharedHousehold := model.Household{
+		Name:        "开心家庭",
+		Kind:        householdKindShared,
+		OwnerUserID: 101,
+		Status:      householdStatusActive,
+	}
+	if err := database.GetDB().Create(&sharedHousehold).Error; err != nil {
+		t.Fatalf("create shared household: %v", err)
+	}
+	if err := database.GetDB().Create(&model.HouseholdMember{
+		HouseholdID: sharedHousehold.ID,
+		UserID:      101,
+		Role:        householdRoleOwner,
+		Status:      householdMemberStatusActive,
+	}).Error; err != nil {
+		t.Fatalf("create shared household member: %v", err)
+	}
+
+	sourceItem := model.LifeTracePantryItem{
+		UserID:             101,
+		HouseholdID:        personalHouseholdID(101),
+		CreatedBy:          101,
+		UpdatedBy:          101,
+		Name:               "鲜牛奶",
+		Category:           "食品",
+		Quantity:           1,
+		Unit:               "盒",
+		Location:           "冷藏",
+		ExpiresAt:          "2026-06-12",
+		Status:             "normal",
+		ReminderEnabled:    true,
+		ReminderUseDefault: true,
+		ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+		ReminderTime:       "09:00",
+	}
+	targetItem := model.LifeTracePantryItem{
+		UserID:             101,
+		HouseholdID:        sharedHousehold.ID,
+		CreatedBy:          101,
+		UpdatedBy:          101,
+		Name:               "鲜牛奶",
+		Category:           "食品",
+		Quantity:           1,
+		Unit:               "盒",
+		Location:           "冷藏",
+		ExpiresAt:          "2026-06-12",
+		Status:             "normal",
+		ReminderEnabled:    true,
+		ReminderUseDefault: true,
+		ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+		ReminderTime:       "09:00",
+	}
+	for _, item := range []*model.LifeTracePantryItem{&sourceItem, &targetItem} {
+		if err := database.GetDB().Create(item).Error; err != nil {
+			t.Fatalf("seed pantry item: %v", err)
+		}
+	}
+
+	transferReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/life-trace/pantry/transfer",
+		bytes.NewBufferString(`{
+			"targetHouseholdId":"`+sharedHousehold.ID.String()+`",
+			"itemIds":["`+sourceItem.ID.String()+`"],
+			"mode":"copy"
+		}`),
+	)
+	transferReq.Header.Set("Content-Type", "application/json")
+	transferResp := httptest.NewRecorder()
+	router.ServeHTTP(transferResp, transferReq)
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(transferResp.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode error payload: %v", err)
+	}
+	if transferResp.Code != http.StatusOK || payload["code"] != float64(http.StatusConflict) {
+		t.Fatalf("expected business conflict payload, got status=%d payload=%+v", transferResp.Code, payload)
+	}
+	if payload["message"] == "" {
+		t.Fatalf("expected conflict message, got %+v", payload)
 	}
 }

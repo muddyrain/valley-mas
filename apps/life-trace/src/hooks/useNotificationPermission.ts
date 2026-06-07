@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  type DailyBriefPreviewPayload,
   deletePushSubscription,
   getPushConfig,
   type PushConfig,
@@ -147,12 +148,14 @@ export function useNotificationPermission(token?: string | null) {
 
   const requestPermission = useCallback(async () => {
     if (!window.isSecureContext || !('Notification' in window) || !('serviceWorker' in navigator)) {
-      setPermission(getNotificationPermission());
-      return;
+      const next = getNotificationPermission();
+      setPermission(next);
+      return next;
     }
 
     const next = await Notification.requestPermission();
     setPermission(next);
+    return next;
   }, []);
 
   const showTestNotification = useCallback(async () => {
@@ -181,6 +184,34 @@ export function useNotificationPermission(token?: string | null) {
     }
 
     new Notification(title, options);
+    return true;
+  }, []);
+
+  const showPreviewNotification = useCallback(async (payload: DailyBriefPreviewPayload) => {
+    if (
+      !window.isSecureContext ||
+      !('Notification' in window) ||
+      Notification.permission !== 'granted'
+    ) {
+      setPermission(getNotificationPermission());
+      return false;
+    }
+
+    const options: NotificationOptions = {
+      body: payload.body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: payload.tag || 'life-trace-daily-brief-preview',
+      data: { url: payload.url || '/today' },
+    };
+
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification(payload.title, options);
+      return true;
+    }
+
+    new Notification(payload.title, options);
     return true;
   }, []);
 
@@ -330,6 +361,7 @@ export function useNotificationPermission(token?: string | null) {
     label,
     requestPermission,
     showTestNotification,
+    showPreviewNotification,
     enableServerPush,
     showServerTestNotification,
     refreshServerPushState,
