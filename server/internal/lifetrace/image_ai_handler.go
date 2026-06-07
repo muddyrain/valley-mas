@@ -22,10 +22,13 @@ type imageAnalysisRequest struct {
 }
 
 type pantryPhotoAnalysisRequest struct {
-	ImageURL    string `json:"imageUrl"`
-	ImageBase64 string `json:"imageBase64"`
-	HouseholdID string `json:"householdId"`
-	Hint        string `json:"hint"`
+	ImageURL      string `json:"imageUrl"`
+	ImageBase64   string `json:"imageBase64"`
+	HouseholdID   string `json:"householdId"`
+	Hint          string `json:"hint"`
+	BarcodeValue  string `json:"barcodeValue"`
+	BarcodeFormat string `json:"barcodeFormat"`
+	BarcodeSource string `json:"barcodeSource"`
 }
 
 type imageAnalysisSchedule struct {
@@ -71,6 +74,8 @@ type pantryPhotoDetectedItem struct {
 	ProductionDate  string       `json:"productionDate"`
 	PurchaseDate    string       `json:"purchaseDate"`
 	ShelfLifeDays   int          `json:"shelfLifeDays"`
+	BarcodeValue    string       `json:"barcodeValue"`
+	BarcodeFormat   string       `json:"barcodeFormat"`
 	Confidence      float64      `json:"confidence"`
 	Warnings        []string     `json:"warnings"`
 	CropBox         imageCropBox `json:"cropBox"`
@@ -243,7 +248,14 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 		return
 	}
 
-	prompt := buildPantryPhotoAnalysisPrompt(req.Hint, householdCtx.Household.Name, aiCfg.UseVision)
+	prompt := buildPantryPhotoAnalysisPrompt(
+		req.Hint,
+		householdCtx.Household.Name,
+		aiCfg.UseVision,
+		normalizePantryBarcodeValue(req.BarcodeValue),
+		normalizePantryBarcodeFormat(req.BarcodeFormat),
+		strings.TrimSpace(req.BarcodeSource),
+	)
 	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
 	defer cancel()
 
@@ -275,6 +287,8 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 		"productionDate":    parsed.ProductionDate,
 		"purchaseDate":      parsed.PurchaseDate,
 		"shelfLifeDays":     parsed.ShelfLifeDays,
+		"barcodeValue":      parsed.BarcodeValue,
+		"barcodeFormat":     parsed.BarcodeFormat,
 		"tags":              parsed.Tags,
 		"confidence":        parsed.Confidence,
 		"warnings":          parsed.Warnings,
@@ -338,7 +352,14 @@ func buildImageAnalysisPrompt(kind string, useVision bool) string {
 	}, "\n")
 }
 
-func buildPantryPhotoAnalysisPrompt(hint string, householdName string, useVision bool) string {
+func buildPantryPhotoAnalysisPrompt(
+	hint string,
+	householdName string,
+	useVision bool,
+	barcodeValue string,
+	barcodeFormat string,
+	barcodeSource string,
+) string {
 	visionInstruction := "请直接观察图片内容，优先识别画面主体商品。"
 	if !useVision {
 		visionInstruction = "视觉模型未配置时，请只基于用户补充说明给出保守草稿，不要声称看到了具体画面。"
@@ -352,10 +373,23 @@ func buildPantryPhotoAnalysisPrompt(hint string, householdName string, useVision
 	if householdName == "" {
 		householdName = "当前库存空间"
 	}
+	barcodeValue = trimRunes(strings.TrimSpace(barcodeValue), 80)
+	barcodeFormat = trimRunes(strings.TrimSpace(barcodeFormat), 24)
+	barcodeSource = trimRunes(strings.TrimSpace(barcodeSource), 24)
+	barcodeInstruction := "包装编码：无。"
+	if barcodeValue != "" {
+		if barcodeFormat == "" {
+			barcodeFormat = "unknown"
+		}
+		if barcodeSource == "" {
+			barcodeSource = "manual"
+		}
+		barcodeInstruction = "包装编码：" + barcodeValue + "；格式：" + barcodeFormat + "；来源：" + barcodeSource + "。"
+	}
 
 	return strings.Join([]string{
 		"你是 Life Trace 的家庭库存商品识别 AI，只输出一个 JSON 对象，不要 Markdown，不要解释。",
-		"JSON 格式：{\"name\":\"商品名称\",\"category\":\"食品|日用品|药品|宠物|其他\",\"brand\":\"品牌或空字符串\",\"spec\":\"规格或空字符串\",\"quantity\":1,\"unit\":\"件|瓶|盒|袋|个|包|罐|支\",\"storageLocation\":\"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他\",\"expiresAt\":\"YYYY-MM-DD 或空字符串\",\"productionDate\":\"YYYY-MM-DD 或空字符串\",\"purchaseDate\":\"YYYY-MM-DD 或空字符串\",\"shelfLifeDays\":0,\"tags\":[\"标签\"],\"confidence\":0.0,\"warnings\":[\"需要用户确认的事项\"],\"cropBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.8,\"height\":0.8},\"multiItemDetected\":false,\"detectedItems\":[{\"id\":\"item-1\",\"name\":\"商品名称\",\"brand\":\"品牌或空字符串\",\"spec\":\"规格或空字符串\",\"category\":\"食品|日用品|药品|宠物|其他\",\"quantity\":1,\"unit\":\"件|瓶|盒|袋|个|包|罐|支\",\"storageLocation\":\"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他\",\"expiresAt\":\"YYYY-MM-DD 或空字符串\",\"productionDate\":\"YYYY-MM-DD 或空字符串\",\"shelfLifeDays\":0,\"confidence\":0.0,\"warnings\":[\"需要用户确认的事项\"],\"cropBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.8,\"height\":0.8}}],\"ocrHints\":[{\"kind\":\"production_date|expiry_date|shelf_life_days|shelf_life_text\",\"text\":\"原文\",\"normalizedValue\":\"YYYY-MM-DD 或 180\",\"confidence\":0.0,\"sourceRegion\":{\"x\":0.1,\"y\":0.1,\"width\":0.2,\"height\":0.1}}],\"summary\":\"60字以内说明\"}",
+		"JSON 格式：{\"name\":\"商品名称\",\"category\":\"食品|日用品|药品|宠物|其他\",\"brand\":\"品牌或空字符串\",\"spec\":\"规格或空字符串\",\"quantity\":1,\"unit\":\"件|瓶|盒|袋|个|包|罐|支\",\"storageLocation\":\"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他\",\"expiresAt\":\"YYYY-MM-DD 或空字符串\",\"productionDate\":\"YYYY-MM-DD 或空字符串\",\"purchaseDate\":\"YYYY-MM-DD 或空字符串\",\"shelfLifeDays\":0,\"barcodeValue\":\"包装编码或空字符串\",\"barcodeFormat\":\"ean_13|ean_8|upc_a|upc_e|code_128|qr_code|unknown|空字符串\",\"tags\":[\"标签\"],\"confidence\":0.0,\"warnings\":[\"需要用户确认的事项\"],\"cropBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.8,\"height\":0.8},\"multiItemDetected\":false,\"detectedItems\":[{\"id\":\"item-1\",\"name\":\"商品名称\",\"brand\":\"品牌或空字符串\",\"spec\":\"规格或空字符串\",\"category\":\"食品|日用品|药品|宠物|其他\",\"quantity\":1,\"unit\":\"件|瓶|盒|袋|个|包|罐|支\",\"storageLocation\":\"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他\",\"expiresAt\":\"YYYY-MM-DD 或空字符串\",\"productionDate\":\"YYYY-MM-DD 或空字符串\",\"shelfLifeDays\":0,\"barcodeValue\":\"包装编码或空字符串\",\"barcodeFormat\":\"ean_13|ean_8|upc_a|upc_e|code_128|qr_code|unknown|空字符串\",\"confidence\":0.0,\"warnings\":[\"需要用户确认的事项\"],\"cropBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.8,\"height\":0.8}}],\"ocrHints\":[{\"kind\":\"production_date|expiry_date|shelf_life_days|shelf_life_text\",\"text\":\"原文\",\"normalizedValue\":\"YYYY-MM-DD 或 180\",\"confidence\":0.0,\"sourceRegion\":{\"x\":0.1,\"y\":0.1,\"width\":0.2,\"height\":0.1}}],\"summary\":\"60字以内说明\"}",
 		"category 和 storageLocation 必须从候选值中选择。",
 		"顶层字段仍然表示你判断的主商品，同时把主商品也放进 detectedItems[0]。",
 		"detectedItems 最多返回 5 个候选，按 confidence 从高到低排序；如果只识别到 1 个商品，multiItemDetected 仍返回 false。",
@@ -366,11 +400,13 @@ func buildPantryPhotoAnalysisPrompt(hint string, householdName string, useVision
 		"如果看到多个日期且无法确认哪一个是到期日，不要自动填写 expiresAt，只在 warnings 和 ocrHints 里说明冲突。",
 		"如果保质期和生产日期都没有出现，不要提示缺少保质期，expiresAt、productionDate 和 shelfLifeDays 返回空值或 0。",
 		"不要编造看不清的品牌、规格、生产日期或保质期。",
+		"包装编码只能作为线索；不要因为有编码就编造商品名、品牌或规格。图片和编码冲突时，把编码放入 barcodeValue/barcodeFormat，并在 warnings 提示用户确认。",
 		"如果图片中有多个商品，返回主商品和多候选列表，但不要自动假设用户要批量入库。",
 		"药品、保健品、婴幼儿食品等敏感品类只做库存记录，不给医疗、安全或食用建议。",
 		"tags 输出 2-5 个简体中文短标签。",
 		visionInstruction,
 		"当前库存空间：" + householdName,
+		barcodeInstruction,
 		"用户补充说明：" + hint,
 	}, "\n")
 }
@@ -522,6 +558,8 @@ func parsePantryPhotoAnalysisAIResponse(raw string) (pantryPhotoAnalysisAIRespon
 	parsed.ProductionDate = primaryItem.ProductionDate
 	parsed.PurchaseDate = primaryItem.PurchaseDate
 	parsed.ShelfLifeDays = primaryItem.ShelfLifeDays
+	parsed.BarcodeValue = primaryItem.BarcodeValue
+	parsed.BarcodeFormat = primaryItem.BarcodeFormat
 	parsed.Confidence = primaryItem.Confidence
 	parsed.Warnings = primaryItem.Warnings
 	parsed.CropBox = primaryItem.CropBox
@@ -556,6 +594,8 @@ func normalizePantryPhotoDetectedItem(item pantryPhotoDetectedItem, fallbackID s
 	item.ProductionDate = normalizePantryDate(item.ProductionDate)
 	item.PurchaseDate = normalizePantryDate(item.PurchaseDate)
 	item.ShelfLifeDays = normalizePantryShelfLifeDays(item.ShelfLifeDays)
+	item.BarcodeValue = normalizePantryBarcodeValue(item.BarcodeValue)
+	item.BarcodeFormat = normalizePantryBarcodeFormat(item.BarcodeFormat)
 	item.Confidence = normalizePantryPhotoConfidence(item.Confidence)
 	item.Warnings = normalizePantryPhotoWarnings(item.Warnings)
 	item.CropBox = normalizeImageCropBox(item.CropBox)
@@ -610,6 +650,12 @@ func mergePrimaryPantryPhotoDetectedItem(primary pantryPhotoDetectedItem, candid
 	}
 	if primary.ShelfLifeDays <= 0 {
 		primary.ShelfLifeDays = candidate.ShelfLifeDays
+	}
+	if primary.BarcodeValue == "" {
+		primary.BarcodeValue = candidate.BarcodeValue
+	}
+	if primary.BarcodeFormat == "" {
+		primary.BarcodeFormat = candidate.BarcodeFormat
 	}
 	if primary.Confidence <= 0 {
 		primary.Confidence = candidate.Confidence

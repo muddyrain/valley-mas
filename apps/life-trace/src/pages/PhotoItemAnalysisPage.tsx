@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Camera,
   Check,
   ChevronDown,
@@ -18,6 +17,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { listHouseholds } from '@/api/household';
 import {
   analyzePantryPhoto,
+  lookupPantryBarcodeMatch,
+  type PantryBarcodeMatchResponse,
   type PantryPhotoAnalysisResponse,
   type PantryPhotoCropBox,
   type PantryPhotoDetectedItem,
@@ -29,10 +30,12 @@ import { FormItem } from '@/components/FormItem';
 import { OptionPickerSheet } from '@/components/OptionPickerSheet';
 import { PantryExpiryDateField } from '@/components/PantryExpiryDateField';
 import { SectionHeader } from '@/components/SectionHeader';
+import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
+  applyPhotoItemBarcodeMatchToDraftForm,
   buildPhotoItemAnalysisSmartSuggestions,
   buildPhotoItemCropBoxStyle,
   buildPhotoItemDraftFormFromDetectedItem,
@@ -58,12 +61,18 @@ import {
   type PhotoItemAnalysisSmartSuggestion,
   type PhotoItemCropPreviewLayout,
   type PhotoItemDraftForm,
+  type PhotoItemManualEditedField,
   type PhotoItemOCRSummary,
   readPhotoItemAnalysisHistory,
   removePhotoItemAnalysisHistory,
   summarizePhotoItemOCRHints,
   upsertPhotoItemAnalysisHistory,
 } from '@/lib/photoItemAnalysis';
+import {
+  getManualPhotoItemBarcode,
+  type PhotoItemBarcodeResult,
+  scanPhotoItemBarcodeFromFile,
+} from '@/lib/photoItemBarcode';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -102,6 +111,16 @@ const pantryLocations: PantryLocation[] = [
 const categoryPickerOptions = pantryCategories.map((option) => ({ label: option, value: option }));
 const locationPickerOptions = pantryLocations.map((option) => ({ label: option, value: option }));
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+const barcodeFormatOptions = [
+  { label: '自动', value: '' },
+  { label: 'EAN-13', value: 'ean_13' },
+  { label: 'EAN-8', value: 'ean_8' },
+  { label: 'UPC-A', value: 'upc_a' },
+  { label: 'UPC-E', value: 'upc_e' },
+  { label: 'Code 128', value: 'code_128' },
+  { label: 'QR Code', value: 'qr_code' },
+  { label: '其他', value: 'unknown' },
+];
 
 const initialForm: DraftForm = {
   name: '',
@@ -114,6 +133,8 @@ const initialForm: DraftForm = {
   note: '',
   householdId: '',
   reminderEnabled: true,
+  barcodeValue: '',
+  barcodeFormat: '',
 };
 
 function buildAnalysisNote(
@@ -394,6 +415,8 @@ export function PhotoItemAnalysisPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
   const handledRequestedDraftIdRef = useRef('');
+  const barcodeLookupKeyRef = useRef('');
+  const manualEditedFieldsRef = useRef<Set<PhotoItemManualEditedField>>(new Set());
   const [state, setState] = useState<CaptureState>('idle');
   const [cameraError, setCameraError] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -415,6 +438,10 @@ export function PhotoItemAnalysisPage() {
   const [currentHistoryId, setCurrentHistoryId] = useState('');
   const [selectedDetectedItemId, setSelectedDetectedItemId] = useState('');
   const [processedDetectedItemIds, setProcessedDetectedItemIds] = useState<string[]>([]);
+  const [barcodeScanning, setBarcodeScanning] = useState(false);
+  const [barcodeMatching, setBarcodeMatching] = useState(false);
+  const [barcodeMatch, setBarcodeMatch] = useState<PantryBarcodeMatchResponse | null>(null);
+  const [barcodeStatusText, setBarcodeStatusText] = useState('');
 
   const cameraActive = state === 'camera-ready';
   const busy = state === 'uploading' || state === 'analyzing' || state === 'saving';
@@ -433,6 +460,9 @@ export function PhotoItemAnalysisPage() {
   );
   const activeCropBox = selectedDetectedItem?.cropBox ?? analysis?.cropBox;
   const hasExpiryDate = Boolean(form.expiresAt.trim());
+  const barcodeResult = getManualPhotoItemBarcode(form.barcodeValue ?? '', form.barcodeFormat);
+  const barcodeLookupValue = barcodeResult?.value ?? '';
+  const barcodeLookupFormat = barcodeResult?.format ?? '';
   const hasCropSuggestion = Boolean(normalizePhotoItemCropBox(activeCropBox));
   const hasMeaningfulCropSuggestion = isMeaningfulPhotoItemCropBox(activeCropBox);
   const cropBoxStyle = useMemo(
@@ -567,6 +597,53 @@ export function PhotoItemAnalysisPage() {
   }, [analysis, loadPantry, pantryLoaded, pantryLoading, token]);
 
   useEffect(() => {
+    if (!token || !barcodeLookupValue) {
+      barcodeLookupKeyRef.current = '';
+      setBarcodeMatch(null);
+      setBarcodeMatching(false);
+      return;
+    }
+
+    const lookupKey = [barcodeLookupValue, barcodeLookupFormat, form.householdId].join('|');
+    barcodeLookupKeyRef.current = lookupKey;
+    let cancelled = false;
+    setBarcodeMatching(true);
+
+    lookupPantryBarcodeMatch(token, {
+      barcodeValue: barcodeLookupValue,
+      barcodeFormat: barcodeLookupFormat,
+      householdId: form.householdId || undefined,
+    })
+      .then((match) => {
+        if (cancelled || barcodeLookupKeyRef.current !== lookupKey) {
+          return;
+        }
+        setBarcodeMatch(match.matched ? match : null);
+        if (match.matched) {
+          setForm((current) =>
+            applyPhotoItemBarcodeMatchToDraftForm(current, match, manualEditedFieldsRef.current),
+          );
+          setBarcodeStatusText(`来自历史确认：${match.name || '已保存商品'}。`);
+        }
+      })
+      .catch(() => {
+        if (cancelled || barcodeLookupKeyRef.current !== lookupKey) {
+          return;
+        }
+        setBarcodeMatch(null);
+      })
+      .finally(() => {
+        if (!cancelled && barcodeLookupKeyRef.current === lookupKey) {
+          setBarcodeMatching(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [barcodeLookupFormat, barcodeLookupValue, form.householdId, token]);
+
+  useEffect(() => {
     return () => {
       if (imagePreviewUrl) {
         URL.revokeObjectURL(imagePreviewUrl);
@@ -663,6 +740,39 @@ export function PhotoItemAnalysisPage() {
     };
   }, [cameraActive, cameraStream]);
 
+  const markManualEditedField = useCallback((field: PhotoItemManualEditedField) => {
+    manualEditedFieldsRef.current.add(field);
+  }, []);
+
+  const applyBarcodeResult = useCallback((result: PhotoItemBarcodeResult) => {
+    setForm((current) => ({
+      ...current,
+      barcodeValue: result.value,
+      barcodeFormat: result.format,
+    }));
+    setBarcodeStatusText(result.source === 'native' ? '已识别包装编码。' : '已填写包装编码。');
+  }, []);
+
+  const scanBarcodeForFile = useCallback(
+    async (file: File) => {
+      setBarcodeScanning(true);
+      setBarcodeStatusText('');
+      try {
+        const result = await scanPhotoItemBarcodeFromFile(file);
+        if (result) {
+          applyBarcodeResult(result);
+        } else {
+          setBarcodeStatusText('未识别到包装编码，可手动填写。');
+        }
+      } catch {
+        setBarcodeStatusText('当前浏览器不支持自动识别，可手动填写。');
+      } finally {
+        setBarcodeScanning(false);
+      }
+    },
+    [applyBarcodeResult],
+  );
+
   const updateImageFile = (file: File) => {
     if (imagePreviewUrl) {
       URL.revokeObjectURL(imagePreviewUrl);
@@ -672,12 +782,18 @@ export function PhotoItemAnalysisPage() {
     setUploadedImageUrl('');
     setAnalysis(null);
     setCoverMode('original');
+    setForm((current) => ({ ...current, barcodeValue: '', barcodeFormat: '' }));
+    setBarcodeMatch(null);
+    setBarcodeMatching(false);
+    setBarcodeStatusText('');
+    manualEditedFieldsRef.current = new Set();
     setCurrentHistoryId('');
     setSelectedDetectedItemId('');
     setProcessedDetectedItemIds([]);
     setReviewSheetOpen(false);
     setError('');
     setState('captured');
+    void scanBarcodeForFile(file);
   };
 
   const startCamera = async () => {
@@ -770,6 +886,9 @@ export function PhotoItemAnalysisPage() {
       const result = await analyzePantryPhoto(token, {
         imageUrl: upload.url,
         householdId: form.householdId || undefined,
+        barcodeValue: barcodeResult?.value,
+        barcodeFormat: barcodeResult?.format,
+        barcodeSource: barcodeResult?.source,
       });
       const selectedItem =
         getPhotoItemSelectedDetectedItem(result) ?? getPhotoItemDetectedItems(result)[0];
@@ -785,6 +904,10 @@ export function PhotoItemAnalysisPage() {
               },
               pantryPreferences,
               nextNote,
+              {
+                barcodeMatch,
+                manualEditedFields: manualEditedFieldsRef.current,
+              },
             ),
             openedAt: '',
             householdId:
@@ -805,7 +928,13 @@ export function PhotoItemAnalysisPage() {
         ? 'crop'
         : 'original';
       setAnalysis(result);
-      setForm(nextForm);
+      setForm(
+        applyPhotoItemBarcodeMatchToDraftForm(
+          nextForm,
+          barcodeMatch,
+          manualEditedFieldsRef.current,
+        ),
+      );
       setExpiryBaseDate(nextExpiryBaseDate);
       setCoverMode(nextCoverMode);
       setCurrentHistoryId(historyId);
@@ -816,7 +945,11 @@ export function PhotoItemAnalysisPage() {
         imageUrl: upload.url,
         imageName: getFallbackFileName(imageFile),
         analysis: result,
-        form: nextForm,
+        form: applyPhotoItemBarcodeMatchToDraftForm(
+          nextForm,
+          barcodeMatch,
+          manualEditedFieldsRef.current,
+        ),
         selectedDetectedItemId: nextSelectedDetectedItemId,
         processedDetectedItemIds: [],
         ocrHints: result.ocrHints,
@@ -905,48 +1038,46 @@ export function PhotoItemAnalysisPage() {
             : null;
           if (analysis && nextDetectedItem) {
             const nextNote = buildAnalysisNote(analysis, nextDetectedItem);
-            setProcessedDetectedItemIds(nextProcessedDetectedItemIds);
-            setSelectedDetectedItemId(nextDetectedItemId);
-            setForm((current) => ({
+            markPhotoItemAnalysisSaved(currentHistoryId, item.id);
+            const nextHistoryId = createPhotoItemAnalysisHistoryId();
+            const nextDraftForm = {
               ...buildPhotoItemDraftFormFromDetectedItem(
                 nextDetectedItem,
-                { ...current, householdId: current.householdId || form.householdId },
+                { ...form, householdId: form.householdId },
                 pantryPreferences,
                 nextNote,
+                {
+                  barcodeMatch,
+                  manualEditedFields: manualEditedFieldsRef.current,
+                },
               ),
-              householdId: current.householdId || form.householdId,
+              householdId: form.householdId,
               openedAt: '',
-            }));
+            };
+            setProcessedDetectedItemIds(nextProcessedDetectedItemIds);
+            setSelectedDetectedItemId(nextDetectedItemId);
+            setCurrentHistoryId(nextHistoryId);
+            setForm(nextDraftForm);
             setExpiryBaseDate(
               nextDetectedItem.productionDate || nextDetectedItem.purchaseDate || '',
             );
             upsertPhotoItemAnalysisHistory({
-              ...(currentHistoryItem ?? {
-                id: currentHistoryId,
-                imageUrl: uploadedImageUrl,
-                imageName: imageFile ? getFallbackFileName(imageFile) : undefined,
-                analysis,
-                form,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                status: 'draft' as const,
-              }),
+              id: nextHistoryId,
+              imageUrl: uploadedImageUrl,
+              imageName:
+                currentHistoryItem?.imageName ??
+                (imageFile ? getFallbackFileName(imageFile) : undefined),
               analysis,
-              form: {
-                ...buildPhotoItemDraftFormFromDetectedItem(
-                  nextDetectedItem,
-                  { ...form, householdId: form.householdId },
-                  pantryPreferences,
-                  nextNote,
-                ),
-                householdId: form.householdId,
-                openedAt: '',
-              },
+              form: nextDraftForm,
               selectedDetectedItemId: nextDetectedItemId,
               processedDetectedItemIds: nextProcessedDetectedItemIds,
               ocrHints: analysis.ocrHints,
               expiryBaseDate:
                 nextDetectedItem.productionDate || nextDetectedItem.purchaseDate || '',
+              householdName: selectedHouseholdName,
+              status: 'draft',
+              coverMode,
+              createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             });
             setHistoryItems(readPhotoItemAnalysisHistory());
@@ -961,7 +1092,8 @@ export function PhotoItemAnalysisPage() {
         setHistoryItems(readPhotoItemAnalysisHistory());
       }
       setState('done');
-      setReviewSheetOpen(true);
+      setCurrentHistoryId('');
+      setReviewSheetOpen(false);
       showToast(
         mergeCandidate
           ? `已把数量合并到「${item.name}」。`
@@ -992,6 +1124,11 @@ export function PhotoItemAnalysisPage() {
     setReviewSheetOpen(false);
     setActivePicker(null);
     setExpiryBaseDate('');
+    setBarcodeScanning(false);
+    setBarcodeMatching(false);
+    setBarcodeMatch(null);
+    setBarcodeStatusText('');
+    manualEditedFieldsRef.current = new Set();
     setForm((current) => ({
       ...initialForm,
       householdId: current.householdId,
@@ -1015,6 +1152,8 @@ export function PhotoItemAnalysisPage() {
       setUploadedImageUrl(draft.imageUrl);
       setAnalysis(draft.analysis);
       setForm(draft.form);
+      setBarcodeMatch(null);
+      manualEditedFieldsRef.current = new Set();
       const restoredSelectedDetectedItem =
         getPhotoItemSelectedDetectedItem(draft.analysis, draft.selectedDetectedItemId) ??
         getPhotoItemDetectedItems(draft.analysis)[0] ??
@@ -1039,6 +1178,9 @@ export function PhotoItemAnalysisPage() {
         restoredSelectedDetectedItem?.id || draft.selectedDetectedItemId || '',
       );
       setProcessedDetectedItemIds(draft.processedDetectedItemIds ?? []);
+      setBarcodeScanning(false);
+      setBarcodeMatching(false);
+      setBarcodeStatusText(draft.form.barcodeValue ? '已恢复包装编码。' : '');
       setState('reviewing');
       setReviewSheetOpen(shouldOpenSheet);
       setActivePicker(null);
@@ -1161,6 +1303,10 @@ export function PhotoItemAnalysisPage() {
         },
         pantryPreferences,
         nextNote,
+        {
+          barcodeMatch,
+          manualEditedFields: manualEditedFieldsRef.current,
+        },
       ),
       householdId: current.householdId,
       openedAt: '',
@@ -1172,24 +1318,12 @@ export function PhotoItemAnalysisPage() {
   };
 
   return (
-    <div className="space-y-6 pb-2">
-      <header className="flex items-center gap-3">
-        <Button
-          type="button"
-          variant="ghost"
-          className="-ml-2 h-12 min-w-16 rounded-2xl px-3"
-          aria-label="返回 AI 页"
-          onClick={handleBackToAi}
-        >
-          <ArrowLeft className="size-5 shrink-0" />
-          <span className="text-sm font-semibold">返回</span>
-        </Button>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-life-ai">Life AI</p>
-          <h1 className="truncate text-2xl font-semibold tracking-tight">拍照分析商品</h1>
-        </div>
-      </header>
-
+    <SubPageShell
+      title="拍照分析商品"
+      eyebrow="Life AI"
+      onBack={handleBackToAi}
+      contentClassName="space-y-6 pb-2"
+    >
       {latestDraft ? (
         <Card className="border-life-ai/25 bg-life-ai/5 p-4">
           <div className="flex items-start gap-3">
@@ -1808,11 +1942,17 @@ export function PhotoItemAnalysisPage() {
               type="button"
               variant="ai"
               className="h-12 w-full whitespace-nowrap"
-              onClick={() => setReviewSheetOpen(true)}
+              onClick={() => {
+                if (state === 'done') {
+                  navigate('/pantry');
+                  return;
+                }
+                setReviewSheetOpen(true);
+              }}
             >
               <Check className="size-4 shrink-0" />
               <span className="whitespace-nowrap">
-                {state === 'done' ? '查看入库结果' : '打开入库确认'}
+                {state === 'done' ? '查看库存' : '打开入库确认'}
               </span>
             </Button>
             {canRemoveCurrentDraft ? (
@@ -1831,7 +1971,7 @@ export function PhotoItemAnalysisPage() {
       ) : null}
 
       <BottomSheet
-        open={reviewSheetOpen && reviewReady}
+        open={state !== 'done' && reviewSheetOpen && reviewReady}
         onOpenChange={setReviewSheetOpen}
         overlayLabel="关闭入库确认"
         zIndexClassName="z-50"
@@ -1978,9 +2118,61 @@ export function PhotoItemAnalysisPage() {
             <input
               value={form.name}
               className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              onChange={(event) => {
+                markManualEditedField('name');
+                setForm((current) => ({ ...current, name: event.target.value }));
+              }}
             />
           </FormItem>
+
+          <div className="rounded-[1.25rem] border border-life-ai/20 bg-life-ai/5 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-life-ai">包装编码</p>
+              <Badge tone={form.barcodeValue ? 'ai' : 'default'} className="shrink-0">
+                {barcodeScanning
+                  ? '识别中'
+                  : barcodeMatching
+                    ? '匹配中'
+                    : barcodeMatch
+                      ? '历史确认'
+                      : form.barcodeValue
+                        ? '已填写'
+                        : '可选'}
+              </Badge>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {barcodeStatusText || '条码或二维码可帮助确认品牌和规格。'}
+            </p>
+            <div className="mt-3 grid grid-cols-[minmax(0,1fr)_7.25rem] gap-3 max-[360px]:grid-cols-1">
+              <FormItem label="编码">
+                <input
+                  value={form.barcodeValue ?? ''}
+                  disabled={state === 'saving'}
+                  className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring disabled:opacity-60"
+                  placeholder="手动填写"
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, barcodeValue: event.target.value }))
+                  }
+                />
+              </FormItem>
+              <FormItem label="格式">
+                <select
+                  value={form.barcodeFormat ?? ''}
+                  disabled={state === 'saving'}
+                  className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm text-foreground outline-none transition focus:border-ring disabled:opacity-60"
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, barcodeFormat: event.target.value }))
+                  }
+                >
+                  {barcodeFormatOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </FormItem>
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
             <FormItem label="分类">
@@ -2027,9 +2219,10 @@ export function PhotoItemAnalysisPage() {
               <input
                 value={form.unit}
                 className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, unit: event.target.value }))
-                }
+                onChange={(event) => {
+                  markManualEditedField('unit');
+                  setForm((current) => ({ ...current, unit: event.target.value }));
+                }}
               />
             </FormItem>
           </div>
@@ -2220,7 +2413,10 @@ export function PhotoItemAnalysisPage() {
         value={form.category}
         options={categoryPickerOptions}
         onOpenChange={(nextOpen) => setActivePicker(nextOpen ? 'category' : null)}
-        onSelect={(value) => setForm((current) => ({ ...current, category: value }))}
+        onSelect={(value) => {
+          markManualEditedField('category');
+          setForm((current) => ({ ...current, category: value }));
+        }}
       />
       <OptionPickerSheet<PantryLocation>
         open={activePicker === 'location'}
@@ -2228,8 +2424,11 @@ export function PhotoItemAnalysisPage() {
         value={form.location}
         options={locationPickerOptions}
         onOpenChange={(nextOpen) => setActivePicker(nextOpen ? 'location' : null)}
-        onSelect={(value) => setForm((current) => ({ ...current, location: value }))}
+        onSelect={(value) => {
+          markManualEditedField('location');
+          setForm((current) => ({ ...current, location: value }));
+        }}
       />
-    </div>
+    </SubPageShell>
   );
 }

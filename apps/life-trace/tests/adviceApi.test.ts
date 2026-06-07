@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   analyzeImage,
   deleteWeeklyReview,
+  generateRecipeSuggestions,
   generateTodayAdvice,
   generateWeeklyReview,
   listWeeklyReviews,
@@ -157,6 +158,67 @@ describe('advice api', () => {
         headers: expect.any(Headers),
       }),
     );
+  });
+
+  it('generates pantry-first recipes with household scope and bearer token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: 0,
+        message: 'success',
+        data: {
+          summary: '优先用掉临期番茄。',
+          recipes: [
+            {
+              id: 'recipe-1',
+              title: '番茄炒蛋',
+              reason: '番茄临期，搭配鸡蛋最快手。',
+              usedItems: ['番茄', '鸡蛋'],
+              missingItems: ['葱，可省略'],
+              timeMinutes: 15,
+              difficulty: '简单',
+              servings: 2,
+              steps: ['番茄切块', '鸡蛋炒散', '合炒调味'],
+              tags: ['临期优先'],
+              planTitle: '晚餐做番茄炒蛋',
+              planNote: '做完后手动确认库存消耗。',
+            },
+          ],
+          warnings: ['确认鸡蛋状态后再烹饪。'],
+          householdId: 'household-1',
+          householdName: '开心家庭',
+          source: 'ark',
+          model: 'ep-recipe',
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const data = await generateRecipeSuggestions(token, {
+      meal: '晚餐',
+      servings: 2,
+      maxMinutes: 20,
+      householdId: 'household-1',
+    });
+
+    expect(data.recipes[0].title).toBe('番茄炒蛋');
+    expect(data.householdName).toBe('开心家庭');
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/life-trace/ai/recipes?householdId=household-1',
+      expect.objectContaining({
+        credentials: 'include',
+        method: 'POST',
+        body: JSON.stringify({
+          meal: '晚餐',
+          servings: 2,
+          maxMinutes: 20,
+        }),
+        headers: expect.any(Headers),
+      }),
+    );
+    const headers = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(headers.get('Authorization')).toBe(`Bearer ${token}`);
+    expect(headers.get('Content-Type')).toBe('application/json');
   });
 
   it('analyzes an image with bearer token', async () => {

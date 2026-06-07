@@ -4,7 +4,13 @@ import { AppFeedbackToast } from '@/components/AppFeedbackToast';
 import { AppReminderToast } from '@/components/AppReminderToast';
 import { AppShell } from '@/components/AppShell';
 import { LifeTraceBrandMark } from '@/components/LifeTraceBrandMark';
-import { AiActionsPage, AiHistoryPage, AiPage, AiWeeklyReviewsPage } from '@/pages/AiPage';
+import {
+  AiActionsPage,
+  AiHistoryPage,
+  AiPage,
+  AiPhotoItemHistoryPage,
+  AiWeeklyReviewsPage,
+} from '@/pages/AiPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { PantryPage } from '@/pages/PantryPage';
 import { PhotoItemAnalysisPage } from '@/pages/PhotoItemAnalysisPage';
@@ -87,6 +93,7 @@ function AppContent() {
           <Route path="/ai" element={<AiPage />} />
           <Route path="/ai/history" element={<AiHistoryPage />} />
           <Route path="/ai/actions" element={<AiActionsPage />} />
+          <Route path="/ai/photo-item-history" element={<AiPhotoItemHistoryPage />} />
           <Route path="/ai/photo-item-analysis" element={<PhotoItemAnalysisPage />} />
           <Route path="/ai/weekly-reviews" element={<AiWeeklyReviewsPage />} />
           <Route path="/traces/:traceId?" element={<TracesPage />} />

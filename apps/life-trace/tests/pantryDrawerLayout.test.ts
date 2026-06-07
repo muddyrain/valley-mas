@@ -15,6 +15,7 @@ const photoItemAnalysisSource = readFileSync(
   'utf8',
 );
 const aiPageSource = readFileSync(resolve(__dirname, '../src/pages/AiPage.tsx'), 'utf8');
+const appSource = readFileSync(resolve(__dirname, '../src/App.tsx'), 'utf8');
 const expiryDateFieldSource = readFileSync(
   resolve(__dirname, '../src/components/PantryExpiryDateField.tsx'),
   'utf8',
@@ -77,18 +78,75 @@ describe('pantry drawer mobile layout guards', () => {
     expect(photoItemAnalysisSource).toContain('onClick={() => restoreDraft(latestDraft)}');
   });
 
-  it('keeps the photo analysis back action explicit and easy to tap', () => {
+  it('keeps the photo analysis back action in the shared subpage header', () => {
     expect(photoItemAnalysisSource).toContain("navigate('/ai', { replace: true })");
-    expect(photoItemAnalysisSource).toContain('aria-label="返回 AI 页"');
-    expect(photoItemAnalysisSource).toContain('className="-ml-2 h-12 min-w-16 rounded-2xl px-3"');
+    expect(photoItemAnalysisSource).toContain('title="拍照分析商品"');
+    expect(photoItemAnalysisSource).toContain('eyebrow="Life AI"');
+    expect(photoItemAnalysisSource).toContain('onBack={handleBackToAi}');
   });
 
   it('keeps photo analysis drafts removable from both AI and draft review entry points', () => {
     expect(aiPageSource).toContain('onRemovePhotoItemDraft');
     expect(aiPageSource).toContain('handleRemovePhotoItemDraft');
-    expect(aiPageSource).toContain('aria-label={`移除${item.form.name');
+    expect(aiPageSource).toMatch(/aria-label=\{`移除\$\{itemName\}草稿`\}/);
     expect(photoItemAnalysisSource).toContain('const removeCurrentDraft = () =>');
     expect(photoItemAnalysisSource).toContain('canRemoveCurrentDraft');
     expect(photoItemAnalysisSource).toContain('移除草稿');
+  });
+
+  it('keeps each confirmed product as saved history before moving to the next detected draft', () => {
+    expect(photoItemAnalysisSource).toContain(
+      'markPhotoItemAnalysisSaved(currentHistoryId, item.id)',
+    );
+    expect(photoItemAnalysisSource).toContain(
+      'const nextHistoryId = createPhotoItemAnalysisHistoryId();',
+    );
+    expect(photoItemAnalysisSource).toContain('setCurrentHistoryId(nextHistoryId)');
+    expect(photoItemAnalysisSource).toContain('id: nextHistoryId');
+  });
+
+  it('closes the inventory confirmation sheet after the final photo item is saved', () => {
+    expect(photoItemAnalysisSource).toContain("setState('done')");
+    expect(photoItemAnalysisSource).toContain('setReviewSheetOpen(false)');
+    expect(photoItemAnalysisSource).not.toContain(
+      "setState('done');\r\n      setReviewSheetOpen(true)",
+    );
+  });
+
+  it('refreshes recent product recognition after same-tab photo history changes', () => {
+    expect(aiPageSource).toContain('PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT');
+    expect(aiPageSource).toContain(
+      'window.addEventListener(PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT',
+    );
+    expect(aiPageSource).toContain('onOpenSavedPantryItem');
+    expect(aiPageSource).toContain("item.status === 'saved'");
+  });
+
+  it('keeps recent product recognition as a summary with a full history page', () => {
+    expect(appSource).toContain('AiPhotoItemHistoryPage');
+    expect(appSource).toContain('path="/ai/photo-item-history"');
+    expect(aiPageSource).toContain('function PhotoItemHistoryArchive');
+    expect(aiPageSource).toContain('getPhotoItemAnalysisSummaryItems(photoItemHistory)');
+    expect(aiPageSource).not.toContain('photoItemHistory.slice(0, 3).map');
+    expect(aiPageSource).toContain("navigate('/ai/photo-item-history')");
+    expect(aiPageSource).toContain('全部');
+  });
+
+  it('lets the full product recognition history handle drafts and saved items differently', () => {
+    expect(aiPageSource).toContain('title="最近商品识别"');
+    expect(aiPageSource).toContain('onOpenPhotoItemDraft(item.id)');
+    expect(aiPageSource).toContain("onOpenSavedPantryItem={() => navigate('/pantry')}");
+    expect(aiPageSource).toContain('onRemovePhotoItemDraft(item.id)');
+  });
+
+  it('shows an immediate smart recipe loading state in the main chat area', () => {
+    expect(aiPageSource).toContain("title: '正在生成智能菜谱'");
+    expect(aiPageSource).toContain("quickActionLoading === '智能菜谱'");
+    expect(aiPageSource).toContain('RecipeLoadingState');
+  });
+
+  it('does not stack large conversation sync skeletons under the recent recognition summary', () => {
+    expect(aiPageSource).not.toContain('正在载入对话');
+    expect(aiPageSource).not.toContain('正在把云端记录同步到当前设备。');
   });
 });

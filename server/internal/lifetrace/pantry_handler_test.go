@@ -26,6 +26,8 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 		"note": "早餐优先喝掉",
 		"imageUrl": "https://example.com/milk.jpg",
 		"thumbnailUrl": "` + thumbnailURL + `",
+		"barcodeValue": " 6901234567890 ",
+		"barcodeFormat": "EAN_13",
 		"status": "normal",
 		"reminder": {
 			"enabled": true,
@@ -52,6 +54,9 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 	if created["thumbnailUrl"] != thumbnailURL {
 		t.Fatalf("expected long thumbnail url to round-trip, got %+v", created["thumbnailUrl"])
 	}
+	if created["barcodeValue"] != "6901234567890" || created["barcodeFormat"] != "ean_13" {
+		t.Fatalf("expected barcode fields to round-trip, got %+v", created)
+	}
 	rules := created["reminderRules"].([]interface{})
 	if len(rules) != 2 || rules[0] != "3d" {
 		t.Fatalf("expected reminder rules to round-trip, got %+v", rules)
@@ -70,6 +75,9 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 	}
 	if list[0].(map[string]interface{})["thumbnailUrl"] != thumbnailURL {
 		t.Fatalf("expected list response to keep long thumbnail url, got %+v", list[0])
+	}
+	if list[0].(map[string]interface{})["barcodeValue"] != "6901234567890" {
+		t.Fatalf("expected list response to keep barcode value, got %+v", list[0])
 	}
 	if decodeTracePayload(t, listResp)["data"].(map[string]interface{})["householdName"] != "我的空间" {
 		t.Fatalf("expected list response to include household name, got %+v", decodeTracePayload(t, listResp)["data"])
@@ -185,6 +193,69 @@ func TestUpdatePantryItemStatusAndDelete(t *testing.T) {
 	}
 }
 
+func TestConsumePantryItemPartiallyAndDiscardAll(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+	item := model.LifeTracePantryItem{
+		UserID:             101,
+		HouseholdID:        personalHouseholdID(101),
+		Name:               "抽纸",
+		Category:           "日用品",
+		Quantity:           18,
+		Unit:               "包",
+		Location:           "卫生间",
+		Status:             "normal",
+		ReminderEnabled:    true,
+		ReminderUseDefault: true,
+		ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
+		ReminderTime:       "09:00",
+	}
+	if err := database.GetDB().Create(&item).Error; err != nil {
+		t.Fatalf("seed pantry item: %v", err)
+	}
+
+	consumeReq := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/v1/life-trace/pantry/"+item.ID.String()+"/consume",
+		bytes.NewBufferString(`{"action":"used","quantity":3}`),
+	)
+	consumeReq.Header.Set("Content-Type", "application/json")
+	consumeResp := httptest.NewRecorder()
+	router.ServeHTTP(consumeResp, consumeReq)
+
+	consumed := decodeTracePayload(t, consumeResp)["data"].(map[string]interface{})
+	if consumed["quantity"] != float64(15) || consumed["status"] != "normal" {
+		t.Fatalf("expected partial consume to keep item active with reduced quantity, got %+v", consumed)
+	}
+
+	discardReq := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/v1/life-trace/pantry/"+item.ID.String()+"/consume",
+		bytes.NewBufferString(`{"action":"discarded","quantity":15}`),
+	)
+	discardReq.Header.Set("Content-Type", "application/json")
+	discardResp := httptest.NewRecorder()
+	router.ServeHTTP(discardResp, discardReq)
+
+	discarded := decodeTracePayload(t, discardResp)["data"].(map[string]interface{})
+	if discarded["quantity"] != float64(15) || discarded["status"] != "discarded" {
+		t.Fatalf("expected full discard to mark item discarded without repeated clicks, got %+v", discarded)
+	}
+
+	var traces []model.LifeTraceTrace
+	if err := database.GetDB().Where("user_id = ?", 101).Order("created_at ASC").Find(&traces).Error; err != nil {
+		t.Fatalf("list traces: %v", err)
+	}
+	if len(traces) != 2 {
+		t.Fatalf("expected consume and discard traces, got %+v", traces)
+	}
+	if traces[0].Title != "使用库存：抽纸" || !strings.Contains(traces[0].Summary, "3包") || !strings.Contains(traces[0].Summary, "剩余 15包") {
+		t.Fatalf("expected partial consume trace to include delta and remaining quantity, got %+v", traces[0])
+	}
+	if traces[1].Title != "已丢弃：抽纸" || !strings.Contains(traces[1].Summary, "15包") {
+		t.Fatalf("expected full discard trace to include processed quantity, got %+v", traces[1])
+	}
+}
+
 func TestListPantryOnlyReturnsCurrentUserData(t *testing.T) {
 	router := setupTraceTestRouter(t, 101)
 	if err := database.GetDB().Create(&model.LifeTracePantryItem{
@@ -280,6 +351,162 @@ func TestPantrySupportsSharedHouseholdSelection(t *testing.T) {
 	}
 	if sharedData["householdId"] != sharedHousehold.ID.String() {
 		t.Fatalf("expected selected household id, got %+v", sharedData["householdId"])
+	}
+}
+
+func TestLookupPantryBarcodeMatchReturnsLatestItemFromCurrentHousehold(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+	olderTime := time.Date(2026, 6, 5, 10, 0, 0, 0, time.UTC)
+	newerTime := time.Date(2026, 6, 6, 10, 0, 0, 0, time.UTC)
+
+	seedItems := []model.LifeTracePantryItem{
+		{
+			UserID:        101,
+			HouseholdID:   personalHouseholdID(101),
+			Name:          "旧名称纸巾",
+			Category:      "日用品",
+			Quantity:      1,
+			Unit:          "件",
+			Location:      "储物柜",
+			Status:        "normal",
+			BarcodeValue:  "6972205226407",
+			BarcodeFormat: "ean_13",
+			UpdatedAt:     olderTime,
+		},
+		{
+			UserID:        101,
+			HouseholdID:   personalHouseholdID(101),
+			Name:          "植护抽纸",
+			Category:      "日用品",
+			Quantity:      1,
+			Unit:          "包",
+			Location:      "卫生间",
+			Status:        "used-up",
+			BarcodeValue:  "6972205226407",
+			BarcodeFormat: "ean_13",
+			UpdatedAt:     newerTime,
+		},
+		{
+			UserID:        202,
+			HouseholdID:   personalHouseholdID(202),
+			Name:          "别人家的纸巾",
+			Category:      "日用品",
+			Quantity:      1,
+			Unit:          "包",
+			Location:      "厨房",
+			Status:        "normal",
+			BarcodeValue:  "6972205226407",
+			BarcodeFormat: "ean_13",
+			UpdatedAt:     newerTime.Add(time.Hour),
+		},
+	}
+	for _, item := range seedItems {
+		if err := database.GetDB().Create(&item).Error; err != nil {
+			t.Fatalf("create pantry item: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/life-trace/pantry/barcode-match?barcodeValue=6972205226407&barcodeFormat=EAN-13",
+		nil,
+	)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	if data["matched"] != true || data["name"] != "植护抽纸" {
+		t.Fatalf("expected latest current-household barcode match, got %+v", data)
+	}
+	if data["unit"] != "包" || data["location"] != "卫生间" || data["source"] != "pantry-history" {
+		t.Fatalf("expected stable barcode profile fields, got %+v", data)
+	}
+	if data["quantity"] != nil || data["expiresAt"] != nil || data["imageUrl"] != nil {
+		t.Fatalf("barcode match must not return volatile pantry fields, got %+v", data)
+	}
+
+	noMatchReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/life-trace/pantry/barcode-match?barcodeValue=0000000000000&barcodeFormat=ean_13",
+		nil,
+	)
+	noMatchResp := httptest.NewRecorder()
+	router.ServeHTTP(noMatchResp, noMatchReq)
+	noMatchData := decodeTracePayload(t, noMatchResp)["data"].(map[string]interface{})
+	if noMatchData["matched"] != false {
+		t.Fatalf("expected no match response, got %+v", noMatchData)
+	}
+}
+
+func TestLookupPantryBarcodeMatchUsesHouseholdMembership(t *testing.T) {
+	router := setupTraceTestRouter(t, 202)
+	sharedHousehold := model.Household{
+		Name:        "共享家庭",
+		Kind:        householdKindShared,
+		OwnerUserID: 101,
+		Status:      householdStatusActive,
+	}
+	if err := database.GetDB().Create(&sharedHousehold).Error; err != nil {
+		t.Fatalf("create shared household: %v", err)
+	}
+	if err := database.GetDB().Create(&model.HouseholdMember{
+		HouseholdID: sharedHousehold.ID,
+		UserID:      202,
+		Role:        householdRoleMember,
+		Status:      householdMemberStatusActive,
+	}).Error; err != nil {
+		t.Fatalf("create member membership: %v", err)
+	}
+	if err := database.GetDB().Create(&model.LifeTracePantryItem{
+		UserID:        101,
+		HouseholdID:   sharedHousehold.ID,
+		Name:          "共享家庭牛奶",
+		Category:      "食品",
+		Quantity:      1,
+		Unit:          "盒",
+		Location:      "冷藏",
+		Status:        "normal",
+		BarcodeValue:  "6901234567890",
+		BarcodeFormat: "ean_13",
+	}).Error; err != nil {
+		t.Fatalf("create shared pantry item: %v", err)
+	}
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/life-trace/pantry/barcode-match?barcodeValue=6901234567890&barcodeFormat=ean_13&householdId="+sharedHousehold.ID.String(),
+		nil,
+	)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	if data["matched"] != true || data["name"] != "共享家庭牛奶" {
+		t.Fatalf("expected shared household member barcode match, got %+v", data)
+	}
+
+	blockedHousehold := model.Household{
+		Name:        "不可访问家庭",
+		Kind:        householdKindShared,
+		OwnerUserID: 404,
+		Status:      householdStatusActive,
+	}
+	if err := database.GetDB().Create(&blockedHousehold).Error; err != nil {
+		t.Fatalf("create blocked household: %v", err)
+	}
+	forbiddenReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/life-trace/pantry/barcode-match?barcodeValue=6901234567890&barcodeFormat=ean_13&householdId="+blockedHousehold.ID.String(),
+		nil,
+	)
+	forbiddenResp := httptest.NewRecorder()
+	router.ServeHTTP(forbiddenResp, forbiddenReq)
+	var forbiddenPayload map[string]interface{}
+	if err := json.Unmarshal(forbiddenResp.Body.Bytes(), &forbiddenPayload); err != nil {
+		t.Fatalf("decode forbidden response: %v", err)
+	}
+	if forbiddenPayload["code"] != float64(http.StatusForbidden) {
+		t.Fatalf("expected non-member lookup to be forbidden, got %+v", forbiddenPayload)
 	}
 }
 

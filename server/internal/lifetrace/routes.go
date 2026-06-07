@@ -63,8 +63,10 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 		{
 			pantry.GET("", handler.ListPantryItems)
 			pantry.POST("", handler.CreatePantryItem)
+			pantry.GET("/barcode-match", handler.LookupPantryBarcodeMatch)
 			pantry.POST("/transfer/preview", handler.PreviewPantryTransfer)
 			pantry.POST("/transfer", handler.TransferPantryItems)
+			pantry.PATCH("/:id/consume", handler.ConsumePantryItem)
 			pantry.PATCH("/:id", handler.UpdatePantryItem)
 			pantry.PATCH("/:id/status", handler.UpdatePantryItemStatus)
 			pantry.DELETE("/:id", handler.DeletePantryItem)

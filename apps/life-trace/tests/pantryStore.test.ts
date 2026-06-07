@@ -181,6 +181,75 @@ describe('pantry store', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('consumes pantry quantity and updates the local pantry item', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: 0,
+        message: 'success',
+        data: {
+          id: 'pantry-1',
+          householdId: '',
+          name: '抽纸',
+          category: '日用品',
+          quantity: 1,
+          unit: '包',
+          location: '卫生间',
+          expiresAt: '',
+          openedAt: '',
+          note: '',
+          imageUrl: '',
+          thumbnailUrl: '',
+          status: 'normal',
+          reminderEnabled: false,
+          reminderUseDefault: true,
+          reminderRules: [],
+          reminderTime: '09:00',
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { useAuthStore } = await import('../src/store/useAuthStore');
+    const { useLifeTraceStore } = await import('../src/store/useLifeTraceStore');
+    useAuthStore.setState({ token: 'token', status: 'authenticated' });
+    useLifeTraceStore.setState({
+      pantryItems: [
+        {
+          id: 'pantry-1',
+          householdId: '',
+          name: '抽纸',
+          category: '日用品',
+          quantity: 2,
+          unit: '包',
+          location: '卫生间',
+          note: '',
+          status: 'normal',
+          reminder: {
+            enabled: false,
+            useDefault: true,
+            rules: [],
+            reminderTime: '09:00',
+          },
+          createdAt: '2026-06-07T00:00:00.000Z',
+          updatedAt: '2026-06-07T00:00:00.000Z',
+        },
+      ],
+    });
+
+    const updated = await useLifeTraceStore
+      .getState()
+      .consumePantryItem('pantry-1', { action: 'used', quantity: 1 });
+
+    expect(updated?.quantity).toBe(1);
+    expect(useLifeTraceStore.getState().pantryItems[0].quantity).toBe(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/life-trace/pantry/pantry-1/consume');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toEqual({
+      action: 'used',
+      quantity: 1,
+    });
+  });
+
   it('keeps the created shared household as the pantry list scope', async () => {
     const fetchMock = vi
       .fn()

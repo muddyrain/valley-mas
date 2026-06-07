@@ -64,6 +64,8 @@ export type PantryPhotoDetectedItem = {
   productionDate?: string;
   purchaseDate?: string;
   shelfLifeDays?: number;
+  barcodeValue?: string;
+  barcodeFormat?: string;
   confidence: number;
   warnings: string[];
   cropBox?: PantryPhotoCropBox;
@@ -73,6 +75,9 @@ export type PantryPhotoAnalysisRequest = {
   imageUrl: string;
   householdId?: string;
   hint?: string;
+  barcodeValue?: string;
+  barcodeFormat?: string;
+  barcodeSource?: string;
 };
 
 export type PantryPhotoAnalysisResponse = {
@@ -87,6 +92,8 @@ export type PantryPhotoAnalysisResponse = {
   productionDate?: string;
   purchaseDate?: string;
   shelfLifeDays?: number;
+  barcodeValue?: string;
+  barcodeFormat?: string;
   tags: string[];
   confidence: number;
   warnings: string[];
@@ -99,6 +106,33 @@ export type PantryPhotoAnalysisResponse = {
   householdName?: string;
   source: 'ark';
   model?: string;
+};
+
+export type PantryBarcodeMatchRequest = {
+  barcodeValue?: string;
+  barcodeFormat?: string;
+  householdId?: string;
+};
+
+export type PantryBarcodeMatchResponse = {
+  matched: boolean;
+  source?: 'pantry-history';
+  matchedItemId?: string;
+  householdId?: string;
+  name?: string;
+  category?: PantryItem['category'];
+  unit?: string;
+  location?: PantryItem['location'];
+  barcodeValue?: string;
+  barcodeFormat?: string;
+  updatedAt?: string;
+};
+
+export type PantryConsumeAction = 'used' | 'discarded';
+
+export type PantryConsumeRequest = {
+  action: PantryConsumeAction;
+  quantity: number;
 };
 
 export type PantryTransferMode = 'copy' | 'move';
@@ -201,6 +235,8 @@ function serializePantryItemInput(input: NewPantryItemInput) {
     note: input.note,
     imageUrl: input.imageUrl,
     thumbnailUrl: input.thumbnailUrl,
+    barcodeValue: input.barcodeValue,
+    barcodeFormat: input.barcodeFormat,
     status: input.status,
     reminder: {
       enabled: input.reminder.enabled,
@@ -216,6 +252,8 @@ function deserializePantryItem(item: PantryItemResponse): PantryItem {
     ...item,
     imageUrl: item.imageUrl || undefined,
     thumbnailUrl: item.thumbnailUrl || undefined,
+    barcodeValue: item.barcodeValue || undefined,
+    barcodeFormat: item.barcodeFormat || undefined,
     reminder: {
       enabled: item.reminderEnabled,
       useDefault: item.reminderUseDefault,
@@ -289,6 +327,22 @@ export function updatePantryItemStatus(
   ).then(deserializePantryItem);
 }
 
+export function consumePantryItem(
+  token: string,
+  id: string,
+  input: PantryConsumeRequest,
+  householdId?: string,
+) {
+  return apiRequest<PantryItemResponse>(
+    buildHouseholdPath(`/life-trace/pantry/${id}/consume`, householdId),
+    token,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    },
+  ).then(deserializePantryItem);
+}
+
 export function deletePantryItem(token: string, id: string, householdId?: string) {
   return apiRequest<{ id: string }>(
     buildHouseholdPath(`/life-trace/pantry/${id}`, householdId),
@@ -296,6 +350,24 @@ export function deletePantryItem(token: string, id: string, householdId?: string
     {
       method: 'DELETE',
     },
+  );
+}
+
+export function lookupPantryBarcodeMatch(token: string, input: PantryBarcodeMatchRequest) {
+  const params = new URLSearchParams();
+  if (input.barcodeValue?.trim()) {
+    params.set('barcodeValue', input.barcodeValue.trim());
+  }
+  if (input.barcodeFormat?.trim()) {
+    params.set('barcodeFormat', input.barcodeFormat.trim());
+  }
+  if (input.householdId?.trim()) {
+    params.set('householdId', input.householdId.trim());
+  }
+  const query = params.toString();
+  return apiRequest<PantryBarcodeMatchResponse>(
+    `/life-trace/pantry/barcode-match${query ? `?${query}` : ''}`,
+    token,
   );
 }
 

@@ -24,11 +24,31 @@ describe('pantry status action guards', () => {
 
   it('keeps mobile status action labels stable while the action is pending', () => {
     expect(pantryPageSource).toContain('const StatusActionIcon = BadgeAlert');
-    expect(pantryPageSource).toContain('const DiscardActionIcon = Trash2');
+    expect(pantryPageSource).toContain('const consumePending = pendingActionId ===');
+    expect(pantryPageSource).toContain(':consume-used`;');
+    expect(pantryPageSource).toContain(':consume-discarded` || consumePending');
     expect(pantryPageSource).toContain('<ActionLoadingIcon className="size-4" tone="trace" />');
     expect(pantryPageSource).toContain('<ActionLoadingIcon className="size-4" tone="alert" />');
     expect(pantryPageSource).toContain('min-w-10 whitespace-nowrap text-center');
+    expect(pantryPageSource).toContain("'用 1'");
+    expect(pantryPageSource).toContain("'处理'");
     expect(pantryPageSource).not.toContain("usedUpPending ? '处理中...'");
     expect(pantryPageSource).not.toContain("discardedPending ? '处理中...'");
+  });
+
+  it('keeps partial consume actions available from the process sheet', () => {
+    expect(pantryPageSource).toContain('openConsumeSheet(item)');
+    expect(pantryPageSource).toContain('处理数量');
+    expect(pantryPageSource).toContain('使用数量');
+    expect(pantryPageSource).toContain('全部用完');
+    expect(pantryPageSource).toContain('丢弃数量');
+    expect(pantryPageSource).toContain('全部丢弃');
+  });
+
+  it('uses shaped pantry skeletons instead of a plain syncing text card', () => {
+    expect(pantryPageSource).toContain('function PantryListSkeleton');
+    expect(pantryPageSource).toContain('<PantryListSkeleton');
+    expect(pantryPageSource).toContain('aria-label="库存加载中"');
+    expect(pantryPageSource).not.toContain('正在同步{currentHouseholdName}库存...');
   });
 });

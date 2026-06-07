@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PantryPhotoAnalysisResponse } from '../src/api/pantry';
 import {
   buildPhotoItemAnalysisSmartSuggestions,
+  buildPhotoItemDraftFormFromDetectedItem,
   buildPhotoItemMergedPantryInput,
   buildPhotoItemPantryInput,
   calculatePhotoItemCropPreviewLayout,
@@ -10,10 +11,12 @@ import {
   getNextUnprocessedDetectedItemId,
   getPhotoItemAnalysisDraftById,
   getPhotoItemAnalysisReviewIssues,
+  getPhotoItemAnalysisSummaryItems,
   getPhotoItemDetectedItems,
   getPhotoItemSelectedDetectedItem,
   markPhotoItemAnalysisQualityFeedback,
   markPhotoItemAnalysisSaved,
+  PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT,
   type PhotoItemAnalysisHistoryItem,
   readPhotoItemAnalysisHistory,
   removePhotoItemAnalysisHistory,
@@ -90,6 +93,8 @@ function createPantryItem(overrides: Partial<PantryItem> = {}): PantryItem {
     quantity: overrides.quantity ?? 1,
     unit: overrides.unit ?? '盒',
     location: overrides.location ?? '冷藏',
+    expiresAt: overrides.expiresAt,
+    openedAt: overrides.openedAt,
     note: overrides.note ?? '',
     status: overrides.status ?? 'normal',
     reminder: overrides.reminder ?? {
@@ -128,6 +133,30 @@ describe('photo item analysis helpers', () => {
 
     expect(input.imageUrl).toBe('https://example.com/real-photo.jpg');
     expect(input.thumbnailUrl).toBeUndefined();
+  });
+
+  it('carries confirmed barcode fields into pantry input', () => {
+    const input = buildPhotoItemPantryInput({
+      form: {
+        name: '牛奶',
+        category: '食品',
+        quantity: '1',
+        unit: '盒',
+        location: '冷藏',
+        expiresAt: '',
+        openedAt: '',
+        note: '',
+        householdId: '',
+        reminderEnabled: false,
+        barcodeValue: ' 6901234567890 ',
+        barcodeFormat: 'ean_13',
+      },
+      pantryPreferences,
+      uploadedImageUrl: 'https://example.com/milk.jpg',
+    });
+
+    expect(input.barcodeValue).toBe('6901234567890');
+    expect(input.barcodeFormat).toBe('ean_13');
   });
 
   it('calculates a focused subject preview from the AI crop box', () => {
@@ -258,7 +287,7 @@ describe('photo item analysis helpers', () => {
     expect(history[0].form.name).toBe('青年牙线棒');
   });
 
-  it('marks recovered drafts as saved after pantry creation', () => {
+  it('keeps saved photo analysis in recent history while removing it from draft recovery', () => {
     const storage = createStorage();
 
     upsertPhotoItemAnalysisHistory(createHistoryItem({ id: 'draft-1' }), storage);
@@ -268,6 +297,79 @@ describe('photo item analysis helpers', () => {
     expect(saved.status).toBe('saved');
     expect(saved.savedItemId).toBe('pantry-1');
     expect(getLatestPhotoItemAnalysisDraft(storage)).toBeNull();
+  });
+
+  it('prioritizes draft photo recognition items in the AI page summary', () => {
+    const items = [
+      createHistoryItem({
+        id: 'saved-latest',
+        status: 'saved',
+        updatedAt: '2026-06-07T10:00:00Z',
+      }),
+      createHistoryItem({
+        id: 'draft-latest',
+        status: 'draft',
+        updatedAt: '2026-06-07T09:00:00Z',
+      }),
+      createHistoryItem({
+        id: 'saved-older',
+        status: 'saved',
+        updatedAt: '2026-06-07T08:00:00Z',
+      }),
+      createHistoryItem({
+        id: 'draft-older',
+        status: 'draft',
+        updatedAt: '2026-06-07T07:00:00Z',
+      }),
+      createHistoryItem({
+        id: 'draft-oldest',
+        status: 'draft',
+        updatedAt: '2026-06-07T06:00:00Z',
+      }),
+    ];
+
+    expect(getPhotoItemAnalysisSummaryItems(items).map((item) => item.id)).toEqual([
+      'draft-latest',
+      'draft-older',
+      'saved-latest',
+    ]);
+  });
+
+  it('shows recent saved photo recognition items when there are no drafts', () => {
+    const items = [
+      createHistoryItem({
+        id: 'saved-1',
+        status: 'saved',
+        updatedAt: '2026-06-07T10:00:00Z',
+      }),
+      createHistoryItem({
+        id: 'saved-2',
+        status: 'saved',
+        updatedAt: '2026-06-07T09:00:00Z',
+      }),
+      createHistoryItem({
+        id: 'saved-3',
+        status: 'saved',
+        updatedAt: '2026-06-07T08:00:00Z',
+      }),
+      createHistoryItem({
+        id: 'saved-4',
+        status: 'saved',
+        updatedAt: '2026-06-07T07:00:00Z',
+      }),
+    ];
+
+    expect(getPhotoItemAnalysisSummaryItems(items).map((item) => item.id)).toEqual([
+      'saved-1',
+      'saved-2',
+      'saved-3',
+    ]);
+  });
+
+  it('exposes a history change event for same-tab recent recognition refreshes', () => {
+    expect(PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT).toBe(
+      'life-trace-photo-item-analysis-history-changed',
+    );
   });
 
   it('ignores broken photo analysis history payloads', () => {
@@ -454,6 +556,100 @@ describe('photo item analysis helpers', () => {
     ]);
   });
 
+  it('lets barcode history override AI draft fields while preserving expiry OCR output', () => {
+    const draft = buildPhotoItemDraftFormFromDetectedItem(
+      {
+        id: 'item-1',
+        name: 'AI 猜测纸巾',
+        category: '其他',
+        quantity: 1,
+        unit: '件',
+        storageLocation: '储物柜',
+        expiresAt: '2028-11-01',
+        barcodeValue: '6972205226407',
+        barcodeFormat: 'ean_13',
+        confidence: 0.72,
+        warnings: [],
+      },
+      {
+        ...createHistoryItem().form,
+        barcodeValue: '6972205226407',
+        barcodeFormat: 'ean_13',
+      },
+      pantryPreferences,
+      'AI 识别：纸巾。',
+      {
+        barcodeMatch: {
+          matched: true,
+          source: 'pantry-history',
+          matchedItemId: 'pantry-history-1',
+          householdId: 'household-1',
+          name: '植护抽纸',
+          category: '日用品',
+          unit: '包',
+          location: '卫生间',
+          barcodeValue: '6972205226407',
+          barcodeFormat: 'ean_13',
+          updatedAt: '2026-06-06T01:00:00.000Z',
+        },
+      },
+    );
+
+    expect(draft).toMatchObject({
+      name: '植护抽纸',
+      category: '日用品',
+      unit: '包',
+      location: '卫生间',
+      expiresAt: '2028-11-01',
+      barcodeValue: '6972205226407',
+      barcodeFormat: 'ean_13',
+    });
+  });
+
+  it('keeps manually edited draft fields ahead of barcode history and AI output', () => {
+    const draft = buildPhotoItemDraftFormFromDetectedItem(
+      {
+        id: 'item-1',
+        name: 'AI 牛奶',
+        category: '食品',
+        quantity: 1,
+        unit: '盒',
+        storageLocation: '冷藏',
+        confidence: 0.72,
+        warnings: [],
+      },
+      {
+        ...createHistoryItem().form,
+        name: '我手动改过的名称',
+        unit: '箱',
+        barcodeValue: '6901234567890',
+        barcodeFormat: 'ean_13',
+      },
+      pantryPreferences,
+      'AI 识别：牛奶。',
+      {
+        barcodeMatch: {
+          matched: true,
+          source: 'pantry-history',
+          matchedItemId: 'pantry-history-1',
+          householdId: 'household-1',
+          name: '历史牛奶',
+          category: '食品',
+          unit: '瓶',
+          location: '冷藏',
+          barcodeValue: '6901234567890',
+          barcodeFormat: 'ean_13',
+          updatedAt: '2026-06-06T01:00:00.000Z',
+        },
+        manualEditedFields: ['name', 'unit'],
+      },
+    );
+
+    expect(draft.name).toBe('我手动改过的名称');
+    expect(draft.unit).toBe('箱');
+    expect(draft.location).toBe('冷藏');
+  });
+
   it('ignores used-up and discarded pantry history when building smart suggestions', () => {
     const suggestions = buildPhotoItemAnalysisSmartSuggestions({
       analysis,
@@ -541,6 +737,54 @@ describe('photo item analysis helpers', () => {
     });
 
     expect(candidates.map((candidate) => candidate.item.id)).toEqual(['same']);
+  });
+
+  it('does not suggest merging the same product when expiry dates differ', () => {
+    const candidates = findPhotoItemAnalysisDuplicateCandidates({
+      analysis,
+      form: {
+        ...createHistoryItem().form,
+        householdId: 'household-1',
+        location: '冷藏',
+        unit: '盒',
+        expiresAt: '2029-02-01',
+      },
+      pantryItems: [
+        createPantryItem({
+          id: 'older-batch',
+          name: '牛奶',
+          location: '冷藏',
+          unit: '盒',
+          expiresAt: '2028-11-01',
+        }),
+      ],
+    });
+
+    expect(candidates).toEqual([]);
+  });
+
+  it('still suggests merging the same product when expiry dates match', () => {
+    const candidates = findPhotoItemAnalysisDuplicateCandidates({
+      analysis,
+      form: {
+        ...createHistoryItem().form,
+        householdId: 'household-1',
+        location: '冷藏',
+        unit: '盒',
+        expiresAt: '2029-02-01',
+      },
+      pantryItems: [
+        createPantryItem({
+          id: 'same-batch',
+          name: '牛奶',
+          location: '冷藏',
+          unit: '盒',
+          expiresAt: '2029-02-01',
+        }),
+      ],
+    });
+
+    expect(candidates.map((candidate) => candidate.item.id)).toEqual(['same-batch']);
   });
 
   it('builds merged pantry input by adding quantity while preserving the existing item fields', () => {

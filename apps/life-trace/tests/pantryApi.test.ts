@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  consumePantryItem,
   createPantryItem,
   deletePantryItem,
   generatePantryThumbnail,
   listPantry,
+  lookupPantryBarcodeMatch,
   updatePantryItem,
   updatePantryItemStatus,
 } from '../src/api/pantry';
@@ -147,6 +149,35 @@ describe('pantry api', () => {
     expect(fetchMock.mock.calls[0][1].method).toBe('PATCH');
   });
 
+  it('consumes pantry quantities through the consume endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: 0,
+        message: 'success',
+        data: { ...pantryResponse, quantity: 1 },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const updated = await consumePantryItem(
+      token,
+      'pantry-1',
+      { action: 'used', quantity: 1 },
+      'household-1',
+    );
+
+    expect(updated.quantity).toBe(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/v1/life-trace/pantry/pantry-1/consume?householdId=household-1',
+    );
+    expect(fetchMock.mock.calls[0][1].method).toBe('PATCH');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toEqual({
+      action: 'used',
+      quantity: 1,
+    });
+  });
+
   it('generates pantry thumbnails through the AI endpoint', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -178,5 +209,41 @@ describe('pantry api', () => {
       location: '冷藏',
       note: '早餐优先喝掉',
     });
+  });
+
+  it('looks up pantry barcode matches with encoded query params', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: 0,
+        message: 'success',
+        data: {
+          matched: true,
+          source: 'pantry-history',
+          matchedItemId: 'pantry-1',
+          householdId: 'household-1',
+          name: '植护抽纸',
+          category: '日用品',
+          unit: '包',
+          location: '卫生间',
+          barcodeValue: '6972205226407',
+          barcodeFormat: 'ean_13',
+          updatedAt: '2026-06-06T01:00:00.000Z',
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await lookupPantryBarcodeMatch(token, {
+      barcodeValue: '6972205226407',
+      barcodeFormat: 'EAN-13',
+      householdId: 'household 1',
+    });
+
+    expect(result.matched).toBe(true);
+    expect(result.name).toBe('植护抽纸');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/v1/life-trace/pantry/barcode-match?barcodeValue=6972205226407&barcodeFormat=EAN-13&householdId=household+1',
+    );
   });
 });

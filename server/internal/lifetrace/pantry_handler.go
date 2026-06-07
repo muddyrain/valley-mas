@@ -23,22 +23,29 @@ type pantryReminderPayload struct {
 }
 
 type createPantryItemRequest struct {
-	Name         string                `json:"name"`
-	Category     string                `json:"category"`
-	Quantity     int                   `json:"quantity"`
-	Unit         string                `json:"unit"`
-	Location     string                `json:"location"`
-	ExpiresAt    string                `json:"expiresAt"`
-	OpenedAt     string                `json:"openedAt"`
-	Note         string                `json:"note"`
-	ImageURL     string                `json:"imageUrl"`
-	ThumbnailURL string                `json:"thumbnailUrl"`
-	Status       string                `json:"status"`
-	Reminder     pantryReminderPayload `json:"reminder"`
+	Name          string                `json:"name"`
+	Category      string                `json:"category"`
+	Quantity      int                   `json:"quantity"`
+	Unit          string                `json:"unit"`
+	Location      string                `json:"location"`
+	ExpiresAt     string                `json:"expiresAt"`
+	OpenedAt      string                `json:"openedAt"`
+	Note          string                `json:"note"`
+	ImageURL      string                `json:"imageUrl"`
+	ThumbnailURL  string                `json:"thumbnailUrl"`
+	BarcodeValue  string                `json:"barcodeValue"`
+	BarcodeFormat string                `json:"barcodeFormat"`
+	Status        string                `json:"status"`
+	Reminder      pantryReminderPayload `json:"reminder"`
 }
 
 type updatePantryStatusRequest struct {
 	Status string `json:"status"`
+}
+
+type consumePantryItemRequest struct {
+	Action   string `json:"action"`
+	Quantity int    `json:"quantity"`
 }
 
 type pantryListSummary struct {
@@ -46,6 +53,20 @@ type pantryListSummary struct {
 	Expiring int64 `json:"expiring"`
 	Expired  int64 `json:"expired"`
 	Active   int64 `json:"active"`
+}
+
+type pantryBarcodeMatchResponse struct {
+	Matched       bool              `json:"matched"`
+	Source        string            `json:"source,omitempty"`
+	MatchedItemID model.Int64String `json:"matchedItemId,omitempty"`
+	HouseholdID   model.Int64String `json:"householdId,omitempty"`
+	Name          string            `json:"name,omitempty"`
+	Category      string            `json:"category,omitempty"`
+	Unit          string            `json:"unit,omitempty"`
+	Location      string            `json:"location,omitempty"`
+	BarcodeValue  string            `json:"barcodeValue,omitempty"`
+	BarcodeFormat string            `json:"barcodeFormat,omitempty"`
+	UpdatedAt     time.Time         `json:"updatedAt,omitempty"`
 }
 
 var validPantryCategories = map[string]bool{
@@ -117,6 +138,24 @@ func normalizePantryUnit(unit string) string {
 	return unit
 }
 
+func normalizePantryBarcodeValue(value string) string {
+	value = strings.TrimSpace(value)
+	return strings.Join(strings.Fields(value), "")
+}
+
+func normalizePantryBarcodeFormat(format string) string {
+	format = strings.ToLower(strings.TrimSpace(format))
+	format = strings.ReplaceAll(format, "-", "_")
+	switch format {
+	case "ean_13", "ean_8", "upc_a", "upc_e", "code_128", "qr_code":
+		return format
+	case "":
+		return ""
+	default:
+		return "unknown"
+	}
+}
+
 func normalizePantryQuantity(quantity int) int {
 	if quantity <= 0 {
 		return 1
@@ -182,6 +221,22 @@ func buildPantryTraceRecord(
 	}
 
 	switch options.Action {
+	case "used":
+		trace.Title = truncatePantryTraceText("使用库存："+item.Name, 160)
+		trace.Summary = truncatePantryTraceText(
+			"已使用「"+item.Name+"」"+deltaText+"，剩余 "+quantityText+"。",
+			1000,
+		)
+		trace.Mood = "踏实"
+		trace.Tags = normalizeTraceTags([]string{item.Category, "家庭库存", "使用"})
+	case "discarded-partial":
+		trace.Title = truncatePantryTraceText("丢弃库存："+item.Name, 160)
+		trace.Summary = truncatePantryTraceText(
+			"已丢弃「"+item.Name+"」"+deltaText+"，剩余 "+quantityText+"。",
+			1000,
+		)
+		trace.Mood = "提醒"
+		trace.Tags = normalizeTraceTags([]string{item.Category, "家庭库存", "丢弃"})
 	case "used-up":
 		trace.Title = truncatePantryTraceText("已用完："+item.Name, 160)
 		trace.Summary = truncatePantryTraceText(
@@ -389,6 +444,59 @@ func (h *Handler) ListPantryItems(c *gin.Context) {
 	})
 }
 
+func (h *Handler) LookupPantryBarcodeMatch(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	householdCtx, ok := readHouseholdContext(c, userID)
+	if !ok {
+		return
+	}
+
+	barcodeValue := normalizePantryBarcodeValue(c.Query("barcodeValue"))
+	barcodeFormat := normalizePantryBarcodeFormat(c.Query("barcodeFormat"))
+	if barcodeValue == "" {
+		success(c, pantryBarcodeMatchResponse{Matched: false})
+		return
+	}
+
+	query := database.GetDB().
+		Where("household_id = ? AND barcode_value = ?", householdCtx.Household.ID, barcodeValue)
+	if barcodeFormat != "" {
+		query = query.Where("barcode_format = ?", barcodeFormat)
+	}
+
+	var item model.LifeTracePantryItem
+	if err := query.
+		Order("updated_at DESC").
+		Order("created_at DESC").
+		First(&item).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			success(c, pantryBarcodeMatchResponse{Matched: false})
+			return
+		}
+		fail(c, http.StatusInternalServerError, "查询包装编码失败")
+		return
+	}
+
+	success(c, pantryBarcodeMatchResponse{
+		Matched:       true,
+		Source:        "pantry-history",
+		MatchedItemID: item.ID,
+		HouseholdID:   item.HouseholdID,
+		Name:          item.Name,
+		Category:      item.Category,
+		Unit:          item.Unit,
+		Location:      item.Location,
+		BarcodeValue:  item.BarcodeValue,
+		BarcodeFormat: item.BarcodeFormat,
+		UpdatedAt:     item.UpdatedAt,
+	})
+}
+
 func (h *Handler) CreatePantryItem(c *gin.Context) {
 	userID, ok := currentUserID(c)
 	if !ok {
@@ -431,6 +539,8 @@ func (h *Handler) CreatePantryItem(c *gin.Context) {
 		Note:               strings.TrimSpace(req.Note),
 		ImageURL:           strings.TrimSpace(req.ImageURL),
 		ThumbnailURL:       strings.TrimSpace(req.ThumbnailURL),
+		BarcodeValue:       normalizePantryBarcodeValue(req.BarcodeValue),
+		BarcodeFormat:      normalizePantryBarcodeFormat(req.BarcodeFormat),
 		Status:             normalizePantryStatus(req.Status),
 		CreatedBy:          userID,
 		UpdatedBy:          userID,
@@ -505,6 +615,8 @@ func (h *Handler) UpdatePantryItem(c *gin.Context) {
 		"note":                 strings.TrimSpace(req.Note),
 		"image_url":            strings.TrimSpace(req.ImageURL),
 		"thumbnail_url":        strings.TrimSpace(req.ThumbnailURL),
+		"barcode_value":        normalizePantryBarcodeValue(req.BarcodeValue),
+		"barcode_format":       normalizePantryBarcodeFormat(req.BarcodeFormat),
 		"status":               normalizePantryStatus(req.Status),
 		"updated_by":           userID,
 		"reminder_enabled":     reminderEnabled,
@@ -571,6 +683,101 @@ func (h *Handler) UpdatePantryItemStatus(c *gin.Context) {
 		})
 	}
 
+	success(c, item)
+}
+
+func normalizePantryConsumeAction(action string) string {
+	switch strings.ToLower(strings.TrimSpace(action)) {
+	case "used", "discarded":
+		return strings.ToLower(strings.TrimSpace(action))
+	default:
+		return ""
+	}
+}
+
+func (h *Handler) ConsumePantryItem(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	householdCtx, ok := readHouseholdContext(c, userID)
+	if !ok {
+		return
+	}
+
+	item, found := findPantryItem(c.Param("id"), householdCtx.Household.ID)
+	if !found {
+		fail(c, http.StatusNotFound, "库存不存在")
+		return
+	}
+	if item.Status == "used-up" || item.Status == "discarded" {
+		fail(c, http.StatusBadRequest, "库存已处理")
+		return
+	}
+
+	var req consumePantryItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	action := normalizePantryConsumeAction(req.Action)
+	if action == "" || req.Quantity <= 0 {
+		fail(c, http.StatusBadRequest, "处理数量无效")
+		return
+	}
+
+	currentQuantity := normalizePantryQuantity(item.Quantity)
+	consumeQuantity := req.Quantity
+	if consumeQuantity >= currentQuantity {
+		status := "used-up"
+		if action == "discarded" {
+			status = "discarded"
+		}
+		if err := database.GetDB().Model(&item).Updates(map[string]interface{}{
+			"status":     status,
+			"updated_by": userID,
+		}).Error; err != nil {
+			fail(c, http.StatusInternalServerError, "更新库存失败")
+			return
+		}
+		resetPantryReminderDeliveries(nil, item.ID)
+		if err := database.GetDB().First(&item, "id = ? AND household_id = ?", item.ID, householdCtx.Household.ID).Error; err != nil {
+			fail(c, http.StatusInternalServerError, "读取库存失败")
+			return
+		}
+		writePantryTrace(userID, item, pantryTraceOptions{
+			Action:              status,
+			TargetHouseholdName: householdCtx.Household.Name,
+		})
+		success(c, item)
+		return
+	}
+
+	remainingQuantity := currentQuantity - consumeQuantity
+	if err := database.GetDB().Model(&item).Updates(map[string]interface{}{
+		"quantity":   remainingQuantity,
+		"status":     "normal",
+		"updated_by": userID,
+	}).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "更新库存失败")
+		return
+	}
+	if err := database.GetDB().First(&item, "id = ? AND household_id = ?", item.ID, householdCtx.Household.ID).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "读取库存失败")
+		return
+	}
+
+	traceAction := "used"
+	if action == "discarded" {
+		traceAction = "discarded-partial"
+	}
+	writePantryTrace(userID, item, pantryTraceOptions{
+		Action:              traceAction,
+		QuantityDelta:       consumeQuantity,
+		TargetHouseholdName: householdCtx.Household.Name,
+	})
 	success(c, item)
 }
 

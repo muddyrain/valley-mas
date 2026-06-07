@@ -9,20 +9,33 @@ type SubPageShellProps = {
   title: string;
   eyebrow?: string;
   backTo?: string;
+  fallbackBackTo?: string;
   onBack?: () => void;
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  contentClassName?: string;
 };
+
+export function canNavigateBackFromState(historyState: unknown) {
+  if (!historyState || typeof historyState !== 'object') {
+    return false;
+  }
+
+  const { idx } = historyState as { idx?: unknown };
+  return typeof idx === 'number' && idx > 0;
+}
 
 export function SubPageShell({
   title,
   eyebrow,
   backTo,
+  fallbackBackTo,
   onBack,
   action,
   children,
   className,
+  contentClassName,
 }: SubPageShellProps) {
   const navigate = useNavigate();
   const pageRef = useRef<HTMLDivElement>(null);
@@ -59,6 +72,14 @@ export function SubPageShell({
       navigate(backTo);
       return;
     }
+    if (canNavigateBackFromState(window.history.state)) {
+      navigate(-1);
+      return;
+    }
+    if (fallbackBackTo) {
+      navigate(fallbackBackTo);
+      return;
+    }
     navigate(-1);
   };
 
@@ -85,7 +106,7 @@ export function SubPageShell({
           <div className="flex size-10 shrink-0 items-center justify-end">{action}</div>
         </div>
       </header>
-      {children}
+      <div className={contentClassName}>{children}</div>
     </div>
   );
 }

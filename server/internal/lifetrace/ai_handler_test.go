@@ -499,6 +499,26 @@ func TestParsePantryPhotoAnalysisAIResponseWarnsWhenShelfLifeMissingProductionDa
 	}
 }
 
+func TestParsePantryPhotoAnalysisAIResponsePreservesBarcodeFields(t *testing.T) {
+	parsed, err := parsePantryPhotoAnalysisAIResponse(`{
+		"name":"牛奶",
+		"category":"食品",
+		"quantity":1,
+		"unit":"盒",
+		"storageLocation":"冷藏",
+		"barcodeValue":" 6901234567890 ",
+		"barcodeFormat":"EAN_13",
+		"warnings":[]
+	}`)
+	if err != nil {
+		t.Fatalf("parse pantry photo analysis: %v", err)
+	}
+
+	if parsed.BarcodeValue != "6901234567890" || parsed.BarcodeFormat != "ean_13" {
+		t.Fatalf("expected normalized barcode fields, got %+v", parsed)
+	}
+}
+
 func TestGenerateWeeklyReviewUsesCloudLifeContext(t *testing.T) {
 	var capturedPrompt string
 	openAIServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

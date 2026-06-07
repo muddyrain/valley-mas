@@ -1,4 +1,5 @@
 import type {
+  PantryBarcodeMatchResponse,
   PantryPhotoAnalysisResponse,
   PantryPhotoDetectedItem,
   PantryPhotoOCRHint,
@@ -23,6 +24,8 @@ export type PhotoItemDraftForm = {
   note: string;
   householdId: string;
   reminderEnabled: boolean;
+  barcodeValue?: string;
+  barcodeFormat?: string;
 };
 
 export type PhotoItemAnalysisHistoryStatus = 'draft' | 'saved';
@@ -141,8 +144,37 @@ type BuildPhotoItemMergedPantryInputOptions = {
   form: PhotoItemDraftForm;
 };
 
+export type PhotoItemManualEditedField = 'name' | 'category' | 'unit' | 'location';
+
+type BuildPhotoItemDraftFormOptions = {
+  barcodeMatch?: PantryBarcodeMatchResponse | null;
+  manualEditedFields?: Iterable<PhotoItemManualEditedField>;
+};
+
+export function applyPhotoItemBarcodeMatchToDraftForm(
+  form: PhotoItemDraftForm,
+  barcodeMatch?: PantryBarcodeMatchResponse | null,
+  manualEditedFields: Iterable<PhotoItemManualEditedField> = [],
+): PhotoItemDraftForm {
+  if (!barcodeMatch?.matched) {
+    return form;
+  }
+  const editedFields = new Set(manualEditedFields);
+  return {
+    ...form,
+    name: editedFields.has('name') ? form.name : barcodeMatch.name || form.name,
+    category: editedFields.has('category') ? form.category : barcodeMatch.category || form.category,
+    unit: editedFields.has('unit') ? form.unit : barcodeMatch.unit || form.unit,
+    location: editedFields.has('location') ? form.location : barcodeMatch.location || form.location,
+    barcodeValue: barcodeMatch.barcodeValue || form.barcodeValue,
+    barcodeFormat: barcodeMatch.barcodeFormat || form.barcodeFormat,
+  };
+}
+
 const PHOTO_ITEM_ANALYSIS_HISTORY_KEY = 'life-trace-photo-item-analysis-history-v1';
 const MAX_PHOTO_ITEM_ANALYSIS_HISTORY = 8;
+export const PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT =
+  'life-trace-photo-item-analysis-history-changed';
 
 type HistoryStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
@@ -151,6 +183,13 @@ function getPhotoItemAnalysisStorage(): HistoryStorage | null {
     return null;
   }
   return window.localStorage;
+}
+
+function notifyPhotoItemAnalysisHistoryChanged() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.dispatchEvent(new Event(PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT));
 }
 
 function normalizeHistoryItem(item: unknown): PhotoItemAnalysisHistoryItem | null {
@@ -271,6 +310,7 @@ export function writePhotoItemAnalysisHistory(
     .slice(0, MAX_PHOTO_ITEM_ANALYSIS_HISTORY);
 
   storage.setItem(PHOTO_ITEM_ANALYSIS_HISTORY_KEY, JSON.stringify(deduped));
+  notifyPhotoItemAnalysisHistoryChanged();
 }
 
 export function upsertPhotoItemAnalysisHistory(
@@ -322,6 +362,19 @@ export function markPhotoItemAnalysisSaved(
     ),
     storage,
   );
+}
+
+export function getPhotoItemAnalysisSummaryItems(
+  items: PhotoItemAnalysisHistoryItem[],
+): PhotoItemAnalysisHistoryItem[] {
+  const drafts = items.filter((item) => item.status === 'draft');
+  const saved = items.filter((item) => item.status === 'saved');
+
+  if (drafts.length === 0) {
+    return saved.slice(0, 3);
+  }
+
+  return [...drafts.slice(0, 2), ...saved.slice(0, 1)].slice(0, 3);
 }
 
 export function markPhotoItemAnalysisQualityFeedback(
@@ -435,19 +488,33 @@ export function buildPhotoItemDraftFormFromDetectedItem(
   fallbackForm: PhotoItemDraftForm,
   pantryPreferences: PantryPreferences,
   note = '',
+  options: BuildPhotoItemDraftFormOptions = {},
 ) {
-  return {
+  const manualEditedFields = new Set(options.manualEditedFields ?? []);
+  const barcodeMatch = options.barcodeMatch?.matched ? options.barcodeMatch : null;
+  const draft = {
     ...fallbackForm,
-    name: detectedItem.name || fallbackForm.name,
-    category: detectedItem.category || fallbackForm.category,
+    name: manualEditedFields.has('name')
+      ? fallbackForm.name
+      : detectedItem.name || fallbackForm.name,
+    category: manualEditedFields.has('category')
+      ? fallbackForm.category
+      : detectedItem.category || fallbackForm.category,
     quantity: String(detectedItem.quantity || 1),
-    unit: detectedItem.unit || fallbackForm.unit,
-    location: detectedItem.storageLocation || fallbackForm.location,
+    unit: manualEditedFields.has('unit')
+      ? fallbackForm.unit
+      : detectedItem.unit || fallbackForm.unit,
+    location: manualEditedFields.has('location')
+      ? fallbackForm.location
+      : detectedItem.storageLocation || fallbackForm.location,
     expiresAt: detectedItem.expiresAt || '',
     openedAt: fallbackForm.openedAt,
     note,
     reminderEnabled: detectedItem.expiresAt ? pantryPreferences.defaultReminderEnabled : false,
+    barcodeValue: detectedItem.barcodeValue || fallbackForm.barcodeValue || '',
+    barcodeFormat: detectedItem.barcodeFormat || fallbackForm.barcodeFormat || '',
   };
+  return applyPhotoItemBarcodeMatchToDraftForm(draft, barcodeMatch, manualEditedFields);
 }
 
 function getOCRHintLabel(kind: PantryPhotoOCRHint['kind']) {
@@ -639,6 +706,19 @@ function normalizeDuplicateText(value: string) {
   return normalizeSuggestionText(value).replace(/\s+/g, '');
 }
 
+function normalizeDuplicateBatchDate(value?: string) {
+  return value?.trim() ?? '';
+}
+
+function isSamePantryBatch(form: PhotoItemDraftForm, item: PantryItem) {
+  const formExpiry = normalizeDuplicateBatchDate(form.expiresAt);
+  const itemExpiry = normalizeDuplicateBatchDate(item.expiresAt);
+  if (!formExpiry && !itemExpiry) {
+    return true;
+  }
+  return Boolean(formExpiry && itemExpiry && formExpiry === itemExpiry);
+}
+
 function appendMergeNote(existingNote: string, newNote: string) {
   const current = existingNote.trim();
   const incoming = newNote.trim();
@@ -665,6 +745,7 @@ export function findPhotoItemAnalysisDuplicateCandidates({
     .filter((item) => item.category === form.category)
     .filter((item) => item.location === form.location)
     .filter((item) => item.unit.trim() === form.unit.trim())
+    .filter((item) => isSamePantryBatch(form, item))
     .map((item): PhotoItemAnalysisDuplicateCandidate | null => {
       const itemName = normalizeDuplicateText(item.name);
       const itemNote = normalizeDuplicateText(item.note);
@@ -718,6 +799,8 @@ export function buildPhotoItemMergedPantryInput({
     note: appendMergeNote(existingItem.note, form.note),
     imageUrl: existingItem.imageUrl,
     thumbnailUrl: existingItem.thumbnailUrl,
+    barcodeValue: existingItem.barcodeValue || form.barcodeValue?.trim() || undefined,
+    barcodeFormat: existingItem.barcodeFormat || form.barcodeFormat?.trim() || undefined,
     status: existingItem.status,
     reminder: existingItem.reminder,
   };
@@ -820,7 +903,7 @@ export function getPhotoItemAnalysisReviewIssues(
   const issues: PhotoItemAnalysisReviewIssue[] = [];
   const note = form.note.trim();
   const confidence = Number.isFinite(selectedItem?.confidence)
-    ? selectedItem!.confidence
+    ? (selectedItem?.confidence ?? 0)
     : Number.isFinite(analysis.confidence)
       ? analysis.confidence
       : 0;
@@ -933,6 +1016,8 @@ export function buildPhotoItemPantryInput({
     note: form.note.trim(),
     imageUrl: uploadedImageUrl || undefined,
     thumbnailUrl: thumbnailUrl || undefined,
+    barcodeValue: form.barcodeValue?.trim() || undefined,
+    barcodeFormat: form.barcodeFormat?.trim().toLowerCase() || undefined,
     status: 'normal',
     reminder: buildDefaultPantryReminder(
       pantryPreferences,

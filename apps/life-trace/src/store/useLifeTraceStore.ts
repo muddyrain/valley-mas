@@ -4,6 +4,8 @@ import { listCheckins, toggleCheckin } from '@/api/checkins';
 import {
   type ListPantryOptions,
   listPantry,
+  type PantryConsumeRequest,
+  consumePantryItem as requestConsumePantryItem,
   createPantryItem as requestCreatePantryItem,
   deletePantryItem as requestDeletePantryItem,
   updatePantryItem as requestUpdatePantryItem,
@@ -119,6 +121,11 @@ type LifeTraceState = {
   updatePantryItemStatus: (
     itemId: string,
     status: PantryItemStatus,
+    householdId?: string,
+  ) => Promise<PantryItem | null>;
+  consumePantryItem: (
+    itemId: string,
+    input: PantryConsumeRequest,
     householdId?: string,
   ) => Promise<PantryItem | null>;
   removePantryItem: (itemId: string, householdId?: string) => Promise<boolean>;
@@ -1121,6 +1128,53 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           return null;
         } finally {
           pantryStatusUpdateInFlightKeys.delete(statusUpdateKey);
+        }
+      },
+      consumePantryItem: async (itemId, input, householdId) => {
+        const token = getToken();
+        if (!token) {
+          set({ pantryError: '请先登录后再更新库存数量' });
+          return null;
+        }
+
+        const consumeKey = `${normalizeHouseholdScopeId(householdId) || 'personal'}:${itemId}:consume`;
+        if (pantryStatusUpdateInFlightKeys.has(consumeKey)) {
+          return null;
+        }
+
+        pantryStatusUpdateInFlightKeys.add(consumeKey);
+        try {
+          const updatedItem = normalizePantryItem(
+            await requestConsumePantryItem(token, itemId, input, householdId),
+          );
+          const activeHouseholdId = normalizeHouseholdScopeId(get().pantryListOptions.householdId);
+          const targetHouseholdId = normalizeHouseholdScopeId(householdId);
+          set((state) => ({
+            pantryItems: targetHouseholdId
+              ? state.pantryItems
+              : state.pantryItems.map((item) => (item.id === itemId ? updatedItem : item)),
+            pantryError: '',
+            aiActions: [
+              {
+                id: createActionId(),
+                title: input.action === 'used' ? '记录了库存使用' : '记录了库存丢弃',
+                timeLabel: '刚刚',
+              },
+              ...getAiActions(state),
+            ],
+          }));
+          if (get().pantryListLoaded && activeHouseholdId === targetHouseholdId) {
+            void get().loadPantryList(get().pantryListOptions);
+          }
+          if (get().tracesLoaded) {
+            void get().loadTraces();
+          }
+          return updatedItem;
+        } catch (error) {
+          set({ pantryError: getLifeTraceErrorMessage(error, '更新库存数量失败') });
+          return null;
+        } finally {
+          pantryStatusUpdateInFlightKeys.delete(consumeKey);
         }
       },
       removePantryItem: async (itemId, householdId) => {

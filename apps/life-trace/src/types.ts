@@ -99,6 +99,8 @@ export type PantryItem = {
   note: string;
   imageUrl?: string;
   thumbnailUrl?: string;
+  barcodeValue?: string;
+  barcodeFormat?: string;
   status: PantryItemStatus;
   reminder: PantryReminderConfig;
   createdAt?: string;

@@ -1,6 +1,5 @@
 import {
   AlertCircle,
-  ArrowLeft,
   ArrowRight,
   CalendarDays,
   Camera,
@@ -54,6 +53,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ImageAnalysisDrawer } from '@/components/ImageAnalysisDrawer';
 import { LifeTraceBrandMark } from '@/components/LifeTraceBrandMark';
 import { SectionHeader } from '@/components/SectionHeader';
+import { SubPageShell } from '@/components/SubPageShell';
 import { MessageSyncSkeleton, SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -61,12 +61,15 @@ import { suggestedPrompts } from '@/data/mock';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import { formatLocationDisplay } from '@/lib/location';
 import {
+  getPhotoItemAnalysisSummaryItems,
+  PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT,
   type PhotoItemAnalysisHistoryItem,
   readPhotoItemAnalysisHistory,
   removePhotoItemAnalysisHistory,
 } from '@/lib/photoItemAnalysis';
 import { getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { getLocalISODate } from '@/lib/planSchedule';
+import { createPlanFromRecipe } from '@/lib/recipePlan';
 import { readWeatherCache } from '@/lib/weatherCache';
 import {
   buildWeeklyReviewActionMarker,
@@ -130,20 +133,6 @@ function formatPlanDisplayTime(
   return `${dateText} ${timeText}`;
 }
 
-function createPlanFromRecipe(recipe: RecipeSuggestionItem): NewPlanInput {
-  return {
-    title: recipe.planTitle || recipe.title,
-    type: '吃饭',
-    timeLabel: '今天 19:00',
-    scheduledDate: getLocalISODate(new Date()),
-    scheduledTime: '19:00',
-    timezone: 'Asia/Shanghai',
-    reminder: true,
-    note: `${recipe.planNote}\n消耗库存：${recipe.usedItems.join('、') || '按实际食材确认'}。`,
-    source: 'ai_advice',
-  };
-}
-
 function formatAssistantActionMessage(event: LifeAssistantActionEvent) {
   if (event.type === 'create_plan') {
     if (event.plan && event.status === 'created') {
@@ -178,6 +167,66 @@ function formatPhotoItemQualityFeedback(item: PhotoItemAnalysisHistoryItem) {
   return item.qualityFeedback.rating === 'accurate'
     ? { label: '准确', tone: 'trace' as const }
     : { label: '不准确', tone: 'alert' as const };
+}
+
+function PhotoItemHistoryRow({
+  item,
+  onOpenPhotoItemDraft,
+  onOpenSavedPantryItem,
+  onRemovePhotoItemDraft,
+}: {
+  item: PhotoItemAnalysisHistoryItem;
+  onOpenPhotoItemDraft: (draftId: string) => void;
+  onOpenSavedPantryItem: () => void;
+  onRemovePhotoItemDraft?: (draftId: string) => void;
+}) {
+  const qualityFeedback = formatPhotoItemQualityFeedback(item);
+  const saved = item.status === 'saved';
+  const itemName = item.form.name || item.analysis.name || '待确认商品';
+
+  return (
+    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-secondary/45 p-2 text-left transition hover:bg-secondary">
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left outline-none transition focus-visible:ring-2 focus-visible:ring-life-ai/40"
+        onClick={() => (saved ? onOpenSavedPantryItem() : onOpenPhotoItemDraft(item.id))}
+      >
+        {item.imageUrl ? (
+          <img
+            src={item.imageUrl}
+            alt={itemName}
+            className="size-12 shrink-0 rounded-xl object-cover"
+          />
+        ) : (
+          <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-background text-life-ai">
+            <Image className="size-5" />
+          </span>
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">{itemName}</span>
+          <span className="mt-1 block truncate text-xs text-muted-foreground">
+            {formatPhotoItemHistoryTime(item.updatedAt)} · {item.householdName || '我的空间'}
+          </span>
+        </span>
+        <span className="flex shrink-0 flex-col items-end gap-1">
+          <Badge tone={saved ? 'trace' : 'ai'}>{saved ? '已入库' : '草稿'}</Badge>
+          {qualityFeedback ? (
+            <Badge tone={qualityFeedback.tone}>{qualityFeedback.label}</Badge>
+          ) : null}
+        </span>
+      </button>
+      {!saved && onRemovePhotoItemDraft ? (
+        <button
+          type="button"
+          className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-xl border border-life-alert/15 bg-background/70 text-life-alert transition hover:border-life-alert/35 hover:bg-life-alert/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-life-alert/30"
+          aria-label={`移除${itemName}草稿`}
+          onClick={() => onRemovePhotoItemDraft(item.id)}
+        >
+          <Trash2 className="size-4" />
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 function normalizeAssistantMessage(message: LifeAssistantMessage, index: number): AssistantMessage {
@@ -487,6 +536,28 @@ function RecipeSuggestionPanel({
   );
 }
 
+function RecipeLoadingState() {
+  return (
+    <div className="mb-3 rounded-2xl border border-life-health/25 bg-life-health/10 p-4">
+      <div className="flex items-center gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+          <ActionLoadingIcon className="size-5" tone="health" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">正在生成智能菜谱</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            正在读取当前 Pantry 食品库存。
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 space-y-2" aria-hidden="true">
+        <div className="h-3 w-3/4 animate-pulse rounded-full bg-life-health/20 motion-reduce:animate-none" />
+        <div className="h-3 w-1/2 animate-pulse rounded-full bg-life-health/20 motion-reduce:animate-none" />
+      </div>
+    </div>
+  );
+}
+
 function WeeklyReviewsArchive({
   reviews,
   loading,
@@ -511,29 +582,7 @@ function WeeklyReviewsArchive({
   addingActionKey: string | null;
 }) {
   return (
-    <div className="min-w-0 space-y-6 overflow-x-hidden">
-      <header className="space-y-5">
-        <button
-          type="button"
-          className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-          onClick={onBack}
-        >
-          <ArrowLeft className="size-4" />
-          返回
-        </button>
-        <div className="flex items-center gap-3">
-          <div className="grid size-12 place-items-center rounded-2xl bg-life-health/10 text-life-health">
-            <History className="size-6" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-3xl font-bold tracking-tight max-[360px]:text-2xl">历史周报</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {loading ? '正在同步已存档周报' : `已存档 ${reviews.length} 篇`}
-            </p>
-          </div>
-        </div>
-      </header>
-
+    <SubPageShell title="历史周报" eyebrow="周报归档" onBack={onBack} contentClassName="space-y-6">
       {loading ? (
         <SyncState
           title="正在同步历史周报"
@@ -613,7 +662,7 @@ function WeeklyReviewsArchive({
           );
         })}
       </div>
-    </div>
+    </SubPageShell>
   );
 }
 
@@ -635,40 +684,23 @@ function AssistantHistoryPage({
   const groups = groupAssistantMessages(messages);
 
   return (
-    <div className="min-w-0 space-y-6 overflow-x-hidden">
-      <header className="space-y-5">
+    <SubPageShell
+      title="对话历史"
+      eyebrow="Life AI"
+      onBack={onBack}
+      contentClassName="space-y-6"
+      action={
         <button
           type="button"
-          className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-          onClick={onBack}
+          className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-full border border-border bg-card text-muted-foreground transition hover:bg-life-alert/10 hover:text-life-alert disabled:cursor-default disabled:opacity-50"
+          aria-label="清空对话历史"
+          disabled={loading || messages.length === 0}
+          onClick={onRequestClear}
         >
-          <ArrowLeft className="size-4" />
-          返回
+          <Trash2 className="size-4" />
         </button>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              <div className="grid size-11 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
-                <History className="size-5" />
-              </div>
-              <span className="text-2xl font-bold max-[360px]:text-xl">对话历史</span>
-            </div>
-            <p className="mt-3 text-sm text-muted-foreground">
-              {loading ? '正在同步云端对话' : `${messages.length} 条生活助理记录`}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-full border border-border bg-card text-muted-foreground transition hover:bg-life-alert/10 hover:text-life-alert disabled:cursor-default disabled:opacity-50"
-            aria-label="清空对话历史"
-            disabled={loading || messages.length === 0}
-            onClick={onRequestClear}
-          >
-            <Trash2 className="size-4" />
-          </button>
-        </div>
-      </header>
-
+      }
+    >
       {notice ? (
         <Card className="border-life-trace/20 bg-life-trace/10 p-4 text-sm font-semibold text-life-trace">
           {notice}
@@ -710,7 +742,7 @@ function AssistantHistoryPage({
           />
         )}
       </section>
-    </div>
+    </SubPageShell>
   );
 }
 
@@ -739,29 +771,12 @@ function AiActionCard({ action }: { action: AiAction }) {
 
 function AiActionsArchive({ actions, onBack }: { actions: AiAction[]; onBack: () => void }) {
   return (
-    <div className="min-w-0 space-y-6 overflow-x-hidden">
-      <header className="space-y-5">
-        <button
-          type="button"
-          className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-          onClick={onBack}
-        >
-          <ArrowLeft className="size-4" />
-          返回
-        </button>
-        <div className="flex items-center gap-3">
-          <div className="grid size-12 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
-            <Sparkles className="size-6" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-3xl font-bold tracking-tight max-[360px]:text-2xl">AI 操作历史</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              共 {actions.length} 条 Life AI 记录
-            </p>
-          </div>
-        </div>
-      </header>
-
+    <SubPageShell
+      title="AI 操作历史"
+      eyebrow="Life AI"
+      onBack={onBack}
+      contentClassName="space-y-6"
+    >
       {actions.length > 0 ? (
         <div className="space-y-3">
           {actions.map((action) => (
@@ -778,7 +793,73 @@ function AiActionsArchive({ actions, onBack }: { actions: AiAction[]; onBack: ()
           align="center"
         />
       )}
-    </div>
+    </SubPageShell>
+  );
+}
+
+function PhotoItemHistoryArchive({
+  items,
+  onBack,
+  onOpenPhotoAnalysis,
+  onOpenPhotoItemDraft,
+  onOpenSavedPantryItem,
+  onRemovePhotoItemDraft,
+}: {
+  items: PhotoItemAnalysisHistoryItem[];
+  onBack: () => void;
+  onOpenPhotoAnalysis: () => void;
+  onOpenPhotoItemDraft: (draftId: string) => void;
+  onOpenSavedPantryItem: () => void;
+  onRemovePhotoItemDraft: (draftId: string) => void;
+}) {
+  const draftCount = items.filter((item) => item.status === 'draft').length;
+
+  return (
+    <SubPageShell
+      title="最近商品识别"
+      eyebrow="Life AI"
+      onBack={onBack}
+      contentClassName="space-y-6"
+      action={
+        <button
+          type="button"
+          className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-full border border-life-ai/25 bg-life-ai/10 text-life-ai transition hover:bg-life-ai/15"
+          aria-label="拍照识别商品"
+          onClick={onOpenPhotoAnalysis}
+        >
+          <Camera className="size-4" />
+        </button>
+      }
+    >
+      <section>
+        <SectionHeader
+          title="全部记录"
+          meta={draftCount > 0 ? `${draftCount} 条草稿` : `${items.length} 条`}
+        />
+        {items.length > 0 ? (
+          <div className="mt-3 space-y-3">
+            {items.map((item) => (
+              <PhotoItemHistoryRow
+                key={item.id}
+                item={item}
+                onOpenPhotoItemDraft={onOpenPhotoItemDraft}
+                onOpenSavedPantryItem={onOpenSavedPantryItem}
+                onRemovePhotoItemDraft={onRemovePhotoItemDraft}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="还没有商品识别"
+            description="拍照或从相册选择商品后，识别记录会保存。"
+            eyebrow="商品识别"
+            icon={Camera}
+            tone="ai"
+            align="center"
+          />
+        )}
+      </section>
+    </SubPageShell>
   );
 }
 
@@ -1160,7 +1241,9 @@ function AgentConversationPanel({
   onCreateConversation,
   onOpenWeeklyReviews,
   onOpenPhotoAnalysis,
+  onOpenPhotoItemHistory,
   onOpenPhotoItemDraft,
+  onOpenSavedPantryItem,
   onRemovePhotoItemDraft,
   onOpenActions,
   toolsSheetOpen,
@@ -1203,7 +1286,9 @@ function AgentConversationPanel({
   onCreateConversation: () => void;
   onOpenWeeklyReviews: () => void;
   onOpenPhotoAnalysis: () => void;
+  onOpenPhotoItemHistory: () => void;
   onOpenPhotoItemDraft: (draftId: string) => void;
+  onOpenSavedPantryItem: () => void;
   onRemovePhotoItemDraft: (draftId: string) => void;
   onOpenActions: () => void;
   toolsSheetOpen: boolean;
@@ -1216,6 +1301,7 @@ function AgentConversationPanel({
   const latestMessage = messages[messages.length - 1];
   const canSend = Boolean(input.trim()) && !streaming;
   const latestPhotoDraft = photoItemHistory.find((item) => item.status === 'draft') ?? null;
+  const summaryPhotoItemHistory = getPhotoItemAnalysisSummaryItems(photoItemHistory);
   const hasChatActivity =
     messages.length > 0 || Boolean(result) || Boolean(recipeResult) || adviceCards.length > 0;
   const landingPromptCards = suggestedPrompts.slice(0, 4);
@@ -1386,80 +1472,43 @@ function AgentConversationPanel({
               </div>
             ) : null}
 
-            {!hasChatActivity && photoItemHistory.length > 0 ? (
+            {!hasChatActivity && summaryPhotoItemHistory.length > 0 ? (
               <div className="mb-3 rounded-2xl border border-life-ai/20 bg-card p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">最近商品识别</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      未入库草稿可以回到拍照页继续编辑。
+                      草稿可继续编辑，已入库商品可回到库存查看。
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-life-ai/10 px-3 py-1.5 text-xs font-semibold text-life-ai"
-                    onClick={onOpenPhotoAnalysis}
-                  >
-                    <Camera className="size-3.5" />
-                    继续拍
-                  </button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      className="inline-flex cursor-pointer items-center rounded-full border border-life-ai/20 px-3 py-1.5 text-xs font-semibold text-life-ai transition hover:bg-life-ai/10"
+                      onClick={onOpenPhotoItemHistory}
+                    >
+                      全部
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-life-ai/10 px-3 py-1.5 text-xs font-semibold text-life-ai"
+                      onClick={onOpenPhotoAnalysis}
+                    >
+                      <Camera className="size-3.5" />
+                      继续拍
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-3 grid gap-2">
-                  {photoItemHistory.slice(0, 3).map((item) => {
-                    const qualityFeedback = formatPhotoItemQualityFeedback(item);
-
-                    return (
-                      <div
-                        key={item.id}
-                        className="flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-secondary/45 p-2 text-left transition hover:bg-secondary"
-                      >
-                        <button
-                          type="button"
-                          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left outline-none transition focus-visible:ring-2 focus-visible:ring-life-ai/40"
-                          onClick={() => onOpenPhotoItemDraft(item.id)}
-                        >
-                          {item.imageUrl ? (
-                            <img
-                              src={item.imageUrl}
-                              alt={item.form.name || item.analysis.name || '商品识别图片'}
-                              className="size-12 shrink-0 rounded-xl object-cover"
-                            />
-                          ) : (
-                            <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-background text-life-ai">
-                              <Image className="size-5" />
-                            </span>
-                          )}
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-semibold">
-                              {item.form.name || item.analysis.name || '待确认商品'}
-                            </span>
-                            <span className="mt-1 block truncate text-xs text-muted-foreground">
-                              {formatPhotoItemHistoryTime(item.updatedAt)} ·{' '}
-                              {item.householdName || '我的空间'}
-                            </span>
-                          </span>
-                          <span className="flex shrink-0 flex-col items-end gap-1">
-                            <Badge tone={item.status === 'draft' ? 'ai' : 'trace'}>
-                              {item.status === 'draft' ? '草稿' : '已入库'}
-                            </Badge>
-                            {qualityFeedback ? (
-                              <Badge tone={qualityFeedback.tone}>{qualityFeedback.label}</Badge>
-                            ) : null}
-                          </span>
-                        </button>
-                        {item.status === 'draft' ? (
-                          <button
-                            type="button"
-                            className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-xl border border-life-alert/15 bg-background/70 text-life-alert transition hover:border-life-alert/35 hover:bg-life-alert/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-life-alert/30"
-                            aria-label={`移除${item.form.name || item.analysis.name || '商品'}草稿`}
-                            onClick={() => onRemovePhotoItemDraft(item.id)}
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                  {summaryPhotoItemHistory.map((item) => (
+                    <PhotoItemHistoryRow
+                      key={item.id}
+                      item={item}
+                      onOpenPhotoItemDraft={onOpenPhotoItemDraft}
+                      onOpenSavedPantryItem={onOpenSavedPantryItem}
+                      onRemovePhotoItemDraft={onRemovePhotoItemDraft}
+                    />
+                  ))}
                 </div>
               </div>
             ) : null}
@@ -1471,21 +1520,9 @@ function AgentConversationPanel({
                 onAddRecipePlan={onAddRecipePlan}
               />
             ) : null}
+            {quickActionLoading === '智能菜谱' && !recipeResult ? <RecipeLoadingState /> : null}
 
-            {loading && messages.length === 0 ? (
-              <div className="space-y-3">
-                <MessageSyncSkeleton />
-                <div className="rounded-2xl border border-life-ai/20 bg-life-ai/5 p-4">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-life-ai">
-                    <ActionLoadingIcon className="size-4" />
-                    正在载入对话
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    正在把云端记录同步到当前设备。
-                  </p>
-                </div>
-              </div>
-            ) : messages.length > 0 ? (
+            {messages.length > 0 ? (
               <div className="space-y-2.5">
                 {messages.map((message) => (
                   <AssistantMessageCard
@@ -1724,6 +1761,7 @@ function useAiPageState() {
     refreshPhotoItemHistory();
 
     window.addEventListener('focus', refreshPhotoItemHistory);
+    window.addEventListener(PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT, refreshPhotoItemHistory);
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         refreshPhotoItemHistory();
@@ -1733,6 +1771,10 @@ function useAiPageState() {
 
     return () => {
       window.removeEventListener('focus', refreshPhotoItemHistory);
+      window.removeEventListener(
+        PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT,
+        refreshPhotoItemHistory,
+      );
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
@@ -2193,6 +2235,11 @@ function useAiPageState() {
       setQuickActionLoading(label);
       setAdviceCards([]);
       setRecipeResult(null);
+      setResult({
+        title: '正在生成智能菜谱',
+        detail: '正在读取当前 Pantry 食品库存。',
+        tone: 'health',
+      });
       try {
         if (!token) {
           throw new Error('请先登录后再生成智能菜谱');
@@ -2682,6 +2729,23 @@ export function AiActionsPage() {
   return <AiActionsArchive actions={aiActions} onBack={() => navigate('/ai')} />;
 }
 
+export function AiPhotoItemHistoryPage() {
+  const { photoItemHistory, handleRemovePhotoItemDraft, navigate } = useAiPageState();
+
+  return (
+    <PhotoItemHistoryArchive
+      items={photoItemHistory}
+      onBack={() => navigate('/ai')}
+      onOpenPhotoAnalysis={() => navigate('/ai/photo-item-analysis')}
+      onOpenPhotoItemDraft={(draftId) =>
+        navigate(`/ai/photo-item-analysis?draftId=${encodeURIComponent(draftId)}`)
+      }
+      onOpenSavedPantryItem={() => navigate('/pantry')}
+      onRemovePhotoItemDraft={handleRemovePhotoItemDraft}
+    />
+  );
+}
+
 export function AiWeeklyReviewsPage() {
   const {
     plans,
@@ -2838,9 +2902,11 @@ export function AiPage() {
         onCreateConversation={() => void handleCreateAssistantConversation()}
         onOpenWeeklyReviews={() => navigate('/ai/weekly-reviews')}
         onOpenPhotoAnalysis={() => navigate('/ai/photo-item-analysis')}
+        onOpenPhotoItemHistory={() => navigate('/ai/photo-item-history')}
         onOpenPhotoItemDraft={(draftId) =>
           navigate(`/ai/photo-item-analysis?draftId=${encodeURIComponent(draftId)}`)
         }
+        onOpenSavedPantryItem={() => navigate('/pantry')}
         onRemovePhotoItemDraft={handleRemovePhotoItemDraft}
         onOpenActions={() => navigate('/ai/actions')}
         toolsSheetOpen={assistantToolsSheetOpen}

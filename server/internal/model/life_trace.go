@@ -150,6 +150,8 @@ type LifeTracePantryItem struct {
 	Note               string         `gorm:"size:1000" json:"note"`
 	ImageURL           string         `gorm:"size:800" json:"imageUrl,omitempty"`
 	ThumbnailURL       string         `gorm:"type:text" json:"thumbnailUrl,omitempty"`
+	BarcodeValue       string         `gorm:"size:120;index" json:"barcodeValue,omitempty"`
+	BarcodeFormat      string         `gorm:"size:40" json:"barcodeFormat,omitempty"`
 	Status             string         `gorm:"size:20;not null;default:'normal';index" json:"status"`
 	CreatedBy          Int64String    `gorm:"column:created_by;index" json:"createdBy,omitempty"`
 	UpdatedBy          Int64String    `gorm:"column:updated_by;index" json:"updatedBy,omitempty"`
