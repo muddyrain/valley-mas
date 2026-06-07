@@ -7,6 +7,7 @@ import {
   leaveHousehold,
   listHouseholdMembers,
   listHouseholds,
+  revokeHouseholdInvite,
   transferHouseholdOwner,
 } from '@/api/household';
 import { getLifeTraceErrorMessage } from '@/lib/error';
@@ -203,6 +204,19 @@ export function usePantryHouseholdManager() {
     [token],
   );
 
+  const handleRevokeInvite = useCallback(
+    async (householdId: string) => {
+      if (!token) {
+        throw new Error('请先登录后再撤销邀请码');
+      }
+
+      const payload = await revokeHouseholdInvite(token, householdId);
+      setInvitePayload(payload);
+      return payload;
+    },
+    [token],
+  );
+
   const handleLeaveHousehold = useCallback(
     async (householdId: string) => {
       if (!token) {
@@ -269,6 +283,7 @@ export function usePantryHouseholdManager() {
     handleCreateHousehold,
     handleJoinHousehold,
     handleCreateInvite,
+    handleRevokeInvite,
     handleLeaveHousehold,
     handleTransferOwner,
     handleDissolveHousehold,

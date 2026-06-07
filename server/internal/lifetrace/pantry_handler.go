@@ -143,12 +143,25 @@ func formatPantryTraceTime(now time.Time) string {
 	return now.Format("01/02 15:04")
 }
 
-func buildPantryTraceRecord(userID model.Int64String, item model.LifeTracePantryItem, action string, now time.Time) model.LifeTraceTrace {
-	expiryText := ""
-	if item.ExpiresAt != "" {
-		expiryText = "，保质期记录到 " + item.ExpiresAt
-	}
+type pantryTraceOptions struct {
+	Action              string
+	QuantityDelta       int
+	TargetHouseholdName string
+	SourceHouseholdName string
+	Moved               bool
+	Merged              bool
+}
 
+func formatPantryTraceQuantity(quantity int, unit string) string {
+	return strconv.Itoa(normalizePantryQuantity(quantity)) + normalizePantryUnit(unit)
+}
+
+func buildPantryTraceRecord(
+	userID model.Int64String,
+	item model.LifeTracePantryItem,
+	options pantryTraceOptions,
+	now time.Time,
+) model.LifeTraceTrace {
 	trace := model.LifeTraceTrace{
 		UserID:    userID,
 		Location:  truncatePantryTraceText(item.Location, 120),
@@ -157,27 +170,66 @@ func buildPantryTraceRecord(userID model.Int64String, item model.LifeTracePantry
 		Source:    "库存",
 	}
 
-	switch action {
+	quantityText := formatPantryTraceQuantity(item.Quantity, item.Unit)
+	deltaText := formatPantryTraceQuantity(options.QuantityDelta, item.Unit)
+	householdName := strings.TrimSpace(options.TargetHouseholdName)
+	if householdName == "" {
+		householdName = "我的空间"
+	}
+	expiryText := ""
+	if item.ExpiresAt != "" {
+		expiryText = "，保质期到 " + item.ExpiresAt
+	}
+
+	switch options.Action {
 	case "used-up":
-		trace.Title = truncatePantryTraceText(item.Name+" 已用完", 160)
+		trace.Title = truncatePantryTraceText("已用完："+item.Name, 160)
 		trace.Summary = truncatePantryTraceText(
-			"Life Trace 记录了「"+item.Name+"」已经处理完成，这次属于家庭库存的正常消耗。",
+			"已将「"+item.Name+"」标记为已用完，处理数量为 "+quantityText+"。",
 			1000,
 		)
 		trace.Mood = "踏实"
 		trace.Tags = normalizeTraceTags([]string{item.Category, "家庭库存", "用完"})
 	case "discarded":
-		trace.Title = truncatePantryTraceText(item.Name+" 已丢弃", 160)
+		trace.Title = truncatePantryTraceText("已丢弃："+item.Name, 160)
 		trace.Summary = truncatePantryTraceText(
-			"Life Trace 记录了「"+item.Name+"」已经被丢弃，后续可以结合库存提醒减少浪费。",
+			"已将「"+item.Name+"」标记为已丢弃，处理数量为 "+quantityText+"。",
 			1000,
 		)
 		trace.Mood = "提醒"
 		trace.Tags = normalizeTraceTags([]string{item.Category, "家庭库存", "丢弃"})
+	case "transfer-created":
+		trace.Title = truncatePantryTraceText("转移到共享家庭："+item.Name, 160)
+		summary := "已将「" + item.Name + "」" + quantityText + "转移到「" + householdName + "」"
+		if options.Moved {
+			summary += "，并从个人空间移出"
+		}
+		summary += "。"
+		trace.Summary = truncatePantryTraceText(summary, 1000)
+		trace.Mood = "踏实"
+		tags := []string{item.Category, "家庭库存", "转移到共享家庭"}
+		if options.Moved {
+			tags = append(tags, "从个人空间移出")
+		}
+		trace.Tags = normalizeTraceTags(tags)
+	case "transfer-merged":
+		trace.Title = truncatePantryTraceText("合并数量："+item.Name, 160)
+		summary := "已将「" + item.Name + "」数量 +" + deltaText + " 合并到「" + householdName + "」"
+		if options.Moved {
+			summary += "，并从个人空间移出原条目"
+		}
+		summary += "；当前共 " + quantityText + "。"
+		trace.Summary = truncatePantryTraceText(summary, 1000)
+		trace.Mood = "踏实"
+		tags := []string{item.Category, "家庭库存", "合并数量", "转移到共享家庭"}
+		if options.Moved {
+			tags = append(tags, "从个人空间移出")
+		}
+		trace.Tags = normalizeTraceTags(tags)
 	default:
 		trace.Title = truncatePantryTraceText("新增库存："+item.Name, 160)
 		trace.Summary = truncatePantryTraceText(
-			"Life Trace 已将「"+item.Name+"」加入家庭库存，数量为 "+strconv.Itoa(item.Quantity)+item.Unit+expiryText+"。",
+			"已将「"+item.Name+"」新增到「"+householdName+"」，数量为 "+quantityText+expiryText+"。",
 			1000,
 		)
 		trace.Mood = "踏实"
@@ -187,13 +239,13 @@ func buildPantryTraceRecord(userID model.Int64String, item model.LifeTracePantry
 	return trace
 }
 
-func writePantryTrace(userID model.Int64String, item model.LifeTracePantryItem, action string) {
-	trace := buildPantryTraceRecord(userID, item, action, time.Now())
+func writePantryTrace(userID model.Int64String, item model.LifeTracePantryItem, options pantryTraceOptions) {
+	trace := buildPantryTraceRecord(userID, item, options, time.Now())
 	if err := database.GetDB().Create(&trace).Error; err != nil && logger.Log != nil {
 		logger.Log.WithFields(map[string]interface{}{
 			"userId":         userID.String(),
 			"pantryItemId":   item.ID.String(),
-			"pantryAction":   action,
+			"pantryAction":   options.Action,
 			"pantryName":     item.Name,
 			"pantryCategory": item.Category,
 		}).WithError(err).Warn("LifeTrace pantry trace journaling failed")
@@ -399,7 +451,10 @@ func (h *Handler) CreatePantryItem(c *gin.Context) {
 		}
 		item.ReminderEnabled = false
 	}
-	writePantryTrace(userID, item, "created")
+	writePantryTrace(userID, item, pantryTraceOptions{
+		Action:              "created",
+		TargetHouseholdName: householdCtx.Household.Name,
+	})
 
 	success(c, item)
 }
@@ -510,7 +565,10 @@ func (h *Handler) UpdatePantryItemStatus(c *gin.Context) {
 		return
 	}
 	if status == "used-up" || status == "discarded" {
-		writePantryTrace(userID, item, status)
+		writePantryTrace(userID, item, pantryTraceOptions{
+			Action:              status,
+			TargetHouseholdName: householdCtx.Household.Name,
+		})
 	}
 
 	success(c, item)

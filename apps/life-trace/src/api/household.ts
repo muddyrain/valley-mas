@@ -37,6 +37,12 @@ export function createHouseholdInvite(token: string, householdId: string) {
   );
 }
 
+export function revokeHouseholdInvite(token: string, householdId: string) {
+  return apiRequest<HouseholdInvitePayload>(`/life-trace/households/${householdId}/invite`, token, {
+    method: 'DELETE',
+  });
+}
+
 export function joinHousehold(token: string, inviteCode: string) {
   return apiRequest<HouseholdSummary>('/life-trace/households/join', token, {
     method: 'POST',

@@ -80,6 +80,13 @@ type pantryTransferResponse struct {
 	Items               []pantryTransferResultItem `json:"items"`
 }
 
+type pantryTransferTraceEvent struct {
+	Item          model.LifeTracePantryItem
+	QuantityDelta int
+	Moved         bool
+	Merged        bool
+}
+
 func (h *Handler) PreviewPantryTransfer(c *gin.Context) {
 	userID, ok := currentUserID(c)
 	if !ok {
@@ -476,6 +483,7 @@ func executePantryTransfer(
 		ConflictPolicy:      req.ConflictPolicy,
 		Items:               make([]pantryTransferResultItem, 0, len(orderedIDs)),
 	}
+	traceEvents := make([]pantryTransferTraceEvent, 0, len(orderedIDs))
 
 	err := database.GetDB().Transaction(func(tx *gorm.DB) error {
 		sourceItems, err := loadPantryTransferSourceItems(
@@ -536,6 +544,12 @@ func executePantryTransfer(
 					Action:       pantryTransferActionMerge,
 				})
 				result.MergedCount++
+				traceEvents = append(traceEvents, pantryTransferTraceEvent{
+					Item:          targetItem,
+					QuantityDelta: sourceItem.Quantity,
+					Moved:         req.Mode == pantryTransferModeMove,
+					Merged:        true,
+				})
 
 				if req.Mode == pantryTransferModeMove {
 					if err := tx.Delete(&model.LifeTracePantryItem{}, "id = ? AND household_id = ?", sourceItem.ID, sourceCtx.Household.ID).Error; err != nil {
@@ -566,6 +580,12 @@ func executePantryTransfer(
 				Action:       pantryTransferActionCreate,
 			})
 			result.CreatedCount++
+			traceEvents = append(traceEvents, pantryTransferTraceEvent{
+				Item:          newItem,
+				QuantityDelta: sourceItem.Quantity,
+				Moved:         req.Mode == pantryTransferModeMove,
+				Merged:        false,
+			})
 
 			if req.Mode == pantryTransferModeMove {
 				if err := tx.Delete(&model.LifeTracePantryItem{}, "id = ? AND household_id = ?", sourceItem.ID, sourceCtx.Household.ID).Error; err != nil {
@@ -581,6 +601,21 @@ func executePantryTransfer(
 	})
 	if err != nil {
 		return pantryTransferResponse{}, err
+	}
+
+	for _, event := range traceEvents {
+		action := "transfer-created"
+		if event.Merged {
+			action = "transfer-merged"
+		}
+		writePantryTrace(userID, event.Item, pantryTraceOptions{
+			Action:              action,
+			QuantityDelta:       event.QuantityDelta,
+			TargetHouseholdName: targetCtx.Household.Name,
+			SourceHouseholdName: sourceCtx.Household.Name,
+			Moved:               event.Moved,
+			Merged:              event.Merged,
+		})
 	}
 
 	return result, nil

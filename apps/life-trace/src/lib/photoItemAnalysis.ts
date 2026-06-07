@@ -1,4 +1,8 @@
-import type { PantryPhotoAnalysisResponse } from '@/api/pantry';
+import type {
+  PantryPhotoAnalysisResponse,
+  PantryPhotoDetectedItem,
+  PantryPhotoOCRHint,
+} from '@/api/pantry';
 import { buildDefaultPantryReminder } from '@/lib/pantry';
 import type {
   NewPantryItemInput,
@@ -82,6 +86,9 @@ export type PhotoItemAnalysisHistoryItem = {
   imageName?: string;
   analysis: PantryPhotoAnalysisResponse;
   form: PhotoItemDraftForm;
+  selectedDetectedItemId?: string;
+  processedDetectedItemIds?: string[];
+  ocrHints?: PantryPhotoOCRHint[];
   expiryBaseDate?: string;
   householdName?: string;
   status: PhotoItemAnalysisHistoryStatus;
@@ -98,6 +105,20 @@ type BuildPhotoItemPantryInputOptions = {
   pantryPreferences: PantryPreferences;
   uploadedImageUrl: string;
   thumbnailUrl?: string;
+};
+
+export type PhotoItemOCRResolutionState = 'auto' | 'needs-confirm' | 'missing-production' | 'none';
+
+export type PhotoItemOCRSummary = {
+  state: PhotoItemOCRResolutionState;
+  title: string;
+  detail: string;
+  entries: Array<{
+    id: string;
+    label: string;
+    text: string;
+    normalizedValue?: string;
+  }>;
 };
 
 type BuildPhotoItemAnalysisSmartSuggestionsOptions = {
@@ -154,6 +175,24 @@ function normalizeHistoryItem(item: unknown): PhotoItemAnalysisHistoryItem | nul
     imageName: typeof candidate.imageName === 'string' ? candidate.imageName : undefined,
     analysis: candidate.analysis,
     form: candidate.form,
+    selectedDetectedItemId:
+      typeof candidate.selectedDetectedItemId === 'string'
+        ? candidate.selectedDetectedItemId
+        : undefined,
+    processedDetectedItemIds: Array.isArray(candidate.processedDetectedItemIds)
+      ? candidate.processedDetectedItemIds.filter(
+          (item): item is string => typeof item === 'string' && item.trim().length > 0,
+        )
+      : [],
+    ocrHints: Array.isArray(candidate.ocrHints)
+      ? candidate.ocrHints.filter(
+          (item): item is PantryPhotoOCRHint =>
+            Boolean(item) &&
+            typeof item === 'object' &&
+            typeof item.kind === 'string' &&
+            typeof item.text === 'string',
+        )
+      : [],
     expiryBaseDate:
       typeof candidate.expiryBaseDate === 'string' ? candidate.expiryBaseDate : undefined,
     householdName:
@@ -320,6 +359,152 @@ export function removePhotoItemAnalysisHistory(
 
 function includesAnyKeyword(values: string[], keywords: string[]) {
   return values.some((value) => keywords.some((keyword) => value.includes(keyword)));
+}
+
+function uniqueStrings(values: string[]) {
+  return values.filter((value, index) => values.indexOf(value) === index);
+}
+
+export function getPhotoItemDetectedItems(analysis: PantryPhotoAnalysisResponse) {
+  const candidates =
+    analysis.detectedItems?.length > 0
+      ? analysis.detectedItems
+      : [
+          {
+            id: 'item-1',
+            name: analysis.name,
+            category: analysis.category,
+            brand: analysis.brand,
+            spec: analysis.spec,
+            quantity: analysis.quantity,
+            unit: analysis.unit,
+            storageLocation: analysis.storageLocation,
+            expiresAt: analysis.expiresAt,
+            productionDate: analysis.productionDate,
+            purchaseDate: analysis.purchaseDate,
+            shelfLifeDays: analysis.shelfLifeDays,
+            confidence: analysis.confidence,
+            warnings: analysis.warnings,
+            cropBox: analysis.cropBox,
+          },
+        ];
+
+  return candidates
+    .map((item, index) => ({
+      ...item,
+      id: item.id || `item-${index + 1}`,
+      warnings: item.warnings ?? [],
+      confidence: Number.isFinite(item.confidence) ? item.confidence : 0,
+    }))
+    .slice(0, 5);
+}
+
+export function getPhotoItemSelectedDetectedItem(
+  analysis: PantryPhotoAnalysisResponse,
+  selectedDetectedItemId?: string,
+) {
+  const items = getPhotoItemDetectedItems(analysis);
+  return (
+    items.find((item) => item.id === selectedDetectedItemId) ??
+    (!selectedDetectedItemId ? items[0] : undefined) ??
+    items[0] ??
+    null
+  );
+}
+
+export function getNextUnprocessedDetectedItemId(
+  analysis: PantryPhotoAnalysisResponse,
+  processedDetectedItemIds: string[],
+  currentDetectedItemId?: string,
+) {
+  const items = getPhotoItemDetectedItems(analysis);
+  const processed = new Set(processedDetectedItemIds);
+  for (const item of items) {
+    if (item.id === currentDetectedItemId) {
+      continue;
+    }
+    if (!processed.has(item.id)) {
+      return item.id;
+    }
+  }
+  return '';
+}
+
+export function buildPhotoItemDraftFormFromDetectedItem(
+  detectedItem: PantryPhotoDetectedItem,
+  fallbackForm: PhotoItemDraftForm,
+  pantryPreferences: PantryPreferences,
+  note = '',
+) {
+  return {
+    ...fallbackForm,
+    name: detectedItem.name || fallbackForm.name,
+    category: detectedItem.category || fallbackForm.category,
+    quantity: String(detectedItem.quantity || 1),
+    unit: detectedItem.unit || fallbackForm.unit,
+    location: detectedItem.storageLocation || fallbackForm.location,
+    expiresAt: detectedItem.expiresAt || '',
+    openedAt: fallbackForm.openedAt,
+    note,
+    reminderEnabled: detectedItem.expiresAt ? pantryPreferences.defaultReminderEnabled : false,
+  };
+}
+
+function getOCRHintLabel(kind: PantryPhotoOCRHint['kind']) {
+  switch (kind) {
+    case 'production_date':
+      return '生产日期';
+    case 'expiry_date':
+      return '到期日期';
+    case 'shelf_life_days':
+      return '保质期天数';
+    case 'shelf_life_text':
+      return '保质期文本';
+    default:
+      return 'OCR';
+  }
+}
+
+export function summarizePhotoItemOCRHints(
+  ocrHints: PantryPhotoOCRHint[],
+  detectedItem?: PantryPhotoDetectedItem | null,
+): PhotoItemOCRSummary | null {
+  if (!ocrHints.length) {
+    return null;
+  }
+
+  const entries = ocrHints.map((hint, index) => ({
+    id: `${hint.kind}-${index}`,
+    label: getOCRHintLabel(hint.kind),
+    text: hint.text,
+    normalizedValue: hint.normalizedValue,
+  }));
+  const warningText = uniqueStrings(detectedItem?.warnings ?? []);
+
+  if (detectedItem?.expiresAt) {
+    return {
+      state: 'auto',
+      title: '已自动推导到期日',
+      detail: `当前到期日为 ${detectedItem.expiresAt}。`,
+      entries,
+    };
+  }
+
+  if (warningText.some((item) => item.includes('生产日期'))) {
+    return {
+      state: 'missing-production',
+      title: '还缺生产日期',
+      detail: '识别到了保质期线索，但还不能自动算出到期日。',
+      entries,
+    };
+  }
+
+  return {
+    state: 'needs-confirm',
+    title: 'OCR 已提取日期线索',
+    detail: '请确认这些日期后再决定是否写入到期日。',
+    entries,
+  };
 }
 
 function normalizeSuggestionText(value: string) {
@@ -628,11 +813,17 @@ export function buildPhotoItemAnalysisSmartSuggestions({
 export function getPhotoItemAnalysisReviewIssues(
   analysis: PantryPhotoAnalysisResponse,
   form: PhotoItemDraftForm,
+  selectedDetectedItemId?: string,
 ): PhotoItemAnalysisReviewIssue[] {
-  const warnings = analysis.warnings ?? [];
+  const selectedItem = getPhotoItemSelectedDetectedItem(analysis, selectedDetectedItemId);
+  const warnings = selectedItem?.warnings ?? analysis.warnings ?? [];
   const issues: PhotoItemAnalysisReviewIssue[] = [];
   const note = form.note.trim();
-  const confidence = Number.isFinite(analysis.confidence) ? analysis.confidence : 0;
+  const confidence = Number.isFinite(selectedItem?.confidence)
+    ? selectedItem!.confidence
+    : Number.isFinite(analysis.confidence)
+      ? analysis.confidence
+      : 0;
   const lowConfidence = confidence > 0 && confidence < 0.75;
   const veryLowConfidence = confidence > 0 && confidence < 0.55;
 
@@ -662,7 +853,7 @@ export function getPhotoItemAnalysisReviewIssues(
   }
 
   if (
-    !analysis.brand?.trim() &&
+    !selectedItem?.brand?.trim() &&
     !note.includes('品牌未知') &&
     (lowConfidence || includesAnyKeyword(warnings, ['品牌']))
   ) {
@@ -676,7 +867,7 @@ export function getPhotoItemAnalysisReviewIssues(
   }
 
   if (
-    !analysis.spec?.trim() &&
+    !selectedItem?.spec?.trim() &&
     !note.includes('规格不记录') &&
     (lowConfidence || includesAnyKeyword(warnings, ['规格', '容量']))
   ) {
@@ -692,9 +883,9 @@ export function getPhotoItemAnalysisReviewIssues(
   if (
     !form.expiresAt.trim() &&
     !note.includes('不记录保质期') &&
-    (Boolean(analysis.shelfLifeDays) ||
-      Boolean(analysis.productionDate) ||
-      Boolean(analysis.purchaseDate) ||
+    (Boolean(selectedItem?.shelfLifeDays) ||
+      Boolean(selectedItem?.productionDate) ||
+      Boolean(selectedItem?.purchaseDate) ||
       includesAnyKeyword(warnings, ['保质期', '生产日期', '到期', '过期']))
   ) {
     issues.push({

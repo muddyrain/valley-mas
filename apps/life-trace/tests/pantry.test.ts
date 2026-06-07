@@ -94,12 +94,15 @@ describe('pantry helpers', () => {
   it('builds a trace payload for pantry actions', () => {
     const item = createItem('milk', {
       name: '牛奶',
+      quantity: 2,
+      unit: '盒',
       location: '冷藏',
       imageUrl: 'https://example.com/milk.jpg',
     });
     const trace = buildPantryTraceInput(item, 'used-up', now);
 
-    expect(trace.title).toContain('已用完');
+    expect(trace.title).toBe('已用完：牛奶');
+    expect(trace.summary).toContain('2盒');
     expect(trace.location).toBe('冷藏');
     expect(trace.imageUrl).toBe('https://example.com/milk.jpg');
     expect(trace.tags).toContain('家庭库存');
@@ -119,6 +122,7 @@ describe('pantry helpers', () => {
 
     expect(trace.title).toBe('新增库存：牛奶');
     expect(trace.summary).toContain('数量为 2盒');
+    expect(trace.summary).toContain('我的空间');
     expect(trace.summary).toContain('2026-06-10');
     expect(trace.location).toBe('冷藏');
     expect(trace.imageUrl).toBe('https://example.com/milk-thumb.jpg');

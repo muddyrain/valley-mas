@@ -3,6 +3,7 @@ import {
   Clock,
   Image,
   MapPin,
+  PackageCheck,
   Pencil,
   Plus,
   Sparkles,
@@ -69,6 +70,14 @@ const sourceTone: Record<Trace['source'], 'plan' | 'health' | 'trace'> = {
 };
 
 const TAG_PREVIEW_LIMIT = 3;
+const pantryTraceActionTags = [
+  '新增库存',
+  '合并数量',
+  '转移到共享家庭',
+  '从个人空间移出',
+  '用完',
+  '丢弃',
+] as const;
 
 type TraceMonthGroup = {
   key: string;
@@ -177,6 +186,10 @@ function getTraceTags(traces: Trace[]) {
   });
 }
 
+function getPantryTraceActionTag(trace: Trace) {
+  return pantryTraceActionTags.find((tag) => trace.tags.includes(tag)) ?? null;
+}
+
 function ImagePreviewDialog({ trace, onClose }: { trace: Trace | null; onClose: () => void }) {
   if (!trace?.imageUrl) {
     return null;
@@ -238,7 +251,19 @@ function TraceDetailContent({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={sourceTone[trace.source]}>{trace.source}</Badge>
+            <Badge tone={sourceTone[trace.source]}>
+              {trace.source === '库存' ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <PackageCheck className="size-3.5" />
+                  {trace.source}
+                </span>
+              ) : (
+                trace.source
+              )}
+            </Badge>
+            {trace.source === '库存' && getPantryTraceActionTag(trace) ? (
+              <Badge tone="ai">{getPantryTraceActionTag(trace)}</Badge>
+            ) : null}
             <Badge tone="trace">{trace.mood}</Badge>
           </div>
           <h2 className="mt-3 text-2xl font-semibold leading-tight">{trace.title}</h2>
@@ -602,7 +627,11 @@ export function TracesPage() {
                     <span className="size-2 rounded-full bg-life-trace" />
                   </span>
                   <Card
-                    className="cursor-pointer overflow-hidden border-border/80 transition hover:border-life-trace/40 hover:shadow-[0_18px_56px_rgba(16,185,129,0.08)]"
+                    className={cn(
+                      'cursor-pointer overflow-hidden border-border/80 transition hover:border-life-trace/40 hover:shadow-[0_18px_56px_rgba(16,185,129,0.08)]',
+                      trace.source === '库存' &&
+                        'border-life-ai/15 bg-[linear-gradient(180deg,rgba(6,182,212,0.04),rgba(16,185,129,0.03))]',
+                    )}
                     role="button"
                     tabIndex={0}
                     onClick={() => navigate(`/traces/${trace.id}`)}
@@ -634,7 +663,19 @@ export function TracesPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <Badge tone={sourceTone[trace.source]}>{trace.source}</Badge>
+                            <Badge tone={sourceTone[trace.source]}>
+                              {trace.source === '库存' ? (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <PackageCheck className="size-3.5" />
+                                  {trace.source}
+                                </span>
+                              ) : (
+                                trace.source
+                              )}
+                            </Badge>
+                            {trace.source === '库存' && getPantryTraceActionTag(trace) ? (
+                              <Badge tone="ai">{getPantryTraceActionTag(trace)}</Badge>
+                            ) : null}
                             <Badge tone="trace">{trace.mood}</Badge>
                             {index === 0 ? <Badge tone="ai">本月最近</Badge> : null}
                           </div>

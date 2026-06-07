@@ -20,6 +20,7 @@ import {
   analyzePantryPhoto,
   type PantryPhotoAnalysisResponse,
   type PantryPhotoCropBox,
+  type PantryPhotoDetectedItem,
 } from '@/api/pantry';
 import { uploadLifeTraceImage } from '@/api/upload';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
@@ -34,14 +35,18 @@ import { Card } from '@/components/ui/card';
 import {
   buildPhotoItemAnalysisSmartSuggestions,
   buildPhotoItemCropBoxStyle,
+  buildPhotoItemDraftFormFromDetectedItem,
   buildPhotoItemMergedPantryInput,
   buildPhotoItemPantryInput,
   calculatePhotoItemCropPreviewLayout,
   createPhotoItemAnalysisHistoryId,
   findPhotoItemAnalysisDuplicateCandidates,
   getLatestPhotoItemAnalysisDraft,
+  getNextUnprocessedDetectedItemId,
   getPhotoItemAnalysisDraftById,
   getPhotoItemAnalysisReviewIssues,
+  getPhotoItemDetectedItems,
+  getPhotoItemSelectedDetectedItem,
   isMeaningfulPhotoItemCropBox,
   markPhotoItemAnalysisQualityFeedback,
   markPhotoItemAnalysisSaved,
@@ -53,8 +58,10 @@ import {
   type PhotoItemAnalysisSmartSuggestion,
   type PhotoItemCropPreviewLayout,
   type PhotoItemDraftForm,
+  type PhotoItemOCRSummary,
   readPhotoItemAnalysisHistory,
   removePhotoItemAnalysisHistory,
+  summarizePhotoItemOCRHints,
   upsertPhotoItemAnalysisHistory,
 } from '@/lib/photoItemAnalysis';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -109,11 +116,15 @@ const initialForm: DraftForm = {
   reminderEnabled: true,
 };
 
-function buildAnalysisNote(result: PantryPhotoAnalysisResponse) {
+function buildAnalysisNote(
+  result: PantryPhotoAnalysisResponse,
+  detectedItem?: PantryPhotoDetectedItem | null,
+) {
+  const target = detectedItem ?? getPhotoItemSelectedDetectedItem(result) ?? null;
   const parts = [
     result.summary,
-    result.brand ? `品牌：${result.brand}` : '',
-    result.spec ? `规格：${result.spec}` : '',
+    target?.brand ? `品牌：${target.brand}` : '',
+    target?.spec ? `规格：${target.spec}` : '',
     result.tags?.length ? `标签：${result.tags.join('、')}` : '',
   ].filter(Boolean);
   return parts.join('\n');
@@ -402,6 +413,8 @@ export function PhotoItemAnalysisPage() {
     readPhotoItemAnalysisHistory(),
   );
   const [currentHistoryId, setCurrentHistoryId] = useState('');
+  const [selectedDetectedItemId, setSelectedDetectedItemId] = useState('');
+  const [processedDetectedItemIds, setProcessedDetectedItemIds] = useState<string[]>([]);
 
   const cameraActive = state === 'camera-ready';
   const busy = state === 'uploading' || state === 'analyzing' || state === 'saving';
@@ -410,12 +423,21 @@ export function PhotoItemAnalysisPage() {
   const scannerStatusLabel = state === 'done' ? '已入库' : busy ? '处理中' : '待确认';
   const visionStageLabel =
     state === 'uploading' ? '正在同步影像' : state === 'analyzing' ? '正在解析商品' : '视觉待命';
+  const detectedItems = useMemo(
+    () => (analysis ? getPhotoItemDetectedItems(analysis) : []),
+    [analysis],
+  );
+  const selectedDetectedItem = useMemo(
+    () => (analysis ? getPhotoItemSelectedDetectedItem(analysis, selectedDetectedItemId) : null),
+    [analysis, selectedDetectedItemId],
+  );
+  const activeCropBox = selectedDetectedItem?.cropBox ?? analysis?.cropBox;
   const hasExpiryDate = Boolean(form.expiresAt.trim());
-  const hasCropSuggestion = Boolean(normalizePhotoItemCropBox(analysis?.cropBox));
-  const hasMeaningfulCropSuggestion = isMeaningfulPhotoItemCropBox(analysis?.cropBox);
+  const hasCropSuggestion = Boolean(normalizePhotoItemCropBox(activeCropBox));
+  const hasMeaningfulCropSuggestion = isMeaningfulPhotoItemCropBox(activeCropBox);
   const cropBoxStyle = useMemo(
-    () => (hasMeaningfulCropSuggestion ? buildPhotoItemCropBoxStyle(analysis?.cropBox) : null),
-    [analysis?.cropBox, hasMeaningfulCropSuggestion],
+    () => (hasMeaningfulCropSuggestion ? buildPhotoItemCropBoxStyle(activeCropBox) : null),
+    [activeCropBox, hasMeaningfulCropSuggestion],
   );
   const latestDraft = useMemo(
     () =>
@@ -437,10 +459,19 @@ export function PhotoItemAnalysisPage() {
     () => historyItems.find((item) => item.id === currentHistoryId) ?? null,
     [currentHistoryId, historyItems],
   );
+  const remainingDetectedItemCount = useMemo(
+    () => detectedItems.filter((item) => !processedDetectedItemIds.includes(item.id)).length,
+    [detectedItems, processedDetectedItemIds],
+  );
+  const ocrSummary = useMemo<PhotoItemOCRSummary | null>(
+    () => summarizePhotoItemOCRHints(analysis?.ocrHints ?? [], selectedDetectedItem),
+    [analysis?.ocrHints, selectedDetectedItem],
+  );
   const canRemoveCurrentDraft = currentHistoryItem?.status === 'draft';
   const reviewIssues = useMemo(
-    () => (analysis ? getPhotoItemAnalysisReviewIssues(analysis, form) : []),
-    [analysis, form],
+    () =>
+      analysis ? getPhotoItemAnalysisReviewIssues(analysis, form, selectedDetectedItemId) : [],
+    [analysis, form, selectedDetectedItemId],
   );
   const pantryHistoryItems = useMemo(() => {
     const byId = new Map(pantryItems.map((item) => [item.id, item]));
@@ -556,6 +587,9 @@ export function PhotoItemAnalysisPage() {
       imageName: existing?.imageName,
       analysis,
       form,
+      selectedDetectedItemId,
+      processedDetectedItemIds,
+      ocrHints: analysis.ocrHints,
       expiryBaseDate,
       householdName: selectedHouseholdName,
       status: 'draft',
@@ -571,6 +605,8 @@ export function PhotoItemAnalysisPage() {
     coverMode,
     expiryBaseDate,
     form,
+    processedDetectedItemIds,
+    selectedDetectedItemId,
     selectedHouseholdName,
     state,
     uploadedImageUrl,
@@ -637,6 +673,8 @@ export function PhotoItemAnalysisPage() {
     setAnalysis(null);
     setCoverMode('original');
     setCurrentHistoryId('');
+    setSelectedDetectedItemId('');
+    setProcessedDetectedItemIds([]);
     setReviewSheetOpen(false);
     setError('');
     setState('captured');
@@ -733,23 +771,37 @@ export function PhotoItemAnalysisPage() {
         imageUrl: upload.url,
         householdId: form.householdId || undefined,
       });
-      const nextForm: DraftForm = {
-        ...form,
-        name: result.name || form.name,
-        category: result.category || form.category,
-        quantity: String(result.quantity || 1),
-        unit: result.unit || form.unit,
-        location: result.storageLocation || form.location,
-        expiresAt: result.expiresAt || '',
-        openedAt: '',
-        note: buildAnalysisNote(result),
-        householdId:
-          resolveSelectableHouseholdId(result.householdId, households) || form.householdId,
-        reminderEnabled: result.expiresAt ? pantryPreferences.defaultReminderEnabled : false,
-      };
-      const nextExpiryBaseDate = result.productionDate || result.purchaseDate || '';
+      const selectedItem =
+        getPhotoItemSelectedDetectedItem(result) ?? getPhotoItemDetectedItems(result)[0];
+      const nextNote = buildAnalysisNote(result, selectedItem);
+      const nextForm: DraftForm = selectedItem
+        ? {
+            ...buildPhotoItemDraftFormFromDetectedItem(
+              selectedItem,
+              {
+                ...form,
+                householdId:
+                  resolveSelectableHouseholdId(result.householdId, households) || form.householdId,
+              },
+              pantryPreferences,
+              nextNote,
+            ),
+            openedAt: '',
+            householdId:
+              resolveSelectableHouseholdId(result.householdId, households) || form.householdId,
+          }
+        : {
+            ...form,
+            note: nextNote,
+            householdId:
+              resolveSelectableHouseholdId(result.householdId, households) || form.householdId,
+          };
+      const nextSelectedDetectedItemId = selectedItem?.id || '';
+      const nextExpiryBaseDate = selectedItem?.productionDate || selectedItem?.purchaseDate || '';
       const historyId = createPhotoItemAnalysisHistoryId();
-      const nextCoverMode: PhotoItemAnalysisCoverMode = isMeaningfulPhotoItemCropBox(result.cropBox)
+      const nextCoverMode: PhotoItemAnalysisCoverMode = isMeaningfulPhotoItemCropBox(
+        selectedItem?.cropBox ?? result.cropBox,
+      )
         ? 'crop'
         : 'original';
       setAnalysis(result);
@@ -757,12 +809,17 @@ export function PhotoItemAnalysisPage() {
       setExpiryBaseDate(nextExpiryBaseDate);
       setCoverMode(nextCoverMode);
       setCurrentHistoryId(historyId);
+      setSelectedDetectedItemId(nextSelectedDetectedItemId);
+      setProcessedDetectedItemIds([]);
       upsertPhotoItemAnalysisHistory({
         id: historyId,
         imageUrl: upload.url,
         imageName: getFallbackFileName(imageFile),
         analysis: result,
         form: nextForm,
+        selectedDetectedItemId: nextSelectedDetectedItemId,
+        processedDetectedItemIds: [],
+        ocrHints: result.ocrHints,
         expiryBaseDate: nextExpiryBaseDate,
         householdName: selectedHouseholdName,
         status: 'draft',
@@ -792,10 +849,15 @@ export function PhotoItemAnalysisPage() {
     setError('');
     try {
       const mergeCandidate = mode === 'merge' ? primaryDuplicateCandidate : null;
+      const currentDetectedItem = selectedDetectedItem;
       let thumbnailUrl = '';
-      if (!mergeCandidate && token && analysis && coverMode === 'crop') {
+      if (!mergeCandidate && token && currentDetectedItem && coverMode === 'crop') {
         const sourceFile = await loadCoverSourceFile(imageFile, uploadedImageUrl);
-        const coverFile = await createCroppedCoverFile(sourceFile, analysis.cropBox);
+        const coverFile = await createCroppedCoverFile(
+          sourceFile,
+          currentDetectedItem.cropBox ??
+            analysis?.cropBox ?? { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+        );
         const coverUpload = await uploadLifeTraceImage(token, coverFile);
         thumbnailUrl = coverUpload.url;
       }
@@ -826,6 +888,75 @@ export function PhotoItemAnalysisPage() {
         { silent: true },
       );
       if (currentHistoryId) {
+        const nextProcessedDetectedItemIds = currentDetectedItem
+          ? [...processedDetectedItemIds, currentDetectedItem.id]
+          : processedDetectedItemIds;
+        const nextDetectedItemId = analysis
+          ? getNextUnprocessedDetectedItemId(
+              analysis,
+              nextProcessedDetectedItemIds,
+              currentDetectedItem?.id,
+            )
+          : '';
+
+        if (nextDetectedItemId) {
+          const nextDetectedItem = analysis
+            ? getPhotoItemSelectedDetectedItem(analysis, nextDetectedItemId)
+            : null;
+          if (analysis && nextDetectedItem) {
+            const nextNote = buildAnalysisNote(analysis, nextDetectedItem);
+            setProcessedDetectedItemIds(nextProcessedDetectedItemIds);
+            setSelectedDetectedItemId(nextDetectedItemId);
+            setForm((current) => ({
+              ...buildPhotoItemDraftFormFromDetectedItem(
+                nextDetectedItem,
+                { ...current, householdId: current.householdId || form.householdId },
+                pantryPreferences,
+                nextNote,
+              ),
+              householdId: current.householdId || form.householdId,
+              openedAt: '',
+            }));
+            setExpiryBaseDate(
+              nextDetectedItem.productionDate || nextDetectedItem.purchaseDate || '',
+            );
+            upsertPhotoItemAnalysisHistory({
+              ...(currentHistoryItem ?? {
+                id: currentHistoryId,
+                imageUrl: uploadedImageUrl,
+                imageName: imageFile ? getFallbackFileName(imageFile) : undefined,
+                analysis,
+                form,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                status: 'draft' as const,
+              }),
+              analysis,
+              form: {
+                ...buildPhotoItemDraftFormFromDetectedItem(
+                  nextDetectedItem,
+                  { ...form, householdId: form.householdId },
+                  pantryPreferences,
+                  nextNote,
+                ),
+                householdId: form.householdId,
+                openedAt: '',
+              },
+              selectedDetectedItemId: nextDetectedItemId,
+              processedDetectedItemIds: nextProcessedDetectedItemIds,
+              ocrHints: analysis.ocrHints,
+              expiryBaseDate:
+                nextDetectedItem.productionDate || nextDetectedItem.purchaseDate || '',
+              updatedAt: new Date().toISOString(),
+            });
+            setHistoryItems(readPhotoItemAnalysisHistory());
+            setState('reviewing');
+            setReviewSheetOpen(true);
+            showToast(`已保存一件，继续确认下一件：${nextDetectedItem.name}`, 'success');
+            return;
+          }
+        }
+
         markPhotoItemAnalysisSaved(currentHistoryId, item.id);
         setHistoryItems(readPhotoItemAnalysisHistory());
       }
@@ -856,6 +987,8 @@ export function PhotoItemAnalysisPage() {
     setAnalysis(null);
     setCoverMode('original');
     setCurrentHistoryId('');
+    setSelectedDetectedItemId('');
+    setProcessedDetectedItemIds([]);
     setReviewSheetOpen(false);
     setActivePicker(null);
     setExpiryBaseDate('');
@@ -882,13 +1015,30 @@ export function PhotoItemAnalysisPage() {
       setUploadedImageUrl(draft.imageUrl);
       setAnalysis(draft.analysis);
       setForm(draft.form);
-      setExpiryBaseDate(draft.expiryBaseDate || draft.analysis.productionDate || '');
+      const restoredSelectedDetectedItem =
+        getPhotoItemSelectedDetectedItem(draft.analysis, draft.selectedDetectedItemId) ??
+        getPhotoItemDetectedItems(draft.analysis)[0] ??
+        null;
+      setExpiryBaseDate(
+        draft.expiryBaseDate ||
+          restoredSelectedDetectedItem?.productionDate ||
+          restoredSelectedDetectedItem?.purchaseDate ||
+          draft.analysis.productionDate ||
+          '',
+      );
       setCoverMode(
-        draft.coverMode === 'crop' && isMeaningfulPhotoItemCropBox(draft.analysis.cropBox)
+        draft.coverMode === 'crop' &&
+          isMeaningfulPhotoItemCropBox(
+            restoredSelectedDetectedItem?.cropBox ?? draft.analysis.cropBox,
+          )
           ? 'crop'
           : 'original',
       );
       setCurrentHistoryId(draft.id);
+      setSelectedDetectedItemId(
+        restoredSelectedDetectedItem?.id || draft.selectedDetectedItemId || '',
+      );
+      setProcessedDetectedItemIds(draft.processedDetectedItemIds ?? []);
       setState('reviewing');
       setReviewSheetOpen(shouldOpenSheet);
       setActivePicker(null);
@@ -985,6 +1135,36 @@ export function PhotoItemAnalysisPage() {
       ...suggestion.patch,
     }));
     showToast(`已应用${suggestion.label}。`, 'success');
+  };
+
+  const handleSelectDetectedItem = (itemId: string) => {
+    if (!analysis) {
+      return;
+    }
+
+    const nextDetectedItem = getPhotoItemSelectedDetectedItem(analysis, itemId);
+    if (!nextDetectedItem) {
+      return;
+    }
+
+    const nextNote = buildAnalysisNote(analysis, nextDetectedItem);
+    setSelectedDetectedItemId(nextDetectedItem.id);
+    setCoverMode(isMeaningfulPhotoItemCropBox(nextDetectedItem.cropBox) ? 'crop' : 'original');
+    setExpiryBaseDate(nextDetectedItem.productionDate || nextDetectedItem.purchaseDate || '');
+    setForm((current) => ({
+      ...buildPhotoItemDraftFormFromDetectedItem(
+        nextDetectedItem,
+        {
+          ...current,
+          householdId: current.householdId,
+          openedAt: '',
+        },
+        pantryPreferences,
+        nextNote,
+      ),
+      householdId: current.householdId,
+      openedAt: '',
+    }));
   };
 
   const handleBackToAi = () => {
@@ -1096,6 +1276,34 @@ export function PhotoItemAnalysisPage() {
                 入库
               </span>
             </div>
+            {visionProcessing ? (
+              <div className="mt-3 border-t border-white/[0.08] pt-3">
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-life-ai/25 bg-life-ai/10 text-life-ai">
+                      <span className="size-2 animate-pulse rounded-full bg-life-ai shadow-[0_0_16px_rgba(6,182,212,0.9)] motion-reduce:animate-none" />
+                    </span>
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {visionStageLabel}
+                    </p>
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-life-trace/25 bg-life-trace/10 px-2.5 py-1 text-[10px] font-semibold text-life-trace">
+                      <span className="size-1.5 animate-pulse rounded-full bg-life-trace shadow-[0_0_12px_rgba(16,185,129,0.9)] motion-reduce:animate-none" />
+                      处理中
+                    </span>
+                  </div>
+                  <div className="flex w-full justify-center gap-1.5 overflow-hidden">
+                    {['主体定位', '字段抽取', '库存匹配'].map((label) => (
+                      <span
+                        key={label}
+                        className="min-w-0 rounded-full border border-life-ai/18 bg-life-ai/10 px-2.5 py-1 text-center text-[10px] font-semibold text-life-ai/90"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="relative overflow-hidden rounded-[1.45rem] border border-life-ai/25 bg-background/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
@@ -1188,31 +1396,6 @@ export function PhotoItemAnalysisPage() {
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_52%,rgba(6,182,212,0.12),transparent_42%),linear-gradient(180deg,rgba(6,182,212,0.05),rgba(16,185,129,0.04))]" />
                 <div className="absolute inset-x-5 top-8 h-16 animate-[life-vision-scan_1.9s_ease-in-out_infinite] rounded-full bg-gradient-to-b from-life-ai/0 via-life-ai/24 to-life-trace/0 blur-md motion-reduce:animate-none" />
                 <div className="absolute inset-x-6 top-1/2 h-px bg-gradient-to-r from-transparent via-life-ai/85 to-transparent shadow-[0_0_30px_rgba(6,182,212,0.85)]" />
-                <div className="absolute inset-x-4 top-4 rounded-2xl border border-life-ai/20 bg-background/35 px-3 py-2.5 shadow-[0_14px_36px_rgba(0,0,0,0.2)] backdrop-blur-xl">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{visionStageLabel}</p>
-                      <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-life-ai/80">
-                        Vision Analysis
-                      </p>
-                    </div>
-                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-life-trace/25 bg-life-trace/10 px-2.5 py-1 text-[10px] font-semibold text-life-trace">
-                      <span className="size-1.5 animate-pulse rounded-full bg-life-trace shadow-[0_0_12px_rgba(16,185,129,0.9)] motion-reduce:animate-none" />
-                      Live
-                    </span>
-                  </div>
-                  <div className="mt-2 flex gap-1.5 overflow-hidden">
-                    {['主体定位', '字段抽取', '库存匹配'].map((label, index) => (
-                      <span
-                        key={label}
-                        className="min-w-0 flex-1 rounded-full border border-life-ai/20 bg-life-ai/10 px-2 py-1 text-center text-[10px] font-semibold text-life-ai/90"
-                        style={{ animationDelay: `${index * 180}ms` }}
-                      >
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
               </div>
             ) : null}
           </div>
@@ -1362,20 +1545,106 @@ export function PhotoItemAnalysisPage() {
 
       {analysis ? (
         <section>
-          <SectionHeader title="AI 识别结果" meta={`${Math.round(analysis.confidence * 100)}%`} />
+          <SectionHeader
+            title="AI 识别结果"
+            meta={`${Math.round((selectedDetectedItem?.confidence ?? analysis.confidence) * 100)}%`}
+          />
           <Card className="space-y-4 p-4">
+            {detectedItems.length > 1 ? (
+              <div className="rounded-[1.25rem] border border-life-ai/20 bg-life-ai/5 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-life-ai">候选商品</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      同一张图里识别到 {detectedItems.length} 个候选，当前还剩{' '}
+                      {remainingDetectedItemCount} 个待确认。
+                    </p>
+                  </div>
+                  <Badge tone="ai" className="shrink-0">
+                    {detectedItems.length} 件
+                  </Badge>
+                </div>
+                <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {detectedItems.map((item, index) => {
+                    const active = item.id === selectedDetectedItemId;
+                    const processed = processedDetectedItemIds.includes(item.id);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`min-w-[11rem] shrink-0 rounded-2xl border px-3 py-3 text-left transition ${
+                          active
+                            ? 'border-life-ai/35 bg-life-ai/12 text-foreground'
+                            : 'border-border bg-card/80 text-muted-foreground hover:bg-secondary'
+                        }`}
+                        onClick={() => handleSelectDetectedItem(item.id)}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold">
+                            候选 {index + 1}
+                            {processed ? ' · 已处理' : ''}
+                          </span>
+                          <span className="text-[11px] font-semibold">
+                            {Math.round(item.confidence * 100)}%
+                          </span>
+                        </div>
+                        <p className="mt-2 truncate text-sm font-semibold text-foreground">
+                          {item.name}
+                        </p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {[item.brand, item.spec].filter(Boolean).join(' · ') || item.category}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
             <div className="flex min-w-0 items-start justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="truncate text-xl font-semibold">{analysis.name}</h2>
+                <h2 className="truncate text-xl font-semibold">
+                  {form.name || selectedDetectedItem?.name || analysis.name}
+                </h2>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">{analysis.summary}</p>
+                {selectedDetectedItem?.brand || selectedDetectedItem?.spec ? (
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                    {[selectedDetectedItem.brand, selectedDetectedItem.spec]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                ) : null}
               </div>
               <Badge tone="plan" className="shrink-0 whitespace-nowrap">
-                {analysis.category}
+                {selectedDetectedItem?.category || analysis.category}
               </Badge>
             </div>
-            {analysis.warnings.length > 0 ? (
+            <div className="grid gap-3 text-sm sm:grid-cols-3">
+              <div className="rounded-2xl border border-border bg-secondary/60 px-4 py-3">
+                <p className="text-xs text-muted-foreground">数量</p>
+                <p className="mt-1 font-semibold">
+                  {selectedDetectedItem?.quantity || analysis.quantity}{' '}
+                  {selectedDetectedItem?.unit || analysis.unit}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-secondary/60 px-4 py-3">
+                <p className="text-xs text-muted-foreground">位置建议</p>
+                <p className="mt-1 truncate font-semibold">
+                  {selectedDetectedItem?.storageLocation || analysis.storageLocation}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-secondary/60 px-4 py-3">
+                <p className="text-xs text-muted-foreground">保质期</p>
+                <p className="mt-1 truncate font-semibold">
+                  {selectedDetectedItem?.expiresAt || analysis.expiresAt || '待确认'}
+                </p>
+              </div>
+            </div>
+            {(selectedDetectedItem?.warnings.length || analysis.warnings.length) > 0 ? (
               <div className="space-y-2">
-                {analysis.warnings.map((warning) => (
+                {(selectedDetectedItem?.warnings.length
+                  ? selectedDetectedItem.warnings
+                  : analysis.warnings
+                ).map((warning) => (
                   <p
                     key={warning}
                     className="rounded-2xl bg-life-alert/10 px-4 py-3 text-sm leading-6 text-life-alert"
@@ -1595,7 +1864,7 @@ export function PhotoItemAnalysisPage() {
                 <CropPreviewImage
                   src={imagePreviewUrl}
                   alt={form.name || analysis?.name || '商品图片'}
-                  cropBox={analysis?.cropBox}
+                  cropBox={activeCropBox}
                   cropEnabled={coverMode === 'crop' && hasMeaningfulCropSuggestion}
                 />
               </div>
@@ -1777,6 +2046,48 @@ export function PhotoItemAnalysisPage() {
                 }
               />
             </FormItem>
+            {ocrSummary ? (
+              <div
+                className={`rounded-[1.25rem] border p-3 ${
+                  ocrSummary.state === 'auto'
+                    ? 'border-life-trace/25 bg-life-trace/5'
+                    : ocrSummary.state === 'missing-production'
+                      ? 'border-life-alert/25 bg-life-alert/5'
+                      : 'border-life-ai/20 bg-life-ai/5'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">{ocrSummary.title}</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      {ocrSummary.detail}
+                    </p>
+                  </div>
+                  <Badge
+                    tone={
+                      ocrSummary.state === 'auto'
+                        ? 'trace'
+                        : ocrSummary.state === 'missing-production'
+                          ? 'alert'
+                          : 'ai'
+                    }
+                    className="shrink-0"
+                  >
+                    OCR
+                  </Badge>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {ocrSummary.entries.map((entry) => (
+                    <span
+                      key={entry.id}
+                      className="rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs text-muted-foreground"
+                    >
+                      {entry.label}：{entry.normalizedValue || entry.text}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <PantryExpiryDateField
               idPrefix="photo-item"
               expiresAt={form.expiresAt}

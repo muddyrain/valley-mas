@@ -89,6 +89,9 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 	if len(traces) != 1 || traces[0].Source != "库存" || traces[0].Title != "新增库存：鲜牛奶" {
 		t.Fatalf("expected pantry create to write trace, got %+v", traces)
 	}
+	if !strings.Contains(traces[0].Summary, "我的空间") || !strings.Contains(traces[0].Summary, "2盒") {
+		t.Fatalf("expected pantry create trace summary to include household and quantity, got %+v", traces[0])
+	}
 }
 
 func TestCreatePantryItemDisablesReminderWithoutExpiry(t *testing.T) {
@@ -166,8 +169,11 @@ func TestUpdatePantryItemStatusAndDelete(t *testing.T) {
 		Find(&traces).Error; err != nil {
 		t.Fatalf("list traces after status update: %v", err)
 	}
-	if len(traces) != 1 || traces[0].Source != "库存" || traces[0].Title != "生菜 已用完" {
+	if len(traces) != 1 || traces[0].Source != "库存" || traces[0].Title != "已用完：生菜" {
 		t.Fatalf("expected pantry status update to write inventory trace, got %+v", traces)
+	}
+	if !strings.Contains(traces[0].Summary, "1袋") {
+		t.Fatalf("expected pantry status trace summary to include quantity, got %+v", traces[0])
 	}
 
 	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/life-trace/pantry/"+item.ID.String(), nil)
@@ -606,6 +612,35 @@ func TestTransferPantryItemsMoveWithMergeDeletesSourceAndAccumulatesQuantity(t *
 	}
 	if sharedCount != 2 {
 		t.Fatalf("expected two shared items after move, got %d", sharedCount)
+	}
+
+	var traces []model.LifeTraceTrace
+	if err := database.GetDB().
+		Where("user_id = ? AND source = ?", 101, "库存").
+		Order("created_at DESC").
+		Find(&traces).Error; err != nil {
+		t.Fatalf("list traces after transfer: %v", err)
+	}
+	if len(traces) != 2 {
+		t.Fatalf("expected transfer to write two pantry traces, got %+v", traces)
+	}
+	if traces[0].Title != "转移到共享家庭：吐司" && traces[1].Title != "转移到共享家庭：吐司" {
+		t.Fatalf("expected moved created item trace, got %+v", traces)
+	}
+	var mergedTrace *model.LifeTraceTrace
+	for index := range traces {
+		if traces[index].Title == "合并数量：鲜牛奶" {
+			mergedTrace = &traces[index]
+			break
+		}
+	}
+	if mergedTrace == nil {
+		t.Fatalf("expected merged transfer trace, got %+v", traces)
+	}
+	if !strings.Contains(mergedTrace.Summary, "开心家庭") ||
+		!strings.Contains(mergedTrace.Summary, "+2盒") ||
+		!strings.Contains(mergedTrace.Summary, "当前共 5盒") {
+		t.Fatalf("expected merged transfer summary to include target household and quantity delta, got %+v", mergedTrace)
 	}
 }
 

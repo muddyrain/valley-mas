@@ -109,6 +109,7 @@ export function ProfilePage() {
     handleCreateHousehold,
     handleJoinHousehold,
     handleCreateInvite,
+    handleRevokeInvite,
     handleLeaveHousehold,
     handleTransferOwner,
     handleDissolveHousehold,
@@ -838,6 +839,9 @@ export function ProfilePage() {
         }}
         onCreateInvite={async (householdId) => {
           await handleCreateInvite(householdId);
+        }}
+        onRevokeInvite={async (householdId) => {
+          await handleRevokeInvite(householdId);
         }}
         onRefreshMembers={loadHouseholdMembersFor}
         onTransferOwner={handleTransferOwner}

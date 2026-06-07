@@ -249,7 +249,16 @@ func (h *Handler) CreateHouseholdInvite(c *gin.Context) {
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
 	invite.ExpiresAt = &expiresAt
 
-	if err := database.GetDB().Create(&invite).Error; err != nil {
+	if err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.HouseholdInvite{}).
+			Where("household_id = ? AND status = ?", ctx.Household.ID, householdInviteStatusPending).
+			Updates(map[string]interface{}{
+				"status": householdInviteStatusRevoked,
+			}).Error; err != nil {
+			return err
+		}
+		return tx.Create(&invite).Error
+	}); err != nil {
 		fail(c, http.StatusInternalServerError, "创建邀请失败")
 		return
 	}
@@ -259,6 +268,54 @@ func (h *Handler) CreateHouseholdInvite(c *gin.Context) {
 		"inviteCode":  invite.InviteCode,
 		"expiresAt":   invite.ExpiresAt,
 		"status":      invite.Status,
+	})
+}
+
+func (h *Handler) RevokeHouseholdInvite(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	ctx, ok := readHouseholdContext(c, userID)
+	if !ok {
+		return
+	}
+	if ctx.Household.Kind != householdKindShared {
+		fail(c, http.StatusBadRequest, "个人空间没有可撤销的邀请码")
+		return
+	}
+	if ctx.Member.Role != householdRoleOwner && ctx.Member.Role != householdRoleAdmin {
+		fail(c, http.StatusForbidden, "只有家庭管理员可以撤销邀请码")
+		return
+	}
+
+	var invite model.HouseholdInvite
+	if err := database.GetDB().
+		Where("household_id = ? AND status = ?", ctx.Household.ID, householdInviteStatusPending).
+		Order("created_at DESC").
+		First(&invite).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			fail(c, http.StatusNotFound, "当前没有可撤销的邀请码")
+			return
+		}
+		fail(c, http.StatusInternalServerError, "读取邀请码失败")
+		return
+	}
+
+	if err := database.GetDB().Model(&invite).Updates(map[string]interface{}{
+		"status": householdInviteStatusRevoked,
+	}).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "撤销邀请码失败")
+		return
+	}
+
+	success(c, gin.H{
+		"householdId": invite.HouseholdID,
+		"inviteCode":  invite.InviteCode,
+		"expiresAt":   invite.ExpiresAt,
+		"status":      householdInviteStatusRevoked,
 	})
 }
 

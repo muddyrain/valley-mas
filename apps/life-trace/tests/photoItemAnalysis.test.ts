@@ -7,13 +7,17 @@ import {
   calculatePhotoItemCropPreviewLayout,
   findPhotoItemAnalysisDuplicateCandidates,
   getLatestPhotoItemAnalysisDraft,
+  getNextUnprocessedDetectedItemId,
   getPhotoItemAnalysisDraftById,
   getPhotoItemAnalysisReviewIssues,
+  getPhotoItemDetectedItems,
+  getPhotoItemSelectedDetectedItem,
   markPhotoItemAnalysisQualityFeedback,
   markPhotoItemAnalysisSaved,
   type PhotoItemAnalysisHistoryItem,
   readPhotoItemAnalysisHistory,
   removePhotoItemAnalysisHistory,
+  summarizePhotoItemOCRHints,
   upsertPhotoItemAnalysisHistory,
 } from '../src/lib/photoItemAnalysis';
 import type { PantryItem } from '../src/types';
@@ -39,6 +43,8 @@ const analysis: PantryPhotoAnalysisResponse = {
   warnings: [],
   cropBox: { x: 0, y: 0, width: 1, height: 1 },
   summary: '识别为牛奶。',
+  detectedItems: [],
+  ocrHints: [],
   source: 'ark',
 };
 
@@ -294,6 +300,69 @@ describe('photo item analysis helpers', () => {
     );
 
     expect(issues.map((issue) => issue.id)).toEqual(['confidence', 'brand', 'spec', 'expiry']);
+  });
+
+  it('supports selecting and continuing through multiple detected items', () => {
+    const multiItemAnalysis: PantryPhotoAnalysisResponse = {
+      ...analysis,
+      detectedItems: [
+        {
+          id: 'milk',
+          name: '牛奶',
+          category: '食品',
+          quantity: 1,
+          unit: '盒',
+          storageLocation: '冷藏',
+          confidence: 0.88,
+          warnings: [],
+        },
+        {
+          id: 'bread',
+          name: '吐司',
+          category: '食品',
+          quantity: 1,
+          unit: '袋',
+          storageLocation: '厨房',
+          confidence: 0.76,
+          warnings: ['画面里还有其他商品，请逐个确认'],
+        },
+      ],
+      multiItemDetected: true,
+      ocrHints: [],
+    };
+
+    expect(getPhotoItemDetectedItems(multiItemAnalysis).map((item) => item.id)).toEqual([
+      'milk',
+      'bread',
+    ]);
+    expect(getPhotoItemSelectedDetectedItem(multiItemAnalysis, 'bread')?.name).toBe('吐司');
+    expect(getNextUnprocessedDetectedItemId(multiItemAnalysis, ['milk'], 'milk')).toBe('bread');
+  });
+
+  it('summarizes OCR hints when expiry can be auto derived', () => {
+    const summary = summarizePhotoItemOCRHints(
+      [
+        { kind: 'production_date', text: '2026.06.01', normalizedValue: '2026-06-01' },
+        { kind: 'shelf_life_days', text: '180天', normalizedValue: '180' },
+      ],
+      {
+        id: 'milk',
+        name: '牛奶',
+        category: '食品',
+        quantity: 1,
+        unit: '盒',
+        storageLocation: '冷藏',
+        expiresAt: '2026-11-28',
+        productionDate: '2026-06-01',
+        shelfLifeDays: 180,
+        confidence: 0.9,
+        warnings: [],
+      },
+    );
+
+    expect(summary?.state).toBe('auto');
+    expect(summary?.detail).toContain('2026-11-28');
+    expect(summary?.entries).toHaveLength(2);
   });
 
   it('does not keep showing review issues after the user explicitly dismisses them', () => {

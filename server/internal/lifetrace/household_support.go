@@ -385,14 +385,17 @@ households.name,
 households.kind,
 households.status,
 households.owner_user_id,
-household_members.role,
+COALESCE(active_household_members.role, historical_household_members.role) AS role,
 COUNT(active_members.id) AS member_count
 `).
-		Joins("JOIN household_members ON household_members.household_id = households.id AND household_members.user_id = ? AND household_members.status = ?", userID, householdMemberStatusActive).
+		Joins("LEFT JOIN household_members AS active_household_members ON active_household_members.household_id = households.id AND active_household_members.user_id = ? AND active_household_members.status = ? AND active_household_members.deleted_at IS NULL", userID, householdMemberStatusActive).
+		Joins("LEFT JOIN household_members AS historical_household_members ON historical_household_members.id = (SELECT hm.id FROM household_members hm WHERE hm.household_id = households.id AND hm.user_id = ? AND hm.deleted_at IS NULL ORDER BY CASE hm.status WHEN 'active' THEN 0 WHEN 'left' THEN 1 ELSE 2 END, hm.updated_at DESC LIMIT 1)", userID).
 		Joins("LEFT JOIN household_members AS active_members ON active_members.household_id = households.id AND active_members.status = ? AND active_members.deleted_at IS NULL", householdMemberStatusActive).
-		Where("households.deleted_at IS NULL AND households.status != ?", householdStatusDissolved).
-		Group("households.id, households.name, households.kind, households.status, households.owner_user_id, household_members.role").
+		Where("households.deleted_at IS NULL").
+		Where("active_household_members.id IS NOT NULL OR historical_household_members.id IS NOT NULL OR (households.kind = ? AND households.owner_user_id = ?)", householdKindPersonal, userID).
+		Group("households.id, households.name, households.kind, households.status, households.owner_user_id, active_household_members.role, historical_household_members.role").
 		Order("CASE WHEN households.kind = 'personal' THEN 0 ELSE 1 END").
+		Order("CASE WHEN households.status = 'active' THEN 0 ELSE 1 END").
 		Order("households.created_at ASC").
 		Scan(&rows).Error
 	if err != nil {

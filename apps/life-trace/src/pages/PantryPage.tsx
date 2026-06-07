@@ -194,6 +194,7 @@ export function PantryPage() {
     handleCreateHousehold,
     handleJoinHousehold,
     handleCreateInvite,
+    handleRevokeInvite,
     handleLeaveHousehold,
     handleTransferOwner,
     handleDissolveHousehold,
@@ -986,6 +987,9 @@ export function PantryPage() {
         }}
         onCreateInvite={async (householdId) => {
           await handleCreateInvite(householdId);
+        }}
+        onRevokeInvite={async (householdId) => {
+          await handleRevokeInvite(householdId);
         }}
         onRefreshMembers={loadHouseholdMembersFor}
         onTransferOwner={handleTransferOwner}

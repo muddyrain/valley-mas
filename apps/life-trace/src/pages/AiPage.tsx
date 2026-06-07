@@ -17,6 +17,7 @@ import {
   Plus,
   Send,
   Sparkles,
+  Sun,
   Trash2,
   Utensils,
 } from 'lucide-react';
@@ -56,7 +57,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { MessageSyncSkeleton, SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { aiQuickActions, suggestedPrompts } from '@/data/mock';
+import { suggestedPrompts } from '@/data/mock';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import { formatLocationDisplay } from '@/lib/location';
 import {
@@ -66,6 +67,7 @@ import {
 } from '@/lib/photoItemAnalysis';
 import { getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { getLocalISODate } from '@/lib/planSchedule';
+import { readWeatherCache } from '@/lib/weatherCache';
 import {
   buildWeeklyReviewActionMarker,
   createPlanFromWeeklyReviewAction,
@@ -897,6 +899,232 @@ function AssistantConversationSheet({
   );
 }
 
+function ContextSummaryChip({
+  icon: Icon,
+  label,
+  value,
+  toneClass,
+}: {
+  icon: typeof CalendarDays;
+  label: string;
+  value: string;
+  toneClass: string;
+}) {
+  return (
+    <div className="inline-flex min-w-0 shrink-0 items-center gap-2 rounded-full border border-border bg-secondary/45 px-3 py-2 text-xs">
+      <Icon className={`size-3.5 shrink-0 ${toneClass}`} />
+      <span className="text-muted-foreground">{label}</span>
+      <span className="truncate font-semibold text-foreground">{value}</span>
+    </div>
+  );
+}
+
+function AssistantLandingPromptButton({
+  icon: Icon,
+  title,
+  onClick,
+}: {
+  icon: typeof Sparkles;
+  title: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="inline-flex min-h-12 w-full items-center gap-3 rounded-2xl border border-border/80 bg-secondary/35 px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-secondary"
+      onClick={onClick}
+    >
+      <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-background/80 text-life-ai">
+        <Icon className="size-4" />
+      </span>
+      <span className="line-clamp-2 min-w-0 flex-1 leading-5">{title}</span>
+    </button>
+  );
+}
+
+function AssistantToolRow({
+  icon: Icon,
+  label,
+  toneClass,
+  onClick,
+  loading = false,
+  disabled = false,
+  meta,
+}: {
+  icon: typeof Sparkles;
+  label: string;
+  toneClass: string;
+  onClick: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+  meta?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-border/80 bg-card/80 px-3 py-2.5 text-left transition hover:bg-secondary disabled:opacity-70"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span
+        className={`grid size-8 shrink-0 place-items-center rounded-xl bg-secondary/80 ${toneClass}`}
+      >
+        {loading ? <ActionLoadingIcon className="size-4" /> : <Icon className="size-4" />}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{label}</span>
+      {meta ? (
+        <span className="shrink-0 rounded-full border border-border bg-background/70 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+          {meta}
+        </span>
+      ) : null}
+      <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+    </button>
+  );
+}
+
+function AssistantToolsSheet({
+  open,
+  quickActionLoading,
+  weeklyReviewsLoading,
+  weeklyReviewCount,
+  aiActionCount,
+  latestPhotoDraft,
+  onOpenChange,
+  onOpenWeeklyReviews,
+  onOpenActions,
+  onOpenPhotoAnalysis,
+  onOpenPhotoItemDraft,
+  onQuickAction,
+}: {
+  open: boolean;
+  quickActionLoading: string | null;
+  weeklyReviewsLoading: boolean;
+  weeklyReviewCount: number;
+  aiActionCount: number;
+  latestPhotoDraft: PhotoItemAnalysisHistoryItem | null;
+  onOpenChange: (open: boolean) => void;
+  onOpenWeeklyReviews: () => void;
+  onOpenActions: () => void;
+  onOpenPhotoAnalysis: () => void;
+  onOpenPhotoItemDraft: (draftId: string) => void;
+  onQuickAction: (label: string) => void;
+}) {
+  const closeAndRun = (callback: () => void) => {
+    onOpenChange(false);
+    callback();
+  };
+
+  return (
+    <BottomSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      overlayLabel="关闭 AI 工具"
+      className="space-y-5"
+      portal
+    >
+      <div className="space-y-1">
+        <p className="text-xl font-semibold">AI 工具</p>
+        <p className="text-sm text-muted-foreground">计划、图片、Pantry 与回顾</p>
+      </div>
+
+      <div className="rounded-[1.4rem] border border-border bg-secondary/20 p-3">
+        <div className="mb-3 flex items-center justify-between gap-3 px-1">
+          <p className="text-sm font-semibold">生活动作</p>
+          <span className="text-xs text-muted-foreground">4 个动作</span>
+        </div>
+        <div className="space-y-2">
+          <AssistantToolRow
+            icon={Sun}
+            label="今天安排"
+            toneClass="text-life-health"
+            loading={quickActionLoading === '生成今日建议'}
+            disabled={Boolean(quickActionLoading)}
+            onClick={() => closeAndRun(() => onQuickAction('生成今日建议'))}
+          />
+          <AssistantToolRow
+            icon={CalendarDays}
+            label="创建计划"
+            toneClass="text-life-plan"
+            disabled={Boolean(quickActionLoading)}
+            onClick={() => closeAndRun(() => onQuickAction('创建计划'))}
+          />
+          <AssistantToolRow
+            icon={Image}
+            label="分析图片"
+            toneClass="text-life-trace"
+            disabled={Boolean(quickActionLoading)}
+            onClick={() => closeAndRun(() => onQuickAction('分析图片'))}
+          />
+          <AssistantToolRow
+            icon={Sparkles}
+            label="生成踪迹"
+            toneClass="text-life-ai"
+            disabled={Boolean(quickActionLoading)}
+            onClick={() => closeAndRun(() => onQuickAction('生成踪迹'))}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-[1.4rem] border border-border bg-secondary/20 p-3">
+        <div className="mb-3 flex items-center justify-between gap-3 px-1">
+          <p className="text-sm font-semibold">Pantry 智能</p>
+          <span className="text-xs text-muted-foreground">4 个入口</span>
+        </div>
+        <div className="space-y-2">
+          <AssistantToolRow
+            icon={Camera}
+            label="拍照分析商品"
+            toneClass="text-life-ai"
+            onClick={() => closeAndRun(onOpenPhotoAnalysis)}
+          />
+          <AssistantToolRow
+            icon={Utensils}
+            label="智能菜谱"
+            toneClass="text-life-health"
+            loading={quickActionLoading === '智能菜谱'}
+            disabled={Boolean(quickActionLoading)}
+            onClick={() => closeAndRun(() => onQuickAction('智能菜谱'))}
+          />
+          <AssistantToolRow
+            icon={History}
+            label="历史周报"
+            toneClass="text-life-health"
+            meta={weeklyReviewsLoading ? '同步中' : String(weeklyReviewCount)}
+            onClick={() => closeAndRun(onOpenWeeklyReviews)}
+          />
+          <AssistantToolRow
+            icon={Sparkles}
+            label="AI 操作"
+            toneClass="text-life-ai"
+            meta={String(aiActionCount)}
+            onClick={() => closeAndRun(onOpenActions)}
+          />
+        </div>
+        {latestPhotoDraft ? (
+          <button
+            type="button"
+            className="mt-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-life-ai/20 bg-card px-3 py-3 text-left transition hover:bg-secondary"
+            onClick={() => closeAndRun(() => onOpenPhotoItemDraft(latestPhotoDraft.id))}
+          >
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold">
+                {latestPhotoDraft.form.name || latestPhotoDraft.analysis.name}
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                {formatPhotoItemHistoryTime(latestPhotoDraft.updatedAt)} · 待继续确认
+              </span>
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-life-ai/10 px-3 py-1.5 text-xs font-semibold text-life-ai">
+              <ArrowRight className="size-3.5" />
+              继续
+            </span>
+          </button>
+        ) : null}
+      </div>
+    </BottomSheet>
+  );
+}
+
 function AgentConversationPanel({
   conversation,
   messages,
@@ -912,11 +1140,15 @@ function AgentConversationPanel({
   addingRecipeId,
   weeklyReviews,
   weeklyReviewsLoading,
-  latestWeeklyReview,
   photoItemHistory,
-  quickActions,
   quickActionLoading,
   aiActions,
+  locationLabel,
+  weatherSummary,
+  pantryHouseholdLabel,
+  openPlanCount,
+  completedCheckinCount,
+  expiringPantryCount,
   speechSupported,
   listening,
   speechError,
@@ -931,6 +1163,8 @@ function AgentConversationPanel({
   onOpenPhotoItemDraft,
   onRemovePhotoItemDraft,
   onOpenActions,
+  toolsSheetOpen,
+  onToolsSheetOpenChange,
   onAddAdvicePlan,
   onAddRecipePlan,
   onQuickAction,
@@ -949,11 +1183,15 @@ function AgentConversationPanel({
   addingRecipeId: string | null;
   weeklyReviews: WeeklyReviewResponse[];
   weeklyReviewsLoading: boolean;
-  latestWeeklyReview?: WeeklyReviewResponse;
   photoItemHistory: PhotoItemAnalysisHistoryItem[];
-  quickActions: typeof aiQuickActions;
   quickActionLoading: string | null;
   aiActions: AiAction[];
+  locationLabel: string;
+  weatherSummary: string;
+  pantryHouseholdLabel: string;
+  openPlanCount: number;
+  completedCheckinCount: number;
+  expiringPantryCount: number;
   speechSupported: boolean;
   listening: boolean;
   speechError: string;
@@ -968,6 +1206,8 @@ function AgentConversationPanel({
   onOpenPhotoItemDraft: (draftId: string) => void;
   onRemovePhotoItemDraft: (draftId: string) => void;
   onOpenActions: () => void;
+  toolsSheetOpen: boolean;
+  onToolsSheetOpenChange: (open: boolean) => void;
   onAddAdvicePlan: (item: AdvicePayload) => void;
   onAddRecipePlan: (recipe: RecipeSuggestionItem) => void;
   onQuickAction: (label: string) => void;
@@ -975,6 +1215,10 @@ function AgentConversationPanel({
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const latestMessage = messages[messages.length - 1];
   const canSend = Boolean(input.trim()) && !streaming;
+  const latestPhotoDraft = photoItemHistory.find((item) => item.status === 'draft') ?? null;
+  const hasChatActivity =
+    messages.length > 0 || Boolean(result) || Boolean(recipeResult) || adviceCards.length > 0;
+  const landingPromptCards = suggestedPrompts.slice(0, 4);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -1025,54 +1269,71 @@ function AgentConversationPanel({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="shrink-0 border-b border-border bg-secondary/20 px-3 py-2">
-          <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {quickActions.map((action) => {
-              const Icon = action.icon;
-              const loadingAction = quickActionLoading === action.label;
-
-              return (
-                <button
-                  type="button"
-                  key={action.label}
-                  className="inline-flex min-h-9 shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-semibold transition hover:bg-secondary disabled:cursor-default disabled:opacity-70 max-[360px]:text-xs"
-                  disabled={Boolean(quickActionLoading)}
-                  onClick={() => onQuickAction(action.label)}
-                >
-                  {loadingAction ? (
-                    <ActionLoadingIcon className="size-4" />
-                  ) : (
-                    <Icon className={`size-4 ${action.tone}`} />
-                  )}
-                  {action.label}
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              className="inline-flex min-h-9 shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full border border-life-health/20 bg-card px-3.5 py-1.5 text-sm font-semibold text-life-health transition hover:bg-secondary max-[360px]:text-xs"
-              onClick={onOpenWeeklyReviews}
-            >
-              <History className="size-4" />
-              {weeklyReviewsLoading
-                ? '周报同步中'
-                : latestWeeklyReview
-                  ? '历史周报'
-                  : `${weeklyReviews.length} 篇周报`}
-            </button>
-            <button
-              type="button"
-              className="inline-flex min-h-9 shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full border border-life-ai/20 bg-card px-3.5 py-1.5 text-sm font-semibold text-life-ai transition hover:bg-secondary max-[360px]:text-xs"
-              onClick={onOpenActions}
-            >
-              <Sparkles className="size-4" />
-              AI 操作 {aiActions.length}
-            </button>
-          </div>
-        </div>
-
         <section className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {!hasChatActivity ? (
+              <div className="mb-5 space-y-4 py-6">
+                <div className="rounded-[1.4rem] border border-life-ai/20 bg-card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-lg font-semibold">今天想怎么过？</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {locationLabel} · {weatherSummary}
+                      </p>
+                    </div>
+                    <LifeTraceBrandMark className="size-10 rounded-2xl" />
+                  </div>
+                  <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <ContextSummaryChip
+                      icon={CalendarDays}
+                      label="计划"
+                      value={`${openPlanCount} 项`}
+                      toneClass="text-life-plan"
+                    />
+                    <ContextSummaryChip
+                      icon={Utensils}
+                      label="临期"
+                      value={`${expiringPantryCount} 件`}
+                      toneClass="text-life-health"
+                    />
+                    <ContextSummaryChip
+                      icon={Check}
+                      label="打卡"
+                      value={`${completedCheckinCount} 项`}
+                      toneClass="text-life-trace"
+                    />
+                    <ContextSummaryChip
+                      icon={Sparkles}
+                      label="Pantry"
+                      value={pantryHouseholdLabel}
+                      toneClass="text-life-ai"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3 px-1">
+                    <p className="text-sm font-semibold text-muted-foreground">开场提问</p>
+                    {streaming ? <Badge tone="ai">思考中</Badge> : null}
+                  </div>
+                  <div className="grid gap-2">
+                    {landingPromptCards.map((prompt) => {
+                      const Icon = prompt.icon;
+
+                      return (
+                        <AssistantLandingPromptButton
+                          key={prompt.title}
+                          icon={Icon}
+                          title={prompt.title}
+                          onClick={() => onPrompt(prompt)}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {result ? (
               <div className="mb-3 rounded-2xl border border-life-ai/20 bg-life-ai/5 p-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -1125,7 +1386,7 @@ function AgentConversationPanel({
               </div>
             ) : null}
 
-            {photoItemHistory.length > 0 ? (
+            {!hasChatActivity && photoItemHistory.length > 0 ? (
               <div className="mb-3 rounded-2xl border border-life-ai/20 bg-card p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -1236,36 +1497,7 @@ function AgentConversationPanel({
                 ))}
                 <div ref={bottomRef} />
               </div>
-            ) : (
-              <div className="flex min-h-full flex-col justify-center gap-5 py-8">
-                <div className="mx-auto grid size-28 place-items-center rounded-[2rem] bg-life-ai/10 shadow-[0_18px_60px_rgba(6,182,212,0.12)]">
-                  <LifeTraceBrandMark className="size-20 rounded-[1.6rem]" />
-                </div>
-                <div className="mx-2 rounded-[1.4rem] bg-secondary/70 px-5 py-4">
-                  <p className="text-base leading-8">
-                    嗨，我是 Life Trace
-                    Agent。可以帮你安排计划、记录踪迹、分析库存和整理生活建议。今天有什么可以帮你的吗？
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 px-1">
-                  {suggestedPrompts.slice(0, 4).map((prompt) => {
-                    const Icon = prompt.icon;
-
-                    return (
-                      <button
-                        key={prompt.title}
-                        type="button"
-                        className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-left text-sm font-semibold transition hover:bg-secondary"
-                        onClick={() => onPrompt(prompt)}
-                      >
-                        <Icon className="size-4 shrink-0 text-life-ai" />
-                        <span className="min-w-0 truncate">{prompt.title}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            ) : null}
           </div>
 
           <div className="shrink-0 border-t border-border bg-background/88 p-2 backdrop-blur">
@@ -1299,6 +1531,15 @@ function AgentConversationPanel({
                 <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-2xl border border-life-ai/20 bg-card px-3 text-sm font-semibold text-life-ai transition hover:bg-life-ai/5"
+                    aria-label="打开 AI 工具"
+                    onClick={() => onToolsSheetOpenChange(true)}
+                  >
+                    <Sparkles className="size-4" />
+                    工具
+                  </button>
+                  <button
+                    type="button"
                     className={`grid size-10 place-items-center rounded-2xl border transition ${
                       listening
                         ? 'border-life-ai bg-life-ai/10 text-life-ai'
@@ -1329,6 +1570,21 @@ function AgentConversationPanel({
           </div>
         </section>
       </div>
+
+      <AssistantToolsSheet
+        open={toolsSheetOpen}
+        quickActionLoading={quickActionLoading}
+        weeklyReviewsLoading={weeklyReviewsLoading}
+        weeklyReviewCount={weeklyReviews.length}
+        aiActionCount={aiActions.length}
+        latestPhotoDraft={latestPhotoDraft}
+        onOpenChange={onToolsSheetOpenChange}
+        onOpenWeeklyReviews={onOpenWeeklyReviews}
+        onOpenActions={onOpenActions}
+        onOpenPhotoAnalysis={onOpenPhotoAnalysis}
+        onOpenPhotoItemDraft={onOpenPhotoItemDraft}
+        onQuickAction={onQuickAction}
+      />
     </div>
   );
 }
@@ -1348,6 +1604,9 @@ function formatWeeklyReviewDateTime(value: string) {
 
 function useAiPageState() {
   const preferredPantryHouseholdId = useLifeTraceStore((state) => state.preferredPantryHouseholdId);
+  const preferredPantryHouseholdName = useLifeTraceStore(
+    (state) => state.preferredPantryHouseholdName,
+  );
   const plans = useLifeTraceStore((state) => state.plans);
   const traces = useLifeTraceStore((state) => state.traces);
   const checkins = useLifeTraceStore((state) => state.checkins);
@@ -1362,6 +1621,8 @@ function useAiPageState() {
   const receiveServerPantryItem = useLifeTraceStore((state) => state.receiveServerPantryItem);
   const addTrace = useLifeTraceStore((state) => state.addTrace);
   const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
+  const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
+  const pantryListSummary = useLifeTraceStore((state) => state.pantryListSummary);
   const generateTraceFromLatestPlan = useLifeTraceStore(
     (state) => state.generateTraceFromLatestPlan,
   );
@@ -1379,6 +1640,7 @@ function useAiPageState() {
   );
   const [activeAssistantConversationId, setActiveAssistantConversationId] = useState('');
   const [assistantConversationSheetOpen, setAssistantConversationSheetOpen] = useState(false);
+  const [assistantToolsSheetOpen, setAssistantToolsSheetOpen] = useState(false);
   const [assistantConversationsLoading, setAssistantConversationsLoading] = useState(false);
   const [assistantConversationCreating, setAssistantConversationCreating] = useState(false);
   const [deletingAssistantConversationId, setDeletingAssistantConversationId] = useState<
@@ -1416,17 +1678,38 @@ function useAiPageState() {
   const todayDate = useMemo(() => getLocalISODate(new Date()), []);
   const todayCheckins = checkinsDate === todayDate ? checkins : [];
   const completedCheckinCount = todayCheckins.filter((item) => item.completed).length;
-  const activeHabitCount = settings.habits.length;
-  const latestTrace = traces[0];
   const latestWeeklyReview = weeklyReviews[0];
   const currentWeekReview = findCurrentWeekReview(weeklyReviews);
   const activeAssistantConversation =
     assistantConversations.find((item) => item.id === activeAssistantConversationId) ?? null;
   const locationLabel = formatLocationDisplay(settings.city) || settings.city;
-  const placeholder = useMemo(
-    () => `${locationLabel} · ${settings.commuteMethod}通勤 · ${openPlanCount} 个待完成计划`,
-    [locationLabel, openPlanCount, settings.commuteMethod],
-  );
+  const weatherSummary = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return settings.city;
+    }
+    const cached = readWeatherCache(window.localStorage, settings.city);
+    if (!cached) {
+      return settings.city;
+    }
+    return `${cached.now.temp}° ${cached.now.text}`;
+  }, [settings.city]);
+  const expiringPantryCount = pantryListSummary.expiring + pantryListSummary.expired;
+  const pantryHouseholdLabel = preferredPantryHouseholdId
+    ? preferredPantryHouseholdName || '当前共享空间'
+    : '我的空间';
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    void loadPantryList({
+      page: 1,
+      pageSize: 20,
+      status: 'all',
+      category: 'all',
+      householdId: preferredPantryHouseholdId || undefined,
+    });
+  }, [loadPantryList, preferredPantryHouseholdId, token]);
 
   useEffect(() => {
     if (!token || !settingsLoaded) {
@@ -1455,14 +1738,8 @@ function useAiPageState() {
   }, []);
 
   const handleRemovePhotoItemDraft = (draftId: string) => {
-    const draft = photoItemHistory.find((item) => item.id === draftId);
     removePhotoItemAnalysisHistory(draftId);
     setPhotoItemHistory(readPhotoItemAnalysisHistory());
-    setResult({
-      title: '已移除拍照草稿',
-      detail: `「${draft?.form.name || draft?.analysis.name || '未入库商品'}」不会再出现在最近识别里。`,
-      tone: 'trace',
-    });
   };
 
   useEffect(() => {
@@ -2303,6 +2580,8 @@ function useAiPageState() {
     activeAssistantConversation,
     assistantConversationSheetOpen,
     setAssistantConversationSheetOpen,
+    assistantToolsSheetOpen,
+    setAssistantToolsSheetOpen,
     assistantConversationsLoading,
     assistantConversationCreating,
     deletingAssistantConversationId,
@@ -2334,13 +2613,13 @@ function useAiPageState() {
     openPlanCount,
     completedPlanCount,
     completedCheckinCount,
-    activeHabitCount,
-    latestTrace,
     latestWeeklyReview,
     photoItemHistory,
     handleRemovePhotoItemDraft,
     locationLabel,
-    placeholder,
+    weatherSummary,
+    pantryHouseholdLabel,
+    expiringPantryCount,
     handleSelectAssistantConversation,
     handleCreateAssistantConversation,
     handleDeleteAssistantConversation,
@@ -2483,6 +2762,8 @@ export function AiPage() {
     activeAssistantConversation,
     assistantConversationSheetOpen,
     setAssistantConversationSheetOpen,
+    assistantToolsSheetOpen,
+    setAssistantToolsSheetOpen,
     assistantConversationsLoading,
     assistantConversationCreating,
     deletingAssistantConversationId,
@@ -2499,9 +2780,14 @@ export function AiPage() {
     weeklyReviewsLoading,
     weeklyReviewRegenerateTarget,
     setWeeklyReviewRegenerateTarget,
-    latestWeeklyReview,
     photoItemHistory,
     handleRemovePhotoItemDraft,
+    locationLabel,
+    weatherSummary,
+    pantryHouseholdLabel,
+    openPlanCount,
+    completedCheckinCount,
+    expiringPantryCount,
     handleSelectAssistantConversation,
     handleCreateAssistantConversation,
     handleDeleteAssistantConversation,
@@ -2530,11 +2816,15 @@ export function AiPage() {
         addingRecipeId={addingRecipeId}
         weeklyReviews={weeklyReviews}
         weeklyReviewsLoading={weeklyReviewsLoading}
-        latestWeeklyReview={latestWeeklyReview}
         photoItemHistory={photoItemHistory}
-        quickActions={aiQuickActions}
         quickActionLoading={quickActionLoading}
         aiActions={aiActions}
+        locationLabel={locationLabel}
+        weatherSummary={weatherSummary}
+        pantryHouseholdLabel={pantryHouseholdLabel}
+        openPlanCount={openPlanCount}
+        completedCheckinCount={completedCheckinCount}
+        expiringPantryCount={expiringPantryCount}
         speechSupported={assistantSpeechSupported}
         listening={assistantListening}
         speechError={assistantSpeechError}
@@ -2553,6 +2843,8 @@ export function AiPage() {
         }
         onRemovePhotoItemDraft={handleRemovePhotoItemDraft}
         onOpenActions={() => navigate('/ai/actions')}
+        toolsSheetOpen={assistantToolsSheetOpen}
+        onToolsSheetOpenChange={setAssistantToolsSheetOpen}
         onAddAdvicePlan={(item) => void handleAddAdvicePlan(item)}
         onAddRecipePlan={(recipe) => void handleAddRecipePlan(recipe)}
         onQuickAction={(label) => void handleQuickAction(label)}

@@ -43,6 +43,32 @@ export type PantryPhotoCropBox = {
   height: number;
 };
 
+export type PantryPhotoOCRHint = {
+  kind: 'production_date' | 'expiry_date' | 'shelf_life_days' | 'shelf_life_text';
+  text: string;
+  normalizedValue?: string;
+  confidence?: number;
+  sourceRegion?: PantryPhotoCropBox;
+};
+
+export type PantryPhotoDetectedItem = {
+  id: string;
+  name: string;
+  category: PantryItem['category'];
+  brand?: string;
+  spec?: string;
+  quantity: number;
+  unit: string;
+  storageLocation: PantryItem['location'];
+  expiresAt?: string;
+  productionDate?: string;
+  purchaseDate?: string;
+  shelfLifeDays?: number;
+  confidence: number;
+  warnings: string[];
+  cropBox?: PantryPhotoCropBox;
+};
+
 export type PantryPhotoAnalysisRequest = {
   imageUrl: string;
   householdId?: string;
@@ -66,6 +92,9 @@ export type PantryPhotoAnalysisResponse = {
   warnings: string[];
   cropBox: PantryPhotoCropBox;
   summary: string;
+  multiItemDetected?: boolean;
+  detectedItems: PantryPhotoDetectedItem[];
+  ocrHints: PantryPhotoOCRHint[];
   householdId?: string;
   householdName?: string;
   source: 'ark';

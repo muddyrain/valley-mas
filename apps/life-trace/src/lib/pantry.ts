@@ -212,12 +212,13 @@ export function buildPantryTraceInput(
   now = new Date(),
 ): NewTraceInput {
   const actionLabel = action === 'used-up' ? '用完' : '丢弃';
+  const quantityText = `${item.quantity}${item.unit}`;
   return {
-    title: `${item.name}${action === 'used-up' ? ' 已用完' : ' 已丢弃'}`,
+    title: `${action === 'used-up' ? '已用完' : '已丢弃'}：${item.name}`,
     summary:
       action === 'used-up'
-        ? `Life Trace 记录了「${item.name}」已经处理完成，这次属于家庭库存的正常消耗。`
-        : `Life Trace 记录了「${item.name}」已经被丢弃，后续可以结合库存提醒减少浪费。`,
+        ? `已将「${item.name}」标记为已用完，处理数量为 ${quantityText}。`
+        : `已将「${item.name}」标记为已丢弃，处理数量为 ${quantityText}。`,
     timeLabel: formatPantryTraceTime(now),
     location: item.location,
     imageUrl: item.imageUrl || item.thumbnailUrl,
@@ -231,7 +232,7 @@ export function buildPantryCreatedTraceInput(item: PantryItem, now = new Date())
   const expiryText = item.expiresAt ? `，保质期记录到 ${item.expiresAt}` : '';
   return {
     title: `新增库存：${item.name}`,
-    summary: `Life Trace 已将「${item.name}」加入家庭库存，数量为 ${item.quantity}${item.unit}${expiryText}。`,
+    summary: `已将「${item.name}」新增到「${item.householdId ? '共享空间' : '我的空间'}」，数量为 ${item.quantity}${item.unit}${expiryText}。`,
     timeLabel: formatPantryTraceTime(now),
     location: item.location,
     imageUrl: item.imageUrl || item.thumbnailUrl,

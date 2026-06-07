@@ -42,6 +42,7 @@ export function ReminderSettingsPage() {
   const [permissionRequesting, setPermissionRequesting] = useState(false);
   const [dailyBriefPreviewing, setDailyBriefPreviewing] = useState(false);
   const [notificationTesting, setNotificationTesting] = useState(false);
+  const [serverPushTesting, setServerPushTesting] = useState(false);
   const [serverPushBinding, setServerPushBinding] = useState(false);
   const [notificationTestMessage, setNotificationTestMessage] = useState('');
   const token = useAuthStore((state) => state.token);
@@ -64,6 +65,11 @@ export function ReminderSettingsPage() {
     ? `${pantryPreferences.defaultReminderTime} · ${pantryPreferences.defaultReminderRules.length} 个节点`
     : '已关闭';
   const enabledSignals = Number(settings.weatherAlerts) + Number(settings.planReminders);
+  const serviceWorkerLabel = !notification.secureContext
+    ? '需要 HTTPS / localhost'
+    : 'serviceWorker' in navigator
+      ? '已就绪'
+      : '不可用';
 
   const update = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
     updateSettings({ [key]: value });
@@ -115,6 +121,23 @@ export function ReminderSettingsPage() {
       );
     } finally {
       setServerPushBinding(false);
+    }
+  };
+
+  const handleServerPushTest = async () => {
+    setServerPushTesting(true);
+    setNotificationTestMessage('');
+    try {
+      const result = await notification.showServerTestNotification();
+      setNotificationTestMessage(
+        result.sent
+          ? result.rebound
+            ? '服务端测试通知已送出，设备已重新绑定。'
+            : '服务端测试通知已送出，请看设备是否收到。'
+          : result.error || '服务端测试通知失败。',
+      );
+    } finally {
+      setServerPushTesting(false);
     }
   };
 
@@ -192,6 +215,34 @@ export function ReminderSettingsPage() {
                 <p className="text-xs font-semibold text-muted-foreground">库存默认提醒</p>
                 <p className="mt-2 text-sm font-semibold text-foreground">
                   {pantryReminderOverviewMeta}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </section>
+
+        <section className="space-y-3">
+          <SectionHeader title="通知诊断" meta="权限 / SW / Push" />
+          <Card className="space-y-3 p-4">
+            <div className="grid grid-cols-2 gap-2 max-[360px]:grid-cols-1">
+              <div className="rounded-[1.1rem] border border-border bg-secondary/55 p-3">
+                <p className="text-xs font-semibold text-muted-foreground">权限状态</p>
+                <p className="mt-2 text-sm font-semibold text-foreground">{notification.label}</p>
+              </div>
+              <div className="rounded-[1.1rem] border border-border bg-secondary/55 p-3">
+                <p className="text-xs font-semibold text-muted-foreground">Service Worker</p>
+                <p className="mt-2 text-sm font-semibold text-foreground">{serviceWorkerLabel}</p>
+              </div>
+              <div className="rounded-[1.1rem] border border-border bg-secondary/55 p-3">
+                <p className="text-xs font-semibold text-muted-foreground">Push 绑定</p>
+                <p className="mt-2 text-sm font-semibold text-foreground">
+                  {notification.serverPushLabel}
+                </p>
+              </div>
+              <div className="rounded-[1.1rem] border border-border bg-secondary/55 p-3">
+                <p className="text-xs font-semibold text-muted-foreground">最近测试</p>
+                <p className="mt-2 text-sm font-semibold text-foreground">
+                  {notificationTestMessage || '还没跑过测试'}
                 </p>
               </div>
             </div>
@@ -491,6 +542,20 @@ export function ReminderSettingsPage() {
                     : '绑定推送'}
               </Button>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!notification.serverPushReady || serverPushTesting}
+              onClick={() => void handleServerPushTest()}
+            >
+              {serverPushTesting ? (
+                <ActionLoadingIcon className="size-4" tone="ai" />
+              ) : (
+                <Wifi className="size-4" />
+              )}
+              {serverPushTesting ? '测试中' : '服务端测试'}
+            </Button>
           </Card>
         </section>
       </div>
