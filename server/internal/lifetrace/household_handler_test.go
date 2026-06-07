@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
@@ -204,5 +205,61 @@ func TestHouseholdInviteJoinLeaveAndDissolveFlow(t *testing.T) {
 	}
 	if household.Status != householdStatusDissolved {
 		t.Fatalf("expected household status dissolved, got %+v", household)
+	}
+}
+
+func TestGetHouseholdInviteReturnsLatestInviteAndExpiresStalePendingInvite(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/households", bytes.NewBufferString(`{"name":"爸妈家"}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp := httptest.NewRecorder()
+	router.ServeHTTP(createResp, createReq)
+	created := decodeTracePayload(t, createResp)["data"].(map[string]interface{})
+	householdID := created["id"].(string)
+
+	getInviteReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/households/"+householdID+"/invite", nil)
+	getInviteResp := httptest.NewRecorder()
+	router.ServeHTTP(getInviteResp, getInviteReq)
+	if decodeTracePayload(t, getInviteResp)["data"] != nil {
+		t.Fatalf("expected nil invite before generation, got %+v", decodeTracePayload(t, getInviteResp)["data"])
+	}
+
+	createInviteReq := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/households/"+householdID+"/invites", bytes.NewBufferString(`{}`))
+	createInviteReq.Header.Set("Content-Type", "application/json")
+	createInviteResp := httptest.NewRecorder()
+	router.ServeHTTP(createInviteResp, createInviteReq)
+	invite := decodeTracePayload(t, createInviteResp)["data"].(map[string]interface{})
+	if invite["status"] != householdInviteStatusPending {
+		t.Fatalf("expected pending invite after creation, got %+v", invite)
+	}
+
+	getInviteResp = httptest.NewRecorder()
+	router.ServeHTTP(getInviteResp, getInviteReq)
+	latestInvite := decodeTracePayload(t, getInviteResp)["data"].(map[string]interface{})
+	if latestInvite["inviteCode"] != invite["inviteCode"] || latestInvite["status"] != householdInviteStatusPending {
+		t.Fatalf("expected latest invite payload, got %+v", latestInvite)
+	}
+
+	var storedInvite model.HouseholdInvite
+	if err := database.GetDB().
+		Where("household_id = ?", householdID).
+		Order("created_at DESC").
+		First(&storedInvite).Error; err != nil {
+		t.Fatalf("load invite failed: %v", err)
+	}
+	expiredAt := time.Now().Add(-2 * time.Hour)
+	if err := database.GetDB().Model(&storedInvite).Updates(map[string]interface{}{
+		"expires_at": expiredAt,
+		"status":     householdInviteStatusPending,
+	}).Error; err != nil {
+		t.Fatalf("expire invite failed: %v", err)
+	}
+
+	getInviteResp = httptest.NewRecorder()
+	router.ServeHTTP(getInviteResp, getInviteReq)
+	expiredInvite := decodeTracePayload(t, getInviteResp)["data"].(map[string]interface{})
+	if expiredInvite["status"] != householdInviteStatusExpired {
+		t.Fatalf("expected expired invite status, got %+v", expiredInvite)
 	}
 }

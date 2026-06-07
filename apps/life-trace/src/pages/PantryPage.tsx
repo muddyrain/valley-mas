@@ -5,6 +5,7 @@ import {
   Camera,
   Check,
   ClipboardList,
+  Home,
   Milk,
   PackagePlus,
   Pill,
@@ -12,12 +13,14 @@ import {
   Settings2,
   Sparkles,
   Trash2,
+  Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadErrorState } from '@/components/LoadErrorState';
+import { PantryHouseholdDetailSheet } from '@/components/PantryHouseholdDetailSheet';
 import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
 import { PantryItemDrawer } from '@/components/PantryItemDrawer';
 import { PantryTransferSheet } from '@/components/PantryTransferSheet';
@@ -154,6 +157,7 @@ export function PantryPage() {
   const [transferSheetOpen, setTransferSheetOpen] = useState(false);
   const [transferItems, setTransferItems] = useState<PantryItem[]>([]);
   const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
+  const [householdDetailOpen, setHouseholdDetailOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<PantryItemStatus | 'all'>(() =>
     readStatusFilter(new URLSearchParams(window.location.search)),
   );
@@ -172,24 +176,26 @@ export function PantryPage() {
   const latestSearchParamsRef = useRef(searchParams);
   const showToast = useFeedbackToastStore((state) => state.showToast);
   const effectiveHouseholdId = preferredPantryHouseholdId || pantryResolvedHouseholdId;
-  const isPersonalScope = !preferredPantryHouseholdId;
   const currentHouseholdName =
     pantryResolvedHouseholdName || preferredPantryHouseholdName || '当前空间';
-  const canTransferFromCurrentHousehold = isPersonalScope && Boolean(pantryResolvedHouseholdId);
   const selectedItems = useMemo(
     () => pantryList.filter((item) => selectedItemIds.includes(item.id)),
     [pantryList, selectedItemIds],
   );
   const {
     households,
+    householdsLoaded,
     householdsLoading,
     householdError,
     householdMembers,
     householdMembersLoading,
     invitePayload,
+    inviteLoading,
     activeHouseholdId,
+    currentHousehold,
     loadHouseholds,
     loadHouseholdMembersFor,
+    loadHouseholdInvite,
     handleSelectHousehold,
     handleCreateHousehold,
     handleJoinHousehold,
@@ -199,6 +205,11 @@ export function PantryPage() {
     handleTransferOwner,
     handleDissolveHousehold,
   } = usePantryHouseholdManager();
+  const isPersonalScope =
+    currentHousehold?.kind === 'personal' || (!currentHousehold && !preferredPantryHouseholdId);
+  const canTransferFromCurrentHousehold = isPersonalScope && Boolean(pantryResolvedHouseholdId);
+  const currentSpaceMetaText =
+    currentHousehold?.kind === 'shared' ? `${currentHousehold.memberCount} 人共享` : '个人空间';
 
   const syncUrlState = useCallback(
     (updates: {
@@ -344,6 +355,14 @@ export function PantryPage() {
   }, [refreshPantryList, settingsLoaded]);
 
   useEffect(() => {
+    if (!settingsLoaded || householdsLoaded || householdsLoading) {
+      return;
+    }
+
+    void loadHouseholds();
+  }, [householdsLoaded, householdsLoading, loadHouseholds, settingsLoaded]);
+
+  useEffect(() => {
     if (pantryLoading || pantryLoadingMore || !pantryPagination.hasMore) {
       return;
     }
@@ -423,21 +442,23 @@ export function PantryPage() {
 
   return (
     <div className="space-y-5">
-      <header className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <button
-            type="button"
-            className="text-sm text-muted-foreground transition hover:text-foreground"
-            onClick={() => navigate('/today')}
-          >
-            返回今日
-          </button>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight max-[360px]:text-2xl">家庭库存</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            直接跟随你在我的页设置的当前空间，打开就能看临期、补货和今晚该先处理什么。
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-2">
+      <header className="space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <button
+              type="button"
+              className="text-sm text-muted-foreground transition hover:text-foreground"
+              onClick={() => navigate('/today')}
+            >
+              返回今日
+            </button>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight max-[360px]:text-2xl">
+              家庭库存
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              直接跟随你在我的页设置的当前空间，打开就能看临期、补货和今晚该先处理什么。
+            </p>
+          </div>
           <Button
             type="button"
             variant="ai"
@@ -450,56 +471,117 @@ export function PantryPage() {
             <PackagePlus className="size-4" />
             添加
           </Button>
-          {canTransferFromCurrentHousehold && pantryList.length > 0 ? (
-            <Button type="button" variant="ghost" size="sm" onClick={toggleSelectionMode}>
-              {selectionMode ? '取消批量' : '批量选择'}
-            </Button>
-          ) : null}
+        </div>
+
+        <div className="relative overflow-hidden rounded-[1.45rem] border border-life-ai/15 bg-[radial-gradient(circle_at_top_right,rgba(6,182,212,0.14),transparent_30%),linear-gradient(180deg,rgba(24,24,27,0.96),rgba(24,24,27,0.92))] p-3 shadow-[0_18px_46px_rgba(0,0,0,0.2)]">
+          <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-life-ai/60 to-transparent" />
+          <div className="absolute -right-8 -top-8 size-24 rounded-full bg-life-ai/10 blur-2xl" />
+          <div className="relative flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <div className="grid size-12 shrink-0 place-items-center rounded-[1.15rem] border border-life-ai/20 bg-life-ai/10 text-life-ai shadow-[0_12px_28px_rgba(6,182,212,0.14)]">
+                  {currentHousehold?.kind === 'shared' ? (
+                    <Users className="size-5" />
+                  ) : (
+                    <Home className="size-5" />
+                  )}
+                </div>
+                <div className="min-w-0 pt-0.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge tone="ai" className="px-2 py-0.5 text-[11px]">
+                      当前空间
+                    </Badge>
+                    {currentHousehold?.kind === 'shared' ? (
+                      <Badge tone="default" className="px-2 py-0.5 text-[11px]">
+                        共享家庭
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <p className="mt-2 truncate text-[1.1rem] font-semibold text-foreground">
+                    {pantryLoading && !pantryLoaded ? '正在同步当前空间...' : currentHouseholdName}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{currentSpaceMetaText}</p>
+                </div>
+              </div>
+
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5 px-3 text-xs"
+                  disabled={householdsLoading && householdSheetOpen}
+                  onClick={() => setHouseholdSheetOpen(true)}
+                >
+                  {householdsLoading && householdSheetOpen ? (
+                    <ActionLoadingIcon className="size-4" tone="ai" />
+                  ) : (
+                    <Settings2 className="size-4" />
+                  )}
+                  切换空间
+                </Button>
+                {currentHousehold?.kind === 'shared' && currentHousehold.status === 'active' ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 gap-1.5 bg-secondary/45 px-3 text-xs hover:bg-secondary/70"
+                    onClick={() => setHouseholdDetailOpen(true)}
+                  >
+                    <Users className="size-4" />
+                    空间详情
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[11px] font-medium text-foreground/88">
+                在库 {pantrySummary.total}
+              </span>
+              <span className="rounded-full border border-life-health/24 bg-life-health/12 px-2.5 py-1 text-[11px] font-medium text-life-health">
+                临期 {pantrySummary.expiring}
+              </span>
+              <span className="rounded-full border border-life-alert/24 bg-life-alert/12 px-2.5 py-1 text-[11px] font-medium text-life-alert">
+                风险 {pantrySummary.expired}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
+              <div className="rounded-2xl border border-white/12 bg-secondary/78 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <p className="text-[11px] font-semibold text-muted-foreground">在库</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">
+                  {pantrySummary.total} 件
+                </p>
+              </div>
+              <div className="rounded-2xl border border-life-health/24 bg-life-health/12 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                <p className="text-[11px] font-semibold text-muted-foreground">临期</p>
+                <p className="mt-1 text-sm font-semibold text-life-health">
+                  {pantrySummary.expiring} 件待处理
+                </p>
+              </div>
+              <div className="rounded-2xl border border-life-alert/24 bg-life-alert/12 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                <p className="text-[11px] font-semibold text-muted-foreground">风险</p>
+                <p className="mt-1 text-sm font-semibold text-life-alert">
+                  {pantrySummary.expired} 件已过期
+                </p>
+              </div>
+            </div>
+
+            {canTransferFromCurrentHousehold && pantryList.length > 0 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full justify-center border border-dashed border-border bg-secondary/35 text-muted-foreground hover:bg-secondary/65 hover:text-foreground"
+                onClick={toggleSelectionMode}
+              >
+                {selectionMode ? '取消批量选择' : '批量选择后转移到共享家庭'}
+              </Button>
+            ) : null}
+          </div>
         </div>
       </header>
-
-      <Card className="space-y-4 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <Badge tone="ai">当前空间</Badge>
-            <h2 className="mt-2 truncate text-xl font-semibold">
-              {pantryLoading && !pantryLoaded ? '正在同步当前空间' : currentHouseholdName}
-            </h2>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={householdsLoading && householdSheetOpen}
-            onClick={() => setHouseholdSheetOpen(true)}
-          >
-            {householdsLoading && householdSheetOpen ? (
-              <ActionLoadingIcon className="size-4" tone="ai" />
-            ) : (
-              <Settings2 className="size-4" />
-            )}
-            切换空间
-          </Button>
-        </div>
-      </Card>
-
-      <section className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
-        <Card className="border-life-health/20 bg-life-health/10 p-4">
-          <p className="text-sm font-semibold text-life-health">临期</p>
-          <p className="mt-2 text-2xl font-bold">{pantrySummary.expiring}</p>
-          <p className="mt-1 text-xs text-muted-foreground">7 天内需要处理</p>
-        </Card>
-        <Card className="border-life-alert/20 bg-life-alert/10 p-4">
-          <p className="text-sm font-semibold text-life-alert">已过期</p>
-          <p className="mt-2 text-2xl font-bold">{pantrySummary.expired}</p>
-          <p className="mt-1 text-xs text-muted-foreground">需要尽快确认</p>
-        </Card>
-        <Card className="border-life-ai/20 bg-life-ai/10 p-4">
-          <p className="text-sm font-semibold text-life-ai">在库总数</p>
-          <p className="mt-2 text-2xl font-bold">{pantrySummary.total}</p>
-          <p className="mt-1 text-xs text-muted-foreground">当前空间仍在管理中的条目</p>
-        </Card>
-      </section>
 
       <Card className="space-y-4 p-4">
         <label className="relative block">
@@ -971,20 +1053,24 @@ export function PantryPage() {
         onOpenChange={setHouseholdSheetOpen}
         households={households}
         selectedHouseholdId={activeHouseholdId}
-        members={householdMembers}
-        membersLoading={householdMembersLoading}
         householdsLoading={householdsLoading}
-        invitePayload={invitePayload}
-        onSelectHousehold={(householdId) => {
-          handleSelectHousehold(householdId);
-          void loadHouseholdMembersFor(householdId);
-        }}
+        onSelectHousehold={handleSelectHousehold}
         onCreateHousehold={async (name) => {
           await handleCreateHousehold(name);
         }}
         onJoinHousehold={async (inviteCode) => {
           await handleJoinHousehold(inviteCode);
         }}
+      />
+      <PantryHouseholdDetailSheet
+        open={householdDetailOpen}
+        onOpenChange={setHouseholdDetailOpen}
+        household={currentHousehold?.kind === 'shared' ? currentHousehold : null}
+        members={householdMembers}
+        membersLoading={householdMembersLoading}
+        invitePayload={invitePayload}
+        inviteLoading={inviteLoading}
+        onLoadInvite={loadHouseholdInvite}
         onCreateInvite={async (householdId) => {
           await handleCreateInvite(householdId);
         }}

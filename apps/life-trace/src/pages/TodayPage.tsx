@@ -6,6 +6,8 @@ import {
   Droplets,
   LoaderCircle,
   MapPin,
+  PackageCheck,
+  PackageOpen,
   RefreshCw,
   Settings,
   Sun,
@@ -22,7 +24,6 @@ import {
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AnimatedWeatherIcon } from '@/components/AnimatedWeatherIcon';
 import { LocationPicker } from '@/components/LocationPicker';
-import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { weatherMetrics } from '@/data/mock';
@@ -259,8 +260,15 @@ export function TodayPage() {
   const todayCheckins = checkinsDate === todayDate ? checkins : [];
   const pantryHouseholdName = pantryListResolvedHouseholdName || preferredPantryHouseholdName;
   const pantryOverview = pantryListSummary;
+  const pantryAttentionTotal = pantryOverview.expiring + pantryOverview.expired;
   const pantryCardLoading =
     Boolean(token) && (!settingsLoaded || !pantryListLoaded || pantryListLoading);
+  let pantryPrioritySummary = '今天没有临期或过期条目。';
+  if (pantryCardLoading) {
+    pantryPrioritySummary = '正在同步库存，稍后按到期优先级展示。';
+  } else if (pantryAttentionTotal > 0) {
+    pantryPrioritySummary = `${pantryOverview.expiring} 件临期，${pantryOverview.expired} 件已过期。`;
+  }
   const pantryPreviewItems = useMemo(
     () =>
       sortPantryItems(pantryListItems)
@@ -821,7 +829,7 @@ export function TodayPage() {
         />
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge tone={pantryOverview.expired > 0 ? 'alert' : 'health'}>家中临期</Badge>
               {pantryHouseholdName && !pantryCardLoading ? (
                 <span className="text-xs text-muted-foreground">
@@ -833,37 +841,55 @@ export function TodayPage() {
               ) : null}
             </div>
             <h2 className="mt-2 text-lg font-semibold">今天该先处理哪几样</h2>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              {pantryCardLoading
-                ? '正在同步当前空间和库存，马上就能看到今天该优先处理的条目。'
-                : pantryOverview.expiring || pantryOverview.expired
-                  ? `${pantryOverview.expiring} 件临期，${pantryOverview.expired} 件已过期。点进去可以拍照、补图和改提醒。`
-                  : '目前没有临期或过期条目，可以先把家里的食品和用品收进库存。'}
-            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">{pantryPrioritySummary}</p>
           </div>
           <button
             type="button"
-            className="shrink-0 cursor-pointer rounded-full bg-secondary px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
+            className="shrink-0 cursor-pointer rounded-full bg-secondary px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:text-foreground focus:outline-none focus:ring-2 focus:ring-life-health/30"
             onClick={() => navigate(pantryPageHref)}
           >
             查看
           </button>
         </div>
         {pantryCardLoading ? (
-          <div className="space-y-3">
-            <SyncState
-              title="正在同步当前空间库存"
-              description="临期和过期条目马上出来。"
-              tone="health"
-              showRail={false}
-            />
-            <SyncState
-              title="正在加载库存条目"
-              tone="health"
-              variant="skeleton-list"
-              rows={2}
-              showRail={false}
-            />
+          <div
+            className="rounded-[1.15rem] border border-life-health/15 bg-life-health/5 px-4 py-4"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <div className="flex items-center gap-3">
+              <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/12 text-life-health">
+                <ActionLoadingIcon tone="health" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-foreground">正在整理库存优先级</p>
+                  <RefreshCw className="size-3.5 animate-spin text-life-health motion-reduce:animate-none" />
+                </div>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  当前空间、临期和过期状态正在同步。
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 space-y-2">
+              {[0, 1, 2].map((index) => (
+                <div
+                  key={`pantry-loading-${index}`}
+                  className="flex items-center gap-3 rounded-2xl bg-card/60 px-3 py-2.5"
+                >
+                  <div className="size-9 shrink-0 animate-pulse rounded-2xl bg-life-health/15 motion-reduce:animate-none" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div
+                      className={cn(
+                        'h-3 animate-pulse rounded-full bg-secondary motion-reduce:animate-none',
+                        index === 0 ? 'w-24' : index === 1 ? 'w-32' : 'w-20',
+                      )}
+                    />
+                    <div className="h-2.5 w-full animate-pulse rounded-full bg-secondary/70 motion-reduce:animate-none" />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : pantryPreviewItems.length > 0 ? (
           <div className="space-y-2">
@@ -902,8 +928,42 @@ export function TodayPage() {
             })}
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-border px-4 py-5 text-sm leading-6 text-muted-foreground">
-            先从冰箱里最常忘的一样开始，比如牛奶、鸡蛋或生菜，补一张图会更容易一眼认出来。
+          <div className="rounded-[1.15rem] border border-dashed border-life-health/25 bg-life-health/5 px-4 py-4">
+            <div className="flex items-start gap-3">
+              <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-health/12 text-life-health">
+                <PackageCheck className="size-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground">今天没有紧急库存</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  先补一件常忘的食品或用品，后面会自动排到这里。
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="rounded-2xl bg-card/70 px-3 py-3">
+                <p className="text-[11px] font-medium text-muted-foreground">临期</p>
+                <p className="mt-1 text-lg font-semibold text-life-health">
+                  {pantryOverview.expiring}
+                  <span className="ml-1 text-xs font-medium text-muted-foreground">件</span>
+                </p>
+              </div>
+              <div className="rounded-2xl bg-card/70 px-3 py-3">
+                <p className="text-[11px] font-medium text-muted-foreground">过期</p>
+                <p className="mt-1 text-lg font-semibold text-life-alert">
+                  {pantryOverview.expired}
+                  <span className="ml-1 text-xs font-medium text-muted-foreground">件</span>
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="mt-4 inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-life-health/12 px-4 text-sm font-semibold text-life-health transition hover:bg-life-health/18 focus:outline-none focus:ring-2 focus:ring-life-health/30"
+              onClick={() => navigate(pantryPageHref)}
+            >
+              <PackageOpen className="size-4" />
+              去补库存
+            </button>
           </div>
         )}
       </Card>

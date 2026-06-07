@@ -26,6 +26,13 @@ export function listHouseholdMembers(token: string, householdId: string) {
   );
 }
 
+export function getHouseholdInvite(token: string, householdId: string) {
+  return apiRequest<HouseholdInvitePayload | null>(
+    `/life-trace/households/${householdId}/invite`,
+    token,
+  );
+}
+
 export function createHouseholdInvite(token: string, householdId: string) {
   return apiRequest<HouseholdInvitePayload>(
     `/life-trace/households/${householdId}/invites`,

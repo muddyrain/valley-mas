@@ -3,6 +3,7 @@ import {
   createHousehold,
   createHouseholdInvite,
   dissolveHousehold,
+  getHouseholdInvite,
   joinHousehold,
   leaveHousehold,
   listHouseholdMembers,
@@ -30,6 +31,7 @@ export function usePantryHouseholdManager() {
   const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
   const [householdMembersLoading, setHouseholdMembersLoading] = useState(false);
   const [invitePayload, setInvitePayload] = useState<HouseholdInvitePayload | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
   const [activeHouseholdId, setActiveHouseholdId] = useState('');
   const invitePayloadRef = useRef(invitePayload);
   const pendingActiveHouseholdIdRef = useRef('');
@@ -50,6 +52,7 @@ export function usePantryHouseholdManager() {
     setHouseholdMembers([]);
     setHouseholdMembersLoading(false);
     setInvitePayload(null);
+    setInviteLoading(false);
     setActiveHouseholdId('');
     pendingActiveHouseholdIdRef.current = '';
   }, [token]);
@@ -74,6 +77,27 @@ export function usePantryHouseholdManager() {
         throw new Error(getLifeTraceErrorMessage(error, '读取家庭成员失败'));
       } finally {
         setHouseholdMembersLoading(false);
+      }
+    },
+    [token],
+  );
+
+  const loadHouseholdInvite = useCallback(
+    async (householdId: string) => {
+      if (!token || !householdId) {
+        setInvitePayload(null);
+        return null;
+      }
+
+      setInviteLoading(true);
+      try {
+        const response = await getHouseholdInvite(token, householdId);
+        setInvitePayload(response);
+        return response;
+      } catch (error) {
+        throw new Error(getLifeTraceErrorMessage(error, '读取邀请码失败'));
+      } finally {
+        setInviteLoading(false);
       }
     },
     [token],
@@ -275,10 +299,12 @@ export function usePantryHouseholdManager() {
     householdMembers,
     householdMembersLoading,
     invitePayload,
+    inviteLoading,
     activeHouseholdId,
     currentHousehold,
     loadHouseholds,
     loadHouseholdMembersFor,
+    loadHouseholdInvite,
     handleSelectHousehold,
     handleCreateHousehold,
     handleJoinHousehold,

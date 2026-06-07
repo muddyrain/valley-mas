@@ -220,6 +220,56 @@ func (h *Handler) ListHouseholdMembers(c *gin.Context) {
 	})
 }
 
+func (h *Handler) GetHouseholdInvite(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	ctx, ok := readHouseholdContext(c, userID)
+	if !ok {
+		return
+	}
+	if ctx.Household.Kind != householdKindShared {
+		success(c, nil)
+		return
+	}
+	if ctx.Member.Role != householdRoleOwner && ctx.Member.Role != householdRoleAdmin {
+		fail(c, http.StatusForbidden, "只有家庭管理员可以查看邀请码")
+		return
+	}
+
+	var invite model.HouseholdInvite
+	if err := database.GetDB().
+		Where("household_id = ?", ctx.Household.ID).
+		Order("created_at DESC").
+		First(&invite).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			success(c, nil)
+			return
+		}
+		fail(c, http.StatusInternalServerError, "读取邀请码失败")
+		return
+	}
+
+	now := time.Now()
+	if invite.Status == householdInviteStatusPending && invite.ExpiresAt != nil && invite.ExpiresAt.Before(now) {
+		if err := database.GetDB().Model(&invite).Update("status", householdInviteStatusExpired).Error; err != nil {
+			fail(c, http.StatusInternalServerError, "读取邀请码失败")
+			return
+		}
+		invite.Status = householdInviteStatusExpired
+	}
+
+	success(c, gin.H{
+		"householdId": invite.HouseholdID,
+		"inviteCode":  invite.InviteCode,
+		"expiresAt":   invite.ExpiresAt,
+		"status":      invite.Status,
+	})
+}
+
 func (h *Handler) CreateHouseholdInvite(c *gin.Context) {
 	userID, ok := currentUserID(c)
 	if !ok {

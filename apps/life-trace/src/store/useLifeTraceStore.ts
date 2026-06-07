@@ -1026,6 +1026,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           if (get().pantryListLoaded && activeHouseholdId === targetHouseholdId) {
             void get().loadPantryList(get().pantryListOptions);
           }
+          if (get().tracesLoaded) {
+            void get().loadTraces();
+          }
           return item;
         } catch (error) {
           set({ pantryError: getLifeTraceErrorMessage(error, '添加库存失败') });
@@ -1109,6 +1112,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           if (get().pantryListLoaded && activeHouseholdId === targetHouseholdId) {
             void get().loadPantryList(get().pantryListOptions);
           }
+          if ((status === 'used-up' || status === 'discarded') && get().tracesLoaded) {
+            void get().loadTraces();
+          }
           return updatedItem;
         } catch (error) {
           set({ pantryError: getLifeTraceErrorMessage(error, '更新库存状态失败') });
@@ -1189,6 +1195,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
 
           if (state.pantryListLoaded && activeHouseholdId === targetHouseholdId) {
             void get().loadPantryList(state.pantryListOptions);
+          }
+          if (state.tracesLoaded) {
+            void get().loadTraces();
           }
 
           return {

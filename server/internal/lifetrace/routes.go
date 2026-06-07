@@ -77,6 +77,7 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			households.POST("", handler.CreateHousehold)
 			households.GET("/:householdId", handler.GetHousehold)
 			households.GET("/:householdId/members", handler.ListHouseholdMembers)
+			households.GET("/:householdId/invite", handler.GetHouseholdInvite)
 			households.POST("/:householdId/invites", handler.CreateHouseholdInvite)
 			households.DELETE("/:householdId/invite", handler.RevokeHouseholdInvite)
 			households.POST("/join", handler.JoinHousehold)

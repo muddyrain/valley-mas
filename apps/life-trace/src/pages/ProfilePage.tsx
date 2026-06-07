@@ -28,6 +28,7 @@ import { useNavigate } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { FeedbackSheet } from '@/components/FeedbackSheet';
 import { LocationPicker } from '@/components/LocationPicker';
+import { PantryHouseholdDetailSheet } from '@/components/PantryHouseholdDetailSheet';
 import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
 import { ProfileAvatarSheet } from '@/components/ProfileAvatarSheet';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -63,6 +64,7 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
   const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
+  const [householdDetailOpen, setHouseholdDetailOpen] = useState(false);
   const [feedbackSheetOpen, setFeedbackSheetOpen] = useState(false);
   const [habitDraft, setHabitDraft] = useState('');
   const [habitDraftError, setHabitDraftError] = useState('');
@@ -101,10 +103,12 @@ export function ProfilePage() {
     householdMembers,
     householdMembersLoading,
     invitePayload,
+    inviteLoading,
     activeHouseholdId,
     currentHousehold,
     loadHouseholds,
     loadHouseholdMembersFor,
+    loadHouseholdInvite,
     handleSelectHousehold,
     handleCreateHousehold,
     handleJoinHousehold,
@@ -571,11 +575,23 @@ export function ProfilePage() {
             </p>
           )}
 
-          <div className="grid grid-cols-2 gap-2 max-[360px]:grid-cols-1">
+          <div
+            className={cn(
+              'grid gap-2 max-[360px]:grid-cols-1',
+              currentHousehold?.kind === 'shared' && currentHousehold.status === 'active'
+                ? 'grid-cols-3'
+                : 'grid-cols-2',
+            )}
+          >
             <Button type="button" variant="ai" onClick={() => setHouseholdSheetOpen(true)}>
               <Users className="size-4" />
               管理空间
             </Button>
+            {currentHousehold?.kind === 'shared' && currentHousehold.status === 'active' ? (
+              <Button type="button" variant="outline" onClick={() => setHouseholdDetailOpen(true)}>
+                查看空间详情
+              </Button>
+            ) : null}
             <Button type="button" variant="outline" onClick={() => navigate('/pantry')}>
               查看当前库存
             </Button>
@@ -823,20 +839,24 @@ export function ProfilePage() {
         onOpenChange={setHouseholdSheetOpen}
         households={households}
         selectedHouseholdId={activeHouseholdId}
-        members={householdMembers}
-        membersLoading={householdMembersLoading}
         householdsLoading={householdsLoading}
-        invitePayload={invitePayload}
-        onSelectHousehold={(householdId) => {
-          handleSelectHousehold(householdId);
-          void loadHouseholdMembersFor(householdId);
-        }}
+        onSelectHousehold={handleSelectHousehold}
         onCreateHousehold={async (name) => {
           await handleCreateHousehold(name);
         }}
         onJoinHousehold={async (inviteCode) => {
           await handleJoinHousehold(inviteCode);
         }}
+      />
+      <PantryHouseholdDetailSheet
+        open={householdDetailOpen}
+        onOpenChange={setHouseholdDetailOpen}
+        household={currentHousehold?.kind === 'shared' ? currentHousehold : null}
+        members={householdMembers}
+        membersLoading={householdMembersLoading}
+        invitePayload={invitePayload}
+        inviteLoading={inviteLoading}
+        onLoadInvite={loadHouseholdInvite}
         onCreateInvite={async (householdId) => {
           await handleCreateInvite(householdId);
         }}
