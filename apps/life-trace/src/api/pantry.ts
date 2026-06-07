@@ -387,10 +387,15 @@ export function generatePantryThumbnail(
   }).finally(() => globalThis.clearTimeout(timeout));
 }
 
-export function analyzePantryPhoto(token: string, input: PantryPhotoAnalysisRequest) {
+export function analyzePantryPhoto(
+  token: string,
+  input: PantryPhotoAnalysisRequest,
+  options: { signal?: AbortSignal } = {},
+) {
   return apiRequest<PantryPhotoAnalysisResponse>('/life-trace/ai/pantry-photo-analysis', token, {
     method: 'POST',
     body: JSON.stringify(input),
+    signal: options.signal,
   });
 }
 

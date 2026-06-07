@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  analyzePantryPhoto,
   consumePantryItem,
   createPantryItem,
   deletePantryItem,
@@ -209,6 +210,44 @@ describe('pantry api', () => {
       location: '冷藏',
       note: '早餐优先喝掉',
     });
+  });
+
+  it('passes abort signals to pantry photo analysis requests', async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: 0,
+        message: 'success',
+        data: {
+          name: '鲜牛奶',
+          category: '食品',
+          quantity: 1,
+          unit: '盒',
+          storageLocation: '冷藏',
+          tags: ['冷藏'],
+          confidence: 0.9,
+          warnings: [],
+          ocrHints: [],
+          householdId: '0',
+          source: 'ark',
+          model: 'ep-vision',
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await analyzePantryPhoto(
+      token,
+      {
+        imageUrl: 'https://example.com/milk.jpg',
+        householdId: 'household-1',
+      },
+      { signal: controller.signal },
+    );
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/life-trace/ai/pantry-photo-analysis');
+    expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal);
   });
 
   it('looks up pantry barcode matches with encoded query params', async () => {

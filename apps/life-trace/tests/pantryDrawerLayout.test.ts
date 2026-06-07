@@ -85,6 +85,12 @@ describe('pantry drawer mobile layout guards', () => {
     expect(photoItemAnalysisSource).toContain('onBack={handleBackToAi}');
   });
 
+  it('cancels in-flight photo item analysis when leaving the page', () => {
+    expect(photoItemAnalysisSource).toContain('analysisAbortRef');
+    expect(photoItemAnalysisSource).toContain('analysisAbortRef.current?.abort()');
+    expect(photoItemAnalysisSource).toContain('{ signal: analysisAbortController.signal }');
+  });
+
   it('keeps photo analysis drafts removable from both AI and draft review entry points', () => {
     expect(aiPageSource).toContain('onRemovePhotoItemDraft');
     expect(aiPageSource).toContain('handleRemovePhotoItemDraft');
@@ -148,5 +154,27 @@ describe('pantry drawer mobile layout guards', () => {
   it('does not stack large conversation sync skeletons under the recent recognition summary', () => {
     expect(aiPageSource).not.toContain('正在载入对话');
     expect(aiPageSource).not.toContain('正在把云端记录同步到当前设备。');
+  });
+
+  it('keeps transparent cover generation local and user triggered', () => {
+    expect(pantryDrawerSource).toContain('createPantryCutoutCoverFile');
+    expect(pantryDrawerSource).toContain('handleGenerateTransparentCover');
+    expect(pantryDrawerSource).toContain('生成透明封面');
+    expect(pantryDrawerSource).toContain('用实拍图做封面');
+    expect(photoItemAnalysisSource).toContain('createPantryCutoutCoverFile');
+    expect(photoItemAnalysisSource).toContain('transparentCoverUrl');
+    expect(photoItemAnalysisSource).toContain('transparentCoverError');
+    expect(photoItemAnalysisSource).toContain('生成透明封面');
+    expect(photoItemAnalysisSource).toContain("coverMode === 'transparent'");
+    expect(photoItemAnalysisSource).not.toContain(
+      "setError(coverError instanceof Error ? coverError.message : '透明封面生成失败，请稍后再试。')",
+    );
+    expect(photoItemAnalysisSource).not.toContain(
+      "{hasMeaningfulCropSuggestion && state !== 'done' ? (",
+    );
+    expect(photoItemAnalysisSource).toContain('bg-[length:12px_12px]');
+    expect(photoItemAnalysisSource).not.toContain('shadow-[0_0_0_9999px');
+    expect(photoItemAnalysisSource).not.toContain('shadow-[0_0_24px');
+    expect(photoItemAnalysisSource).not.toContain('shadow-[0_0_28px');
   });
 });

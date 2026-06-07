@@ -1,6 +1,7 @@
 import { ArrowRightLeft, Camera, ChevronDown, Sparkles, Trash2, X } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { generatePantryThumbnail } from '@/api/pantry';
+import { uploadLifeTraceImage } from '@/api/upload';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
@@ -10,6 +11,7 @@ import { PantryExpiryDateField } from '@/components/PantryExpiryDateField';
 import { Button } from '@/components/ui/button';
 import { getLifeTraceErrorMessage } from '@/lib/error';
 import { formatPantryReminderSummary, getPantryPersistedStatus } from '@/lib/pantry';
+import { createPantryCutoutCoverFile } from '@/lib/pantryCutout';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -265,6 +267,37 @@ export function PantryItemDrawer({
     }
   };
 
+  const handleGenerateTransparentCover = async () => {
+    if (!token) {
+      setThumbnailError('请先登录后再生成透明封面。');
+      return;
+    }
+    if (!form.imageUrl) {
+      setThumbnailError('请先添加真实图片。');
+      return;
+    }
+    if (thumbnailGenerating) {
+      return;
+    }
+
+    setThumbnailGenerating(true);
+    setThumbnailError('');
+    try {
+      const response = await fetch(form.imageUrl);
+      if (!response.ok) {
+        throw new Error('图片读取失败，请稍后再试。');
+      }
+      const sourceBlob = await response.blob();
+      const coverFile = await createPantryCutoutCoverFile(sourceBlob);
+      const uploaded = await uploadLifeTraceImage(token, coverFile);
+      updateField('thumbnailUrl', uploaded.url);
+    } catch (error) {
+      setThumbnailError(getLifeTraceErrorMessage(error, '透明封面生成失败，请稍后再试。'));
+    } finally {
+      setThumbnailGenerating(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!item || deleting) {
       return;
@@ -445,8 +478,8 @@ export function PantryItemDrawer({
           <div className="space-y-3 rounded-[1.25rem] border border-border bg-secondary/60 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium">AI 缩略图</p>
-                <p className="mt-1 text-xs text-muted-foreground">补一张更整洁的封面图。</p>
+                <p className="text-sm font-medium">封面图</p>
+                <p className="mt-1 text-xs text-muted-foreground">补一张更整洁的商品封面。</p>
               </div>
               {form.thumbnailUrl ? (
                 <Button
@@ -461,6 +494,20 @@ export function PantryItemDrawer({
               ) : null}
             </div>
             <div className="grid grid-cols-2 gap-2 max-[360px]:grid-cols-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!form.imageUrl || thumbnailGenerating || imageUploading || submitting}
+                onClick={() => void handleGenerateTransparentCover()}
+              >
+                {thumbnailGenerating ? (
+                  <ActionLoadingIcon className="size-4" tone="ai" />
+                ) : (
+                  <Sparkles className="size-4" />
+                )}
+                {thumbnailGenerating ? '生成中...' : '生成透明封面'}
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -487,11 +534,11 @@ export function PantryItemDrawer({
               </Button>
             </div>
             {aiThumbnailPreview ? (
-              <div className="overflow-hidden rounded-[1.1rem] border border-border bg-card">
+              <div className="overflow-hidden rounded-[1.1rem] border border-border bg-card bg-[linear-gradient(45deg,rgba(255,255,255,0.08)_25%,transparent_25%),linear-gradient(-45deg,rgba(255,255,255,0.08)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,rgba(255,255,255,0.08)_75%),linear-gradient(-45deg,transparent_75%,rgba(255,255,255,0.08)_75%)] bg-[length:12px_12px] bg-[position:0_0,0_6px,6px_-6px,-6px_0px]">
                 <img
                   src={aiThumbnailPreview}
                   alt={form.name || '库存图片预览'}
-                  className="aspect-video w-full object-cover"
+                  className="aspect-video w-full object-contain"
                 />
               </div>
             ) : null}
@@ -499,7 +546,7 @@ export function PantryItemDrawer({
               <p className="text-xs text-muted-foreground">封面已准备好，保存后就会生效。</p>
             ) : null}
             {saveQueuedAfterThumbnail ? (
-              <p className="text-xs text-life-trace">AI 缩略图生成中，完成后会自动继续保存。</p>
+              <p className="text-xs text-life-trace">封面生成中，完成后会自动继续保存。</p>
             ) : null}
             {thumbnailError ? <p className="text-xs text-destructive">{thumbnailError}</p> : null}
           </div>

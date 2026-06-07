@@ -34,6 +34,7 @@ import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { createPantryCutoutCoverFile } from '@/lib/pantryCutout';
 import {
   applyPhotoItemBarcodeMatchToDraftForm,
   buildPhotoItemAnalysisSmartSuggestions,
@@ -94,6 +95,8 @@ type DraftForm = PhotoItemDraftForm;
 type CoverModeSelectorProps = {
   value: PhotoItemAnalysisCoverMode;
   disabled?: boolean;
+  cropReady?: boolean;
+  transparentReady?: boolean;
   size?: 'md' | 'sm';
   onChange: (value: PhotoItemAnalysisCoverMode) => void;
 };
@@ -161,6 +164,14 @@ function appendUniqueNoteLine(note: string, line: string) {
 
 function getFallbackFileName(file: File) {
   return file.name || `pantry-photo-${Date.now()}.jpg`;
+}
+
+function isPhotoItemAnalysisAbortError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const message = error.message.toLowerCase();
+  return error.name === 'AbortError' || message.includes('abort') || message.includes('aborted');
 }
 
 type CropPreviewImageProps = {
@@ -251,6 +262,8 @@ function CropPreviewImage({ src, alt, cropBox, cropEnabled }: CropPreviewImagePr
 function CoverModeSelector({
   value,
   disabled = false,
+  cropReady = true,
+  transparentReady = false,
   size = 'md',
   onChange,
 }: CoverModeSelectorProps) {
@@ -260,7 +273,7 @@ function CoverModeSelector({
       : 'min-h-14 rounded-2xl border px-3 py-2 text-sm font-semibold transition';
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-3 gap-2">
       <button
         type="button"
         className={`${buttonClassName} flex flex-col items-center justify-center gap-0.5 ${
@@ -268,11 +281,13 @@ function CoverModeSelector({
             ? 'border-life-trace/40 bg-life-trace/10 text-life-trace'
             : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
         }`}
-        disabled={disabled}
+        disabled={disabled || !cropReady}
         onClick={() => onChange('crop')}
       >
         <span className="whitespace-nowrap">裁剪主体</span>
-        <span className="whitespace-nowrap text-[10px] font-medium opacity-75">生成封面</span>
+        <span className="whitespace-nowrap text-[10px] font-medium opacity-75">
+          {cropReady ? '生成封面' : '无裁剪'}
+        </span>
       </button>
       <button
         type="button"
@@ -286,6 +301,21 @@ function CoverModeSelector({
       >
         <span className="whitespace-nowrap">不裁剪</span>
         <span className="whitespace-nowrap text-[10px] font-medium opacity-75">使用原图</span>
+      </button>
+      <button
+        type="button"
+        className={`${buttonClassName} flex flex-col items-center justify-center gap-0.5 ${
+          value === 'transparent'
+            ? 'border-life-health/40 bg-life-health/10 text-life-health'
+            : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
+        }`}
+        disabled={disabled || !transparentReady}
+        onClick={() => onChange('transparent')}
+      >
+        <span className="whitespace-nowrap">透明封面</span>
+        <span className="whitespace-nowrap text-[10px] font-medium opacity-75">
+          {transparentReady ? '已生成' : '先生成'}
+        </span>
       </button>
     </div>
   );
@@ -416,6 +446,7 @@ export function PhotoItemAnalysisPage() {
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
   const handledRequestedDraftIdRef = useRef('');
   const barcodeLookupKeyRef = useRef('');
+  const analysisAbortRef = useRef<AbortController | null>(null);
   const manualEditedFieldsRef = useRef<Set<PhotoItemManualEditedField>>(new Set());
   const [state, setState] = useState<CaptureState>('idle');
   const [cameraError, setCameraError] = useState('');
@@ -432,6 +463,9 @@ export function PhotoItemAnalysisPage() {
   const [activePicker, setActivePicker] = useState<'category' | 'location' | null>(null);
   const [expiryBaseDate, setExpiryBaseDate] = useState('');
   const [coverMode, setCoverMode] = useState<PhotoItemAnalysisCoverMode>('original');
+  const [transparentCoverUrl, setTransparentCoverUrl] = useState('');
+  const [transparentCoverGenerating, setTransparentCoverGenerating] = useState(false);
+  const [transparentCoverError, setTransparentCoverError] = useState('');
   const [historyItems, setHistoryItems] = useState<PhotoItemAnalysisHistoryItem[]>(() =>
     readPhotoItemAnalysisHistory(),
   );
@@ -709,6 +743,13 @@ export function PhotoItemAnalysisPage() {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
+  useEffect(
+    () => () => {
+      analysisAbortRef.current?.abort();
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!cameraActive || !cameraStream || !videoRef.current) {
       return;
@@ -774,6 +815,7 @@ export function PhotoItemAnalysisPage() {
   );
 
   const updateImageFile = (file: File) => {
+    analysisAbortRef.current?.abort();
     if (imagePreviewUrl) {
       URL.revokeObjectURL(imagePreviewUrl);
     }
@@ -782,6 +824,9 @@ export function PhotoItemAnalysisPage() {
     setUploadedImageUrl('');
     setAnalysis(null);
     setCoverMode('original');
+    setTransparentCoverUrl('');
+    setTransparentCoverGenerating(false);
+    setTransparentCoverError('');
     setForm((current) => ({ ...current, barcodeValue: '', barcodeFormat: '' }));
     setBarcodeMatch(null);
     setBarcodeMatching(false);
@@ -879,17 +924,38 @@ export function PhotoItemAnalysisPage() {
 
     setState('uploading');
     setError('');
+    analysisAbortRef.current?.abort();
+    const analysisAbortController = new AbortController();
+    analysisAbortRef.current = analysisAbortController;
     try {
-      const upload = await uploadLifeTraceImage(token, imageFile);
+      const upload = await uploadLifeTraceImage(token, imageFile, {
+        signal: analysisAbortController.signal,
+      });
+      if (
+        analysisAbortController.signal.aborted ||
+        analysisAbortRef.current !== analysisAbortController
+      ) {
+        return;
+      }
       setUploadedImageUrl(upload.url);
       setState('analyzing');
-      const result = await analyzePantryPhoto(token, {
-        imageUrl: upload.url,
-        householdId: form.householdId || undefined,
-        barcodeValue: barcodeResult?.value,
-        barcodeFormat: barcodeResult?.format,
-        barcodeSource: barcodeResult?.source,
-      });
+      const result = await analyzePantryPhoto(
+        token,
+        {
+          imageUrl: upload.url,
+          householdId: form.householdId || undefined,
+          barcodeValue: barcodeResult?.value,
+          barcodeFormat: barcodeResult?.format,
+          barcodeSource: barcodeResult?.source,
+        },
+        { signal: analysisAbortController.signal },
+      );
+      if (
+        analysisAbortController.signal.aborted ||
+        analysisAbortRef.current !== analysisAbortController
+      ) {
+        return;
+      }
       const selectedItem =
         getPhotoItemSelectedDetectedItem(result) ?? getPhotoItemDetectedItems(result)[0];
       const nextNote = buildAnalysisNote(result, selectedItem);
@@ -965,10 +1031,17 @@ export function PhotoItemAnalysisPage() {
       setReviewSheetOpen(true);
       showToast('商品识别完成，请确认后入库。', 'success');
     } catch (analysisError) {
+      if (analysisAbortController.signal.aborted || isPhotoItemAnalysisAbortError(analysisError)) {
+        return;
+      }
       setState('captured');
       setError(
         analysisError instanceof Error ? analysisError.message : '商品分析失败，请稍后再试。',
       );
+    } finally {
+      if (analysisAbortRef.current === analysisAbortController) {
+        analysisAbortRef.current = null;
+      }
     }
   };
 
@@ -984,7 +1057,9 @@ export function PhotoItemAnalysisPage() {
       const mergeCandidate = mode === 'merge' ? primaryDuplicateCandidate : null;
       const currentDetectedItem = selectedDetectedItem;
       let thumbnailUrl = '';
-      if (!mergeCandidate && token && currentDetectedItem && coverMode === 'crop') {
+      if (!mergeCandidate && coverMode === 'transparent' && transparentCoverUrl) {
+        thumbnailUrl = transparentCoverUrl;
+      } else if (!mergeCandidate && token && currentDetectedItem && coverMode === 'crop') {
         const sourceFile = await loadCoverSourceFile(imageFile, uploadedImageUrl);
         const coverFile = await createCroppedCoverFile(
           sourceFile,
@@ -1106,7 +1181,41 @@ export function PhotoItemAnalysisPage() {
     }
   };
 
+  const handleGenerateTransparentCover = async () => {
+    if (!token) {
+      setTransparentCoverError('请先登录后再生成透明封面。');
+      return;
+    }
+    if (!imageFile && !uploadedImageUrl) {
+      setTransparentCoverError('请先拍照或选择商品图片。');
+      return;
+    }
+    if (transparentCoverGenerating || state === 'saving') {
+      return;
+    }
+
+    setTransparentCoverGenerating(true);
+    setTransparentCoverError('');
+    setError('');
+    try {
+      const sourceFile = await loadCoverSourceFile(imageFile, uploadedImageUrl);
+      const coverFile = await createPantryCutoutCoverFile(sourceFile);
+      const uploaded = await uploadLifeTraceImage(token, coverFile);
+      setTransparentCoverUrl(uploaded.url);
+      setTransparentCoverError('');
+      setCoverMode('transparent');
+      showToast('透明封面已生成。', 'success');
+    } catch (coverError) {
+      setTransparentCoverError(
+        coverError instanceof Error ? coverError.message : '透明封面生成失败，请稍后再试。',
+      );
+    } finally {
+      setTransparentCoverGenerating(false);
+    }
+  };
+
   const resetFlow = () => {
+    analysisAbortRef.current?.abort();
     stopCamera();
     if (imagePreviewUrl) {
       URL.revokeObjectURL(imagePreviewUrl);
@@ -1118,6 +1227,9 @@ export function PhotoItemAnalysisPage() {
     setUploadedImageUrl('');
     setAnalysis(null);
     setCoverMode('original');
+    setTransparentCoverUrl('');
+    setTransparentCoverGenerating(false);
+    setTransparentCoverError('');
     setCurrentHistoryId('');
     setSelectedDetectedItemId('');
     setProcessedDetectedItemIds([]);
@@ -1152,6 +1264,9 @@ export function PhotoItemAnalysisPage() {
       setUploadedImageUrl(draft.imageUrl);
       setAnalysis(draft.analysis);
       setForm(draft.form);
+      setTransparentCoverUrl('');
+      setTransparentCoverGenerating(false);
+      setTransparentCoverError('');
       setBarcodeMatch(null);
       manualEditedFieldsRef.current = new Set();
       const restoredSelectedDetectedItem =
@@ -1292,6 +1407,8 @@ export function PhotoItemAnalysisPage() {
     const nextNote = buildAnalysisNote(analysis, nextDetectedItem);
     setSelectedDetectedItemId(nextDetectedItem.id);
     setCoverMode(isMeaningfulPhotoItemCropBox(nextDetectedItem.cropBox) ? 'crop' : 'original');
+    setTransparentCoverUrl('');
+    setTransparentCoverError('');
     setExpiryBaseDate(nextDetectedItem.productionDate || nextDetectedItem.purchaseDate || '');
     setForm((current) => ({
       ...buildPhotoItemDraftFormFromDetectedItem(
@@ -1314,6 +1431,7 @@ export function PhotoItemAnalysisPage() {
   };
 
   const handleBackToAi = () => {
+    analysisAbortRef.current?.abort();
     navigate('/ai', { replace: true });
   };
 
@@ -1443,7 +1561,7 @@ export function PhotoItemAnalysisPage() {
           <div className="relative overflow-hidden rounded-[1.45rem] border border-life-ai/25 bg-background/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
             <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(180deg,transparent,rgba(6,182,212,0.08),transparent)] opacity-70" />
             <div
-              className={`pointer-events-none absolute inset-x-8 z-20 h-px bg-life-ai/80 shadow-[0_0_24px_rgba(6,182,212,0.75)] motion-reduce:animate-none ${
+              className={`pointer-events-none absolute inset-x-8 z-20 h-px bg-life-ai/80 motion-reduce:animate-none ${
                 visionProcessing
                   ? 'top-0 animate-[life-vision-scan_1.9s_ease-in-out_infinite]'
                   : imagePreviewUrl || cameraActive
@@ -1451,26 +1569,10 @@ export function PhotoItemAnalysisPage() {
                     : 'top-[28%] opacity-35'
               }`}
             />
-            <span
-              className={`pointer-events-none absolute top-3 left-3 z-20 size-7 border-t-2 border-l-2 border-life-ai ${
-                visionProcessing ? 'shadow-[0_0_24px_rgba(6,182,212,0.85)]' : ''
-              }`}
-            />
-            <span
-              className={`pointer-events-none absolute top-3 right-3 z-20 size-7 border-t-2 border-r-2 border-life-ai ${
-                visionProcessing ? 'shadow-[0_0_24px_rgba(6,182,212,0.85)]' : ''
-              }`}
-            />
-            <span
-              className={`pointer-events-none absolute bottom-3 left-3 z-20 size-7 border-b-2 border-l-2 border-life-trace ${
-                visionProcessing ? 'shadow-[0_0_24px_rgba(16,185,129,0.75)]' : ''
-              }`}
-            />
-            <span
-              className={`pointer-events-none absolute right-3 bottom-3 z-20 size-7 border-r-2 border-b-2 border-life-trace ${
-                visionProcessing ? 'shadow-[0_0_24px_rgba(16,185,129,0.75)]' : ''
-              }`}
-            />
+            <span className="pointer-events-none absolute top-3 left-3 z-20 size-7 border-t-2 border-l-2 border-life-ai" />
+            <span className="pointer-events-none absolute top-3 right-3 z-20 size-7 border-t-2 border-r-2 border-life-ai" />
+            <span className="pointer-events-none absolute bottom-3 left-3 z-20 size-7 border-b-2 border-l-2 border-life-trace" />
+            <span className="pointer-events-none absolute right-3 bottom-3 z-20 size-7 border-r-2 border-b-2 border-life-trace" />
 
             {cameraActive ? (
               <video
@@ -1492,7 +1594,7 @@ export function PhotoItemAnalysisPage() {
                 />
                 {cropBoxStyle ? (
                   <div
-                    className="pointer-events-none absolute z-30 rounded-[1rem] border-2 border-life-trace shadow-[0_0_0_9999px_rgba(0,0,0,0.36),0_0_28px_rgba(16,185,129,0.75)]"
+                    className="pointer-events-none absolute z-30 rounded-[1rem] border-2 border-life-trace"
                     style={cropBoxStyle}
                   >
                     <span className="absolute -top-8 left-0 rounded-full border border-life-trace/30 bg-background/65 px-2.5 py-1 text-[10px] font-semibold text-life-trace backdrop-blur">
@@ -1555,7 +1657,12 @@ export function PhotoItemAnalysisPage() {
               </div>
               {hasMeaningfulCropSuggestion ? (
                 <div className="mt-3">
-                  <CoverModeSelector value={coverMode} onChange={setCoverMode} />
+                  <CoverModeSelector
+                    value={coverMode}
+                    cropReady={hasMeaningfulCropSuggestion}
+                    transparentReady={Boolean(transparentCoverUrl)}
+                    onChange={setCoverMode}
+                  />
                 </div>
               ) : null}
             </div>
@@ -2000,9 +2107,13 @@ export function PhotoItemAnalysisPage() {
         {imagePreviewUrl ? (
           <div className="mb-4 rounded-[1.25rem] border border-border bg-card/95 p-3 shadow-lg shadow-background/35">
             <div className="flex items-center gap-3">
-              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-background">
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-background bg-[linear-gradient(45deg,rgba(255,255,255,0.08)_25%,transparent_25%),linear-gradient(-45deg,rgba(255,255,255,0.08)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,rgba(255,255,255,0.08)_75%),linear-gradient(-45deg,transparent_75%,rgba(255,255,255,0.08)_75%)] bg-[length:12px_12px] bg-[position:0_0,0_6px,6px_-6px,-6px_0px]">
                 <CropPreviewImage
-                  src={imagePreviewUrl}
+                  src={
+                    coverMode === 'transparent' && transparentCoverUrl
+                      ? transparentCoverUrl
+                      : imagePreviewUrl
+                  }
                   alt={form.name || analysis?.name || '商品图片'}
                   cropBox={activeCropBox}
                   cropEnabled={coverMode === 'crop' && hasMeaningfulCropSuggestion}
@@ -2014,16 +2125,20 @@ export function PhotoItemAnalysisPage() {
                   {hasCropSuggestion ? (
                     <span
                       className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-                        coverMode === 'crop' && hasMeaningfulCropSuggestion
-                          ? 'border-life-trace/30 bg-life-trace/10 text-life-trace'
-                          : 'border-life-ai/25 bg-life-ai/10 text-life-ai'
+                        coverMode === 'transparent' && transparentCoverUrl
+                          ? 'border-life-health/30 bg-life-health/10 text-life-health'
+                          : coverMode === 'crop' && hasMeaningfulCropSuggestion
+                            ? 'border-life-trace/30 bg-life-trace/10 text-life-trace'
+                            : 'border-life-ai/25 bg-life-ai/10 text-life-ai'
                       }`}
                     >
-                      {coverMode === 'crop' && hasMeaningfulCropSuggestion
-                        ? '封面：裁剪主体'
-                        : hasMeaningfulCropSuggestion
-                          ? '封面：不裁剪'
-                          : '主体框接近原图'}
+                      {coverMode === 'transparent' && transparentCoverUrl
+                        ? '封面：透明'
+                        : coverMode === 'crop' && hasMeaningfulCropSuggestion
+                          ? '封面：裁剪主体'
+                          : hasMeaningfulCropSuggestion
+                            ? '封面：不裁剪'
+                            : '主体框接近原图'}
                     </span>
                   ) : null}
                 </div>
@@ -2031,22 +2146,52 @@ export function PhotoItemAnalysisPage() {
                   {form.name || analysis?.name || '待确认商品'}
                 </p>
                 <p className="mt-1 truncate text-xs leading-5 text-muted-foreground">
-                  {coverMode === 'crop' && hasMeaningfulCropSuggestion
-                    ? '保存时生成主体封面，原图保留。'
-                    : imageFile
-                      ? getFallbackFileName(imageFile)
-                      : '商品图片'}
+                  {coverMode === 'transparent' && transparentCoverUrl
+                    ? '保存时使用透明封面，原图保留。'
+                    : coverMode === 'crop' && hasMeaningfulCropSuggestion
+                      ? '保存时生成主体封面，原图保留。'
+                      : imageFile
+                        ? getFallbackFileName(imageFile)
+                        : '商品图片'}
                 </p>
               </div>
             </div>
-            {hasMeaningfulCropSuggestion && state !== 'done' ? (
+            {state !== 'done' ? (
               <div className="mt-3">
-                <CoverModeSelector
-                  value={coverMode}
+                {hasMeaningfulCropSuggestion || transparentCoverUrl ? (
+                  <CoverModeSelector
+                    value={coverMode}
+                    size="sm"
+                    disabled={state === 'saving'}
+                    cropReady={hasMeaningfulCropSuggestion}
+                    transparentReady={Boolean(transparentCoverUrl)}
+                    onChange={setCoverMode}
+                  />
+                ) : null}
+                <Button
+                  type="button"
+                  variant="ghost"
                   size="sm"
-                  disabled={state === 'saving'}
-                  onChange={setCoverMode}
-                />
+                  className="mt-2 w-full"
+                  disabled={transparentCoverGenerating || state === 'saving'}
+                  onClick={() => void handleGenerateTransparentCover()}
+                >
+                  {transparentCoverGenerating ? (
+                    <ActionLoadingIcon className="size-4" tone="ai" />
+                  ) : (
+                    <Sparkles className="size-4" />
+                  )}
+                  {transparentCoverGenerating
+                    ? '生成中...'
+                    : transparentCoverUrl
+                      ? '重新生成透明封面'
+                      : '生成透明封面'}
+                </Button>
+                {transparentCoverError ? (
+                  <p className="mt-2 rounded-2xl border border-life-alert/20 bg-life-alert/10 px-3 py-2 text-xs leading-5 text-life-alert">
+                    {transparentCoverError}
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>

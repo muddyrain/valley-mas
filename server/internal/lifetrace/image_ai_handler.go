@@ -15,6 +15,8 @@ import (
 	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 )
 
+const httpStatusClientClosedRequest = 499
+
 type imageAnalysisRequest struct {
 	ImageURL    string `json:"imageUrl"`
 	ImageBase64 string `json:"imageBase64"`
@@ -261,6 +263,20 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 
 	raw, modelName, err := callLifeTraceImageAI(aiCtx, aiCfg, imageInput, prompt)
 	if err != nil {
+		if isLifeTraceAIRequestCanceled(err) {
+			if errors.Is(err, context.Canceled) {
+				c.JSON(httpStatusClientClosedRequest, apiResponse{
+					Code:    httpStatusClientClosedRequest,
+					Message: "商品分析已取消",
+				})
+				return
+			}
+			c.JSON(http.StatusGatewayTimeout, apiResponse{
+				Code:    http.StatusGatewayTimeout,
+				Message: "AI 商品分析超时，请稍后重试",
+			})
+			return
+		}
 		c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "AI 商品分析失败：" + err.Error()})
 		return
 	}
@@ -409,6 +425,10 @@ func buildPantryPhotoAnalysisPrompt(
 		barcodeInstruction,
 		"用户补充说明：" + hint,
 	}, "\n")
+}
+
+func isLifeTraceAIRequestCanceled(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 func callLifeTraceImageAI(

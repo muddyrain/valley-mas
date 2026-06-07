@@ -32,7 +32,7 @@ export type PhotoItemAnalysisHistoryStatus = 'draft' | 'saved';
 
 export type PhotoItemAnalysisQualityRating = 'accurate' | 'inaccurate';
 
-export type PhotoItemAnalysisCoverMode = 'original' | 'crop';
+export type PhotoItemAnalysisCoverMode = 'original' | 'crop' | 'transparent';
 
 export type PhotoItemAnalysisQualityFeedback = {
   rating: PhotoItemAnalysisQualityRating;

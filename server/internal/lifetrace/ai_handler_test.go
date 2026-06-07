@@ -270,6 +270,22 @@ func TestGeneratePantryThumbnailRequiresAIConfig(t *testing.T) {
 	}
 }
 
+func TestLifeTraceAIRequestCancellationClassification(t *testing.T) {
+	for _, err := range []error{
+		context.Canceled,
+		context.DeadlineExceeded,
+		fmt.Errorf("wrapped cancel: %w", context.Canceled),
+	} {
+		if !isLifeTraceAIRequestCanceled(err) {
+			t.Fatalf("expected %v to be treated as request cancellation", err)
+		}
+	}
+
+	if isLifeTraceAIRequestCanceled(errors.New("upstream failed")) {
+		t.Fatal("expected upstream failures to remain AI errors")
+	}
+}
+
 func TestGeneratePantryThumbnailUsesARKImageModel(t *testing.T) {
 	lifeTraceArkClient = nil
 	lifeTraceArkClientOnce = sync.Once{}
