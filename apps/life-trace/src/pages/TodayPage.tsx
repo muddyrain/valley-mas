@@ -189,6 +189,121 @@ function formatDateKey(value: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function SkeletonBar({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'animate-pulse rounded-full bg-secondary motion-reduce:animate-none',
+        className,
+      )}
+    />
+  );
+}
+
+function TodayAchievementSkeleton() {
+  return (
+    <Card
+      className="relative overflow-hidden border-life-ai/20 p-4 shadow-[0_18px_54px_rgba(6,182,212,0.08)]"
+      data-today-entrance
+      aria-label="最近成就加载中"
+      aria-busy="true"
+    >
+      <span className="sr-only">正在加载最近成就</span>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-ai/70 to-transparent"
+      />
+      <div className="flex items-center gap-3">
+        <div className="size-12 shrink-0 animate-pulse rounded-2xl bg-life-ai/10 motion-reduce:animate-none" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <SkeletonBar className="h-5 w-16 bg-life-ai/15" />
+            <SkeletonBar className="h-3 w-20" />
+          </div>
+          <SkeletonBar className="mt-3 h-4 w-40" />
+          <SkeletonBar className="mt-2 h-3 w-full" />
+          <SkeletonBar className="mt-2 h-3 w-2/3" />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function TodayPantrySkeleton() {
+  return (
+    <div
+      className="rounded-[1.15rem] border border-life-health/15 bg-life-health/5 px-4 py-4"
+      aria-busy="true"
+    >
+      <span className="sr-only">正在加载库存摘要，卡片高度保持稳定</span>
+      <div className="space-y-2">
+        {[0, 1, 2].map((index) => (
+          <div
+            key={`pantry-loading-${index}`}
+            className="flex items-center gap-3 rounded-2xl bg-card/60 px-3 py-2.5"
+          >
+            <div className="size-11 shrink-0 animate-pulse rounded-2xl bg-life-health/15 motion-reduce:animate-none" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <SkeletonBar
+                className={cn('h-3', index === 0 ? 'w-28' : index === 1 ? 'w-36' : 'w-24')}
+              />
+              <SkeletonBar className="h-2.5 w-full bg-secondary/70" />
+            </div>
+            <SkeletonBar className="h-6 w-12 shrink-0 bg-life-health/12" />
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="rounded-2xl bg-card/70 px-3 py-3">
+          <SkeletonBar className="h-3 w-10" />
+          <SkeletonBar className="mt-2 h-6 w-14 bg-life-health/15" />
+        </div>
+        <div className="rounded-2xl bg-card/70 px-3 py-3">
+          <SkeletonBar className="h-3 w-10" />
+          <SkeletonBar className="mt-2 h-6 w-14 bg-life-alert/15" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TodayHabitSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-2 max-[340px]:grid-cols-1">
+      <span className="sr-only">正在加载今日打卡</span>
+      {[0, 1, 2, 3].map((index) => (
+        <div
+          key={`today-habit-skeleton-${index}`}
+          className="flex min-h-12 items-center justify-between gap-2 rounded-2xl border border-border bg-secondary px-3"
+        >
+          <SkeletonBar className={cn('h-3', index % 2 === 0 ? 'w-14' : 'w-20')} />
+          <div className="size-6 shrink-0 animate-pulse rounded-full border border-border bg-card motion-reduce:animate-none" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TodayPlanSkeleton() {
+  return (
+    <div className="space-y-2">
+      <span className="sr-only">正在加载今日计划</span>
+      {[0, 1].map((index) => (
+        <div
+          key={`today-plan-skeleton-${index}`}
+          className="flex h-16 items-center justify-between gap-3 rounded-2xl bg-secondary px-3"
+        >
+          <div className="min-w-0 flex-1 space-y-2">
+            <SkeletonBar className={cn('h-3', index === 0 ? 'w-36' : 'w-28')} />
+            <SkeletonBar className="h-2.5 w-24 bg-muted" />
+          </div>
+          <SkeletonBar className="h-6 w-12 shrink-0 bg-life-plan/12" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function parseWeatherHourDateTime(dateTime?: string) {
   if (!dateTime) {
     return null;
@@ -214,6 +329,7 @@ export function TodayPage() {
   const plansLoaded = useLifeTraceStore((state) => state.plansLoaded);
   const checkins = useLifeTraceStore((state) => state.checkins);
   const checkinsDate = useLifeTraceStore((state) => state.checkinsDate);
+  const checkinsLoaded = useLifeTraceStore((state) => state.checkinsLoaded);
   const checkinsLoading = useLifeTraceStore((state) => state.checkinsLoading);
   const checkinsError = useLifeTraceStore((state) => state.checkinsError);
   const checkinTogglingByName = useLifeTraceStore((state) => state.checkinTogglingByName);
@@ -231,6 +347,8 @@ export function TodayPage() {
     (state) => state.pantryListResolvedHouseholdName,
   );
   const recentAchievements = useLifeTraceStore((state) => state.recentAchievements);
+  const achievementsLoaded = useLifeTraceStore((state) => state.achievementsLoaded);
+  const achievementsLoading = useLifeTraceStore((state) => state.achievementsLoading);
   const updateSettings = useLifeTraceStore((state) => state.updateSettings);
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
@@ -260,15 +378,15 @@ export function TodayPage() {
   );
   const habitNames = settings.habits;
   const todayCheckins = checkinsDate === todayDate ? checkins : [];
+  const checkinsCardLoading =
+    Boolean(token) && (!settingsLoaded || !checkinsLoaded || checkinsDate !== todayDate);
   const pantryHouseholdName = pantryListResolvedHouseholdName || preferredPantryHouseholdName;
   const pantryOverview = pantryListSummary;
   const pantryAttentionTotal = pantryOverview.expiring + pantryOverview.expired;
-  const pantryCardLoading =
-    Boolean(token) && (!settingsLoaded || !pantryListLoaded || pantryListLoading);
+  const pantryCardInitialLoading = Boolean(token) && (!settingsLoaded || !pantryListLoaded);
+  const pantryCardRefreshing = Boolean(token) && pantryListLoaded && pantryListLoading;
   let pantryPrioritySummary = '今天没有临期或过期条目。';
-  if (pantryCardLoading) {
-    pantryPrioritySummary = '正在同步库存，稍后按到期优先级展示。';
-  } else if (pantryAttentionTotal > 0) {
+  if (pantryAttentionTotal > 0) {
     pantryPrioritySummary = `${pantryOverview.expiring} 件临期，${pantryOverview.expired} 件已过期。`;
   }
   const pantryPreviewItems = useMemo(
@@ -352,6 +470,7 @@ export function TodayPage() {
     () => plans.filter((plan) => !plan.completed && isOverduePlan(plan)),
     [plans],
   );
+  const planCardLoading = Boolean(token) && !plansLoaded;
   const previewPlans =
     overduePlans.length > 0 ? overduePlans.slice(0, 3) : todayOpenPlans.slice(0, 3);
   const planPulseText =
@@ -454,6 +573,8 @@ export function TodayPage() {
 
   const pantryPageHref = '/pantry';
   const latestAchievement = recentAchievements[0];
+  const achievementCardLoading =
+    Boolean(token) && (!achievementsLoaded || (achievementsLoading && !latestAchievement));
 
   const handleRefreshWeather = () => {
     if (weatherLoading) {
@@ -871,7 +992,9 @@ export function TodayPage() {
         )}
       </Card>
 
-      {latestAchievement ? (
+      {achievementCardLoading ? (
+        <TodayAchievementSkeleton />
+      ) : latestAchievement ? (
         <Card
           className="relative overflow-hidden border-life-ai/20 p-4 shadow-[0_18px_54px_rgba(6,182,212,0.08)]"
           data-today-entrance
@@ -916,17 +1039,26 @@ export function TodayPage() {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={pantryOverview.expired > 0 ? 'alert' : 'health'}>家中临期</Badge>
-              {pantryHouseholdName && !pantryCardLoading ? (
+              {pantryHouseholdName && !pantryCardInitialLoading ? (
                 <span className="text-xs text-muted-foreground">
                   当前空间：{pantryHouseholdName}
                 </span>
               ) : null}
-              {pantryOverview.expired > 0 && !pantryCardLoading ? (
+              {pantryOverview.expired > 0 && !pantryCardInitialLoading ? (
                 <span className="text-xs text-life-alert">{pantryOverview.expired} 件已过期</span>
+              ) : null}
+              {pantryCardRefreshing ? (
+                <ActionLoadingIcon className="size-3.5" tone="health" />
               ) : null}
             </div>
             <h2 className="mt-2 text-lg font-semibold">今天该先处理哪几样</h2>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">{pantryPrioritySummary}</p>
+            {pantryCardInitialLoading ? (
+              <SkeletonBar className="mt-2 h-3 w-44" />
+            ) : (
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {pantryPrioritySummary}
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -936,46 +1068,8 @@ export function TodayPage() {
             查看
           </button>
         </div>
-        {pantryCardLoading ? (
-          <div
-            className="rounded-[1.15rem] border border-life-health/15 bg-life-health/5 px-4 py-4"
-            aria-live="polite"
-            aria-busy="true"
-          >
-            <div className="flex items-center gap-3">
-              <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/12 text-life-health">
-                <ActionLoadingIcon tone="health" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-foreground">正在整理库存优先级</p>
-                  <RefreshCw className="size-3.5 animate-spin text-life-health motion-reduce:animate-none" />
-                </div>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  当前空间、临期和过期状态正在同步。
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 space-y-2">
-              {[0, 1, 2].map((index) => (
-                <div
-                  key={`pantry-loading-${index}`}
-                  className="flex items-center gap-3 rounded-2xl bg-card/60 px-3 py-2.5"
-                >
-                  <div className="size-9 shrink-0 animate-pulse rounded-2xl bg-life-health/15 motion-reduce:animate-none" />
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div
-                      className={cn(
-                        'h-3 animate-pulse rounded-full bg-secondary motion-reduce:animate-none',
-                        index === 0 ? 'w-24' : index === 1 ? 'w-32' : 'w-20',
-                      )}
-                    />
-                    <div className="h-2.5 w-full animate-pulse rounded-full bg-secondary/70 motion-reduce:animate-none" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+        {pantryCardInitialLoading ? (
+          <TodayPantrySkeleton />
         ) : pantryPreviewItems.length > 0 ? (
           <div className="space-y-2">
             {pantryPreviewItems.map((item) => {
@@ -1064,15 +1158,23 @@ export function TodayPage() {
           <div>
             <div className="flex items-center gap-2">
               <Badge tone="trace">今日打卡</Badge>
-              {checkinsLoading ? <ActionLoadingIcon className="size-3.5" tone="trace" /> : null}
+              {checkinsLoading && !checkinsCardLoading ? (
+                <ActionLoadingIcon className="size-3.5" tone="trace" />
+              ) : null}
             </div>
             <h2 className="mt-2 text-lg font-semibold">保持一点生活节奏</h2>
           </div>
           <div className="rounded-2xl border border-life-trace/25 bg-life-trace/10 px-3 py-2 text-sm font-bold text-life-trace">
-            {habitProgress}
+            {checkinsCardLoading ? (
+              <SkeletonBar className="h-4 w-10 bg-life-trace/20" />
+            ) : (
+              habitProgress
+            )}
           </div>
         </div>
-        {habitNames.length > 0 ? (
+        {checkinsCardLoading ? (
+          <TodayHabitSkeleton />
+        ) : habitNames.length > 0 ? (
           <div className="grid grid-cols-2 gap-2 max-[340px]:grid-cols-1">
             {habitNames.map((name) => {
               const checkin = todayCheckins.find((item) => item.name === name);
@@ -1114,7 +1216,7 @@ export function TodayPage() {
         ) : (
           <div className="rounded-2xl border border-dashed border-border px-4 py-4">
             <p className="text-sm leading-6 text-muted-foreground">
-              还没有设置今天要坚持的打卡项。去我的页新增后，这里就会直接按云端清单展示。
+              还没有设置今天要坚持的打卡项。设置后会按云端清单展示。
             </p>
             <button
               type="button"
@@ -1125,7 +1227,7 @@ export function TodayPage() {
             </button>
           </div>
         )}
-        {checkinsError ? (
+        {checkinsCardLoading ? null : checkinsError ? (
           <p className="mt-3 text-sm text-life-alert">{checkinsError}</p>
         ) : (
           <p className="mt-3 text-xs leading-5 text-muted-foreground">{checkinAdviceText}</p>
@@ -1135,11 +1237,17 @@ export function TodayPage() {
       <Card className="p-4" data-today-entrance>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <Badge tone={overduePlans.length > 0 ? 'alert' : 'plan'}>今日计划</Badge>
+            <Badge tone={!planCardLoading && overduePlans.length > 0 ? 'alert' : 'plan'}>
+              今日计划
+            </Badge>
             <h2 className="mt-2 text-lg font-semibold">
-              {overduePlans.length > 0 ? '先处理逾期计划' : '今天要推进什么'}
+              {!planCardLoading && overduePlans.length > 0 ? '先处理逾期计划' : '今天要推进什么'}
             </h2>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">{planPulseText}</p>
+            {planCardLoading ? (
+              <SkeletonBar className="mt-2 h-3 w-48" />
+            ) : (
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">{planPulseText}</p>
+            )}
           </div>
           <button
             type="button"
@@ -1149,7 +1257,7 @@ export function TodayPage() {
             管理
           </button>
         </div>
-        {nextReminder ? (
+        {!planCardLoading && nextReminder ? (
           <button
             type="button"
             className="mb-3 flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-secondary px-3 py-3 text-left transition hover:bg-secondary/80"
@@ -1172,58 +1280,49 @@ export function TodayPage() {
             </span>
           </button>
         ) : null}
-        {plansLoaded ? (
-          previewPlans.length > 0 ? (
-            <div className="space-y-2">
-              {previewPlans.map((plan) => {
-                const { dateText, timeText } = getPlanDisplayTimeParts(plan);
-                const overdue = isOverduePlan(plan);
-
-                return (
-                  <button
-                    type="button"
-                    key={plan.id}
-                    className={cn(
-                      'flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border px-3 py-3 text-left transition hover:border-foreground/20',
-                      overdue
-                        ? 'border-life-alert/30 bg-life-alert/10'
-                        : 'border-border bg-secondary',
-                    )}
-                    onClick={() => navigate(`/plans/${plan.id}`)}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{plan.title}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {dateText} {timeText}
-                      </p>
-                    </div>
-                    <span
-                      className={cn(
-                        'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
-                        overdue
-                          ? 'bg-life-alert/15 text-life-alert'
-                          : 'bg-life-plan/10 text-life-plan',
-                      )}
-                    >
-                      {overdue ? '逾期' : plan.type}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-border px-4 py-5 text-sm leading-6 text-muted-foreground">
-              今天还没有计划。可以进入计划页手动创建，或在 AI 给出明确事项时加入计划。
-            </div>
-          )
-        ) : (
+        {planCardLoading ? (
+          <TodayPlanSkeleton />
+        ) : previewPlans.length > 0 ? (
           <div className="space-y-2">
-            {Array.from({ length: 2 }).map((_, index) => (
-              <div
-                key={`today-plan-skeleton-${index}`}
-                className="h-16 animate-pulse rounded-2xl bg-secondary"
-              />
-            ))}
+            {previewPlans.map((plan) => {
+              const { dateText, timeText } = getPlanDisplayTimeParts(plan);
+              const overdue = isOverduePlan(plan);
+
+              return (
+                <button
+                  type="button"
+                  key={plan.id}
+                  className={cn(
+                    'flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border px-3 py-3 text-left transition hover:border-foreground/20',
+                    overdue
+                      ? 'border-life-alert/30 bg-life-alert/10'
+                      : 'border-border bg-secondary',
+                  )}
+                  onClick={() => navigate(`/plans/${plan.id}`)}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{plan.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {dateText} {timeText}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
+                      overdue
+                        ? 'bg-life-alert/15 text-life-alert'
+                        : 'bg-life-plan/10 text-life-plan',
+                    )}
+                  >
+                    {overdue ? '逾期' : plan.type}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border px-4 py-5 text-sm leading-6 text-muted-foreground">
+            今天还没有计划。可以进入计划页手动创建，或在 AI 给出明确事项时加入计划。
           </div>
         )}
       </Card>
