@@ -154,6 +154,7 @@ func autoMigrate() error {
 		&model.LifeTraceCheckin{},
 		&model.LifeTraceTrace{},
 		&model.LifeTracePantryItem{},
+		&model.LifeTracePhotoItemDraft{},
 		&model.LifeTraceSettings{},
 		&model.LifeTraceWeeklyReview{},
 		&model.LifeTraceFeedback{},

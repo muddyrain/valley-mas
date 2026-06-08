@@ -100,6 +100,8 @@ export type PhotoItemAnalysisHistoryItem = {
   savedAt?: string;
   savedItemId?: string;
   coverMode?: PhotoItemAnalysisCoverMode;
+  transparentCoverUrl?: string;
+  transparentCoverTechLabel?: string;
   qualityFeedback?: PhotoItemAnalysisQualityFeedback;
 };
 
@@ -241,7 +243,18 @@ function normalizeHistoryItem(item: unknown): PhotoItemAnalysisHistoryItem | nul
     updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : candidate.createdAt,
     savedAt: typeof candidate.savedAt === 'string' ? candidate.savedAt : undefined,
     savedItemId: typeof candidate.savedItemId === 'string' ? candidate.savedItemId : undefined,
-    coverMode: candidate.coverMode === 'crop' ? 'crop' : 'original',
+    coverMode:
+      candidate.coverMode === 'transparent'
+        ? 'transparent'
+        : candidate.coverMode === 'crop'
+          ? 'crop'
+          : 'original',
+    transparentCoverUrl:
+      typeof candidate.transparentCoverUrl === 'string' ? candidate.transparentCoverUrl : undefined,
+    transparentCoverTechLabel:
+      typeof candidate.transparentCoverTechLabel === 'string'
+        ? candidate.transparentCoverTechLabel
+        : undefined,
     qualityFeedback:
       candidate.qualityFeedback?.rating === 'accurate' ||
       candidate.qualityFeedback?.rating === 'inaccurate'

@@ -164,6 +164,29 @@ type LifeTracePantryItem struct {
 	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
+type LifeTracePhotoItemDraft struct {
+	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID      Int64String    `gorm:"column:user_id;index;not null;uniqueIndex:uidx_life_trace_photo_item_draft" json:"userId"`
+	DraftID     string         `gorm:"column:draft_id;size:120;not null;uniqueIndex:uidx_life_trace_photo_item_draft" json:"draftId"`
+	ImageURL    string         `gorm:"type:text" json:"imageUrl,omitempty"`
+	Status      string         `gorm:"size:20;not null;default:'draft';index" json:"status"`
+	SavedItemID string         `gorm:"column:saved_item_id;size:80;index" json:"savedItemId,omitempty"`
+	Payload     string         `gorm:"type:text;not null" json:"payload"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (draft *LifeTracePhotoItemDraft) BeforeCreate(tx *gorm.DB) error {
+	if draft.ID == 0 {
+		draft.ID = Int64String(utils.GenerateID())
+	}
+	if draft.Status == "" {
+		draft.Status = "draft"
+	}
+	return nil
+}
+
 func (item *LifeTracePantryItem) BeforeCreate(tx *gorm.DB) error {
 	if item.ID == 0 {
 		item.ID = Int64String(utils.GenerateID())

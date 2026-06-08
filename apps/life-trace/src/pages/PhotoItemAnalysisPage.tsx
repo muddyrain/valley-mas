@@ -55,8 +55,6 @@ import {
   getPhotoItemDetectedItems,
   getPhotoItemSelectedDetectedItem,
   isMeaningfulPhotoItemCropBox,
-  markPhotoItemAnalysisQualityFeedback,
-  markPhotoItemAnalysisSaved,
   normalizePhotoItemCropBox,
   type PhotoItemAnalysisCoverMode,
   type PhotoItemAnalysisHistoryItem,
@@ -68,10 +66,15 @@ import {
   type PhotoItemManualEditedField,
   type PhotoItemOCRSummary,
   readPhotoItemAnalysisHistory,
-  removePhotoItemAnalysisHistory,
   summarizePhotoItemOCRHints,
-  upsertPhotoItemAnalysisHistory,
 } from '@/lib/photoItemAnalysis';
+import {
+  loadPhotoItemAnalysisHistory,
+  markPhotoItemAnalysisHistoryQualityFeedback,
+  markPhotoItemAnalysisHistorySaved,
+  persistPhotoItemAnalysisHistoryItem,
+  removePhotoItemAnalysisHistoryItem,
+} from '@/lib/photoItemAnalysisCloud';
 import {
   getManualPhotoItemBarcode,
   type PhotoItemBarcodeResult,
@@ -531,6 +534,18 @@ export function PhotoItemAnalysisPage() {
     () => detectedItems.filter((item) => !processedDetectedItemIds.includes(item.id)).length,
     [detectedItems, processedDetectedItemIds],
   );
+  const batchDetectedItems = useMemo(() => {
+    const processed = new Set(processedDetectedItemIds);
+    const pendingItems = detectedItems.filter((item) => !processed.has(item.id));
+    if (!selectedDetectedItem || processed.has(selectedDetectedItem.id)) {
+      return pendingItems;
+    }
+    return [
+      selectedDetectedItem,
+      ...pendingItems.filter((item) => item.id !== selectedDetectedItem.id),
+    ];
+  }, [detectedItems, processedDetectedItemIds, selectedDetectedItem]);
+  const batchDetectedItemCount = batchDetectedItems.length;
   const ocrSummary = useMemo<PhotoItemOCRSummary | null>(
     () => summarizePhotoItemOCRHints(analysis?.ocrHints ?? [], selectedDetectedItem),
     [analysis?.ocrHints, selectedDetectedItem],
@@ -594,6 +609,14 @@ export function PhotoItemAnalysisPage() {
     );
   }, [form.householdId, households, preferredPantryHouseholdId, preferredPantryHouseholdName]);
 
+  const persistHistoryItem = useCallback(
+    (item: PhotoItemAnalysisHistoryItem) => {
+      void persistPhotoItemAnalysisHistoryItem(token, item).then(setHistoryItems);
+      setHistoryItems(readPhotoItemAnalysisHistory());
+    },
+    [token],
+  );
+
   useEffect(() => {
     setForm((current) => ({
       ...current,
@@ -601,6 +624,18 @@ export function PhotoItemAnalysisPage() {
       reminderEnabled: current.expiresAt ? pantryPreferences.defaultReminderEnabled : false,
     }));
   }, [pantryPreferences.defaultReminderEnabled, preferredPantryHouseholdId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadPhotoItemAnalysisHistory(token).then((items) => {
+      if (!cancelled) {
+        setHistoryItems(items);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   useEffect(() => {
     if (!token) {
@@ -696,7 +731,7 @@ export function PhotoItemAnalysisPage() {
 
     const now = new Date().toISOString();
     const existing = readPhotoItemAnalysisHistory().find((item) => item.id === currentHistoryId);
-    upsertPhotoItemAnalysisHistory({
+    persistHistoryItem({
       id: currentHistoryId,
       imageUrl: uploadedImageUrl,
       imageName: existing?.imageName,
@@ -711,9 +746,10 @@ export function PhotoItemAnalysisPage() {
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       coverMode,
+      transparentCoverUrl,
+      transparentCoverTechLabel,
       qualityFeedback: existing?.qualityFeedback,
     });
-    setHistoryItems(readPhotoItemAnalysisHistory());
   }, [
     analysis,
     currentHistoryId,
@@ -721,9 +757,12 @@ export function PhotoItemAnalysisPage() {
     expiryBaseDate,
     form,
     processedDetectedItemIds,
+    persistHistoryItem,
     selectedDetectedItemId,
     selectedHouseholdName,
     state,
+    transparentCoverTechLabel,
+    transparentCoverUrl,
     uploadedImageUrl,
   ]);
 
@@ -1011,7 +1050,7 @@ export function PhotoItemAnalysisPage() {
       setCurrentHistoryId(historyId);
       setSelectedDetectedItemId(nextSelectedDetectedItemId);
       setProcessedDetectedItemIds([]);
-      upsertPhotoItemAnalysisHistory({
+      persistHistoryItem({
         id: historyId,
         imageUrl: upload.url,
         imageName: getFallbackFileName(imageFile),
@@ -1031,7 +1070,6 @@ export function PhotoItemAnalysisPage() {
         updatedAt: new Date().toISOString(),
         coverMode: nextCoverMode,
       });
-      setHistoryItems(readPhotoItemAnalysisHistory());
       setState('reviewing');
       setReviewSheetOpen(true);
       showToast('商品识别完成，请确认后入库。', 'success');
@@ -1118,7 +1156,9 @@ export function PhotoItemAnalysisPage() {
             : null;
           if (analysis && nextDetectedItem) {
             const nextNote = buildAnalysisNote(analysis, nextDetectedItem);
-            markPhotoItemAnalysisSaved(currentHistoryId, item.id);
+            void markPhotoItemAnalysisHistorySaved(token, currentHistoryId, item.id).then(
+              setHistoryItems,
+            );
             const nextHistoryId = createPhotoItemAnalysisHistoryId();
             const nextDraftForm = {
               ...buildPhotoItemDraftFormFromDetectedItem(
@@ -1141,7 +1181,7 @@ export function PhotoItemAnalysisPage() {
             setExpiryBaseDate(
               nextDetectedItem.productionDate || nextDetectedItem.purchaseDate || '',
             );
-            upsertPhotoItemAnalysisHistory({
+            persistHistoryItem({
               id: nextHistoryId,
               imageUrl: uploadedImageUrl,
               imageName:
@@ -1157,10 +1197,11 @@ export function PhotoItemAnalysisPage() {
               householdName: selectedHouseholdName,
               status: 'draft',
               coverMode,
+              transparentCoverUrl,
+              transparentCoverTechLabel,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             });
-            setHistoryItems(readPhotoItemAnalysisHistory());
             setState('reviewing');
             setReviewSheetOpen(true);
             showToast(`已保存一件，继续确认下一件：${nextDetectedItem.name}`, 'success');
@@ -1168,8 +1209,9 @@ export function PhotoItemAnalysisPage() {
           }
         }
 
-        markPhotoItemAnalysisSaved(currentHistoryId, item.id);
-        setHistoryItems(readPhotoItemAnalysisHistory());
+        void markPhotoItemAnalysisHistorySaved(token, currentHistoryId, item.id).then(
+          setHistoryItems,
+        );
       }
       setState('done');
       setCurrentHistoryId('');
@@ -1183,6 +1225,155 @@ export function PhotoItemAnalysisPage() {
     } catch (saveError) {
       setState('reviewing');
       setError(saveError instanceof Error ? saveError.message : '入库失败，请稍后再试。');
+    }
+  };
+
+  const saveBatchPantryItems = async () => {
+    if (!analysis || batchDetectedItems.length <= 1) {
+      return;
+    }
+    if (!form.name.trim()) {
+      setError('请先确认当前商品名称。');
+      return;
+    }
+
+    setState('saving');
+    setError('');
+    const createdItems: Array<{ id: string; name: string }> = [];
+    const savedDetectedItemIds: string[] = [];
+
+    try {
+      let currentThumbnailUrl = '';
+      if (coverMode === 'transparent' && transparentCoverUrl) {
+        currentThumbnailUrl = transparentCoverUrl;
+      } else if (token && selectedDetectedItem && coverMode === 'crop') {
+        const sourceFile = await loadCoverSourceFile(imageFile, uploadedImageUrl);
+        const coverFile = await createCroppedCoverFile(
+          sourceFile,
+          selectedDetectedItem.cropBox ??
+            analysis.cropBox ?? { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+        );
+        const coverUpload = await uploadLifeTraceImage(token, coverFile);
+        currentThumbnailUrl = coverUpload.url;
+      }
+
+      for (const detectedItem of batchDetectedItems) {
+        const isCurrentItem = detectedItem.id === selectedDetectedItem?.id;
+        const nextNote = buildAnalysisNote(analysis, detectedItem);
+        const draftForm = isCurrentItem
+          ? form
+          : {
+              ...buildPhotoItemDraftFormFromDetectedItem(
+                detectedItem,
+                {
+                  ...form,
+                  openedAt: '',
+                  householdId: form.householdId,
+                },
+                pantryPreferences,
+                nextNote,
+              ),
+              householdId: form.householdId,
+              openedAt: '',
+            };
+        if (!draftForm.name.trim()) {
+          throw new Error(`第 ${createdItems.length + 1} 件缺少商品名称，请逐个确认后再入库。`);
+        }
+
+        const item = await addPantryItem(
+          buildPhotoItemPantryInput({
+            form: draftForm,
+            pantryPreferences,
+            uploadedImageUrl,
+            thumbnailUrl: isCurrentItem ? currentThumbnailUrl : '',
+          }),
+          form.householdId || undefined,
+        );
+        if (!item) {
+          throw new Error('批量入库失败，请稍后重试。');
+        }
+        createdItems.push({ id: item.id, name: item.name });
+        savedDetectedItemIds.push(detectedItem.id);
+      }
+
+      void setActivePantryHousehold(
+        form.householdId || '',
+        form.householdId ? selectedHouseholdName : '',
+        { silent: true },
+      );
+
+      if (currentHistoryId) {
+        const nextProcessedDetectedItemIds = [
+          ...new Set([...processedDetectedItemIds, ...savedDetectedItemIds]),
+        ];
+        const now = new Date().toISOString();
+        persistHistoryItem({
+          id: currentHistoryId,
+          imageUrl: uploadedImageUrl,
+          imageName:
+            currentHistoryItem?.imageName ??
+            (imageFile ? getFallbackFileName(imageFile) : undefined),
+          analysis,
+          form,
+          selectedDetectedItemId,
+          processedDetectedItemIds: nextProcessedDetectedItemIds,
+          ocrHints: analysis.ocrHints,
+          expiryBaseDate,
+          householdName: selectedHouseholdName,
+          status: 'saved',
+          coverMode,
+          transparentCoverUrl,
+          transparentCoverTechLabel,
+          createdAt: currentHistoryItem?.createdAt ?? now,
+          updatedAt: now,
+          savedAt: now,
+          savedItemId: createdItems[0]?.id,
+          qualityFeedback: currentHistoryItem?.qualityFeedback,
+        });
+        setProcessedDetectedItemIds(nextProcessedDetectedItemIds);
+      }
+
+      setState('done');
+      setCurrentHistoryId('');
+      setReviewSheetOpen(false);
+      showToast(`已批量入库 ${createdItems.length} 件商品。`, 'success');
+    } catch (saveError) {
+      const nextProcessedDetectedItemIds = [
+        ...new Set([...processedDetectedItemIds, ...savedDetectedItemIds]),
+      ];
+      if (savedDetectedItemIds.length > 0 && currentHistoryId) {
+        const now = new Date().toISOString();
+        setProcessedDetectedItemIds(nextProcessedDetectedItemIds);
+        persistHistoryItem({
+          id: currentHistoryId,
+          imageUrl: uploadedImageUrl,
+          imageName:
+            currentHistoryItem?.imageName ??
+            (imageFile ? getFallbackFileName(imageFile) : undefined),
+          analysis,
+          form,
+          selectedDetectedItemId,
+          processedDetectedItemIds: nextProcessedDetectedItemIds,
+          ocrHints: analysis.ocrHints,
+          expiryBaseDate,
+          householdName: selectedHouseholdName,
+          status: 'draft',
+          coverMode,
+          transparentCoverUrl,
+          transparentCoverTechLabel,
+          createdAt: currentHistoryItem?.createdAt ?? now,
+          updatedAt: now,
+          qualityFeedback: currentHistoryItem?.qualityFeedback,
+        });
+      }
+      setState('reviewing');
+      setError(
+        savedDetectedItemIds.length > 0
+          ? `已入库 ${savedDetectedItemIds.length} 件，剩余商品未完成，请重试。`
+          : saveError instanceof Error
+            ? saveError.message
+            : '批量入库失败，请稍后再试。',
+      );
     }
   };
 
@@ -1283,8 +1474,8 @@ export function PhotoItemAnalysisPage() {
       setUploadedImageUrl(draft.imageUrl);
       setAnalysis(draft.analysis);
       setForm(draft.form);
-      setTransparentCoverUrl('');
-      setTransparentCoverTechLabel('');
+      setTransparentCoverUrl(draft.transparentCoverUrl ?? '');
+      setTransparentCoverTechLabel(draft.transparentCoverTechLabel ?? '');
       setTransparentCoverGenerating(false);
       setTransparentCoverError('');
       setBarcodeMatch(null);
@@ -1301,12 +1492,14 @@ export function PhotoItemAnalysisPage() {
           '',
       );
       setCoverMode(
-        draft.coverMode === 'crop' &&
-          isMeaningfulPhotoItemCropBox(
-            restoredSelectedDetectedItem?.cropBox ?? draft.analysis.cropBox,
-          )
-          ? 'crop'
-          : 'original',
+        draft.coverMode === 'transparent' && draft.transparentCoverUrl
+          ? 'transparent'
+          : draft.coverMode === 'crop' &&
+              isMeaningfulPhotoItemCropBox(
+                restoredSelectedDetectedItem?.cropBox ?? draft.analysis.cropBox,
+              )
+            ? 'crop'
+            : 'original',
       );
       setCurrentHistoryId(draft.id);
       setSelectedDetectedItemId(
@@ -1346,7 +1539,7 @@ export function PhotoItemAnalysisPage() {
   }, [requestedDraft, requestedDraftId, restoreDraft, showToast]);
 
   const dismissDraft = (draftId: string) => {
-    removePhotoItemAnalysisHistory(draftId);
+    void removePhotoItemAnalysisHistoryItem(token, draftId).then(setHistoryItems);
     setHistoryItems(readPhotoItemAnalysisHistory());
   };
 
@@ -1355,7 +1548,7 @@ export function PhotoItemAnalysisPage() {
       return;
     }
 
-    removePhotoItemAnalysisHistory(currentHistoryId);
+    void removePhotoItemAnalysisHistoryItem(token, currentHistoryId).then(setHistoryItems);
     setHistoryItems(readPhotoItemAnalysisHistory());
     showToast('已移除拍照草稿。', 'success');
     navigate('/ai', { replace: true });
@@ -1401,7 +1594,9 @@ export function PhotoItemAnalysisPage() {
     if (!currentHistoryId) {
       return;
     }
-    markPhotoItemAnalysisQualityFeedback(currentHistoryId, rating);
+    void markPhotoItemAnalysisHistoryQualityFeedback(token, currentHistoryId, rating).then(
+      setHistoryItems,
+    );
     setHistoryItems(readPhotoItemAnalysisHistory());
     showToast(rating === 'accurate' ? '已记录：识别准确。' : '已记录：识别不准确。', 'success');
   };
@@ -2015,7 +2210,7 @@ export function PhotoItemAnalysisPage() {
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">本次识别是否准确</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    反馈会保存在本机识别历史里，后续用于优化提示词和字段兜底。
+                    反馈会保存在云端识别历史里，帮助后续识别更稳定，也方便你继续复核。
                   </p>
                 </div>
               </div>
@@ -2562,21 +2757,41 @@ export function PhotoItemAnalysisPage() {
               </Button>
             </div>
           ) : (
-            <Button
-              type="submit"
-              variant="ai"
-              className="h-12 w-full whitespace-nowrap disabled:opacity-80"
-              disabled={state === 'saving'}
-            >
-              {state === 'saving' ? (
-                <ActionLoadingIcon className="size-4 shrink-0 text-background" />
-              ) : (
-                <Check className="size-4 shrink-0" />
-              )}
-              <span className="whitespace-nowrap">
-                {state === 'saving' ? '入库中...' : '确认入库'}
-              </span>
-            </Button>
+            <div className="grid gap-2">
+              <Button
+                type="submit"
+                variant="ai"
+                className="h-12 w-full whitespace-nowrap disabled:opacity-80"
+                disabled={state === 'saving'}
+              >
+                {state === 'saving' ? (
+                  <ActionLoadingIcon className="size-4 shrink-0 text-background" />
+                ) : (
+                  <Check className="size-4 shrink-0" />
+                )}
+                <span className="whitespace-nowrap">
+                  {state === 'saving' ? '入库中...' : '确认入库'}
+                </span>
+              </Button>
+              {batchDetectedItemCount > 1 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 w-full whitespace-nowrap"
+                  disabled={state === 'saving'}
+                  onClick={() => void saveBatchPantryItems()}
+                >
+                  {state === 'saving' ? (
+                    <ActionLoadingIcon className="size-4 shrink-0" />
+                  ) : (
+                    <PackageCheck className="size-4 shrink-0" />
+                  )}
+                  <span className="whitespace-nowrap">
+                    {state === 'saving' ? '批量入库中...' : `批量入库 ${batchDetectedItemCount} 件`}
+                  </span>
+                </Button>
+              ) : null}
+            </div>
           )}
         </form>
       </BottomSheet>

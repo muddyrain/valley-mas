@@ -65,8 +65,11 @@ import {
   PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT,
   type PhotoItemAnalysisHistoryItem,
   readPhotoItemAnalysisHistory,
-  removePhotoItemAnalysisHistory,
 } from '@/lib/photoItemAnalysis';
+import {
+  loadPhotoItemAnalysisHistory,
+  removePhotoItemAnalysisHistoryItem,
+} from '@/lib/photoItemAnalysisCloud';
 import { getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { getLocalISODate } from '@/lib/planSchedule';
 import { createPlanFromRecipe } from '@/lib/recipePlan';
@@ -1757,30 +1760,43 @@ function useAiPageState() {
   }, [loadCheckins, settingsLoaded, todayDate, token]);
 
   useEffect(() => {
-    const refreshPhotoItemHistory = () => setPhotoItemHistory(readPhotoItemAnalysisHistory());
-    refreshPhotoItemHistory();
+    let cancelled = false;
+    const refreshPhotoItemHistoryFromLocal = () =>
+      setPhotoItemHistory(readPhotoItemAnalysisHistory());
+    const refreshPhotoItemHistoryFromCloud = () => {
+      void loadPhotoItemAnalysisHistory(token).then((items) => {
+        if (!cancelled) {
+          setPhotoItemHistory(items);
+        }
+      });
+    };
+    refreshPhotoItemHistoryFromCloud();
 
-    window.addEventListener('focus', refreshPhotoItemHistory);
-    window.addEventListener(PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT, refreshPhotoItemHistory);
+    window.addEventListener('focus', refreshPhotoItemHistoryFromCloud);
+    window.addEventListener(
+      PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT,
+      refreshPhotoItemHistoryFromLocal,
+    );
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        refreshPhotoItemHistory();
+        refreshPhotoItemHistoryFromCloud();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      window.removeEventListener('focus', refreshPhotoItemHistory);
+      cancelled = true;
+      window.removeEventListener('focus', refreshPhotoItemHistoryFromCloud);
       window.removeEventListener(
         PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT,
-        refreshPhotoItemHistory,
+        refreshPhotoItemHistoryFromLocal,
       );
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [token]);
 
   const handleRemovePhotoItemDraft = (draftId: string) => {
-    removePhotoItemAnalysisHistory(draftId);
+    void removePhotoItemAnalysisHistoryItem(token, draftId).then(setPhotoItemHistory);
     setPhotoItemHistory(readPhotoItemAnalysisHistory());
   };
 
