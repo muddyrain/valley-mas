@@ -11,9 +11,10 @@
 
 - Web 前台：`apps/web/AGENTS.md`。
 - Admin 后台：`apps/admin/AGENTS.md`。
+- Admin 运营后台入口：`apps/admin/src/pages/admin-ops`、`apps/admin/src/api/operations.ts`；覆盖运营列表、AI 调用审计和存储资产只读治理。
 - Go 服务端：`server/AGENTS.md`、`server/README.md`、`server/migrations/README.md`。
 - Life Trace：`apps/life-trace/README.md`、`apps/life-trace/docs/PLAN.md`。
-- AI Mind Arena：`apps/ai-mind-arena/AGENTS.md`、`apps/ai-mind-arena/README.md`。
+- AI Mind Arena：`apps/ai-mind-arena/AGENTS.md`、`apps/ai-mind-arena/README.md`、`server/internal/model/mind_arena.go`。
 - WorldSim：`apps/world-sim/AGENTS.md`、`apps/world-sim/docs/*`。
 - Toy Climb Arena：`apps/toy-climb-arena/AGENTS.md`、`apps/toy-climb-arena/docs/*`。
 - Scratch Legend：`apps/scratch-legend/AGENTS.md`、`apps/scratch-legend/docs/*`。

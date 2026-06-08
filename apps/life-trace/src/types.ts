@@ -168,6 +168,34 @@ export type Trace = {
 
 export type NewTraceInput = Omit<Trace, 'id' | 'createdAt' | 'updatedAt'>;
 
+export type InboxItemType = 'text' | 'link';
+
+export type InboxItemStatus = 'inbox' | 'converted' | 'archived';
+
+export type InboxConvertedType = 'plan' | 'trace';
+
+export type InboxItem = {
+  id: string;
+  title: string;
+  content?: string;
+  itemType: InboxItemType;
+  linkUrl?: string;
+  tags: string[];
+  status: InboxItemStatus;
+  convertedType?: InboxConvertedType;
+  convertedId?: string;
+  convertedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type NewInboxItemInput = {
+  title: string;
+  content?: string;
+  itemType: InboxItemType;
+  linkUrl?: string;
+  tags: string[];
+};
 export type Checkin = {
   id: string;
   userId: string;
@@ -183,6 +211,8 @@ export type AiAction = {
   id: string;
   title: string;
   timeLabel: string;
+  actionType?: string;
+  createdAt?: string;
 };
 
 export type AdviceTone = 'weather' | 'ai' | 'plan' | 'trace' | 'health' | 'alert';

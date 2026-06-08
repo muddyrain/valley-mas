@@ -3,6 +3,7 @@ package router
 import (
 	"valley-server/internal/ai"
 	"valley-server/internal/config"
+	"valley-server/internal/database"
 	"valley-server/internal/handler"
 	"valley-server/internal/lifetrace"
 	"valley-server/internal/logger"
@@ -29,7 +30,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 	api := r.Group("/api/v1")
 	{
-		mindArenaStore := mindarena.NewMemoryStore()
+		mindArenaStore := mindarena.Store(mindarena.NewMemoryStore())
+		if db := database.GetDB(); db != nil {
+			mindArenaStore = mindarena.NewGormStore(db)
+		}
 		mindArenaService := mindarena.NewService(mindArenaStore, ai.NewServiceFromEnv())
 		mindarena.RegisterMindArenaRoutes(api, mindarena.NewHandler(mindArenaService))
 
@@ -168,6 +172,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 				adminOnly.GET("/users", handler.ListUsers)
 				adminOnly.POST("/users", handler.CreateUser)
 				adminOnly.GET("/users/:id", handler.GetUserDetail)
+				adminOnly.GET("/users/:id/operations", handler.AdminGetUserOperations)
 				adminOnly.PUT("/users/:id", handler.UpdateUser)
 				adminOnly.PUT("/users/:id/status", handler.UpdateUserStatus)
 				adminOnly.DELETE("/users/:id", handler.DeleteUser)
@@ -195,10 +200,46 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 				adminOnly.GET("/records/downloads", handler.ListDownloadRecords)
 				adminOnly.GET("/records/downloads/export", handler.ExportDownloadRecords)
+				adminOnly.GET("/resources/:id/operations", handler.AdminGetResourceOperations)
+				adminOnly.GET("/audit/operation-logs", handler.AdminListOperationLogs)
+				adminOnly.GET("/audit/code-access-logs", handler.AdminListCodeAccessLogs)
+				adminOnly.GET("/audit/storage-assets", handler.AdminListStorageAssets)
+				adminOnly.GET("/ai/usage-logs", handler.AdminListAIUsageLogs)
+				adminOnly.GET("/ai/usage-summary", handler.AdminGetAIUsageSummary)
 				// 资源标签增删改（仅管理员）
 				adminOnly.POST("/resource-tags", handler.CreateResourceTag)
 				adminOnly.PATCH("/resource-tags/:id", handler.UpdateResourceTag)
 				adminOnly.DELETE("/resource-tags/:id", handler.DeleteResourceTag)
+				adminOnly.GET("/blog/categories", handler.AdminListBlogCategories)
+				adminOnly.POST("/blog/categories", handler.AdminCreateBlogCategory)
+				adminOnly.PUT("/blog/categories/:id", handler.AdminUpdateBlogCategory)
+				adminOnly.DELETE("/blog/categories/:id", handler.AdminDeleteBlogCategory)
+				adminOnly.GET("/blog/tags", handler.AdminListBlogTags)
+				adminOnly.POST("/blog/tags", handler.AdminCreateBlogTag)
+				adminOnly.PUT("/blog/tags/:id", handler.AdminUpdateBlogTag)
+				adminOnly.DELETE("/blog/tags/:id", handler.AdminDeleteBlogTag)
+				adminOnly.GET("/blog/comments", handler.AdminListBlogComments)
+				adminOnly.DELETE("/blog/comments/:id", handler.AdminDeleteBlogComment)
+				adminOnly.GET("/guestbook/messages", handler.AdminListGuestbookMessages)
+				adminOnly.DELETE("/guestbook/messages/:id", handler.DeleteGuestbookMessage)
+				adminOnly.PATCH("/guestbook/messages/:id/pin", handler.UpdateGuestbookMessagePin)
+				adminOnly.PATCH("/guestbook/messages/:id/status", handler.AdminUpdateGuestbookMessageStatus)
+				adminOnly.GET("/creator-albums", handler.AdminListCreatorAlbums)
+				adminOnly.GET("/creator-albums/:id", handler.AdminGetCreatorAlbumDetail)
+				adminOnly.PUT("/creator-albums/:id", handler.AdminUpdateCreatorAlbum)
+				adminOnly.DELETE("/creator-albums/:id", handler.AdminDeleteCreatorAlbum)
+				adminOnly.GET("/relations/favorites", handler.AdminListFavorites)
+				adminOnly.GET("/relations/follows", handler.AdminListFollows)
+				adminOnly.GET("/notifications", handler.AdminListNotifications)
+				adminOnly.POST("/notifications", handler.AdminCreateNotification)
+				adminOnly.PATCH("/notifications/:id/read-state", handler.AdminUpdateNotificationReadState)
+				adminOnly.GET("/life-trace/households", handler.ListAdminLifeTraceHouseholds)
+				adminOnly.GET("/life-trace/push-subscriptions", handler.ListAdminLifeTracePushSubscriptions)
+				adminOnly.GET("/life-trace/push-deliveries", handler.ListAdminLifeTracePushDeliveries)
+				adminOnly.GET("/life-trace/ai-conversations", handler.ListAdminLifeTraceAIConversations)
+				adminOnly.GET("/life-trace/holiday-calendars", handler.ListAdminLifeTraceHolidayCalendars)
+				adminOnly.GET("/mind-arena/debates", handler.AdminListMindArenaDebates)
+				adminOnly.GET("/mind-arena/debates/:id", handler.AdminGetMindArenaDebate)
 
 			}
 

@@ -66,14 +66,17 @@ export function SyncState({
     return (
       <div className={cn('space-y-3', className)} aria-live="polite" aria-busy="true">
         {Array.from({ length: rows }, (_, index) => (
-          <Card key={index} className={cn('relative overflow-hidden p-4', toneClass.card)}>
-            {showRail ? (
-              <div className={cn('absolute inset-x-4 top-0 h-px', toneClass.rail)} />
-            ) : null}
+          <Card
+            key={index}
+            className={cn(
+              'border-border/80 bg-secondary/25 p-4 shadow-none',
+              tone !== 'default' ? 'border-border/70' : null,
+            )}
+          >
             <div className="flex items-start gap-3">
               <div
                 className={cn(
-                  'grid size-10 shrink-0 place-items-center rounded-2xl',
+                  'grid size-10 shrink-0 place-items-center rounded-2xl opacity-90',
                   toneClass.icon,
                 )}
               >
@@ -84,9 +87,9 @@ export function SyncState({
                 )}
               </div>
               <div className="min-w-0 flex-1 space-y-3">
-                <div className="h-3 w-28 animate-pulse rounded-full bg-secondary motion-reduce:animate-none" />
-                <div className="h-3 w-full animate-pulse rounded-full bg-secondary motion-reduce:animate-none" />
-                <div className="h-3 w-2/3 animate-pulse rounded-full bg-secondary motion-reduce:animate-none" />
+                <div className="h-3 w-24 animate-pulse rounded-full bg-muted-foreground/16 motion-reduce:animate-none" />
+                <div className="h-3 w-11/12 animate-pulse rounded-full bg-muted-foreground/16 motion-reduce:animate-none" />
+                <div className="h-3 w-7/12 animate-pulse rounded-full bg-muted-foreground/16 motion-reduce:animate-none" />
               </div>
             </div>
             {index === 0 ? <span className="sr-only">{title}</span> : null}

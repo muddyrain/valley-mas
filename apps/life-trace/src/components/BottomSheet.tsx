@@ -16,6 +16,7 @@ type BottomSheetProps = {
   children: ReactNode;
   closeDisabled?: boolean;
   className?: string;
+  contentClassName?: string;
   zIndexClassName?: string;
   showHandle?: boolean;
   portal?: boolean;
@@ -28,6 +29,7 @@ export function BottomSheet({
   children,
   closeDisabled = false,
   className,
+  contentClassName,
   zIndexClassName = 'z-[70]',
   showHandle = true,
   portal = true,
@@ -185,6 +187,7 @@ export function BottomSheet({
           className={cn(
             'safe-bottom min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 max-[360px]:px-4',
             showHandle ? null : 'pt-5 max-[360px]:pt-4',
+            contentClassName,
           )}
         >
           {children}

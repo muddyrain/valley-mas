@@ -17,6 +17,7 @@ type EditTraceDrawerProps = {
   open: boolean;
   trace: Trace | null;
   onOpenChange: (open: boolean) => void;
+  initialInput?: Partial<NewTraceInput>;
   onSaved?: (trace: Trace) => void;
 };
 
@@ -37,7 +38,13 @@ function parseTags(value: string) {
     .filter(Boolean);
 }
 
-export function EditTraceDrawer({ open, trace, onOpenChange, onSaved }: EditTraceDrawerProps) {
+export function EditTraceDrawer({
+  open,
+  trace,
+  onOpenChange,
+  initialInput,
+  onSaved,
+}: EditTraceDrawerProps) {
   const addTrace = useLifeTraceStore((state) => state.addTrace);
   const editTrace = useLifeTraceStore((state) => state.editTrace);
   const tracesError = useLifeTraceStore((state) => state.tracesError);
@@ -69,17 +76,19 @@ export function EditTraceDrawer({ open, trace, onOpenChange, onSaved }: EditTrac
     }
 
     if (!trace) {
-      setForm({
+      const nextForm = {
         title: '',
         summary: '',
         timeLabel: `今天 ${getDefaultTimeLabel()}`,
         location: '',
         imageUrl: '',
         mood: '放松',
-        tags: ['生活迹'],
-        source: '手动',
-      });
-      setTagText('生活迹');
+        ...initialInput,
+        tags: initialInput?.tags?.length ? initialInput.tags : ['生活迹'],
+        source: initialInput?.source ?? '手动',
+      };
+      setForm(nextForm);
+      setTagText(stringifyTags(nextForm.tags));
       setErrors({});
       return;
     }
@@ -97,7 +106,7 @@ export function EditTraceDrawer({ open, trace, onOpenChange, onSaved }: EditTrac
     });
     setTagText(stringifyTags(trace.tags.length > 0 ? trace.tags : ['生活迹']));
     setErrors({});
-  }, [open, trace]);
+  }, [initialInput, open, trace]);
 
   const updateField = <K extends keyof NewTraceInput>(key: K, value: NewTraceInput[K]) => {
     setForm((current) => ({ ...current, [key]: value }));

@@ -47,5 +47,7 @@ func isAddressInUseError(err error) bool {
 	if errors.Is(err, syscall.EADDRINUSE) {
 		return true
 	}
-	return strings.Contains(strings.ToLower(err.Error()), "address already in use")
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "address already in use") ||
+		strings.Contains(message, "only one usage of each socket address")
 }

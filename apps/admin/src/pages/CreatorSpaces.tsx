@@ -1,6 +1,6 @@
 import { AppstoreOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Button, Card, Form, Image, Input, Modal, message, Space, Switch, Transfer } from 'antd';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { CreatorSpace } from '../api/creator';
 import {
@@ -32,7 +32,7 @@ export default function CreatorSpaces() {
   const [selectedResourceIds, setSelectedResourceIds] = useState<string[]>([]);
 
   // 加载创作者信息和空间
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!creatorId) return;
 
     setLoading(true);
@@ -59,13 +59,12 @@ export default function CreatorSpaces() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [creatorId, form]);
 
   // 初始加载
   useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creatorId]);
+    void fetchData();
+  }, [fetchData]);
 
   // 提交表单
   const handleSubmit = async () => {

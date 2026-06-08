@@ -5,6 +5,17 @@ import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-route
 import { reqGetCurrentUser } from './api/auth';
 import Layout from './layouts/Layout';
 import ApplyCreator from './pages/ApplyCreator';
+import AIUsageLogs from './pages/admin-ops/AIUsageLogs';
+import AuditLogs from './pages/admin-ops/AuditLogs';
+import BlogComments from './pages/admin-ops/BlogComments';
+import BlogTaxonomy from './pages/admin-ops/BlogTaxonomy';
+import CreatorAlbums from './pages/admin-ops/CreatorAlbums';
+import GuestbookMessages from './pages/admin-ops/GuestbookMessages';
+import LifeTraceOps from './pages/admin-ops/LifeTraceOps';
+import MindArenaDebates from './pages/admin-ops/MindArenaDebates';
+import Notifications from './pages/admin-ops/Notifications';
+import Relations from './pages/admin-ops/Relations';
+import ResourceTags from './pages/admin-ops/ResourceTags';
 import BlogPostEdit from './pages/BlogPostEdit';
 import BlogPosts from './pages/BlogPosts';
 import CreatorApplications from './pages/CreatorApplications';
@@ -120,6 +131,38 @@ function App() {
           <Route path="blog-posts" element={<BlogPosts />} />
           <Route path="blog-posts/create" element={<BlogPostEdit />} />
           <Route path="blog-posts/edit/:id" element={<BlogPostEdit />} />
+          <Route path="blog-groups" element={<BlogTaxonomy kind="groups" />} />
+          <Route path="blog-categories" element={<BlogTaxonomy kind="categories" />} />
+          <Route path="blog-tags" element={<BlogTaxonomy kind="tags" />} />
+          <Route path="blog-comments" element={<BlogComments />} />
+          <Route path="guestbook" element={<GuestbookMessages />} />
+          <Route path="resource-tags" element={<ResourceTags />} />
+          <Route path="creator-albums" element={<CreatorAlbums />} />
+          <Route path="notifications" element={<Notifications />} />
+          <Route path="relations/favorites" element={<Relations kind="favorites" />} />
+          <Route path="relations/follows" element={<Relations kind="follows" />} />
+          <Route path="audit/operation-logs" element={<AuditLogs kind="operation-logs" />} />
+          <Route path="audit/code-access-logs" element={<AuditLogs kind="code-access-logs" />} />
+          <Route path="audit/storage-assets" element={<AuditLogs kind="storage-assets" />} />
+          <Route path="ai/usage-logs" element={<AIUsageLogs />} />
+          <Route path="life-trace/households" element={<LifeTraceOps kind="households" />} />
+          <Route
+            path="life-trace/push-subscriptions"
+            element={<LifeTraceOps kind="push-subscriptions" />}
+          />
+          <Route
+            path="life-trace/push-deliveries"
+            element={<LifeTraceOps kind="push-deliveries" />}
+          />
+          <Route
+            path="life-trace/ai-conversations"
+            element={<LifeTraceOps kind="ai-conversations" />}
+          />
+          <Route
+            path="life-trace/holiday-calendars"
+            element={<LifeTraceOps kind="holiday-calendars" />}
+          />
+          <Route path="mind-arena/debates" element={<MindArenaDebates />} />
         </Route>
       </Routes>
     </BrowserRouter>

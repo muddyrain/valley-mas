@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"valley-server/internal/aiusage"
 
 	"github.com/gin-gonic/gin"
 	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
@@ -181,6 +182,7 @@ func (h *Handler) AnalyzeImage(c *gin.Context) {
 
 	prompt := buildImageAnalysisPrompt(req.Kind, aiCfg.UseVision)
 	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
+	aiCtx = aiusage.WithAudit(aiCtx, "life-trace-image", userID.String())
 	defer cancel()
 
 	raw, modelName, err := callLifeTraceImageAI(aiCtx, aiCfg, imageInput, prompt)
@@ -259,6 +261,7 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 		strings.TrimSpace(req.BarcodeSource),
 	)
 	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
+	aiCtx = aiusage.WithAudit(aiCtx, "life-trace-pantry-photo", userID.String())
 	defer cancel()
 
 	raw, modelName, err := callLifeTraceImageAI(aiCtx, aiCfg, imageInput, prompt)
@@ -437,6 +440,7 @@ func callLifeTraceImageAI(
 	imageInput string,
 	prompt string,
 ) (string, string, error) {
+	start := time.Now()
 	client := ensureLifeTraceArkClient(cfg.APIKey, cfg.BaseURL)
 	content := &arkmodel.ChatCompletionMessageContent{}
 	if cfg.UseVision {
@@ -469,10 +473,13 @@ func callLifeTraceImageAI(
 		Temperature: &temperature,
 	})
 	if err != nil {
+		recordLifeTraceAIUsage(ctx, "ark", cfg.Model, prompt, "", aiusage.Since(start), err)
 		return "", "", err
 	}
 	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == nil {
-		return "", resp.Model, errors.New("empty AI response")
+		err := errors.New("empty AI response")
+		recordLifeTraceAIUsage(ctx, "ark", resp.Model, prompt, "", aiusage.Since(start), err)
+		return "", resp.Model, err
 	}
 
 	raw := ""
@@ -490,8 +497,11 @@ func callLifeTraceImageAI(
 	}
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", resp.Model, errors.New("empty AI content")
+		err := errors.New("empty AI content")
+		recordLifeTraceAIUsage(ctx, "ark", resp.Model, prompt, "", aiusage.Since(start), err)
+		return "", resp.Model, err
 	}
+	recordLifeTraceAIUsage(ctx, "ark", resp.Model, prompt, raw, aiusage.Since(start), nil)
 	return raw, resp.Model, nil
 }
 

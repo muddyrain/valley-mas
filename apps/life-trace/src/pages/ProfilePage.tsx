@@ -7,6 +7,7 @@ import {
   Clock,
   Download,
   Heart,
+  Inbox,
   LogOut,
   MapPin,
   MessageSquareText,
@@ -554,6 +555,28 @@ export function ProfilePage() {
             打开提醒设置
             <ChevronRight className="size-4" />
           </Button>
+        </Card>
+      </section>
+
+      <section data-profile-card className="space-y-3">
+        <SectionHeader title="个人工具" meta="Inbox" />
+        <Card className="p-4">
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 text-left"
+            onClick={() => navigate('/inbox')}
+          >
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+              <Inbox className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold">捕捉 Inbox</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                收下想法、链接和待处理事项。
+              </p>
+            </div>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </button>
         </Card>
       </section>
 

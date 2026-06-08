@@ -65,6 +65,16 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			traces.DELETE("/:id", handler.DeleteTrace)
 		}
 
+		inbox := group.Group("/inbox")
+		inbox.Use(auth)
+		{
+			inbox.GET("", handler.ListInboxItems)
+			inbox.POST("", handler.CreateInboxItem)
+			inbox.PATCH("/:id", handler.UpdateInboxItem)
+			inbox.PATCH("/:id/status", handler.UpdateInboxItemStatus)
+			inbox.PATCH("/:id/convert", handler.ConvertInboxItem)
+			inbox.DELETE("/:id", handler.DeleteInboxItem)
+		}
 		pantry := group.Group("/pantry")
 		pantry.Use(auth)
 		{

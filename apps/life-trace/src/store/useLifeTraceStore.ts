@@ -1,7 +1,17 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { listAchievements } from '@/api/achievements';
+import { listAiActions } from '@/api/aiActions';
 import { listCheckins, toggleCheckin } from '@/api/checkins';
+import {
+  type ListInboxOptions,
+  listInboxItems,
+  convertInboxItem as requestConvertInboxItem,
+  createInboxItem as requestCreateInboxItem,
+  deleteInboxItem as requestDeleteInboxItem,
+  updateInboxItem as requestUpdateInboxItem,
+  updateInboxItemStatus as requestUpdateInboxItemStatus,
+} from '@/api/inbox';
 import {
   type ListPantryOptions,
   listPantry,
@@ -23,6 +33,7 @@ import {
 import { getSettings, saveSettings } from '@/api/settings';
 import { createTrace, deleteTrace, listTraces, updateTrace } from '@/api/traces';
 import { findNewlyUnlockedAchievements, normalizeAchievement } from '@/lib/achievements';
+import { normalizeAiActionRecord } from '@/lib/aiHistory';
 import { getLifeTraceErrorMessage } from '@/lib/error';
 import { resolvePantryStatus } from '@/lib/pantry';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -33,7 +44,11 @@ import type {
   AiAction,
   AppTab,
   Checkin,
+  InboxConvertedType,
+  InboxItem,
+  InboxItemStatus,
   ListPagination,
+  NewInboxItemInput,
   NewPantryItemInput,
   NewPlanInput,
   NewTraceInput,
@@ -70,6 +85,16 @@ type LifeTraceState = {
   traceCreating: boolean;
   traceUpdatingById: Record<string, boolean>;
   traceDeletingById: Record<string, boolean>;
+  inboxItems: InboxItem[];
+  inboxLoaded: boolean;
+  inboxLoading: boolean;
+  inboxLoadingMore: boolean;
+  inboxError: string;
+  inboxPagination: ListPagination;
+  inboxListOptions: ListInboxOptions;
+  inboxCreating: boolean;
+  inboxUpdatingById: Record<string, boolean>;
+  inboxDeletingById: Record<string, boolean>;
   checkins: Checkin[];
   checkinsDate: string;
   checkinsLoaded: boolean;
@@ -120,8 +145,11 @@ type LifeTraceState = {
   loadMorePlans: () => Promise<void>;
   loadTraces: () => Promise<void>;
   loadMoreTraces: () => Promise<void>;
+  loadInboxItems: (options?: ListInboxOptions) => Promise<void>;
+  loadMoreInboxItems: () => Promise<void>;
   loadCheckins: (date: string) => Promise<void>;
   loadAchievements: (options?: { notifyNew?: boolean }) => Promise<void>;
+  loadAiActions: () => Promise<void>;
   toggleHabitCheckin: (date: string, name: string, completed: boolean) => Promise<void>;
   addPlan: (input: NewPlanInput) => Promise<Plan | null>;
   addPantryItem: (input: NewPantryItemInput, householdId?: string) => Promise<PantryItem | null>;
@@ -146,6 +174,15 @@ type LifeTraceState = {
   editPlan: (planId: string, input: NewPlanInput) => Promise<Plan | null>;
   addTrace: (input: NewTraceInput) => Promise<Trace | null>;
   editTrace: (traceId: string, input: NewTraceInput) => Promise<Trace | null>;
+  addInboxItem: (input: NewInboxItemInput) => Promise<InboxItem | null>;
+  editInboxItem: (itemId: string, input: NewInboxItemInput) => Promise<InboxItem | null>;
+  updateInboxStatus: (itemId: string, status: InboxItemStatus) => Promise<InboxItem | null>;
+  convertInbox: (
+    itemId: string,
+    convertedType: InboxConvertedType,
+    convertedId: string,
+  ) => Promise<InboxItem | null>;
+  removeInboxItem: (itemId: string) => Promise<boolean>;
   completePlan: (planId: string) => Promise<void>;
   removePlan: (planId: string) => Promise<void>;
   removeTrace: (traceId: string) => Promise<void>;
@@ -211,6 +248,12 @@ const defaultPantryListOptions: ListPantryOptions = {
   category: 'all',
 };
 
+const defaultInboxListOptions: ListInboxOptions = {
+  page: 1,
+  pageSize: 20,
+  status: 'inbox',
+  type: 'all',
+};
 function formatTraceRecordedTime(value?: string) {
   const date = value ? new Date(value) : new Date();
   const validDate = Number.isNaN(date.getTime()) ? new Date() : date;
@@ -393,6 +436,19 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       traceCreating: false,
       traceUpdatingById: {},
       traceDeletingById: {},
+      inboxItems: [],
+      inboxLoaded: false,
+      inboxLoading: false,
+      inboxLoadingMore: false,
+      inboxError: '',
+      inboxPagination: {
+        ...defaultPagination,
+        pageSize: defaultInboxListOptions.pageSize ?? 20,
+      },
+      inboxListOptions: defaultInboxListOptions,
+      inboxCreating: false,
+      inboxUpdatingById: {},
+      inboxDeletingById: {},
       checkins: [],
       checkinsDate: '',
       checkinsLoaded: false,
@@ -943,6 +999,90 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           });
         }
       },
+      loadInboxItems: async (options = {}) => {
+        const token = getToken();
+        const nextOptions = {
+          ...get().inboxListOptions,
+          ...options,
+          page: 1,
+          pageSize: options.pageSize ?? get().inboxListOptions.pageSize ?? 20,
+        };
+        if (!token) {
+          set({
+            inboxItems: [],
+            inboxLoaded: true,
+            inboxLoading: false,
+            inboxLoadingMore: false,
+            inboxError: '',
+            inboxPagination: {
+              ...defaultPagination,
+              pageSize: nextOptions.pageSize ?? 20,
+            },
+            inboxListOptions: nextOptions,
+          });
+          return;
+        }
+
+        set({ inboxLoading: true, inboxError: '', inboxListOptions: nextOptions });
+        try {
+          const { list, pagination } = await listInboxItems(token, nextOptions);
+          set({
+            inboxItems: list,
+            inboxPagination: pagination ?? {
+              ...defaultPagination,
+              pageSize: nextOptions.pageSize ?? 20,
+              total: list.length,
+              hasMore: false,
+            },
+            inboxLoaded: true,
+            inboxLoading: false,
+            inboxError: '',
+          });
+        } catch (error) {
+          set({
+            inboxLoading: false,
+            inboxLoaded: true,
+            inboxError: getLifeTraceErrorMessage(error, '获取 Inbox 失败'),
+          });
+        }
+      },
+      loadMoreInboxItems: async () => {
+        const token = getToken();
+        const { inboxListOptions, inboxPagination, inboxLoading, inboxLoadingMore } = get();
+        if (!token || inboxLoading || inboxLoadingMore || !inboxPagination.hasMore) {
+          return;
+        }
+
+        set({ inboxLoadingMore: true, inboxError: '' });
+        try {
+          const nextPage = inboxPagination.page + 1;
+          const { list, pagination } = await listInboxItems(token, {
+            ...inboxListOptions,
+            page: nextPage,
+            pageSize: inboxPagination.pageSize,
+          });
+          set((state) => {
+            const existingIds = new Set(state.inboxItems.map((item) => item.id));
+            const nextItems = list.filter((item) => !existingIds.has(item.id));
+            return {
+              inboxItems: [...state.inboxItems, ...nextItems],
+              inboxPagination: pagination ?? {
+                page: nextPage,
+                pageSize: inboxPagination.pageSize,
+                total: state.inboxItems.length + nextItems.length,
+                hasMore: false,
+              },
+              inboxLoadingMore: false,
+              inboxError: '',
+            };
+          });
+        } catch (error) {
+          set({
+            inboxLoadingMore: false,
+            inboxError: getLifeTraceErrorMessage(error, '加载更多 Inbox 失败'),
+          });
+        }
+      },
       loadCheckins: async (date) => {
         const token = getToken();
         if (!token) {
@@ -1011,6 +1151,20 @@ export const useLifeTraceStore = create<LifeTraceState>()(
             achievementsLoading: false,
             achievementsError: getLifeTraceErrorMessage(error, '获取生活成就失败'),
           });
+        }
+      },
+      loadAiActions: async () => {
+        const token = getToken();
+        if (!token) {
+          set({ aiActions: [] });
+          return;
+        }
+
+        try {
+          const response = await listAiActions(token);
+          set({ aiActions: response.list.map(normalizeAiActionRecord) });
+        } catch {
+          // Keep local actions when the history endpoint is temporarily unavailable.
         }
       },
       toggleHabitCheckin: async (date, name, completed) => {
@@ -1458,6 +1612,166 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         } finally {
           set((state) => ({
             traceUpdatingById: { ...state.traceUpdatingById, [traceId]: false },
+          }));
+        }
+      },
+      addInboxItem: async (input) => {
+        const token = getToken();
+        if (!token) {
+          set({ inboxError: '请先登录后再收下内容' });
+          return null;
+        }
+        if (get().inboxCreating) {
+          return null;
+        }
+
+        set({ inboxCreating: true, inboxError: '' });
+        try {
+          const item = await requestCreateInboxItem(token, input);
+          set((state) => ({
+            inboxItems: [item, ...state.inboxItems],
+            inboxPagination: {
+              ...state.inboxPagination,
+              total: state.inboxPagination.total + 1,
+            },
+            inboxError: '',
+            aiActions: [
+              { id: createActionId(), title: `收下了「${item.title}」`, timeLabel: '刚刚' },
+              ...getAiActions(state),
+            ],
+          }));
+          return item;
+        } catch (error) {
+          set({ inboxError: getLifeTraceErrorMessage(error, '创建 Inbox 失败') });
+          return null;
+        } finally {
+          set({ inboxCreating: false });
+        }
+      },
+      editInboxItem: async (itemId, input) => {
+        const token = getToken();
+        if (!token) {
+          set({ inboxError: '请先登录后再编辑 Inbox' });
+          return null;
+        }
+        if (get().inboxUpdatingById[itemId]) {
+          return null;
+        }
+
+        set((state) => ({
+          inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: true },
+          inboxError: '',
+        }));
+        try {
+          const updated = await requestUpdateInboxItem(token, itemId, input);
+          set((state) => ({
+            inboxItems: state.inboxItems.map((item) => (item.id === itemId ? updated : item)),
+            inboxError: '',
+          }));
+          return updated;
+        } catch (error) {
+          set({ inboxError: getLifeTraceErrorMessage(error, '编辑 Inbox 失败') });
+          return null;
+        } finally {
+          set((state) => ({
+            inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: false },
+          }));
+        }
+      },
+      updateInboxStatus: async (itemId, status) => {
+        const token = getToken();
+        if (!token) {
+          set({ inboxError: '请先登录后再更新 Inbox' });
+          return null;
+        }
+        if (get().inboxUpdatingById[itemId]) {
+          return null;
+        }
+
+        set((state) => ({
+          inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: true },
+          inboxError: '',
+        }));
+        try {
+          const updated = await requestUpdateInboxItemStatus(token, itemId, status);
+          set((state) => ({
+            inboxItems: state.inboxItems.map((item) => (item.id === itemId ? updated : item)),
+            inboxError: '',
+          }));
+          return updated;
+        } catch (error) {
+          set({ inboxError: getLifeTraceErrorMessage(error, '更新 Inbox 失败') });
+          return null;
+        } finally {
+          set((state) => ({
+            inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: false },
+          }));
+        }
+      },
+      convertInbox: async (itemId, convertedType, convertedId) => {
+        const token = getToken();
+        if (!token) {
+          set({ inboxError: '请先登录后再转化 Inbox' });
+          return null;
+        }
+        if (get().inboxUpdatingById[itemId]) {
+          return null;
+        }
+
+        set((state) => ({
+          inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: true },
+          inboxError: '',
+        }));
+        try {
+          const updated = await requestConvertInboxItem(token, itemId, {
+            convertedType,
+            convertedId,
+          });
+          set((state) => ({
+            inboxItems: state.inboxItems.map((item) => (item.id === itemId ? updated : item)),
+            inboxError: '',
+            aiActions: [
+              { id: createActionId(), title: `转化了「${updated.title}」`, timeLabel: '刚刚' },
+              ...getAiActions(state),
+            ],
+          }));
+          return updated;
+        } catch (error) {
+          set({ inboxError: getLifeTraceErrorMessage(error, '转化 Inbox 失败') });
+          return null;
+        } finally {
+          set((state) => ({
+            inboxUpdatingById: { ...state.inboxUpdatingById, [itemId]: false },
+          }));
+        }
+      },
+      removeInboxItem: async (itemId) => {
+        const token = getToken();
+        if (!token || get().inboxDeletingById[itemId]) {
+          return false;
+        }
+
+        set((state) => ({
+          inboxDeletingById: { ...state.inboxDeletingById, [itemId]: true },
+          inboxError: '',
+        }));
+        try {
+          await requestDeleteInboxItem(token, itemId);
+          set((state) => ({
+            inboxItems: state.inboxItems.filter((item) => item.id !== itemId),
+            inboxPagination: {
+              ...state.inboxPagination,
+              total: Math.max(state.inboxPagination.total - 1, 0),
+            },
+            inboxError: '',
+          }));
+          return true;
+        } catch (error) {
+          set({ inboxError: getLifeTraceErrorMessage(error, '删除 Inbox 失败') });
+          return false;
+        } finally {
+          set((state) => ({
+            inboxDeletingById: { ...state.inboxDeletingById, [itemId]: false },
           }));
         }
       },

@@ -137,6 +137,39 @@ func (trace *LifeTraceTrace) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+type LifeTraceInboxItem struct {
+	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID        Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	Title         string         `gorm:"size:160;not null" json:"title"`
+	Content       string         `gorm:"type:text" json:"content,omitempty"`
+	ItemType      string         `gorm:"column:item_type;size:20;not null;default:'text';index" json:"itemType"`
+	LinkURL       string         `gorm:"column:link_url;size:800" json:"linkUrl,omitempty"`
+	Tags          StringList     `gorm:"type:text" json:"tags"`
+	Status        string         `gorm:"size:20;not null;default:'inbox';index" json:"status"`
+	ConvertedType string         `gorm:"column:converted_type;size:30" json:"convertedType,omitempty"`
+	ConvertedID   string         `gorm:"column:converted_id;size:80;index" json:"convertedId,omitempty"`
+	ConvertedAt   *time.Time     `json:"convertedAt,omitempty"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (item *LifeTraceInboxItem) BeforeCreate(tx *gorm.DB) error {
+	if item.ID == 0 {
+		item.ID = Int64String(utils.GenerateID())
+	}
+	if item.ItemType == "" {
+		item.ItemType = "text"
+	}
+	if item.Status == "" {
+		item.Status = "inbox"
+	}
+	if item.Tags == nil {
+		item.Tags = StringList{}
+	}
+	return nil
+}
+
 type LifeTracePantryItem struct {
 	ID                 Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID             Int64String    `gorm:"column:user_id;index;not null" json:"userId"`

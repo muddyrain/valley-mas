@@ -18,7 +18,7 @@ import {
   Tooltip,
   Typography,
 } from 'antd';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBeforeUnload, useNavigate, useParams } from 'react-router-dom';
 import type { Category, CreatePostData, PostType, Visibility } from '@/api/blog';
 import { createPost, getAdminPostDetail, getCategories, updatePost } from '@/api/blog';
@@ -130,9 +130,51 @@ export default function BlogPostEdit() {
   const watchedValues = Form.useWatch([], form);
   const postType = watchedValues?.postType || 'blog';
 
+  const loadCategories = useCallback(async () => {
+    try {
+      const categoriesData = await getCategories();
+      setCategories(categoriesData || []);
+    } catch (error) {
+      console.error('Failed to load categories:', error);
+      message.error('加载分类失败');
+    }
+  }, []);
+
+  const loadPost = useCallback(
+    async (postId: string) => {
+      setLoading(true);
+      try {
+        const post = await getAdminPostDetail(postId);
+        const values: EditorFormValues = {
+          title: post.title,
+          postType: post.postType || 'blog',
+          visibility: post.visibility || 'private',
+          templateKey: post.templateKey || '',
+          templateData: post.templateData || '',
+          excerpt: post.excerpt || '',
+          cover: post.cover || '',
+          categoryId: post.categoryId,
+          status: post.status,
+          isTop: post.isTop,
+        };
+
+        form.setFieldsValue(values);
+        const markdown = post.content || '';
+        setContent(markdown);
+        setInitialSnapshot(makeSnapshot(values, markdown));
+      } catch (error) {
+        console.error('Failed to load post:', error);
+        message.error('加载文章失败');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [form],
+  );
+
   useEffect(() => {
     void loadCategories();
-  }, []);
+  }, [loadCategories]);
 
   useEffect(() => {
     try {
@@ -154,7 +196,7 @@ export default function BlogPostEdit() {
     }
 
     void loadPost(id);
-  }, [id, isEdit, form]);
+  }, [id, isEdit, form, loadPost]);
 
   const currentSnapshot = useMemo(
     () => makeSnapshot(watchedValues || defaultValues, content),
@@ -172,7 +214,7 @@ export default function BlogPostEdit() {
     event.returnValue = '';
   });
 
-  const confirmLeave = () => window.confirm('当前有未保存内容，确认离开吗？');
+  const confirmLeave = useCallback(() => window.confirm('当前有未保存内容，确认离开吗？'), []);
 
   const guardedNavigate = (to: string) => {
     if (!bypassNavigationGuardRef.current && isDirty && !confirmLeave()) return;
@@ -214,49 +256,10 @@ export default function BlogPostEdit() {
 
     document.addEventListener('click', handleDocumentClick, true);
     return () => document.removeEventListener('click', handleDocumentClick, true);
-  }, [isDirty]);
+  }, [confirmLeave, isDirty]);
 
   const charCount = useMemo(() => countReadableChars(content), [content]);
   const readingMinutes = useMemo(() => Math.max(1, Math.ceil(charCount / 500)), [charCount]);
-
-  const loadCategories = async () => {
-    try {
-      const categoriesData = await getCategories();
-      setCategories(categoriesData || []);
-    } catch (error) {
-      console.error('Failed to load categories:', error);
-      message.error('加载分类失败');
-    }
-  };
-
-  const loadPost = async (postId: string) => {
-    setLoading(true);
-    try {
-      const post = await getAdminPostDetail(postId);
-      const values: EditorFormValues = {
-        title: post.title,
-        postType: post.postType || 'blog',
-        visibility: post.visibility || 'private',
-        templateKey: post.templateKey || '',
-        templateData: post.templateData || '',
-        excerpt: post.excerpt || '',
-        cover: post.cover || '',
-        categoryId: post.categoryId,
-        status: post.status,
-        isTop: post.isTop,
-      };
-
-      form.setFieldsValue(values);
-      const markdown = post.content || '';
-      setContent(markdown);
-      setInitialSnapshot(makeSnapshot(values, markdown));
-    } catch (error) {
-      console.error('Failed to load post:', error);
-      message.error('加载文章失败');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleTemplatePreset = () => {
     const key = form.getFieldValue('templateKey');

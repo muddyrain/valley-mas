@@ -12,6 +12,7 @@ import {
   AiPhotoItemHistoryPage,
   AiWeeklyReviewsPage,
 } from '@/pages/AiPage';
+import { InboxPage } from '@/pages/InboxPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { PantryItemDetailPage } from '@/pages/PantryItemDetailPage';
 import { PantryPage } from '@/pages/PantryPage';
@@ -38,6 +39,7 @@ function AppContent() {
   const loadPantry = useLifeTraceStore((state) => state.loadPantry);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
   const loadTraces = useLifeTraceStore((state) => state.loadTraces);
+  const loadInboxItems = useLifeTraceStore((state) => state.loadInboxItems);
   const loadAchievements = useLifeTraceStore((state) => state.loadAchievements);
   const { status, token, verifySession } = useAuthStore();
   const location = useLocation();
@@ -55,9 +57,19 @@ function AppContent() {
       void loadPantry();
       void loadPlans();
       void loadTraces();
+      void loadInboxItems();
       void loadAchievements();
     }
-  }, [loadAchievements, loadPantry, loadPlans, loadSettings, loadTraces, status, token]);
+  }, [
+    loadAchievements,
+    loadInboxItems,
+    loadPantry,
+    loadPlans,
+    loadSettings,
+    loadTraces,
+    status,
+    token,
+  ]);
 
   useEffect(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
@@ -93,6 +105,7 @@ function AppContent() {
           <Route path="/" element={<Navigate to="/today" replace />} />
           <Route path="/today" element={<TodayPage />} />
           <Route path="/pantry" element={<PantryPage />} />
+          <Route path="/inbox" element={<InboxPage />} />
           <Route path="/pantry/:itemId" element={<PantryItemDetailPage />} />
           <Route path="/plans/:planId?" element={<PlansPage />} />
           <Route path="/ai" element={<AiPage />} />

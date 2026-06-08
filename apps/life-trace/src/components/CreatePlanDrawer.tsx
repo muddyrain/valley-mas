@@ -42,6 +42,8 @@ type CreatePlanDrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   plan?: Plan | null;
+  initialInput?: Partial<NewPlanInput>;
+  onSaved?: (plan: Plan) => void;
 };
 
 function addDays(base: Date, days: number) {
@@ -75,7 +77,13 @@ function getDateOptionFromPlan(plan: Plan, now = new Date()): DateOptionValue {
   return matched ? matched.value : 'custom';
 }
 
-export function CreatePlanDrawer({ open, onOpenChange, plan }: CreatePlanDrawerProps) {
+export function CreatePlanDrawer({
+  open,
+  onOpenChange,
+  plan,
+  initialInput,
+  onSaved,
+}: CreatePlanDrawerProps) {
   const addPlan = useLifeTraceStore((state) => state.addPlan);
   const editPlan = useLifeTraceStore((state) => state.editPlan);
   const plansError = useLifeTraceStore((state) => state.plansError);
@@ -118,13 +126,19 @@ export function CreatePlanDrawer({ open, onOpenChange, plan }: CreatePlanDrawerP
       setCustomDate(nextDateOption === 'custom' ? (plan.scheduledDate ?? '') : '');
       setTime(plan.scheduledTime || timeText);
     } else {
-      setForm(defaultForm);
+      setForm({
+        ...defaultForm,
+        ...initialInput,
+        reminder: initialInput?.reminder ?? defaultForm.reminder,
+        type: initialInput?.type ?? defaultForm.type,
+        source: initialInput?.source ?? 'manual',
+      });
       setDateOption('今天');
       setCustomDate('');
       setTime('');
     }
     setErrors({});
-  }, [open, plan]);
+  }, [initialInput, open, plan]);
 
   const updateField = <K extends keyof NewPlanInput>(key: K, value: NewPlanInput[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -164,6 +178,7 @@ export function CreatePlanDrawer({ open, onOpenChange, plan }: CreatePlanDrawerP
     const savedPlan = plan ? await editPlan(plan.id, payload) : await addPlan(payload);
 
     if (savedPlan) {
+      onSaved?.(savedPlan);
       onOpenChange(false);
     }
   };

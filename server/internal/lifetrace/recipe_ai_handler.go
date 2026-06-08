@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"valley-server/internal/aiusage"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 
@@ -102,6 +103,7 @@ func (h *Handler) GenerateRecipeSuggestions(c *gin.Context) {
 
 	prompt := buildRecipeSuggestionPrompt(req, pantryCtx, time.Now())
 	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
+	aiCtx = aiusage.WithAudit(aiCtx, "life-trace-recipe", userID.String())
 	defer cancel()
 
 	raw, modelName, err := callLifeTraceAIWithMaxTokens(aiCtx, aiCfg, prompt, lifeTraceRecipeMaxTokens)

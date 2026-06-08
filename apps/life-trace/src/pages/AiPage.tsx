@@ -14,6 +14,7 @@ import {
   Mic,
   MicOff,
   Plus,
+  Search,
   Send,
   Sparkles,
   Sun,
@@ -50,7 +51,6 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { EmptyState } from '@/components/EmptyState';
-import { ImageAnalysisDrawer } from '@/components/ImageAnalysisDrawer';
 import { LifeTraceBrandMark } from '@/components/LifeTraceBrandMark';
 import { SectionHeader } from '@/components/SectionHeader';
 import { SubPageShell } from '@/components/SubPageShell';
@@ -59,6 +59,12 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { suggestedPrompts } from '@/data/mock';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
+import {
+  filterAiActions,
+  getAiActionMeta,
+  getAssistantMessageDate,
+  groupAssistantMessagesByDate,
+} from '@/lib/aiHistory';
 import { formatLocationDisplay } from '@/lib/location';
 import {
   getPhotoItemAnalysisSummaryItems,
@@ -241,25 +247,6 @@ function normalizeAssistantMessage(message: LifeAssistantMessage, index: number)
   };
 }
 
-function getAssistantMessageDate(message: AssistantMessage) {
-  if (message.createdAt) {
-    const date = new Date(message.createdAt);
-    if (!Number.isNaN(date.getTime())) {
-      return date;
-    }
-  }
-
-  const timestamp = message.id.match(/(?:user|assistant)-(\d+)/)?.[1];
-  if (timestamp) {
-    const date = new Date(Number(timestamp));
-    if (!Number.isNaN(date.getTime())) {
-      return date;
-    }
-  }
-
-  return null;
-}
-
 function formatAssistantMessageTime(message: AssistantMessage) {
   const date = getAssistantMessageDate(message);
   if (!date) {
@@ -284,47 +271,6 @@ function formatConversationTime(conversation: LifeAssistantConversation) {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function getAssistantHistoryGroupLabel(message: AssistantMessage, now = new Date()) {
-  const date = getAssistantMessageDate(message);
-  if (!date) {
-    return '更早';
-  }
-
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const startOfMessageDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const dayDiff = Math.round((startOfToday - startOfMessageDay) / 86400000);
-
-  if (dayDiff === 0) {
-    return '今天';
-  }
-  if (dayDiff === 1) {
-    return '昨天';
-  }
-  if (dayDiff < 7) {
-    return `${dayDiff} 天前`;
-  }
-  return date.toLocaleDateString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-  });
-}
-
-function groupAssistantMessages(messages: AssistantMessage[]) {
-  const groups: Array<{ label: string; messages: AssistantMessage[] }> = [];
-
-  for (const message of messages) {
-    const label = getAssistantHistoryGroupLabel(message);
-    const latestGroup = groups[groups.length - 1];
-    if (latestGroup?.label === label) {
-      latestGroup.messages.push(message);
-    } else {
-      groups.push({ label, messages: [message] });
-    }
-  }
-
-  return groups;
 }
 
 function WeeklyReviewPanel({
@@ -684,7 +630,10 @@ function AssistantHistoryPage({
   onRequestClear: () => void;
   notice?: string;
 }) {
-  const groups = groupAssistantMessages(messages);
+  const [keyword, setKeyword] = useState('');
+  const groups = groupAssistantMessagesByDate(messages, keyword);
+  const filteredMessageCount = groups.reduce((sum, group) => sum + group.messages.length, 0);
+  const hasKeyword = keyword.trim().length > 0;
 
   return (
     <SubPageShell
@@ -710,8 +659,22 @@ function AssistantHistoryPage({
         </Card>
       ) : null}
 
-      <section>
-        <SectionHeader title="全部对话" meta={loading ? '同步中' : `${messages.length} 条`} />
+      <section className="space-y-4">
+        <div className="space-y-3">
+          <SectionHeader
+            title="全部对话"
+            meta={loading ? '同步中' : `${filteredMessageCount} 条`}
+          />
+          <label className="flex min-h-11 items-center gap-2 rounded-2xl border border-border bg-card px-3 text-sm text-muted-foreground focus-within:border-life-ai/50 focus-within:text-life-ai">
+            <Search className="size-4 shrink-0" />
+            <input
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              className="min-w-0 flex-1 bg-transparent py-2.5 text-foreground outline-none placeholder:text-muted-foreground"
+              placeholder="搜索对话内容"
+            />
+          </label>
+        </div>
         {loading && messages.length === 0 ? (
           <MessageSyncSkeleton />
         ) : groups.length > 0 ? (
@@ -734,6 +697,15 @@ function AssistantHistoryPage({
               </div>
             ))}
           </div>
+        ) : hasKeyword ? (
+          <EmptyState
+            title="没有匹配对话"
+            description="换个关键词再找找。"
+            eyebrow="对话搜索"
+            icon={Search}
+            tone="ai"
+            align="center"
+          />
         ) : (
           <EmptyState
             title="还没有对话"
@@ -750,29 +722,42 @@ function AssistantHistoryPage({
 }
 
 function AiActionCard({ action }: { action: AiAction }) {
-  const Icon = action.title.includes('计划')
-    ? CalendarDays
-    : action.title.includes('图片')
-      ? Image
-      : Sparkles;
+  const meta = getAiActionMeta(action);
+  const Icon =
+    meta.label === '计划'
+      ? CalendarDays
+      : meta.label === '图片'
+        ? Image
+        : meta.label === 'Pantry'
+          ? Utensils
+          : meta.label === '回顾'
+            ? History
+            : Sparkles;
 
   return (
     <Card className="flex items-center gap-4 p-4">
-      <div className="grid size-10 shrink-0 place-items-center rounded-full bg-life-trace/10 text-life-trace">
+      <div className="grid size-10 shrink-0 place-items-center rounded-full bg-secondary text-life-ai">
         <Icon className="size-5" />
       </div>
       <div className="min-w-0 flex-1">
-        <h3 className="line-clamp-2 font-semibold">{action.title}</h3>
-        <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-          <Clock className="size-3" />
-          {action.timeLabel}
+        <div className="mb-1 flex items-center gap-2">
+          <Badge tone={meta.tone}>{meta.label}</Badge>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Clock className="size-3" />
+            {action.timeLabel}
+          </div>
         </div>
+        <h3 className="line-clamp-2 text-sm font-semibold leading-5">{action.title}</h3>
       </div>
     </Card>
   );
 }
 
 function AiActionsArchive({ actions, onBack }: { actions: AiAction[]; onBack: () => void }) {
+  const [keyword, setKeyword] = useState('');
+  const filteredActions = filterAiActions(actions, keyword);
+  const hasKeyword = keyword.trim().length > 0;
+
   return (
     <SubPageShell
       title="AI 操作历史"
@@ -780,16 +765,38 @@ function AiActionsArchive({ actions, onBack }: { actions: AiAction[]; onBack: ()
       onBack={onBack}
       contentClassName="space-y-6"
     >
-      {actions.length > 0 ? (
+      <section className="space-y-3">
+        <SectionHeader title="动作追踪" meta={`${filteredActions.length} 条`} />
+        <label className="flex min-h-11 items-center gap-2 rounded-2xl border border-border bg-card px-3 text-sm text-muted-foreground focus-within:border-life-ai/50 focus-within:text-life-ai">
+          <Search className="size-4 shrink-0" />
+          <input
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            className="min-w-0 flex-1 bg-transparent py-2.5 text-foreground outline-none placeholder:text-muted-foreground"
+            placeholder="搜索动作"
+          />
+        </label>
+      </section>
+
+      {filteredActions.length > 0 ? (
         <div className="space-y-3">
-          {actions.map((action) => (
+          {filteredActions.map((action) => (
             <AiActionCard key={action.id} action={action} />
           ))}
         </div>
+      ) : hasKeyword ? (
+        <EmptyState
+          title="没有匹配动作"
+          description="换个关键词再找找。"
+          eyebrow="动作搜索"
+          icon={Search}
+          tone="ai"
+          align="center"
+        />
       ) : (
         <EmptyState
           title="还没有 AI 操作"
-          description="生成建议、分析图片、创建计划后，这里会沉淀最近的 AI 操作。"
+          description="生成建议、创建计划、处理库存后，最近操作会保存在这里。"
           eyebrow="Life AI"
           icon={Sparkles}
           tone="ai"
@@ -1046,12 +1053,12 @@ function AssistantToolRow({
   return (
     <button
       type="button"
-      className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-border/80 bg-card/80 px-3 py-2.5 text-left transition hover:bg-secondary disabled:opacity-70"
+      className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-card/70 px-3 py-2.5 text-left transition hover:border-border hover:bg-secondary/70 disabled:opacity-70"
       disabled={disabled}
       onClick={onClick}
     >
       <span
-        className={`grid size-8 shrink-0 place-items-center rounded-xl bg-secondary/80 ${toneClass}`}
+        className={`grid size-8 shrink-0 place-items-center rounded-xl bg-secondary/70 ${toneClass}`}
       >
         {loading ? <ActionLoadingIcon className="size-4" /> : <Icon className="size-4" />}
       </span>
@@ -1075,6 +1082,7 @@ function AssistantToolsSheet({
   latestPhotoDraft,
   onOpenChange,
   onOpenWeeklyReviews,
+  onOpenHistory,
   onOpenActions,
   onOpenPhotoAnalysis,
   onOpenPhotoItemDraft,
@@ -1088,6 +1096,7 @@ function AssistantToolsSheet({
   latestPhotoDraft: PhotoItemAnalysisHistoryItem | null;
   onOpenChange: (open: boolean) => void;
   onOpenWeeklyReviews: () => void;
+  onOpenHistory: () => void;
   onOpenActions: () => void;
   onOpenPhotoAnalysis: () => void;
   onOpenPhotoItemDraft: (draftId: string) => void;
@@ -1103,20 +1112,20 @@ function AssistantToolsSheet({
       open={open}
       onOpenChange={onOpenChange}
       overlayLabel="关闭 AI 工具"
-      className="space-y-5"
+      contentClassName="space-y-6"
       portal
     >
-      <div className="space-y-1">
-        <p className="text-xl font-semibold">AI 工具</p>
-        <p className="text-sm text-muted-foreground">计划、图片、Pantry 与回顾</p>
+      <div className="px-1 pb-1">
+        <p className="text-2xl font-semibold tracking-normal">AI 工具</p>
+        <p className="mt-2 text-sm leading-5 text-muted-foreground">计划、Pantry 与回顾</p>
       </div>
 
-      <div className="rounded-[1.4rem] border border-border bg-secondary/20 p-3">
-        <div className="mb-3 flex items-center justify-between gap-3 px-1">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3 px-1">
           <p className="text-sm font-semibold">生活动作</p>
-          <span className="text-xs text-muted-foreground">4 个动作</span>
+          <span className="text-xs text-muted-foreground">3 个动作</span>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-[1.35rem] border border-border/80 bg-secondary/15 p-2.5">
           <AssistantToolRow
             icon={Sun}
             label="今天安排"
@@ -1133,13 +1142,6 @@ function AssistantToolsSheet({
             onClick={() => closeAndRun(() => onQuickAction('创建计划'))}
           />
           <AssistantToolRow
-            icon={Image}
-            label="分析图片"
-            toneClass="text-life-trace"
-            disabled={Boolean(quickActionLoading)}
-            onClick={() => closeAndRun(() => onQuickAction('分析图片'))}
-          />
-          <AssistantToolRow
             icon={Sparkles}
             label="生成踪迹"
             toneClass="text-life-ai"
@@ -1149,12 +1151,12 @@ function AssistantToolsSheet({
         </div>
       </div>
 
-      <div className="rounded-[1.4rem] border border-border bg-secondary/20 p-3">
-        <div className="mb-3 flex items-center justify-between gap-3 px-1">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3 px-1">
           <p className="text-sm font-semibold">Pantry 智能</p>
-          <span className="text-xs text-muted-foreground">4 个入口</span>
+          <span className="text-xs text-muted-foreground">5 个入口</span>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-[1.35rem] border border-border/80 bg-secondary/15 p-2.5">
           <AssistantToolRow
             icon={Camera}
             label="拍照分析商品"
@@ -1175,6 +1177,12 @@ function AssistantToolsSheet({
             toneClass="text-life-health"
             meta={weeklyReviewsLoading ? '同步中' : String(weeklyReviewCount)}
             onClick={() => closeAndRun(onOpenWeeklyReviews)}
+          />
+          <AssistantToolRow
+            icon={MessageSquareText}
+            label="对话历史"
+            toneClass="text-life-ai"
+            onClick={() => closeAndRun(onOpenHistory)}
           />
           <AssistantToolRow
             icon={Sparkles}
@@ -1243,6 +1251,7 @@ function AgentConversationPanel({
   onOpenConversations,
   onCreateConversation,
   onOpenWeeklyReviews,
+  onOpenHistory,
   onOpenPhotoAnalysis,
   onOpenPhotoItemHistory,
   onOpenPhotoItemDraft,
@@ -1288,6 +1297,7 @@ function AgentConversationPanel({
   onOpenConversations: () => void;
   onCreateConversation: () => void;
   onOpenWeeklyReviews: () => void;
+  onOpenHistory: () => void;
   onOpenPhotoAnalysis: () => void;
   onOpenPhotoItemHistory: () => void;
   onOpenPhotoItemDraft: (draftId: string) => void;
@@ -1620,6 +1630,7 @@ function AgentConversationPanel({
         latestPhotoDraft={latestPhotoDraft}
         onOpenChange={onToolsSheetOpenChange}
         onOpenWeeklyReviews={onOpenWeeklyReviews}
+        onOpenHistory={onOpenHistory}
         onOpenActions={onOpenActions}
         onOpenPhotoAnalysis={onOpenPhotoAnalysis}
         onOpenPhotoItemDraft={onOpenPhotoItemDraft}
@@ -1659,8 +1670,8 @@ function useAiPageState() {
   const addPlan = useLifeTraceStore((state) => state.addPlan);
   const receiveServerPlan = useLifeTraceStore((state) => state.receiveServerPlan);
   const receiveServerPantryItem = useLifeTraceStore((state) => state.receiveServerPantryItem);
-  const addTrace = useLifeTraceStore((state) => state.addTrace);
   const loadAchievements = useLifeTraceStore((state) => state.loadAchievements);
+  const loadAiActions = useLifeTraceStore((state) => state.loadAiActions);
   const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const pantryListSummary = useLifeTraceStore((state) => state.pantryListSummary);
@@ -1670,7 +1681,6 @@ function useAiPageState() {
   const token = useAuthStore((state) => state.token);
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [imageDrawerOpen, setImageDrawerOpen] = useState(false);
   const [result, setResult] = useState<AiResult | null>(null);
   const [recipeResult, setRecipeResult] = useState<RecipeSuggestionResponse | null>(null);
   const [adviceCards, setAdviceCards] = useState<AdvicePayload[]>([]);
@@ -1738,6 +1748,13 @@ function useAiPageState() {
   const pantryHouseholdLabel = preferredPantryHouseholdId
     ? preferredPantryHouseholdName || '当前共享空间'
     : '我的空间';
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    void loadAiActions();
+  }, [loadAiActions, token]);
 
   useEffect(() => {
     if (!token) {
@@ -2351,12 +2368,11 @@ function useAiPageState() {
       return;
     }
 
-    setImageDrawerOpen(true);
     setRecipeResult(null);
     setResult({
-      title: '准备分析图片',
-      detail: '上传图片或粘贴图片链接后，可以生成生活计划或直接生成踪迹。',
-      tone: 'trace',
+      title: '暂不支持这个动作',
+      detail: '可以先使用计划、踪迹、智能菜谱或拍照分析商品。',
+      tone: 'alert',
     });
   };
 
@@ -2624,17 +2640,10 @@ function useAiPageState() {
     checkinsLoading,
     settings,
     aiActions,
-    addAiAction,
-    addPlan,
-    addTrace,
-    token,
     navigate,
     drawerOpen,
     setDrawerOpen,
-    imageDrawerOpen,
-    setImageDrawerOpen,
     result,
-    setResult,
     recipeResult,
     adviceCards,
     assistantInput,
@@ -2823,17 +2832,10 @@ export function AiPage() {
   const {
     plans,
     aiActions,
-    addAiAction,
-    addPlan,
-    addTrace,
-    token,
     navigate,
     drawerOpen,
     setDrawerOpen,
-    imageDrawerOpen,
-    setImageDrawerOpen,
     result,
-    setResult,
     recipeResult,
     adviceCards,
     assistantInput,
@@ -2919,6 +2921,7 @@ export function AiPage() {
         onOpenConversations={() => setAssistantConversationSheetOpen(true)}
         onCreateConversation={() => void handleCreateAssistantConversation()}
         onOpenWeeklyReviews={() => navigate('/ai/weekly-reviews')}
+        onOpenHistory={() => navigate('/ai/history')}
         onOpenPhotoAnalysis={() => navigate('/ai/photo-item-analysis')}
         onOpenPhotoItemHistory={() => navigate('/ai/photo-item-history')}
         onOpenPhotoItemDraft={(draftId) =>
@@ -2948,37 +2951,6 @@ export function AiPage() {
       />
 
       <CreatePlanDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
-      <ImageAnalysisDrawer
-        open={imageDrawerOpen}
-        token={token}
-        onOpenChange={setImageDrawerOpen}
-        onCreatePlan={(input) => {
-          void addPlan(input);
-          setResult({
-            title: '已从图片生成计划',
-            detail: `「${input.title}」已加入计划列表，完成后可以继续生成踪迹。`,
-            tone: 'plan',
-          });
-        }}
-        onCreateTrace={(input) => {
-          void addTrace(input).then((trace) => {
-            setResult(
-              trace
-                ? {
-                    title: '已从图片生成踪迹',
-                    detail: `「${input.title}」已加入踪迹流，可以到“踪迹”页查看。`,
-                    tone: 'trace',
-                  }
-                : {
-                    title: '踪迹保存失败',
-                    detail: '刚才的图片分析结果没有保存成功，请稍后再试。',
-                    tone: 'alert',
-                  },
-            );
-          });
-        }}
-        onAnalyzed={(title) => addAiAction(title)}
-      />
       <ConfirmDialog
         open={Boolean(weeklyReviewRegenerateTarget)}
         title="重新生成本周周报？"

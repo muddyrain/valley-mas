@@ -1,5 +1,6 @@
 import {
   DeleteOutlined,
+  EyeOutlined,
   ReloadOutlined,
   SearchOutlined,
   UploadOutlined,
@@ -10,6 +11,8 @@ import type { UploadFile, UploadProps } from 'antd';
 import {
   Button,
   Card,
+  Descriptions,
+  Drawer,
   Form,
   Image,
   Input,
@@ -23,6 +26,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useEffect, useState } from 'react';
+import { type AdminResourceOperations, getResourceOperations } from '@/api/operations';
 import { UserCardInfo } from '@/components/UserCardInfo';
 import { type Creator, reqGetCreatorList } from '../api/creator';
 import {
@@ -69,6 +73,11 @@ export default function Resources() {
   const [creatorForm] = Form.useForm();
   const [users, setUsers] = useState<Array<{ id: string; nickname: string }>>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [resourceOperations, setResourceOperations] = useState<AdminResourceOperations | null>(
+    null,
+  );
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
   const isCreator = userInfo.role === 'creator';
 
@@ -209,6 +218,19 @@ export default function Resources() {
     }
   };
 
+  const openResourceDetail = async (resource: Resource) => {
+    setDetailOpen(true);
+    setDetailLoading(true);
+    try {
+      setResourceOperations(await getResourceOperations(resource.id));
+    } catch (error) {
+      console.error('Failed to load resource detail:', error);
+      message.error('加载资源详情失败');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
   const handleUpdateCreator = async () => {
     if (!currentResource) return;
 
@@ -338,6 +360,14 @@ export default function Resources() {
                 ?.label
             }
           </Tag>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => void openResourceDetail(record)}
+          >
+            详情
+          </Button>
           {!isCreator && (
             <Button
               type="link"
@@ -521,6 +551,95 @@ export default function Resources() {
           )}
         </Form>
       </Modal>
+
+      <Drawer
+        title="资源运营详情"
+        open={detailOpen}
+        width={760}
+        onClose={() => setDetailOpen(false)}
+        loading={detailLoading}
+      >
+        {resourceOperations ? (
+          <div className="space-y-5">
+            <Descriptions column={1} bordered size="small">
+              <Descriptions.Item label="标题">
+                {String(resourceOperations.resource.title || '未命名资源')}
+              </Descriptions.Item>
+              <Descriptions.Item label="上传者">
+                {String(
+                  (resourceOperations.resource.user as { nickname?: string } | undefined)
+                    ?.nickname ||
+                    resourceOperations.resource.userId ||
+                    '-',
+                )}
+              </Descriptions.Item>
+              <Descriptions.Item label="存储 key">
+                <span className="font-mono text-xs">
+                  {String(resourceOperations.resource.storageKey || '-')}
+                </span>
+              </Descriptions.Item>
+              <Descriptions.Item label="下载数">
+                {resourceOperations.downloadCount}
+              </Descriptions.Item>
+              <Descriptions.Item label="收藏数">
+                {resourceOperations.favoriteCount}
+              </Descriptions.Item>
+              <Descriptions.Item label="标签">
+                <Space wrap>
+                  {resourceOperations.tags.length
+                    ? resourceOperations.tags.map((tag) => <Tag key={tag.id}>{tag.name}</Tag>)
+                    : '-'}
+                </Space>
+              </Descriptions.Item>
+              <Descriptions.Item label="所属专辑">
+                <Space direction="vertical" size={2}>
+                  {resourceOperations.albums.length
+                    ? resourceOperations.albums.map((album) => (
+                        <span key={album.id}>
+                          {album.name}
+                          {album.creator?.user?.nickname ? ` / ${album.creator.user.nickname}` : ''}
+                        </span>
+                      ))
+                    : '-'}
+                </Space>
+              </Descriptions.Item>
+            </Descriptions>
+
+            <Table
+              size="small"
+              rowKey={(record) => String(record.id)}
+              dataSource={resourceOperations.downloads}
+              pagination={false}
+              columns={[
+                { title: '最近下载用户', dataIndex: ['user', 'nickname'] },
+                {
+                  title: '时间',
+                  dataIndex: 'createdAt',
+                  width: 180,
+                  render: (value?: string) =>
+                    value ? new Date(value).toLocaleString('zh-CN') : '-',
+                },
+              ]}
+            />
+            <Table
+              size="small"
+              rowKey={(record) => String(record.id)}
+              dataSource={resourceOperations.favorites}
+              pagination={false}
+              columns={[
+                { title: '最近收藏用户', dataIndex: ['user', 'nickname'] },
+                {
+                  title: '时间',
+                  dataIndex: 'createdAt',
+                  width: 180,
+                  render: (value?: string) =>
+                    value ? new Date(value).toLocaleString('zh-CN') : '-',
+                },
+              ]}
+            />
+          </div>
+        ) : null}
+      </Drawer>
     </div>
   );
 }

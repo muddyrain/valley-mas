@@ -343,6 +343,10 @@ func GetAdminLifeTraceOverview(c *gin.Context) {
 
 func ListAdminLifeTraceRecords(c *gin.Context) {
 	recordType := strings.TrimSpace(c.DefaultQuery("type", "plans"))
+	listAdminLifeTraceRecordsByType(c, recordType)
+}
+
+func listAdminLifeTraceRecordsByType(c *gin.Context, recordType string) {
 	switch recordType {
 	case "plans":
 		listAdminLifeTracePlans(c)
@@ -364,9 +368,34 @@ func ListAdminLifeTraceRecords(c *gin.Context) {
 		listAdminLifeTracePushDailyDeliveries(c)
 	case "push-pantry-deliveries":
 		listAdminLifeTracePushPantryDeliveries(c)
+	case "households":
+		listAdminLifeTraceHouseholds(c)
+	case "holiday-calendars":
+		listAdminLifeTraceHolidayCalendars(c)
 	default:
 		Error(c, 400, "不支持的 Life Trace 记录类型")
 	}
+}
+
+func ListAdminLifeTraceHouseholds(c *gin.Context) {
+	listAdminLifeTraceRecordsByType(c, "households")
+}
+
+func ListAdminLifeTracePushSubscriptions(c *gin.Context) {
+	listAdminLifeTraceRecordsByType(c, "push-subscriptions")
+}
+
+func ListAdminLifeTracePushDeliveries(c *gin.Context) {
+	recordType := strings.TrimSpace(c.DefaultQuery("type", "push-plan-deliveries"))
+	listAdminLifeTraceRecordsByType(c, recordType)
+}
+
+func ListAdminLifeTraceAIConversations(c *gin.Context) {
+	listAdminLifeTraceRecordsByType(c, "ai-conversations")
+}
+
+func ListAdminLifeTraceHolidayCalendars(c *gin.Context) {
+	listAdminLifeTraceRecordsByType(c, "holiday-calendars")
 }
 
 func finishAdminLifeTraceRecords(c *gin.Context, rows []adminLifeTraceRecordRow, total int64, page adminLifeTracePageParams) {
@@ -757,6 +786,100 @@ func listAdminLifeTracePushDailyDeliveries(c *gin.Context) {
 
 func listAdminLifeTracePushPantryDeliveries(c *gin.Context) {
 	listAdminLifeTracePushDeliveries[model.LifeTracePantryReminderDelivery](c, "push-pantry-deliveries", "pantryItemId")
+}
+
+func listAdminLifeTraceHouseholds(c *gin.Context) {
+	page := parseAdminLifeTracePage(c)
+	query := database.GetDB().Model(&model.Household{})
+	if status := strings.TrimSpace(c.Query("status")); status != "" && status != "all" {
+		query = query.Where("status = ?", status)
+	}
+	if keyword := strings.TrimSpace(c.Query("keyword")); keyword != "" {
+		query = query.Where("name LIKE ? OR kind LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+	}
+	query = applyAdminLifeTraceDateFilters(query, c, "created_at")
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		Error(c, 500, "查询家庭空间失败")
+		return
+	}
+	var items []model.Household
+	if err := query.Order("created_at DESC").Limit(page.PageSize).Offset(page.Offset).Find(&items).Error; err != nil {
+		Error(c, 500, "查询家庭空间失败")
+		return
+	}
+
+	userIDs := make([]model.Int64String, 0, len(items))
+	for _, item := range items {
+		userIDs = append(userIDs, item.OwnerUserID)
+	}
+	users := loadAdminLifeTraceUsers(userIDs)
+	rows := make([]adminLifeTraceRecordRow, 0, len(items))
+	for _, item := range items {
+		updatedAt := item.UpdatedAt
+		rows = append(rows, adminLifeTraceRecordRow{
+			ID:        item.ID.String(),
+			Type:      "households",
+			UserID:    item.OwnerUserID.String(),
+			UserName:  adminLifeTraceUserName(users[item.OwnerUserID], item.OwnerUserID),
+			Title:     item.Name,
+			Status:    item.Status,
+			Source:    item.Kind,
+			CreatedAt: item.CreatedAt,
+			UpdatedAt: &updatedAt,
+			Detail: map[string]any{
+				"dissolvedAt": item.DissolvedAt,
+			},
+		})
+	}
+	finishAdminLifeTraceRecords(c, rows, total, page)
+}
+
+func listAdminLifeTraceHolidayCalendars(c *gin.Context) {
+	page := parseAdminLifeTracePage(c)
+	query := database.GetDB().Model(&model.LifeTraceHolidayCalendar{})
+	if keyword := strings.TrimSpace(c.Query("keyword")); keyword != "" {
+		query = query.Where("country LIKE ? OR source_name LIKE ? OR source_url LIKE ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
+	}
+	if year := strings.TrimSpace(c.Query("year")); year != "" {
+		if value, err := strconv.Atoi(year); err == nil {
+			query = query.Where("year = ?", value)
+		}
+	}
+	query = applyAdminLifeTraceDateFilters(query, c, "created_at")
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		Error(c, 500, "查询节假日缓存失败")
+		return
+	}
+	var items []model.LifeTraceHolidayCalendar
+	if err := query.Order("year DESC, updated_at DESC").Limit(page.PageSize).Offset(page.Offset).Find(&items).Error; err != nil {
+		Error(c, 500, "查询节假日缓存失败")
+		return
+	}
+
+	rows := make([]adminLifeTraceRecordRow, 0, len(items))
+	for _, item := range items {
+		updatedAt := item.UpdatedAt
+		rows = append(rows, adminLifeTraceRecordRow{
+			ID:        item.ID.String(),
+			Type:      "holiday-calendars",
+			UserID:    "",
+			UserName:  "",
+			Title:     item.Country + " " + strconv.Itoa(item.Year),
+			Status:    item.SourceName,
+			Source:    item.SourceURL,
+			CreatedAt: item.CreatedAt,
+			UpdatedAt: &updatedAt,
+			Detail: map[string]any{
+				"syncedAt":      item.SyncedAt,
+				"lastCheckedAt": item.LastCheckedAt,
+			},
+		})
+	}
+	finishAdminLifeTraceRecords(c, rows, total, page)
 }
 
 func listAdminLifeTracePushDeliveries[T any](c *gin.Context, recordType string, targetLabel string) {

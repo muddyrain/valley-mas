@@ -29,6 +29,7 @@ func setupTraceTestRouter(t *testing.T, userID model.Int64String, webPush ...con
 		&model.LifeTracePlan{},
 		&model.LifeTraceCheckin{},
 		&model.LifeTraceTrace{},
+		&model.LifeTraceInboxItem{},
 		&model.LifeTracePantryItem{},
 		&model.LifeTracePhotoItemDraft{},
 		&model.LifeTraceSettings{},
@@ -76,6 +77,19 @@ func decodeTracePayload(t *testing.T, recorder *httptest.ResponseRecorder) map[s
 	}
 	if payload["code"].(float64) != 0 {
 		t.Fatalf("expected success response, got %+v", payload)
+	}
+	return payload
+}
+
+func decodeTraceErrorPayload(t *testing.T, recorder *httptest.ResponseRecorder) map[string]interface{} {
+	t.Helper()
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode error response: %v\nbody: %s", err, recorder.Body.String())
+	}
+	if payload["code"].(float64) == 0 {
+		t.Fatalf("expected error response, got %+v", payload)
 	}
 	return payload
 }

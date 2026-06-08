@@ -12,6 +12,26 @@ export interface PaginationResponse<T> {
   total: number;
 }
 
+export interface DateRangeParams {
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface AdminListParams extends PaginationParams, DateRangeParams {
+  keyword?: string;
+  status?: string;
+  type?: string;
+  userId?: string;
+  creatorId?: string;
+  resourceId?: string;
+  risk?: string;
+}
+
+export interface AdminListResponse<T> extends PaginationResponse<T> {
+  page: number;
+  pageSize: number;
+}
+
 // 平台类型
 export type Platform = 'wechat' | 'douyin' | 'mini_app';
 

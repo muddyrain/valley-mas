@@ -19,7 +19,7 @@ import {
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Post, PostType } from '@/api/blog';
 import { deletePost, getAdminPosts } from '@/api/blog';
@@ -42,11 +42,7 @@ export default function BlogPosts() {
   const [postType, setPostType] = useState<PostType | ''>('');
   const [keyword, setKeyword] = useState('');
 
-  useEffect(() => {
-    void loadPosts();
-  }, [page, pageSize, status, postType]);
-
-  const loadPosts = async () => {
+  const loadPosts = useCallback(async () => {
     setLoading(true);
     try {
       const data = await getAdminPosts({
@@ -63,7 +59,11 @@ export default function BlogPosts() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, postType, status]);
+
+  useEffect(() => {
+    void loadPosts();
+  }, [loadPosts]);
 
   const handleDelete = async (id: string) => {
     try {

@@ -4,6 +4,7 @@ import {
   Check,
   Cloud,
   Droplets,
+  Inbox,
   LoaderCircle,
   MapPin,
   PackageCheck,
@@ -990,6 +991,33 @@ export function TodayPage() {
             </div>
           </>
         )}
+      </Card>
+
+      <Card
+        className="relative overflow-hidden border-life-ai/20 p-4 shadow-[0_18px_54px_rgba(6,182,212,0.08)]"
+        data-today-entrance
+      >
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 text-left"
+          onClick={() => navigate('/inbox')}
+        >
+          <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+            <Inbox className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="ai">快速捕捉</Badge>
+              <span className="text-xs text-muted-foreground">Inbox</span>
+            </div>
+            <p className="mt-2 truncate text-sm font-semibold text-foreground">
+              收下想法、链接和待处理事项
+            </p>
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+              稍后再转成计划或踪迹。
+            </p>
+          </div>
+        </button>
       </Card>
 
       {achievementCardLoading ? (

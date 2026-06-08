@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"valley-server/internal/aiusage"
 	"valley-server/internal/database"
 	"valley-server/internal/model"
 
@@ -236,6 +237,7 @@ func (h *Handler) GenerateTodayAdvice(c *gin.Context) {
 	}
 
 	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
+	aiCtx = aiusage.WithAudit(aiCtx, "life-trace-today-advice", userID.String())
 	defer cancel()
 
 	raw, modelName, err := callLifeTraceAI(aiCtx, aiCfg, prompt)
@@ -333,6 +335,7 @@ func (h *Handler) GenerateWeeklyReview(c *gin.Context) {
 
 	prompt := buildWeeklyReviewPrompt(settings, weekStart, weekEnd, completedPlans, openPlans, traces, checkins)
 	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
+	aiCtx = aiusage.WithAudit(aiCtx, "life-trace-weekly-review", userID.String())
 	defer cancel()
 
 	raw, modelName, err := callLifeTraceAIWithMaxTokens(aiCtx, aiCfg, prompt, lifeTraceWeeklyReviewMaxTokens)
@@ -2564,6 +2567,7 @@ func callLifeTraceTextAIWithMaxTokens(
 	prompt string,
 	maxTokens int,
 ) (string, string, error) {
+	start := time.Now()
 	temperature := float32(0.35)
 	content := strings.TrimSpace(prompt)
 	resp, err := client.CreateChatCompletion(ctx, arkmodel.CreateChatCompletionRequest{
@@ -2580,10 +2584,13 @@ func callLifeTraceTextAIWithMaxTokens(
 		Temperature: &temperature,
 	})
 	if err != nil {
+		recordLifeTraceAIUsage(ctx, "ark", modelID, prompt, "", aiusage.Since(start), err)
 		return "", "", err
 	}
 	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == nil {
-		return "", resp.Model, errors.New("empty AI response")
+		err := errors.New("empty AI response")
+		recordLifeTraceAIUsage(ctx, "ark", resp.Model, prompt, "", aiusage.Since(start), err)
+		return "", resp.Model, err
 	}
 
 	raw := ""
@@ -2602,9 +2609,33 @@ func callLifeTraceTextAIWithMaxTokens(
 
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", resp.Model, errors.New("empty AI content")
+		err := errors.New("empty AI content")
+		recordLifeTraceAIUsage(ctx, "ark", resp.Model, prompt, "", aiusage.Since(start), err)
+		return "", resp.Model, err
 	}
+	recordLifeTraceAIUsage(ctx, "ark", resp.Model, prompt, raw, aiusage.Since(start), nil)
 	return raw, resp.Model, nil
+}
+
+func recordLifeTraceAIUsage(ctx context.Context, provider string, modelName string, prompt string, response string, latencyMs int64, err error) {
+	audit := aiusage.FromContext(ctx)
+	status := aiusage.StatusSuccess
+	errMessage := ""
+	if err != nil {
+		status = aiusage.StatusFailed
+		errMessage = err.Error()
+	}
+	aiusage.Record(aiusage.Entry{
+		Feature:       audit.Feature,
+		Provider:      provider,
+		Model:         modelName,
+		UserID:        audit.UserID,
+		Status:        status,
+		PromptChars:   aiusage.CharCount(prompt),
+		ResponseChars: aiusage.CharCount(response),
+		LatencyMs:     latencyMs,
+		ErrorMessage:  errMessage,
+	})
 }
 
 func callLifeTraceAI(ctx context.Context, cfg lifeTraceAIConfig, prompt string) (string, string, error) {
@@ -2693,6 +2724,7 @@ func callLifeTraceOpenAI(ctx context.Context, cfg lifeTraceAIConfig, prompt stri
 }
 
 func callLifeTraceOpenAIWithMaxTokens(ctx context.Context, cfg lifeTraceAIConfig, prompt string, maxTokens int) (string, string, error) {
+	start := time.Now()
 	body, err := json.Marshal(lifeTraceOpenAIRequest{
 		Model: cfg.Model,
 		Messages: []lifeTraceOpenAIMessage{
@@ -2709,12 +2741,14 @@ func callLifeTraceOpenAIWithMaxTokens(ctx context.Context, cfg lifeTraceAIConfig
 		},
 	})
 	if err != nil {
+		recordLifeTraceAIUsage(ctx, "openai", cfg.Model, prompt, "", aiusage.Since(start), err)
 		return "", "", err
 	}
 
 	httpClient := &http.Client{Timeout: cfg.Timeout}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.BaseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
+		recordLifeTraceAIUsage(ctx, "openai", cfg.Model, prompt, "", aiusage.Since(start), err)
 		return "", "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
@@ -2723,30 +2757,41 @@ func callLifeTraceOpenAIWithMaxTokens(ctx context.Context, cfg lifeTraceAIConfig
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
+		recordLifeTraceAIUsage(ctx, "openai", cfg.Model, prompt, "", aiusage.Since(start), err)
 		return "", "", err
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
+		recordLifeTraceAIUsage(ctx, "openai", cfg.Model, prompt, "", aiusage.Since(start), err)
 		return "", "", err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", "", fmt.Errorf("OpenAI upstream returned %d: %s", resp.StatusCode, trimRunes(string(respBody), 180))
+		err := fmt.Errorf("OpenAI upstream returned %d: %s", resp.StatusCode, trimRunes(string(respBody), 180))
+		recordLifeTraceAIUsage(ctx, "openai", cfg.Model, prompt, "", aiusage.Since(start), err)
+		return "", "", err
 	}
 
 	var parsed lifeTraceOpenAIResponse
 	if err := json.Unmarshal(respBody, &parsed); err != nil {
-		return "", "", fmt.Errorf("decode OpenAI response failed: %w", err)
+		wrapped := fmt.Errorf("decode OpenAI response failed: %w", err)
+		recordLifeTraceAIUsage(ctx, "openai", cfg.Model, prompt, "", aiusage.Since(start), wrapped)
+		return "", "", wrapped
 	}
 	if len(parsed.Choices) == 0 {
-		return "", parsed.Model, errors.New("OpenAI upstream returned no choices")
+		err := errors.New("OpenAI upstream returned no choices")
+		recordLifeTraceAIUsage(ctx, "openai", parsed.Model, prompt, "", aiusage.Since(start), err)
+		return "", parsed.Model, err
 	}
 
 	content := strings.TrimSpace(parsed.Choices[0].Message.Content)
 	if content == "" {
-		return "", parsed.Model, errors.New("OpenAI upstream returned empty content")
+		err := errors.New("OpenAI upstream returned empty content")
+		recordLifeTraceAIUsage(ctx, "openai", parsed.Model, prompt, "", aiusage.Since(start), err)
+		return "", parsed.Model, err
 	}
+	recordLifeTraceAIUsage(ctx, "openai", parsed.Model, prompt, content, aiusage.Since(start), nil)
 	return content, parsed.Model, nil
 }
 
