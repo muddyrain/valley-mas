@@ -1,7 +1,6 @@
 import { ArrowRightLeft, Camera, ChevronDown, Sparkles, Trash2, X } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { generatePantryThumbnail } from '@/api/pantry';
-import { uploadLifeTraceImage } from '@/api/upload';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
@@ -11,7 +10,10 @@ import { PantryExpiryDateField } from '@/components/PantryExpiryDateField';
 import { Button } from '@/components/ui/button';
 import { getLifeTraceErrorMessage } from '@/lib/error';
 import { formatPantryReminderSummary, getPantryPersistedStatus } from '@/lib/pantry';
-import { createPantryCutoutCoverFile } from '@/lib/pantryCutout';
+import {
+  generatePantryTransparentCoverWithFallback,
+  getPantryTransparentCoverTechLabel,
+} from '@/lib/pantryTransparentCover';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -90,6 +92,7 @@ export function PantryItemDrawer({
   const [errors, setErrors] = useState<PantryFormErrors>({});
   const [thumbnailGenerating, setThumbnailGenerating] = useState(false);
   const [thumbnailError, setThumbnailError] = useState('');
+  const [transparentCoverTechLabel, setTransparentCoverTechLabel] = useState('');
   const [imageUploading, setImageUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -130,6 +133,7 @@ export function PantryItemDrawer({
     setDeleting(false);
     setThumbnailGenerating(false);
     setThumbnailError('');
+    setTransparentCoverTechLabel('');
     setSaveQueuedAfterThumbnail(false);
     queuedPayloadRef.current = null;
     setActivePicker(null);
@@ -252,6 +256,7 @@ export function PantryItemDrawer({
 
     setThumbnailGenerating(true);
     setThumbnailError('');
+    setTransparentCoverTechLabel('');
     try {
       const result = await generatePantryThumbnail(token, {
         name: form.name.trim() || undefined,
@@ -282,15 +287,13 @@ export function PantryItemDrawer({
 
     setThumbnailGenerating(true);
     setThumbnailError('');
+    setTransparentCoverTechLabel('');
     try {
-      const response = await fetch(form.imageUrl);
-      if (!response.ok) {
-        throw new Error('图片读取失败，请稍后再试。');
-      }
-      const sourceBlob = await response.blob();
-      const coverFile = await createPantryCutoutCoverFile(sourceBlob);
-      const uploaded = await uploadLifeTraceImage(token, coverFile);
-      updateField('thumbnailUrl', uploaded.url);
+      const result = await generatePantryTransparentCoverWithFallback(token, {
+        imageUrl: form.imageUrl,
+      });
+      updateField('thumbnailUrl', result.thumbnailUrl);
+      setTransparentCoverTechLabel(getPantryTransparentCoverTechLabel(result));
     } catch (error) {
       setThumbnailError(getLifeTraceErrorMessage(error, '透明封面生成失败，请稍后再试。'));
     } finally {
@@ -486,7 +489,10 @@ export function PantryItemDrawer({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => updateField('thumbnailUrl', '')}
+                  onClick={() => {
+                    updateField('thumbnailUrl', '');
+                    setTransparentCoverTechLabel('');
+                  }}
                 >
                   <Trash2 className="size-4" />
                   清除
@@ -527,7 +533,10 @@ export function PantryItemDrawer({
                 variant="ghost"
                 size="sm"
                 disabled={!form.imageUrl || thumbnailGenerating || submitting}
-                onClick={() => updateField('thumbnailUrl', form.imageUrl || '')}
+                onClick={() => {
+                  updateField('thumbnailUrl', form.imageUrl || '');
+                  setTransparentCoverTechLabel('');
+                }}
               >
                 <Camera className="size-4" />
                 用实拍图做封面
@@ -543,7 +552,14 @@ export function PantryItemDrawer({
               </div>
             ) : null}
             {form.thumbnailUrl ? (
-              <p className="text-xs text-muted-foreground">封面已准备好，保存后就会生效。</p>
+              <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>封面已准备好，保存后就会生效。</span>
+                {transparentCoverTechLabel ? (
+                  <span className="rounded-full border border-life-health/30 bg-life-health/10 px-2 py-0.5 text-[10px] font-semibold text-life-health">
+                    {transparentCoverTechLabel}
+                  </span>
+                ) : null}
+              </p>
             ) : null}
             {saveQueuedAfterThumbnail ? (
               <p className="text-xs text-life-trace">封面生成中，完成后会自动继续保存。</p>

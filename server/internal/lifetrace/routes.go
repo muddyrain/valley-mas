@@ -26,6 +26,7 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			ai.POST("/weekly-review", handler.GenerateWeeklyReview)
 			ai.POST("/image-analysis", handler.AnalyzeImage)
 			ai.POST("/pantry-photo-analysis", handler.AnalyzePantryPhoto)
+			ai.POST("/transparent-cover", handler.GenerateTransparentCover)
 			ai.POST("/pantry-thumbnail", handler.GeneratePantryThumbnail)
 			ai.POST("/recipes", handler.GenerateRecipeSuggestions)
 			ai.POST("/assistant/stream", handler.StreamAssistant)

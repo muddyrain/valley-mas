@@ -896,6 +896,9 @@ export function TodayPage() {
             {pantryPreviewItems.map((item) => {
               const status = resolvePantryStatus(item);
               const coverUrl = getPantryCoverUrl(item);
+              const hasSeparateCover = Boolean(
+                item.thumbnailUrl && item.thumbnailUrl !== item.imageUrl,
+              );
               return (
                 <button
                   key={item.id}
@@ -907,7 +910,10 @@ export function TodayPage() {
                     <img
                       src={coverUrl}
                       alt={item.name}
-                      className="size-12 shrink-0 rounded-2xl object-cover"
+                      className={cn(
+                        'size-12 shrink-0 rounded-2xl',
+                        hasSeparateCover ? 'bg-secondary p-1 object-contain' : 'object-cover',
+                      )}
                     />
                   ) : (
                     <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">

@@ -1,24 +1,21 @@
-export type PantryCutoutRunner = (input: Blob, options?: { signal?: AbortSignal }) => Promise<Blob>;
+import type { Config, ImageSource } from '@imgly/background-removal';
+
+export type PantryCutoutRunner = (
+  input: ImageSource,
+  options?: { signal?: AbortSignal },
+) => Promise<Blob>;
 
 export type PantryCutoutSupportSnapshot = {
   blob?: boolean;
   file?: boolean;
 };
 
-type BackgroundRemovalPipeline = (input: Blob) => Promise<{
-  data: ArrayLike<number>;
-  width: number;
-  height: number;
-  channels: number;
-  toBlob: (type?: string, quality?: number) => Promise<Blob>;
-}>;
+export const PANTRY_CUTOUT_TOOL = '@imgly/background-removal';
+export const PANTRY_CUTOUT_MODEL = 'isnet_quint8';
 
-const PANTRY_CUTOUT_MODEL_ID = 'Xenova/modnet';
 const MIN_VISIBLE_PIXEL_RATIO = 0.01;
 const MIN_TRANSPARENT_PIXEL_RATIO = 0.01;
-const MIN_VISIBLE_RGB_AVERAGE = 6;
-
-let backgroundRemovalPipelinePromise: Promise<BackgroundRemovalPipeline> | null = null;
+const MIN_VISIBLE_RGB_AVERAGE = 4;
 
 function throwIfAborted(signal?: AbortSignal) {
   if (signal?.aborted) {
@@ -45,16 +42,36 @@ export function getPantryCutoutSupportReason(
   return '';
 }
 
-export type PantryCutoutImageLike = {
-  data: ArrayLike<number>;
-  width: number;
-  height: number;
-  channels: number;
-};
+function getCanvasContext(width: number, height: number) {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  return canvas.getContext('2d');
+}
 
-export function assertPantryCutoutImageUsable(image: PantryCutoutImageLike) {
+async function readBlobImageData(blob: Blob) {
+  if (typeof createImageBitmap === 'undefined') {
+    return null;
+  }
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const context = getCanvasContext(bitmap.width, bitmap.height);
+    if (!context) {
+      return null;
+    }
+    context.drawImage(bitmap, 0, 0);
+    return context.getImageData(0, 0, bitmap.width, bitmap.height);
+  } finally {
+    bitmap.close();
+  }
+}
+
+export function assertPantryCutoutImageUsable(image: ImageData) {
   const pixelCount = Math.max(0, image.width * image.height);
-  if (!pixelCount || image.channels !== 4) {
+  if (!pixelCount) {
     throw new Error('透明封面生成失败：模型没有返回可用透明图。');
   }
 
@@ -62,7 +79,7 @@ export function assertPantryCutoutImageUsable(image: PantryCutoutImageLike) {
   let transparentPixels = 0;
   let visibleRgbTotal = 0;
 
-  for (let offset = 0; offset < image.data.length; offset += image.channels) {
+  for (let offset = 0; offset < image.data.length; offset += 4) {
     const alpha = image.data[offset + 3] ?? 0;
     if (alpha > 16) {
       visiblePixels += 1;
@@ -87,33 +104,43 @@ export function assertPantryCutoutImageUsable(image: PantryCutoutImageLike) {
   }
 }
 
-async function getBackgroundRemovalPipeline() {
-  if (!backgroundRemovalPipelinePromise) {
-    backgroundRemovalPipelinePromise = import('@huggingface/transformers').then(
-      async ({ pipeline }) => {
-        const remover = await pipeline('background-removal', PANTRY_CUTOUT_MODEL_ID);
-        return remover as BackgroundRemovalPipeline;
-      },
-    );
+export async function assertPantryCutoutBlobUsable(blob: Blob) {
+  if (blob.size <= 0) {
+    throw new Error('透明封面生成失败：模型返回空图片。');
   }
-  return backgroundRemovalPipelinePromise;
+  if (blob.type && blob.type.toLowerCase() !== 'image/png') {
+    throw new Error('透明封面生成失败，请保留当前封面后再试。');
+  }
+
+  const imageData = await readBlobImageData(blob);
+  if (imageData) {
+    assertPantryCutoutImageUsable(imageData);
+  }
 }
 
-export async function runTransformersPantryCutout(
-  input: Blob,
+export async function runImglyPantryCutout(
+  input: ImageSource,
   options: { signal?: AbortSignal } = {},
 ) {
   throwIfAborted(options.signal);
-  const remover = await getBackgroundRemovalPipeline();
+  const { removeBackground } = await import('@imgly/background-removal');
   throwIfAborted(options.signal);
-  const image = await remover(input);
+
+  const config: Config = {
+    model: PANTRY_CUTOUT_MODEL,
+    output: {
+      format: 'image/png',
+    },
+    fetchArgs: options.signal ? { signal: options.signal } : undefined,
+  };
+  const output = await removeBackground(input, config);
   throwIfAborted(options.signal);
-  assertPantryCutoutImageUsable(image);
-  return image.toBlob('image/png');
+  await assertPantryCutoutBlobUsable(output);
+  return output;
 }
 
 export async function createPantryCutoutCoverFile(
-  input: Blob,
+  input: ImageSource,
   options: { runner?: PantryCutoutRunner; signal?: AbortSignal } = {},
 ) {
   const supportReason = getPantryCutoutSupportReason();
@@ -121,11 +148,8 @@ export async function createPantryCutoutCoverFile(
     throw new Error(supportReason);
   }
 
-  const runner = options.runner ?? runTransformersPantryCutout;
+  const runner = options.runner ?? runImglyPantryCutout;
   const output = await runner(input, { signal: options.signal });
-  if (output.type.toLowerCase() !== 'image/png') {
-    throw new Error('透明封面生成失败，请保留当前封面后再试。');
-  }
-
+  await assertPantryCutoutBlobUsable(output);
   return new File([output], `pantry-transparent-cover-${Date.now()}.png`, { type: 'image/png' });
 }

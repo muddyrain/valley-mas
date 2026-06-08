@@ -270,6 +270,90 @@ func TestGeneratePantryThumbnailRequiresAIConfig(t *testing.T) {
 	}
 }
 
+func TestGenerateTransparentCoverRequiresRemoveBGConfig(t *testing.T) {
+	t.Setenv("REMOVE_BG_API_KEY", "")
+
+	router := setupTraceTestRouter(t, 101)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/transparent-cover", bytes.NewBufferString(`{"imageUrl":"https://example.com/milk.jpg"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if !strings.Contains(resp.Body.String(), "REMOVE_BG_API_KEY") {
+		t.Fatalf("expected config message, got %s", resp.Body.String())
+	}
+}
+
+func TestGenerateTransparentCoverUsesRemoveBG(t *testing.T) {
+	originalUpload := uploadGeneratedPantryThumbnailToTOS
+	uploadGeneratedPantryThumbnailToTOS = func(
+		_ context.Context,
+		userID interface{ String() string },
+		image generatedPantryThumbnail,
+	) (pantryThumbnailUploadResult, error) {
+		if userID.String() != "101" {
+			t.Fatalf("expected upload userID 101, got %s", userID.String())
+		}
+		if string(image.Bytes) != "png-bytes" {
+			t.Fatalf("expected remove.bg png bytes, got %q", string(image.Bytes))
+		}
+		if image.MIMEType != "image/png" {
+			t.Fatalf("expected png mime type, got %s", image.MIMEType)
+		}
+		return pantryThumbnailUploadResult{
+			URL: "https://example.com/transparent-cover.png",
+			Key: "life-trace/101/20260602/transparent-cover.png",
+		}, nil
+	}
+	defer func() {
+		uploadGeneratedPantryThumbnailToTOS = originalUpload
+	}()
+
+	var capturedKey string
+	var capturedForm string
+	removeBGServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedKey = r.Header.Get("X-Api-Key")
+		if err := r.ParseMultipartForm(2 << 20); err != nil {
+			t.Fatalf("parse remove.bg form: %v", err)
+		}
+		capturedForm = r.FormValue("image_url") + "|" + r.FormValue("size") + "|" + r.FormValue("format")
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("png-bytes"))
+	}))
+	defer removeBGServer.Close()
+
+	t.Setenv("REMOVE_BG_API_KEY", "test-remove-bg-key")
+	t.Setenv("REMOVE_BG_API_URL", removeBGServer.URL)
+
+	router := setupTraceTestRouter(t, 101)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/transparent-cover", bytes.NewBufferString(`{"imageUrl":"https://example.com/milk.jpg"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	if data["thumbnailUrl"] != "https://example.com/transparent-cover.png" {
+		t.Fatalf("expected transparent cover url, got %+v", data)
+	}
+	if data["source"] != "remove-bg" || data["tool"] != "remove.bg" {
+		t.Fatalf("expected remove.bg metadata, got %+v", data)
+	}
+	if capturedKey != "test-remove-bg-key" {
+		t.Fatalf("expected remove.bg API key header, got %q", capturedKey)
+	}
+	if capturedForm != "https://example.com/milk.jpg|preview|png" {
+		t.Fatalf("expected remove.bg form fields, got %q", capturedForm)
+	}
+}
+
 func TestLifeTraceAIRequestCancellationClassification(t *testing.T) {
 	for _, err := range []error{
 		context.Canceled,

@@ -61,12 +61,17 @@ describe('pantry helpers', () => {
     expect(getPantryPersistedStatus('expired')).toBe('normal');
   });
 
-  it('builds cover fallback from real image to thumbnail', () => {
+  it('prefers the selected cover over the real image for pantry cards', () => {
     const real = createItem('real', { imageUrl: 'https://example.com/real.jpg' });
     const ai = createItem('ai', { thumbnailUrl: 'data:image/svg+xml,abc' });
+    const transparent = createItem('transparent', {
+      imageUrl: 'https://example.com/real.jpg',
+      thumbnailUrl: 'https://example.com/transparent.png',
+    });
 
     expect(getPantryCoverUrl(real)).toBe('https://example.com/real.jpg');
     expect(getPantryCoverUrl(ai)).toBe('data:image/svg+xml,abc');
+    expect(getPantryCoverUrl(transparent)).toBe('https://example.com/transparent.png');
   });
 
   it('sorts expired items before expiring ones', () => {
@@ -98,13 +103,14 @@ describe('pantry helpers', () => {
       unit: '盒',
       location: '冷藏',
       imageUrl: 'https://example.com/milk.jpg',
+      thumbnailUrl: 'https://example.com/milk-cover.png',
     });
     const trace = buildPantryTraceInput(item, 'used-up', now);
 
     expect(trace.title).toBe('已用完：牛奶');
     expect(trace.summary).toContain('2盒');
     expect(trace.location).toBe('冷藏');
-    expect(trace.imageUrl).toBe('https://example.com/milk.jpg');
+    expect(trace.imageUrl).toBe('https://example.com/milk-cover.png');
     expect(trace.tags).toContain('家庭库存');
     expect(trace.source).toBe('库存');
   });

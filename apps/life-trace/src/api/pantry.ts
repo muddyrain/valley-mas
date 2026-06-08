@@ -36,6 +36,18 @@ export type PantryThumbnailResponse = {
   model?: string;
 };
 
+export type PantryTransparentCoverRequest = {
+  imageUrl: string;
+};
+
+export type PantryTransparentCoverResponse = {
+  thumbnailUrl: string;
+  source: 'remove-bg';
+  tool: 'remove.bg';
+  size?: string;
+  format?: 'png';
+};
+
 export type PantryPhotoCropBox = {
   x: number;
   y: number;
@@ -384,6 +396,24 @@ export function generatePantryThumbnail(
     method: 'POST',
     body: JSON.stringify(input),
     signal: controller.signal,
+    suppressErrorToast: true,
+  }).finally(() => globalThis.clearTimeout(timeout));
+}
+
+export function generatePantryTransparentCover(
+  token: string,
+  input: PantryTransparentCoverRequest,
+  options: { signal?: AbortSignal } = {},
+) {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), 30000);
+  options.signal?.addEventListener('abort', () => controller.abort(), { once: true });
+
+  return apiRequest<PantryTransparentCoverResponse>('/life-trace/ai/transparent-cover', token, {
+    method: 'POST',
+    body: JSON.stringify(input),
+    signal: controller.signal,
+    suppressErrorToast: true,
   }).finally(() => globalThis.clearTimeout(timeout));
 }
 
@@ -396,6 +426,7 @@ export function analyzePantryPhoto(
     method: 'POST',
     body: JSON.stringify(input),
     signal: options.signal,
+    suppressErrorToast: true,
   });
 }
 

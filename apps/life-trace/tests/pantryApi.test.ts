@@ -5,11 +5,13 @@ import {
   createPantryItem,
   deletePantryItem,
   generatePantryThumbnail,
+  generatePantryTransparentCover,
   listPantry,
   lookupPantryBarcodeMatch,
   updatePantryItem,
   updatePantryItemStatus,
 } from '../src/api/pantry';
+import { useFeedbackToastStore } from '../src/store/useFeedbackToastStore';
 
 const token = 'test-token';
 
@@ -34,6 +36,11 @@ const pantryResponse = {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  const activeTimer = useFeedbackToastStore.getState().timer;
+  if (activeTimer) {
+    globalThis.clearTimeout(activeTimer);
+  }
+  useFeedbackToastStore.setState({ current: null, timer: null });
 });
 
 describe('pantry api', () => {
@@ -210,6 +217,73 @@ describe('pantry api', () => {
       location: '冷藏',
       note: '早餐优先喝掉',
     });
+  });
+
+  it('generates transparent covers through the remove.bg backend endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: 0,
+        message: 'success',
+        data: {
+          thumbnailUrl: 'https://cdn.example.com/pantry-transparent.png',
+          source: 'remove-bg',
+          tool: 'remove.bg',
+          size: 'preview',
+          format: 'png',
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await generatePantryTransparentCover(token, {
+      imageUrl: 'https://cdn.example.com/original.jpg',
+    });
+
+    expect(result.thumbnailUrl).toBe('https://cdn.example.com/pantry-transparent.png');
+    expect(result.tool).toBe('remove.bg');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/life-trace/ai/transparent-cover');
+    expect(fetchMock.mock.calls[0][1].method).toBe('POST');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toEqual({
+      imageUrl: 'https://cdn.example.com/original.jpg',
+    });
+  });
+
+  it('lets pantry AI callers render inline errors without duplicate global toasts', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({
+        code: 503,
+        message: '透明封面未配置：缺少 REMOVE_BG_API_KEY',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      generatePantryTransparentCover(token, {
+        imageUrl: 'https://cdn.example.com/original.jpg',
+      }),
+    ).rejects.toThrow('透明封面未配置：缺少 REMOVE_BG_API_KEY');
+    await expect(
+      generatePantryThumbnail(token, {
+        name: '鲜牛奶',
+        category: '食品',
+        location: '冷藏',
+      }),
+    ).rejects.toThrow('透明封面未配置：缺少 REMOVE_BG_API_KEY');
+    await expect(
+      analyzePantryPhoto(token, {
+        imageUrl: 'https://cdn.example.com/original.jpg',
+      }),
+    ).rejects.toThrow('透明封面未配置：缺少 REMOVE_BG_API_KEY');
+
+    expect(useFeedbackToastStore.getState().current).toBeNull();
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      '/api/v1/life-trace/ai/transparent-cover',
+      '/api/v1/life-trace/ai/pantry-thumbnail',
+      '/api/v1/life-trace/ai/pantry-photo-analysis',
+    ]);
   });
 
   it('passes abort signals to pantry photo analysis requests', async () => {

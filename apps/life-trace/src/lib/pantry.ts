@@ -106,7 +106,7 @@ export function getPantryExpiryText(item: PantryItem, now = new Date()) {
 }
 
 export function getPantryCoverUrl(item: PantryItem) {
-  return item.imageUrl || item.thumbnailUrl || '';
+  return item.thumbnailUrl || item.imageUrl || '';
 }
 
 export function formatPantryReminderSummary(reminder: PantryReminderConfig) {
@@ -221,7 +221,7 @@ export function buildPantryTraceInput(
         : `已将「${item.name}」标记为已丢弃，处理数量为 ${quantityText}。`,
     timeLabel: formatPantryTraceTime(now),
     location: item.location,
-    imageUrl: item.imageUrl || item.thumbnailUrl,
+    imageUrl: getPantryCoverUrl(item),
     mood: action === 'used-up' ? '踏实' : '提醒',
     tags: [item.category, '家庭库存', actionLabel],
     source: '库存',
@@ -235,7 +235,7 @@ export function buildPantryCreatedTraceInput(item: PantryItem, now = new Date())
     summary: `已将「${item.name}」新增到「${item.householdId ? '共享空间' : '我的空间'}」，数量为 ${item.quantity}${item.unit}${expiryText}。`,
     timeLabel: formatPantryTraceTime(now),
     location: item.location,
-    imageUrl: item.imageUrl || item.thumbnailUrl,
+    imageUrl: getPantryCoverUrl(item),
     mood: '踏实',
     tags: [item.category, '家庭库存', '新增库存'],
     source: '库存',

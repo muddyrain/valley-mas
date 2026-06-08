@@ -892,7 +892,9 @@ export function PantryPage() {
               {pantryList.map((item) => {
                 const status = resolvePantryStatus(item);
                 const coverUrl = getPantryCoverUrl(item);
-                const useContainedCover = !item.imageUrl && Boolean(item.thumbnailUrl);
+                const hasSeparateCover = Boolean(
+                  item.thumbnailUrl && item.thumbnailUrl !== item.imageUrl,
+                );
                 const Icon = categoryIconMap[item.category];
                 const actionPending = pendingActionId?.startsWith(`${item.id}:`) ?? false;
                 const terminalStatus = status === 'used-up' || status === 'discarded';
@@ -935,9 +937,7 @@ export function PantryPage() {
                             alt={item.name}
                             className={cn(
                               'h-full min-h-28 w-full',
-                              useContainedCover
-                                ? 'bg-secondary p-2 object-contain'
-                                : 'object-cover',
+                              hasSeparateCover ? 'bg-secondary p-2 object-contain' : 'object-cover',
                             )}
                           />
                         ) : (
@@ -958,7 +958,7 @@ export function PantryPage() {
                             <h3 className="mt-2 truncate text-base font-semibold">{item.name}</h3>
                           </div>
                           <div className="flex shrink-0 items-start gap-2">
-                            {!selectionMode && !item.imageUrl && item.thumbnailUrl ? (
+                            {!selectionMode && hasSeparateCover ? (
                               <Badge tone="ai">
                                 <Sparkles className="mr-1 size-3.5" />
                                 AI 图

@@ -3,21 +3,19 @@ import {
   assertPantryCutoutImageUsable,
   createPantryCutoutCoverFile,
   getPantryCutoutSupportReason,
+  PANTRY_CUTOUT_MODEL,
+  PANTRY_CUTOUT_TOOL,
   type PantryCutoutRunner,
 } from '../src/lib/pantryCutout';
-
-const cutoutSource = await import('node:fs').then(({ readFileSync }) =>
-  readFileSync(new URL('../src/lib/pantryCutout.ts', import.meta.url), 'utf8'),
-);
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
 describe('pantry local cutout', () => {
-  it('uses a model supported by the Transformers.js background-removal pipeline', () => {
-    expect(cutoutSource).toContain("'Xenova/modnet'");
-    expect(cutoutSource).not.toContain('briaai/RMBG-1.4');
+  it('uses IMG.LY with the smaller local model for fallback background removal', () => {
+    expect(PANTRY_CUTOUT_TOOL).toBe('@imgly/background-removal');
+    expect(PANTRY_CUTOUT_MODEL).toBe('isnet_quint8');
   });
 
   it('wraps the local cutout PNG blob into a timestamped file', async () => {
@@ -56,18 +54,16 @@ describe('pantry local cutout', () => {
       assertPantryCutoutImageUsable({
         width: 2,
         height: 2,
-        channels: 4,
         data: new Uint8ClampedArray([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-      }),
+      } as ImageData),
     ).toThrow('没有识别到可用主体');
 
     expect(() =>
       assertPantryCutoutImageUsable({
         width: 2,
         height: 2,
-        channels: 4,
         data: new Uint8ClampedArray([0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255]),
-      }),
+      } as ImageData),
     ).toThrow('模型没有分离背景');
   });
 
@@ -76,9 +72,8 @@ describe('pantry local cutout', () => {
       assertPantryCutoutImageUsable({
         width: 2,
         height: 2,
-        channels: 4,
         data: new Uint8ClampedArray([0, 0, 0, 0, 220, 40, 30, 255, 0, 0, 0, 0, 240, 230, 210, 255]),
-      }),
+      } as ImageData),
     ).not.toThrow();
   });
 });

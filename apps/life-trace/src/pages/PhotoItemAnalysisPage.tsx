@@ -34,7 +34,10 @@ import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { createPantryCutoutCoverFile } from '@/lib/pantryCutout';
+import {
+  generatePantryTransparentCoverWithFallback,
+  getPantryTransparentCoverTechLabel,
+} from '@/lib/pantryTransparentCover';
 import {
   applyPhotoItemBarcodeMatchToDraftForm,
   buildPhotoItemAnalysisSmartSuggestions,
@@ -464,6 +467,7 @@ export function PhotoItemAnalysisPage() {
   const [expiryBaseDate, setExpiryBaseDate] = useState('');
   const [coverMode, setCoverMode] = useState<PhotoItemAnalysisCoverMode>('original');
   const [transparentCoverUrl, setTransparentCoverUrl] = useState('');
+  const [transparentCoverTechLabel, setTransparentCoverTechLabel] = useState('');
   const [transparentCoverGenerating, setTransparentCoverGenerating] = useState(false);
   const [transparentCoverError, setTransparentCoverError] = useState('');
   const [historyItems, setHistoryItems] = useState<PhotoItemAnalysisHistoryItem[]>(() =>
@@ -825,6 +829,7 @@ export function PhotoItemAnalysisPage() {
     setAnalysis(null);
     setCoverMode('original');
     setTransparentCoverUrl('');
+    setTransparentCoverTechLabel('');
     setTransparentCoverGenerating(false);
     setTransparentCoverError('');
     setForm((current) => ({ ...current, barcodeValue: '', barcodeFormat: '' }));
@@ -1196,12 +1201,25 @@ export function PhotoItemAnalysisPage() {
 
     setTransparentCoverGenerating(true);
     setTransparentCoverError('');
+    setTransparentCoverTechLabel('');
     setError('');
     try {
-      const sourceFile = await loadCoverSourceFile(imageFile, uploadedImageUrl);
-      const coverFile = await createPantryCutoutCoverFile(sourceFile);
-      const uploaded = await uploadLifeTraceImage(token, coverFile);
-      setTransparentCoverUrl(uploaded.url);
+      let sourceImageUrl = uploadedImageUrl;
+      if (!sourceImageUrl && imageFile) {
+        const uploaded = await uploadLifeTraceImage(token, imageFile);
+        sourceImageUrl = uploaded.url;
+        setUploadedImageUrl(uploaded.url);
+      }
+      if (!sourceImageUrl) {
+        throw new Error('缺少原图，无法生成透明封面。');
+      }
+      const result = await generatePantryTransparentCoverWithFallback(
+        token,
+        { imageUrl: sourceImageUrl },
+        { sourceImage: imageFile ?? sourceImageUrl },
+      );
+      setTransparentCoverUrl(result.thumbnailUrl);
+      setTransparentCoverTechLabel(getPantryTransparentCoverTechLabel(result));
       setTransparentCoverError('');
       setCoverMode('transparent');
       showToast('透明封面已生成。', 'success');
@@ -1228,6 +1246,7 @@ export function PhotoItemAnalysisPage() {
     setAnalysis(null);
     setCoverMode('original');
     setTransparentCoverUrl('');
+    setTransparentCoverTechLabel('');
     setTransparentCoverGenerating(false);
     setTransparentCoverError('');
     setCurrentHistoryId('');
@@ -1265,6 +1284,7 @@ export function PhotoItemAnalysisPage() {
       setAnalysis(draft.analysis);
       setForm(draft.form);
       setTransparentCoverUrl('');
+      setTransparentCoverTechLabel('');
       setTransparentCoverGenerating(false);
       setTransparentCoverError('');
       setBarcodeMatch(null);
@@ -1408,6 +1428,7 @@ export function PhotoItemAnalysisPage() {
     setSelectedDetectedItemId(nextDetectedItem.id);
     setCoverMode(isMeaningfulPhotoItemCropBox(nextDetectedItem.cropBox) ? 'crop' : 'original');
     setTransparentCoverUrl('');
+    setTransparentCoverTechLabel('');
     setTransparentCoverError('');
     setExpiryBaseDate(nextDetectedItem.productionDate || nextDetectedItem.purchaseDate || '');
     setForm((current) => ({
@@ -2139,6 +2160,13 @@ export function PhotoItemAnalysisPage() {
                           : hasMeaningfulCropSuggestion
                             ? '封面：不裁剪'
                             : '主体框接近原图'}
+                    </span>
+                  ) : null}
+                  {coverMode === 'transparent' &&
+                  transparentCoverUrl &&
+                  transparentCoverTechLabel ? (
+                    <span className="rounded-full border border-life-health/30 bg-life-health/10 px-2 py-0.5 text-[10px] font-semibold text-life-health">
+                      {transparentCoverTechLabel}
                     </span>
                   ) : null}
                 </div>

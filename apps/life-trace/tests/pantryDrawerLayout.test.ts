@@ -156,12 +156,17 @@ describe('pantry drawer mobile layout guards', () => {
     expect(aiPageSource).not.toContain('正在把云端记录同步到当前设备。');
   });
 
-  it('keeps transparent cover generation local and user triggered', () => {
-    expect(pantryDrawerSource).toContain('createPantryCutoutCoverFile');
+  it('keeps transparent cover generation user triggered with local fallback', () => {
+    expect(pantryDrawerSource).toContain('generatePantryTransparentCoverWithFallback');
+    expect(pantryDrawerSource).toContain('getPantryTransparentCoverTechLabel');
+    expect(pantryDrawerSource).toContain('transparentCoverTechLabel');
     expect(pantryDrawerSource).toContain('handleGenerateTransparentCover');
     expect(pantryDrawerSource).toContain('生成透明封面');
     expect(pantryDrawerSource).toContain('用实拍图做封面');
-    expect(photoItemAnalysisSource).toContain('createPantryCutoutCoverFile');
+    expect(photoItemAnalysisSource).toContain('generatePantryTransparentCoverWithFallback');
+    expect(photoItemAnalysisSource).toContain('getPantryTransparentCoverTechLabel');
+    expect(photoItemAnalysisSource).toContain('transparentCoverTechLabel');
+    expect(photoItemAnalysisSource).toContain('sourceImage: imageFile ?? sourceImageUrl');
     expect(photoItemAnalysisSource).toContain('transparentCoverUrl');
     expect(photoItemAnalysisSource).toContain('transparentCoverError');
     expect(photoItemAnalysisSource).toContain('生成透明封面');
