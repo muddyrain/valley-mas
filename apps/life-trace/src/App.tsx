@@ -13,6 +13,7 @@ import {
   AiWeeklyReviewsPage,
 } from '@/pages/AiPage';
 import { LoginPage } from '@/pages/LoginPage';
+import { PantryItemDetailPage } from '@/pages/PantryItemDetailPage';
 import { PantryPage } from '@/pages/PantryPage';
 import { PhotoItemAnalysisPage } from '@/pages/PhotoItemAnalysisPage';
 import { PlansPage } from '@/pages/PlansPage';
@@ -92,6 +93,7 @@ function AppContent() {
           <Route path="/" element={<Navigate to="/today" replace />} />
           <Route path="/today" element={<TodayPage />} />
           <Route path="/pantry" element={<PantryPage />} />
+          <Route path="/pantry/:itemId" element={<PantryItemDetailPage />} />
           <Route path="/plans/:planId?" element={<PlansPage />} />
           <Route path="/ai" element={<AiPage />} />
           <Route path="/ai/history" element={<AiHistoryPage />} />

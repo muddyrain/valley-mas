@@ -77,6 +77,8 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			pantry.DELETE("/photo-drafts/:draftId", handler.DeletePhotoItemDraft)
 			pantry.POST("/transfer/preview", handler.PreviewPantryTransfer)
 			pantry.POST("/transfer", handler.TransferPantryItems)
+			pantry.GET("/:id/timeline", handler.ListPantryItemTimeline)
+			pantry.GET("/:id", handler.GetPantryItem)
 			pantry.PATCH("/:id/consume", handler.ConsumePantryItem)
 			pantry.PATCH("/:id", handler.UpdatePantryItem)
 			pantry.PATCH("/:id/status", handler.UpdatePantryItemStatus)

@@ -153,6 +153,7 @@ export type HouseholdInvitePayload = {
 export type Trace = {
   id: string;
   planId?: string;
+  pantryItemId?: string;
   title: string;
   summary: string;
   timeLabel: string;

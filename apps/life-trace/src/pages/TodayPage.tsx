@@ -522,16 +522,16 @@ export function TodayPage() {
 
       <Card className="min-w-0 overflow-hidden p-5 max-[360px]:p-4" data-today-entrance>
         {showWeatherSkeleton ? (
-          <div className="space-y-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="size-16 animate-pulse rounded-2xl bg-life-weather/10" />
+          <div className="space-y-0">
+            <div className="mb-7 flex items-center justify-between gap-3 max-[360px]:items-start">
+              <div className="flex min-w-0 items-center gap-4 max-[360px]:gap-3">
+                <div className="size-16 shrink-0 animate-pulse rounded-2xl bg-life-weather/10 max-[360px]:size-14" />
                 <div>
                   <div className="h-14 w-24 animate-pulse rounded-2xl bg-secondary" />
                   <div className="mt-3 h-5 w-16 animate-pulse rounded-full bg-secondary" />
                 </div>
               </div>
-              <div className="flex flex-col items-end">
+              <div className="flex min-w-0 max-w-[44%] flex-col items-end max-[360px]:max-w-[42%]">
                 <div className="h-6 w-20 animate-pulse rounded-full bg-secondary" />
                 <div className="mt-3 h-4 w-14 animate-pulse rounded-full bg-secondary" />
                 <div className="mt-3 flex items-center gap-2">
@@ -554,15 +554,64 @@ export function TodayPage() {
                 </div>
               ))}
             </div>
-            <div className="flex gap-3 overflow-hidden pb-1">
+
+            <div
+              className={cn(
+                'mt-4 grid gap-3',
+                settings.weatherAlerts && 'min-[720px]:grid-cols-[1.4fr_1fr]',
+              )}
+            >
+              {settings.weatherAlerts ? (
+                <div className="rounded-2xl border border-life-weather/20 bg-life-weather/5 px-3 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className="size-4 animate-pulse rounded-full bg-life-weather/20" />
+                    <div className="h-4 w-24 animate-pulse rounded-full bg-life-weather/20" />
+                  </div>
+                  <div className="mt-3 h-3 w-full animate-pulse rounded-full bg-secondary" />
+                  <div className="mt-2 h-3 w-2/3 animate-pulse rounded-full bg-secondary" />
+                </div>
+              ) : null}
+
+              <div className="rounded-2xl border border-border bg-secondary/40 px-3 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <div className="size-5 animate-pulse rounded-full bg-muted" />
+                      <div className="h-4 w-20 animate-pulse rounded-full bg-muted" />
+                    </div>
+                    <div className="mt-2 h-3 w-16 animate-pulse rounded-full bg-muted" />
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <div className="h-4 w-14 animate-pulse rounded-full bg-muted" />
+                    <div className="mt-2 h-3 w-10 animate-pulse rounded-full bg-muted" />
+                  </div>
+                </div>
+                <div className="mt-4 h-3 w-full animate-pulse rounded-full bg-muted" />
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="h-4 w-20 animate-pulse rounded-full bg-secondary" />
+                  <div className="mt-2 h-3 w-36 animate-pulse rounded-full bg-secondary" />
+                </div>
+                <div className="flex gap-1 rounded-2xl bg-secondary p-1">
+                  <div className="h-8 w-12 animate-pulse rounded-xl bg-card" />
+                  <div className="h-8 w-12 animate-pulse rounded-xl bg-muted" />
+                </div>
+              </div>
+            </div>
+            <div className="-mx-1 flex max-w-full gap-3 overflow-hidden px-1 pb-1">
               {Array.from({ length: 5 }).map((_, index) => (
                 <div
                   key={`weather-hour-skeleton-${index}`}
-                  className="flex min-w-14 flex-col items-center gap-2 rounded-2xl bg-secondary px-3 py-3"
+                  className="flex min-w-20 shrink-0 flex-col items-center gap-2 rounded-2xl bg-secondary px-3 py-3"
                 >
                   <div className="h-3 w-8 animate-pulse rounded-full bg-muted" />
                   <div className="size-5 animate-pulse rounded-full bg-muted" />
                   <div className="h-5 w-7 animate-pulse rounded-full bg-muted" />
+                  <div className="h-3 w-8 animate-pulse rounded-full bg-muted" />
                 </div>
               ))}
             </div>

@@ -113,7 +113,7 @@ export function PantryTransferSheet({
       return;
     }
 
-    if (!sourceHouseholdId || itemCount === 0) {
+    if (itemCount === 0) {
       setTargetHouseholds([]);
       setSheetError('当前没有可转移的库存条目。');
       return;

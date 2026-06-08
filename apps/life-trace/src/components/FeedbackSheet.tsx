@@ -4,6 +4,7 @@ import { createLifeTraceFeedback } from '@/api/feedback';
 import { uploadLifeTraceImage } from '@/api/upload';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
+import { ImagePreview } from '@/components/ImagePreview';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -214,7 +215,12 @@ export function FeedbackSheet({ open, onOpenChange }: FeedbackSheetProps) {
                   key={url}
                   className="group relative overflow-hidden rounded-2xl border border-border bg-secondary"
                 >
-                  <img src={url} alt="反馈截图" className="aspect-square w-full object-cover" />
+                  <ImagePreview
+                    src={url}
+                    alt="反馈截图"
+                    title="反馈截图"
+                    imageClassName="aspect-square w-full object-cover"
+                  />
                   <button
                     type="button"
                     className="absolute right-1.5 top-1.5 grid size-7 place-items-center rounded-full bg-background/80 text-foreground opacity-90 backdrop-blur transition hover:bg-background"

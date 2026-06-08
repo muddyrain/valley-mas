@@ -1,10 +1,12 @@
 import { apiRequest } from '@/api/request';
 import type {
+  HouseholdSummary,
   ListPagination,
   NewPantryItemInput,
   PantryItem,
   PantryItemStatus,
   PantryOverview,
+  Trace,
 } from '@/types';
 
 export type ListPantryOptions = {
@@ -211,6 +213,16 @@ export type PantryTransferResponse = {
   items: PantryTransferResultItem[];
 };
 
+export type PantryItemDetailResponse = {
+  item: PantryItem;
+  household: HouseholdSummary;
+};
+
+export type PantryItemTimelineResponse = {
+  itemId: string;
+  list: Trace[];
+};
+
 function buildListQuery(options: ListPantryOptions = {}) {
   const params = new URLSearchParams();
   if (options.page) {
@@ -294,6 +306,20 @@ function buildHouseholdPath(path: string, householdId?: string) {
   }
   const separator = path.includes('?') ? '&' : '?';
   return `${path}${separator}householdId=${encodeURIComponent(householdId)}`;
+}
+
+export function getPantryItem(token: string, id: string) {
+  return apiRequest<{
+    item: PantryItemResponse;
+    household: HouseholdSummary;
+  }>(`/life-trace/pantry/${id}`, token).then((data) => ({
+    item: deserializePantryItem(data.item),
+    household: data.household,
+  }));
+}
+
+export function getPantryItemTimeline(token: string, id: string) {
+  return apiRequest<PantryItemTimelineResponse>(`/life-trace/pantry/${id}/timeline`, token);
 }
 
 export function createPantryItem(token: string, input: NewPantryItemInput, householdId?: string) {

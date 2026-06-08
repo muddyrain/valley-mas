@@ -2,6 +2,7 @@ import {
   Bell,
   BellOff,
   CalendarDays,
+  CalendarPlus,
   Check,
   Clock,
   MapPin,
@@ -13,6 +14,7 @@ import {
 import { useId } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
+import { ImagePreview } from '@/components/ImagePreview';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -62,6 +64,7 @@ type PlanDetailContentProps = {
   onComplete: (plan: Plan) => void;
   onEdit: (plan: Plan) => void;
   onDelete: (plan: Plan) => void;
+  onAddToCalendar: (plan: Plan) => void;
 };
 
 type PlanDetailDrawerProps = PlanDetailContentProps & {
@@ -76,6 +79,7 @@ export function PlanDetailContent({
   onComplete,
   onEdit,
   onDelete,
+  onAddToCalendar,
 }: PlanDetailContentProps) {
   const titleId = useId();
   const busy = completing || deleting;
@@ -112,10 +116,12 @@ export function PlanDetailContent({
 
       {plan.imageUrl ? (
         <div className="overflow-hidden rounded-2xl border border-border bg-secondary">
-          <img
+          <ImagePreview
             src={plan.imageUrl}
             alt={plan.title}
-            className="h-44 w-full object-cover opacity-90"
+            title={plan.title}
+            subtitle={plan.timeLabel}
+            imageClassName="h-44 w-full object-cover opacity-90"
           />
         </div>
       ) : (
@@ -179,6 +185,15 @@ export function PlanDetailContent({
       <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
         <Button
           type="button"
+          variant="outline"
+          disabled={busy}
+          onClick={() => onAddToCalendar(plan)}
+        >
+          <CalendarPlus className="size-4" />
+          加入日历
+        </Button>
+        <Button
+          type="button"
           variant={plan.completed ? 'secondary' : 'outline'}
           disabled={busy}
           onClick={() => onComplete(plan)}
@@ -227,6 +242,7 @@ export function PlanDetailDrawer({
   onComplete,
   onEdit,
   onDelete,
+  onAddToCalendar,
 }: PlanDetailDrawerProps) {
   return (
     <BottomSheet
@@ -249,6 +265,7 @@ export function PlanDetailDrawer({
         onComplete={onComplete}
         onEdit={onEdit}
         onDelete={onDelete}
+        onAddToCalendar={onAddToCalendar}
       />
     </BottomSheet>
   );

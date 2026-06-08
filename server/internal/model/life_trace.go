@@ -104,20 +104,21 @@ func (list *StringList) Scan(value interface{}) error {
 }
 
 type LifeTraceTrace struct {
-	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID    Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
-	PlanID    *Int64String   `gorm:"column:plan_id;index" json:"planId,omitempty"`
-	Title     string         `gorm:"size:160;not null" json:"title"`
-	Summary   string         `gorm:"size:1000;not null" json:"summary"`
-	TimeLabel string         `gorm:"size:80;not null" json:"timeLabel"`
-	Location  string         `gorm:"size:120" json:"location,omitempty"`
-	ImageURL  string         `gorm:"size:800" json:"imageUrl,omitempty"`
-	Mood      string         `gorm:"size:30;not null;default:'放松'" json:"mood"`
-	Tags      StringList     `gorm:"type:text" json:"tags"`
-	Source    string         `gorm:"size:20;not null;default:'手动';index" json:"source"`
-	CreatedAt time.Time      `json:"createdAt"`
-	UpdatedAt time.Time      `json:"updatedAt"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID           Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID       Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	PlanID       *Int64String   `gorm:"column:plan_id;index" json:"planId,omitempty"`
+	PantryItemID *Int64String   `gorm:"column:pantry_item_id;index" json:"pantryItemId,omitempty"`
+	Title        string         `gorm:"size:160;not null" json:"title"`
+	Summary      string         `gorm:"size:1000;not null" json:"summary"`
+	TimeLabel    string         `gorm:"size:80;not null" json:"timeLabel"`
+	Location     string         `gorm:"size:120" json:"location,omitempty"`
+	ImageURL     string         `gorm:"size:800" json:"imageUrl,omitempty"`
+	Mood         string         `gorm:"size:30;not null;default:'放松'" json:"mood"`
+	Tags         StringList     `gorm:"type:text" json:"tags"`
+	Source       string         `gorm:"size:20;not null;default:'手动';index" json:"source"`
+	CreatedAt    time.Time      `json:"createdAt"`
+	UpdatedAt    time.Time      `json:"updatedAt"`
+	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (trace *LifeTraceTrace) BeforeCreate(tx *gorm.DB) error {

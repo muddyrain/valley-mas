@@ -51,4 +51,10 @@ describe('pantry status action guards', () => {
     expect(pantryPageSource).toContain('aria-label="库存加载中"');
     expect(pantryPageSource).not.toContain('正在同步{currentHouseholdName}库存...');
   });
+
+  it('keeps pantry card thumbnails in a fixed mobile slot', () => {
+    expect(pantryPageSource).toContain('flex w-full items-start gap-0 text-left');
+    expect(pantryPageSource).toContain('grid h-44 w-26 shrink-0');
+    expect(pantryPageSource).not.toContain('h-full min-h-28 w-full');
+  });
 });

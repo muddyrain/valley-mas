@@ -2,6 +2,7 @@ import { ImagePlus, Trash2, UploadCloud } from 'lucide-react';
 import { type ChangeEvent, useRef, useState } from 'react';
 import { uploadLifeTraceImage } from '@/api/upload';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { ImagePreview } from '@/components/ImagePreview';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -113,7 +114,13 @@ export function AppImageUploader({
 
       {value ? (
         <div className="overflow-hidden rounded-[1.25rem] border border-border bg-secondary">
-          <img src={value} alt="已上传图片" className="aspect-video w-full object-cover" />
+          <ImagePreview
+            src={value}
+            alt="已上传图片"
+            title={label}
+            subtitle="已上传"
+            imageClassName="aspect-video w-full object-cover"
+          />
         </div>
       ) : cameraAndLibrary ? (
         <div className="space-y-3 rounded-[1.25rem] border border-dashed border-border bg-secondary p-4">

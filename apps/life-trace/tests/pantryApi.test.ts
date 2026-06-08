@@ -6,6 +6,8 @@ import {
   deletePantryItem,
   generatePantryThumbnail,
   generatePantryTransparentCover,
+  getPantryItem,
+  getPantryItemTimeline,
   listPantry,
   lookupPantryBarcodeMatch,
   updatePantryItem,
@@ -119,6 +121,62 @@ describe('pantry api', () => {
       rules: ['3d', 'same-day'],
       reminderTime: '08:30',
     });
+  });
+
+  it('loads pantry detail and timeline endpoints', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          code: 0,
+          message: 'success',
+          data: {
+            item: pantryResponse,
+            household: {
+              id: 'household-1',
+              name: '我的空间',
+              kind: 'personal',
+              status: 'active',
+              ownerUserId: '101',
+              role: 'owner',
+              memberCount: 1,
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          code: 0,
+          message: 'success',
+          data: {
+            itemId: 'pantry-1',
+            list: [
+              {
+                id: 'trace-1',
+                pantryItemId: 'pantry-1',
+                title: '新增库存：牛奶',
+                summary: '已新增',
+                timeLabel: '06/08 09:00',
+                mood: '踏实',
+                tags: ['家庭库存'],
+                source: '库存',
+              },
+            ],
+          },
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const detail = await getPantryItem(token, 'pantry-1');
+    const timeline = await getPantryItemTimeline(token, 'pantry-1');
+
+    expect(detail.item.reminder.rules).toEqual(['3d', 'same-day']);
+    expect(detail.household.name).toBe('我的空间');
+    expect(timeline.list[0].pantryItemId).toBe('pantry-1');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/life-trace/pantry/pantry-1');
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/life-trace/pantry/pantry-1/timeline');
   });
 
   it('updates pantry items through the pantry endpoint', async () => {

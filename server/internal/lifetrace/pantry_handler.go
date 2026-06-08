@@ -69,6 +69,11 @@ type pantryBarcodeMatchResponse struct {
 	UpdatedAt     time.Time         `json:"updatedAt,omitempty"`
 }
 
+type pantryItemDetailResponse struct {
+	Item      model.LifeTracePantryItem `json:"item"`
+	Household householdSummary          `json:"household"`
+}
+
 var validPantryCategories = map[string]bool{
 	"食品":  true,
 	"日用品": true,
@@ -202,11 +207,12 @@ func buildPantryTraceRecord(
 	now time.Time,
 ) model.LifeTraceTrace {
 	trace := model.LifeTraceTrace{
-		UserID:    userID,
-		Location:  truncatePantryTraceText(item.Location, 120),
-		ImageURL:  truncatePantryTraceText(item.ImageURL, 800),
-		TimeLabel: formatPantryTraceTime(now),
-		Source:    "库存",
+		UserID:       userID,
+		PantryItemID: &item.ID,
+		Location:     truncatePantryTraceText(item.Location, 120),
+		ImageURL:     truncatePantryTraceText(item.ImageURL, 800),
+		TimeLabel:    formatPantryTraceTime(now),
+		Source:       "库存",
 	}
 
 	quantityText := formatPantryTraceQuantity(item.Quantity, item.Unit)
@@ -253,6 +259,14 @@ func buildPantryTraceRecord(
 		)
 		trace.Mood = "提醒"
 		trace.Tags = normalizeTraceTags([]string{item.Category, "家庭库存", "丢弃"})
+	case "edited":
+		trace.Title = truncatePantryTraceText("编辑库存："+item.Name, 160)
+		trace.Summary = truncatePantryTraceText(
+			"已更新「"+item.Name+"」的库存信息，当前数量为 "+quantityText+expiryText+"。",
+			1000,
+		)
+		trace.Mood = "踏实"
+		trace.Tags = normalizeTraceTags([]string{item.Category, "家庭库存", "编辑"})
 	case "transfer-created":
 		trace.Title = truncatePantryTraceText("转移到共享家庭："+item.Name, 160)
 		summary := "已将「" + item.Name + "」" + quantityText + "转移到「" + householdName + "」"
@@ -441,6 +455,70 @@ func (h *Handler) ListPantryItems(c *gin.Context) {
 		"list":          items,
 		"pagination":    buildListPagination(page, pageSize, total),
 		"summary":       summary,
+	})
+}
+
+func (h *Handler) GetPantryItem(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	item, householdCtx, found := findAccessiblePantryItem(c.Param("id"), userID)
+	if !found {
+		fail(c, http.StatusNotFound, "库存不存在")
+		return
+	}
+
+	memberCount, err := activeHouseholdMemberCount(householdCtx.Household.ID)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "读取库存失败")
+		return
+	}
+
+	success(c, pantryItemDetailResponse{
+		Item:      item,
+		Household: householdSummaryFromContext(householdCtx, memberCount),
+	})
+}
+
+func (h *Handler) ListPantryItemTimeline(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+
+	item, _, found := findAccessiblePantryItem(c.Param("id"), userID)
+	if !found {
+		fail(c, http.StatusNotFound, "库存不存在")
+		return
+	}
+
+	likeName := "%" + item.Name + "%"
+	query := database.GetDB().
+		Where("source = ?", "库存").
+		Where(
+			"pantry_item_id = ? OR (user_id = ? AND pantry_item_id IS NULL AND (title LIKE ? OR summary LIKE ?))",
+			item.ID,
+			userID,
+			likeName,
+			likeName,
+		)
+
+	var traces []model.LifeTraceTrace
+	if err := query.
+		Order("created_at DESC").
+		Limit(50).
+		Find(&traces).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "读取库存时间线失败")
+		return
+	}
+
+	success(c, gin.H{
+		"itemId": item.ID,
+		"list":   traces,
 	})
 }
 
@@ -636,6 +714,10 @@ func (h *Handler) UpdatePantryItem(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "读取库存失败")
 		return
 	}
+	writePantryTrace(userID, item, pantryTraceOptions{
+		Action:              "edited",
+		TargetHouseholdName: householdCtx.Household.Name,
+	})
 	success(c, item)
 }
 
@@ -822,6 +904,29 @@ func findPantryItem(id string, householdID model.Int64String) (model.LifeTracePa
 		return item, false
 	}
 	return item, false
+}
+
+func findAccessiblePantryItem(
+	id string,
+	userID model.Int64String,
+) (model.LifeTracePantryItem, householdContext, bool) {
+	if _, _, err := ensurePersonalHousehold(userID); err != nil {
+		return model.LifeTracePantryItem{}, householdContext{}, false
+	}
+
+	var item model.LifeTracePantryItem
+	err := database.GetDB().
+		First(&item, "id = ?", strings.TrimSpace(id)).Error
+	if err != nil {
+		return model.LifeTracePantryItem{}, householdContext{}, false
+	}
+
+	ctx, err := resolveAccessibleHouseholdContext(userID, item.HouseholdID)
+	if err != nil {
+		return model.LifeTracePantryItem{}, householdContext{}, false
+	}
+
+	return item, ctx, true
 }
 
 func resetPantryReminderDeliveries(tx *gorm.DB, pantryItemID model.Int64String) {

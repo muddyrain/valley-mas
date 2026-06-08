@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { EmptyState } from '@/components/EmptyState';
@@ -196,6 +196,7 @@ function PantrySummaryValue({
 }
 
 export function PantryPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const preferredPantryHouseholdId = useLifeTraceStore((state) => state.preferredPantryHouseholdId);
   const preferredPantryHouseholdName = useLifeTraceStore(
@@ -917,7 +918,7 @@ export function PantryPage() {
                     <button
                       type="button"
                       className={cn(
-                        'flex w-full items-stretch gap-0 text-left',
+                        'flex w-full items-start gap-0 text-left',
                         status === 'discarded' && 'opacity-80',
                         selectionMode && selectedItemIds.includes(item.id) && 'bg-life-ai/5',
                       )}
@@ -926,17 +927,16 @@ export function PantryPage() {
                           toggleItemSelection(item.id);
                           return;
                         }
-                        setEditingItem(item);
-                        setDrawerOpen(true);
+                        navigate(`/pantry/${item.id}`);
                       }}
                     >
-                      <div className="grid w-26 shrink-0 place-items-center bg-secondary max-[360px]:w-24">
+                      <div className="grid h-44 w-26 shrink-0 place-items-center bg-secondary max-[360px]:h-40 max-[360px]:w-24">
                         {coverUrl ? (
                           <img
                             src={coverUrl}
                             alt={item.name}
                             className={cn(
-                              'h-full min-h-28 w-full',
+                              'h-full w-full',
                               hasSeparateCover ? 'bg-secondary p-2 object-contain' : 'object-cover',
                             )}
                           />

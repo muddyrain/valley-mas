@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Bell,
   BellOff,
+  CalendarPlus,
   Check,
   Filter,
   Plus,
@@ -16,6 +17,7 @@ import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { EmptyState } from '@/components/EmptyState';
+import { ImagePreview } from '@/components/ImagePreview';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { PlanDetailContent } from '@/components/PlanDetailDrawer';
 import { SubPageShell } from '@/components/SubPageShell';
@@ -24,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { getVisiblePlanNote } from '@/lib/advicePlan';
+import { openPlanInNativeCalendar } from '@/lib/calendarInterop';
 import { isAuthDependencyMessage } from '@/lib/error';
 import { gsap, useGSAP } from '@/lib/gsap';
 import {
@@ -96,6 +99,7 @@ export function PlansPage() {
     planUpdatingById,
     planCompletingById,
     planDeletingById,
+    settings,
     completePlan,
     loadPlans,
     loadMorePlans,
@@ -174,6 +178,16 @@ export function PlansPage() {
   const showPlansErrorCard = Boolean(plansError) && !plansSyncIssue;
   const showPlansSyncFallback = Boolean(plansSyncIssue) && !plansLoading && plans.length === 0;
   const showPlansErrorFallback = showPlansErrorCard && !plansLoading && plans.length === 0;
+
+  const handleAddToCalendar = (plan: Plan) => {
+    const opened = openPlanInNativeCalendar(plan, {
+      reminderLeadMinutes: settings.planReminderLeadMinutes,
+    });
+
+    if (!opened) {
+      window.alert('这个计划还缺少明确时间，暂时不能加入日历');
+    }
+  };
 
   useEffect(() => {
     if (planId && !plansLoading && plans.length > 0 && !selectedPlan) {
@@ -258,10 +272,12 @@ export function PlansPage() {
           />
         ) : null}
         {plan.imageUrl ? (
-          <img
+          <ImagePreview
             src={plan.imageUrl}
             alt={plan.title}
-            className="h-32 w-full object-cover opacity-80"
+            title={plan.title}
+            subtitle={plan.timeLabel}
+            imageClassName="h-32 w-full object-cover opacity-80"
           />
         ) : null}
         <div className="relative z-10 grid grid-cols-[4.75rem_1fr] gap-4 p-4 max-[360px]:grid-cols-1 max-[360px]:gap-3 max-[360px]:p-3">
@@ -308,7 +324,19 @@ export function PlansPage() {
               {getVisiblePlanNote(plan.note)}
             </p>
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground">点开查看详情和更多操作</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleAddToCalendar(plan);
+                }}
+                disabled={busy}
+              >
+                <CalendarPlus className="size-4" />
+                加入日历
+              </Button>
               <Button
                 type="button"
                 variant={plan.completed ? 'secondary' : 'outline'}
@@ -350,6 +378,7 @@ export function PlansPage() {
               setDrawerOpen(true);
             }}
             onDelete={(plan) => setDeleteTarget(plan)}
+            onAddToCalendar={handleAddToCalendar}
           />
         ) : plansLoading ? (
           <SyncState title="正在同步计划详情" description="正在从云端刷新计划列表。" tone="plan" />

@@ -5,6 +5,7 @@ import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ImagePreview } from '@/components/ImagePreview';
 import { OptionPickerSheet } from '@/components/OptionPickerSheet';
 import { PantryExpiryDateField } from '@/components/PantryExpiryDateField';
 import { Button } from '@/components/ui/button';
@@ -544,10 +545,12 @@ export function PantryItemDrawer({
             </div>
             {aiThumbnailPreview ? (
               <div className="overflow-hidden rounded-[1.1rem] border border-border bg-card bg-[linear-gradient(45deg,rgba(255,255,255,0.08)_25%,transparent_25%),linear-gradient(-45deg,rgba(255,255,255,0.08)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,rgba(255,255,255,0.08)_75%),linear-gradient(-45deg,transparent_75%,rgba(255,255,255,0.08)_75%)] bg-[length:12px_12px] bg-[position:0_0,0_6px,6px_-6px,-6px_0px]">
-                <img
+                <ImagePreview
                   src={aiThumbnailPreview}
                   alt={form.name || '库存图片预览'}
-                  className="aspect-video w-full object-contain"
+                  title={form.name || '库存图片预览'}
+                  subtitle="封面图"
+                  imageClassName="aspect-video w-full object-contain"
                 />
               </div>
             ) : null}

@@ -8,15 +8,14 @@ import {
   Plus,
   Sparkles,
   Trash2,
-  X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EditTraceDrawer } from '@/components/EditTraceDrawer';
 import { EmptyState } from '@/components/EmptyState';
+import { ImagePreview } from '@/components/ImagePreview';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { SyncState } from '@/components/SyncState';
@@ -190,57 +189,16 @@ function getPantryTraceActionTag(trace: Trace) {
   return pantryTraceActionTags.find((tag) => trace.tags.includes(tag)) ?? null;
 }
 
-function ImagePreviewDialog({ trace, onClose }: { trace: Trace | null; onClose: () => void }) {
-  if (!trace?.imageUrl) {
-    return null;
-  }
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[90] bg-background/90 p-4 backdrop-blur-xl"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${trace.title} 图片预览`}
-      onMouseDown={onClose}
-    >
-      <div className="safe-top safe-bottom mx-auto flex h-full max-w-[430px] flex-col justify-center gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{trace.title}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{trace.timeLabel}</p>
-          </div>
-          <Button type="button" variant="secondary" size="icon" onClick={onClose}>
-            <X className="size-5" />
-          </Button>
-        </div>
-        <div
-          className="overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-2xl"
-          onMouseDown={(event) => event.stopPropagation()}
-        >
-          <img
-            src={trace.imageUrl}
-            alt={trace.title}
-            className="max-h-[72dvh] w-full object-contain"
-          />
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
 function TraceDetailContent({
   trace,
   deleting,
   onRequestEdit,
   onRequestDelete,
-  onPreviewImage,
 }: {
   trace: Trace | null;
   deleting: boolean;
   onRequestEdit: (trace: Trace) => void;
   onRequestDelete: (trace: Trace) => void;
-  onPreviewImage: (trace: Trace) => void;
 }) {
   if (!trace) {
     return null;
@@ -276,13 +234,14 @@ function TraceDetailContent({
       </div>
 
       {trace.imageUrl ? (
-        <button
-          type="button"
+        <ImagePreview
+          src={trace.imageUrl}
+          alt={trace.title}
+          title={trace.title}
+          subtitle={trace.timeLabel}
           className="block w-full cursor-zoom-in overflow-hidden rounded-2xl border border-border bg-secondary text-left"
-          onClick={() => onPreviewImage(trace)}
-        >
-          <img src={trace.imageUrl} alt={trace.title} className="w-full object-cover opacity-90" />
-        </button>
+          imageClassName="w-full object-cover opacity-90"
+        />
       ) : (
         <div className="flex min-h-24 items-center gap-3 rounded-2xl border border-border bg-secondary px-4 text-muted-foreground">
           <Image className="size-5 text-life-trace" />
@@ -373,7 +332,6 @@ export function TracesPage() {
   const [editTarget, setEditTarget] = useState<Trace | null>(null);
   const [activeTag, setActiveTag] = useState('全部');
   const [tagsExpanded, setTagsExpanded] = useState(false);
-  const [previewTrace, setPreviewTrace] = useState<Trace | null>(null);
 
   const traceTags = useMemo(() => getTraceTags(traces), [traces]);
   const visibleTraceTags = useMemo(() => {
@@ -435,7 +393,6 @@ export function TracesPage() {
             deleting={Boolean(traceDeletingById[selectedTrace.id])}
             onRequestEdit={setEditTarget}
             onRequestDelete={requestDeleteTrace}
-            onPreviewImage={setPreviewTrace}
           />
         ) : tracesLoading ? (
           <SyncState title="正在同步踪迹详情" tone="trace" variant="skeleton-list" />
@@ -448,7 +405,6 @@ export function TracesPage() {
             onRetry={() => void loadTraces()}
           />
         )}
-        <ImagePreviewDialog trace={previewTrace} onClose={() => setPreviewTrace(null)} />
         <EditTraceDrawer
           open={Boolean(editTarget)}
           trace={editTarget}
@@ -643,21 +599,14 @@ export function TracesPage() {
                     }}
                   >
                     {trace.imageUrl ? (
-                      <button
-                        type="button"
+                      <ImagePreview
+                        src={trace.imageUrl}
+                        alt={trace.title}
+                        title={trace.title}
+                        subtitle={trace.timeLabel}
                         className="block w-full cursor-zoom-in overflow-hidden text-left"
-                        aria-label={`预览${trace.title}图片`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setPreviewTrace(trace);
-                        }}
-                      >
-                        <img
-                          src={trace.imageUrl}
-                          alt={trace.title}
-                          className="aspect-video w-full object-cover opacity-90 transition duration-500 hover:scale-[1.02]"
-                        />
-                      </button>
+                        imageClassName="aspect-video w-full object-cover opacity-90 transition duration-500 hover:scale-[1.02]"
+                      />
                     ) : null}
                     <div className="space-y-4 p-4">
                       <div className="flex items-start justify-between gap-3">
@@ -796,7 +745,6 @@ export function TracesPage() {
         <p className="text-center text-xs text-muted-foreground">已展示 {traces.length} 条踪迹</p>
       ) : null}
 
-      <ImagePreviewDialog trace={previewTrace} onClose={() => setPreviewTrace(null)} />
       <EditTraceDrawer open={createOpen} trace={null} onOpenChange={setCreateOpen} />
       <EditTraceDrawer
         open={Boolean(editTarget)}

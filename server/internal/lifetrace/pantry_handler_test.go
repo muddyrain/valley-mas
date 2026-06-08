@@ -87,6 +87,33 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 		t.Fatalf("expected pantry summary for one active item, got %+v", summary)
 	}
 
+	detailReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry/"+created["id"].(string), nil)
+	detailResp := httptest.NewRecorder()
+	router.ServeHTTP(detailResp, detailReq)
+
+	detail := decodeTracePayload(t, detailResp)["data"].(map[string]interface{})
+	detailItem := detail["item"].(map[string]interface{})
+	if detailItem["id"] != created["id"] || detailItem["name"] != "鲜牛奶" {
+		t.Fatalf("expected pantry detail to include item, got %+v", detail)
+	}
+	detailHousehold := detail["household"].(map[string]interface{})
+	if detailHousehold["name"] != "我的空间" || detailHousehold["kind"] != "personal" {
+		t.Fatalf("expected pantry detail to include household, got %+v", detailHousehold)
+	}
+
+	timelineReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry/"+created["id"].(string)+"/timeline", nil)
+	timelineResp := httptest.NewRecorder()
+	router.ServeHTTP(timelineResp, timelineReq)
+
+	timeline := decodeTracePayload(t, timelineResp)["data"].(map[string]interface{})
+	if timeline["itemId"] != created["id"] {
+		t.Fatalf("expected pantry timeline item id, got %+v", timeline)
+	}
+	timelineList := timeline["list"].([]interface{})
+	if len(timelineList) != 1 || timelineList[0].(map[string]interface{})["title"] != "新增库存：鲜牛奶" {
+		t.Fatalf("expected pantry timeline to include create trace, got %+v", timelineList)
+	}
+
 	var traces []model.LifeTraceTrace
 	if err := database.GetDB().
 		Where("user_id = ?", 101).
@@ -99,6 +126,9 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 	}
 	if !strings.Contains(traces[0].Summary, "我的空间") || !strings.Contains(traces[0].Summary, "2盒") {
 		t.Fatalf("expected pantry create trace summary to include household and quantity, got %+v", traces[0])
+	}
+	if traces[0].PantryItemID == nil || traces[0].PantryItemID.String() != created["id"] {
+		t.Fatalf("expected pantry create trace to reference item, got %+v", traces[0].PantryItemID)
 	}
 }
 
@@ -182,6 +212,9 @@ func TestUpdatePantryItemStatusAndDelete(t *testing.T) {
 	}
 	if !strings.Contains(traces[0].Summary, "1袋") {
 		t.Fatalf("expected pantry status trace summary to include quantity, got %+v", traces[0])
+	}
+	if traces[0].PantryItemID == nil || *traces[0].PantryItemID != item.ID {
+		t.Fatalf("expected pantry status trace to reference item, got %+v", traces[0].PantryItemID)
 	}
 
 	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/life-trace/pantry/"+item.ID.String(), nil)
