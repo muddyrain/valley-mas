@@ -40,6 +40,12 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			ai.DELETE("/conversations/:conversationId", handler.DeleteAssistantConversation)
 		}
 
+		achievements := group.Group("/achievements")
+		achievements.Use(auth)
+		{
+			achievements.GET("", handler.ListAchievements)
+		}
+
 		plans := group.Group("/plans")
 		plans.Use(auth)
 		{

@@ -4,6 +4,7 @@ import { AppFeedbackToast } from '@/components/AppFeedbackToast';
 import { AppReminderToast } from '@/components/AppReminderToast';
 import { AppShell } from '@/components/AppShell';
 import { LifeTraceBrandMark } from '@/components/LifeTraceBrandMark';
+import { AchievementsPage } from '@/pages/AchievementsPage';
 import {
   AiActionsPage,
   AiHistoryPage,
@@ -36,6 +37,7 @@ function AppContent() {
   const loadPantry = useLifeTraceStore((state) => state.loadPantry);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
   const loadTraces = useLifeTraceStore((state) => state.loadTraces);
+  const loadAchievements = useLifeTraceStore((state) => state.loadAchievements);
   const { status, token, verifySession } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -52,8 +54,9 @@ function AppContent() {
       void loadPantry();
       void loadPlans();
       void loadTraces();
+      void loadAchievements();
     }
-  }, [loadPantry, loadPlans, loadSettings, loadTraces, status, token]);
+  }, [loadAchievements, loadPantry, loadPlans, loadSettings, loadTraces, status, token]);
 
   useEffect(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
@@ -96,6 +99,7 @@ function AppContent() {
           <Route path="/ai/photo-item-history" element={<AiPhotoItemHistoryPage />} />
           <Route path="/ai/photo-item-analysis" element={<PhotoItemAnalysisPage />} />
           <Route path="/ai/weekly-reviews" element={<AiWeeklyReviewsPage />} />
+          <Route path="/achievements" element={<AchievementsPage />} />
           <Route path="/traces/:traceId?" element={<TracesPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/profile/reminders" element={<ReminderSettingsPage />} />

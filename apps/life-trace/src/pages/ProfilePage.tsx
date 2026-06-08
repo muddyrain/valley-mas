@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Smartphone,
   Sparkles,
+  Trophy,
   Users,
   X,
   Zap,
@@ -46,10 +47,12 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { CommuteMethod, UserSettings } from '@/types';
+import type { Achievement, CommuteMethod, UserSettings } from '@/types';
 
 const commuteMethods: CommuteMethod[] = ['开车', '地铁', '步行', '骑行', '远程'];
 const suggestedHabitOptions = ['喝水', '休息', '运动', '护肤', '早睡', '吃药'];
+const canPreviewAchievementToast = import.meta.env.DEV;
+const previewAchievementToastDurationMs = 4200;
 
 const commuteIcons: Record<CommuteMethod, typeof Car> = {
   开车: Car,
@@ -58,6 +61,21 @@ const commuteIcons: Record<CommuteMethod, typeof Car> = {
   骑行: Zap,
   远程: BriefcaseBusiness,
 };
+
+const buildPreviewAchievement = (): Achievement => ({
+  code: 'preview_first_plan',
+  title: '把想法落到日历上',
+  description: '创建第一条生活计划。',
+  category: 'plan',
+  rarity: 'common',
+  icon: 'calendar-plus',
+  tone: 'plan',
+  hidden: false,
+  unlocked: true,
+  unlockedAt: new Date().toISOString(),
+  progress: 1,
+  target: 1,
+});
 
 export function ProfilePage() {
   const pageRef = useRef<HTMLDivElement>(null);
@@ -77,6 +95,9 @@ export function ProfilePage() {
     (state) => state.preferredPantryHouseholdName,
   );
   const pantryPreferences = useLifeTraceStore((state) => state.pantryPreferences);
+  const achievementSummary = useLifeTraceStore((state) => state.achievementSummary);
+  const recentAchievements = useLifeTraceStore((state) => state.recentAchievements);
+  const achievementsLoading = useLifeTraceStore((state) => state.achievementsLoading);
   const updateSettings = useLifeTraceStore((state) => state.updateSettings);
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
@@ -138,6 +159,13 @@ export function ProfilePage() {
   const pantryReminderMeta = pantryPreferences.defaultReminderEnabled
     ? `${pantryPreferences.defaultReminderTime} · ${pantryPreferences.defaultReminderRules.length} 个节点`
     : '已关闭';
+  const latestAchievement = recentAchievements[0];
+  const achievementMeta =
+    achievementSummary.total > 0
+      ? `${achievementSummary.unlocked}/${achievementSummary.total} 枚`
+      : achievementsLoading
+        ? '同步中'
+        : '待收集';
 
   useEffect(() => {
     if (!token || !settingsLoaded || householdsLoaded || householdsLoading) {
@@ -235,6 +263,12 @@ export function ProfilePage() {
 
   const pushSaveMessage = (message: string) => {
     showToast(message);
+  };
+
+  const previewAchievementToast = () => {
+    showToast('收集到「把想法落到日历上」', 'success', previewAchievementToastDurationMs, {
+      achievement: buildPreviewAchievement(),
+    });
   };
 
   const addHabit = (rawValue: string) => {
@@ -532,6 +566,74 @@ export function ProfilePage() {
           active={settings.aiPersonalization}
           onToggle={() => update('aiPersonalization', !settings.aiPersonalization)}
         />
+      </section>
+
+      <section data-profile-card className="space-y-3">
+        <SectionHeader title="生活成就" meta={achievementMeta} />
+        <Card className="relative overflow-hidden border-life-ai/20 p-4">
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-ai/70 to-transparent"
+          />
+          <div className="flex items-start gap-3">
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+              <Trophy className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold">生活徽章馆</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                {latestAchievement
+                  ? `最近收集到「${latestAchievement.title}」。`
+                  : '慢慢收集日常里的小进展。'}
+              </p>
+            </div>
+            <Badge tone={achievementSummary.unlocked > 0 ? 'ai' : 'default'}>
+              {achievementSummary.unlocked} 枚
+            </Badge>
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="rounded-2xl bg-secondary px-3 py-3">
+              <p className="text-[11px] font-medium text-muted-foreground">本月新增</p>
+              <p className="mt-1 text-base font-semibold text-foreground">
+                {achievementSummary.monthlyNew}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-secondary px-3 py-3">
+              <p className="text-[11px] font-medium text-muted-foreground">少见成就</p>
+              <p className="mt-1 text-base font-semibold text-foreground">
+                {achievementSummary.rareUnlocked}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-secondary px-3 py-3">
+              <p className="text-[11px] font-medium text-muted-foreground">已收集</p>
+              <p className="mt-1 text-base font-semibold text-foreground">
+                {achievementSummary.unlocked}
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => navigate('/achievements')}
+            >
+              打开生活成就
+              <ChevronRight className="size-4" />
+            </Button>
+            {canPreviewAchievementToast ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full sm:w-auto"
+                onClick={previewAchievementToast}
+              >
+                预览收集提示
+                <Sparkles className="size-4" />
+              </Button>
+            ) : null}
+          </div>
+        </Card>
       </section>
 
       <section data-profile-card className="space-y-3">

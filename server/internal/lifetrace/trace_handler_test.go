@@ -33,6 +33,7 @@ func setupTraceTestRouter(t *testing.T, userID model.Int64String, webPush ...con
 		&model.LifeTracePhotoItemDraft{},
 		&model.LifeTraceSettings{},
 		&model.LifeTraceWeeklyReview{},
+		&model.LifeTraceAchievement{},
 		&model.OperationLog{},
 		&model.LifeTraceAIConversation{},
 		&model.LifeTraceAIMessage{},

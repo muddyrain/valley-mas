@@ -168,6 +168,7 @@ func (h *Handler) CreateHousehold(c *gin.Context) {
 		return
 	}
 
+	evaluateAchievementsQuietly(userID)
 	success(c, householdSummary{
 		ID:          household.ID,
 		Name:        household.Name,
@@ -483,6 +484,7 @@ func (h *Handler) JoinHousehold(c *gin.Context) {
 		return
 	}
 
+	evaluateAchievementsQuietly(userID)
 	success(c, householdSummary{
 		ID:          joinedHousehold.ID,
 		Name:        joinedHousehold.Name,

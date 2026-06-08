@@ -357,6 +357,7 @@ func (h *Handler) GenerateWeeklyReview(c *gin.Context) {
 		return
 	}
 
+	evaluateAchievementsQuietly(userID)
 	success(c, weeklyReviewPayload(review))
 }
 
@@ -816,6 +817,7 @@ func (h *Handler) createAssistantPlanFromDraft(userID model.Int64String, draft l
 		}
 	}
 
+	evaluateAchievementsQuietly(userID)
 	return &lifeTraceAssistantActionPayload{
 		Type:    "create_plan",
 		Status:  "created",
@@ -1394,6 +1396,7 @@ func (h *Handler) createAssistantPantryItemFromDraft(c *gin.Context, userID mode
 		item.ReminderEnabled = false
 	}
 
+	evaluateAchievementsQuietly(userID)
 	message := fmt.Sprintf("已经帮你把「%s」收进「%s」了，放在%s。", item.Name, householdCtx.Household.Name, item.Location)
 	if item.ExpiresAt != "" {
 		message = fmt.Sprintf("已经帮你把「%s」收进「%s」了，放在%s，保质期到 %s。", item.Name, householdCtx.Household.Name, item.Location, item.ExpiresAt)

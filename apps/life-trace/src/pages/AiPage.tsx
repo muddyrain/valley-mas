@@ -1660,6 +1660,7 @@ function useAiPageState() {
   const receiveServerPlan = useLifeTraceStore((state) => state.receiveServerPlan);
   const receiveServerPantryItem = useLifeTraceStore((state) => state.receiveServerPantryItem);
   const addTrace = useLifeTraceStore((state) => state.addTrace);
+  const loadAchievements = useLifeTraceStore((state) => state.loadAchievements);
   const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const pantryListSummary = useLifeTraceStore((state) => state.pantryListSummary);
@@ -1938,6 +1939,7 @@ function useAiPageState() {
 
     try {
       const saved = await saveLifeAssistantMessage(token, message, conversationId);
+      void loadAchievements({ notifyNew: true });
       if (message.role === 'user') {
         const title = message.content.trim().slice(0, 32);
         setAssistantConversations((items) =>

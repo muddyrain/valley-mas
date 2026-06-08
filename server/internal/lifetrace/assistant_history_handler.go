@@ -338,6 +338,7 @@ func createAssistantMessage(
 		Where("id = ? AND user_id = ?", conversationID, userID).
 		Updates(updates).Error
 
+	evaluateAchievementsQuietly(userID)
 	return message, nil
 }
 

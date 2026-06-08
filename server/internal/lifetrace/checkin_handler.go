@@ -113,6 +113,7 @@ func (h *Handler) ToggleCheckin(c *gin.Context) {
 			fail(c, http.StatusInternalServerError, "保存打卡失败")
 			return
 		}
+		evaluateAchievementsQuietly(userID)
 		success(c, checkin)
 		return
 	}
@@ -136,5 +137,6 @@ func (h *Handler) ToggleCheckin(c *gin.Context) {
 		return
 	}
 
+	evaluateAchievementsQuietly(userID)
 	success(c, checkin)
 }

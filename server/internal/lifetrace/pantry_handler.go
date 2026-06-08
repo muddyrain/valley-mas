@@ -566,6 +566,7 @@ func (h *Handler) CreatePantryItem(c *gin.Context) {
 		TargetHouseholdName: householdCtx.Household.Name,
 	})
 
+	evaluateAchievementsQuietly(userID)
 	success(c, item)
 }
 
@@ -683,6 +684,7 @@ func (h *Handler) UpdatePantryItemStatus(c *gin.Context) {
 		})
 	}
 
+	evaluateAchievementsQuietly(userID)
 	success(c, item)
 }
 
@@ -751,6 +753,7 @@ func (h *Handler) ConsumePantryItem(c *gin.Context) {
 			Action:              status,
 			TargetHouseholdName: householdCtx.Household.Name,
 		})
+		evaluateAchievementsQuietly(userID)
 		success(c, item)
 		return
 	}
@@ -778,6 +781,7 @@ func (h *Handler) ConsumePantryItem(c *gin.Context) {
 		QuantityDelta:       consumeQuantity,
 		TargetHouseholdName: householdCtx.Household.Name,
 	})
+	evaluateAchievementsQuietly(userID)
 	success(c, item)
 }
 

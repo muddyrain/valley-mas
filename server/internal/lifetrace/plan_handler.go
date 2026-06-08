@@ -314,6 +314,7 @@ func (h *Handler) CreatePlan(c *gin.Context) {
 		plan.Reminder = false
 	}
 
+	evaluateAchievementsQuietly(userID)
 	success(c, plan)
 }
 
@@ -355,6 +356,7 @@ func (h *Handler) UpdatePlanStatus(c *gin.Context) {
 		return
 	}
 
+	evaluateAchievementsQuietly(userID)
 	success(c, plan)
 }
 

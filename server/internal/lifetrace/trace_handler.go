@@ -168,6 +168,7 @@ func (h *Handler) CreateTrace(c *gin.Context) {
 		return
 	}
 
+	evaluateAchievementsQuietly(userID)
 	success(c, trace)
 }
 

@@ -313,6 +313,39 @@ func (review *LifeTraceWeeklyReview) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+type LifeTraceAchievement struct {
+	ID           Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID       Int64String    `gorm:"column:user_id;index;not null;uniqueIndex:uidx_life_trace_achievement_user_code" json:"userId"`
+	Code         string         `gorm:"size:80;not null;uniqueIndex:uidx_life_trace_achievement_user_code" json:"code"`
+	Category     string         `gorm:"size:30;not null;index" json:"category"`
+	EvidenceType string         `gorm:"size:40" json:"evidenceType,omitempty"`
+	EvidenceID   string         `gorm:"size:80" json:"evidenceId,omitempty"`
+	Progress     int            `gorm:"not null;default:0" json:"progress"`
+	Target       int            `gorm:"not null;default:1" json:"target"`
+	AIComment    string         `gorm:"column:ai_comment;size:500" json:"aiComment,omitempty"`
+	Metadata     string         `gorm:"type:text;not null;default:'{}'" json:"metadata,omitempty"`
+	UnlockedAt   time.Time      `gorm:"column:unlocked_at;not null;index" json:"unlockedAt"`
+	CreatedAt    time.Time      `json:"createdAt"`
+	UpdatedAt    time.Time      `json:"updatedAt"`
+	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (achievement *LifeTraceAchievement) BeforeCreate(tx *gorm.DB) error {
+	if achievement.ID == 0 {
+		achievement.ID = Int64String(utils.GenerateID())
+	}
+	if achievement.Target <= 0 {
+		achievement.Target = 1
+	}
+	if achievement.Metadata == "" {
+		achievement.Metadata = "{}"
+	}
+	if achievement.UnlockedAt.IsZero() {
+		achievement.UnlockedAt = time.Now()
+	}
+	return nil
+}
+
 type LifeTraceFeedback struct {
 	ID         Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID     Int64String    `gorm:"column:user_id;index;not null" json:"userId"`

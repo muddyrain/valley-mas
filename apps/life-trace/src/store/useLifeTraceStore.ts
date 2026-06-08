@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { listAchievements } from '@/api/achievements';
 import { listCheckins, toggleCheckin } from '@/api/checkins';
 import {
   type ListPantryOptions,
@@ -21,10 +22,14 @@ import {
 } from '@/api/plans';
 import { getSettings, saveSettings } from '@/api/settings';
 import { createTrace, deleteTrace, listTraces, updateTrace } from '@/api/traces';
+import { findNewlyUnlockedAchievements, normalizeAchievement } from '@/lib/achievements';
 import { getLifeTraceErrorMessage } from '@/lib/error';
 import { resolvePantryStatus } from '@/lib/pantry';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import type {
+  Achievement,
+  AchievementSummary,
   AiAction,
   AppTab,
   Checkin,
@@ -91,6 +96,12 @@ type LifeTraceState = {
   pantryListResolvedHouseholdName: string;
   pantryListSummary: PantryOverview;
   pantryPreferences: PantryPreferences;
+  achievements: Achievement[];
+  achievementSummary: AchievementSummary;
+  recentAchievements: Achievement[];
+  achievementsLoaded: boolean;
+  achievementsLoading: boolean;
+  achievementsError: string;
   aiActions: AiAction[];
   setActiveTab: (tab: AppTab) => void;
   setPreferredPantryHouseholdId: (householdId?: string, householdName?: string) => void;
@@ -110,6 +121,7 @@ type LifeTraceState = {
   loadTraces: () => Promise<void>;
   loadMoreTraces: () => Promise<void>;
   loadCheckins: (date: string) => Promise<void>;
+  loadAchievements: (options?: { notifyNew?: boolean }) => Promise<void>;
   toggleHabitCheckin: (date: string, name: string, completed: boolean) => Promise<void>;
   addPlan: (input: NewPlanInput) => Promise<Plan | null>;
   addPantryItem: (input: NewPantryItemInput, householdId?: string) => Promise<PantryItem | null>;
@@ -184,6 +196,14 @@ const defaultPantryOverview: PantryOverview = {
   active: 0,
 };
 
+const defaultAchievementSummary: AchievementSummary = {
+  total: 0,
+  unlocked: 0,
+  monthlyNew: 0,
+  rareUnlocked: 0,
+};
+const ACHIEVEMENT_TOAST_DURATION_MS = 4200;
+
 const defaultPantryListOptions: ListPantryOptions = {
   page: 1,
   pageSize: 20,
@@ -230,6 +250,22 @@ const createActionId = () =>
 const getAiActions = (state: Pick<LifeTraceState, 'aiActions'>) => state.aiActions ?? [];
 
 const getToken = () => useAuthStore.getState().token;
+
+function notifyNewAchievements(previous: Achievement[], next: Achievement[]) {
+  const newlyUnlocked = findNewlyUnlockedAchievements(previous, next);
+  if (newlyUnlocked.length === 0) {
+    return;
+  }
+
+  const first = newlyUnlocked[0];
+  const suffix = newlyUnlocked.length > 1 ? `等 ${newlyUnlocked.length} 枚` : '';
+  useFeedbackToastStore
+    .getState()
+    .showToast(`收集到「${first.title}」${suffix}`, 'success', ACHIEVEMENT_TOAST_DURATION_MS, {
+      achievement: first,
+      achievementExtraCount: Math.max(0, newlyUnlocked.length - 1),
+    });
+}
 
 let settingsSaveTimer: ReturnType<typeof setTimeout> | null = null;
 const pantryStatusUpdateInFlightKeys = new Set<string>();
@@ -386,6 +422,12 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       pantryListResolvedHouseholdName: '',
       pantryListSummary: defaultPantryOverview,
       pantryPreferences: defaultPantryPreferences,
+      achievements: [],
+      achievementSummary: defaultAchievementSummary,
+      recentAchievements: [],
+      achievementsLoaded: false,
+      achievementsLoading: false,
+      achievementsError: '',
       aiActions: [],
       setActiveTab: (tab) => set({ activeTab: tab }),
       setPreferredPantryHouseholdId: (householdId, householdName) =>
@@ -932,6 +974,45 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           });
         }
       },
+      loadAchievements: async (options = {}) => {
+        const token = getToken();
+        if (!token) {
+          set({
+            achievements: [],
+            achievementSummary: defaultAchievementSummary,
+            recentAchievements: [],
+            achievementsLoaded: true,
+            achievementsLoading: false,
+            achievementsError: '',
+          });
+          return;
+        }
+
+        const previous = get().achievements;
+        set({ achievementsLoading: true, achievementsError: '' });
+        try {
+          const response = await listAchievements(token);
+          const nextAchievements = response.list.map(normalizeAchievement);
+          const nextRecent = response.recent.map(normalizeAchievement);
+          set({
+            achievements: nextAchievements,
+            achievementSummary: response.summary,
+            recentAchievements: nextRecent,
+            achievementsLoaded: true,
+            achievementsLoading: false,
+            achievementsError: '',
+          });
+          if (options.notifyNew && previous.length > 0) {
+            notifyNewAchievements(previous, nextAchievements);
+          }
+        } catch (error) {
+          set({
+            achievementsLoaded: true,
+            achievementsLoading: false,
+            achievementsError: getLifeTraceErrorMessage(error, '获取生活成就失败'),
+          });
+        }
+      },
       toggleHabitCheckin: async (date, name, completed) => {
         const token = getToken();
         if (!token) {
@@ -968,6 +1049,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               ],
             };
           });
+          void get().loadAchievements({ notifyNew: true });
         } catch (error) {
           set({ checkinsError: error instanceof Error ? error.message : '保存打卡失败' });
         } finally {
@@ -1001,6 +1083,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               ...getAiActions(state),
             ],
           }));
+          void get().loadAchievements({ notifyNew: true });
           return plan;
         } catch (error) {
           set({ plansError: error instanceof Error ? error.message : '创建计划失败' });
@@ -1036,6 +1119,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           if (get().tracesLoaded) {
             void get().loadTraces();
           }
+          void get().loadAchievements({ notifyNew: true });
           return item;
         } catch (error) {
           set({ pantryError: getLifeTraceErrorMessage(error, '添加库存失败') });
@@ -1122,6 +1206,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           if ((status === 'used-up' || status === 'discarded') && get().tracesLoaded) {
             void get().loadTraces();
           }
+          void get().loadAchievements({ notifyNew: true });
           return updatedItem;
         } catch (error) {
           set({ pantryError: getLifeTraceErrorMessage(error, '更新库存状态失败') });
@@ -1169,6 +1254,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           if (get().tracesLoaded) {
             void get().loadTraces();
           }
+          void get().loadAchievements({ notifyNew: true });
           return updatedItem;
         } catch (error) {
           set({ pantryError: getLifeTraceErrorMessage(error, '更新库存数量失败') });
@@ -1214,7 +1300,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           return false;
         }
       },
-      receiveServerPlan: (plan, actionTitle) =>
+      receiveServerPlan: (plan, actionTitle) => {
         set((state) => {
           const exists = state.plans.some((item) => item.id === plan.id);
           const plans = exists
@@ -1233,8 +1319,10 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               ...getAiActions(state),
             ],
           };
-        }),
-      receiveServerPantryItem: (item, actionTitle) =>
+        });
+        void get().loadAchievements({ notifyNew: true });
+      },
+      receiveServerPantryItem: (item, actionTitle) => {
         set((state) => {
           const normalizedItem = normalizePantryItem(item);
           const targetHouseholdId = normalizeHouseholdScopeId(normalizedItem.householdId);
@@ -1266,7 +1354,9 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               ...getAiActions(state),
             ],
           };
-        }),
+        });
+        void get().loadAchievements({ notifyNew: true });
+      },
       editPlan: async (planId, input) => {
         const token = getToken();
         if (!token) {
@@ -1327,6 +1417,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               ...getAiActions(state),
             ],
           }));
+          void get().loadAchievements({ notifyNew: true });
           return trace;
         } catch (error) {
           set({ tracesError: error instanceof Error ? error.message : '创建踪迹失败' });
@@ -1398,6 +1489,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
                 ...getAiActions(state),
               ],
             }));
+            void get().loadAchievements({ notifyNew: true });
             return;
           }
 
@@ -1412,6 +1504,7 @@ export const useLifeTraceStore = create<LifeTraceState>()(
               ...getAiActions(state),
             ],
           }));
+          void get().loadAchievements({ notifyNew: true });
         } catch (error) {
           set({ plansError: error instanceof Error ? error.message : '更新计划失败' });
         } finally {

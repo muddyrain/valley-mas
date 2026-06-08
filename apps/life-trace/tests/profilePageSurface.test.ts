@@ -24,4 +24,9 @@ describe('profile page surface', () => {
   it('exposes an immediate daily brief preview entry inside reminder settings', () => {
     expect(reminderSettingsPageSource).toContain('立即预览简报通知');
   });
+
+  it('keeps the achievement toast preview behind the dev environment guard', () => {
+    expect(profilePageSource).toContain('预览收集提示');
+    expect(profilePageSource).toContain('const canPreviewAchievementToast = import.meta.env.DEV');
+  });
 });

@@ -196,3 +196,34 @@ export type AdvicePayload = {
 export type Advice = AdvicePayload & {
   icon: LucideIcon;
 };
+
+export type AchievementCategory = 'plan' | 'trace' | 'pantry' | 'ai' | 'family';
+
+export type AchievementRarity = 'common' | 'rare' | 'epic';
+
+export type AchievementTone = 'default' | 'weather' | 'ai' | 'plan' | 'trace' | 'health' | 'alert';
+
+export type Achievement = {
+  code: string;
+  title: string;
+  description: string;
+  category: AchievementCategory;
+  rarity: AchievementRarity;
+  icon: string;
+  tone: AchievementTone;
+  hidden: boolean;
+  unlocked: boolean;
+  unlockedAt?: string;
+  progress: number;
+  target: number;
+  evidenceType?: string;
+  evidenceId?: string;
+  aiComment?: string;
+};
+
+export type AchievementSummary = {
+  total: number;
+  unlocked: number;
+  monthlyNew: number;
+  rareUnlocked: number;
+};

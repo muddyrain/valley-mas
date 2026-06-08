@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Settings,
   Sun,
+  Trophy,
   Wind,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -229,6 +230,7 @@ export function TodayPage() {
   const pantryListResolvedHouseholdName = useLifeTraceStore(
     (state) => state.pantryListResolvedHouseholdName,
   );
+  const recentAchievements = useLifeTraceStore((state) => state.recentAchievements);
   const updateSettings = useLifeTraceStore((state) => state.updateSettings);
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
@@ -451,6 +453,7 @@ export function TodayPage() {
   }, [loadPantryList, preferredPantryHouseholdId, settingsLoaded, token]);
 
   const pantryPageHref = '/pantry';
+  const latestAchievement = recentAchievements[0];
 
   const handleRefreshWeather = () => {
     if (weatherLoading) {
@@ -818,6 +821,39 @@ export function TodayPage() {
           </>
         )}
       </Card>
+
+      {latestAchievement ? (
+        <Card
+          className="relative overflow-hidden border-life-ai/20 p-4 shadow-[0_18px_54px_rgba(6,182,212,0.08)]"
+          data-today-entrance
+        >
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-ai/70 to-transparent"
+          />
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 text-left"
+            onClick={() => navigate('/achievements')}
+          >
+            <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+              <Trophy className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="ai">最近成就</Badge>
+                <span className="text-xs text-muted-foreground">生活徽章馆</span>
+              </div>
+              <p className="mt-2 truncate text-sm font-semibold text-foreground">
+                {latestAchievement.title}
+              </p>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                {latestAchievement.description}
+              </p>
+            </div>
+          </button>
+        </Card>
+      ) : null}
 
       <Card
         className="relative overflow-hidden border-life-health/20 p-4 shadow-[0_18px_64px_rgba(34,197,94,0.08)]"
