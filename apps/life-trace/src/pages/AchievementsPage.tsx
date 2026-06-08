@@ -1,6 +1,7 @@
 import { RefreshCw, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { AchievementCard, getAchievementIcon } from '@/components/AchievementCard';
+import { AchievementBadgeIcon } from '@/components/AchievementBadgeIcon';
+import { AchievementCard } from '@/components/AchievementCard';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { EmptyState } from '@/components/EmptyState';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -167,7 +168,6 @@ export function AchievementsPage() {
 }
 
 function RecentAchievementItem({ achievement, last }: { achievement: Achievement; last: boolean }) {
-  const Icon = getAchievementIcon(achievement.icon);
   const unlockedAt = formatRecentAchievementTime(achievement.unlockedAt);
 
   return (
@@ -178,9 +178,7 @@ function RecentAchievementItem({ achievement, last }: { achievement: Achievement
           className="absolute left-5 top-11 h-[calc(100%-1.75rem)] w-px bg-border"
         />
       ) : null}
-      <div className="relative grid size-10 shrink-0 place-items-center rounded-2xl border border-life-health/30 bg-life-health/10 text-life-health">
-        <Icon className="size-4" />
-      </div>
+      <AchievementBadgeIcon achievement={achievement} size="sm" />
       <div className="min-w-0 flex-1 pb-1">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={achievement.tone}>{achievement.title}</Badge>

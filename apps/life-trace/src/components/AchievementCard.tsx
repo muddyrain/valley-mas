@@ -1,88 +1,39 @@
-import {
-  AlarmClockCheck,
-  Archive,
-  BookOpenText,
-  CalendarDays,
-  CalendarPlus,
-  CheckCircle2,
-  ChefHat,
-  ClipboardList,
-  Footprints,
-  History,
-  Image,
-  ImagePlus,
-  Leaf,
-  type LucideIcon,
-  MessageCircle,
-  PackagePlus,
-  ScanBarcode,
-  Sparkles,
-  SunMedium,
-  Users,
-  Utensils,
-} from 'lucide-react';
+import { Share2 } from 'lucide-react';
+import { AchievementBadgeIcon } from '@/components/AchievementBadgeIcon';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { shareAchievementCard } from '@/lib/achievementShareCard';
 import {
   achievementCategoryLabels,
   achievementRarityLabels,
   getAchievementProgressMeta,
 } from '@/lib/achievements';
 import { cn } from '@/lib/utils';
+import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import type { Achievement, AchievementRarity } from '@/types';
-
-const achievementIcons: Record<string, LucideIcon> = {
-  'alarm-clock-check': AlarmClockCheck,
-  archive: Archive,
-  'book-open-text': BookOpenText,
-  'calendar-days': CalendarDays,
-  'calendar-plus': CalendarPlus,
-  'check-circle-2': CheckCircle2,
-  'chef-hat': ChefHat,
-  'clipboard-list': ClipboardList,
-  footprints: Footprints,
-  history: History,
-  image: Image,
-  'image-plus': ImagePlus,
-  leaf: Leaf,
-  'message-circle': MessageCircle,
-  'package-plus': PackagePlus,
-  'scan-barcode': ScanBarcode,
-  sparkles: Sparkles,
-  'sun-medium': SunMedium,
-  users: Users,
-  utensils: Utensils,
-};
-
-export function getAchievementIcon(icon: string): LucideIcon {
-  return achievementIcons[icon] ?? Sparkles;
-}
 
 const unlockedRarityStyles: Record<
   AchievementRarity,
   {
     card: string;
     rail: string;
-    icon: string;
     rarityText: string;
   }
 > = {
   common: {
     card: 'border-life-ai/30 bg-card shadow-[0_14px_42px_rgba(6,182,212,0.07)]',
     rail: 'bg-life-ai/65',
-    icon: 'border-life-ai/20 bg-life-ai/10 text-life-ai',
     rarityText: 'text-muted-foreground',
   },
   rare: {
     card: 'border-life-health/35 bg-card shadow-[0_14px_42px_rgba(245,158,11,0.08)]',
     rail: 'bg-life-health/70',
-    icon: 'border-life-health/25 bg-life-health/10 text-life-health',
     rarityText: 'text-life-health',
   },
   epic: {
     card: 'border-life-plan/35 bg-card shadow-[0_14px_42px_rgba(139,92,246,0.1)]',
     rail: 'bg-life-plan/70',
-    icon: 'border-life-plan/25 bg-life-plan/10 text-life-plan',
     rarityText: 'text-life-plan',
   },
 };
@@ -94,7 +45,7 @@ type AchievementCardProps = {
 };
 
 export function AchievementCard({ achievement, compact = false, className }: AchievementCardProps) {
-  const Icon = getAchievementIcon(achievement.icon);
+  const showToast = useFeedbackToastStore((state) => state.showToast);
   const unlockedStyle = unlockedRarityStyles[achievement.rarity];
   const progressMeta = getAchievementProgressMeta(achievement);
   const progressText =
@@ -105,6 +56,14 @@ export function AchievementCard({ achievement, compact = false, className }: Ach
         day: '2-digit',
       })
     : '';
+  const handleShare = async () => {
+    try {
+      const result = await shareAchievementCard(achievement);
+      showToast(result === 'shared' ? '分享面板已打开' : '成就分享卡已下载', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '分享卡生成失败，请稍后再试', 'error');
+    }
+  };
 
   return (
     <Card
@@ -123,17 +82,7 @@ export function AchievementCard({ achievement, compact = false, className }: Ach
         )}
       />
       <div className="flex items-start gap-3">
-        <div
-          className={cn(
-            'grid shrink-0 place-items-center rounded-2xl border',
-            compact ? 'size-10' : 'size-12',
-            achievement.unlocked
-              ? unlockedStyle.icon
-              : 'border-border bg-card/70 text-muted-foreground',
-          )}
-        >
-          <Icon className={compact ? 'size-4' : 'size-5'} />
-        </div>
+        <AchievementBadgeIcon achievement={achievement} size={compact ? 'sm' : 'md'} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={achievement.unlocked ? achievement.tone : 'default'}>
@@ -175,6 +124,18 @@ export function AchievementCard({ achievement, compact = false, className }: Ach
           ) : null}
           {achievement.unlocked && unlockedDate ? (
             <p className="mt-2 text-xs font-medium text-life-ai/90">{unlockedDate} 解锁</p>
+          ) : null}
+          {achievement.unlocked && !compact ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3 h-8 gap-1.5 px-3 text-xs"
+              onClick={() => void handleShare()}
+            >
+              <Share2 className="size-3.5" />
+              分享成就
+            </Button>
           ) : null}
         </div>
       </div>

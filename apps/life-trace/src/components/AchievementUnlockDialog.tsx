@@ -1,9 +1,11 @@
-import { X } from 'lucide-react';
+import { Share2, X } from 'lucide-react';
 import { useEffect } from 'react';
-import { getAchievementIcon } from '@/components/AchievementCard';
+import { AchievementBadgeIcon } from '@/components/AchievementBadgeIcon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { shareAchievementCard } from '@/lib/achievementShareCard';
 import { achievementCategoryLabels, achievementRarityLabels } from '@/lib/achievements';
+import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import type { Achievement } from '@/types';
 
 type AchievementUnlockDialogProps = {
@@ -38,7 +40,7 @@ export function AchievementUnlockDialog({
   onClose,
   onOpenAchievements,
 }: AchievementUnlockDialogProps) {
-  const Icon = getAchievementIcon(achievement.icon);
+  const showToast = useFeedbackToastStore((state) => state.showToast);
   const unlockedAtText = formatUnlockedAt(achievement.unlockedAt);
   const progressText =
     achievement.target > 1 ? `${achievement.progress}/${achievement.target}` : '已收集';
@@ -53,6 +55,15 @@ export function AchievementUnlockDialog({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+
+  const handleShare = async () => {
+    try {
+      const result = await shareAchievementCard(achievement);
+      showToast(result === 'shared' ? '分享面板已打开' : '成就分享卡已下载', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '分享卡生成失败，请稍后再试', 'error');
+    }
+  };
 
   return (
     <div
@@ -85,9 +96,7 @@ export function AchievementUnlockDialog({
 
         <div className="p-5">
           <div className="flex items-start gap-4">
-            <div className="grid size-16 shrink-0 place-items-center rounded-2xl border border-life-health/45 bg-life-health/15 text-life-health shadow-[0_0_34px_rgba(245,158,11,0.28)]">
-              <Icon className="size-7" />
-            </div>
+            <AchievementBadgeIcon achievement={achievement} size="lg" />
             <div className="min-w-0 flex-1 pr-8">
               <Badge tone="health">成就已解锁</Badge>
               <h2
@@ -126,6 +135,15 @@ export function AchievementUnlockDialog({
           <div className="mt-5 flex flex-col gap-2 sm:flex-row">
             <Button type="button" className="w-full sm:flex-1" onClick={onOpenAchievements}>
               查看成就页
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full sm:flex-1"
+              onClick={() => void handleShare()}
+            >
+              <Share2 className="size-4" />
+              分享成就
             </Button>
             <Button type="button" variant="outline" className="w-full sm:flex-1" onClick={onClose}>
               收好

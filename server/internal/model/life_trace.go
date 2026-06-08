@@ -419,6 +419,25 @@ func (message *LifeTraceAIMessage) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+type LifeTraceAIAction struct {
+	ID         Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID     Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	Title      string         `gorm:"size:160;not null" json:"title"`
+	ActionType string         `gorm:"column:action_type;size:40;not null;default:'general';index" json:"actionType"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (action *LifeTraceAIAction) BeforeCreate(tx *gorm.DB) error {
+	if action.ID == 0 {
+		action.ID = Int64String(utils.GenerateID())
+	}
+	if action.ActionType == "" {
+		action.ActionType = "general"
+	}
+	return nil
+}
+
 type LifeTracePushSubscription struct {
 	ID         Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID     Int64String    `gorm:"column:user_id;index;not null" json:"userId"`

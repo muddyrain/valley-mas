@@ -161,6 +161,7 @@ func autoMigrate() error {
 		&model.LifeTraceFeedback{},
 		&model.LifeTraceAIConversation{},
 		&model.LifeTraceAIMessage{},
+		&model.LifeTraceAIAction{},
 		&model.LifeTracePushSubscription{},
 		&model.LifeTracePushDelivery{},
 		&model.LifeTraceDailyBriefDelivery{},
