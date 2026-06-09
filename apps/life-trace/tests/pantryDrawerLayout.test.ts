@@ -102,7 +102,7 @@ describe('pantry drawer mobile layout guards', () => {
 
   it('keeps each confirmed product as saved history before moving to the next detected draft', () => {
     expect(photoItemAnalysisSource).toContain(
-      'markPhotoItemAnalysisSaved(currentHistoryId, item.id)',
+      'markPhotoItemAnalysisHistorySaved(token, currentHistoryId, item.id)',
     );
     expect(photoItemAnalysisSource).toContain(
       'const nextHistoryId = createPhotoItemAnalysisHistoryId();',
@@ -122,7 +122,7 @@ describe('pantry drawer mobile layout guards', () => {
   it('refreshes recent product recognition after same-tab photo history changes', () => {
     expect(aiPageSource).toContain('PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT');
     expect(aiPageSource).toContain(
-      'window.addEventListener(PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT',
+      'PHOTO_ITEM_ANALYSIS_HISTORY_CHANGED_EVENT,\n      refreshPhotoItemHistoryFromLocal',
     );
     expect(aiPageSource).toContain('onOpenSavedPantryItem');
     expect(aiPageSource).toContain("item.status === 'saved'");

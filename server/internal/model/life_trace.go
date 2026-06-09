@@ -13,6 +13,7 @@ import (
 type LifeTracePlan struct {
 	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID        Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	PlaceID       *Int64String   `gorm:"column:place_id;index" json:"placeId,omitempty"`
 	Title         string         `gorm:"size:160;not null" json:"title"`
 	Type          string         `gorm:"size:30;not null" json:"type"`
 	TimeLabel     string         `gorm:"size:80;not null" json:"timeLabel"`
@@ -107,7 +108,10 @@ type LifeTraceTrace struct {
 	ID           Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID       Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
 	PlanID       *Int64String   `gorm:"column:plan_id;index" json:"planId,omitempty"`
+	PlaceID      *Int64String   `gorm:"column:place_id;index" json:"placeId,omitempty"`
 	PantryItemID *Int64String   `gorm:"column:pantry_item_id;index" json:"pantryItemId,omitempty"`
+	MediaDiaryID *Int64String   `gorm:"column:media_diary_id;index" json:"mediaDiaryId,omitempty"`
+	OutfitID     *Int64String   `gorm:"column:outfit_id;index" json:"outfitId,omitempty"`
 	Title        string         `gorm:"size:160;not null" json:"title"`
 	Summary      string         `gorm:"size:1000;not null" json:"summary"`
 	TimeLabel    string         `gorm:"size:80;not null" json:"timeLabel"`
@@ -137,21 +141,145 @@ func (trace *LifeTraceTrace) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+type LifeTraceClosetItem struct {
+	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID      Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	HouseholdID Int64String    `gorm:"column:household_id;index" json:"householdId,omitempty"`
+	Name        string         `gorm:"size:160;not null" json:"name"`
+	Category    string         `gorm:"size:30;not null;default:'上装';index" json:"category"`
+	Color       string         `gorm:"size:40;not null;default:'未标注';index" json:"color"`
+	Material    string         `gorm:"size:80" json:"material,omitempty"`
+	WarmthLevel string         `gorm:"column:warmth_level;size:20;not null;default:'常规';index" json:"warmthLevel"`
+	Seasons     StringList     `gorm:"type:text" json:"seasons"`
+	SceneTags   StringList     `gorm:"column:scene_tags;type:text" json:"sceneTags"`
+	Status      string         `gorm:"size:20;not null;default:'active';index" json:"status"`
+	ImageURL    string         `gorm:"size:800" json:"imageUrl,omitempty"`
+	Shared      bool           `gorm:"default:false;index" json:"shared"`
+	Note        string         `gorm:"size:1000" json:"note"`
+	CreatedBy   Int64String    `gorm:"column:created_by;index" json:"createdBy,omitempty"`
+	UpdatedBy   Int64String    `gorm:"column:updated_by;index" json:"updatedBy,omitempty"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (item *LifeTraceClosetItem) BeforeCreate(tx *gorm.DB) error {
+	if item.ID == 0 {
+		item.ID = Int64String(utils.GenerateID())
+	}
+	if item.Category == "" {
+		item.Category = "上装"
+	}
+	if item.Color == "" {
+		item.Color = "未标注"
+	}
+	if item.WarmthLevel == "" {
+		item.WarmthLevel = "常规"
+	}
+	if item.Status == "" {
+		item.Status = "active"
+	}
+	if item.Seasons == nil {
+		item.Seasons = StringList{"四季"}
+	}
+	if item.SceneTags == nil {
+		item.SceneTags = StringList{"日常"}
+	}
+	return nil
+}
+
+type LifeTraceOutfit struct {
+	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID      Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	HouseholdID Int64String    `gorm:"column:household_id;index" json:"householdId,omitempty"`
+	Title       string         `gorm:"size:160;not null" json:"title"`
+	ItemIDs     StringList     `gorm:"column:item_ids;type:text" json:"itemIds"`
+	Scene       string         `gorm:"size:40;not null;default:'日常';index" json:"scene"`
+	WeatherText string         `gorm:"column:weather_text;size:120" json:"weatherText,omitempty"`
+	MinTemp     int            `gorm:"column:min_temp;default:0" json:"minTemp"`
+	MaxTemp     int            `gorm:"column:max_temp;default:0" json:"maxTemp"`
+	PlanID      *Int64String   `gorm:"column:plan_id;index" json:"planId,omitempty"`
+	WornDate    string         `gorm:"column:worn_date;size:20;index" json:"wornDate,omitempty"`
+	Rating      int            `gorm:"default:0" json:"rating"`
+	Note        string         `gorm:"size:1000" json:"note"`
+	ImageURL    string         `gorm:"size:800" json:"imageUrl,omitempty"`
+	Shared      bool           `gorm:"default:false;index" json:"shared"`
+	Status      string         `gorm:"size:20;not null;default:'planned';index" json:"status"`
+	CreatedBy   Int64String    `gorm:"column:created_by;index" json:"createdBy,omitempty"`
+	UpdatedBy   Int64String    `gorm:"column:updated_by;index" json:"updatedBy,omitempty"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (outfit *LifeTraceOutfit) BeforeCreate(tx *gorm.DB) error {
+	if outfit.ID == 0 {
+		outfit.ID = Int64String(utils.GenerateID())
+	}
+	if outfit.ItemIDs == nil {
+		outfit.ItemIDs = StringList{}
+	}
+	if outfit.Scene == "" {
+		outfit.Scene = "日常"
+	}
+	if outfit.Status == "" {
+		outfit.Status = "planned"
+	}
+	return nil
+}
+
+type LifeTracePlace struct {
+	ID             Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID         Int64String    `gorm:"column:user_id;index;not null;uniqueIndex:uidx_life_trace_place_user_normalized" json:"userId"`
+	Name           string         `gorm:"size:120;not null" json:"name"`
+	NormalizedName string         `gorm:"column:normalized_name;size:120;not null;uniqueIndex:uidx_life_trace_place_user_normalized" json:"normalizedName"`
+	Status         string         `gorm:"size:24;not null;default:'visited';index" json:"status"`
+	City           string         `gorm:"size:80" json:"city,omitempty"`
+	District       string         `gorm:"size:80" json:"district,omitempty"`
+	Address        string         `gorm:"size:240" json:"address,omitempty"`
+	Latitude       *float64       `gorm:"column:latitude" json:"latitude,omitempty"`
+	Longitude      *float64       `gorm:"column:longitude" json:"longitude,omitempty"`
+	Favorite       bool           `gorm:"default:false;index" json:"favorite"`
+	Archived       bool           `gorm:"default:false;index" json:"archived"`
+	Note           string         `gorm:"size:1000" json:"note"`
+	VisitCount     int            `gorm:"not null;default:0" json:"visitCount"`
+	FirstSeenAt    *time.Time     `gorm:"column:first_seen_at;index" json:"firstSeenAt,omitempty"`
+	LastSeenAt     *time.Time     `gorm:"column:last_seen_at;index" json:"lastSeenAt,omitempty"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	UpdatedAt      time.Time      `json:"updatedAt"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (place *LifeTracePlace) BeforeCreate(tx *gorm.DB) error {
+	if place.ID == 0 {
+		place.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
 type LifeTraceInboxItem struct {
-	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID        Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
-	Title         string         `gorm:"size:160;not null" json:"title"`
-	Content       string         `gorm:"type:text" json:"content,omitempty"`
-	ItemType      string         `gorm:"column:item_type;size:20;not null;default:'text';index" json:"itemType"`
-	LinkURL       string         `gorm:"column:link_url;size:800" json:"linkUrl,omitempty"`
-	Tags          StringList     `gorm:"type:text" json:"tags"`
-	Status        string         `gorm:"size:20;not null;default:'inbox';index" json:"status"`
-	ConvertedType string         `gorm:"column:converted_type;size:30" json:"convertedType,omitempty"`
-	ConvertedID   string         `gorm:"column:converted_id;size:80;index" json:"convertedId,omitempty"`
-	ConvertedAt   *time.Time     `json:"convertedAt,omitempty"`
-	CreatedAt     time.Time      `json:"createdAt"`
-	UpdatedAt     time.Time      `json:"updatedAt"`
-	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+	ID              Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID          Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	Title           string         `gorm:"size:160;not null" json:"title"`
+	Content         string         `gorm:"type:text" json:"content,omitempty"`
+	ItemType        string         `gorm:"column:item_type;size:20;not null;default:'text';index" json:"itemType"`
+	LinkURL         string         `gorm:"column:link_url;size:800" json:"linkUrl,omitempty"`
+	ImageURL        string         `gorm:"column:image_url;size:800" json:"imageUrl,omitempty"`
+	Tags            StringList     `gorm:"type:text" json:"tags"`
+	Status          string         `gorm:"size:20;not null;default:'inbox';index" json:"status"`
+	ConvertedType   string         `gorm:"column:converted_type;size:30" json:"convertedType,omitempty"`
+	ConvertedID     string         `gorm:"column:converted_id;size:80;index" json:"convertedId,omitempty"`
+	ConvertedAt     *time.Time     `json:"convertedAt,omitempty"`
+	AITitle         string         `gorm:"column:ai_title;size:160" json:"aiTitle,omitempty"`
+	AISummary       string         `gorm:"column:ai_summary;size:1000" json:"aiSummary,omitempty"`
+	AITags          StringList     `gorm:"column:ai_tags;type:text" json:"aiTags"`
+	AISuggestedType string         `gorm:"column:ai_suggested_type;size:30" json:"aiSuggestedType,omitempty"`
+	AIReason        string         `gorm:"column:ai_reason;size:500" json:"aiReason,omitempty"`
+	AIModel         string         `gorm:"column:ai_model;size:120" json:"aiModel,omitempty"`
+	AIOrganizedAt   *time.Time     `gorm:"column:ai_organized_at" json:"aiOrganizedAt,omitempty"`
+	CreatedAt       time.Time      `json:"createdAt"`
+	UpdatedAt       time.Time      `json:"updatedAt"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (item *LifeTraceInboxItem) BeforeCreate(tx *gorm.DB) error {
@@ -166,6 +294,82 @@ func (item *LifeTraceInboxItem) BeforeCreate(tx *gorm.DB) error {
 	}
 	if item.Tags == nil {
 		item.Tags = StringList{}
+	}
+	if item.AITags == nil {
+		item.AITags = StringList{}
+	}
+	return nil
+}
+
+type LifeTraceMediaDiaryEntry struct {
+	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID        Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	TraceID       *Int64String   `gorm:"column:trace_id;index" json:"traceId,omitempty"`
+	MediaType     string         `gorm:"column:media_type;size:20;not null;index" json:"mediaType"`
+	Status        string         `gorm:"size:20;not null;default:'想看';index" json:"status"`
+	Title         string         `gorm:"size:160;not null;index" json:"title"`
+	OriginalTitle string         `gorm:"column:original_title;size:160" json:"originalTitle,omitempty"`
+	Creator       string         `gorm:"size:160" json:"creator,omitempty"`
+	ReleaseYear   int            `gorm:"column:release_year;index" json:"releaseYear,omitempty"`
+	CoverURL      string         `gorm:"column:cover_url;size:800" json:"coverUrl,omitempty"`
+	Rating        int            `gorm:"not null;default:0" json:"rating"`
+	StartedAt     string         `gorm:"column:started_at;size:20;index" json:"startedAt,omitempty"`
+	FinishedAt    string         `gorm:"column:finished_at;size:20;index" json:"finishedAt,omitempty"`
+	Note          string         `gorm:"size:1000" json:"note"`
+	Quote         string         `gorm:"size:500" json:"quote"`
+	Tags          StringList     `gorm:"type:text" json:"tags"`
+	Source        string         `gorm:"size:30;not null;default:'manual';index" json:"source"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (entry *LifeTraceMediaDiaryEntry) BeforeCreate(tx *gorm.DB) error {
+	if entry.ID == 0 {
+		entry.ID = Int64String(utils.GenerateID())
+	}
+	if entry.MediaType == "" {
+		entry.MediaType = "书籍"
+	}
+	if entry.Status == "" {
+		entry.Status = "想看"
+	}
+	if entry.Source == "" {
+		entry.Source = "manual"
+	}
+	if entry.Tags == nil {
+		entry.Tags = StringList{}
+	}
+	return nil
+}
+
+type LifeTraceLedgerEntry struct {
+	ID           Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID       Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	AmountCents  int64          `gorm:"column:amount_cents;not null" json:"amountCents"`
+	Currency     string         `gorm:"size:8;not null;default:'CNY';index" json:"currency"`
+	Direction    string         `gorm:"size:20;not null;index" json:"direction"`
+	Category     string         `gorm:"size:30;not null;index" json:"category"`
+	OccurredAt   time.Time      `gorm:"column:occurred_at;not null;index" json:"occurredAt"`
+	Merchant     string         `gorm:"size:160" json:"merchant,omitempty"`
+	Location     string         `gorm:"size:120" json:"location,omitempty"`
+	Note         string         `gorm:"size:1000" json:"note"`
+	ImageURL     string         `gorm:"size:800" json:"imageUrl,omitempty"`
+	InboxItemID  *Int64String   `gorm:"column:inbox_item_id;index" json:"inboxItemId,omitempty"`
+	PlanID       *Int64String   `gorm:"column:plan_id;index" json:"planId,omitempty"`
+	TraceID      *Int64String   `gorm:"column:trace_id;index" json:"traceId,omitempty"`
+	PantryItemID *Int64String   `gorm:"column:pantry_item_id;index" json:"pantryItemId,omitempty"`
+	CreatedAt    time.Time      `json:"createdAt"`
+	UpdatedAt    time.Time      `json:"updatedAt"`
+	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (entry *LifeTraceLedgerEntry) BeforeCreate(tx *gorm.DB) error {
+	if entry.ID == 0 {
+		entry.ID = Int64String(utils.GenerateID())
+	}
+	if entry.Currency == "" {
+		entry.Currency = "CNY"
 	}
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 	"valley-server/internal/config"
 	"valley-server/internal/model"
@@ -16,6 +17,13 @@ import (
 )
 
 var DB *gorm.DB
+
+const (
+	AutoMigrateScopeAll       = "all"
+	AutoMigrateScopeCore      = "core"
+	AutoMigrateScopeContent   = "content"
+	AutoMigrateScopeLifeTrace = "lifetrace"
+)
 
 // Init initializes database connection and migrations.
 func Init(cfg *config.Config) error {
@@ -68,7 +76,7 @@ func Init(cfg *config.Config) error {
 	}
 
 	if cfg.Database.AutoMigrate {
-		if err := autoMigrate(); err != nil {
+		if err := AutoMigrate(AutoMigrateScopeAll); err != nil {
 			return fmt.Errorf("failed to migrate database: %w", err)
 		}
 	} else {
@@ -122,12 +130,264 @@ func initPostgres(cfg *config.Config) (gorm.Dialector, error) {
 	return postgresDriver.Open(dsn), nil
 }
 
-func autoMigrate() error {
-	if err := DB.AutoMigrate(
+func AutoMigrate(scope string) error {
+	plan, err := buildAutoMigratePlan(scope)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Auto migrate started (scope=%s, models=%d)", plan.scope, len(plan.models))
+	if err := DB.AutoMigrate(plan.models...); err != nil {
+		return err
+	}
+
+	if plan.fixResourceForeignKey {
+		if err := fixResourceForeignKeyConstraint(); err != nil {
+			// Do not block startup because of historical dirty data.
+			log.Printf("warn: fix resource foreign key skipped: %v", err)
+		}
+	}
+
+	if plan.initDefaultBlogData {
+		if err := initDefaultBlogData(); err != nil {
+			return err
+		}
+	}
+
+	log.Printf("Auto migrate completed (scope=%s)", plan.scope)
+	return nil
+}
+
+func AutoMigrateModels(names []string) error {
+	models, normalizedNames, err := migrationModelsByName(names)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Auto migrate started (models=%s)", strings.Join(normalizedNames, ","))
+	if err := DB.AutoMigrate(models...); err != nil {
+		return err
+	}
+
+	log.Printf("Auto migrate completed (models=%s)", strings.Join(normalizedNames, ","))
+	return nil
+}
+
+type autoMigratePlan struct {
+	scope                 string
+	models                []any
+	fixResourceForeignKey bool
+	initDefaultBlogData   bool
+}
+
+func buildAutoMigratePlan(scope string) (autoMigratePlan, error) {
+	normalizedScope, err := NormalizeAutoMigrateScope(scope)
+	if err != nil {
+		return autoMigratePlan{}, err
+	}
+
+	switch normalizedScope {
+	case AutoMigrateScopeAll:
+		return autoMigratePlan{
+			scope:                 normalizedScope,
+			models:                allMigrationModels(),
+			fixResourceForeignKey: true,
+			initDefaultBlogData:   true,
+		}, nil
+	case AutoMigrateScopeCore:
+		return autoMigratePlan{
+			scope:  normalizedScope,
+			models: coreMigrationModels(),
+		}, nil
+	case AutoMigrateScopeContent:
+		return autoMigratePlan{
+			scope:                 normalizedScope,
+			models:                contentMigrationModels(),
+			fixResourceForeignKey: true,
+			initDefaultBlogData:   true,
+		}, nil
+	case AutoMigrateScopeLifeTrace:
+		return autoMigratePlan{
+			scope:  normalizedScope,
+			models: lifeTraceMigrationModels(),
+		}, nil
+	}
+
+	return autoMigratePlan{}, fmt.Errorf("unsupported auto migrate scope %q (supported: all, core, content, lifetrace)", scope)
+}
+
+func allMigrationModels() []any {
+	models := make([]any, 0, len(coreMigrationModels())+len(contentDomainMigrationModels())+len(lifeTraceDomainMigrationModels()))
+	models = append(models, coreMigrationModels()...)
+	models = append(models, contentDomainMigrationModels()...)
+	models = append(models, lifeTraceDomainMigrationModels()...)
+	return models
+}
+
+func NormalizeAutoMigrateScope(scope string) (string, error) {
+	normalizedScope := strings.ToLower(strings.TrimSpace(scope))
+	if normalizedScope == "" {
+		normalizedScope = AutoMigrateScopeLifeTrace
+	}
+
+	switch normalizedScope {
+	case AutoMigrateScopeAll, AutoMigrateScopeCore, AutoMigrateScopeContent, AutoMigrateScopeLifeTrace:
+		return normalizedScope, nil
+	default:
+		return "", fmt.Errorf("unsupported auto migrate scope %q (supported: all, core, content, lifetrace)", scope)
+	}
+}
+
+func NormalizeAutoMigrateModelNames(names []string) ([]string, error) {
+	_, normalizedNames, err := migrationModelsByName(names)
+	return normalizedNames, err
+}
+
+func migrationModelsByName(names []string) ([]any, []string, error) {
+	aliases := autoMigrateModelAliases()
+	modelsByName := autoMigrateModelsByName()
+
+	seen := make(map[string]struct{})
+	models := make([]any, 0, len(names))
+	normalizedNames := make([]string, 0, len(names))
+	for _, rawName := range names {
+		name := strings.ToLower(strings.TrimSpace(rawName))
+		if name == "" {
+			continue
+		}
+		if canonical, ok := aliases[name]; ok {
+			name = canonical
+		}
+		model, ok := modelsByName[name]
+		if !ok {
+			return nil, nil, fmt.Errorf("unsupported auto migrate model %q", rawName)
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		models = append(models, model)
+		normalizedNames = append(normalizedNames, name)
+	}
+
+	if len(models) == 0 {
+		return nil, nil, fmt.Errorf("at least one auto migrate model is required")
+	}
+	return models, normalizedNames, nil
+}
+
+func autoMigrateModelsByName() map[string]any {
+	return map[string]any{
+		"user":                               &model.User{},
+		"household":                          &model.Household{},
+		"household_member":                   &model.HouseholdMember{},
+		"household_invite":                   &model.HouseholdInvite{},
+		"operation_log":                      &model.OperationLog{},
+		"creator":                            &model.Creator{},
+		"creator_space":                      &model.CreatorSpace{},
+		"resource":                           &model.Resource{},
+		"resource_tag":                       &model.ResourceTag{},
+		"resource_tag_relation":              &model.ResourceTagRelation{},
+		"download_record":                    &model.DownloadRecord{},
+		"code_access_log":                    &model.CodeAccessLog{},
+		"creator_application":                &model.CreatorApplication{},
+		"creator_audit_config":               &model.CreatorAuditConfig{},
+		"user_favorite":                      &model.UserFavorite{},
+		"user_follow":                        &model.UserFollow{},
+		"user_avatar_history":                &model.UserAvatarHistory{},
+		"user_notification":                  &model.UserNotification{},
+		"guestbook_message":                  &model.GuestbookMessage{},
+		"creator_album":                      &model.CreatorAlbum{},
+		"post_group":                         &model.PostGroup{},
+		"post":                               &model.Post{},
+		"post_category":                      &model.PostCategory{},
+		"post_tag":                           &model.PostTag{},
+		"post_tag_relation":                  &model.PostTagRelation{},
+		"post_comment":                       &model.PostComment{},
+		"lifetrace_plan":                     &model.LifeTracePlan{},
+		"lifetrace_checkin":                  &model.LifeTraceCheckin{},
+		"lifetrace_trace":                    &model.LifeTraceTrace{},
+		"lifetrace_place":                    &model.LifeTracePlace{},
+		"lifetrace_inbox_item":               &model.LifeTraceInboxItem{},
+		"lifetrace_media_diary_entry":        &model.LifeTraceMediaDiaryEntry{},
+		"lifetrace_ledger_entry":             &model.LifeTraceLedgerEntry{},
+		"lifetrace_closet_item":              &model.LifeTraceClosetItem{},
+		"lifetrace_outfit":                   &model.LifeTraceOutfit{},
+		"lifetrace_pantry_item":              &model.LifeTracePantryItem{},
+		"lifetrace_photo_item_draft":         &model.LifeTracePhotoItemDraft{},
+		"lifetrace_settings":                 &model.LifeTraceSettings{},
+		"lifetrace_weekly_review":            &model.LifeTraceWeeklyReview{},
+		"lifetrace_achievement":              &model.LifeTraceAchievement{},
+		"lifetrace_feedback":                 &model.LifeTraceFeedback{},
+		"lifetrace_ai_conversation":          &model.LifeTraceAIConversation{},
+		"lifetrace_ai_message":               &model.LifeTraceAIMessage{},
+		"lifetrace_ai_action":                &model.LifeTraceAIAction{},
+		"lifetrace_push_subscription":        &model.LifeTracePushSubscription{},
+		"lifetrace_push_delivery":            &model.LifeTracePushDelivery{},
+		"lifetrace_daily_brief_delivery":     &model.LifeTraceDailyBriefDelivery{},
+		"lifetrace_pantry_reminder_delivery": &model.LifeTracePantryReminderDelivery{},
+		"lifetrace_holiday_calendar":         &model.LifeTraceHolidayCalendar{},
+	}
+}
+
+func autoMigrateModelAliases() map[string]string {
+	return map[string]string{
+		"users":                    "user",
+		"places":                   "lifetrace_place",
+		"place":                    "lifetrace_place",
+		"plans":                    "lifetrace_plan",
+		"plan":                     "lifetrace_plan",
+		"checkins":                 "lifetrace_checkin",
+		"checkin":                  "lifetrace_checkin",
+		"traces":                   "lifetrace_trace",
+		"trace":                    "lifetrace_trace",
+		"inbox":                    "lifetrace_inbox_item",
+		"inbox_item":               "lifetrace_inbox_item",
+		"media_diary":              "lifetrace_media_diary_entry",
+		"media_diary_entry":        "lifetrace_media_diary_entry",
+		"ledger":                   "lifetrace_ledger_entry",
+		"ledger_entry":             "lifetrace_ledger_entry",
+		"closet":                   "lifetrace_closet_item",
+		"closet_item":              "lifetrace_closet_item",
+		"outfit":                   "lifetrace_outfit",
+		"outfits":                  "lifetrace_outfit",
+		"pantry":                   "lifetrace_pantry_item",
+		"pantry_item":              "lifetrace_pantry_item",
+		"photo_draft":              "lifetrace_photo_item_draft",
+		"settings":                 "lifetrace_settings",
+		"weekly_review":            "lifetrace_weekly_review",
+		"achievement":              "lifetrace_achievement",
+		"feedback":                 "lifetrace_feedback",
+		"ai_conversation":          "lifetrace_ai_conversation",
+		"ai_message":               "lifetrace_ai_message",
+		"ai_action":                "lifetrace_ai_action",
+		"push_subscription":        "lifetrace_push_subscription",
+		"push_delivery":            "lifetrace_push_delivery",
+		"daily_brief_delivery":     "lifetrace_daily_brief_delivery",
+		"pantry_reminder_delivery": "lifetrace_pantry_reminder_delivery",
+		"holiday_calendar":         "lifetrace_holiday_calendar",
+	}
+}
+
+func coreMigrationModels() []any {
+	return []any{
 		&model.User{},
 		&model.Household{},
 		&model.HouseholdMember{},
 		&model.HouseholdInvite{},
+		&model.OperationLog{},
+	}
+}
+
+func contentMigrationModels() []any {
+	models := make([]any, 0, len(coreMigrationModels())+len(contentDomainMigrationModels()))
+	models = append(models, coreMigrationModels()...)
+	models = append(models, contentDomainMigrationModels()...)
+	return models
+}
+
+func contentDomainMigrationModels() []any {
+	return []any{
 		&model.Creator{},
 		&model.CreatorSpace{},
 		&model.Resource{},
@@ -149,11 +409,27 @@ func autoMigrate() error {
 		&model.PostTag{},
 		&model.PostTagRelation{},
 		&model.PostComment{},
-		&model.OperationLog{},
+	}
+}
+
+func lifeTraceMigrationModels() []any {
+	models := make([]any, 0, len(coreMigrationModels())+len(lifeTraceDomainMigrationModels()))
+	models = append(models, coreMigrationModels()...)
+	models = append(models, lifeTraceDomainMigrationModels()...)
+	return models
+}
+
+func lifeTraceDomainMigrationModels() []any {
+	return []any{
 		&model.LifeTracePlan{},
 		&model.LifeTraceCheckin{},
 		&model.LifeTraceTrace{},
+		&model.LifeTracePlace{},
 		&model.LifeTraceInboxItem{},
+		&model.LifeTraceMediaDiaryEntry{},
+		&model.LifeTraceLedgerEntry{},
+		&model.LifeTraceClosetItem{},
+		&model.LifeTraceOutfit{},
 		&model.LifeTracePantryItem{},
 		&model.LifeTracePhotoItemDraft{},
 		&model.LifeTraceSettings{},
@@ -168,16 +444,7 @@ func autoMigrate() error {
 		&model.LifeTraceDailyBriefDelivery{},
 		&model.LifeTracePantryReminderDelivery{},
 		&model.LifeTraceHolidayCalendar{},
-	); err != nil {
-		return err
 	}
-
-	if err := fixResourceForeignKeyConstraint(); err != nil {
-		// Do not block startup because of historical dirty data.
-		log.Printf("warn: fix resource foreign key skipped: %v", err)
-	}
-
-	return initDefaultBlogData()
 }
 
 // fixResourceForeignKeyConstraint repairs historical wrong FK settings for

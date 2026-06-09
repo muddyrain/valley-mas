@@ -15,6 +15,7 @@ import (
 
 type createTraceRequest struct {
 	PlanID    string   `json:"planId"`
+	PlaceID   string   `json:"placeId"`
 	Title     string   `json:"title"`
 	Summary   string   `json:"summary"`
 	TimeLabel string   `json:"timeLabel"`
@@ -26,10 +27,12 @@ type createTraceRequest struct {
 }
 
 var validTraceSources = map[string]bool{
-	"计划": true,
-	"打卡": true,
-	"库存": true,
-	"手动": true,
+	"计划":  true,
+	"打卡":  true,
+	"库存":  true,
+	"书影音": true,
+	"穿搭":  true,
+	"手动":  true,
 }
 
 func normalizeTraceSource(source string) string {
@@ -140,13 +143,20 @@ func (h *Handler) CreateTrace(c *gin.Context) {
 		return
 	}
 
+	placeID, location, ok := resolveLifeTracePlaceInput(userID, req.PlaceID, req.Location)
+	if !ok {
+		fail(c, http.StatusBadRequest, "地点不合法")
+		return
+	}
+
 	trace := model.LifeTraceTrace{
 		UserID:    userID,
 		PlanID:    planID,
+		PlaceID:   placeID,
 		Title:     title,
 		Summary:   summary,
 		TimeLabel: timeLabel,
-		Location:  strings.TrimSpace(req.Location),
+		Location:  location,
 		ImageURL:  strings.TrimSpace(req.ImageURL),
 		Mood:      normalizeTraceMood(req.Mood),
 		Tags:      normalizeTraceTags(req.Tags),
@@ -168,6 +178,7 @@ func (h *Handler) CreateTrace(c *gin.Context) {
 		return
 	}
 
+	reconcileTracePlace(&trace, "")
 	evaluateAchievementsQuietly(userID)
 	success(c, trace)
 }
@@ -205,12 +216,20 @@ func (h *Handler) UpdateTrace(c *gin.Context) {
 		return
 	}
 
+	placeID, location, ok := resolveLifeTracePlaceInput(userID, req.PlaceID, req.Location)
+	if !ok {
+		fail(c, http.StatusBadRequest, "地点不合法")
+		return
+	}
+	previousLocation := trace.Location
+
 	updates := map[string]interface{}{
 		"plan_id":    planID,
+		"place_id":   placeID,
 		"title":      title,
 		"summary":    summary,
 		"time_label": timeLabel,
-		"location":   strings.TrimSpace(req.Location),
+		"location":   location,
 		"image_url":  strings.TrimSpace(req.ImageURL),
 		"mood":       normalizeTraceMood(req.Mood),
 		"tags":       normalizeTraceTags(req.Tags),
@@ -227,6 +246,7 @@ func (h *Handler) UpdateTrace(c *gin.Context) {
 		return
 	}
 
+	reconcileTracePlace(&trace, previousLocation)
 	success(c, trace)
 }
 

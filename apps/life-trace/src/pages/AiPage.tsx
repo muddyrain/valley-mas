@@ -16,6 +16,7 @@ import {
   Plus,
   Search,
   Send,
+  Shirt,
   Sparkles,
   Sun,
   Trash2,
@@ -65,6 +66,7 @@ import {
   getAssistantMessageDate,
   groupAssistantMessagesByDate,
 } from '@/lib/aiHistory';
+import { formatLedgerAmount } from '@/lib/ledger';
 import { formatLocationDisplay } from '@/lib/location';
 import {
   getPhotoItemAnalysisSummaryItems,
@@ -149,6 +151,13 @@ function formatAssistantActionMessage(event: LifeAssistantActionEvent) {
     }
     if (event.plan && event.status === 'exists') {
       return `这个计划已经在列表里了：${event.plan.title}。`;
+    }
+    return event.message;
+  }
+
+  if (event.type === 'create_ledger_entry') {
+    if (event.ledgerEntry && event.status === 'created') {
+      return `已经帮你记下这笔账：${formatLedgerAmount(event.ledgerEntry.amountCents, event.ledgerEntry.currency)} · ${event.ledgerEntry.category}。`;
     }
     return event.message;
   }
@@ -1123,7 +1132,7 @@ function AssistantToolsSheet({
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3 px-1">
           <p className="text-sm font-semibold">生活动作</p>
-          <span className="text-xs text-muted-foreground">3 个动作</span>
+          <span className="text-xs text-muted-foreground">5 个动作</span>
         </div>
         <div className="space-y-2 rounded-[1.35rem] border border-border/80 bg-secondary/15 p-2.5">
           <AssistantToolRow
@@ -1147,6 +1156,20 @@ function AssistantToolsSheet({
             toneClass="text-life-ai"
             disabled={Boolean(quickActionLoading)}
             onClick={() => closeAndRun(() => onQuickAction('生成踪迹'))}
+          />
+          <AssistantToolRow
+            icon={Shirt}
+            label="今日穿搭"
+            toneClass="text-life-trace"
+            disabled={Boolean(quickActionLoading)}
+            onClick={() => closeAndRun(() => onQuickAction('今日穿搭'))}
+          />
+          <AssistantToolRow
+            icon={Camera}
+            label="拍照识别衣物"
+            toneClass="text-life-ai"
+            disabled={Boolean(quickActionLoading)}
+            onClick={() => closeAndRun(() => onQuickAction('拍照识别衣物'))}
           />
         </div>
       </div>
@@ -1670,6 +1693,7 @@ function useAiPageState() {
   const addPlan = useLifeTraceStore((state) => state.addPlan);
   const receiveServerPlan = useLifeTraceStore((state) => state.receiveServerPlan);
   const receiveServerPantryItem = useLifeTraceStore((state) => state.receiveServerPantryItem);
+  const receiveServerLedgerEntry = useLifeTraceStore((state) => state.receiveServerLedgerEntry);
   const loadAchievements = useLifeTraceStore((state) => state.loadAchievements);
   const loadAiActions = useLifeTraceStore((state) => state.loadAiActions);
   const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
@@ -2123,6 +2147,33 @@ function useAiPageState() {
       return;
     }
 
+    if (event.type === 'create_ledger_entry') {
+      if (event.ledgerEntry) {
+        receiveServerLedgerEntry(
+          event.ledgerEntry,
+          event.status === 'created'
+            ? `生活助理记下了「${event.ledgerEntry.category}」账目`
+            : `生活助理识别到「${event.ledgerEntry.category}」账目`,
+        );
+      }
+
+      setResult({
+        title:
+          event.status === 'created'
+            ? '已记账'
+            : event.status === 'need_more_info'
+              ? '还差一点信息'
+              : '账目未保存',
+        detail:
+          event.ledgerEntry && event.status === 'created'
+            ? `${formatLedgerAmount(event.ledgerEntry.amountCents, event.ledgerEntry.currency)} · ${event.ledgerEntry.category}`
+            : event.message,
+        tone:
+          event.status === 'error' ? 'alert' : event.status === 'need_more_info' ? 'ai' : 'plan',
+      });
+      return;
+    }
+
     if (event.pantryItem) {
       receiveServerPantryItem(
         event.pantryItem,
@@ -2263,6 +2314,16 @@ function useAiPageState() {
 
     if (label === '拍照分析商品') {
       navigate('/ai/photo-item-analysis');
+      return;
+    }
+
+    if (label === '今日穿搭') {
+      navigate('/closet');
+      return;
+    }
+
+    if (label === '拍照识别衣物') {
+      navigate('/ai/photo-clothing-analysis');
       return;
     }
 

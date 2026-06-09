@@ -33,7 +33,8 @@ func run(args []string, out io.Writer) error {
 	if !options.apply {
 		fmt.Fprintf(out, "dry run only: no database changes will be applied\n")
 		fmt.Fprintf(out, "target: %s\n", describeDatabaseTarget(cfg))
-		fmt.Fprintf(out, "rerun with --apply to run GORM AutoMigrate against the configured database\n")
+		fmt.Fprintf(out, "scope: %s\n", describeSyncSelection(options))
+		fmt.Fprintf(out, "rerun with --apply plus --models or --scope to run GORM AutoMigrate against the configured database\n")
 		return nil
 	}
 
@@ -45,14 +46,23 @@ func run(args []string, out io.Writer) error {
 		return err
 	}
 
-	cfg.Database.AutoMigrate = true
-	fmt.Fprintf(out, "syncing database schema via GORM AutoMigrate\n")
+	cfg.Database.AutoMigrate = false
+	fmt.Fprintf(out, "syncing database schema via scoped GORM AutoMigrate\n")
 	fmt.Fprintf(out, "target: %s\n", describeDatabaseTarget(cfg))
+	fmt.Fprintf(out, "scope: %s\n", describeSyncSelection(options))
 
 	if err := database.Init(cfg); err != nil {
 		return err
 	}
 	defer database.Close()
+
+	if len(options.models) > 0 {
+		if err := database.AutoMigrateModels(options.models); err != nil {
+			return err
+		}
+	} else if err := database.AutoMigrate(options.scope); err != nil {
+		return err
+	}
 
 	fmt.Fprintln(out, "schema sync complete")
 	return nil
@@ -61,6 +71,8 @@ func run(args []string, out io.Writer) error {
 type syncOptions struct {
 	apply           bool
 	allowProduction bool
+	scope           string
+	models          []string
 }
 
 func parseOptions(args []string, out io.Writer) (syncOptions, error) {
@@ -69,8 +81,25 @@ func parseOptions(args []string, out io.Writer) (syncOptions, error) {
 	flags.SetOutput(out)
 	flags.BoolVar(&options.apply, "apply", false, "apply GORM AutoMigrate to the configured database")
 	flags.BoolVar(&options.allowProduction, "allow-production", false, "allow running when ENV=production")
+	flags.StringVar(&options.scope, "scope", "", "migration scope: lifetrace, content, core, or all")
+	modelNames := flags.String("models", "", "comma-separated model aliases, for example: places,ledger,closet")
 	if err := flags.Parse(args); err != nil {
 		return options, err
+	}
+	options.models = splitCommaList(*modelNames)
+	if options.scope != "" {
+		scope, err := database.NormalizeAutoMigrateScope(options.scope)
+		if err != nil {
+			return options, err
+		}
+		options.scope = scope
+	}
+	if len(options.models) > 0 {
+		models, err := database.NormalizeAutoMigrateModelNames(options.models)
+		if err != nil {
+			return options, err
+		}
+		options.models = models
 	}
 	return options, nil
 }
@@ -79,7 +108,45 @@ func validateRun(cfg *config.Config, options syncOptions) error {
 	if strings.EqualFold(strings.TrimSpace(cfg.Env), "production") && !options.allowProduction {
 		return fmt.Errorf("refusing to sync schema in production without --allow-production")
 	}
+	if options.scope != "" && len(options.models) > 0 {
+		return fmt.Errorf("choose either --models or --scope, not both")
+	}
+	if options.scope == "" && len(options.models) == 0 {
+		return fmt.Errorf("refusing to run without an explicit migration target; pass --models places,ledger or --scope lifetrace")
+	}
+	if options.scope != "" {
+		if _, err := database.NormalizeAutoMigrateScope(options.scope); err != nil {
+			return err
+		}
+	}
+	if len(options.models) > 0 {
+		if _, err := database.NormalizeAutoMigrateModelNames(options.models); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func describeSyncSelection(options syncOptions) string {
+	if len(options.models) > 0 {
+		return fmt.Sprintf("models:%s", strings.Join(options.models, ","))
+	}
+	if options.scope != "" {
+		return options.scope
+	}
+	return "none"
+}
+
+func splitCommaList(value string) []string {
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			items = append(items, part)
+		}
+	}
+	return items
 }
 
 func describeDatabaseTarget(cfg *config.Config) string {

@@ -23,6 +23,7 @@ type apiResponse struct {
 }
 
 type createPlanRequest struct {
+	PlaceID       string `json:"placeId"`
 	Title         string `json:"title"`
 	Type          string `json:"type"`
 	TimeLabel     string `json:"timeLabel"`
@@ -280,8 +281,15 @@ func (h *Handler) CreatePlan(c *gin.Context) {
 		return
 	}
 
+	placeID, location, ok := resolveLifeTracePlaceInput(userID, req.PlaceID, req.Location)
+	if !ok {
+		fail(c, http.StatusBadRequest, "地点不合法")
+		return
+	}
+
 	plan := model.LifeTracePlan{
 		UserID:        userID,
+		PlaceID:       placeID,
 		Title:         title,
 		Type:          normalizePlanType(req.Type),
 		TimeLabel:     timeLabel,
@@ -290,7 +298,7 @@ func (h *Handler) CreatePlan(c *gin.Context) {
 		Timezone:      timezone,
 		Reminder:      req.Reminder,
 		ImageURL:      strings.TrimSpace(req.ImageURL),
-		Location:      strings.TrimSpace(req.Location),
+		Location:      location,
 		Note:          sanitizePlanNote(req.Note),
 		Source:        normalizePlanSource(req.Source),
 	}
@@ -314,6 +322,7 @@ func (h *Handler) CreatePlan(c *gin.Context) {
 		plan.Reminder = false
 	}
 
+	reconcilePlanPlace(&plan, "")
 	evaluateAchievementsQuietly(userID)
 	success(c, plan)
 }
@@ -396,7 +405,15 @@ func (h *Handler) UpdatePlan(c *gin.Context) {
 		return
 	}
 
+	placeID, location, ok := resolveLifeTracePlaceInput(userID, req.PlaceID, req.Location)
+	if !ok {
+		fail(c, http.StatusBadRequest, "地点不合法")
+		return
+	}
+	previousLocation := plan.Location
+
 	updates := map[string]interface{}{
+		"place_id":       placeID,
 		"title":          title,
 		"type":           normalizePlanType(req.Type),
 		"time_label":     timeLabel,
@@ -405,7 +422,7 @@ func (h *Handler) UpdatePlan(c *gin.Context) {
 		"timezone":       timezone,
 		"reminder":       req.Reminder,
 		"image_url":      strings.TrimSpace(req.ImageURL),
-		"location":       strings.TrimSpace(req.Location),
+		"location":       location,
 		"note":           sanitizePlanNote(req.Note),
 		"source":         normalizePlanSource(req.Source),
 	}
@@ -425,6 +442,7 @@ func (h *Handler) UpdatePlan(c *gin.Context) {
 		return
 	}
 
+	reconcilePlanPlace(&plan, previousLocation)
 	success(c, plan)
 }
 

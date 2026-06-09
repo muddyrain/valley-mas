@@ -6,6 +6,7 @@ export type PlanType = '电影' | '吃饭' | '运动' | '阅读' | '聚会' | '�
 
 export type Plan = {
   id: string;
+  placeId?: string;
   title: string;
   type: PlanType;
   timeLabel: string;
@@ -115,6 +116,68 @@ export type PantryPreferences = {
   defaultReminderTime: string;
 };
 
+export type ClosetCategory = '上装' | '下装' | '外套' | '鞋履' | '配饰' | '包袋' | '套装' | '其他';
+
+export type ClosetWarmthLevel = '轻薄' | '常规' | '保暖' | '厚重';
+
+export type ClosetSeason = '春' | '夏' | '秋' | '冬' | '四季';
+
+export type ClosetItemStatus = 'active' | 'laundry' | 'archived';
+
+export type ClosetItem = {
+  id: string;
+  householdId?: string;
+  name: string;
+  category: ClosetCategory;
+  color: string;
+  material?: string;
+  warmthLevel: ClosetWarmthLevel;
+  seasons: ClosetSeason[];
+  sceneTags: string[];
+  status: ClosetItemStatus;
+  imageUrl?: string;
+  shared: boolean;
+  note: string;
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type NewClosetItemInput = Omit<
+  ClosetItem,
+  'id' | 'householdId' | 'createdBy' | 'updatedBy' | 'createdAt' | 'updatedAt'
+>;
+
+export type OutfitStatus = 'planned' | 'worn' | 'saved';
+
+export type Outfit = {
+  id: string;
+  householdId?: string;
+  title: string;
+  itemIds: string[];
+  scene: string;
+  weatherText?: string;
+  minTemp: number;
+  maxTemp: number;
+  planId?: string;
+  wornDate?: string;
+  rating: number;
+  note: string;
+  imageUrl?: string;
+  shared: boolean;
+  status: OutfitStatus;
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type NewOutfitInput = Omit<
+  Outfit,
+  'id' | 'householdId' | 'createdBy' | 'updatedBy' | 'createdAt' | 'updatedAt'
+>;
+
 export type HouseholdKind = 'personal' | 'shared';
 
 export type HouseholdStatus = 'active' | 'dissolved';
@@ -153,7 +216,10 @@ export type HouseholdInvitePayload = {
 export type Trace = {
   id: string;
   planId?: string;
+  placeId?: string;
   pantryItemId?: string;
+  mediaDiaryId?: string;
+  outfitId?: string;
   title: string;
   summary: string;
   timeLabel: string;
@@ -161,18 +227,58 @@ export type Trace = {
   imageUrl?: string;
   mood: string;
   tags: string[];
-  source: '计划' | '打卡' | '库存' | '手动';
+  source: '计划' | '打卡' | '库存' | '书影音' | '穿搭' | '手动';
   createdAt?: string;
   updatedAt?: string;
 };
 
 export type NewTraceInput = Omit<Trace, 'id' | 'createdAt' | 'updatedAt'>;
 
-export type InboxItemType = 'text' | 'link';
+export type Place = {
+  id: string;
+  name: string;
+  normalizedName: string;
+  status: PlaceStatus;
+  city?: string;
+  district?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  favorite: boolean;
+  archived: boolean;
+  note: string;
+  visitCount: number;
+  firstSeenAt?: string;
+  lastSeenAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type PlaceStatus = 'visited' | 'want';
+
+export type PlaceRecordType = 'plan' | 'trace';
+
+export type PlaceRecord = {
+  id: string;
+  recordType: PlaceRecordType;
+  title: string;
+  timeLabel?: string;
+  location?: string;
+  imageUrl?: string;
+  source?: string;
+  completed?: boolean;
+  mood?: string;
+  tags?: string[];
+  createdAt?: string;
+};
+
+export type InboxItemType = 'text' | 'link' | 'image';
 
 export type InboxItemStatus = 'inbox' | 'converted' | 'archived';
 
-export type InboxConvertedType = 'plan' | 'trace';
+export type InboxConvertedType = 'plan' | 'trace' | 'ledger';
+
+export type InboxAISuggestedType = 'plan' | 'trace';
 
 export type InboxItem = {
   id: string;
@@ -180,11 +286,19 @@ export type InboxItem = {
   content?: string;
   itemType: InboxItemType;
   linkUrl?: string;
+  imageUrl?: string;
   tags: string[];
   status: InboxItemStatus;
   convertedType?: InboxConvertedType;
   convertedId?: string;
   convertedAt?: string;
+  aiTitle?: string;
+  aiSummary?: string;
+  aiTags?: string[];
+  aiSuggestedType?: InboxAISuggestedType;
+  aiReason?: string;
+  aiModel?: string;
+  aiOrganizedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -194,7 +308,123 @@ export type NewInboxItemInput = {
   content?: string;
   itemType: InboxItemType;
   linkUrl?: string;
+  imageUrl?: string;
   tags: string[];
+};
+
+export type LedgerDirection = '支出' | '收入' | '退款' | '转账备注';
+
+export type LedgerCategory =
+  | '吃饭'
+  | '交通'
+  | '购物'
+  | '书影音'
+  | '订阅'
+  | '家用'
+  | '礼物'
+  | '医疗'
+  | '其他';
+
+export type LedgerEntry = {
+  id: string;
+  amount: number;
+  amountCents: number;
+  currency: string;
+  direction: LedgerDirection;
+  category: LedgerCategory;
+  occurredAt: string;
+  merchant?: string;
+  location?: string;
+  note: string;
+  imageUrl?: string;
+  inboxItemId?: string;
+  planId?: string;
+  traceId?: string;
+  pantryItemId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type NewLedgerEntryInput = {
+  amount: number;
+  currency?: string;
+  direction: LedgerDirection;
+  category: LedgerCategory;
+  occurredAt: string;
+  merchant?: string;
+  location?: string;
+  note?: string;
+  imageUrl?: string;
+  inboxItemId?: string;
+  planId?: string;
+  traceId?: string;
+  pantryItemId?: string;
+};
+
+export type LedgerCategorySummary = {
+  category: LedgerCategory;
+  amountCents: number;
+  amount: number;
+  count: number;
+};
+
+export type LedgerSummary = {
+  month: string;
+  expenseCents: number;
+  incomeCents: number;
+  refundCents: number;
+  netCents: number;
+  expense: number;
+  income: number;
+  refund: number;
+  net: number;
+  categories: LedgerCategorySummary[];
+};
+
+export type MediaDiaryType = '书籍' | '电影' | '剧集' | '动漫' | '音乐';
+
+export type MediaDiaryStatus = '想看' | '进行中' | '已完成' | '搁置';
+
+export type MediaDiaryEntry = {
+  id: string;
+  userId: string;
+  traceId?: string;
+  mediaType: MediaDiaryType;
+  status: MediaDiaryStatus;
+  title: string;
+  originalTitle?: string;
+  creator?: string;
+  releaseYear?: number;
+  coverUrl?: string;
+  rating: number;
+  startedAt?: string;
+  finishedAt?: string;
+  note: string;
+  quote: string;
+  tags: string[];
+  source: 'manual' | 'ai_suggest';
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type NewMediaDiaryEntryInput = Omit<
+  MediaDiaryEntry,
+  'id' | 'userId' | 'traceId' | 'createdAt' | 'updatedAt'
+>;
+
+export type MediaDiaryAISuggestion = {
+  originalTitle?: string;
+  creator?: string;
+  releaseYear?: number;
+  tags: string[];
+  note: string;
+};
+
+export type MediaDiarySummary = {
+  total: number;
+  completedMonth: number;
+  bestRating: number;
+  recent?: MediaDiaryEntry;
 };
 export type Checkin = {
   id: string;

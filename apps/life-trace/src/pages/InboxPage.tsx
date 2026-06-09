@@ -8,33 +8,32 @@ import {
   LoaderCircle,
   Pencil,
   Plus,
+  ReceiptText,
   Search,
+  Sparkles,
   Trash2,
 } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { EditTraceDrawer } from '@/components/EditTraceDrawer';
 import { EmptyState } from '@/components/EmptyState';
+import { ImagePreview } from '@/components/ImagePreview';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { applyInboxAISuggestion, buildInboxPlanDraft, buildInboxTraceDraft } from '@/lib/inbox';
+import { buildLedgerDraftFromInbox } from '@/lib/ledger';
 import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type {
-  InboxItem,
-  InboxItemStatus,
-  InboxItemType,
-  NewInboxItemInput,
-  NewPlanInput,
-  NewTraceInput,
-} from '@/types';
+import type { InboxItem, InboxItemStatus, InboxItemType, NewInboxItemInput } from '@/types';
 
 type InboxFilter = InboxItemStatus | 'all';
 
-type InboxFormErrors = Partial<Record<'title' | 'linkUrl', string>>;
+type InboxFormErrors = Partial<Record<'title' | 'linkUrl' | 'imageUrl', string>>;
 
 const inboxFilters: Array<{ value: InboxFilter; label: string }> = [
   { value: 'inbox', label: '未处理' },
@@ -48,22 +47,9 @@ const defaultForm: NewInboxItemInput = {
   content: '',
   itemType: 'text',
   linkUrl: '',
+  imageUrl: '',
   tags: [],
 };
-
-function getDefaultPlanTime() {
-  const date = new Date();
-  date.setHours(date.getHours() + 1);
-  return date.toTimeString().slice(0, 5);
-}
-
-function getDefaultTraceTimeLabel() {
-  const time = new Date().toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-  return `今天 ${time}`;
-}
 
 function parseTags(value: string) {
   return value
@@ -92,6 +78,7 @@ function buildInboxInput(
     content: normalizedContent,
     itemType: inferredType,
     linkUrl: inferredType === 'link' ? (linkMatch?.[0] ?? '') : '',
+    imageUrl: '',
     tags,
   };
 }
@@ -132,26 +119,11 @@ function formatInboxTime(value?: string) {
   }).format(date);
 }
 
-function buildPlanDraft(item: InboxItem): Partial<NewPlanInput> {
-  return {
-    title: item.title,
-    type: '普通事项',
-    timeLabel: `今天 ${getDefaultPlanTime()}`,
-    reminder: true,
-    note: [item.content, item.linkUrl].filter(Boolean).join('\n'),
-    source: 'manual',
-  };
-}
-
-function buildTraceDraft(item: InboxItem): Partial<NewTraceInput> {
-  return {
-    title: item.title,
-    summary: [item.content, item.linkUrl].filter(Boolean).join('\n') || item.title,
-    timeLabel: getDefaultTraceTimeLabel(),
-    mood: '放松',
-    tags: item.tags.length ? item.tags : ['生活迹'],
-    source: '手动',
-  };
+function getInboxTypeLabel(itemType: InboxItemType) {
+  if (itemType === 'image') {
+    return '图片';
+  }
+  return itemType === 'link' ? '链接' : '文本';
 }
 
 export function InboxPage() {
@@ -171,13 +143,14 @@ export function InboxPage() {
   const editInboxItem = useLifeTraceStore((state) => state.editInboxItem);
   const updateInboxStatus = useLifeTraceStore((state) => state.updateInboxStatus);
   const convertInbox = useLifeTraceStore((state) => state.convertInbox);
+  const organizeInbox = useLifeTraceStore((state) => state.organizeInbox);
   const removeInboxItem = useLifeTraceStore((state) => state.removeInboxItem);
   const [quickText, setQuickText] = useState('');
   const [quickError, setQuickError] = useState('');
   const [filter, setFilter] = useState<InboxFilter>('inbox');
   const [typeFilter, setTypeFilter] = useState<InboxItemType | 'all'>('all');
   const [query, setQuery] = useState('');
-  const [editingItem, setEditingItem] = useState<InboxItem | null>(null);
+  const [editingItem, setEditingItem] = useState<InboxItem | null | undefined>(undefined);
   const [form, setForm] = useState<NewInboxItemInput>(defaultForm);
   const [tagText, setTagText] = useState('');
   const [formErrors, setFormErrors] = useState<InboxFormErrors>({});
@@ -189,7 +162,13 @@ export function InboxPage() {
   }, [filter, loadInboxItems, query, typeFilter]);
 
   useEffect(() => {
-    if (!editingItem) {
+    if (editingItem === undefined) {
+      return;
+    }
+    if (editingItem === null) {
+      setForm(defaultForm);
+      setTagText('');
+      setFormErrors({});
       return;
     }
     setForm({
@@ -197,6 +176,7 @@ export function InboxPage() {
       content: editingItem.content ?? '',
       itemType: editingItem.itemType,
       linkUrl: editingItem.linkUrl ?? '',
+      imageUrl: editingItem.imageUrl ?? '',
       tags: editingItem.tags,
     });
     setTagText(stringifyTags(editingItem.tags));
@@ -235,7 +215,7 @@ export function InboxPage() {
   };
 
   const closeEditor = () => {
-    setEditingItem(null);
+    setEditingItem(undefined);
     setForm(defaultForm);
     setTagText('');
     setFormErrors({});
@@ -243,10 +223,9 @@ export function InboxPage() {
 
   const submitEditor = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!editingItem) {
+    if (editingItem === undefined) {
       return;
     }
-
     const nextErrors: InboxFormErrors = {};
     if (!form.title.trim()) {
       nextErrors.title = '请输入标题';
@@ -257,18 +236,24 @@ export function InboxPage() {
     if (form.itemType === 'link' && form.linkUrl && !/^https?:\/\//.test(form.linkUrl.trim())) {
       nextErrors.linkUrl = '链接需要以 http 或 https 开头';
     }
+    if (form.itemType === 'image' && !form.imageUrl?.trim()) {
+      nextErrors.imageUrl = '请先上传图片';
+    }
     if (Object.keys(nextErrors).length > 0) {
       setFormErrors(nextErrors);
       return;
     }
 
-    const saved = await editInboxItem(editingItem.id, {
+    const input = {
       ...form,
       title: form.title.trim(),
       content: form.content?.trim() || '',
       linkUrl: form.itemType === 'link' ? form.linkUrl?.trim() || '' : '',
+      imageUrl: form.itemType === 'image' ? form.imageUrl?.trim() || '' : '',
       tags: parseTags(tagText),
-    });
+    };
+    const saved =
+      editingItem === null ? await addInboxItem(input) : await editInboxItem(editingItem.id, input);
     if (saved) {
       closeEditor();
     }
@@ -280,6 +265,34 @@ export function InboxPage() {
 
   const convertToTrace = async (item: InboxItem) => {
     setTraceDraftItem(item);
+  };
+
+  const convertToLedger = (item: InboxItem) => {
+    const draft = buildLedgerDraftFromInbox(item);
+    const params = new URLSearchParams({
+      new: '1',
+      inboxItemId: item.id,
+      amount: draft.amount ? String(draft.amount) : '',
+      category: draft.category ?? '其他',
+      merchant: draft.merchant ?? '',
+      note: draft.note ?? '',
+      imageUrl: draft.imageUrl ?? item.imageUrl ?? '',
+    });
+    navigate(`/ledger?${params.toString()}`);
+  };
+
+  const applySuggestionToEditor = () => {
+    if (!editingItem) {
+      return;
+    }
+    const suggested = applyInboxAISuggestion(editingItem);
+    setForm((current) => ({
+      ...current,
+      title: suggested.title,
+      content: suggested.content ?? '',
+      tags: suggested.tags,
+    }));
+    setTagText(stringifyTags(suggested.tags));
   };
 
   return (
@@ -372,6 +385,7 @@ export function InboxPage() {
               <option value="all">全部类型</option>
               <option value="text">文本</option>
               <option value="link">链接</option>
+              <option value="image">图片</option>
             </select>
             <label className="relative block">
               <Search className="-translate-y-1/2 absolute left-3 top-1/2 size-4 text-muted-foreground" />
@@ -419,7 +433,12 @@ export function InboxPage() {
                         <Badge tone={getItemStatusTone(item.status)}>
                           {getItemStatusLabel(item.status)}
                         </Badge>
-                        <Badge tone="default">{item.itemType === 'link' ? '链接' : '文本'}</Badge>
+                        <Badge tone="default">{getInboxTypeLabel(item.itemType)}</Badge>
+                        {item.aiSuggestedType ? (
+                          <Badge tone="ai">
+                            建议{item.aiSuggestedType === 'plan' ? '计划' : '踪迹'}
+                          </Badge>
+                        ) : null}
                         {item.convertedType ? (
                           <Badge tone="trace">
                             {item.convertedType === 'plan' ? '计划' : '踪迹'}
@@ -427,10 +446,53 @@ export function InboxPage() {
                         ) : null}
                       </div>
                       <h2 className="break-words text-base font-semibold">{item.title}</h2>
+                      {item.imageUrl ? (
+                        <div className="mt-3 max-w-sm overflow-hidden rounded-[1.25rem] border border-border bg-secondary">
+                          <ImagePreview
+                            src={item.imageUrl}
+                            alt={item.title}
+                            title={item.title}
+                            subtitle="Inbox 图片"
+                            imageClassName="aspect-video w-full object-cover"
+                          />
+                        </div>
+                      ) : null}
                       {item.content ? (
                         <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
                           {item.content}
                         </p>
+                      ) : null}
+                      {item.aiSummary ? (
+                        <div className="mt-3 rounded-2xl border border-life-ai/20 bg-life-ai/10 p-3">
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <Sparkles className="size-4 text-life-ai" />
+                            <p className="text-sm font-semibold text-life-ai">AI 整理</p>
+                            {item.aiOrganizedAt ? (
+                              <span className="text-xs text-muted-foreground">
+                                {formatInboxTime(item.aiOrganizedAt)}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-sm font-semibold">{item.aiTitle || item.title}</p>
+                          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                            {item.aiSummary}
+                          </p>
+                          {item.aiReason ? (
+                            <p className="mt-2 text-xs text-muted-foreground">{item.aiReason}</p>
+                          ) : null}
+                          {item.aiTags?.length ? (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {item.aiTags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="rounded-full bg-background/60 px-2.5 py-1 text-xs text-life-ai"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
                       ) : null}
                       {item.linkUrl ? (
                         <a
@@ -467,6 +529,37 @@ export function InboxPage() {
                             variant="outline"
                             size="sm"
                             disabled={disabled}
+                            onClick={() => void organizeInbox(item.id)}
+                          >
+                            {updating ? <ActionLoadingIcon /> : <Sparkles className="size-4" />}
+                            AI 整理
+                          </Button>
+                          {item.aiSummary ? (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              disabled={disabled}
+                              onClick={async () => {
+                                const suggested = applyInboxAISuggestion(item);
+                                await editInboxItem(item.id, {
+                                  title: suggested.title,
+                                  content: suggested.content ?? '',
+                                  itemType: suggested.itemType,
+                                  linkUrl: suggested.linkUrl ?? '',
+                                  imageUrl: suggested.imageUrl ?? '',
+                                  tags: suggested.tags,
+                                });
+                              }}
+                            >
+                              应用建议
+                            </Button>
+                          ) : null}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={disabled}
                             onClick={() => void convertToPlan(item)}
                           >
                             <ClipboardList className="size-4" />
@@ -481,6 +574,16 @@ export function InboxPage() {
                           >
                             <FileText className="size-4" />
                             转踪迹
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={disabled}
+                            onClick={() => convertToLedger(item)}
+                          >
+                            <ReceiptText className="size-4" />
+                            转账目
                           </Button>
                           <Button
                             type="button"
@@ -555,7 +658,7 @@ export function InboxPage() {
       </section>
 
       <BottomSheet
-        open={Boolean(editingItem)}
+        open={editingItem !== undefined}
         onOpenChange={(open) => {
           if (!open) {
             closeEditor();
@@ -565,7 +668,9 @@ export function InboxPage() {
         zIndexClassName="z-[60]"
       >
         <div className="mb-5">
-          <h2 className="text-xl font-semibold">编辑 Inbox</h2>
+          <h2 className="text-xl font-semibold">
+            {editingItem === null ? '收下 Inbox' : '编辑 Inbox'}
+          </h2>
         </div>
         <form className="space-y-4" onSubmit={submitEditor}>
           <label className="block space-y-2">
@@ -610,6 +715,7 @@ export function InboxPage() {
               >
                 <option value="text">文本</option>
                 <option value="link">链接</option>
+                <option value="image">图片</option>
               </select>
             </label>
             <label className="block space-y-2">
@@ -642,6 +748,43 @@ export function InboxPage() {
               ) : null}
             </label>
           ) : null}
+          {form.itemType === 'image' ? (
+            <div>
+              <AppImageUploader
+                value={form.imageUrl}
+                onChange={(url) => {
+                  setForm((current) => ({ ...current, imageUrl: url }));
+                  setFormErrors((current) => ({ ...current, imageUrl: undefined }));
+                }}
+                label="Inbox 图片"
+                description="支持拍照或从相册选择一张图片。"
+                cameraAndLibrary
+              />
+              {formErrors.imageUrl ? (
+                <p className="mt-2 text-xs text-destructive">{formErrors.imageUrl}</p>
+              ) : null}
+            </div>
+          ) : null}
+          {editingItem?.aiSummary ? (
+            <Card className="border-life-ai/20 bg-life-ai/10 p-3">
+              <p className="text-sm font-semibold text-life-ai">AI 整理</p>
+              <p className="mt-2 text-sm font-semibold">
+                {editingItem.aiTitle || editingItem.title}
+              </p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                {editingItem.aiSummary}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={applySuggestionToEditor}
+              >
+                应用建议
+              </Button>
+            </Card>
+          ) : null}
           <div className="grid grid-cols-2 gap-3 pt-2 max-[360px]:grid-cols-1">
             <Button type="button" variant="secondary" onClick={closeEditor}>
               取消
@@ -649,10 +792,19 @@ export function InboxPage() {
             <Button
               type="submit"
               variant="ai"
-              disabled={editingItem ? Boolean(inboxUpdatingById[editingItem.id]) : false}
+              disabled={
+                editingItem === null
+                  ? inboxCreating
+                  : editingItem
+                    ? Boolean(inboxUpdatingById[editingItem.id])
+                    : false
+              }
             >
-              {editingItem && inboxUpdatingById[editingItem.id] ? <ActionLoadingIcon /> : null}
-              保存修改
+              {(editingItem === null && inboxCreating) ||
+              (editingItem && inboxUpdatingById[editingItem.id]) ? (
+                <ActionLoadingIcon />
+              ) : null}
+              {editingItem === null ? '收下' : '保存修改'}
             </Button>
           </div>
         </form>
@@ -660,7 +812,7 @@ export function InboxPage() {
 
       <CreatePlanDrawer
         open={Boolean(planDraftItem)}
-        initialInput={planDraftItem ? buildPlanDraft(planDraftItem) : undefined}
+        initialInput={planDraftItem ? buildInboxPlanDraft(planDraftItem) : undefined}
         onSaved={(plan) => {
           if (planDraftItem) {
             void convertInbox(planDraftItem.id, 'plan', plan.id);
@@ -675,7 +827,7 @@ export function InboxPage() {
       <EditTraceDrawer
         open={Boolean(traceDraftItem)}
         trace={null}
-        initialInput={traceDraftItem ? buildTraceDraft(traceDraftItem) : undefined}
+        initialInput={traceDraftItem ? buildInboxTraceDraft(traceDraftItem) : undefined}
         onSaved={(trace) => {
           if (traceDraftItem) {
             void convertInbox(traceDraftItem.id, 'trace', trace.id);

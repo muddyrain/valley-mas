@@ -10,6 +10,7 @@ type FormItemProps = {
   required?: boolean;
   className?: string;
   labelClassName?: string;
+  density?: 'default' | 'compact';
 };
 
 export function FormItem({
@@ -21,6 +22,7 @@ export function FormItem({
   required = false,
   className,
   labelClassName,
+  density = 'default',
 }: FormItemProps) {
   const labelContent = (
     <>
@@ -29,25 +31,45 @@ export function FormItem({
     </>
   );
 
+  const compact = density === 'compact';
+
   return (
-    <div className={cn('min-w-0 space-y-3', className)}>
+    <div className={cn('min-w-0', compact ? 'space-y-2' : 'space-y-3', className)}>
       {htmlFor ? (
         <label
           htmlFor={htmlFor}
-          className={cn('block text-sm font-semibold leading-none', labelClassName)}
+          className={cn(
+            'block text-sm font-semibold',
+            compact ? 'leading-5' : 'leading-none',
+            labelClassName,
+          )}
         >
           {labelContent}
         </label>
       ) : (
-        <span className={cn('block text-sm font-semibold leading-none', labelClassName)}>
+        <span
+          className={cn(
+            'block text-sm font-semibold',
+            compact ? 'leading-5' : 'leading-none',
+            labelClassName,
+          )}
+        >
           {labelContent}
         </span>
       )}
       {description ? (
-        <span className="block text-xs leading-5 text-muted-foreground">{description}</span>
+        <span
+          className={cn('block text-xs leading-5 text-muted-foreground', compact ? '-mt-1' : null)}
+        >
+          {description}
+        </span>
       ) : null}
       {children}
-      {error ? <span className="block text-xs text-destructive">{error}</span> : null}
+      {error ? (
+        <span className={cn('block text-xs text-destructive', compact ? '-mt-0.5' : null)}>
+          {error}
+        </span>
+      ) : null}
     </div>
   );
 }

@@ -12,11 +12,16 @@ import {
   AiPhotoItemHistoryPage,
   AiWeeklyReviewsPage,
 } from '@/pages/AiPage';
+import { ClosetPage } from '@/pages/ClosetPage';
 import { InboxPage } from '@/pages/InboxPage';
+import { LedgerPage } from '@/pages/LedgerPage';
 import { LoginPage } from '@/pages/LoginPage';
+import { MediaDiaryPage } from '@/pages/MediaDiaryPage';
 import { PantryItemDetailPage } from '@/pages/PantryItemDetailPage';
 import { PantryPage } from '@/pages/PantryPage';
+import { PhotoClothingAnalysisPage } from '@/pages/PhotoClothingAnalysisPage';
 import { PhotoItemAnalysisPage } from '@/pages/PhotoItemAnalysisPage';
+import { PlacesPage } from '@/pages/PlacesPage';
 import { PlansPage } from '@/pages/PlansPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { ReminderSettingsPage } from '@/pages/ReminderSettingsPage';
@@ -38,8 +43,10 @@ function AppContent() {
   const loadSettings = useLifeTraceStore((state) => state.loadSettings);
   const loadPantry = useLifeTraceStore((state) => state.loadPantry);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
+  const loadPlaces = useLifeTraceStore((state) => state.loadPlaces);
   const loadTraces = useLifeTraceStore((state) => state.loadTraces);
   const loadInboxItems = useLifeTraceStore((state) => state.loadInboxItems);
+  const loadLedgerEntries = useLifeTraceStore((state) => state.loadLedgerEntries);
   const loadAchievements = useLifeTraceStore((state) => state.loadAchievements);
   const { status, token, verifySession } = useAuthStore();
   const location = useLocation();
@@ -56,14 +63,18 @@ function AppContent() {
       void loadSettings();
       void loadPantry();
       void loadPlans();
+      void loadPlaces();
       void loadTraces();
       void loadInboxItems();
+      void loadLedgerEntries();
       void loadAchievements();
     }
   }, [
     loadAchievements,
     loadInboxItems,
+    loadLedgerEntries,
     loadPantry,
+    loadPlaces,
     loadPlans,
     loadSettings,
     loadTraces,
@@ -105,7 +116,13 @@ function AppContent() {
           <Route path="/" element={<Navigate to="/today" replace />} />
           <Route path="/today" element={<TodayPage />} />
           <Route path="/pantry" element={<PantryPage />} />
+          <Route path="/closet" element={<ClosetPage />} />
+          <Route path="/closet/items/:itemId" element={<ClosetPage />} />
+          <Route path="/closet/outfits/:outfitId" element={<ClosetPage />} />
           <Route path="/inbox" element={<InboxPage />} />
+          <Route path="/ledger" element={<LedgerPage />} />
+          <Route path="/media-diary/:entryId?" element={<MediaDiaryPage />} />
+          <Route path="/places/:placeId?" element={<PlacesPage />} />
           <Route path="/pantry/:itemId" element={<PantryItemDetailPage />} />
           <Route path="/plans/:planId?" element={<PlansPage />} />
           <Route path="/ai" element={<AiPage />} />
@@ -113,6 +130,7 @@ function AppContent() {
           <Route path="/ai/actions" element={<AiActionsPage />} />
           <Route path="/ai/photo-item-history" element={<AiPhotoItemHistoryPage />} />
           <Route path="/ai/photo-item-analysis" element={<PhotoItemAnalysisPage />} />
+          <Route path="/ai/photo-clothing-analysis" element={<PhotoClothingAnalysisPage />} />
           <Route path="/ai/weekly-reviews" element={<AiWeeklyReviewsPage />} />
           <Route path="/achievements" element={<AchievementsPage />} />
           <Route path="/traces/:traceId?" element={<TracesPage />} />

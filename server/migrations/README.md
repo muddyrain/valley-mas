@@ -28,13 +28,15 @@
 cd server && go test ./...
 ```
 
-一次性补齐当前 GORM model 对应的缺失表和字段：
+一次性补齐当前 GORM model 对应的缺失表和字段。优先指定具体 model，避免远程 PostgreSQL 上全量 schema introspection 过慢：
 
 ```bash
-cd server && go run ./cmd/sync-schema --apply
+cd server && go run ./cmd/sync-schema --apply --models places,ledger,closet
 ```
 
-`sync-schema` 是开发和共享测试环境的应急同步命令，不是完整迁移执行器。它不会记录 SQL 文件是否已执行，也不会替代生产环境的审查、回滚和分阶段发布流程。
+如需同步其他范围，可显式传入 `--scope lifetrace`、`--scope core`、`--scope content` 或 `--scope all`。`--scope all` 保留历史全量 AutoMigrate 行为，可能在远程库上很慢。带 `--apply` 时必须指定 `--models` 或 `--scope`，避免误跑大范围同步。
+
+`sync-schema` 是开发和共享测试环境的应急同步命令，不是完整迁移执行器。它不会记录 SQL 文件是否已执行，也不会替代生产环境的审查、回滚和分阶段发布流程。新增字段或生产变更仍优先写明确 SQL 迁移。
 
 使用本地自动迁移验证模型：
 

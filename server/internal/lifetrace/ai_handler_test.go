@@ -1276,6 +1276,66 @@ func TestCreateAssistantPantryItemFromDraftAsksProductionDateWhenOnlyShelfLifePr
 	}
 }
 
+func TestCreateAssistantLedgerEntryFromDraftCreatesEntry(t *testing.T) {
+	_ = setupTraceTestRouter(t, 101)
+	var handler Handler
+
+	payload := handler.createAssistantLedgerEntryFromDraft(101, lifeTraceAssistantLedgerDraft{
+		Amount:     36.5,
+		Currency:   "CNY",
+		Direction:  "支出",
+		Category:   "吃饭",
+		OccurredAt: "2026-06-09T12:30:00+08:00",
+		Merchant:   "午饭",
+		Note:       "午饭花了36.5元",
+	})
+	if payload == nil || payload.Status != "created" || payload.LedgerEntry == nil {
+		t.Fatalf("expected created ledger payload, got %+v", payload)
+	}
+	if payload.Type != "create_ledger_entry" {
+		t.Fatalf("expected create_ledger_entry action type, got %+v", payload)
+	}
+	if payload.LedgerEntry.AmountCents != 3650 || payload.LedgerEntry.Category != "吃饭" {
+		t.Fatalf("expected saved ledger fields, got %+v", payload.LedgerEntry)
+	}
+
+	var count int64
+	if err := database.GetDB().
+		Model(&model.LifeTraceLedgerEntry{}).
+		Where("user_id = ? AND category = ?", model.Int64String(101), "吃饭").
+		Count(&count).Error; err != nil {
+		t.Fatalf("count ledger entries: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one ledger entry, got %d", count)
+	}
+}
+
+func TestCreateAssistantLedgerEntryFromDraftAsksAmountWhenMissing(t *testing.T) {
+	_ = setupTraceTestRouter(t, 101)
+	var handler Handler
+
+	payload := handler.createAssistantLedgerEntryFromDraft(101, lifeTraceAssistantLedgerDraft{
+		Direction:  "支出",
+		Category:   "吃饭",
+		OccurredAt: "2026-06-09T12:30:00+08:00",
+		Merchant:   "午饭",
+		Note:       "帮我记一笔午饭",
+	})
+	if payload == nil || payload.Status != "need_more_info" {
+		t.Fatalf("expected need_more_info payload, got %+v", payload)
+	}
+	if payload.Type != "create_ledger_entry" {
+		t.Fatalf("expected create_ledger_entry action type, got %+v", payload)
+	}
+	if len(payload.NeedMoreInfoFields) != 1 || payload.NeedMoreInfoFields[0] != "amount" {
+		t.Fatalf("expected amount missing field, got %+v", payload.NeedMoreInfoFields)
+	}
+	if !strings.Contains(payload.Message, "金额") {
+		t.Fatalf("expected amount follow-up message, got %+v", payload.Message)
+	}
+}
+
 func TestParseLifeTraceAssistantStructuredResponseSupportsNeedMoreInfo(t *testing.T) {
 	raw := `{
 		"reply":"要把牛奶收进库存，我还差一个保质期。",
@@ -1455,6 +1515,68 @@ func TestStreamAssistantStructuredResponseCreatesPantryItem(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("expected structured stream to create pantry item, got %d", count)
+	}
+}
+
+func TestStreamAssistantStructuredResponseCreatesLedgerEntry(t *testing.T) {
+	var captured []lifeTraceOpenAIRequest
+	openAIServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req lifeTraceOpenAIRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode OpenAI request: %v", err)
+		}
+		captured = append(captured, req)
+		w.Header().Set("Content-Type", "application/json")
+		toolArgs := `{"reply":"已经帮你记下这笔账。","action":{"type":"create_ledger_entry","message":"已经帮你记下这笔账。","ledger":{"amount":36.5,"currency":"CNY","direction":"支出","category":"吃饭","occurredAt":"2026-06-09T12:30:00+08:00","merchant":"午饭","note":"午饭花了36.5元"}}}`
+		_, _ = fmt.Fprintf(w, `{"model":"gpt-test","choices":[{"message":{"role":"assistant","tool_calls":[{"id":"call_1","type":"function","function":{"name":"%s","arguments":%q}}]}}]}`, lifeTraceAssistantToolName, toolArgs)
+	}))
+	defer openAIServer.Close()
+
+	t.Setenv("OPENAI_API_KEY", "test-openai-key")
+	t.Setenv("OPENAI_API_BASE_URL", openAIServer.URL)
+	t.Setenv("OPENAI_API_MODEL", "gpt-test")
+
+	router := setupTraceTestRouter(t, 101)
+	if err := database.GetDB().Create(&model.LifeTraceSettings{
+		UserID:        101,
+		City:          "上海",
+		CommuteMethod: "地铁",
+		Habits:        model.StringList{"记账"},
+	}).Error; err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/assistant/stream", bytes.NewBufferString(`{
+		"message":"帮我记一笔午饭花了36.5元",
+		"history":[]
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if len(captured) != 1 {
+		t.Fatalf("expected one structured OpenAI request, got %d", len(captured))
+	}
+	if !strings.Contains(resp.Body.String(), `"action":{"type":"create_ledger_entry"`) {
+		t.Fatalf("expected SSE ledger action payload, got %s", resp.Body.String())
+	}
+	if !strings.Contains(resp.Body.String(), `"amountCents":3650`) {
+		t.Fatalf("expected ledger entry amount in SSE body, got %s", resp.Body.String())
+	}
+
+	var count int64
+	if err := database.GetDB().
+		Model(&model.LifeTraceLedgerEntry{}).
+		Where("user_id = ? AND category = ?", model.Int64String(101), "吃饭").
+		Count(&count).Error; err != nil {
+		t.Fatalf("count ledger entries: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected structured stream to create ledger entry, got %d", count)
 	}
 }
 

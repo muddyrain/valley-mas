@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   Clock,
+  Disc3,
   Image,
   MapPin,
   PackageCheck,
@@ -26,7 +27,7 @@ import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Trace } from '@/types';
 
-type TraceFilter = 'all' | 'plan' | 'checkin' | 'pantry' | 'manual' | 'with-image';
+type TraceFilter = 'all' | 'plan' | 'checkin' | 'pantry' | 'media' | 'manual' | 'with-image';
 
 const traceFilters: Array<{ id: TraceFilter; label: string; emptyText: string }> = [
   {
@@ -50,6 +51,11 @@ const traceFilters: Array<{ id: TraceFilter; label: string; emptyText: string }>
     emptyText: '还没有库存类踪迹。拍照入库、用完或丢弃库存后会沉淀到这里。',
   },
   {
+    id: 'media',
+    label: '书影音',
+    emptyText: '还没有书影音踪迹。保存书影音日记后会沉淀到这里。',
+  },
+  {
     id: 'manual',
     label: '手动',
     emptyText: '还没有手动记录的踪迹。可以从图片分析或计划完成后开始积累。',
@@ -65,6 +71,8 @@ const sourceTone: Record<Trace['source'], 'plan' | 'health' | 'trace'> = {
   计划: 'plan',
   打卡: 'health',
   库存: 'trace',
+  书影音: 'trace',
+  穿搭: 'plan',
   手动: 'trace',
 };
 
@@ -93,6 +101,9 @@ function filterTraces(traces: Trace[], filter: TraceFilter) {
   }
   if (filter === 'pantry') {
     return traces.filter((trace) => trace.source === '库存');
+  }
+  if (filter === 'media') {
+    return traces.filter((trace) => trace.source === '书影音');
   }
   if (filter === 'manual') {
     return traces.filter((trace) => trace.source === '手动');
@@ -448,6 +459,25 @@ export function TracesPage() {
           新建
         </Button>
       </div>
+
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 rounded-[1.25rem] border border-life-trace/20 bg-life-trace/5 p-4 text-left transition hover:border-life-trace/40 hover:bg-life-trace/10"
+        onClick={() => navigate('/media-diary')}
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-trace/10 text-life-trace">
+            <Disc3 className="size-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block font-semibold">书影音日记</span>
+            <span className="mt-1 block text-sm text-muted-foreground">
+              书籍、电影、剧集、动漫和音乐
+            </span>
+          </span>
+        </span>
+        <Badge tone="trace">进入</Badge>
+      </button>
 
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {traceFilters.map((filter) => {

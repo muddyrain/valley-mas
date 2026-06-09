@@ -9,6 +9,29 @@ function createStorage() {
   };
 }
 
+function fetchUrls(fetchMock: ReturnType<typeof vi.fn>) {
+  return fetchMock.mock.calls.map((call) => String(call[0]));
+}
+
+function expectNoTraceWrite(fetchMock: ReturnType<typeof vi.fn>) {
+  expect(fetchUrls(fetchMock).some((url) => url.includes('/api/v1/life-trace/traces'))).toBe(false);
+}
+
+function createAchievementsResponse() {
+  return {
+    ok: true,
+    json: async () => ({
+      code: 0,
+      message: 'success',
+      data: {
+        summary: { total: 0, unlocked: 0, completionRate: 0 },
+        list: [],
+        recent: [],
+      },
+    }),
+  };
+}
+
 describe('pantry store', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -48,31 +71,37 @@ describe('pantry store', () => {
   });
 
   it('creates a pantry item without issuing a second client trace request', async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        code: 0,
-        message: 'success',
-        data: {
-          id: 'pantry-1',
-          householdId: '',
-          name: '牛奶',
-          category: '食品',
-          quantity: 2,
-          unit: '盒',
-          location: '冷藏',
-          expiresAt: '2026-06-10',
-          openedAt: '2026-06-02',
-          note: '',
-          imageUrl: 'https://example.com/milk.jpg',
-          thumbnailUrl: '',
-          status: 'normal',
-          reminderEnabled: true,
-          reminderUseDefault: true,
-          reminderRules: ['7d', '3d'],
-          reminderTime: '09:00',
-        },
-      }),
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/achievements')) {
+        return Promise.resolve(createAchievementsResponse());
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          code: 0,
+          message: 'success',
+          data: {
+            id: 'pantry-1',
+            householdId: '',
+            name: '牛奶',
+            category: '食品',
+            quantity: 2,
+            unit: '盒',
+            location: '冷藏',
+            expiresAt: '2026-06-10',
+            openedAt: '2026-06-02',
+            note: '',
+            imageUrl: 'https://example.com/milk.jpg',
+            thumbnailUrl: '',
+            status: 'normal',
+            reminderEnabled: true,
+            reminderUseDefault: true,
+            reminderRules: ['7d', '3d'],
+            reminderTime: '09:00',
+          },
+        }),
+      });
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -101,8 +130,8 @@ describe('pantry store', () => {
     });
 
     expect(item?.name).toBe('牛奶');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/life-trace/pantry');
+    expectNoTraceWrite(fetchMock);
   });
 
   it('deduplicates concurrent pantry status updates before creating traces', async () => {
@@ -114,6 +143,9 @@ describe('pantry store', () => {
       const url = String(input);
       if (url.includes('/status')) {
         return statusResponse;
+      }
+      if (url.includes('/achievements')) {
+        return Promise.resolve(createAchievementsResponse());
       }
       return Promise.resolve({
         ok: true,
@@ -178,7 +210,8 @@ describe('pantry store', () => {
 
     const updated = await first;
     expect(updated?.status).toBe('discarded');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchUrls(fetchMock).filter((url) => url.includes('/status'))).toHaveLength(1);
+    expectNoTraceWrite(fetchMock);
   });
 
   it('consumes pantry quantity and updates the local pantry item', async () => {
@@ -251,9 +284,59 @@ describe('pantry store', () => {
   });
 
   it('keeps the created shared household as the pantry list scope', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/achievements')) {
+        return Promise.resolve(createAchievementsResponse());
+      }
+      if (url.includes('/settings')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            code: 0,
+            message: 'success',
+            data: {
+              activePantryHouseholdId: 'household-shared',
+              city: '上海',
+              workStart: '09:30',
+              workEnd: '18:30',
+              commuteMethod: '开车',
+              dailyBriefTime: '08:10',
+              workdayMode: 'legal',
+              workdays: ['1', '2', '3', '4', '5'],
+              holidaySync: true,
+              weekendReminders: false,
+              planReminderLeadMinutes: 10,
+              quietStart: '22:30',
+              quietEnd: '07:30',
+              weatherAlerts: true,
+              planReminders: true,
+              aiPersonalization: true,
+              habits: ['喝水'],
+              pantryReminderEnabled: true,
+              pantryReminderRules: ['7d', '3d', 'same-day'],
+              pantryReminderTime: '08:30',
+            },
+          }),
+        });
+      }
+      if (url.includes('/pantry?')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            code: 0,
+            message: 'success',
+            data: {
+              householdId: 'household-shared',
+              householdName: '家里',
+              list: [],
+              pagination: { page: 1, pageSize: 20, total: 0, hasMore: false },
+              summary: { total: 0, expiring: 0, expired: 0, active: 0 },
+            },
+          }),
+        });
+      }
+      return Promise.resolve({
         ok: true,
         json: async () => ({
           code: 0,
@@ -278,50 +361,8 @@ describe('pantry store', () => {
             reminderTime: '08:30',
           },
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          code: 0,
-          message: 'success',
-          data: {
-            activePantryHouseholdId: 'household-shared',
-            city: '上海',
-            workStart: '09:30',
-            workEnd: '18:30',
-            commuteMethod: '开车',
-            dailyBriefTime: '08:10',
-            workdayMode: 'legal',
-            workdays: ['1', '2', '3', '4', '5'],
-            holidaySync: true,
-            weekendReminders: false,
-            planReminderLeadMinutes: 10,
-            quietStart: '22:30',
-            quietEnd: '07:30',
-            weatherAlerts: true,
-            planReminders: true,
-            aiPersonalization: true,
-            habits: ['喝水'],
-            pantryReminderEnabled: true,
-            pantryReminderRules: ['7d', '3d', 'same-day'],
-            pantryReminderTime: '08:30',
-          },
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          code: 0,
-          message: 'success',
-          data: {
-            householdId: 'household-shared',
-            householdName: '家里',
-            list: [],
-            pagination: { page: 1, pageSize: 20, total: 0, hasMore: false },
-            summary: { total: 0, expiring: 0, expired: 0, active: 0 },
-          },
-        }),
       });
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     const { useAuthStore } = await import('../src/store/useAuthStore');
@@ -352,7 +393,9 @@ describe('pantry store', () => {
     expect(item?.householdId).toBe('household-shared');
 
     await useLifeTraceStore.getState().setActivePantryHousehold('household-shared', '家里');
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() =>
+      expect(fetchUrls(fetchMock).some((url) => url.includes('/settings'))).toBe(true),
+    );
     await useLifeTraceStore.getState().loadPantryList({
       pageSize: 20,
       householdId: useLifeTraceStore.getState().preferredPantryHouseholdId,
@@ -360,11 +403,14 @@ describe('pantry store', () => {
 
     expect(useLifeTraceStore.getState().preferredPantryHouseholdId).toBe('household-shared');
     expect(useLifeTraceStore.getState().preferredPantryHouseholdName).toBe('家里');
-    expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/life-trace/settings');
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toMatchObject({
+    const settingsCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).includes('/api/v1/life-trace/settings'),
+    );
+    expect(settingsCall?.[0]).toBe('/api/v1/life-trace/settings');
+    expect(JSON.parse(settingsCall?.[1].body as string)).toMatchObject({
       activePantryHouseholdId: 'household-shared',
     });
-    expect(fetchMock.mock.calls[2][0]).toBe(
+    expect(fetchUrls(fetchMock)).toContain(
       '/api/v1/life-trace/pantry?page=1&pageSize=20&householdId=household-shared',
     );
   });

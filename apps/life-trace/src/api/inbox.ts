@@ -78,6 +78,12 @@ export function convertInboxItem(token: string, id: string, input: ConvertInboxI
   });
 }
 
+export function organizeInboxItem(token: string, id: string) {
+  return apiRequest<InboxItem>(`/life-trace/inbox/${id}/organize`, token, {
+    method: 'POST',
+  });
+}
+
 export function deleteInboxItem(token: string, id: string) {
   return apiRequest<{ id: string }>(`/life-trace/inbox/${id}`, token, {
     method: 'DELETE',

@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
+import { PlaceSuggestions } from '@/components/PlaceSuggestions';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -95,6 +96,7 @@ export function EditTraceDrawer({
 
     setForm({
       planId: trace.planId,
+      placeId: trace.placeId,
       title: trace.title,
       summary: trace.summary,
       timeLabel: trace.timeLabel,
@@ -137,6 +139,7 @@ export function EditTraceDrawer({
       summary: form.summary.trim(),
       timeLabel: form.timeLabel.trim(),
       location: form.location?.trim() || undefined,
+      placeId: form.placeId,
       imageUrl: form.imageUrl?.trim() || undefined,
       mood: form.mood.trim() || '放松',
       tags: parseTags(tagText),
@@ -276,9 +279,19 @@ export function EditTraceDrawer({
             <span className="text-sm font-medium">地点</span>
             <input
               value={form.location}
-              onChange={(event) => updateField('location', event.target.value)}
+              onChange={(event) => {
+                updateField('location', event.target.value);
+                updateField('placeId', undefined);
+              }}
               placeholder="可选"
               className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+            />
+            <PlaceSuggestions
+              value={form.location}
+              onSelect={(place) => {
+                updateField('location', place.name);
+                updateField('placeId', place.id);
+              }}
             />
           </label>
         </div>

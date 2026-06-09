@@ -26,9 +26,13 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			ai.POST("/weekly-review", handler.GenerateWeeklyReview)
 			ai.POST("/image-analysis", handler.AnalyzeImage)
 			ai.POST("/pantry-photo-analysis", handler.AnalyzePantryPhoto)
+			ai.POST("/clothing-photo-analysis", handler.AnalyzeClothingPhoto)
+			ai.POST("/outfit-suggestions", handler.GenerateOutfitSuggestions)
 			ai.POST("/transparent-cover", handler.GenerateTransparentCover)
 			ai.POST("/pantry-thumbnail", handler.GeneratePantryThumbnail)
 			ai.POST("/recipes", handler.GenerateRecipeSuggestions)
+			ai.GET("/actions", handler.ListAIActions)
+			ai.POST("/actions", handler.CreateAIAction)
 			ai.POST("/assistant/stream", handler.StreamAssistant)
 			ai.GET("/conversation", handler.GetAssistantConversation)
 			ai.POST("/conversation/messages", handler.CreateAssistantMessage)
@@ -65,6 +69,27 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			traces.DELETE("/:id", handler.DeleteTrace)
 		}
 
+		places := group.Group("/places")
+		places.Use(auth)
+		{
+			places.GET("", handler.ListPlaces)
+			places.POST("", handler.CreatePlace)
+			places.GET("/export", handler.ExportPlaces)
+			places.GET("/:id", handler.GetPlace)
+			places.PATCH("/:id", handler.UpdatePlace)
+			places.GET("/:id/records", handler.ListPlaceRecords)
+		}
+
+		mediaDiary := group.Group("/media-diary")
+		mediaDiary.Use(auth)
+		{
+			mediaDiary.GET("", handler.ListMediaDiaryEntries)
+			mediaDiary.POST("", handler.CreateMediaDiaryEntry)
+			mediaDiary.POST("/ai-suggest", handler.SuggestMediaDiaryEntry)
+			mediaDiary.PATCH("/:id", handler.UpdateMediaDiaryEntry)
+			mediaDiary.DELETE("/:id", handler.DeleteMediaDiaryEntry)
+		}
+
 		inbox := group.Group("/inbox")
 		inbox.Use(auth)
 		{
@@ -73,8 +98,33 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			inbox.PATCH("/:id", handler.UpdateInboxItem)
 			inbox.PATCH("/:id/status", handler.UpdateInboxItemStatus)
 			inbox.PATCH("/:id/convert", handler.ConvertInboxItem)
+			inbox.POST("/:id/organize", handler.OrganizeInboxItem)
 			inbox.DELETE("/:id", handler.DeleteInboxItem)
 		}
+
+		ledger := group.Group("/ledger")
+		ledger.Use(auth)
+		{
+			ledger.GET("", handler.ListLedgerEntries)
+			ledger.POST("", handler.CreateLedgerEntry)
+			ledger.PATCH("/:id", handler.UpdateLedgerEntry)
+			ledger.DELETE("/:id", handler.DeleteLedgerEntry)
+		}
+
+		closet := group.Group("/closet")
+		closet.Use(auth)
+		{
+			closet.GET("/items", handler.ListClosetItems)
+			closet.POST("/items", handler.CreateClosetItem)
+			closet.GET("/items/:id", handler.GetClosetItem)
+			closet.PATCH("/items/:id", handler.UpdateClosetItem)
+			closet.DELETE("/items/:id", handler.DeleteClosetItem)
+			closet.GET("/outfits", handler.ListOutfits)
+			closet.POST("/outfits", handler.CreateOutfit)
+			closet.GET("/outfits/:id", handler.GetOutfit)
+			closet.PATCH("/outfits/:id/status", handler.UpdateOutfitStatus)
+		}
+
 		pantry := group.Group("/pantry")
 		pantry.Use(auth)
 		{

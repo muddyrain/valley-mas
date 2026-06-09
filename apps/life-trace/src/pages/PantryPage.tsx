@@ -9,6 +9,7 @@ import {
   Milk,
   PackagePlus,
   Pill,
+  ReceiptText,
   Search,
   Settings2,
   Sparkles,
@@ -1008,7 +1009,7 @@ export function PantryPage() {
                           : '点这张卡片即可加入本次批量转移。'}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-3 gap-px border-t border-border bg-border/60">
+                      <div className="grid grid-cols-4 gap-px border-t border-border bg-border/60">
                         <button
                           type="button"
                           disabled={consumeDisabled}
@@ -1060,6 +1061,24 @@ export function PantryPage() {
                         >
                           <Camera className="size-4" />
                           编辑
+                        </button>
+                        <button
+                          type="button"
+                          className="flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold text-life-health transition hover:bg-life-health/10"
+                          onClick={() => {
+                            const params = new URLSearchParams({
+                              new: '1',
+                              pantryItemId: item.id,
+                              category: item.category === '食品' ? '吃饭' : '购物',
+                              merchant: item.name,
+                              note: `${item.name} · ${item.quantity}${item.unit}`,
+                              imageUrl: item.imageUrl || item.thumbnailUrl || '',
+                            });
+                            navigate(`/ledger?${params.toString()}`);
+                          }}
+                        >
+                          <ReceiptText className="size-4" />
+                          记账
                         </button>
                       </div>
                     )}

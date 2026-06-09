@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
+import { PlaceSuggestions } from '@/components/PlaceSuggestions';
 import { Button } from '@/components/ui/button';
 import { splitPlanTimeLabel } from '@/lib/planReminder';
 import {
@@ -119,6 +120,7 @@ export function CreatePlanDrawer({
         reminder: plan.reminder,
         imageUrl: plan.imageUrl ?? '',
         location: plan.location ?? '',
+        placeId: plan.placeId,
         note: plan.note,
         source: plan.source ?? 'manual',
       });
@@ -172,6 +174,7 @@ export function CreatePlanDrawer({
       ...schedule,
       imageUrl: form.imageUrl?.trim() || undefined,
       location: form.location?.trim() || undefined,
+      placeId: form.placeId,
       note: form.note.trim() || '由 Life Trace 创建的新生活计划。',
     };
 
@@ -324,9 +327,19 @@ export function CreatePlanDrawer({
             <span className="text-sm font-medium">地点</span>
             <input
               value={form.location}
-              onChange={(event) => updateField('location', event.target.value)}
+              onChange={(event) => {
+                updateField('location', event.target.value);
+                updateField('placeId', undefined);
+              }}
               placeholder="可选"
               className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
+            />
+            <PlaceSuggestions
+              value={form.location}
+              onSelect={(place) => {
+                updateField('location', place.name);
+                updateField('placeId', place.id);
+              }}
             />
           </label>
           <button

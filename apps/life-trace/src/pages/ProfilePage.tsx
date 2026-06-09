@@ -5,6 +5,7 @@ import {
   Car,
   ChevronRight,
   Clock,
+  Disc3,
   Download,
   Heart,
   Inbox,
@@ -13,11 +14,13 @@ import {
   MessageSquareText,
   MoonStar,
   Plus,
+  ReceiptText,
   RefreshCw,
   Route,
   Settings2,
   Share2,
   ShieldCheck,
+  Shirt,
   Smartphone,
   Sparkles,
   Trophy,
@@ -559,8 +562,8 @@ export function ProfilePage() {
       </section>
 
       <section data-profile-card className="space-y-3">
-        <SectionHeader title="个人工具" meta="Inbox" />
-        <Card className="p-4">
+        <SectionHeader title="个人工具" meta="Inbox / 轻账本" />
+        <Card className="grid gap-3 p-4">
           <button
             type="button"
             className="flex w-full items-center gap-3 text-left"
@@ -574,6 +577,36 @@ export function ProfilePage() {
               <p className="mt-1 text-sm leading-5 text-muted-foreground">
                 收下想法、链接和待处理事项。
               </p>
+            </div>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
+            onClick={() => navigate('/places')}
+          >
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-trace/10 text-life-trace">
+              <MapPin className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold">地点库</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                收藏常去地点，回看相关计划和踪迹。
+              </p>
+            </div>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
+            onClick={() => navigate('/ledger')}
+          >
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+              <ReceiptText className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold">轻账本</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">记录支出、收入和退款。</p>
             </div>
             <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
           </button>
@@ -722,6 +755,50 @@ export function ProfilePage() {
             </Button>
           </div>
         </Card>
+      </section>
+
+      <section data-profile-card className="space-y-3">
+        <SectionHeader title="衣橱与穿搭" meta="日用搭配" />
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-4 rounded-[1.25rem] border border-life-ai/20 bg-card p-4 text-left transition hover:border-life-ai/35 hover:bg-card/95"
+          onClick={() => navigate('/closet')}
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+              <Shirt className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block font-semibold">衣橱</span>
+              <span className="mt-1 block text-sm leading-5 text-muted-foreground">
+                单品、共享衣物池和今日穿搭
+              </span>
+            </span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+        </button>
+      </section>
+
+      <section data-profile-card className="space-y-3">
+        <SectionHeader title="书影音" meta="日记" />
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-4 rounded-[1.25rem] border border-life-trace/20 bg-card p-4 text-left transition hover:border-life-trace/35 hover:bg-card/95"
+          onClick={() => navigate('/media-diary')}
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-trace/10 text-life-trace">
+              <Disc3 className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block font-semibold">书影音日记</span>
+              <span className="mt-1 block text-sm leading-5 text-muted-foreground">
+                书籍、电影、剧集、动漫和音乐
+              </span>
+            </span>
+          </span>
+          <Badge tone="trace">打开</Badge>
+        </button>
       </section>
 
       <section data-profile-card className="space-y-3">

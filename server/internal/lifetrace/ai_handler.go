@@ -94,6 +94,17 @@ type lifeTraceAssistantPantryDraft struct {
 	Note      string `json:"note"`
 }
 
+type lifeTraceAssistantLedgerDraft struct {
+	Amount     float64 `json:"amount"`
+	Currency   string  `json:"currency"`
+	Direction  string  `json:"direction"`
+	Category   string  `json:"category"`
+	OccurredAt string  `json:"occurredAt"`
+	Merchant   string  `json:"merchant"`
+	Location   string  `json:"location"`
+	Note       string  `json:"note"`
+}
+
 type lifeTraceAssistantActionPayload struct {
 	Type               string                     `json:"type"`
 	Status             string                     `json:"status"`
@@ -102,6 +113,7 @@ type lifeTraceAssistantActionPayload struct {
 	HouseholdName      string                     `json:"householdName,omitempty"`
 	Plan               *model.LifeTracePlan       `json:"plan,omitempty"`
 	PantryItem         *model.LifeTracePantryItem `json:"pantryItem,omitempty"`
+	LedgerEntry        *ledgerEntryResponse       `json:"ledgerEntry,omitempty"`
 }
 
 type lifeTraceAssistantStructuredAction struct {
@@ -110,6 +122,7 @@ type lifeTraceAssistantStructuredAction struct {
 	NeedMoreInfoFields []string                       `json:"needMoreInfoFields,omitempty"`
 	Plan               *lifeTraceAssistantPlanDraft   `json:"plan,omitempty"`
 	Pantry             *lifeTraceAssistantPantryDraft `json:"pantry,omitempty"`
+	Ledger             *lifeTraceAssistantLedgerDraft `json:"ledger,omitempty"`
 }
 
 type lifeTraceAssistantStructuredResponse struct {
@@ -147,6 +160,11 @@ var (
 	assistantOpenedAtPattern         = regexp.MustCompile(`(?:开封日期|开封于|开封)[:：是 ]*(\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?)`)
 	assistantPantryQuantityPattern   = regexp.MustCompile(`(\d+)\s*(瓶|盒|袋|包|罐|个|件|桶|支|片|听|杯|箱|条|份)`)
 	assistantPantryLeadingCount      = regexp.MustCompile(`^(?:一|1|一个|一件)?\s*(瓶|盒|袋|包|罐|个|件|桶|支|片|听|杯|箱|条|份)\s*`)
+	assistantLedgerIntentPattern     = regexp.MustCompile(`记账|记一笔|记个账|账目|消费|花了|支出|收入|退款|转账|付款|付了|买单|收款|工资|奖金|报销`)
+	assistantLedgerSymbolAmount      = regexp.MustCompile(`(?:¥|￥)\s*(\d+(?:\.\d{1,2})?)`)
+	assistantLedgerUnitAmount        = regexp.MustCompile(`(\d+(?:\.\d{1,2})?)\s*(?:元|块|块钱|rmb|RMB)`)
+	assistantLedgerIntentAmount      = regexp.MustCompile(`(?:记账|记一笔|记个账|账目|消费|花了|支出|收入|退款|转账|付款|付了|买单|收款|工资|奖金|报销)[^0-9¥￥]{0,12}(\d+(?:\.\d{1,2})?)`)
+	assistantLedgerMerchantNoise     = regexp.MustCompile(`记账|记一笔|记个账|帮我|帮忙|一下|今天|刚刚|刚才|花了|消费|支出|收入|退款|转账|付款|付了|买单|收款|工资|奖金|报销|(?:¥|￥)?\s*\d+(?:\.\d{1,2})?\s*(?:元|块|块钱|rmb|RMB)?`)
 )
 
 type todayAdviceCacheEntry struct {
@@ -483,6 +501,7 @@ func (h *Handler) StreamAssistant(c *gin.Context) {
 	structuredPrompt := buildLifeTraceAssistantStructuredPrompt(settings, weather, plans, checkins, traces, req, now)
 	planDraft := buildLifeTraceAssistantPlanDraft(req.Message, now)
 	pantryDraft := buildLifeTraceAssistantPantryDraft(req.Message)
+	ledgerDraft := buildLifeTraceAssistantLedgerDraft(req.Message, now)
 	if planDraft == nil {
 		planDraft = buildLifeTraceAssistantPlanFollowUpDraft(req.Message, findRecentAssistantPlanDraft(req.History, now), now)
 	}
@@ -496,6 +515,11 @@ func (h *Handler) StreamAssistant(c *gin.Context) {
 		}
 
 		switch {
+		case ledgerDraft != nil:
+			actionEventSent = true
+			send(lifeTraceAssistantStreamChunk{
+				Action: h.createAssistantLedgerEntryFromDraft(userID, *ledgerDraft),
+			})
 		case pantryDraft != nil:
 			actionEventSent = true
 			send(lifeTraceAssistantStreamChunk{
@@ -512,7 +536,7 @@ func (h *Handler) StreamAssistant(c *gin.Context) {
 	aiCtx, cancel := context.WithTimeout(c.Request.Context(), aiCfg.Timeout)
 	defer cancel()
 
-	if err := h.streamLifeTraceAssistantStructured(c, aiCtx, aiCfg, systemPrompt, structuredPrompt, userID, now, planDraft, pantryDraft); err == nil {
+	if err := h.streamLifeTraceAssistantStructured(c, aiCtx, aiCfg, systemPrompt, structuredPrompt, userID, now, planDraft, pantryDraft, ledgerDraft); err == nil {
 		return
 	}
 
@@ -860,6 +884,23 @@ func buildLifeTraceAssistantPantryDraft(message string) *lifeTraceAssistantPantr
 	}
 }
 
+func buildLifeTraceAssistantLedgerDraft(message string, now time.Time) *lifeTraceAssistantLedgerDraft {
+	text := strings.TrimSpace(message)
+	if text == "" || !assistantLedgerIntentPattern.MatchString(text) {
+		return nil
+	}
+
+	return &lifeTraceAssistantLedgerDraft{
+		Amount:     inferLifeTraceAssistantLedgerAmount(text),
+		Currency:   "CNY",
+		Direction:  inferLifeTraceAssistantLedgerDirection(text),
+		Category:   inferLifeTraceAssistantLedgerCategory(text),
+		OccurredAt: now.Format(time.RFC3339),
+		Merchant:   inferLifeTraceAssistantLedgerMerchant(text),
+		Note:       trimRunes(text, 180),
+	}
+}
+
 func buildLifeTraceAssistantPlanFollowUpDraft(
 	message string,
 	base *lifeTraceAssistantPlanDraft,
@@ -1049,6 +1090,65 @@ func findRecentAssistantPantryDraft(history []lifeTraceAssistantMessage) *lifeTr
 	return nil
 }
 
+func inferLifeTraceAssistantLedgerAmount(text string) float64 {
+	for _, pattern := range []*regexp.Regexp{
+		assistantLedgerSymbolAmount,
+		assistantLedgerUnitAmount,
+		assistantLedgerIntentAmount,
+	} {
+		if match := pattern.FindStringSubmatch(text); len(match) >= 2 {
+			amount, err := strconv.ParseFloat(strings.TrimSpace(match[1]), 64)
+			if err == nil && amount > 0 {
+				return amount
+			}
+		}
+	}
+	return 0
+}
+
+func inferLifeTraceAssistantLedgerDirection(text string) string {
+	switch {
+	case strings.Contains(text, "收入") || strings.Contains(text, "工资") || strings.Contains(text, "奖金") || strings.Contains(text, "收款"):
+		return "收入"
+	case strings.Contains(text, "退款") || strings.Contains(text, "退了"):
+		return "退款"
+	case strings.Contains(text, "转账"):
+		return "转账备注"
+	default:
+		return "支出"
+	}
+}
+
+func inferLifeTraceAssistantLedgerCategory(text string) string {
+	switch {
+	case strings.Contains(text, "饭") || strings.Contains(text, "餐") || strings.Contains(text, "咖啡") || strings.Contains(text, "奶茶") || strings.Contains(text, "外卖") || strings.Contains(text, "火锅"):
+		return "吃饭"
+	case strings.Contains(text, "地铁") || strings.Contains(text, "公交") || strings.Contains(text, "打车") || strings.Contains(text, "停车") || strings.Contains(text, "加油") || strings.Contains(text, "火车") || strings.Contains(text, "机票"):
+		return "交通"
+	case strings.Contains(text, "电影") || strings.Contains(text, "书") || strings.Contains(text, "音乐") || strings.Contains(text, "游戏") || strings.Contains(text, "展"):
+		return "书影音"
+	case strings.Contains(text, "会员") || strings.Contains(text, "订阅") || strings.Contains(text, "续费"):
+		return "订阅"
+	case strings.Contains(text, "家用") || strings.Contains(text, "日用品") || strings.Contains(text, "水电") || strings.Contains(text, "燃气"):
+		return "家用"
+	case strings.Contains(text, "礼物") || strings.Contains(text, "红包"):
+		return "礼物"
+	case strings.Contains(text, "医院") || strings.Contains(text, "药") || strings.Contains(text, "体检") || strings.Contains(text, "牙"):
+		return "医疗"
+	case strings.Contains(text, "买") || strings.Contains(text, "购") || strings.Contains(text, "超市") || strings.Contains(text, "便利店") || strings.Contains(text, "商场"):
+		return "购物"
+	default:
+		return "其他"
+	}
+}
+
+func inferLifeTraceAssistantLedgerMerchant(text string) string {
+	merchant := assistantLedgerMerchantNoise.ReplaceAllString(text, " ")
+	merchant = strings.NewReplacer("，", " ", ",", " ", "。", " ", "；", " ", ";", " ", "：", " ", ":", " ").Replace(merchant)
+	merchant = strings.Join(strings.Fields(merchant), " ")
+	return trimRunes(strings.TrimSpace(merchant), 80)
+}
+
 func inferLifeTraceAssistantProductionDate(text string) string {
 	if match := assistantProductionDatePattern.FindStringSubmatch(text); len(match) >= 2 {
 		return normalizeAssistantDate(match[1])
@@ -1179,7 +1279,7 @@ func normalizeAssistantNeedMoreInfoFields(fields []string) []string {
 	for _, field := range fields {
 		field = strings.TrimSpace(field)
 		switch field {
-		case "expiresAt", "scheduledDate", "scheduledTime":
+		case "expiresAt", "scheduledDate", "scheduledTime", "amount":
 			if !seen[field] {
 				seen[field] = true
 				result = append(result, field)
@@ -1196,6 +1296,13 @@ func buildAssistantPantryNeedMoreInfoMessage(name string) string {
 	return fmt.Sprintf("要把「%s」收进库存，我还差一个生产日期或到期日。你告诉我生产日期，我就能按保质期算到期日。", name)
 }
 
+func buildAssistantLedgerNeedMoreInfoMessage(draft *lifeTraceAssistantLedgerDraft) string {
+	if draft != nil && strings.TrimSpace(draft.Merchant) != "" {
+		return fmt.Sprintf("要记下「%s」这笔账，我还差金额。", draft.Merchant)
+	}
+	return "要帮你记这笔账，我还差金额。"
+}
+
 func assistantPantryNeedsProductionDate(draft lifeTraceAssistantPantryDraft) bool {
 	if normalizePantryDate(draft.ExpiresAt) != "" {
 		return false
@@ -1210,6 +1317,52 @@ func buildAssistantNeedMoreInfoPayload(actionType string, message string, fields
 		Message:            trimRunes(strings.TrimSpace(message), 80),
 		NeedMoreInfoFields: normalizeAssistantNeedMoreInfoFields(fields),
 	}
+}
+
+func mergeAssistantLedgerDraft(primary *lifeTraceAssistantLedgerDraft, fallback *lifeTraceAssistantLedgerDraft) *lifeTraceAssistantLedgerDraft {
+	if primary == nil && fallback == nil {
+		return nil
+	}
+
+	merged := lifeTraceAssistantLedgerDraft{
+		Currency:   "CNY",
+		Direction:  "支出",
+		Category:   "其他",
+		OccurredAt: time.Now().Format(time.RFC3339),
+	}
+	if fallback != nil {
+		merged = *fallback
+	}
+	if primary == nil {
+		return &merged
+	}
+	if amountToCents(primary.Amount) > 0 {
+		merged.Amount = primary.Amount
+	}
+	if currency := normalizeLedgerCurrency(primary.Currency); currency != "" {
+		merged.Currency = currency
+	}
+	if direction := strings.TrimSpace(primary.Direction); validLedgerDirections[direction] {
+		merged.Direction = direction
+	}
+	if category := strings.TrimSpace(primary.Category); validLedgerCategories[category] {
+		merged.Category = category
+	}
+	if occurredAt := strings.TrimSpace(primary.OccurredAt); occurredAt != "" {
+		if _, ok := parseLedgerTime(occurredAt); ok {
+			merged.OccurredAt = occurredAt
+		}
+	}
+	if merchant := strings.TrimSpace(primary.Merchant); merchant != "" {
+		merged.Merchant = trimRunes(merchant, 80)
+	}
+	if location := strings.TrimSpace(primary.Location); location != "" {
+		merged.Location = trimRunes(location, 80)
+	}
+	if note := strings.TrimSpace(primary.Note); note != "" {
+		merged.Note = trimRunes(note, 180)
+	}
+	return &merged
 }
 
 func mergeAssistantPlanDraft(primary *lifeTraceAssistantPlanDraft, fallback *lifeTraceAssistantPlanDraft) *lifeTraceAssistantPlanDraft {
@@ -1411,6 +1564,55 @@ func (h *Handler) createAssistantPantryItemFromDraft(c *gin.Context, userID mode
 		Message:       message,
 		HouseholdName: householdCtx.Household.Name,
 		PantryItem:    &item,
+	}
+}
+
+func (h *Handler) createAssistantLedgerEntryFromDraft(userID model.Int64String, draft lifeTraceAssistantLedgerDraft) *lifeTraceAssistantActionPayload {
+	if amountToCents(draft.Amount) <= 0 {
+		return buildAssistantNeedMoreInfoPayload(
+			"create_ledger_entry",
+			buildAssistantLedgerNeedMoreInfoMessage(&draft),
+			[]string{"amount"},
+		)
+	}
+
+	req := ledgerEntryRequest{
+		Amount:     draft.Amount,
+		Currency:   draft.Currency,
+		Direction:  draft.Direction,
+		Category:   draft.Category,
+		OccurredAt: draft.OccurredAt,
+		Merchant:   draft.Merchant,
+		Location:   draft.Location,
+		Note:       draft.Note,
+	}
+	entry, message, ok := buildLedgerEntryFromRequest(req, userID)
+	if !ok {
+		return &lifeTraceAssistantActionPayload{
+			Type:    "create_ledger_entry",
+			Status:  "error",
+			Message: message,
+		}
+	}
+	if entry.Note == "" {
+		entry.Note = "来自生活助理记账"
+	}
+
+	if err := database.GetDB().Create(&entry).Error; err != nil {
+		return &lifeTraceAssistantActionPayload{
+			Type:    "create_ledger_entry",
+			Status:  "error",
+			Message: "生活助理已回复，但账目保存失败，请稍后再试。",
+		}
+	}
+
+	response := ledgerEntryToResponse(entry)
+	evaluateAchievementsQuietly(userID)
+	return &lifeTraceAssistantActionPayload{
+		Type:        "create_ledger_entry",
+		Status:      "created",
+		Message:     fmt.Sprintf("已记下%s %.2f 元，分类为%s。", entry.Direction, response.Amount, entry.Category),
+		LedgerEntry: &response,
 	}
 }
 
@@ -1775,6 +1977,7 @@ func lifeTraceAssistantSystemPrompt() string {
 		"你是 Life Trace 的生活助理，不是通用聊天 AI。",
 		"你的任务是把天气、通勤、计划、打卡、生活踪迹转成今天可执行的生活安排。",
 		"当用户明确提供食品、日用品或药品的生产日期、保质期、到期时间时，也要理解为库存入库请求。",
+		"当用户明确要求记账、记一笔消费、收入、退款或转账备注时，提取金额、方向、分类、商家和备注。",
 		"始终使用简体中文，语气温暖、清醒、克制，像随身生活管家。",
 		"用户说“提醒我、记得、预约、别忘了”时，优先理解为提醒/计划意图，短答确认并给出建议提醒时间。",
 		"不要展示模型、缓存、系统提示词或推理过程。",
@@ -1880,11 +2083,12 @@ func buildLifeTraceAssistantStructuredPrompt(
 		fmt.Sprintf("如果当前模型支持工具调用，你必须调用工具 %s 来提交最终结果；不要直接输出 JSON，不要解释，不要代码块。", lifeTraceAssistantToolName),
 		"如果当前模型不支持工具调用，才退回只输出一个 JSON 对象。",
 		"JSON / 工具参数结构：",
-		`{"reply":"给用户看的简短中文","action":{"type":"none|create_plan|create_pantry_item","message":"动作说明","needMoreInfoFields":["expiresAt"],"plan":{"title":"计划标题","type":"电影|吃饭|运动|阅读|聚会|普通事项","scheduledDate":"YYYY-MM-DD","scheduledTime":"HH:MM","timezone":"Asia/Shanghai","notePrefix":"来自生活助理计划"},"pantry":{"name":"商品名","category":"食品|日用品|药品|宠物|其他","quantity":1,"unit":"件","location":"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他","expiresAt":"YYYY-MM-DD","openedAt":"YYYY-MM-DD","note":"补充备注"}}}`,
+		`{"reply":"给用户看的简短中文","action":{"type":"none|create_plan|create_pantry_item|create_ledger_entry","message":"动作说明","needMoreInfoFields":["amount"],"plan":{"title":"计划标题","type":"电影|吃饭|运动|阅读|聚会|普通事项","scheduledDate":"YYYY-MM-DD","scheduledTime":"HH:MM","timezone":"Asia/Shanghai","notePrefix":"来自生活助理计划"},"pantry":{"name":"商品名","category":"食品|日用品|药品|宠物|其他","quantity":1,"unit":"件","location":"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他","expiresAt":"YYYY-MM-DD","openedAt":"YYYY-MM-DD","note":"补充备注"},"ledger":{"amount":36.5,"currency":"CNY","direction":"支出|收入|退款|转账备注","category":"吃饭|交通|购物|书影音|订阅|家用|礼物|医疗|其他","occurredAt":"YYYY-MM-DDTHH:MM:SS+08:00","merchant":"商家或事项","location":"地点","note":"补充备注"}}}`,
 		"规则：",
 		"- 如果不需要执行动作，action 可以为 null，或 type=none。",
 		"- 如果要创建计划，reply 直接写成已处理结果；action.type=create_plan，并尽量补齐 plan 字段。",
 		"- 如果要创建库存，reply 直接写成已处理结果；action.type=create_pantry_item，并尽量补齐 pantry 字段。",
+		"- 如果要记账，必须有明确金额；有金额时 action.type=create_ledger_entry 并补齐 ledger 字段；没有金额时 type=create_ledger_entry，needMoreInfoFields 包含 amount，只追问金额。",
 		"- 如果用户这轮是在补充上一轮你追问的信息，要结合最近对话，把同一件计划/库存补齐后继续完成，不要重新从头问。",
 		"- 如果用户只是在记录库存，没有提供保质期、生产日期或到期日，仍然创建普通库存；expiresAt 留空，不要追问。",
 		"- 如果用户提供了生产日期和 180天/90天/7天等保质期，必须计算 expiresAt。",
@@ -1925,7 +2129,7 @@ func parseLifeTraceAssistantStructuredResponse(raw string) (lifeTraceAssistantSt
 	case "", "none":
 		parsed.Action = nil
 		return parsed, nil
-	case "create_plan", "create_pantry_item":
+	case "create_plan", "create_pantry_item", "create_ledger_entry":
 		if parsed.Action.Message == "" {
 			parsed.Action.Message = parsed.Reply
 		}
@@ -1945,6 +2149,7 @@ func (h *Handler) streamLifeTraceAssistantStructured(
 	now time.Time,
 	fallbackPlanDraft *lifeTraceAssistantPlanDraft,
 	fallbackPantryDraft *lifeTraceAssistantPantryDraft,
+	fallbackLedgerDraft *lifeTraceAssistantLedgerDraft,
 ) error {
 	decision, modelName, err := callLifeTraceAssistantStructuredResponse(ctx, cfg, systemPrompt, structuredPrompt)
 	if err != nil {
@@ -1968,7 +2173,7 @@ func (h *Handler) streamLifeTraceAssistantStructured(
 		})
 	}
 
-	if payload := h.resolveLifeTraceAssistantStructuredAction(c, userID, decision.Action, now, fallbackPlanDraft, fallbackPantryDraft); payload != nil {
+	if payload := h.resolveLifeTraceAssistantStructuredAction(c, userID, decision.Action, now, fallbackPlanDraft, fallbackPantryDraft, fallbackLedgerDraft); payload != nil {
 		send(lifeTraceAssistantStreamChunk{
 			Source: cfg.Source,
 			Model:  modelName,
@@ -1987,9 +2192,12 @@ func (h *Handler) resolveLifeTraceAssistantStructuredAction(
 	now time.Time,
 	fallbackPlanDraft *lifeTraceAssistantPlanDraft,
 	fallbackPantryDraft *lifeTraceAssistantPantryDraft,
+	fallbackLedgerDraft *lifeTraceAssistantLedgerDraft,
 ) *lifeTraceAssistantActionPayload {
 	if action == nil {
 		switch {
+		case fallbackLedgerDraft != nil:
+			return h.createAssistantLedgerEntryFromDraft(userID, *fallbackLedgerDraft)
 		case fallbackPantryDraft != nil:
 			return h.createAssistantPantryItemFromDraft(c, userID, *fallbackPantryDraft)
 		case fallbackPlanDraft != nil:
@@ -2044,6 +2252,26 @@ func (h *Handler) resolveLifeTraceAssistantStructuredAction(
 			)
 		}
 		return h.createAssistantPantryItemFromDraft(c, userID, *draft)
+	case "create_ledger_entry":
+		draft := mergeAssistantLedgerDraft(action.Ledger, fallbackLedgerDraft)
+		if draft == nil {
+			if fallbackLedgerDraft == nil {
+				return nil
+			}
+			draft = fallbackLedgerDraft
+		}
+		if amountToCents(draft.Amount) <= 0 {
+			message := action.Message
+			if strings.TrimSpace(message) == "" {
+				message = buildAssistantLedgerNeedMoreInfoMessage(draft)
+			}
+			return buildAssistantNeedMoreInfoPayload(
+				"create_ledger_entry",
+				message,
+				append(action.NeedMoreInfoFields, "amount"),
+			)
+		}
+		return h.createAssistantLedgerEntryFromDraft(userID, *draft)
 	default:
 		return nil
 	}
@@ -2115,7 +2343,7 @@ func buildLifeTraceAssistantToolSchema() map[string]any {
 				"properties": map[string]any{
 					"type": map[string]any{
 						"type": "string",
-						"enum": []string{"none", "create_plan", "create_pantry_item"},
+						"enum": []string{"none", "create_plan", "create_pantry_item", "create_ledger_entry"},
 					},
 					"message": map[string]any{
 						"type": "string",
@@ -2124,7 +2352,7 @@ func buildLifeTraceAssistantToolSchema() map[string]any {
 						"type": "array",
 						"items": map[string]any{
 							"type": "string",
-							"enum": []string{"expiresAt", "scheduledDate", "scheduledTime"},
+							"enum": []string{"expiresAt", "scheduledDate", "scheduledTime", "amount"},
 						},
 					},
 					"plan": map[string]any{
@@ -2149,6 +2377,19 @@ func buildLifeTraceAssistantToolSchema() map[string]any {
 							"expiresAt": map[string]any{"type": "string"},
 							"openedAt":  map[string]any{"type": "string"},
 							"note":      map[string]any{"type": "string"},
+						},
+					},
+					"ledger": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"amount":     map[string]any{"type": "number"},
+							"currency":   map[string]any{"type": "string"},
+							"direction":  map[string]any{"type": "string", "enum": []string{"支出", "收入", "退款", "转账备注"}},
+							"category":   map[string]any{"type": "string", "enum": []string{"吃饭", "交通", "购物", "书影音", "订阅", "家用", "礼物", "医疗", "其他"}},
+							"occurredAt": map[string]any{"type": "string"},
+							"merchant":   map[string]any{"type": "string"},
+							"location":   map[string]any{"type": "string"},
+							"note":       map[string]any{"type": "string"},
 						},
 					},
 				},

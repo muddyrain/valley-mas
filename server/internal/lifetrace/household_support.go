@@ -137,6 +137,20 @@ func reconcilePersonalHousehold(tx *gorm.DB, userID model.Int64String) (model.Ho
 			Update("household_id", primary.ID).Error; err != nil {
 			return model.Household{}, model.HouseholdMember{}, err
 		}
+		if tx.Migrator().HasTable(&model.LifeTraceClosetItem{}) {
+			if err := tx.Model(&model.LifeTraceClosetItem{}).
+				Where("household_id IN ?", duplicateIDs).
+				Update("household_id", primary.ID).Error; err != nil {
+				return model.Household{}, model.HouseholdMember{}, err
+			}
+		}
+		if tx.Migrator().HasTable(&model.LifeTraceOutfit{}) {
+			if err := tx.Model(&model.LifeTraceOutfit{}).
+				Where("household_id IN ?", duplicateIDs).
+				Update("household_id", primary.ID).Error; err != nil {
+				return model.Household{}, model.HouseholdMember{}, err
+			}
+		}
 
 		var duplicateMembers []model.HouseholdMember
 		if err := tx.
@@ -262,13 +276,36 @@ func ensurePersonalHousehold(userID model.Int64String) (model.Household, model.H
 }
 
 func backfillUserPantryHousehold(tx *gorm.DB, userID, householdID model.Int64String) error {
-	return tx.Model(&model.LifeTracePantryItem{}).
+	if err := tx.Model(&model.LifeTracePantryItem{}).
 		Where("user_id = ? AND (household_id IS NULL OR household_id = 0)", userID).
 		Updates(map[string]interface{}{
 			"household_id": householdID,
 			"created_by":   gorm.Expr("CASE WHEN created_by IS NULL OR created_by = 0 THEN ? ELSE created_by END", userID),
 			"updated_by":   gorm.Expr("CASE WHEN updated_by IS NULL OR updated_by = 0 THEN ? ELSE updated_by END", userID),
-		}).Error
+		}).Error; err != nil {
+		return err
+	}
+	if tx.Migrator().HasTable(&model.LifeTraceClosetItem{}) {
+		if err := tx.Model(&model.LifeTraceClosetItem{}).
+			Where("user_id = ? AND (household_id IS NULL OR household_id = 0)", userID).
+			Updates(map[string]interface{}{
+				"household_id": householdID,
+				"created_by":   gorm.Expr("CASE WHEN created_by IS NULL OR created_by = 0 THEN ? ELSE created_by END", userID),
+				"updated_by":   gorm.Expr("CASE WHEN updated_by IS NULL OR updated_by = 0 THEN ? ELSE updated_by END", userID),
+			}).Error; err != nil {
+			return err
+		}
+	}
+	if tx.Migrator().HasTable(&model.LifeTraceOutfit{}) {
+		return tx.Model(&model.LifeTraceOutfit{}).
+			Where("user_id = ? AND (household_id IS NULL OR household_id = 0)", userID).
+			Updates(map[string]interface{}{
+				"household_id": householdID,
+				"created_by":   gorm.Expr("CASE WHEN created_by IS NULL OR created_by = 0 THEN ? ELSE created_by END", userID),
+				"updated_by":   gorm.Expr("CASE WHEN updated_by IS NULL OR updated_by = 0 THEN ? ELSE updated_by END", userID),
+			}).Error
+	}
+	return nil
 }
 
 func resolveRequestedHouseholdID(c *gin.Context) model.Int64String {

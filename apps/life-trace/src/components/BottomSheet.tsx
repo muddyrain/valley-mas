@@ -20,6 +20,7 @@ type BottomSheetProps = {
   zIndexClassName?: string;
   showHandle?: boolean;
   portal?: boolean;
+  spacing?: 'default' | 'compact';
 };
 
 export function BottomSheet({
@@ -33,6 +34,7 @@ export function BottomSheet({
   zIndexClassName = 'z-[70]',
   showHandle = true,
   portal = true,
+  spacing = 'default',
 }: BottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const [dragOffset, setDragOffset] = useState(0);
@@ -57,6 +59,8 @@ export function BottomSheet({
     }
     onOpenChange(false);
   };
+
+  const compact = spacing === 'compact';
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (
@@ -169,9 +173,17 @@ export function BottomSheet({
         }}
       >
         {showHandle ? (
-          <div className="shrink-0 px-5 pt-5 max-[360px]:px-4 max-[360px]:pt-4">
+          <div
+            className={cn(
+              'shrink-0 px-5 max-[360px]:px-4',
+              compact ? 'pt-3 max-[360px]:pt-3' : 'pt-5 max-[360px]:pt-4',
+            )}
+          >
             <div
-              className="-mx-2 mb-4 flex h-8 touch-none select-none items-center justify-center rounded-full cursor-grab active:cursor-grabbing"
+              className={cn(
+                '-mx-2 flex touch-none select-none items-center justify-center rounded-full cursor-grab active:cursor-grabbing',
+                compact ? 'mb-2 h-6' : 'mb-4 h-8',
+              )}
               data-sheet-drag-handle="true"
               style={{ touchAction: 'none' }}
               onPointerDown={handlePointerDown}
@@ -186,7 +198,7 @@ export function BottomSheet({
         <div
           className={cn(
             'safe-bottom min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 max-[360px]:px-4',
-            showHandle ? null : 'pt-5 max-[360px]:pt-4',
+            showHandle ? null : compact ? 'pt-3 max-[360px]:pt-3' : 'pt-5 max-[360px]:pt-4',
             contentClassName,
           )}
         >

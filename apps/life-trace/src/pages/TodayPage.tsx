@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   Bell,
+  Camera,
   Check,
   Cloud,
   Droplets,
@@ -9,8 +10,11 @@ import {
   MapPin,
   PackageCheck,
   PackageOpen,
+  ReceiptText,
   RefreshCw,
   Settings,
+  Shirt,
+  Sparkles,
   Sun,
   Trophy,
   Wind,
@@ -994,6 +998,51 @@ export function TodayPage() {
       </Card>
 
       <Card
+        className="relative overflow-hidden border-life-ai/20 bg-life-ai/5 p-4 shadow-[0_18px_54px_rgba(6,182,212,0.08)]"
+        data-today-entrance
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-semibold text-life-ai">
+              <Shirt className="size-4" />
+              今日穿搭
+            </div>
+            <p className="mt-2 text-base font-semibold text-foreground">
+              {weatherReady
+                ? `${weather.now.text} · ${weather.now.high}°/${weather.now.low}°`
+                : '按今日节奏搭一套'}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {todayOpenPlans.length > 0
+                ? `今天有 ${todayOpenPlans.length} 个计划，可以按场景挑一套。`
+                : '从常穿单品里保存一套，出门后可沉淀成踪迹。'}
+            </p>
+          </div>
+          <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
+            <Sparkles className="size-5" />
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-life-ai px-3 text-sm font-semibold text-background transition hover:bg-life-ai/90"
+            onClick={() => navigate('/closet')}
+          >
+            <Shirt className="size-4" />
+            打开衣橱
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold transition hover:bg-secondary"
+            onClick={() => navigate('/ai/photo-clothing-analysis')}
+          >
+            <Camera className="size-4" />
+            拍照识别
+          </button>
+        </div>
+      </Card>
+
+      <Card
         className="relative overflow-hidden border-life-ai/20 p-4 shadow-[0_18px_54px_rgba(6,182,212,0.08)]"
         data-today-entrance
       >
@@ -1015,6 +1064,31 @@ export function TodayPage() {
             </p>
             <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
               稍后再转成计划或踪迹。
+            </p>
+          </div>
+        </button>
+      </Card>
+
+      <Card
+        className="relative overflow-hidden border-life-health/20 p-4 shadow-[0_18px_54px_rgba(34,197,94,0.08)]"
+        data-today-entrance
+      >
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 text-left"
+          onClick={() => navigate('/ledger')}
+        >
+          <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+            <ReceiptText className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="health">轻账本</Badge>
+              <span className="text-xs text-muted-foreground">本月记录</span>
+            </div>
+            <p className="mt-2 truncate text-sm font-semibold text-foreground">记一笔生活支出</p>
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+              回看吃饭、交通和日常花费。
             </p>
           </div>
         </button>

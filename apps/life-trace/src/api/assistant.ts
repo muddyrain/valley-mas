@@ -1,5 +1,5 @@
 import { API_BASE, apiRequest } from '@/api/request';
-import type { PantryItem, Plan } from '@/types';
+import type { LedgerEntry, PantryItem, Plan } from '@/types';
 
 export type LifeAssistantMessage = {
   id?: string;
@@ -53,7 +53,15 @@ export type LifeAssistantPantryEvent = LifeAssistantActionBase & {
   pantryItem?: PantryItem;
 };
 
-export type LifeAssistantActionEvent = LifeAssistantPlanEvent | LifeAssistantPantryEvent;
+export type LifeAssistantLedgerEvent = LifeAssistantActionBase & {
+  type: 'create_ledger_entry';
+  ledgerEntry?: LedgerEntry;
+};
+
+export type LifeAssistantActionEvent =
+  | LifeAssistantPlanEvent
+  | LifeAssistantPantryEvent
+  | LifeAssistantLedgerEvent;
 
 type StreamOptions = {
   message: string;
