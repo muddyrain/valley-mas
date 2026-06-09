@@ -9,7 +9,7 @@ import {
 import { listHouseholds } from '@/api/household';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
-import { ClosetItemSheet, defaultClosetItemForm } from '@/components/ClosetItemSheet';
+import { ClosetItemSheet, clothingAnalysisToClosetDraft } from '@/components/ClosetItemSheet';
 import { EmptyState } from '@/components/EmptyState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
@@ -19,26 +19,6 @@ import { getLifeTraceErrorMessage } from '@/lib/error';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import type { HouseholdSummary, NewClosetItemInput } from '@/types';
-
-function analysisToForm(
-  analysis: ClothingPhotoAnalysisResponse,
-  imageUrl: string,
-  shared: boolean,
-): NewClosetItemInput {
-  return {
-    ...defaultClosetItemForm,
-    name: analysis.name,
-    category: analysis.category,
-    color: analysis.color,
-    material: analysis.material || '',
-    warmthLevel: analysis.warmthLevel,
-    seasons: analysis.seasons.length ? analysis.seasons : ['四季'],
-    sceneTags: analysis.sceneTags.length ? analysis.sceneTags : ['日常'],
-    imageUrl,
-    shared,
-    note: analysis.summary,
-  };
-}
 
 export function PhotoClothingAnalysisPage() {
   const token = useAuthStore((state) => state.token);
@@ -114,7 +94,9 @@ export function PhotoClothingAnalysisPage() {
     }
   };
 
-  const draft = analysis ? analysisToForm(analysis, imageUrl, sharedAvailable) : undefined;
+  const draft = analysis
+    ? clothingAnalysisToClosetDraft(analysis, imageUrl, sharedAvailable)
+    : undefined;
 
   return (
     <SubPageShell title="拍照识别衣物" eyebrow="衣橱 AI" fallbackBackTo="/closet">
@@ -143,6 +125,7 @@ export function PhotoClothingAnalysisPage() {
             description="支持拍照或从相册选择。"
             cameraAndLibrary
             disabled={analyzing}
+            previewFit="contain"
           />
 
           {households.length > 1 ? (

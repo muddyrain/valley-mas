@@ -118,6 +118,61 @@ func TestClosetSharedPoolVisibleToHouseholdMembers(t *testing.T) {
 	}
 }
 
+func TestClosetDefaultsToPersonalHouseholdWhenPantryPrefersShared(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+	sharedHouseholdID := model.Int64String(301)
+	if err := database.GetDB().Create(&model.Household{
+		ID:          sharedHouseholdID,
+		Name:        "开心家庭",
+		Kind:        householdKindShared,
+		OwnerUserID: 101,
+		Status:      householdStatusActive,
+	}).Error; err != nil {
+		t.Fatalf("seed household: %v", err)
+	}
+	if err := database.GetDB().Create(&model.HouseholdMember{
+		HouseholdID: sharedHouseholdID,
+		UserID:      101,
+		Role:        householdRoleOwner,
+		Status:      householdMemberStatusActive,
+	}).Error; err != nil {
+		t.Fatalf("seed member: %v", err)
+	}
+	if err := database.GetDB().Create(&model.LifeTraceSettings{
+		UserID:                  101,
+		ActivePantryHouseholdID: sharedHouseholdID,
+	}).Error; err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+
+	body := bytes.NewBufferString(`{
+		"name": "碎花裙",
+		"category": "套装",
+		"color": "白色",
+		"warmthLevel": "轻薄",
+		"seasons": ["春", "夏"],
+		"sceneTags": ["日常"]
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/closet/items", body)
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	created := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	if created["householdId"] != "-101" {
+		t.Fatalf("expected default closet item in personal household, got %+v", created)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/closet/items", nil)
+	listResp := httptest.NewRecorder()
+	router.ServeHTTP(listResp, listReq)
+	data := decodeTracePayload(t, listResp)["data"].(map[string]interface{})
+	list := data["list"].([]interface{})
+	if len(list) != 1 || list[0].(map[string]interface{})["name"] != "碎花裙" {
+		t.Fatalf("expected personal closet list to include saved item, got %+v", data)
+	}
+}
+
 func TestOutfitRequiresAccessibleItemsAndWritesTraceWhenWorn(t *testing.T) {
 	router := setupTraceTestRouter(t, 101)
 	item := model.LifeTraceClosetItem{

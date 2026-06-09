@@ -2,6 +2,7 @@ import { Camera, Check, Plus, Shirt, Star, Trash2, Users, WandSparkles } from 'l
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
+  analyzeClothingPhoto,
   type ClosetSummary,
   createClosetItem,
   createOutfit,
@@ -17,7 +18,7 @@ import {
 } from '@/api/closet';
 import { listHouseholds } from '@/api/household';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
-import { ClosetItemSheet } from '@/components/ClosetItemSheet';
+import { ClosetItemSheet, clothingAnalysisToClosetDraft } from '@/components/ClosetItemSheet';
 import { EmptyState } from '@/components/EmptyState';
 import { SectionHeader } from '@/components/SectionHeader';
 import { SubPageShell } from '@/components/SubPageShell';
@@ -72,6 +73,7 @@ export function ClosetPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ClosetItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [itemImageAnalyzing, setItemImageAnalyzing] = useState(false);
   const [suggestions, setSuggestions] = useState<OutfitSuggestion[]>([]);
   const [suggesting, setSuggesting] = useState(false);
   const [selectedOutfit, setSelectedOutfit] = useState<{
@@ -214,6 +216,26 @@ export function ClosetPage() {
       showToast(getLifeTraceErrorMessage(saveError, '保存衣物失败'), 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleAnalyzeItemImage = async (imageUrl: string) => {
+    if (!token || itemImageAnalyzing) {
+      return null;
+    }
+    setItemImageAnalyzing(true);
+    try {
+      const analysis = await analyzeClothingPhoto(token, {
+        imageUrl,
+        householdId,
+      });
+      showToast('已生成衣物草稿', 'success');
+      return clothingAnalysisToClosetDraft(analysis, imageUrl, sharedAvailable);
+    } catch (analysisError) {
+      showToast(getLifeTraceErrorMessage(analysisError, '识别衣物失败'), 'error');
+      return null;
+    } finally {
+      setItemImageAnalyzing(false);
     }
   };
 
@@ -643,6 +665,8 @@ export function ClosetPage() {
         item={editingItem}
         sharedAvailable={sharedAvailable}
         submitting={submitting}
+        analyzing={itemImageAnalyzing}
+        onAnalyzeImage={handleAnalyzeItemImage}
         onSubmit={handleSaveItem}
       />
     </SubPageShell>

@@ -343,6 +343,18 @@ func loadPreferredPantryHouseholdID(userID model.Int64String) model.Int64String 
 }
 
 func resolveHouseholdContext(c *gin.Context, userID model.Int64String) (householdContext, error) {
+	return resolveHouseholdContextWithPreference(c, userID, true)
+}
+
+func resolvePersonalDefaultHouseholdContext(c *gin.Context, userID model.Int64String) (householdContext, error) {
+	return resolveHouseholdContextWithPreference(c, userID, false)
+}
+
+func resolveHouseholdContextWithPreference(
+	c *gin.Context,
+	userID model.Int64String,
+	usePreferredPantryHousehold bool,
+) (householdContext, error) {
 	personalHousehold, personalMember, err := ensurePersonalHousehold(userID)
 	if err != nil {
 		return householdContext{}, err
@@ -350,7 +362,7 @@ func resolveHouseholdContext(c *gin.Context, userID model.Int64String) (househol
 
 	requestedID := resolveRequestedHouseholdID(c)
 	explicitRequest := requestedID != 0
-	if requestedID == 0 {
+	if requestedID == 0 && usePreferredPantryHousehold {
 		requestedID = loadPreferredPantryHouseholdID(userID)
 	}
 	if requestedID == 0 || requestedID == personalHousehold.ID {

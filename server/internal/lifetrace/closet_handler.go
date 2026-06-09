@@ -264,7 +264,7 @@ func (h *Handler) ListClosetItems(c *gin.Context) {
 		return
 	}
 
-	householdCtx, ok := readHouseholdContext(c, userID)
+	householdCtx, ok := readClosetHouseholdContext(c, userID)
 	if !ok {
 		return
 	}
@@ -344,6 +344,19 @@ func buildClosetItemSummary(items []model.LifeTraceClosetItem, total int64) gin.
 	}
 }
 
+func readClosetHouseholdContext(c *gin.Context, userID model.Int64String) (householdContext, bool) {
+	ctx, err := resolvePersonalDefaultHouseholdContext(c, userID)
+	if err == nil {
+		return ctx, true
+	}
+	if errors.Is(err, errHouseholdNotAccessible) {
+		fail(c, http.StatusForbidden, "家庭不存在或不可访问")
+		return householdContext{}, false
+	}
+	fail(c, http.StatusInternalServerError, "读取家庭失败")
+	return householdContext{}, false
+}
+
 func (h *Handler) GetClosetItem(c *gin.Context) {
 	userID, ok := currentUserID(c)
 	if !ok {
@@ -382,7 +395,7 @@ func (h *Handler) CreateClosetItem(c *gin.Context) {
 		fail(c, http.StatusBadRequest, "衣物名称不能为空")
 		return
 	}
-	householdCtx, ok := readHouseholdContext(c, userID)
+	householdCtx, ok := readClosetHouseholdContext(c, userID)
 	if !ok {
 		return
 	}
@@ -494,7 +507,7 @@ func (h *Handler) ListOutfits(c *gin.Context) {
 		fail(c, http.StatusUnauthorized, "未登录")
 		return
 	}
-	householdCtx, ok := readHouseholdContext(c, userID)
+	householdCtx, ok := readClosetHouseholdContext(c, userID)
 	if !ok {
 		return
 	}
@@ -569,7 +582,7 @@ func (h *Handler) CreateOutfit(c *gin.Context) {
 		fail(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	householdCtx, ok := readHouseholdContext(c, userID)
+	householdCtx, ok := readClosetHouseholdContext(c, userID)
 	if !ok {
 		return
 	}
@@ -763,7 +776,7 @@ func (h *Handler) AnalyzeClothingPhoto(c *gin.Context) {
 		query.Set("householdId", strings.TrimSpace(req.HouseholdID))
 		c.Request.URL.RawQuery = query.Encode()
 	}
-	householdCtx, ok := readHouseholdContext(c, userID)
+	householdCtx, ok := readClosetHouseholdContext(c, userID)
 	if !ok {
 		return
 	}
@@ -871,7 +884,7 @@ func (h *Handler) GenerateOutfitSuggestions(c *gin.Context) {
 		query.Set("householdId", strings.TrimSpace(req.HouseholdID))
 		c.Request.URL.RawQuery = query.Encode()
 	}
-	householdCtx, ok := readHouseholdContext(c, userID)
+	householdCtx, ok := readClosetHouseholdContext(c, userID)
 	if !ok {
 		return
 	}

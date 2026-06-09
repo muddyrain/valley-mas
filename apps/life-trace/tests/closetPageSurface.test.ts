@@ -7,6 +7,10 @@ const todayPageSource = readFileSync(resolve(__dirname, '../src/pages/TodayPage.
 const aiPageSource = readFileSync(resolve(__dirname, '../src/pages/AiPage.tsx'), 'utf8');
 const profilePageSource = readFileSync(resolve(__dirname, '../src/pages/ProfilePage.tsx'), 'utf8');
 const closetApiSource = readFileSync(resolve(__dirname, '../src/api/closet.ts'), 'utf8');
+const appImageUploaderSource = readFileSync(
+  resolve(__dirname, '../src/components/AppImageUploader.tsx'),
+  'utf8',
+);
 const closetPagePath = resolve(__dirname, '../src/pages/ClosetPage.tsx');
 const clothingAnalysisPagePath = resolve(__dirname, '../src/pages/PhotoClothingAnalysisPage.tsx');
 
@@ -32,6 +36,32 @@ describe('closet page surface', () => {
     expect(closetApiSource).toContain('/life-trace/closet/outfits');
     expect(closetApiSource).toContain('/life-trace/ai/clothing-photo-analysis');
     expect(closetApiSource).toContain('/life-trace/ai/outfit-suggestions');
+  });
+
+  it('exposes AI photo drafting inside the manual closet item form', () => {
+    const closetPageSource = readFileSync(closetPagePath, 'utf8');
+    const closetItemSheetSource = readFileSync(
+      resolve(__dirname, '../src/components/ClosetItemSheet.tsx'),
+      'utf8',
+    );
+
+    expect(closetPageSource).toContain('analyzeClothingPhoto');
+    expect(closetPageSource).toContain('onAnalyzeImage={handleAnalyzeItemImage}');
+    expect(closetItemSheetSource).toContain('AI 识别填表');
+    expect(closetItemSheetSource).toContain('mergeClosetAnalysisDraft');
+  });
+
+  it('keeps closet upload previews uncropped for portrait clothing photos', () => {
+    const closetItemSheetSource = readFileSync(
+      resolve(__dirname, '../src/components/ClosetItemSheet.tsx'),
+      'utf8',
+    );
+    const clothingAnalysisPageSource = readFileSync(clothingAnalysisPagePath, 'utf8');
+
+    expect(appImageUploaderSource).toContain("previewFit?: 'cover' | 'contain'");
+    expect(appImageUploaderSource).toContain("previewFit === 'contain'");
+    expect(closetItemSheetSource).toContain('previewFit="contain"');
+    expect(clothingAnalysisPageSource).toContain('previewFit="contain"');
   });
 
   it('keeps developer analysis copy out of visible closet UI', () => {

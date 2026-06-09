@@ -15,4 +15,10 @@ describe('AI page surface', () => {
     expect(aiPageSource).not.toContain('label="分析图片"');
     expect(aiPageSource).not.toContain("onQuickAction('分析图片')");
   });
+
+  it('keeps the chat input hint mobile friendly', () => {
+    expect(aiPageSource).toContain('placeholder="输入想聊的事"');
+    expect(aiPageSource).not.toContain('Shift + Enter');
+    expect(aiPageSource).not.toContain('按 Enter 发送');
+  });
 });

@@ -1579,7 +1579,7 @@ function AgentConversationPanel({
                 className="max-h-28 min-h-12 w-full resize-none bg-transparent px-3 py-1.5 text-base leading-7 outline-none placeholder:text-muted-foreground"
                 value={input}
                 disabled={streaming}
-                placeholder="输入消息，按 Enter 发送，Shift + Enter 换行"
+                placeholder="输入想聊的事"
                 onChange={(event) => onInputChange(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && !event.shiftKey) {

@@ -1,4 +1,7 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { Sparkles } from 'lucide-react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
+import type { ClothingPhotoAnalysisResponse } from '@/api/closet';
+import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/ui/button';
@@ -38,6 +41,8 @@ export const defaultClosetItemForm: NewClosetItemInput = {
   note: '',
 };
 
+type ClosetDraftField = keyof NewClosetItemInput;
+
 type ClosetItemSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -45,8 +50,64 @@ type ClosetItemSheetProps = {
   initialValue?: Partial<NewClosetItemInput>;
   sharedAvailable?: boolean;
   submitting?: boolean;
+  analyzing?: boolean;
+  onAnalyzeImage?: (imageUrl: string) => Promise<Partial<NewClosetItemInput> | null>;
   onSubmit: (input: NewClosetItemInput) => Promise<void> | void;
 };
+
+function isDefaultClosetFieldValue<K extends ClosetDraftField>(
+  key: K,
+  value: NewClosetItemInput[K],
+) {
+  const defaultValue = defaultClosetItemForm[key];
+  if (Array.isArray(defaultValue) && Array.isArray(value)) {
+    return (
+      defaultValue.length === value.length &&
+      defaultValue.every((item, index) => item === value[index])
+    );
+  }
+  return value === defaultValue;
+}
+
+export function mergeClosetAnalysisDraft(
+  current: NewClosetItemInput,
+  draft: Partial<NewClosetItemInput>,
+  touchedFields: ReadonlySet<ClosetDraftField> = new Set(),
+): NewClosetItemInput {
+  const next = { ...current };
+  (Object.keys(draft) as ClosetDraftField[]).forEach((key) => {
+    const value = draft[key];
+    if (
+      value === undefined ||
+      touchedFields.has(key) ||
+      !isDefaultClosetFieldValue(key, current[key])
+    ) {
+      return;
+    }
+    next[key] = value as never;
+  });
+  return next;
+}
+
+export function clothingAnalysisToClosetDraft(
+  analysis: ClothingPhotoAnalysisResponse,
+  imageUrl: string,
+  shared: boolean,
+): NewClosetItemInput {
+  return {
+    ...defaultClosetItemForm,
+    name: analysis.name,
+    category: analysis.category,
+    color: analysis.color,
+    material: analysis.material || '',
+    warmthLevel: analysis.warmthLevel,
+    seasons: analysis.seasons.length ? analysis.seasons : ['四季'],
+    sceneTags: analysis.sceneTags.length ? analysis.sceneTags : ['日常'],
+    imageUrl,
+    shared,
+    note: analysis.summary,
+  };
+}
 
 function toggleListValue<T extends string>(list: T[], value: T) {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
@@ -74,11 +135,14 @@ export function ClosetItemSheet({
   initialValue,
   sharedAvailable = false,
   submitting = false,
+  analyzing = false,
+  onAnalyzeImage,
   onSubmit,
 }: ClosetItemSheetProps) {
   const [form, setForm] = useState<NewClosetItemInput>(defaultClosetItemForm);
   const [sceneText, setSceneText] = useState('日常');
   const [error, setError] = useState('');
+  const touchedFieldsRef = useRef<Set<ClosetDraftField>>(new Set());
 
   useEffect(() => {
     if (!open) {
@@ -101,11 +165,29 @@ export function ClosetItemSheet({
       : { ...defaultClosetItemForm, ...initialValue };
     setForm(next);
     setSceneText((next.sceneTags || ['日常']).join('、'));
+    touchedFieldsRef.current = new Set();
     setError('');
   }, [initialValue, item, open]);
 
   const update = <K extends keyof NewClosetItemInput>(key: K, value: NewClosetItemInput[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
+    touchedFieldsRef.current = new Set(touchedFieldsRef.current).add(key);
+  };
+
+  const handleAnalyzeImage = async () => {
+    if (!onAnalyzeImage || !form.imageUrl || analyzing) {
+      return;
+    }
+    setError('');
+    const draft = await onAnalyzeImage(form.imageUrl);
+    if (!draft) {
+      return;
+    }
+    setForm((current) => {
+      const next = mergeClosetAnalysisDraft(current, draft, touchedFieldsRef.current);
+      setSceneText((next.sceneTags || ['日常']).join('、'));
+      return next;
+    });
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -158,8 +240,21 @@ export function ClosetItemSheet({
           label="衣物照片"
           description="支持拍照或从相册选择。"
           cameraAndLibrary
-          disabled={submitting}
+          disabled={submitting || analyzing}
+          previewFit="contain"
         />
+        {!item && onAnalyzeImage && form.imageUrl ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={analyzing || submitting}
+            onClick={() => void handleAnalyzeImage()}
+          >
+            {analyzing ? <ActionLoadingIcon tone="ai" /> : <Sparkles className="size-4" />}
+            {analyzing ? '识别中' : 'AI 识别填表'}
+          </Button>
+        ) : null}
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block space-y-2">
@@ -236,7 +331,10 @@ export function ClosetItemSheet({
           <span className="text-sm font-medium">场景标签</span>
           <input
             value={sceneText}
-            onChange={(event) => setSceneText(event.target.value)}
+            onChange={(event) => {
+              setSceneText(event.target.value);
+              touchedFieldsRef.current = new Set(touchedFieldsRef.current).add('sceneTags');
+            }}
             className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none focus:border-life-ai/50"
             placeholder="通勤、雨天、聚会"
           />

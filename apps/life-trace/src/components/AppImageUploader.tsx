@@ -16,6 +16,7 @@ type AppImageUploaderProps = {
   className?: string;
   onUploadingChange?: (uploading: boolean) => void;
   cameraAndLibrary?: boolean;
+  previewFit?: 'cover' | 'contain';
 };
 
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -37,6 +38,7 @@ export function AppImageUploader({
   className,
   onUploadingChange,
   cameraAndLibrary = false,
+  previewFit = 'cover',
 }: AppImageUploaderProps) {
   const token = useAuthStore((state) => state.token);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -113,13 +115,22 @@ export function AppImageUploader({
       </div>
 
       {value ? (
-        <div className="overflow-hidden rounded-[1.25rem] border border-border bg-secondary">
+        <div
+          className={cn(
+            'overflow-hidden rounded-[1.25rem] border border-border bg-secondary',
+            previewFit === 'contain' ? 'bg-card/60' : null,
+          )}
+        >
           <ImagePreview
             src={value}
             alt="已上传图片"
             title={label}
             subtitle="已上传"
-            imageClassName="aspect-video w-full object-cover"
+            imageClassName={
+              previewFit === 'contain'
+                ? 'max-h-72 min-h-44 w-full bg-secondary object-contain'
+                : 'aspect-video w-full object-cover'
+            }
           />
         </div>
       ) : cameraAndLibrary ? (
