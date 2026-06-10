@@ -1,6 +1,7 @@
 import { Calendar, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { FormItem } from '@/components/FormItem';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 const shelfLifeOptions = [
@@ -54,13 +55,13 @@ function DateInputWithClear({
 }: DateInputWithClearProps) {
   return (
     <div className="relative min-w-0">
-      <input
+      <Input
         id={id}
         type="date"
         value={value}
         disabled={disabled}
         className={cn(
-          'block h-11 min-w-0 w-full appearance-none rounded-2xl border border-border bg-background px-4 text-sm leading-[2.75rem] outline-none transition focus:border-ring disabled:opacity-60 [&::-webkit-date-and-time-value]:min-h-11 [&::-webkit-date-and-time-value]:text-left',
+          'block appearance-none bg-background text-sm leading-[2.75rem] [&::-webkit-date-and-time-value]:min-h-11 [&::-webkit-date-and-time-value]:text-left',
           value ? 'pr-[4.25rem]' : 'pr-10',
           value
             ? '[&::-webkit-calendar-picker-indicator]:right-9'
@@ -172,7 +173,7 @@ export function PantryExpiryDateField({
 
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_6rem] items-end gap-2 max-[360px]:grid-cols-1">
         <FormItem label="自定义天数">
-          <input
+          <Input
             type="number"
             min="1"
             step="1"
@@ -180,7 +181,7 @@ export function PantryExpiryDateField({
             value={customDays}
             disabled={disabled}
             placeholder="例如 180"
-            className="block h-11 min-w-0 w-full rounded-2xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:opacity-60"
+            className="block bg-background text-sm"
             onChange={(event) => setCustomDays(event.target.value)}
           />
         </FormItem>

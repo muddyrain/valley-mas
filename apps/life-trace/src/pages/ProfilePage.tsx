@@ -31,6 +31,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { EntryCard } from '@/components/EntryCard';
 import { FeedbackSheet } from '@/components/FeedbackSheet';
 import { LocationPicker } from '@/components/LocationPicker';
 import { PantryHouseholdDetailSheet } from '@/components/PantryHouseholdDetailSheet';
@@ -41,6 +42,7 @@ import { SettingInput, SettingToggle, SyncStatus } from '@/components/SettingsCo
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { usePantryHouseholdManager } from '@/hooks/usePantryHouseholdManager';
 import { usePwaStatus } from '@/hooks/usePwaStatus';
 import { APP_VERSION_LABEL } from '@/lib/appVersion';
@@ -781,24 +783,14 @@ export function ProfilePage() {
 
       <section data-profile-card className="space-y-3">
         <SectionHeader title="书影音" meta="日记" />
-        <button
-          type="button"
-          className="flex w-full items-center justify-between gap-4 rounded-[1.25rem] border border-life-trace/20 bg-card p-4 text-left transition hover:border-life-trace/35 hover:bg-card/95"
+        <EntryCard
+          icon={Disc3}
+          badge="打开"
+          title="书影音日记"
+          description="书籍、电影、剧集、动漫和音乐"
+          tone="trace"
           onClick={() => navigate('/media-diary')}
-        >
-          <span className="flex min-w-0 items-center gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-trace/10 text-life-trace">
-              <Disc3 className="size-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block font-semibold">书影音日记</span>
-              <span className="mt-1 block text-sm leading-5 text-muted-foreground">
-                书籍、电影、剧集、动漫和音乐
-              </span>
-            </span>
-          </span>
-          <Badge tone="trace">打开</Badge>
-        </button>
+        />
       </section>
 
       <section data-profile-card className="space-y-3">
@@ -817,12 +809,12 @@ export function ProfilePage() {
           </div>
 
           <div className="flex gap-2 max-[360px]:flex-col">
-            <input
+            <Input
               type="text"
               value={habitDraft}
               maxLength={40}
               placeholder="例如：晚饭后吃维生素D"
-              className="h-11 flex-1 rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-life-trace/50"
+              className="flex-1 text-sm focus:border-life-trace/50"
               onChange={(event) => {
                 setHabitDraft(event.target.value);
                 if (habitDraftError) {

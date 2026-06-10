@@ -1,9 +1,10 @@
-import { Camera, Sparkles, X } from 'lucide-react';
+import { Camera, Sparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { analyzeImage, type ImageAnalysisResponse } from '@/api/advice';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
+import { SheetActions, SheetHeader } from '@/components/FormItem';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { buildPlanSchedule, type PlanDateOption } from '@/lib/planSchedule';
@@ -159,17 +160,12 @@ export function ImageAnalysisDrawer({
       overlayLabel="关闭图片分析"
       zIndexClassName="z-40"
     >
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-xl font-semibold">分析图片</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            先上传到云端，再交给服务端视觉 AI 分析。
-          </p>
-        </div>
-        <Button type="button" variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
-          <X className="size-5" />
-        </Button>
-      </div>
+      <SheetHeader
+        title="分析图片"
+        description="先上传到云端，再交给服务端视觉 AI 分析。"
+        icon={Camera}
+        onClose={() => onOpenChange(false)}
+      />
 
       <div className="space-y-4">
         <AppImageUploader
@@ -228,14 +224,14 @@ export function ImageAnalysisDrawer({
             </div>
             <h3 className="font-semibold">{analysis.title}</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{analysis.summary}</p>
-            <div className="mt-4 grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+            <SheetActions className="mt-4">
               <Button type="button" variant="secondary" onClick={handleCreatePlan}>
                 生成计划
               </Button>
               <Button type="button" variant="ai" onClick={handleCreateTrace}>
                 生成踪迹
               </Button>
-            </div>
+            </SheetActions>
           </Card>
         ) : null}
       </div>

@@ -1,4 +1,4 @@
-import { Check, History, ImagePlus, PencilLine, X } from 'lucide-react';
+import { Check, History, ImagePlus, PencilLine } from 'lucide-react';
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type AvatarHistoryItem,
@@ -9,8 +9,10 @@ import {
 } from '@/api/auth';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
+import { FormItem, SheetHeader } from '@/components/FormItem';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 type ProfileAvatarSheetProps = {
@@ -210,21 +212,15 @@ export function ProfileAvatarSheet({
       portal
       className="will-change-transform"
     >
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="inline-flex items-center gap-2 rounded-full border border-life-ai/25 bg-life-ai/10 px-3 py-1 text-xs font-semibold text-life-ai">
-            <PencilLine className="size-3.5" />
-            编辑资料
-          </p>
-          <h3 className="mt-3 text-xl font-semibold">头像与昵称</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            支持上传新头像、切换历史头像，也可以顺手改一下昵称。
-          </p>
-        </div>
-        <Button type="button" variant="ghost" size="icon" disabled={busy} onClick={closeSheet}>
-          <X className="size-5" />
-        </Button>
-      </div>
+      <SheetHeader
+        title="头像与昵称"
+        description="支持上传新头像、切换历史头像，也可以顺手改一下昵称。"
+        meta="编辑资料"
+        icon={PencilLine}
+        iconClassName="bg-life-plan/10 text-life-plan"
+        closeDisabled={busy}
+        onClose={closeSheet}
+      />
 
       <Card className="overflow-hidden border-life-ai/20 bg-[linear-gradient(180deg,rgba(6,182,212,0.08),rgba(16,185,129,0.06))] p-5">
         <div className="flex flex-col items-center text-center">
@@ -274,19 +270,18 @@ export function ProfileAvatarSheet({
             <PencilLine className="size-4.5" />
           </div>
           <div className="min-w-0 flex-1">
-            <label htmlFor="profile-nickname" className="text-sm font-semibold">
-              昵称
-            </label>
-            <input
-              id="profile-nickname"
-              type="text"
-              maxLength={24}
-              value={nickname}
-              disabled={busy}
-              onChange={(event) => setNickname(event.target.value)}
-              className="mt-2 h-12 w-full rounded-2xl border border-border bg-secondary/70 px-4 text-base font-medium text-foreground outline-none transition focus:border-life-ai/45 focus:bg-card"
-              placeholder="输入你的昵称"
-            />
+            <FormItem label="昵称">
+              <Input
+                id="profile-nickname"
+                type="text"
+                maxLength={24}
+                value={nickname}
+                disabled={busy}
+                onChange={(event) => setNickname(event.target.value)}
+                className="h-12 bg-secondary/70 text-base font-medium focus:bg-card"
+                placeholder="输入你的昵称"
+              />
+            </FormItem>
             <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
               <span>头像和昵称会同步到你的账户资料。</span>
               <span>{nickname.length}/24</span>

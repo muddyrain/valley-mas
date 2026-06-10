@@ -44,7 +44,7 @@ export function PlaceSuggestions({ value = '', onSelect, limit = 6 }: PlaceSugge
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="-mx-0.5 flex gap-2 overflow-x-auto px-0.5 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {suggestions.map((place) => {
         const active = normalizedValue === place.name;
         return (
@@ -52,7 +52,7 @@ export function PlaceSuggestions({ value = '', onSelect, limit = 6 }: PlaceSugge
             key={place.id}
             type="button"
             className={cn(
-              'inline-flex h-9 max-w-full items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition',
+              'inline-flex h-9 max-w-[9.5rem] shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition',
               active
                 ? 'border-life-trace/45 bg-life-trace/10 text-life-trace'
                 : 'border-border bg-secondary text-muted-foreground hover:text-foreground',

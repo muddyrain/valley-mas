@@ -1,7 +1,6 @@
 import {
   Camera,
   Check,
-  ChevronDown,
   History,
   ImagePlus,
   PackageCheck,
@@ -26,7 +25,7 @@ import {
 import { uploadLifeTraceImage } from '@/api/upload';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
-import { FormItem } from '@/components/FormItem';
+import { FormItem, PickerFieldButton, SheetSelectField } from '@/components/FormItem';
 import { OptionPickerSheet } from '@/components/OptionPickerSheet';
 import { PantryExpiryDateField } from '@/components/PantryExpiryDateField';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -34,6 +33,9 @@ import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import {
   generatePantryTransparentCoverWithFallback,
   getPantryTransparentCoverTechLabel,
@@ -483,6 +485,15 @@ export function PhotoItemAnalysisPage() {
   const [barcodeMatching, setBarcodeMatching] = useState(false);
   const [barcodeMatch, setBarcodeMatch] = useState<PantryBarcodeMatchResponse | null>(null);
   const [barcodeStatusText, setBarcodeStatusText] = useState('');
+  const householdOptions = useMemo(
+    () => [
+      { label: '我的空间', value: '' },
+      ...households
+        .filter((household) => household.kind === 'shared')
+        .map((household) => ({ label: household.name, value: household.id })),
+    ],
+    [households],
+  );
 
   const cameraActive = state === 'camera-ready';
   const busy = state === 'uploading' || state === 'analyzing' || state === 'saving';
@@ -2483,9 +2494,8 @@ export function PhotoItemAnalysisPage() {
           }}
         >
           <FormItem label="商品名称" required>
-            <input
+            <Input
               value={form.name}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
               onChange={(event) => {
                 markManualEditedField('name');
                 setForm((current) => ({ ...current, name: event.target.value }));
@@ -2513,80 +2523,60 @@ export function PhotoItemAnalysisPage() {
             </p>
             <div className="mt-3 grid grid-cols-[minmax(0,1fr)_7.25rem] gap-3 max-[360px]:grid-cols-1">
               <FormItem label="编码">
-                <input
+                <Input
                   value={form.barcodeValue ?? ''}
                   disabled={state === 'saving'}
-                  className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring disabled:opacity-60"
                   placeholder="手动填写"
                   onChange={(event) =>
                     setForm((current) => ({ ...current, barcodeValue: event.target.value }))
                   }
                 />
               </FormItem>
-              <FormItem label="格式">
-                <select
-                  value={form.barcodeFormat ?? ''}
-                  disabled={state === 'saving'}
-                  className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm text-foreground outline-none transition focus:border-ring disabled:opacity-60"
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, barcodeFormat: event.target.value }))
-                  }
-                >
-                  {barcodeFormatOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </FormItem>
+              <SheetSelectField
+                label="格式"
+                value={form.barcodeFormat ?? ''}
+                options={barcodeFormatOptions}
+                disabled={state === 'saving'}
+                onValueChange={(value) =>
+                  setForm((current) => ({ ...current, barcodeFormat: value }))
+                }
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
             <FormItem label="分类">
-              <button
-                type="button"
+              <PickerFieldButton
                 disabled={state === 'saving'}
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
                 onClick={() => setActivePicker('category')}
               >
-                <span className="flex items-center justify-between gap-3">
-                  <span>{form.category}</span>
-                  <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-                </span>
-              </button>
+                {form.category}
+              </PickerFieldButton>
             </FormItem>
             <FormItem label="位置">
-              <button
-                type="button"
+              <PickerFieldButton
                 disabled={state === 'saving'}
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
                 onClick={() => setActivePicker('location')}
               >
-                <span className="flex items-center justify-between gap-3">
-                  <span>{form.location}</span>
-                  <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-                </span>
-              </button>
+                {form.location}
+              </PickerFieldButton>
             </FormItem>
           </div>
 
           <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-3 max-[360px]:grid-cols-1">
             <FormItem label="数量" required>
-              <input
+              <Input
                 type="number"
                 min="1"
                 value={form.quantity}
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
                 onChange={(event) =>
                   setForm((current) => ({ ...current, quantity: event.target.value }))
                 }
               />
             </FormItem>
             <FormItem label="单位">
-              <input
+              <Input
                 value={form.unit}
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
                 onChange={(event) => {
                   markManualEditedField('unit');
                   setForm((current) => ({ ...current, unit: event.target.value }));
@@ -2597,11 +2587,11 @@ export function PhotoItemAnalysisPage() {
 
           <div className="grid min-w-0 grid-cols-1 gap-3">
             <FormItem label="开封日期">
-              <input
+              <Input
                 type="date"
                 value={form.openedAt}
                 disabled={state === 'saving'}
-                className="h-11 min-w-0 w-full appearance-none rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring disabled:opacity-60"
+                className="appearance-none"
                 onChange={(event) =>
                   setForm((current) => ({ ...current, openedAt: event.target.value }))
                 }
@@ -2667,27 +2657,15 @@ export function PhotoItemAnalysisPage() {
             />
           </div>
 
-          <FormItem label="家庭空间">
-            <select
-              value={form.householdId}
-              disabled={householdsLoading || state === 'saving'}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring disabled:opacity-60"
-              onChange={(event) =>
-                setForm((current) => ({ ...current, householdId: event.target.value }))
-              }
-            >
-              <option value="">我的空间</option>
-              {households
-                .filter((household) => household.kind === 'shared')
-                .map((household) => (
-                  <option key={household.id} value={household.id}>
-                    {household.name}
-                  </option>
-                ))}
-            </select>
-          </FormItem>
+          <SheetSelectField
+            label="家庭空间"
+            value={form.householdId}
+            options={householdOptions}
+            disabled={householdsLoading || state === 'saving'}
+            onValueChange={(value) => setForm((current) => ({ ...current, householdId: value }))}
+          />
 
-          <label className="flex items-center justify-between gap-3 rounded-[1.25rem] border border-border bg-secondary/60 px-4 py-3 text-sm">
+          <div className="flex items-center justify-between gap-3 rounded-[1.25rem] border border-border bg-secondary/60 px-4 py-3 text-sm">
             <span>
               <span className="block font-semibold text-foreground">使用默认到期提醒</span>
               <span className="mt-1 block text-xs text-muted-foreground">
@@ -2696,22 +2674,20 @@ export function PhotoItemAnalysisPage() {
                   : '未设置保质期时，仅作为普通物品记录。'}
               </span>
             </span>
-            <input
-              type="checkbox"
+            <Switch
+              size="sm"
               checked={hasExpiryDate && form.reminderEnabled}
-              className="size-5 accent-life-ai"
               disabled={state === 'saving' || !hasExpiryDate}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, reminderEnabled: event.target.checked }))
+              onCheckedChange={(checked) =>
+                setForm((current) => ({ ...current, reminderEnabled: checked }))
               }
             />
-          </label>
+          </div>
 
           <FormItem label="备注">
-            <textarea
+            <Textarea
               value={form.note}
               rows={4}
-              className="w-full resize-none rounded-2xl border border-border bg-secondary px-4 py-3 text-sm text-foreground outline-none transition focus:border-ring"
               onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))}
             />
           </FormItem>

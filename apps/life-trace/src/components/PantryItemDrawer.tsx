@@ -1,14 +1,19 @@
-import { ArrowRightLeft, Camera, ChevronDown, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowRightLeft, Camera, Sparkles, Trash2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { generatePantryThumbnail } from '@/api/pantry';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { FormItem, PickerFieldButton, SheetHeader } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
 import { OptionPickerSheet } from '@/components/OptionPickerSheet';
 import { PantryExpiryDateField } from '@/components/PantryExpiryDateField';
+import { TonePanel } from '@/components/TonePanel';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { getLifeTraceErrorMessage } from '@/lib/error';
 import { formatPantryReminderSummary, getPantryPersistedStatus } from '@/lib/pantry';
 import {
@@ -348,27 +353,16 @@ export function PantryItemDrawer({
         overlayLabel="关闭库存编辑"
         zIndexClassName="z-50"
       >
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-xl font-semibold">{editing ? '编辑库存' : '添加库存'}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              给家里的商品留一张图，再决定何时提醒你处理。
-            </p>
-            {householdName ? (
-              <p className="mt-2 text-xs font-medium text-life-ai">保存到：{householdName}</p>
-            ) : null}
-          </div>
-          <Button type="button" variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
-            <X className="size-5" />
-          </Button>
-        </div>
+        <SheetHeader
+          title={editing ? '编辑库存' : '添加库存'}
+          description="给家里的商品留一张图，再决定何时提醒你处理。"
+          meta={householdName ? `保存到：${householdName}` : undefined}
+          onClose={() => onOpenChange(false)}
+        />
 
         <form className="min-w-0 space-y-4" onSubmit={handleSubmit}>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">
-              名称 <span className="text-life-alert">*</span>
-            </span>
-            <input
+          <FormItem label="名称" required error={errors.name}>
+            <Input
               value={form.name}
               onChange={(event) => {
                 updateField('name', event.target.value);
@@ -376,51 +370,25 @@ export function PantryItemDrawer({
               }}
               placeholder="例如：低温鲜奶"
               aria-invalid={Boolean(errors.name)}
-              className={cn(
-                'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
-                errors.name ? 'border-destructive' : 'border-border',
-              )}
             />
-            {errors.name ? <p className="text-xs text-destructive">{errors.name}</p> : null}
-          </label>
+          </FormItem>
 
           <div className="grid min-w-0 grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-            <div className="block min-w-0 space-y-2">
-              <span className="text-sm font-medium">分类</span>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => setActivePicker('category')}
-                className="h-11 min-w-0 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
-              >
-                <span className="flex items-center justify-between gap-3">
-                  <span>{form.category}</span>
-                  <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-                </span>
-              </button>
-            </div>
-            <div className="block min-w-0 space-y-2">
-              <span className="text-sm font-medium">位置</span>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => setActivePicker('location')}
-                className="h-11 min-w-0 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
-              >
-                <span className="flex items-center justify-between gap-3">
-                  <span>{form.location}</span>
-                  <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-                </span>
-              </button>
-            </div>
+            <FormItem label="分类">
+              <PickerFieldButton disabled={submitting} onClick={() => setActivePicker('category')}>
+                {form.category}
+              </PickerFieldButton>
+            </FormItem>
+            <FormItem label="位置">
+              <PickerFieldButton disabled={submitting} onClick={() => setActivePicker('location')}>
+                {form.location}
+              </PickerFieldButton>
+            </FormItem>
           </div>
 
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_7.5rem] gap-3 max-[360px]:grid-cols-1">
-            <label className="block min-w-0 space-y-2">
-              <span className="text-sm font-medium">
-                数量 <span className="text-life-alert">*</span>
-              </span>
-              <input
+            <FormItem label="数量" required error={errors.quantity}>
+              <Input
                 type="number"
                 min="1"
                 step="1"
@@ -430,38 +398,26 @@ export function PantryItemDrawer({
                   setErrors((current) => ({ ...current, quantity: undefined }));
                 }}
                 aria-invalid={Boolean(errors.quantity)}
-                className={cn(
-                  'h-11 min-w-0 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
-                  errors.quantity ? 'border-destructive' : 'border-border',
-                )}
               />
-              {errors.quantity ? (
-                <p className="text-xs text-destructive">{errors.quantity}</p>
-              ) : null}
-            </label>
-            <label className="block min-w-0 space-y-2">
-              <span className="text-sm font-medium">单位</span>
-              <input
+            </FormItem>
+            <FormItem label="单位">
+              <Input
                 value={form.unit}
                 onChange={(event) => updateField('unit', event.target.value)}
                 placeholder="件"
-                className="h-11 min-w-0 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
               />
-            </label>
+            </FormItem>
           </div>
 
           <div className="grid min-w-0 grid-cols-1 gap-3">
-            <label className="block min-w-0 space-y-2">
-              <span className="text-sm font-medium">开封日期</span>
-              <span className="block min-w-0 max-w-full overflow-hidden rounded-2xl">
-                <input
-                  type="date"
-                  value={form.openedAt || ''}
-                  onChange={(event) => updateField('openedAt', event.target.value)}
-                  className="block h-11 min-w-0 max-w-full w-full appearance-none rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
-                />
-              </span>
-            </label>
+            <FormItem label="开封日期">
+              <Input
+                type="date"
+                value={form.openedAt || ''}
+                onChange={(event) => updateField('openedAt', event.target.value)}
+                className="appearance-none"
+              />
+            </FormItem>
             <PantryExpiryDateField
               idPrefix="pantry-item"
               expiresAt={form.expiresAt || ''}
@@ -479,13 +435,13 @@ export function PantryItemDrawer({
             description="给这件库存留一张更好辨认的照片。"
           />
 
-          <div className="space-y-3 rounded-[1.25rem] border border-border bg-secondary/60 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium">封面图</p>
-                <p className="mt-1 text-xs text-muted-foreground">补一张更整洁的商品封面。</p>
-              </div>
-              {form.thumbnailUrl ? (
+          <TonePanel
+            tone="ai"
+            icon={Sparkles}
+            title="封面图"
+            description="补一张更整洁的商品封面。"
+            action={
+              form.thumbnailUrl ? (
                 <Button
                   type="button"
                   variant="ghost"
@@ -498,8 +454,9 @@ export function PantryItemDrawer({
                   <Trash2 className="size-4" />
                   清除
                 </Button>
-              ) : null}
-            </div>
+              ) : null
+            }
+          >
             <div className="grid grid-cols-2 gap-2 max-[360px]:grid-cols-1">
               <Button
                 type="button"
@@ -568,33 +525,39 @@ export function PantryItemDrawer({
               <p className="text-xs text-life-trace">封面生成中，完成后会自动继续保存。</p>
             ) : null}
             {thumbnailError ? <p className="text-xs text-destructive">{thumbnailError}</p> : null}
-          </div>
+          </TonePanel>
 
-          <div className="space-y-3 rounded-[1.25rem] border border-border bg-secondary/60 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium">提醒设置</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  默认全部提醒，你也可以只给这件商品单独改。
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant={form.reminder.useDefault ? 'secondary' : 'outline'}
-                size="sm"
-                onClick={() =>
-                  updateField('reminder', {
-                    ...form.reminder,
-                    useDefault: !form.reminder.useDefault,
-                    enabled: !form.reminder.useDefault
-                      ? pantryPreferences.defaultReminderEnabled
-                      : form.reminder.enabled,
-                  })
-                }
+          <TonePanel
+            tone="health"
+            icon={ArrowRightLeft}
+            title="提醒设置"
+            description="默认全部提醒，你也可以只给这件商品单独改。"
+            action={
+              <div
+                className={cn(
+                  'flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold',
+                  form.reminder.useDefault
+                    ? 'border-border bg-secondary text-secondary-foreground'
+                    : 'border-border text-muted-foreground',
+                )}
               >
-                {form.reminder.useDefault ? '使用默认' : '单独设置'}
-              </Button>
-            </div>
+                <span>{form.reminder.useDefault ? '使用默认' : '单独设置'}</span>
+                <Switch
+                  size="sm"
+                  checked={form.reminder.useDefault}
+                  onCheckedChange={(checked) =>
+                    updateField('reminder', {
+                      ...form.reminder,
+                      useDefault: checked,
+                      enabled: checked
+                        ? pantryPreferences.defaultReminderEnabled
+                        : form.reminder.enabled,
+                    })
+                  }
+                />
+              </div>
+            }
+          >
             <div className="rounded-2xl border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
               当前：{reminderSummary}
               <span className="ml-2 text-xs">
@@ -639,9 +602,8 @@ export function PantryItemDrawer({
                     );
                   })}
                 </div>
-                <label className="block space-y-2">
-                  <span className="text-sm font-medium">提醒时间</span>
-                  <input
+                <FormItem label="提醒时间">
+                  <Input
                     type="time"
                     value={form.reminder.reminderTime}
                     onChange={(event) =>
@@ -650,23 +612,21 @@ export function PantryItemDrawer({
                         reminderTime: event.target.value,
                       })
                     }
-                    className="h-11 w-full rounded-2xl border border-border bg-card px-4 text-sm outline-none transition focus:border-ring"
+                    className="bg-card"
                   />
-                </label>
+                </FormItem>
               </>
             ) : null}
-          </div>
+          </TonePanel>
 
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">备注</span>
-            <textarea
+          <FormItem label="备注">
+            <Textarea
               value={form.note}
               onChange={(event) => updateField('note', event.target.value)}
               rows={3}
               placeholder="例如：周末早餐要先喝掉。"
-              className="w-full rounded-2xl border border-border bg-secondary px-4 py-3 text-sm outline-none transition focus:border-ring"
             />
-          </label>
+          </FormItem>
 
           {editing && showTransferAction && item && onRequestTransfer ? (
             <Button

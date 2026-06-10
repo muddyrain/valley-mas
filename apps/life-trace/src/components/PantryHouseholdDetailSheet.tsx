@@ -1,9 +1,10 @@
-import { Copy, Crown, LogOut, RefreshCw, Shield, Sparkles, Trash2, Users, X } from 'lucide-react';
+import { Copy, Crown, LogOut, RefreshCw, Shield, Sparkles, Trash2, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
+import { SheetActions, SheetHeader } from '@/components/FormItem';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -183,26 +184,12 @@ export function PantryHouseholdDetailSheet({
         zIndexClassName="z-[80]"
         portal
       >
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-xl font-semibold">当前空间详情</h2>
-            <p className="mt-1 text-sm text-muted-foreground">看成员、邀请码和当前家庭状态。</p>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="关闭当前家庭详情"
-            data-sheet-drag-ignore="true"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onOpenChange(false);
-            }}
-          >
-            <X className="size-5" />
-          </Button>
-        </div>
+        <SheetHeader
+          title="当前空间详情"
+          description="看成员、邀请码和当前家庭状态。"
+          icon={Users}
+          onClose={() => onOpenChange(false)}
+        />
 
         {sheetError ? (
           <Card className="mb-4 border-life-alert/20 bg-life-alert/10 p-4 text-sm text-life-alert">
@@ -512,7 +499,7 @@ export function PantryHouseholdDetailSheet({
                   )}
                 </Card>
 
-                <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+                <SheetActions>
                   <Button
                     type="button"
                     variant="outline"
@@ -552,7 +539,7 @@ export function PantryHouseholdDetailSheet({
                     )}
                     {submittingAction === 'dissolve' ? '解散中...' : '解散家庭'}
                   </Button>
-                </div>
+                </SheetActions>
 
                 {ownerLeavingBlocked ? (
                   <p className="text-xs text-muted-foreground">

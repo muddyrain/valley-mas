@@ -1,5 +1,7 @@
 import { CheckCircle2, type LucideIcon } from 'lucide-react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
 type SettingInputProps = {
@@ -66,22 +68,22 @@ export function SettingInput({
               <span className="block h-7 truncate text-base font-semibold text-foreground">
                 {value || placeholder}
               </span>
-              <input
+              <Input
                 type="time"
                 value={value}
                 placeholder={placeholder}
                 onChange={(event) => onChange(event.target.value)}
                 step={60}
-                className="absolute inset-0 h-7 w-full cursor-pointer opacity-0"
+                className="absolute inset-0 h-7 cursor-pointer rounded-none border-0 bg-transparent px-0 opacity-0 focus:border-transparent focus-visible:border-transparent focus-visible:ring-0"
               />
             </span>
           ) : (
-            <input
+            <Input
               type={type}
               value={value}
               placeholder={placeholder}
               onChange={(event) => onChange(event.target.value)}
-              className="mt-1 h-7 w-full bg-transparent text-base font-semibold text-foreground outline-none placeholder:text-muted-foreground"
+              className="mt-1 h-7 rounded-none border-0 bg-transparent px-0 text-base font-semibold focus:border-transparent focus-visible:border-transparent focus-visible:ring-0"
             />
           )}
         </span>
@@ -106,6 +108,7 @@ export function SettingToggle({
   return (
     <button
       type="button"
+      aria-pressed={active}
       className={cn(
         'group flex w-full items-center justify-between gap-4 rounded-[1.35rem] border p-4 text-left transition duration-300',
         active
@@ -128,19 +131,7 @@ export function SettingToggle({
           <span className="mt-1 block text-sm leading-5 text-muted-foreground">{detail}</span>
         </span>
       </span>
-      <span
-        className={cn(
-          'relative h-8 w-14 shrink-0 rounded-full p-1 transition duration-300',
-          active ? 'bg-life-trace' : 'bg-secondary',
-        )}
-      >
-        <span
-          className={cn(
-            'block size-6 rounded-full bg-foreground transition duration-300',
-            active ? 'translate-x-6 bg-background shadow-[0_0_18px_rgba(250,250,250,0.25)]' : '',
-          )}
-        />
-      </span>
+      <Switch checked={active} tabIndex={-1} aria-hidden="true" className="pointer-events-none" />
     </button>
   );
 }

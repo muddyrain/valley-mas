@@ -56,8 +56,10 @@ import { LifeTraceBrandMark } from '@/components/LifeTraceBrandMark';
 import { SectionHeader } from '@/components/SectionHeader';
 import { SubPageShell } from '@/components/SubPageShell';
 import { MessageSyncSkeleton, SyncState } from '@/components/SyncState';
+import { TonePanel } from '@/components/TonePanel';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
 import { suggestedPrompts } from '@/data/mock';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import {
@@ -663,9 +665,9 @@ function AssistantHistoryPage({
       }
     >
       {notice ? (
-        <Card className="border-life-trace/20 bg-life-trace/10 p-4 text-sm font-semibold text-life-trace">
-          {notice}
-        </Card>
+        <TonePanel tone="trace" className="p-4">
+          <p className="text-sm font-semibold text-life-trace">{notice}</p>
+        </TonePanel>
       ) : null}
 
       <section className="space-y-4">
@@ -1575,8 +1577,8 @@ function AgentConversationPanel({
 
           <div className="shrink-0 border-t border-border bg-background/88 p-2 backdrop-blur">
             <div className="rounded-[1.1rem] border border-life-ai/25 bg-secondary/40 p-2 transition focus-within:border-life-ai/60 focus-within:bg-secondary focus-within:shadow-[0_0_0_3px_rgba(6,182,212,0.08)]">
-              <textarea
-                className="max-h-28 min-h-12 w-full resize-none bg-transparent px-3 py-1.5 text-base leading-7 outline-none placeholder:text-muted-foreground"
+              <Textarea
+                className="max-h-28 min-h-12 border-0 bg-transparent px-3 py-1.5 text-base leading-7 focus:border-transparent focus-visible:border-transparent focus-visible:ring-0"
                 value={input}
                 disabled={streaming}
                 placeholder="输入想聊的事"

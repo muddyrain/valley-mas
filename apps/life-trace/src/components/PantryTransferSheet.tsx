@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRightLeft, Check, ChevronsRight, Copy, Users, X } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Check, ChevronsRight, Copy, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { listHouseholds } from '@/api/household';
 import {
@@ -12,6 +12,7 @@ import {
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { EmptyState } from '@/components/EmptyState';
+import { SheetActions, SheetHeader } from '@/components/FormItem';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -258,17 +259,13 @@ export function PantryTransferSheet({
       zIndexClassName="z-[80]"
       portal
     >
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-xl font-semibold">转移到共享家庭</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            先预览重复库存，再决定是复制还是移动到共享家庭空间。
-          </p>
-        </div>
-        <Button type="button" variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
-          <X className="size-5" />
-        </Button>
-      </div>
+      <SheetHeader
+        title="转移到共享家庭"
+        description="先预览重复库存，再决定是复制还是移动到共享家庭空间。"
+        icon={ArrowRightLeft}
+        iconClassName="bg-life-plan/10 text-life-plan"
+        onClose={() => onOpenChange(false)}
+      />
 
       {sheetError ? (
         <Card className="mb-4 border-life-alert/20 bg-life-alert/10 p-4 text-sm text-life-alert">
@@ -508,7 +505,7 @@ export function PantryTransferSheet({
           </Card>
         ) : null}
 
-        <div className="flex gap-3 max-[360px]:flex-col">
+        <SheetActions>
           <Button
             type="button"
             variant="outline"
@@ -535,7 +532,7 @@ export function PantryTransferSheet({
             {submitting ? <ActionLoadingIcon className="size-4" tone="ai" /> : null}
             {submitting ? '转移中...' : mode === 'move' ? '确认移动' : '确认复制'}
           </Button>
-        </div>
+        </SheetActions>
       </div>
     </BottomSheet>
   );

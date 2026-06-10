@@ -4,7 +4,11 @@ import type { ClothingPhotoAnalysisResponse } from '@/api/closet';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
+import { FormItem, SheetHeader, SheetSelectField } from '@/components/FormItem';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import type {
   ClosetCategory,
@@ -27,6 +31,14 @@ export const closetCategoryOptions: ClosetCategory[] = [
 
 export const closetWarmthOptions: ClosetWarmthLevel[] = ['轻薄', '常规', '保暖', '厚重'];
 export const closetSeasonOptions: ClosetSeason[] = ['春', '夏', '秋', '冬', '四季'];
+const closetCategorySelectOptions = closetCategoryOptions.map((option) => ({
+  label: option,
+  value: option,
+}));
+const closetWarmthSelectOptions = closetWarmthOptions.map((option) => ({
+  label: option,
+  value: option,
+}));
 export const defaultClosetItemForm: NewClosetItemInput = {
   name: '',
   category: '上装',
@@ -219,20 +231,21 @@ export function ClosetItemSheet({
       contentClassName="space-y-5 pb-6"
       portal
     >
-      <div>
-        <p className="text-2xl font-semibold tracking-normal">{item ? '编辑衣物' : '添加衣物'}</p>
-        <p className="mt-2 text-sm text-muted-foreground">衣物信息</p>
-      </div>
+      <SheetHeader
+        title={item ? '编辑衣物' : '添加衣物'}
+        description="衣物信息"
+        closeDisabled={submitting}
+        onClose={() => onOpenChange(false)}
+        className="mb-0"
+      />
       <form className="space-y-5" onSubmit={handleSubmit}>
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">名称</span>
-          <input
+        <FormItem label="名称" error={error}>
+          <Input
             value={form.name}
             onChange={(event) => update('name', event.target.value)}
-            className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none focus:border-life-ai/50"
             placeholder="蓝色衬衫"
           />
-        </label>
+        </FormItem>
 
         <AppImageUploader
           value={form.imageUrl}
@@ -257,50 +270,31 @@ export function ClosetItemSheet({
         ) : null}
 
         <div className="grid grid-cols-2 gap-3">
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">品类</span>
-            <select
-              value={form.category}
-              onChange={(event) => update('category', event.target.value as ClosetCategory)}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none focus:border-life-ai/50"
-            >
-              {closetCategoryOptions.map((option) => (
-                <option key={option}>{option}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">厚薄</span>
-            <select
-              value={form.warmthLevel}
-              onChange={(event) => update('warmthLevel', event.target.value as ClosetWarmthLevel)}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none focus:border-life-ai/50"
-            >
-              {closetWarmthOptions.map((option) => (
-                <option key={option}>{option}</option>
-              ))}
-            </select>
-          </label>
+          <SheetSelectField
+            label="品类"
+            value={form.category}
+            options={closetCategorySelectOptions}
+            onValueChange={(value) => update('category', value)}
+          />
+          <SheetSelectField
+            label="厚薄"
+            value={form.warmthLevel}
+            options={closetWarmthSelectOptions}
+            onValueChange={(value) => update('warmthLevel', value)}
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">颜色</span>
-            <input
-              value={form.color}
-              onChange={(event) => update('color', event.target.value)}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none focus:border-life-ai/50"
-            />
-          </label>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">材质</span>
-            <input
+          <FormItem label="颜色">
+            <Input value={form.color} onChange={(event) => update('color', event.target.value)} />
+          </FormItem>
+          <FormItem label="材质">
+            <Input
               value={form.material}
               onChange={(event) => update('material', event.target.value)}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none focus:border-life-ai/50"
               placeholder="棉 / 羊毛"
             />
-          </label>
+          </FormItem>
         </div>
 
         <div className="space-y-2">
@@ -327,45 +321,38 @@ export function ClosetItemSheet({
           </div>
         </div>
 
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">场景标签</span>
-          <input
+        <FormItem label="场景标签">
+          <Input
             value={sceneText}
             onChange={(event) => {
               setSceneText(event.target.value);
               touchedFieldsRef.current = new Set(touchedFieldsRef.current).add('sceneTags');
             }}
-            className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none focus:border-life-ai/50"
             placeholder="通勤、雨天、聚会"
           />
-        </label>
+        </FormItem>
 
         {sharedAvailable ? (
-          <label className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-secondary/50 px-4 py-3">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-secondary/50 px-4 py-3">
             <span>
               <span className="block text-sm font-semibold">共享衣物池</span>
               <span className="mt-1 block text-xs text-muted-foreground">家庭成员可见</span>
             </span>
-            <input
-              type="checkbox"
+            <Switch
+              size="sm"
               checked={form.shared}
-              onChange={(event) => update('shared', event.target.checked)}
-              className="size-5 accent-life-ai"
+              onCheckedChange={(checked) => update('shared', checked)}
             />
-          </label>
+          </div>
         ) : null}
 
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">备注</span>
-          <textarea
+        <FormItem label="备注">
+          <Textarea
             value={form.note}
             onChange={(event) => update('note', event.target.value)}
-            className="min-h-24 w-full rounded-2xl border border-border bg-secondary px-4 py-3 text-sm outline-none focus:border-life-ai/50"
             placeholder="适合什么天气、搭配或护理提醒"
           />
-        </label>
-
-        {error ? <p className="text-sm text-life-alert">{error}</p> : null}
+        </FormItem>
 
         <Button type="submit" variant="ai" className="w-full" disabled={submitting}>
           {submitting ? '保存中' : item ? '保存修改' : '保存衣物'}

@@ -13,7 +13,6 @@ import {
   Star,
   Trash2,
   Tv,
-  X,
 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -30,6 +29,7 @@ import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
+import { FormItem, SheetActions, SheetHeader, SheetSelectField } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { SubPageShell } from '@/components/SubPageShell';
@@ -37,6 +37,8 @@ import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
@@ -63,6 +65,14 @@ const mediaDiaryTypes: Array<{ value: MediaDiaryType; label: string; icon: typeo
 ];
 
 const mediaDiaryStatuses: MediaDiaryStatus[] = ['想看', '进行中', '已完成', '搁置'];
+const mediaDiaryStatusOptions = mediaDiaryStatuses.map((status) => ({
+  label: status,
+  value: status,
+}));
+const mediaDiaryRatingOptions = Array.from({ length: 11 }, (_, index) => ({
+  label: index === 0 ? '未评分' : `${(index / 2).toFixed(1)} 星`,
+  value: String(index),
+}));
 
 const defaultPagination: ListPagination = {
   page: 1,
@@ -482,64 +492,35 @@ function MediaDiaryEditor({
       closeDisabled={submitting}
       zIndexClassName="z-[70]"
     >
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-xl font-semibold">{entry ? '编辑书影音' : '新建书影音'}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">记录作品、评分、摘录和当下感受。</p>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          disabled={submitting}
-          onClick={() => onOpenChange(false)}
-        >
-          <X className="size-5" />
-        </Button>
-      </div>
+      <SheetHeader
+        title={entry ? '编辑书影音' : '新建书影音'}
+        description="记录作品、评分、摘录和当下感受。"
+        closeDisabled={submitting}
+        onClose={() => onOpenChange(false)}
+      />
 
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">类型</span>
-            <select
-              value={form.mediaType}
-              onChange={(event) => {
-                const mediaType = event.target.value as MediaDiaryType;
-                updateField('mediaType', mediaType);
-                setTagText(stringifyTags(normalizeFormTags(mediaType, tagText)));
-              }}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
-            >
-              {mediaDiaryTypes.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">状态</span>
-            <select
-              value={form.status}
-              onChange={(event) => updateField('status', event.target.value as MediaDiaryStatus)}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
-            >
-              {mediaDiaryStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SheetSelectField
+            label="类型"
+            value={form.mediaType}
+            options={mediaDiaryTypes}
+            onValueChange={(mediaType) => {
+              updateField('mediaType', mediaType);
+              setTagText(stringifyTags(normalizeFormTags(mediaType, tagText)));
+            }}
+          />
+          <SheetSelectField
+            label="状态"
+            value={form.status}
+            options={mediaDiaryStatusOptions}
+            onValueChange={(value) => updateField('status', value)}
+          />
         </div>
 
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">
-            作品标题 <span className="text-life-alert">*</span>
-          </span>
+        <FormItem label="作品标题" required error={errors.title}>
           <div className="flex gap-2 max-[360px]:flex-col">
-            <input
+            <Input
               value={form.title}
               onChange={(event) => {
                 updateField('title', event.target.value);
@@ -547,10 +528,7 @@ function MediaDiaryEditor({
               }}
               aria-invalid={Boolean(errors.title)}
               placeholder="例如：夜航西飞"
-              className={cn(
-                'h-11 flex-1 rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
-                errors.title ? 'border-destructive' : 'border-border',
-              )}
+              className="flex-1"
             />
             <Button
               type="button"
@@ -562,34 +540,28 @@ function MediaDiaryEditor({
               {suggesting ? '补全中' : 'AI 补全'}
             </Button>
           </div>
-          {errors.title ? <p className="text-xs text-destructive">{errors.title}</p> : null}
-        </label>
+        </FormItem>
 
         <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">原名</span>
-            <input
+          <FormItem label="原名">
+            <Input
               value={form.originalTitle}
               onChange={(event) => updateField('originalTitle', event.target.value)}
               placeholder="可选"
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
             />
-          </label>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">作者 / 导演 / 艺人</span>
-            <input
+          </FormItem>
+          <FormItem label="作者 / 导演 / 艺人">
+            <Input
               value={form.creator}
               onChange={(event) => updateField('creator', event.target.value)}
               placeholder="可选"
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
             />
-          </label>
+          </FormItem>
         </div>
 
         <div className="grid grid-cols-3 gap-3 max-[420px]:grid-cols-1">
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">年份</span>
-            <input
+          <FormItem label="年份">
+            <Input
               type="number"
               value={form.releaseYear ?? ''}
               min={0}
@@ -601,43 +573,30 @@ function MediaDiaryEditor({
                 )
               }
               placeholder="可选"
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
             />
-          </label>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">评分</span>
-            <select
-              value={form.rating}
-              onChange={(event) => updateField('rating', Number(event.target.value))}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
-            >
-              {Array.from({ length: 11 }, (_, index) => (
-                <option key={index} value={index}>
-                  {index === 0 ? '未评分' : `${(index / 2).toFixed(1)} 星`}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">完成日期</span>
-            <input
+          </FormItem>
+          <SheetSelectField
+            label="评分"
+            value={String(form.rating)}
+            options={mediaDiaryRatingOptions}
+            onValueChange={(value) => updateField('rating', Number(value))}
+          />
+          <FormItem label="完成日期">
+            <Input
               type="date"
               value={form.finishedAt}
               onChange={(event) => updateField('finishedAt', event.target.value)}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
             />
-          </label>
+          </FormItem>
         </div>
 
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">开始日期</span>
-          <input
+        <FormItem label="开始日期">
+          <Input
             type="date"
             value={form.startedAt}
             onChange={(event) => updateField('startedAt', event.target.value)}
-            className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
           />
-        </label>
+        </FormItem>
 
         <AppImageUploader
           value={form.coverUrl}
@@ -648,38 +607,32 @@ function MediaDiaryEditor({
           onUploadingChange={setImageUploading}
         />
 
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">短评</span>
-          <textarea
+        <FormItem label="短评">
+          <Textarea
             value={form.note}
             onChange={(event) => updateField('note', event.target.value)}
             placeholder="留下这次阅读、观看或收听后的感受。"
-            className="min-h-24 w-full resize-none rounded-2xl border border-border bg-secondary px-4 py-3 text-sm outline-none transition focus:border-ring"
+            className="min-h-24"
           />
-        </label>
+        </FormItem>
 
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">摘录</span>
-          <textarea
+        <FormItem label="摘录">
+          <Textarea
             value={form.quote}
             onChange={(event) => updateField('quote', event.target.value)}
             placeholder="可选"
-            className="min-h-20 w-full resize-none rounded-2xl border border-border bg-secondary px-4 py-3 text-sm outline-none transition focus:border-ring"
           />
-        </label>
+        </FormItem>
 
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">标签</span>
-          <input
+        <FormItem label="标签" description="可用顿号、逗号或换行分隔。">
+          <Input
             value={tagText}
             onChange={(event) => setTagText(event.target.value)}
             placeholder="例如：非虚构、周末、书影音"
-            className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
           />
-          <p className="text-xs text-muted-foreground">可用顿号、逗号或换行分隔。</p>
-        </label>
+        </FormItem>
 
-        <div className="grid grid-cols-2 gap-3 pt-2 max-[360px]:grid-cols-1">
+        <SheetActions>
           <Button
             type="button"
             variant="secondary"
@@ -692,7 +645,7 @@ function MediaDiaryEditor({
             {saving ? <ActionLoadingIcon tone="ai" /> : null}
             {saving ? '保存中' : '保存'}
           </Button>
-        </div>
+        </SheetActions>
       </form>
     </BottomSheet>
   );
@@ -947,11 +900,11 @@ export function MediaDiaryPage() {
         <form className="flex gap-2 max-[360px]:flex-col" onSubmit={submitSearch}>
           <label className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
+            <Input
               value={searchDraft}
               onChange={(event) => setSearchDraft(event.target.value)}
               placeholder="搜索标题、作者或短评"
-              className="h-11 w-full rounded-2xl border border-border bg-secondary pl-10 pr-4 text-sm outline-none transition focus:border-ring"
+              className="pl-10"
             />
           </label>
           <Button type="submit" variant="outline">

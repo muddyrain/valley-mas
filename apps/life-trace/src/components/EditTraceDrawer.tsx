@@ -1,16 +1,18 @@
-import { X } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { BottomSheet } from '@/components/BottomSheet';
+import { FormItem, SheetActions, SheetHeader, SheetSelectField } from '@/components/FormItem';
 import { PlaceSuggestions } from '@/components/PlaceSuggestions';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { NewTraceInput, Trace } from '@/types';
 
 const traceSources: Trace['source'][] = ['计划', '打卡', '库存', '手动'];
 const traceMoods = ['放松', '满足', '活力', '平静', '开心', '专注'];
+const traceSourceOptions = traceSources.map((source) => ({ label: source, value: source }));
 
 type TraceFormErrors = Partial<Record<'title' | 'summary' | 'timeLabel', string>>;
 
@@ -67,6 +69,7 @@ export function EditTraceDrawer({
   const [errors, setErrors] = useState<TraceFormErrors>({});
   const [imageUploading, setImageUploading] = useState(false);
   const visibleMoods = traceMoods.includes(form.mood) ? traceMoods : [form.mood, ...traceMoods];
+  const visibleMoodOptions = visibleMoods.map((mood) => ({ label: mood, value: mood }));
   const editing = Boolean(trace);
   const saving = editing ? updating : creating;
   const submitting = saving || imageUploading;
@@ -161,32 +164,20 @@ export function EditTraceDrawer({
       closeDisabled={submitting}
       zIndexClassName="z-[70]"
     >
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-xl font-semibold">{editing ? '编辑踪迹' : '新建踪迹'}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {editing
-              ? '补充照片、地点、心情和标签，让这条记录更完整。'
-              : '不用等计划完成，也可以直接记录今天值得留下的片段。'}
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          disabled={submitting}
-          onClick={() => onOpenChange(false)}
-        >
-          <X className="size-5" />
-        </Button>
-      </div>
+      <SheetHeader
+        title={editing ? '编辑踪迹' : '新建踪迹'}
+        description={
+          editing
+            ? '补充照片、地点、心情和标签，让这条记录更完整。'
+            : '不用等计划完成，也可以直接记录今天值得留下的片段。'
+        }
+        closeDisabled={submitting}
+        onClose={() => onOpenChange(false)}
+      />
 
       <form className="space-y-4" onSubmit={handleSubmit}>
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">
-            标题 <span className="text-life-alert">*</span>
-          </span>
-          <input
+        <FormItem label="标题" required error={errors.title}>
+          <Input
             value={form.title}
             onChange={(event) => {
               updateField('title', event.target.value);
@@ -194,19 +185,11 @@ export function EditTraceDrawer({
             }}
             aria-invalid={Boolean(errors.title)}
             placeholder="例如：晚饭后散步"
-            className={cn(
-              'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
-              errors.title ? 'border-destructive' : 'border-border',
-            )}
           />
-          {errors.title ? <p className="text-xs text-destructive">{errors.title}</p> : null}
-        </label>
+        </FormItem>
 
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">
-            生活摘要 <span className="text-life-alert">*</span>
-          </span>
-          <textarea
+        <FormItem label="生活摘要" required error={errors.summary}>
+          <Textarea
             value={form.summary}
             onChange={(event) => {
               updateField('summary', event.target.value);
@@ -214,20 +197,12 @@ export function EditTraceDrawer({
             }}
             aria-invalid={Boolean(errors.summary)}
             placeholder="记录这件事发生了什么、当时的感受或值得记住的细节。"
-            className={cn(
-              'min-h-24 w-full resize-none rounded-2xl border bg-secondary px-4 py-3 text-sm outline-none transition focus:border-ring',
-              errors.summary ? 'border-destructive' : 'border-border',
-            )}
           />
-          {errors.summary ? <p className="text-xs text-destructive">{errors.summary}</p> : null}
-        </label>
+        </FormItem>
 
         <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">
-              时间 <span className="text-life-alert">*</span>
-            </span>
-            <input
+          <FormItem label="时间" required error={errors.timeLabel}>
+            <Input
               value={form.timeLabel}
               onChange={(event) => {
                 updateField('timeLabel', event.target.value);
@@ -235,56 +210,31 @@ export function EditTraceDrawer({
               }}
               aria-invalid={Boolean(errors.timeLabel)}
               placeholder="今天 20:10"
-              className={cn(
-                'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
-                errors.timeLabel ? 'border-destructive' : 'border-border',
-              )}
             />
-          </label>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">来源</span>
-            <select
-              value={form.source}
-              onChange={(event) => updateField('source', event.target.value as Trace['source'])}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
-            >
-              {traceSources.map((source) => (
-                <option key={source} value={source}>
-                  {source}
-                </option>
-              ))}
-            </select>
-          </label>
+          </FormItem>
+          <SheetSelectField
+            label="来源"
+            value={form.source}
+            options={traceSourceOptions}
+            onValueChange={(value) => updateField('source', value)}
+          />
         </div>
-        {errors.timeLabel ? (
-          <p className="-mt-2 text-xs text-destructive">{errors.timeLabel}</p>
-        ) : null}
 
         <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">心情</span>
-            <select
-              value={form.mood}
-              onChange={(event) => updateField('mood', event.target.value)}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
-            >
-              {visibleMoods.map((mood) => (
-                <option key={mood} value={mood}>
-                  {mood}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">地点</span>
-            <input
+          <SheetSelectField
+            label="心情"
+            value={form.mood}
+            options={visibleMoodOptions}
+            onValueChange={(value) => updateField('mood', value)}
+          />
+          <FormItem label="地点">
+            <Input
               value={form.location}
               onChange={(event) => {
                 updateField('location', event.target.value);
                 updateField('placeId', undefined);
               }}
               placeholder="可选"
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
             />
             <PlaceSuggestions
               value={form.location}
@@ -293,7 +243,7 @@ export function EditTraceDrawer({
                 updateField('placeId', place.id);
               }}
             />
-          </label>
+          </FormItem>
         </div>
 
         <AppImageUploader
@@ -305,16 +255,13 @@ export function EditTraceDrawer({
           onUploadingChange={setImageUploading}
         />
 
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">标签</span>
-          <input
+        <FormItem label="标签" description="可用顿号、逗号或换行分隔多个标签。">
+          <Input
             value={tagText}
             onChange={(event) => setTagText(event.target.value)}
             placeholder="例如：计划完成、散步、生活迹"
-            className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
           />
-          <p className="text-xs text-muted-foreground">可用顿号、逗号或换行分隔多个标签。</p>
-        </label>
+        </FormItem>
 
         {tracesError ? (
           <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -322,7 +269,7 @@ export function EditTraceDrawer({
           </div>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-3 pt-2 max-[360px]:grid-cols-1">
+        <SheetActions>
           <Button
             type="button"
             variant="secondary"
@@ -335,7 +282,7 @@ export function EditTraceDrawer({
             {submitting ? <ActionLoadingIcon /> : null}
             {submitting ? '保存中' : editing ? '保存修改' : '保存踪迹'}
           </Button>
-        </div>
+        </SheetActions>
       </form>
     </BottomSheet>
   );

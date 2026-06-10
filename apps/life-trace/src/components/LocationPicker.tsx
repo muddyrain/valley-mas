@@ -1,7 +1,9 @@
-import { ChevronRight, MapPin, X } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { BottomSheet } from '@/components/BottomSheet';
+import { FormItem, SheetActions, SheetHeader } from '@/components/FormItem';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   buildLocationValue,
   formatLocationDisplay,
@@ -77,15 +79,12 @@ export function LocationPicker({
         overlayLabel={`关闭${title}`}
         zIndexClassName="z-[72]"
       >
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-lg font-semibold">{title}</h3>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
-          </div>
-          <Button type="button" variant="ghost" size="icon" onClick={() => setOpen(false)}>
-            <X className="size-5" />
-          </Button>
-        </div>
+        <SheetHeader
+          title={title}
+          description={description}
+          icon={MapPin}
+          onClose={() => setOpen(false)}
+        />
 
         <div className="space-y-4">
           <div>
@@ -112,31 +111,21 @@ export function LocationPicker({
             </div>
           </div>
 
-          <label className="block rounded-[1.35rem] border border-border bg-card/80 p-4">
-            <span className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-              <MapPin className="size-4 text-life-ai" />
-              城市
-            </span>
-            <input
+          <FormItem label="城市">
+            <Input
               value={draft.city}
               onChange={(event) => updateDraft('city', event.target.value)}
               placeholder="例如：杭州"
-              className="w-full bg-transparent text-base font-semibold text-foreground outline-none placeholder:text-muted-foreground"
             />
-          </label>
+          </FormItem>
 
-          <label className="block rounded-[1.35rem] border border-border bg-card/80 p-4">
-            <span className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-              <ChevronRight className="size-4 text-life-ai" />
-              区县 / 区域
-            </span>
-            <input
+          <FormItem label="区县 / 区域">
+            <Input
               value={draft.district}
               onChange={(event) => updateDraft('district', event.target.value)}
               placeholder="例如：西湖区、滨江区"
-              className="w-full bg-transparent text-base font-semibold text-foreground outline-none placeholder:text-muted-foreground"
             />
-          </label>
+          </FormItem>
 
           <div className="rounded-[1.35rem] border border-life-ai/20 bg-life-ai/5 px-4 py-3">
             <p className="text-xs font-semibold text-life-ai">当前将保存为</p>
@@ -147,14 +136,14 @@ export function LocationPicker({
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        <SheetActions className="mt-5">
           <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
             取消
           </Button>
           <Button type="button" disabled={!draft.city.trim()} onClick={handleSave}>
             保存定位
           </Button>
-        </div>
+        </SheetActions>
       </BottomSheet>
     </>
   );

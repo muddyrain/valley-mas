@@ -1,11 +1,13 @@
-import { ImagePlus, MessageSquareText, Send, Trash2, X } from 'lucide-react';
+import { ImagePlus, MessageSquareText, Send, Trash2 } from 'lucide-react';
 import { type ChangeEvent, useRef, useState } from 'react';
 import { createLifeTraceFeedback } from '@/api/feedback';
 import { uploadLifeTraceImage } from '@/api/upload';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
+import { FormItem, SheetHeader } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
@@ -140,37 +142,22 @@ export function FeedbackSheet({ open, onOpenChange }: FeedbackSheetProps) {
       portal
     >
       <div className="space-y-5">
-        <div className="flex items-start gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
-            <MessageSquareText className="size-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-lg font-semibold">问题反馈</p>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              告诉我哪里卡住了，截图也可以一起发来。
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-9 rounded-xl"
-            disabled={busy}
-            aria-label="关闭"
-            onClick={() => onOpenChange(false)}
-          >
-            <X className="size-4" />
-          </Button>
-        </div>
+        <SheetHeader
+          title="问题反馈"
+          description="告诉我哪里卡住了，截图也可以一起发来。"
+          icon={MessageSquareText}
+          closeDisabled={busy}
+          onClose={() => onOpenChange(false)}
+          className="mb-0"
+        />
 
-        <label className="block space-y-2">
-          <span className="text-sm font-semibold">反馈内容</span>
-          <textarea
+        <FormItem label="反馈内容">
+          <Textarea
             value={content}
             disabled={busy}
             maxLength={maxFeedbackContentLength}
             placeholder="比如：某个按钮点了没反应、上传图片失败、提醒时间不对..."
-            className="min-h-36 w-full resize-none rounded-[1.25rem] border border-border bg-secondary/80 px-4 py-3 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-life-ai/50"
+            className="min-h-36 bg-secondary/80 leading-6"
             onChange={(event) => {
               setContent(event.target.value);
               if (error) {
@@ -188,7 +175,7 @@ export function FeedbackSheet({ open, onOpenChange }: FeedbackSheetProps) {
           >
             {contentLength}/{maxFeedbackContentLength}
           </span>
-        </label>
+        </FormItem>
 
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">

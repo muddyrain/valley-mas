@@ -11,10 +11,12 @@ import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AppImageUploader } from '@/components/AppImageUploader';
 import { ClosetItemSheet, clothingAnalysisToClosetDraft } from '@/components/ClosetItemSheet';
 import { EmptyState } from '@/components/EmptyState';
+import { FormItem, SheetSelectField } from '@/components/FormItem';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { getLifeTraceErrorMessage } from '@/lib/error';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
@@ -37,6 +39,10 @@ export function PhotoClothingAnalysisPage() {
   const selectedHousehold = useMemo(
     () => households.find((item) => item.id === selectedHouseholdId) ?? households[0] ?? null,
     [households, selectedHouseholdId],
+  );
+  const householdOptions = useMemo(
+    () => households.map((household) => ({ label: household.name, value: household.id })),
+    [households],
   );
   const householdId =
     selectedHousehold?.kind === 'shared' && selectedHousehold.status === 'active'
@@ -129,31 +135,22 @@ export function PhotoClothingAnalysisPage() {
           />
 
           {households.length > 1 ? (
-            <label className="block space-y-2">
-              <span className="text-sm font-medium">保存空间</span>
-              <select
-                value={selectedHouseholdId}
-                onChange={(event) => setSelectedHouseholdId(event.target.value)}
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none focus:border-life-ai/50"
-              >
-                {households.map((household) => (
-                  <option key={household.id} value={household.id}>
-                    {household.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SheetSelectField
+              label="保存空间"
+              value={selectedHouseholdId}
+              options={householdOptions}
+              onValueChange={setSelectedHouseholdId}
+            />
           ) : null}
 
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">提示</span>
-            <input
+          <FormItem label="提示">
+            <Input
               value={hint}
               onChange={(event) => setHint(event.target.value)}
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none focus:border-life-ai/50"
+              className="text-sm focus:border-life-ai/50"
               placeholder="比如：这是通勤常穿的衬衫"
             />
-          </label>
+          </FormItem>
 
           {error ? <p className="text-sm text-life-alert">{error}</p> : null}
 

@@ -12,10 +12,18 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { EmptyState } from '@/components/EmptyState';
-import { FormItem } from '@/components/FormItem';
+import {
+  FormItem,
+  SheetActions,
+  SheetHeader,
+  SheetSelectButton,
+  SheetSelectField,
+} from '@/components/FormItem';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   formatLedgerAmount,
   getDefaultLedgerMonth,
@@ -43,6 +51,18 @@ const defaultForm: NewLedgerEntryInput = {
   note: '',
   imageUrl: '',
 };
+const ledgerDirectionOptions = ledgerDirections.map((direction) => ({
+  label: direction,
+  value: direction,
+}));
+const ledgerDirectionFilterOptions: Array<{ value: LedgerDirectionFilter; label: string }> = [
+  { value: 'all', label: '全部方向' },
+  ...ledgerDirectionOptions,
+];
+const ledgerCategoryOptions = ledgerCategories.map((category) => ({
+  label: category,
+  value: category,
+}));
 
 function formatDateTimeLocal(value?: string) {
   const date = value ? new Date(value) : new Date();
@@ -345,18 +365,13 @@ export function LedgerPage() {
               </button>
             ))}
           </div>
-          <select
+          <SheetSelectButton
             value={directionFilter}
-            onChange={(event) => setDirectionFilter(event.target.value as LedgerDirectionFilter)}
-            className="h-10 rounded-xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
-          >
-            <option value="all">全部方向</option>
-            {ledgerDirections.map((direction) => (
-              <option key={direction} value={direction}>
-                {direction}
-              </option>
-            ))}
-          </select>
+            options={ledgerDirectionFilterOptions}
+            pickerTitle="方向"
+            className="h-10 rounded-xl"
+            onValueChange={setDirectionFilter}
+          />
         </div>
 
         {ledgerError ? (
@@ -482,13 +497,15 @@ export function LedgerPage() {
         zIndexClassName="z-[70]"
         spacing="compact"
       >
-        <div className="mb-4">
-          <h2 className="text-xl font-semibold">{editingEntry ? '编辑账目' : '记一笔'}</h2>
-        </div>
+        <SheetHeader
+          title={editingEntry ? '编辑账目' : '记一笔'}
+          onClose={closeForm}
+          className="mb-4"
+        />
         <form className="space-y-3.5" onSubmit={submitForm}>
           <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
             <FormItem label="金额" error={formErrors.amount} density="compact">
-              <input
+              <Input
                 type="number"
                 min="0"
                 step="0.01"
@@ -497,97 +514,76 @@ export function LedgerPage() {
                   setForm((current) => ({ ...current, amount: Number(event.target.value) }));
                   setFormErrors((current) => ({ ...current, amount: undefined }));
                 }}
-                className={cn(
-                  'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
-                  formErrors.amount ? 'border-destructive' : 'border-border',
-                )}
+                aria-invalid={Boolean(formErrors.amount)}
               />
             </FormItem>
             <FormItem label="时间" error={formErrors.occurredAt} density="compact">
-              <input
+              <Input
                 type="datetime-local"
                 value={form.occurredAt}
                 onChange={(event) => {
                   setForm((current) => ({ ...current, occurredAt: event.target.value }));
                   setFormErrors((current) => ({ ...current, occurredAt: undefined }));
                 }}
-                className={cn(
-                  'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
-                  formErrors.occurredAt ? 'border-destructive' : 'border-border',
-                )}
+                aria-invalid={Boolean(formErrors.occurredAt)}
               />
             </FormItem>
           </div>
 
           <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-            <FormItem label="方向" density="compact">
-              <select
-                value={form.direction}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    direction: event.target.value as LedgerDirection,
-                  }))
-                }
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
-              >
-                {ledgerDirections.map((direction) => (
-                  <option key={direction} value={direction}>
-                    {direction}
-                  </option>
-                ))}
-              </select>
-            </FormItem>
-            <FormItem label="分类" density="compact">
-              <select
-                value={form.category}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    category: event.target.value as LedgerCategory,
-                  }))
-                }
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
-              >
-                {ledgerCategories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </FormItem>
+            <SheetSelectField
+              label="方向"
+              density="compact"
+              value={form.direction}
+              options={ledgerDirectionOptions}
+              onValueChange={(value) =>
+                setForm((current) => ({
+                  ...current,
+                  direction: value,
+                }))
+              }
+            />
+            <SheetSelectField
+              label="分类"
+              density="compact"
+              value={form.category}
+              options={ledgerCategoryOptions}
+              onValueChange={(value) =>
+                setForm((current) => ({
+                  ...current,
+                  category: value,
+                }))
+              }
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
             <FormItem label="商家" density="compact">
-              <input
+              <Input
                 value={form.merchant}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, merchant: event.target.value }))
                 }
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
               />
             </FormItem>
             <FormItem label="地点" density="compact">
-              <input
+              <Input
                 value={form.location}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, location: event.target.value }))
                 }
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
               />
             </FormItem>
           </div>
 
           <FormItem label="备注" density="compact">
-            <textarea
+            <Textarea
               value={form.note}
               onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))}
-              className="min-h-24 w-full resize-none rounded-2xl border border-border bg-secondary px-4 py-3 text-sm outline-none transition focus:border-ring"
             />
           </FormItem>
 
-          <div className="grid grid-cols-2 gap-3 pt-1.5 max-[360px]:grid-cols-1">
+          <SheetActions className="pt-1.5">
             <Button type="button" variant="secondary" onClick={closeForm}>
               取消
             </Button>
@@ -602,7 +598,7 @@ export function LedgerPage() {
               {!editingEntry && ledgerCreating ? <ActionLoadingIcon /> : null}
               保存账目
             </Button>
-          </div>
+          </SheetActions>
         </form>
       </BottomSheet>
     </div>

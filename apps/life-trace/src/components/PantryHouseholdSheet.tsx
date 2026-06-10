@@ -1,11 +1,13 @@
-import { Home, Plus, UserPlus, Users, X } from 'lucide-react';
+import { Home, Plus, UserPlus, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { EmptyState } from '@/components/EmptyState';
+import { FormItem, SheetHeader } from '@/components/FormItem';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { getLifeTraceErrorMessage } from '@/lib/error';
 import { sortHouseholdsForSheet } from '@/lib/householdSheet';
 import { cn } from '@/lib/utils';
@@ -63,26 +65,13 @@ export function PantryHouseholdSheet({
       zIndexClassName="z-[75]"
       portal
     >
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-xl font-semibold">家庭空间</h2>
-          <p className="mt-1 text-sm text-muted-foreground">切换当前空间，或创建、加入共享家庭。</p>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="关闭家庭空间管理"
-          data-sheet-drag-ignore="true"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onOpenChange(false);
-          }}
-        >
-          <X className="size-5" />
-        </Button>
-      </div>
+      <SheetHeader
+        title="家庭空间"
+        description="切换当前空间，或创建、加入共享家庭。"
+        icon={Home}
+        iconClassName="bg-life-ai/10 text-life-ai"
+        onClose={() => onOpenChange(false)}
+      />
 
       {sheetError ? (
         <Card className="mb-4 border-life-alert/20 bg-life-alert/10 p-4 text-sm text-life-alert">
@@ -180,12 +169,13 @@ export function PantryHouseholdSheet({
                 <p className="text-xs text-muted-foreground">例如：一家三口、周末囤货组</p>
               </div>
             </div>
-            <input
-              value={createName}
-              onChange={(event) => setCreateName(event.target.value)}
-              placeholder="输入家庭名称"
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
-            />
+            <FormItem label="家庭名称" density="compact">
+              <Input
+                value={createName}
+                onChange={(event) => setCreateName(event.target.value)}
+                placeholder="输入家庭名称"
+              />
+            </FormItem>
             <Button
               type="button"
               variant="ai"
@@ -229,12 +219,14 @@ export function PantryHouseholdSheet({
                 <p className="text-xs text-muted-foreground">输入邀请码，切进共享库存一起维护</p>
               </div>
             </div>
-            <input
-              value={joinCode}
-              onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
-              placeholder="例如：HHABC123"
-              className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm uppercase outline-none transition focus:border-ring"
-            />
+            <FormItem label="邀请码" density="compact">
+              <Input
+                value={joinCode}
+                onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
+                placeholder="例如：HHABC123"
+                className="uppercase"
+              />
+            </FormItem>
             <Button
               type="button"
               variant="outline"

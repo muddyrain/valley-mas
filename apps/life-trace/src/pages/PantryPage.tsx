@@ -15,13 +15,13 @@ import {
   Sparkles,
   Trash2,
   Users,
-  X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { EmptyState } from '@/components/EmptyState';
+import { FormItem, SheetActions, SheetHeader } from '@/components/FormItem';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { PantryHouseholdDetailSheet } from '@/components/PantryHouseholdDetailSheet';
 import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
@@ -31,6 +31,7 @@ import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { usePantryHouseholdManager } from '@/hooks/usePantryHouseholdManager';
 import {
   getPantryCoverUrl,
@@ -1166,39 +1167,26 @@ export function PantryPage() {
         >
           {consumeItem ? (
             <div className="space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="text-xl font-semibold">处理库存</h2>
-                  <p className="mt-1 truncate text-sm text-muted-foreground">
-                    {consumeItem.name} · {consumeItem.quantity}
-                    {consumeItem.unit} · {consumeItem.location}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setConsumeItem(null)}
-                >
-                  <X className="size-5" />
-                </Button>
-              </div>
-              <label className="block text-sm font-semibold text-foreground">
-                处理数量
-                <input
+              <SheetHeader
+                title="处理库存"
+                description={`${consumeItem.name} · ${consumeItem.quantity}${consumeItem.unit} · ${consumeItem.location}`}
+                icon={Settings2}
+                iconClassName="bg-life-trace/10 text-life-trace"
+                onClose={() => setConsumeItem(null)}
+              />
+              <FormItem
+                label="处理数量"
+                description={`剩余 ${consumeRemainingQuantity}${consumeItem.unit}`}
+              >
+                <Input
                   type="number"
                   min="1"
                   max={consumeItem.quantity}
                   value={consumeQuantity}
-                  className="mt-2 h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm text-foreground outline-none transition focus:border-ring"
                   onChange={(event) => setConsumeQuantity(event.target.value)}
                 />
-              </label>
-              <p className="text-xs text-muted-foreground">
-                剩余 {consumeRemainingQuantity}
-                {consumeItem.unit}
-              </p>
-              <div className="grid grid-cols-2 gap-3">
+              </FormItem>
+              <SheetActions>
                 <Button
                   type="button"
                   variant="outline"
@@ -1242,6 +1230,8 @@ export function PantryPage() {
                   )}
                   丢弃数量
                 </Button>
+              </SheetActions>
+              <SheetActions className="pt-0">
                 <Button
                   type="button"
                   variant="outline"
@@ -1253,7 +1243,7 @@ export function PantryPage() {
                 >
                   全部丢弃
                 </Button>
-              </div>
+              </SheetActions>
             </div>
           ) : null}
         </BottomSheet>

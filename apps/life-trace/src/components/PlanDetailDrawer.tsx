@@ -14,6 +14,7 @@ import {
 import { useId } from 'react';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
+import { SheetActions } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -182,7 +183,7 @@ export function PlanDetailContent({
         </p>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+      <SheetActions className="pt-0">
         <Button
           type="button"
           variant="outline"
@@ -217,7 +218,7 @@ export function PlanDetailContent({
             已完成
           </Button>
         )}
-      </div>
+      </SheetActions>
 
       <Button
         type="button"

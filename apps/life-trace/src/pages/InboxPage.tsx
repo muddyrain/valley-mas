@@ -21,10 +21,19 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { EditTraceDrawer } from '@/components/EditTraceDrawer';
 import { EmptyState } from '@/components/EmptyState';
+import {
+  FormItem,
+  SheetActions,
+  SheetHeader,
+  SheetSelectButton,
+  SheetSelectField,
+} from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { applyInboxAISuggestion, buildInboxPlanDraft, buildInboxTraceDraft } from '@/lib/inbox';
 import { buildLedgerDraftFromInbox } from '@/lib/ledger';
 import { cn } from '@/lib/utils';
@@ -40,6 +49,15 @@ const inboxFilters: Array<{ value: InboxFilter; label: string }> = [
   { value: 'converted', label: '已转化' },
   { value: 'archived', label: '已归档' },
   { value: 'all', label: '全部' },
+];
+const inboxItemTypeOptions: Array<{ value: InboxItemType; label: string }> = [
+  { value: 'text', label: '文本' },
+  { value: 'link', label: '链接' },
+  { value: 'image', label: '图片' },
+];
+const inboxTypeFilterOptions: Array<{ value: InboxItemType | 'all'; label: string }> = [
+  { value: 'all', label: '全部类型' },
+  ...inboxItemTypeOptions,
 ];
 
 const defaultForm: NewInboxItemInput = {
@@ -317,14 +335,14 @@ export function InboxPage() {
         <form className="grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={submitQuickCapture}>
           <label className="block">
             <span className="sr-only">快速捕捉</span>
-            <textarea
+            <Textarea
               value={quickText}
               onChange={(event) => {
                 setQuickText(event.target.value);
                 setQuickError('');
               }}
               placeholder="先收下一个想法、链接或待处理事项"
-              className="min-h-24 w-full resize-none rounded-2xl border border-border bg-secondary px-4 py-3 text-sm outline-none transition focus:border-ring"
+              className="min-h-24 text-sm"
             />
           </label>
           <div className="flex items-end">
@@ -377,16 +395,13 @@ export function InboxPage() {
             ))}
           </div>
           <div className="grid gap-2 sm:grid-cols-[auto_1fr]">
-            <select
+            <SheetSelectButton
               value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value as InboxItemType | 'all')}
-              className="h-10 rounded-xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
-            >
-              <option value="all">全部类型</option>
-              <option value="text">文本</option>
-              <option value="link">链接</option>
-              <option value="image">图片</option>
-            </select>
+              options={inboxTypeFilterOptions}
+              pickerTitle="类型"
+              className="h-10 rounded-xl"
+              onValueChange={setTypeFilter}
+            />
             <label className="relative block">
               <Search className="-translate-y-1/2 absolute left-3 top-1/2 size-4 text-muted-foreground" />
               <input
@@ -667,86 +682,61 @@ export function InboxPage() {
         overlayLabel="关闭编辑 Inbox"
         zIndexClassName="z-[60]"
       >
-        <div className="mb-5">
-          <h2 className="text-xl font-semibold">
-            {editingItem === null ? '收下 Inbox' : '编辑 Inbox'}
-          </h2>
-        </div>
+        <SheetHeader
+          title={editingItem === null ? '收下 Inbox' : '编辑 Inbox'}
+          onClose={closeEditor}
+        />
         <form className="space-y-4" onSubmit={submitEditor}>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">标题</span>
-            <input
+          <FormItem label="标题" error={formErrors.title}>
+            <Input
               value={form.title}
               onChange={(event) => {
                 setForm((current) => ({ ...current, title: event.target.value }));
                 setFormErrors((current) => ({ ...current, title: undefined }));
               }}
-              className={cn(
-                'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
-                formErrors.title ? 'border-destructive' : 'border-border',
-              )}
+              aria-invalid={Boolean(formErrors.title)}
             />
-            {formErrors.title ? (
-              <p className="text-xs text-destructive">{formErrors.title}</p>
-            ) : null}
-          </label>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium">内容</span>
-            <textarea
+          </FormItem>
+          <FormItem label="内容">
+            <Textarea
               value={form.content}
               onChange={(event) =>
                 setForm((current) => ({ ...current, content: event.target.value }))
               }
-              className="min-h-24 w-full resize-none rounded-2xl border border-border bg-secondary px-4 py-3 text-sm outline-none transition focus:border-ring"
             />
-          </label>
+          </FormItem>
           <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-            <label className="block space-y-2">
-              <span className="text-sm font-medium">类型</span>
-              <select
-                value={form.itemType}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    itemType: event.target.value as InboxItemType,
-                  }))
-                }
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
-              >
-                <option value="text">文本</option>
-                <option value="link">链接</option>
-                <option value="image">图片</option>
-              </select>
-            </label>
-            <label className="block space-y-2">
-              <span className="text-sm font-medium">标签</span>
-              <input
+            <SheetSelectField
+              label="类型"
+              value={form.itemType}
+              options={inboxItemTypeOptions}
+              onValueChange={(value) =>
+                setForm((current) => ({
+                  ...current,
+                  itemType: value,
+                }))
+              }
+            />
+            <FormItem label="标签">
+              <Input
                 value={tagText}
                 onChange={(event) => setTagText(event.target.value)}
                 placeholder="灵感、待办"
-                className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
               />
-            </label>
+            </FormItem>
           </div>
           {form.itemType === 'link' ? (
-            <label className="block space-y-2">
-              <span className="text-sm font-medium">链接</span>
-              <input
+            <FormItem label="链接" error={formErrors.linkUrl}>
+              <Input
                 value={form.linkUrl}
                 onChange={(event) => {
                   setForm((current) => ({ ...current, linkUrl: event.target.value }));
                   setFormErrors((current) => ({ ...current, linkUrl: undefined }));
                 }}
                 placeholder="https://"
-                className={cn(
-                  'h-11 w-full rounded-2xl border bg-secondary px-4 text-sm outline-none transition focus:border-ring',
-                  formErrors.linkUrl ? 'border-destructive' : 'border-border',
-                )}
+                aria-invalid={Boolean(formErrors.linkUrl)}
               />
-              {formErrors.linkUrl ? (
-                <p className="text-xs text-destructive">{formErrors.linkUrl}</p>
-              ) : null}
-            </label>
+            </FormItem>
           ) : null}
           {form.itemType === 'image' ? (
             <div>
@@ -785,7 +775,7 @@ export function InboxPage() {
               </Button>
             </Card>
           ) : null}
-          <div className="grid grid-cols-2 gap-3 pt-2 max-[360px]:grid-cols-1">
+          <SheetActions>
             <Button type="button" variant="secondary" onClick={closeEditor}>
               取消
             </Button>
@@ -806,7 +796,7 @@ export function InboxPage() {
               ) : null}
               {editingItem === null ? '收下' : '保存修改'}
             </Button>
-          </div>
+          </SheetActions>
         </form>
       </BottomSheet>
 

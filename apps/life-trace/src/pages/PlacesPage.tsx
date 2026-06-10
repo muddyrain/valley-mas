@@ -13,12 +13,16 @@ import {
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { EmptyState } from '@/components/EmptyState';
+import { FormItem, SheetActions, SheetSelectField } from '@/components/FormItem';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { SectionHeader } from '@/components/SectionHeader';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Place, PlaceRecord, PlaceStatus } from '@/types';
@@ -46,6 +50,11 @@ const defaultPlaceForm: PlaceFormState = {
   longitude: '',
   note: '',
 };
+
+const placeStatusOptions: Array<{ label: string; value: PlaceStatus }> = [
+  { value: 'visited', label: '去过' },
+  { value: 'want', label: '想去' },
+];
 
 function placeToForm(place: Place): PlaceFormState {
   return {
@@ -210,91 +219,63 @@ function PlaceFormFields({
 
   return (
     <>
-      <label className="block space-y-2">
-        <span className="text-sm font-medium">地点名称</span>
-        <input
-          value={form.name}
-          onChange={(event) => updateField('name', event.target.value)}
-          className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
-        />
-      </label>
+      <FormItem label="地点名称">
+        <Input value={form.name} onChange={(event) => updateField('name', event.target.value)} />
+      </FormItem>
       <div className="grid grid-cols-2 gap-3">
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">状态</span>
-          <select
-            value={form.status}
-            onChange={(event) => updateField('status', event.target.value as PlaceStatus)}
-            className="h-11 w-full rounded-2xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
-          >
-            <option value="visited">去过</option>
-            <option value="want">想去</option>
-          </select>
-        </label>
-        <label className="flex items-end gap-2 rounded-2xl border border-border bg-secondary px-4 py-3 text-sm">
-          <input
-            type="checkbox"
+        <SheetSelectField
+          label="状态"
+          value={form.status}
+          options={placeStatusOptions}
+          onValueChange={(value) => updateField('status', value)}
+        />
+        <div className="flex h-11 items-center justify-between gap-3 self-end rounded-2xl border border-border bg-secondary px-4 text-sm">
+          <span>收藏</span>
+          <Switch
+            size="sm"
             checked={form.favorite}
-            onChange={(event) => updateField('favorite', event.target.checked)}
+            onCheckedChange={(checked) => updateField('favorite', checked)}
           />
-          收藏
-        </label>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">城市</span>
-          <input
-            value={form.city}
-            onChange={(event) => updateField('city', event.target.value)}
-            className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
-          />
-        </label>
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">区县</span>
-          <input
+        <FormItem label="城市">
+          <Input value={form.city} onChange={(event) => updateField('city', event.target.value)} />
+        </FormItem>
+        <FormItem label="区县">
+          <Input
             value={form.district}
             onChange={(event) => updateField('district', event.target.value)}
-            className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
           />
-        </label>
+        </FormItem>
       </div>
-      <label className="block space-y-2">
-        <span className="text-sm font-medium">地址</span>
-        <input
+      <FormItem label="地址">
+        <Input
           value={form.address}
           onChange={(event) => updateField('address', event.target.value)}
-          className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
         />
-      </label>
+      </FormItem>
       <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">纬度</span>
-          <input
+        <FormItem label="纬度">
+          <Input
             inputMode="decimal"
             value={form.latitude}
             onChange={(event) => updateField('latitude', event.target.value)}
             placeholder="-90 到 90"
-            className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
           />
-        </label>
-        <label className="block space-y-2">
-          <span className="text-sm font-medium">经度</span>
-          <input
+        </FormItem>
+        <FormItem label="经度">
+          <Input
             inputMode="decimal"
             value={form.longitude}
             onChange={(event) => updateField('longitude', event.target.value)}
             placeholder="-180 到 180"
-            className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
           />
-        </label>
+        </FormItem>
       </div>
-      <label className="block space-y-2">
-        <span className="text-sm font-medium">备注</span>
-        <textarea
-          value={form.note}
-          onChange={(event) => updateField('note', event.target.value)}
-          className="min-h-20 w-full resize-none rounded-2xl border border-border bg-secondary px-4 py-3 text-sm outline-none transition focus:border-ring"
-        />
-      </label>
+      <FormItem label="备注">
+        <Textarea value={form.note} onChange={(event) => updateField('note', event.target.value)} />
+      </FormItem>
     </>
   );
 }
@@ -413,7 +394,7 @@ function PlacesListView() {
             <form className="space-y-3" onSubmit={handleCreate}>
               <PlaceFormFields form={createForm} setForm={setCreateForm} />
               {formError ? <p className="text-xs text-destructive">{formError}</p> : null}
-              <div className="grid grid-cols-2 gap-2">
+              <SheetActions className="pt-0">
                 <Button type="button" variant="secondary" onClick={() => setCreating(false)}>
                   取消
                 </Button>
@@ -424,7 +405,7 @@ function PlacesListView() {
                 >
                   {placeCreating ? '创建中' : '保存地点'}
                 </Button>
-              </div>
+              </SheetActions>
             </form>
           </Card>
         ) : null}
@@ -621,14 +602,14 @@ function PlaceDetailView({ placeId }: { placeId: string }) {
             <form className="space-y-3" onSubmit={handleSubmit}>
               <PlaceFormFields form={draftForm} setForm={setDraftForm} />
               {formError ? <p className="text-xs text-destructive">{formError}</p> : null}
-              <div className="grid grid-cols-2 gap-2">
+              <SheetActions className="pt-0">
                 <Button type="button" variant="secondary" onClick={() => setEditing(false)}>
                   取消
                 </Button>
                 <Button type="submit" variant="ai" disabled={updating || !draftForm.name.trim()}>
                   {updating ? '保存中' : '保存地点'}
                 </Button>
-              </div>
+              </SheetActions>
             </form>
           </Card>
         ) : null}

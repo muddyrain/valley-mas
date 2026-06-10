@@ -14,7 +14,6 @@ import {
   StickyNote,
   Trash2,
   Users,
-  X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -22,6 +21,7 @@ import { getPantryItem, getPantryItemTimeline } from '@/api/pantry';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { EmptyState } from '@/components/EmptyState';
+import { FormItem, SheetActions, SheetHeader } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { PantryItemDrawer } from '@/components/PantryItemDrawer';
@@ -30,6 +30,7 @@ import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   formatPantryReminderSummary,
   getPantryCoverUrl,
@@ -602,40 +603,29 @@ export function PantryItemDetailPage() {
             }}
           >
             <div className="space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="text-xl font-semibold">使用数量</h2>
-                  <p className="mt-1 truncate text-sm text-muted-foreground">
-                    {item.name} · 当前 {buildQuantityLabel(item)}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setQuantitySheetOpen(false)}
-                >
-                  <X className="size-5" />
-                </Button>
-              </div>
-              <label className="block space-y-2">
-                <span className="text-sm font-medium">数量</span>
-                <input
+              <SheetHeader
+                title="使用数量"
+                description={`${item.name} · 当前 ${buildQuantityLabel(item)}`}
+                icon={BadgeAlert}
+                iconClassName="bg-life-trace/10 text-life-trace"
+                onClose={() => setQuantitySheetOpen(false)}
+              />
+              <FormItem label="数量">
+                <Input
                   type="number"
                   min="1"
                   max={item.quantity}
                   step="1"
                   value={quantityText}
                   onChange={(event) => setQuantityText(event.target.value)}
-                  className="h-11 w-full rounded-2xl border border-border bg-secondary px-4 text-sm outline-none transition focus:border-ring"
                 />
-              </label>
+              </FormItem>
               <Card className="border-life-trace/20 bg-life-trace/10 p-3 text-sm text-life-trace">
                 本次使用 {quantityNumber}
                 {item.unit}，处理后剩余 {remainingAfterUse}
                 {item.unit}。
               </Card>
-              <div className="grid grid-cols-2 gap-2">
+              <SheetActions className="gap-2 pt-0">
                 <Button type="button" variant="outline" onClick={() => setQuantitySheetOpen(false)}>
                   取消
                 </Button>
@@ -653,7 +643,7 @@ export function PantryItemDetailPage() {
                   )}
                   确认使用
                 </Button>
-              </div>
+              </SheetActions>
             </div>
           </BottomSheet>
         </div>
