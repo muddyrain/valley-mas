@@ -18,6 +18,8 @@ import (
 	"time"
 	"valley-server/internal/aiusage"
 	"valley-server/internal/database"
+	lifeagent "valley-server/internal/lifetrace/agent"
+	lifeai "valley-server/internal/lifetrace/ai"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -65,13 +67,7 @@ type lifeTraceAssistantStreamChunk struct {
 	Action *lifeTraceAssistantActionPayload `json:"action,omitempty"`
 }
 
-type lifeTraceAIConfig struct {
-	Source  string
-	APIKey  string
-	BaseURL string
-	Model   string
-	Timeout time.Duration
-}
+type lifeTraceAIConfig = lifeai.TextConfig
 
 type lifeTraceAssistantPlanDraft struct {
 	Title            string `json:"title"`
@@ -130,9 +126,28 @@ type lifeTraceAssistantStructuredResponse struct {
 	Action *lifeTraceAssistantStructuredAction `json:"action,omitempty"`
 }
 
-var (
-	lifeTraceArkClientOnce sync.Once
-	lifeTraceArkClient     *arkruntime.Client
+var lifeTraceAssistantActionRegistry = lifeagent.NewRegistry(
+	lifeagent.ActionSpec{
+		Type:               "create_plan",
+		Description:        "Create a Life Trace plan or reminder from assistant intent.",
+		RequiredFields:     []string{"title", "scheduledDate", "scheduledTime"},
+		NeedMoreInfoFields: []string{"scheduledDate", "scheduledTime"},
+		AuditScene:         "life-trace-assistant-create-plan",
+	},
+	lifeagent.ActionSpec{
+		Type:               "create_pantry_item",
+		Description:        "Create a Pantry item draft from assistant intent.",
+		RequiredFields:     []string{"name"},
+		NeedMoreInfoFields: []string{"expiresAt"},
+		AuditScene:         "life-trace-assistant-create-pantry-item",
+	},
+	lifeagent.ActionSpec{
+		Type:               "create_ledger_entry",
+		Description:        "Create a lightweight ledger entry from assistant intent.",
+		RequiredFields:     []string{"amount"},
+		NeedMoreInfoFields: []string{"amount"},
+		AuditScene:         "life-trace-assistant-create-ledger-entry",
+	},
 )
 
 var (
@@ -1617,21 +1632,7 @@ func (h *Handler) createAssistantLedgerEntryFromDraft(userID model.Int64String, 
 }
 
 func readLifeTraceAIConfig() (lifeTraceAIConfig, string) {
-	if cfg, ok := readLifeTraceOpenAIConfig(); ok {
-		return cfg, ""
-	}
-
-	apiKey, arkBaseURL, textModel, errMsg := readLifeTraceArkTextConfig()
-	if errMsg != "" {
-		return lifeTraceAIConfig{}, errMsg
-	}
-	return lifeTraceAIConfig{
-		Source:  "ark",
-		APIKey:  apiKey,
-		BaseURL: arkBaseURL,
-		Model:   textModel,
-		Timeout: lifeTraceTodayAdviceDefaultTimeout,
-	}, ""
+	return lifeai.ReadTextConfig(lifeTraceTodayAdviceDefaultTimeout)
 }
 
 func readLifeTraceOpenAIConfig() (lifeTraceAIConfig, bool) {
@@ -1727,14 +1728,7 @@ func clearCachedTodayAdvice() {
 }
 
 func ensureLifeTraceArkClient(apiKey, arkBaseURL string) *arkruntime.Client {
-	lifeTraceArkClientOnce.Do(func() {
-		lifeTraceArkClient = arkruntime.NewClientWithApiKey(
-			apiKey,
-			arkruntime.WithBaseUrl(arkBaseURL),
-			arkruntime.WithTimeout(35*time.Second),
-		)
-	})
-	return lifeTraceArkClient
+	return lifeai.EnsureARKClient(apiKey, arkBaseURL)
 }
 
 func buildTodayAdvicePrompt(
@@ -2207,6 +2201,13 @@ func (h *Handler) resolveLifeTraceAssistantStructuredAction(
 		}
 	}
 
+	if strings.TrimSpace(action.Type) == "none" {
+		return nil
+	}
+	if _, ok := lifeTraceAssistantActionRegistry.Get(action.Type); !ok {
+		return nil
+	}
+
 	switch action.Type {
 	case "create_plan":
 		draft := mergeAssistantPlanDraft(action.Plan, fallbackPlanDraft)
@@ -2330,6 +2331,7 @@ func callLifeTraceAssistantToolResponse(
 }
 
 func buildLifeTraceAssistantToolSchema() map[string]any {
+	actionTypes := append([]string{"none"}, lifeTraceAssistantActionRegistry.Types()...)
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -2343,7 +2345,7 @@ func buildLifeTraceAssistantToolSchema() map[string]any {
 				"properties": map[string]any{
 					"type": map[string]any{
 						"type": "string",
-						"enum": []string{"none", "create_plan", "create_pantry_item", "create_ledger_entry"},
+						"enum": actionTypes,
 					},
 					"message": map[string]any{
 						"type": "string",
@@ -2884,12 +2886,12 @@ func callLifeTraceAI(ctx context.Context, cfg lifeTraceAIConfig, prompt string) 
 }
 
 func callLifeTraceAIWithMaxTokens(ctx context.Context, cfg lifeTraceAIConfig, prompt string, maxTokens int) (string, string, error) {
-	if cfg.Source == "openai" {
-		return callLifeTraceOpenAIWithMaxTokens(ctx, cfg, prompt, maxTokens)
-	}
-
-	client := ensureLifeTraceArkClient(cfg.APIKey, cfg.BaseURL)
-	return callLifeTraceTextAIWithMaxTokens(ctx, client, cfg.Model, prompt, maxTokens)
+	result, err := lifeai.NewClient().GenerateJSON(ctx, cfg, lifeai.TextRequest{
+		Prompt:    prompt,
+		MaxTokens: maxTokens,
+		JSONMode:  true,
+	})
+	return result.Content, result.Model, err
 }
 
 type lifeTraceOpenAIRequest struct {

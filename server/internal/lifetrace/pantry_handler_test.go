@@ -15,6 +15,7 @@ import (
 func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 	router := setupTraceTestRouter(t, 101)
 	thumbnailURL := "data:image/svg+xml;charset=UTF-8," + strings.Repeat("a", 1800)
+	expiresAt := time.Now().AddDate(0, 0, 3).Format("2006-01-02")
 
 	body := bytes.NewBufferString(`{
 		"name": "鲜牛奶",
@@ -22,7 +23,7 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 		"quantity": 2,
 		"unit": "盒",
 		"location": "冷藏",
-		"expiresAt": "2026-06-10",
+		"expiresAt": "` + expiresAt + `",
 		"note": "早餐优先喝掉",
 		"imageUrl": "https://example.com/milk.jpg",
 		"thumbnailUrl": "` + thumbnailURL + `",

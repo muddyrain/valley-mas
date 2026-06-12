@@ -5,15 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 	"valley-server/internal/aiusage"
+	lifeai "valley-server/internal/lifetrace/ai"
 
 	"github.com/gin-gonic/gin"
-	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 )
 
 const httpStatusClientClosedRequest = 499
@@ -92,13 +91,7 @@ type pantryPhotoOCRHint struct {
 	SourceRegion    imageCropBox `json:"sourceRegion"`
 }
 
-type lifeTraceImageAIConfig struct {
-	APIKey    string
-	BaseURL   string
-	Model     string
-	Timeout   time.Duration
-	UseVision bool
-}
+type lifeTraceImageAIConfig = lifeai.ImageConfig
 
 const lifeTraceImageAnalysisMaxTokens = 900
 
@@ -324,35 +317,7 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 }
 
 func readLifeTraceImageAIConfig() (lifeTraceImageAIConfig, string) {
-	apiKey := strings.TrimSpace(os.Getenv("ARK_API_KEY"))
-	arkBaseURL := strings.TrimSpace(os.Getenv("ARK_BASE_URL"))
-	visionModel := strings.TrimSpace(os.Getenv("ARK_VISION_MODEL"))
-	textModel := strings.TrimSpace(os.Getenv("ARK_TEXT_MODEL"))
-	if arkBaseURL == "" {
-		arkBaseURL = "https://ark.cn-beijing.volces.com/api/v3"
-	}
-	if apiKey == "" {
-		return lifeTraceImageAIConfig{}, "AI 未配置：缺少 ARK_API_KEY"
-	}
-	if strings.HasPrefix(visionModel, "ep-") {
-		return lifeTraceImageAIConfig{
-			APIKey:    apiKey,
-			BaseURL:   arkBaseURL,
-			Model:     visionModel,
-			Timeout:   lifeTraceTodayAdviceDefaultTimeout,
-			UseVision: true,
-		}, ""
-	}
-	if strings.HasPrefix(textModel, "ep-") {
-		return lifeTraceImageAIConfig{
-			APIKey:    apiKey,
-			BaseURL:   arkBaseURL,
-			Model:     textModel,
-			Timeout:   lifeTraceTodayAdviceDefaultTimeout,
-			UseVision: false,
-		}, ""
-	}
-	return lifeTraceImageAIConfig{}, "AI 未配置：ARK_VISION_MODEL 或 ARK_TEXT_MODEL 必须以 ep- 开头"
+	return lifeai.ReadImageConfig(lifeTraceTodayAdviceDefaultTimeout)
 }
 
 func buildImageAnalysisPrompt(kind string, useVision bool) string {
@@ -440,80 +405,16 @@ func callLifeTraceImageAI(
 	imageInput string,
 	prompt string,
 ) (string, string, error) {
-	start := time.Now()
-	client := ensureLifeTraceArkClient(cfg.APIKey, cfg.BaseURL)
-	content := &arkmodel.ChatCompletionMessageContent{}
-	if cfg.UseVision {
-		imageURL := normalizeLifeTraceImageInput(imageInput)
-		content.ListValue = []*arkmodel.ChatCompletionMessageContentPart{
-			{
-				Type: arkmodel.ChatCompletionMessageContentPartTypeImageURL,
-				ImageURL: &arkmodel.ChatMessageImageURL{
-					URL:    imageURL,
-					Detail: arkmodel.ImageURLDetailLow,
-				},
-			},
-			{
-				Type: arkmodel.ChatCompletionMessageContentPartTypeText,
-				Text: prompt,
-			},
-		}
-	} else {
-		content.StringValue = &prompt
-	}
-
-	temperature := float32(0.3)
-	maxTokens := lifeTraceImageAnalysisMaxTokens
-	resp, err := client.CreateChatCompletion(ctx, arkmodel.CreateChatCompletionRequest{
-		Model: cfg.Model,
-		Messages: []*arkmodel.ChatCompletionMessage{
-			{Role: arkmodel.ChatMessageRoleUser, Content: content},
-		},
-		MaxTokens:   &maxTokens,
-		Temperature: &temperature,
+	result, err := lifeai.NewClient().GenerateVisionJSON(ctx, cfg, lifeai.VisionRequest{
+		ImageInput: imageInput,
+		Prompt:     prompt,
+		MaxTokens:  lifeTraceImageAnalysisMaxTokens,
 	})
-	if err != nil {
-		recordLifeTraceAIUsage(ctx, "ark", cfg.Model, prompt, "", aiusage.Since(start), err)
-		return "", "", err
-	}
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == nil {
-		err := errors.New("empty AI response")
-		recordLifeTraceAIUsage(ctx, "ark", resp.Model, prompt, "", aiusage.Since(start), err)
-		return "", resp.Model, err
-	}
-
-	raw := ""
-	contentValue := resp.Choices[0].Message.Content
-	if contentValue.StringValue != nil {
-		raw = *contentValue.StringValue
-	} else {
-		parts := make([]string, 0, len(contentValue.ListValue))
-		for _, part := range contentValue.ListValue {
-			if part != nil && strings.TrimSpace(part.Text) != "" {
-				parts = append(parts, strings.TrimSpace(part.Text))
-			}
-		}
-		raw = strings.Join(parts, "\n")
-	}
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		err := errors.New("empty AI content")
-		recordLifeTraceAIUsage(ctx, "ark", resp.Model, prompt, "", aiusage.Since(start), err)
-		return "", resp.Model, err
-	}
-	recordLifeTraceAIUsage(ctx, "ark", resp.Model, prompt, raw, aiusage.Since(start), nil)
-	return raw, resp.Model, nil
+	return result.Content, result.Model, err
 }
 
 func normalizeLifeTraceImageInput(raw string) string {
-	imageURL := strings.TrimSpace(raw)
-	lower := strings.ToLower(imageURL)
-	if strings.HasPrefix(lower, "http://") ||
-		strings.HasPrefix(lower, "https://") ||
-		strings.HasPrefix(lower, "data:") {
-		return imageURL
-	}
-	return "data:image/jpeg;base64," + imageURL
+	return lifeai.NormalizeImageInput(raw)
 }
 
 func parseImageAnalysisAIResponse(raw string, kind string) (imageAnalysisAIResponse, error) {

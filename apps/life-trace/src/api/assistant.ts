@@ -27,7 +27,7 @@ export type LifeAssistantConversationsResponse = {
   list: LifeAssistantConversation[];
 };
 
-type AssistantStreamChunk = {
+export type AssistantStreamChunk = {
   chunk?: string;
   done?: boolean;
   error?: string;
@@ -58,10 +58,16 @@ export type LifeAssistantLedgerEvent = LifeAssistantActionBase & {
   ledgerEntry?: LedgerEntry;
 };
 
+export interface LifeAssistantActionEventMap {
+  create_plan: LifeAssistantPlanEvent;
+  create_pantry_item: LifeAssistantPantryEvent;
+  create_ledger_entry: LifeAssistantLedgerEvent;
+}
+
 export type LifeAssistantActionEvent =
-  | LifeAssistantPlanEvent
-  | LifeAssistantPantryEvent
-  | LifeAssistantLedgerEvent;
+  LifeAssistantActionEventMap[keyof LifeAssistantActionEventMap];
+
+export type LifeAssistantActionType = keyof LifeAssistantActionEventMap | (string & {});
 
 type StreamOptions = {
   message: string;

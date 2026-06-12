@@ -44,7 +44,6 @@ import {
   type LifeAssistantMessage,
   listLifeAssistantConversations,
   saveLifeAssistantMessage,
-  streamLifeAssistant,
 } from '@/api/assistant';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AssistantMessageCard } from '@/components/AssistantMessageCard';
@@ -61,6 +60,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { suggestedPrompts } from '@/data/mock';
+import { useLifeAssistantStream } from '@/features/ai/useLifeAssistantStream';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
 import {
   filterAiActions,
@@ -1706,6 +1706,10 @@ function useAiPageState() {
   );
   const token = useAuthStore((state) => state.token);
   const navigate = useNavigate();
+  const { stream: streamAssistant } = useLifeAssistantStream({
+    token: token || undefined,
+    householdId: preferredPantryHouseholdId || undefined,
+  });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [result, setResult] = useState<AiResult | null>(null);
   const [recipeResult, setRecipeResult] = useState<RecipeSuggestionResponse | null>(null);
@@ -2176,26 +2180,37 @@ function useAiPageState() {
       return;
     }
 
-    if (event.pantryItem) {
-      receiveServerPantryItem(
-        event.pantryItem,
-        event.status === 'created'
-          ? `生活助理收进了「${event.pantryItem.name}」`
-          : `生活助理识别到「${event.pantryItem.name}」库存`,
-      );
+    if (event.type === 'create_pantry_item') {
+      if (event.pantryItem) {
+        receiveServerPantryItem(
+          event.pantryItem,
+          event.status === 'created'
+            ? `生活助理收进了「${event.pantryItem.name}」`
+            : `生活助理识别到「${event.pantryItem.name}」库存`,
+        );
+      }
+
+      setResult({
+        title:
+          event.status === 'created'
+            ? '已加入库存'
+            : event.status === 'exists'
+              ? '库存已存在'
+              : event.status === 'need_more_info'
+                ? '还差一点信息'
+                : '库存未保存',
+        detail: event.message,
+        tone:
+          event.status === 'error' ? 'alert' : event.status === 'need_more_info' ? 'ai' : 'trace',
+      });
+      return;
     }
 
+    const unhandledEvent = event as { status?: string; message?: string };
     setResult({
-      title:
-        event.status === 'created'
-          ? '已加入库存'
-          : event.status === 'exists'
-            ? '库存已存在'
-            : event.status === 'need_more_info'
-              ? '还差一点信息'
-              : '库存未保存',
-      detail: event.message,
-      tone: event.status === 'error' ? 'alert' : event.status === 'need_more_info' ? 'ai' : 'trace',
+      title: unhandledEvent.status === 'need_more_info' ? '还差一点信息' : '这次先记下来了',
+      detail: unhandledEvent.message || '可以继续告诉生活助理你想补充什么。',
+      tone: unhandledEvent.status === 'error' ? 'alert' : 'ai',
     });
   };
 
@@ -2504,10 +2519,9 @@ function useAiPageState() {
     let actionReply = '';
 
     try {
-      await streamLifeAssistant(token, {
+      await streamAssistant({
         message,
         history,
-        householdId: preferredPantryHouseholdId || undefined,
         onMeta: (meta) => {
           if (meta.model) {
             setAssistantModel(meta.model);

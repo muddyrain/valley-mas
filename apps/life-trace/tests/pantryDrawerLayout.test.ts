@@ -20,6 +20,7 @@ const expiryDateFieldSource = readFileSync(
   resolve(__dirname, '../src/components/PantryExpiryDateField.tsx'),
   'utf8',
 );
+const formItemSource = readFileSync(resolve(__dirname, '../src/components/FormItem.tsx'), 'utf8');
 
 describe('pantry drawer mobile layout guards', () => {
   it('clips sheet content horizontally instead of exposing a horizontal scrollbar', () => {
@@ -42,10 +43,10 @@ describe('pantry drawer mobile layout guards', () => {
   it('allows pantry form grids and date fields to shrink inside the bottom sheet', () => {
     expect(pantryDrawerSource).toContain('form className="min-w-0 space-y-4"');
     expect(pantryDrawerSource).toContain('className="grid min-w-0 grid-cols-2');
-    expect(pantryDrawerSource).toContain('className="h-11 min-w-0 w-full');
-    expect(pantryDrawerSource).toContain(
-      'className="block min-w-0 max-w-full overflow-hidden rounded-2xl"',
-    );
+    expect(pantryDrawerSource).toContain('PickerFieldButton');
+    expect(formItemSource).toContain('h-11 min-w-0 w-full');
+    expect(pantryDrawerSource).toContain('className="overflow-hidden rounded-');
+    expect(pantryDrawerSource).toContain('<ImagePreview');
     expect(pantryDrawerSource).toContain('type="date"');
     expect(pantryDrawerSource).toContain('appearance-none');
   });

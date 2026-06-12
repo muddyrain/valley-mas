@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	lifeai "valley-server/internal/lifetrace/ai"
 	"valley-server/internal/service"
 	"valley-server/internal/utils"
 
@@ -117,33 +118,10 @@ func (h *Handler) GeneratePantryThumbnail(c *gin.Context) {
 	})
 }
 
-type lifeTracePantryThumbnailConfig struct {
-	APIKey   string
-	BaseURL  string
-	ModelIDs []string
-}
+type lifeTracePantryThumbnailConfig = lifeai.ThumbnailConfig
 
 func readLifeTracePantryThumbnailConfig() (lifeTracePantryThumbnailConfig, string) {
-	apiKey := strings.TrimSpace(os.Getenv("ARK_API_KEY"))
-	baseURL := strings.TrimSpace(os.Getenv("ARK_BASE_URL"))
-	primary := strings.TrimSpace(os.Getenv("ARK_IMAGE_MODEL"))
-	if baseURL == "" {
-		baseURL = "https://ark.cn-beijing.volces.com/api/v3"
-	}
-	if apiKey == "" {
-		return lifeTracePantryThumbnailConfig{}, "AI 未配置：缺少 ARK_API_KEY"
-	}
-
-	modelIDs := lifeTraceImageModelCandidates(primary)
-	if len(modelIDs) == 0 {
-		return lifeTracePantryThumbnailConfig{}, "AI 未配置：缺少 ARK_IMAGE_MODEL"
-	}
-
-	return lifeTracePantryThumbnailConfig{
-		APIKey:   apiKey,
-		BaseURL:  baseURL,
-		ModelIDs: modelIDs,
-	}, ""
+	return lifeai.ReadThumbnailConfig()
 }
 
 func buildPantryThumbnailPrompt(req pantryThumbnailRequest) string {

@@ -9,10 +9,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 	"valley-server/internal/database"
+	lifeai "valley-server/internal/lifetrace/ai"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -371,8 +371,7 @@ func TestLifeTraceAIRequestCancellationClassification(t *testing.T) {
 }
 
 func TestGeneratePantryThumbnailUsesARKImageModel(t *testing.T) {
-	lifeTraceArkClient = nil
-	lifeTraceArkClientOnce = sync.Once{}
+	lifeai.ResetARKClientForTest()
 	originalUpload := uploadGeneratedPantryThumbnailToTOS
 	uploadGeneratedPantryThumbnailToTOS = func(
 		_ context.Context,
