@@ -2,14 +2,13 @@ package lifetrace
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 	"valley-server/internal/aiusage"
 	"valley-server/internal/database"
+	"valley-server/internal/lifetrace/ai/prompts"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -339,13 +338,7 @@ func (h *Handler) ConvertInboxItem(c *gin.Context) {
 	success(c, item)
 }
 
-type inboxOrganizeAIResponse struct {
-	Title         string   `json:"title"`
-	Summary       string   `json:"summary"`
-	Tags          []string `json:"tags"`
-	SuggestedType string   `json:"suggestedType"`
-	Reason        string   `json:"reason"`
-}
+type inboxOrganizeAIResponse = prompts.InboxOrganizeOutput
 
 func (h *Handler) OrganizeInboxItem(c *gin.Context) {
 	userID, ok := currentUserID(c)
@@ -467,32 +460,7 @@ func findInboxItem(id string, userID model.Int64String) (model.LifeTraceInboxIte
 }
 
 func buildInboxOrganizePrompt(item model.LifeTraceInboxItem) string {
-	linkText := strings.TrimSpace(item.LinkURL)
-	if linkText == "" {
-		linkText = "无"
-	}
-	imageText := strings.TrimSpace(item.ImageURL)
-	if imageText == "" {
-		imageText = "无"
-	}
-	tags := strings.Join(item.Tags, "、")
-	if tags == "" {
-		tags = "无"
-	}
-	return strings.Join([]string{
-		"你是 Life Trace 的 Inbox 整理 AI，只输出一个 JSON 对象，不要 Markdown，不要解释。",
-		"JSON 格式：{\"title\":\"整理后的标题，24字以内\",\"summary\":\"整理摘要，80字以内\",\"tags\":[\"标签\"],\"suggestedType\":\"plan|trace\",\"reason\":\"建议去向原因，40字以内\"}",
-		"只根据用户已经收下的内容整理，不要编造没有出现的人名、地点、金额、日期或结论。",
-		"如果像未来要做的事，suggestedType 返回 plan；如果像已经发生的记录，返回 trace。",
-		"tags 输出 1-4 个简体中文短标签。",
-		"",
-		fmt.Sprintf("原始标题：%s", item.Title),
-		fmt.Sprintf("内容：%s", emptyInboxPromptText(item.Content)),
-		fmt.Sprintf("类型：%s", item.ItemType),
-		fmt.Sprintf("链接：%s", linkText),
-		fmt.Sprintf("图片：%s", imageText),
-		fmt.Sprintf("原标签：%s", tags),
-	}, "\n")
+	return prompts.BuildInboxOrganizePrompt(inboxPromptInput(item))
 }
 
 func emptyInboxPromptText(text string) string {
@@ -504,36 +472,19 @@ func emptyInboxPromptText(text string) string {
 }
 
 func parseInboxOrganizeAIResponse(raw string, item model.LifeTraceInboxItem) (inboxOrganizeAIResponse, error) {
-	raw = strings.TrimSpace(raw)
-	start := strings.Index(raw, "{")
-	end := strings.LastIndex(raw, "}")
-	if start < 0 || end <= start {
-		return inboxOrganizeAIResponse{}, errors.New("missing JSON object")
-	}
+	return prompts.ParseInboxOrganizeOutput(raw, inboxPromptInput(item))
+}
 
-	var parsed inboxOrganizeAIResponse
-	if err := json.Unmarshal([]byte(raw[start:end+1]), &parsed); err != nil {
-		return inboxOrganizeAIResponse{}, err
+func inboxPromptInput(item model.LifeTraceInboxItem) prompts.InboxOrganizeInput {
+	return prompts.InboxOrganizeInput{
+		Title:                 item.Title,
+		Content:               item.Content,
+		ItemType:              item.ItemType,
+		LinkURL:               item.LinkURL,
+		ImageURL:              item.ImageURL,
+		Tags:                  []string(item.Tags),
+		FallbackSuggestedType: inferInboxSuggestedType(item),
 	}
-
-	parsed.Title = trimRunes(parsed.Title, 24)
-	if parsed.Title == "" {
-		parsed.Title = trimRunes(item.Title, 24)
-	}
-	parsed.Summary = trimRunes(parsed.Summary, 80)
-	if parsed.Summary == "" {
-		parsed.Summary = trimRunes(strings.Join([]string{item.Content, item.LinkURL, item.ImageURL}, " "), 80)
-	}
-	parsed.Tags = normalizeInboxAITags(parsed.Tags, item.Tags)
-	parsed.SuggestedType = strings.TrimSpace(parsed.SuggestedType)
-	if !validInboxAISuggestedTypes[parsed.SuggestedType] {
-		parsed.SuggestedType = inferInboxSuggestedType(item)
-	}
-	parsed.Reason = trimRunes(parsed.Reason, 40)
-	if parsed.Reason == "" {
-		parsed.Reason = "已根据 Inbox 内容整理去向。"
-	}
-	return parsed, nil
 }
 
 func normalizeInboxAITags(tags []string, fallback model.StringList) []string {

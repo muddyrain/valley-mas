@@ -11,6 +11,7 @@ import (
 	"time"
 	"valley-server/internal/aiusage"
 	lifeai "valley-server/internal/lifetrace/ai"
+	"valley-server/internal/lifetrace/ai/prompts"
 
 	"github.com/gin-gonic/gin"
 )
@@ -33,10 +34,7 @@ type pantryPhotoAnalysisRequest struct {
 	BarcodeSource string `json:"barcodeSource"`
 }
 
-type imageAnalysisSchedule struct {
-	DateOption string `json:"dateOption"`
-	Time       string `json:"time"`
-}
+type imageAnalysisSchedule = prompts.ImageAnalysisSchedule
 
 type imageCropBox struct {
 	X      float64 `json:"x"`
@@ -45,14 +43,7 @@ type imageCropBox struct {
 	Height float64 `json:"height"`
 }
 
-type imageAnalysisAIResponse struct {
-	Title    string                `json:"title"`
-	Summary  string                `json:"summary"`
-	PlanType string                `json:"planType"`
-	Mood     string                `json:"mood"`
-	Tags     []string              `json:"tags"`
-	Schedule imageAnalysisSchedule `json:"schedule"`
-}
+type imageAnalysisAIResponse = prompts.ImageAnalysisOutput
 
 type pantryPhotoAnalysisAIResponse struct {
 	pantryPhotoDetectedItem
@@ -321,19 +312,10 @@ func readLifeTraceImageAIConfig() (lifeTraceImageAIConfig, string) {
 }
 
 func buildImageAnalysisPrompt(kind string, useVision bool) string {
-	kind = normalizeImageAnalysisKind(kind)
-	visionInstruction := "请直接观察图片内容，结合画面主体、场景和生活用途给出建议。"
-	if !useVision {
-		visionInstruction = "视觉模型未配置时，请只基于用户选择的图片类型给出保守建议，不要声称看到了具体画面。"
-	}
-
-	return strings.Join([]string{
-		"你是 Life Trace 的图片生活分析 AI，只输出一个 JSON 对象，不要 Markdown，不要解释。",
-		"JSON 格式：{\"title\":\"计划标题，16字以内\",\"summary\":\"分析和建议，60字以内\",\"planType\":\"电影|吃饭|运动|阅读|聚会|普通事项\",\"mood\":\"心情，6字以内\",\"tags\":[\"标签\"],\"schedule\":{\"dateOption\":\"今天|明天|周五|周六|周日\",\"time\":\"HH:MM\"}}",
-		"tags 输出 2-4 个简体中文短标签。",
-		visionInstruction,
-		"图片类型提示：" + kind,
-	}, "\n")
+	return prompts.BuildImageAnalysisPrompt(prompts.ImageAnalysisInput{
+		Kind:      kind,
+		UseVision: useVision,
+	})
 }
 
 func buildPantryPhotoAnalysisPrompt(
@@ -418,40 +400,7 @@ func normalizeLifeTraceImageInput(raw string) string {
 }
 
 func parseImageAnalysisAIResponse(raw string, kind string) (imageAnalysisAIResponse, error) {
-	raw = strings.TrimSpace(raw)
-	start := strings.Index(raw, "{")
-	end := strings.LastIndex(raw, "}")
-	if start < 0 || end <= start {
-		return imageAnalysisAIResponse{}, errors.New("missing JSON object")
-	}
-
-	var parsed imageAnalysisAIResponse
-	if err := json.Unmarshal([]byte(raw[start:end+1]), &parsed); err != nil {
-		return imageAnalysisAIResponse{}, err
-	}
-
-	fallback := imageAnalysisDefaultForKind(kind)
-	parsed.Title = trimRunes(parsed.Title, 20)
-	if parsed.Title == "" {
-		parsed.Title = fallback.Title
-	}
-	parsed.Summary = trimRunes(parsed.Summary, 72)
-	if parsed.Summary == "" {
-		parsed.Summary = fallback.Summary
-	}
-	parsed.PlanType = strings.TrimSpace(parsed.PlanType)
-	if !validImageAnalysisPlanTypes[parsed.PlanType] {
-		parsed.PlanType = fallback.PlanType
-	}
-	parsed.Mood = trimRunes(parsed.Mood, 6)
-	if parsed.Mood == "" {
-		parsed.Mood = fallback.Mood
-	}
-	parsed.Tags = normalizeImageAnalysisTags(parsed.Tags, fallback.Tags)
-	if !isValidImageAnalysisSchedule(parsed.Schedule) {
-		parsed.Schedule = fallback.Schedule
-	}
-	return parsed, nil
+	return prompts.ParseImageAnalysisOutput(raw, kind)
 }
 
 func parsePantryPhotoAnalysisAIResponse(raw string) (pantryPhotoAnalysisAIResponse, error) {

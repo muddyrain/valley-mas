@@ -2,7 +2,6 @@ package lifetrace
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"time"
 	"valley-server/internal/aiusage"
 	"valley-server/internal/database"
+	"valley-server/internal/lifetrace/ai/prompts"
 	"valley-server/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -47,6 +47,16 @@ type mediaDiaryAISuggestion struct {
 	ReleaseYear   int      `json:"releaseYear"`
 	Tags          []string `json:"tags"`
 	Note          string   `json:"note"`
+}
+
+func mediaDiarySuggestionFromPrompt(suggestion prompts.MediaDiarySuggestion) mediaDiaryAISuggestion {
+	return mediaDiaryAISuggestion{
+		OriginalTitle: suggestion.OriginalTitle,
+		Creator:       suggestion.Creator,
+		ReleaseYear:   suggestion.ReleaseYear,
+		Tags:          suggestion.Tags,
+		Note:          suggestion.Note,
+	}
 }
 
 type mediaDiarySummary struct {
@@ -500,35 +510,18 @@ func (h *Handler) SuggestMediaDiaryEntry(c *gin.Context) {
 }
 
 func buildMediaDiaryAISuggestPrompt(mediaType string, title string) string {
-	return strings.Join([]string{
-		"你是 Life Trace 的书影音日记助手。只输出 JSON 对象，不要 Markdown，不要解释。",
-		"用户会自行确认信息，不能编造冷门事实；不确定的字段留空。",
-		"JSON 字段：originalTitle, creator, releaseYear, tags, note。",
-		"tags 最多 5 个，每个不超过 12 个字；note 不超过 80 个中文字符。",
-		fmt.Sprintf("类型：%s", mediaType),
-		fmt.Sprintf("标题：%s", title),
-	}, "\n")
+	return prompts.BuildMediaDiarySuggestPrompt(prompts.MediaDiarySuggestInput{
+		MediaType: mediaType,
+		Title:     title,
+	})
 }
 
 func parseMediaDiaryAISuggestion(raw string) (mediaDiaryAISuggestion, error) {
-	raw = strings.TrimSpace(raw)
-	start := strings.Index(raw, "{")
-	end := strings.LastIndex(raw, "}")
-	if start < 0 || end <= start {
-		return mediaDiaryAISuggestion{}, errors.New("missing JSON object")
-	}
-
-	var suggestion mediaDiaryAISuggestion
-	if err := json.Unmarshal([]byte(raw[start:end+1]), &suggestion); err != nil {
+	suggestion, err := prompts.ParseMediaDiarySuggestion(raw)
+	if err != nil {
 		return mediaDiaryAISuggestion{}, err
 	}
-
-	suggestion.OriginalTitle = trimRunes(strings.TrimSpace(suggestion.OriginalTitle), 160)
-	suggestion.Creator = trimRunes(strings.TrimSpace(suggestion.Creator), 160)
-	suggestion.ReleaseYear = normalizeMediaDiaryYear(suggestion.ReleaseYear)
-	suggestion.Note = trimRunes(strings.TrimSpace(suggestion.Note), 80)
-	suggestion.Tags = normalizeMediaDiarySuggestionTags(suggestion.Tags)
-	return suggestion, nil
+	return mediaDiarySuggestionFromPrompt(suggestion), nil
 }
 
 func normalizeMediaDiarySuggestionTags(tags []string) []string {
