@@ -465,6 +465,19 @@ export function getPhotoItemDetectedItems(analysis: PantryPhotoAnalysisResponse)
     .slice(0, 5);
 }
 
+export function getPhotoItemModelTag(analysis: PantryPhotoAnalysisResponse) {
+  const explicitTag = analysis.modelTag?.trim();
+  if (explicitTag) {
+    return explicitTag;
+  }
+
+  const source = analysis.source?.trim().toLowerCase();
+  const sourceLabel =
+    source === 'gemini' ? 'Gemini' : source === 'ark' ? 'ARK' : source ? source.toUpperCase() : '';
+  const model = analysis.model?.trim() ?? '';
+  return [sourceLabel, model].filter(Boolean).join(' · ');
+}
+
 export function getPhotoItemSelectedDetectedItem(
   analysis: PantryPhotoAnalysisResponse,
   selectedDetectedItemId?: string,

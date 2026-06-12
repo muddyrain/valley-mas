@@ -3,11 +3,13 @@ package ai
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -101,6 +103,10 @@ func (Client) GenerateVisionJSON(ctx context.Context, cfg ImageConfig, req Visio
 		req.Temperature = 0.3
 	}
 
+	if cfg.Source == "gemini" {
+		return generateGeminiVisionJSON(ctx, cfg, req)
+	}
+
 	start := time.Now()
 	client := EnsureARKClient(cfg.APIKey, cfg.BaseURL)
 	content := &arkmodel.ChatCompletionMessageContent{}
@@ -142,6 +148,199 @@ func (Client) GenerateVisionJSON(ctx context.Context, cfg ImageConfig, req Visio
 	}
 	recordUsage(ctx, "ark", resp.Model, req.Prompt, raw, aiusage.Since(start), nil)
 	return Result{Content: raw, Model: resp.Model, Source: "ark"}, nil
+}
+
+type geminiGenerateContentRequest struct {
+	Contents         []geminiContent        `json:"contents"`
+	GenerationConfig geminiGenerationConfig `json:"generationConfig"`
+}
+
+type geminiContent struct {
+	Parts []geminiPart `json:"parts"`
+}
+
+type geminiPart struct {
+	Text       string            `json:"text,omitempty"`
+	InlineData *geminiInlineData `json:"inline_data,omitempty"`
+}
+
+type geminiInlineData struct {
+	MimeType string `json:"mime_type"`
+	Data     string `json:"data"`
+}
+
+type geminiGenerationConfig struct {
+	Temperature      float32 `json:"temperature,omitempty"`
+	MaxOutputTokens  int     `json:"maxOutputTokens,omitempty"`
+	ResponseMimeType string  `json:"responseMimeType,omitempty"`
+}
+
+type geminiGenerateContentResponse struct {
+	Candidates []struct {
+		Content struct {
+			Parts []geminiPart `json:"parts"`
+		} `json:"content"`
+	} `json:"candidates"`
+	ModelVersion string `json:"modelVersion"`
+}
+
+func generateGeminiVisionJSON(ctx context.Context, cfg ImageConfig, req VisionRequest) (Result, error) {
+	start := time.Now()
+	mimeType, imageData, err := prepareGeminiInlineImage(ctx, cfg, req.ImageInput)
+	if err != nil {
+		recordUsage(ctx, "gemini", cfg.Model, req.Prompt, "", aiusage.Since(start), err)
+		return Result{}, err
+	}
+
+	payload := geminiGenerateContentRequest{
+		Contents: []geminiContent{
+			{
+				Parts: []geminiPart{
+					{Text: req.Prompt},
+					{InlineData: &geminiInlineData{MimeType: mimeType, Data: imageData}},
+				},
+			},
+		},
+		GenerationConfig: geminiGenerationConfig{
+			Temperature:      req.Temperature,
+			MaxOutputTokens:  req.MaxTokens,
+			ResponseMimeType: "application/json",
+		},
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		recordUsage(ctx, "gemini", cfg.Model, req.Prompt, "", aiusage.Since(start), err)
+		return Result{}, err
+	}
+
+	endpoint := strings.TrimRight(cfg.BaseURL, "/") + "/models/" + url.PathEscape(cfg.Model) + ":generateContent"
+	httpClient := &http.Client{Timeout: cfg.Timeout}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		recordUsage(ctx, "gemini", cfg.Model, req.Prompt, "", aiusage.Since(start), err)
+		return Result{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("x-goog-api-key", cfg.APIKey)
+
+	resp, err := httpClient.Do(httpReq)
+	if err != nil {
+		recordUsage(ctx, "gemini", cfg.Model, req.Prompt, "", aiusage.Since(start), err)
+		return Result{}, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		recordUsage(ctx, "gemini", cfg.Model, req.Prompt, "", aiusage.Since(start), err)
+		return Result{}, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		err := fmt.Errorf("Gemini upstream returned %d: %s", resp.StatusCode, trimRunes(string(respBody), 180))
+		recordUsage(ctx, "gemini", cfg.Model, req.Prompt, "", aiusage.Since(start), err)
+		return Result{}, err
+	}
+
+	var parsed geminiGenerateContentResponse
+	if err := json.Unmarshal(respBody, &parsed); err != nil {
+		wrapped := fmt.Errorf("decode Gemini response failed: %w", err)
+		recordUsage(ctx, "gemini", cfg.Model, req.Prompt, "", aiusage.Since(start), wrapped)
+		return Result{}, wrapped
+	}
+	content, err := extractGeminiContent(parsed)
+	if err != nil {
+		recordUsage(ctx, "gemini", cfg.Model, req.Prompt, "", aiusage.Since(start), err)
+		return Result{Model: cfg.Model, Source: "gemini"}, err
+	}
+	modelName := strings.TrimSpace(parsed.ModelVersion)
+	if modelName == "" {
+		modelName = cfg.Model
+	}
+
+	recordUsage(ctx, "gemini", modelName, req.Prompt, content, aiusage.Since(start), nil)
+	return Result{Content: content, Model: modelName, Source: "gemini"}, nil
+}
+
+func prepareGeminiInlineImage(ctx context.Context, cfg ImageConfig, raw string) (string, string, error) {
+	imageInput := strings.TrimSpace(raw)
+	if imageInput == "" {
+		return "", "", errors.New("empty image input")
+	}
+	lower := strings.ToLower(imageInput)
+	if strings.HasPrefix(lower, "data:") {
+		return parseDataURLImage(imageInput)
+	}
+	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
+		return fetchGeminiImageURL(ctx, cfg, imageInput)
+	}
+	if _, err := base64.StdEncoding.DecodeString(imageInput); err != nil {
+		return "", "", fmt.Errorf("invalid base64 image input: %w", err)
+	}
+	return "image/jpeg", imageInput, nil
+}
+
+func parseDataURLImage(raw string) (string, string, error) {
+	meta, data, ok := strings.Cut(raw, ",")
+	if !ok {
+		return "", "", errors.New("invalid data URL image input")
+	}
+	mimeType := strings.TrimPrefix(strings.TrimSpace(meta), "data:")
+	mimeType = strings.TrimSuffix(mimeType, ";base64")
+	if mimeType == "" {
+		mimeType = "image/jpeg"
+	}
+	if _, err := base64.StdEncoding.DecodeString(strings.TrimSpace(data)); err != nil {
+		return "", "", fmt.Errorf("invalid data URL base64 image input: %w", err)
+	}
+	return mimeType, strings.TrimSpace(data), nil
+}
+
+func fetchGeminiImageURL(ctx context.Context, cfg ImageConfig, imageURL string) (string, string, error) {
+	httpClient := &http.Client{Timeout: cfg.Timeout}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
+	if err != nil {
+		return "", "", err
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", "", fmt.Errorf("image URL returned %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", err
+	}
+	if len(body) == 0 {
+		return "", "", errors.New("image URL returned empty body")
+	}
+	mimeType := strings.TrimSpace(strings.Split(resp.Header.Get("Content-Type"), ";")[0])
+	if mimeType == "" || !strings.HasPrefix(strings.ToLower(mimeType), "image/") {
+		mimeType = "image/jpeg"
+	}
+	return mimeType, base64.StdEncoding.EncodeToString(body), nil
+}
+
+func extractGeminiContent(resp geminiGenerateContentResponse) (string, error) {
+	if len(resp.Candidates) == 0 {
+		return "", errors.New("Gemini upstream returned no candidates")
+	}
+	parts := make([]string, 0, len(resp.Candidates[0].Content.Parts))
+	for _, part := range resp.Candidates[0].Content.Parts {
+		text := strings.TrimSpace(part.Text)
+		if text != "" {
+			parts = append(parts, text)
+		}
+	}
+	content := strings.TrimSpace(strings.Join(parts, "\n"))
+	if content == "" {
+		return "", errors.New("Gemini upstream returned empty content")
+	}
+	return content, nil
 }
 
 func generateARKText(ctx context.Context, cfg TextConfig, req TextRequest) (Result, error) {

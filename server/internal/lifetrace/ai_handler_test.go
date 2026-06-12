@@ -618,6 +618,45 @@ func TestParsePantryPhotoAnalysisAIResponsePreservesBarcodeFields(t *testing.T) 
 	}
 }
 
+func TestAnalyzePantryPhotoReturnsModelTag(t *testing.T) {
+	geminiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"modelVersion":"gemini-test",
+			"candidates":[{
+				"content":{
+					"parts":[{
+						"text":"{\"name\":\"牛奶\",\"category\":\"食品\",\"quantity\":1,\"unit\":\"盒\",\"storageLocation\":\"冷藏\",\"tags\":[\"AI识别\"],\"confidence\":0.88,\"warnings\":[],\"summary\":\"已识别牛奶。\"}"
+					}]
+				}
+			}]
+		}`))
+	}))
+	defer geminiServer.Close()
+
+	t.Setenv("GEMINI_API_KEY", "test-gemini-key")
+	t.Setenv("GEMINI_API_BASE_URL", geminiServer.URL)
+	t.Setenv("GEMINI_VISION_MODEL", "gemini-test")
+
+	router := setupTraceTestRouter(t, 101)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/pantry-photo-analysis", bytes.NewBufferString(`{
+		"imageBase64":"aW1hZ2U=",
+		"hint":"牛奶"
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	if data["source"] != "gemini" || data["model"] != "gemini-test" || data["modelTag"] != "Gemini · gemini-test" {
+		t.Fatalf("expected Gemini model metadata, got %+v", data)
+	}
+}
+
 func TestGenerateWeeklyReviewUsesCloudLifeContext(t *testing.T) {
 	var capturedPrompt string
 	openAIServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

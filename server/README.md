@@ -170,7 +170,7 @@ cd server && go run ./cmd/sync-schema --apply --scope all
 - 端口被占用：检查是否已有服务监听 `:8080`，或通过 `PORT` 改端口。
 - 环境变量缺失：对照 `server/.env.example` 补齐本地 `.env`。
 - 数据库结构不一致：本地可使用 `go run ./cmd/sync-schema --apply --models places,ledger` 等精确命令，或确认当前环境是否允许 `DB_AUTO_MIGRATE=true`；生产环境应使用明确的迁移流程。
-- AI 调用失败：确认 `ARK_*` 或 `AI_*` 配置；AI Mind Arena 配置缺失或上游失败时应回退 mock。
+- AI 调用失败：先确认功能归属。Valley/Blog/Creator 默认看 `ARK_*`；Life Trace 文本 AI 若配置了 `LIFE_TRACE_AI_*` 会优先使用它，否则回退 `ARK_TEXT_MODEL`；AI Mind Arena 看 `MIND_ARENA_AI_*`，默认复用 `ARK_TEXT_MODEL`，只有单独切模型时才配置 `MIND_ARENA_AI_MODEL`。配置缺失或上游失败时应回退 mock，旧 `OPENAI_API_*` 和 `AI_*` 仅作兼容。
 
 ## 相关入口
 

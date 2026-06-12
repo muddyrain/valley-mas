@@ -201,7 +201,7 @@ MVP 能力：
 状态：已完成并验收收口。
 
 - AI 页“拍照分析商品”入口和独立拍照分析页已落地。
-- 商品图片识别接口已接入服务端 ARK 视觉模型。
+- 商品图片识别接口已接入服务端模型代理，Pantry 拍照分析优先使用 Gemini 视觉模型，未配置时回退 ARK。
 - 用户确认后才写 Pantry，不自动入库。
 - 拍照、相册上传、重拍、编辑、入库、失败重试和共享家庭入库已完成手动验收。
 
@@ -446,6 +446,7 @@ AI 返回草稿字段：
 - `confidence`：整体识别置信度。
 - `warnings`：识别不确定、保质期不可见、需要用户确认等提示。
 - `cropBox`：建议裁剪框，保留服务端响应兼容。
+- `source` / `model` / `modelTag`：本次识别使用的 AI provider、模型名和展示标签，例如 `Gemini · gemini-2.5-flash` 或 `ARK · ep-...`。
 
 用户可编辑字段：
 
@@ -479,14 +480,14 @@ AI 返回草稿字段：
 - 状态：Zustand + localStorage 兜底持久化；核心数据通过 Go API 同步。
 - PWA：manifest + service worker。
 - 后端：复用 Valley MAS Go 服务，Life Trace 能力集中在 `server/internal/lifetrace`。
-- AI：复用现有 ARK 配置和服务端 AI 调用链路，不在前端直连模型。
+- AI：服务端统一代理模型调用，不在前端直连模型；Pantry 拍照分析优先使用 Gemini 视觉模型，其他 Life Trace AI 默认复用现有 ARK / Life Trace 文本配置。
 - 图片：复用现有上传接口和服务端图片分析能力。
 
 依赖策略：
 
 - 默认不新增第三方依赖。
 - 新增依赖前必须说明要解决的问题、主要取舍和替代方案，并询问用户是否采用。
-- AI 拍照分析复用浏览器原生 `MediaDevices.getUserMedia`、`canvas`、现有上传接口和现有 ARK 视觉模型。
+- AI 拍照分析复用浏览器原生 `MediaDevices.getUserMedia`、`canvas`、现有上传接口；Pantry 商品识别优先走 Gemini 视觉模型，未配置时回退现有 ARK 视觉/文本模型。
 - 条码识别首版使用浏览器原生 `BarcodeDetector`；不可用、识别失败或格式不支持时，提供手动输入编码入口。
 - IMG.LY 兜底使用较小的 `isnet_quint8` 模型，优先保证能返回透明 PNG，不追求最高质量。
 

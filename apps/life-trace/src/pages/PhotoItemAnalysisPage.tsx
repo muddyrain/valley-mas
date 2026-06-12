@@ -55,6 +55,7 @@ import {
   getPhotoItemAnalysisDraftById,
   getPhotoItemAnalysisReviewIssues,
   getPhotoItemDetectedItems,
+  getPhotoItemModelTag,
   getPhotoItemSelectedDetectedItem,
   isMeaningfulPhotoItemCropBox,
   normalizePhotoItemCropBox,
@@ -506,6 +507,7 @@ export function PhotoItemAnalysisPage() {
     () => (analysis ? getPhotoItemDetectedItems(analysis) : []),
     [analysis],
   );
+  const modelTag = useMemo(() => (analysis ? getPhotoItemModelTag(analysis) : ''), [analysis]);
   const selectedDetectedItem = useMemo(
     () => (analysis ? getPhotoItemSelectedDetectedItem(analysis, selectedDetectedItemId) : null),
     [analysis, selectedDetectedItemId],
@@ -2018,6 +2020,13 @@ export function PhotoItemAnalysisPage() {
             meta={`${Math.round((selectedDetectedItem?.confidence ?? analysis.confidence) * 100)}%`}
           />
           <Card className="space-y-4 p-4">
+            {modelTag ? (
+              <div className="flex justify-end">
+                <Badge tone="ai" className="shrink-0 whitespace-nowrap">
+                  {modelTag}
+                </Badge>
+              </div>
+            ) : null}
             {detectedItems.length > 1 ? (
               <div className="rounded-[1.25rem] border border-life-ai/20 bg-life-ai/5 p-3">
                 <div className="flex items-center justify-between gap-3">

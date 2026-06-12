@@ -51,12 +51,23 @@ export function AssistantMessageCard({
             </p>
             {meta ? <span className="shrink-0 text-xs text-muted-foreground">{meta}</span> : null}
           </div>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
-            {message.content || (streaming ? '正在思考下一步安排...' : '暂无回复')}
-            {!isUser && streaming ? (
-              <span className="ml-1 inline-block h-4 w-1 animate-pulse rounded-full bg-life-ai align-[-2px]" />
-            ) : null}
-          </p>
+          {streaming && !message.content ? (
+            <div className="mt-2 inline-flex items-center gap-2 text-sm leading-6 text-foreground">
+              <span>正在整理</span>
+              <span className="inline-flex items-center gap-1" aria-hidden="true">
+                <span className="size-1.5 animate-pulse rounded-full bg-life-ai motion-reduce:animate-none" />
+                <span className="size-1.5 animate-pulse rounded-full bg-life-ai [animation-delay:150ms] motion-reduce:animate-none" />
+                <span className="size-1.5 animate-pulse rounded-full bg-life-ai [animation-delay:300ms] motion-reduce:animate-none" />
+              </span>
+            </div>
+          ) : (
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
+              {message.content || '暂无回复'}
+              {!isUser && streaming ? (
+                <span className="ml-1 inline-block h-4 w-1 animate-pulse rounded-full bg-life-ai align-[-2px] motion-reduce:animate-none" />
+              ) : null}
+            </p>
+          )}
         </div>
       </div>
     </div>

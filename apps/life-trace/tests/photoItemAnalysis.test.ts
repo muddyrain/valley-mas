@@ -13,6 +13,7 @@ import {
   getPhotoItemAnalysisReviewIssues,
   getPhotoItemAnalysisSummaryItems,
   getPhotoItemDetectedItems,
+  getPhotoItemModelTag,
   getPhotoItemSelectedDetectedItem,
   markPhotoItemAnalysisQualityFeedback,
   markPhotoItemAnalysisSaved,
@@ -133,6 +134,26 @@ describe('photo item analysis helpers', () => {
 
     expect(input.imageUrl).toBe('https://example.com/real-photo.jpg');
     expect(input.thumbnailUrl).toBeUndefined();
+  });
+
+  it('formats the AI model tag from analysis metadata', () => {
+    expect(
+      getPhotoItemModelTag({
+        ...analysis,
+        source: 'gemini',
+        model: 'gemini-2.5-flash',
+        modelTag: 'Gemini · gemini-2.5-flash',
+      }),
+    ).toBe('Gemini · gemini-2.5-flash');
+
+    expect(
+      getPhotoItemModelTag({
+        ...analysis,
+        source: 'ark',
+        model: 'ep-vision',
+        modelTag: undefined,
+      }),
+    ).toBe('ARK · ep-vision');
   });
 
   it('carries confirmed barcode fields into pantry input', () => {

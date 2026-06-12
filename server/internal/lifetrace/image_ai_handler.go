@@ -230,7 +230,7 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 		return
 	}
 
-	aiCfg, errMsg := readLifeTraceImageAIConfig()
+	aiCfg, errMsg := readLifeTracePantryPhotoAIConfig()
 	if errMsg != "" {
 		c.JSON(http.StatusServiceUnavailable, apiResponse{Code: http.StatusServiceUnavailable, Message: errMsg})
 		return
@@ -277,6 +277,7 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 	if modelName == "" {
 		modelName = aiCfg.Model
 	}
+	modelTag := buildAIModelTag(aiCfg.Source, modelName)
 
 	success(c, gin.H{
 		"name":              parsed.Name,
@@ -302,13 +303,39 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 		"ocrHints":          parsed.OCRHints,
 		"householdId":       householdCtx.Household.ID,
 		"householdName":     householdCtx.Household.Name,
-		"source":            "ark",
+		"source":            aiCfg.Source,
 		"model":             modelName,
+		"modelTag":          modelTag,
 	})
 }
 
 func readLifeTraceImageAIConfig() (lifeTraceImageAIConfig, string) {
 	return lifeai.ReadImageConfig(lifeTraceTodayAdviceDefaultTimeout)
+}
+
+func readLifeTracePantryPhotoAIConfig() (lifeTraceImageAIConfig, string) {
+	return lifeai.ReadPantryPhotoConfig(lifeTraceTodayAdviceDefaultTimeout)
+}
+
+func buildAIModelTag(source string, modelName string) string {
+	source = strings.TrimSpace(strings.ToLower(source))
+	modelName = strings.TrimSpace(modelName)
+	label := strings.ToUpper(source)
+	switch source {
+	case "gemini":
+		label = "Gemini"
+	case "ark":
+		label = "ARK"
+	case "openai":
+		label = "OpenAI"
+	}
+	if modelName == "" {
+		return label
+	}
+	if label == "" {
+		return modelName
+	}
+	return label + " · " + modelName
 }
 
 func buildImageAnalysisPrompt(kind string, useVision bool) string {

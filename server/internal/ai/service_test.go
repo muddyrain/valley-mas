@@ -28,6 +28,50 @@ func TestNormalizeAIProvider(t *testing.T) {
 }
 
 func TestNewServiceFromEnv(t *testing.T) {
+	t.Run("prefers namespaced mind arena env", func(t *testing.T) {
+		t.Setenv("MIND_ARENA_AI_PROVIDER", "doubao")
+		t.Setenv("MIND_ARENA_AI_API_KEY", "mind-key")
+		t.Setenv("MIND_ARENA_AI_BASE_URL", "")
+		t.Setenv("MIND_ARENA_AI_MODEL", "ep-mind")
+		t.Setenv("AI_PROVIDER", "mock")
+		t.Setenv("AI_API_KEY", "")
+		t.Setenv("AI_MODEL", "")
+
+		service := NewServiceFromEnv()
+		fallback, ok := service.(*FallbackService)
+		if !ok {
+			t.Fatalf("expected *FallbackService, got %T", service)
+		}
+		primary, ok := fallback.primary.(*OpenAICompatibleService)
+		if !ok {
+			t.Fatalf("expected primary *OpenAICompatibleService, got %T", fallback.primary)
+		}
+		if primary.model != "ep-mind" {
+			t.Fatalf("expected namespaced model, got %q", primary.model)
+		}
+	})
+
+	t.Run("falls back to shared ark text model", func(t *testing.T) {
+		t.Setenv("MIND_ARENA_AI_PROVIDER", "doubao")
+		t.Setenv("MIND_ARENA_AI_API_KEY", "mind-key")
+		t.Setenv("MIND_ARENA_AI_BASE_URL", "")
+		t.Setenv("MIND_ARENA_AI_MODEL", "")
+		t.Setenv("ARK_TEXT_MODEL", "ep-shared-text")
+
+		service := NewServiceFromEnv()
+		fallback, ok := service.(*FallbackService)
+		if !ok {
+			t.Fatalf("expected *FallbackService, got %T", service)
+		}
+		primary, ok := fallback.primary.(*OpenAICompatibleService)
+		if !ok {
+			t.Fatalf("expected primary *OpenAICompatibleService, got %T", fallback.primary)
+		}
+		if primary.model != "ep-shared-text" {
+			t.Fatalf("expected shared ARK text model, got %q", primary.model)
+		}
+	})
+
 	t.Run("returns openai compatible service for doubao provider", func(t *testing.T) {
 		t.Setenv("AI_PROVIDER", "doubao")
 		t.Setenv("AI_API_KEY", "test-key")

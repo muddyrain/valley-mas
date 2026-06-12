@@ -68,6 +68,7 @@ import {
   getAssistantMessageDate,
   groupAssistantMessagesByDate,
 } from '@/lib/aiHistory';
+import { buildAssistantFailureMessage } from '@/lib/assistantMessages';
 import { formatLedgerAmount } from '@/lib/ledger';
 import { formatLocationDisplay } from '@/lib/location';
 import {
@@ -1367,17 +1368,17 @@ function AgentConversationPanel({
             {streaming ? (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-life-ai/10 px-2 py-0.5 text-xs font-semibold text-life-ai">
                 <ActionLoadingIcon className="size-3" />
-                思考中
+                处理中
               </span>
             ) : null}
           </div>
           <p className="truncate text-xs text-muted-foreground">
             {streaming
-              ? '正在流式输出'
+              ? '正在生成回复'
               : loading
                 ? '正在同步云端对话'
                 : model
-                  ? `模型 ${model}`
+                  ? '已连接生活助理'
                   : '内容由 AI 生成'}
           </p>
         </div>
@@ -1438,7 +1439,7 @@ function AgentConversationPanel({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-3 px-1">
                     <p className="text-sm font-semibold text-muted-foreground">开场提问</p>
-                    {streaming ? <Badge tone="ai">思考中</Badge> : null}
+                    {streaming ? <Badge tone="ai">处理中</Badge> : null}
                   </div>
                   <div className="grid gap-2">
                     {landingPromptCards.map((prompt) => {
@@ -1596,7 +1597,7 @@ function AgentConversationPanel({
                     {listening
                       ? '正在听写，停下后可以直接发送'
                       : streaming
-                        ? '生活助理正在流式输出'
+                        ? '正在生成回复'
                         : '所有工具都会在当前 chat 内完成'}
                   </p>
                   {speechError ? (
@@ -2551,21 +2552,21 @@ function useAiPageState() {
       }
     } catch (error) {
       const detail = error instanceof Error ? error.message : '生活助理暂时没有回应';
+      const failureMessage = buildAssistantFailureMessage(reply, detail);
       setAssistantMessages((items) =>
         items.map((item) =>
           item.id === assistantId
             ? {
                 ...item,
-                content:
-                  reply.trim() ||
-                  `刚才没有连接上生活助理。你可以稍后重试，我会继续基于天气、计划和打卡来安排。(${detail})`,
+                content: failureMessage,
               }
             : item,
         ),
       );
-      if (reply.trim()) {
-        void saveAssistantMessageToServer({ role: 'assistant', content: reply }, conversationId);
-      }
+      void saveAssistantMessageToServer(
+        { role: 'assistant', content: failureMessage },
+        conversationId,
+      );
     } finally {
       setAssistantStreaming(false);
     }

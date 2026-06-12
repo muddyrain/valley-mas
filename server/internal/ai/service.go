@@ -23,17 +23,28 @@ type AIService interface {
 
 func NewServiceFromEnv() AIService {
 	mock := NewMockAIService()
-	provider := normalizeAIProvider(os.Getenv("AI_PROVIDER"))
-	if isOpenAICompatibleProvider(provider) && strings.TrimSpace(os.Getenv("AI_API_KEY")) != "" {
+	provider := normalizeAIProvider(firstEnv("MIND_ARENA_AI_PROVIDER", "AI_PROVIDER"))
+	apiKey := firstEnv("MIND_ARENA_AI_API_KEY", "AI_API_KEY")
+	if isOpenAICompatibleProvider(provider) && apiKey != "" {
 		primary := NewOpenAICompatibleService(OpenAICompatibleConfig{
 			Provider: provider,
-			BaseURL:  os.Getenv("AI_BASE_URL"),
-			APIKey:   os.Getenv("AI_API_KEY"),
-			Model:    os.Getenv("AI_MODEL"),
+			BaseURL:  firstEnv("MIND_ARENA_AI_BASE_URL", "AI_BASE_URL"),
+			APIKey:   apiKey,
+			Model:    firstEnv("MIND_ARENA_AI_MODEL", "AI_MODEL", "ARK_TEXT_MODEL"),
 		})
 		return NewFallbackService(primary, mock)
 	}
 	return mock
+}
+
+func firstEnv(keys ...string) string {
+	for _, key := range keys {
+		value := strings.TrimSpace(os.Getenv(key))
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func normalizeAIProvider(provider string) string {

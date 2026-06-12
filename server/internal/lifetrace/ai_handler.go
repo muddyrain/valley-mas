@@ -1635,31 +1635,6 @@ func readLifeTraceAIConfig() (lifeTraceAIConfig, string) {
 	return lifeai.ReadTextConfig(lifeTraceTodayAdviceDefaultTimeout)
 }
 
-func readLifeTraceOpenAIConfig() (lifeTraceAIConfig, bool) {
-	apiKey := strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
-	if apiKey == "" {
-		return lifeTraceAIConfig{}, false
-	}
-
-	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("OPENAI_API_BASE_URL")), "/")
-	if baseURL == "" {
-		baseURL = "https://api.openai.com/v1"
-	}
-
-	model := strings.TrimSpace(os.Getenv("OPENAI_API_MODEL"))
-	if model == "" {
-		model = "gpt-5.4"
-	}
-
-	return lifeTraceAIConfig{
-		Source:  "openai",
-		APIKey:  apiKey,
-		BaseURL: baseURL,
-		Model:   model,
-		Timeout: parseLifeTraceOpenAITimeout(os.Getenv("OPENAI_API_TIMEOUT")),
-	}, true
-}
-
 func readLifeTraceArkTextConfig() (apiKey, arkBaseURL, textModel string, errMsg string) {
 	apiKey = strings.TrimSpace(os.Getenv("ARK_API_KEY"))
 	textModel = strings.TrimSpace(os.Getenv("ARK_TEXT_MODEL"))
@@ -1674,19 +1649,6 @@ func readLifeTraceArkTextConfig() (apiKey, arkBaseURL, textModel string, errMsg 
 		return "", "", "", "AI 未配置：ARK_TEXT_MODEL 必须以 ep- 开头"
 	}
 	return apiKey, arkBaseURL, textModel, ""
-}
-
-func parseLifeTraceOpenAITimeout(raw string) time.Duration {
-	value := strings.TrimSpace(raw)
-	if value == "" {
-		return lifeTraceTodayAdviceDefaultTimeout
-	}
-
-	seconds, err := strconv.Atoi(value)
-	if err != nil || seconds <= 0 {
-		return lifeTraceTodayAdviceDefaultTimeout
-	}
-	return time.Duration(seconds) * time.Second
 }
 
 func buildTodayAdviceCacheKey(userID model.Int64String, cfg lifeTraceAIConfig, prompt string) string {

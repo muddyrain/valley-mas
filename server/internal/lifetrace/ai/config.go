@@ -7,7 +7,11 @@ import (
 	"time"
 )
 
-const DefaultARKBaseURL = "https://ark.cn-beijing.volces.com/api/v3"
+const (
+	DefaultARKBaseURL    = "https://ark.cn-beijing.volces.com/api/v3"
+	DefaultGeminiBaseURL = "https://generativelanguage.googleapis.com/v1beta"
+	DefaultGeminiModel   = "gemini-2.5-flash"
+)
 
 type TextConfig struct {
 	Source  string
@@ -18,6 +22,7 @@ type TextConfig struct {
 }
 
 type ImageConfig struct {
+	Source    string
 	APIKey    string
 	BaseURL   string
 	Model     string
@@ -62,6 +67,7 @@ func ReadImageConfig(defaultTimeout time.Duration) (ImageConfig, string) {
 	}
 	if strings.HasPrefix(visionModel, "ep-") {
 		return ImageConfig{
+			Source:    "ark",
 			APIKey:    apiKey,
 			BaseURL:   baseURL,
 			Model:     visionModel,
@@ -71,6 +77,7 @@ func ReadImageConfig(defaultTimeout time.Duration) (ImageConfig, string) {
 	}
 	if strings.HasPrefix(textModel, "ep-") {
 		return ImageConfig{
+			Source:    "ark",
 			APIKey:    apiKey,
 			BaseURL:   baseURL,
 			Model:     textModel,
@@ -79,6 +86,13 @@ func ReadImageConfig(defaultTimeout time.Duration) (ImageConfig, string) {
 		}, ""
 	}
 	return ImageConfig{}, "AI 未配置：ARK_VISION_MODEL 或 ARK_TEXT_MODEL 必须以 ep- 开头"
+}
+
+func ReadPantryPhotoConfig(defaultTimeout time.Duration) (ImageConfig, string) {
+	if cfg, ok := readGeminiVisionConfig(defaultTimeout); ok {
+		return cfg, ""
+	}
+	return ReadImageConfig(defaultTimeout)
 }
 
 func ReadThumbnailConfig() (ThumbnailConfig, string) {
@@ -121,28 +135,64 @@ func ReadARKTextConfig() (apiKey, baseURL, textModel string, errMsg string) {
 }
 
 func readOpenAIConfig(defaultTimeout time.Duration) (TextConfig, bool) {
-	apiKey := strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
+	apiKey := firstEnv("LIFE_TRACE_AI_API_KEY", "OPENAI_API_KEY")
 	if apiKey == "" {
 		return TextConfig{}, false
 	}
 
-	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("OPENAI_API_BASE_URL")), "/")
+	baseURL := strings.TrimRight(firstEnv("LIFE_TRACE_AI_BASE_URL", "OPENAI_API_BASE_URL"), "/")
 	if baseURL == "" {
 		baseURL = "https://api.openai.com/v1"
 	}
 
-	model := strings.TrimSpace(os.Getenv("OPENAI_API_MODEL"))
+	model := firstEnv("LIFE_TRACE_AI_MODEL", "OPENAI_API_MODEL")
 	if model == "" {
 		model = "gpt-5.4"
 	}
 
+	timeoutRaw := firstEnv("LIFE_TRACE_AI_TIMEOUT_SECONDS", "OPENAI_API_TIMEOUT")
 	return TextConfig{
 		Source:  "openai",
 		APIKey:  apiKey,
 		BaseURL: baseURL,
 		Model:   model,
-		Timeout: parseOpenAITimeout(os.Getenv("OPENAI_API_TIMEOUT"), defaultTimeout),
+		Timeout: parseOpenAITimeout(timeoutRaw, defaultTimeout),
 	}, true
+}
+
+func readGeminiVisionConfig(defaultTimeout time.Duration) (ImageConfig, bool) {
+	apiKey := strings.TrimSpace(os.Getenv("GEMINI_API_KEY"))
+	if apiKey == "" {
+		return ImageConfig{}, false
+	}
+
+	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("GEMINI_API_BASE_URL")), "/")
+	if baseURL == "" {
+		baseURL = DefaultGeminiBaseURL
+	}
+	model := strings.TrimSpace(os.Getenv("GEMINI_VISION_MODEL"))
+	if model == "" {
+		model = DefaultGeminiModel
+	}
+
+	return ImageConfig{
+		Source:    "gemini",
+		APIKey:    apiKey,
+		BaseURL:   baseURL,
+		Model:     model,
+		Timeout:   defaultTimeout,
+		UseVision: true,
+	}, true
+}
+
+func firstEnv(keys ...string) string {
+	for _, key := range keys {
+		value := strings.TrimSpace(os.Getenv(key))
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func parseOpenAITimeout(raw string, fallback time.Duration) time.Duration {
