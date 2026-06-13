@@ -35,33 +35,64 @@
 }
 
 :root {
-  color-scheme: dark;
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #18181b;
-  --card-foreground: #fafafa;
-  --popover: #18181b;
-  --popover-foreground: #fafafa;
-  --primary: #fafafa;
-  --primary-foreground: #09090b;
-  --secondary: #27272a;
-  --secondary-foreground: #fafafa;
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
-  --accent: #27272a;
-  --accent-foreground: #fafafa;
-  --destructive: #ef4444;
-  --destructive-foreground: #fafafa;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #3b82f6;
-  --life-weather: #3b82f6;
-  --life-ai: #06b6d4;
-  --life-plan: #8b5cf6;
-  --life-trace: #10b981;
-  --life-health: #f59e0b;
-  --life-alert: #f97316;
+  color-scheme: light;
+  --background: #fbf7ef;
+  --foreground: #2d2923;
+  --card: #fffdf8;
+  --card-foreground: #2d2923;
+  --popover: #fffdf8;
+  --popover-foreground: #2d2923;
+  --primary: #2f4738;
+  --primary-foreground: #fffdf8;
+  --secondary: #f1e9dd;
+  --secondary-foreground: #3e352b;
+  --muted: #eee5d8;
+  --muted-foreground: #7b7166;
+  --accent: #e8f1eb;
+  --accent-foreground: #2f4738;
+  --destructive: #dc2626;
+  --destructive-foreground: #fffdf8;
+  --border: #e2d7c8;
+  --input: #e2d7c8;
+  --ring: #6b8f7a;
+  --life-weather: #3778a8;
+  --life-ai: #5f9270;
+  --life-plan: #6f8f74;
+  --life-trace: #5f9270;
+  --life-health: #bd8a24;
+  --life-alert: #d16034;
   --radius: 0.875rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background: #09090b;
+    --foreground: #fafafa;
+    --card: #18181b;
+    --card-foreground: #fafafa;
+    --popover: #18181b;
+    --popover-foreground: #fafafa;
+    --primary: #fafafa;
+    --primary-foreground: #09090b;
+    --secondary: #27272a;
+    --secondary-foreground: #fafafa;
+    --muted: #27272a;
+    --muted-foreground: #a1a1aa;
+    --accent: #27272a;
+    --accent-foreground: #fafafa;
+    --destructive: #ef4444;
+    --destructive-foreground: #fafafa;
+    --border: #27272a;
+    --input: #27272a;
+    --ring: #3b82f6;
+    --life-weather: #3b82f6;
+    --life-ai: #06b6d4;
+    --life-plan: #8b5cf6;
+    --life-trace: #10b981;
+    --life-health: #f59e0b;
+    --life-alert: #f97316;
+  }
 }
 
 @layer base {
@@ -86,6 +117,10 @@
     overscroll-behavior-x: none;
     font-family:
       Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.84), transparent 24rem),
+      radial-gradient(circle at 88% 12%, rgba(218, 201, 171, 0.18), transparent 18rem),
+      linear-gradient(180deg, var(--background), var(--background));
   }
 
   button,
@@ -116,6 +151,35 @@
   input,
   textarea {
     cursor: text;
+  }
+}
+
+@layer components {
+  .life-soft-page {
+    background-image:
+      radial-gradient(circle at 16% 5%, rgba(255, 255, 255, 0.72), transparent 16rem),
+      linear-gradient(rgba(104, 86, 55, 0.028) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(104, 86, 55, 0.02) 1px, transparent 1px);
+    background-size:
+      auto,
+      24px 24px,
+      24px 24px;
+  }
+
+  .life-soft-card {
+    border-color: color-mix(in srgb, var(--border) 78%, transparent);
+    background: color-mix(in srgb, var(--card) 84%, transparent);
+    box-shadow: 0 18px 54px rgba(71, 58, 42, 0.075);
+    backdrop-filter: blur(16px);
+  }
+
+  .life-soft-tabbar {
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--card) 92%, transparent), var(--card)),
+      linear-gradient(rgba(104, 86, 55, 0.025) 1px, transparent 1px);
+    background-size:
+      auto,
+      22px 22px;
   }
 }
 

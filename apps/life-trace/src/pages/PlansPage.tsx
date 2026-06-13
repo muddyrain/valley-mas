@@ -4,6 +4,7 @@ import {
   BellOff,
   CalendarPlus,
   Check,
+  ChevronRight,
   Filter,
   Plus,
   RotateCcw,
@@ -20,6 +21,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ImagePreview } from '@/components/ImagePreview';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { PlanDetailContent } from '@/components/PlanDetailDrawer';
+import { SoftHeader, SoftPage, SoftPanel, SoftSectionTitle } from '@/components/SoftDiary';
 import { SubPageShell } from '@/components/SubPageShell';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
@@ -36,7 +38,6 @@ import {
   isOverduePlan,
   type PlanFilter,
   splitPlansByTimeline,
-  splitPlansByToday,
 } from '@/lib/planGroups';
 import { getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { cn } from '@/lib/utils';
@@ -150,7 +151,6 @@ export function PlansPage() {
           ? filterPlans(visibleBasePlans, 'completed')
           : filterPlans(visibleBasePlans, activeFilter);
   const filteredPlans = filterPlansByKeywordAndType(viewPlans, searchQuery, typeFilter);
-  const { todayPlans } = splitPlansByToday(plans);
   const timelineGroups = splitPlansByTimeline(filteredPlans, now);
   const overdueCount = splitPlansByTimeline(plans, now).overduePlans.length;
   const activeFilterConfig =
@@ -178,6 +178,28 @@ export function PlansPage() {
   const showPlansErrorCard = Boolean(plansError) && !plansSyncIssue;
   const showPlansSyncFallback = Boolean(plansSyncIssue) && !plansLoading && plans.length === 0;
   const showPlansErrorFallback = showPlansErrorCard && !plansLoading && plans.length === 0;
+  const weekDays = useMemo(() => {
+    const base = new Date();
+    const monday = new Date(base);
+    const day = monday.getDay() || 7;
+    monday.setDate(base.getDate() - day + 1);
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + index);
+      const dateKey = date.toISOString().slice(0, 10);
+      const hasPlan = plans.some((plan) => plan.scheduledDate === dateKey && !plan.completed);
+      return {
+        key: dateKey,
+        weekday: ['一', '二', '三', '四', '五', '六', '日'][index],
+        day: date.getDate(),
+        active: date.toDateString() === base.toDateString(),
+        hasPlan,
+      };
+    });
+  }, [plans]);
+  const todayTimelinePlans = timelineGroups.todayPlans.slice(0, 5);
+  const upcomingPreviewPlans = timelineGroups.upcomingPlans.slice(0, 2);
 
   const handleAddToCalendar = (plan: Plan) => {
     const opened = openPlanInNativeCalendar(plan, {
@@ -431,39 +453,19 @@ export function PlansPage() {
   }
 
   return (
-    <div ref={pageRef} className="min-w-0 space-y-5 overflow-x-hidden">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-xl font-semibold tracking-tight">计划</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {todayPlans.length} 个今日计划
-            {overdueCount > 0 ? ` · ${overdueCount} 个逾期` : ''}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="icon"
-            aria-label={searchOpen ? '关闭搜索' : '搜索计划'}
-            onClick={() => setSearchOpen((current) => !current)}
-          >
-            {searchOpen ? <X className="size-5" /> : <Search className="size-5" />}
-          </Button>
-          <Button
-            type="button"
-            variant={filterOpen ? 'ai' : 'secondary'}
-            size="icon"
-            aria-label={filterOpen ? '关闭筛选' : '筛选计划'}
-            onClick={() => setFilterOpen((current) => !current)}
-          >
-            <Filter className="size-5" />
-          </Button>
+    <SoftPage ref={pageRef} className="space-y-5">
+      <SoftHeader
+        title="计划"
+        subtitle={new Intl.DateTimeFormat('zh-CN', {
+          month: 'numeric',
+          day: 'numeric',
+          weekday: 'short',
+        }).format(new Date())}
+        action={
           <Button
             type="button"
             variant="ai"
-            size="icon"
-            aria-label="创建计划"
+            className="h-14 rounded-[1.15rem] px-4 text-base"
             disabled={planCreating}
             onClick={() => {
               setEditingPlan(null);
@@ -471,9 +473,41 @@ export function PlansPage() {
             }}
           >
             {planCreating ? <ActionLoadingIcon /> : <Plus className="size-5" />}
+            新建
           </Button>
+        }
+      />
+
+      <SoftPanel className="px-3.5 py-4">
+        <div className="grid grid-cols-7 gap-1.5 text-center">
+          {weekDays.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={cn(
+                'grid min-h-[4.35rem] place-items-center rounded-[1.05rem] text-sm transition',
+                item.active
+                  ? 'bg-life-trace text-primary-foreground shadow-[0_12px_28px_rgba(95,146,112,0.24)]'
+                  : 'text-muted-foreground hover:bg-secondary',
+              )}
+              onClick={() => setActiveFilter('today')}
+            >
+              <span className="text-[0.8rem] font-semibold">{item.weekday}</span>
+              <span className="text-[1.15rem] font-semibold leading-none">{item.day}</span>
+              <span
+                className={cn(
+                  'size-1.5 rounded-full',
+                  item.active
+                    ? 'bg-primary-foreground/80'
+                    : item.hasPlan
+                      ? 'bg-life-trace'
+                      : 'bg-border',
+                )}
+              />
+            </button>
+          ))}
         </div>
-      </div>
+      </SoftPanel>
 
       {overdueCount > 0 && activeFilter !== 'completed' ? (
         <button
@@ -489,7 +523,7 @@ export function PlansPage() {
         </button>
       ) : null}
 
-      <div className="grid grid-cols-3 rounded-2xl bg-card p-1 text-sm font-semibold text-muted-foreground">
+      <div className="grid grid-cols-3 rounded-[1.35rem] border border-border/70 bg-card/70 p-1 text-sm font-semibold text-muted-foreground">
         {primaryPlanFilters.map((filter) => {
           const active = activeFilter === filter.id;
 
@@ -507,6 +541,29 @@ export function PlansPage() {
             </button>
           );
         })}
+      </div>
+
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="rounded-full"
+          onClick={() => setSearchOpen((current) => !current)}
+        >
+          {searchOpen ? <X className="size-4" /> : <Search className="size-4" />}
+          {searchOpen ? '收起搜索' : '搜索'}
+        </Button>
+        <Button
+          type="button"
+          variant={filterOpen ? 'ai' : 'secondary'}
+          size="sm"
+          className="rounded-full"
+          onClick={() => setFilterOpen((current) => !current)}
+        >
+          <Filter className="size-4" />
+          筛选
+        </Button>
       </div>
 
       {searchOpen ? (
@@ -614,7 +671,95 @@ export function PlansPage() {
         <SyncState title="正在同步你的计划" description="正在从云端刷新计划列表。" tone="plan" />
       ) : null}
 
-      <div className="space-y-6">
+      <div className="space-y-5">
+        <SoftSectionTitle title="今天的安排" meta={`${todayTimelinePlans.length} 个`} />
+        <SoftPanel className="px-4 py-2">
+          {todayTimelinePlans.length > 0 ? (
+            <div className="relative py-2 pl-[5.25rem]">
+              <div className="absolute left-[4.55rem] top-7 bottom-7 w-px bg-border" />
+              {todayTimelinePlans.map((plan, index) => {
+                const { timeText } = getPlanDisplayTimeParts(plan);
+                const tone =
+                  index % 4 === 0
+                    ? 'bg-life-trace'
+                    : index % 4 === 1
+                      ? 'bg-life-weather'
+                      : index % 4 === 2
+                        ? 'bg-life-alert'
+                        : 'bg-life-plan';
+                return (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    className="relative flex min-h-[5rem] w-full items-center gap-3.5 border-b border-border/70 py-3 text-left last:border-b-0"
+                    onClick={() => navigate(`/plans/${plan.id}`)}
+                  >
+                    <span className="absolute -left-[4.85rem] w-14 text-[1.05rem] font-semibold text-life-trace">
+                      {timeText}
+                    </span>
+                    <span
+                      className={cn(
+                        'absolute -left-[0.95rem] grid size-3.5 place-items-center rounded-full border-2 border-card shadow-sm',
+                        tone,
+                      )}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-[1.05rem] font-semibold">{plan.title}</span>
+                        <Badge tone={typeTone[plan.type]}>{plan.type}</Badge>
+                      </span>
+                      <span className="mt-1 block truncate text-sm text-muted-foreground">
+                        {getVisiblePlanNote(plan.note)}
+                      </span>
+                    </span>
+                    <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-7 text-center text-sm text-muted-foreground">
+              今天还没有安排，可以先添加一个轻量计划。
+            </div>
+          )}
+        </SoftPanel>
+
+        <SoftSectionTitle title="即将到来" meta={`${upcomingPreviewPlans.length} 个`} />
+        <SoftPanel className="px-4 py-2">
+          {upcomingPreviewPlans.length > 0 ? (
+            upcomingPreviewPlans.map((plan) => {
+              const { dateText, timeText } = getPlanDisplayTimeParts(plan);
+              return (
+                <button
+                  key={plan.id}
+                  type="button"
+                  className="flex min-h-[4.8rem] w-full items-center gap-4 border-b border-border/70 py-3 text-left last:border-b-0"
+                  onClick={() => navigate(`/plans/${plan.id}`)}
+                >
+                  <span className="w-20 shrink-0 text-sm font-semibold text-life-trace">
+                    {dateText}
+                    <span className="mt-1 block text-muted-foreground">{timeText}</span>
+                  </span>
+                  <span className="grid size-12 shrink-0 place-items-center rounded-full bg-life-health/10 text-life-health">
+                    <CalendarPlus className="size-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-base font-semibold">{plan.title}</span>
+                    <span className="mt-1 block truncate text-sm text-muted-foreground">
+                      {getVisiblePlanNote(plan.note)}
+                    </span>
+                  </span>
+                  <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+                </button>
+              );
+            })
+          ) : (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              未来安排会出现在这里。
+            </div>
+          )}
+        </SoftPanel>
+
         {planGroups.map((group) => (
           <section key={group.title} className="space-y-3">
             <div className="flex items-center justify-between gap-3">
@@ -744,6 +889,6 @@ export function PlansPage() {
           void removePlan(deleteTarget.id).then(() => setDeleteTarget(null));
         }}
       />
-    </div>
+    </SoftPage>
   );
 }

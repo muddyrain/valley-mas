@@ -1,8 +1,8 @@
 import {
-  CalendarDays,
   ClipboardList,
   Download,
-  MapPinned,
+  House,
+  NotebookText,
   RefreshCw,
   Share2,
   Sparkles,
@@ -13,7 +13,6 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useLifeTraceEntrance } from '@/hooks/useLifeTraceEntrance';
 import { usePwaStatus } from '@/hooks/usePwaStatus';
-import { gsap, useGSAP } from '@/lib/gsap';
 import { getPwaShareFeedback } from '@/lib/pwa';
 import { cn } from '@/lib/utils';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
@@ -21,11 +20,11 @@ import type { AppTab } from '@/types';
 import { ActionLoadingIcon } from './ActionLoadingIcon';
 import { Button } from './ui/button';
 
-const tabs: Array<{ id: AppTab; label: string; path: string; icon: typeof CalendarDays }> = [
-  { id: 'today', label: '今日', path: '/today', icon: CalendarDays },
+const tabs: Array<{ id: AppTab; label: string; path: string; icon: typeof House }> = [
+  { id: 'today', label: '今日', path: '/today', icon: House },
   { id: 'plans', label: '计划', path: '/plans', icon: ClipboardList },
   { id: 'ai', label: 'AI', path: '/ai', icon: Sparkles },
-  { id: 'traces', label: '踪迹', path: '/traces', icon: MapPinned },
+  { id: 'traces', label: '踪迹', path: '/traces', icon: NotebookText },
   { id: 'profile', label: '我的', path: '/profile', icon: UserRound },
 ];
 
@@ -51,6 +50,69 @@ function getScrollRouteKey(pathname: string) {
 
 function isTabRoute(pathname: string) {
   return tabs.some((tab) => tab.path === pathname);
+}
+
+function BottomTabLink({
+  active,
+  icon: Icon,
+  isCenter = false,
+  label,
+  path,
+}: {
+  active: boolean;
+  icon: typeof House;
+  isCenter?: boolean;
+  label: string;
+  path: string;
+}) {
+  if (isCenter) {
+    return (
+      <NavLink
+        to={path}
+        data-tab-active={active}
+        className="group relative flex h-[4.55rem] min-w-0 items-start justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span
+          data-tab-icon
+          className={cn(
+            'mt-0 grid size-[3.85rem] place-items-center rounded-full border border-white/55 bg-life-trace text-primary-foreground shadow-[0_12px_26px_rgba(78,143,104,0.28)] transition-colors duration-200 group-hover:bg-life-trace/95 max-[360px]:size-[3.55rem]',
+            active && 'shadow-[0_13px_28px_rgba(78,143,104,0.34)]',
+          )}
+        >
+          <span className="flex flex-col items-center justify-center gap-0.5">
+            <Icon className="size-[1.45rem] fill-primary-foreground/15 stroke-[2.1]" />
+            <span
+              data-tab-label
+              className="text-[0.76rem] font-semibold leading-none text-primary-foreground"
+            >
+              {label}
+            </span>
+          </span>
+        </span>
+      </NavLink>
+    );
+  }
+
+  return (
+    <NavLink
+      to={path}
+      data-tab-active={active}
+      className={cn(
+        'group flex h-[4.15rem] min-w-0 flex-col items-center justify-end gap-1.5 rounded-2xl px-1 pb-1 text-muted-foreground transition-colors duration-200 hover:text-life-trace focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[360px]:h-[3.95rem]',
+        active && 'text-life-trace',
+      )}
+    >
+      <span data-tab-icon className="grid size-7 place-items-center transition-colors duration-200">
+        <Icon className={cn('size-[1.48rem] stroke-[1.9]', active && 'stroke-[2]')} />
+      </span>
+      <span
+        data-tab-label
+        className="max-w-full truncate text-[0.78rem] font-medium leading-none tracking-normal"
+      >
+        {label}
+      </span>
+    </NavLink>
+  );
 }
 
 function scrollContentToTop(element: HTMLElement | null, _routeKey: string) {
@@ -88,8 +150,8 @@ function PwaActionBanner({ hidden }: { hidden: boolean }) {
   };
 
   return (
-    <div className="safe-x pointer-events-none fixed inset-x-0 bottom-[calc(6.9rem+env(safe-area-inset-bottom))] z-40 mx-auto w-full max-w-[430px]">
-      <div className="pointer-events-auto rounded-[1.35rem] border border-life-ai/20 bg-card/95 p-3 shadow-[0_-18px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
+    <div className="safe-x pointer-events-none fixed inset-x-0 bottom-[calc(6.9rem+env(safe-area-inset-bottom))] z-40 w-full">
+      <div className="pointer-events-auto rounded-[1.35rem] border border-life-ai/20 bg-card/95 p-3 shadow-[0_-18px_54px_rgba(45,41,35,0.14)] backdrop-blur-2xl">
         <div className="flex items-start gap-3">
           <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
             {updateAvailable ? <RefreshCw className="size-5" /> : <Download className="size-5" />}
@@ -173,56 +235,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     scrollContentToTop(contentRef.current, scrollRouteKey);
   }, [scrollRouteKey]);
 
-  useGSAP(
-    () => {
-      const mm = gsap.matchMedia();
-
-      mm.add('(prefers-reduced-motion: no-preference)', () => {
-        const activeItem = navRef.current?.querySelector('[data-tab-active="true"]');
-        if (!activeItem) {
-          return;
-        }
-
-        gsap.fromTo(
-          activeItem.querySelector('[data-tab-icon]'),
-          { y: 6, scale: 0.86, autoAlpha: 0.76 },
-          {
-            y: 0,
-            scale: 1,
-            autoAlpha: 1,
-            duration: 0.36,
-            ease: 'back.out(1.8)',
-            clearProps: 'transform,opacity,visibility',
-          },
-        );
-        gsap.fromTo(
-          activeItem.querySelector('[data-tab-label]'),
-          { y: 5, autoAlpha: 0.55 },
-          {
-            y: 0,
-            autoAlpha: 1,
-            duration: 0.28,
-            ease: 'power2.out',
-            clearProps: 'transform,opacity,visibility',
-          },
-        );
-      });
-
-      return () => mm.revert();
-    },
-    { scope: navRef, dependencies: [activeTab], revertOnUpdate: true },
-  );
-
   return (
     <div className="h-dvh w-full overflow-hidden bg-background text-foreground">
       <main
         ref={contentRef}
         className={cn(
-          'safe-top mx-auto h-dvh w-full max-w-[430px] overflow-x-hidden overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          'h-dvh w-full overflow-x-hidden overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          showBottomNavigation && !isAgentChatRoute && 'life-soft-page',
           isAgentChatRoute
             ? 'overflow-hidden px-0 pb-0'
             : showBottomNavigation
-              ? 'safe-x overflow-y-auto pb-[calc(10rem+env(safe-area-inset-bottom))] max-[360px]:px-3'
+              ? 'overflow-y-auto pb-[calc(5.35rem+env(safe-area-inset-bottom))]'
               : 'safe-x overflow-y-auto pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-[360px]:px-3',
         )}
       >
@@ -236,63 +259,26 @@ export function AppShell({ children }: { children: ReactNode }) {
       {showBottomOverlay ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 bottom-0 z-20 mx-auto h-[calc(11rem+env(safe-area-inset-bottom))] w-full max-w-[430px] bg-gradient-to-t from-background via-background via-55% to-transparent"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-20 h-[calc(4.9rem+env(safe-area-inset-bottom))] w-full bg-gradient-to-t from-background via-background/35 via-42% to-transparent"
         />
       ) : null}
       <PwaActionBanner hidden={!showBottomOverlay} />
       {showBottomNavigation ? (
         <nav
           ref={navRef}
-          className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[430px] border-t border-white/[0.07] bg-card/88 px-3 pt-3 shadow-[0_-18px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl max-[360px]:px-2"
+          className="life-soft-tabbar fixed inset-x-0 bottom-0 z-30 w-full border-t border-border/55 px-2 pt-1 [padding-bottom:max(0.45rem,env(safe-area-inset-bottom))] shadow-[0_-6px_18px_rgba(71,58,42,0.04)] backdrop-blur-xl max-[360px]:px-4"
         >
-          <div className="grid grid-cols-5 items-stretch gap-1 rounded-[1.65rem] border border-white/[0.04] bg-background/28 p-1.5 max-[360px]:gap-0.5 max-[360px]:p-1">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const active = activeTab === tab.id;
-              const isAi = tab.id === 'ai';
-
-              return (
-                <NavLink
-                  key={tab.id}
-                  to={tab.path}
-                  data-tab-active={active}
-                  className={cn(
-                    'group relative inline-flex h-[4.1rem] min-w-0 shrink cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-[1.25rem] border border-transparent px-1 text-sm font-medium text-muted-foreground transition duration-300 hover:bg-secondary/35 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[360px]:h-[3.85rem]',
-                    active &&
-                      !isAi &&
-                      'border-white/[0.10] bg-secondary/36 text-foreground shadow-[0_6px_18px_rgba(0,0,0,0.14)]',
-                    isAi && 'hover:bg-life-ai/[0.045] hover:text-life-ai',
-                    isAi &&
-                      active &&
-                      'border-life-ai/24 bg-life-ai/[0.045] text-life-ai shadow-[0_6px_20px_rgba(6,182,212,0.08)]',
-                  )}
-                >
-                  <span
-                    data-tab-icon
-                    className={cn(
-                      'relative z-10 grid size-8 place-items-center rounded-2xl transition duration-300 group-hover:-translate-y-0.5 group-hover:bg-secondary/55 group-hover:text-foreground',
-                      isAi && 'text-life-ai group-hover:bg-life-ai/10 group-hover:text-life-ai',
-                      active &&
-                        'bg-background/72 text-foreground shadow-[0_5px_14px_rgba(0,0,0,0.14)]',
-                      active && isAi && 'text-life-ai group-hover:bg-background/72',
-                    )}
-                  >
-                    <Icon className="size-5" />
-                  </span>
-                  <span
-                    data-tab-label
-                    className={cn(
-                      'relative z-10 max-w-full truncate text-xs font-semibold transition duration-300',
-                      'max-[360px]:text-[11px]',
-                      active ? 'text-foreground' : 'text-muted-foreground',
-                      isAi && active && 'text-life-ai',
-                    )}
-                  >
-                    {tab.label}
-                  </span>
-                </NavLink>
-              );
-            })}
+          <div className="grid h-[4.55rem] grid-cols-5 items-end gap-0.5">
+            {tabs.map((tab) => (
+              <BottomTabLink
+                key={tab.id}
+                active={activeTab === tab.id}
+                icon={tab.icon}
+                isCenter={tab.id === 'ai'}
+                label={tab.label}
+                path={tab.path}
+              />
+            ))}
           </div>
         </nav>
       ) : null}

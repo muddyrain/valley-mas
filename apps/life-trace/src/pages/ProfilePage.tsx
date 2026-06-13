@@ -9,6 +9,7 @@ import {
   Download,
   Heart,
   Inbox,
+  Leaf,
   LogOut,
   MapPin,
   MessageSquareText,
@@ -17,7 +18,6 @@ import {
   ReceiptText,
   RefreshCw,
   Route,
-  Settings2,
   Share2,
   ShieldCheck,
   Shirt,
@@ -156,7 +156,7 @@ export function ProfilePage() {
     ? currentHousehold.kind === 'personal'
       ? '个人空间'
       : `${currentHousehold.memberCount} 人共享`
-    : '今日页和库存页会跟随这里';
+    : '待同步';
   const ActiveCommuteIcon = commuteIcons[settings.commuteMethod];
   const planReminderMeta =
     settings.planReminderLeadMinutes === 0
@@ -306,32 +306,24 @@ export function ProfilePage() {
   };
 
   return (
-    <div ref={pageRef} className="space-y-6">
+    <div ref={pageRef} className="life-soft-page space-y-6 px-5 pt-4 max-[360px]:px-4">
       <section
         data-profile-hero
-        className="relative overflow-hidden rounded-[2rem] border border-life-ai/20 bg-card p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)] max-[360px]:p-4"
+        className="relative overflow-hidden rounded-[1.65rem] border border-border/70 bg-card/80 p-5 shadow-[0_18px_54px_rgba(71,58,42,0.075)] backdrop-blur max-[360px]:p-4"
       >
         <div
           aria-hidden="true"
-          className="absolute inset-x-0 top-0 h-24 bg-[linear-gradient(135deg,rgba(6,182,212,0.24),rgba(16,185,129,0.14),rgba(139,92,246,0.18))]"
+          className="absolute inset-x-0 top-0 h-28 bg-[linear-gradient(135deg,rgba(95,146,112,0.13),rgba(255,253,248,0.68),rgba(232,241,235,0.2))]"
         />
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-[linear-gradient(rgba(250,250,250,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(250,250,250,0.035)_1px,transparent_1px)] bg-[size:26px_26px] opacity-50"
+          className="absolute inset-0 bg-[linear-gradient(rgba(104,86,55,0.028)_1px,transparent_1px),linear-gradient(90deg,rgba(104,86,55,0.02)_1px,transparent_1px)] bg-[size:24px_24px] opacity-80"
         />
         <div className="relative space-y-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 pr-2">
-              <p className="inline-flex items-center gap-2 rounded-full border border-life-ai/25 bg-life-ai/10 px-3 py-1 text-xs font-semibold text-life-ai">
-                <Settings2 className="size-3.5" />
-                Life Trace Settings
-              </p>
-              <h1 className="mt-3 text-3xl font-bold leading-tight max-[360px]:text-2xl">
-                我的生活参数
-              </h1>
-              <p className="mt-4 max-w-[24ch] text-sm leading-7 text-muted-foreground">
-                城市、通勤、提醒和习惯会组成你的今日建议和每日简报。
-              </p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-life-trace">
+              <Leaf className="size-4 shrink-0" />
+              <span className="truncate">我的生活页</span>
             </div>
             <Button
               type="button"
@@ -345,7 +337,7 @@ export function ProfilePage() {
             </Button>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-[1.125rem] max-[360px]:gap-3.5">
             <button
               type="button"
               className="group relative shrink-0 text-left"
@@ -355,10 +347,10 @@ export function ProfilePage() {
                 <img
                   src={user.avatar}
                   alt={profileName}
-                  className="size-16 rounded-[1.4rem] border border-foreground/10 object-cover shadow-[0_16px_40px_rgba(0,0,0,0.24)] transition duration-300 group-hover:scale-[1.03]"
+                  className="size-[4.6rem] rounded-[1.45rem] border border-foreground/10 object-cover shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition duration-300 group-hover:scale-[1.03] max-[360px]:size-16"
                 />
               ) : (
-                <div className="grid size-16 place-items-center rounded-[1.4rem] border border-life-ai/20 bg-life-ai text-2xl font-bold text-background shadow-[0_16px_40px_rgba(6,182,212,0.18)] transition duration-300 group-hover:scale-[1.03]">
+                <div className="grid size-[4.6rem] place-items-center rounded-[1.45rem] border border-life-ai/20 bg-life-ai text-2xl font-bold text-primary-foreground shadow-[0_16px_40px_rgba(95,146,112,0.18)] transition duration-300 group-hover:scale-[1.03] max-[360px]:size-16">
                   {profileName.slice(0, 1).toUpperCase()}
                 </div>
               )}
@@ -373,10 +365,10 @@ export function ProfilePage() {
               </span>
             </button>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <button
                   type="button"
-                  className="min-w-0 truncate text-left text-xl font-semibold transition hover:text-life-ai"
+                  className="min-w-0 truncate text-left text-[1.72rem] font-semibold leading-tight transition hover:text-life-ai max-[360px]:text-[1.45rem]"
                   onClick={() => setAvatarSheetOpen(true)}
                 >
                   {profileName}
@@ -389,31 +381,29 @@ export function ProfilePage() {
                   编辑资料
                 </button>
               </div>
-              <p className="mt-1 truncate text-sm text-muted-foreground">
-                今日建议、AI 对话和简报都会按这套设置生成。
-              </p>
+              <p className="mt-2 truncate text-[0.95rem] text-muted-foreground">今天也在好好生活</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
-            <div className="rounded-2xl border border-foreground/10 bg-background/35 p-3 backdrop-blur">
-              <ActiveCommuteIcon className="mb-2 size-4 text-life-ai" />
-              <p className="truncate text-sm font-semibold">{settings.commuteMethod}</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">通勤方式</p>
+          <div className="grid grid-cols-3 gap-2.5 max-[360px]:grid-cols-1">
+            <div className="rounded-2xl border border-border/70 bg-background/50 p-3.5 backdrop-blur">
+              <ActiveCommuteIcon className="mb-2 size-[1.05rem] text-life-ai" />
+              <p className="truncate text-[0.95rem] font-semibold">{settings.commuteMethod}</p>
+              <p className="mt-1 text-xs text-muted-foreground">通勤方式</p>
             </div>
-            <div className="rounded-2xl border border-foreground/10 bg-background/35 p-3 backdrop-blur">
-              <Clock className="mb-2 size-4 text-life-plan" />
-              <p className="text-[13px] font-semibold leading-tight whitespace-nowrap">
+            <div className="rounded-2xl border border-border/70 bg-background/50 p-3.5 backdrop-blur">
+              <Clock className="mb-2 size-[1.05rem] text-life-plan" />
+              <p className="text-[0.84rem] font-semibold leading-tight whitespace-nowrap">
                 <span>{settings.workStart}</span>
                 <span className="px-1 text-muted-foreground">-</span>
                 <span>{settings.workEnd}</span>
               </p>
-              <p className="mt-1 text-[11px] text-muted-foreground">工作时段</p>
+              <p className="mt-1 text-xs text-muted-foreground">工作时段</p>
             </div>
-            <div className="rounded-2xl border border-foreground/10 bg-background/35 p-3 backdrop-blur">
-              <Heart className="mb-2 size-4 text-life-trace" />
-              <p className="truncate text-sm font-semibold">{settings.habits.length} 项</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">打卡开启</p>
+            <div className="rounded-2xl border border-border/70 bg-background/50 p-3.5 backdrop-blur">
+              <Heart className="mb-2 size-[1.05rem] text-life-trace" />
+              <p className="truncate text-[0.95rem] font-semibold">{settings.habits.length} 项</p>
+              <p className="mt-1 text-xs text-muted-foreground">打卡开启</p>
             </div>
           </div>
 
@@ -702,10 +692,9 @@ export function ProfilePage() {
               <Users className="size-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold">统一设置当前库存空间</h3>
+              <h3 className="font-semibold">库存与家庭空间</h3>
               <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                在这里选好个人空间或共享家庭后，Today
-                页的库存提醒和库存列表都会直接跟随，不需要每次进去再切。
+                当前库存、家庭成员和共享提醒。
               </p>
             </div>
           </div>
@@ -731,7 +720,7 @@ export function ProfilePage() {
             <p className="text-sm text-life-alert">{householdError}</p>
           ) : (
             <p className="text-xs leading-5 text-muted-foreground">
-              创建家庭、加入家庭、邀请家人和切换当前空间，都统一放在这个入口里。
+              创建家庭、邀请家人、切换空间。
             </p>
           )}
 
@@ -801,9 +790,9 @@ export function ProfilePage() {
               <Heart className="size-5" />
             </div>
             <div className="min-w-0">
-              <h3 className="font-semibold">自定义你的今日打卡</h3>
+              <h3 className="font-semibold">每日打卡</h3>
               <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                这里保存的是云端打卡清单。像喝药、维生素、遛狗、拉伸这类个人节奏，都可以自己加。
+                喝水、休息、运动和睡前小习惯。
               </p>
             </div>
           </div>
@@ -837,9 +826,7 @@ export function ProfilePage() {
           {habitDraftError ? (
             <p className="text-sm text-life-alert">{habitDraftError}</p>
           ) : (
-            <p className="text-xs leading-5 text-muted-foreground">
-              新增或删除后会自动同步到云端，Today 页和 AI 简报会直接用这份清单。
-            </p>
+            <p className="text-xs leading-5 text-muted-foreground">今日页会按这份清单展示。</p>
           )}
 
           {settings.habits.length > 0 ? (
@@ -913,10 +900,10 @@ export function ProfilePage() {
                   : installed
                     ? '当前已以应用模式运行，可以继续检查更新或分享给其他用户。'
                     : canInstall
-                      ? '当前浏览器支持一键安装，可以放到桌面快速打开。'
+                      ? '放到桌面后可以更快打开。'
                       : iosInstallHint
-                        ? 'iPhone 需要从浏览器分享菜单添加到主屏幕，安装后可在这里检查更新。'
-                        : '也可以先用浏览器访问，并把应用分享给其他用户。'}
+                        ? '从浏览器分享菜单添加到主屏幕。'
+                        : '浏览器访问和分享都可继续使用。'}
               </p>
             </div>
           </div>

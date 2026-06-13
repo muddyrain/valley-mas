@@ -23,13 +23,13 @@ type AnimatedWeatherIconProps = {
 const wrapperSizeClassMap: Record<NonNullable<AnimatedWeatherIconProps['size']>, string> = {
   hero: 'size-12 max-[360px]:size-10',
   hourly: 'size-8',
-  compact: 'size-5',
+  compact: 'size-7',
 };
 
 const fallbackSizeClassMap: Record<NonNullable<AnimatedWeatherIconProps['size']>, string> = {
   hero: 'size-9 max-[360px]:size-7',
   hourly: 'size-5',
-  compact: 'size-4',
+  compact: 'size-[1.35rem]',
 };
 
 function resolveWeatherMotionKind(text: string): WeatherMotionKind {
@@ -120,7 +120,7 @@ export function AnimatedWeatherIcon({
         className,
       )}
     >
-      {prefersReducedMotion ? (
+      {prefersReducedMotion || size === 'compact' ? (
         <FallbackIcon kind={kind} size={size} className={iconClassName} />
       ) : (
         <Lottie

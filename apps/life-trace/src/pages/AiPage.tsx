@@ -7,6 +7,7 @@ import {
   Clock,
   History,
   Image,
+  Leaf,
   Lightbulb,
   ListChecks,
   Menu,
@@ -84,6 +85,7 @@ import {
 import { getPlanDisplayTimeParts } from '@/lib/planReminder';
 import { getLocalISODate } from '@/lib/planSchedule';
 import { createPlanFromRecipe } from '@/lib/recipePlan';
+import { cn } from '@/lib/utils';
 import { readWeatherCache } from '@/lib/weatherCache';
 import {
   buildWeeklyReviewActionMarker,
@@ -1026,21 +1028,27 @@ function AssistantLandingPromptButton({
   icon: Icon,
   title,
   onClick,
+  className,
 }: {
   icon: typeof Sparkles;
   title: string;
   onClick: () => void;
+  className?: string;
 }) {
   return (
     <button
       type="button"
-      className="inline-flex min-h-12 w-full items-center gap-3 rounded-2xl border border-border/80 bg-secondary/35 px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-secondary"
+      className={cn(
+        'inline-flex min-h-16 w-full items-center gap-4 rounded-2xl border border-border/80 bg-secondary/35 px-4 py-3 text-left text-sm font-semibold transition hover:bg-secondary',
+        className,
+      )}
       onClick={onClick}
     >
-      <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-background/80 text-life-ai">
-        <Icon className="size-4" />
+      <span className="grid size-12 shrink-0 place-items-center rounded-[1rem] bg-life-trace/10 text-life-trace">
+        <Icon className="size-5" />
       </span>
-      <span className="line-clamp-2 min-w-0 flex-1 leading-5">{title}</span>
+      <span className="line-clamp-2 min-w-0 flex-1 text-base leading-6">{title}</span>
+      <ArrowRight className="size-5 shrink-0 text-muted-foreground" />
     </button>
   );
 }
@@ -1350,21 +1358,22 @@ function AgentConversationPanel({
   });
 
   return (
-    <div className="flex h-[calc(100dvh_-_8.75rem_-_env(safe-area-inset-bottom))] min-h-0 flex-col overflow-hidden bg-background max-[360px]:h-[calc(100dvh_-_8.35rem_-_env(safe-area-inset-bottom))]">
-      <div className="grid shrink-0 grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2 px-3 py-2">
+    <div className="life-soft-page flex h-[calc(100dvh_-_8.75rem_-_env(safe-area-inset-bottom))] min-h-0 flex-col overflow-hidden bg-background px-4 pt-3 max-[360px]:h-[calc(100dvh_-_8.35rem_-_env(safe-area-inset-bottom))] max-[360px]:px-3">
+      <div className="grid shrink-0 grid-cols-[3rem_minmax(0,1fr)_3rem] items-start gap-2 pb-3">
         <button
           type="button"
-          className="grid size-10 place-items-center rounded-full text-foreground transition hover:bg-secondary"
+          className="mt-1 grid size-12 place-items-center rounded-[1.05rem] bg-card/80 text-foreground shadow-[0_8px_24px_rgba(71,58,42,0.07)] transition hover:bg-secondary"
           aria-label="打开话题列表"
           onClick={onOpenConversations}
         >
-          <Menu className="size-6" />
+          <Menu className="size-5" />
         </button>
-        <div className="min-w-0 text-center">
-          <div className="flex min-w-0 items-center justify-center gap-1">
-            <p className="truncate text-base font-semibold">
-              {conversation?.title || 'Life Trace Agent'}
-            </p>
+        <div className="min-w-0 text-left">
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="truncate text-[2.45rem] font-semibold leading-none max-[360px]:text-[2rem]">
+              Life AI
+            </h1>
+            <Leaf className="size-7 shrink-0 text-life-trace" />
             {streaming ? (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-life-ai/10 px-2 py-0.5 text-xs font-semibold text-life-ai">
                 <ActionLoadingIcon className="size-3" />
@@ -1372,36 +1381,36 @@ function AgentConversationPanel({
               </span>
             ) : null}
           </div>
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="mt-2 truncate text-base text-muted-foreground">
             {streaming
-              ? '正在生成回复'
+              ? '正在整理下一步'
               : loading
-                ? '正在同步云端对话'
+                ? '同步生活记忆'
                 : model
-                  ? '已连接生活助理'
-                  : '内容由 AI 生成'}
+                  ? conversation?.title || '帮你把生活整理成下一步'
+                  : '帮你把生活整理成下一步'}
           </p>
         </div>
         <button
           type="button"
-          className="grid size-10 place-items-center rounded-full text-foreground transition hover:bg-secondary disabled:opacity-50"
+          className="mt-1 grid size-12 place-items-center rounded-[1.05rem] bg-card/80 text-foreground shadow-[0_8px_24px_rgba(71,58,42,0.07)] transition hover:bg-secondary disabled:opacity-50"
           aria-label="新话题"
           disabled={streaming}
           onClick={onCreateConversation}
         >
-          <Plus className="size-6" />
+          <Plus className="size-5" />
         </button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <section className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {!hasChatActivity ? (
-              <div className="mb-5 space-y-4 py-6">
-                <div className="rounded-[1.4rem] border border-life-ai/20 bg-card p-4">
+              <div className="mb-5 space-y-5">
+                <div className="rounded-[1.45rem] border border-border/75 bg-card/78 p-4 shadow-[0_18px_54px_rgba(71,58,42,0.075)] backdrop-blur">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-lg font-semibold">今天想怎么过？</p>
+                      <p className="text-xl font-semibold">今天我看到了这些</p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {locationLabel} · {weatherSummary}
                       </p>
@@ -1436,12 +1445,21 @@ function AgentConversationPanel({
                   </div>
                 </div>
 
+                <div className="rounded-[1.45rem] border border-border/75 bg-card/78 p-4 shadow-[0_18px_54px_rgba(71,58,42,0.075)]">
+                  <div className="flex items-start gap-3">
+                    <LifeTraceBrandMark className="size-11 rounded-full" />
+                    <div className="min-w-0 flex-1 rounded-[1.25rem] border border-border/70 bg-background/70 px-4 py-3 text-lg font-semibold leading-8">
+                      今天适合先处理一件小事：补一个计划，或者把临期食材用掉。
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-3 px-1">
-                    <p className="text-sm font-semibold text-muted-foreground">开场提问</p>
+                    <p className="text-xl font-semibold">生活动作</p>
                     {streaming ? <Badge tone="ai">处理中</Badge> : null}
                   </div>
-                  <div className="grid gap-2">
+                  <div className="overflow-hidden rounded-[1.45rem] border border-border/75 bg-card/78 shadow-[0_18px_54px_rgba(71,58,42,0.075)]">
                     {landingPromptCards.map((prompt) => {
                       const Icon = prompt.icon;
 
@@ -1451,6 +1469,7 @@ function AgentConversationPanel({
                           icon={Icon}
                           title={prompt.title}
                           onClick={() => onPrompt(prompt)}
+                          className="rounded-none border-0 border-b border-border/70 bg-transparent last:border-b-0"
                         />
                       );
                     })}

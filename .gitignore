@@ -61,6 +61,7 @@ Recordings/
 # Build outputs
 [Bb]uild/
 [Bb]uilds/
+output/
 
 # IDE
 .vs/

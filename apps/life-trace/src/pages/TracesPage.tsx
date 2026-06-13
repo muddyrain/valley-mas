@@ -18,6 +18,14 @@ import { EditTraceDrawer } from '@/components/EditTraceDrawer';
 import { EmptyState } from '@/components/EmptyState';
 import { ImagePreview } from '@/components/ImagePreview';
 import { LoadErrorState } from '@/components/LoadErrorState';
+import {
+  SoftHeader,
+  SoftIconBadge,
+  SoftPage,
+  SoftPanel,
+  SoftSectionTitle,
+  SoftStatGrid,
+} from '@/components/SoftDiary';
 import { SubPageShell } from '@/components/SubPageShell';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
@@ -372,6 +380,12 @@ export function TracesPage() {
   const selectedTrace = traceId ? (traces.find((trace) => trace.id === traceId) ?? null) : null;
   const activeFilterConfig =
     traceFilters.find((filter) => filter.id === activeFilter) ?? traceFilters[0];
+  const imageTraceCount = filteredTraces.filter((trace) => trace.imageUrl).length;
+  const locationTraceCount = filteredTraces.filter((trace) => trace.location).length;
+  const currentMonthLabel = new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+  }).format(new Date());
 
   useEffect(() => {
     if (traceId && !tracesLoading && traces.length > 0 && !selectedTrace) {
@@ -448,27 +462,39 @@ export function TracesPage() {
   }
 
   return (
-    <div className="min-w-0 space-y-5 overflow-x-hidden">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-xl font-semibold tracking-tight">踪迹</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{traces.length} 条记录</p>
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
-          <Plus className="size-4" />
-          新建
-        </Button>
-      </div>
+    <SoftPage>
+      <SoftHeader
+        title="踪迹"
+        subtitle="把今天变成可回看的生活"
+        action={
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className="size-14 rounded-[1.15rem]"
+            aria-label="新建踪迹"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus className="size-6" />
+          </Button>
+        }
+      />
+
+      <SoftStatGrid
+        items={[
+          { label: '条记录', value: filteredTraces.length || traces.length, icon: CalendarDays },
+          { label: '个地点', value: locationTraceCount, icon: MapPin },
+          { label: '张照片', value: imageTraceCount, icon: Image, tone: 'weather' },
+        ]}
+      />
 
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-3 rounded-[1.25rem] border border-life-trace/20 bg-life-trace/5 p-4 text-left transition hover:border-life-trace/40 hover:bg-life-trace/10"
+        className="flex w-full items-center justify-between gap-3 rounded-[1.35rem] border border-life-trace/20 bg-card/85 p-4 text-left shadow-[0_18px_54px_rgba(71,58,42,0.075)] transition hover:border-life-trace/40 hover:bg-card"
         onClick={() => navigate('/media-diary')}
       >
         <span className="flex min-w-0 items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-trace/10 text-life-trace">
-            <Disc3 className="size-5" />
-          </span>
+          <SoftIconBadge icon={Disc3} tone="trace" />
           <span className="min-w-0">
             <span className="block font-semibold">书影音日记</span>
             <span className="mt-1 block text-sm text-muted-foreground">
@@ -479,28 +505,32 @@ export function TracesPage() {
         <Badge tone="trace">进入</Badge>
       </button>
 
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {traceFilters.map((filter) => {
-          const active = activeFilter === filter.id;
+      <div className="rounded-[1.35rem] border border-border/70 bg-card/80 p-1">
+        <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {traceFilters.map((filter) => {
+            const active = activeFilter === filter.id;
 
-          return (
-            <button
-              type="button"
-              key={filter.id}
-              className={cn(
-                'min-h-10 shrink-0 cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition',
-                active ? 'bg-life-trace text-background' : 'bg-card text-muted-foreground',
-              )}
-              onClick={() => setActiveFilter(filter.id)}
-              aria-pressed={active}
-            >
-              {filter.label}
-            </button>
-          );
-        })}
+            return (
+              <button
+                type="button"
+                key={filter.id}
+                className={cn(
+                  'min-h-12 shrink-0 cursor-pointer rounded-[1.05rem] px-5 py-2 text-sm font-semibold transition',
+                  active
+                    ? 'bg-life-trace text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-secondary',
+                )}
+                onClick={() => setActiveFilter(filter.id)}
+                aria-pressed={active}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="rounded-[1.25rem] border border-border/80 bg-card/55 p-3 shadow-[0_14px_50px_rgba(0,0,0,0.08)]">
+      <SoftPanel className="p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">标签筛选</p>
@@ -561,7 +591,7 @@ export function TracesPage() {
             </button>
           ))}
         </div>
-      </div>
+      </SoftPanel>
 
       {tracesError && !showTracesErrorFallback ? (
         <Card className="border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
@@ -575,22 +605,7 @@ export function TracesPage() {
 
       <div className="space-y-7">
         {filteredTraces.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2 max-[360px]:grid-cols-1">
-            <Card className="border-life-trace/20 bg-life-trace/5 p-3">
-              <p className="text-lg font-semibold">{filteredTraces.length}</p>
-              <p className="mt-1 text-xs text-muted-foreground">当前踪迹</p>
-            </Card>
-            <Card className="border-life-plan/20 bg-life-plan/5 p-3">
-              <p className="text-lg font-semibold">{monthGroups.length}</p>
-              <p className="mt-1 text-xs text-muted-foreground">月份归档</p>
-            </Card>
-            <Card className="border-life-ai/20 bg-life-ai/5 p-3">
-              <p className="text-lg font-semibold">
-                {filteredTraces.filter((trace) => trace.imageUrl).length}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">图片记录</p>
-            </Card>
-          </div>
+          <SoftSectionTitle title={currentMonthLabel} meta={`${filteredTraces.length} 条记录`} />
         ) : null}
 
         {monthGroups.map((group) => (
@@ -605,16 +620,19 @@ export function TracesPage() {
               </span>
             </div>
 
-            <div className="relative space-y-5 pl-8 max-[360px]:pl-6">
-              <div className="absolute bottom-0 left-3 top-1 w-px bg-gradient-to-b from-life-trace/60 via-border to-transparent" />
+            <div className="relative space-y-5">
+              <div className="absolute bottom-0 left-4 top-1 w-px bg-gradient-to-b from-life-trace/60 via-border to-transparent" />
               {group.traces.map((trace, index) => (
-                <article key={trace.id} className="relative">
-                  <span className="absolute -left-[1.55rem] top-5 grid size-5 place-items-center rounded-full border border-life-trace/40 bg-background shadow-[0_0_0_5px_rgba(16,185,129,0.06)] max-[360px]:-left-[1.3rem]">
-                    <span className="size-2 rounded-full bg-life-trace" />
+                <article
+                  key={trace.id}
+                  className="relative grid grid-cols-[2rem_minmax(0,1fr)] gap-3"
+                >
+                  <span className="relative z-10 mt-5 grid size-5 self-start justify-self-center rounded-full border border-life-trace/40 bg-background shadow-[0_0_0_5px_rgba(16,185,129,0.06)]">
+                    <span className="m-auto size-2 rounded-full bg-life-trace" />
                   </span>
                   <Card
                     className={cn(
-                      'cursor-pointer overflow-hidden border-border/80 transition hover:border-life-trace/40 hover:shadow-[0_18px_56px_rgba(16,185,129,0.08)]',
+                      'cursor-pointer overflow-hidden rounded-[1.35rem] border-border/80 bg-card/85 shadow-[0_18px_54px_rgba(71,58,42,0.065)] transition hover:border-life-trace/40 hover:shadow-[0_18px_56px_rgba(16,185,129,0.08)]',
                       trace.source === '库存' &&
                         'border-life-ai/15 bg-[linear-gradient(180deg,rgba(6,182,212,0.04),rgba(16,185,129,0.03))]',
                     )}
@@ -678,7 +696,7 @@ export function TracesPage() {
                           )}
                         </button>
                       </div>
-                      <div className="rounded-2xl bg-secondary p-3 text-sm leading-6 text-muted-foreground">
+                      <div className="rounded-2xl bg-secondary/70 p-3 text-sm leading-6 text-muted-foreground">
                         {trace.summary}
                       </div>
                       <div className="grid gap-2 text-sm text-muted-foreground">
@@ -803,6 +821,6 @@ export function TracesPage() {
         }}
         onConfirm={() => void confirmDeleteTrace()}
       />
-    </div>
+    </SoftPage>
   );
 }
