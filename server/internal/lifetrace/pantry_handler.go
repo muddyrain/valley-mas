@@ -25,6 +25,7 @@ type pantryReminderPayload struct {
 type createPantryItemRequest struct {
 	Name          string                `json:"name"`
 	Category      string                `json:"category"`
+	Tags          []string              `json:"tags"`
 	Quantity      int                   `json:"quantity"`
 	Unit          string                `json:"unit"`
 	Location      string                `json:"location"`
@@ -106,6 +107,29 @@ func normalizePantryCategory(category string) string {
 		return "食品"
 	}
 	return category
+}
+
+func normalizePantryTags(tags []string) model.StringList {
+	seen := map[string]bool{}
+	normalized := model.StringList{}
+	for _, tag := range tags {
+		value := strings.TrimSpace(tag)
+		if value == "" {
+			continue
+		}
+		if len([]rune(value)) > 16 {
+			value = string([]rune(value)[:16])
+		}
+		if seen[value] {
+			continue
+		}
+		seen[value] = true
+		normalized = append(normalized, value)
+		if len(normalized) >= 8 {
+			break
+		}
+	}
+	return normalized
 }
 
 func normalizePantryLocation(location string) string {
@@ -359,7 +383,7 @@ func applyPantryListFilters(query *gorm.DB, c *gin.Context) *gorm.DB {
 	keyword := strings.TrimSpace(c.Query("q"))
 	if keyword != "" {
 		like := "%" + keyword + "%"
-		query = query.Where("(name LIKE ? OR note LIKE ? OR location LIKE ?)", like, like, like)
+		query = query.Where("(name LIKE ? OR note LIKE ? OR location LIKE ? OR tags LIKE ?)", like, like, like, like)
 	}
 
 	return query
@@ -609,6 +633,7 @@ func (h *Handler) CreatePantryItem(c *gin.Context) {
 		HouseholdID:        householdCtx.Household.ID,
 		Name:               name,
 		Category:           normalizePantryCategory(req.Category),
+		Tags:               normalizePantryTags(req.Tags),
 		Quantity:           normalizePantryQuantity(req.Quantity),
 		Unit:               normalizePantryUnit(req.Unit),
 		Location:           normalizePantryLocation(req.Location),
@@ -686,6 +711,7 @@ func (h *Handler) UpdatePantryItem(c *gin.Context) {
 	updates := map[string]interface{}{
 		"name":                 name,
 		"category":             normalizePantryCategory(req.Category),
+		"tags":                 normalizePantryTags(req.Tags),
 		"quantity":             normalizePantryQuantity(req.Quantity),
 		"unit":                 normalizePantryUnit(req.Unit),
 		"location":             normalizePantryLocation(req.Location),

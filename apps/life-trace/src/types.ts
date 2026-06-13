@@ -92,6 +92,7 @@ export type PantryItem = {
   householdId?: string;
   name: string;
   category: PantryCategory;
+  tags: string[];
   quantity: number;
   unit: string;
   location: PantryLocation;
@@ -108,7 +109,9 @@ export type PantryItem = {
   updatedAt?: string;
 };
 
-export type NewPantryItemInput = Omit<PantryItem, 'id' | 'createdAt' | 'updatedAt'>;
+export type NewPantryItemInput = Omit<PantryItem, 'id' | 'tags' | 'createdAt' | 'updatedAt'> & {
+  tags?: string[];
+};
 
 export type PantryPreferences = {
   defaultReminderEnabled: boolean;

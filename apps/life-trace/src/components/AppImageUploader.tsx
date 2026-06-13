@@ -4,6 +4,7 @@ import { uploadLifeTraceImage } from '@/api/upload';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { ImagePreview } from '@/components/ImagePreview';
 import { Button } from '@/components/ui/button';
+import { compressImageFile } from '@/lib/imageCompression';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -20,6 +21,7 @@ type AppImageUploaderProps = {
 };
 
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+const maxSourceImageSizeMB = 30;
 const maxImageSizeMB = 10;
 
 function formatImageSize(size: number) {
@@ -33,7 +35,7 @@ export function AppImageUploader({
   value,
   onChange,
   label = '图片',
-  description = '支持 JPG、PNG、WebP，最大 10MB。',
+  description = '支持 JPG、PNG、WebP，上传前会自动压缩。',
   disabled = false,
   className,
   onUploadingChange,
@@ -65,8 +67,8 @@ export function AppImageUploader({
       return;
     }
 
-    if (file.size > maxImageSizeMB * 1024 * 1024) {
-      setError(`图片不能超过 ${maxImageSizeMB}MB。`);
+    if (file.size > maxSourceImageSizeMB * 1024 * 1024) {
+      setError(`图片不能超过 ${maxSourceImageSizeMB}MB。`);
       return;
     }
 
@@ -79,7 +81,13 @@ export function AppImageUploader({
     setError('');
     setFileMeta(`${file.name} · ${formatImageSize(file.size)}`);
     try {
-      const result = await uploadLifeTraceImage(token, file);
+      setFileMeta(`正在压缩图片 · ${formatImageSize(file.size)}`);
+      const uploadFile = await compressImageFile(file);
+      if (uploadFile.size > maxImageSizeMB * 1024 * 1024) {
+        setError(`图片压缩后仍超过 ${maxImageSizeMB}MB。`);
+        return;
+      }
+      const result = await uploadLifeTraceImage(token, uploadFile);
       onChange(result.url);
       setFileMeta(`${result.fileName} · ${formatImageSize(result.size)}`);
     } catch (uploadError) {

@@ -21,6 +21,7 @@ const pantryResponse = {
   id: 'pantry-1',
   name: '牛奶',
   category: '食品',
+  tags: ['冷藏', '早餐'],
   quantity: 2,
   unit: '盒',
   location: '冷藏',
@@ -87,6 +88,7 @@ describe('pantry api', () => {
     const created = await createPantryItem(token, {
       name: '牛奶',
       category: '食品',
+      tags: ['冷藏', '早餐', '早餐'],
       quantity: 2,
       unit: '盒',
       location: '冷藏',
@@ -115,6 +117,7 @@ describe('pantry api', () => {
     expect(fetchMock.mock.calls[3][1].method).toBe('DELETE');
 
     const createBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+    expect(createBody.tags).toEqual(['冷藏', '早餐']);
     expect(createBody.reminder).toEqual({
       enabled: true,
       useDefault: false,
@@ -360,7 +363,6 @@ describe('pantry api', () => {
           tags: ['冷藏'],
           confidence: 0.9,
           warnings: [],
-          ocrHints: [],
           householdId: '0',
           source: 'ark',
           model: 'ep-vision',

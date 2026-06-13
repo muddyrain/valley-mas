@@ -223,7 +223,7 @@ export function buildPantryTraceInput(
     location: item.location,
     imageUrl: getPantryCoverUrl(item),
     mood: action === 'used-up' ? '踏实' : '提醒',
-    tags: [item.category, '家庭库存', actionLabel],
+    tags: [item.category, ...item.tags, '家庭库存', actionLabel],
     source: '库存',
   };
 }
@@ -237,7 +237,7 @@ export function buildPantryCreatedTraceInput(item: PantryItem, now = new Date())
     location: item.location,
     imageUrl: getPantryCoverUrl(item),
     mood: '踏实',
-    tags: [item.category, '家庭库存', '新增库存'],
+    tags: [item.category, ...item.tags, '家庭库存', '新增库存'],
     source: '库存',
   };
 }

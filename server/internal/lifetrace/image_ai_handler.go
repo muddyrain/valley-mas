@@ -31,7 +31,6 @@ type pantryPhotoAnalysisRequest struct {
 	ImageBase64   string `json:"imageBase64"`
 	HouseholdID   string `json:"householdId"`
 	Hint          string `json:"hint"`
-	AnalysisMode  string `json:"analysisMode"`
 	BarcodeValue  string `json:"barcodeValue"`
 	BarcodeFormat string `json:"barcodeFormat"`
 	BarcodeSource string `json:"barcodeSource"`
@@ -52,7 +51,7 @@ type pantryPhotoAnalysisAIResponse struct {
 	pantryPhotoDetectedItem
 	MultiItemDetected bool                      `json:"multiItemDetected"`
 	DetectedItems     []pantryPhotoDetectedItem `json:"detectedItems"`
-	OCRHints          []pantryPhotoOCRHint      `json:"ocrHints"`
+	DateHints         []pantryPhotoDateHint     `json:"dateHints"`
 	Tags              []string                  `json:"tags"`
 	Summary           string                    `json:"summary"`
 }
@@ -77,7 +76,7 @@ type pantryPhotoDetectedItem struct {
 	CropBox         imageCropBox `json:"cropBox"`
 }
 
-type pantryPhotoOCRHint struct {
+type pantryPhotoDateHint struct {
 	Kind            string       `json:"kind"`
 	Text            string       `json:"text"`
 	NormalizedValue string       `json:"normalizedValue"`
@@ -236,12 +235,6 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 		return
 	}
 
-	analysisMode := normalizePantryPhotoAnalysisMode(req.AnalysisMode)
-	if analysisMode == "ocr" {
-		h.analyzePantryPhotoWithOCR(c, householdCtx, req, imageInput)
-		return
-	}
-
 	aiCfg, errMsg := readLifeTracePantryPhotoAIConfig()
 	if errMsg != "" {
 		c.JSON(http.StatusServiceUnavailable, apiResponse{Code: http.StatusServiceUnavailable, Message: errMsg})
@@ -252,7 +245,6 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 		req.Hint,
 		householdCtx.Household.Name,
 		aiCfg.UseVision,
-		analysisMode,
 		normalizePantryBarcodeValue(req.BarcodeValue),
 		normalizePantryBarcodeFormat(req.BarcodeFormat),
 		strings.TrimSpace(req.BarcodeSource),
@@ -322,7 +314,6 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 		"summary":           parsed.Summary,
 		"multiItemDetected": parsed.MultiItemDetected,
 		"detectedItems":     parsed.DetectedItems,
-		"ocrHints":          parsed.OCRHints,
 		"householdId":       householdCtx.Household.ID,
 		"householdName":     householdCtx.Household.Name,
 		"source":            aiCfg.Source,
@@ -371,7 +362,6 @@ func buildPantryPhotoAnalysisPrompt(
 	hint string,
 	householdName string,
 	useVision bool,
-	analysisMode string,
 	barcodeValue string,
 	barcodeFormat string,
 	barcodeSource string,
@@ -385,10 +375,7 @@ func buildPantryPhotoAnalysisPrompt(
 	if hint == "" {
 		hint = "用户没有补充说明。"
 	}
-	modeInstruction := "当前模式：AI 商品分析。优先识别商品名称、分类、数量、规格、存放位置，同时提取保质期 OCR 线索。"
-	if analysisMode == "ocr" {
-		modeInstruction = "当前模式：OCR 拍照分析。优先读取包装上的生产日期、到期日、保质期天数和保质期原文；商品名称、分类、数量只给保守草稿，不要因为包装图案编造字段。"
-	}
+	modeInstruction := "当前模式：AI 商品分析。优先识别商品名称、分类、数量、规格、存放位置，同时提取包装日期线索。"
 	householdName = trimRunes(strings.TrimSpace(householdName), 24)
 	if householdName == "" {
 		householdName = "当前库存空间"
@@ -411,15 +398,15 @@ func buildPantryPhotoAnalysisPrompt(
 		"你是 Life Trace 的家庭库存商品识别 AI，只输出一个 JSON 对象，不要 Markdown，不要解释。",
 		"输出必须是严格合法 JSON：第一个字符必须是 {，最后一个字符必须是 }，不要使用 ```、注释、前后缀文本或自然语言说明。",
 		"如果图片看不清或无法确定商品，也必须返回符合格式的 JSON，把 name 设为“待确认商品”，confidence 设为 0.2，并在 warnings 说明需要用户确认。",
-		"JSON 格式：{\"name\":\"商品名称\",\"category\":\"食品|日用品|药品|宠物|其他\",\"brand\":\"品牌或空字符串\",\"spec\":\"规格或空字符串\",\"quantity\":1,\"unit\":\"件|瓶|盒|袋|个|包|罐|支\",\"storageLocation\":\"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他\",\"expiresAt\":\"YYYY-MM-DD 或空字符串\",\"productionDate\":\"YYYY-MM-DD 或空字符串\",\"purchaseDate\":\"YYYY-MM-DD 或空字符串\",\"shelfLifeDays\":0,\"barcodeValue\":\"包装编码或空字符串\",\"barcodeFormat\":\"ean_13|ean_8|upc_a|upc_e|code_128|qr_code|unknown|空字符串\",\"tags\":[\"标签\"],\"confidence\":0.0,\"warnings\":[\"需要用户确认的事项\"],\"cropBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.8,\"height\":0.8},\"multiItemDetected\":false,\"detectedItems\":[{\"id\":\"item-1\",\"name\":\"商品名称\",\"brand\":\"品牌或空字符串\",\"spec\":\"规格或空字符串\",\"category\":\"食品|日用品|药品|宠物|其他\",\"quantity\":1,\"unit\":\"件|瓶|盒|袋|个|包|罐|支\",\"storageLocation\":\"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他\",\"expiresAt\":\"YYYY-MM-DD 或空字符串\",\"productionDate\":\"YYYY-MM-DD 或空字符串\",\"shelfLifeDays\":0,\"barcodeValue\":\"包装编码或空字符串\",\"barcodeFormat\":\"ean_13|ean_8|upc_a|upc_e|code_128|qr_code|unknown|空字符串\",\"confidence\":0.0,\"warnings\":[\"需要用户确认的事项\"],\"cropBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.8,\"height\":0.8}}],\"ocrHints\":[{\"kind\":\"production_date|expiry_date|shelf_life_days|shelf_life_text\",\"text\":\"原文\",\"normalizedValue\":\"YYYY-MM-DD 或 180\",\"confidence\":0.0,\"sourceRegion\":{\"x\":0.1,\"y\":0.1,\"width\":0.2,\"height\":0.1}}],\"summary\":\"60字以内说明\"}",
+		"JSON 格式：{\"name\":\"商品名称\",\"category\":\"食品|日用品|药品|宠物|其他\",\"brand\":\"品牌或空字符串\",\"spec\":\"规格或空字符串\",\"quantity\":1,\"unit\":\"件|瓶|盒|袋|个|包|罐|支\",\"storageLocation\":\"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他\",\"expiresAt\":\"YYYY-MM-DD 或空字符串\",\"productionDate\":\"YYYY-MM-DD 或空字符串\",\"purchaseDate\":\"YYYY-MM-DD 或空字符串\",\"shelfLifeDays\":0,\"barcodeValue\":\"包装编码或空字符串\",\"barcodeFormat\":\"ean_13|ean_8|upc_a|upc_e|code_128|qr_code|unknown|空字符串\",\"tags\":[\"标签\"],\"confidence\":0.0,\"warnings\":[\"需要用户确认的事项\"],\"cropBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.8,\"height\":0.8},\"multiItemDetected\":false,\"detectedItems\":[{\"id\":\"item-1\",\"name\":\"商品名称\",\"brand\":\"品牌或空字符串\",\"spec\":\"规格或空字符串\",\"category\":\"食品|日用品|药品|宠物|其他\",\"quantity\":1,\"unit\":\"件|瓶|盒|袋|个|包|罐|支\",\"storageLocation\":\"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他\",\"expiresAt\":\"YYYY-MM-DD 或空字符串\",\"productionDate\":\"YYYY-MM-DD 或空字符串\",\"shelfLifeDays\":0,\"barcodeValue\":\"包装编码或空字符串\",\"barcodeFormat\":\"ean_13|ean_8|upc_a|upc_e|code_128|qr_code|unknown|空字符串\",\"confidence\":0.0,\"warnings\":[\"需要用户确认的事项\"],\"cropBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.8,\"height\":0.8}}],\"dateHints\":[{\"kind\":\"production_date|expiry_date|shelf_life_days|shelf_life_text\",\"text\":\"原文\",\"normalizedValue\":\"YYYY-MM-DD 或 180\",\"confidence\":0.0,\"sourceRegion\":{\"x\":0.1,\"y\":0.1,\"width\":0.2,\"height\":0.1}}],\"summary\":\"60字以内说明\"}",
 		"category 和 storageLocation 必须从候选值中选择。",
 		"顶层字段仍然表示你判断的主商品，同时把主商品也放进 detectedItems[0]。",
 		"detectedItems 最多返回 5 个候选，按 confidence 从高到低排序；如果只识别到 1 个商品，multiItemDetected 仍返回 false。",
 		"cropBox 和 sourceRegion 使用 0-1 比例坐标；如果不确定，返回居中 0.1/0.1/0.8/0.8。",
-		"如果识别到明确到期日，填写 expiresAt，并在 ocrHints 里追加 expiry_date。",
-		"如果包装或用户补充中同时出现生产日期和 180天/90天/7天等保质期，填写 productionDate、shelfLifeDays，并计算 expiresAt；同时把生产日期和保质期文本都写入 ocrHints。",
-		"如果只看到保质期天数但没有生产日期，expiresAt 返回空字符串，并在 warnings 提示缺少生产日期，无法计算到期日；ocrHints 仍保留保质期线索。",
-		"如果看到多个日期且无法确认哪一个是到期日，不要自动填写 expiresAt，只在 warnings 和 ocrHints 里说明冲突。",
+		"如果识别到明确到期日，填写 expiresAt，并在 dateHints 里追加 expiry_date。",
+		"如果包装或用户补充中同时出现生产日期和 180天/90天/7天等保质期，填写 productionDate、shelfLifeDays，并计算 expiresAt；同时把生产日期和保质期文本都写入 dateHints。",
+		"如果只看到保质期天数但没有生产日期，expiresAt 返回空字符串，并在 warnings 提示缺少生产日期，无法计算到期日；dateHints 仍保留保质期线索。",
+		"如果看到多个日期且无法确认哪一个是到期日，不要自动填写 expiresAt，只在 warnings 和 dateHints 里说明冲突。",
 		"如果保质期和生产日期都没有出现，不要提示缺少保质期，expiresAt、productionDate 和 shelfLifeDays 返回空值或 0。",
 		"不要编造看不清的品牌、规格、生产日期或保质期。",
 		"包装编码只能作为线索；不要因为有编码就编造商品名、品牌或规格。图片和编码冲突时，把编码放入 barcodeValue/barcodeFormat，并在 warnings 提示用户确认。",
@@ -432,15 +419,6 @@ func buildPantryPhotoAnalysisPrompt(
 		barcodeInstruction,
 		"用户补充说明：" + hint,
 	}, "\n")
-}
-
-func normalizePantryPhotoAnalysisMode(raw string) string {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "ocr":
-		return "ocr"
-	default:
-		return "ai"
-	}
 }
 
 func isLifeTraceAIRequestCanceled(err error) bool {
@@ -500,8 +478,8 @@ func parsePantryPhotoAnalysisAIResponse(raw string) (pantryPhotoAnalysisAIRespon
 		primaryItem = mergePrimaryPantryPhotoDetectedItem(primaryItem, detectedItems[0])
 		detectedItems[0] = primaryItem
 	}
-	ocrHints := normalizePantryPhotoOCRHints(parsed.OCRHints)
-	primaryItem, ocrHints = applyOCRRulesToPantryPhotoItem(primaryItem, ocrHints)
+	dateHints := normalizePantryPhotoDateHints(parsed.DateHints)
+	primaryItem, dateHints = applyDateRulesToPantryPhotoItem(primaryItem, dateHints)
 	detectedItems[0] = primaryItem
 
 	parsed.Name = primaryItem.Name
@@ -522,7 +500,7 @@ func parsePantryPhotoAnalysisAIResponse(raw string) (pantryPhotoAnalysisAIRespon
 	parsed.CropBox = primaryItem.CropBox
 	parsed.DetectedItems = detectedItems
 	parsed.MultiItemDetected = parsed.MultiItemDetected || len(parsed.DetectedItems) > 1
-	parsed.OCRHints = ocrHints
+	parsed.DateHints = dateHints
 	parsed.Tags = normalizePantryPhotoTags(parsed.Tags)
 	parsed.Summary = trimRunes(strings.TrimSpace(parsed.Summary), 80)
 	if parsed.Summary == "" {
@@ -626,12 +604,12 @@ func mergePrimaryPantryPhotoDetectedItem(primary pantryPhotoDetectedItem, candid
 	return normalizePantryPhotoDetectedItem(primary, primary.ID)
 }
 
-func normalizePantryPhotoOCRHints(items []pantryPhotoOCRHint) []pantryPhotoOCRHint {
-	result := make([]pantryPhotoOCRHint, 0, 6)
+func normalizePantryPhotoDateHints(items []pantryPhotoDateHint) []pantryPhotoDateHint {
+	result := make([]pantryPhotoDateHint, 0, 6)
 	seen := map[string]bool{}
 	for _, item := range items {
 		kind := strings.TrimSpace(item.Kind)
-		if !isValidPantryOCRHintKind(kind) {
+		if !isValidPantryDateHintKind(kind) {
 			continue
 		}
 		text := trimRunes(strings.TrimSpace(item.Text), 32)
@@ -647,7 +625,7 @@ func normalizePantryPhotoOCRHints(items []pantryPhotoOCRHint) []pantryPhotoOCRHi
 			continue
 		}
 		seen[key] = true
-		result = append(result, pantryPhotoOCRHint{
+		result = append(result, pantryPhotoDateHint{
 			Kind:            kind,
 			Text:            text,
 			NormalizedValue: normalizedValue,
@@ -672,7 +650,7 @@ func looksLikePantryShelfLifeText(text string, normalizedValue string) bool {
 	return pantryShelfLifeValuePattern.MatchString(combined)
 }
 
-func isValidPantryOCRHintKind(kind string) bool {
+func isValidPantryDateHintKind(kind string) bool {
 	switch kind {
 	case "production_date", "expiry_date", "shelf_life_days", "shelf_life_text":
 		return true
@@ -681,13 +659,13 @@ func isValidPantryOCRHintKind(kind string) bool {
 	}
 }
 
-func applyOCRRulesToPantryPhotoItem(
+func applyDateRulesToPantryPhotoItem(
 	item pantryPhotoDetectedItem,
-	ocrHints []pantryPhotoOCRHint,
-) (pantryPhotoDetectedItem, []pantryPhotoOCRHint) {
+	dateHints []pantryPhotoDateHint,
+) (pantryPhotoDetectedItem, []pantryPhotoDateHint) {
 	expiryValues := make([]string, 0, 2)
 	shelfLifeDays := item.ShelfLifeDays
-	for _, hint := range ocrHints {
+	for _, hint := range dateHints {
 		switch hint.Kind {
 		case "expiry_date":
 			if date := normalizePantryDate(hint.NormalizedValue); date != "" {
@@ -726,7 +704,7 @@ func applyOCRRulesToPantryPhotoItem(
 	}
 
 	item.Warnings = normalizePantryPhotoWarnings(item.Warnings)
-	return item, ocrHints
+	return item, dateHints
 }
 
 func uniquePantryDateValues(values []string) []string {

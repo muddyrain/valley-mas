@@ -37,6 +37,7 @@ export function BottomSheet({
   spacing = 'default',
 }: BottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [dragOffset, setDragOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
   const startYRef = useRef(0);
@@ -50,7 +51,10 @@ export function BottomSheet({
       startYRef.current = 0;
       dragStartYRef.current = 0;
       pointerIdRef.current = null;
+      return;
     }
+
+    contentRef.current?.scrollTo({ top: 0, left: 0 });
   }, [open]);
 
   const requestClose = () => {
@@ -196,6 +200,7 @@ export function BottomSheet({
           </div>
         ) : null}
         <div
+          ref={contentRef}
           className={cn(
             'safe-bottom min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 max-[360px]:px-4',
             showHandle ? null : compact ? 'pt-3 max-[360px]:pt-3' : 'pt-5 max-[360px]:pt-4',

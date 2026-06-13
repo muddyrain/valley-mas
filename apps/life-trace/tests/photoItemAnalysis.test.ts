@@ -21,7 +21,6 @@ import {
   type PhotoItemAnalysisHistoryItem,
   readPhotoItemAnalysisHistory,
   removePhotoItemAnalysisHistory,
-  summarizePhotoItemOCRHints,
   upsertPhotoItemAnalysisHistory,
 } from '../src/lib/photoItemAnalysis';
 import type { PantryItem } from '../src/types';
@@ -48,7 +47,6 @@ const analysis: PantryPhotoAnalysisResponse = {
   cropBox: { x: 0, y: 0, width: 1, height: 1 },
   summary: '识别为牛奶。',
   detectedItems: [],
-  ocrHints: [],
   source: 'ark',
 };
 
@@ -69,6 +67,7 @@ function createHistoryItem(
     form: {
       name: '牛奶',
       category: '食品',
+      tags: ['冷藏'],
       quantity: '1',
       unit: '盒',
       location: '冷藏',
@@ -91,6 +90,7 @@ function createPantryItem(overrides: Partial<PantryItem> = {}): PantryItem {
     householdId: overrides.householdId ?? 'household-1',
     name: overrides.name ?? '牛奶',
     category: overrides.category ?? '食品',
+    tags: overrides.tags ?? [],
     quantity: overrides.quantity ?? 1,
     unit: overrides.unit ?? '盒',
     location: overrides.location ?? '冷藏',
@@ -451,7 +451,6 @@ describe('photo item analysis helpers', () => {
         },
       ],
       multiItemDetected: true,
-      ocrHints: [],
     };
 
     expect(getPhotoItemDetectedItems(multiItemAnalysis).map((item) => item.id)).toEqual([
@@ -460,32 +459,6 @@ describe('photo item analysis helpers', () => {
     ]);
     expect(getPhotoItemSelectedDetectedItem(multiItemAnalysis, 'bread')?.name).toBe('吐司');
     expect(getNextUnprocessedDetectedItemId(multiItemAnalysis, ['milk'], 'milk')).toBe('bread');
-  });
-
-  it('summarizes OCR hints when expiry can be auto derived', () => {
-    const summary = summarizePhotoItemOCRHints(
-      [
-        { kind: 'production_date', text: '2026.06.01', normalizedValue: '2026-06-01' },
-        { kind: 'shelf_life_days', text: '180天', normalizedValue: '180' },
-      ],
-      {
-        id: 'milk',
-        name: '牛奶',
-        category: '食品',
-        quantity: 1,
-        unit: '盒',
-        storageLocation: '冷藏',
-        expiresAt: '2026-11-28',
-        productionDate: '2026-06-01',
-        shelfLifeDays: 180,
-        confidence: 0.9,
-        warnings: [],
-      },
-    );
-
-    expect(summary?.state).toBe('auto');
-    expect(summary?.detail).toContain('2026-11-28');
-    expect(summary?.entries).toHaveLength(2);
   });
 
   it('does not keep showing review issues after the user explicitly dismisses them', () => {
@@ -577,7 +550,7 @@ describe('photo item analysis helpers', () => {
     ]);
   });
 
-  it('lets barcode history override AI draft fields while preserving expiry OCR output', () => {
+  it('lets barcode history override AI draft fields while preserving expiry output', () => {
     const draft = buildPhotoItemDraftFormFromDetectedItem(
       {
         id: 'item-1',

@@ -329,6 +329,11 @@ export function PantryItemDetailPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={getPantryStatusTone(status)}>{getPantryStatusLabel(status)}</Badge>
                 <Badge tone="default">{item.category}</Badge>
+                {item.tags.map((tag) => (
+                  <Badge key={tag} tone="trace">
+                    {tag}
+                  </Badge>
+                ))}
                 {household?.kind === 'shared' ? (
                   <Badge tone="ai">
                     <Users className="mr-1 size-3.5" />

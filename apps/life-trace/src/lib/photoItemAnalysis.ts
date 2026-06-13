@@ -2,9 +2,9 @@ import type {
   PantryBarcodeMatchResponse,
   PantryPhotoAnalysisResponse,
   PantryPhotoDetectedItem,
-  PantryPhotoOCRHint,
 } from '@/api/pantry';
 import { buildDefaultPantryReminder } from '@/lib/pantry';
+import { normalizePantryTags } from '@/lib/pantryTags';
 import type {
   NewPantryItemInput,
   PantryCategory,
@@ -16,6 +16,7 @@ import type {
 export type PhotoItemDraftForm = {
   name: string;
   category: PantryCategory;
+  tags: string[];
   quantity: string;
   unit: string;
   location: PantryLocation;
@@ -33,7 +34,6 @@ export type PhotoItemAnalysisHistoryStatus = 'draft' | 'saved';
 export type PhotoItemAnalysisQualityRating = 'accurate' | 'inaccurate';
 
 export type PhotoItemAnalysisCoverMode = 'original' | 'crop' | 'transparent';
-export type PhotoItemAnalysisMode = 'ai' | 'ocr';
 
 export type PhotoItemAnalysisQualityFeedback = {
   rating: PhotoItemAnalysisQualityRating;
@@ -92,7 +92,6 @@ export type PhotoItemAnalysisHistoryItem = {
   form: PhotoItemDraftForm;
   selectedDetectedItemId?: string;
   processedDetectedItemIds?: string[];
-  ocrHints?: PantryPhotoOCRHint[];
   expiryBaseDate?: string;
   householdName?: string;
   status: PhotoItemAnalysisHistoryStatus;
@@ -103,7 +102,6 @@ export type PhotoItemAnalysisHistoryItem = {
   coverMode?: PhotoItemAnalysisCoverMode;
   transparentCoverUrl?: string;
   transparentCoverTechLabel?: string;
-  analysisMode?: PhotoItemAnalysisMode;
   qualityFeedback?: PhotoItemAnalysisQualityFeedback;
 };
 
@@ -112,20 +110,6 @@ type BuildPhotoItemPantryInputOptions = {
   pantryPreferences: PantryPreferences;
   uploadedImageUrl: string;
   thumbnailUrl?: string;
-};
-
-export type PhotoItemOCRResolutionState = 'auto' | 'needs-confirm' | 'missing-production' | 'none';
-
-export type PhotoItemOCRSummary = {
-  state: PhotoItemOCRResolutionState;
-  title: string;
-  detail: string;
-  entries: Array<{
-    id: string;
-    label: string;
-    text: string;
-    normalizedValue?: string;
-  }>;
 };
 
 type BuildPhotoItemAnalysisSmartSuggestionsOptions = {
@@ -217,7 +201,7 @@ function normalizeHistoryItem(item: unknown): PhotoItemAnalysisHistoryItem | nul
     imageUrl: candidate.imageUrl,
     imageName: typeof candidate.imageName === 'string' ? candidate.imageName : undefined,
     analysis: candidate.analysis,
-    form: candidate.form,
+    form: { ...candidate.form, tags: normalizePantryTags(candidate.form.tags) },
     selectedDetectedItemId:
       typeof candidate.selectedDetectedItemId === 'string'
         ? candidate.selectedDetectedItemId
@@ -225,15 +209,6 @@ function normalizeHistoryItem(item: unknown): PhotoItemAnalysisHistoryItem | nul
     processedDetectedItemIds: Array.isArray(candidate.processedDetectedItemIds)
       ? candidate.processedDetectedItemIds.filter(
           (item): item is string => typeof item === 'string' && item.trim().length > 0,
-        )
-      : [],
-    ocrHints: Array.isArray(candidate.ocrHints)
-      ? candidate.ocrHints.filter(
-          (item): item is PantryPhotoOCRHint =>
-            Boolean(item) &&
-            typeof item === 'object' &&
-            typeof item.kind === 'string' &&
-            typeof item.text === 'string',
         )
       : [],
     expiryBaseDate:
@@ -257,7 +232,6 @@ function normalizeHistoryItem(item: unknown): PhotoItemAnalysisHistoryItem | nul
       typeof candidate.transparentCoverTechLabel === 'string'
         ? candidate.transparentCoverTechLabel
         : undefined,
-    analysisMode: candidate.analysisMode === 'ocr' ? 'ocr' : 'ai',
     qualityFeedback:
       candidate.qualityFeedback?.rating === 'accurate' ||
       candidate.qualityFeedback?.rating === 'inaccurate'
@@ -430,10 +404,6 @@ function includesAnyKeyword(values: string[], keywords: string[]) {
   return values.some((value) => keywords.some((keyword) => value.includes(keyword)));
 }
 
-function uniqueStrings(values: string[]) {
-  return values.filter((value, index) => values.indexOf(value) === index);
-}
-
 export function getPhotoItemDetectedItems(analysis: PantryPhotoAnalysisResponse) {
   const candidates =
     analysis.detectedItems?.length > 0
@@ -443,6 +413,7 @@ export function getPhotoItemDetectedItems(analysis: PantryPhotoAnalysisResponse)
             id: 'item-1',
             name: analysis.name,
             category: analysis.category,
+            tags: analysis.tags,
             brand: analysis.brand,
             spec: analysis.spec,
             quantity: analysis.quantity,
@@ -530,6 +501,7 @@ export function buildPhotoItemDraftFormFromDetectedItem(
       ? fallbackForm.category
       : detectedItem.category || fallbackForm.category,
     quantity: String(detectedItem.quantity || 1),
+    tags: normalizePantryTags(detectedItem.tags ?? fallbackForm.tags),
     unit: manualEditedFields.has('unit')
       ? fallbackForm.unit
       : detectedItem.unit || fallbackForm.unit,
@@ -544,63 +516,6 @@ export function buildPhotoItemDraftFormFromDetectedItem(
     barcodeFormat: detectedItem.barcodeFormat || fallbackForm.barcodeFormat || '',
   };
   return applyPhotoItemBarcodeMatchToDraftForm(draft, barcodeMatch, manualEditedFields);
-}
-
-function getOCRHintLabel(kind: PantryPhotoOCRHint['kind']) {
-  switch (kind) {
-    case 'production_date':
-      return '生产日期';
-    case 'expiry_date':
-      return '到期日期';
-    case 'shelf_life_days':
-      return '保质期天数';
-    case 'shelf_life_text':
-      return '保质期文本';
-    default:
-      return 'OCR';
-  }
-}
-
-export function summarizePhotoItemOCRHints(
-  ocrHints: PantryPhotoOCRHint[],
-  detectedItem?: PantryPhotoDetectedItem | null,
-): PhotoItemOCRSummary | null {
-  if (!ocrHints.length) {
-    return null;
-  }
-
-  const entries = ocrHints.map((hint, index) => ({
-    id: `${hint.kind}-${index}`,
-    label: getOCRHintLabel(hint.kind),
-    text: hint.text,
-    normalizedValue: hint.normalizedValue,
-  }));
-  const warningText = uniqueStrings(detectedItem?.warnings ?? []);
-
-  if (detectedItem?.expiresAt) {
-    return {
-      state: 'auto',
-      title: '已自动推导到期日',
-      detail: `当前到期日为 ${detectedItem.expiresAt}。`,
-      entries,
-    };
-  }
-
-  if (warningText.some((item) => item.includes('生产日期'))) {
-    return {
-      state: 'missing-production',
-      title: '还缺生产日期',
-      detail: '识别到了保质期线索，但还不能自动算出到期日。',
-      entries,
-    };
-  }
-
-  return {
-    state: 'needs-confirm',
-    title: 'OCR 已提取日期线索',
-    detail: '请确认这些日期后再决定是否写入到期日。',
-    entries,
-  };
 }
 
 function normalizeSuggestionText(value: string) {
@@ -1040,6 +955,7 @@ export function buildPhotoItemPantryInput({
     quantity: parseDraftQuantity(form.quantity),
     unit: form.unit.trim() || '件',
     location: form.location,
+    tags: normalizePantryTags(form.tags),
     expiresAt: expiresAt || undefined,
     openedAt: openedAt || undefined,
     note: form.note.trim(),

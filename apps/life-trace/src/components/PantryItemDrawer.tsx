@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { FormItem, PickerFieldButton, SheetHeader } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
 import { OptionPickerSheet } from '@/components/OptionPickerSheet';
-import { PantryExpiryDateField } from '@/components/PantryExpiryDateField';
+import { DateInputWithClear, PantryExpiryDateField } from '@/components/PantryExpiryDateField';
 import { TonePanel } from '@/components/TonePanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { getLifeTraceErrorMessage } from '@/lib/error';
 import { formatPantryReminderSummary, getPantryPersistedStatus } from '@/lib/pantry';
+import { formatPantryTagText, parsePantryTagText } from '@/lib/pantryTags';
 import {
   generatePantryTransparentCoverWithFallback,
   getPantryTransparentCoverTechLabel,
@@ -49,6 +50,7 @@ const locationPickerOptions = locationOptions.map((option) => ({ label: option, 
 const defaultPantryForm = (preferences: PantryPreferences): NewPantryItemInput => ({
   name: '',
   category: '食品',
+  tags: [],
   quantity: 1,
   unit: '件',
   location: '冷藏',
@@ -104,6 +106,7 @@ export function PantryItemDrawer({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saveQueuedAfterThumbnail, setSaveQueuedAfterThumbnail] = useState(false);
+  const [tagText, setTagText] = useState('');
   const [activePicker, setActivePicker] = useState<'category' | 'location' | null>(null);
   const queuedPayloadRef = useRef<NewPantryItemInput | null>(null);
   const editing = Boolean(item);
@@ -116,6 +119,7 @@ export function PantryItemDrawer({
     if (item) {
       setForm({
         ...item,
+        tags: item.tags ?? [],
         quantity: item.quantity || 1,
         unit: item.unit || '件',
         note: item.note || '',
@@ -130,8 +134,10 @@ export function PantryItemDrawer({
           reminderTime: item.reminder?.reminderTime || pantryPreferences.defaultReminderTime,
         },
       });
+      setTagText(formatPantryTagText(item.tags));
     } else {
       setForm(defaultPantryForm(pantryPreferences));
+      setTagText('');
     }
     setErrors({});
     setSubmitting(false);
@@ -200,6 +206,7 @@ export function PantryItemDrawer({
       ...form,
       name: form.name.trim(),
       unit: form.unit.trim() || '件',
+      tags: parsePantryTagText(tagText),
       expiresAt: expiresAt || undefined,
       openedAt: form.openedAt || undefined,
       imageUrl: form.imageUrl?.trim() || undefined,
@@ -220,6 +227,13 @@ export function PantryItemDrawer({
         if (saved) {
           queuedPayloadRef.current = null;
           setSaveQueuedAfterThumbnail(false);
+          if (!item) {
+            setForm(defaultPantryForm(pantryPreferences));
+            setErrors({});
+            setThumbnailError('');
+            setTransparentCoverTechLabel('');
+            setTagText('');
+          }
           onOpenChange(false);
           onSaved?.(`${editing ? '已更新' : '已保存'}「${saved.name}」库存`);
         }
@@ -227,7 +241,16 @@ export function PantryItemDrawer({
         setSubmitting(false);
       }
     },
-    [addPantryItem, editPantryItem, editing, householdId, item, onOpenChange, onSaved],
+    [
+      addPantryItem,
+      editPantryItem,
+      editing,
+      householdId,
+      item,
+      onOpenChange,
+      onSaved,
+      pantryPreferences,
+    ],
   );
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -324,6 +347,16 @@ export function PantryItemDrawer({
     onSaved?.(`已删除「${item.name}」库存`);
   };
 
+  const clearNewItemDraft = () => {
+    setForm(defaultPantryForm(pantryPreferences));
+    setTagText('');
+    setErrors({});
+    setThumbnailError('');
+    setTransparentCoverTechLabel('');
+    setSaveQueuedAfterThumbnail(false);
+    queuedPayloadRef.current = null;
+  };
+
   useEffect(() => {
     if (
       thumbnailGenerating ||
@@ -386,6 +419,14 @@ export function PantryItemDrawer({
             </FormItem>
           </div>
 
+          <FormItem label="标签">
+            <Input
+              value={tagText}
+              onChange={(event) => setTagText(event.target.value)}
+              placeholder="例如：冷冻、零食"
+            />
+          </FormItem>
+
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_7.5rem] gap-3 max-[360px]:grid-cols-1">
             <FormItem label="数量" required error={errors.quantity}>
               <Input
@@ -411,11 +452,12 @@ export function PantryItemDrawer({
 
           <div className="grid min-w-0 grid-cols-1 gap-3">
             <FormItem label="开封日期">
-              <Input
-                type="date"
+              <DateInputWithClear
+                id="pantry-item-opened-at"
                 value={form.openedAt || ''}
-                onChange={(event) => updateField('openedAt', event.target.value)}
-                className="appearance-none"
+                disabled={submitting}
+                clearLabel="清空开封日期"
+                onChange={(value) => updateField('openedAt', value)}
               />
             </FormItem>
             <PantryExpiryDateField
@@ -433,6 +475,7 @@ export function PantryItemDrawer({
             cameraAndLibrary
             label="真实图片"
             description="给这件库存留一张更好辨认的照片。"
+            previewFit="contain"
           />
 
           <TonePanel
@@ -649,7 +692,7 @@ export function PantryItemDrawer({
               'flex gap-2',
               editing
                 ? 'items-stretch justify-between max-[360px]:flex-col'
-                : 'items-center justify-end',
+                : 'items-stretch justify-between max-[360px]:flex-col',
             )}
           >
             {editing ? (
@@ -663,7 +706,18 @@ export function PantryItemDrawer({
                 <Trash2 className="size-4" />
                 删除库存
               </Button>
-            ) : null}
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-life-alert hover:bg-life-alert/10 hover:text-life-alert"
+                disabled={imageUploading || submitting || thumbnailGenerating}
+                onClick={clearNewItemDraft}
+              >
+                <Trash2 className="size-4" />
+                清空内容
+              </Button>
+            )}
             <Button
               type="button"
               variant="ghost"

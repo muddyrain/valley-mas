@@ -1,4 +1,5 @@
 import { apiRequest } from '@/api/request';
+import { normalizePantryTags } from '@/lib/pantryTags';
 import type {
   HouseholdSummary,
   ListPagination,
@@ -34,7 +35,7 @@ export type PantryThumbnailRequest = {
 
 export type PantryThumbnailResponse = {
   thumbnailUrl: string;
-  source: 'ark' | 'gemini' | 'ocr';
+  source: 'ark' | 'gemini';
   model?: string;
   modelTag?: string;
 };
@@ -58,18 +59,11 @@ export type PantryPhotoCropBox = {
   height: number;
 };
 
-export type PantryPhotoOCRHint = {
-  kind: 'production_date' | 'expiry_date' | 'shelf_life_days' | 'shelf_life_text';
-  text: string;
-  normalizedValue?: string;
-  confidence?: number;
-  sourceRegion?: PantryPhotoCropBox;
-};
-
 export type PantryPhotoDetectedItem = {
   id: string;
   name: string;
   category: PantryItem['category'];
+  tags?: string[];
   brand?: string;
   spec?: string;
   quantity: number;
@@ -90,7 +84,6 @@ export type PantryPhotoAnalysisRequest = {
   imageUrl: string;
   householdId?: string;
   hint?: string;
-  analysisMode?: 'ai' | 'ocr';
   barcodeValue?: string;
   barcodeFormat?: string;
   barcodeSource?: string;
@@ -117,7 +110,6 @@ export type PantryPhotoAnalysisResponse = {
   summary: string;
   multiItemDetected?: boolean;
   detectedItems: PantryPhotoDetectedItem[];
-  ocrHints: PantryPhotoOCRHint[];
   householdId?: string;
   householdName?: string;
   source: 'ark' | 'gemini';
@@ -254,6 +246,7 @@ function serializePantryItemInput(input: NewPantryItemInput) {
   return {
     name: input.name,
     category: input.category,
+    tags: normalizePantryTags(input.tags),
     quantity: input.quantity,
     unit: input.unit,
     location: input.location,
@@ -277,6 +270,7 @@ function serializePantryItemInput(input: NewPantryItemInput) {
 function deserializePantryItem(item: PantryItemResponse): PantryItem {
   return {
     ...item,
+    tags: normalizePantryTags(Array.isArray(item.tags) ? item.tags : []),
     imageUrl: item.imageUrl || undefined,
     thumbnailUrl: item.thumbnailUrl || undefined,
     barcodeValue: item.barcodeValue || undefined,

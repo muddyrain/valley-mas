@@ -46,7 +46,7 @@ function addDays(dateText: string, days: number) {
   return formatDateInput(date);
 }
 
-function DateInputWithClear({
+export function DateInputWithClear({
   id,
   value,
   disabled,

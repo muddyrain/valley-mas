@@ -18,6 +18,7 @@ function createItem(id: string, fields: Partial<PantryItem> = {}): PantryItem {
     id,
     name: id,
     category: '食品',
+    tags: [],
     quantity: 1,
     unit: '件',
     location: '冷藏',

@@ -36,6 +36,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { formatPantryTagText, parsePantryTagText } from '@/lib/pantryTags';
 import {
   generatePantryTransparentCoverWithFallback,
   getPantryTransparentCoverTechLabel,
@@ -61,16 +62,13 @@ import {
   normalizePhotoItemCropBox,
   type PhotoItemAnalysisCoverMode,
   type PhotoItemAnalysisHistoryItem,
-  type PhotoItemAnalysisMode,
   type PhotoItemAnalysisQualityRating,
   type PhotoItemAnalysisReviewIssue,
   type PhotoItemAnalysisSmartSuggestion,
   type PhotoItemCropPreviewLayout,
   type PhotoItemDraftForm,
   type PhotoItemManualEditedField,
-  type PhotoItemOCRSummary,
   readPhotoItemAnalysisHistory,
-  summarizePhotoItemOCRHints,
 } from '@/lib/photoItemAnalysis';
 import {
   loadPhotoItemAnalysisHistory,
@@ -124,31 +122,6 @@ const pantryLocations: PantryLocation[] = [
 const categoryPickerOptions = pantryCategories.map((option) => ({ label: option, value: option }));
 const locationPickerOptions = pantryLocations.map((option) => ({ label: option, value: option }));
 const acceptedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
-const analysisModeOptions: Array<{
-  value: PhotoItemAnalysisMode;
-  label: string;
-  title: string;
-  description: string;
-  stageLabel: string;
-  chips: string[];
-}> = [
-  {
-    value: 'ai',
-    label: 'AI分析',
-    title: 'AI 商品扫描舱',
-    description: '对准商品包装，系统会识别名称、分类、数量、位置和到期线索。',
-    stageLabel: '正在解析商品',
-    chips: ['主体定位', '字段抽取', '库存匹配'],
-  },
-  {
-    value: 'ocr',
-    label: 'OCR拍照分析',
-    title: 'OCR 保质期扫描',
-    description: '对准生产日期、到期日或保质期文字，系统会提取日期线索。',
-    stageLabel: '正在提取日期',
-    chips: ['日期定位', '文字提取', '到期推导'],
-  },
-];
 const barcodeFormatOptions = [
   { label: '自动', value: '' },
   { label: 'EAN-13', value: 'ean_13' },
@@ -163,6 +136,7 @@ const barcodeFormatOptions = [
 const initialForm: DraftForm = {
   name: '',
   category: '食品',
+  tags: [],
   quantity: '1',
   unit: '件',
   location: '厨房',
@@ -207,10 +181,6 @@ function isPhotoItemAnalysisAbortError(error: unknown) {
   }
   const message = error.message.toLowerCase();
   return error.name === 'AbortError' || message.includes('abort') || message.includes('aborted');
-}
-
-function getAnalysisModeOption(mode: PhotoItemAnalysisMode) {
-  return analysisModeOptions.find((option) => option.value === mode) ?? analysisModeOptions[0];
 }
 
 type CropPreviewImageProps = {
@@ -488,13 +458,13 @@ export function PhotoItemAnalysisPage() {
   const analysisAbortRef = useRef<AbortController | null>(null);
   const manualEditedFieldsRef = useRef<Set<PhotoItemManualEditedField>>(new Set());
   const [state, setState] = useState<CaptureState>('idle');
-  const [analysisMode, setAnalysisMode] = useState<PhotoItemAnalysisMode>('ai');
   const [cameraError, setCameraError] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const [uploadedImageUrl, setUploadedImageUrl] = useState('');
   const [analysis, setAnalysis] = useState<PantryPhotoAnalysisResponse | null>(null);
   const [form, setForm] = useState<DraftForm>(initialForm);
+  const [tagText, setTagText] = useState('');
   const [households, setHouseholds] = useState<HouseholdSummary[]>([]);
   const [householdsLoading, setHouseholdsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -532,15 +502,8 @@ export function PhotoItemAnalysisPage() {
   const visionProcessing = state === 'uploading' || state === 'analyzing';
   const reviewReady = Boolean(analysis);
   const scannerStatusLabel = state === 'done' ? '已入库' : busy ? '处理中' : '待确认';
-  const activeAnalysisModeOption = getAnalysisModeOption(analysisMode);
   const visionStageLabel =
-    state === 'uploading'
-      ? '正在同步影像'
-      : state === 'analyzing'
-        ? activeAnalysisModeOption.stageLabel
-        : analysisMode === 'ocr'
-          ? 'OCR 待命'
-          : '视觉待命';
+    state === 'uploading' ? '正在同步影像' : state === 'analyzing' ? '正在解析商品' : '视觉待命';
   const detectedItems = useMemo(
     () => (analysis ? getPhotoItemDetectedItems(analysis) : []),
     [analysis],
@@ -597,10 +560,6 @@ export function PhotoItemAnalysisPage() {
     ];
   }, [detectedItems, processedDetectedItemIds, selectedDetectedItem]);
   const batchDetectedItemCount = batchDetectedItems.length;
-  const ocrSummary = useMemo<PhotoItemOCRSummary | null>(
-    () => summarizePhotoItemOCRHints(analysis?.ocrHints ?? [], selectedDetectedItem),
-    [analysis?.ocrHints, selectedDetectedItem],
-  );
   const canRemoveCurrentDraft = currentHistoryItem?.status === 'draft';
   const reviewIssues = useMemo(
     () =>
@@ -790,7 +749,6 @@ export function PhotoItemAnalysisPage() {
       form,
       selectedDetectedItemId,
       processedDetectedItemIds,
-      ocrHints: analysis.ocrHints,
       expiryBaseDate,
       householdName: selectedHouseholdName,
       status: 'draft',
@@ -799,12 +757,10 @@ export function PhotoItemAnalysisPage() {
       coverMode,
       transparentCoverUrl,
       transparentCoverTechLabel,
-      analysisMode,
       qualityFeedback: existing?.qualityFeedback,
     });
   }, [
     analysis,
-    analysisMode,
     currentHistoryId,
     coverMode,
     expiryBaseDate,
@@ -1044,7 +1000,6 @@ export function PhotoItemAnalysisPage() {
           barcodeValue: barcodeResult?.value,
           barcodeFormat: barcodeResult?.format,
           barcodeSource: barcodeResult?.source,
-          analysisMode,
         },
         { signal: analysisAbortController.signal },
       );
@@ -1091,14 +1046,14 @@ export function PhotoItemAnalysisPage() {
       )
         ? 'crop'
         : 'original';
-      setAnalysis(result);
-      setForm(
-        applyPhotoItemBarcodeMatchToDraftForm(
-          nextForm,
-          barcodeMatch,
-          manualEditedFieldsRef.current,
-        ),
+      const nextDraftForm = applyPhotoItemBarcodeMatchToDraftForm(
+        nextForm,
+        barcodeMatch,
+        manualEditedFieldsRef.current,
       );
+      setAnalysis(result);
+      setForm(nextDraftForm);
+      setTagText(formatPantryTagText(nextDraftForm.tags));
       setExpiryBaseDate(nextExpiryBaseDate);
       setCoverMode(nextCoverMode);
       setCurrentHistoryId(historyId);
@@ -1109,21 +1064,15 @@ export function PhotoItemAnalysisPage() {
         imageUrl: upload.url,
         imageName: getFallbackFileName(imageFile),
         analysis: result,
-        form: applyPhotoItemBarcodeMatchToDraftForm(
-          nextForm,
-          barcodeMatch,
-          manualEditedFieldsRef.current,
-        ),
+        form: nextDraftForm,
         selectedDetectedItemId: nextSelectedDetectedItemId,
         processedDetectedItemIds: [],
-        ocrHints: result.ocrHints,
         expiryBaseDate: nextExpiryBaseDate,
         householdName: selectedHouseholdName,
         status: 'draft',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         coverMode: nextCoverMode,
-        analysisMode,
       });
       setState('reviewing');
       setReviewSheetOpen(true);
@@ -1233,6 +1182,7 @@ export function PhotoItemAnalysisPage() {
             setSelectedDetectedItemId(nextDetectedItemId);
             setCurrentHistoryId(nextHistoryId);
             setForm(nextDraftForm);
+            setTagText(formatPantryTagText(nextDraftForm.tags));
             setExpiryBaseDate(
               nextDetectedItem.productionDate || nextDetectedItem.purchaseDate || '',
             );
@@ -1246,7 +1196,6 @@ export function PhotoItemAnalysisPage() {
               form: nextDraftForm,
               selectedDetectedItemId: nextDetectedItemId,
               processedDetectedItemIds: nextProcessedDetectedItemIds,
-              ocrHints: analysis.ocrHints,
               expiryBaseDate:
                 nextDetectedItem.productionDate || nextDetectedItem.purchaseDate || '',
               householdName: selectedHouseholdName,
@@ -1254,7 +1203,6 @@ export function PhotoItemAnalysisPage() {
               coverMode,
               transparentCoverUrl,
               transparentCoverTechLabel,
-              analysisMode,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             });
@@ -1373,14 +1321,12 @@ export function PhotoItemAnalysisPage() {
           form,
           selectedDetectedItemId,
           processedDetectedItemIds: nextProcessedDetectedItemIds,
-          ocrHints: analysis.ocrHints,
           expiryBaseDate,
           householdName: selectedHouseholdName,
           status: 'saved',
           coverMode,
           transparentCoverUrl,
           transparentCoverTechLabel,
-          analysisMode,
           createdAt: currentHistoryItem?.createdAt ?? now,
           updatedAt: now,
           savedAt: now,
@@ -1411,14 +1357,12 @@ export function PhotoItemAnalysisPage() {
           form,
           selectedDetectedItemId,
           processedDetectedItemIds: nextProcessedDetectedItemIds,
-          ocrHints: analysis.ocrHints,
           expiryBaseDate,
           householdName: selectedHouseholdName,
           status: 'draft',
           coverMode,
           transparentCoverUrl,
           transparentCoverTechLabel,
-          analysisMode,
           createdAt: currentHistoryItem?.createdAt ?? now,
           updatedAt: now,
           qualityFeedback: currentHistoryItem?.qualityFeedback,
@@ -1514,27 +1458,8 @@ export function PhotoItemAnalysisPage() {
       householdId: current.householdId,
       reminderEnabled: pantryPreferences.defaultReminderEnabled,
     }));
+    setTagText('');
     setError('');
-  };
-
-  const handleAnalysisModeChange = (nextMode: PhotoItemAnalysisMode) => {
-    if (nextMode === analysisMode || busy) {
-      return;
-    }
-    analysisAbortRef.current?.abort();
-    setAnalysisMode(nextMode);
-    setAnalysis(null);
-    setCurrentHistoryId('');
-    setSelectedDetectedItemId('');
-    setProcessedDetectedItemIds([]);
-    setReviewSheetOpen(false);
-    setExpiryBaseDate('');
-    setCoverMode('original');
-    setTransparentCoverUrl('');
-    setTransparentCoverTechLabel('');
-    setTransparentCoverError('');
-    setError('');
-    setState(imagePreviewUrl || imageFile ? 'captured' : 'idle');
   };
 
   const restoreDraft = useCallback(
@@ -1551,8 +1476,8 @@ export function PhotoItemAnalysisPage() {
       setImagePreviewUrl(draft.imageUrl);
       setUploadedImageUrl(draft.imageUrl);
       setAnalysis(draft.analysis);
-      setAnalysisMode(draft.analysisMode ?? 'ai');
-      setForm(draft.form);
+      setForm({ ...draft.form, tags: draft.form.tags ?? [] });
+      setTagText(formatPantryTagText(draft.form.tags));
       setTransparentCoverUrl(draft.transparentCoverUrl ?? '');
       setTransparentCoverTechLabel(draft.transparentCoverTechLabel ?? '');
       setTransparentCoverGenerating(false);
@@ -1705,24 +1630,28 @@ export function PhotoItemAnalysisPage() {
     setTransparentCoverTechLabel('');
     setTransparentCoverError('');
     setExpiryBaseDate(nextDetectedItem.productionDate || nextDetectedItem.purchaseDate || '');
-    setForm((current) => ({
-      ...buildPhotoItemDraftFormFromDetectedItem(
-        nextDetectedItem,
-        {
-          ...current,
-          householdId: current.householdId,
-          openedAt: '',
-        },
-        pantryPreferences,
-        nextNote,
-        {
-          barcodeMatch,
-          manualEditedFields: manualEditedFieldsRef.current,
-        },
-      ),
-      householdId: current.householdId,
-      openedAt: '',
-    }));
+    setForm((current) => {
+      const nextForm = {
+        ...buildPhotoItemDraftFormFromDetectedItem(
+          nextDetectedItem,
+          {
+            ...current,
+            householdId: current.householdId,
+            openedAt: '',
+          },
+          pantryPreferences,
+          nextNote,
+          {
+            barcodeMatch,
+            manualEditedFields: manualEditedFieldsRef.current,
+          },
+        ),
+        householdId: current.householdId,
+        openedAt: '',
+      };
+      setTagText(formatPantryTagText(nextForm.tags));
+      return nextForm;
+    });
   };
 
   const handleBackToAi = () => {
@@ -1772,28 +1701,7 @@ export function PhotoItemAnalysisPage() {
         </Card>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2 rounded-[1.25rem] border border-border bg-card p-1.5">
-        {analysisModeOptions.map((option) => {
-          const active = option.value === analysisMode;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              className={`min-h-11 rounded-2xl px-3 text-sm font-semibold transition ${
-                active
-                  ? 'bg-life-ai text-background shadow-sm'
-                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-              }`}
-              disabled={busy}
-              onClick={() => handleAnalysisModeChange(option.value)}
-            >
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <section className="relative overflow-hidden rounded-[1.75rem] border border-life-ai/20 bg-card p-4 shadow-[0_24px_90px_rgba(0,0,0,0.28)]">
+      <section className="relative overflow-hidden rounded-[1.75rem] border border-life-trace/18 bg-card p-4 shadow-[0_18px_52px_rgba(78,63,42,0.08)]">
         <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(6,182,212,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.1)_1px,transparent_1px)] [background-size:28px_28px]" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-ai/80 to-transparent" />
         <div className="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-gradient-to-r from-transparent via-life-trace/45 to-transparent" />
@@ -1804,11 +1712,9 @@ export function PhotoItemAnalysisPage() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-life-ai">
                 Vision Dock
               </p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight">
-                {activeAnalysisModeOption.title}
-              </h2>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight">AI 商品扫描舱</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {activeAnalysisModeOption.description}
+                对准商品包装，系统会识别名称、分类、数量、位置和到期线索。
               </p>
             </div>
             <Badge
@@ -1862,7 +1768,7 @@ export function PhotoItemAnalysisPage() {
                     </span>
                   </div>
                   <div className="flex w-full justify-center gap-1.5 overflow-hidden">
-                    {activeAnalysisModeOption.chips.map((label) => (
+                    {['主体定位', '字段抽取', '库存匹配'].map((label) => (
                       <span
                         key={label}
                         className="min-w-0 rounded-full border border-life-ai/18 bg-life-ai/10 px-2.5 py-1 text-center text-[10px] font-semibold text-life-ai/90"
@@ -1934,9 +1840,7 @@ export function PhotoItemAnalysisPage() {
                   <div className="space-y-3">
                     <p className="text-base font-semibold">等待商品进入取景框</p>
                     <p className="text-sm leading-6 text-muted-foreground">
-                      {analysisMode === 'ocr'
-                        ? '建议让日期和保质期文字占据画面中央，减少反光和遮挡。'
-                        : '建议让包装正面占据画面中央，减少反光和遮挡。'}
+                      建议让包装正面占据画面中央，减少反光和遮挡。
                     </p>
                   </div>
                   <div className="mx-auto flex max-w-[12rem] items-center gap-2 pt-1">
@@ -2041,9 +1945,7 @@ export function PhotoItemAnalysisPage() {
                     ? '上传中...'
                     : state === 'analyzing'
                       ? '分析中...'
-                      : analysisMode === 'ocr'
-                        ? '开始OCR分析'
-                        : '开始分析'}
+                      : '开始分析'}
                 </span>
               </Button>
             </div>
@@ -2109,7 +2011,7 @@ export function PhotoItemAnalysisPage() {
       {analysis ? (
         <section>
           <SectionHeader
-            title={analysisMode === 'ocr' ? 'OCR 识别结果' : 'AI 识别结果'}
+            title="AI 识别结果"
             meta={`${Math.round((selectedDetectedItem?.confidence ?? analysis.confidence) * 100)}%`}
           />
           <Card className="space-y-4 p-4">
@@ -2665,6 +2567,21 @@ export function PhotoItemAnalysisPage() {
             </FormItem>
           </div>
 
+          <FormItem label="标签">
+            <Input
+              value={tagText}
+              disabled={state === 'saving'}
+              placeholder="例如：冷冻、零食"
+              onChange={(event) => {
+                setTagText(event.target.value);
+                setForm((current) => ({
+                  ...current,
+                  tags: parsePantryTagText(event.target.value),
+                }));
+              }}
+            />
+          </FormItem>
+
           <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-3 max-[360px]:grid-cols-1">
             <FormItem label="数量" required>
               <Input
@@ -2699,48 +2616,6 @@ export function PhotoItemAnalysisPage() {
                 }
               />
             </FormItem>
-            {ocrSummary ? (
-              <div
-                className={`rounded-[1.25rem] border p-3 ${
-                  ocrSummary.state === 'auto'
-                    ? 'border-life-trace/25 bg-life-trace/5'
-                    : ocrSummary.state === 'missing-production'
-                      ? 'border-life-alert/25 bg-life-alert/5'
-                      : 'border-life-ai/20 bg-life-ai/5'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold">{ocrSummary.title}</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {ocrSummary.detail}
-                    </p>
-                  </div>
-                  <Badge
-                    tone={
-                      ocrSummary.state === 'auto'
-                        ? 'trace'
-                        : ocrSummary.state === 'missing-production'
-                          ? 'alert'
-                          : 'ai'
-                    }
-                    className="shrink-0"
-                  >
-                    OCR
-                  </Badge>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {ocrSummary.entries.map((entry) => (
-                    <span
-                      key={entry.id}
-                      className="rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs text-muted-foreground"
-                    >
-                      {entry.label}：{entry.normalizedValue || entry.text}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ) : null}
             <PantryExpiryDateField
               idPrefix="photo-item"
               expiresAt={form.expiresAt}
@@ -2871,6 +2746,18 @@ export function PhotoItemAnalysisPage() {
               ) : null}
             </div>
           )}
+          {canRemoveCurrentDraft ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11 w-full text-life-alert hover:bg-life-alert/10 hover:text-life-alert"
+              disabled={state === 'saving'}
+              onClick={removeCurrentDraft}
+            >
+              <Trash2 className="size-4 shrink-0" />
+              <span className="whitespace-nowrap">删除草稿</span>
+            </Button>
+          ) : null}
         </form>
       </BottomSheet>
       <OptionPickerSheet<PantryCategory>

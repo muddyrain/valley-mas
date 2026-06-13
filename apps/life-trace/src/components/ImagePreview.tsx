@@ -37,6 +37,10 @@ export function ImagePreview({
   children,
 }: ImagePreviewProps) {
   const [open, setOpen] = useState(false);
+  const [loadedSrc, setLoadedSrc] = useState('');
+  const [errorSrc, setErrorSrc] = useState('');
+  const imageLoaded = loadedSrc === src;
+  const imageError = errorSrc === src;
 
   useEffect(() => {
     if (!open) {
@@ -86,7 +90,33 @@ export function ImagePreview({
         openPreview();
       }}
     >
-      <img src={src} alt={alt} className={imageClassName} />
+      <span className="relative block w-full">
+        {!imageLoaded ? (
+          <span className="absolute inset-0 z-10 grid place-items-center bg-secondary/80 text-xs font-medium text-muted-foreground backdrop-blur-[1px]">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/88 px-3 py-1.5 shadow-sm">
+              <span className="size-3 animate-spin rounded-full border-2 border-life-trace/25 border-t-life-trace motion-reduce:animate-none" />
+              {imageError ? '图片加载失败' : '图片加载中'}
+            </span>
+          </span>
+        ) : null}
+        <img
+          src={src}
+          alt={alt}
+          className={cn(
+            'transition-opacity duration-200',
+            imageLoaded ? 'opacity-100' : 'opacity-0',
+            imageClassName,
+          )}
+          onLoad={() => {
+            setLoadedSrc(src);
+            setErrorSrc('');
+          }}
+          onError={() => {
+            setLoadedSrc('');
+            setErrorSrc(src);
+          }}
+        />
+      </span>
     </button>
   );
 

@@ -380,6 +380,7 @@ type LifeTracePantryItem struct {
 	HouseholdID        Int64String    `gorm:"column:household_id;index" json:"householdId,omitempty"`
 	Name               string         `gorm:"size:160;not null" json:"name"`
 	Category           string         `gorm:"size:30;not null;default:'食品';index" json:"category"`
+	Tags               StringList     `gorm:"type:text" json:"tags"`
 	Quantity           int            `gorm:"not null;default:1" json:"quantity"`
 	Unit               string         `gorm:"size:20;not null;default:'件'" json:"unit"`
 	Location           string         `gorm:"size:30;not null;default:'冷藏';index" json:"location"`
@@ -431,6 +432,9 @@ func (item *LifeTracePantryItem) BeforeCreate(tx *gorm.DB) error {
 	}
 	if item.Category == "" {
 		item.Category = "食品"
+	}
+	if item.Tags == nil {
+		item.Tags = StringList{}
 	}
 	if item.Quantity <= 0 {
 		item.Quantity = 1

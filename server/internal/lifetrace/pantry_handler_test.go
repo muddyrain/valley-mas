@@ -20,6 +20,7 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 	body := bytes.NewBufferString(`{
 		"name": "鲜牛奶",
 		"category": "食品",
+		"tags": ["冷藏", "早餐", "早餐"],
 		"quantity": 2,
 		"unit": "盒",
 		"location": "冷藏",
@@ -52,6 +53,10 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 	if created["unit"] != "盒" || created["location"] != "冷藏" {
 		t.Fatalf("expected persisted pantry metadata, got %+v", created)
 	}
+	tags := created["tags"].([]interface{})
+	if len(tags) != 2 || tags[0] != "冷藏" || tags[1] != "早餐" {
+		t.Fatalf("expected tags to be normalized, got %+v", tags)
+	}
 	if created["thumbnailUrl"] != thumbnailURL {
 		t.Fatalf("expected long thumbnail url to round-trip, got %+v", created["thumbnailUrl"])
 	}
@@ -79,6 +84,10 @@ func TestCreateAndListPantryItemsForCurrentUser(t *testing.T) {
 	}
 	if list[0].(map[string]interface{})["barcodeValue"] != "6901234567890" {
 		t.Fatalf("expected list response to keep barcode value, got %+v", list[0])
+	}
+	listTags := list[0].(map[string]interface{})["tags"].([]interface{})
+	if len(listTags) != 2 || listTags[0] != "冷藏" {
+		t.Fatalf("expected list response to keep tags, got %+v", listTags)
 	}
 	if decodeTracePayload(t, listResp)["data"].(map[string]interface{})["householdName"] != "我的空间" {
 		t.Fatalf("expected list response to include household name, got %+v", decodeTracePayload(t, listResp)["data"])
