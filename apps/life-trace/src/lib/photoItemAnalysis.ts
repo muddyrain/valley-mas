@@ -33,6 +33,7 @@ export type PhotoItemAnalysisHistoryStatus = 'draft' | 'saved';
 export type PhotoItemAnalysisQualityRating = 'accurate' | 'inaccurate';
 
 export type PhotoItemAnalysisCoverMode = 'original' | 'crop' | 'transparent';
+export type PhotoItemAnalysisMode = 'ai' | 'ocr';
 
 export type PhotoItemAnalysisQualityFeedback = {
   rating: PhotoItemAnalysisQualityRating;
@@ -102,6 +103,7 @@ export type PhotoItemAnalysisHistoryItem = {
   coverMode?: PhotoItemAnalysisCoverMode;
   transparentCoverUrl?: string;
   transparentCoverTechLabel?: string;
+  analysisMode?: PhotoItemAnalysisMode;
   qualityFeedback?: PhotoItemAnalysisQualityFeedback;
 };
 
@@ -255,6 +257,7 @@ function normalizeHistoryItem(item: unknown): PhotoItemAnalysisHistoryItem | nul
       typeof candidate.transparentCoverTechLabel === 'string'
         ? candidate.transparentCoverTechLabel
         : undefined,
+    analysisMode: candidate.analysisMode === 'ocr' ? 'ocr' : 'ai',
     qualityFeedback:
       candidate.qualityFeedback?.rating === 'accurate' ||
       candidate.qualityFeedback?.rating === 'inaccurate'

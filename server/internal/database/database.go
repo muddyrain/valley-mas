@@ -283,6 +283,7 @@ func autoMigrateModelsByName() map[string]any {
 		"household_member":                   &model.HouseholdMember{},
 		"household_invite":                   &model.HouseholdInvite{},
 		"operation_log":                      &model.OperationLog{},
+		"ai_usage_log":                       &model.AIUsageLog{},
 		"creator":                            &model.Creator{},
 		"creator_space":                      &model.CreatorSpace{},
 		"resource":                           &model.Resource{},
@@ -333,6 +334,8 @@ func autoMigrateModelsByName() map[string]any {
 func autoMigrateModelAliases() map[string]string {
 	return map[string]string{
 		"users":                    "user",
+		"ai_usage":                 "ai_usage_log",
+		"ai_usage_logs":            "ai_usage_log",
 		"places":                   "lifetrace_place",
 		"place":                    "lifetrace_place",
 		"plans":                    "lifetrace_plan",
@@ -376,6 +379,7 @@ func coreMigrationModels() []any {
 		&model.HouseholdMember{},
 		&model.HouseholdInvite{},
 		&model.OperationLog{},
+		&model.AIUsageLog{},
 	}
 }
 

@@ -241,7 +241,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         ref={contentRef}
         className={cn(
           'h-dvh w-full overflow-x-hidden overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-          showBottomNavigation && !isAgentChatRoute && 'life-soft-page',
+          showBottomNavigation && 'life-soft-page',
           isAgentChatRoute
             ? 'overflow-hidden px-0 pb-0'
             : showBottomNavigation

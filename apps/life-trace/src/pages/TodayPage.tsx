@@ -654,7 +654,7 @@ export function TodayPage() {
   return (
     <div
       ref={pageRef}
-      className="life-soft-page min-w-0 space-y-5 overflow-x-hidden px-5 pt-7 max-[360px]:px-4 max-[360px]:pt-6"
+      className="min-w-0 space-y-5 overflow-x-hidden px-5 pt-7 max-[360px]:px-4 max-[360px]:pt-6"
     >
       <section className="relative overflow-hidden px-0.5 pb-1 pt-0" data-today-entrance>
         <div className="relative flex min-w-0 items-start justify-between gap-4">

@@ -1,6 +1,11 @@
 package database
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+
+	"valley-server/internal/model"
+)
 
 func TestNormalizeAutoMigrateScopeDefaultsToLifeTrace(t *testing.T) {
 	scope, err := NormalizeAutoMigrateScope("")
@@ -40,12 +45,12 @@ func TestBuildAutoMigratePlanKeepsAllScopeLargest(t *testing.T) {
 }
 
 func TestNormalizeAutoMigrateModelNamesResolvesAliases(t *testing.T) {
-	names, err := NormalizeAutoMigrateModelNames([]string{"places", "ledger", "closet"})
+	names, err := NormalizeAutoMigrateModelNames([]string{"places", "ledger", "closet", "ai_usage_logs"})
 	if err != nil {
 		t.Fatalf("normalize model names: %v", err)
 	}
 
-	want := []string{"lifetrace_place", "lifetrace_ledger_entry", "lifetrace_closet_item"}
+	want := []string{"lifetrace_place", "lifetrace_ledger_entry", "lifetrace_closet_item", "ai_usage_log"}
 	for i := range want {
 		if names[i] != want[i] {
 			t.Fatalf("expected names %v, got %v", want, names)
@@ -53,8 +58,28 @@ func TestNormalizeAutoMigrateModelNamesResolvesAliases(t *testing.T) {
 	}
 }
 
+func TestLifeTraceScopeIncludesAIUsageLog(t *testing.T) {
+	plan, err := buildAutoMigratePlan(AutoMigrateScopeLifeTrace)
+	if err != nil {
+		t.Fatalf("build lifetrace plan: %v", err)
+	}
+	if !migrationPlanHasModel(plan.models, &model.AIUsageLog{}) {
+		t.Fatal("expected lifetrace scope to include AI usage logs")
+	}
+}
+
 func TestNormalizeAutoMigrateModelNamesRequiresAtLeastOneModel(t *testing.T) {
 	if _, err := NormalizeAutoMigrateModelNames(nil); err == nil {
 		t.Fatal("expected empty model list to be rejected")
 	}
+}
+
+func migrationPlanHasModel(models []any, target any) bool {
+	targetType := reflect.TypeOf(target)
+	for _, candidate := range models {
+		if reflect.TypeOf(candidate) == targetType {
+			return true
+		}
+	}
+	return false
 }

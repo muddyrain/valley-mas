@@ -12,8 +12,10 @@ import (
 	"valley-server/internal/aiusage"
 	lifeai "valley-server/internal/lifetrace/ai"
 	"valley-server/internal/lifetrace/ai/prompts"
+	"valley-server/internal/logger"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 const httpStatusClientClosedRequest = 499
@@ -29,6 +31,7 @@ type pantryPhotoAnalysisRequest struct {
 	ImageBase64   string `json:"imageBase64"`
 	HouseholdID   string `json:"householdId"`
 	Hint          string `json:"hint"`
+	AnalysisMode  string `json:"analysisMode"`
 	BarcodeValue  string `json:"barcodeValue"`
 	BarcodeFormat string `json:"barcodeFormat"`
 	BarcodeSource string `json:"barcodeSource"`
@@ -84,7 +87,10 @@ type pantryPhotoOCRHint struct {
 
 type lifeTraceImageAIConfig = lifeai.ImageConfig
 
-const lifeTraceImageAnalysisMaxTokens = 900
+const (
+	lifeTraceImageAnalysisMaxTokens       = 900
+	lifeTracePantryPhotoAnalysisMaxTokens = 2200
+)
 
 var imageAnalysisDefaults = map[string]imageAnalysisAIResponse{
 	"电影海报": {
@@ -230,6 +236,12 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 		return
 	}
 
+	analysisMode := normalizePantryPhotoAnalysisMode(req.AnalysisMode)
+	if analysisMode == "ocr" {
+		h.analyzePantryPhotoWithOCR(c, householdCtx, req, imageInput)
+		return
+	}
+
 	aiCfg, errMsg := readLifeTracePantryPhotoAIConfig()
 	if errMsg != "" {
 		c.JSON(http.StatusServiceUnavailable, apiResponse{Code: http.StatusServiceUnavailable, Message: errMsg})
@@ -240,6 +252,7 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 		req.Hint,
 		householdCtx.Household.Name,
 		aiCfg.UseVision,
+		analysisMode,
 		normalizePantryBarcodeValue(req.BarcodeValue),
 		normalizePantryBarcodeFormat(req.BarcodeFormat),
 		strings.TrimSpace(req.BarcodeSource),
@@ -248,7 +261,7 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 	aiCtx = aiusage.WithAudit(aiCtx, "life-trace-pantry-photo", userID.String())
 	defer cancel()
 
-	raw, modelName, err := callLifeTraceImageAI(aiCtx, aiCfg, imageInput, prompt)
+	raw, modelName, err := callLifeTraceImageAIWithMaxTokens(aiCtx, aiCfg, imageInput, prompt, lifeTracePantryPhotoAnalysisMaxTokens)
 	if err != nil {
 		if isLifeTraceAIRequestCanceled(err) {
 			if errors.Is(err, context.Canceled) {
@@ -264,12 +277,21 @@ func (h *Handler) AnalyzePantryPhoto(c *gin.Context) {
 			})
 			return
 		}
+		logger.Error(c, "LifeTrace pantry photo AI call failed", err, logrus.Fields{
+			"source": aiCfg.Source,
+			"model":  aiCfg.Model,
+		})
 		c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "AI 商品分析失败：" + err.Error()})
 		return
 	}
 
 	parsed, err := parsePantryPhotoAnalysisAIResponse(raw)
 	if err != nil {
+		logger.Error(c, "LifeTrace pantry photo AI response parse failed", err, logrus.Fields{
+			"source":     aiCfg.Source,
+			"model":      modelName,
+			"rawPreview": trimRunes(strings.TrimSpace(raw), 240),
+		})
 		c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "AI 商品分析解析失败：" + err.Error()})
 		return
 	}
@@ -349,6 +371,7 @@ func buildPantryPhotoAnalysisPrompt(
 	hint string,
 	householdName string,
 	useVision bool,
+	analysisMode string,
 	barcodeValue string,
 	barcodeFormat string,
 	barcodeSource string,
@@ -361,6 +384,10 @@ func buildPantryPhotoAnalysisPrompt(
 	hint = trimRunes(strings.TrimSpace(hint), 80)
 	if hint == "" {
 		hint = "用户没有补充说明。"
+	}
+	modeInstruction := "当前模式：AI 商品分析。优先识别商品名称、分类、数量、规格、存放位置，同时提取保质期 OCR 线索。"
+	if analysisMode == "ocr" {
+		modeInstruction = "当前模式：OCR 拍照分析。优先读取包装上的生产日期、到期日、保质期天数和保质期原文；商品名称、分类、数量只给保守草稿，不要因为包装图案编造字段。"
 	}
 	householdName = trimRunes(strings.TrimSpace(householdName), 24)
 	if householdName == "" {
@@ -382,6 +409,8 @@ func buildPantryPhotoAnalysisPrompt(
 
 	return strings.Join([]string{
 		"你是 Life Trace 的家庭库存商品识别 AI，只输出一个 JSON 对象，不要 Markdown，不要解释。",
+		"输出必须是严格合法 JSON：第一个字符必须是 {，最后一个字符必须是 }，不要使用 ```、注释、前后缀文本或自然语言说明。",
+		"如果图片看不清或无法确定商品，也必须返回符合格式的 JSON，把 name 设为“待确认商品”，confidence 设为 0.2，并在 warnings 说明需要用户确认。",
 		"JSON 格式：{\"name\":\"商品名称\",\"category\":\"食品|日用品|药品|宠物|其他\",\"brand\":\"品牌或空字符串\",\"spec\":\"规格或空字符串\",\"quantity\":1,\"unit\":\"件|瓶|盒|袋|个|包|罐|支\",\"storageLocation\":\"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他\",\"expiresAt\":\"YYYY-MM-DD 或空字符串\",\"productionDate\":\"YYYY-MM-DD 或空字符串\",\"purchaseDate\":\"YYYY-MM-DD 或空字符串\",\"shelfLifeDays\":0,\"barcodeValue\":\"包装编码或空字符串\",\"barcodeFormat\":\"ean_13|ean_8|upc_a|upc_e|code_128|qr_code|unknown|空字符串\",\"tags\":[\"标签\"],\"confidence\":0.0,\"warnings\":[\"需要用户确认的事项\"],\"cropBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.8,\"height\":0.8},\"multiItemDetected\":false,\"detectedItems\":[{\"id\":\"item-1\",\"name\":\"商品名称\",\"brand\":\"品牌或空字符串\",\"spec\":\"规格或空字符串\",\"category\":\"食品|日用品|药品|宠物|其他\",\"quantity\":1,\"unit\":\"件|瓶|盒|袋|个|包|罐|支\",\"storageLocation\":\"冷藏|冷冻|厨房|储物柜|卫生间|玄关|其他\",\"expiresAt\":\"YYYY-MM-DD 或空字符串\",\"productionDate\":\"YYYY-MM-DD 或空字符串\",\"shelfLifeDays\":0,\"barcodeValue\":\"包装编码或空字符串\",\"barcodeFormat\":\"ean_13|ean_8|upc_a|upc_e|code_128|qr_code|unknown|空字符串\",\"confidence\":0.0,\"warnings\":[\"需要用户确认的事项\"],\"cropBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.8,\"height\":0.8}}],\"ocrHints\":[{\"kind\":\"production_date|expiry_date|shelf_life_days|shelf_life_text\",\"text\":\"原文\",\"normalizedValue\":\"YYYY-MM-DD 或 180\",\"confidence\":0.0,\"sourceRegion\":{\"x\":0.1,\"y\":0.1,\"width\":0.2,\"height\":0.1}}],\"summary\":\"60字以内说明\"}",
 		"category 和 storageLocation 必须从候选值中选择。",
 		"顶层字段仍然表示你判断的主商品，同时把主商品也放进 detectedItems[0]。",
@@ -398,10 +427,20 @@ func buildPantryPhotoAnalysisPrompt(
 		"药品、保健品、婴幼儿食品等敏感品类只做库存记录，不给医疗、安全或食用建议。",
 		"tags 输出 2-5 个简体中文短标签。",
 		visionInstruction,
+		modeInstruction,
 		"当前库存空间：" + householdName,
 		barcodeInstruction,
 		"用户补充说明：" + hint,
 	}, "\n")
+}
+
+func normalizePantryPhotoAnalysisMode(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "ocr":
+		return "ocr"
+	default:
+		return "ai"
+	}
 }
 
 func isLifeTraceAIRequestCanceled(err error) bool {
@@ -414,10 +453,20 @@ func callLifeTraceImageAI(
 	imageInput string,
 	prompt string,
 ) (string, string, error) {
+	return callLifeTraceImageAIWithMaxTokens(ctx, cfg, imageInput, prompt, lifeTraceImageAnalysisMaxTokens)
+}
+
+func callLifeTraceImageAIWithMaxTokens(
+	ctx context.Context,
+	cfg lifeTraceImageAIConfig,
+	imageInput string,
+	prompt string,
+	maxTokens int,
+) (string, string, error) {
 	result, err := lifeai.NewClient().GenerateVisionJSON(ctx, cfg, lifeai.VisionRequest{
 		ImageInput: imageInput,
 		Prompt:     prompt,
-		MaxTokens:  lifeTraceImageAnalysisMaxTokens,
+		MaxTokens:  maxTokens,
 	})
 	return result.Content, result.Model, err
 }
@@ -453,6 +502,7 @@ func parsePantryPhotoAnalysisAIResponse(raw string) (pantryPhotoAnalysisAIRespon
 	}
 	ocrHints := normalizePantryPhotoOCRHints(parsed.OCRHints)
 	primaryItem, ocrHints = applyOCRRulesToPantryPhotoItem(primaryItem, ocrHints)
+	detectedItems[0] = primaryItem
 
 	parsed.Name = primaryItem.Name
 	parsed.Category = primaryItem.Category
@@ -636,6 +686,7 @@ func applyOCRRulesToPantryPhotoItem(
 	ocrHints []pantryPhotoOCRHint,
 ) (pantryPhotoDetectedItem, []pantryPhotoOCRHint) {
 	expiryValues := make([]string, 0, 2)
+	shelfLifeDays := item.ShelfLifeDays
 	for _, hint := range ocrHints {
 		switch hint.Kind {
 		case "expiry_date":
@@ -647,25 +698,30 @@ func applyOCRRulesToPantryPhotoItem(
 				item.ProductionDate = normalizePantryDate(hint.NormalizedValue)
 			}
 		case "shelf_life_days":
-			if item.ShelfLifeDays <= 0 {
+			if shelfLifeDays <= 0 {
 				if days, err := strconv.Atoi(strings.TrimSpace(hint.NormalizedValue)); err == nil {
-					item.ShelfLifeDays = normalizePantryShelfLifeDays(days)
+					shelfLifeDays = normalizePantryShelfLifeDays(days)
 				}
 			}
 		}
 	}
 
 	expiryValues = uniquePantryDateValues(expiryValues)
+	if item.ProductionDate != "" && shelfLifeDays > 0 {
+		item.ShelfLifeDays = shelfLifeDays
+	}
 	if len(expiryValues) > 1 {
 		item.ExpiresAt = ""
 		item.Warnings = append(item.Warnings, "识别到多个日期，暂不自动填写到期日")
 	} else if len(expiryValues) == 1 {
 		item.ExpiresAt = expiryValues[0]
-	} else if item.ExpiresAt == "" && item.ProductionDate != "" && item.ShelfLifeDays > 0 {
+	} else if item.ExpiresAt == "" && item.ProductionDate != "" && shelfLifeDays > 0 {
+		item.ShelfLifeDays = shelfLifeDays
 		item.ExpiresAt = addDaysToPantryDate(item.ProductionDate, item.ShelfLifeDays)
 	}
 
-	if item.ExpiresAt == "" && item.ProductionDate == "" && item.ShelfLifeDays > 0 {
+	if item.ExpiresAt == "" && item.ProductionDate == "" && shelfLifeDays > 0 {
+		item.ShelfLifeDays = 0
 		item.Warnings = append(item.Warnings, "识别到保质期但缺少生产日期，无法计算到期日")
 	}
 

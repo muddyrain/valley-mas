@@ -306,7 +306,7 @@ export function ProfilePage() {
   };
 
   return (
-    <div ref={pageRef} className="life-soft-page space-y-6 px-5 pt-4 max-[360px]:px-4">
+    <div ref={pageRef} className="space-y-6 px-5 pt-4 max-[360px]:px-4">
       <section
         data-profile-hero
         className="relative overflow-hidden rounded-[1.65rem] border border-border/70 bg-card/80 p-5 shadow-[0_18px_54px_rgba(71,58,42,0.075)] backdrop-blur max-[360px]:p-4"

@@ -1358,7 +1358,7 @@ function AgentConversationPanel({
   });
 
   return (
-    <div className="life-soft-page flex h-[calc(100dvh_-_8.75rem_-_env(safe-area-inset-bottom))] min-h-0 flex-col overflow-hidden bg-background px-4 pt-3 max-[360px]:h-[calc(100dvh_-_8.35rem_-_env(safe-area-inset-bottom))] max-[360px]:px-3">
+    <div className="flex h-[calc(100dvh_-_5.35rem_-_env(safe-area-inset-bottom))] min-h-0 flex-col overflow-hidden px-4 pt-3 max-[360px]:px-3">
       <div className="grid shrink-0 grid-cols-[3rem_minmax(0,1fr)_3rem] items-start gap-2 pb-3">
         <button
           type="button"

@@ -590,8 +590,11 @@ func TestParsePantryPhotoAnalysisAIResponseWarnsWhenShelfLifeMissingProductionDa
 		t.Fatalf("parse pantry photo analysis: %v", err)
 	}
 
-	if parsed.ExpiresAt != "" || parsed.ProductionDate != "" || parsed.ShelfLifeDays != 90 {
-		t.Fatalf("expected shelf life without calculated expiry, got %+v", parsed)
+	if parsed.ExpiresAt != "" || parsed.ProductionDate != "" || parsed.ShelfLifeDays != 0 {
+		t.Fatalf("expected shelf life to be ignored without date anchor, got %+v", parsed)
+	}
+	if len(parsed.DetectedItems) != 1 || parsed.DetectedItems[0].ShelfLifeDays != 0 {
+		t.Fatalf("expected detected item shelf life to be ignored without date anchor, got %+v", parsed.DetectedItems)
 	}
 	if len(parsed.Warnings) != 1 || !strings.Contains(parsed.Warnings[0], "生产日期") {
 		t.Fatalf("expected missing production date warning, got %+v", parsed.Warnings)

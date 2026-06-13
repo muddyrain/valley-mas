@@ -34,6 +34,7 @@ func TestReadPantryPhotoConfigPrefersGemini(t *testing.T) {
 	t.Setenv("GEMINI_API_KEY", "gemini-key")
 	t.Setenv("GEMINI_API_BASE_URL", "https://gemini.example.com/v1beta/")
 	t.Setenv("GEMINI_VISION_MODEL", "gemini-test")
+	t.Setenv("LIFE_TRACE_PANTRY_PHOTO_AI_TIMEOUT_SECONDS", "45")
 	t.Setenv("ARK_API_KEY", "ark-key")
 	t.Setenv("ARK_VISION_MODEL", "ep-vision")
 	t.Setenv("ARK_TEXT_MODEL", "ep-text")
@@ -47,6 +48,9 @@ func TestReadPantryPhotoConfigPrefersGemini(t *testing.T) {
 	}
 	if cfg.BaseURL != "https://gemini.example.com/v1beta" || cfg.Model != "gemini-test" || !cfg.UseVision {
 		t.Fatalf("expected Gemini vision defaults, got %+v", cfg)
+	}
+	if cfg.Timeout != 45*time.Second {
+		t.Fatalf("expected Pantry photo timeout override, got %v", cfg.Timeout)
 	}
 }
 
@@ -62,6 +66,35 @@ func TestReadPantryPhotoConfigFallsBackToARKImageConfig(t *testing.T) {
 	}
 	if cfg.Source != "ark" || cfg.Model != "ep-vision" || !cfg.UseVision {
 		t.Fatalf("expected ARK vision fallback, got %+v", cfg)
+	}
+}
+
+func TestReadPantryPhotoConfigCanForceARKProvider(t *testing.T) {
+	t.Setenv("LIFE_TRACE_PANTRY_PHOTO_AI_PROVIDER", "ark")
+	t.Setenv("GEMINI_API_KEY", "gemini-key")
+	t.Setenv("ARK_API_KEY", "ark-key")
+	t.Setenv("ARK_VISION_MODEL", "ep-vision")
+	t.Setenv("ARK_TEXT_MODEL", "ep-text")
+
+	cfg, errMsg := ReadPantryPhotoConfig(30 * time.Second)
+	if errMsg != "" {
+		t.Fatalf("unexpected error: %s", errMsg)
+	}
+	if cfg.Source != "ark" || cfg.Model != "ep-vision" || !cfg.UseVision {
+		t.Fatalf("expected forced ARK vision config, got %+v", cfg)
+	}
+}
+
+func TestReadPantryPhotoConfigForcedGeminiRequiresKey(t *testing.T) {
+	t.Setenv("LIFE_TRACE_PANTRY_PHOTO_AI_PROVIDER", "gemini")
+	t.Setenv("GEMINI_API_KEY", "")
+	t.Setenv("ARK_API_KEY", "ark-key")
+	t.Setenv("ARK_VISION_MODEL", "ep-vision")
+	t.Setenv("ARK_TEXT_MODEL", "ep-text")
+
+	_, errMsg := ReadPantryPhotoConfig(30 * time.Second)
+	if errMsg != "AI 未配置：缺少 GEMINI_API_KEY" {
+		t.Fatalf("unexpected error message: %q", errMsg)
 	}
 }
 

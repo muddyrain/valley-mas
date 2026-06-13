@@ -174,12 +174,11 @@
   }
 
   .life-soft-tabbar {
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--card) 92%, transparent), var(--card)),
-      linear-gradient(rgba(104, 86, 55, 0.025) 1px, transparent 1px);
-    background-size:
-      auto,
-      22px 22px;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--card) 94%, transparent),
+      var(--card)
+    );
   }
 }
 

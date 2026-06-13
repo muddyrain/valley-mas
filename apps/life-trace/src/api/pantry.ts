@@ -34,7 +34,7 @@ export type PantryThumbnailRequest = {
 
 export type PantryThumbnailResponse = {
   thumbnailUrl: string;
-  source: 'ark' | 'gemini';
+  source: 'ark' | 'gemini' | 'ocr';
   model?: string;
   modelTag?: string;
 };
@@ -90,6 +90,7 @@ export type PantryPhotoAnalysisRequest = {
   imageUrl: string;
   householdId?: string;
   hint?: string;
+  analysisMode?: 'ai' | 'ocr';
   barcodeValue?: string;
   barcodeFormat?: string;
   barcodeSource?: string;

@@ -21,10 +21,7 @@ export const SoftPage = forwardRef<HTMLDivElement, { children: ReactNode; classN
     return (
       <div
         ref={ref}
-        className={cn(
-          'life-soft-page min-w-0 space-y-6 overflow-x-hidden px-5 pt-4 max-[360px]:px-4',
-          className,
-        )}
+        className={cn('min-w-0 space-y-6 overflow-x-hidden px-5 pt-4 max-[360px]:px-4', className)}
       >
         {children}
       </div>

@@ -89,6 +89,21 @@ func ReadImageConfig(defaultTimeout time.Duration) (ImageConfig, string) {
 }
 
 func ReadPantryPhotoConfig(defaultTimeout time.Duration) (ImageConfig, string) {
+	provider := strings.ToLower(strings.TrimSpace(os.Getenv("LIFE_TRACE_PANTRY_PHOTO_AI_PROVIDER")))
+	switch provider {
+	case "", "auto":
+	case "ark":
+		return ReadImageConfig(defaultTimeout)
+	case "gemini":
+		cfg, ok := readGeminiVisionConfig(defaultTimeout)
+		if !ok {
+			return ImageConfig{}, "AI 未配置：缺少 GEMINI_API_KEY"
+		}
+		return cfg, ""
+	default:
+		return ImageConfig{}, "AI 未配置：LIFE_TRACE_PANTRY_PHOTO_AI_PROVIDER 仅支持 auto、gemini、ark"
+	}
+
 	if cfg, ok := readGeminiVisionConfig(defaultTimeout); ok {
 		return cfg, ""
 	}
@@ -180,7 +195,7 @@ func readGeminiVisionConfig(defaultTimeout time.Duration) (ImageConfig, bool) {
 		APIKey:    apiKey,
 		BaseURL:   baseURL,
 		Model:     model,
-		Timeout:   defaultTimeout,
+		Timeout:   parseTimeoutSeconds(firstEnv("LIFE_TRACE_PANTRY_PHOTO_AI_TIMEOUT_SECONDS", "GEMINI_VISION_TIMEOUT_SECONDS"), defaultTimeout),
 		UseVision: true,
 	}, true
 }
@@ -196,6 +211,10 @@ func firstEnv(keys ...string) string {
 }
 
 func parseOpenAITimeout(raw string, fallback time.Duration) time.Duration {
+	return parseTimeoutSeconds(raw, fallback)
+}
+
+func parseTimeoutSeconds(raw string, fallback time.Duration) time.Duration {
 	value := strings.TrimSpace(raw)
 	if value == "" {
 		return fallback
