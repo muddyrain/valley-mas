@@ -7,6 +7,7 @@ import type {
   PantryItem,
   PantryItemStatus,
   PantryOverview,
+  PantrySortMode,
   Trace,
 } from '@/types';
 
@@ -16,6 +17,7 @@ export type ListPantryOptions = {
   householdId?: string;
   status?: PantryItemStatus | 'all';
   category?: PantryItem['category'] | 'all';
+  sort?: PantrySortMode;
   q?: string;
 };
 
@@ -234,6 +236,9 @@ function buildListQuery(options: ListPantryOptions = {}) {
   }
   if (options.category && options.category !== 'all') {
     params.set('category', options.category);
+  }
+  if (options.sort && options.sort !== 'expiry-asc') {
+    params.set('sort', options.sort);
   }
   if (options.q?.trim()) {
     params.set('q', options.q.trim());

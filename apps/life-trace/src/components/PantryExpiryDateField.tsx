@@ -105,6 +105,7 @@ export function PantryExpiryDateField({
 
   useEffect(() => {
     setBaseDate(initialBaseDate);
+    setCustomDays('');
   }, [initialBaseDate]);
 
   const updateBaseDate = (value: string) => {

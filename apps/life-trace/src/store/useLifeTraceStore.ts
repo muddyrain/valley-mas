@@ -309,6 +309,7 @@ const defaultPantryListOptions: ListPantryOptions = {
   pageSize: 20,
   status: 'all',
   category: 'all',
+  sort: 'expiry-asc',
 };
 
 const defaultInboxListOptions: ListInboxOptions = {
@@ -490,6 +491,7 @@ function normalizePantryListOptions(
     householdId: householdId || undefined,
     status: options.status ?? current.status ?? 'all',
     category: options.category ?? current.category ?? 'all',
+    sort: options.sort ?? current.sort ?? 'expiry-asc',
     q: q || undefined,
   };
 }

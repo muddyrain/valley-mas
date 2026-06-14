@@ -39,6 +39,39 @@ export function getPantryDaysUntilExpiry(item: PantryItem, now = new Date()) {
   return Math.round((expiryDate.getTime() - today.getTime()) / DAY_IN_MS);
 }
 
+function formatCalendarDuration(fromDate: Date, toDate: Date) {
+  if (toDate < fromDate) {
+    return formatCalendarDuration(toDate, fromDate);
+  }
+
+  let years = toDate.getFullYear() - fromDate.getFullYear();
+  let months = toDate.getMonth() - fromDate.getMonth();
+  let days = toDate.getDate() - fromDate.getDate();
+
+  if (days < 0) {
+    months -= 1;
+    const previousMonthLastDay = new Date(toDate.getFullYear(), toDate.getMonth(), 0).getDate();
+    days += previousMonthLastDay;
+  }
+
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+
+  const parts: string[] = [];
+  if (years > 0) {
+    parts.push(`${years}年`);
+  }
+  if (months > 0) {
+    parts.push(`${months}个月`);
+  }
+  if (days > 0 || parts.length === 0) {
+    parts.push(`${days}天`);
+  }
+  return parts.join('');
+}
+
 export function resolvePantryStatus(item: PantryItem, now = new Date()): PantryItemStatus {
   if (item.status === 'used-up' || item.status === 'discarded') {
     return item.status;
@@ -96,13 +129,19 @@ export function getPantryExpiryText(item: PantryItem, now = new Date()) {
   if (daysUntilExpiry === null) {
     return '未设置过期日';
   }
+  const today = startOfDay(now);
+  const expiryDate = parsePantryDate(item.expiresAt);
+  const durationText =
+    expiryDate && Math.abs(daysUntilExpiry) >= 30
+      ? formatCalendarDuration(today, expiryDate)
+      : `${Math.abs(daysUntilExpiry)}天`;
   if (daysUntilExpiry < 0) {
-    return `已过期 ${Math.abs(daysUntilExpiry)} 天`;
+    return `已过期${durationText}`;
   }
   if (daysUntilExpiry === 0) {
     return '今天到期';
   }
-  return `${daysUntilExpiry} 天后到期`;
+  return `${durationText}后到期`;
 }
 
 export function getPantryCoverUrl(item: PantryItem) {

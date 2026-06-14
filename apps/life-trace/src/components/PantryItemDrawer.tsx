@@ -75,6 +75,7 @@ type PantryItemDrawerProps = {
   householdId?: string;
   householdName?: string;
   onSaved?: (message: string) => void;
+  onDeleted?: (message: string) => void;
   showTransferAction?: boolean;
   onRequestTransfer?: (item: PantryItem) => void;
 };
@@ -88,6 +89,7 @@ export function PantryItemDrawer({
   householdId,
   householdName,
   onSaved,
+  onDeleted,
   showTransferAction = false,
   onRequestTransfer,
 }: PantryItemDrawerProps) {
@@ -108,11 +110,31 @@ export function PantryItemDrawer({
   const [saveQueuedAfterThumbnail, setSaveQueuedAfterThumbnail] = useState(false);
   const [tagText, setTagText] = useState('');
   const [activePicker, setActivePicker] = useState<'category' | 'location' | null>(null);
+  const [expiryFieldResetKey, setExpiryFieldResetKey] = useState(0);
   const queuedPayloadRef = useRef<NewPantryItemInput | null>(null);
   const editing = Boolean(item);
 
+  const resetNewItemDraft = useCallback(() => {
+    setForm(defaultPantryForm(pantryPreferences));
+    setTagText('');
+    setErrors({});
+    setSubmitting(false);
+    setDeleteConfirmOpen(false);
+    setDeleting(false);
+    setThumbnailGenerating(false);
+    setThumbnailError('');
+    setTransparentCoverTechLabel('');
+    setSaveQueuedAfterThumbnail(false);
+    queuedPayloadRef.current = null;
+    setActivePicker(null);
+    setExpiryFieldResetKey((current) => current + 1);
+  }, [pantryPreferences]);
+
   useEffect(() => {
     if (!open) {
+      if (!item) {
+        resetNewItemDraft();
+      }
       return;
     }
 
@@ -135,9 +157,9 @@ export function PantryItemDrawer({
         },
       });
       setTagText(formatPantryTagText(item.tags));
+      setExpiryFieldResetKey((current) => current + 1);
     } else {
-      setForm(defaultPantryForm(pantryPreferences));
-      setTagText('');
+      resetNewItemDraft();
     }
     setErrors({});
     setSubmitting(false);
@@ -149,7 +171,7 @@ export function PantryItemDrawer({
     setSaveQueuedAfterThumbnail(false);
     queuedPayloadRef.current = null;
     setActivePicker(null);
-  }, [item, open, pantryPreferences]);
+  }, [item, open, pantryPreferences, resetNewItemDraft]);
 
   const updateField = <K extends keyof NewPantryItemInput>(
     key: K,
@@ -228,11 +250,7 @@ export function PantryItemDrawer({
           queuedPayloadRef.current = null;
           setSaveQueuedAfterThumbnail(false);
           if (!item) {
-            setForm(defaultPantryForm(pantryPreferences));
-            setErrors({});
-            setThumbnailError('');
-            setTransparentCoverTechLabel('');
-            setTagText('');
+            resetNewItemDraft();
           }
           onOpenChange(false);
           onSaved?.(`${editing ? '已更新' : '已保存'}「${saved.name}」库存`);
@@ -249,7 +267,7 @@ export function PantryItemDrawer({
       item,
       onOpenChange,
       onSaved,
-      pantryPreferences,
+      resetNewItemDraft,
     ],
   );
 
@@ -344,18 +362,15 @@ export function PantryItemDrawer({
 
     setDeleteConfirmOpen(false);
     onOpenChange(false);
-    onSaved?.(`已删除「${item.name}」库存`);
+    const message = `已删除「${item.name}」库存`;
+    if (onDeleted) {
+      onDeleted(message);
+    } else {
+      onSaved?.(message);
+    }
   };
 
-  const clearNewItemDraft = () => {
-    setForm(defaultPantryForm(pantryPreferences));
-    setTagText('');
-    setErrors({});
-    setThumbnailError('');
-    setTransparentCoverTechLabel('');
-    setSaveQueuedAfterThumbnail(false);
-    queuedPayloadRef.current = null;
-  };
+  const clearNewItemDraft = resetNewItemDraft;
 
   useEffect(() => {
     if (
@@ -461,6 +476,7 @@ export function PantryItemDrawer({
               />
             </FormItem>
             <PantryExpiryDateField
+              key={expiryFieldResetKey}
               idPrefix="pantry-item"
               expiresAt={form.expiresAt || ''}
               disabled={submitting}

@@ -101,6 +101,12 @@ var validPantryStatuses = map[string]bool{
 	"discarded": true,
 }
 
+var validPantrySorts = map[string]bool{
+	"expiry-asc":   true,
+	"created-desc": true,
+	"expiry-desc":  true,
+}
+
 func normalizePantryCategory(category string) string {
 	category = strings.TrimSpace(category)
 	if !validPantryCategories[category] {
@@ -146,6 +152,14 @@ func normalizePantryStatus(status string) string {
 		return "normal"
 	}
 	return status
+}
+
+func normalizePantrySort(sort string) string {
+	sort = strings.TrimSpace(sort)
+	if !validPantrySorts[sort] {
+		return "expiry-asc"
+	}
+	return sort
 }
 
 func normalizePantryDate(value string) string {
@@ -389,7 +403,20 @@ func applyPantryListFilters(query *gorm.DB, c *gin.Context) *gorm.DB {
 	return query
 }
 
-func applyPantryListOrdering(query *gorm.DB, now time.Time) *gorm.DB {
+func applyPantryListOrdering(query *gorm.DB, now time.Time, sort string) *gorm.DB {
+	switch normalizePantrySort(sort) {
+	case "created-desc":
+		return query.
+			Order("created_at DESC").
+			Order("updated_at DESC")
+	case "expiry-desc":
+		return query.
+			Order(clause.Expr{SQL: "CASE WHEN expires_at = '' OR expires_at IS NULL THEN 1 ELSE 0 END"}).
+			Order("expires_at DESC").
+			Order("updated_at DESC").
+			Order("created_at DESC")
+	}
+
 	today, expiringDeadline := pantryDerivedDateBounds(now)
 	priorityExpr := clause.Expr{
 		SQL: `
@@ -459,7 +486,7 @@ func (h *Handler) ListPantryItems(c *gin.Context) {
 	}
 
 	var items []model.LifeTracePantryItem
-	if err := applyPantryListOrdering(baseQuery, now).
+	if err := applyPantryListOrdering(baseQuery, now, c.Query("sort")).
 		Limit(pageSize).
 		Offset(offset).
 		Find(&items).Error; err != nil {

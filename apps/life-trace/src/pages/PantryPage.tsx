@@ -2,6 +2,7 @@ import {
   Apple,
   Archive,
   BadgeAlert,
+  CalendarClock,
   Camera,
   Check,
   ClipboardList,
@@ -37,13 +38,12 @@ import {
   getPantryCoverUrl,
   getPantryExpiryText,
   getPantryStatusLabel,
-  getPantryStatusTone,
   resolvePantryStatus,
 } from '@/lib/pantry';
 import { cn } from '@/lib/utils';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { PantryCategory, PantryItem, PantryItemStatus } from '@/types';
+import type { PantryCategory, PantryItem, PantryItemStatus, PantrySortMode } from '@/types';
 
 const statusFilters: Array<{ id: PantryItemStatus | 'all'; label: string }> = [
   { id: 'all', label: '在库' },
@@ -60,6 +60,12 @@ const categoryFilters: Array<PantryCategory | 'all'> = [
   '药品',
   '宠物',
   '其他',
+];
+
+const sortOptions: Array<{ id: PantrySortMode; label: string }> = [
+  { id: 'expiry-asc', label: '快过期' },
+  { id: 'created-desc', label: '录入时间' },
+  { id: 'expiry-desc', label: '保质期最长' },
 ];
 
 const categoryIconMap = {
@@ -92,11 +98,20 @@ function readQueryText(params: URLSearchParams) {
   return params.get('q')?.trim() ?? '';
 }
 
+function readSortMode(params: URLSearchParams): PantrySortMode {
+  const value = params.get('sort');
+  if (value && sortOptions.some((item) => item.id === value)) {
+    return value as PantrySortMode;
+  }
+  return 'expiry-asc';
+}
+
 function updateSearchParams(
   current: URLSearchParams,
   updates: {
     status?: PantryItemStatus | 'all';
     category?: PantryCategory | 'all';
+    sort?: PantrySortMode;
     q?: string;
   },
 ) {
@@ -115,6 +130,14 @@ function updateSearchParams(
       next.delete('category');
     } else {
       next.set('category', updates.category);
+    }
+  }
+
+  if (updates.sort !== undefined) {
+    if (updates.sort === 'expiry-asc') {
+      next.delete('sort');
+    } else {
+      next.set('sort', updates.sort);
     }
   }
 
@@ -237,6 +260,9 @@ export function PantryPage() {
   const [categoryFilter, setCategoryFilter] = useState<PantryCategory | 'all'>(() =>
     readCategoryFilter(new URLSearchParams(window.location.search)),
   );
+  const [sortMode, setSortMode] = useState<PantrySortMode>(() =>
+    readSortMode(new URLSearchParams(window.location.search)),
+  );
   const [searchQuery, setSearchQuery] = useState(() =>
     readQueryText(new URLSearchParams(window.location.search)),
   );
@@ -251,6 +277,8 @@ export function PantryPage() {
   const effectiveHouseholdId = preferredPantryHouseholdId || pantryResolvedHouseholdId;
   const currentHouseholdName =
     pantryResolvedHouseholdName || preferredPantryHouseholdName || '当前空间';
+  const currentSortLabel =
+    sortOptions.find((option) => option.id === sortMode)?.label ?? sortOptions[0].label;
   const selectedItems = useMemo(
     () => pantryList.filter((item) => selectedItemIds.includes(item.id)),
     [pantryList, selectedItemIds],
@@ -295,6 +323,7 @@ export function PantryPage() {
     (updates: {
       status?: PantryItemStatus | 'all';
       category?: PantryCategory | 'all';
+      sort?: PantrySortMode;
       q?: string;
     }) => {
       const current = latestSearchParamsRef.current;
@@ -313,10 +342,12 @@ export function PantryPage() {
   useEffect(() => {
     const nextStatus = readStatusFilter(searchParams);
     const nextCategory = readCategoryFilter(searchParams);
+    const nextSort = readSortMode(searchParams);
     const nextQuery = readQueryText(searchParams);
 
     setStatusFilter((current) => (current === nextStatus ? current : nextStatus));
     setCategoryFilter((current) => (current === nextCategory ? current : nextCategory));
+    setSortMode((current) => (current === nextSort ? current : nextSort));
     setSearchQuery((current) => (current === nextQuery ? current : nextQuery));
     setDebouncedSearchQuery((current) => (current === nextQuery ? current : nextQuery));
   }, [searchParams]);
@@ -336,9 +367,10 @@ export function PantryPage() {
       householdId: preferredPantryHouseholdId || undefined,
       status: statusFilter,
       category: categoryFilter,
+      sort: sortMode,
       q: debouncedSearchQuery.trim() || undefined,
     }),
-    [categoryFilter, debouncedSearchQuery, preferredPantryHouseholdId, statusFilter],
+    [categoryFilter, debouncedSearchQuery, preferredPantryHouseholdId, sortMode, statusFilter],
   );
 
   const loadMorePantryItems = useCallback(async () => {
@@ -715,6 +747,7 @@ export function PantryPage() {
                   ? '只看在库条目'
                   : `状态：${getPantryStatusLabel(statusFilter)}`}
                 {categoryFilter === 'all' ? ' · 全部分类' : ` · 分类：${categoryFilter}`}
+                {` · ${currentSortLabel}`}
               </p>
             </div>
             {statusFilter !== 'all' || categoryFilter !== 'all' || searchQuery.trim() ? (
@@ -782,6 +815,31 @@ export function PantryPage() {
                     aria-pressed={active}
                   >
                     {category === 'all' ? '全部分类' : category}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <span className="shrink-0 text-xs font-semibold text-muted-foreground">排序</span>
+              {sortOptions.map((option) => {
+                const active = sortMode === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={cn(
+                      'h-9 shrink-0 rounded-full border px-3 text-xs font-semibold transition',
+                      active
+                        ? 'border-life-health/45 bg-life-health/10 text-life-health'
+                        : 'border-border bg-secondary text-muted-foreground hover:text-foreground',
+                    )}
+                    onClick={() => {
+                      setSortMode(option.id);
+                      syncUrlState({ sort: option.id });
+                    }}
+                    aria-pressed={active}
+                  >
+                    {option.label}
                   </button>
                 );
               })}
@@ -912,7 +970,7 @@ export function PantryPage() {
                   <Card
                     key={item.id}
                     className={cn(
-                      'overflow-hidden p-0',
+                      'overflow-hidden rounded-[1.6rem] border-border/80 bg-card/95 p-0 shadow-sm shadow-background/25 transition hover:border-life-health/25 hover:shadow-[0_14px_36px_rgba(71,58,42,0.08)]',
                       status === 'discarded' && 'border-border/70 bg-secondary/20',
                       status === 'used-up' && 'border-border/80 bg-secondary/10',
                     )}
@@ -920,7 +978,7 @@ export function PantryPage() {
                     <button
                       type="button"
                       className={cn(
-                        'flex w-full items-start gap-0 text-left',
+                        'flex w-full items-stretch gap-3 p-3 text-left',
                         status === 'discarded' && 'opacity-80',
                         selectionMode && selectedItemIds.includes(item.id) && 'bg-life-ai/5',
                       )}
@@ -932,7 +990,7 @@ export function PantryPage() {
                         navigate(`/pantry/${item.id}`);
                       }}
                     >
-                      <div className="grid h-44 w-26 shrink-0 place-items-center bg-secondary max-[360px]:h-40 max-[360px]:w-24">
+                      <div className="grid h-32 w-[6.75rem] shrink-0 place-items-center overflow-hidden rounded-[1.25rem] border border-border/70 bg-secondary/70 max-[360px]:h-[7.5rem] max-[360px]:w-24">
                         {coverUrl ? (
                           <img
                             src={coverUrl}
@@ -943,33 +1001,41 @@ export function PantryPage() {
                             )}
                           />
                         ) : (
-                          <div className="grid size-14 place-items-center rounded-3xl bg-life-ai/10 text-life-ai">
-                            <Icon className="size-7" />
+                          <div className="grid size-14 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+                            <Icon className="size-6" />
                           </div>
                         )}
                       </div>
-                      <div className="min-w-0 flex-1 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge tone={getPantryStatusTone(status)}>
+                      <div className="flex min-w-0 flex-1 flex-col py-0.5">
+                        <div className="min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                              <span
+                                className={cn(
+                                  'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                  status === 'expired'
+                                    ? 'bg-life-alert/10 text-life-alert'
+                                    : status === 'expiring'
+                                      ? 'bg-life-health/10 text-life-health'
+                                      : 'bg-life-trace/10 text-life-trace',
+                                )}
+                              >
                                 {getPantryStatusLabel(status)}
-                              </Badge>
-                              <Badge tone="default">{item.category}</Badge>
+                              </span>
+                              <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                                {item.category}
+                              </span>
+                              {!selectionMode && hasSeparateCover ? (
+                                <span className="inline-flex items-center rounded-full bg-life-ai/10 px-2 py-0.5 text-[11px] font-semibold text-life-ai">
+                                  <Sparkles className="mr-1 size-3" />
+                                  AI 图
+                                </span>
+                              ) : null}
                             </div>
-                            <h3 className="mt-2 truncate text-base font-semibold">{item.name}</h3>
-                          </div>
-                          <div className="flex shrink-0 items-start gap-2">
-                            {!selectionMode && hasSeparateCover ? (
-                              <Badge tone="ai">
-                                <Sparkles className="mr-1 size-3.5" />
-                                AI 图
-                              </Badge>
-                            ) : null}
                             {selectionMode ? (
                               <div
                                 className={cn(
-                                  'mt-1 grid size-5 place-items-center rounded-md border',
+                                  'grid size-5 shrink-0 place-items-center rounded-md border',
                                   selectedItemIds.includes(item.id)
                                     ? 'border-life-ai bg-life-ai text-background'
                                     : 'border-border bg-card text-transparent',
@@ -979,34 +1045,43 @@ export function PantryPage() {
                               </div>
                             ) : null}
                           </div>
+                          <h3 className="mt-2 line-clamp-2 text-base font-semibold leading-snug">
+                            {item.name}
+                          </h3>
                         </div>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          {item.location} · {item.quantity}
-                          {item.unit}
-                        </p>
-                        <p
-                          className={cn(
-                            'mt-1 text-sm',
-                            status === 'expired'
-                              ? 'text-life-alert'
-                              : status === 'expiring'
-                                ? 'text-life-health'
-                                : 'text-muted-foreground',
-                          )}
-                        >
-                          {getPantryExpiryText(item)}
-                        </p>
+                        <div className="mt-2 grid gap-1.5 text-xs text-muted-foreground">
+                          <span className="inline-flex min-w-0 items-center gap-1.5">
+                            <Home className="size-3.5 shrink-0 text-life-trace" />
+                            <span className="truncate">
+                              {item.location} · {item.quantity}
+                              {item.unit}
+                            </span>
+                          </span>
+                          <span
+                            className={cn(
+                              'inline-flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold',
+                              status === 'expired'
+                                ? 'bg-life-alert/10 text-life-alert'
+                                : status === 'expiring'
+                                  ? 'bg-life-health/10 text-life-health'
+                                  : 'bg-secondary text-muted-foreground',
+                            )}
+                          >
+                            <CalendarClock className="size-3.5 shrink-0" />
+                            <span className="truncate">{getPantryExpiryText(item)}</span>
+                          </span>
+                        </div>
                         {item.note ? (
                           <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
                             {item.note}
                           </p>
                         ) : null}
                         {item.tags.length > 0 ? (
-                          <div className="mt-3 flex flex-wrap gap-1.5">
+                          <div className="mt-auto flex flex-wrap gap-1.5 pt-2">
                             {item.tags.slice(0, 3).map((tag) => (
                               <span
                                 key={tag}
-                                className="rounded-full border border-life-trace/20 bg-life-trace/8 px-2 py-0.5 text-[11px] font-medium text-life-trace"
+                                className="rounded-full border border-life-trace/15 bg-life-trace/8 px-2 py-0.5 text-[11px] font-medium text-life-trace"
                               >
                                 {tag}
                               </span>
@@ -1016,21 +1091,21 @@ export function PantryPage() {
                       </div>
                     </button>
                     {selectionMode ? (
-                      <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+                      <div className="border-t border-border/70 px-4 py-3 text-xs text-muted-foreground">
                         {selectedItemIds.includes(item.id)
                           ? '已加入本次批量转移。'
                           : '点这张卡片即可加入本次批量转移。'}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-4 gap-px border-t border-border bg-border/60">
+                      <div className="grid grid-cols-4 border-t border-border/70 bg-card/80">
                         <button
                           type="button"
                           disabled={consumeDisabled}
                           className={cn(
-                            'flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
+                            'flex h-12 items-center justify-center gap-1.5 border-r border-border/60 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-55',
                             status === 'used-up'
                               ? 'text-muted-foreground'
-                              : 'text-life-trace hover:bg-life-trace/10',
+                              : 'text-life-trace hover:bg-life-trace/8',
                           )}
                           onClick={() => void handleConsumeAction(item, 'used', 1)}
                         >
@@ -1039,7 +1114,7 @@ export function PantryPage() {
                           ) : (
                             <StatusActionIcon className="size-4" />
                           )}
-                          <span className="min-w-10 whitespace-nowrap text-center">
+                          <span className="whitespace-nowrap">
                             {status === 'used-up' ? '已用完' : item.quantity > 1 ? '用 1' : '用完'}
                           </span>
                         </button>
@@ -1047,10 +1122,10 @@ export function PantryPage() {
                           type="button"
                           disabled={discardedDisabled || processPending}
                           className={cn(
-                            'flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
+                            'flex h-12 items-center justify-center gap-1.5 border-r border-border/60 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-55',
                             status === 'discarded'
                               ? 'text-muted-foreground'
-                              : 'text-life-alert hover:bg-life-alert/10',
+                              : 'text-life-alert hover:bg-life-alert/8',
                           )}
                           onClick={() => openConsumeSheet(item)}
                         >
@@ -1059,14 +1134,14 @@ export function PantryPage() {
                           ) : (
                             <Settings2 className="size-4" />
                           )}
-                          <span className="min-w-10 whitespace-nowrap text-center">
+                          <span className="whitespace-nowrap">
                             {status === 'discarded' ? '已丢弃' : '处理'}
                           </span>
                         </button>
                         <button
                           type="button"
                           disabled={actionPending}
-                          className="flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold text-life-ai transition hover:bg-life-ai/10 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="flex h-12 items-center justify-center gap-1.5 border-r border-border/60 text-xs font-semibold text-life-ai transition hover:bg-life-ai/8 disabled:cursor-not-allowed disabled:opacity-55"
                           onClick={() => {
                             setEditingItem(item);
                             setDrawerOpen(true);
@@ -1077,7 +1152,7 @@ export function PantryPage() {
                         </button>
                         <button
                           type="button"
-                          className="flex h-11 items-center justify-center gap-2 bg-card text-sm font-semibold text-life-health transition hover:bg-life-health/10"
+                          className="flex h-12 items-center justify-center gap-1.5 text-xs font-semibold text-life-health transition hover:bg-life-health/8"
                           onClick={() => {
                             const params = new URLSearchParams({
                               new: '1',
@@ -1262,7 +1337,12 @@ export function PantryPage() {
 
         <PantryItemDrawer
           open={drawerOpen}
-          onOpenChange={setDrawerOpen}
+          onOpenChange={(nextOpen) => {
+            setDrawerOpen(nextOpen);
+            if (!nextOpen) {
+              setEditingItem(null);
+            }
+          }}
           item={editingItem}
           householdId={effectiveHouseholdId || undefined}
           householdName={currentHouseholdName}

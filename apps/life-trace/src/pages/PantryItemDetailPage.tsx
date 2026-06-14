@@ -579,6 +579,11 @@ export function PantryItemDetailPage() {
             householdName={household?.name}
             showTransferAction={transferSupported}
             onRequestTransfer={() => setTransferOpen(true)}
+            onDeleted={(message) => {
+              showToast(message, 'success');
+              void loadPantryList({ householdId: preferredPantryHouseholdId || undefined });
+              navigate('/pantry', { replace: true });
+            }}
             onSaved={(message) => {
               showToast(message, 'success');
               void refreshDetail();

@@ -559,6 +559,7 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 	expiringDate := today.AddDate(0, 0, 2).Format("2006-01-02")
 	expiredDate := today.AddDate(0, 0, -1).Format("2006-01-02")
 	normalDate := today.AddDate(0, 0, 15).Format("2006-01-02")
+	baseCreatedAt := time.Now().Add(-4 * time.Hour)
 
 	seedItems := []model.LifeTracePantryItem{
 		{
@@ -574,6 +575,8 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 			ReminderUseDefault: true,
 			ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
 			ReminderTime:       "09:00",
+			CreatedAt:          baseCreatedAt,
+			UpdatedAt:          baseCreatedAt,
 		},
 		{
 			UserID:             101,
@@ -588,6 +591,8 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 			ReminderUseDefault: true,
 			ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
 			ReminderTime:       "09:00",
+			CreatedAt:          baseCreatedAt.Add(time.Hour),
+			UpdatedAt:          baseCreatedAt.Add(time.Hour),
 		},
 		{
 			UserID:             101,
@@ -602,6 +607,8 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 			ReminderUseDefault: true,
 			ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
 			ReminderTime:       "09:00",
+			CreatedAt:          baseCreatedAt.Add(2 * time.Hour),
+			UpdatedAt:          baseCreatedAt.Add(2 * time.Hour),
 		},
 		{
 			UserID:             101,
@@ -616,6 +623,8 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 			ReminderUseDefault: true,
 			ReminderRules:      model.StringList{"7d", "3d", "same-day", "expired"},
 			ReminderTime:       "09:00",
+			CreatedAt:          baseCreatedAt.Add(3 * time.Hour),
+			UpdatedAt:          baseCreatedAt.Add(3 * time.Hour),
 		},
 	}
 	for _, item := range seedItems {
@@ -656,6 +665,33 @@ func TestListPantrySupportsDerivedStatusFiltersAndPagination(t *testing.T) {
 	if pageList[0].(map[string]interface{})["name"] != "过期酸奶" || pageList[1].(map[string]interface{})["name"] != "临期鸡蛋" {
 		t.Fatalf("expected pantry list to prioritize expired then expiring items, got %+v", pageList)
 	}
+
+	createdReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?page=1&pageSize=2&sort=created-desc", nil)
+	createdResp := httptest.NewRecorder()
+	router.ServeHTTP(createdResp, createdReq)
+
+	createdData := decodeTracePayload(t, createdResp)["data"].(map[string]interface{})
+	createdList := createdData["list"].([]interface{})
+	if len(createdList) != 2 {
+		t.Fatalf("expected created sort first page to contain 2 items, got %+v", createdList)
+	}
+	if createdList[0].(map[string]interface{})["name"] != "大米" || createdList[1].(map[string]interface{})["name"] != "临期鸡蛋" {
+		t.Fatalf("expected created sort to prioritize latest active items, got %+v", createdList)
+	}
+
+	expiryDescReq := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/pantry?page=1&pageSize=3&sort=expiry-desc", nil)
+	expiryDescResp := httptest.NewRecorder()
+	router.ServeHTTP(expiryDescResp, expiryDescReq)
+
+	expiryDescData := decodeTracePayload(t, expiryDescResp)["data"].(map[string]interface{})
+	expiryDescList := expiryDescData["list"].([]interface{})
+	if len(expiryDescList) != 3 {
+		t.Fatalf("expected expiry desc sort to contain 3 items, got %+v", expiryDescList)
+	}
+	if expiryDescList[0].(map[string]interface{})["name"] != "大米" || expiryDescList[2].(map[string]interface{})["name"] != "过期酸奶" {
+		t.Fatalf("expected expiry desc sort to prioritize longest expiry, got %+v", expiryDescList)
+	}
+
 	pagination := pageData["pagination"].(map[string]interface{})
 	if pagination["total"] != float64(3) || pagination["hasMore"] != true {
 		t.Fatalf("expected pagination metadata for remaining items, got %+v", pagination)

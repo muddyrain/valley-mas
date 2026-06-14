@@ -73,6 +73,8 @@ export type PantryReminderRule = '7d' | '3d' | 'same-day' | 'expired';
 
 export type PantryItemStatus = 'normal' | 'expiring' | 'expired' | 'used-up' | 'discarded';
 
+export type PantrySortMode = 'expiry-asc' | 'created-desc' | 'expiry-desc';
+
 export type PantryReminderConfig = {
   enabled: boolean;
   useDefault: boolean;
