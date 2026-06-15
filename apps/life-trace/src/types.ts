@@ -128,6 +128,8 @@ export type ClosetWarmthLevel = '轻薄' | '常规' | '保暖' | '厚重';
 export type ClosetSeason = '春' | '夏' | '秋' | '冬' | '四季';
 
 export type ClosetItemStatus = 'active' | 'laundry' | 'archived';
+export type ClosetCareMethod = '机洗' | '手洗' | '干洗' | '通风';
+export type ClosetPreferenceLevel = 'neutral' | 'favorite' | 'avoid';
 
 export type ClosetItem = {
   id: string;
@@ -143,6 +145,10 @@ export type ClosetItem = {
   imageUrl?: string;
   shared: boolean;
   note: string;
+  careMethod?: ClosetCareMethod;
+  careIntervalWears?: number;
+  lastCareDate?: string;
+  preferenceLevel?: ClosetPreferenceLevel;
   createdBy?: string;
   updatedBy?: string;
   createdAt?: string;

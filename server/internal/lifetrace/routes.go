@@ -118,6 +118,7 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			closet.POST("/items", handler.CreateClosetItem)
 			closet.GET("/items/:id", handler.GetClosetItem)
 			closet.PATCH("/items/:id", handler.UpdateClosetItem)
+			closet.PATCH("/items/:id/care", handler.UpdateClosetItemCare)
 			closet.DELETE("/items/:id", handler.DeleteClosetItem)
 			closet.GET("/outfits", handler.ListOutfits)
 			closet.POST("/outfits", handler.CreateOutfit)

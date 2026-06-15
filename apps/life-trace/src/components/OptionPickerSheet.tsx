@@ -19,6 +19,8 @@ type OptionPickerSheetProps<T extends string> = {
   onSelect: (value: T) => void;
 };
 
+export const OPTION_PICKER_Z_INDEX_CLASS = 'z-[80]';
+
 export function OptionPickerSheet<T extends string>({
   open,
   title,
@@ -33,7 +35,7 @@ export function OptionPickerSheet<T extends string>({
       open={open}
       onOpenChange={onOpenChange}
       overlayLabel={`关闭${title}选择器`}
-      zIndexClassName="z-[70]"
+      zIndexClassName={OPTION_PICKER_Z_INDEX_CLASS}
     >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">

@@ -20,17 +20,25 @@ import (
 )
 
 type closetItemRequest struct {
-	Name        string   `json:"name"`
-	Category    string   `json:"category"`
-	Color       string   `json:"color"`
-	Material    string   `json:"material"`
-	WarmthLevel string   `json:"warmthLevel"`
-	Seasons     []string `json:"seasons"`
-	SceneTags   []string `json:"sceneTags"`
-	Status      string   `json:"status"`
-	ImageURL    string   `json:"imageUrl"`
-	Shared      bool     `json:"shared"`
-	Note        string   `json:"note"`
+	Name              string   `json:"name"`
+	Category          string   `json:"category"`
+	Color             string   `json:"color"`
+	Material          string   `json:"material"`
+	WarmthLevel       string   `json:"warmthLevel"`
+	Seasons           []string `json:"seasons"`
+	SceneTags         []string `json:"sceneTags"`
+	Status            string   `json:"status"`
+	ImageURL          string   `json:"imageUrl"`
+	Shared            bool     `json:"shared"`
+	Note              string   `json:"note"`
+	CareMethod        string   `json:"careMethod"`
+	CareIntervalWears int      `json:"careIntervalWears"`
+	LastCareDate      string   `json:"lastCareDate"`
+	PreferenceLevel   string   `json:"preferenceLevel"`
+}
+
+type closetItemCareRequest struct {
+	LastCareDate string `json:"lastCareDate"`
 }
 
 type outfitRequest struct {
@@ -113,6 +121,15 @@ type outfitSuggestionAIResponse struct {
 type closetItemWearStats struct {
 	WornCount    int    `json:"wornCount"`
 	LastWornDate string `json:"lastWornDate,omitempty"`
+	IdleDays     int    `json:"idleDays,omitempty"`
+	IdleLevel    string `json:"idleLevel,omitempty"`
+}
+
+type closetItemCareStats struct {
+	WornCountSinceCare int    `json:"wornCountSinceCare"`
+	CareStatus         string `json:"careStatus"`
+	DueInWears         int    `json:"dueInWears,omitempty"`
+	OverdueWears       int    `json:"overdueWears,omitempty"`
 }
 
 var validClosetCategories = map[string]bool{
@@ -145,6 +162,19 @@ var validClosetStatuses = map[string]bool{
 	"active":   true,
 	"laundry":  true,
 	"archived": true,
+}
+
+var validClosetCareMethods = map[string]bool{
+	"机洗": true,
+	"手洗": true,
+	"干洗": true,
+	"通风": true,
+}
+
+var validClosetPreferenceLevels = map[string]bool{
+	"neutral":  true,
+	"favorite": true,
+	"avoid":    true,
 }
 
 var validOutfitStatuses = map[string]bool{
@@ -225,6 +255,32 @@ func normalizeClosetStatus(value string) string {
 	return value
 }
 
+func normalizeClosetCareMethod(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || !validClosetCareMethods[value] {
+		return ""
+	}
+	return value
+}
+
+func normalizeClosetCareIntervalWears(value int) int {
+	if value < 0 {
+		return 0
+	}
+	if value > 30 {
+		return 30
+	}
+	return value
+}
+
+func normalizeClosetPreferenceLevel(value string) string {
+	value = strings.TrimSpace(value)
+	if !validClosetPreferenceLevels[value] {
+		return "neutral"
+	}
+	return value
+}
+
 func normalizeOutfitStatus(value string) string {
 	value = strings.TrimSpace(value)
 	if !validOutfitStatuses[value] {
@@ -297,10 +353,16 @@ func (h *Handler) ListClosetItems(c *gin.Context) {
 		return
 	}
 
+	wearStatsByItemID, err := loadClosetWearStats(userID, householdCtx)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "获取衣橱失败")
+		return
+	}
+
 	success(c, gin.H{
 		"householdId":   householdCtx.Household.ID,
 		"householdName": householdCtx.Household.Name,
-		"list":          items,
+		"list":          buildClosetListResponseItems(items, wearStatsByItemID),
 		"pagination":    buildListPagination(page, pageSize, total),
 		"summary":       buildClosetItemSummary(items, total),
 	})
@@ -378,7 +440,7 @@ func (h *Handler) GetClosetItem(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "读取衣物失败")
 		return
 	}
-	wearStats, err := buildClosetItemWearStats(userID, householdCtx, item.ID)
+	wearStats, err := buildClosetItemWearStats(userID, householdCtx, item)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "读取衣物失败")
 		return
@@ -387,6 +449,7 @@ func (h *Handler) GetClosetItem(c *gin.Context) {
 		"item":      item,
 		"household": householdSummaryFromContext(householdCtx, memberCount),
 		"wearStats": wearStats,
+		"careStats": buildClosetItemCareStats(item),
 	})
 }
 
@@ -412,21 +475,25 @@ func (h *Handler) CreateClosetItem(c *gin.Context) {
 	}
 	shared := req.Shared && householdCtx.Household.Kind == householdKindShared
 	item := model.LifeTraceClosetItem{
-		UserID:      userID,
-		HouseholdID: householdCtx.Household.ID,
-		Name:        trimRunes(name, 160),
-		Category:    normalizeClosetCategory(req.Category),
-		Color:       normalizeClosetColor(req.Color),
-		Material:    trimRunes(strings.TrimSpace(req.Material), 80),
-		WarmthLevel: normalizeClosetWarmthLevel(req.WarmthLevel),
-		Seasons:     normalizeClosetSeasons(req.Seasons),
-		SceneTags:   normalizeClosetSceneTags(req.SceneTags),
-		Status:      normalizeClosetStatus(req.Status),
-		ImageURL:    strings.TrimSpace(req.ImageURL),
-		Shared:      shared,
-		Note:        strings.TrimSpace(req.Note),
-		CreatedBy:   userID,
-		UpdatedBy:   userID,
+		UserID:            userID,
+		HouseholdID:       householdCtx.Household.ID,
+		Name:              trimRunes(name, 160),
+		Category:          normalizeClosetCategory(req.Category),
+		Color:             normalizeClosetColor(req.Color),
+		Material:          trimRunes(strings.TrimSpace(req.Material), 80),
+		WarmthLevel:       normalizeClosetWarmthLevel(req.WarmthLevel),
+		Seasons:           normalizeClosetSeasons(req.Seasons),
+		SceneTags:         normalizeClosetSceneTags(req.SceneTags),
+		Status:            normalizeClosetStatus(req.Status),
+		ImageURL:          strings.TrimSpace(req.ImageURL),
+		Shared:            shared,
+		Note:              strings.TrimSpace(req.Note),
+		CareMethod:        normalizeClosetCareMethod(req.CareMethod),
+		CareIntervalWears: normalizeClosetCareIntervalWears(req.CareIntervalWears),
+		LastCareDate:      normalizeClosetDate(req.LastCareDate),
+		PreferenceLevel:   normalizeClosetPreferenceLevel(req.PreferenceLevel),
+		CreatedBy:         userID,
+		UpdatedBy:         userID,
 	}
 	if err := database.GetDB().Create(&item).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "创建衣物失败")
@@ -466,21 +533,65 @@ func (h *Handler) UpdateClosetItem(c *gin.Context) {
 	}
 	shared := req.Shared && householdCtx.Household.Kind == householdKindShared
 	updates := map[string]interface{}{
-		"name":         trimRunes(name, 160),
-		"category":     normalizeClosetCategory(req.Category),
-		"color":        normalizeClosetColor(req.Color),
-		"material":     trimRunes(strings.TrimSpace(req.Material), 80),
-		"warmth_level": normalizeClosetWarmthLevel(req.WarmthLevel),
-		"seasons":      normalizeClosetSeasons(req.Seasons),
-		"scene_tags":   normalizeClosetSceneTags(req.SceneTags),
-		"status":       normalizeClosetStatus(req.Status),
-		"image_url":    strings.TrimSpace(req.ImageURL),
-		"shared":       shared,
-		"note":         strings.TrimSpace(req.Note),
-		"updated_by":   userID,
+		"name":                trimRunes(name, 160),
+		"category":            normalizeClosetCategory(req.Category),
+		"color":               normalizeClosetColor(req.Color),
+		"material":            trimRunes(strings.TrimSpace(req.Material), 80),
+		"warmth_level":        normalizeClosetWarmthLevel(req.WarmthLevel),
+		"seasons":             normalizeClosetSeasons(req.Seasons),
+		"scene_tags":          normalizeClosetSceneTags(req.SceneTags),
+		"status":              normalizeClosetStatus(req.Status),
+		"image_url":           strings.TrimSpace(req.ImageURL),
+		"shared":              shared,
+		"note":                strings.TrimSpace(req.Note),
+		"care_method":         normalizeClosetCareMethod(req.CareMethod),
+		"care_interval_wears": normalizeClosetCareIntervalWears(req.CareIntervalWears),
+		"last_care_date":      normalizeClosetDate(req.LastCareDate),
+		"preference_level":    normalizeClosetPreferenceLevel(req.PreferenceLevel),
+		"updated_by":          userID,
 	}
 	if err := database.GetDB().Model(&item).Updates(updates).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "更新衣物失败")
+		return
+	}
+	if err := database.GetDB().First(&item, "id = ?", item.ID).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "读取衣物失败")
+		return
+	}
+	success(c, item)
+}
+
+func (h *Handler) UpdateClosetItemCare(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		fail(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+	item, householdCtx, found := findAccessibleClosetItem(c.Param("id"), userID)
+	if !found {
+		fail(c, http.StatusNotFound, "衣物不存在")
+		return
+	}
+	if item.UserID != userID && householdCtx.Member.Role == householdRoleMember {
+		fail(c, http.StatusForbidden, "无权编辑这件衣物")
+		return
+	}
+	var req closetItemCareRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	lastCareDate := normalizeClosetDate(req.LastCareDate)
+	if lastCareDate == "" {
+		fail(c, http.StatusBadRequest, "洗护日期不能为空")
+		return
+	}
+	if err := database.GetDB().Model(&item).Updates(map[string]any{
+		"last_care_date": lastCareDate,
+		"status":         "active",
+		"updated_by":     userID,
+	}).Error; err != nil {
+		fail(c, http.StatusInternalServerError, "更新洗护失败")
 		return
 	}
 	if err := database.GetDB().First(&item, "id = ?", item.ID).Error; err != nil {
@@ -1059,6 +1170,12 @@ func scoreClosetItemForSuggestion(item model.LifeTraceClosetItem, req outfitSugg
 	if strings.Contains(req.WeatherText, "雨") && (item.Category == "外套" || item.Category == "鞋履") {
 		score += 4
 	}
+	switch item.PreferenceLevel {
+	case "favorite":
+		score += 10
+	case "avoid":
+		score -= 8
+	}
 	return score
 }
 
@@ -1181,7 +1298,49 @@ func parseOutfitSuggestionAIResponse(raw string, items []model.LifeTraceClosetIt
 	return result, nil
 }
 
-func buildClosetItemWearStats(userID model.Int64String, householdCtx householdContext, itemID model.Int64String) (closetItemWearStats, error) {
+func buildClosetListResponseItems(items []model.LifeTraceClosetItem, wearStatsByItemID map[string]closetItemWearStats) []gin.H {
+	result := make([]gin.H, 0, len(items))
+	for _, item := range items {
+		entry := gin.H{
+			"id":                item.ID,
+			"userId":            item.UserID,
+			"householdId":       item.HouseholdID,
+			"name":              item.Name,
+			"category":          item.Category,
+			"color":             item.Color,
+			"material":          item.Material,
+			"warmthLevel":       item.WarmthLevel,
+			"seasons":           item.Seasons,
+			"sceneTags":         item.SceneTags,
+			"status":            item.Status,
+			"imageUrl":          item.ImageURL,
+			"shared":            item.Shared,
+			"note":              item.Note,
+			"careMethod":        item.CareMethod,
+			"careIntervalWears": item.CareIntervalWears,
+			"lastCareDate":      item.LastCareDate,
+			"preferenceLevel":   item.PreferenceLevel,
+			"createdBy":         item.CreatedBy,
+			"updatedBy":         item.UpdatedBy,
+			"createdAt":         item.CreatedAt,
+			"updatedAt":         item.UpdatedAt,
+			"wearStats":         finalizeClosetWearStats(wearStatsByItemID[item.ID.String()], item.CreatedAt, time.Now()),
+			"careStats":         buildClosetItemCareStats(item),
+		}
+		result = append(result, entry)
+	}
+	return result
+}
+
+func buildClosetItemWearStats(userID model.Int64String, householdCtx householdContext, item model.LifeTraceClosetItem) (closetItemWearStats, error) {
+	wearStatsByItemID, err := loadClosetWearStats(userID, householdCtx)
+	if err != nil {
+		return closetItemWearStats{}, err
+	}
+	return finalizeClosetWearStats(wearStatsByItemID[item.ID.String()], item.CreatedAt, time.Now()), nil
+}
+
+func loadClosetWearStats(userID model.Int64String, householdCtx householdContext) (map[string]closetItemWearStats, error) {
 	query := database.GetDB().Where("household_id = ? AND status = ?", householdCtx.Household.ID, "worn")
 	if householdCtx.Household.Kind == householdKindPersonal {
 		query = query.Where("user_id = ?", userID)
@@ -1191,28 +1350,99 @@ func buildClosetItemWearStats(userID model.Int64String, householdCtx householdCo
 
 	var outfits []model.LifeTraceOutfit
 	if err := query.Find(&outfits).Error; err != nil {
-		return closetItemWearStats{}, err
+		return nil, err
 	}
 
-	stats := closetItemWearStats{}
+	statsByItemID := map[string]closetItemWearStats{}
 	for _, outfit := range outfits {
-		containsItem := false
 		for _, rawID := range outfit.ItemIDs {
-			if strings.TrimSpace(rawID) == itemID.String() {
-				containsItem = true
+			itemID := strings.TrimSpace(rawID)
+			if itemID == "" {
+				continue
+			}
+			stats := statsByItemID[itemID]
+			stats.WornCount++
+			wornDate := strings.TrimSpace(outfit.WornDate)
+			if wornDate != "" && wornDate > stats.LastWornDate {
+				stats.LastWornDate = wornDate
+			}
+			statsByItemID[itemID] = stats
+		}
+	}
+	return statsByItemID, nil
+}
+
+func finalizeClosetWearStats(stats closetItemWearStats, createdAt time.Time, now time.Time) closetItemWearStats {
+	idleSince := createdAt
+	if stats.LastWornDate != "" {
+		if parsed, err := time.Parse("2006-01-02", stats.LastWornDate); err == nil {
+			idleSince = parsed
+		}
+	}
+	if now.After(idleSince) {
+		stats.IdleDays = int(now.Sub(idleSince).Hours() / 24)
+	}
+	switch {
+	case stats.IdleDays >= 90:
+		stats.IdleLevel = "stale"
+	case stats.IdleDays >= 30:
+		stats.IdleLevel = "idle"
+	default:
+		stats.IdleLevel = "normal"
+	}
+	return stats
+}
+
+func buildClosetItemCareStats(item model.LifeTraceClosetItem) closetItemCareStats {
+	interval := normalizeClosetCareIntervalWears(item.CareIntervalWears)
+	if interval <= 0 {
+		return closetItemCareStats{CareStatus: "unset"}
+	}
+	wornCountSinceCare := countClosetItemWornSinceCare(item)
+	stats := closetItemCareStats{
+		WornCountSinceCare: wornCountSinceCare,
+		CareStatus:         "fresh",
+	}
+	switch {
+	case wornCountSinceCare > interval:
+		stats.CareStatus = "overdue"
+		stats.OverdueWears = wornCountSinceCare - interval
+	case wornCountSinceCare == interval:
+		stats.CareStatus = "due"
+	case wornCountSinceCare < interval:
+		stats.DueInWears = interval - wornCountSinceCare
+	}
+	return stats
+}
+
+func countClosetItemWornSinceCare(item model.LifeTraceClosetItem) int {
+	query := database.GetDB().
+		Model(&model.LifeTraceOutfit{}).
+		Where("household_id = ? AND status = ?", item.HouseholdID, "worn")
+	if item.LastCareDate != "" {
+		query = query.Where("worn_date > ?", item.LastCareDate)
+	}
+	if item.HouseholdID <= 0 {
+		query = query.Where("user_id = ?", item.UserID)
+	} else if item.Shared {
+		query = query.Where("shared = ?", true)
+	}
+
+	var outfits []model.LifeTraceOutfit
+	if err := query.Find(&outfits).Error; err != nil {
+		return 0
+	}
+
+	count := 0
+	for _, outfit := range outfits {
+		for _, rawID := range outfit.ItemIDs {
+			if strings.TrimSpace(rawID) == item.ID.String() {
+				count++
 				break
 			}
 		}
-		if !containsItem {
-			continue
-		}
-		stats.WornCount++
-		wornDate := strings.TrimSpace(outfit.WornDate)
-		if wornDate != "" && wornDate > stats.LastWornDate {
-			stats.LastWornDate = wornDate
-		}
 	}
-	return stats, nil
+	return count
 }
 
 func findAccessibleClosetItem(id string, userID model.Int64String) (model.LifeTraceClosetItem, householdContext, bool) {

@@ -11,8 +11,10 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import type {
+  ClosetCareMethod,
   ClosetCategory,
   ClosetItem,
+  ClosetPreferenceLevel,
   ClosetSeason,
   ClosetWarmthLevel,
   NewClosetItemInput,
@@ -31,6 +33,12 @@ export const closetCategoryOptions: ClosetCategory[] = [
 
 export const closetWarmthOptions: ClosetWarmthLevel[] = ['轻薄', '常规', '保暖', '厚重'];
 export const closetSeasonOptions: ClosetSeason[] = ['春', '夏', '秋', '冬', '四季'];
+export const closetCareMethodOptions: ClosetCareMethod[] = ['机洗', '手洗', '干洗', '通风'];
+export const closetPreferenceLevelOptions: ClosetPreferenceLevel[] = [
+  'neutral',
+  'favorite',
+  'avoid',
+];
 const closetCategorySelectOptions = closetCategoryOptions.map((option) => ({
   label: option,
   value: option,
@@ -39,6 +47,15 @@ const closetWarmthSelectOptions = closetWarmthOptions.map((option) => ({
   label: option,
   value: option,
 }));
+const closetCareMethodSelectOptions = closetCareMethodOptions.map((option) => ({
+  label: option,
+  value: option,
+}));
+const closetPreferenceSelectOptions = [
+  { label: '正常', value: 'neutral' },
+  { label: '常穿', value: 'favorite' },
+  { label: '少穿', value: 'avoid' },
+] as const;
 export const defaultClosetItemForm: NewClosetItemInput = {
   name: '',
   category: '上装',
@@ -51,6 +68,10 @@ export const defaultClosetItemForm: NewClosetItemInput = {
   imageUrl: '',
   shared: false,
   note: '',
+  careMethod: '机洗',
+  careIntervalWears: 3,
+  lastCareDate: '',
+  preferenceLevel: 'neutral',
 };
 
 type ClosetDraftField = keyof NewClosetItemInput;
@@ -173,6 +194,10 @@ export function ClosetItemSheet({
           imageUrl: item.imageUrl || '',
           shared: item.shared,
           note: item.note || '',
+          careMethod: item.careMethod || '机洗',
+          careIntervalWears: item.careIntervalWears || 3,
+          lastCareDate: item.lastCareDate || '',
+          preferenceLevel: item.preferenceLevel || 'neutral',
         }
       : { ...defaultClosetItemForm, ...initialValue };
     setForm(next);
@@ -220,6 +245,8 @@ export function ClosetItemSheet({
       seasons: form.seasons.length ? form.seasons : ['四季'],
       sceneTags: sceneTags.length ? sceneTags : ['日常'],
       shared: sharedAvailable ? form.shared : false,
+      careIntervalWears: Math.max(0, Math.min(30, Number(form.careIntervalWears) || 0)),
+      lastCareDate: form.lastCareDate?.trim() || '',
     });
   };
 
@@ -329,6 +356,40 @@ export function ClosetItemSheet({
               touchedFieldsRef.current = new Set(touchedFieldsRef.current).add('sceneTags');
             }}
             placeholder="通勤、雨天、聚会"
+          />
+        </FormItem>
+
+        <div className="grid grid-cols-2 gap-3">
+          <SheetSelectField
+            label="洗护方式"
+            value={form.careMethod || '机洗'}
+            options={closetCareMethodSelectOptions}
+            onValueChange={(value) => update('careMethod', value as ClosetCareMethod)}
+          />
+          <FormItem label="建议几次一洗">
+            <Input
+              type="number"
+              min={0}
+              max={30}
+              value={String(form.careIntervalWears ?? 0)}
+              onChange={(event) => update('careIntervalWears', Number(event.target.value) || 0)}
+              placeholder="3"
+            />
+          </FormItem>
+        </div>
+
+        <SheetSelectField
+          label="穿搭偏好"
+          value={form.preferenceLevel || 'neutral'}
+          options={closetPreferenceSelectOptions}
+          onValueChange={(value) => update('preferenceLevel', value as ClosetPreferenceLevel)}
+        />
+
+        <FormItem label="上次洗护">
+          <Input
+            type="date"
+            value={form.lastCareDate || ''}
+            onChange={(event) => update('lastCareDate', event.target.value)}
           />
         </FormItem>
 

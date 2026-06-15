@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   analyzeClothingPhoto,
+  type ClosetItemCareStats,
   type ClosetItemWearStats,
+  type ClosetListItem,
   type ClosetSummary,
   createClosetItem,
   createOutfit,
@@ -15,6 +17,7 @@ import {
   listOutfits,
   type OutfitSuggestion,
   updateClosetItem,
+  updateClosetItemCare,
   updateOutfitStatus,
 } from '@/api/closet';
 import { listHouseholds } from '@/api/household';
@@ -26,6 +29,17 @@ import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+  buildClosetCareLabel,
+  buildClosetCarePayload,
+  isClosetItemCareDue,
+} from '@/lib/closetCare';
+import {
+  buildClosetOrganizePlanInput,
+  getClosetIdleLabel,
+  isClosetItemIdle,
+} from '@/lib/closetIdle';
+import { getClosetPreferenceLabel } from '@/lib/closetPreference';
 import { getLifeTraceErrorMessage } from '@/lib/error';
 import { buildOutfitSuggestionContext } from '@/lib/outfitSuggestionContext';
 import { cn } from '@/lib/utils';
@@ -66,13 +80,15 @@ export function ClosetPage() {
   const plans = useLifeTraceStore((state) => state.plans);
   const plansLoaded = useLifeTraceStore((state) => state.plansLoaded);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
+  const addPlan = useLifeTraceStore((state) => state.addPlan);
+  const planCreating = useLifeTraceStore((state) => state.planCreating);
   const settings = useLifeTraceStore((state) => state.settings);
   const navigate = useNavigate();
   const { itemId, outfitId } = useParams<{ itemId?: string; outfitId?: string }>();
   const showToast = useFeedbackToastStore((state) => state.showToast);
   const [households, setHouseholds] = useState<HouseholdSummary[]>([]);
   const [selectedHouseholdId, setSelectedHouseholdId] = useState('');
-  const [items, setItems] = useState<ClosetItem[]>([]);
+  const [items, setItems] = useState<ClosetListItem[]>([]);
   const [outfits, setOutfits] = useState<Outfit[]>([]);
   const [summary, setSummary] = useState(defaultClosetSummary);
   const [loading, setLoading] = useState(false);
@@ -95,8 +111,12 @@ export function ClosetPage() {
     item: ClosetItem;
     household: HouseholdSummary;
     wearStats?: ClosetItemWearStats;
+    careStats?: ClosetItemCareStats;
   } | null>(null);
   const [itemLoading, setItemLoading] = useState(false);
+  const [itemFilter, setItemFilter] = useState<'all' | 'idle' | 'care'>('all');
+  const [organizingItemId, setOrganizingItemId] = useState('');
+  const [caringItemId, setCaringItemId] = useState('');
 
   const selectedHousehold = useMemo(
     () => households.find((item) => item.id === selectedHouseholdId) ?? households[0] ?? null,
@@ -113,6 +133,23 @@ export function ClosetPage() {
   const suggestionContext = useMemo(
     () => buildOutfitSuggestionContext({ settings, plans, weather: cachedWeather }),
     [cachedWeather, plans, settings],
+  );
+  const idleItemsCount = useMemo(
+    () => items.filter((item) => isClosetItemIdle(item.wearStats)).length,
+    [items],
+  );
+  const filteredItems = useMemo(
+    () =>
+      itemFilter === 'idle'
+        ? items.filter((item) => isClosetItemIdle(item.wearStats))
+        : itemFilter === 'care'
+          ? items.filter((item) => isClosetItemCareDue(item.careStats))
+          : items,
+    [itemFilter, items],
+  );
+  const careDueItemsCount = useMemo(
+    () => items.filter((item) => isClosetItemCareDue(item.careStats)).length,
+    [items],
   );
 
   useEffect(() => {
@@ -401,6 +438,47 @@ export function ClosetPage() {
     }
   };
 
+  const handleCreateOrganizePlan = async (item: ClosetItem) => {
+    setOrganizingItemId(item.id);
+    try {
+      const plan = await addPlan(buildClosetOrganizePlanInput(item, todayDateKey()));
+      if (!plan) {
+        showToast('整理提醒创建失败', 'error');
+        return;
+      }
+      showToast('已加入整理提醒', 'success');
+    } finally {
+      setOrganizingItemId('');
+    }
+  };
+
+  const handleMarkItemCare = async (item: ClosetItem) => {
+    if (!token) {
+      return;
+    }
+    setCaringItemId(item.id);
+    try {
+      const updated = await updateClosetItemCare(
+        token,
+        item.id,
+        buildClosetCarePayload(todayDateKey()),
+      );
+      setItems((current) =>
+        current.map((entry) => (entry.id === updated.id ? { ...entry, ...updated } : entry)),
+      );
+      if (selectedItem?.item.id === updated.id) {
+        const detail = await getClosetItem(token, updated.id);
+        setSelectedItem(detail);
+      }
+      showToast('已记录刚洗过', 'success');
+      void loadItems();
+    } catch (careError) {
+      showToast(getLifeTraceErrorMessage(careError, '更新洗护失败'), 'error');
+    } finally {
+      setCaringItemId('');
+    }
+  };
+
   if (itemId) {
     return (
       <SubPageShell title="衣物详情" eyebrow="衣橱" fallbackBackTo="/closet">
@@ -458,6 +536,28 @@ export function ClosetPage() {
                     label="最近穿着"
                     value={selectedItem.wearStats?.lastWornDate || '未记录'}
                   />
+                  <InfoPill
+                    label="闲置状态"
+                    value={getClosetIdleLabel(selectedItem.wearStats) || '最近有穿'}
+                  />
+                  <InfoPill label="洗护方式" value={selectedItem.item.careMethod || '未设置'} />
+                  <InfoPill
+                    label="建议周期"
+                    value={
+                      selectedItem.item.careIntervalWears
+                        ? `${selectedItem.item.careIntervalWears} 次一洗`
+                        : '未设置'
+                    }
+                  />
+                  <InfoPill label="上次洗护" value={selectedItem.item.lastCareDate || '未记录'} />
+                  <InfoPill
+                    label="洗护状态"
+                    value={buildClosetCareLabel(selectedItem.careStats) || '无需提醒'}
+                  />
+                  <InfoPill
+                    label="穿搭偏好"
+                    value={getClosetPreferenceLabel(selectedItem.item.preferenceLevel) || '正常'}
+                  />
                 </div>
                 {selectedItem.item.material || selectedItem.item.note ? (
                   <p className="text-sm leading-6 text-muted-foreground">
@@ -466,6 +566,28 @@ export function ClosetPage() {
                       .join(' · ')}
                   </p>
                 ) : null}
+                <Button
+                  type="button"
+                  variant="ai"
+                  className="w-full"
+                  disabled={caringItemId === selectedItem.item.id}
+                  onClick={() => void handleMarkItemCare(selectedItem.item)}
+                >
+                  {caringItemId === selectedItem.item.id ? <ActionLoadingIcon tone="ai" /> : null}
+                  刚洗过
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={planCreating && organizingItemId === selectedItem.item.id}
+                  onClick={() => void handleCreateOrganizePlan(selectedItem.item)}
+                >
+                  {planCreating && organizingItemId === selectedItem.item.id ? (
+                    <ActionLoadingIcon />
+                  ) : null}
+                  加入整理提醒
+                </Button>
                 <Button
                   type="button"
                   variant="ghost"
@@ -708,26 +830,80 @@ export function ClosetPage() {
         ) : null}
 
         <section>
-          <SectionHeader title="衣物" meta={loading ? '同步中' : `${items.length} 件`} />
+          <SectionHeader title="衣物" meta={loading ? '同步中' : `${filteredItems.length} 件`} />
+          {!loading && items.length > 0 ? (
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              <button
+                type="button"
+                className={cn(
+                  'inline-flex shrink-0 items-center rounded-full border px-3 py-2 text-sm font-semibold transition',
+                  itemFilter === 'all'
+                    ? 'border-life-ai/40 bg-life-ai/10 text-life-ai'
+                    : 'border-border bg-secondary text-muted-foreground',
+                )}
+                onClick={() => setItemFilter('all')}
+              >
+                全部衣物
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  'inline-flex shrink-0 items-center rounded-full border px-3 py-2 text-sm font-semibold transition',
+                  itemFilter === 'idle'
+                    ? 'border-life-alert/40 bg-life-alert/10 text-life-alert'
+                    : 'border-border bg-secondary text-muted-foreground',
+                )}
+                onClick={() => setItemFilter('idle')}
+              >
+                闲置中 {idleItemsCount > 0 ? `${idleItemsCount}` : ''}
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  'inline-flex shrink-0 items-center rounded-full border px-3 py-2 text-sm font-semibold transition',
+                  itemFilter === 'care'
+                    ? 'border-life-health/40 bg-life-health/10 text-life-health'
+                    : 'border-border bg-secondary text-muted-foreground',
+                )}
+                onClick={() => setItemFilter('care')}
+              >
+                待洗护 {careDueItemsCount > 0 ? `${careDueItemsCount}` : ''}
+              </button>
+            </div>
+          ) : null}
           {loading ? (
             <Card className="p-5 text-sm text-muted-foreground">正在读取衣橱</Card>
-          ) : items.length === 0 ? (
+          ) : filteredItems.length === 0 ? (
             <EmptyState
               icon={Shirt}
               tone="ai"
               eyebrow="衣橱"
-              title="还没有衣物"
-              description="添加几件常穿单品后，就能生成今日穿搭。"
+              title={
+                items.length === 0
+                  ? '还没有衣物'
+                  : itemFilter === 'care'
+                    ? '还没有待洗护衣物'
+                    : '还没有闲置衣物'
+              }
+              description={
+                items.length === 0
+                  ? '添加几件常穿单品后，就能生成今日穿搭。'
+                  : itemFilter === 'care'
+                    ? '目前洗护状态都还轻松。'
+                    : '最近穿着都很活跃。'
+              }
               action={
-                <Button type="button" variant="ai" onClick={() => setSheetOpen(true)}>
-                  <Plus className="size-4" />
-                  添加衣物
-                </Button>
+                items.length === 0 ? (
+                  <Button type="button" variant="ai" onClick={() => setSheetOpen(true)}>
+                    <Plus className="size-4" />
+                    添加衣物
+                  </Button>
+                ) : undefined
               }
             />
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <ClosetItemCard
                   key={item.id}
                   item={item}
@@ -821,7 +997,7 @@ function ClosetItemCard({
   onEdit,
   onDelete,
 }: {
-  item: ClosetItem;
+  item: ClosetListItem;
   compact?: boolean;
   onOpen?: () => void;
   onEdit?: () => void;
@@ -854,8 +1030,29 @@ function ClosetItemCard({
             <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
               {formatItemMeta(item)}
             </p>
+            {getClosetIdleLabel(item.wearStats) ? (
+              <p className="mt-2 text-xs font-semibold text-life-alert">
+                {getClosetIdleLabel(item.wearStats)}
+              </p>
+            ) : null}
+            {buildClosetCareLabel(item.careStats) ? (
+              <p className="mt-1 text-xs font-semibold text-life-health">
+                {buildClosetCareLabel(item.careStats)}
+              </p>
+            ) : null}
+            {getClosetPreferenceLabel(item.preferenceLevel) ? (
+              <p className="mt-1 text-xs font-semibold text-life-ai">
+                {getClosetPreferenceLabel(item.preferenceLevel)}
+              </p>
+            ) : null}
           </div>
-          {item.shared ? <Badge tone="ai">共享</Badge> : null}
+          <div className="flex flex-col items-end gap-2">
+            {item.shared ? <Badge tone="ai">共享</Badge> : null}
+            {item.wearStats?.idleLevel === 'stale' ? <Badge tone="alert">久未穿</Badge> : null}
+            {item.careStats?.careStatus === 'due' || item.careStats?.careStatus === 'overdue' ? (
+              <Badge tone="health">待洗护</Badge>
+            ) : null}
+          </div>
         </div>
         {onEdit || onDelete ? (
           <div className="mt-3 flex gap-2">

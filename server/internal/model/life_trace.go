@@ -142,25 +142,29 @@ func (trace *LifeTraceTrace) BeforeCreate(tx *gorm.DB) error {
 }
 
 type LifeTraceClosetItem struct {
-	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID      Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
-	HouseholdID Int64String    `gorm:"column:household_id;index" json:"householdId,omitempty"`
-	Name        string         `gorm:"size:160;not null" json:"name"`
-	Category    string         `gorm:"size:30;not null;default:'上装';index" json:"category"`
-	Color       string         `gorm:"size:40;not null;default:'未标注';index" json:"color"`
-	Material    string         `gorm:"size:80" json:"material,omitempty"`
-	WarmthLevel string         `gorm:"column:warmth_level;size:20;not null;default:'常规';index" json:"warmthLevel"`
-	Seasons     StringList     `gorm:"type:text" json:"seasons"`
-	SceneTags   StringList     `gorm:"column:scene_tags;type:text" json:"sceneTags"`
-	Status      string         `gorm:"size:20;not null;default:'active';index" json:"status"`
-	ImageURL    string         `gorm:"size:800" json:"imageUrl,omitempty"`
-	Shared      bool           `gorm:"default:false;index" json:"shared"`
-	Note        string         `gorm:"size:1000" json:"note"`
-	CreatedBy   Int64String    `gorm:"column:created_by;index" json:"createdBy,omitempty"`
-	UpdatedBy   Int64String    `gorm:"column:updated_by;index" json:"updatedBy,omitempty"`
-	CreatedAt   time.Time      `json:"createdAt"`
-	UpdatedAt   time.Time      `json:"updatedAt"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID            Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	HouseholdID       Int64String    `gorm:"column:household_id;index" json:"householdId,omitempty"`
+	Name              string         `gorm:"size:160;not null" json:"name"`
+	Category          string         `gorm:"size:30;not null;default:'上装';index" json:"category"`
+	Color             string         `gorm:"size:40;not null;default:'未标注';index" json:"color"`
+	Material          string         `gorm:"size:80" json:"material,omitempty"`
+	WarmthLevel       string         `gorm:"column:warmth_level;size:20;not null;default:'常规';index" json:"warmthLevel"`
+	Seasons           StringList     `gorm:"type:text" json:"seasons"`
+	SceneTags         StringList     `gorm:"column:scene_tags;type:text" json:"sceneTags"`
+	Status            string         `gorm:"size:20;not null;default:'active';index" json:"status"`
+	ImageURL          string         `gorm:"size:800" json:"imageUrl,omitempty"`
+	Shared            bool           `gorm:"default:false;index" json:"shared"`
+	Note              string         `gorm:"size:1000" json:"note"`
+	CareMethod        string         `gorm:"column:care_method;size:20" json:"careMethod,omitempty"`
+	CareIntervalWears int            `gorm:"column:care_interval_wears;default:0" json:"careIntervalWears"`
+	LastCareDate      string         `gorm:"column:last_care_date;size:20;index" json:"lastCareDate,omitempty"`
+	PreferenceLevel   string         `gorm:"column:preference_level;size:20;not null;default:'neutral';index" json:"preferenceLevel"`
+	CreatedBy         Int64String    `gorm:"column:created_by;index" json:"createdBy,omitempty"`
+	UpdatedBy         Int64String    `gorm:"column:updated_by;index" json:"updatedBy,omitempty"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	UpdatedAt         time.Time      `json:"updatedAt"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (item *LifeTraceClosetItem) BeforeCreate(tx *gorm.DB) error {
@@ -178,6 +182,9 @@ func (item *LifeTraceClosetItem) BeforeCreate(tx *gorm.DB) error {
 	}
 	if item.Status == "" {
 		item.Status = "active"
+	}
+	if item.PreferenceLevel == "" {
+		item.PreferenceLevel = "neutral"
 	}
 	if item.Seasons == nil {
 		item.Seasons = StringList{"四季"}

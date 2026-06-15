@@ -33,7 +33,7 @@ export type ClosetSummary = {
 export type ListClosetItemsResponse = {
   householdId?: string;
   householdName?: string;
-  list: ClosetItem[];
+  list: ClosetListItem[];
   pagination?: ListPagination;
   summary?: ClosetSummary;
 };
@@ -41,12 +41,31 @@ export type ListClosetItemsResponse = {
 export type ClosetItemWearStats = {
   wornCount: number;
   lastWornDate?: string;
+  idleDays?: number;
+  idleLevel?: 'normal' | 'idle' | 'stale';
+};
+
+export type ClosetItemCareStats = {
+  wornCountSinceCare: number;
+  careStatus: 'unset' | 'fresh' | 'due' | 'overdue';
+  dueInWears?: number;
+  overdueWears?: number;
+};
+
+export type ClosetListItem = ClosetItem & {
+  wearStats?: ClosetItemWearStats;
+  careStats?: ClosetItemCareStats;
 };
 
 export type ClosetItemDetailResponse = {
   item: ClosetItem;
   household: HouseholdSummary;
   wearStats?: ClosetItemWearStats;
+  careStats?: ClosetItemCareStats;
+};
+
+export type ClosetItemCareInput = {
+  lastCareDate: string;
 };
 
 export type ListOutfitsOptions = {
@@ -187,6 +206,13 @@ export function updateClosetItem(
 export function deleteClosetItem(token: string, id: string) {
   return apiRequest<{ id: string }>(`/life-trace/closet/items/${id}`, token, {
     method: 'DELETE',
+  });
+}
+
+export function updateClosetItemCare(token: string, id: string, input: ClosetItemCareInput) {
+  return apiRequest<ClosetItem>(`/life-trace/closet/items/${id}/care`, token, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
   });
 }
 
