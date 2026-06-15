@@ -110,6 +110,11 @@ type outfitSuggestionAIResponse struct {
 	} `json:"suggestions"`
 }
 
+type closetItemWearStats struct {
+	WornCount    int    `json:"wornCount"`
+	LastWornDate string `json:"lastWornDate,omitempty"`
+}
+
 var validClosetCategories = map[string]bool{
 	"上装": true,
 	"下装": true,
@@ -373,9 +378,15 @@ func (h *Handler) GetClosetItem(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "读取衣物失败")
 		return
 	}
+	wearStats, err := buildClosetItemWearStats(userID, householdCtx, item.ID)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "读取衣物失败")
+		return
+	}
 	success(c, gin.H{
 		"item":      item,
 		"household": householdSummaryFromContext(householdCtx, memberCount),
+		"wearStats": wearStats,
 	})
 }
 
@@ -1168,6 +1179,40 @@ func parseOutfitSuggestionAIResponse(raw string, items []model.LifeTraceClosetIt
 		}
 	}
 	return result, nil
+}
+
+func buildClosetItemWearStats(userID model.Int64String, householdCtx householdContext, itemID model.Int64String) (closetItemWearStats, error) {
+	query := database.GetDB().Where("household_id = ? AND status = ?", householdCtx.Household.ID, "worn")
+	if householdCtx.Household.Kind == householdKindPersonal {
+		query = query.Where("user_id = ?", userID)
+	} else {
+		query = query.Where("shared = ?", true)
+	}
+
+	var outfits []model.LifeTraceOutfit
+	if err := query.Find(&outfits).Error; err != nil {
+		return closetItemWearStats{}, err
+	}
+
+	stats := closetItemWearStats{}
+	for _, outfit := range outfits {
+		containsItem := false
+		for _, rawID := range outfit.ItemIDs {
+			if strings.TrimSpace(rawID) == itemID.String() {
+				containsItem = true
+				break
+			}
+		}
+		if !containsItem {
+			continue
+		}
+		stats.WornCount++
+		wornDate := strings.TrimSpace(outfit.WornDate)
+		if wornDate != "" && wornDate > stats.LastWornDate {
+			stats.LastWornDate = wornDate
+		}
+	}
+	return stats, nil
 }
 
 func findAccessibleClosetItem(id string, userID model.Int64String) (model.LifeTraceClosetItem, householdContext, bool) {

@@ -38,9 +38,15 @@ export type ListClosetItemsResponse = {
   summary?: ClosetSummary;
 };
 
+export type ClosetItemWearStats = {
+  wornCount: number;
+  lastWornDate?: string;
+};
+
 export type ClosetItemDetailResponse = {
   item: ClosetItem;
   household: HouseholdSummary;
+  wearStats?: ClosetItemWearStats;
 };
 
 export type ListOutfitsOptions = {

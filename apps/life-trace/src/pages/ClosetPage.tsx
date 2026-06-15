@@ -1,8 +1,9 @@
 import { Camera, Check, Plus, Shirt, Star, Trash2, Users, WandSparkles } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   analyzeClothingPhoto,
+  type ClosetItemWearStats,
   type ClosetSummary,
   createClosetItem,
   createOutfit,
@@ -26,9 +27,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { getLifeTraceErrorMessage } from '@/lib/error';
+import { buildOutfitSuggestionContext } from '@/lib/outfitSuggestionContext';
 import { cn } from '@/lib/utils';
+import { readWeatherCache } from '@/lib/weatherCache';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
+import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { ClosetItem, HouseholdSummary, NewClosetItemInput, Outfit } from '@/types';
 
 const defaultClosetSummary: ClosetSummary = {
@@ -59,6 +63,10 @@ function todayDateKey() {
 
 export function ClosetPage() {
   const token = useAuthStore((state) => state.token);
+  const plans = useLifeTraceStore((state) => state.plans);
+  const plansLoaded = useLifeTraceStore((state) => state.plansLoaded);
+  const loadPlans = useLifeTraceStore((state) => state.loadPlans);
+  const settings = useLifeTraceStore((state) => state.settings);
   const navigate = useNavigate();
   const { itemId, outfitId } = useParams<{ itemId?: string; outfitId?: string }>();
   const showToast = useFeedbackToastStore((state) => state.showToast);
@@ -76,6 +84,7 @@ export function ClosetPage() {
   const [itemImageAnalyzing, setItemImageAnalyzing] = useState(false);
   const [suggestions, setSuggestions] = useState<OutfitSuggestion[]>([]);
   const [suggesting, setSuggesting] = useState(false);
+  const [actingSuggestionKey, setActingSuggestionKey] = useState('');
   const [selectedOutfit, setSelectedOutfit] = useState<{
     outfit: Outfit;
     items: ClosetItem[];
@@ -85,6 +94,7 @@ export function ClosetPage() {
   const [selectedItem, setSelectedItem] = useState<{
     item: ClosetItem;
     household: HouseholdSummary;
+    wearStats?: ClosetItemWearStats;
   } | null>(null);
   const [itemLoading, setItemLoading] = useState(false);
 
@@ -94,6 +104,23 @@ export function ClosetPage() {
   );
   const householdId = getHouseholdQueryId(selectedHousehold);
   const sharedAvailable = isSharedHousehold(selectedHousehold);
+  const cachedWeather = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    return readWeatherCache(window.localStorage, settings.city || '上海');
+  }, [settings.city]);
+  const suggestionContext = useMemo(
+    () => buildOutfitSuggestionContext({ settings, plans, weather: cachedWeather }),
+    [cachedWeather, plans, settings],
+  );
+
+  useEffect(() => {
+    if (!token || plansLoaded) {
+      return;
+    }
+    void loadPlans({ status: 'open', pageSize: 60 });
+  }, [loadPlans, plansLoaded, token]);
 
   useEffect(() => {
     if (!token) {
@@ -111,7 +138,7 @@ export function ClosetPage() {
     })();
   }, [token]);
 
-  const loadItems = async () => {
+  const loadItems = useCallback(async () => {
     if (!token) {
       return;
     }
@@ -131,9 +158,9 @@ export function ClosetPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [householdId, token]);
 
-  const loadOutfits = async () => {
+  const loadOutfits = useCallback(async () => {
     if (!token) {
       return;
     }
@@ -151,14 +178,13 @@ export function ClosetPage() {
     } finally {
       setOutfitsLoading(false);
     }
-  };
+  }, [householdId, token]);
 
   useEffect(() => {
     void loadItems();
     void loadOutfits();
     setSuggestions([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [householdId, token]);
+  }, [loadItems, loadOutfits]);
 
   useEffect(() => {
     if (!token || !outfitId) {
@@ -265,8 +291,15 @@ export function ClosetPage() {
     try {
       const response = await generateOutfitSuggestions(token, {
         householdId,
-        scene: '日常',
-        weatherText: '今日天气',
+        scene: suggestionContext.scene,
+        weatherText: suggestionContext.weatherText,
+        temperature: suggestionContext.temperature,
+        lowTemp: suggestionContext.lowTemp,
+        highTemp: suggestionContext.highTemp,
+        precip: suggestionContext.precip,
+        planType: suggestionContext.planType,
+        planTitle: suggestionContext.planTitle,
+        preferShared: sharedAvailable || undefined,
       });
       setSuggestions(response.suggestions);
       if (response.suggestions.length === 0) {
@@ -279,33 +312,71 @@ export function ClosetPage() {
     }
   };
 
+  const buildSuggestionOutfitInput = (suggestion: OutfitSuggestion) => ({
+    title: suggestion.title,
+    itemIds: suggestion.itemIds,
+    scene: suggestion.scene || suggestionContext.scene || '日常',
+    weatherText: suggestion.weatherText || suggestionContext.weatherText || '',
+    minTemp: suggestionContext.lowTemp || 0,
+    maxTemp: suggestionContext.highTemp || 0,
+    planId: suggestionContext.planId,
+    wornDate: '',
+    rating: 0,
+    note: suggestion.summary,
+    imageUrl: suggestion.items[0]?.imageUrl || '',
+    shared: sharedAvailable,
+    status: 'saved' as const,
+  });
+
+  const getSuggestionActionKey = (suggestion: OutfitSuggestion, action: 'save' | 'wear') =>
+    `${action}:${suggestion.title}:${suggestion.itemIds.join('-')}`;
+
+  const upsertOutfit = (outfit: Outfit) => {
+    setOutfits((current) => {
+      const exists = current.some((item) => item.id === outfit.id);
+      return exists
+        ? current.map((item) => (item.id === outfit.id ? outfit : item))
+        : [outfit, ...current];
+    });
+  };
+
   const handleSaveSuggestion = async (suggestion: OutfitSuggestion) => {
     if (!token) {
       return;
     }
+    const actionKey = getSuggestionActionKey(suggestion, 'save');
+    setActingSuggestionKey(actionKey);
     try {
-      const saved = await createOutfit(
-        token,
-        {
-          title: suggestion.title,
-          itemIds: suggestion.itemIds,
-          scene: suggestion.scene || '日常',
-          weatherText: suggestion.weatherText || '',
-          minTemp: 0,
-          maxTemp: 0,
-          wornDate: '',
-          rating: 0,
-          note: suggestion.summary,
-          imageUrl: suggestion.items[0]?.imageUrl || '',
-          shared: sharedAvailable,
-          status: 'saved',
-        },
-        householdId,
-      );
-      setOutfits((current) => [saved, ...current]);
+      const saved = await createOutfit(token, buildSuggestionOutfitInput(suggestion), householdId);
+      upsertOutfit(saved);
       showToast('穿搭已保存', 'success');
     } catch (saveError) {
       showToast(getLifeTraceErrorMessage(saveError, '保存穿搭失败'), 'error');
+    } finally {
+      setActingSuggestionKey('');
+    }
+  };
+
+  const handleWearSuggestion = async (suggestion: OutfitSuggestion) => {
+    if (!token) {
+      return;
+    }
+    const actionKey = getSuggestionActionKey(suggestion, 'wear');
+    setActingSuggestionKey(actionKey);
+    try {
+      const saved = await createOutfit(token, buildSuggestionOutfitInput(suggestion), householdId);
+      const updated = await updateOutfitStatus(token, saved.id, {
+        status: 'worn',
+        wornDate: todayDateKey(),
+        rating: 4,
+        note: suggestion.summary,
+      });
+      upsertOutfit(updated);
+      showToast('已记录今天穿搭', 'success');
+    } catch (wearError) {
+      showToast(getLifeTraceErrorMessage(wearError, '记录穿搭失败'), 'error');
+    } finally {
+      setActingSuggestionKey('');
     }
   };
 
@@ -379,6 +450,14 @@ export function ClosetPage() {
                   <InfoPill label="厚薄" value={selectedItem.item.warmthLevel} />
                   <InfoPill label="季节" value={selectedItem.item.seasons.join(' / ')} />
                   <InfoPill label="场景" value={selectedItem.item.sceneTags.join(' / ')} />
+                  <InfoPill
+                    label="穿过次数"
+                    value={`${selectedItem.wearStats?.wornCount !== undefined ? selectedItem.wearStats.wornCount : 0} 次`}
+                  />
+                  <InfoPill
+                    label="最近穿着"
+                    value={selectedItem.wearStats?.lastWornDate || '未记录'}
+                  />
                 </div>
                 {selectedItem.item.material || selectedItem.item.note ? (
                   <p className="text-sm leading-6 text-muted-foreground">
@@ -551,35 +630,79 @@ export function ClosetPage() {
           <section>
             <SectionHeader title="建议穿搭" meta={`${suggestions.length} 套`} />
             <div className="space-y-3">
-              {suggestions.map((suggestion) => (
-                <Card key={`${suggestion.title}-${suggestion.itemIds.join('-')}`} className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Badge tone={suggestion.source === 'ai' ? 'ai' : 'trace'}>
-                          {suggestion.source === 'ai' ? 'AI' : '规则'}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {suggestion.items.length} 件
-                        </span>
+              {suggestions.map((suggestion) => {
+                const saveActionKey = getSuggestionActionKey(suggestion, 'save');
+                const wearActionKey = getSuggestionActionKey(suggestion, 'wear');
+                const savingSuggestion = actingSuggestionKey === saveActionKey;
+                const wearingSuggestion = actingSuggestionKey === wearActionKey;
+                return (
+                  <Card key={`${suggestion.title}-${suggestion.itemIds.join('-')}`} className="p-4">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge tone={suggestion.source === 'ai' ? 'ai' : 'trace'}>
+                              {suggestion.source === 'ai' ? 'AI' : '规则'}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {suggestion.items.length} 件 ·{' '}
+                              {suggestion.scene || suggestionContext.scene}
+                            </span>
+                          </div>
+                          <h3 className="mt-3 font-semibold">{suggestion.title}</h3>
+                          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                            {suggestion.summary}
+                          </p>
+                        </div>
                       </div>
-                      <h3 className="mt-3 font-semibold">{suggestion.title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                        {suggestion.summary}
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        {suggestion.weatherText || suggestionContext.weatherText}
+                        {suggestionContext.temperature
+                          ? ` · ${suggestionContext.temperature}°`
+                          : ''}
+                        {suggestionContext.planTitle
+                          ? ` · 今日计划：${suggestionContext.planTitle}`
+                          : ''}
                       </p>
+                      {suggestion.items.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {suggestion.items.slice(0, 4).map((item) => (
+                            <Badge key={item.id} tone="default">
+                              {item.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={Boolean(actingSuggestionKey)}
+                          onClick={() => void handleSaveSuggestion(suggestion)}
+                        >
+                          {savingSuggestion ? <ActionLoadingIcon /> : <Star className="size-4" />}
+                          保存穿搭
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ai"
+                          disabled={Boolean(actingSuggestionKey)}
+                          onClick={() => void handleWearSuggestion(suggestion)}
+                        >
+                          {wearingSuggestion ? (
+                            <ActionLoadingIcon tone="ai" />
+                          ) : (
+                            <Check className="size-4" />
+                          )}
+                          今天就穿
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void handleSaveSuggestion(suggestion)}
-                    >
-                      <Star className="size-4" />
-                      保存
-                    </Button>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           </section>
         ) : null}

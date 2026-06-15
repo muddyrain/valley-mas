@@ -244,6 +244,71 @@ func TestOutfitRequiresAccessibleItemsAndWritesTraceWhenWorn(t *testing.T) {
 	}
 }
 
+func TestGetClosetItemReturnsWearStats(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+	item := model.LifeTraceClosetItem{
+		UserID:      101,
+		HouseholdID: -101,
+		Name:        "白 T",
+		Category:    "上装",
+		Color:       "白色",
+		WarmthLevel: "轻薄",
+		Seasons:     model.StringList{"夏"},
+		SceneTags:   model.StringList{"日常"},
+		Status:      "active",
+	}
+	otherItem := model.LifeTraceClosetItem{
+		UserID:      101,
+		HouseholdID: -101,
+		Name:        "牛仔裤",
+		Category:    "下装",
+		Color:       "蓝色",
+		WarmthLevel: "常规",
+		Seasons:     model.StringList{"四季"},
+		SceneTags:   model.StringList{"日常"},
+		Status:      "active",
+	}
+	otherUserItem := model.LifeTraceClosetItem{
+		UserID:      202,
+		HouseholdID: -202,
+		Name:        "别人衬衫",
+		Category:    "上装",
+		Color:       "灰色",
+		WarmthLevel: "常规",
+		Seasons:     model.StringList{"四季"},
+		SceneTags:   model.StringList{"日常"},
+		Status:      "active",
+	}
+	for _, seed := range []*model.LifeTraceClosetItem{&item, &otherItem, &otherUserItem} {
+		if err := database.GetDB().Create(seed).Error; err != nil {
+			t.Fatalf("seed closet item: %v", err)
+		}
+	}
+
+	outfits := []model.LifeTraceOutfit{
+		{UserID: 101, HouseholdID: -101, Title: "周一穿搭", ItemIDs: model.StringList{item.ID.String()}, Scene: "日常", Status: "worn", WornDate: "2026-06-09"},
+		{UserID: 101, HouseholdID: -101, Title: "周二穿搭", ItemIDs: model.StringList{item.ID.String(), otherItem.ID.String()}, Scene: "日常", Status: "worn", WornDate: "2026-06-10"},
+		{UserID: 101, HouseholdID: -101, Title: "收藏穿搭", ItemIDs: model.StringList{item.ID.String()}, Scene: "日常", Status: "saved", WornDate: "2026-06-11"},
+		{UserID: 101, HouseholdID: -101, Title: "其他穿搭", ItemIDs: model.StringList{otherItem.ID.String()}, Scene: "日常", Status: "worn", WornDate: "2026-06-12"},
+		{UserID: 202, HouseholdID: -202, Title: "别人穿搭", ItemIDs: model.StringList{otherUserItem.ID.String()}, Scene: "日常", Status: "worn", WornDate: "2026-06-13"},
+	}
+	for _, outfit := range outfits {
+		if err := database.GetDB().Create(&outfit).Error; err != nil {
+			t.Fatalf("seed outfit: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/life-trace/closet/items/"+item.ID.String(), nil)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	wearStats := data["wearStats"].(map[string]interface{})
+	if wearStats["wornCount"] != float64(2) || wearStats["lastWornDate"] != "2026-06-10" {
+		t.Fatalf("unexpected wear stats: %+v", wearStats)
+	}
+}
+
 func TestParseClothingPhotoAnalysisNormalizesFields(t *testing.T) {
 	parsed, err := parseClothingPhotoAnalysisAIResponse(`衣物：
 	{
@@ -266,6 +331,39 @@ func TestParseClothingPhotoAnalysisNormalizesFields(t *testing.T) {
 	}
 	if len(parsed.Seasons) != 2 || parsed.Seasons[0] != "春" || len(parsed.SceneTags) != 2 {
 		t.Fatalf("expected normalized seasons/tags, got %+v %+v", parsed.Seasons, parsed.SceneTags)
+	}
+}
+
+func TestGenerateOutfitSuggestionsUsesContextForRuleFallback(t *testing.T) {
+	router := setupTraceTestRouter(t, 101)
+	for _, item := range []model.LifeTraceClosetItem{
+		{UserID: 101, HouseholdID: -101, Name: "运动速干衣", Category: "上装", Color: "蓝色", WarmthLevel: "轻薄", Seasons: model.StringList{"夏"}, SceneTags: model.StringList{"运动"}, Status: "active"},
+		{UserID: 101, HouseholdID: -101, Name: "厚毛衣", Category: "上装", Color: "灰色", WarmthLevel: "厚重", Seasons: model.StringList{"冬"}, SceneTags: model.StringList{"日常"}, Status: "active"},
+		{UserID: 101, HouseholdID: -101, Name: "运动短裤", Category: "下装", Color: "黑色", WarmthLevel: "轻薄", Seasons: model.StringList{"夏"}, SceneTags: model.StringList{"运动"}, Status: "active"},
+	} {
+		if err := database.GetDB().Create(&item).Error; err != nil {
+			t.Fatalf("seed closet item: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/outfit-suggestions", bytes.NewBufferString(`{"weatherText":"晴","temperature":30,"planType":"运动","scene":"运动","planTitle":"晚上跑步"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+	suggestions := data["suggestions"].([]interface{})
+	if len(suggestions) == 0 {
+		t.Fatalf("expected context-aware outfit suggestions, got %+v", data)
+	}
+	first := suggestions[0].(map[string]interface{})
+	items := first["items"].([]interface{})
+	if len(items) == 0 {
+		t.Fatalf("expected suggested items, got %+v", first)
+	}
+	firstItem := items[0].(map[string]interface{})
+	if firstItem["name"] != "运动速干衣" {
+		t.Fatalf("expected sport lightweight item to lead suggestions, got %+v", first)
 	}
 }
 
