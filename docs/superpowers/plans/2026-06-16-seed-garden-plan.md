@@ -1838,41 +1838,53 @@ func RegisterGardenRoutes(api *gin.RouterGroup, h *Handler, auth gin.HandlerFunc
 }
 ```
 
-- [ ] **Step 5：在 router.go 接入真实 AI**
+- [ ] **Step 5：在 router.go 接入 MVP AI（Mock-first 策略）**
+
+> **决策（2026-06-16）：** 当前 `internal/ai` 包接口完全是 mindarena 专属（GeneratePersonas/GenerateDebateRound/JudgeDebate），不暴露通用文本生成。MVP 阶段使用 garden 包内置的 `MockTextAI` 直接 wire，不修改 `internal/ai`、不创建对接 ARK 的 AIAdapter；真实 ARK / Gemini 接入推迟到 **M3.5** 单独任务。该决策与 mindarena 的 mock-first 一致。
 
 ```go
 // server/internal/router/router.go (mindarena 后)
 if db := database.GetDB(); db != nil {
     gardenStore := garden.NewGormStore(db)
-    aiSvc := ai.NewServiceFromEnv()
-    gardenAI := garden.NewAIAdapter(aiSvc) // 见下一步
+    gardenAI := garden.NewMockTextAI()
     manifestPath := "internal/garden/assets/manifest.json"
-    manifest, manifestErr := garden.LoadManifest(manifestPath)
+    gardenManifest, manifestErr := garden.LoadManifest(manifestPath)
     if manifestErr != nil {
-        logger.Warnf("garden manifest 加载失败: %v", manifestErr)
-        manifest = garden.NewManifest(nil)
+        gardenManifest = garden.NewManifest(nil)
     }
-    gardenSvc := garden.NewServiceWithDeps(gardenStore, gardenAI, manifest, time.Now().UnixNano())
+    gardenSvc := garden.NewServiceWithDeps(gardenStore, gardenAI, gardenManifest, time.Now().UnixNano())
     garden.RegisterGardenRoutes(api, garden.NewHandler(gardenSvc), middleware.Auth(cfg))
 }
 ```
 
-> import 增加 `valley-server/internal/garden`、`time`。
+> import 增加 `valley-server/internal/garden`、`time`。manifest 加载失败时静默 fallback 到空 manifest（当前 router.go 在该位置不暴露 logger）。
 
-- [ ] **Step 6：在 garden/ai.go 末尾追加 AI adapter**
+- [ ] **Step 6：在 garden/ai.go 末尾追加 MockTextAI（MVP 阶段）**
 
 ```go
-// 接入 internal/ai 服务（具体方法名跟随实际 ai.Service 签名调整）
-type AIAdapter struct{ svc *ai.Service }
+// MockTextAI 是 MVP 阶段的 mock 文本 AI 实现，按 prompt 关键词返回伪造的种子精灵 / 收获 / 通用回应文本。
+// 真实 ARK / Gemini 接入推迟到 M3.5 单独任务。
+type MockTextAI struct{}
 
-func NewAIAdapter(svc *ai.Service) *AIAdapter { return &AIAdapter{svc: svc} }
+func NewMockTextAI() *MockTextAI { return &MockTextAI{} }
 
-func (a *AIAdapter) GenerateText(ctx context.Context, prompt string) (string, error) {
-    return a.svc.GenerateText(ctx, prompt) // 若 ai.Service 没有 GenerateText，则改用其单条 chat 方法并取首个回复
+func (m *MockTextAI) GenerateText(ctx context.Context, prompt string) (string, error) {
+    select {
+    case <-ctx.Done():
+        return "", ctx.Err()
+    default:
+    }
+    if strings.Contains(prompt, "种子精灵") {
+        return `{"name_zh":"未读消息","concept_en":"unread message","tags":["anxious","phone","pink","bell","social"],"rarity":"R","mood":"焦虑","description":"那个一直没回的人，让你刷新了八十次。","first_log":"我刚刚发芽，铃铛上还沾着昨晚的提示音。"}`, nil
+    }
+    if strings.Contains(prompt, "fruit_name") {
+        return `{"final_story":"它从一颗未读消息长成了一段坦然的释怀。","fruit_name":"已读未回果","fruit_description":"果皮上印着一行未读小字，咬一口能吃到平静。","farewell_letter":"谢谢你陪我等到现在。"}`, nil
+    }
+    return "我又长大了一点，谢谢你今天还记得我。", nil
 }
 ```
 
-> 阅读 [server/internal/ai/service.go](file:///Users/bytedance/Desktop/study/valley-mas/server/internal/ai/service.go) 找到合适的单 prompt 文本生成方法名后再实现。如果只暴露 chat 系列方法，包装成「单 user message」即可。
+> import 增加 `strings`（已有 context）。**不要 import `valley-server/internal/ai`**——保留 mindarena 与 garden 的 AI 实现互相独立。M3.5 接入真实 ARK 时，再单独评估是抽公共 TextService 接口还是 garden 自己实现 HTTP 客户端。
 
 - [ ] **Step 7：联调命令**
 
@@ -1880,7 +1892,7 @@ func (a *AIAdapter) GenerateText(ctx context.Context, prompt string) (string, er
 cd server && go test ./internal/garden/...
 cd server && go build ./cmd/server
 git add server/internal/garden/ server/internal/router/router.go
-git commit -m "feat(garden): 暴露 GET /garden 与 POST /garden/plant，接入真实 AI 与 manifest"
+git commit -m "feat(garden): 暴露 GET /garden 与 POST /garden/plant，接入 MockTextAI 与 manifest"
 ```
 
 预期：所有 test PASS，build 成功。

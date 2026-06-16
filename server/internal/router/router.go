@@ -1,6 +1,8 @@
 package router
 
 import (
+	"time"
+
 	"valley-server/internal/ai"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
@@ -40,7 +42,13 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 		if db := database.GetDB(); db != nil {
 			gardenStore := garden.NewGormStore(db)
-			gardenSvc := garden.NewService(gardenStore)
+			gardenAI := garden.NewMockTextAI()
+			manifestPath := "internal/garden/assets/manifest.json"
+			gardenManifest, manifestErr := garden.LoadManifest(manifestPath)
+			if manifestErr != nil {
+				gardenManifest = garden.NewManifest(nil)
+			}
+			gardenSvc := garden.NewServiceWithDeps(gardenStore, gardenAI, gardenManifest, time.Now().UnixNano())
 			garden.RegisterGardenRoutes(api, garden.NewHandler(gardenSvc), middleware.Auth(cfg))
 		}
 
