@@ -1,0 +1,22 @@
+[
+  {
+    "key": "monday_morning",
+    "name_zh": "周一早上",
+    "rarity": "N",
+    "concept_tags": ["sleepy", "monday", "tired", "coffee", "morning"],
+    "stages": {
+      "1": "monday_morning_1.png",
+      "2": "monday_morning_2.png",
+      "3": "monday_morning_3.png"
+    },
+    "palette_hint": "warm brown"
+  },
+  {
+    "key": "unread_msg",
+    "name_zh": "未读消息",
+    "rarity": "R",
+    "concept_tags": ["anxious", "phone", "pink", "bell", "social"],
+    "stages": { "1": "unread_msg_1.png", "2": "unread_msg_2.png", "3": "unread_msg_3.png" },
+    "palette_hint": "soft pink"
+  }
+]
