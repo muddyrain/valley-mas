@@ -4,6 +4,7 @@ import (
 	"valley-server/internal/ai"
 	"valley-server/internal/config"
 	"valley-server/internal/database"
+	"valley-server/internal/garden"
 	"valley-server/internal/handler"
 	"valley-server/internal/lifetrace"
 	"valley-server/internal/logger"
@@ -36,6 +37,12 @@ func Setup(cfg *config.Config) *gin.Engine {
 		}
 		mindArenaService := mindarena.NewService(mindArenaStore, ai.NewServiceFromEnv())
 		mindarena.RegisterMindArenaRoutes(api, mindarena.NewHandler(mindArenaService))
+
+		if db := database.GetDB(); db != nil {
+			gardenStore := garden.NewGormStore(db)
+			gardenSvc := garden.NewService(gardenStore)
+			garden.RegisterGardenRoutes(api, garden.NewHandler(gardenSvc), middleware.Auth(cfg))
+		}
 
 		lifeTraceWeatherService := lifetrace.NewWeatherService(cfg.QWeather)
 		lifetrace.RegisterRoutes(
