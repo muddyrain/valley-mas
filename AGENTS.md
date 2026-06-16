@@ -29,6 +29,7 @@
 | Admin 后台 | `apps/admin/AGENTS.md` | 管理后台页面、审核与管理流程、Ant Design 管理端组件和 Admin API 封装。 |
 | AI Mind Arena | `apps/ai-mind-arena/AGENTS.md` | 脑内会议室 Next.js 前端、多人格辩论 UI、SSE 对战流和分享体验。 |
 | WorldSim | `apps/world-sim/AGENTS.md` | 沙盒文明模拟游戏、游戏设计文档、Phaser/Vite 子项目规则。 |
+| Seed Garden | `apps/seed-garden/AGENTS.md` | 「语种园」AI 挂机种田作品集小游戏的前端子项目。 |
 | Go 服务端 | `server/AGENTS.md` | Gin/GORM API、认证中间件、业务 handler、数据模型、AI 与 Mind Arena 服务端能力。 |
 
 ## 计划文档同步

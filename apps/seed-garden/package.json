@@ -1,0 +1,40 @@
+{
+  "name": "@valley/seed-garden",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5180",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4180",
+    "typecheck": "tsc --noEmit",
+    "check": "biome check src",
+    "lint": "biome lint src",
+    "format": "biome format --write src",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "axios": "catalog:shared-runtime",
+    "clsx": "catalog:shared-runtime",
+    "framer-motion": "^11.0.0",
+    "html2canvas": "^1.4.1",
+    "lucide-react": "catalog:shared-runtime",
+    "react": "catalog:react-19",
+    "react-dom": "catalog:react-19",
+    "react-router-dom": "catalog:shared-runtime",
+    "zustand": "catalog:shared-runtime"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:node-22",
+    "@types/react": "catalog:react-19",
+    "@types/react-dom": "catalog:react-19",
+    "@vitejs/plugin-react-swc": "catalog:vite-6",
+    "autoprefixer": "catalog:tailwind-3",
+    "postcss": "catalog:tailwind-3",
+    "tailwindcss": "catalog:tailwind-3",
+    "typescript": "catalog:ts-tooling",
+    "vite": "catalog:vite-6",
+    "vitest": "catalog:test"
+  }
+}
