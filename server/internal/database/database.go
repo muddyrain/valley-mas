@@ -217,10 +217,11 @@ func buildAutoMigratePlan(scope string) (autoMigratePlan, error) {
 }
 
 func allMigrationModels() []any {
-	models := make([]any, 0, len(coreMigrationModels())+len(contentDomainMigrationModels())+len(lifeTraceDomainMigrationModels()))
+	models := make([]any, 0, len(coreMigrationModels())+len(contentDomainMigrationModels())+len(lifeTraceDomainMigrationModels())+len(gardenDomainMigrationModels()))
 	models = append(models, coreMigrationModels()...)
 	models = append(models, contentDomainMigrationModels()...)
 	models = append(models, lifeTraceDomainMigrationModels()...)
+	models = append(models, gardenDomainMigrationModels()...)
 	return models
 }
 
@@ -328,6 +329,11 @@ func autoMigrateModelsByName() map[string]any {
 		"lifetrace_daily_brief_delivery":     &model.LifeTraceDailyBriefDelivery{},
 		"lifetrace_pantry_reminder_delivery": &model.LifeTracePantryReminderDelivery{},
 		"lifetrace_holiday_calendar":         &model.LifeTraceHolidayCalendar{},
+		"garden":                             &model.Garden{},
+		"garden_plant":                       &model.Plant{},
+		"garden_growth_log":                  &model.GrowthLog{},
+		"garden_interaction_log":             &model.InteractionLog{},
+		"garden_harvest":                     &model.Harvest{},
 	}
 }
 
@@ -448,6 +454,16 @@ func lifeTraceDomainMigrationModels() []any {
 		&model.LifeTraceDailyBriefDelivery{},
 		&model.LifeTracePantryReminderDelivery{},
 		&model.LifeTraceHolidayCalendar{},
+	}
+}
+
+func gardenDomainMigrationModels() []any {
+	return []any{
+		&model.Garden{},
+		&model.Plant{},
+		&model.GrowthLog{},
+		&model.InteractionLog{},
+		&model.Harvest{},
 	}
 }
 
