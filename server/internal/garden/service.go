@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strings"
 	"time"
 
@@ -377,4 +378,45 @@ func (s *Service) Harvest(ctx context.Context, userID, plantID uint64) (*model.H
 	})
 
 	return harvest, nil
+}
+
+// EncyclopediaItem 图鉴单项：已收获 Plant + 对应 Harvest。
+type EncyclopediaItem struct {
+	Plant   *model.Plant   `json:"plant"`
+	Harvest *model.Harvest `json:"harvest"`
+}
+
+// ListEncyclopedia 返回当前用户所有已收获植物及其 harvest，按 harvested_at desc。
+// store 缺失对应 harvest（理论不应发生）的项会被跳过，保证前端不会拿到 nil harvest。
+func (s *Service) ListEncyclopedia(ctx context.Context, userID uint64) ([]EncyclopediaItem, error) {
+	plants, err := s.store.ListHarvestedPlantsByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]EncyclopediaItem, 0, len(plants))
+	for i := range plants {
+		p := plants[i]
+		h, err := s.store.GetHarvest(ctx, p.ID)
+		if err != nil {
+			return nil, err
+		}
+		if h == nil {
+			continue
+		}
+		plantCopy := p
+		items = append(items, EncyclopediaItem{Plant: &plantCopy, Harvest: h})
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		ti := timePtrValue(items[i].Plant.HarvestedAt)
+		tj := timePtrValue(items[j].Plant.HarvestedAt)
+		return ti.After(tj)
+	})
+	return items, nil
+}
+
+func timePtrValue(t *time.Time) time.Time {
+	if t == nil {
+		return time.Time{}
+	}
+	return *t
 }

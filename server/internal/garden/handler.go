@@ -170,3 +170,13 @@ func (h *Handler) Harvest(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, harvest)
 }
+
+// GetEncyclopedia 处理 GET /garden/encyclopedia：返回当前用户已收获植物 + harvest 列表。
+func (h *Handler) GetEncyclopedia(c *gin.Context) {
+	items, err := h.svc.ListEncyclopedia(c.Request.Context(), h.userID(c))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, items)
+}

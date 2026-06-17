@@ -427,3 +427,80 @@ func TestHarvestAIFallback(t *testing.T) {
 		t.Fatalf("expected status=harvested even on fallback, got %s", updated.Status)
 	}
 }
+
+func TestListEncyclopediaEmpty(t *testing.T) {
+	store := newMemStore()
+	svc := garden.NewServiceWithDeps(store, &fakeAI{reply: ""}, garden.NewManifest(nil), garden.FixedRandSource(1))
+
+	items, err := svc.ListEncyclopedia(context.Background(), 7)
+	if err != nil {
+		t.Fatalf("ListEncyclopedia err: %v", err)
+	}
+	if items == nil {
+		t.Fatalf("expected non-nil empty slice, got nil")
+	}
+	if len(items) != 0 {
+		t.Fatalf("expected 0 items, got %d", len(items))
+	}
+}
+
+func TestListEncyclopediaWithHarvests(t *testing.T) {
+	store := newMemStore()
+	manifest := garden.NewManifest([]garden.AssetEntry{{Key: "k", Rarity: "N", Tags: []string{"x"}}})
+
+	// 第一棵：种 + 强制成熟 + 收获
+	first := newMatureTestPlant(t, store, 7)
+	first.Name = "未读消息"
+	if err := store.UpdatePlant(context.Background(), first); err != nil {
+		t.Fatalf("update first err: %v", err)
+	}
+	ai1 := &fakeAI{reply: `{"final_story":"s1","fruit_name":"果一","fruit_description":"d1","farewell_letter":"再见1"}`}
+	svc1 := garden.NewServiceWithDeps(store, ai1, manifest, garden.FixedRandSource(1))
+	if _, err := svc1.Harvest(context.Background(), 7, first.ID); err != nil {
+		t.Fatalf("first harvest err: %v", err)
+	}
+
+	// 让第二棵的 harvested_at 比第一棵晚一些，验证排序
+	time.Sleep(5 * time.Millisecond)
+
+	second := newMatureTestPlant(t, store, 7)
+	second.Name = "夜跑"
+	if err := store.UpdatePlant(context.Background(), second); err != nil {
+		t.Fatalf("update second err: %v", err)
+	}
+	ai2 := &fakeAI{reply: `{"final_story":"s2","fruit_name":"果二","fruit_description":"d2","farewell_letter":"再见2"}`}
+	svc2 := garden.NewServiceWithDeps(store, ai2, manifest, garden.FixedRandSource(2))
+	if _, err := svc2.Harvest(context.Background(), 7, second.ID); err != nil {
+		t.Fatalf("second harvest err: %v", err)
+	}
+
+	items, err := svc2.ListEncyclopedia(context.Background(), 7)
+	if err != nil {
+		t.Fatalf("ListEncyclopedia err: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(items))
+	}
+	// 按 harvested_at desc 排序：second 在前，first 在后
+	if items[0].Plant == nil || items[0].Harvest == nil {
+		t.Fatalf("expected non-nil plant + harvest in item 0, got %+v", items[0])
+	}
+	if items[0].Plant.ID != second.ID {
+		t.Fatalf("expected newest harvest first (plant id %d), got %d", second.ID, items[0].Plant.ID)
+	}
+	if items[0].Harvest.FruitName != "果二" {
+		t.Fatalf("expected fruit_name=果二, got %s", items[0].Harvest.FruitName)
+	}
+	if items[1].Plant.ID != first.ID {
+		t.Fatalf("expected oldest harvest last (plant id %d), got %d", first.ID, items[1].Plant.ID)
+	}
+
+	// 跨用户隔离
+	other, err := svc2.ListEncyclopedia(context.Background(), 999)
+	if err != nil {
+		t.Fatalf("other user err: %v", err)
+	}
+	if len(other) != 0 {
+		t.Fatalf("expected 0 items for other user, got %d", len(other))
+	}
+}

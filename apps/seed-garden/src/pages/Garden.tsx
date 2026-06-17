@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { fetchGarden } from '@/api/garden';
 import { plantSeed } from '@/api/plant';
 import { PlantPot } from '@/components/PlantPot';
@@ -32,6 +32,12 @@ export default function Garden() {
       <header className="text-center pt-6">
         <h1 className="text-3xl font-bold text-garden-ink">语种园</h1>
         <p className="text-garden-ink/60 text-sm">把任何东西种成一棵从未存在过的植物</p>
+        <Link
+          to="/garden/encyclopedia"
+          className="mt-2 inline-block text-xs text-garden-ink/60 underline-offset-4 hover:text-garden-ink hover:underline"
+        >
+          图鉴 →
+        </Link>
       </header>
       <div className="grid grid-cols-3 gap-3">
         {slots.map((_, i) => (

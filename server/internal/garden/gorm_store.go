@@ -98,6 +98,9 @@ func (s *gormStore) CreateHarvest(ctx context.Context, h *model.Harvest) error {
 func (s *gormStore) GetHarvest(ctx context.Context, plantID uint64) (*model.Harvest, error) {
 	var h model.Harvest
 	if err := s.db.WithContext(ctx).Where("plant_id = ?", plantID).First(&h).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return &h, nil
