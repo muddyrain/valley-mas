@@ -1,7 +1,7 @@
 import html2canvas from 'html2canvas';
 import { useRef, useState } from 'react';
 import type { Harvest, Plant } from '@/api/types';
-import { plantFallbackDataUrl } from '@/lib/plantFallback';
+import { plantFallbackBg, plantFallbackEmoji } from '@/lib/plantFallback';
 import { rarityFrame } from '@/lib/rarityStyles';
 import { RarityBadge } from './RarityBadge';
 
@@ -21,11 +21,13 @@ function truncate(text: string, limit: number): string {
 export function ShareCardExport({ plant, harvest }: ShareCardExportProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  const [imgFailed, setImgFailed] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
   const src = `/assets/encyclopedia/${plant.rarity}/${plant.asset_key}_${plant.stage_max}.png`;
-  const fallback = plantFallbackDataUrl(plant.rarity);
+  const bg = plantFallbackBg(plant.rarity);
+  const emoji = plantFallbackEmoji(plant.rarity);
   const farewell = truncate(harvest.farewell_letter, FAREWELL_LIMIT);
 
   const handleExport = async () => {
@@ -33,19 +35,20 @@ export function ShareCardExport({ plant, harvest }: ShareCardExportProps) {
     setExporting(true);
     setErrMsg(null);
     try {
-      // 等图片真正解码完，避免 html2canvas 截到空白
       const img = imgRef.current;
-      if (img && !img.complete) {
-        await new Promise<void>((resolve) => {
-          img.addEventListener('load', () => resolve(), { once: true });
-          img.addEventListener('error', () => resolve(), { once: true });
-        });
-      }
-      if (img?.decode) {
-        try {
-          await img.decode();
-        } catch {
-          // decode 失败不阻塞导出（fallback 图已通过 onError 切换）
+      if (img && !imgFailed) {
+        if (!img.complete) {
+          await new Promise<void>((resolve) => {
+            img.addEventListener('load', () => resolve(), { once: true });
+            img.addEventListener('error', () => resolve(), { once: true });
+          });
+        }
+        if (img.decode) {
+          try {
+            await img.decode();
+          } catch {
+            // decode 失败也不阻塞，由 onError 切换到 fallback DOM
+          }
         }
       }
       const canvas = await html2canvas(cardRef.current, {
@@ -80,17 +83,21 @@ export function ShareCardExport({ plant, harvest }: ShareCardExportProps) {
           <span className="text-xs font-bold tracking-widest text-amber-800/80">语种园</span>
           <RarityBadge rarity={plant.rarity} />
         </div>
-        <div className="aspect-square w-full bg-amber-100/70 rounded-2xl flex items-center justify-center">
-          <img
-            ref={imgRef}
-            src={src}
-            alt={harvest.fruit_name}
-            className="max-h-full max-w-full rounded-2xl object-contain"
-            onError={(e) => {
-              const el = e.currentTarget;
-              if (el.src !== fallback) el.src = fallback;
-            }}
-          />
+        <div
+          className="aspect-square w-full rounded-2xl flex items-center justify-center"
+          style={{ backgroundColor: bg }}
+        >
+          {imgFailed ? (
+            <span className="text-[120px] leading-none select-none">{emoji}</span>
+          ) : (
+            <img
+              ref={imgRef}
+              src={src}
+              alt={harvest.fruit_name}
+              className="max-h-full max-w-full rounded-2xl object-contain"
+              onError={() => setImgFailed(true)}
+            />
+          )}
         </div>
         <div className="flex flex-col gap-1">
           <p className="text-lg font-bold text-garden-ink">{harvest.fruit_name}</p>
