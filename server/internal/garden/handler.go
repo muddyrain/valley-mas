@@ -48,17 +48,24 @@ func (h *Handler) PlantSeed(c *gin.Context) {
 	c.JSON(http.StatusOK, plant)
 }
 
-// userID 从 gin.Context 中读取认证中间件写入的 user_id。
+// userID 从 gin.Context 中读取认证中间件写入的 userId。
+// 项目通用中间件写入 key=userId、类型 int64；测试中也兼容 uint64。
 func (h *Handler) userID(c *gin.Context) uint64 {
-	v, ok := c.Get("user_id")
+	v, ok := c.Get("userId")
 	if !ok {
 		return 0
 	}
-	id, ok := v.(uint64)
-	if !ok {
+	switch id := v.(type) {
+	case int64:
+		if id < 0 {
+			return 0
+		}
+		return uint64(id)
+	case uint64:
+		return id
+	default:
 		return 0
 	}
-	return id
 }
 
 // GetPlantDetail 处理 GET /garden/plant/:id：返回植物详情 + 成长日志。

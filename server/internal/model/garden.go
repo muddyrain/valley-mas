@@ -18,7 +18,7 @@ func (Garden) TableName() string { return "gardens" }
 type Plant struct {
 	ID           uint64     `gorm:"primaryKey;autoIncrement"             json:"id"`
 	UserID       uint64     `gorm:"index;not null"                       json:"user_id"`
-	SlotIndex    int        `gorm:"not null;default:-1"                  json:"slot_index"`
+	SlotIndex    int        `gorm:"not null"                             json:"slot_index"`
 	ConceptInput string     `gorm:"type:varchar(255);not null"           json:"concept_input"`
 	ConceptEN    string     `gorm:"type:varchar(120);not null"           json:"concept_en"`
 	Name         string     `gorm:"type:varchar(120);not null"           json:"name"`

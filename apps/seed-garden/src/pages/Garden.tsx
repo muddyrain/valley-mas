@@ -13,6 +13,7 @@ export default function Garden() {
   const { garden, plants, setGarden, setPlants, upsertPlant } = useGardenStore();
   const [loading, setLoading] = useState(false);
   const [birthing, setBirthing] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -37,14 +38,19 @@ export default function Garden() {
           <PlantPot key={i} slotIndex={i} plant={plants.find((p) => p.slot_index === i)} />
         ))}
       </div>
+      {err && <div className="rounded-2xl bg-red-100/80 px-4 py-3 text-sm text-red-700">{err}</div>}
       <SeedInputBar
         loading={loading}
         onSubmit={async (concept, style) => {
           setLoading(true);
           setBirthing(true);
+          setErr(null);
           try {
             const p = await plantSeed(concept, style);
             upsertPlant(p);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : '播种失败，请稍后再试';
+            setErr(msg);
           } finally {
             setLoading(false);
             setTimeout(() => setBirthing(false), 800);

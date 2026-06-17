@@ -39,7 +39,7 @@ func TestPlantHandlerCreatesPlant(t *testing.T) {
 	r := gin.New()
 	api := r.Group("/api/v1")
 	fakeAuth := func(c *gin.Context) {
-		c.Set("user_id", uint64(42))
+		c.Set("userId", uint64(42))
 		c.Next()
 	}
 	garden.RegisterGardenRoutes(api, garden.NewHandler(svc), fakeAuth)
