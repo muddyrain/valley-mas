@@ -5,6 +5,7 @@ import { fetchPlantDetail } from '@/api/plant';
 import type { PlantDetailView } from '@/api/types';
 import { GrowthTimeline } from '@/components/GrowthTimeline';
 import { RarityBadge } from '@/components/RarityBadge';
+import { plantFallbackDataUrl } from '@/lib/plantFallback';
 import { rarityFrame } from '@/lib/rarityStyles';
 import { formatCountdown } from '@/lib/stageTimer';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -63,6 +64,7 @@ export default function PlantDetail() {
 
   const p = view.plant;
   const src = `/assets/encyclopedia/${p.rarity}/${p.asset_key}_${p.stage}.png`;
+  const fallback = plantFallbackDataUrl(p.rarity);
   const isGrowing = p.status === 'growing';
 
   return (
@@ -75,7 +77,16 @@ export default function PlantDetail() {
           <h1 className="text-xl font-bold text-garden-ink">{p.name}</h1>
           <RarityBadge rarity={p.rarity} />
         </div>
-        <img src={src} alt={p.name} className="w-full max-w-sm mx-auto" loading="lazy" />
+        <img
+          src={src}
+          alt={p.name}
+          className="w-full max-w-sm mx-auto"
+          loading="lazy"
+          onError={(e) => {
+            const img = e.currentTarget;
+            if (img.src !== fallback) img.src = fallback;
+          }}
+        />
         <p className="text-sm text-garden-ink/70 mt-2">{p.description}</p>
         <p className="text-xs text-garden-ink/60 mt-2">
           阶段 {p.stage}/{p.stage_max} · 状态 {STATUS_LABEL[p.status] ?? p.status}

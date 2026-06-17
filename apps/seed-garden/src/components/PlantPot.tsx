@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
 import type { Plant } from '@/api/types';
+import { plantFallbackDataUrl } from '@/lib/plantFallback';
 import { rarityFrame } from '@/lib/rarityStyles';
 import { RarityBadge } from './RarityBadge';
 
@@ -13,6 +14,7 @@ export function PlantPot({ plant, slotIndex }: { plant?: Plant; slotIndex: numbe
     );
   }
   const src = `/assets/encyclopedia/${plant.rarity}/${plant.asset_key}_${plant.stage}.png`;
+  const fallback = plantFallbackDataUrl(plant.rarity);
   return (
     <Link
       to={`/garden/plant/${plant.id}`}
@@ -25,7 +27,16 @@ export function PlantPot({ plant, slotIndex }: { plant?: Plant; slotIndex: numbe
         <span className="font-medium text-garden-ink">{plant.name}</span>
         <RarityBadge rarity={plant.rarity} />
       </div>
-      <img src={src} alt={plant.name} className="w-full h-[80%] object-contain" loading="lazy" />
+      <img
+        src={src}
+        alt={plant.name}
+        className="w-full h-[80%] object-contain"
+        loading="lazy"
+        onError={(e) => {
+          const img = e.currentTarget;
+          if (img.src !== fallback) img.src = fallback;
+        }}
+      />
       <div className="text-center text-xs text-garden-ink/60">
         阶段 {plant.stage}/{plant.stage_max}
       </div>
