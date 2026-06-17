@@ -36,3 +36,19 @@ export interface GardenView {
   garden: Garden;
   plants: Plant[];
 }
+
+export type GrowthLogType = 'birth' | 'grow' | 'event' | 'harvest';
+
+export interface GrowthLog {
+  id: number;
+  plant_id: number;
+  stage: number;
+  type: GrowthLogType;
+  content: string;
+  created_at: string;
+}
+
+export interface PlantDetailView {
+  plant: Plant;
+  logs: GrowthLog[];
+}
