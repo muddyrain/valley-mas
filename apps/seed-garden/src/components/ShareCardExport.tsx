@@ -20,6 +20,7 @@ function truncate(text: string, limit: number): string {
 
 export function ShareCardExport({ plant, harvest }: ShareCardExportProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const [exporting, setExporting] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
@@ -32,10 +33,26 @@ export function ShareCardExport({ plant, harvest }: ShareCardExportProps) {
     setExporting(true);
     setErrMsg(null);
     try {
+      // 等图片真正解码完，避免 html2canvas 截到空白
+      const img = imgRef.current;
+      if (img && !img.complete) {
+        await new Promise<void>((resolve) => {
+          img.addEventListener('load', () => resolve(), { once: true });
+          img.addEventListener('error', () => resolve(), { once: true });
+        });
+      }
+      if (img?.decode) {
+        try {
+          await img.decode();
+        } catch {
+          // decode 失败不阻塞导出（fallback 图已通过 onError 切换）
+        }
+      }
       const canvas = await html2canvas(cardRef.current, {
         scale: 2,
-        backgroundColor: null,
+        backgroundColor: '#fffbeb',
         useCORS: true,
+        allowTaint: true,
         logging: false,
       });
       const dataUrl = canvas.toDataURL('image/png');
@@ -63,15 +80,15 @@ export function ShareCardExport({ plant, harvest }: ShareCardExportProps) {
           <span className="text-xs font-bold tracking-widest text-amber-800/80">语种园</span>
           <RarityBadge rarity={plant.rarity} />
         </div>
-        <div className="aspect-square w-full overflow-hidden rounded-2xl bg-amber-100/70">
+        <div className="aspect-square w-full bg-amber-100/70 rounded-2xl flex items-center justify-center">
           <img
+            ref={imgRef}
             src={src}
             alt={harvest.fruit_name}
-            crossOrigin="anonymous"
-            className="h-full w-full object-contain"
+            className="max-h-full max-w-full rounded-2xl object-contain"
             onError={(e) => {
-              const img = e.currentTarget;
-              if (img.src !== fallback) img.src = fallback;
+              const el = e.currentTarget;
+              if (el.src !== fallback) el.src = fallback;
             }}
           />
         </div>
