@@ -1,6 +1,8 @@
+import axios from 'axios';
 import clsx from 'clsx';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
+import { waterPlant } from '@/api/interaction';
 import { fetchPlantDetail } from '@/api/plant';
 import type { PlantDetailView } from '@/api/types';
 import { GrowthTimeline } from '@/components/GrowthTimeline';
@@ -22,6 +24,10 @@ export default function PlantDetail() {
   const [view, setView] = useState<PlantDetailView | null>(null);
   const [tick, setTick] = useState(Date.now());
   const [error, setError] = useState<string | null>(null);
+  const [watering, setWatering] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reloadRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!id || !token) return;
@@ -37,6 +43,7 @@ export default function PlantDetail() {
         .catch((e: Error) => {
           if (alive) setError(e.message);
         });
+    reloadRef.current = load;
     load();
     const poll = setInterval(load, 30_000);
     const ticker = setInterval(() => setTick(Date.now()), 1000);
@@ -46,6 +53,38 @@ export default function PlantDetail() {
       clearInterval(ticker);
     };
   }, [id, token]);
+
+  useEffect(
+    () => () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    },
+    [],
+  );
+
+  const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(msg);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleWater = async () => {
+    if (!id || watering) return;
+    setWatering(true);
+    try {
+      const res = await waterPlant(Number(id));
+      showToast(res.reply);
+      reloadRef.current();
+    } catch (e) {
+      if (axios.isAxiosError(e) && e.response?.status === 429) {
+        showToast('今天浇得有点多了，植物想休息一下');
+      } else {
+        const msg = e instanceof Error ? e.message : '浇水失败，请稍后再试';
+        showToast(msg);
+      }
+    } finally {
+      setWatering(false);
+    }
+  };
 
   if (!token) return <Navigate to="/login" replace />;
 
@@ -93,6 +132,30 @@ export default function PlantDetail() {
           {isGrowing && ` · 距下一阶段 ${formatCountdown(p.next_stage_at, tick)}`}
         </p>
       </section>
+      {isGrowing && (
+        <div className="flex flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={handleWater}
+            disabled={watering}
+            className={clsx(
+              'rounded-full px-6 py-2 text-sm font-bold text-white shadow transition',
+              watering ? 'bg-garden-ink/40' : 'bg-garden-ink hover:bg-garden-ink/90',
+            )}
+          >
+            {watering ? '浇水中...' : '浇水'}
+          </button>
+          <div
+            className={clsx(
+              'min-h-[1.5rem] text-center text-sm text-garden-ink/80 transition-opacity duration-500',
+              toast ? 'opacity-100' : 'opacity-0',
+            )}
+            aria-live="polite"
+          >
+            {toast}
+          </div>
+        </div>
+      )}
       <section>
         <h2 className="text-sm font-bold text-garden-ink/70 mb-2">成长日志</h2>
         <GrowthTimeline logs={view.logs} />

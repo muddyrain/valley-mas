@@ -10,10 +10,11 @@ import (
 )
 
 type memStore struct {
-	g      *model.Garden
-	plants []model.Plant
-	logs   []model.GrowthLog
-	nextID uint64
+	g               *model.Garden
+	plants          []model.Plant
+	logs            []model.GrowthLog
+	interactionLogs []model.InteractionLog
+	nextID          uint64
 }
 
 func newMemStore() *memStore { return &memStore{nextID: 1} }
@@ -85,11 +86,24 @@ func (m *memStore) ListGrowthLogs(_ context.Context, plantID uint64) ([]model.Gr
 	}
 	return out, nil
 }
-func (m *memStore) AppendInteractionLog(_ context.Context, _ *model.InteractionLog) error {
+func (m *memStore) AppendInteractionLog(_ context.Context, log *model.InteractionLog) error {
+	log.ID = m.nextID
+	m.nextID++
+	if log.CreatedAt.IsZero() {
+		log.CreatedAt = time.Now()
+	}
+	m.interactionLogs = append(m.interactionLogs, *log)
 	return nil
 }
-func (m *memStore) CountTodayInteractions(_ context.Context, _ uint64, _ string) (int, error) {
-	return 0, nil
+func (m *memStore) CountTodayInteractions(_ context.Context, plantID uint64, action string) (int, error) {
+	today := time.Now().Truncate(24 * time.Hour)
+	count := 0
+	for _, l := range m.interactionLogs {
+		if l.PlantID == plantID && l.Action == action && !l.CreatedAt.Before(today) {
+			count++
+		}
+	}
+	return count, nil
 }
 func (m *memStore) CreateHarvest(_ context.Context, _ *model.Harvest) error            { return nil }
 func (m *memStore) GetHarvest(_ context.Context, _ uint64) (*model.Harvest, error)     { return nil, nil }
@@ -137,5 +151,83 @@ func TestPlantSeedSlotsFull(t *testing.T) {
 	}
 	if _, err := svc.PlantSeed(context.Background(), 7, garden.PlantSeedReq{Concept: "x", WaterStyle: "water"}); err != garden.ErrSlotsFull {
 		t.Fatalf("expected ErrSlotsFull, got %v", err)
+	}
+}
+
+func newWaterTestPlant(t *testing.T, store *memStore, userID uint64) *model.Plant {
+	t.Helper()
+	store.EnsureGarden(context.Background(), userID)
+	p := &model.Plant{
+		UserID:      userID,
+		SlotIndex:   0,
+		Name:        "未读消息",
+		Mood:        "焦虑",
+		WaterStyle:  garden.WaterPlain,
+		Rarity:      garden.RarityR,
+		Stage:       1,
+		StageMax:    3,
+		AssetKey:    "unread_msg",
+		NextStageAt: time.Now().Add(10 * time.Minute),
+		Status:      garden.StatusGrowing,
+	}
+	if err := store.CreatePlant(context.Background(), p); err != nil {
+		t.Fatalf("create plant: %v", err)
+	}
+	return p
+}
+
+func TestWaterHappyPath(t *testing.T) {
+	store := newMemStore()
+	p := newWaterTestPlant(t, store, 7)
+	before := p.NextStageAt
+	ai := &fakeAI{reply: "咕嘟咕嘟，谢谢你今天还记得我。"}
+	svc := garden.NewServiceWithDeps(store, ai, garden.NewManifest(nil), garden.FixedRandSource(1))
+
+	reply, err := svc.Water(context.Background(), 7, p.ID)
+	if err != nil {
+		t.Fatalf("Water err: %v", err)
+	}
+	if reply == "" {
+		t.Fatalf("expected non-empty reply")
+	}
+
+	updated, _ := store.GetPlant(context.Background(), p.ID)
+	delta := before.Sub(updated.NextStageAt)
+	if delta < 29*time.Second || delta > 31*time.Second {
+		t.Fatalf("expected next_stage_at advanced ~30s, got delta=%s", delta)
+	}
+
+	if got := len(store.interactionLogs); got != 1 {
+		t.Fatalf("expected 1 interaction log, got %d", got)
+	}
+	if store.interactionLogs[0].Action != garden.ActionWater || store.interactionLogs[0].AIReply == "" {
+		t.Fatalf("unexpected interaction log: %+v", store.interactionLogs[0])
+	}
+}
+
+func TestWaterDailyLimit(t *testing.T) {
+	store := newMemStore()
+	p := newWaterTestPlant(t, store, 7)
+	ai := &fakeAI{reply: "咕嘟"}
+	svc := garden.NewServiceWithDeps(store, ai, garden.NewManifest(nil), garden.FixedRandSource(1))
+
+	for i := 0; i < 5; i++ {
+		if _, err := svc.Water(context.Background(), 7, p.ID); err != nil {
+			t.Fatalf("water %d err: %v", i, err)
+		}
+	}
+	if _, err := svc.Water(context.Background(), 7, p.ID); err != garden.ErrInteractionLimited {
+		t.Fatalf("expected ErrInteractionLimited, got %v", err)
+	}
+}
+
+func TestWaterPlantNotOwned(t *testing.T) {
+	store := newMemStore()
+	p := newWaterTestPlant(t, store, 7)
+	ai := &fakeAI{reply: "咕嘟"}
+	svc := garden.NewServiceWithDeps(store, ai, garden.NewManifest(nil), garden.FixedRandSource(1))
+
+	if _, err := svc.Water(context.Background(), 999, p.ID); err != garden.ErrPlantNotOwned {
+		t.Fatalf("expected ErrPlantNotOwned, got %v", err)
 	}
 }

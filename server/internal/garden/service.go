@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"strings"
 	"time"
 
 	"valley-server/internal/model"
@@ -187,12 +188,9 @@ type PlantDetailView struct {
 
 // GetPlantDetail 返回植物详情；查询前 lazy advance，确保前端始终看到最新阶段。
 func (s *Service) GetPlantDetail(ctx context.Context, userID, plantID uint64) (*PlantDetailView, error) {
-	p, err := s.store.GetPlant(ctx, plantID)
+	p, err := s.ownedPlant(ctx, userID, plantID)
 	if err != nil {
 		return nil, err
-	}
-	if p.UserID != userID {
-		return nil, ErrPlantNotOwned
 	}
 	if err := s.AdvancePlant(ctx, p); err != nil {
 		return nil, err
@@ -202,4 +200,59 @@ func (s *Service) GetPlantDetail(ctx context.Context, userID, plantID uint64) (*
 		return nil, err
 	}
 	return &PlantDetailView{Plant: p, Logs: logs}, nil
+}
+
+// ownedPlant 加载并校验植物归属，供 Water/Chat/Harvest 等互动接口复用。
+func (s *Service) ownedPlant(ctx context.Context, userID, plantID uint64) (*model.Plant, error) {
+	p, err := s.store.GetPlant(ctx, plantID)
+	if err != nil {
+		return nil, err
+	}
+	if p.UserID != userID {
+		return nil, ErrPlantNotOwned
+	}
+	return p, nil
+}
+
+// Water 浇一次水：每天每株最多 5 次，调用 AI 给出口语化回应，并把成长加速 30s。
+func (s *Service) Water(ctx context.Context, userID, plantID uint64) (string, error) {
+	p, err := s.ownedPlant(ctx, userID, plantID)
+	if err != nil {
+		return "", err
+	}
+	count, err := s.store.CountTodayInteractions(ctx, plantID, ActionWater)
+	if err != nil {
+		return "", err
+	}
+	if count >= 5 {
+		return "", ErrInteractionLimited
+	}
+
+	const fallbackReply = "（咕嘟咕嘟，水声）"
+	reply := fallbackReply
+	if s.ai != nil {
+		out, aiErr := s.ai.GenerateText(ctx, PromptWaterReply(p.Name, p.Mood, p.WaterStyle))
+		if aiErr == nil {
+			if trimmed := strings.TrimSpace(out); trimmed != "" {
+				reply = trimmed
+			}
+		}
+	}
+
+	if err := s.store.AppendInteractionLog(ctx, &model.InteractionLog{
+		PlantID: plantID,
+		Action:  ActionWater,
+		AIReply: reply,
+	}); err != nil {
+		return "", err
+	}
+
+	if p.Status == StatusGrowing {
+		p.NextStageAt = p.NextStageAt.Add(-30 * time.Second)
+		if err := s.store.UpdatePlant(ctx, p); err != nil {
+			return "", err
+		}
+	}
+
+	return reply, nil
 }

@@ -89,3 +89,27 @@ func (h *Handler) GetPlantDetail(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, view)
 }
+
+// Water 处理 POST /garden/plant/:id/water：每日每株最多 5 次，返回 AI 回应文本。
+func (h *Handler) Water(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_id"})
+		return
+	}
+	reply, err := h.svc.Water(c.Request.Context(), h.userID(c), id)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrPlantNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+		case errors.Is(err, ErrPlantNotOwned):
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		case errors.Is(err, ErrInteractionLimited):
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "interaction_limited"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"reply": reply})
+}
