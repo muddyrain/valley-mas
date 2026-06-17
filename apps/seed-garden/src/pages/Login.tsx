@@ -17,8 +17,20 @@ export default function Login() {
           e.preventDefault();
           setErr(null);
           try {
-            const resp = await request.post<{ token: string }>('/login', { email, password });
-            setToken(resp.data.token);
+            const resp = await request.post<{
+              code: number;
+              message: string;
+              data?: { token: string };
+            }>('/login', {
+              email,
+              password,
+              loginType: 'password',
+            });
+            if (resp.data.code !== 0 || !resp.data.data?.token) {
+              setErr(resp.data.message || '登录失败');
+              return;
+            }
+            setToken(resp.data.data.token);
             nav('/garden', { replace: true });
           } catch (e2) {
             setErr((e2 as Error).message);
