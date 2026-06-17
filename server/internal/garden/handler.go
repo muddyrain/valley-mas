@@ -113,3 +113,36 @@ func (h *Handler) Water(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"reply": reply})
 }
+
+// Chat 处理 POST /garden/plant/:id/chat：仅成熟植物可聊，每日每株最多 3 次。
+func (h *Handler) Chat(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_id"})
+		return
+	}
+	var req ChatReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "empty_message"})
+		return
+	}
+	reply, err := h.svc.Chat(c.Request.Context(), h.userID(c), id, req.Message)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrPlantNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+		case errors.Is(err, ErrPlantNotOwned):
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		case errors.Is(err, ErrNotMature):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "not_mature"})
+		case errors.Is(err, ErrInteractionLimited):
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "interaction_limited"})
+		case err.Error() == "empty_message":
+			c.JSON(http.StatusBadRequest, gin.H{"error": "empty_message"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"reply": reply})
+}

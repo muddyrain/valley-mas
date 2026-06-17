@@ -2,7 +2,7 @@ import axios from 'axios';
 import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { waterPlant } from '@/api/interaction';
+import { chatPlant, waterPlant } from '@/api/interaction';
 import { fetchPlantDetail } from '@/api/plant';
 import type { PlantDetailView } from '@/api/types';
 import { GrowthTimeline } from '@/components/GrowthTimeline';
@@ -28,6 +28,10 @@ export default function PlantDetail() {
   const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reloadRef = useRef<() => void>(() => {});
+  const [chatInput, setChatInput] = useState('');
+  const [chatting, setChatting] = useState(false);
+  const [lastChat, setLastChat] = useState<{ user: string; reply: string } | null>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id || !token) return;
@@ -86,6 +90,31 @@ export default function PlantDetail() {
     }
   };
 
+  const handleChat = async () => {
+    if (!id || chatting) return;
+    const msg = chatInput.trim();
+    if (!msg) {
+      setChatError('说点什么再发吧');
+      return;
+    }
+    setChatting(true);
+    setChatError(null);
+    try {
+      const res = await chatPlant(Number(id), msg);
+      setLastChat({ user: msg, reply: res.reply });
+      setChatInput('');
+    } catch (e) {
+      if (axios.isAxiosError(e) && e.response?.status === 429) {
+        setChatError('今天聊得有点多了，明天再来');
+      } else {
+        const errMsg = e instanceof Error ? e.message : '聊天失败，请稍后再试';
+        setChatError(errMsg);
+      }
+    } finally {
+      setChatting(false);
+    }
+  };
+
   if (!token) return <Navigate to="/login" replace />;
 
   if (error) {
@@ -105,6 +134,7 @@ export default function PlantDetail() {
   const src = `/assets/encyclopedia/${p.rarity}/${p.asset_key}_${p.stage}.png`;
   const fallback = plantFallbackDataUrl(p.rarity);
   const isGrowing = p.status === 'growing';
+  const isMature = p.status === 'mature';
 
   return (
     <main className="mx-auto max-w-xl p-4 flex flex-col gap-4">
@@ -155,6 +185,51 @@ export default function PlantDetail() {
             {toast}
           </div>
         </div>
+      )}
+      {isMature && (
+        <section className="flex flex-col gap-2 rounded-3xl border border-garden-ink/10 bg-white/60 p-4">
+          <h2 className="text-sm font-bold text-garden-ink/70">跟它聊聊</h2>
+          <textarea
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            maxLength={200}
+            rows={3}
+            placeholder="说点什么..."
+            disabled={chatting}
+            className="w-full resize-none rounded-2xl border border-garden-ink/15 bg-white/80 p-3 text-sm text-garden-ink outline-none focus:border-garden-ink/40 disabled:opacity-60"
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-garden-ink/50">{chatInput.length}/200</span>
+            <button
+              type="button"
+              onClick={handleChat}
+              disabled={chatting}
+              className={clsx(
+                'rounded-full px-5 py-1.5 text-sm font-bold text-white shadow transition',
+                chatting ? 'bg-garden-ink/40' : 'bg-garden-ink hover:bg-garden-ink/90',
+              )}
+            >
+              {chatting ? '发送中...' : '跟它聊聊'}
+            </button>
+          </div>
+          {chatError && (
+            <p className="text-xs text-red-500" aria-live="polite">
+              {chatError}
+            </p>
+          )}
+          {lastChat && (
+            <div className="flex flex-col gap-1 rounded-2xl bg-garden-ink/5 p-3 text-sm text-garden-ink/80">
+              <p>
+                <span className="font-bold text-garden-ink/70">我说：</span>
+                {lastChat.user}
+              </p>
+              <p>
+                <span className="font-bold text-garden-ink/70">它说：</span>
+                {lastChat.reply}
+              </p>
+            </div>
+          )}
+        </section>
       )}
       <section>
         <h2 className="text-sm font-bold text-garden-ink/70 mb-2">成长日志</h2>

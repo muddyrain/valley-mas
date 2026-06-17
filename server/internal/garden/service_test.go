@@ -231,3 +231,83 @@ func TestWaterPlantNotOwned(t *testing.T) {
 		t.Fatalf("expected ErrPlantNotOwned, got %v", err)
 	}
 }
+
+func newMatureTestPlant(t *testing.T, store *memStore, userID uint64) *model.Plant {
+	t.Helper()
+	store.EnsureGarden(context.Background(), userID)
+	p := &model.Plant{
+		UserID:      userID,
+		SlotIndex:   0,
+		Name:        "未读消息",
+		Mood:        "释然",
+		WaterStyle:  garden.WaterPlain,
+		Rarity:      garden.RarityR,
+		Stage:       3,
+		StageMax:    3,
+		AssetKey:    "unread_msg",
+		NextStageAt: time.Now(),
+		Status:      garden.StatusMature,
+	}
+	if err := store.CreatePlant(context.Background(), p); err != nil {
+		t.Fatalf("create plant: %v", err)
+	}
+	return p
+}
+
+func TestChatOnMature(t *testing.T) {
+	store := newMemStore()
+	p := newMatureTestPlant(t, store, 7)
+	ai := &fakeAI{reply: "你来啦，我就知道你今天会来。"}
+	svc := garden.NewServiceWithDeps(store, ai, garden.NewManifest(nil), garden.FixedRandSource(1))
+
+	reply, err := svc.Chat(context.Background(), 7, p.ID, "今天怎么样？")
+	if err != nil {
+		t.Fatalf("Chat err: %v", err)
+	}
+	if reply == "" {
+		t.Fatalf("expected non-empty reply")
+	}
+	if got := len(store.interactionLogs); got != 1 {
+		t.Fatalf("expected 1 interaction log, got %d", got)
+	}
+	log := store.interactionLogs[0]
+	if log.Action != garden.ActionChat {
+		t.Fatalf("expected action chat, got %s", log.Action)
+	}
+	if log.UserInput != "今天怎么样？" {
+		t.Fatalf("unexpected user_input: %q", log.UserInput)
+	}
+	if log.AIReply == "" {
+		t.Fatalf("expected ai_reply not empty")
+	}
+}
+
+func TestChatOnGrowingForbidden(t *testing.T) {
+	store := newMemStore()
+	p := newWaterTestPlant(t, store, 7)
+	ai := &fakeAI{reply: "..."}
+	svc := garden.NewServiceWithDeps(store, ai, garden.NewManifest(nil), garden.FixedRandSource(1))
+
+	if _, err := svc.Chat(context.Background(), 7, p.ID, "嗨"); err != garden.ErrNotMature {
+		t.Fatalf("expected ErrNotMature, got %v", err)
+	}
+	if got := len(store.interactionLogs); got != 0 {
+		t.Fatalf("expected 0 interaction logs, got %d", got)
+	}
+}
+
+func TestChatDailyLimit(t *testing.T) {
+	store := newMemStore()
+	p := newMatureTestPlant(t, store, 7)
+	ai := &fakeAI{reply: "嗯。"}
+	svc := garden.NewServiceWithDeps(store, ai, garden.NewManifest(nil), garden.FixedRandSource(1))
+
+	for i := 0; i < 3; i++ {
+		if _, err := svc.Chat(context.Background(), 7, p.ID, "再聊一次"); err != nil {
+			t.Fatalf("chat %d err: %v", i, err)
+		}
+	}
+	if _, err := svc.Chat(context.Background(), 7, p.ID, "第四次"); err != garden.ErrInteractionLimited {
+		t.Fatalf("expected ErrInteractionLimited, got %v", err)
+	}
+}

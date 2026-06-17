@@ -256,3 +256,47 @@ func (s *Service) Water(ctx context.Context, userID, plantID uint64) (string, er
 
 	return reply, nil
 }
+
+// Chat 与已成熟植物聊天：每天每株最多 3 次，仅 mature 状态可用。
+func (s *Service) Chat(ctx context.Context, userID, plantID uint64, message string) (string, error) {
+	msg := strings.TrimSpace(message)
+	if msg == "" {
+		return "", errors.New("empty_message")
+	}
+	p, err := s.ownedPlant(ctx, userID, plantID)
+	if err != nil {
+		return "", err
+	}
+	if p.Status != StatusMature {
+		return "", ErrNotMature
+	}
+	count, err := s.store.CountTodayInteractions(ctx, plantID, ActionChat)
+	if err != nil {
+		return "", err
+	}
+	if count >= 3 {
+		return "", ErrInteractionLimited
+	}
+
+	const fallbackReply = "（沉默地点了点头）"
+	reply := fallbackReply
+	if s.ai != nil {
+		out, aiErr := s.ai.GenerateText(ctx, PromptChat(p.Name, p.Mood, p.WaterStyle, msg))
+		if aiErr == nil {
+			if trimmed := strings.TrimSpace(out); trimmed != "" {
+				reply = trimmed
+			}
+		}
+	}
+
+	if err := s.store.AppendInteractionLog(ctx, &model.InteractionLog{
+		PlantID:   plantID,
+		Action:    ActionChat,
+		UserInput: msg,
+		AIReply:   reply,
+	}); err != nil {
+		return "", err
+	}
+
+	return reply, nil
+}
