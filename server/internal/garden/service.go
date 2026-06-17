@@ -420,3 +420,32 @@ func timePtrValue(t *time.Time) time.Time {
 	}
 	return *t
 }
+
+// ShareView 是 GET /garden/share/:id 的脱敏分享视图。
+// 仅对已收获 (harvested) 植物开放，并在返回前抹掉 user_id，
+// 避免公开链接泄露归属信息。
+type ShareView struct {
+	Plant   *model.Plant   `json:"plant"`
+	Harvest *model.Harvest `json:"harvest"`
+}
+
+// GetShare 返回脱敏后的分享视图。
+// 任何非 harvested 状态、缺失对应 harvest，或植物不存在均返回 ErrPlantNotFound。
+func (s *Service) GetShare(ctx context.Context, plantID uint64) (*ShareView, error) {
+	p, err := s.store.GetPlant(ctx, plantID)
+	if err != nil {
+		return nil, err
+	}
+	if p.Status != StatusHarvested {
+		return nil, ErrPlantNotFound
+	}
+	h, err := s.store.GetHarvest(ctx, plantID)
+	if err != nil {
+		return nil, err
+	}
+	if h == nil {
+		return nil, ErrPlantNotFound
+	}
+	p.UserID = 0
+	return &ShareView{Plant: p, Harvest: h}, nil
+}

@@ -50,6 +50,17 @@ export function EncyclopediaCard({ item, index }: { item: EncyclopediaItem; inde
         <p className="text-sm font-bold text-garden-ink">{harvest.fruit_name}</p>
         <p className="line-clamp-2 text-xs text-garden-ink/70">{harvest.fruit_description}</p>
         {harvestedAt && <p className="mt-1 text-[11px] text-garden-ink/50">收获于 {harvestedAt}</p>}
+        <div className="mt-1 flex justify-end">
+          <a
+            href={`/garden/share/${plant.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-[11px] text-garden-ink/60 hover:text-garden-ink"
+          >
+            分享 →
+          </a>
+        </div>
       </div>
     </Link>
   );

@@ -180,3 +180,23 @@ func (h *Handler) GetEncyclopedia(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, items)
 }
+
+// GetShare 处理 GET /garden/share/:id：公开分享视图（脱敏后的 plant + harvest）。
+// 仅对已收获植物开放，未收获或不存在均返回 404。
+func (h *Handler) GetShare(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_id"})
+		return
+	}
+	view, err := h.svc.GetShare(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, ErrPlantNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, view)
+}

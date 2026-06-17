@@ -7,6 +7,7 @@ import { fetchPlantDetail, harvestPlant } from '@/api/plant';
 import type { Harvest, PlantDetailView } from '@/api/types';
 import { GrowthTimeline } from '@/components/GrowthTimeline';
 import { RarityBadge } from '@/components/RarityBadge';
+import { ShareCardExport } from '@/components/ShareCardExport';
 import { plantFallbackDataUrl } from '@/lib/plantFallback';
 import { rarityFrame } from '@/lib/rarityStyles';
 import { formatCountdown } from '@/lib/stageTimer';
@@ -281,6 +282,9 @@ export default function PlantDetail() {
           <div className="rounded-2xl bg-white/70 p-3 text-sm text-garden-ink/80">
             <p className="font-bold text-garden-ink/70 mb-1">告别信</p>
             <p className="whitespace-pre-wrap">{harvest.farewell_letter}</p>
+          </div>
+          <div className="flex flex-col items-center gap-2 pt-2">
+            <ShareCardExport plant={view.plant} harvest={harvest} />
           </div>
           <button
             type="button"

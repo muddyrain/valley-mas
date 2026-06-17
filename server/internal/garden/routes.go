@@ -8,6 +8,7 @@ import "github.com/gin-gonic/gin"
 func RegisterGardenRoutes(api *gin.RouterGroup, h *Handler, auth gin.HandlerFunc) {
 	g := api.Group("/garden")
 	g.GET("/health", h.Health)
+	g.GET("/share/:id", h.GetShare)
 
 	authed := g.Group("")
 	authed.Use(auth)

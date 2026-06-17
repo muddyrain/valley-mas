@@ -504,3 +504,58 @@ func TestListEncyclopediaWithHarvests(t *testing.T) {
 		t.Fatalf("expected 0 items for other user, got %d", len(other))
 	}
 }
+
+func TestGetShareHarvested(t *testing.T) {
+	store := newMemStore()
+	manifest := garden.NewManifest([]garden.AssetEntry{{Key: "k", Rarity: "N", Tags: []string{"x"}}})
+
+	p := newMatureTestPlant(t, store, 7)
+	p.Name = "未读消息"
+	if err := store.UpdatePlant(context.Background(), p); err != nil {
+		t.Fatalf("update plant err: %v", err)
+	}
+	ai := &fakeAI{reply: `{"final_story":"它静静长大。","fruit_name":"已读未回果","fruit_description":"d","farewell_letter":"再见。"}`}
+	svc := garden.NewServiceWithDeps(store, ai, manifest, garden.FixedRandSource(1))
+	if _, err := svc.Harvest(context.Background(), 7, p.ID); err != nil {
+		t.Fatalf("harvest err: %v", err)
+	}
+
+	view, err := svc.GetShare(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("GetShare err: %v", err)
+	}
+	if view == nil || view.Plant == nil || view.Harvest == nil {
+		t.Fatalf("expected non-nil share view, got %+v", view)
+	}
+	if view.Plant.UserID != 0 {
+		t.Fatalf("expected user_id stripped to 0, got %d", view.Plant.UserID)
+	}
+	if view.Plant.Name != "未读消息" {
+		t.Fatalf("expected plant name preserved, got %q", view.Plant.Name)
+	}
+	if view.Harvest.FruitName != "已读未回果" {
+		t.Fatalf("expected fruit name preserved, got %q", view.Harvest.FruitName)
+	}
+	if view.Harvest.FarewellLetter == "" || view.Harvest.FinalStory == "" {
+		t.Fatalf("expected harvest text fields filled, got %+v", view.Harvest)
+	}
+}
+
+func TestGetShareNotHarvested(t *testing.T) {
+	store := newMemStore()
+	p := newWaterTestPlant(t, store, 7)
+	svc := garden.NewServiceWithDeps(store, &fakeAI{reply: ""}, garden.NewManifest(nil), garden.FixedRandSource(1))
+
+	if _, err := svc.GetShare(context.Background(), p.ID); err != garden.ErrPlantNotFound {
+		t.Fatalf("expected ErrPlantNotFound for growing plant, got %v", err)
+	}
+}
+
+func TestGetShareNotFound(t *testing.T) {
+	store := newMemStore()
+	svc := garden.NewServiceWithDeps(store, &fakeAI{reply: ""}, garden.NewManifest(nil), garden.FixedRandSource(1))
+
+	if _, err := svc.GetShare(context.Background(), 999); err != garden.ErrPlantNotFound {
+		t.Fatalf("expected ErrPlantNotFound for missing plant, got %v", err)
+	}
+}
