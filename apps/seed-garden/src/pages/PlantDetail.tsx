@@ -1,10 +1,10 @@
 import axios from 'axios';
 import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { chatPlant, waterPlant } from '@/api/interaction';
-import { fetchPlantDetail } from '@/api/plant';
-import type { PlantDetailView } from '@/api/types';
+import { fetchPlantDetail, harvestPlant } from '@/api/plant';
+import type { Harvest, PlantDetailView } from '@/api/types';
 import { GrowthTimeline } from '@/components/GrowthTimeline';
 import { RarityBadge } from '@/components/RarityBadge';
 import { plantFallbackDataUrl } from '@/lib/plantFallback';
@@ -20,6 +20,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function PlantDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { token } = useAuthStore();
   const [view, setView] = useState<PlantDetailView | null>(null);
   const [tick, setTick] = useState(Date.now());
@@ -32,6 +33,9 @@ export default function PlantDetail() {
   const [chatting, setChatting] = useState(false);
   const [lastChat, setLastChat] = useState<{ user: string; reply: string } | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [harvesting, setHarvesting] = useState(false);
+  const [harvest, setHarvest] = useState<Harvest | null>(null);
+  const [harvestError, setHarvestError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id || !token) return;
@@ -115,6 +119,22 @@ export default function PlantDetail() {
     }
   };
 
+  const handleHarvest = async () => {
+    if (!id || harvesting) return;
+    if (!window.confirm('收获后这棵植物会离开花园，确定吗？')) return;
+    setHarvesting(true);
+    setHarvestError(null);
+    try {
+      const res = await harvestPlant(Number(id));
+      setHarvest(res);
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : '收获失败，请稍后再试';
+      setHarvestError(errMsg);
+    } finally {
+      setHarvesting(false);
+    }
+  };
+
   if (!token) return <Navigate to="/login" replace />;
 
   if (error) {
@@ -186,7 +206,27 @@ export default function PlantDetail() {
           </div>
         </div>
       )}
-      {isMature && (
+      {isMature && !harvest && (
+        <div className="flex flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={handleHarvest}
+            disabled={harvesting}
+            className={clsx(
+              'rounded-full px-6 py-2 text-sm font-bold text-white shadow transition',
+              harvesting ? 'bg-amber-700/40' : 'bg-amber-700 hover:bg-amber-700/90',
+            )}
+          >
+            {harvesting ? '收获中...' : '收获'}
+          </button>
+          {harvestError && (
+            <p className="text-xs text-red-500" aria-live="polite">
+              {harvestError}
+            </p>
+          )}
+        </div>
+      )}
+      {isMature && !harvest && (
         <section className="flex flex-col gap-2 rounded-3xl border border-garden-ink/10 bg-white/60 p-4">
           <h2 className="text-sm font-bold text-garden-ink/70">跟它聊聊</h2>
           <textarea
@@ -229,6 +269,26 @@ export default function PlantDetail() {
               </p>
             </div>
           )}
+        </section>
+      )}
+      {harvest && (
+        <section className="flex flex-col gap-3 rounded-3xl border-2 border-amber-700/40 bg-amber-50/80 p-4">
+          <h2 className="text-base font-bold text-amber-900">收获完成</h2>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-bold text-garden-ink">{harvest.fruit_name}</p>
+            <p className="text-sm text-garden-ink/80">{harvest.fruit_description}</p>
+          </div>
+          <div className="rounded-2xl bg-white/70 p-3 text-sm text-garden-ink/80">
+            <p className="font-bold text-garden-ink/70 mb-1">告别信</p>
+            <p className="whitespace-pre-wrap">{harvest.farewell_letter}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/garden')}
+            className="self-center rounded-full bg-garden-ink px-6 py-2 text-sm font-bold text-white shadow hover:bg-garden-ink/90"
+          >
+            返回花园
+          </button>
         </section>
       )}
       <section>

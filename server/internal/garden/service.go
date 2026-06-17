@@ -3,6 +3,7 @@ package garden
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -299,4 +300,81 @@ func (s *Service) Chat(ctx context.Context, userID, plantID uint64, message stri
 	}
 
 	return reply, nil
+}
+
+// Harvest 收获一颗已成熟的植物：调用 AI 生成果实与告别信，
+// 写入 Harvest 实体，把植物切换到 harvested 状态并释放 slot。
+func (s *Service) Harvest(ctx context.Context, userID, plantID uint64) (*model.Harvest, error) {
+	p, err := s.ownedPlant(ctx, userID, plantID)
+	if err != nil {
+		return nil, err
+	}
+	if p.Status != StatusMature {
+		return nil, ErrNotMature
+	}
+
+	logs, err := s.store.ListGrowthLogs(ctx, plantID)
+	if err != nil {
+		return nil, err
+	}
+	parts := make([]string, 0, len(logs))
+	for _, l := range logs {
+		parts = append(parts, fmt.Sprintf("[阶段 %d] %s", l.Stage, l.Content))
+	}
+	summary := strings.Join(parts, "\n")
+
+	parsed := &HarvestJSON{
+		FinalStory:       "（这棵植物在沉默中走向了告别。）",
+		FruitName:        p.Name + "的果实",
+		FruitDescription: p.Description,
+		FarewellLetter:   "它没有留下一句话，但你都懂。",
+	}
+	if s.ai != nil {
+		raw, aiErr := s.ai.GenerateText(ctx, PromptHarvest(p.Name, p.Mood, p.WaterStyle, summary))
+		if aiErr == nil {
+			if got, parseErr := ParseHarvestJSON(raw); parseErr == nil {
+				if strings.TrimSpace(got.FinalStory) != "" {
+					parsed.FinalStory = got.FinalStory
+				}
+				if strings.TrimSpace(got.FruitName) != "" {
+					parsed.FruitName = got.FruitName
+				}
+				if strings.TrimSpace(got.FruitDescription) != "" {
+					parsed.FruitDescription = got.FruitDescription
+				}
+				if strings.TrimSpace(got.FarewellLetter) != "" {
+					parsed.FarewellLetter = got.FarewellLetter
+				}
+			}
+		}
+	}
+
+	harvest := &model.Harvest{
+		PlantID:          p.ID,
+		FinalAssetKey:    p.AssetKey,
+		FinalStory:       parsed.FinalStory,
+		FruitName:        parsed.FruitName,
+		FruitDescription: parsed.FruitDescription,
+		FarewellLetter:   parsed.FarewellLetter,
+	}
+	if err := s.store.CreateHarvest(ctx, harvest); err != nil {
+		return nil, err
+	}
+
+	now := s.now()
+	p.Status = StatusHarvested
+	p.SlotIndex = -1
+	p.HarvestedAt = &now
+	if err := s.store.UpdatePlant(ctx, p); err != nil {
+		return nil, err
+	}
+
+	_ = s.store.AppendGrowthLog(ctx, &model.GrowthLog{
+		PlantID: p.ID,
+		Stage:   p.StageMax,
+		Type:    LogTypeHarvest,
+		Content: parsed.FarewellLetter,
+	})
+
+	return harvest, nil
 }

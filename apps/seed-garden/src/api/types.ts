@@ -52,3 +52,14 @@ export interface PlantDetailView {
   plant: Plant;
   logs: GrowthLog[];
 }
+
+export interface Harvest {
+  id: number;
+  plant_id: number;
+  final_asset_key: string;
+  final_story: string;
+  fruit_name: string;
+  fruit_description: string;
+  farewell_letter: string;
+  created_at: string;
+}

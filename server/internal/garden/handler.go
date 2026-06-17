@@ -146,3 +146,27 @@ func (h *Handler) Chat(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"reply": reply})
 }
+
+// Harvest 处理 POST /garden/plant/:id/harvest：仅成熟植物可收获，写入 Harvest 并释放 slot。
+func (h *Handler) Harvest(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_id"})
+		return
+	}
+	harvest, err := h.svc.Harvest(c.Request.Context(), h.userID(c), id)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrPlantNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+		case errors.Is(err, ErrPlantNotOwned):
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		case errors.Is(err, ErrNotMature):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "not_mature"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, harvest)
+}

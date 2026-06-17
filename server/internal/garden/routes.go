@@ -17,5 +17,6 @@ func RegisterGardenRoutes(api *gin.RouterGroup, h *Handler, auth gin.HandlerFunc
 		authed.GET("/plant/:id", h.GetPlantDetail)
 		authed.POST("/plant/:id/water", h.Water)
 		authed.POST("/plant/:id/chat", h.Chat)
+		authed.POST("/plant/:id/harvest", h.Harvest)
 	}
 }
