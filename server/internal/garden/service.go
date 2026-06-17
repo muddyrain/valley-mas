@@ -178,3 +178,28 @@ func (s *Service) GetGardenView(ctx context.Context, userID uint64) (*GardenView
 	}
 	return &GardenView{Garden: g, Plants: plants}, nil
 }
+
+// PlantDetailView 是 GET /garden/plant/:id 的聚合返回。
+type PlantDetailView struct {
+	Plant *model.Plant      `json:"plant"`
+	Logs  []model.GrowthLog `json:"logs"`
+}
+
+// GetPlantDetail 返回植物详情；查询前 lazy advance，确保前端始终看到最新阶段。
+func (s *Service) GetPlantDetail(ctx context.Context, userID, plantID uint64) (*PlantDetailView, error) {
+	p, err := s.store.GetPlant(ctx, plantID)
+	if err != nil {
+		return nil, err
+	}
+	if p.UserID != userID {
+		return nil, ErrPlantNotOwned
+	}
+	if err := s.AdvancePlant(ctx, p); err != nil {
+		return nil, err
+	}
+	logs, err := s.store.ListGrowthLogs(ctx, plantID)
+	if err != nil {
+		return nil, err
+	}
+	return &PlantDetailView{Plant: p, Logs: logs}, nil
+}

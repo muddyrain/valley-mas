@@ -3,6 +3,7 @@ package garden
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -58,4 +59,26 @@ func (h *Handler) userID(c *gin.Context) uint64 {
 		return 0
 	}
 	return id
+}
+
+// GetPlantDetail 处理 GET /garden/plant/:id：返回植物详情 + 成长日志。
+func (h *Handler) GetPlantDetail(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_id"})
+		return
+	}
+	view, err := h.svc.GetPlantDetail(c.Request.Context(), h.userID(c), id)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrPlantNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+		case errors.Is(err, ErrPlantNotOwned):
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, view)
 }
