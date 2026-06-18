@@ -5,9 +5,10 @@ import {
   ClipboardList,
   ExternalLink,
   FileText,
+  Lightbulb,
   LoaderCircle,
+  MoreHorizontal,
   Pencil,
-  Plus,
   ReceiptText,
   Search,
   Sparkles,
@@ -174,6 +175,7 @@ export function InboxPage() {
   const [formErrors, setFormErrors] = useState<InboxFormErrors>({});
   const [planDraftItem, setPlanDraftItem] = useState<InboxItem | null>(null);
   const [traceDraftItem, setTraceDraftItem] = useState<InboxItem | null>(null);
+  const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadInboxItems({ status: filter, type: typeFilter, q: query });
@@ -321,27 +323,25 @@ export function InboxPage() {
             <ChevronLeft className="size-5" />
           </Button>
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-life-ai">Inbox</p>
-            <h1 className="truncate text-2xl font-semibold">捕捉 Inbox</h1>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-life-ai">
+              Inspiration
+            </p>
+            <h1 className="truncate text-2xl font-semibold">灵感</h1>
           </div>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => setEditingItem(null)}>
-          <Plus className="size-4" />
-          收下
-        </Button>
       </header>
 
       <Card className="p-4">
         <form className="grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={submitQuickCapture}>
           <label className="block">
-            <span className="sr-only">快速捕捉</span>
+            <span className="sr-only">写下灵感</span>
             <Textarea
               value={quickText}
               onChange={(event) => {
                 setQuickText(event.target.value);
                 setQuickError('');
               }}
-              placeholder="先收下一个想法、链接或待处理事项"
+              placeholder="写下你刚才想到的事，链接也行"
               className="min-h-24 text-sm"
             />
           </label>
@@ -352,8 +352,8 @@ export function InboxPage() {
               className="w-full sm:w-auto"
               disabled={inboxCreating}
             >
-              {inboxCreating ? <ActionLoadingIcon /> : <Plus className="size-4" />}
-              {inboxCreating ? '保存中' : '收下'}
+              {inboxCreating ? <ActionLoadingIcon /> : <Lightbulb className="size-4" />}
+              {inboxCreating ? '保存中' : '记下'}
             </Button>
           </div>
         </form>
@@ -423,14 +423,14 @@ export function InboxPage() {
         {inboxLoading && !inboxLoaded ? (
           <Card className="grid min-h-44 place-items-center p-6 text-sm text-muted-foreground">
             <LoaderCircle className="mb-3 size-6 animate-spin text-life-ai motion-reduce:animate-none" />
-            正在同步 Inbox
+            正在同步灵感
           </Card>
         ) : inboxItems.length === 0 ? (
           <EmptyState
-            title="还没有未处理内容"
-            description="先收下一条想法，之后再决定去向。"
-            eyebrow="Inbox"
-            icon={ClipboardList}
+            title="还没有灵感记下"
+            description="写下你刚才想到的事，先记下来再说。"
+            eyebrow="灵感"
+            icon={Lightbulb}
             tone="ai"
           />
         ) : (
@@ -467,7 +467,7 @@ export function InboxPage() {
                             src={item.imageUrl}
                             alt={item.title}
                             title={item.title}
-                            subtitle="Inbox 图片"
+                            subtitle="灵感图片"
                             imageClassName="aspect-video w-full object-cover"
                           />
                         </div>
@@ -537,6 +537,32 @@ export function InboxPage() {
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2 lg:max-w-56 lg:justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={disabled}
+                        onClick={() => setEditingItem(item)}
+                      >
+                        <Pencil className="size-4" />
+                        编辑
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={disabled}
+                        onClick={() =>
+                          setExpandedActionId((current) => (current === item.id ? null : item.id))
+                        }
+                      >
+                        <MoreHorizontal className="size-4" />
+                        {expandedActionId === item.id ? '收起' : '更多'}
+                      </Button>
+                    </div>
+                  </div>
+                  {expandedActionId === item.id ? (
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
                       {item.status === 'inbox' ? (
                         <>
                           <Button
@@ -629,23 +655,13 @@ export function InboxPage() {
                         variant="ghost"
                         size="sm"
                         disabled={disabled}
-                        onClick={() => setEditingItem(item)}
-                      >
-                        <Pencil className="size-4" />
-                        编辑
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={disabled}
                         onClick={() => void removeInboxItem(item.id)}
                       >
                         {deleting ? <ActionLoadingIcon /> : <Trash2 className="size-4" />}
                         删除
                       </Button>
                     </div>
-                  </div>
+                  ) : null}
                 </Card>
               );
             })}
@@ -679,13 +695,10 @@ export function InboxPage() {
             closeEditor();
           }
         }}
-        overlayLabel="关闭编辑 Inbox"
+        overlayLabel="关闭编辑灵感"
         zIndexClassName="z-[60]"
       >
-        <SheetHeader
-          title={editingItem === null ? '收下 Inbox' : '编辑 Inbox'}
-          onClose={closeEditor}
-        />
+        <SheetHeader title={editingItem === null ? '记下灵感' : '编辑灵感'} onClose={closeEditor} />
         <form className="space-y-4" onSubmit={submitEditor}>
           <FormItem label="标题" error={formErrors.title}>
             <Input
@@ -746,7 +759,7 @@ export function InboxPage() {
                   setForm((current) => ({ ...current, imageUrl: url }));
                   setFormErrors((current) => ({ ...current, imageUrl: undefined }));
                 }}
-                label="Inbox 图片"
+                label="灵感图片"
                 description="支持拍照或从相册选择一张图片。"
                 cameraAndLibrary
               />
@@ -794,7 +807,7 @@ export function InboxPage() {
               (editingItem && inboxUpdatingById[editingItem.id]) ? (
                 <ActionLoadingIcon />
               ) : null}
-              {editingItem === null ? '收下' : '保存修改'}
+              {editingItem === null ? '记下' : '保存修改'}
             </Button>
           </SheetActions>
         </form>
