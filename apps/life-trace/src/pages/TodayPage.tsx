@@ -20,6 +20,7 @@ import {
   Sparkles,
   Sun,
   Trophy,
+  Wallet,
   Wind,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -33,6 +34,7 @@ import {
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { AnimatedWeatherIcon } from '@/components/AnimatedWeatherIcon';
 import { ActionTile, EntryCard } from '@/components/EntryCard';
+import { QuickLedgerSheet } from '@/components/QuickLedgerSheet';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { weatherMetrics } from '@/data/mock';
@@ -127,7 +129,13 @@ function buildFallbackHourlyWeather(): WeatherApiHour[] {
   });
 
   return [
-    { time: '现在', dateTime: now.toISOString(), temp: '22°', text: '多云', active: true },
+    {
+      time: '现在',
+      dateTime: now.toISOString(),
+      temp: '22°',
+      text: '多云',
+      active: true,
+    },
     ...forecastHours,
   ];
 }
@@ -372,6 +380,7 @@ export function TodayPage() {
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState('');
   const [selectedWeatherDay, setSelectedWeatherDay] = useState<WeatherDayTab>('today');
+  const [quickLedgerOpen, setQuickLedgerOpen] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
   const showToast = useFeedbackToastStore((state) => state.showToast);
   const todayDate = useMemo(() => getLocalISODate(new Date()), []);
@@ -525,7 +534,12 @@ export function TodayPage() {
       ? `${todayOpenPlans.length} 个计划待推进`
       : '今天还没有安排';
   const todaySummaryItems = [
-    { label: '习惯完成', value: habitProgress, tone: 'text-life-trace', icon: Check },
+    {
+      label: '习惯完成',
+      value: habitProgress,
+      tone: 'text-life-trace',
+      icon: Check,
+    },
     {
       label: '好事发生',
       value: latestAchievement ? '1' : `${completedHabitCount}`,
@@ -796,10 +810,10 @@ export function TodayPage() {
             <button
               type="button"
               className="inline-flex items-center gap-1 transition hover:text-primary-foreground"
-              onClick={() => navigate('/plans')}
+              onClick={() => setQuickLedgerOpen(true)}
             >
-              <Check className="size-3 stroke-[2]" />
-              建计划
+              <Wallet className="size-3 stroke-[2]" />
+              记一笔
             </button>
             <button
               type="button"
@@ -1714,6 +1728,7 @@ export function TodayPage() {
           )}
         </Card>
       </div>
+      <QuickLedgerSheet open={quickLedgerOpen} onOpenChange={setQuickLedgerOpen} />
     </div>
   );
 }
