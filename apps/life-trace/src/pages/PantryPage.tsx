@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetHeader } from '@/components/FormItem';
 import { LoadErrorState } from '@/components/LoadErrorState';
@@ -244,6 +245,7 @@ export function PantryPage() {
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const loadMorePantryList = useLifeTraceStore((state) => state.loadMorePantryList);
   const consumePantryItem = useLifeTraceStore((state) => state.consumePantryItem);
+  const addShoppingItem = useLifeTraceStore((state) => state.addShoppingItem);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PantryItem | null>(null);
   const [consumeItem, setConsumeItem] = useState<PantryItem | null>(null);
@@ -271,6 +273,11 @@ export function PantryPage() {
   );
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const statusActionInFlightRef = useRef<Set<string>>(new Set());
+  const [shoppingPrompt, setShoppingPrompt] = useState<{
+    item: PantryItem;
+    action: 'used' | 'discarded';
+  } | null>(null);
+  const [shoppingPromptLoading, setShoppingPromptLoading] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const latestSearchParamsRef = useRef(searchParams);
   const showToast = useFeedbackToastStore((state) => state.showToast);
@@ -405,6 +412,9 @@ export function PantryPage() {
         showToast(`已记录${actionLabel} ${normalizedQuantity}${item.unit}`, 'success');
         if (consumeItem?.id === item.id) {
           setConsumeItem(null);
+        }
+        if (updated.status === 'used-up' || updated.status === 'discarded') {
+          setShoppingPrompt({ item: updated, action });
         }
       }
     } finally {
@@ -1405,6 +1415,49 @@ export function PantryPage() {
           </Card>
         ) : null}
       </div>
+
+      <ConfirmDialog
+        open={Boolean(shoppingPrompt)}
+        title="加入采购清单？"
+        description={
+          shoppingPrompt
+            ? `${shoppingPrompt.item.name} 已${shoppingPrompt.action === 'used' ? '用完' : '丢弃'}，是否加入采购清单方便下次补货？`
+            : ''
+        }
+        confirmLabel="加入清单"
+        loadingLabel="加入中"
+        loading={shoppingPromptLoading}
+        onCancel={() => {
+          if (!shoppingPromptLoading) {
+            setShoppingPrompt(null);
+          }
+        }}
+        onConfirm={() => {
+          if (!shoppingPrompt) {
+            return;
+          }
+          const { item, action } = shoppingPrompt;
+          setShoppingPromptLoading(true);
+          void (async () => {
+            try {
+              const saved = await addShoppingItem({
+                name: item.name,
+                quantity: 1,
+                unit: item.unit || '件',
+                category: item.category || '食品',
+                source: action === 'used' ? 'pantry_used_up' : 'pantry_discard',
+                sourcePantryItemId: item.id,
+              });
+              if (saved) {
+                showToast('已加入采购清单', 'success');
+                setShoppingPrompt(null);
+              }
+            } finally {
+              setShoppingPromptLoading(false);
+            }
+          })();
+        }}
+      />
     </SubPageShell>
   );
 }

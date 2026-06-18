@@ -17,6 +17,7 @@ import {
   ReceiptText,
   RefreshCw,
   Shirt,
+  ShoppingBasket,
   Sparkles,
   Sun,
   Trophy,
@@ -369,6 +370,9 @@ export function TodayPage() {
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
   const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
   const toggleHabitCheckin = useLifeTraceStore((state) => state.toggleHabitCheckin);
+  const shoppingListItems = useLifeTraceStore((state) => state.shoppingListItems);
+  const shoppingListLoaded = useLifeTraceStore((state) => state.shoppingListLoaded);
+  const loadShoppingList = useLifeTraceStore((state) => state.loadShoppingList);
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
   const navigate = useNavigate();
@@ -633,6 +637,13 @@ export function TodayPage() {
       pageSize: 20,
     });
   }, [loadPantryList, preferredPantryHouseholdId, settingsLoaded, token]);
+
+  useEffect(() => {
+    if (!token || !settingsLoaded) {
+      return;
+    }
+    void loadShoppingList({ status: 'open' });
+  }, [loadShoppingList, preferredPantryHouseholdId, settingsLoaded, token]);
 
   const pantryPageHref = '/pantry';
   const achievementCardLoading =
@@ -937,6 +948,25 @@ export function TodayPage() {
           </span>
           <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
         </button>
+
+        {shoppingListLoaded && shoppingListItems.some((entry) => !entry.checkedAt) ? (
+          <button
+            type="button"
+            className="flex items-center gap-3 rounded-[1.35rem] border border-border bg-card/85 px-4 py-3 text-left shadow-[0_8px_24px_rgba(45,41,35,0.04)]"
+            onClick={() => navigate('/shopping')}
+          >
+            <span className="grid size-[3.1rem] shrink-0 place-items-center rounded-[1.08rem] bg-life-health/10 text-life-health">
+              <ShoppingBasket className="size-[1.35rem]" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-base font-semibold">采购清单</span>
+              <span className="mt-1 block truncate text-sm text-muted-foreground">
+                还有 {shoppingListItems.filter((entry) => !entry.checkedAt).length} 项待买
+              </span>
+            </span>
+            <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+          </button>
+        ) : null}
 
         <button
           type="button"

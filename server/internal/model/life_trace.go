@@ -474,6 +474,44 @@ func (item *LifeTracePantryItem) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+type LifeTraceShoppingListItem struct {
+	ID                 Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID             Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	HouseholdID        Int64String    `gorm:"column:household_id;index" json:"householdId,omitempty"`
+	Name               string         `gorm:"size:160;not null" json:"name"`
+	Quantity           int            `gorm:"not null;default:1" json:"quantity"`
+	Unit               string         `gorm:"size:20;not null;default:'件'" json:"unit"`
+	Category           string         `gorm:"size:30;not null;default:'食品';index" json:"category"`
+	Source             string         `gorm:"size:30;not null;default:'manual';index" json:"source"`
+	SourcePantryItemID *Int64String   `gorm:"column:source_pantry_item_id;index" json:"sourcePantryItemId,omitempty"`
+	Note               string         `gorm:"size:1000" json:"note"`
+	CheckedAt          *time.Time     `gorm:"column:checked_at;index" json:"checkedAt,omitempty"`
+	CreatedBy          Int64String    `gorm:"column:created_by;index" json:"createdBy,omitempty"`
+	UpdatedBy          Int64String    `gorm:"column:updated_by;index" json:"updatedBy,omitempty"`
+	CreatedAt          time.Time      `json:"createdAt"`
+	UpdatedAt          time.Time      `json:"updatedAt"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (item *LifeTraceShoppingListItem) BeforeCreate(tx *gorm.DB) error {
+	if item.ID == 0 {
+		item.ID = Int64String(utils.GenerateID())
+	}
+	if item.Quantity <= 0 {
+		item.Quantity = 1
+	}
+	if item.Unit == "" {
+		item.Unit = "件"
+	}
+	if item.Category == "" {
+		item.Category = "食品"
+	}
+	if item.Source == "" {
+		item.Source = "manual"
+	}
+	return nil
+}
+
 type LifeTraceSettings struct {
 	ID                      Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID                  Int64String    `gorm:"column:user_id;uniqueIndex;not null" json:"userId"`

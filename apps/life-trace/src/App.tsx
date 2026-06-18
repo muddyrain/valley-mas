@@ -25,6 +25,7 @@ import { PlacesPage } from '@/pages/PlacesPage';
 import { PlansPage } from '@/pages/PlansPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { ReminderSettingsPage } from '@/pages/ReminderSettingsPage';
+import { ShoppingListPage } from '@/pages/ShoppingListPage';
 import { TodayPage } from '@/pages/TodayPage';
 import { TracesPage } from '@/pages/TracesPage';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -121,6 +122,7 @@ function AppContent() {
           <Route path="/closet/outfits/:outfitId" element={<ClosetPage />} />
           <Route path="/inbox" element={<InboxPage />} />
           <Route path="/ledger" element={<LedgerPage />} />
+          <Route path="/shopping" element={<ShoppingListPage />} />
           <Route path="/media-diary/:entryId?" element={<MediaDiaryPage />} />
           <Route path="/places/:placeId?" element={<PlacesPage />} />
           <Route path="/pantry/:itemId" element={<PantryItemDetailPage />} />
