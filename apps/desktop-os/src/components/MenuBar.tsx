@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useControlCenterStore } from '../store/controlCenterStore';
+import { useNotificationCenterStore } from '../store/notificationCenterStore';
+import { useSpotlightStore } from '../store/spotlightStore';
 import { type AppId, useWindowStore } from '../store/windowStore';
 import './MenuBar.css';
 
@@ -21,11 +24,30 @@ export default function MenuBar() {
   const [now, setNow] = useState(() => new Date());
   const focusedId = useWindowStore((s) => s.focusedId);
   const focused = useWindowStore((s) => s.windows.find((w) => w.id === s.focusedId));
+  const openSpotlight = useSpotlightStore((s) => s.open);
+  const toggleControlCenter = useControlCenterStore((s) => s.toggle);
+  const closeControlCenter = useControlCenterStore((s) => s.close);
+  const wifi = useControlCenterStore((s) => s.wifi);
+  const bluetooth = useControlCenterStore((s) => s.bluetooth);
+  const toggleNotificationCenter = useNotificationCenterStore((s) => s.toggle);
+  const closeNotificationCenter = useNotificationCenterStore((s) => s.close);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(t);
   }, []);
+
+  function handleControlCenter(e: React.MouseEvent) {
+    e.stopPropagation();
+    closeNotificationCenter();
+    toggleControlCenter();
+  }
+
+  function handleNotificationCenter(e: React.MouseEvent) {
+    e.stopPropagation();
+    closeControlCenter();
+    toggleNotificationCenter();
+  }
 
   const appName = focused ? (APP_NAME[focused.appId] ?? focused.title) : 'Finder';
 
@@ -44,10 +66,27 @@ export default function MenuBar() {
         <span className="menu-bar__item">帮助</span>
       </div>
       <div className="menu-bar__right">
-        <span className="menu-bar__icon">🔍</span>
-        <span className="menu-bar__icon">🔋</span>
-        <span className="menu-bar__icon">📶</span>
-        <span className="menu-bar__clock">{formatClock(now)}</span>
+        <button type="button" className="menu-bar__btn" onClick={openSpotlight} title="搜索（⌘K）">
+          🔍
+        </button>
+        <button
+          type="button"
+          className="menu-bar__btn menu-bar__btn--cc"
+          onClick={handleControlCenter}
+          title="控制中心"
+        >
+          <span className={wifi ? '' : 'is-dim'}>📶</span>
+          <span className={bluetooth ? '' : 'is-dim'}>🔷</span>
+          <span>🔋</span>
+        </button>
+        <button
+          type="button"
+          className="menu-bar__btn menu-bar__btn--clock"
+          onClick={handleNotificationCenter}
+          title="通知中心"
+        >
+          {formatClock(now)}
+        </button>
       </div>
     </div>
   );
