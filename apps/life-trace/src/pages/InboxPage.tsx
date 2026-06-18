@@ -1,5 +1,6 @@
 import {
   Archive,
+  BookOpen,
   CheckCircle2,
   ChevronLeft,
   ClipboardList,
@@ -7,6 +8,7 @@ import {
   FileText,
   Lightbulb,
   LoaderCircle,
+  MapPin,
   MoreHorizontal,
   Pencil,
   ReceiptText,
@@ -35,7 +37,13 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { applyInboxAISuggestion, buildInboxPlanDraft, buildInboxTraceDraft } from '@/lib/inbox';
+import {
+  applyInboxAISuggestion,
+  buildInboxMediaDraft,
+  buildInboxPlaceDraft,
+  buildInboxPlanDraft,
+  buildInboxTraceDraft,
+} from '@/lib/inbox';
 import { buildLedgerDraftFromInbox } from '@/lib/ledger';
 import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -299,6 +307,33 @@ export function InboxPage() {
       imageUrl: draft.imageUrl ?? item.imageUrl ?? '',
     });
     navigate(`/ledger?${params.toString()}`);
+  };
+
+  const convertToMedia = (item: InboxItem) => {
+    const draft = buildInboxMediaDraft(item);
+    const params = new URLSearchParams({
+      new: '1',
+      inboxItemId: item.id,
+      mediaType: draft.mediaType,
+      status: draft.status,
+      title: draft.title,
+      note: draft.note,
+      coverUrl: draft.coverUrl,
+      tags: draft.tags.join(','),
+    });
+    navigate(`/media-diary?${params.toString()}`);
+  };
+
+  const convertToPlace = (item: InboxItem) => {
+    const draft = buildInboxPlaceDraft(item);
+    const params = new URLSearchParams({
+      new: '1',
+      inboxItemId: item.id,
+      name: draft.name,
+      status: draft.status,
+      note: draft.note,
+    });
+    navigate(`/places?${params.toString()}`);
   };
 
   const applySuggestionToEditor = () => {
@@ -625,6 +660,26 @@ export function InboxPage() {
                           >
                             <ReceiptText className="size-4" />
                             转账目
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={disabled}
+                            onClick={() => convertToMedia(item)}
+                          >
+                            <BookOpen className="size-4" />
+                            转书影音
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={disabled}
+                            onClick={() => convertToPlace(item)}
+                          >
+                            <MapPin className="size-4" />
+                            转地点
                           </Button>
                           <Button
                             type="button"
