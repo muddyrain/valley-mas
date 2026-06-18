@@ -1,0 +1,27 @@
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  color: var(--plush-text);
+  background: var(--plush-sky);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+button {
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+img {
+  -webkit-user-drag: none;
+  user-select: none;
+}
