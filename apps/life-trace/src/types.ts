@@ -4,6 +4,8 @@ export type AppTab = 'today' | 'plans' | 'ai' | 'traces' | 'profile';
 
 export type PlanType = '电影' | '吃饭' | '运动' | '阅读' | '聚会' | '普通事项';
 
+export type PlanRecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+
 export type Plan = {
   id: string;
   placeId?: string;
@@ -20,6 +22,10 @@ export type Plan = {
   source?: PlanSource;
   completed: boolean;
   completedAt?: string;
+  recurrenceFrequency?: PlanRecurrenceFrequency;
+  recurrenceInterval?: number;
+  recurrenceEndAt?: string;
+  recurrenceParentId?: string;
   createdAt?: string;
   updatedAt?: string;
 };

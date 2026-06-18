@@ -2369,7 +2369,15 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         }));
         try {
           const nextCompleted = !target.completed;
-          const updated = await updatePlanStatus(token, planId, nextCompleted);
+          const result = await updatePlanStatus(token, planId, nextCompleted);
+          const updated: Plan =
+            result && typeof result === 'object' && 'plan' in result
+              ? result.plan
+              : (result as Plan);
+          const derivedPlan: Plan | null =
+            result && typeof result === 'object' && 'derivedPlan' in result
+              ? (result.derivedPlan ?? null)
+              : null;
           if (!nextCompleted) {
             set((state) => ({
               plans: state.plans.map((plan) => (plan.id === planId ? updated : plan)),
@@ -2388,16 +2396,39 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           }
 
           const trace = await createTrace(token, createTraceFromPlan(updated));
-          set((state) => ({
-            plans: state.plans.map((plan) => (plan.id === planId ? updated : plan)),
-            traces: [trace, ...state.traces],
-            plansError: '',
-            tracesError: '',
-            aiActions: [
-              { id: createActionId(), title: `生成了「${updated.title}」踪迹`, timeLabel: '刚刚' },
-              ...getAiActions(state),
-            ],
-          }));
+          set((state) => {
+            const replaced = state.plans.map((plan) => (plan.id === planId ? updated : plan));
+            const nextPlans = derivedPlan ? [derivedPlan, ...replaced] : replaced;
+            const nextActions = derivedPlan
+              ? [
+                  {
+                    id: createActionId(),
+                    title: `周期计划「${updated.title}」已生成下一次（${derivedPlan.scheduledDate || ''}）`,
+                    timeLabel: '刚刚',
+                  },
+                  {
+                    id: createActionId(),
+                    title: `生成了「${updated.title}」踪迹`,
+                    timeLabel: '刚刚',
+                  },
+                  ...getAiActions(state),
+                ]
+              : [
+                  {
+                    id: createActionId(),
+                    title: `生成了「${updated.title}」踪迹`,
+                    timeLabel: '刚刚',
+                  },
+                  ...getAiActions(state),
+                ];
+            return {
+              plans: nextPlans,
+              traces: [trace, ...state.traces],
+              plansError: '',
+              tracesError: '',
+              aiActions: nextActions,
+            };
+          });
           void get().loadAchievements({ notifyNew: true });
         } catch (error) {
           set({ plansError: error instanceof Error ? error.message : '更新计划失败' });

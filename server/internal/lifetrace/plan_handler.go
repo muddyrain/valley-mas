@@ -23,18 +23,21 @@ type apiResponse struct {
 }
 
 type createPlanRequest struct {
-	PlaceID       string `json:"placeId"`
-	Title         string `json:"title"`
-	Type          string `json:"type"`
-	TimeLabel     string `json:"timeLabel"`
-	ScheduledDate string `json:"scheduledDate"`
-	ScheduledTime string `json:"scheduledTime"`
-	Timezone      string `json:"timezone"`
-	Reminder      bool   `json:"reminder"`
-	ImageURL      string `json:"imageUrl"`
-	Location      string `json:"location"`
-	Note          string `json:"note"`
-	Source        string `json:"source"`
+	PlaceID             string `json:"placeId"`
+	Title               string `json:"title"`
+	Type                string `json:"type"`
+	TimeLabel           string `json:"timeLabel"`
+	ScheduledDate       string `json:"scheduledDate"`
+	ScheduledTime       string `json:"scheduledTime"`
+	Timezone            string `json:"timezone"`
+	Reminder            bool   `json:"reminder"`
+	ImageURL            string `json:"imageUrl"`
+	Location            string `json:"location"`
+	Note                string `json:"note"`
+	Source              string `json:"source"`
+	RecurrenceFrequency string `json:"recurrenceFrequency"`
+	RecurrenceInterval  int    `json:"recurrenceInterval"`
+	RecurrenceEndAt     string `json:"recurrenceEndAt"`
 }
 
 type updatePlanStatusRequest struct {
@@ -62,6 +65,14 @@ var validPlanSources = map[string]bool{
 	"weather_advice": true,
 	"ai_advice":      true,
 	"image_ai":       true,
+}
+
+var validRecurrenceFrequencies = map[string]bool{
+	"none":    true,
+	"daily":   true,
+	"weekly":  true,
+	"monthly": true,
+	"yearly":  true,
 }
 
 var planInternalMarkerPattern = regexp.MustCompile(`\s*#(?:assistant-plan|assistant-reminder|advice):[^\s。；;，,]+`)
@@ -111,6 +122,64 @@ func normalizePlanType(planType string) string {
 		return "普通事项"
 	}
 	return planType
+}
+
+func normalizeRecurrenceFrequency(frequency string) string {
+	frequency = strings.TrimSpace(frequency)
+	if frequency == "" {
+		return "none"
+	}
+	if !validRecurrenceFrequencies[frequency] {
+		return "none"
+	}
+	return frequency
+}
+
+func sanitizeRecurrenceInterval(interval int) int {
+	if interval <= 0 {
+		return 1
+	}
+	if interval > 365 {
+		return 365
+	}
+	return interval
+}
+
+func sanitizeRecurrenceEndAt(endAt string) (*string, bool) {
+	endAt = strings.TrimSpace(endAt)
+	if endAt == "" {
+		return nil, true
+	}
+	if _, err := time.Parse("2006-01-02", endAt); err != nil {
+		return nil, false
+	}
+	return &endAt, true
+}
+
+func nextRecurrenceDate(frequency string, interval int, baseDate string) (string, bool) {
+	if baseDate == "" || frequency == "" || frequency == "none" {
+		return "", false
+	}
+	t, err := time.Parse("2006-01-02", baseDate)
+	if err != nil {
+		return "", false
+	}
+	if interval <= 0 {
+		interval = 1
+	}
+	switch frequency {
+	case "daily":
+		t = t.AddDate(0, 0, interval)
+	case "weekly":
+		t = t.AddDate(0, 0, 7*interval)
+	case "monthly":
+		t = t.AddDate(0, interval, 0)
+	case "yearly":
+		t = t.AddDate(interval, 0, 0)
+	default:
+		return "", false
+	}
+	return t.Format("2006-01-02"), true
 }
 
 func sanitizePlanNote(note string) string {
@@ -287,20 +356,38 @@ func (h *Handler) CreatePlan(c *gin.Context) {
 		return
 	}
 
+	recurrenceFrequency := normalizeRecurrenceFrequency(req.RecurrenceFrequency)
+	recurrenceInterval := sanitizeRecurrenceInterval(req.RecurrenceInterval)
+	recurrenceEndAt, ok := sanitizeRecurrenceEndAt(req.RecurrenceEndAt)
+	if !ok {
+		fail(c, http.StatusBadRequest, "周期结束日期格式错误")
+		return
+	}
+	if recurrenceFrequency == "none" {
+		recurrenceInterval = 1
+		recurrenceEndAt = nil
+	} else if scheduledDate == "" {
+		fail(c, http.StatusBadRequest, "周期计划需要先选择日期")
+		return
+	}
+
 	plan := model.LifeTracePlan{
-		UserID:        userID,
-		PlaceID:       placeID,
-		Title:         title,
-		Type:          normalizePlanType(req.Type),
-		TimeLabel:     timeLabel,
-		ScheduledDate: scheduledDate,
-		ScheduledTime: scheduledTime,
-		Timezone:      timezone,
-		Reminder:      req.Reminder,
-		ImageURL:      strings.TrimSpace(req.ImageURL),
-		Location:      location,
-		Note:          sanitizePlanNote(req.Note),
-		Source:        normalizePlanSource(req.Source),
+		UserID:              userID,
+		PlaceID:             placeID,
+		Title:               title,
+		Type:                normalizePlanType(req.Type),
+		TimeLabel:           timeLabel,
+		ScheduledDate:       scheduledDate,
+		ScheduledTime:       scheduledTime,
+		Timezone:            timezone,
+		Reminder:            req.Reminder,
+		ImageURL:            strings.TrimSpace(req.ImageURL),
+		Location:            location,
+		Note:                sanitizePlanNote(req.Note),
+		Source:              normalizePlanSource(req.Source),
+		RecurrenceFrequency: recurrenceFrequency,
+		RecurrenceInterval:  recurrenceInterval,
+		RecurrenceEndAt:     recurrenceEndAt,
 	}
 
 	if plan.Note == "" {
@@ -365,8 +452,59 @@ func (h *Handler) UpdatePlanStatus(c *gin.Context) {
 		return
 	}
 
+	derivedPlan, derived := maybeDerivePlanRecurrence(plan)
+
 	evaluateAchievementsQuietly(userID)
+	if derived {
+		success(c, gin.H{"plan": plan, "derivedPlan": derivedPlan})
+		return
+	}
 	success(c, plan)
+}
+
+func maybeDerivePlanRecurrence(plan model.LifeTracePlan) (*model.LifeTracePlan, bool) {
+	if !plan.Completed {
+		return nil, false
+	}
+	if plan.RecurrenceFrequency == "" || plan.RecurrenceFrequency == "none" {
+		return nil, false
+	}
+	nextDate, ok := nextRecurrenceDate(plan.RecurrenceFrequency, plan.RecurrenceInterval, plan.ScheduledDate)
+	if !ok {
+		return nil, false
+	}
+	if plan.RecurrenceEndAt != nil && *plan.RecurrenceEndAt != "" && nextDate > *plan.RecurrenceEndAt {
+		return nil, false
+	}
+	parentID := plan.RecurrenceParentID
+	if parentID == nil {
+		root := plan.ID
+		parentID = &root
+	}
+	next := model.LifeTracePlan{
+		UserID:              plan.UserID,
+		PlaceID:             plan.PlaceID,
+		Title:               plan.Title,
+		Type:                plan.Type,
+		TimeLabel:           plan.TimeLabel,
+		ScheduledDate:       nextDate,
+		ScheduledTime:       plan.ScheduledTime,
+		Timezone:            plan.Timezone,
+		Reminder:            plan.Reminder,
+		ImageURL:            plan.ImageURL,
+		Location:            plan.Location,
+		Note:                plan.Note,
+		Source:              plan.Source,
+		RecurrenceFrequency: plan.RecurrenceFrequency,
+		RecurrenceInterval:  plan.RecurrenceInterval,
+		RecurrenceEndAt:     plan.RecurrenceEndAt,
+		RecurrenceParentID:  parentID,
+	}
+	if err := database.GetDB().Create(&next).Error; err != nil {
+		logger.Log.WithField("error", err).Error("LifeTrace derive recurrence plan failed")
+		return nil, false
+	}
+	return &next, true
 }
 
 func (h *Handler) UpdatePlan(c *gin.Context) {
@@ -412,19 +550,37 @@ func (h *Handler) UpdatePlan(c *gin.Context) {
 	}
 	previousLocation := plan.Location
 
+	recurrenceFrequency := normalizeRecurrenceFrequency(req.RecurrenceFrequency)
+	recurrenceInterval := sanitizeRecurrenceInterval(req.RecurrenceInterval)
+	recurrenceEndAt, ok := sanitizeRecurrenceEndAt(req.RecurrenceEndAt)
+	if !ok {
+		fail(c, http.StatusBadRequest, "周期结束日期格式错误")
+		return
+	}
+	if recurrenceFrequency == "none" {
+		recurrenceInterval = 1
+		recurrenceEndAt = nil
+	} else if scheduledDate == "" {
+		fail(c, http.StatusBadRequest, "周期计划需要先选择日期")
+		return
+	}
+
 	updates := map[string]interface{}{
-		"place_id":       placeID,
-		"title":          title,
-		"type":           normalizePlanType(req.Type),
-		"time_label":     timeLabel,
-		"scheduled_date": scheduledDate,
-		"scheduled_time": scheduledTime,
-		"timezone":       timezone,
-		"reminder":       req.Reminder,
-		"image_url":      strings.TrimSpace(req.ImageURL),
-		"location":       location,
-		"note":           sanitizePlanNote(req.Note),
-		"source":         normalizePlanSource(req.Source),
+		"place_id":             placeID,
+		"title":                title,
+		"type":                 normalizePlanType(req.Type),
+		"time_label":           timeLabel,
+		"scheduled_date":       scheduledDate,
+		"scheduled_time":       scheduledTime,
+		"timezone":             timezone,
+		"reminder":             req.Reminder,
+		"image_url":            strings.TrimSpace(req.ImageURL),
+		"location":             location,
+		"note":                 sanitizePlanNote(req.Note),
+		"source":               normalizePlanSource(req.Source),
+		"recurrence_frequency": recurrenceFrequency,
+		"recurrence_interval":  recurrenceInterval,
+		"recurrence_end_at":    recurrenceEndAt,
 	}
 	if updates["note"] == "" {
 		updates["note"] = "由 Life Trace 创建的新生活计划。"
