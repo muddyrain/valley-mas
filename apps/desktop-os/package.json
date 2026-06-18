@@ -1,0 +1,27 @@
+{
+  "name": "@valley/desktop-os",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint src/",
+    "check": "biome check src/",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "react": "catalog:react-19",
+    "react-dom": "catalog:react-19",
+    "zustand": "catalog:shared-runtime"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:react-19",
+    "@types/react-dom": "catalog:react-19",
+    "@vitejs/plugin-react-swc": "catalog:vite-6",
+    "typescript": "catalog:ts-tooling",
+    "vite": "catalog:vite-6"
+  }
+}

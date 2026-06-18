@@ -1,0 +1,98 @@
+.window {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  background: var(--plush-cream);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(90, 74, 58, 0.08);
+  box-shadow: var(--shadow-window);
+  overflow: visible;
+  animation: window-pop 0.32s var(--ease-spring);
+  transform-origin: center center;
+  transition:
+    box-shadow 0.2s var(--ease-out),
+    opacity 0.22s var(--ease-out),
+    transform 0.22s var(--ease-out),
+    filter 0.22s var(--ease-out);
+}
+
+@keyframes window-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.window.is-blurred {
+  box-shadow: 0 8px 24px rgba(90, 74, 58, 0.12);
+}
+
+.window.is-minimized {
+  opacity: 0;
+  transform: scale(0.32) translateY(60vh);
+  transform-origin: 50% 100%;
+  filter: blur(2px);
+  pointer-events: none;
+  transition:
+    opacity 0.32s var(--ease-out),
+    transform 0.36s cubic-bezier(0.55, 0.05, 0.45, 0.95),
+    filter 0.32s var(--ease-out);
+}
+
+.window.is-closing {
+  opacity: 0;
+  transform: scale(0.86);
+  pointer-events: none;
+}
+
+.window__titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+  background: linear-gradient(180deg, #fffaf0 0%, #f1ead6 100%);
+  border-bottom: 1px solid rgba(90, 74, 58, 0.08);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  cursor: grab;
+  user-select: none;
+}
+.window__titlebar:active {
+  cursor: grabbing;
+}
+
+.window.is-blurred .window__titlebar {
+  background: linear-gradient(180deg, #f5f1e6 0%, #ebe4d2 100%);
+}
+
+.window__titlebar-spacer {
+  width: 64px;
+}
+
+.window__title {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--plush-text);
+  pointer-events: none;
+  letter-spacing: 0.2px;
+}
+
+.window.is-blurred .window__title {
+  color: rgba(90, 74, 58, 0.5);
+}
+
+.window__body {
+  flex: 1;
+  overflow: auto;
+  background: var(--plush-cream-soft);
+  padding: 18px;
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}

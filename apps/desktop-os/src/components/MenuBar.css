@@ -1,0 +1,42 @@
+.menu-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  background: rgba(248, 245, 236, 0.72);
+  backdrop-filter: saturate(140%) blur(18px);
+  -webkit-backdrop-filter: saturate(140%) blur(18px);
+  border-bottom: 1px solid rgba(90, 74, 58, 0.08);
+  font-size: 13px;
+  color: var(--plush-text);
+}
+
+.menu-bar__left,
+.menu-bar__right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.menu-bar__logo {
+  font-size: 14px;
+}
+.menu-bar__app {
+  font-weight: 600;
+}
+.menu-bar__item {
+  opacity: 0.8;
+  cursor: default;
+}
+.menu-bar__icon {
+  font-size: 13px;
+}
+.menu-bar__clock {
+  font-variant-numeric: tabular-nums;
+}
