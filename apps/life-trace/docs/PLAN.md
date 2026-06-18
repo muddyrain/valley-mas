@@ -174,12 +174,21 @@ B 块（后置）：
 
 ### P5：个人生活扩展页增强
 
-状态：后置。
+状态：进行中。
 
-- 灵感（原 Inbox）：语音输入、AI 摘要质量增强、AI 页生活动作入口、书影音/地点/账目草稿继续后置。
-- 书影音日记：外部平台检索、灵感转草稿、计划完成后补书影音草稿、本月书影音月报。
-- 地点地图：地图 pin 视图、外部地图搜索、地点分类、地点照片、地点标签，以及书影音/账目/灵感关联。
-- 轻账本：票据图片 AI 草稿、轻量订阅/续费提醒、`life_trace_recurring_payments`。
+#### P5.1 灵感沉淀路径（已交付）
+
+- 服务端 `validInboxConvertedTypes` 扩 `media | place`，覆盖到 PATCH /lifetrace/inbox-items/:id/convert，附 `inbox_handler_test.go` 子测试。
+- 前端 `InboxConvertedType` 同步扩 union；`lib/inbox.ts` 新增 `buildInboxMediaDraft / buildInboxPlaceDraft`，含基于域名的最浅 `mediaType` 推断（豆瓣/IMDB/Bilibili/网易云等）。
+- InboxPage 展开行新增「转书影音」「转地点」按钮，复用既有 `convertInbox` 落库；按钮仅在 `status === 'inbox'` 显示。
+- MediaDiaryPage / PlacesPage 接 `?new=1&inboxItemId=…` query 预填新建表单，提交成功后自动写入 `convertedType` 和 `convertedId`，并把原灵感置为已转化（与现有 ledger 入口一致）。
+- 验证：`pnpm --filter @valley/life-trace exec tsc --noEmit`、`go test ./internal/lifetrace/...`、`encoding-guard` 全部通过；本次未做 AI 推荐 chip（aiSuggestedType 仅支持 plan/trace，避免改 prompt）。
+
+#### 后续子卡
+
+- P5.2 轻账本订阅与续费：票据图片 AI 草稿、轻量订阅/续费提醒、`life_trace_recurring_payments`。
+- P5.3 地点 v3 / 书影音外部检索：地图 pin 视图、外部地图搜索、地点分类、地点照片、地点标签；书影音外部平台检索；本月书影音月报。
+- 灵感（原 Inbox）：语音输入、AI 摘要质量增强、AI 页生活动作入口。
 - 衣橱 / 穿搭：穿着次数统计、最近穿着时间。
 
 ### P6：成就体系增强

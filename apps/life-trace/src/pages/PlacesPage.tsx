@@ -11,7 +11,7 @@ import {
   StarOff,
 } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetSelectField } from '@/components/FormItem';
 import { LoadErrorState } from '@/components/LoadErrorState';
@@ -316,14 +316,38 @@ function PlacesListView() {
   const loadMorePlaces = useLifeTraceStore((state) => state.loadMorePlaces);
   const addPlace = useLifeTraceStore((state) => state.addPlace);
   const exportPlaces = useLifeTraceStore((state) => state.exportPlaces);
+  const convertInbox = useLifeTraceStore((state) => state.convertInbox);
   const groups = useMemo(() => groupPlaces(places), [places]);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState<PlaceFormState>(defaultPlaceForm);
   const [formError, setFormError] = useState('');
+  const [pendingInboxItemId, setPendingInboxItemId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadPlaces({ page: 1, pageSize: 20, archived: false });
   }, [loadPlaces]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('new') !== '1') {
+      return;
+    }
+    const rawStatus = params.get('status');
+    const status: PlaceStatus =
+      rawStatus === 'want' || rawStatus === 'visited' ? rawStatus : 'want';
+    setCreateForm({
+      ...defaultPlaceForm,
+      name: params.get('name') ?? '',
+      status,
+      note: params.get('note') ?? '',
+    });
+    setPendingInboxItemId(params.get('inboxItemId'));
+    setFormError('');
+    setCreating(true);
+    navigate(location.pathname, { replace: true });
+  }, [location.pathname, location.search, navigate]);
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -339,7 +363,11 @@ function PlacesListView() {
     }
     const created = await addPlace(payload);
     if (created) {
+      if (pendingInboxItemId) {
+        void convertInbox(pendingInboxItemId, 'place', created.id);
+      }
       setCreateForm(defaultPlaceForm);
+      setPendingInboxItemId(null);
       setCreating(false);
     }
   };

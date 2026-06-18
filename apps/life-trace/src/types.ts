@@ -325,7 +325,7 @@ export type InboxItemType = 'text' | 'link' | 'image';
 
 export type InboxItemStatus = 'inbox' | 'converted' | 'archived';
 
-export type InboxConvertedType = 'plan' | 'trace' | 'ledger';
+export type InboxConvertedType = 'plan' | 'trace' | 'ledger' | 'media' | 'place';
 
 export type InboxAISuggestedType = 'plan' | 'trace';
 

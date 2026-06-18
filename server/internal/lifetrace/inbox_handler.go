@@ -49,6 +49,8 @@ var validInboxConvertedTypes = map[string]bool{
 	"plan":   true,
 	"trace":  true,
 	"ledger": true,
+	"media":  true,
+	"place":  true,
 }
 
 var validInboxAISuggestedTypes = map[string]bool{
