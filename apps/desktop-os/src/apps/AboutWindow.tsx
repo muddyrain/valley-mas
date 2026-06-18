@@ -3,7 +3,9 @@ import './AboutWindow.css';
 export default function AboutWindow() {
   return (
     <div className="about">
-      <img className="about__hero" src="/widgets/06_mascot_about.png" alt="mascot" />
+      <div className="about__hero" aria-hidden>
+        🍎
+      </div>
       <div className="about__info">
         <h1 className="about__title">macOS Plush</h1>
         <p className="about__sub">版本 0.1.0 · Nintendo Inspired</p>
