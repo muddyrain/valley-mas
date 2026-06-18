@@ -11,25 +11,29 @@ import (
 )
 
 type LifeTracePlan struct {
-	ID            Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID        Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
-	PlaceID       *Int64String   `gorm:"column:place_id;index" json:"placeId,omitempty"`
-	Title         string         `gorm:"size:160;not null" json:"title"`
-	Type          string         `gorm:"size:30;not null" json:"type"`
-	TimeLabel     string         `gorm:"size:80;not null" json:"timeLabel"`
-	ScheduledDate string         `gorm:"size:20;index" json:"scheduledDate,omitempty"`
-	ScheduledTime string         `gorm:"size:20" json:"scheduledTime,omitempty"`
-	Timezone      string         `gorm:"size:64;default:'Asia/Shanghai'" json:"timezone,omitempty"`
-	Reminder      bool           `gorm:"default:true" json:"reminder"`
-	ImageURL      string         `gorm:"size:800" json:"imageUrl,omitempty"`
-	Location      string         `gorm:"size:120" json:"location,omitempty"`
-	Note          string         `gorm:"size:1000" json:"note"`
-	Source        string         `gorm:"size:40;default:'manual';index" json:"source"`
-	Completed     bool           `gorm:"default:false;index" json:"completed"`
-	CompletedAt   *time.Time     `json:"completedAt,omitempty"`
-	CreatedAt     time.Time      `json:"createdAt"`
-	UpdatedAt     time.Time      `json:"updatedAt"`
-	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                  Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID              Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	PlaceID             *Int64String   `gorm:"column:place_id;index" json:"placeId,omitempty"`
+	Title               string         `gorm:"size:160;not null" json:"title"`
+	Type                string         `gorm:"size:30;not null" json:"type"`
+	TimeLabel           string         `gorm:"size:80;not null" json:"timeLabel"`
+	ScheduledDate       string         `gorm:"size:20;index" json:"scheduledDate,omitempty"`
+	ScheduledTime       string         `gorm:"size:20" json:"scheduledTime,omitempty"`
+	Timezone            string         `gorm:"size:64;default:'Asia/Shanghai'" json:"timezone,omitempty"`
+	Reminder            bool           `gorm:"default:true" json:"reminder"`
+	ImageURL            string         `gorm:"size:800" json:"imageUrl,omitempty"`
+	Location            string         `gorm:"size:120" json:"location,omitempty"`
+	Note                string         `gorm:"size:1000" json:"note"`
+	Source              string         `gorm:"size:40;default:'manual';index" json:"source"`
+	Completed           bool           `gorm:"default:false;index" json:"completed"`
+	CompletedAt         *time.Time     `json:"completedAt,omitempty"`
+	RecurrenceFrequency string         `gorm:"column:recurrence_frequency;size:16;default:'none';index" json:"recurrenceFrequency"`
+	RecurrenceInterval  int            `gorm:"column:recurrence_interval;default:1" json:"recurrenceInterval"`
+	RecurrenceEndAt     *string        `gorm:"column:recurrence_end_at;size:20" json:"recurrenceEndAt,omitempty"`
+	RecurrenceParentID  *Int64String   `gorm:"column:recurrence_parent_id;index" json:"recurrenceParentId,omitempty"`
+	CreatedAt           time.Time      `json:"createdAt"`
+	UpdatedAt           time.Time      `json:"updatedAt"`
+	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 type LifeTraceCheckin struct {
@@ -64,6 +68,12 @@ func (p *LifeTracePlan) BeforeCreate(tx *gorm.DB) error {
 	}
 	if p.Timezone == "" {
 		p.Timezone = "Asia/Shanghai"
+	}
+	if p.RecurrenceFrequency == "" {
+		p.RecurrenceFrequency = "none"
+	}
+	if p.RecurrenceInterval <= 0 {
+		p.RecurrenceInterval = 1
 	}
 	return nil
 }

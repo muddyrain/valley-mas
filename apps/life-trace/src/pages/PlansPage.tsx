@@ -72,12 +72,13 @@ const planTypeOptions: Array<PlanType | 'all'> = [
   '普通事项',
 ];
 
-type QuickPlanFilter = 'all' | 'weekend' | 'reminded';
+type QuickPlanFilter = 'all' | 'weekend' | 'reminded' | 'recurring';
 
 const quickFilterOptions: Array<{ id: QuickPlanFilter; label: string }> = [
   { id: 'all', label: '全部计划' },
   { id: 'weekend', label: '只看周末' },
   { id: 'reminded', label: '只看提醒' },
+  { id: 'recurring', label: '仅看周期' },
 ];
 
 const typeTone: Record<PlanType, 'plan' | 'health' | 'trace' | 'weather' | 'ai' | 'alert'> = {
@@ -136,6 +137,11 @@ export function PlansPage() {
     }
     if (quickFilter === 'reminded') {
       nextPlans = filterPlans(nextPlans, 'reminded');
+    }
+    if (quickFilter === 'recurring') {
+      nextPlans = nextPlans.filter(
+        (plan) => plan.recurrenceFrequency && plan.recurrenceFrequency !== 'none',
+      );
     }
     if (activeFilter !== 'completed') {
       nextPlans = nextPlans.filter((plan) => !plan.completed);
@@ -324,6 +330,9 @@ export function PlansPage() {
                   <Badge tone={typeTone[plan.type]}>{plan.type}</Badge>
                   {isAdvicePlan(plan) ? <Badge tone="ai">今日建议</Badge> : null}
                   {isOverduePlan(plan) ? <Badge tone="alert">已逾期</Badge> : null}
+                  {plan.recurrenceFrequency && plan.recurrenceFrequency !== 'none' ? (
+                    <Badge tone="weather">循环</Badge>
+                  ) : null}
                   {plan.completed ? <Badge tone="trace">已完成</Badge> : null}
                 </div>
                 <h2 className="mt-2 line-clamp-2 text-lg font-semibold leading-snug">
@@ -453,7 +462,7 @@ export function PlansPage() {
   }
 
   return (
-    <SoftPage ref={pageRef} className="space-y-5">
+    <SoftPage ref={pageRef} className="space-y-5 pb-32">
       <SoftHeader
         title="计划"
         subtitle={new Intl.DateTimeFormat('zh-CN', {

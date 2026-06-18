@@ -63,8 +63,10 @@ export function updatePlan(token: string, id: string, input: NewPlanInput) {
   });
 }
 
+export type UpdatePlanStatusResult = Plan | { plan: Plan; derivedPlan?: Plan | null };
+
 export function updatePlanStatus(token: string, id: string, completed: boolean) {
-  return apiRequest<Plan>(`/life-trace/plans/${id}/status`, token, {
+  return apiRequest<UpdatePlanStatusResult>(`/life-trace/plans/${id}/status`, token, {
     method: 'PATCH',
     body: JSON.stringify({ completed }),
   });
