@@ -127,6 +127,38 @@ export type PantryPreferences = {
   defaultReminderTime: string;
 };
 
+export type ShoppingListSource =
+  | 'manual'
+  | 'pantry_used_up'
+  | 'pantry_low'
+  | 'pantry_discard'
+  | 'recipe';
+
+export type ShoppingListItem = {
+  id: string;
+  householdId?: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  category: string;
+  source: ShoppingListSource;
+  sourcePantryItemId?: string;
+  note?: string;
+  checkedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type NewShoppingListItemInput = {
+  name: string;
+  quantity?: number;
+  unit?: string;
+  category?: string;
+  source?: ShoppingListSource;
+  sourcePantryItemId?: string;
+  note?: string;
+};
+
 export type ClosetCategory = '上装' | '下装' | '外套' | '鞋履' | '配饰' | '包袋' | '套装' | '其他';
 
 export type ClosetWarmthLevel = '轻薄' | '常规' | '保暖' | '厚重';

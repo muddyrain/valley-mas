@@ -146,6 +146,16 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			pantry.DELETE("/:id", handler.DeletePantryItem)
 		}
 
+		shopping := group.Group("/shopping")
+		shopping.Use(auth)
+		{
+			shopping.GET("", handler.ListShoppingListItems)
+			shopping.POST("", handler.CreateShoppingListItem)
+			shopping.PATCH("/:id", handler.UpdateShoppingListItem)
+			shopping.PATCH("/:id/check", handler.CheckShoppingListItem)
+			shopping.DELETE("/:id", handler.DeleteShoppingListItem)
+		}
+
 		households := group.Group("/households")
 		households.Use(auth)
 		{

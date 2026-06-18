@@ -51,6 +51,14 @@ import {
   updatePlanStatus,
 } from '@/api/plans';
 import { getSettings, saveSettings } from '@/api/settings';
+import {
+  type ListShoppingOptions,
+  listShopping,
+  checkShoppingItem as requestCheckShoppingItem,
+  createShoppingItem as requestCreateShoppingItem,
+  deleteShoppingItem as requestDeleteShoppingItem,
+  updateShoppingItem as requestUpdateShoppingItem,
+} from '@/api/shopping';
 import { createTrace, deleteTrace, listTraces, updateTrace } from '@/api/traces';
 import { findNewlyUnlockedAchievements, normalizeAchievement } from '@/lib/achievements';
 import { normalizeAiActionRecord } from '@/lib/aiHistory';
@@ -75,6 +83,7 @@ import type {
   NewLedgerEntryInput,
   NewPantryItemInput,
   NewPlanInput,
+  NewShoppingListItemInput,
   NewTraceInput,
   PantryItem,
   PantryItemStatus,
@@ -83,6 +92,7 @@ import type {
   Place,
   PlaceRecord,
   Plan,
+  ShoppingListItem,
   Trace,
   UserSettings,
 } from '@/types';
@@ -171,6 +181,11 @@ type LifeTraceState = {
   pantryListResolvedHouseholdName: string;
   pantryListSummary: PantryOverview;
   pantryPreferences: PantryPreferences;
+  shoppingListItems: ShoppingListItem[];
+  shoppingListLoaded: boolean;
+  shoppingListLoading: boolean;
+  shoppingListError: string;
+  shoppingListResolvedHouseholdId: string;
   achievements: Achievement[];
   achievementSummary: AchievementSummary;
   recentAchievements: Achievement[];
@@ -246,6 +261,14 @@ type LifeTraceState = {
   addLedgerEntry: (input: NewLedgerEntryInput) => Promise<LedgerEntry | null>;
   editLedgerEntry: (entryId: string, input: NewLedgerEntryInput) => Promise<LedgerEntry | null>;
   removeLedgerEntry: (entryId: string) => Promise<boolean>;
+  loadShoppingList: (options?: ListShoppingOptions) => Promise<void>;
+  addShoppingItem: (input: NewShoppingListItemInput) => Promise<ShoppingListItem | null>;
+  editShoppingItem: (
+    itemId: string,
+    input: NewShoppingListItemInput,
+  ) => Promise<ShoppingListItem | null>;
+  toggleShoppingItem: (itemId: string, checked: boolean) => Promise<ShoppingListItem | null>;
+  removeShoppingItem: (itemId: string) => Promise<boolean>;
   completePlan: (planId: string) => Promise<void>;
   removePlan: (planId: string) => Promise<void>;
   removeTrace: (traceId: string) => Promise<void>;
@@ -602,6 +625,11 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       pantryListResolvedHouseholdName: '',
       pantryListSummary: defaultPantryOverview,
       pantryPreferences: defaultPantryPreferences,
+      shoppingListItems: [],
+      shoppingListLoaded: false,
+      shoppingListLoading: false,
+      shoppingListError: '',
+      shoppingListResolvedHouseholdId: '',
       achievements: [],
       achievementSummary: defaultAchievementSummary,
       recentAchievements: [],
@@ -2353,6 +2381,103 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           set((state) => ({
             ledgerDeletingById: { ...state.ledgerDeletingById, [entryId]: false },
           }));
+        }
+      },
+      loadShoppingList: async (options = {}) => {
+        const token = getToken();
+        const householdId =
+          options.householdId ??
+          (get().preferredPantryHouseholdId ? get().preferredPantryHouseholdId : undefined);
+        if (!token) {
+          set({
+            shoppingListItems: [],
+            shoppingListLoaded: true,
+            shoppingListLoading: false,
+            shoppingListError: '',
+            shoppingListResolvedHouseholdId: '',
+          });
+          return;
+        }
+        set({ shoppingListLoading: true, shoppingListError: '' });
+        try {
+          const data = await listShopping(token, { ...options, householdId });
+          set({
+            shoppingListItems: data.list,
+            shoppingListLoaded: true,
+            shoppingListLoading: false,
+            shoppingListError: '',
+            shoppingListResolvedHouseholdId: data.householdId ?? '',
+          });
+        } catch (error) {
+          set({
+            shoppingListLoaded: true,
+            shoppingListLoading: false,
+            shoppingListError: getLifeTraceErrorMessage(error, '获取采购清单失败'),
+          });
+        }
+      },
+      addShoppingItem: async (input) => {
+        const token = getToken();
+        if (!token) return null;
+        const householdId = get().preferredPantryHouseholdId || undefined;
+        try {
+          const item = await requestCreateShoppingItem(token, input, householdId);
+          set((state) => ({
+            shoppingListItems: [item, ...state.shoppingListItems],
+          }));
+          return item;
+        } catch (error) {
+          set({ shoppingListError: getLifeTraceErrorMessage(error, '加入采购清单失败') });
+          return null;
+        }
+      },
+      editShoppingItem: async (itemId, input) => {
+        const token = getToken();
+        if (!token) return null;
+        const householdId = get().preferredPantryHouseholdId || undefined;
+        try {
+          const item = await requestUpdateShoppingItem(token, itemId, input, householdId);
+          set((state) => ({
+            shoppingListItems: state.shoppingListItems.map((entry) =>
+              entry.id === itemId ? item : entry,
+            ),
+          }));
+          return item;
+        } catch (error) {
+          set({ shoppingListError: getLifeTraceErrorMessage(error, '更新采购清单失败') });
+          return null;
+        }
+      },
+      toggleShoppingItem: async (itemId, checked) => {
+        const token = getToken();
+        if (!token) return null;
+        const householdId = get().preferredPantryHouseholdId || undefined;
+        try {
+          const item = await requestCheckShoppingItem(token, itemId, checked, householdId);
+          set((state) => ({
+            shoppingListItems: state.shoppingListItems.map((entry) =>
+              entry.id === itemId ? item : entry,
+            ),
+          }));
+          return item;
+        } catch (error) {
+          set({ shoppingListError: getLifeTraceErrorMessage(error, '更新采购清单失败') });
+          return null;
+        }
+      },
+      removeShoppingItem: async (itemId) => {
+        const token = getToken();
+        if (!token) return false;
+        const householdId = get().preferredPantryHouseholdId || undefined;
+        try {
+          await requestDeleteShoppingItem(token, itemId, householdId);
+          set((state) => ({
+            shoppingListItems: state.shoppingListItems.filter((entry) => entry.id !== itemId),
+          }));
+          return true;
+        } catch (error) {
+          set({ shoppingListError: getLifeTraceErrorMessage(error, '删除采购清单失败') });
+          return false;
         }
       },
       completePlan: async (planId) => {

@@ -435,6 +435,7 @@ func lifeTraceDomainMigrationModels() []any {
 		&model.LifeTraceClosetItem{},
 		&model.LifeTraceOutfit{},
 		&model.LifeTracePantryItem{},
+		&model.LifeTraceShoppingListItem{},
 		&model.LifeTracePhotoItemDraft{},
 		&model.LifeTraceSettings{},
 		&model.LifeTraceWeeklyReview{},

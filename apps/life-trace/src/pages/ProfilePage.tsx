@@ -21,6 +21,7 @@ import {
   Share2,
   ShieldCheck,
   Shirt,
+  ShoppingBasket,
   Smartphone,
   Sparkles,
   Trophy,
@@ -554,7 +555,7 @@ export function ProfilePage() {
       </section>
 
       <section data-profile-card className="space-y-3">
-        <SectionHeader title="个人工具" meta="Inbox / 轻账本" />
+        <SectionHeader title="个人工具" meta="Inbox / 轻账本 / 采购清单" />
         <Card className="grid gap-3 p-4">
           <button
             type="button"
@@ -599,6 +600,22 @@ export function ProfilePage() {
             <div className="min-w-0 flex-1">
               <h3 className="font-semibold">轻账本</h3>
               <p className="mt-1 text-sm leading-5 text-muted-foreground">记录支出、收入和退款。</p>
+            </div>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
+            onClick={() => navigate('/shopping')}
+          >
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+              <ShoppingBasket className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold">采购清单</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                把要买的东西先记下来，逛超市或下单时一目了然。
+              </p>
             </div>
             <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
           </button>
