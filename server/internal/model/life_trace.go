@@ -361,24 +361,25 @@ func (entry *LifeTraceMediaDiaryEntry) BeforeCreate(tx *gorm.DB) error {
 }
 
 type LifeTraceLedgerEntry struct {
-	ID           Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID       Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
-	AmountCents  int64          `gorm:"column:amount_cents;not null" json:"amountCents"`
-	Currency     string         `gorm:"size:8;not null;default:'CNY';index" json:"currency"`
-	Direction    string         `gorm:"size:20;not null;index" json:"direction"`
-	Category     string         `gorm:"size:30;not null;index" json:"category"`
-	OccurredAt   time.Time      `gorm:"column:occurred_at;not null;index" json:"occurredAt"`
-	Merchant     string         `gorm:"size:160" json:"merchant,omitempty"`
-	Location     string         `gorm:"size:120" json:"location,omitempty"`
-	Note         string         `gorm:"size:1000" json:"note"`
-	ImageURL     string         `gorm:"size:800" json:"imageUrl,omitempty"`
-	InboxItemID  *Int64String   `gorm:"column:inbox_item_id;index" json:"inboxItemId,omitempty"`
-	PlanID       *Int64String   `gorm:"column:plan_id;index" json:"planId,omitempty"`
-	TraceID      *Int64String   `gorm:"column:trace_id;index" json:"traceId,omitempty"`
-	PantryItemID *Int64String   `gorm:"column:pantry_item_id;index" json:"pantryItemId,omitempty"`
-	CreatedAt    time.Time      `json:"createdAt"`
-	UpdatedAt    time.Time      `json:"updatedAt"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                 Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID             Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	AmountCents        int64          `gorm:"column:amount_cents;not null" json:"amountCents"`
+	Currency           string         `gorm:"size:8;not null;default:'CNY';index" json:"currency"`
+	Direction          string         `gorm:"size:20;not null;index" json:"direction"`
+	Category           string         `gorm:"size:30;not null;index" json:"category"`
+	OccurredAt         time.Time      `gorm:"column:occurred_at;not null;index" json:"occurredAt"`
+	Merchant           string         `gorm:"size:160" json:"merchant,omitempty"`
+	Location           string         `gorm:"size:120" json:"location,omitempty"`
+	Note               string         `gorm:"size:1000" json:"note"`
+	ImageURL           string         `gorm:"size:800" json:"imageUrl,omitempty"`
+	InboxItemID        *Int64String   `gorm:"column:inbox_item_id;index" json:"inboxItemId,omitempty"`
+	PlanID             *Int64String   `gorm:"column:plan_id;index" json:"planId,omitempty"`
+	TraceID            *Int64String   `gorm:"column:trace_id;index" json:"traceId,omitempty"`
+	PantryItemID       *Int64String   `gorm:"column:pantry_item_id;index" json:"pantryItemId,omitempty"`
+	RecurringPaymentID *Int64String   `gorm:"column:recurring_payment_id;index" json:"recurringPaymentId,omitempty"`
+	CreatedAt          time.Time      `json:"createdAt"`
+	UpdatedAt          time.Time      `json:"updatedAt"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (entry *LifeTraceLedgerEntry) BeforeCreate(tx *gorm.DB) error {
@@ -474,6 +475,84 @@ func (item *LifeTracePantryItem) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+type LifeTraceRecurringPayment struct {
+	ID                 Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID             Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
+	Name               string         `gorm:"size:160;not null" json:"name"`
+	Category           string         `gorm:"size:30;not null;default:'订阅';index" json:"category"`
+	AmountCents        int64          `gorm:"column:amount_cents;not null" json:"amountCents"`
+	Currency           string         `gorm:"size:8;not null;default:'CNY'" json:"currency"`
+	Direction          string         `gorm:"size:20;not null;default:'支出';index" json:"direction"`
+	Merchant           string         `gorm:"size:160" json:"merchant,omitempty"`
+	Note               string         `gorm:"size:1000" json:"note"`
+	ImageURL           string         `gorm:"size:800" json:"imageUrl,omitempty"`
+	Frequency          string         `gorm:"size:16;not null;default:'monthly';index" json:"frequency"`
+	Interval           int            `gorm:"not null;default:1" json:"interval"`
+	StartedAt          string         `gorm:"column:started_at;size:20;not null;index" json:"startedAt"`
+	NextDueAt          string         `gorm:"column:next_due_at;size:20;not null;index" json:"nextDueAt"`
+	EndAt              *string        `gorm:"column:end_at;size:20" json:"endAt,omitempty"`
+	ReminderEnabled    bool           `gorm:"column:reminder_enabled;default:true" json:"reminderEnabled"`
+	ReminderUseDefault bool           `gorm:"column:reminder_use_default;default:true" json:"reminderUseDefault"`
+	ReminderRules      StringList     `gorm:"type:text" json:"reminderRules"`
+	ReminderTime       string         `gorm:"size:20;not null;default:'09:00'" json:"reminderTime"`
+	Archived           bool           `gorm:"default:false;index" json:"archived"`
+	CanceledAt         *time.Time     `gorm:"column:canceled_at;index" json:"canceledAt,omitempty"`
+	CreatedAt          time.Time      `json:"createdAt"`
+	UpdatedAt          time.Time      `json:"updatedAt"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (item *LifeTraceRecurringPayment) BeforeCreate(tx *gorm.DB) error {
+	if item.ID == 0 {
+		item.ID = Int64String(utils.GenerateID())
+	}
+	if item.Category == "" {
+		item.Category = "订阅"
+	}
+	if item.Currency == "" {
+		item.Currency = "CNY"
+	}
+	if item.Direction == "" {
+		item.Direction = "支出"
+	}
+	if item.Frequency == "" {
+		item.Frequency = "monthly"
+	}
+	if item.Interval <= 0 {
+		item.Interval = 1
+	}
+	if item.ReminderRules == nil {
+		item.ReminderRules = StringList{"7d", "3d", "same-day", "overdue"}
+	}
+	if item.ReminderTime == "" {
+		item.ReminderTime = "09:00"
+	}
+	return nil
+}
+
+type LifeTraceRecurringPaymentDelivery struct {
+	ID                 Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID             Int64String    `gorm:"column:user_id;index;not null;uniqueIndex:uidx_life_trace_recurring_delivery" json:"userId"`
+	RecurringPaymentID Int64String    `gorm:"column:recurring_payment_id;index;not null;uniqueIndex:uidx_life_trace_recurring_delivery" json:"recurringPaymentId"`
+	Rule               string         `gorm:"size:20;not null;uniqueIndex:uidx_life_trace_recurring_delivery" json:"rule"`
+	DueAt              time.Time      `gorm:"not null;index;uniqueIndex:uidx_life_trace_recurring_delivery" json:"dueAt"`
+	SubscriptionID     Int64String    `gorm:"column:subscription_id;index;not null;uniqueIndex:uidx_life_trace_recurring_delivery" json:"subscriptionId"`
+	Status             string         `gorm:"size:20;not null;default:'sent';index" json:"status"`
+	Error              string         `gorm:"size:500" json:"error,omitempty"`
+	CreatedAt          time.Time      `json:"createdAt"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (delivery *LifeTraceRecurringPaymentDelivery) BeforeCreate(tx *gorm.DB) error {
+	if delivery.ID == 0 {
+		delivery.ID = Int64String(utils.GenerateID())
+	}
+	if delivery.Status == "" {
+		delivery.Status = "sent"
+	}
+	return nil
+}
+
 type LifeTraceShoppingListItem struct {
 	ID                 Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID             Int64String    `gorm:"column:user_id;index;not null" json:"userId"`
@@ -535,6 +614,9 @@ type LifeTraceSettings struct {
 	PantryReminderEnabled   bool           `gorm:"column:pantry_reminder_enabled;default:true" json:"pantryReminderEnabled"`
 	PantryReminderRules     StringList     `gorm:"type:text" json:"pantryReminderRules"`
 	PantryReminderTime      string         `gorm:"size:20;not null;default:'09:00'" json:"pantryReminderTime"`
+	SubscriptionReminderEnabled bool       `gorm:"column:subscription_reminder_enabled;default:true" json:"subscriptionReminderEnabled"`
+	SubscriptionReminderRules   StringList `gorm:"column:subscription_reminder_rules;type:text" json:"subscriptionReminderRules"`
+	SubscriptionReminderTime    string     `gorm:"column:subscription_reminder_time;size:20;not null;default:'09:00'" json:"subscriptionReminderTime"`
 	CreatedAt               time.Time      `json:"createdAt"`
 	UpdatedAt               time.Time      `json:"updatedAt"`
 	DeletedAt               gorm.DeletedAt `gorm:"index" json:"-"`
@@ -582,6 +664,12 @@ func (settings *LifeTraceSettings) BeforeCreate(tx *gorm.DB) error {
 	}
 	if settings.PantryReminderTime == "" {
 		settings.PantryReminderTime = "09:00"
+	}
+	if settings.SubscriptionReminderRules == nil {
+		settings.SubscriptionReminderRules = StringList{"7d", "3d", "same-day", "overdue"}
+	}
+	if settings.SubscriptionReminderTime == "" {
+		settings.SubscriptionReminderTime = "09:00"
 	}
 	return nil
 }

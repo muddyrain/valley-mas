@@ -111,6 +111,16 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			ledger.DELETE("/:id", handler.DeleteLedgerEntry)
 		}
 
+		recurringPayments := group.Group("/recurring-payments")
+		recurringPayments.Use(auth)
+		{
+			recurringPayments.GET("", handler.ListRecurringPayments)
+			recurringPayments.POST("", handler.CreateRecurringPayment)
+			recurringPayments.PATCH("/:id", handler.UpdateRecurringPayment)
+			recurringPayments.DELETE("/:id", handler.DeleteRecurringPayment)
+			recurringPayments.POST("/:id/advance", handler.AdvanceRecurringPayment)
+		}
+
 		closet := group.Group("/closet")
 		closet.Use(auth)
 		{
