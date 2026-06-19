@@ -186,7 +186,8 @@ B 块（后置）：
 
 #### 后续子卡
 
-- P5.2 轻账本订阅与续费：票据图片 AI 草稿、轻量订阅/续费提醒、`life_trace_recurring_payments`。
+- P5.2a 订阅与续费（已交付）：服务端 `LifeTraceRecurringPayment` 模型与 5 个端点（list/create/update/delete/advance）+ `LedgerEntry.recurring_payment_id` 外键、reminder push 投递；前端 types/api/store/RecurringPaymentsPage 独立页面与 ProfilePage 入口、LedgerPage `?recurringPaymentId=` query 接入与保存后调 advance；服务端单测 `recurring_payment_handler_test.go` 覆盖 nextRecurringDueDate 6 频率 / resolveInitialNextDue / buildRecurringPaymentSummary 折算 / Create 校验 / Advance 跨 EndAt 归档与正常前进。续期策略：advance 仅在 LedgerPage 保存成功后触发，提醒只推不自动记一笔。
+- P5.2b 票据图片 AI 草稿（待启动）：复用 `image_ai_handler` + `LifeTracePhotoItemDraft` 思路，把票据图片转换为 LedgerEntry 草稿。
 - P5.3 地点 v3 / 书影音外部检索：地图 pin 视图、外部地图搜索、地点分类、地点照片、地点标签；书影音外部平台检索；本月书影音月报。
 - 灵感（原 Inbox）：语音输入、AI 摘要质量增强、AI 页生活动作入口。
 - 衣橱 / 穿搭：穿着次数统计、最近穿着时间。

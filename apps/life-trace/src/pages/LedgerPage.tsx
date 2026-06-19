@@ -106,6 +106,7 @@ function entryToInput(entry: LedgerEntry): NewLedgerEntryInput {
     planId: entry.planId,
     traceId: entry.traceId,
     pantryItemId: entry.pantryItemId,
+    recurringPaymentId: entry.recurringPaymentId,
   };
 }
 
@@ -141,6 +142,9 @@ export function LedgerPage() {
   const editLedgerEntry = useLifeTraceStore((state) => state.editLedgerEntry);
   const removeLedgerEntry = useLifeTraceStore((state) => state.removeLedgerEntry);
   const convertInbox = useLifeTraceStore((state) => state.convertInbox);
+  const advanceRecurringPaymentAction = useLifeTraceStore(
+    (state) => state.advanceRecurringPaymentAction,
+  );
   const [month, setMonth] = useState(getDefaultLedgerMonth());
   const [categoryFilter, setCategoryFilter] = useState<LedgerFilter>('all');
   const [directionFilter, setDirectionFilter] = useState<LedgerDirectionFilter>('all');
@@ -168,9 +172,13 @@ export function LedgerPage() {
     const amount = Number(params.get('amount') || '0');
     setEditingEntry(null);
     const category = params.get('category');
+    const direction = params.get('direction');
     setForm({
       ...defaultForm,
       amount: Number.isFinite(amount) ? amount : 0,
+      direction: ledgerDirections.includes(direction as LedgerDirection)
+        ? (direction as LedgerDirection)
+        : '支出',
       category: ledgerCategories.includes(category as LedgerCategory)
         ? (category as LedgerCategory)
         : '购物',
@@ -179,6 +187,7 @@ export function LedgerPage() {
       imageUrl: params.get('imageUrl') || '',
       inboxItemId: params.get('inboxItemId') || undefined,
       pantryItemId: params.get('pantryItemId') || undefined,
+      recurringPaymentId: params.get('recurringPaymentId') || undefined,
       occurredAt: formatDateTimeLocal(),
     });
     setFormOpen(true);
@@ -240,6 +249,9 @@ export function LedgerPage() {
     if (saved) {
       if (!editingEntry && input.inboxItemId) {
         void convertInbox(input.inboxItemId, 'ledger', saved.id);
+      }
+      if (!editingEntry && input.recurringPaymentId) {
+        void advanceRecurringPaymentAction(input.recurringPaymentId);
       }
       closeForm();
     }

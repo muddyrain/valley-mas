@@ -50,6 +50,14 @@ import {
   updatePlan,
   updatePlanStatus,
 } from '@/api/plans';
+import {
+  type ListRecurringPaymentsOptions,
+  listRecurringPayments,
+  advanceRecurringPayment as requestAdvanceRecurringPayment,
+  archiveRecurringPayment as requestArchiveRecurringPayment,
+  createRecurringPayment as requestCreateRecurringPayment,
+  updateRecurringPayment as requestUpdateRecurringPayment,
+} from '@/api/recurringPayments';
 import { getSettings, saveSettings } from '@/api/settings';
 import {
   type ListShoppingOptions,
@@ -83,6 +91,7 @@ import type {
   NewLedgerEntryInput,
   NewPantryItemInput,
   NewPlanInput,
+  NewRecurringPaymentInput,
   NewShoppingListItemInput,
   NewTraceInput,
   PantryItem,
@@ -92,6 +101,8 @@ import type {
   Place,
   PlaceRecord,
   Plan,
+  RecurringPayment,
+  RecurringPaymentSummary,
   ShoppingListItem,
   Trace,
   UserSettings,
@@ -155,6 +166,17 @@ type LifeTraceState = {
   ledgerCreating: boolean;
   ledgerUpdatingById: Record<string, boolean>;
   ledgerDeletingById: Record<string, boolean>;
+  recurringPayments: RecurringPayment[];
+  recurringPaymentsLoaded: boolean;
+  recurringPaymentsLoading: boolean;
+  recurringPaymentsError: string;
+  recurringPaymentsPagination: ListPagination;
+  recurringPaymentsListOptions: ListRecurringPaymentsOptions;
+  recurringPaymentsSummary: RecurringPaymentSummary;
+  recurringPaymentCreating: boolean;
+  recurringPaymentUpdatingById: Record<string, boolean>;
+  recurringPaymentArchivingById: Record<string, boolean>;
+  recurringPaymentAdvancingById: Record<string, boolean>;
   checkins: Checkin[];
   checkinsDate: string;
   checkinsLoaded: boolean;
@@ -261,6 +283,14 @@ type LifeTraceState = {
   addLedgerEntry: (input: NewLedgerEntryInput) => Promise<LedgerEntry | null>;
   editLedgerEntry: (entryId: string, input: NewLedgerEntryInput) => Promise<LedgerEntry | null>;
   removeLedgerEntry: (entryId: string) => Promise<boolean>;
+  loadRecurringPayments: (options?: ListRecurringPaymentsOptions) => Promise<void>;
+  addRecurringPayment: (input: NewRecurringPaymentInput) => Promise<RecurringPayment | null>;
+  editRecurringPayment: (
+    id: string,
+    input: NewRecurringPaymentInput,
+  ) => Promise<RecurringPayment | null>;
+  archiveRecurringPaymentAction: (id: string) => Promise<RecurringPayment | null>;
+  advanceRecurringPaymentAction: (id: string) => Promise<RecurringPayment | null>;
   loadShoppingList: (options?: ListShoppingOptions) => Promise<void>;
   addShoppingItem: (input: NewShoppingListItemInput) => Promise<ShoppingListItem | null>;
   editShoppingItem: (
@@ -297,6 +327,9 @@ const defaultSettings: UserSettings = {
   pantryReminderEnabled: true,
   pantryReminderRules: ['7d', '3d', 'same-day', 'expired'],
   pantryReminderTime: '09:00',
+  subscriptionReminderEnabled: true,
+  subscriptionReminderRules: ['7d', '3d', 'same-day', 'overdue'],
+  subscriptionReminderTime: '09:00',
 };
 
 const defaultPagination: ListPagination = {
@@ -348,6 +381,22 @@ const defaultLedgerListOptions: ListLedgerOptions = {
   month: getDefaultLedgerMonth(),
   category: 'all',
   direction: 'all',
+};
+
+const defaultRecurringPaymentsListOptions: ListRecurringPaymentsOptions = {
+  page: 1,
+  pageSize: 20,
+  status: 'active',
+};
+
+const defaultRecurringPaymentSummary: RecurringPaymentSummary = {
+  total: 0,
+  activeCount: 0,
+  overdueCount: 0,
+  upcomingCount: 0,
+  monthlyExpenseCents: 0,
+  monthlyExpense: 0,
+  upcomingDays: 7,
 };
 
 const defaultPlacesListOptions: ListPlacesOptions = {
@@ -446,6 +495,9 @@ function normalizeSettings(settings: Partial<UserSettings>): UserSettings {
     pantryReminderRules: settings.pantryReminderRules?.length
       ? settings.pantryReminderRules
       : defaultSettings.pantryReminderRules,
+    subscriptionReminderRules: settings.subscriptionReminderRules?.length
+      ? settings.subscriptionReminderRules
+      : defaultSettings.subscriptionReminderRules,
     planReminderLeadMinutes:
       typeof settings.planReminderLeadMinutes === 'number'
         ? settings.planReminderLeadMinutes
@@ -596,6 +648,20 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       ledgerCreating: false,
       ledgerUpdatingById: {},
       ledgerDeletingById: {},
+      recurringPayments: [],
+      recurringPaymentsLoaded: false,
+      recurringPaymentsLoading: false,
+      recurringPaymentsError: '',
+      recurringPaymentsPagination: {
+        ...defaultPagination,
+        pageSize: defaultRecurringPaymentsListOptions.pageSize ?? 20,
+      },
+      recurringPaymentsListOptions: defaultRecurringPaymentsListOptions,
+      recurringPaymentsSummary: defaultRecurringPaymentSummary,
+      recurringPaymentCreating: false,
+      recurringPaymentUpdatingById: {},
+      recurringPaymentArchivingById: {},
+      recurringPaymentAdvancingById: {},
       checkins: [],
       checkinsDate: '',
       checkinsLoaded: false,
@@ -2380,6 +2446,202 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         } finally {
           set((state) => ({
             ledgerDeletingById: { ...state.ledgerDeletingById, [entryId]: false },
+          }));
+        }
+      },
+      loadRecurringPayments: async (options = {}) => {
+        const token = getToken();
+        const nextOptions: ListRecurringPaymentsOptions = {
+          ...get().recurringPaymentsListOptions,
+          ...options,
+          page: options.page ?? 1,
+          pageSize: options.pageSize ?? get().recurringPaymentsListOptions.pageSize ?? 20,
+          status: options.status ?? get().recurringPaymentsListOptions.status ?? 'active',
+        };
+        if (!token) {
+          set({
+            recurringPayments: [],
+            recurringPaymentsLoaded: true,
+            recurringPaymentsLoading: false,
+            recurringPaymentsError: '',
+            recurringPaymentsPagination: {
+              ...defaultPagination,
+              pageSize: nextOptions.pageSize ?? 20,
+            },
+            recurringPaymentsListOptions: nextOptions,
+            recurringPaymentsSummary: defaultRecurringPaymentSummary,
+          });
+          return;
+        }
+
+        set({
+          recurringPaymentsLoading: true,
+          recurringPaymentsError: '',
+          recurringPaymentsListOptions: nextOptions,
+        });
+        try {
+          const { list, summary, pagination } = await listRecurringPayments(token, nextOptions);
+          set({
+            recurringPayments: list,
+            recurringPaymentsSummary: summary,
+            recurringPaymentsPagination: pagination ?? {
+              ...defaultPagination,
+              pageSize: nextOptions.pageSize ?? 20,
+              total: list.length,
+              hasMore: false,
+            },
+            recurringPaymentsLoaded: true,
+            recurringPaymentsLoading: false,
+            recurringPaymentsError: '',
+          });
+        } catch (error) {
+          set({
+            recurringPaymentsLoading: false,
+            recurringPaymentsLoaded: true,
+            recurringPaymentsError: getLifeTraceErrorMessage(error, '获取订阅失败'),
+          });
+        }
+      },
+      addRecurringPayment: async (input) => {
+        const token = getToken();
+        if (!token) {
+          set({ recurringPaymentsError: '请先登录后再添加订阅' });
+          return null;
+        }
+        if (get().recurringPaymentCreating) {
+          return null;
+        }
+
+        set({ recurringPaymentCreating: true, recurringPaymentsError: '' });
+        try {
+          const item = await requestCreateRecurringPayment(token, input);
+          set((state) => ({
+            recurringPayments: [item, ...state.recurringPayments],
+            recurringPaymentsPagination: {
+              ...state.recurringPaymentsPagination,
+              total: state.recurringPaymentsPagination.total + 1,
+            },
+            recurringPaymentsError: '',
+            aiActions: [
+              { id: createActionId(), title: `订阅了「${item.name}」`, timeLabel: '刚刚' },
+              ...getAiActions(state),
+            ],
+          }));
+          void get().loadRecurringPayments(get().recurringPaymentsListOptions);
+          return item;
+        } catch (error) {
+          set({ recurringPaymentsError: getLifeTraceErrorMessage(error, '创建订阅失败') });
+          return null;
+        } finally {
+          set({ recurringPaymentCreating: false });
+        }
+      },
+      editRecurringPayment: async (id, input) => {
+        const token = getToken();
+        if (!token) {
+          set({ recurringPaymentsError: '请先登录后再编辑订阅' });
+          return null;
+        }
+        if (get().recurringPaymentUpdatingById[id]) {
+          return null;
+        }
+
+        set((state) => ({
+          recurringPaymentUpdatingById: { ...state.recurringPaymentUpdatingById, [id]: true },
+          recurringPaymentsError: '',
+        }));
+        try {
+          const updated = await requestUpdateRecurringPayment(token, id, input);
+          set((state) => ({
+            recurringPayments: state.recurringPayments.map((item) =>
+              item.id === id ? updated : item,
+            ),
+            recurringPaymentsError: '',
+          }));
+          void get().loadRecurringPayments(get().recurringPaymentsListOptions);
+          return updated;
+        } catch (error) {
+          set({ recurringPaymentsError: getLifeTraceErrorMessage(error, '更新订阅失败') });
+          return null;
+        } finally {
+          set((state) => ({
+            recurringPaymentUpdatingById: { ...state.recurringPaymentUpdatingById, [id]: false },
+          }));
+        }
+      },
+      archiveRecurringPaymentAction: async (id) => {
+        const token = getToken();
+        if (!token) {
+          set({ recurringPaymentsError: '请先登录后再归档订阅' });
+          return null;
+        }
+        if (get().recurringPaymentArchivingById[id]) {
+          return null;
+        }
+
+        set((state) => ({
+          recurringPaymentArchivingById: { ...state.recurringPaymentArchivingById, [id]: true },
+          recurringPaymentsError: '',
+        }));
+        try {
+          const archived = await requestArchiveRecurringPayment(token, id);
+          set((state) => ({
+            recurringPayments: state.recurringPayments.map((item) =>
+              item.id === id ? archived : item,
+            ),
+            recurringPaymentsError: '',
+            aiActions: [
+              { id: createActionId(), title: `归档了「${archived.name}」`, timeLabel: '刚刚' },
+              ...getAiActions(state),
+            ],
+          }));
+          void get().loadRecurringPayments(get().recurringPaymentsListOptions);
+          return archived;
+        } catch (error) {
+          set({ recurringPaymentsError: getLifeTraceErrorMessage(error, '归档订阅失败') });
+          return null;
+        } finally {
+          set((state) => ({
+            recurringPaymentArchivingById: {
+              ...state.recurringPaymentArchivingById,
+              [id]: false,
+            },
+          }));
+        }
+      },
+      advanceRecurringPaymentAction: async (id) => {
+        const token = getToken();
+        if (!token) {
+          set({ recurringPaymentsError: '请先登录后再推进订阅' });
+          return null;
+        }
+        if (get().recurringPaymentAdvancingById[id]) {
+          return null;
+        }
+
+        set((state) => ({
+          recurringPaymentAdvancingById: { ...state.recurringPaymentAdvancingById, [id]: true },
+          recurringPaymentsError: '',
+        }));
+        try {
+          const advanced = await requestAdvanceRecurringPayment(token, id);
+          set((state) => ({
+            recurringPayments: state.recurringPayments.map((item) =>
+              item.id === id ? advanced : item,
+            ),
+            recurringPaymentsError: '',
+          }));
+          void get().loadRecurringPayments(get().recurringPaymentsListOptions);
+          return advanced;
+        } catch (error) {
+          set({ recurringPaymentsError: getLifeTraceErrorMessage(error, '推进订阅失败') });
+          return null;
+        } finally {
+          set((state) => ({
+            recurringPaymentAdvancingById: {
+              ...state.recurringPaymentAdvancingById,
+              [id]: false,
+            },
           }));
         }
       },

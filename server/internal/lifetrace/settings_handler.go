@@ -35,6 +35,9 @@ type updateSettingsRequest struct {
 	PantryReminderEnabled   bool     `json:"pantryReminderEnabled"`
 	PantryReminderRules     []string `json:"pantryReminderRules"`
 	PantryReminderTime      string   `json:"pantryReminderTime"`
+	SubscriptionReminderEnabled bool     `json:"subscriptionReminderEnabled"`
+	SubscriptionReminderRules   []string `json:"subscriptionReminderRules"`
+	SubscriptionReminderTime    string   `json:"subscriptionReminderTime"`
 }
 
 var errPreferredPantryHouseholdInaccessible = errors.New("preferred pantry household inaccessible")
@@ -85,6 +88,9 @@ func defaultSettings(userID model.Int64String) model.LifeTraceSettings {
 		PantryReminderEnabled:   true,
 		PantryReminderRules:     model.StringList{"7d", "3d", "same-day", "expired"},
 		PantryReminderTime:      "09:00",
+		SubscriptionReminderEnabled: true,
+		SubscriptionReminderRules:   model.StringList{"7d", "3d", "same-day", "overdue"},
+		SubscriptionReminderTime:    "09:00",
 	}
 }
 
@@ -189,6 +195,30 @@ func normalizePantryReminderRules(rules []string) model.StringList {
 	return result
 }
 
+var validSubscriptionReminderRules = map[string]bool{
+	"7d":       true,
+	"3d":       true,
+	"same-day": true,
+	"overdue":  true,
+}
+
+func normalizeSubscriptionReminderRules(rules []string) model.StringList {
+	seen := map[string]bool{}
+	result := model.StringList{}
+	for _, rule := range rules {
+		rule = strings.TrimSpace(rule)
+		if !validSubscriptionReminderRules[rule] || seen[rule] {
+			continue
+		}
+		seen[rule] = true
+		result = append(result, rule)
+	}
+	if len(result) == 0 {
+		return model.StringList{"7d", "3d", "same-day", "overdue"}
+	}
+	return result
+}
+
 func resolvePreferredPantryHouseholdID(userID model.Int64String, raw string) (model.Int64String, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -250,6 +280,9 @@ func applySettingsRequest(settings *model.LifeTraceSettings, req updateSettingsR
 	settings.PantryReminderEnabled = req.PantryReminderEnabled
 	settings.PantryReminderRules = normalizePantryReminderRules(req.PantryReminderRules)
 	settings.PantryReminderTime = normalizeTimeText(req.PantryReminderTime, "09:00")
+	settings.SubscriptionReminderEnabled = req.SubscriptionReminderEnabled
+	settings.SubscriptionReminderRules = normalizeSubscriptionReminderRules(req.SubscriptionReminderRules)
+	settings.SubscriptionReminderTime = normalizeTimeText(req.SubscriptionReminderTime, "09:00")
 	return nil
 }
 

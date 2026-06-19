@@ -69,6 +69,9 @@ export type UserSettings = {
   pantryReminderEnabled: boolean;
   pantryReminderRules: PantryReminderRule[];
   pantryReminderTime: string;
+  subscriptionReminderEnabled: boolean;
+  subscriptionReminderRules: SubscriptionReminderRule[];
+  subscriptionReminderTime: string;
 };
 
 export type PantryCategory = '食品' | '日用品' | '药品' | '宠物' | '其他';
@@ -390,6 +393,7 @@ export type LedgerEntry = {
   planId?: string;
   traceId?: string;
   pantryItemId?: string;
+  recurringPaymentId?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -408,6 +412,7 @@ export type NewLedgerEntryInput = {
   planId?: string;
   traceId?: string;
   pantryItemId?: string;
+  recurringPaymentId?: string;
 };
 
 export type LedgerCategorySummary = {
@@ -428,6 +433,75 @@ export type LedgerSummary = {
   refund: number;
   net: number;
   categories: LedgerCategorySummary[];
+};
+
+export type SubscriptionReminderRule = '7d' | '3d' | 'same-day' | 'overdue';
+
+export type RecurringPaymentFrequency =
+  | 'daily'
+  | 'weekly'
+  | 'monthly'
+  | 'quarterly'
+  | 'half_year'
+  | 'yearly';
+
+export type RecurringPaymentDirection = '支出' | '收入';
+
+export type RecurringPaymentReminderConfig = {
+  enabled: boolean;
+  useDefault: boolean;
+  rules: SubscriptionReminderRule[];
+  reminderTime: string;
+};
+
+export type RecurringPayment = {
+  id: string;
+  userId: string;
+  name: string;
+  category: LedgerCategory;
+  amount: number;
+  amountCents: number;
+  currency: string;
+  direction: RecurringPaymentDirection;
+  merchant?: string;
+  note: string;
+  imageUrl?: string;
+  frequency: RecurringPaymentFrequency;
+  interval: number;
+  startedAt: string;
+  nextDueAt: string;
+  endAt?: string;
+  archived: boolean;
+  canceledAt?: string;
+  reminder: RecurringPaymentReminderConfig;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type NewRecurringPaymentInput = {
+  name: string;
+  category: LedgerCategory;
+  amount: number;
+  currency?: string;
+  direction: RecurringPaymentDirection;
+  merchant?: string;
+  note?: string;
+  imageUrl?: string;
+  frequency: RecurringPaymentFrequency;
+  interval: number;
+  startedAt: string;
+  endAt?: string;
+  reminder: RecurringPaymentReminderConfig;
+};
+
+export type RecurringPaymentSummary = {
+  total: number;
+  activeCount: number;
+  overdueCount: number;
+  upcomingCount: number;
+  monthlyExpenseCents: number;
+  monthlyExpense: number;
+  upcomingDays: number;
 };
 
 export type MediaDiaryType = '书籍' | '电影' | '剧集' | '动漫' | '音乐';

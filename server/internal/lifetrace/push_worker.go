@@ -84,6 +84,9 @@ func scanPushReminders(
 	if err := sendDuePantryPushRemindersAt(ctx, sender, windowMinutes, now); err != nil {
 		return err
 	}
+	if err := sendDueRecurringPaymentRemindersAt(ctx, sender, windowMinutes, now); err != nil {
+		return err
+	}
 	if err := sendDueDailyBriefPushesAt(ctx, sender, weather, windowMinutes, now); err != nil {
 		return err
 	}
@@ -1165,4 +1168,285 @@ func resetPushDeliveriesForPlan(tx *gorm.DB, planID model.Int64String) {
 		tx = database.GetDB()
 	}
 	_ = tx.Unscoped().Where("plan_id = ?", planID).Delete(&model.LifeTracePushDelivery{}).Error
+}
+
+type recurringReminderConfig struct {
+	enabled      bool
+	rules        model.StringList
+	reminderTime string
+}
+
+func sendDueRecurringPaymentRemindersAt(
+	ctx context.Context,
+	sender pushSender,
+	windowMinutes int,
+	now time.Time,
+) error {
+	if windowMinutes <= 0 {
+		windowMinutes = 10
+	}
+
+	var items []model.LifeTraceRecurringPayment
+	if err := database.GetDB().
+		Where("archived = ?", false).
+		Find(&items).Error; err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return nil
+	}
+
+	settingsByUser := map[model.Int64String]model.LifeTraceSettings{}
+	for _, item := range items {
+		if _, ok := settingsByUser[item.UserID]; ok {
+			continue
+		}
+		var settings model.LifeTraceSettings
+		if err := database.GetDB().Where("user_id = ?", item.UserID).First(&settings).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				settings = model.LifeTraceSettings{
+					UserID:                      item.UserID,
+					SubscriptionReminderEnabled: true,
+					SubscriptionReminderRules:   model.StringList{"7d", "3d", "same-day", "overdue"},
+					SubscriptionReminderTime:    "09:00",
+				}
+			} else {
+				return err
+			}
+		}
+		settingsByUser[item.UserID] = settings
+	}
+
+	for _, item := range items {
+		settings := settingsByUser[item.UserID]
+		if isQuietHours(settings, now) {
+			continue
+		}
+		if err := sendRecurringPaymentPushReminder(ctx, sender, item, settings, now, windowMinutes); err != nil {
+			logger.Log.WithFields(map[string]interface{}{
+				"recurringPaymentId": item.ID,
+				"error":              err,
+			}).Warn("LifeTrace Web Push subscription reminder failed")
+		}
+	}
+
+	return nil
+}
+
+func sendRecurringPaymentPushReminder(
+	ctx context.Context,
+	sender pushSender,
+	item model.LifeTraceRecurringPayment,
+	settings model.LifeTraceSettings,
+	now time.Time,
+	windowMinutes int,
+) error {
+	config := resolveRecurringReminderConfig(item, settings)
+	if !config.enabled || len(config.rules) == 0 {
+		return nil
+	}
+
+	var subscriptions []model.LifeTracePushSubscription
+	if err := database.GetDB().
+		Where("user_id = ? AND status = ?", item.UserID, "active").
+		Find(&subscriptions).Error; err != nil {
+		return err
+	}
+	if len(subscriptions) == 0 {
+		return nil
+	}
+
+	for _, rule := range config.rules {
+		dueAt, ok := recurringReminderDueAt(item, config.reminderTime, rule, now, windowMinutes)
+		if !ok {
+			continue
+		}
+
+		payload := buildRecurringPaymentPushPayload(item, rule, dueAt)
+		for _, subscription := range subscriptions {
+			if recurringPaymentDeliveryExists(item.UserID, item.ID, string(rule), subscription.ID, dueAt) {
+				continue
+			}
+
+			deliveryStatus, errorText := sendPushPayload(
+				ctx,
+				sender,
+				subscription,
+				payload,
+				pushFailureContext{
+					kind:     "recurring_payment",
+					targetID: item.ID.String(),
+					rule:     string(rule),
+					dueAt:    dueAt,
+				},
+			)
+			saveRecurringPaymentDelivery(model.LifeTraceRecurringPaymentDelivery{
+				UserID:             item.UserID,
+				RecurringPaymentID: item.ID,
+				Rule:               string(rule),
+				DueAt:              dueAt,
+				SubscriptionID:     subscription.ID,
+				Status:             deliveryStatus,
+				Error:              errorText,
+			})
+		}
+	}
+
+	return nil
+}
+
+func resolveRecurringReminderConfig(
+	item model.LifeTraceRecurringPayment,
+	settings model.LifeTraceSettings,
+) recurringReminderConfig {
+	if item.ReminderUseDefault {
+		return recurringReminderConfig{
+			enabled:      settings.SubscriptionReminderEnabled,
+			rules:        settings.SubscriptionReminderRules,
+			reminderTime: normalizeTimeText(settings.SubscriptionReminderTime, "09:00"),
+		}
+	}
+	return recurringReminderConfig{
+		enabled:      item.ReminderEnabled,
+		rules:        item.ReminderRules,
+		reminderTime: normalizeTimeText(item.ReminderTime, "09:00"),
+	}
+}
+
+func recurringReminderDueAt(
+	item model.LifeTraceRecurringPayment,
+	reminderTime string,
+	rule string,
+	now time.Time,
+	windowMinutes int,
+) (time.Time, bool) {
+	dueDate, ok := parseRecurringDueDate(item.NextDueAt, now.Location())
+	if !ok {
+		return time.Time{}, false
+	}
+
+	targetDate := dueDate
+	switch strings.TrimSpace(rule) {
+	case "7d":
+		targetDate = dueDate.AddDate(0, 0, -7)
+	case "3d":
+		targetDate = dueDate.AddDate(0, 0, -3)
+	case "same-day":
+		targetDate = dueDate
+	case "overdue":
+		targetDate = dueDate.AddDate(0, 0, 1)
+	default:
+		return time.Time{}, false
+	}
+
+	dueAt, ok := parseClockOnDate(reminderTime, targetDate)
+	if !ok || !isWithinReminderWindow(dueAt, now, windowMinutes) {
+		return time.Time{}, false
+	}
+	return dueAt, true
+}
+
+func parseRecurringDueDate(value string, location *time.Location) (time.Time, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, false
+	}
+	parsed, err := time.ParseInLocation("2006-01-02", value, location)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, location), true
+}
+
+func buildRecurringPaymentPushPayload(
+	item model.LifeTraceRecurringPayment,
+	rule string,
+	dueAt time.Time,
+) PushPayload {
+	body := recurringPaymentReminderBody(item, rule)
+
+	title := "订阅续费提醒：" + item.Name
+	switch strings.TrimSpace(rule) {
+	case "same-day":
+		title = "订阅今天扣款：" + item.Name
+	case "overdue":
+		title = "订阅已逾期：" + item.Name
+	}
+
+	urlValues := url.Values{}
+	urlValues.Set("new", "1")
+	urlValues.Set("recurringPaymentId", item.ID.String())
+	urlValues.Set("amount", strconv.FormatFloat(centsToAmount(item.AmountCents), 'f', -1, 64))
+	if category := strings.TrimSpace(item.Category); category != "" {
+		urlValues.Set("category", category)
+	}
+	if merchant := strings.TrimSpace(item.Merchant); merchant != "" {
+		urlValues.Set("merchant", merchant)
+	}
+	if direction := strings.TrimSpace(item.Direction); direction != "" {
+		urlValues.Set("direction", direction)
+	}
+
+	return PushPayload{
+		Title: title,
+		Body:  body,
+		URL:   "/ledger?" + urlValues.Encode(),
+		Tag:   fmt.Sprintf("life-trace-recurring-%s-%s-%d", item.ID.String(), rule, dueAt.Unix()),
+	}
+}
+
+func recurringPaymentReminderBody(item model.LifeTraceRecurringPayment, rule string) string {
+	amountText := fmt.Sprintf("¥%.2f", centsToAmount(item.AmountCents))
+	switch strings.TrimSpace(rule) {
+	case "7d":
+		return fmt.Sprintf("%s 还有 7 天扣款 · %s", item.Name, amountText)
+	case "3d":
+		return fmt.Sprintf("%s 还有 3 天扣款 · %s", item.Name, amountText)
+	case "same-day":
+		return fmt.Sprintf("%s 今天扣款 · %s", item.Name, amountText)
+	case "overdue":
+		return fmt.Sprintf("%s 已逾期 · %s · 点开记一笔", item.Name, amountText)
+	default:
+		return fmt.Sprintf("%s · %s · 需要确认", item.Name, amountText)
+	}
+}
+
+func recurringPaymentDeliveryExists(
+	userID model.Int64String,
+	recurringPaymentID model.Int64String,
+	rule string,
+	subscriptionID model.Int64String,
+	dueAt time.Time,
+) bool {
+	var count int64
+	if err := database.GetDB().
+		Model(&model.LifeTraceRecurringPaymentDelivery{}).
+		Where(
+			"user_id = ? AND recurring_payment_id = ? AND rule = ? AND subscription_id = ? AND due_at = ? AND status = ?",
+			userID,
+			recurringPaymentID,
+			rule,
+			subscriptionID,
+			dueAt,
+			"sent",
+		).
+		Count(&count).Error; err != nil {
+		return false
+	}
+	return count > 0
+}
+
+func saveRecurringPaymentDelivery(delivery model.LifeTraceRecurringPaymentDelivery) {
+	_ = database.GetDB().
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "user_id"},
+				{Name: "recurring_payment_id"},
+				{Name: "rule"},
+				{Name: "due_at"},
+				{Name: "subscription_id"},
+			},
+			DoUpdates: clause.AssignmentColumns([]string{"status", "error", "created_at"}),
+		}).
+		Create(&delivery).Error
 }
