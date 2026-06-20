@@ -91,6 +91,7 @@
 .window__body {
   flex: 1;
   overflow: auto;
+  scrollbar-gutter: stable;
   background: var(--plush-cream-soft);
   padding: 18px;
   border-bottom-left-radius: var(--radius-lg);

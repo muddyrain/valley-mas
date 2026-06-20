@@ -9,7 +9,8 @@
 - **类型：** Vite + React 19 + TypeScript 独立 app
 - **端口：** `5177`（开发模式）
 - **启动：** `pnpm --filter @valley/desktop-os dev`
-- **目标：** 一个看起来像毛毡毛绒玩具世界的伪 macOS 桌面，用作个人作品集 / 趣味项目入口。
+- **目标：** 一个看起来像毛毡毛绒玩具世界的在线桌面系统，用 Finder、Safari、Dock、控制中心和小组件承载可扩展的资源与工具入口。
+- **计划入口：** `apps/desktop-os/docs/PLAN.md`
 
 ## 视觉风格
 
@@ -31,7 +32,10 @@ apps/desktop-os/
 │   │   ├── Dock.tsx          # 底部 Dock
 │   │   └── window/           # 窗口管理与窗体
 │   ├── apps/                 # 各「应用」组件（关于本机、终端…）
+│   ├── finder/               # Finder 内容模型
 │   └── store/                # Zustand store（窗口、主题）
+├── docs/
+│   └── PLAN.md               # Desktop OS 当前计划
 └── public/
     ├── wallpaper/            # 壁纸（手动放入）
     ├── dock/                 # Dock 图标

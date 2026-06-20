@@ -15,6 +15,11 @@
   background: var(--plush-sage);
 }
 
+.toggle-switch:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
 .toggle-switch__knob {
   position: absolute;
   top: 2px;

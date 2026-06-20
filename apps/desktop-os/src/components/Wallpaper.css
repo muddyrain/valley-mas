@@ -3,11 +3,16 @@
   inset: 0;
   z-index: 0;
   overflow: hidden;
+  filter: brightness(var(--wallpaper-brightness, 1));
 }
 
-/* 如果之后放壁纸图，加 background-image 即可：
-   background: url('/wallpaper/plush-day.png') center/cover no-repeat;
-*/
+.wallpaper__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .wallpaper__sky {
   position: absolute;
   inset: 0;

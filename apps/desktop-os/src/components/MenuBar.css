@@ -24,15 +24,94 @@
   gap: 14px;
 }
 
+.menu-bar__apple {
+  position: relative;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+}
+
 .menu-bar__logo {
+  display: grid;
+  min-width: 28px;
+  height: 24px;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 7px;
   font-size: 14px;
+  line-height: 1;
+  transition: background 0.15s var(--ease-out);
+}
+
+.menu-bar__logo:hover,
+.menu-bar__logo.is-active {
+  background: rgba(90, 74, 58, 0.08);
+}
+
+.apple-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1800;
+  display: flex;
+  min-width: 172px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 12px;
+  background: rgba(248, 245, 236, 0.94);
+  box-shadow:
+    0 8px 24px rgba(40, 32, 24, 0.14),
+    0 20px 50px rgba(40, 32, 24, 0.16);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+
+.apple-menu button {
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--plush-text);
+  font-size: 12px;
+  text-align: left;
+}
+
+.apple-menu button:hover {
+  background: rgba(143, 180, 94, 0.18);
 }
 .menu-bar__app {
+  width: 72px;
+  overflow: hidden;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+.menu-bar__menu-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+}
+
 .menu-bar__item {
+  display: grid;
+  height: 24px;
+  place-items: center;
+  padding: 0 8px;
+  border-radius: 7px;
   opacity: 0.8;
-  cursor: default;
+  color: var(--plush-text);
+  font-size: 13px;
+  transition:
+    background 0.15s var(--ease-out),
+    opacity 0.15s var(--ease-out);
+}
+
+.menu-bar__item:hover,
+.menu-bar__item.is-active {
+  background: rgba(90, 74, 58, 0.08);
+  opacity: 1;
 }
 .menu-bar__icon {
   font-size: 13px;
@@ -50,6 +129,22 @@
 .menu-bar__btn:hover {
   background: rgba(90, 74, 58, 0.08);
 }
+.menu-bar__btn.is-active {
+  background: rgba(143, 180, 94, 0.18);
+}
+.menu-bar__btn--launchpad {
+  display: grid;
+  width: 28px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+}
+.menu-bar__btn--launchpad img {
+  width: 17px;
+  height: 17px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 2px rgba(90, 74, 58, 0.16));
+}
 .menu-bar__btn--cc {
   display: inline-flex;
   align-items: center;
@@ -60,5 +155,285 @@
   filter: grayscale(0.6);
 }
 .menu-bar__btn--clock {
+  position: relative;
   font-variant-numeric: tabular-nums;
+}
+
+.menu-bar__badge {
+  position: absolute;
+  top: -3px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border: 1px solid rgba(248, 245, 236, 0.88);
+  border-radius: 999px;
+  background: #d95b4f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+
+.menu-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1800;
+  display: flex;
+  min-width: 216px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 12px;
+  background: rgba(248, 245, 236, 0.94);
+  box-shadow:
+    0 8px 24px rgba(40, 32, 24, 0.14),
+    0 20px 50px rgba(40, 32, 24, 0.16);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+
+.menu-dropdown__item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 28px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--plush-text);
+  font-size: 12px;
+  text-align: left;
+}
+
+.menu-dropdown__item:hover:not(:disabled) {
+  background: rgba(143, 180, 94, 0.18);
+}
+
+.menu-dropdown__item:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.menu-dropdown__item kbd {
+  color: rgba(64, 54, 43, 0.58);
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.menu-dropdown__separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: rgba(90, 74, 58, 0.12);
+}
+
+.menu-dropdown__hint {
+  padding: 6px 10px 4px;
+  color: rgba(64, 54, 43, 0.56);
+  font-size: 11px;
+}
+
+.menu-music {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.menu-music__trigger {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 104px);
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  max-width: 134px;
+  padding: 0 7px 0 4px;
+  border-radius: 7px;
+  color: var(--plush-text);
+  transition: background 0.15s var(--ease-out);
+}
+
+.menu-music__trigger:hover,
+.menu-music__trigger.is-active,
+.menu-music__icon-btn:hover {
+  background: rgba(90, 74, 58, 0.08);
+}
+
+.menu-music__trigger img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 2px rgba(90, 74, 58, 0.12));
+}
+
+.menu-music__trigger-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1;
+  text-align: left;
+}
+
+.menu-music__trigger-text strong,
+.menu-music__trigger-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-music__trigger-text strong {
+  font-size: 11px;
+}
+
+.menu-music__trigger-text span {
+  color: rgba(90, 74, 58, 0.56);
+  font-size: 10px;
+}
+
+.menu-music__icon-btn {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border-radius: 7px;
+  color: var(--plush-text);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.menu-music-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1900;
+  display: flex;
+  width: 300px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  border-radius: 16px;
+  background: rgba(248, 245, 236, 0.95);
+  box-shadow:
+    0 10px 28px rgba(40, 32, 24, 0.14),
+    0 24px 60px rgba(40, 32, 24, 0.18);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+
+.menu-music-panel__now {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.menu-music-panel__now img {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: 0 6px 16px rgba(90, 74, 58, 0.12);
+}
+
+.menu-music-panel__now div,
+.menu-music-panel__progress,
+.menu-music-panel__volume {
+  min-width: 0;
+}
+
+.menu-music-panel__now strong,
+.menu-music-panel__now span,
+.menu-music-panel__now em,
+.menu-music-panel__footer span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-music-panel__now strong {
+  font-size: 14px;
+}
+
+.menu-music-panel__now span,
+.menu-music-panel__now em,
+.menu-music-panel__footer span {
+  color: rgba(90, 74, 58, 0.58);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.menu-music-panel input[type="range"] {
+  width: 100%;
+  accent-color: var(--plush-sage);
+}
+
+.menu-music-panel__progress div,
+.menu-music-panel__volume,
+.menu-music-panel__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.menu-music-panel__progress div,
+.menu-music-panel__volume span {
+  color: rgba(90, 74, 58, 0.56);
+  font-size: 11px;
+}
+
+.menu-music-panel__volume input {
+  flex: 1;
+}
+
+.menu-music-panel__controls {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  gap: 8px;
+}
+
+.menu-music-panel__controls button,
+.menu-music-panel__footer button,
+.menu-music-panel__lyric {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--plush-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.menu-music-panel__controls button:hover,
+.menu-music-panel__footer button:hover,
+.menu-music-panel__lyric:hover {
+  background: rgba(143, 180, 94, 0.16);
+}
+
+.menu-music-panel__controls .is-primary {
+  background: var(--plush-sage);
+  color: #fff;
+}
+
+.menu-music-panel__lyric {
+  width: 100%;
+  border: 1px solid rgba(143, 180, 94, 0.18);
+  color: rgba(90, 74, 58, 0.62);
+  text-align: center;
+}
+
+.menu-music-panel__lyric.is-active {
+  color: var(--plush-sage-deep);
+}
+
+.menu-music-panel__footer span {
+  flex: 1;
 }

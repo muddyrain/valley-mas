@@ -448,6 +448,24 @@ func (n *UserNotification) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+// UserPreference 用户偏好配置
+type UserPreference struct {
+	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	UserID    Int64String    `gorm:"index;uniqueIndex:uidx_user_preference_namespace;not null" json:"userId"`
+	Namespace string         `gorm:"size:80;uniqueIndex:uidx_user_preference_namespace;not null" json:"namespace"`
+	Value     string         `gorm:"type:text;not null" json:"value"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (p *UserPreference) BeforeCreate(tx *gorm.DB) error {
+	if p.ID == 0 {
+		p.ID = Int64String(utils.GenerateID())
+	}
+	return nil
+}
+
 // GuestbookMessage 访客留言
 type GuestbookMessage struct {
 	ID        Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
