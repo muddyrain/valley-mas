@@ -1,4 +1,5 @@
 import {
+  type MutableRefObject,
   type PointerEvent as ReactPointerEvent,
   type UIEvent,
   useEffect,
@@ -19,10 +20,23 @@ import {
 } from '../finder/data';
 import { useAuthStore } from '../store/authStore';
 import { useBrowserStore } from '../store/browserStore';
-import { type FinderViewMode, getFinderViewKey, useFinderStore } from '../store/finderStore';
+import {
+  type FinderResourcePackage,
+  type FinderSavedSearch,
+  type FinderSavedTypeFilter,
+  type FinderViewMode,
+  getFinderViewKey,
+  useFinderStore,
+} from '../store/finderStore';
+import { useNotesStore } from '../store/notesStore';
 import { useResourceStore } from '../store/resourceStore';
+import { useToolStore } from '../store/toolStore';
 import { useWindowStore } from '../store/windowStore';
 import EmptyState from '../ui/EmptyState';
+import PlushImage from '../ui/PlushImage';
+import PlushLoading from '../ui/PlushLoading';
+import PlushLoadMore from '../ui/PlushLoadMore';
+import PlushSelect from '../ui/PlushSelect';
 import { getDefaultWindowOptions } from './desktopApps';
 import './FinderWindow.css';
 
@@ -32,15 +46,33 @@ const VIEW_MODES: Array<{ id: FinderViewMode; label: string; icon: string }> = [
   { id: 'gallery', label: '画廊', icon: '▣' },
 ];
 
+type FinderTypeFilter = FinderSavedTypeFilter;
+
+const TYPE_FILTERS: Array<{ id: FinderTypeFilter; label: string }> = [
+  { id: 'all', label: '全部类型' },
+  { id: 'image', label: '图片' },
+  { id: 'link', label: '网页' },
+  { id: 'tool', label: '工具' },
+  { id: 'downloadable', label: '可下载' },
+];
+
 interface FinderContextMenuState {
   item: FinderItem;
   x: number;
   y: number;
 }
 
+interface FinderOpenWithOption {
+  id: string;
+  label: string;
+  detail: string;
+  action: () => void;
+}
+
 export default function FinderWindow() {
   const currentPath = useFinderStore((s) => s.currentPath);
   const selectedId = useFinderStore((s) => s.selectedId);
+  const selectedIds = useFinderStore((s) => s.selectedIds);
   const activeTagId = useFinderStore((s) => s.activeTagId);
   const viewMode = useFinderStore((s) => s.viewMode);
   const history = useFinderStore((s) => s.history);
@@ -48,12 +80,22 @@ export default function FinderWindow() {
   const recentResourceIds = useFinderStore((s) => s.recentResourceIds);
   const downloadedResourceIds = useFinderStore((s) => s.downloadedResourceIds);
   const viewStates = useFinderStore((s) => s.viewStates);
+  const resourcePackages = useFinderStore((s) => s.resourcePackages);
+  const savedSearches = useFinderStore((s) => s.savedSearches);
   const setPath = useFinderStore((s) => s.setPath);
   const selectItem = useFinderStore((s) => s.selectItem);
+  const toggleSelected = useFinderStore((s) => s.toggleSelected);
+  const selectRange = useFinderStore((s) => s.selectRange);
+  const clearSelection = useFinderStore((s) => s.clearSelection);
   const setViewMode = useFinderStore((s) => s.setViewMode);
   const rememberViewState = useFinderStore((s) => s.rememberViewState);
   const markResourceViewed = useFinderStore((s) => s.markResourceViewed);
   const markResourceDownloaded = useFinderStore((s) => s.markResourceDownloaded);
+  const createResourcePackage = useFinderStore((s) => s.createResourcePackage);
+  const addItemsToPackage = useFinderStore((s) => s.addItemsToPackage);
+  const removeResourcePackage = useFinderStore((s) => s.removeResourcePackage);
+  const saveSearch = useFinderStore((s) => s.saveSearch);
+  const removeSavedSearch = useFinderStore((s) => s.removeSavedSearch);
   const goBack = useFinderStore((s) => s.goBack);
   const goForward = useFinderStore((s) => s.goForward);
   const goUp = useFinderStore((s) => s.goUp);
@@ -69,49 +111,119 @@ export default function FinderWindow() {
   const error = useResourceStore((s) => s.error);
   const loadResources = useResourceStore((s) => s.loadResources);
   const loadMoreResources = useResourceStore((s) => s.loadMoreResources);
+  const refreshResources = useResourceStore((s) => s.refreshResources);
   const setKeyword = useResourceStore((s) => s.setKeyword);
   const setTagId = useResourceStore((s) => s.setTagId);
   const setSort = useResourceStore((s) => s.setSort);
   const setActiveSmartView = useResourceStore((s) => s.setActiveSmartView);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const token = useAuthStore((s) => s.token);
   const openUrl = useBrowserStore((s) => s.openUrl);
   const toggleFavorite = useResourceStore((s) => s.toggleFavorite);
   const download = useResourceStore((s) => s.download);
+  const createNote = useNotesStore((s) => s.createNote);
+  const setTextLabDraft = useToolStore((s) => s.setTextLabDraft);
+  const setDevToolsTab = useToolStore((s) => s.setDevToolsTab);
+  const setDevJsonDraft = useToolStore((s) => s.setDevJsonDraft);
+  const setDevEncodingDraft = useToolStore((s) => s.setDevEncodingDraft);
+  const setDevCsvDraft = useToolStore((s) => s.setDevCsvDraft);
+  const setDailyToolsTab = useToolStore((s) => s.setDailyToolsTab);
   const restoreOrFocus = useWindowStore((s) => s.restoreOrFocus);
   const [previewItem, setPreviewItem] = useState<FinderItem | null>(null);
   const [searchInput, setSearchInput] = useState(keyword);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sidebarScrolling, setSidebarScrolling] = useState(false);
+  const [browserScrolling, setBrowserScrolling] = useState(false);
+  const [detailScrolling, setDetailScrolling] = useState(false);
   const [contextMenu, setContextMenu] = useState<FinderContextMenuState | null>(null);
+  const [imageRetryKey, setImageRetryKey] = useState(0);
+  const [activeTypeFilter, setActiveTypeFilter] = useState<FinderTypeFilter>('all');
+  const [activePackageId, setActivePackageId] = useState<string | null>(null);
+  const [activeSavedSearchId, setActiveSavedSearchId] = useState<string | null>(null);
   const itemRefs = useRef<Record<string, HTMLElement | null>>({});
   const browserRef = useRef<HTMLDivElement | null>(null);
-  const sidebarScrollTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const sidebarScrollTimerRef = useRef<number | null>(null);
+  const browserScrollTimerRef = useRef<number | null>(null);
+  const detailScrollTimerRef = useRef<number | null>(null);
+  const scrollMemoryFrameRef = useRef<number | null>(null);
+  const pendingScrollTopRef = useRef(0);
   const restoringViewRef = useRef(false);
 
   const activeTag = tags.find((tag) => tag.id === activeTagId) ?? null;
   const isResourceBrowser = isServerResourcePath(currentPath);
+  const activePackage = resourcePackages.find((item) => item.id === activePackageId) ?? null;
+  const activeSavedSearch = savedSearches.find((item) => item.id === activeSavedSearchId) ?? null;
 
-  const items = useMemo(() => {
+  const pathItems = useMemo(() => {
+    if (activePackage) {
+      const resourceById = new Map(resources.map((resource) => [resource.id, resource]));
+      return activePackage.resourceIds
+        .flatMap((id) => {
+          const resource = resourceById.get(id);
+          return resource ? [resourceToFinderItem(resource)] : [];
+        })
+        .filter(Boolean);
+    }
     if (!isResourceBrowser) return getFinderItems(currentPath);
     return filterResourcesForPath(currentPath, resources, {
       recentResourceIds,
       downloadedResourceIds,
     }).map(resourceToFinderItem);
-  }, [currentPath, downloadedResourceIds, isResourceBrowser, recentResourceIds, resources]);
+  }, [
+    activePackage,
+    currentPath,
+    downloadedResourceIds,
+    isResourceBrowser,
+    recentResourceIds,
+    resources,
+  ]);
 
-  const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null;
+  const items = useMemo(
+    () => pathItems.filter((item) => matchesTypeFilter(item, activeTypeFilter)),
+    [activeTypeFilter, pathItems],
+  );
+
+  const itemIds = useMemo(() => items.map((item) => item.id), [items]);
+  const itemIdSet = useMemo(() => new Set(itemIds), [itemIds]);
+  const selected = items.find((item) => item.id === selectedId) ?? null;
+  const detailItem = selected ?? items[0] ?? null;
+  const visibleSelectedIds = selectedIds.filter((id) => itemIdSet.has(id));
+  const selectedItems = items.filter((item) => visibleSelectedIds.includes(item.id));
+  const hasBatchSelection = selectedItems.length > 1;
   const previewableItems = useMemo(() => items.filter(isImagePreviewItem), [items]);
-  const locationTitle = activeTag ? activeTag.name : PATH_LABEL[currentPath];
-  const resultCount = isResourceBrowser ? `${items.length}/${total} 项` : `${items.length} 项`;
+  const locationTitle =
+    activePackage?.name ?? activeSavedSearch?.name ?? activeTag?.name ?? PATH_LABEL[currentPath];
+  const resultCount = activePackage
+    ? `${items.length}/${activePackage.resourceIds.length} 项`
+    : activeTypeFilter === 'all'
+      ? isResourceBrowser
+        ? `${items.length}/${total} 项`
+        : `${items.length} 项`
+      : `${items.length}/${pathItems.length} 项`;
+  const activeTypeLabel = TYPE_FILTERS.find((filter) => filter.id === activeTypeFilter)?.label;
+  const activeFiltersLabel = buildSavedSearchName({
+    keyword,
+    tagName: activeTag?.name ?? null,
+    typeLabel: activeTypeFilter === 'all' ? null : (activeTypeLabel ?? null),
+  });
+  const canSaveSearch = Boolean(keyword.trim() || activeTagId || activeTypeFilter !== 'all');
+  const packageableItems =
+    selectedItems.length > 0 ? selectedItems : detailItem ? [detailItem] : [];
+  const packageableResourceIds = packageableItems.flatMap((item) =>
+    item.resourceId ? [item.resourceId] : [],
+  );
+  const canCreatePackage = packageableResourceIds.length > 0;
   const viewKey = getFinderViewKey(currentPath, activeTagId);
   const emptyDescription =
     currentPath === 'recent'
       ? '预览或打开资源后会出现在这里'
       : currentPath === 'downloads'
         ? '下载资源后会出现在这里'
-        : keyword || activeTag
-          ? '清除搜索或标签后再看'
-          : '换个分类看看';
+        : activePackage
+          ? '这个资源包还没有可显示内容'
+          : keyword || activeTag || activeTypeFilter !== 'all'
+            ? '清除筛选后再看'
+            : '换个分类看看';
   const previewIndex = previewItem
     ? previewableItems.findIndex((item) => item.id === previewItem.id)
     : -1;
@@ -225,8 +337,12 @@ export default function FinderWindow() {
   }, [contextMenu]);
 
   useEffect(() => {
-    if (!selected && items[0]) selectItem(items[0].id);
-  }, [items, selected, selectItem]);
+    if (items.length === 0) {
+      if (selectedId || visibleSelectedIds.length > 0) clearSelection();
+      return;
+    }
+    if (!selectedId || !itemIdSet.has(selectedId)) selectItem(items[0].id);
+  }, [clearSelection, itemIdSet, items, selectItem, selectedId, visibleSelectedIds.length]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -236,11 +352,82 @@ export default function FinderWindow() {
   useEffect(() => {
     return () => {
       if (sidebarScrollTimerRef.current) window.clearTimeout(sidebarScrollTimerRef.current);
+      if (browserScrollTimerRef.current) window.clearTimeout(browserScrollTimerRef.current);
+      if (detailScrollTimerRef.current) window.clearTimeout(detailScrollTimerRef.current);
+      if (scrollMemoryFrameRef.current !== null) {
+        window.cancelAnimationFrame(scrollMemoryFrameRef.current);
+      }
     };
   }, []);
 
   function openPath(path: FinderPath, tagId: string | null = null) {
+    setActivePackageId(null);
+    setActiveSavedSearchId(null);
     setPath(path, null, tagId);
+  }
+
+  function openPackage(resourcePackage: FinderResourcePackage) {
+    setActivePackageId(resourcePackage.id);
+    setActiveSavedSearchId(null);
+    setPath('all', null, null);
+  }
+
+  function openSavedSearch(savedSearch: FinderSavedSearch) {
+    setActivePackageId(null);
+    setActiveSavedSearchId(savedSearch.id);
+    setActiveTypeFilter(savedSearch.typeFilter);
+    setSearchInput(savedSearch.keyword);
+    setPath('all', null, savedSearch.tagId);
+    if (keyword !== savedSearch.keyword) void setKeyword(savedSearch.keyword);
+    if (sort !== savedSearch.sort) void setSort(savedSearch.sort);
+  }
+
+  function saveCurrentSearch() {
+    if (!canSaveSearch) return;
+    saveSearch({
+      name: activeFiltersLabel,
+      keyword,
+      tagId: activeTagId,
+      sort,
+      typeFilter: activeTypeFilter,
+    });
+  }
+
+  function saveResourcePackage() {
+    if (packageableResourceIds.length === 0) return;
+    if (activePackage) {
+      addItemsToPackage(activePackage.id, packageableResourceIds);
+      return;
+    }
+    createResourcePackage(makeResourcePackageName(packageableItems), packageableResourceIds);
+  }
+
+  function clearPackage() {
+    setActivePackageId(null);
+  }
+
+  function clearSavedSearch() {
+    setActiveSavedSearchId(null);
+  }
+
+  function deleteResourcePackage(
+    event: React.MouseEvent<HTMLButtonElement>,
+    resourcePackageId: string,
+  ) {
+    event.stopPropagation();
+    removeResourcePackage(resourcePackageId);
+    if (activePackageId === resourcePackageId) {
+      setActivePackageId(null);
+      setPath('all', null, null);
+    }
+  }
+
+  function deleteSavedSearch(event: React.MouseEvent<HTMLButtonElement>, savedSearchId: string) {
+    event.stopPropagation();
+    removeSavedSearch(savedSearchId);
+    if (activeSavedSearchId === savedSearchId) {
+      setActiveSavedSearchId(null);
+    }
   }
 
   function rememberResourceView(item: FinderItem) {
@@ -250,6 +437,107 @@ export default function FinderWindow() {
   function openInSafari(url: string) {
     openUrl(url);
     restoreOrFocus('safari', getDefaultWindowOptions('safari'));
+  }
+
+  function openItemInSafari(item: FinderItem) {
+    if (!item.publicUrl) return;
+    rememberResourceView(item);
+    openInSafari(item.publicUrl);
+  }
+
+  async function openItemInNotes(item: FinderItem) {
+    if (!token) {
+      restoreOrFocus('account', getDefaultWindowOptions('account'));
+      return;
+    }
+    const note = await createNote(token, {
+      title: `资源：${item.title}`,
+      content: formatResourceNote(item),
+    });
+    if (note) restoreOrFocus('notes', getDefaultWindowOptions('notes'));
+  }
+
+  async function openItemInTextLab(item: FinderItem) {
+    setTextLabDraft(formatResourceText(item));
+    await navigator.clipboard?.writeText(formatResourceText(item));
+    restoreOrFocus('textLab', getDefaultWindowOptions('textLab'));
+  }
+
+  function openItemInDevTools(item: FinderItem) {
+    const draft = item.publicUrl ?? formatResourceText(item);
+    if (item.extension?.toLowerCase() === 'csv') {
+      setDevToolsTab('csv');
+      setDevCsvDraft(draft);
+    } else if (item.extension?.toLowerCase() === 'json') {
+      setDevToolsTab('json');
+      setDevJsonDraft(draft);
+    } else {
+      setDevToolsTab('encoding');
+      setDevEncodingDraft(draft);
+    }
+    restoreOrFocus('devTools', getDefaultWindowOptions('devTools'));
+  }
+
+  function openItemInDailyImageTools() {
+    setDailyToolsTab('image');
+    restoreOrFocus('dailyTools', getDefaultWindowOptions('dailyTools'));
+  }
+
+  function openItemInMusic() {
+    restoreOrFocus('music', getDefaultWindowOptions('music'));
+  }
+
+  function getOpenWithOptions(item: FinderItem): FinderOpenWithOption[] {
+    const options: FinderOpenWithOption[] = [];
+    if (item.publicUrl) {
+      options.push({
+        id: 'safari',
+        label: 'Safari',
+        detail: '打开网页',
+        action: () => openItemInSafari(item),
+      });
+    }
+    if (isImagePreviewItem(item)) {
+      options.push({
+        id: 'daily-image',
+        label: '图片工具',
+        detail: '处理图片',
+        action: openItemInDailyImageTools,
+      });
+    }
+    if (isDevToolCandidate(item)) {
+      options.push({
+        id: 'dev-tools',
+        label: '开发工具箱',
+        detail: '解析数据',
+        action: () => openItemInDevTools(item),
+      });
+    }
+    if (isAudioItem(item)) {
+      options.push({
+        id: 'music',
+        label: '音乐',
+        detail: '打开播放器',
+        action: openItemInMusic,
+      });
+    }
+    if (item.kind === 'resource' || item.kind === 'link') {
+      options.push(
+        {
+          id: 'notes',
+          label: '便签',
+          detail: '保存摘要',
+          action: () => void openItemInNotes(item),
+        },
+        {
+          id: 'text-lab',
+          label: '文本工坊',
+          detail: '处理文本',
+          action: () => void openItemInTextLab(item),
+        },
+      );
+    }
+    return options;
   }
 
   function showPreview(item: FinderItem) {
@@ -282,7 +570,7 @@ export default function FinderWindow() {
       setPreviewItem(item);
       return;
     }
-    if (item.publicUrl) openInSafari(item.publicUrl);
+    if (item.publicUrl) openItemInSafari(item);
   }
 
   async function handleFavorite(item: FinderItem) {
@@ -310,29 +598,91 @@ export default function FinderWindow() {
     window.setTimeout(() => setCopiedId((current) => (current === item.id ? null : current)), 1400);
   }
 
+  async function copyBatchLinks() {
+    if (!navigator.clipboard) return;
+    const links = selectedItems.flatMap((item) => (item.publicUrl ? [item.publicUrl] : []));
+    if (links.length === 0) return;
+    await navigator.clipboard.writeText(links.join('\n'));
+    setCopiedId('batch');
+    window.setTimeout(() => setCopiedId((current) => (current === 'batch' ? null : current)), 1400);
+  }
+
+  async function favoriteBatch() {
+    const itemsToFavorite = selectedItems.filter((item) => item.resourceId && !item.isFavorited);
+    if (itemsToFavorite.length === 0) return;
+    if (!isAuthenticated) {
+      restoreOrFocus('account', getDefaultWindowOptions('account'));
+      return;
+    }
+    for (const item of itemsToFavorite) {
+      if (item.resourceId) await toggleFavorite(item.resourceId);
+    }
+  }
+
+  async function downloadBatch() {
+    const downloadableItems = selectedItems.filter((item) => item.resourceId);
+    const urls: string[] = [];
+    for (const item of downloadableItems) {
+      if (!item.resourceId) continue;
+      const url = await download(item.resourceId);
+      if (!url) continue;
+      markResourceDownloaded(item.resourceId);
+      urls.push(url);
+    }
+    if (urls[0]) openInSafari(urls[0]);
+  }
+
   function clearSearch() {
+    setActiveSavedSearchId(null);
     setSearchInput('');
     void setKeyword('');
   }
 
+  function clearTypeFilter() {
+    setActiveSavedSearchId(null);
+    setActiveTypeFilter('all');
+  }
+
   function clearTag() {
+    setActiveSavedSearchId(null);
     setPath('all', null, null);
   }
 
   function handleGridScroll(e: UIEvent<HTMLElement>) {
-    rememberViewState({ scrollTop: e.currentTarget.scrollTop });
+    markScrolling(setBrowserScrolling, browserScrollTimerRef);
+    rememberScrollTop(e.currentTarget.scrollTop);
     if (!isResourceBrowser || loadingMore || loading || !hasMore) return;
     const target = e.currentTarget;
     const remaining = target.scrollHeight - target.scrollTop - target.clientHeight;
     if (remaining < 160) void loadMoreResources();
   }
 
+  function rememberScrollTop(scrollTop: number) {
+    pendingScrollTopRef.current = scrollTop;
+    if (scrollMemoryFrameRef.current !== null) return;
+    scrollMemoryFrameRef.current = window.requestAnimationFrame(() => {
+      scrollMemoryFrameRef.current = null;
+      rememberViewState({ scrollTop: pendingScrollTopRef.current });
+    });
+  }
+
   function handleSidebarScroll() {
-    setSidebarScrolling(true);
-    if (sidebarScrollTimerRef.current) window.clearTimeout(sidebarScrollTimerRef.current);
-    sidebarScrollTimerRef.current = window.setTimeout(() => {
-      setSidebarScrolling(false);
-      sidebarScrollTimerRef.current = null;
+    markScrolling(setSidebarScrolling, sidebarScrollTimerRef);
+  }
+
+  function handleDetailScroll() {
+    markScrolling(setDetailScrolling, detailScrollTimerRef);
+  }
+
+  function markScrolling(
+    setScrolling: (scrolling: boolean) => void,
+    timerRef: MutableRefObject<number | null>,
+  ) {
+    setScrolling(true);
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => {
+      setScrolling(false);
+      timerRef.current = null;
     }, 650);
   }
 
@@ -344,6 +694,18 @@ export default function FinderWindow() {
     );
     const nextIndex = clamp(currentIndex + delta, 0, items.length - 1);
     selectItem(items[nextIndex].id);
+  }
+
+  function selectCard(item: FinderItem, event: React.MouseEvent<HTMLElement>) {
+    if (event.shiftKey) {
+      selectRange(item.id, itemIds);
+      return;
+    }
+    if (event.metaKey || event.ctrlKey) {
+      toggleSelected(item.id, 'toggle');
+      return;
+    }
+    toggleSelected(item.id, 'replace');
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLElement>) {
@@ -371,6 +733,12 @@ export default function FinderWindow() {
   function handleSortChange(nextSort: typeof sort) {
     rememberViewState({ sort: nextSort });
     void setSort(nextSort);
+  }
+
+  async function handleRefresh() {
+    setImageRetryKey(Date.now());
+    if (!isResourceBrowser) return;
+    await refreshResources();
   }
 
   function openContextMenu(item: FinderItem, event: React.MouseEvent<HTMLElement>) {
@@ -405,6 +773,7 @@ export default function FinderWindow() {
           sections={groupedSections.library}
           currentPath={currentPath}
           activeTagId={activeTagId}
+          suppressActive={Boolean(activePackage || activeSavedSearch)}
           onOpenPath={openPath}
         />
         <FinderSidebarGroup
@@ -412,8 +781,74 @@ export default function FinderWindow() {
           sections={groupedSections.smart}
           currentPath={currentPath}
           activeTagId={activeTagId}
+          suppressActive={Boolean(activePackage || activeSavedSearch)}
           onOpenPath={openPath}
         />
+        {resourcePackages.length > 0 && (
+          <div className="finder__sidebar-group">
+            <div className="finder__sidebar-title">资源包</div>
+            {resourcePackages.map((resourcePackage) => (
+              <div
+                key={resourcePackage.id}
+                className={`finder__side-row ${
+                  activePackageId === resourcePackage.id ? 'is-active' : ''
+                }`}
+              >
+                <button
+                  type="button"
+                  className="finder__side-item"
+                  onClick={() => openPackage(resourcePackage)}
+                  title={resourcePackage.name}
+                >
+                  <span className="finder__package-dot" aria-hidden />
+                  <span>{resourcePackage.name}</span>
+                  <small>{resourcePackage.resourceIds.length}</small>
+                </button>
+                <button
+                  type="button"
+                  className="finder__side-delete"
+                  aria-label={`删除资源包：${resourcePackage.name}`}
+                  title="删除资源包"
+                  onClick={(event) => deleteResourcePackage(event, resourcePackage.id)}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {savedSearches.length > 0 && (
+          <div className="finder__sidebar-group">
+            <div className="finder__sidebar-title">保存搜索</div>
+            {savedSearches.map((savedSearch) => (
+              <div
+                key={savedSearch.id}
+                className={`finder__side-row ${
+                  activeSavedSearchId === savedSearch.id ? 'is-active' : ''
+                }`}
+              >
+                <button
+                  type="button"
+                  className="finder__side-item"
+                  onClick={() => openSavedSearch(savedSearch)}
+                  title={savedSearch.name}
+                >
+                  <span className="finder__search-dot" aria-hidden />
+                  <span>{savedSearch.name}</span>
+                </button>
+                <button
+                  type="button"
+                  className="finder__side-delete"
+                  aria-label={`删除保存搜索：${savedSearch.name}`}
+                  title="删除保存搜索"
+                  onClick={(event) => deleteSavedSearch(event, savedSearch.id)}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         {tags.length > 0 && (
           <div className="finder__sidebar-group">
             <div className="finder__sidebar-title">标签</div>
@@ -492,15 +927,44 @@ export default function FinderWindow() {
               )}
             </label>
 
-            <select
+            <PlushSelect
+              className="finder__type-filter"
+              value={activeTypeFilter}
+              onChange={setActiveTypeFilter}
+              ariaLabel="资源类型"
+              options={TYPE_FILTERS.map((filter) => ({ value: filter.id, label: filter.label }))}
+            />
+
+            <PlushSelect
               className="finder__sort"
               value={sort}
-              onChange={(e) => handleSortChange(e.target.value === 'oldest' ? 'oldest' : 'newest')}
-              aria-label="排序"
+              onChange={(value) => handleSortChange(value === 'oldest' ? 'oldest' : 'newest')}
+              ariaLabel="排序"
+              options={[
+                { value: 'newest', label: '最新' },
+                { value: 'oldest', label: '最旧' },
+              ]}
+            />
+
+            <button
+              type="button"
+              className="finder__refresh"
+              onClick={() => void handleRefresh()}
+              disabled={loading || loadingMore}
+              title="刷新资源"
+              aria-label="刷新资源"
             >
-              <option value="newest">最新</option>
-              <option value="oldest">最旧</option>
-            </select>
+              ↻
+            </button>
+
+            <div className="finder__collection-actions">
+              <button type="button" onClick={saveCurrentSearch} disabled={!canSaveSearch}>
+                保存搜索
+              </button>
+              <button type="button" onClick={saveResourcePackage} disabled={!canCreatePackage}>
+                {activePackage ? '加入资源包' : '新建资源包'}
+              </button>
+            </div>
 
             <fieldset className="finder__view-switch">
               <legend className="finder__sr-only">视图</legend>
@@ -519,8 +983,24 @@ export default function FinderWindow() {
             </fieldset>
           </div>
 
-          {(keyword || activeTag) && (
+          {(keyword ||
+            activeTag ||
+            activeTypeFilter !== 'all' ||
+            activePackage ||
+            activeSavedSearch) && (
             <div className="finder__filters">
+              {activePackage && (
+                <button type="button" onClick={clearPackage}>
+                  资源包：{activePackage.name}
+                  <span aria-hidden>×</span>
+                </button>
+              )}
+              {activeSavedSearch && (
+                <button type="button" onClick={clearSavedSearch}>
+                  保存搜索：{activeSavedSearch.name}
+                  <span aria-hidden>×</span>
+                </button>
+              )}
               {keyword && (
                 <button type="button" onClick={clearSearch}>
                   搜索：{keyword}
@@ -533,6 +1013,12 @@ export default function FinderWindow() {
                   <span aria-hidden>×</span>
                 </button>
               )}
+              {activeTypeFilter !== 'all' && activeTypeLabel && (
+                <button type="button" onClick={clearTypeFilter}>
+                  类型：{activeTypeLabel}
+                  <span aria-hidden>×</span>
+                </button>
+              )}
             </div>
           )}
         </header>
@@ -540,7 +1026,9 @@ export default function FinderWindow() {
         <div className="finder__content">
           <div
             ref={browserRef}
-            className={`finder__browser finder__browser--${viewMode}`}
+            className={`finder__browser finder__browser--${viewMode} ${
+              browserScrolling ? 'is-scrolling' : ''
+            }`}
             aria-label={`${locationTitle}内容`}
             onScroll={handleGridScroll}
             onKeyDown={handleKeyDown}
@@ -548,11 +1036,11 @@ export default function FinderWindow() {
             tabIndex={0}
           >
             {loading && (
-              <EmptyState
+              <PlushLoading
                 className="finder__empty-state"
-                icon="⌁"
                 title="正在载入资源"
                 description="请稍候"
+                variant="panel"
               />
             )}
             {error && (
@@ -580,39 +1068,70 @@ export default function FinderWindow() {
                 }}
                 item={item}
                 viewMode={viewMode}
-                selected={selected?.id === item.id}
-                onSelect={() => selectItem(item.id)}
+                selected={visibleSelectedIds.includes(item.id)}
+                imageRetryKey={imageRetryKey}
+                onSelect={(event) => selectCard(item, event)}
                 onActivate={() => activateItem(item)}
                 onPreview={() => showPreview(item)}
-                onOpen={() => item.publicUrl && openInSafari(item.publicUrl)}
+                onOpen={() => openItemInSafari(item)}
                 onFavorite={() => void handleFavorite(item)}
                 onContextMenu={(event) => openContextMenu(item, event)}
               />
             ))}
             {isResourceBrowser && !loading && !error && (
-              <div className="finder__load-more">
-                {loadingMore ? '正在载入更多' : hasMore ? '继续向下滚动' : '已显示全部'}
-              </div>
+              <PlushLoadMore
+                className="finder__load-more"
+                status={loadingMore ? 'loading' : hasMore ? 'more' : 'done'}
+                moreLabel="继续向下滚动"
+                onLoadMore={hasMore && !loadingMore ? () => void loadMoreResources() : undefined}
+              />
             )}
           </div>
 
-          <aside className="finder__detail" aria-label="内容详情">
-            {selected ? (
+          <aside
+            className={`finder__detail ${detailScrolling ? 'is-scrolling' : ''}`}
+            aria-label="内容详情"
+            onScroll={handleDetailScroll}
+          >
+            {detailItem ? (
               <FinderDetail
-                item={selected}
-                copied={copiedId === selected.id}
+                item={detailItem}
+                copied={copiedId === detailItem.id}
+                imageRetryKey={imageRetryKey}
+                openWithOptions={getOpenWithOptions(detailItem)}
                 onOpenPath={openPath}
-                onPreview={() => showPreview(selected)}
-                onOpen={() => selected.publicUrl && openInSafari(selected.publicUrl)}
-                onFavorite={() => void handleFavorite(selected)}
-                onDownload={() => void handleDownload(selected)}
-                onCopy={() => void copyLink(selected)}
+                onPreview={() => showPreview(detailItem)}
+                onOpen={() => openItemInSafari(detailItem)}
+                onFavorite={() => void handleFavorite(detailItem)}
+                onDownload={() => void handleDownload(detailItem)}
+                onCopy={() => void copyLink(detailItem)}
               />
             ) : (
               <EmptyState icon="◇" title="暂无内容" description="选择资源查看详情" />
             )}
           </aside>
         </div>
+
+        {hasBatchSelection && (
+          <div className="finder__batch-bar" role="toolbar" aria-label="批量操作">
+            <strong>{selectedItems.length} 项已选择</strong>
+            <button type="button" onClick={() => void favoriteBatch()}>
+              收藏
+            </button>
+            <button type="button" onClick={() => void downloadBatch()}>
+              下载
+            </button>
+            <button type="button" onClick={() => void copyBatchLinks()}>
+              {copiedId === 'batch' ? '已复制' : '复制链接'}
+            </button>
+            <button type="button" onClick={saveResourcePackage}>
+              {activePackage ? '加入资源包' : '新建资源包'}
+            </button>
+            <button type="button" onClick={clearSelection}>
+              清除选择
+            </button>
+          </div>
+        )}
 
         <footer className="finder__status">
           <span>{items.length} 项</span>
@@ -650,11 +1169,11 @@ export default function FinderWindow() {
             if (contextMenu.item.kind === 'folder' && contextMenu.item.targetPath) {
               openPath(contextMenu.item.targetPath);
             } else if (contextMenu.item.publicUrl) {
-              rememberResourceView(contextMenu.item);
-              openInSafari(contextMenu.item.publicUrl);
+              openItemInSafari(contextMenu.item);
             }
             closeContextMenu();
           }}
+          openWithOptions={getOpenWithOptions(contextMenu.item)}
           onFavorite={() => {
             void handleFavorite(contextMenu.item);
             closeContextMenu();
@@ -682,6 +1201,7 @@ interface FinderSidebarGroupProps {
   sections: typeof FINDER_SECTIONS;
   currentPath: FinderPath;
   activeTagId: string | null;
+  suppressActive?: boolean;
   onOpenPath: (path: FinderPath) => void;
 }
 
@@ -690,6 +1210,7 @@ function FinderSidebarGroup({
   sections,
   currentPath,
   activeTagId,
+  suppressActive = false,
   onOpenPath,
 }: FinderSidebarGroupProps) {
   return (
@@ -700,7 +1221,7 @@ function FinderSidebarGroup({
           type="button"
           key={section.path}
           className={`finder__side-item ${
-            section.path === currentPath && !activeTagId ? 'is-active' : ''
+            section.path === currentPath && !activeTagId && !suppressActive ? 'is-active' : ''
           }`}
           onClick={() => onOpenPath(section.path)}
           title={section.description}
@@ -717,8 +1238,9 @@ interface FinderItemCardProps {
   item: FinderItem;
   viewMode: FinderViewMode;
   selected: boolean;
+  imageRetryKey: number;
   refNode: (node: HTMLElement | null) => void;
-  onSelect: () => void;
+  onSelect: (event: React.MouseEvent<HTMLElement>) => void;
   onActivate: () => void;
   onPreview: () => void;
   onOpen: () => void;
@@ -730,6 +1252,7 @@ function FinderItemCard({
   item,
   viewMode,
   selected,
+  imageRetryKey,
   refNode,
   onSelect,
   onActivate,
@@ -758,11 +1281,13 @@ function FinderItemCard({
       tabIndex={-1}
     >
       <div className="finder-card__media">
-        <img
+        <PlushImage
           className="finder-card__icon"
           src={item.previewImage ?? item.icon}
-          alt=""
-          aria-hidden
+          decorative
+          retryKey={imageRetryKey}
+          fallbackTitle="图片走丢了"
+          fallbackDescription="稍后重试"
         />
         {isResource && (
           <div className="finder-card__badges">
@@ -804,6 +1329,7 @@ function FinderItemCard({
 
 interface FinderContextMenuProps {
   menu: FinderContextMenuState;
+  openWithOptions: FinderOpenWithOption[];
   onClose: () => void;
   onPreview: () => void;
   onOpen: () => void;
@@ -815,6 +1341,7 @@ interface FinderContextMenuProps {
 
 function FinderContextMenu({
   menu,
+  openWithOptions,
   onClose,
   onPreview,
   onOpen,
@@ -862,6 +1389,24 @@ function FinderContextMenu({
           复制链接
         </button>
       )}
+      {openWithOptions.length > 0 && (
+        <>
+          <span className="finder-context-menu__divider" />
+          {openWithOptions.slice(0, 4).map((option) => (
+            <button
+              type="button"
+              role="menuitem"
+              key={option.id}
+              onClick={() => {
+                option.action();
+                onClose();
+              }}
+            >
+              用 {option.label} 打开
+            </button>
+          ))}
+        </>
+      )}
       <span className="finder-context-menu__divider" />
       <button type="button" role="menuitem" onClick={onDetails}>
         查看详情
@@ -876,6 +1421,8 @@ function FinderContextMenu({
 interface FinderDetailProps {
   item: FinderItem;
   copied: boolean;
+  imageRetryKey: number;
+  openWithOptions: FinderOpenWithOption[];
   onOpenPath: (path: FinderPath) => void;
   onPreview: () => void;
   onOpen: () => void;
@@ -887,6 +1434,8 @@ interface FinderDetailProps {
 function FinderDetail({
   item,
   copied,
+  imageRetryKey,
+  openWithOptions,
   onOpenPath,
   onPreview,
   onOpen,
@@ -901,17 +1450,22 @@ function FinderDetail({
 
   return (
     <>
-      <div className="finder__preview">
-        <img
+      <div className={`finder__preview ${item.previewImage ? 'finder__preview--image' : ''}`}>
+        <PlushImage
           className="finder__detail-icon"
           src={item.previewImage ?? item.icon}
-          alt=""
-          aria-hidden
+          alt={item.title}
+          fit={item.previewImage ? 'cover' : 'contain'}
+          retryKey={imageRetryKey}
+          fallbackTitle="图片暂不可见"
+          fallbackDescription="可以刷新资源"
         />
       </div>
-      <div className="finder__detail-kind">{item.status ?? kindLabel(item.kind)}</div>
-      <h3>{item.title}</h3>
-      <p>{item.body}</p>
+      <div className="finder__identity">
+        <div className="finder__detail-kind">{item.status ?? kindLabel(item.kind)}</div>
+        <h3>{item.title}</h3>
+        <p>{item.body}</p>
+      </div>
 
       <section className="finder__section finder__metadata">
         <span className="finder__section-title">信息</span>
@@ -980,6 +1534,20 @@ function FinderDetail({
         </div>
       )}
 
+      {openWithOptions.length > 0 && (
+        <section className="finder__section">
+          <span className="finder__section-title">打开方式</span>
+          <div className="finder__open-with">
+            {openWithOptions.map((option) => (
+              <button type="button" key={option.id} onClick={option.action}>
+                <span>{option.label}</span>
+                <small>{option.detail}</small>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       {resourceUrl && !canPreviewImage && (
         <div className="finder__reference">
           <span>网址</span>
@@ -1010,18 +1578,18 @@ function FinderDetail({
 
       <div className="finder__button-row">
         {canPreviewImage ? (
-          <button type="button" className="finder__open" onClick={onPreview}>
+          <button type="button" className="finder__open finder__open--primary" onClick={onPreview}>
             预览
           </button>
         ) : resourceUrl ? (
-          <button type="button" className="finder__open" onClick={onOpen}>
+          <button type="button" className="finder__open finder__open--primary" onClick={onOpen}>
             用 Safari 打开
           </button>
         ) : null}
         {folderTargetPath && (
           <button
             type="button"
-            className="finder__open"
+            className="finder__open finder__open--primary"
             onClick={() => onOpenPath(folderTargetPath)}
           >
             打开
@@ -1328,20 +1896,29 @@ function ImagePreview({
           onWheel={handleWheel}
           onDoubleClick={resetTransform}
         >
-          {imageState !== 'loaded' && (
-            <div className="image-preview__placeholder">
-              <span>{imageState === 'error' ? '预览失败' : '载入中'}</span>
-            </div>
+          {imageState === 'loading' && (
+            <PlushLoading
+              className="image-preview__loading"
+              title="载入预览"
+              description="正在打开图片"
+              variant="stage"
+              size="lg"
+            />
           )}
-          <img
+          <PlushImage
+            className="image-preview__image"
             src={src}
             alt={item.title}
+            fit="contain"
             draggable={false}
+            fallbackTitle="预览失败"
+            fallbackDescription="图片暂时打不开"
             style={{
               transform: `translate3d(${imageOffset.x}px, ${imageOffset.y}px, 0) scale(${scale}) rotate(${rotate}deg)`,
             }}
             onLoad={() => setImageState('loaded')}
             onError={() => setImageState('error')}
+            onRetry={() => setImageState('loading')}
             onDragStart={(e) => e.preventDefault()}
           />
         </div>
@@ -1436,6 +2013,78 @@ function isImagePreviewItem(item: FinderItem) {
   return (
     item.mediaKind === 'image' && Boolean(item.previewUrl || item.previewImage || item.publicUrl)
   );
+}
+
+function matchesTypeFilter(item: FinderItem, filter: FinderTypeFilter) {
+  switch (filter) {
+    case 'all':
+      return true;
+    case 'image':
+      return item.mediaKind === 'image';
+    case 'link':
+      return Boolean(item.publicUrl) && item.mediaKind !== 'image';
+    case 'tool':
+      return isToolLikeItem(item);
+    case 'downloadable':
+      return Boolean(item.resourceId);
+  }
+}
+
+function isToolLikeItem(item: FinderItem) {
+  const text = [item.title, item.subtitle, item.body, item.status, ...(item.tags ?? [])]
+    .join(' ')
+    .toLowerCase();
+  return ['tool', 'tools', '工具', 'json', 'base64', 'uuid', 'diff', 'csv', 'ai'].some((keyword) =>
+    text.includes(keyword),
+  );
+}
+
+function isDevToolCandidate(item: FinderItem) {
+  const extension = item.extension?.toLowerCase();
+  return extension === 'json' || extension === 'csv' || isToolLikeItem(item);
+}
+
+function isAudioItem(item: FinderItem) {
+  const extension = item.extension?.toLowerCase();
+  const text = [item.title, item.subtitle, item.body, item.status, ...(item.tags ?? [])]
+    .join(' ')
+    .toLowerCase();
+  return (
+    extension === 'mp3' ||
+    extension === 'wav' ||
+    extension === 'ogg' ||
+    extension === 'm4a' ||
+    text.includes('audio') ||
+    text.includes('music') ||
+    text.includes('音乐')
+  );
+}
+
+function formatResourceText(item: FinderItem) {
+  return [item.title, item.body, item.publicUrl, item.tags?.join(' / ')].filter(Boolean).join('\n');
+}
+
+function formatResourceNote(item: FinderItem) {
+  const lines = [`# ${item.title}`, '', item.body];
+  if (item.publicUrl) lines.push('', item.publicUrl);
+  if (item.tags?.length) lines.push('', `标签：${item.tags.join('、')}`);
+  if (item.creatorName) lines.push(`作者：${item.creatorName}`);
+  return lines.filter(Boolean).join('\n');
+}
+
+function buildSavedSearchName(input: {
+  keyword: string;
+  tagName: string | null;
+  typeLabel: string | null;
+}) {
+  const parts = [input.keyword.trim(), input.tagName, input.typeLabel].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : '保存搜索';
+}
+
+function makeResourcePackageName(items: FinderItem[]) {
+  if (items.length === 0) return '资源包';
+  if (items.length === 1) return `${items[0].title} 资源包`;
+  return `${items[0].title} 等 ${items.length} 项`;
 }
 
 function kindLabel(kind: FinderItem['kind']) {

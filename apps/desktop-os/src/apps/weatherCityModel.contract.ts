@@ -1,10 +1,13 @@
 import {
   addWeatherCity,
   applyWeatherCitiesPreference,
+  chooseWeatherCitiesPreference,
   createDefaultWeatherCities,
+  createWeatherCitiesPreference,
   ensureWeatherCities,
   formatWeatherLocationLabel,
   isCoordinateWeatherQuery,
+  mergeLegacyWeatherCitiesPreferences,
   parseWeatherCitiesPreference,
   removeWeatherCity,
   snapshotWeatherCitiesPreference,
@@ -19,6 +22,20 @@ const ensuredWithoutHangzhou = ensureWeatherCities(withoutHangzhou, '上海', '�
 const snapshot = snapshotWeatherCitiesPreference(citiesWithBeijing);
 const parsedSnapshot = parseWeatherCitiesPreference(JSON.stringify(snapshot));
 const appliedSnapshot = applyWeatherCitiesPreference(parsedSnapshot, '119.9945,30.2348', '杭州');
+const localPreference = createWeatherCitiesPreference(
+  citiesWithBeijing,
+  '2026-06-20T10:01:00.000Z',
+);
+const serverPreference = createWeatherCitiesPreference(
+  [citiesWithBeijing[0], addWeatherCity(cities, '广州')[1]].filter(Boolean),
+  '2026-06-20T10:00:00.000Z',
+);
+const chosenPreference = chooseWeatherCitiesPreference(localPreference, serverPreference);
+const mergedLegacyPreference = mergeLegacyWeatherCitiesPreferences(
+  { version: 1, cities: [{ query: '北京' }] },
+  { version: 1, cities: [{ query: '杭州' }] },
+  '2026-06-20T10:02:00.000Z',
+);
 const firstCity = cities[0];
 
 export const WEATHER_CITY_MODEL_CONTRACT = {
@@ -34,4 +51,10 @@ export const WEATHER_CITY_MODEL_CONTRACT = {
     (item) => item.query === firstCity.query,
   ),
   preferenceRestoresAddedCities: appliedSnapshot.some((item) => item.query === '北京'),
+  preferenceUsesVersion2: localPreference.version === 2,
+  preferenceHasUpdatedAt: localPreference.updatedAt === '2026-06-20T10:01:00.000Z',
+  prefersNewerPreference: chosenPreference === localPreference,
+  mergesLegacyPreferences:
+    mergedLegacyPreference.cities.some((item) => item.query === '北京') &&
+    mergedLegacyPreference.cities.some((item) => item.query === '杭州'),
 };

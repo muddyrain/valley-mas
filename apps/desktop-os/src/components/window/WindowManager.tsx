@@ -1,4 +1,3 @@
-import { renderDesktopApp } from '../../apps/appRenderers';
 import { useWindowStore } from '../../store/windowStore';
 import Window from './Window';
 
@@ -8,9 +7,7 @@ export default function WindowManager() {
   return (
     <>
       {windows.map((w) => (
-        <Window key={w.id} state={w}>
-          {renderDesktopApp(w.appId)}
-        </Window>
+        <Window key={w.id} state={w} appId={w.appId} />
       ))}
     </>
   );

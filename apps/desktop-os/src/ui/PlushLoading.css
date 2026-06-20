@@ -1,0 +1,297 @@
+.plush-loading {
+  --plush-loading-size: 54px;
+  --plush-loading-gap: 14px;
+  display: grid;
+  place-items: center;
+  gap: var(--plush-loading-gap);
+  min-width: 0;
+  color: var(--plush-text);
+  text-align: center;
+}
+
+.plush-loading--inline {
+  grid-auto-flow: column;
+  justify-content: center;
+  min-height: 36px;
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.plush-loading--panel {
+  width: min(440px, 100%);
+  min-height: 176px;
+  border: 1px solid rgba(126, 105, 70, 0.12);
+  border-radius: 20px;
+  padding: 22px 24px;
+  background:
+    radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.86), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(255, 244, 218, 0.5)),
+    rgba(255, 249, 238, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 18px 36px rgba(90, 74, 58, 0.08);
+}
+
+.plush-loading--stage {
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(168, 212, 234, 0.24), transparent 28%),
+    radial-gradient(circle at 42% 52%, rgba(244, 217, 122, 0.16), transparent 32%),
+    rgba(255, 250, 240, 0.42);
+}
+
+.plush-loading--sm {
+  --plush-loading-size: 30px;
+  --plush-loading-gap: 8px;
+}
+
+.plush-loading--lg {
+  --plush-loading-size: 64px;
+  --plush-loading-gap: 14px;
+}
+
+.plush-loading__surface {
+  display: grid;
+  grid-template-columns: var(--plush-loading-size) minmax(0, max-content);
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.plush-loading__mark {
+  position: relative;
+  width: var(--plush-loading-size);
+  height: var(--plush-loading-size);
+  border: 1px solid rgba(126, 105, 70, 0.12);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 229, 159, 0.68)),
+    rgba(244, 217, 122, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.76),
+    inset 0 -5px 12px rgba(216, 169, 74, 0.12),
+    0 10px 22px rgba(154, 91, 37, 0.1);
+  overflow: hidden;
+}
+
+.plush-loading__mark::before {
+  position: absolute;
+  inset: 11px 9px auto;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 12px 0 rgba(255, 255, 255, 0.58);
+  content: "";
+}
+
+.plush-loading__mark::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 18%,
+    rgba(255, 255, 255, 0.62) 44%,
+    transparent 68%
+  );
+  content: "";
+  transform: translateX(-110%);
+  animation: plush-loading-sheen 1.55s ease-in-out infinite;
+}
+
+.plush-loading__mark span {
+  position: absolute;
+  bottom: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(217, 122, 79, 0.5);
+  box-shadow:
+    0 0 0 4px rgba(217, 122, 79, 0.08),
+    0 2px 8px rgba(154, 91, 37, 0.08);
+  animation: plush-loading-dot 1.2s ease-in-out infinite;
+}
+
+.plush-loading__mark span:nth-child(1) {
+  left: 12px;
+}
+
+.plush-loading__mark span:nth-child(2) {
+  left: calc(50% - 3.5px);
+  animation-delay: 0.14s;
+}
+
+.plush-loading__mark span:nth-child(3) {
+  right: 12px;
+  animation-delay: 0.28s;
+}
+
+.plush-loading__copy {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 0;
+  text-align: left;
+}
+
+.plush-loading__title {
+  color: #4f4234;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.plush-loading__description {
+  color: rgba(90, 74, 58, 0.58);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.plush-loading__track {
+  position: relative;
+  width: min(220px, 100%);
+  height: 7px;
+  overflow: hidden;
+  border: 1px solid rgba(126, 105, 70, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.54);
+  box-shadow: inset 0 1px 2px rgba(90, 74, 58, 0.06);
+}
+
+.plush-loading__track span {
+  position: absolute;
+  inset: 1px auto 1px 1px;
+  width: 38%;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(244, 217, 122, 0.72), rgba(244, 168, 184, 0.52)),
+    rgba(244, 217, 122, 0.5);
+  box-shadow: 0 0 12px rgba(244, 217, 122, 0.22);
+  animation: plush-loading-track 1.35s ease-in-out infinite;
+}
+
+.plush-loading__skeleton {
+  display: grid;
+  width: min(280px, 100%);
+  gap: 7px;
+}
+
+.plush-loading__skeleton span {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.3),
+      rgba(255, 255, 255, 0.82),
+      rgba(255, 255, 255, 0.3)
+    ),
+    rgba(126, 105, 70, 0.08);
+  background-size: 220% 100%;
+  animation: plush-loading-skeleton 1.4s ease-in-out infinite;
+}
+
+.plush-loading__skeleton span:nth-child(2) {
+  width: 82%;
+}
+
+.plush-loading__skeleton span:nth-child(3) {
+  width: 58%;
+}
+
+.plush-loading--inline .plush-loading__track,
+.plush-loading--inline .plush-loading__skeleton {
+  display: none;
+}
+
+.plush-loading--inline .plush-loading__surface {
+  grid-template-columns: var(--plush-loading-size) minmax(0, 1fr);
+}
+
+.plush-loading--inline .plush-loading__mark {
+  border-radius: 12px;
+}
+
+.plush-loading--stage .plush-loading__surface {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.plush-loading--stage .plush-loading__copy {
+  justify-items: center;
+  text-align: center;
+}
+
+.plush-loading--stage .plush-loading__skeleton {
+  width: min(360px, 68%);
+}
+
+.plush-loading--sm .plush-loading__title {
+  font-size: 12px;
+}
+
+.plush-loading--sm .plush-loading__description {
+  font-size: 11px;
+}
+
+@keyframes plush-loading-sheen {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  64%,
+  100% {
+    transform: translateX(110%);
+  }
+}
+
+@keyframes plush-loading-dot {
+  0%,
+  100% {
+    opacity: 0.42;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 0.86;
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes plush-loading-track {
+  0% {
+    transform: translateX(-30%);
+  }
+
+  50% {
+    transform: translateX(84%);
+  }
+
+  100% {
+    transform: translateX(210%);
+  }
+}
+
+@keyframes plush-loading-skeleton {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plush-loading__mark::after,
+  .plush-loading__mark span,
+  .plush-loading__track span,
+  .plush-loading__skeleton span {
+    animation: none;
+  }
+}

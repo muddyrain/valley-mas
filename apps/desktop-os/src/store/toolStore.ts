@@ -4,6 +4,8 @@ import { persist } from 'zustand/middleware';
 export type FocusMode = 'work' | 'short' | 'long';
 export type FocusStatus = 'idle' | 'running' | 'paused';
 export type RandomizerMode = 'list' | 'dice' | 'coin';
+export type DevToolsTab = 'json' | 'time' | 'encoding' | 'hash' | 'diff' | 'csv';
+export type DailyToolsTab = 'date' | 'password' | 'image' | 'split';
 
 export interface CalcHistoryItem {
   id: string;
@@ -21,6 +23,9 @@ export interface GameBest {
   moves?: number;
   seconds?: number;
   score?: number;
+  lines?: number;
+  level?: number;
+  length?: number;
 }
 
 export interface FocusCompletion {
@@ -90,10 +95,14 @@ interface ToolStore {
   deskTidyBest: GameBest | null;
   beadSortBest: GameBest | null;
   cloudBounceBest: GameBest | null;
+  blockDropBest: GameBest | null;
+  snakeBest: GameBest | null;
   recordPlushMatchBest: (moves: number, seconds: number) => void;
   recordDeskTidyBest: (score: number) => void;
   recordBeadSortBest: (moves: number, seconds: number) => void;
   recordCloudBounceBest: (score: number) => void;
+  recordBlockDropBest: (score: number, lines: number, level: number) => void;
+  recordSnakeBest: (score: number, length: number) => void;
 
   clipboardSnippets: ClipboardSnippet[];
   addClipboardSnippet: (text: string) => void;
@@ -120,6 +129,30 @@ interface ToolStore {
   waterPlushGarden: () => void;
   harvestPlushGarden: () => string | null;
   resetPlushGarden: () => void;
+
+  devToolsTab: DevToolsTab;
+  devJsonDraft: string;
+  devTimeDraft: string;
+  devEncodingDraft: string;
+  devDiffLeft: string;
+  devDiffRight: string;
+  devCsvDraft: string;
+  setDevToolsTab: (tab: DevToolsTab) => void;
+  setDevJsonDraft: (draft: string) => void;
+  setDevTimeDraft: (draft: string) => void;
+  setDevEncodingDraft: (draft: string) => void;
+  setDevDiffLeft: (draft: string) => void;
+  setDevDiffRight: (draft: string) => void;
+  setDevCsvDraft: (draft: string) => void;
+
+  dailyToolsTab: DailyToolsTab;
+  dailyDateStart: string;
+  dailyDateEnd: string;
+  splitBillPeople: Array<{ id: string; name: string; paid: number }>;
+  setDailyToolsTab: (tab: DailyToolsTab) => void;
+  setDailyDateStart: (value: string) => void;
+  setDailyDateEnd: (value: string) => void;
+  setSplitBillPeople: (people: Array<{ id: string; name: string; paid: number }>) => void;
 }
 
 export const FOCUS_DURATIONS: Record<FocusMode, number> = {
@@ -230,6 +263,8 @@ export const useToolStore = create<ToolStore>()(
       deskTidyBest: null,
       beadSortBest: null,
       cloudBounceBest: null,
+      blockDropBest: null,
+      snakeBest: null,
       recordPlushMatchBest: (moves, seconds) =>
         set((state) => {
           const best = state.plushMatchBest;
@@ -253,6 +288,16 @@ export const useToolStore = create<ToolStore>()(
         set((state) => {
           if (state.cloudBounceBest?.score && state.cloudBounceBest.score >= score) return {};
           return { cloudBounceBest: { score } };
+        }),
+      recordBlockDropBest: (score, lines, level) =>
+        set((state) => {
+          if (state.blockDropBest?.score && state.blockDropBest.score >= score) return {};
+          return { blockDropBest: { score, lines, level } };
+        }),
+      recordSnakeBest: (score, length) =>
+        set((state) => {
+          if (state.snakeBest?.score && state.snakeBest.score >= score) return {};
+          return { snakeBest: { score, length } };
         }),
 
       clipboardSnippets: [],
@@ -358,6 +403,33 @@ export const useToolStore = create<ToolStore>()(
             lastWateredAt: null,
           },
         }),
+
+      devToolsTab: 'json',
+      devJsonDraft: '{\n  "hello": "desktop-os"\n}',
+      devTimeDraft: '',
+      devEncodingDraft: '',
+      devDiffLeft: '',
+      devDiffRight: '',
+      devCsvDraft: 'name,value\nValley,1',
+      setDevToolsTab: (tab) => set({ devToolsTab: tab }),
+      setDevJsonDraft: (draft) => set({ devJsonDraft: draft }),
+      setDevTimeDraft: (draft) => set({ devTimeDraft: draft }),
+      setDevEncodingDraft: (draft) => set({ devEncodingDraft: draft }),
+      setDevDiffLeft: (draft) => set({ devDiffLeft: draft }),
+      setDevDiffRight: (draft) => set({ devDiffRight: draft }),
+      setDevCsvDraft: (draft) => set({ devCsvDraft: draft }),
+
+      dailyToolsTab: 'date',
+      dailyDateStart: '',
+      dailyDateEnd: '',
+      splitBillPeople: [
+        { id: 'person-1', name: 'A', paid: 0 },
+        { id: 'person-2', name: 'B', paid: 0 },
+      ],
+      setDailyToolsTab: (tab) => set({ dailyToolsTab: tab }),
+      setDailyDateStart: (value) => set({ dailyDateStart: value }),
+      setDailyDateEnd: (value) => set({ dailyDateEnd: value }),
+      setSplitBillPeople: (people) => set({ splitBillPeople: people }),
     }),
     {
       name: 'desktop-os-mini-apps',
@@ -377,12 +449,25 @@ export const useToolStore = create<ToolStore>()(
         deskTidyBest: state.deskTidyBest,
         beadSortBest: state.beadSortBest,
         cloudBounceBest: state.cloudBounceBest,
+        blockDropBest: state.blockDropBest,
+        snakeBest: state.snakeBest,
         clipboardSnippets: state.clipboardSnippets,
         converterRecent: state.converterRecent,
         textLabDraft: state.textLabDraft,
         paletteColors: state.paletteColors,
         stopwatchRecords: state.stopwatchRecords,
         plushGarden: state.plushGarden,
+        devToolsTab: state.devToolsTab,
+        devJsonDraft: state.devJsonDraft,
+        devTimeDraft: state.devTimeDraft,
+        devEncodingDraft: state.devEncodingDraft,
+        devDiffLeft: state.devDiffLeft,
+        devDiffRight: state.devDiffRight,
+        devCsvDraft: state.devCsvDraft,
+        dailyToolsTab: state.dailyToolsTab,
+        dailyDateStart: state.dailyDateStart,
+        dailyDateEnd: state.dailyDateEnd,
+        splitBillPeople: state.splitBillPeople,
       }),
     },
   ),

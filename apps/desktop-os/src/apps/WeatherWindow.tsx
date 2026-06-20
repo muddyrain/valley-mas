@@ -7,32 +7,41 @@ import { getWeatherCacheKey, useWeatherStore } from '../store/weatherStore';
 import {
   addWeatherCity,
   applyWeatherCitiesPreference,
+  createWeatherCitiesPreference,
   ensureWeatherCities,
   parseWeatherCitiesPreference,
   readWeatherCities,
+  readWeatherCitiesPreference,
   removeWeatherCity,
   resolveSelectedWeatherLocationLabel,
+  resolveWeatherCitiesPreference,
   resolveWeatherCityListLabel,
-  snapshotWeatherCitiesPreference,
   WEATHER_CITIES_PREFERENCE_NAMESPACE,
+  type WeatherCitiesPreferenceValue,
   type WeatherCityItem,
-  writeWeatherCities,
+  writeWeatherCitiesPreference,
 } from './weatherCityModel';
 import './WeatherWindow.css';
+
+type WeatherCitySyncStatus = 'local' | 'syncing' | 'synced' | 'error';
 
 export default function WeatherWindow() {
   const city = useWeatherStore((s) => s.city);
   const weather = useWeatherStore((s) => s.weather);
   const loading = useWeatherStore((s) => s.loading);
   const locating = useWeatherStore((s) => s.locating);
+  const locationAttempted = useWeatherStore((s) => s.locationAttempted);
   const error = useWeatherStore((s) => s.error);
   const weatherCache = useWeatherStore((s) => s.weatherCache);
   const loadWeather = useWeatherStore((s) => s.loadWeather);
+  const relocateWeather = useWeatherStore((s) => s.relocateWeather);
   const prefetchWeather = useWeatherStore((s) => s.prefetchWeather);
   const setCity = useWeatherStore((s) => s.setCity);
   const token = useAuthStore((s) => s.token);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [citySearch, setCitySearch] = useState('');
+  const [citySettingsOpen, setCitySettingsOpen] = useState(false);
+  const [citySyncStatus, setCitySyncStatus] = useState<WeatherCitySyncStatus>('local');
   const [cities, setCities] = useState<WeatherCityItem[]>(() =>
     readWeatherCities(getLocalStorage(), city),
   );
@@ -40,6 +49,7 @@ export default function WeatherWindow() {
   const weatherContextRef = useRef({ city, apiCity: weather?.city });
   const localMutationVersionRef = useRef(0);
   const selectedCityQuery = city.trim().toLowerCase();
+  const initialLocationPending = !locationAttempted && !weather;
 
   useEffect(() => {
     void loadWeather();
@@ -61,14 +71,17 @@ export default function WeatherWindow() {
   }, [city, weather?.city]);
 
   const saveWeatherCitiesToServer = useCallback(
-    async (next: WeatherCityItem[], nextToken: string) => {
+    async (preference: WeatherCitiesPreferenceValue, nextToken: string) => {
+      setCitySyncStatus('syncing');
       try {
         await updateUserPreference(
           WEATHER_CITIES_PREFERENCE_NAMESPACE,
-          JSON.stringify(snapshotWeatherCitiesPreference(next)),
+          JSON.stringify(preference),
           nextToken,
         );
+        setCitySyncStatus('synced');
       } catch (error) {
+        setCitySyncStatus('error');
         console.warn('Weather cities sync failed', error);
       }
     },
@@ -77,44 +90,65 @@ export default function WeatherWindow() {
 
   const persistCities = useCallback(
     (next: WeatherCityItem[]) => {
+      const preference = createWeatherCitiesPreference(next);
       localMutationVersionRef.current += 1;
       citiesRef.current = next;
       setCities(next);
-      writeWeatherCities(getLocalStorage(), next);
+      writeWeatherCitiesPreference(getLocalStorage(), preference);
       if (isAuthenticated && token) {
-        void saveWeatherCitiesToServer(next, token);
+        void saveWeatherCitiesToServer(preference, token);
+      } else {
+        setCitySyncStatus('local');
       }
     },
     [isAuthenticated, saveWeatherCitiesToServer, token],
   );
 
   useEffect(() => {
-    if (!isAuthenticated || !token) return;
+    if (!isAuthenticated || !token) {
+      setCitySyncStatus('local');
+      return;
+    }
     const authToken = token;
     let cancelled = false;
     const loadVersion = localMutationVersionRef.current;
 
     async function loadWeatherCitiesPreference() {
+      setCitySyncStatus('syncing');
+      const localPreference = readWeatherCitiesPreference(getLocalStorage());
       try {
         const preference = await getUserPreference(WEATHER_CITIES_PREFERENCE_NAMESPACE, authToken);
         if (cancelled || loadVersion !== localMutationVersionRef.current) return;
-        const value = parseWeatherCitiesPreference(preference.value);
+        const remotePreference = parseWeatherCitiesPreference(preference.value);
+        const resolvedPreference = resolveWeatherCitiesPreference(
+          localPreference,
+          remotePreference,
+        );
         const currentContext = weatherContextRef.current;
         const next = applyWeatherCitiesPreference(
-          value,
+          resolvedPreference.preference,
           currentContext.city,
           currentContext.apiCity,
           citiesRef.current,
         );
         citiesRef.current = next;
         setCities(next);
-        writeWeatherCities(getLocalStorage(), next);
+        writeWeatherCitiesPreference(getLocalStorage(), resolvedPreference.preference);
+        if (resolvedPreference.shouldSaveRemote) {
+          await saveWeatherCitiesToServer(resolvedPreference.preference, authToken);
+        } else {
+          setCitySyncStatus('synced');
+        }
       } catch (error) {
         if (cancelled) return;
         if (error instanceof ApiError && error.status === 404) {
-          await saveWeatherCitiesToServer(citiesRef.current, authToken);
+          const nextPreference =
+            localPreference ?? createWeatherCitiesPreference(citiesRef.current);
+          writeWeatherCitiesPreference(getLocalStorage(), nextPreference);
+          await saveWeatherCitiesToServer(nextPreference, authToken);
           return;
         }
+        setCitySyncStatus('error');
         console.warn('Weather cities preference load failed', error);
       }
     }
@@ -129,16 +163,15 @@ export default function WeatherWindow() {
     setCities((current) => {
       const next = ensureWeatherCities(current, city, weather?.city);
       citiesRef.current = next;
-      writeWeatherCities(getLocalStorage(), next);
       return next;
     });
   }, [city, weather?.city]);
 
   const headline = useMemo(() => {
-    if (locating) return '定位中';
+    if (initialLocationPending || locating) return '定位中';
     if (loading && !weather) return '更新中';
     return weather?.now.text ?? '天气暂不可用';
-  }, [loading, locating, weather]);
+  }, [initialLocationPending, loading, locating, weather]);
 
   function submitCity(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -173,34 +206,61 @@ export default function WeatherWindow() {
     }
   }
 
-  const displayCity = resolveSelectedWeatherLocationLabel(city, weather?.city, cities);
+  function relocateCurrentCity(e?: React.MouseEvent<HTMLButtonElement>) {
+    e?.stopPropagation();
+    void relocateWeather();
+  }
+
+  const displayCity = initialLocationPending
+    ? '定位中'
+    : resolveSelectedWeatherLocationLabel(city, weather?.city, cities);
+
+  function getCityRowView(item: WeatherCityItem) {
+    const isActive =
+      item.query.trim().toLowerCase() === selectedCityQuery ||
+      (item.currentLocation && item.query.trim().toLowerCase() === selectedCityQuery);
+    const cachedWeather = weatherCache[getWeatherCacheKey(item.query)]?.weather;
+    const rowWeather = isActive ? (weather ?? cachedWeather) : cachedWeather;
+    const label =
+      item.currentLocation && initialLocationPending
+        ? '定位中'
+        : item.currentLocation && rowWeather?.city
+          ? rowWeather.city
+          : resolveWeatherCityListLabel(item, displayCity);
+    const rowSummary =
+      item.currentLocation && locating
+        ? '定位中'
+        : rowWeather?.now.text || getWeatherCityFallbackSubtitle(item);
+    return { isActive, label, rowSummary, rowWeather };
+  }
+
+  const citySyncLabel = getWeatherCitySyncLabel(citySyncStatus, isAuthenticated);
 
   return (
     <div className="weather-window">
       <aside className="weather-sidebar">
-        <form className="weather-search" onSubmit={submitCity}>
-          <input
-            value={citySearch}
-            onChange={(e) => setCitySearch(e.target.value)}
-            aria-label="搜索城市或地区"
-            placeholder="搜索城市或地区"
-          />
-          <button type="submit" aria-label="添加城市">
-            +
-          </button>
-        </form>
-
         <div className="weather-city-list">
           {cities.map((item) => {
-            const isActive =
-              item.query.trim().toLowerCase() === selectedCityQuery ||
-              (item.currentLocation && item.query.trim().toLowerCase() === selectedCityQuery);
-            const label = resolveWeatherCityListLabel(item, displayCity);
-            const cachedWeather = weatherCache[getWeatherCacheKey(item.query)]?.weather;
-            const rowWeather = isActive ? (weather ?? cachedWeather) : cachedWeather;
-            const rowSummary = rowWeather?.now.text || getWeatherCityFallbackSubtitle(item);
+            const { isActive, label, rowSummary, rowWeather } = getCityRowView(item);
             return (
-              <div key={item.id} className={`weather-city ${isActive ? 'is-active' : ''}`}>
+              <div
+                key={item.id}
+                className={`weather-city ${item.currentLocation ? 'weather-city--current' : ''} ${
+                  isActive ? 'is-active' : ''
+                }`}
+              >
+                {item.currentLocation ? (
+                  <button
+                    type="button"
+                    className="weather-city__locate"
+                    onClick={relocateCurrentCity}
+                    disabled={locating}
+                    aria-label={locating ? '定位中' : '重新定位'}
+                    title={locating ? '定位中' : '重新定位'}
+                  >
+                    {locating ? '…' : '⌖'}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="weather-city__select"
@@ -212,20 +272,83 @@ export default function WeatherWindow() {
                   </span>
                   <b>{formatTemperature(rowWeather?.now.temp)}</b>
                 </button>
-                {!item.currentLocation ? (
-                  <button
-                    type="button"
-                    className="weather-city__delete"
-                    onClick={() => deleteCity(item)}
-                    aria-label={`删除${label}`}
-                  >
-                    ×
-                  </button>
-                ) : null}
               </div>
             );
           })}
         </div>
+
+        <div className="weather-sidebar__footer">
+          <button
+            type="button"
+            className="weather-city-settings-button"
+            onClick={() => setCitySettingsOpen(true)}
+            aria-label="城市设置"
+            title="城市设置"
+          >
+            ⚙
+          </button>
+        </div>
+
+        {citySettingsOpen ? (
+          <div className="weather-city-settings" role="dialog" aria-label="城市设置">
+            <div className="weather-city-settings__header">
+              <div>
+                <strong>城市</strong>
+                <span>{citySyncLabel}</span>
+              </div>
+              <button type="button" onClick={() => setCitySettingsOpen(false)}>
+                完成
+              </button>
+            </div>
+            <form className="weather-search weather-city-settings__search" onSubmit={submitCity}>
+              <input
+                value={citySearch}
+                onChange={(e) => setCitySearch(e.target.value)}
+                aria-label="搜索城市或地区"
+                placeholder="搜索城市或地区"
+              />
+              <button type="submit" aria-label="添加城市">
+                +
+              </button>
+            </form>
+            <div className="weather-city-settings__list">
+              {cities.map((item) => {
+                const { label, rowSummary } = getCityRowView(item);
+                return (
+                  <div key={item.id} className="weather-city-settings__row">
+                    <span>
+                      <strong>{label}</strong>
+                      <em>{rowSummary}</em>
+                    </span>
+                    {item.currentLocation ? (
+                      <div className="weather-city-settings__actions">
+                        <button
+                          type="button"
+                          className="weather-city-settings__locate"
+                          onClick={relocateCurrentCity}
+                          disabled={locating}
+                          aria-label={locating ? '定位中' : '重新定位'}
+                          title={locating ? '定位中' : '重新定位'}
+                        >
+                          {locating ? '…' : '⌖'}
+                        </button>
+                        <b className="weather-city-settings__fixed">固定</b>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="weather-city-settings__delete"
+                        onClick={() => deleteCity(item)}
+                      >
+                        删除
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       </aside>
 
       <main className="weather-detail">
@@ -251,8 +374,6 @@ export default function WeatherWindow() {
               <span>
                 {weather?.updatedAt ? `更新于 ${formatUpdatedAt(weather.updatedAt)}` : '尚未更新'}
               </span>
-              {weather?.cached ? <span>缓存</span> : null}
-              {weather?.refreshLimited ? <span>刷新限速</span> : null}
             </div>
           </div>
         </section>
@@ -362,6 +483,13 @@ function WeatherEmptyState() {
 
 function getWeatherCityFallbackSubtitle(item: WeatherCityItem) {
   return item.currentLocation ? '当前位置' : '已添加';
+}
+
+function getWeatherCitySyncLabel(status: WeatherCitySyncStatus, isAuthenticated: boolean) {
+  if (!isAuthenticated) return '本地';
+  if (status === 'syncing') return '同步中';
+  if (status === 'error') return '同步失败';
+  return '已同步';
 }
 
 function formatTemperature(value?: string) {

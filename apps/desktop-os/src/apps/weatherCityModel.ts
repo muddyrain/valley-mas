@@ -10,8 +10,7 @@ export interface WeatherCityItem {
 export const WEATHER_CITIES_STORAGE_KEY = 'desktop-os-weather-cities';
 export const WEATHER_CITIES_PREFERENCE_NAMESPACE = 'desktop-os.weather.cities';
 
-const DEFAULT_CITY_NAMES = [DEFAULT_WEATHER_CITY, '杭州'];
-const WEATHER_CITIES_PREFERENCE_VERSION = 1;
+const WEATHER_CITIES_PREFERENCE_VERSION = 2;
 
 interface WeatherCityPreferenceItem {
   query: string;
@@ -20,6 +19,7 @@ interface WeatherCityPreferenceItem {
 export interface WeatherCitiesPreferenceValue {
   version: number;
   cities: WeatherCityPreferenceItem[];
+  updatedAt?: string;
 }
 
 export function isCoordinateWeatherQuery(value: string) {
@@ -37,7 +37,7 @@ export function formatWeatherLocationLabel(query: string, apiCity?: string) {
 export function createDefaultWeatherCities(query: string, apiCity?: string): WeatherCityItem[] {
   const currentQuery = query.trim() || DEFAULT_WEATHER_CITY;
   const currentLabel = formatWeatherLocationLabel(currentQuery, apiCity);
-  const cities: WeatherCityItem[] = [
+  return [
     {
       id: 'current',
       label: currentLabel,
@@ -45,14 +45,6 @@ export function createDefaultWeatherCities(query: string, apiCity?: string): Wea
       currentLocation: true,
     },
   ];
-
-  for (const name of DEFAULT_CITY_NAMES) {
-    if (!hasCity(cities, name)) {
-      cities.push(createWeatherCityItem(name));
-    }
-  }
-
-  return cities;
 }
 
 export function createWeatherCityItem(input: string): WeatherCityItem {
@@ -66,65 +58,63 @@ export function createWeatherCityItem(input: string): WeatherCityItem {
 }
 
 export function readWeatherCities(storage: Storage | undefined, query: string, apiCity?: string) {
-  if (!storage) return createDefaultWeatherCities(query, apiCity);
-  try {
-    const raw = storage.getItem(WEATHER_CITIES_STORAGE_KEY);
-    if (!raw) return createDefaultWeatherCities(query, apiCity);
-    const parsed = JSON.parse(raw) as Array<Partial<WeatherCityItem>>;
-    if (!Array.isArray(parsed)) return createDefaultWeatherCities(query, apiCity);
-    const cities = parsed
-      .filter(
-        (item): item is Pick<WeatherCityItem, 'query'> & Partial<WeatherCityItem> =>
-          typeof item.query === 'string',
-      )
-      .map((item) =>
-        item.currentLocation
-          ? {
-              id: 'current',
-              label: formatWeatherLocationLabel(query, apiCity),
-              query,
-              currentLocation: true,
-            }
-          : createWeatherCityItem(item.query),
-      );
-    return ensureWeatherCities(cities, query, apiCity);
-  } catch {
-    return createDefaultWeatherCities(query, apiCity);
-  }
+  const preference = readWeatherCitiesPreference(storage);
+  return applyWeatherCitiesPreference(preference, query, apiCity);
 }
 
 export function writeWeatherCities(storage: Storage | undefined, cities: WeatherCityItem[]) {
+  writeWeatherCitiesPreference(storage, createWeatherCitiesPreference(cities));
+}
+
+export function readWeatherCitiesPreference(
+  storage: Storage | undefined,
+): WeatherCitiesPreferenceValue | null {
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(WEATHER_CITIES_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) return createLegacyWeatherCitiesPreference(parsed);
+    return normalizeWeatherCitiesPreference(parsed);
+  } catch {
+    return null;
+  }
+}
+
+export function writeWeatherCitiesPreference(
+  storage: Storage | undefined,
+  preference: WeatherCitiesPreferenceValue,
+) {
   if (!storage) return;
   try {
-    storage.setItem(WEATHER_CITIES_STORAGE_KEY, JSON.stringify(cities));
+    storage.setItem(WEATHER_CITIES_STORAGE_KEY, JSON.stringify(preference));
   } catch {
     // Local storage can be unavailable in restricted browser contexts.
   }
 }
 
-export function snapshotWeatherCitiesPreference(
+export function createWeatherCitiesPreference(
   cities: WeatherCityItem[],
+  updatedAt = new Date().toISOString(),
 ): WeatherCitiesPreferenceValue {
   return {
     version: WEATHER_CITIES_PREFERENCE_VERSION,
-    cities: cities
-      .filter((city) => !city.currentLocation)
-      .map((city) => ({ query: city.query.trim() }))
-      .filter((city) => city.query.length > 0),
+    updatedAt,
+    cities: normalizePreferenceCities(
+      cities.filter((city) => !city.currentLocation).map((city) => ({ query: city.query.trim() })),
+    ),
   };
+}
+
+export function snapshotWeatherCitiesPreference(
+  cities: WeatherCityItem[],
+): WeatherCitiesPreferenceValue {
+  return createWeatherCitiesPreference(cities);
 }
 
 export function parseWeatherCitiesPreference(raw: string): WeatherCitiesPreferenceValue | null {
   try {
-    const value = JSON.parse(raw) as Partial<WeatherCitiesPreferenceValue>;
-    if (!Array.isArray(value.cities)) return null;
-    return {
-      version: Number(value.version ?? WEATHER_CITIES_PREFERENCE_VERSION),
-      cities: value.cities
-        .filter(isWeatherCityPreferenceItem)
-        .map((city) => ({ query: city.query.trim() }))
-        .filter((city) => city.query.length > 0),
-    };
+    return normalizeWeatherCitiesPreference(JSON.parse(raw) as unknown);
   } catch {
     return null;
   }
@@ -151,6 +141,56 @@ export function applyWeatherCitiesPreference(
     query,
     apiCity,
   );
+}
+
+export function chooseWeatherCitiesPreference(
+  first: WeatherCitiesPreferenceValue | null,
+  second: WeatherCitiesPreferenceValue | null,
+) {
+  if (!first) return second;
+  if (!second) return first;
+  const firstIsVersion2 = isVersion2WeatherCitiesPreference(first);
+  const secondIsVersion2 = isVersion2WeatherCitiesPreference(second);
+  if (firstIsVersion2 && secondIsVersion2) {
+    return getPreferenceTime(first) >= getPreferenceTime(second) ? first : second;
+  }
+  if (firstIsVersion2) return first;
+  if (secondIsVersion2) return second;
+  return null;
+}
+
+export function mergeLegacyWeatherCitiesPreferences(
+  first: WeatherCitiesPreferenceValue | null,
+  second: WeatherCitiesPreferenceValue | null,
+  updatedAt = new Date().toISOString(),
+): WeatherCitiesPreferenceValue {
+  return {
+    version: WEATHER_CITIES_PREFERENCE_VERSION,
+    updatedAt,
+    cities: normalizePreferenceCities([...(first?.cities ?? []), ...(second?.cities ?? [])]),
+  };
+}
+
+export function resolveWeatherCitiesPreference(
+  local: WeatherCitiesPreferenceValue | null,
+  remote: WeatherCitiesPreferenceValue | null,
+  updatedAt = new Date().toISOString(),
+) {
+  const chosen = chooseWeatherCitiesPreference(local, remote);
+  if (chosen) {
+    return {
+      preference: chosen,
+      shouldSaveLocal: remote === chosen && local !== chosen,
+      shouldSaveRemote: local === chosen && remote !== chosen,
+    };
+  }
+
+  const preference = mergeLegacyWeatherCitiesPreferences(local, remote, updatedAt);
+  return {
+    preference,
+    shouldSaveLocal: true,
+    shouldSaveRemote: true,
+  };
 }
 
 export function resolveWeatherCityListLabel(city: WeatherCityItem, selectedLocationLabel?: string) {
@@ -180,9 +220,7 @@ export function ensureWeatherCities(
   const existingCurrent = cities.find((city) => city.currentLocation);
   const queryIsCoordinate = isCoordinateWeatherQuery(query);
   const currentQuery = queryIsCoordinate ? query.trim() : existingCurrent?.query || query.trim();
-  const currentLabel = queryIsCoordinate
-    ? apiCity?.trim() || existingCurrent?.label || formatWeatherLocationLabel(query, apiCity)
-    : existingCurrent?.label || formatWeatherLocationLabel(query, apiCity);
+  const currentLabel = resolveCurrentWeatherCityLabel(currentQuery, apiCity, existingCurrent);
   const current: WeatherCityItem = {
     id: 'current',
     label: currentLabel,
@@ -217,6 +255,72 @@ export function removeWeatherCity(cities: WeatherCityItem[], id: string) {
 function hasCity(cities: WeatherCityItem[], query: string) {
   const normalized = query.trim().toLowerCase();
   return cities.some((city) => city.query.trim().toLowerCase() === normalized);
+}
+
+function normalizeWeatherCitiesPreference(value: unknown): WeatherCitiesPreferenceValue | null {
+  if (!value || typeof value !== 'object') return null;
+  const preference = value as Partial<WeatherCitiesPreferenceValue>;
+  if (!Array.isArray(preference.cities)) return null;
+  const version = Number(preference.version ?? 1);
+  const normalized: WeatherCitiesPreferenceValue = {
+    version: Number.isFinite(version) ? version : 1,
+    cities: normalizePreferenceCities(preference.cities),
+  };
+  if (typeof preference.updatedAt === 'string' && preference.updatedAt.trim()) {
+    normalized.updatedAt = preference.updatedAt.trim();
+  }
+  return normalized;
+}
+
+function createLegacyWeatherCitiesPreference(value: Array<Partial<WeatherCityItem>>) {
+  return {
+    version: 1,
+    cities: normalizePreferenceCities(
+      value
+        .filter((item) => !item.currentLocation && typeof item.query === 'string')
+        .map((item) => ({ query: item.query ?? '' })),
+    ),
+  };
+}
+
+function normalizePreferenceCities(cities: WeatherCityPreferenceItem[]) {
+  const seen = new Set<string>();
+  const next: WeatherCityPreferenceItem[] = [];
+  for (const city of cities) {
+    if (!isWeatherCityPreferenceItem(city)) continue;
+    const query = city.query.trim();
+    const key = query.toLowerCase();
+    if (!query || seen.has(key) || isCoordinateWeatherQuery(query)) continue;
+    seen.add(key);
+    next.push({ query });
+  }
+  return next;
+}
+
+function isVersion2WeatherCitiesPreference(value: WeatherCitiesPreferenceValue) {
+  return value.version >= WEATHER_CITIES_PREFERENCE_VERSION && Boolean(value.updatedAt);
+}
+
+function getPreferenceTime(value: WeatherCitiesPreferenceValue) {
+  const time = Date.parse(value.updatedAt ?? '');
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function resolveCurrentWeatherCityLabel(
+  query: string,
+  apiCity: string | undefined,
+  existingCurrent: WeatherCityItem | undefined,
+) {
+  const apiLabel = apiCity?.trim();
+  if (apiLabel) return apiLabel;
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const existingQuery = existingCurrent?.query.trim().toLowerCase();
+  if (existingQuery && existingQuery === normalizedQuery && existingCurrent?.label) {
+    return existingCurrent.label;
+  }
+
+  return formatWeatherLocationLabel(query, apiCity);
 }
 
 function isWeatherCityPreferenceItem(value: unknown): value is WeatherCityPreferenceItem {

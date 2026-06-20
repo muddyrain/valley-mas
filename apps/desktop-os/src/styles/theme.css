@@ -1,17 +1,67 @@
 :root {
-  /* ===== 毛毡风色板（与壁纸同源） ===== */
+  /* ===== Storybook miniature 色板（与壁纸、图标同源） ===== */
   --plush-cream: #f8f5ec;
   --plush-cream-soft: #fff9ee;
+  --plush-cream-deep: #efe2bf;
   --plush-sky: #a8d4ea;
+  --plush-sky-soft: #d8f0f8;
   --plush-sky-deep: #7fb8d6;
   --plush-sage: #8fb45e;
+  --plush-sage-soft: #d9e8b4;
   --plush-sage-deep: #6a9446;
   --plush-terracotta: #d97a4f;
+  --plush-terracotta-soft: #f2b28d;
   --plush-sand: #e8d4a8;
+  --plush-wood: #a86f42;
   --plush-pink: #f4a8b8;
   --plush-butter: #f4d97a;
   --plush-text: #5a4a3a;
   --plush-text-soft: #8a7a6a;
+
+  /* ===== shadcn/Tailwind 语义 token：只作为交互底座，不作为默认视觉方向 ===== */
+  --background: var(--plush-cream);
+  --foreground: var(--plush-text);
+  --card: var(--plush-panel);
+  --card-foreground: var(--plush-text);
+  --popover: var(--plush-popover);
+  --popover-foreground: var(--plush-text);
+  --primary: var(--plush-sage);
+  --primary-foreground: #fffdf5;
+  --secondary: var(--plush-field);
+  --secondary-foreground: var(--plush-text);
+  --muted: rgba(90, 74, 58, 0.08);
+  --muted-foreground: rgba(90, 74, 58, 0.62);
+  --accent: rgba(244, 217, 122, 0.34);
+  --accent-foreground: #4d3a20;
+  --destructive: #d95b4f;
+  --border: var(--plush-outline);
+  --input: var(--plush-field-outline);
+  --ring: var(--plush-focus);
+
+  /* ===== Storybook surfaces ===== */
+  --plush-surface: linear-gradient(180deg, rgba(255, 252, 241, 0.94), rgba(248, 239, 214, 0.9));
+  --plush-panel: rgba(255, 250, 236, 0.88);
+  --plush-panel-strong: rgba(255, 248, 225, 0.96);
+  --plush-popover: rgba(255, 250, 236, 0.96);
+  --plush-field: rgba(255, 255, 255, 0.58);
+  --plush-field-strong: rgba(255, 255, 255, 0.78);
+  --plush-outline: rgba(103, 82, 47, 0.14);
+  --plush-outline-strong: rgba(103, 82, 47, 0.24);
+  --plush-field-outline: rgba(126, 105, 70, 0.18);
+  --plush-focus: rgba(217, 122, 79, 0.44);
+  --plush-highlight: rgba(244, 217, 122, 0.68);
+  --plush-hover: rgba(255, 239, 198, 0.64);
+  --plush-grass-glow: rgba(143, 180, 94, 0.22);
+  --plush-sky-glow: rgba(168, 212, 234, 0.24);
+  --plush-sticker: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(255, 238, 194, 0.78));
+
+  /* ===== Storybook shape language ===== */
+  --shape-squircle-sm: 12px 15px 13px 16px;
+  --shape-squircle-md: 18px 22px 19px 24px;
+  --shape-squircle-lg: 28px 34px 30px 36px;
+  --shape-capsule: 999px;
+  --shape-sticker: 54% 46% 48% 52% / 45% 55% 45% 55%;
+  --shape-leaf: 58% 42% 54% 46% / 46% 58% 42% 54%;
 
   /* ===== 滚动条 ===== */
   --scrollbar-size: 10px;
@@ -26,17 +76,28 @@
   --btn-max: #8fcf76;
 
   /* ===== 阴影 ===== */
-  --shadow-soft: 0 2px 6px rgba(90, 74, 58, 0.08), 0 8px 24px rgba(90, 74, 58, 0.12);
-  --shadow-window: 0 4px 12px rgba(90, 74, 58, 0.12), 0 16px 48px rgba(90, 74, 58, 0.18);
-  --shadow-dock: 0 4px 16px rgba(90, 74, 58, 0.14), 0 12px 36px rgba(90, 74, 58, 0.18);
+  --shadow-soft: 0 3px 8px rgba(90, 74, 58, 0.08), 0 12px 26px rgba(90, 74, 58, 0.1);
+  --shadow-lifted: 0 16px 0 -9px rgba(143, 180, 94, 0.2), 0 20px 46px rgba(90, 74, 58, 0.14);
+  --shadow-window:
+    inset 0 1px 0 rgba(255, 255, 255, 0.64), 0 12px 0 -7px rgba(255, 255, 255, 0.34),
+    0 22px 0 -12px rgba(143, 180, 94, 0.24), 0 28px 60px rgba(90, 74, 58, 0.2);
+  --shadow-dock:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 8px 0 -4px rgba(244, 217, 122, 0.28),
+    0 20px 44px rgba(90, 74, 58, 0.18);
+  --shadow-popover:
+    inset 0 1px 0 rgba(255, 255, 255, 0.76), 0 10px 0 -6px rgba(244, 217, 122, 0.26),
+    0 22px 46px rgba(69, 52, 27, 0.16);
 
   /* ===== 圆角 ===== */
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 34px;
 
   /* ===== 缓动 ===== */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-toy: cubic-bezier(0.22, 1.28, 0.36, 1);
+  --motion-pop-fast: 150ms var(--ease-toy);
+  --motion-pop: 240ms var(--ease-toy);
 }

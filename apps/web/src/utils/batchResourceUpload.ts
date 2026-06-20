@@ -1,3 +1,5 @@
+import { limitFiles } from '@valley/browser-media';
+
 export const MAX_BATCH_RESOURCE_UPLOAD_IMAGES = 10;
 
 export type BatchResourceFileLimitResult<T> = {
@@ -13,15 +15,5 @@ export function limitBatchResourceFiles<T>(
   currentCount: number,
   maxCount = MAX_BATCH_RESOURCE_UPLOAD_IMAGES,
 ): BatchResourceFileLimitResult<T> {
-  const remainingSlots = Math.max(maxCount - currentCount, 0);
-  const accepted = files.slice(0, remainingSlots);
-  const rejectedCount = Math.max(files.length - accepted.length, 0);
-
-  return {
-    accepted,
-    remainingSlots,
-    rejectedCount,
-    exceededLimit: rejectedCount > 0,
-    alreadyAtLimit: remainingSlots === 0 && files.length > 0,
-  };
+  return limitFiles(files, currentCount, maxCount);
 }

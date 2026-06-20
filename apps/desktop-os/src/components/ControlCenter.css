@@ -126,3 +126,40 @@
   letter-spacing: 0.4px;
   padding: 2px 4px 0;
 }
+
+/* Storybook Design System v1 */
+.control-center {
+  border: 1px solid var(--plush-outline);
+  border-radius: var(--shape-squircle-lg);
+  background:
+    radial-gradient(circle at 16% 12%, rgba(255, 255, 255, 0.82), transparent 28%),
+    var(--plush-popover);
+  box-shadow: var(--shadow-popover);
+}
+
+.control-center__group,
+.control-center__sliders {
+  border-color: rgba(255, 255, 255, 0.68);
+  border-radius: var(--shape-squircle-md);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 248, 232, 0.42)),
+    rgba(255, 255, 255, 0.34);
+}
+
+.cc-tile {
+  border-radius: 13px 16px 14px 17px;
+}
+
+.cc-tile:hover {
+  background: var(--plush-hover);
+}
+
+.cc-tile__icon {
+  border-radius: var(--shape-sticker);
+  background: rgba(244, 217, 122, 0.34);
+}
+
+.cc-tile__icon.is-active {
+  background: linear-gradient(180deg, var(--plush-sky-soft), var(--plush-sky));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.54);
+}

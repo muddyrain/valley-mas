@@ -1,3 +1,5 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DESKTOP_APP_LIST,
@@ -9,8 +11,8 @@ import { useLaunchpadStore } from '../store/launchpadStore';
 import { useWindowStore } from '../store/windowStore';
 import './Launchpad.css';
 
-const CATEGORY_ORDER: DesktopAppCategory[] = ['system', 'content', 'tool', 'game'];
 const CLOSE_ANIMATION_MS = 260;
+const DEFAULT_METRICS = { pageSize: 15, columns: 5 };
 
 const CATEGORY_LABEL: Record<DesktopAppCategory, string> = {
   system: '系统',
@@ -21,19 +23,8 @@ const CATEGORY_LABEL: Record<DesktopAppCategory, string> = {
 
 export default function Launchpad() {
   const isOpen = useLaunchpadStore((s) => s.isOpen);
-  const query = useLaunchpadStore((s) => s.query);
-  const setQuery = useLaunchpadStore((s) => s.setQuery);
-  const close = useLaunchpadStore((s) => s.close);
-  const restoreOrFocus = useWindowStore((s) => s.restoreOrFocus);
-  const windows = useWindowStore((s) => s.windows);
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isClosing, setIsClosing] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [keyboardActive, setKeyboardActive] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const runningApps = useMemo(() => new Set(windows.map((w) => w.appId)), [windows]);
-
-  const apps = useMemo(() => filterApps(query), [query]);
 
   useEffect(() => {
     if (isOpen) {
@@ -51,13 +42,58 @@ export default function Launchpad() {
     return () => window.clearTimeout(timer);
   }, [isOpen, shouldRender]);
 
+  if (!shouldRender) return null;
+
+  return <LaunchpadPanel isOpen={isOpen} isClosing={isClosing} />;
+}
+
+interface LaunchpadPanelProps {
+  isOpen: boolean;
+  isClosing: boolean;
+}
+
+function LaunchpadPanel({ isOpen, isClosing }: LaunchpadPanelProps) {
+  const query = useLaunchpadStore((s) => s.query);
+  const setQuery = useLaunchpadStore((s) => s.setQuery);
+  const close = useLaunchpadStore((s) => s.close);
+  const restoreOrFocus = useWindowStore((s) => s.restoreOrFocus);
+  const runningAppIds = useWindowStore((s) => s.runningAppIds);
+  const shouldReduceMotion = useReducedMotion();
+  const { pageSize, columns } = useLaunchpadMetrics();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [keyboardActive, setKeyboardActive] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageDirection, setPageDirection] = useState(1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const runningApps = useMemo(() => new Set(runningAppIds), [runningAppIds]);
+
+  const apps = useMemo(() => filterApps(query), [query]);
+  const pages = useMemo(() => chunkApps(apps, pageSize), [apps, pageSize]);
+  const pageCount = pages.length;
+  const currentPage = pages[pageIndex] ?? [];
+  const pageStartIndex = pageIndex * pageSize;
+
   useEffect(() => {
     if (!isOpen) return;
     setActiveIndex(0);
     setKeyboardActive(false);
+    setPageIndex(0);
+    setPageDirection(1);
     const timer = window.setTimeout(() => inputRef.current?.focus(), 30);
     return () => window.clearTimeout(timer);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (apps.length === 0) {
+      setActiveIndex(0);
+      setPageIndex(0);
+      setKeyboardActive(false);
+      return;
+    }
+
+    setActiveIndex((current) => Math.min(current, apps.length - 1));
+    setPageIndex((current) => Math.min(current, Math.max(0, pageCount - 1)));
+  }, [apps.length, pageCount]);
 
   function openApp(app: DesktopApp) {
     restoreOrFocus(app.id, getDefaultWindowOptions(app.id));
@@ -67,13 +103,33 @@ export default function Launchpad() {
   function updateQuery(nextQuery: string) {
     setQuery(nextQuery);
     setActiveIndex(0);
+    setPageIndex(0);
+    setPageDirection(1);
     setKeyboardActive(false);
   }
 
   function moveActive(delta: number) {
     if (apps.length === 0) return;
+    const nextIndex = (activeIndex + delta + apps.length) % apps.length;
+    const nextPage = Math.floor(nextIndex / pageSize);
+    if (nextPage !== pageIndex) {
+      setPageDirection(nextPage > pageIndex ? 1 : -1);
+      setPageIndex(nextPage);
+    }
     setKeyboardActive(true);
-    setActiveIndex((index) => (index + delta + apps.length) % apps.length);
+    setActiveIndex(nextIndex);
+  }
+
+  function goToPage(nextPage: number) {
+    if (pageCount <= 1) return;
+    const normalizedPage = (nextPage + pageCount) % pageCount;
+    if (normalizedPage === pageIndex) return;
+    const isForward =
+      normalizedPage > pageIndex || (pageIndex === pageCount - 1 && normalizedPage === 0);
+    setPageDirection(isForward ? 1 : -1);
+    setPageIndex(normalizedPage);
+    setActiveIndex(normalizedPage * pageSize);
+    setKeyboardActive(false);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -82,14 +138,32 @@ export default function Launchpad() {
       close();
       return;
     }
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    if (e.key === 'ArrowRight') {
       e.preventDefault();
-      moveActive(1);
+      if (pageCount > 1) {
+        goToPage(pageIndex + 1);
+      } else {
+        moveActive(1);
+      }
       return;
     }
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      moveActive(-1);
+      if (pageCount > 1) {
+        goToPage(pageIndex - 1);
+      } else {
+        moveActive(-1);
+      }
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveActive(columns);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveActive(-columns);
       return;
     }
     if (e.key === 'Enter') {
@@ -99,20 +173,41 @@ export default function Launchpad() {
     }
   }
 
-  if (!shouldRender) return null;
-
   return (
-    <div
-      className={`launchpad ${isClosing ? 'is-closing' : 'is-open'}`}
+    <motion.div
+      className="launchpad"
+      initial={launchpadOverlayState(false, shouldReduceMotion)}
+      animate={launchpadOverlayState(!isClosing, shouldReduceMotion)}
+      transition={launchpadSpring(shouldReduceMotion)}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) close();
       }}
     >
-      <div className="launchpad__surface" role="dialog" aria-label="启动台">
-        <button type="button" className="launchpad__close" onClick={close} aria-label="关闭启动台">
+      <motion.div
+        className="launchpad__surface"
+        role="dialog"
+        aria-label="启动台"
+        initial={launchpadSurfaceState(false, shouldReduceMotion)}
+        animate={launchpadSurfaceState(!isClosing, shouldReduceMotion)}
+        transition={launchpadSpring(shouldReduceMotion)}
+      >
+        <motion.button
+          type="button"
+          className="launchpad__close"
+          onClick={close}
+          aria-label="关闭启动台"
+          initial={launchpadControlState(false, shouldReduceMotion)}
+          animate={launchpadControlState(!isClosing, shouldReduceMotion)}
+          transition={launchpadSpring(shouldReduceMotion, 0.04)}
+        >
           ×
-        </button>
-        <div className="launchpad__search">
+        </motion.button>
+        <motion.div
+          className="launchpad__search"
+          initial={launchpadControlState(false, shouldReduceMotion)}
+          animate={launchpadControlState(!isClosing, shouldReduceMotion)}
+          transition={launchpadSpring(shouldReduceMotion, 0.04)}
+        >
           <img src="/icons/launchpad.png" alt="" aria-hidden />
           <input
             ref={inputRef}
@@ -124,24 +219,51 @@ export default function Launchpad() {
             spellCheck={false}
             autoComplete="off"
           />
-        </div>
+        </motion.div>
 
         {apps.length === 0 ? (
           <div className="launchpad__empty">没有找到应用</div>
         ) : (
-          <div className="launchpad__groups">
-            {CATEGORY_ORDER.map((category) => {
-              const groupApps = apps.filter((app) => app.category === category);
-              if (groupApps.length === 0) return null;
-              return (
-                <section className="launchpad__group" key={category}>
-                  <div className="launchpad__group-title">
-                    <span>{CATEGORY_LABEL[category]}</span>
-                    <span>{groupApps.length}</span>
-                  </div>
+          <>
+            <div className="launchpad__stage">
+              {pageCount > 1 && (
+                <>
+                  <button
+                    type="button"
+                    className="launchpad__nav launchpad__nav--prev"
+                    onClick={() => goToPage(pageIndex - 1)}
+                    aria-label="上一页"
+                  >
+                    <ChevronLeft aria-hidden size={24} strokeWidth={2.6} />
+                  </button>
+                  <button
+                    type="button"
+                    className="launchpad__nav launchpad__nav--next"
+                    onClick={() => goToPage(pageIndex + 1)}
+                    aria-label="下一页"
+                  >
+                    <ChevronRight aria-hidden size={24} strokeWidth={2.6} />
+                  </button>
+                </>
+              )}
+              <AnimatePresence mode="wait" custom={pageDirection}>
+                <motion.div
+                  key={`${query}-${pageSize}-${pageIndex}`}
+                  className="launchpad__page"
+                  custom={{ direction: pageDirection, reduce: Boolean(shouldReduceMotion) }}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  variants={pageVariants}
+                  transition={
+                    shouldReduceMotion
+                      ? { duration: 0 }
+                      : { type: 'spring', stiffness: 420, damping: 38, mass: 0.82 }
+                  }
+                >
                   <div className="launchpad__grid">
-                    {groupApps.map((app) => {
-                      const index = apps.findIndex((item) => item.id === app.id);
+                    {currentPage.map((app, pageItemIndex) => {
+                      const index = pageStartIndex + pageItemIndex;
                       const isActive = keyboardActive && index === activeIndex;
                       const isRunning = runningApps.has(app.id);
                       return (
@@ -164,13 +286,28 @@ export default function Launchpad() {
                       );
                     })}
                   </div>
-                </section>
-              );
-            })}
-          </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {pageCount > 1 && (
+              <nav className="launchpad__pager" aria-label="启动台分页">
+                {pages.map((page, index) => (
+                  <button
+                    type="button"
+                    key={`${page[0]?.id ?? 'page'}-${index}`}
+                    className={`launchpad__dot ${index === pageIndex ? 'is-active' : ''}`}
+                    onClick={() => goToPage(index)}
+                    aria-label={`第 ${index + 1} 页`}
+                    aria-current={index === pageIndex ? 'page' : undefined}
+                  />
+                ))}
+              </nav>
+            )}
+          </>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -187,3 +324,97 @@ function filterApps(query: string) {
     );
   });
 }
+
+function chunkApps(apps: DesktopApp[], pageSize: number) {
+  const chunks: DesktopApp[][] = [];
+  for (let index = 0; index < apps.length; index += pageSize) {
+    chunks.push(apps.slice(index, index + pageSize));
+  }
+  return chunks;
+}
+
+function useLaunchpadMetrics() {
+  const [metrics, setMetrics] = useState(() => getLaunchpadMetrics());
+
+  useEffect(() => {
+    function syncMetrics() {
+      setMetrics(getLaunchpadMetrics());
+    }
+
+    window.addEventListener('resize', syncMetrics);
+    return () => window.removeEventListener('resize', syncMetrics);
+  }, []);
+
+  return metrics;
+}
+
+function getLaunchpadMetrics() {
+  if (typeof window === 'undefined') return DEFAULT_METRICS;
+  if (window.innerWidth <= 640) return { pageSize: 8, columns: 4 };
+  if (window.innerWidth <= 900) return { pageSize: 12, columns: 4 };
+  return DEFAULT_METRICS;
+}
+
+function launchpadOverlayState(open: boolean, reduce: boolean | null) {
+  if (reduce) return { opacity: open ? 1 : 0 };
+  return {
+    opacity: open ? 1 : 0,
+    filter: open ? 'blur(0px) saturate(1)' : 'blur(10px) saturate(0.9)',
+    scale: open ? 1 : 0.22,
+    y: open ? 0 : 42,
+  };
+}
+
+function launchpadSurfaceState(open: boolean, reduce: boolean | null) {
+  if (reduce) return { opacity: open ? 1 : 0 };
+  return {
+    opacity: open ? 1 : 0,
+    filter: open ? 'blur(0px)' : 'blur(8px)',
+    scale: open ? 1 : 0.72,
+    y: open ? 0 : 28,
+  };
+}
+
+function launchpadControlState(open: boolean, reduce: boolean | null) {
+  if (reduce) return { opacity: open ? 1 : 0 };
+  return {
+    opacity: open ? 1 : 0,
+    scale: open ? 1 : 0.86,
+    y: open ? 0 : 10,
+  };
+}
+
+function launchpadSpring(reduce: boolean | null, delay = 0) {
+  if (reduce) return { duration: 0 };
+  return { type: 'spring' as const, stiffness: 420, damping: 34, mass: 0.82, delay };
+}
+
+const pageVariants = {
+  enter: ({ direction, reduce }: { direction: number; reduce: boolean }) =>
+    reduce
+      ? { opacity: 1, x: 0 }
+      : {
+          opacity: 0,
+          filter: 'blur(5px)',
+          x: direction >= 0 ? 86 : -86,
+          scale: 0.985,
+        },
+  center: ({ reduce }: { direction: number; reduce: boolean }) =>
+    reduce
+      ? { opacity: 1, x: 0 }
+      : {
+          opacity: 1,
+          filter: 'blur(0px)',
+          x: 0,
+          scale: 1,
+        },
+  exit: ({ direction, reduce }: { direction: number; reduce: boolean }) =>
+    reduce
+      ? { opacity: 1, x: 0 }
+      : {
+          opacity: 0,
+          filter: 'blur(5px)',
+          x: direction >= 0 ? -86 : 86,
+          scale: 0.985,
+        },
+};

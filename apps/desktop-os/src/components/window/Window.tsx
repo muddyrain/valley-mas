@@ -1,29 +1,36 @@
-import { useRef, useState } from 'react';
-import { useWindowStore, type WindowState } from '../../store/windowStore';
+import { memo, useRef, useState } from 'react';
+import { renderDesktopApp } from '../../apps/appRenderers';
+import { getDesktopAppRuntimePolicy } from '../../apps/desktopApps';
+import { type AppId, useWindowStore, type WindowState } from '../../store/windowStore';
 import ResizeHandles from '../../ui/ResizeHandles';
 import TrafficLights from '../../ui/TrafficLights';
 import './Window.css';
 
 interface Props {
   state: WindowState;
-  children?: React.ReactNode;
+  appId: AppId;
 }
 
 const CLOSE_ANIM_MS = 220;
 
-export default function Window({ state, children }: Props) {
+function Window({ state, appId }: Props) {
   const closeWindow = useWindowStore((s) => s.closeWindow);
   const focusWindow = useWindowStore((s) => s.focusWindow);
   const moveWindow = useWindowStore((s) => s.moveWindow);
   const resizeWindow = useWindowStore((s) => s.resizeWindow);
   const minimizeWindow = useWindowStore((s) => s.minimizeWindow);
   const toggleMaximize = useWindowStore((s) => s.toggleMaximize);
-  const focusedId = useWindowStore((s) => s.focusedId);
+  const isFocused = useWindowStore((s) => s.focusedId === state.id);
 
-  const dragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
+  const dragRef = useRef<{
+    offsetX: number;
+    offsetY: number;
+    x: number;
+    y: number;
+    frame: number | null;
+  } | null>(null);
   const closingRef = useRef(false);
   const [isClosing, setIsClosing] = useState(false);
-  const isFocused = focusedId === state.id;
 
   function handleClose() {
     if (closingRef.current) return;
@@ -38,16 +45,29 @@ export default function Window({ state, children }: Props) {
     dragRef.current = {
       offsetX: e.clientX - state.x,
       offsetY: e.clientY - state.y,
+      x: state.x,
+      y: state.y,
+      frame: null,
+    };
+    const flushMove = () => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      drag.frame = null;
+      moveWindow(state.id, drag.x, drag.y);
     };
     const onMove = (ev: PointerEvent) => {
-      if (!dragRef.current) return;
-      moveWindow(
-        state.id,
-        ev.clientX - dragRef.current.offsetX,
-        Math.max(28, ev.clientY - dragRef.current.offsetY),
-      );
+      const drag = dragRef.current;
+      if (!drag) return;
+      drag.x = ev.clientX - drag.offsetX;
+      drag.y = Math.max(28, ev.clientY - drag.offsetY);
+      if (drag.frame === null) drag.frame = window.requestAnimationFrame(flushMove);
     };
     const onUp = () => {
+      const drag = dragRef.current;
+      if (drag && drag.frame !== null) {
+        window.cancelAnimationFrame(drag.frame);
+        moveWindow(state.id, drag.x, drag.y);
+      }
       dragRef.current = null;
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
@@ -85,7 +105,9 @@ export default function Window({ state, children }: Props) {
         <div className="window__title">{state.title}</div>
         <div className="window__titlebar-spacer" />
       </div>
-      <div className="window__body">{children}</div>
+      <div className="window__body">
+        <DesktopAppHost appId={appId} lifecycleState={state.lifecycleState} />
+      </div>
       {!state.maximized && !isClosing && (
         <ResizeHandles
           rect={{ x: state.x, y: state.y, width: state.width, height: state.height }}
@@ -96,3 +118,17 @@ export default function Window({ state, children }: Props) {
     </div>
   );
 }
+
+export default memo(Window);
+
+const DesktopAppHost = memo(function DesktopAppHost({
+  appId,
+  lifecycleState,
+}: {
+  appId: AppId;
+  lifecycleState: WindowState['lifecycleState'];
+}) {
+  const runtimePolicy = getDesktopAppRuntimePolicy(appId);
+  if (lifecycleState === 'minimized' && runtimePolicy === 'foreground-only') return null;
+  return <>{renderDesktopApp(appId)}</>;
+});

@@ -13,6 +13,7 @@ type Config struct {
 	TOS      TOSConfig
 	JWT      JWTConfig
 	SMTP     SMTPConfig
+	Mail     MailConfig
 	QWeather QWeatherConfig
 	WebPush  WebPushConfig
 	Holiday  HolidaySyncConfig
@@ -54,6 +55,15 @@ type SMTPConfig struct {
 	Pass        string
 	FromName    string
 	FromAddress string
+}
+
+type MailConfig struct {
+	SecretKey           string
+	PublicBaseURL       string
+	FrontendRedirectURL string
+	GmailClientID       string
+	GmailClientSecret   string
+	GmailRedirectURL    string
 }
 
 type QWeatherConfig struct {
@@ -127,6 +137,14 @@ func Load() *Config {
 			Pass:        getEnv("SMTP_PASS", ""),
 			FromName:    getEnv("SMTP_FROM_NAME", "Valley"),
 			FromAddress: getEnv("SMTP_FROM_ADDRESS", ""),
+		},
+		Mail: MailConfig{
+			SecretKey:           getEnv("MAIL_SECRET_KEY", ""),
+			PublicBaseURL:       strings.TrimRight(getEnv("MAIL_PUBLIC_BASE_URL", ""), "/"),
+			FrontendRedirectURL: getEnv("MAIL_FRONTEND_REDIRECT_URL", ""),
+			GmailClientID:       getEnv("GMAIL_CLIENT_ID", ""),
+			GmailClientSecret:   getEnv("GMAIL_CLIENT_SECRET", ""),
+			GmailRedirectURL:    getEnv("GMAIL_REDIRECT_URL", ""),
 		},
 		QWeather: QWeatherConfig{
 			APIKey:                 getEnv("QWEATHER_API_KEY", ""),

@@ -27,9 +27,14 @@ export default function ResizeHandles({
   onResize,
   onResizeStart,
 }: Props) {
-  const startRef = useRef<{ rect: Rect; clientX: number; clientY: number; edge: Edge } | null>(
-    null,
-  );
+  const startRef = useRef<{
+    rect: Rect;
+    clientX: number;
+    clientY: number;
+    edge: Edge;
+    next: Rect;
+    frame: number | null;
+  } | null>(null);
 
   function startResize(edge: Edge) {
     return (e: React.PointerEvent<HTMLDivElement>) => {
@@ -39,9 +44,17 @@ export default function ResizeHandles({
         clientX: e.clientX,
         clientY: e.clientY,
         edge,
+        next: { ...rect },
+        frame: null,
       };
       onResizeStart?.();
 
+      const flushResize = () => {
+        const state = startRef.current;
+        if (!state) return;
+        state.frame = null;
+        onResize(state.next);
+      };
       const onMove = (ev: PointerEvent) => {
         if (!startRef.current) return;
         const { rect: r, clientX, clientY, edge } = startRef.current;
@@ -72,9 +85,17 @@ export default function ResizeHandles({
           nh = minHeight;
         }
 
-        onResize({ x: nx, y: ny, width: nw, height: nh });
+        startRef.current.next = { x: nx, y: ny, width: nw, height: nh };
+        if (startRef.current.frame === null) {
+          startRef.current.frame = window.requestAnimationFrame(flushResize);
+        }
       };
       const onUp = () => {
+        const state = startRef.current;
+        if (state && state.frame !== null) {
+          window.cancelAnimationFrame(state.frame);
+          onResize(state.next);
+        }
         startRef.current = null;
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);

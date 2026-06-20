@@ -1,6 +1,7 @@
 export type DesktopAppId =
   | 'about'
   | 'finder'
+  | 'mail'
   | 'notes'
   | 'music'
   | 'weather'
@@ -9,6 +10,7 @@ export type DesktopAppId =
   | 'settings'
   | 'downloads'
   | 'account'
+  | 'aiTools'
   | 'calculator'
   | 'focus'
   | 'randomizer'
@@ -17,13 +19,20 @@ export type DesktopAppId =
   | 'textLab'
   | 'palette'
   | 'stopwatch'
+  | 'devTools'
+  | 'dailyTools'
   | 'plushMatch'
   | 'deskTidy'
   | 'beadSort'
   | 'plushGarden'
-  | 'cloudBounce';
+  | 'cloudBounce'
+  | 'diceCup'
+  | 'blockDrop'
+  | 'snake';
 
 export type DesktopAppCategory = 'system' | 'tool' | 'game' | 'content';
+export type DesktopAppRuntimePolicy = 'foreground-only' | 'background-allowed';
+export const DEFAULT_RUNTIME_POLICY = 'foreground-only' satisfies DesktopAppRuntimePolicy;
 
 export interface DesktopApp {
   id: DesktopAppId;
@@ -36,6 +45,7 @@ export interface DesktopApp {
   dockDefault: boolean;
   dockEligible?: boolean;
   dockRequired?: boolean;
+  runtimePolicy?: DesktopAppRuntimePolicy;
 }
 
 export const DESKTOP_APPS: Record<DesktopAppId, DesktopApp> = {
@@ -60,6 +70,16 @@ export const DESKTOP_APPS: Record<DesktopAppId, DesktopApp> = {
     dockDefault: true,
     dockRequired: true,
   },
+  mail: {
+    id: 'mail',
+    title: '邮件',
+    icon: '/icons/mail.png',
+    width: 860,
+    height: 560,
+    category: 'content',
+    keywords: ['mail', 'email', 'inbox', '邮件', '邮箱', '收件箱'],
+    dockDefault: true,
+  },
   notes: {
     id: 'notes',
     title: '便签',
@@ -79,6 +99,7 @@ export const DESKTOP_APPS: Record<DesktopAppId, DesktopApp> = {
     category: 'content',
     keywords: ['music', 'radio', '音乐', '播放'],
     dockDefault: true,
+    runtimePolicy: 'background-allowed',
   },
   weather: {
     id: 'weather',
@@ -134,11 +155,35 @@ export const DESKTOP_APPS: Record<DesktopAppId, DesktopApp> = {
     id: 'account',
     title: '账户',
     icon: '/icons/keychain.png',
-    width: 420,
-    height: 380,
+    width: 620,
+    height: 520,
     category: 'system',
     keywords: ['account', 'login', '账户', '登录'],
     dockDefault: true,
+  },
+  aiTools: {
+    id: 'aiTools',
+    title: 'AI Command Center',
+    icon: '/icons/stationery.png',
+    width: 780,
+    height: 560,
+    category: 'tool',
+    keywords: [
+      'ai',
+      'chat',
+      'summary',
+      'translate',
+      'rewrite',
+      'prompt',
+      'AI',
+      '对话',
+      '总结',
+      '翻译',
+      '改写',
+      '提示词',
+    ],
+    dockDefault: false,
+    dockEligible: true,
   },
   calculator: {
     id: 'calculator',
@@ -161,6 +206,7 @@ export const DESKTOP_APPS: Record<DesktopAppId, DesktopApp> = {
     keywords: ['focus', 'timer', 'pomodoro', '专注', '番茄钟'],
     dockDefault: false,
     dockEligible: true,
+    runtimePolicy: 'background-allowed',
   },
   randomizer: {
     id: 'randomizer',
@@ -228,6 +274,51 @@ export const DESKTOP_APPS: Record<DesktopAppId, DesktopApp> = {
     dockDefault: false,
     dockEligible: true,
   },
+  devTools: {
+    id: 'devTools',
+    title: '开发工具箱',
+    icon: '/icons/terminal.png',
+    width: 860,
+    height: 600,
+    category: 'tool',
+    keywords: [
+      'devtools',
+      'json',
+      'timestamp',
+      'base64',
+      'uuid',
+      'diff',
+      'csv',
+      '开发',
+      '工具箱',
+      '时间戳',
+      '编码',
+    ],
+    dockDefault: false,
+    dockEligible: true,
+  },
+  dailyTools: {
+    id: 'dailyTools',
+    title: '日常工具箱',
+    icon: '/icons/widgets.png',
+    width: 760,
+    height: 560,
+    category: 'tool',
+    keywords: [
+      'daily',
+      'password',
+      'date',
+      'image',
+      'bill',
+      '日常',
+      '密码',
+      '日期',
+      '图片',
+      '分账',
+    ],
+    dockDefault: false,
+    dockEligible: true,
+  },
   plushMatch: {
     id: 'plushMatch',
     title: '毛绒配对',
@@ -265,8 +356,8 @@ export const DESKTOP_APPS: Record<DesktopAppId, DesktopApp> = {
     id: 'plushGarden',
     title: '毛绒花园',
     icon: '/icons/eco-leaf.png',
-    width: 520,
-    height: 500,
+    width: 700,
+    height: 540,
     category: 'game',
     keywords: ['garden', 'plant', 'idle', '花园', '浇水', '小游戏'],
     dockDefault: false,
@@ -283,12 +374,49 @@ export const DESKTOP_APPS: Record<DesktopAppId, DesktopApp> = {
     dockDefault: false,
     dockEligible: true,
   },
+  diceCup: {
+    id: 'diceCup',
+    title: '骰盅',
+    icon: '/icons/lucky-bag.png',
+    width: 760,
+    height: 680,
+    category: 'game',
+    keywords: ['dice', 'cup', 'shake', '骰子', '骰盅', '摇骰', '喝酒'],
+    dockDefault: false,
+    dockEligible: true,
+  },
+  blockDrop: {
+    id: 'blockDrop',
+    title: '方块下落',
+    icon: '/icons/favorites-star.png',
+    width: 620,
+    height: 640,
+    category: 'game',
+    keywords: ['tetris', 'block', '俄罗斯方块', '方块', '消除', '小游戏'],
+    dockDefault: false,
+    dockEligible: true,
+  },
+  snake: {
+    id: 'snake',
+    title: '贪吃蛇',
+    icon: '/icons/eco-leaf.png',
+    width: 560,
+    height: 620,
+    category: 'game',
+    keywords: ['snake', 'arcade', '贪吃蛇', '街机', '小游戏'],
+    dockDefault: false,
+    dockEligible: true,
+  },
 };
 
 export const DESKTOP_APP_LIST = Object.values(DESKTOP_APPS);
 
 export function getDesktopApp(appId: DesktopAppId) {
   return DESKTOP_APPS[appId];
+}
+
+export function getDesktopAppRuntimePolicy(appId: DesktopAppId) {
+  return getDesktopApp(appId).runtimePolicy ?? DEFAULT_RUNTIME_POLICY;
 }
 
 export function getDefaultWindowOptions(appId: DesktopAppId) {

@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { useNotesStore } from '../store/notesStore';
 import { useWindowStore } from '../store/windowStore';
 import EmptyState from '../ui/EmptyState';
+import PlushLoading from '../ui/PlushLoading';
 import { getDefaultWindowOptions } from './desktopApps';
 import './NotesWindow.css';
 
@@ -104,7 +105,12 @@ export default function NotesWindow() {
         </div>
         <div className="notes-window__list">
           {loading ? (
-            <div className="notes-window__loading">同步中</div>
+            <PlushLoading
+              className="notes-window__loading"
+              title="同步中"
+              variant="inline"
+              size="sm"
+            />
           ) : notes.length === 0 && !isNewDraft ? (
             <EmptyState
               className="notes-window__empty"

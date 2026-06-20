@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const dockSource = readFileSync('apps/desktop-os/src/components/Dock.tsx', 'utf8');
-const dockStyles = readFileSync('apps/desktop-os/src/components/Dock.css', 'utf8');
+const dockSource = readFileSync('src/components/Dock.tsx', 'utf8');
+const dockStyles = readFileSync('src/components/Dock.css', 'utf8');
 
 describe('dock context menu surface', () => {
   it('uses a macOS-style grouped menu vocabulary', () => {
