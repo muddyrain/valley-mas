@@ -3,6 +3,8 @@ import { resourceToFinderItem } from '../finder/data';
 import { useBrowserStore } from '../store/browserStore';
 import { useResourceStore } from '../store/resourceStore';
 import EmptyState from '../ui/EmptyState';
+import PlushLoading from '../ui/PlushLoading';
+import { scheduleIdleWork } from '../utils/scheduleIdleWork';
 import './DockAppWindows.css';
 
 export default function SafariWindow() {
@@ -27,8 +29,9 @@ export default function SafariWindow() {
   const markEmbedLimited = useBrowserStore((s) => s.markEmbedLimited);
 
   useEffect(() => {
-    void loadResources();
-  }, [loadResources]);
+    if (currentUrl) return;
+    return scheduleIdleWork(() => void loadResources());
+  }, [currentUrl, loadResources]);
 
   useEffect(() => {
     if (!currentUrl || status !== 'loading') return;
@@ -119,11 +122,11 @@ export default function SafariWindow() {
           </div>
           <div className="safari-browser__shortcuts">
             {loading && (
-              <EmptyState
+              <PlushLoading
                 className="safari-browser__empty"
-                icon="⌁"
                 title="正在载入资源"
                 description="请稍候"
+                variant="panel"
               />
             )}
             {error && (

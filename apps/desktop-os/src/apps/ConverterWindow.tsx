@@ -7,6 +7,7 @@ import {
   getConverterGroup,
   getUnitLabel,
 } from '../tools/miniTools';
+import PlushSelect from '../ui/PlushSelect';
 import './MiniApps.css';
 
 export default function ConverterWindow() {
@@ -71,21 +72,19 @@ export default function ConverterWindow() {
           />
         </label>
         <div className="converter-card__units">
-          <select value={fromUnit} onChange={(e) => setFromUnit(e.target.value)}>
-            {group.units.map((unit) => (
-              <option key={unit.id} value={unit.id}>
-                {unit.label}
-              </option>
-            ))}
-          </select>
+          <PlushSelect
+            value={fromUnit}
+            onChange={setFromUnit}
+            ariaLabel="来源单位"
+            options={group.units.map((unit) => ({ value: unit.id, label: unit.label }))}
+          />
           <span>→</span>
-          <select value={toUnit} onChange={(e) => setToUnit(e.target.value)}>
-            {group.units.map((unit) => (
-              <option key={unit.id} value={unit.id}>
-                {unit.label}
-              </option>
-            ))}
-          </select>
+          <PlushSelect
+            value={toUnit}
+            onChange={setToUnit}
+            ariaLabel="目标单位"
+            options={group.units.map((unit) => ({ value: unit.id, label: unit.label }))}
+          />
         </div>
         <button type="button" className="converter-result" onClick={saveRecent}>
           {result === null ? '无法换算' : `${result} ${getUnitLabel(groupId, toUnit)}`}

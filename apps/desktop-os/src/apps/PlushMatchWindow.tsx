@@ -97,7 +97,14 @@ export default function PlushMatchWindow() {
             onClick={() => choose(card)}
             aria-label={card.matched ? '已配对' : '翻开卡片'}
           >
-            {card.revealed || card.matched ? <img src={card.image} alt="" /> : <span />}
+            <span className="match-card__inner">
+              <span className="match-card__face match-card__front">
+                <i />
+              </span>
+              <span className="match-card__face match-card__back">
+                <img src={card.image} alt="" />
+              </span>
+            </span>
           </button>
         ))}
       </fieldset>

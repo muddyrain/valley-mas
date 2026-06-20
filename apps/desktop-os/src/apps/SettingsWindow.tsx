@@ -41,6 +41,7 @@ export default function SettingsWindow() {
   const showDockItem = useDockStore((s) => s.showItem);
   const hideDockItem = useDockStore((s) => s.hideItem);
   const resetDockItems = useDockStore((s) => s.resetItems);
+  const dockSyncLabel = dockSaving ? '同步中' : dockSyncToken && !dockError ? '已同步' : '本地保存';
 
   return (
     <div className="dock-app-window settings-window">
@@ -53,7 +54,10 @@ export default function SettingsWindow() {
         <span className="dock-app-window__badge">{dnd ? '勿扰' : onlineLabel(isOnline)}</span>
       </header>
 
-      <section className="settings-window__grid" aria-label="连接与分享">
+      <section
+        className="settings-window__grid settings-window__status-grid"
+        aria-label="连接与分享"
+      >
         <SettingsStatus icon="📶" title="网络" subtitle={onlineLabel(isOnline)} active={isOnline} />
         <SettingsAction
           icon="🔷"
@@ -108,9 +112,7 @@ export default function SettingsWindow() {
       <section className="settings-window__dock" aria-label="Dock 设置">
         <div className="settings-window__section-row">
           <div className="settings-window__section-title">Dock</div>
-          <span className={`settings-window__sync ${dockError ? 'is-error' : ''}`}>
-            {dockError ? '同步失败' : dockSaving ? '同步中' : dockSyncToken ? '已同步' : '本地保存'}
-          </span>
+          <span className="settings-window__sync">{dockSyncLabel}</span>
           <button type="button" className="settings-window__plain-action" onClick={resetDockItems}>
             恢复默认
           </button>

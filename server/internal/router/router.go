@@ -83,6 +83,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 		api.POST("/login", handler.Login(cfg))
 		api.POST("/register", handler.Register(cfg))
 		api.POST("/email-code/send", handler.SendEmailVerificationCode(cfg))
+		api.GET("/user/mail/accounts/gmail/callback", handler.GmailOAuthCallback(cfg))
 		api.POST("/code/verify", handler.VerifyCode)
 		api.GET("/creator/:code/resources", middleware.OptionalAuth(cfg), handler.GetCreatorResources)
 
@@ -93,6 +94,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			user.GET("/info", handler.GetUserInfo)
 			user.GET("/preferences/:namespace", handler.GetUserPreference)
 			user.PUT("/preferences/:namespace", handler.UpsertUserPreference)
+			handler.RegisterUserMailRoutes(user, cfg)
 			user.POST("/refresh-token", handler.RefreshToken(cfg))
 			user.PUT("/profile", handler.UpdateMyProfile)
 			user.PUT("/password", handler.ChangePassword)

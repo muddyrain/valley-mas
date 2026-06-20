@@ -141,11 +141,7 @@
 }
 
 .notes-window__loading {
-  padding: 12px;
-  color: rgba(90, 74, 58, 0.58);
-  font-size: 12px;
-  font-weight: 700;
-  text-align: center;
+  margin: 8px;
 }
 
 .notes-window__empty {

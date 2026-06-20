@@ -24,6 +24,8 @@ export interface MusicPlaylist {
   trackIds: string[];
 }
 
+let runtimeMusicTracks: MusicTrack[] = [];
+
 const MORNING_LYRICS = `[00:00.00]云慢慢亮起来
 [00:15.00]把桌面调成柔和的光
 [00:31.00]今天先从一首歌开始
@@ -194,6 +196,13 @@ export const MUSIC_TRACKS: MusicTrack[] = [
 
 export const MUSIC_PLAYLISTS: MusicPlaylist[] = [
   {
+    id: 'audius-trending',
+    title: 'Audius Trending',
+    description: '来自 Audius 的公开趋势歌曲，更接近完整英文/独立音乐。',
+    coverUrl: '/icons/music.png',
+    trackIds: [],
+  },
+  {
     id: 'plush-radio',
     title: 'Plush Radio',
     description: '轻快、干净，适合打开桌面后的第一段背景音乐。',
@@ -227,8 +236,22 @@ export const PLAYABLE_MUSIC_TRACKS = MUSIC_TRACKS.filter((track) => track.audioU
 export const DEFAULT_MUSIC_TRACK_ID = PLAYABLE_MUSIC_TRACKS[0]?.id ?? MUSIC_TRACKS[0].id;
 export const DEFAULT_MUSIC_PLAYLIST_ID = MUSIC_TRACKS[0].playlistId;
 
+export function registerRuntimeMusicTracks(tracks: MusicTrack[]) {
+  const staticIds = new Set(MUSIC_TRACKS.map((track) => track.id));
+  const runtimeById = new Map(
+    [...runtimeMusicTracks, ...tracks]
+      .filter((track) => !staticIds.has(track.id))
+      .map((track) => [track.id, track]),
+  );
+  runtimeMusicTracks = [...runtimeById.values()];
+}
+
+export function getAllMusicTracks() {
+  return [...runtimeMusicTracks, ...MUSIC_TRACKS];
+}
+
 export function getMusicTrack(id: string) {
-  return MUSIC_TRACKS.find((track) => track.id === id) ?? MUSIC_TRACKS[0];
+  return getAllMusicTracks().find((track) => track.id === id) ?? getAllMusicTracks()[0];
 }
 
 export function getMusicPlaylist(id: string) {
@@ -237,6 +260,11 @@ export function getMusicPlaylist(id: string) {
 
 export function getPlaylistTracks(playlistId: string) {
   const playlist = getMusicPlaylist(playlistId);
+  if (playlist.trackIds.length === 0) {
+    return getAllMusicTracks().filter(
+      (track) => track.playlistId === playlist.id && track.audioUrl,
+    );
+  }
   return playlist.trackIds.map(getMusicTrack).filter((track) => track.audioUrl);
 }
 

@@ -3,6 +3,8 @@ import { useNotificationCenterStore } from '../store/notificationCenterStore';
 import { useToolStore } from '../store/toolStore';
 import './MiniApps.css';
 
+const PLOT_COUNT = 9;
+
 export default function PlushGardenWindow() {
   const garden = useToolStore((s) => s.plushGarden);
   const waterGarden = useToolStore((s) => s.waterPlushGarden);
@@ -40,42 +42,94 @@ export default function PlushGardenWindow() {
         <span className="dock-app-window__badge">{status}</span>
       </header>
 
-      <section className="garden-bed" aria-label="毛绒花园">
-        {Array.from({ length: 9 }).map((_, index) => (
-          <span key={`plot-${index}`} className={index < garden.blooms ? 'is-blooming' : ''} />
-        ))}
-      </section>
+      <div className="plush-garden-layout">
+        <section className="plush-farm-scene" aria-label="毛绒农场">
+          <div className="plush-farm-sky">
+            <span className="plush-cloud plush-cloud--left" />
+            <span className="plush-cloud plush-cloud--right" />
+          </div>
+          <div className="plush-farm-sun" />
+          <div className="plush-farm-hills" />
+          <div className="plush-farm-fence" aria-hidden="true">
+            {Array.from({ length: 9 }).map((_, index) => (
+              <span key={`fence-${index}`} />
+            ))}
+          </div>
+          <div className="plush-farm-yard">
+            <div className="plush-farm-shed">
+              <span className="plush-farm-shed__roof" />
+              <span className="plush-farm-shed__body" />
+            </div>
+            <div className="plush-farm-path" />
+            <div className="garden-bed">
+              {Array.from({ length: PLOT_COUNT }).map((_, index) => {
+                const isBlooming = index < garden.blooms;
+                const isWatered = !isBlooming && index < garden.water;
+                const cropClass = isBlooming
+                  ? ` garden-plot--crop-${(index % 3) + 1}`
+                  : isWatered
+                    ? ' garden-plot--sprout'
+                    : '';
+                return (
+                  <span
+                    key={`plot-${index}`}
+                    className={`garden-plot${isBlooming ? ' is-blooming' : ''}${isWatered ? ' is-watered' : ''}${cropClass}`}
+                    role="img"
+                    aria-label={isBlooming ? '开花地块' : isWatered ? '发芽地块' : '空地'}
+                  >
+                    <span className="garden-plot__soil" />
+                    <span className="garden-plot__plant" />
+                  </span>
+                );
+              })}
+            </div>
+            <div className="plush-farm-pond" />
+            <div className="plush-farm-crate" />
+            <ul className="plush-farm-decor-row" aria-label="已解锁装饰">
+              {garden.decorations.map((item, index) => (
+                <li
+                  key={item}
+                  className={`plush-farm-decor plush-farm-decor--${(index % 4) + 1}`}
+                  title={item}
+                />
+              ))}
+            </ul>
+          </div>
+        </section>
 
-      <div className="game-stats">
-        <span>水滴 {garden.water}</span>
-        <span>花朵 {garden.blooms}</span>
-        <span>装饰 {garden.decorations.length}</span>
+        <aside className="plush-garden-panel">
+          <div className="game-stats">
+            <span>水滴 {garden.water}</span>
+            <span>花朵 {garden.blooms}</span>
+            <span>装饰 {garden.decorations.length}</span>
+          </div>
+
+          <div className="plush-garden-actions">
+            <button type="button" className="dock-app-window__button" onClick={water}>
+              浇水
+            </button>
+            <button type="button" className="mini-app__secondary" onClick={harvest}>
+              开花
+            </button>
+            <button type="button" className="mini-app__secondary" onClick={resetGarden}>
+              重置
+            </button>
+          </div>
+
+          <section className="plush-garden-decor-panel">
+            <div className="mini-app__panel-head">
+              <span>装饰</span>
+            </div>
+            <div className="garden-decorations">
+              {garden.decorations.length === 0 ? (
+                <span className="mini-list__empty">暂无装饰</span>
+              ) : (
+                garden.decorations.map((item) => <span key={item}>{item}</span>)
+              )}
+            </div>
+          </section>
+        </aside>
       </div>
-
-      <div className="mini-actions">
-        <button type="button" className="dock-app-window__button" onClick={water}>
-          浇水
-        </button>
-        <button type="button" className="mini-app__secondary" onClick={harvest}>
-          开花
-        </button>
-        <button type="button" className="mini-app__secondary" onClick={resetGarden}>
-          重置
-        </button>
-      </div>
-
-      <section className="mini-app__panel">
-        <div className="mini-app__panel-head">
-          <span>装饰</span>
-        </div>
-        <div className="garden-decorations">
-          {garden.decorations.length === 0 ? (
-            <span className="mini-list__empty">暂无装饰</span>
-          ) : (
-            garden.decorations.map((item) => <span key={item}>{item}</span>)
-          )}
-        </div>
-      </section>
     </div>
   );
 }

@@ -7,6 +7,8 @@
   border: 1px solid rgba(90, 74, 58, 0.08);
   box-shadow: var(--shadow-window);
   overflow: visible;
+  outline: none;
+  isolation: isolate;
   animation: window-pop 0.32s var(--ease-spring);
   transform-origin: center center;
   transition:
@@ -14,6 +16,12 @@
     opacity 0.22s var(--ease-out),
     transform 0.22s var(--ease-out),
     filter 0.22s var(--ease-out);
+}
+
+.window:focus,
+.window:focus-visible,
+.window:focus-within {
+  outline: none;
 }
 
 @keyframes window-pop {
@@ -96,4 +104,74 @@
   padding: 18px;
   border-bottom-left-radius: var(--radius-lg);
   border-bottom-right-radius: var(--radius-lg);
+}
+
+/* Storybook Design System v1 */
+.window {
+  border: 1px solid var(--plush-outline);
+  border-color: rgba(126, 105, 70, 0.16);
+  border-radius: 24px 28px 22px 26px;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(255, 255, 255, 0.72), transparent 26%),
+    var(--plush-surface);
+  box-shadow:
+    0 20px 54px rgba(64, 49, 30, 0.16),
+    0 7px 18px rgba(64, 49, 30, 0.1);
+}
+
+.window::before {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+  content: "";
+  pointer-events: none;
+}
+
+.window.is-focused {
+  filter: saturate(1.03);
+  box-shadow:
+    0 24px 68px rgba(64, 49, 30, 0.18),
+    0 8px 22px rgba(64, 49, 30, 0.12),
+    0 0 0 4px rgba(168, 212, 234, 0.11);
+}
+
+.window.is-blurred {
+  box-shadow: var(--shadow-soft);
+  filter: saturate(0.92);
+}
+
+.window__titlebar {
+  height: 38px;
+  border-bottom: 1px solid rgba(126, 105, 70, 0.12);
+  border-top-left-radius: 23px;
+  border-top-right-radius: 27px;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 223, 0.96), rgba(239, 213, 156, 0.82)),
+    var(--plush-butter);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.window.is-blurred .window__titlebar {
+  background:
+    linear-gradient(180deg, rgba(255, 250, 235, 0.78), rgba(237, 225, 196, 0.72)),
+    var(--plush-cream-deep);
+}
+
+.window__title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #4a3924;
+}
+
+.window__body {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(168, 212, 234, 0.12), transparent 28%),
+    radial-gradient(circle at 0% 100%, rgba(143, 180, 94, 0.1), transparent 26%),
+    var(--plush-panel-strong);
+  border-bottom-left-radius: 22px;
+  border-bottom-right-radius: 25px;
 }

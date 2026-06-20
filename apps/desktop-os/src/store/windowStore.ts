@@ -18,12 +18,15 @@ export interface WindowRect {
   height: number;
 }
 
+export type WindowLifecycleState = 'active' | 'minimized' | 'closing';
+
 export interface WindowState extends WindowRect {
   id: string;
   appId: AppId;
   title: string;
   zIndex: number;
   minimized: boolean;
+  lifecycleState: WindowLifecycleState;
   maximized: boolean;
   // 保存最大化前的位置/尺寸，方便 restore
   prevRect?: WindowRect;
@@ -39,8 +42,12 @@ export interface OpenOptions {
 
 interface WindowStore {
   windows: WindowState[];
+  runningAppIds: AppId[];
+  visibleAppIds: AppId[];
+  activeAppIds: AppId[];
   topZ: number;
   focusedId: string | null;
+  focusedAppId: AppId | null;
   lastRects: Partial<Record<AppId, WindowRect>>;
 
   openWindow: (appId: AppId, options?: OpenOptions) => string;
@@ -62,10 +69,43 @@ const toRect = (windowState: WindowState): WindowRect => ({
   height: windowState.height,
 });
 
+export function deriveRunningAppIds(windows: WindowState[]) {
+  const appIds: AppId[] = [];
+  for (const windowState of windows) {
+    if (!appIds.includes(windowState.appId)) appIds.push(windowState.appId);
+  }
+  return appIds;
+}
+
+export function deriveVisibleAppIds(windows: WindowState[]) {
+  const appIds: AppId[] = [];
+  for (const windowState of windows) {
+    if (windowState.lifecycleState === 'minimized' || windowState.minimized) continue;
+    if (!appIds.includes(windowState.appId)) appIds.push(windowState.appId);
+  }
+  return appIds;
+}
+
+export function deriveActiveAppIds(windows: WindowState[]) {
+  return deriveVisibleAppIds(windows);
+}
+
+function deriveLifecycleAppState(windows: WindowState[]) {
+  return {
+    runningAppIds: deriveRunningAppIds(windows),
+    visibleAppIds: deriveVisibleAppIds(windows),
+    activeAppIds: deriveActiveAppIds(windows),
+  };
+}
+
 export const useWindowStore = create<WindowStore>((set, get) => ({
   windows: [],
+  runningAppIds: [],
+  visibleAppIds: [],
+  activeAppIds: [],
   topZ: 10,
   focusedId: null,
+  focusedAppId: null,
   lastRects: {},
 
   openWindow: (appId, options = {}) => {
@@ -79,24 +119,26 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
         state.windows.filter((w) => w.appId === appId).length,
         state.lastRects[appId],
       );
+      const nextWindow: WindowState = {
+        id,
+        appId,
+        title: options.title ?? appId,
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        zIndex: z,
+        minimized: false,
+        lifecycleState: 'active',
+        maximized: false,
+      };
+      const windows = [...state.windows, nextWindow];
       return {
         topZ: z,
         focusedId: id,
-        windows: [
-          ...state.windows,
-          {
-            id,
-            appId,
-            title: options.title ?? appId,
-            x: rect.x,
-            y: rect.y,
-            width: rect.width,
-            height: rect.height,
-            zIndex: z,
-            minimized: false,
-            maximized: false,
-          },
-        ],
+        focusedAppId: appId,
+        windows,
+        ...deriveLifecycleAppState(windows),
       };
     });
     return id;
@@ -112,18 +154,23 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
               null,
             )?.id ?? null)
           : state.focusedId;
-      return { windows: next, focusedId };
+      const focusedAppId = next.find((w) => w.id === focusedId)?.appId ?? null;
+      return { windows: next, focusedId, focusedAppId, ...deriveLifecycleAppState(next) };
     }),
 
   focusWindow: (id) =>
     set((state) => {
       const z = state.topZ + 1;
+      const focusedAppId = state.windows.find((w) => w.id === id)?.appId ?? state.focusedAppId;
+      const windows: WindowState[] = state.windows.map((w) =>
+        w.id === id ? { ...w, zIndex: z, minimized: false, lifecycleState: 'active' as const } : w,
+      );
       return {
         topZ: z,
         focusedId: id,
-        windows: state.windows.map((w) =>
-          w.id === id ? { ...w, zIndex: z, minimized: false } : w,
-        ),
+        focusedAppId,
+        windows,
+        ...deriveLifecycleAppState(windows),
       };
     }),
 
@@ -169,7 +216,9 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
 
   minimizeWindow: (id) =>
     set((state) => {
-      const next = state.windows.map((w) => (w.id === id ? { ...w, minimized: true } : w));
+      const next: WindowState[] = state.windows.map((w) =>
+        w.id === id ? { ...w, minimized: true, lifecycleState: 'minimized' as const } : w,
+      );
       const focusedId =
         state.focusedId === id
           ? (next.reduce<WindowState | null>(
@@ -177,7 +226,8 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
               null,
             )?.id ?? null)
           : state.focusedId;
-      return { windows: next, focusedId };
+      const focusedAppId = next.find((w) => w.id === focusedId)?.appId ?? null;
+      return { windows: next, focusedId, focusedAppId, ...deriveLifecycleAppState(next) };
     }),
 
   toggleMaximize: (id, viewport) =>

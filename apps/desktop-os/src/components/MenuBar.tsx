@@ -7,7 +7,8 @@ import { useLaunchpadStore } from '../store/launchpadStore';
 import { useNotificationCenterStore } from '../store/notificationCenterStore';
 import { useSpotlightStore } from '../store/spotlightStore';
 import { useWindowStore } from '../store/windowStore';
-import MusicMenuItem from './MusicMenuItem';
+import ClockGate from './ClockGate';
+import MusicMenuItemGate from './MusicMenuItem';
 import './MenuBar.css';
 
 type MenuKey = 'file' | 'edit' | 'view' | 'go' | 'window' | 'help';
@@ -35,20 +36,11 @@ const MENU_LABELS: Record<MenuKey, string> = {
 
 const MENU_KEYS = Object.keys(MENU_LABELS) as MenuKey[];
 
-function formatClock(d: Date) {
-  const week = ['日', '一', '二', '三', '四', '五', '六'];
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${m}月${day}日 周${week[d.getDay()]} ${hh}:${mm}`;
-}
-
 export default function MenuBar() {
-  const [now, setNow] = useState(() => new Date());
   const [appleMenuOpen, setAppleMenuOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<MenuKey | null>(null);
-  const focused = useWindowStore((s) => s.windows.find((w) => w.id === s.focusedId));
+  const focusedId = useWindowStore((s) => s.focusedId);
+  const focusedAppId = useWindowStore((s) => s.focusedAppId);
   const openWindow = useWindowStore((s) => s.openWindow);
   const closeWindow = useWindowStore((s) => s.closeWindow);
   const minimizeWindow = useWindowStore((s) => s.minimizeWindow);
@@ -65,11 +57,6 @@ export default function MenuBar() {
   const toggleNotificationCenter = useNotificationCenterStore((s) => s.toggle);
   const closeNotificationCenter = useNotificationCenterStore((s) => s.close);
   const unreadCount = useNotificationCenterStore((s) => s.unreadCount);
-
-  useEffect(() => {
-    const t = window.setInterval(() => setNow(new Date()), 30_000);
-    return () => window.clearInterval(t);
-  }, []);
 
   useEffect(() => {
     if (!appleMenuOpen && !activeMenu) return;
@@ -156,9 +143,9 @@ export default function MenuBar() {
     setActiveMenu((current) => (current === menu ? null : menu));
   }
 
-  const appName = focused ? getDesktopApp(focused.appId).title : getDesktopApp('finder').title;
+  const appName = getDesktopApp(focusedAppId ?? 'finder').title;
   const displayAppName = isLaunchpadOpen ? '启动台' : appName;
-  const hasFocusedWindow = Boolean(focused);
+  const hasFocusedWindow = Boolean(focusedId);
   const menuEntries: Record<MenuKey, MenuEntry[]> = {
     file: [
       { label: '新建 Finder 窗口', shortcut: '⌘N', action: () => openNewAppWindow('finder') },
@@ -168,9 +155,9 @@ export default function MenuBar() {
       {
         label: '关闭窗口',
         shortcut: '⌘W',
-        disabled: !focused,
+        disabled: !focusedId,
         action: () => {
-          if (focused) closeWindow(focused.id);
+          if (focusedId) closeWindow(focusedId);
           closeMenus();
         },
       },
@@ -236,18 +223,18 @@ export default function MenuBar() {
       {
         label: '最小化',
         shortcut: '⌘M',
-        disabled: !focused,
+        disabled: !focusedId,
         action: () => {
-          if (focused) minimizeWindow(focused.id);
+          if (focusedId) minimizeWindow(focusedId);
           closeMenus();
         },
       },
       {
         label: '前置当前窗口',
-        disabled: !focused,
+        disabled: !focusedAppId,
         action: () => {
           closeLaunchpad();
-          if (focused) restoreOrFocus(focused.appId, getDefaultWindowOptions(focused.appId));
+          if (focusedAppId) restoreOrFocus(focusedAppId, getDefaultWindowOptions(focusedAppId));
           closeMenus();
         },
       },
@@ -344,7 +331,7 @@ export default function MenuBar() {
         ))}
       </div>
       <div className="menu-bar__right">
-        <MusicMenuItem />
+        <MusicMenuItemGate />
         <button
           type="button"
           className={`menu-bar__btn menu-bar__btn--launchpad ${isLaunchpadOpen ? 'is-active' : ''}`}
@@ -372,15 +359,7 @@ export default function MenuBar() {
           <span className={bluetoothStatus === 'unsupported' ? 'is-dim' : ''}>🔷</span>
           <span>🔋</span>
         </button>
-        <button
-          type="button"
-          className="menu-bar__btn menu-bar__btn--clock"
-          onClick={handleNotificationCenter}
-          title="通知中心"
-        >
-          {formatClock(now)}
-          {unreadCount > 0 && <span className="menu-bar__badge">{Math.min(unreadCount, 99)}</span>}
-        </button>
+        <ClockGate unreadCount={unreadCount} onClick={handleNotificationCenter} />
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import {
   useCalendarStore,
 } from '../store/calendarStore';
 import { useNotificationCenterStore } from '../store/notificationCenterStore';
+import PlushSelect from '../ui/PlushSelect';
 import './CalendarWindow.css';
 
 type CalendarView = 'month' | 'week' | 'day';
@@ -355,39 +356,37 @@ export default function CalendarWindow() {
             <div className="calendar-window__time-row">
               <label className="calendar-field">
                 <span>分类</span>
-                <select
+                <PlushSelect
                   value={draft.category}
-                  onChange={(e) =>
+                  onChange={(value) =>
                     setDraft((current) => ({
                       ...current,
-                      category: e.target.value as CalendarEventCategory,
+                      category: value,
                     }))
                   }
-                >
-                  {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                  ariaLabel="日程分类"
+                  options={Object.entries(CATEGORY_LABELS).map(([value, label]) => ({
+                    value: value as CalendarEventCategory,
+                    label,
+                  }))}
+                />
               </label>
               <label className="calendar-field">
                 <span>提醒</span>
-                <select
-                  value={draft.reminderMinutes ?? 'none'}
-                  onChange={(e) =>
+                <PlushSelect
+                  value={String(draft.reminderMinutes ?? 'none')}
+                  onChange={(value) =>
                     setDraft((current) => ({
                       ...current,
-                      reminderMinutes: parseReminderValue(e.target.value),
+                      reminderMinutes: parseReminderValue(value),
                     }))
                   }
-                >
-                  {REMINDER_OPTIONS.map((option) => (
-                    <option key={option.value ?? 'none'} value={option.value ?? 'none'}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  ariaLabel="提醒时间"
+                  options={REMINDER_OPTIONS.map((option) => ({
+                    value: String(option.value ?? 'none'),
+                    label: option.label,
+                  }))}
+                />
               </label>
             </div>
             <label className="calendar-field">

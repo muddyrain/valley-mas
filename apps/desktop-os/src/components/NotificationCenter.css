@@ -322,10 +322,20 @@
   color: rgba(90, 74, 58, 0.55);
 }
 .widget-music__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin-bottom: 4px;
   color: var(--plush-sage-deep);
   font-size: 11px;
   font-weight: 700;
+}
+.widget-music__loading-icon {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  stroke-width: 2.6;
+  animation: widget-music-spin 0.72s linear infinite;
 }
 .widget-music__bar {
   height: 3px;
@@ -356,4 +366,44 @@
 }
 .widget-music__actions button:hover {
   background: rgba(143, 180, 94, 0.18);
+}
+
+@keyframes widget-music-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Storybook Design System v1 */
+.notification-center {
+  border: 1px solid var(--plush-outline);
+  border-radius: var(--shape-squircle-lg);
+  background:
+    radial-gradient(circle at 16% 12%, rgba(255, 255, 255, 0.82), transparent 28%),
+    var(--plush-popover);
+  box-shadow: var(--shadow-popover);
+}
+
+.nc__card,
+.widget {
+  border-color: rgba(255, 255, 255, 0.68);
+  border-radius: var(--shape-squircle-md);
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.62), transparent 28%),
+    rgba(255, 255, 255, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+}
+
+.nc__card-close {
+  border-radius: var(--shape-sticker);
+}
+
+.widget::before {
+  opacity: 0.24;
+}
+
+.widget-music__actions button,
+.widget-weather__actions button {
+  border-radius: var(--shape-capsule);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
 }

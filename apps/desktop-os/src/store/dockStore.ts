@@ -73,14 +73,6 @@ const SPECIAL_DOCK_ITEMS: Record<string, DockItemConfig> = {
     canOpenWindow: false,
     required: true,
   },
-  mail: {
-    id: 'mail',
-    label: '邮件',
-    icon: '/icons/mail.png',
-    visible: true,
-    pinned: true,
-    canOpenWindow: false,
-  },
   photos: {
     id: 'photos',
     label: '照片',
@@ -93,9 +85,10 @@ const SPECIAL_DOCK_ITEMS: Record<string, DockItemConfig> = {
     id: 'ai-tools',
     label: 'AI 工具',
     icon: '/icons/stationery.png',
+    appId: 'aiTools',
     visible: true,
     pinned: true,
-    canOpenWindow: false,
+    canOpenWindow: true,
   },
   appstore: {
     id: 'appstore',

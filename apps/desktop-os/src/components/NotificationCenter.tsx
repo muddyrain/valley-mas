@@ -1,6 +1,8 @@
+import { LoaderCircle } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { WeatherApiResponse } from '../api/weather';
 import { getDefaultWindowOptions } from '../apps/desktopApps';
+import { useDelayedFlag } from '../hooks/useDelayedFlag';
 import { getMusicTrack } from '../music/catalog';
 import { formatDuration } from '../music/lyrics';
 import { useAuthStore } from '../store/authStore';
@@ -16,6 +18,13 @@ import './NotificationCenter.css';
 
 export default function NotificationCenter() {
   const isOpen = useNotificationCenterStore((s) => s.isOpen);
+
+  if (!isOpen) return null;
+
+  return <NotificationCenterPanel />;
+}
+
+function NotificationCenterPanel() {
   const close = useNotificationCenterStore((s) => s.close);
   const notifications = useNotificationCenterStore((s) => s.notifications);
   const loading = useNotificationCenterStore((s) => s.loading);
@@ -36,6 +45,7 @@ export default function NotificationCenter() {
   const loadWeather = useWeatherStore((s) => s.loadWeather);
   const currentMusicId = useMusicStore((s) => s.currentTrackId);
   const musicPlaying = useMusicStore((s) => s.isPlaying);
+  const musicBuffering = useMusicStore((s) => s.isBuffering);
   const musicProgress = useMusicStore((s) => s.progress);
   const musicDuration = useMusicStore((s) => s.duration);
   const toggleMusic = useMusicStore((s) => s.togglePlay);
@@ -47,6 +57,8 @@ export default function NotificationCenter() {
   const deskTidyBest = useToolStore((s) => s.deskTidyBest);
   const beadSortBest = useToolStore((s) => s.beadSortBest);
   const cloudBounceBest = useToolStore((s) => s.cloudBounceBest);
+  const blockDropBest = useToolStore((s) => s.blockDropBest);
+  const snakeBest = useToolStore((s) => s.snakeBest);
   const clipboardSnippets = useToolStore((s) => s.clipboardSnippets);
   const converterRecent = useToolStore((s) => s.converterRecent);
   const paletteColors = useToolStore((s) => s.paletteColors);
@@ -55,13 +67,11 @@ export default function NotificationCenter() {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
     void loadWeather();
     if (isAuthenticated && token) void loadNotifications(token);
-  }, [isOpen, isAuthenticated, loadNotifications, loadWeather, token]);
+  }, [isAuthenticated, loadNotifications, loadWeather, token]);
 
   useEffect(() => {
-    if (!isOpen) return;
     function onPointerDown(e: PointerEvent) {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         close();
@@ -76,13 +86,12 @@ export default function NotificationCenter() {
       window.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('keydown', onKey);
     };
-  }, [isOpen, close]);
+  }, [close]);
 
   const today = formatToday(new Date());
   const visibleNotifications = dnd ? [] : notifications.filter((item) => !item.isRead);
   const currentMusic = getMusicTrack(currentMusicId);
-
-  if (!isOpen) return null;
+  const musicLoadingVisible = useDelayedFlag(musicBuffering);
 
   return (
     <div ref={panelRef} className="notification-center" role="dialog" aria-label="通知中心">
@@ -144,6 +153,7 @@ export default function NotificationCenter() {
               weatherError={weatherError}
               currentMusic={currentMusic}
               musicPlaying={musicPlaying}
+              musicBuffering={musicLoadingVisible}
               musicProgress={musicProgress}
               musicDuration={musicDuration}
               focusMode={focusMode}
@@ -154,6 +164,8 @@ export default function NotificationCenter() {
               deskTidyBest={deskTidyBest}
               beadSortBest={beadSortBest}
               cloudBounceBest={cloudBounceBest}
+              blockDropBest={blockDropBest}
+              snakeBest={snakeBest}
               clipboardSnippets={clipboardSnippets.length}
               converterRecent={converterRecent.length}
               paletteColors={paletteColors.length}
@@ -207,6 +219,7 @@ interface WidgetCardProps {
   weatherError: string | null;
   currentMusic: ReturnType<typeof getMusicTrack>;
   musicPlaying: boolean;
+  musicBuffering: boolean;
   musicProgress: number;
   musicDuration: number;
   focusMode: ReturnType<typeof useToolStore.getState>['focusMode'];
@@ -217,6 +230,8 @@ interface WidgetCardProps {
   deskTidyBest: ReturnType<typeof useToolStore.getState>['deskTidyBest'];
   beadSortBest: ReturnType<typeof useToolStore.getState>['beadSortBest'];
   cloudBounceBest: ReturnType<typeof useToolStore.getState>['cloudBounceBest'];
+  blockDropBest: ReturnType<typeof useToolStore.getState>['blockDropBest'];
+  snakeBest: ReturnType<typeof useToolStore.getState>['snakeBest'];
   clipboardSnippets: number;
   converterRecent: number;
   paletteColors: number;
@@ -237,6 +252,7 @@ function WidgetCard({
   weatherError,
   currentMusic,
   musicPlaying,
+  musicBuffering,
   musicProgress,
   musicDuration,
   focusMode,
@@ -247,6 +263,8 @@ function WidgetCard({
   deskTidyBest,
   beadSortBest,
   cloudBounceBest,
+  blockDropBest,
+  snakeBest,
   clipboardSnippets,
   converterRecent,
   paletteColors,
@@ -274,6 +292,7 @@ function WidgetCard({
           weatherError={weatherError}
           currentMusic={currentMusic}
           musicPlaying={musicPlaying}
+          musicBuffering={musicBuffering}
           musicProgress={musicProgress}
           musicDuration={musicDuration}
           focusMode={focusMode}
@@ -284,6 +303,8 @@ function WidgetCard({
           deskTidyBest={deskTidyBest}
           beadSortBest={beadSortBest}
           cloudBounceBest={cloudBounceBest}
+          blockDropBest={blockDropBest}
+          snakeBest={snakeBest}
           clipboardSnippets={clipboardSnippets}
           converterRecent={converterRecent}
           paletteColors={paletteColors}
@@ -308,6 +329,7 @@ function WidgetBody({
   weatherError,
   currentMusic,
   musicPlaying,
+  musicBuffering,
   musicProgress,
   musicDuration,
   focusMode,
@@ -318,6 +340,8 @@ function WidgetBody({
   deskTidyBest,
   beadSortBest,
   cloudBounceBest,
+  blockDropBest,
+  snakeBest,
   clipboardSnippets,
   converterRecent,
   paletteColors,
@@ -370,8 +394,18 @@ function WidgetBody({
         <div className="widget-music">
           <div className="widget-music__track">{currentMusic.title}</div>
           <div className="widget-music__artist">{currentMusic.artist}</div>
-          <div className="widget-music__state">
-            {musicPlaying ? '播放中' : currentMusic.mood} · {formatDuration(musicProgress)}
+          <div className={`widget-music__state ${musicBuffering ? 'is-loading' : ''}`}>
+            {musicBuffering ? (
+              <>
+                <LoaderCircle className="widget-music__loading-icon" aria-hidden />
+                加载中
+              </>
+            ) : musicPlaying ? (
+              '播放中'
+            ) : (
+              currentMusic.mood
+            )}{' '}
+            · {formatDuration(musicProgress)}
           </div>
           <div className="widget-music__bar">
             <div
@@ -383,7 +417,7 @@ function WidgetBody({
           </div>
           <div className="widget-music__actions">
             <button type="button" onClick={onToggleMusic}>
-              {musicPlaying ? '暂停' : '播放'}
+              {musicBuffering ? '加载中' : musicPlaying ? '暂停' : '播放'}
             </button>
             <button type="button" onClick={onOpenMusic}>
               打开
@@ -429,10 +463,20 @@ function WidgetBody({
       return (
         <div className="widget-games">
           <div className="widget-games__score">
-            {formatMiniGameScore(cloudBounceBest?.score, deskTidyBest?.score)}
+            {formatMiniGameScore(
+              blockDropBest?.score,
+              snakeBest?.score,
+              cloudBounceBest?.score,
+              deskTidyBest?.score,
+            )}
           </div>
           <div className="widget-games__hint">
-            {formatMiniGameHint(beadSortBest?.moves, plushGardenBlooms, plushMatchBest?.moves)}
+            {formatMiniGameHint(
+              snakeBest?.length,
+              beadSortBest?.moves,
+              plushGardenBlooms,
+              plushMatchBest?.moves,
+            )}
           </div>
         </div>
       );
@@ -468,12 +512,23 @@ function getWeatherHint(weather: WeatherApiResponse | null, error: string | null
   return `最高 ${high} / 最低 ${low}`;
 }
 
-function formatMiniGameScore(cloudScore?: number, tidyScore?: number) {
-  const score = cloudScore ?? tidyScore;
+function formatMiniGameScore(
+  blockScore?: number,
+  snakeScore?: number,
+  cloudScore?: number,
+  tidyScore?: number,
+) {
+  const score = blockScore ?? snakeScore ?? cloudScore ?? tidyScore;
   return score ? `${score} 分` : '暂无';
 }
 
-function formatMiniGameHint(beadMoves?: number, gardenBlooms = 0, matchMoves?: number) {
+function formatMiniGameHint(
+  snakeLength?: number,
+  beadMoves?: number,
+  gardenBlooms = 0,
+  matchMoves?: number,
+) {
+  if (snakeLength) return `贪吃蛇 ${snakeLength} 节`;
   if (beadMoves) return `色珠 ${beadMoves} 步`;
   if (gardenBlooms > 0) return `花园 ${gardenBlooms} 朵`;
   if (matchMoves) return `配对 ${matchMoves} 步`;

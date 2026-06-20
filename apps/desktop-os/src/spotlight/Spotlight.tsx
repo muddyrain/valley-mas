@@ -1,3 +1,4 @@
+import { Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getDefaultWindowOptions } from '../apps/desktopApps';
 import { useBrowserStore } from '../store/browserStore';
@@ -8,13 +9,19 @@ import { useWindowStore } from '../store/windowStore';
 import { type SpotlightItem, searchSpotlight } from './data';
 import './Spotlight.css';
 
-export default function Spotlight() {
+export default function SpotlightGate() {
   const isOpen = useSpotlightStore((s) => s.isOpen);
+  if (!isOpen) return null;
+  return <SpotlightPanel />;
+}
+
+function SpotlightPanel() {
   const close = useSpotlightStore((s) => s.close);
   const revealFinderItem = useFinderStore((s) => s.revealItem);
   const openBrowserUrl = useBrowserStore((s) => s.openUrl);
   const restoreOrFocus = useWindowStore((s) => s.restoreOrFocus);
   const resources = useResourceStore((s) => s.resources);
+  const loadResources = useResourceStore((s) => s.loadResources);
 
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -23,14 +30,10 @@ export default function Spotlight() {
   const results = useMemo(() => searchSpotlight(query, resources), [query, resources]);
 
   useEffect(() => {
-    if (!isOpen) {
-      setQuery('');
-      setActiveIndex(0);
-      return;
-    }
+    void loadResources();
     const t = window.setTimeout(() => inputRef.current?.focus(), 30);
     return () => window.clearTimeout(t);
-  }, [isOpen]);
+  }, [loadResources]);
 
   function updateQuery(next: string) {
     setQuery(next);
@@ -82,8 +85,6 @@ export default function Spotlight() {
     }
   }
 
-  if (!isOpen) return null;
-
   return (
     <div
       className="spotlight"
@@ -91,11 +92,13 @@ export default function Spotlight() {
         if (e.target === e.currentTarget) close();
       }}
     >
-      <div className="spotlight__panel" role="dialog" aria-label="Spotlight 搜索">
+      <div
+        className={`spotlight__panel ${results.length > 0 ? 'has-results' : 'is-empty'}`}
+        role="dialog"
+        aria-label="Spotlight 搜索"
+      >
         <div className="spotlight__searchbar">
-          <span className="spotlight__icon" aria-hidden>
-            🔍
-          </span>
+          <Search className="spotlight__icon" aria-hidden size={22} strokeWidth={2.4} />
           <input
             ref={inputRef}
             className="spotlight__input"

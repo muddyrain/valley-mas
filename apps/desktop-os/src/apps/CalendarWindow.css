@@ -678,7 +678,6 @@
 }
 
 .calendar-field input,
-.calendar-field select,
 .calendar-field textarea {
   width: 100%;
   border: 1px solid rgba(90, 74, 58, 0.1);
@@ -694,9 +693,8 @@
   padding: 0 10px;
 }
 
-.calendar-field select {
-  height: 34px;
-  padding: 0 10px;
+.calendar-field .plush-select {
+  width: 100%;
 }
 
 .calendar-field input:disabled {
@@ -711,7 +709,6 @@
 }
 
 .calendar-field input:focus,
-.calendar-field select:focus,
 .calendar-field textarea:focus {
   border-color: rgba(168, 212, 234, 0.78);
   box-shadow: 0 0 0 3px rgba(168, 212, 234, 0.22);

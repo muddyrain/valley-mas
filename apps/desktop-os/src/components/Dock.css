@@ -218,9 +218,9 @@
 
 .dock-menu__chevron {
   margin-left: auto;
+  width: 14px;
+  height: 14px;
   color: currentColor;
-  font-size: 15px;
-  line-height: 1;
 }
 
 .dock-menu__submenu {
@@ -294,4 +294,67 @@
     animation: none;
     transition: none;
   }
+}
+
+/* Storybook Design System v1 */
+.dock {
+  padding: 7px 16px 9px;
+  border-color: rgba(255, 255, 255, 0.72);
+  border-radius: 30px 36px 32px 38px;
+  background:
+    radial-gradient(circle at 14% 16%, rgba(255, 255, 255, 0.7), transparent 24%),
+    linear-gradient(180deg, rgba(255, 251, 238, 0.76), rgba(239, 213, 156, 0.54)),
+    rgba(255, 249, 232, 0.64);
+  box-shadow: var(--shadow-dock);
+}
+
+.dock::before {
+  position: absolute;
+  inset: 5px 10px auto;
+  height: 12px;
+  border-radius: var(--shape-capsule);
+  background: rgba(255, 255, 255, 0.34);
+  content: "";
+  pointer-events: none;
+}
+
+.dock__btn {
+  border-radius: var(--shape-sticker);
+}
+
+.dock__btn:hover {
+  background: transparent;
+}
+
+.dock__tooltip {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(74, 57, 33, 0.86);
+  box-shadow: var(--shadow-soft);
+}
+
+.dock__indicator.is-on {
+  background: var(--plush-terracotta);
+  box-shadow: 0 0 0 3px rgba(217, 122, 79, 0.13);
+}
+
+.dock-menu,
+.dock-menu__submenu {
+  border: 1px solid var(--plush-outline);
+  border-radius: var(--shape-squircle-md);
+  background:
+    radial-gradient(circle at 16% 12%, rgba(255, 255, 255, 0.82), transparent 26%),
+    var(--plush-popover);
+  box-shadow: var(--shadow-popover);
+}
+
+.dock-menu__item {
+  min-height: 28px;
+  border-radius: 11px 14px 12px 15px;
+}
+
+.dock-menu__item:hover,
+.dock-menu__submenu-shell:focus-within > .dock-menu__item,
+.dock-menu__submenu-shell:hover > .dock-menu__item {
+  background: linear-gradient(180deg, rgba(255, 239, 198, 0.92), rgba(244, 217, 122, 0.72));
+  color: #4a3516;
 }

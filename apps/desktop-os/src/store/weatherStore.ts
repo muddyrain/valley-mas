@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { DEFAULT_WEATHER_CITY, fetchDesktopWeather, type WeatherApiResponse } from '../api/weather';
 
 const WEATHER_CACHE_MS = 10 * 60 * 1000;
+const COARSE_LOCATION_ACCURACY_METERS = 20_000;
 
 interface WeatherCacheEntry {
   weather: WeatherApiResponse;
@@ -18,6 +19,7 @@ interface WeatherStore {
   error: string | null;
   lastLoadedAt: number | null;
   loadWeather: (refresh?: boolean) => Promise<void>;
+  relocateWeather: () => Promise<void>;
   prefetchWeather: (city: string) => Promise<void>;
   setCity: (city: string) => void;
 }
@@ -90,6 +92,49 @@ export const useWeatherStore = create<WeatherStore>((set, get) => ({
     }
   },
 
+  relocateWeather: async () => {
+    const state = get();
+    if (state.loading || state.locating) return;
+    const requestId = ++weatherRequestSeq;
+
+    set({ loading: true, locating: true, locationAttempted: true, error: null });
+    try {
+      const location = await getBrowserWeatherLocation();
+      if (requestId !== weatherRequestSeq) return;
+      if (!location) {
+        throw new Error('定位失败');
+      }
+
+      const cacheKey = getWeatherCacheKey(location);
+      const weather = await fetchDesktopWeather(location, { refresh: true });
+      if (requestId !== weatherRequestSeq) return;
+      const loadedAt = Date.now();
+      set((current) => ({
+        city: location,
+        weather,
+        loading: false,
+        locating: false,
+        error: null,
+        lastLoadedAt: loadedAt,
+        weatherCache: {
+          ...current.weatherCache,
+          [cacheKey]: {
+            weather,
+            lastLoadedAt: loadedAt,
+          },
+        },
+      }));
+    } catch (error) {
+      if (requestId !== weatherRequestSeq) return;
+      set({
+        loading: false,
+        locating: false,
+        locationAttempted: true,
+        error: error instanceof Error ? error.message : '定位失败',
+      });
+    }
+  },
+
   setCity: (city) => {
     const nextCity = city.trim() || DEFAULT_WEATHER_CITY;
     const current = get();
@@ -153,22 +198,54 @@ export function getWeatherCacheKey(city: string) {
   return (city.trim() || DEFAULT_WEATHER_CITY).toLowerCase();
 }
 
-function getBrowserWeatherLocation() {
+interface BrowserWeatherLocation {
+  query: string;
+  accuracy: number;
+}
+
+async function getBrowserWeatherLocation() {
   if (!('geolocation' in navigator)) return Promise.resolve<string | null>(null);
 
-  return new Promise<string | null>((resolve) => {
+  const precise = await requestBrowserWeatherLocation({
+    enableHighAccuracy: true,
+    maximumAge: 0,
+    timeout: 8_000,
+  });
+  if (precise && precise.accuracy <= COARSE_LOCATION_ACCURACY_METERS) {
+    return precise.query;
+  }
+
+  const fallback = await requestBrowserWeatherLocation({
+    enableHighAccuracy: false,
+    maximumAge: 2 * 60 * 1000,
+    timeout: 4_000,
+  });
+  const best = chooseMoreAccurateLocation(precise, fallback);
+  return best?.query ?? null;
+}
+
+function requestBrowserWeatherLocation(options: PositionOptions) {
+  return new Promise<BrowserWeatherLocation | null>((resolve) => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const longitude = position.coords.longitude.toFixed(4);
         const latitude = position.coords.latitude.toFixed(4);
-        resolve(`${longitude},${latitude}`);
+        resolve({
+          query: `${longitude},${latitude}`,
+          accuracy: position.coords.accuracy,
+        });
       },
       () => resolve(null),
-      {
-        enableHighAccuracy: false,
-        maximumAge: 30 * 60 * 1000,
-        timeout: 5000,
-      },
+      options,
     );
   });
+}
+
+function chooseMoreAccurateLocation(
+  first: BrowserWeatherLocation | null,
+  second: BrowserWeatherLocation | null,
+) {
+  if (!first) return second;
+  if (!second) return first;
+  return second.accuracy < first.accuracy ? second : first;
 }

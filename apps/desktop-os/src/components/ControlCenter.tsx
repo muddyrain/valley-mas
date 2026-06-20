@@ -6,6 +6,13 @@ import './ControlCenter.css';
 
 export default function ControlCenter() {
   const isOpen = useControlCenterStore((s) => s.isOpen);
+
+  if (!isOpen) return null;
+
+  return <ControlCenterPanel />;
+}
+
+function ControlCenterPanel() {
   const close = useControlCenterStore((s) => s.close);
   const isOnline = useControlCenterStore((s) => s.isOnline);
   const bluetoothStatus = useControlCenterStore((s) => s.bluetoothStatus);
@@ -22,7 +29,6 @@ export default function ControlCenter() {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
     function onPointerDown(e: PointerEvent) {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         close();
@@ -37,9 +43,7 @@ export default function ControlCenter() {
       window.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('keydown', onKey);
     };
-  }, [isOpen, close]);
-
-  if (!isOpen) return null;
+  }, [close]);
 
   return (
     <div ref={panelRef} className="control-center" role="dialog" aria-label="控制中心">

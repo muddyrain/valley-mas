@@ -73,6 +73,15 @@ const SQUARE_GAME_PROFILE: WindowProfile = {
   heightRatio: 0.66,
 };
 
+const DICE_CUP_PROFILE: WindowProfile = {
+  minWidth: 760,
+  minHeight: 680,
+  maxWidth: 820,
+  maxHeight: 760,
+  widthRatio: 0.64,
+  heightRatio: 0.84,
+};
+
 const APP_WINDOW_PROFILES: Partial<Record<DesktopAppId, WindowProfile>> = {
   finder: LARGE_PROFILE,
   safari: LARGE_PROFILE,
@@ -82,6 +91,8 @@ const APP_WINDOW_PROFILES: Partial<Record<DesktopAppId, WindowProfile>> = {
   settings: MEDIUM_PROFILE,
   downloads: MEDIUM_PROFILE,
   notes: MEDIUM_PROFILE,
+  devTools: MEDIUM_PROFILE,
+  dailyTools: MEDIUM_PROFILE,
   deskTidy: SQUARE_GAME_PROFILE,
   plushMatch: SQUARE_GAME_PROFILE,
   about: COMPACT_PROFILE,
@@ -97,6 +108,9 @@ const APP_WINDOW_PROFILES: Partial<Record<DesktopAppId, WindowProfile>> = {
   beadSort: SQUARE_GAME_PROFILE,
   plushGarden: COMPACT_PROFILE,
   cloudBounce: SQUARE_GAME_PROFILE,
+  diceCup: DICE_CUP_PROFILE,
+  blockDrop: SQUARE_GAME_PROFILE,
+  snake: SQUARE_GAME_PROFILE,
 };
 
 function clamp(value: number, min: number, max: number) {

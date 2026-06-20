@@ -6,12 +6,14 @@ export default function FocusTimerRuntime() {
   const pushNotification = useNotificationCenterStore((s) => s.pushNotification);
   const syncFocusTimer = useToolStore((s) => s.syncFocusTimer);
   const lastFocusCompletion = useToolStore((s) => s.lastFocusCompletion);
+  const focusStatus = useToolStore((s) => s.focusStatus);
   const notifiedRef = useRef<string | null>(lastFocusCompletion?.id ?? null);
 
   useEffect(() => {
+    if (focusStatus !== 'running') return;
     const timer = window.setInterval(() => syncFocusTimer(), 1000);
     return () => window.clearInterval(timer);
-  }, [syncFocusTimer]);
+  }, [focusStatus, syncFocusTimer]);
 
   useEffect(() => {
     if (!lastFocusCompletion || notifiedRef.current === lastFocusCompletion.id) return;

@@ -280,6 +280,8 @@ func autoMigrateModelsByName() map[string]any {
 	return map[string]any{
 		"user":                               &model.User{},
 		"user_preference":                    &model.UserPreference{},
+		"mail_account":                       &model.MailAccount{},
+		"mail_message":                       &model.MailMessage{},
 		"household":                          &model.Household{},
 		"household_member":                   &model.HouseholdMember{},
 		"household_invite":                   &model.HouseholdInvite{},
@@ -339,6 +341,10 @@ func autoMigrateModelAliases() map[string]string {
 		"user_preferences":         "user_preference",
 		"preferences":              "user_preference",
 		"preference":               "user_preference",
+		"mail_accounts":            "mail_account",
+		"mail_account":             "mail_account",
+		"mail_messages":            "mail_message",
+		"mail_message":             "mail_message",
 		"ai_usage":                 "ai_usage_log",
 		"ai_usage_logs":            "ai_usage_log",
 		"places":                   "lifetrace_place",
@@ -382,6 +388,8 @@ func coreMigrationModels() []any {
 	return []any{
 		&model.User{},
 		&model.UserPreference{},
+		&model.MailAccount{},
+		&model.MailMessage{},
 		&model.Household{},
 		&model.HouseholdMember{},
 		&model.HouseholdInvite{},

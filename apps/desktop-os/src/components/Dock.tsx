@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react';
 import {
   type CSSProperties,
   type PointerEvent,
@@ -31,7 +32,7 @@ interface DockMenuPosition {
 
 export default function Dock() {
   const restoreOrFocus = useWindowStore((s) => s.restoreOrFocus);
-  const windows = useWindowStore((s) => s.windows);
+  const runningAppIds = useWindowStore((s) => s.runningAppIds);
   const isLaunchpadOpen = useLaunchpadStore((s) => s.isOpen);
   const toggleLaunchpad = useLaunchpadStore((s) => s.toggle);
   const closeLaunchpad = useLaunchpadStore((s) => s.close);
@@ -42,7 +43,7 @@ export default function Dock() {
   const autoHide = useDockStore((s) => s.autoHide);
   const pinItem = useDockStore((s) => s.pinItem);
   const removeItem = useDockStore((s) => s.removeItem);
-  const runningApps = new Set<AppId>(windows.map((w) => w.appId));
+  const runningApps = new Set<AppId>(runningAppIds);
 
   const [bouncingIds, setBouncingIds] = useState<Set<string>>(new Set());
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -51,11 +52,14 @@ export default function Dock() {
   const menuRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLLIElement | null>>([]);
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const hoverFrameRef = useRef<number | null>(null);
+  const hoverPointerXRef = useRef(0);
   const visibleItems = items.filter((item) => item.visible);
 
   useEffect(() => {
     return () => {
       for (const t of Object.values(timersRef.current)) clearTimeout(t);
+      if (hoverFrameRef.current !== null) window.cancelAnimationFrame(hoverFrameRef.current);
     };
   }, []);
 
@@ -137,23 +141,28 @@ export default function Dock() {
   }
 
   function updateHoveredIndex(e: PointerEvent<HTMLDivElement>) {
-    const entries = itemRefs.current
-      .map((node, index) => ({ node, index }))
-      .filter((entry): entry is { node: HTMLLIElement; index: number } => Boolean(entry.node));
-    if (entries.length === 0) return;
+    hoverPointerXRef.current = e.clientX;
+    if (hoverFrameRef.current !== null) return;
+    hoverFrameRef.current = window.requestAnimationFrame(() => {
+      hoverFrameRef.current = null;
+      const entries = itemRefs.current
+        .map((node, index) => ({ node, index }))
+        .filter((entry): entry is { node: HTMLLIElement; index: number } => Boolean(entry.node));
+      if (entries.length === 0) return;
 
-    let nearestIndex = entries[0].index;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    for (const entry of entries) {
-      const rect = entry.node.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const distance = Math.abs(e.clientX - centerX);
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestIndex = entry.index;
+      let nearestIndex = entries[0].index;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      for (const entry of entries) {
+        const rect = entry.node.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const distance = Math.abs(hoverPointerXRef.current - centerX);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestIndex = entry.index;
+        }
       }
-    }
-    setHoveredIndex(nearestIndex);
+      setHoveredIndex((current) => (current === nearestIndex ? current : nearestIndex));
+    });
   }
 
   return (
@@ -161,7 +170,13 @@ export default function Dock() {
       <div
         className={`dock ${magnification ? 'is-magnified' : ''} ${autoHide ? 'is-autohide' : ''}`}
         onPointerMove={updateHoveredIndex}
-        onPointerLeave={() => setHoveredIndex(null)}
+        onPointerLeave={() => {
+          if (hoverFrameRef.current !== null) {
+            window.cancelAnimationFrame(hoverFrameRef.current);
+            hoverFrameRef.current = null;
+          }
+          setHoveredIndex((current) => (current === null ? current : null));
+        }}
         style={
           {
             '--dock-icon-size': `${iconSize}px`,
@@ -304,9 +319,12 @@ function DockContextMenu({
           <div className="dock-menu__submenu-shell">
             <button type="button" className="dock-menu__item dock-menu__item--submenu-trigger">
               <span>选项</span>
-              <span className="dock-menu__chevron" aria-hidden>
-                ›
-              </span>
+              <ChevronRight
+                className="dock-menu__chevron"
+                aria-hidden
+                size={14}
+                strokeWidth={2.5}
+              />
             </button>
             <div className="dock-menu__submenu">
               {!item.pinned && (
