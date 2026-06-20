@@ -18,6 +18,7 @@
     0 8px 24px rgba(40, 32, 24, 0.16),
     0 24px 60px rgba(40, 32, 24, 0.18);
   overflow-y: auto;
+  scrollbar-gutter: stable;
   animation: nc-pop 0.24s var(--ease-spring);
   transform-origin: top right;
 }
@@ -84,12 +85,7 @@
 }
 
 .nc__empty {
-  padding: 20px;
-  text-align: center;
-  color: rgba(90, 74, 58, 0.45);
-  font-size: 13px;
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 14px;
+  min-height: 96px;
 }
 
 .nc__list {
@@ -247,6 +243,42 @@
   font-weight: 700;
   line-height: 1;
 }
+.widget-weather__actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  gap: 4px;
+}
+
+.widget-weather__actions button {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  color: rgba(90, 74, 58, 0.62);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  transition:
+    background 0.16s var(--ease-out),
+    color 0.16s var(--ease-out),
+    transform 0.18s var(--ease-spring);
+}
+.widget-weather__actions button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--plush-sky-deep);
+  transform: translateY(-1px);
+}
+.widget-weather__actions button:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+.widget-weather__text {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(90, 74, 58, 0.72);
+}
 .widget-weather__hint {
   font-size: 11px;
   color: rgba(90, 74, 58, 0.55);
@@ -262,6 +294,25 @@
   color: rgba(90, 74, 58, 0.55);
 }
 
+.widget-reminders__count,
+.widget-clock__time,
+.widget-focus__time,
+.widget-mini-tools__count,
+.widget-games__score {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.widget-reminders__hint,
+.widget-clock__hint,
+.widget-focus__hint,
+.widget-mini-tools__hint,
+.widget-games__hint {
+  font-size: 11px;
+  color: rgba(90, 74, 58, 0.55);
+}
+
 .widget-music__track {
   font-size: 13px;
   font-weight: 600;
@@ -269,7 +320,12 @@
 .widget-music__artist {
   font-size: 11px;
   color: rgba(90, 74, 58, 0.55);
+}
+.widget-music__state {
   margin-bottom: 4px;
+  color: var(--plush-sage-deep);
+  font-size: 11px;
+  font-weight: 700;
 }
 .widget-music__bar {
   height: 3px;
@@ -281,4 +337,23 @@
   height: 100%;
   background: currentColor;
   transition: width 0.18s var(--ease-out);
+}
+.widget-music__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.widget-music__actions button {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--plush-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+.widget-music__actions button:hover {
+  background: rgba(143, 180, 94, 0.18);
 }

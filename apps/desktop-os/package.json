@@ -13,6 +13,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "dayjs": "^1.11.19",
     "react": "catalog:react-19",
     "react-dom": "catalog:react-19",
     "zustand": "catalog:shared-runtime"

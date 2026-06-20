@@ -113,6 +113,10 @@ func isChinaLegalWorkday(date time.Time) bool {
 	return getChinaHolidayStatus(date).IsLegalWorkday
 }
 
+func GetChinaHolidayCalendar(year int) (ChinaHolidayCalendar, bool) {
+	return loadChinaHolidayCalendarForYear(year)
+}
+
 func loadChinaHolidayCalendarForYear(year int) (ChinaHolidayCalendar, bool) {
 	if calendar, ok := loadChinaHolidayCalendarFromDB(year); ok {
 		return calendar, true

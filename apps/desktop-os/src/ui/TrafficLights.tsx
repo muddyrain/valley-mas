@@ -9,7 +9,11 @@ interface Props {
 
 export default function TrafficLights({ active, onClose, onMinimize, onMaximize }: Props) {
   return (
-    <div className={`traffic-lights ${active ? 'is-active' : 'is-inactive'}`}>
+    <div
+      className={`traffic-lights ${active ? 'is-active' : 'is-inactive'}`}
+      onPointerDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
       <button
         type="button"
         className="traffic-light traffic-light--close"

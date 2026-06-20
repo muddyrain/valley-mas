@@ -50,6 +50,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 			public.POST("/resource/:id/download", middleware.OptionalAuth(cfg), handler.DownloadResource)
 			public.GET("/hot-creators", handler.GetHotCreators)
 			public.GET("/creators", handler.SearchCreators)
+			public.GET("/holiday-calendars/china/:year", handler.GetChinaHolidayCalendar)
 
 			public.GET("/blog/posts", middleware.OptionalAuth(cfg), handler.GetPosts)
 			public.GET("/blog/posts/id/:id", middleware.OptionalAuth(cfg), handler.GetPostDetailByID)
@@ -90,6 +91,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 		{
 			user.GET("/downloads", handler.GetMyDownloads)
 			user.GET("/info", handler.GetUserInfo)
+			user.GET("/preferences/:namespace", handler.GetUserPreference)
+			user.PUT("/preferences/:namespace", handler.UpsertUserPreference)
 			user.POST("/refresh-token", handler.RefreshToken(cfg))
 			user.PUT("/profile", handler.UpdateMyProfile)
 			user.PUT("/password", handler.ChangePassword)

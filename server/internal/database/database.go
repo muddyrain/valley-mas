@@ -279,6 +279,7 @@ func migrationModelsByName(names []string) ([]any, []string, error) {
 func autoMigrateModelsByName() map[string]any {
 	return map[string]any{
 		"user":                               &model.User{},
+		"user_preference":                    &model.UserPreference{},
 		"household":                          &model.Household{},
 		"household_member":                   &model.HouseholdMember{},
 		"household_invite":                   &model.HouseholdInvite{},
@@ -334,6 +335,9 @@ func autoMigrateModelsByName() map[string]any {
 func autoMigrateModelAliases() map[string]string {
 	return map[string]string{
 		"users":                    "user",
+		"user_preferences":         "user_preference",
+		"preferences":              "user_preference",
+		"preference":               "user_preference",
 		"ai_usage":                 "ai_usage_log",
 		"ai_usage_logs":            "ai_usage_log",
 		"places":                   "lifetrace_place",
@@ -375,6 +379,7 @@ func autoMigrateModelAliases() map[string]string {
 func coreMigrationModels() []any {
 	return []any{
 		&model.User{},
+		&model.UserPreference{},
 		&model.Household{},
 		&model.HouseholdMember{},
 		&model.HouseholdInvite{},

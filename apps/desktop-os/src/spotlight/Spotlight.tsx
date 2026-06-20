@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { getDefaultWindowOptions } from '../apps/desktopApps';
+import { useBrowserStore } from '../store/browserStore';
+import { useFinderStore } from '../store/finderStore';
+import { useResourceStore } from '../store/resourceStore';
 import { useSpotlightStore } from '../store/spotlightStore';
 import { useWindowStore } from '../store/windowStore';
 import { type SpotlightItem, searchSpotlight } from './data';
@@ -7,14 +11,16 @@ import './Spotlight.css';
 export default function Spotlight() {
   const isOpen = useSpotlightStore((s) => s.isOpen);
   const close = useSpotlightStore((s) => s.close);
+  const revealFinderItem = useFinderStore((s) => s.revealItem);
+  const openBrowserUrl = useBrowserStore((s) => s.openUrl);
   const restoreOrFocus = useWindowStore((s) => s.restoreOrFocus);
-  const openWindow = useWindowStore((s) => s.openWindow);
+  const resources = useResourceStore((s) => s.resources);
 
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const results = useMemo(() => searchSpotlight(query), [query]);
+  const results = useMemo(() => searchSpotlight(query, resources), [query, resources]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -26,27 +32,27 @@ export default function Spotlight() {
     return () => window.clearTimeout(t);
   }, [isOpen]);
 
-  useEffect(() => {
+  function updateQuery(next: string) {
+    setQuery(next);
     setActiveIndex(0);
-  }, [query]);
+  }
 
   function runItem(item: SpotlightItem) {
     switch (item.action.type) {
       case 'open-app':
-        restoreOrFocus(item.action.appId);
+        restoreOrFocus(item.action.appId, getDefaultWindowOptions(item.action.appId));
         break;
-      case 'open-folder':
-        openWindow('about', { title: `${item.action.name}`, width: 560, height: 380 });
+      case 'open-finder':
+        revealFinderItem(item.action.path, item.action.selectedId);
+        restoreOrFocus('finder', getDefaultWindowOptions('finder'));
         break;
       case 'calc':
         // 计算结果点击：暂时复制到查询框作为反馈
-        setQuery(item.action.result);
+        updateQuery(item.action.result);
         return;
       case 'web-search':
-        window.open(
-          `https://www.google.com/search?q=${encodeURIComponent(item.action.query)}`,
-          '_blank',
-        );
+        openBrowserUrl(item.action.query);
+        restoreOrFocus('safari', getDefaultWindowOptions('safari'));
         break;
     }
     close();
@@ -95,7 +101,7 @@ export default function Spotlight() {
             className="spotlight__input"
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => updateQuery(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Spotlight 搜索"
             spellCheck={false}
@@ -134,6 +140,8 @@ function kindLabel(kind: SpotlightItem['kind']) {
       return '应用';
     case 'folder':
       return '文件夹';
+    case 'resource':
+      return '资源';
     case 'calc':
       return '计算';
     case 'web':

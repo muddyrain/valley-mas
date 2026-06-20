@@ -4,7 +4,13 @@ import App from './App';
 import './styles/theme.css';
 import './styles/global.css';
 
-ReactDOM.createRoot(document.getElementById('app')!).render(
+const appRoot = document.getElementById('app');
+
+if (!appRoot) {
+  throw new Error('Desktop OS mount node #app is missing.');
+}
+
+ReactDOM.createRoot(appRoot).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>,

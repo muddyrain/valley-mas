@@ -13,6 +13,13 @@
   --plush-text: #5a4a3a;
   --plush-text-soft: #8a7a6a;
 
+  /* ===== 滚动条 ===== */
+  --scrollbar-size: 10px;
+  --scrollbar-track: rgba(255, 255, 255, 0.18);
+  --scrollbar-thumb: rgba(90, 74, 58, 0.18);
+  --scrollbar-thumb-hover: rgba(90, 74, 58, 0.28);
+  --scrollbar-thumb-active: rgba(90, 74, 58, 0.38);
+
   /* ===== 系统按钮三色 ===== */
   --btn-close: #ff8a8a;
   --btn-min: #f4d97a;

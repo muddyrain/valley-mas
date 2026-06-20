@@ -1,6 +1,15 @@
 import { create } from 'zustand';
+import type { DesktopAppId } from '../apps/desktopApps';
+import {
+  clampWindowRect,
+  DOCK_RESERVED_HEIGHT,
+  MIN_WINDOW_HEIGHT,
+  MIN_WINDOW_WIDTH,
+  resolveOpenWindowRect,
+  TOP_BAR_HEIGHT,
+} from './windowSizing';
 
-export type AppId = 'about' | 'finder' | 'notes';
+export type AppId = DesktopAppId;
 
 export interface WindowRect {
   x: number;
@@ -32,6 +41,7 @@ interface WindowStore {
   windows: WindowState[];
   topZ: number;
   focusedId: string | null;
+  lastRects: Partial<Record<AppId, WindowRect>>;
 
   openWindow: (appId: AppId, options?: OpenOptions) => string;
   closeWindow: (id: string) => void;
@@ -40,30 +50,35 @@ interface WindowStore {
   resizeWindow: (id: string, rect: Partial<WindowRect>) => void;
   minimizeWindow: (id: string) => void;
   toggleMaximize: (id: string, viewport: { width: number; height: number }) => void;
-  restoreOrFocus: (appId: AppId) => void;
+  restoreOrFocus: (appId: AppId, options?: OpenOptions) => void;
 }
-
-const MIN_W = 320;
-const MIN_H = 200;
-const TOP_BAR_H = 28;
-const DOCK_RESERVED_H = 96;
 
 let windowSeq = 0;
 const nextId = (appId: AppId) => `${appId}-${++windowSeq}`;
+const toRect = (windowState: WindowState): WindowRect => ({
+  x: windowState.x,
+  y: windowState.y,
+  width: windowState.width,
+  height: windowState.height,
+});
 
 export const useWindowStore = create<WindowStore>((set, get) => ({
   windows: [],
   topZ: 10,
   focusedId: null,
+  lastRects: {},
 
   openWindow: (appId, options = {}) => {
     const id = nextId(appId);
     set((state) => {
       const z = state.topZ + 1;
-      const w = options.width ?? 480;
-      const h = options.height ?? 320;
-      const x = options.x ?? Math.max(60, (window.innerWidth - w) / 2);
-      const y = options.y ?? Math.max(60, (window.innerHeight - h) / 2 - 40);
+      const rect = resolveOpenWindowRect(
+        appId,
+        options,
+        { width: window.innerWidth, height: window.innerHeight },
+        state.windows.filter((w) => w.appId === appId).length,
+        state.lastRects[appId],
+      );
       return {
         topZ: z,
         focusedId: id,
@@ -73,10 +88,10 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
             id,
             appId,
             title: options.title ?? appId,
-            x,
-            y,
-            width: w,
-            height: h,
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
             zIndex: z,
             minimized: false,
             maximized: false,
@@ -113,25 +128,44 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
     }),
 
   moveWindow: (id, x, y) =>
-    set((state) => ({
-      windows: state.windows.map((w) => (w.id === id ? { ...w, x, y, maximized: false } : w)),
-    })),
+    set((state) => {
+      const windows = state.windows.map((w) => {
+        if (w.id !== id) return w;
+        return { ...w, x, y, maximized: false };
+      });
+      const movedWindow = windows.find((w) => w.id === id);
+
+      return {
+        windows,
+        lastRects: movedWindow
+          ? { ...state.lastRects, [movedWindow.appId]: toRect(movedWindow) }
+          : state.lastRects,
+      };
+    }),
 
   resizeWindow: (id, rect) =>
-    set((state) => ({
-      windows: state.windows.map((w) => {
+    set((state) => {
+      const windows = state.windows.map((w) => {
         if (w.id !== id) return w;
         const next: WindowState = {
           ...w,
           x: rect.x ?? w.x,
           y: rect.y ?? w.y,
-          width: Math.max(MIN_W, rect.width ?? w.width),
-          height: Math.max(MIN_H, rect.height ?? w.height),
+          width: Math.max(MIN_WINDOW_WIDTH, rect.width ?? w.width),
+          height: Math.max(MIN_WINDOW_HEIGHT, rect.height ?? w.height),
           maximized: false,
         };
         return next;
-      }),
-    })),
+      });
+      const resizedWindow = windows.find((w) => w.id === id);
+
+      return {
+        windows,
+        lastRects: resizedWindow
+          ? { ...state.lastRects, [resizedWindow.appId]: toRect(resizedWindow) }
+          : state.lastRects,
+      };
+    }),
 
   minimizeWindow: (id) =>
     set((state) => {
@@ -147,13 +181,13 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
     }),
 
   toggleMaximize: (id, viewport) =>
-    set((state) => ({
-      windows: state.windows.map((w) => {
+    set((state) => {
+      const windows = state.windows.map((w) => {
         if (w.id !== id) return w;
         if (w.maximized && w.prevRect) {
           return {
             ...w,
-            ...w.prevRect,
+            ...clampWindowRect(w.prevRect, viewport),
             maximized: false,
             prevRect: undefined,
           };
@@ -162,21 +196,29 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
           ...w,
           prevRect: { x: w.x, y: w.y, width: w.width, height: w.height },
           x: 0,
-          y: TOP_BAR_H,
+          y: TOP_BAR_HEIGHT,
           width: viewport.width,
-          height: viewport.height - TOP_BAR_H - DOCK_RESERVED_H,
+          height: viewport.height - TOP_BAR_HEIGHT - DOCK_RESERVED_HEIGHT,
           maximized: true,
         };
-      }),
-    })),
+      });
+      const restoredWindow = windows.find((w) => w.id === id && !w.maximized);
 
-  restoreOrFocus: (appId) => {
+      return {
+        windows,
+        lastRects: restoredWindow
+          ? { ...state.lastRects, [restoredWindow.appId]: toRect(restoredWindow) }
+          : state.lastRects,
+      };
+    }),
+
+  restoreOrFocus: (appId, options) => {
     const { windows, focusWindow, openWindow } = get();
     const existing = windows.find((w) => w.appId === appId);
     if (existing) {
       focusWindow(existing.id);
     } else {
-      openWindow(appId);
+      openWindow(appId, options);
     }
   },
 }));

@@ -54,8 +54,19 @@
   text-align: left;
   transition: background 0.15s var(--ease-out);
 }
+.cc-tile--static {
+  cursor: default;
+}
 .cc-tile:hover {
   background: rgba(90, 74, 58, 0.06);
+}
+.cc-tile:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+.cc-tile:disabled:hover,
+.cc-tile--static:hover {
+  background: transparent;
 }
 
 .cc-tile__icon {

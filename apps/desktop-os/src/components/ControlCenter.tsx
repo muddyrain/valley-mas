@@ -7,13 +7,15 @@ import './ControlCenter.css';
 export default function ControlCenter() {
   const isOpen = useControlCenterStore((s) => s.isOpen);
   const close = useControlCenterStore((s) => s.close);
-  const wifi = useControlCenterStore((s) => s.wifi);
-  const bluetooth = useControlCenterStore((s) => s.bluetooth);
-  const airdrop = useControlCenterStore((s) => s.airdrop);
+  const isOnline = useControlCenterStore((s) => s.isOnline);
+  const bluetoothStatus = useControlCenterStore((s) => s.bluetoothStatus);
+  const shareStatus = useControlCenterStore((s) => s.shareStatus);
   const dnd = useControlCenterStore((s) => s.doNotDisturb);
   const brightness = useControlCenterStore((s) => s.brightness);
   const volume = useControlCenterStore((s) => s.volume);
-  const setBoolean = useControlCenterStore((s) => s.setBoolean);
+  const requestBluetoothDevice = useControlCenterStore((s) => s.requestBluetoothDevice);
+  const shareDesktop = useControlCenterStore((s) => s.shareDesktop);
+  const setDoNotDisturb = useControlCenterStore((s) => s.setDoNotDisturb);
   const setBrightness = useControlCenterStore((s) => s.setBrightness);
   const setVolume = useControlCenterStore((s) => s.setVolume);
 
@@ -42,63 +44,77 @@ export default function ControlCenter() {
   return (
     <div ref={panelRef} className="control-center" role="dialog" aria-label="控制中心">
       <div className="control-center__group">
-        <Tile
+        <StatusTile
           icon="📶"
-          label="无线局域网"
-          subtitle={wifi ? '家里 WiFi' : '已关闭'}
-          active={wifi}
-          onToggle={(v) => setBoolean('wifi', v)}
+          label="网络"
+          subtitle={isOnline ? '在线' : '离线'}
+          active={isOnline}
         />
-        <Tile
+        <ActionTile
           icon="🔷"
           label="蓝牙"
-          subtitle={bluetooth ? '已开启' : '已关闭'}
-          active={bluetooth}
-          onToggle={(v) => setBoolean('bluetooth', v)}
+          subtitle={bluetoothLabel(bluetoothStatus)}
+          active={bluetoothStatus === 'connected'}
+          disabled={bluetoothStatus === 'unsupported'}
+          onAction={requestBluetoothDevice}
         />
-        <Tile
-          icon="📡"
-          label="隔空投送"
-          subtitle={airdrop ? '所有人' : '已关闭'}
-          active={airdrop}
-          onToggle={(v) => setBoolean('airdrop', v)}
+        <ActionTile
+          icon="📤"
+          label="分享"
+          subtitle={shareLabel(shareStatus)}
+          active={shareStatus === 'shared'}
+          disabled={shareStatus === 'unsupported'}
+          onAction={shareDesktop}
         />
       </div>
 
       <div className="control-center__group">
-        <Tile
-          icon="🌙"
-          label="勿扰"
-          subtitle={dnd ? '至明早 7:00' : '已关闭'}
-          active={dnd}
-          onToggle={(v) => setBoolean('doNotDisturb', v)}
-        />
+        <DndTile active={dnd} onToggle={setDoNotDisturb} />
       </div>
 
       <div className="control-center__sliders">
-        <div className="control-center__slider-label">显示</div>
-        <Slider value={brightness} onChange={setBrightness} icon="☀️" ariaLabel="亮度" />
-        <div className="control-center__slider-label">声音</div>
-        <Slider value={volume} onChange={setVolume} icon="🔈" ariaLabel="音量" />
+        <div className="control-center__slider-label">桌面亮度</div>
+        <Slider value={brightness} onChange={setBrightness} icon="☀️" ariaLabel="桌面亮度" />
+        <div className="control-center__slider-label">站内声音</div>
+        <Slider value={volume} onChange={setVolume} icon="🔈" ariaLabel="站内声音" />
       </div>
     </div>
   );
 }
 
-interface TileProps {
+interface TileBaseProps {
   icon: string;
   label: string;
   subtitle: string;
   active: boolean;
-  onToggle: (next: boolean) => void;
 }
 
-function Tile({ icon, label, subtitle, active, onToggle }: TileProps) {
+function StatusTile({ icon, label, subtitle, active }: TileBaseProps) {
+  return (
+    <div className={`cc-tile cc-tile--static ${active ? 'is-active' : ''}`}>
+      <span className={`cc-tile__icon ${active ? 'is-active' : ''}`} aria-hidden>
+        {icon}
+      </span>
+      <span className="cc-tile__text">
+        <span className="cc-tile__label">{label}</span>
+        <span className="cc-tile__subtitle">{subtitle}</span>
+      </span>
+    </div>
+  );
+}
+
+interface ActionTileProps extends TileBaseProps {
+  disabled?: boolean;
+  onAction: () => void;
+}
+
+function ActionTile({ icon, label, subtitle, active, disabled, onAction }: ActionTileProps) {
   return (
     <button
       type="button"
       className={`cc-tile ${active ? 'is-active' : ''}`}
-      onClick={() => onToggle(!active)}
+      onClick={onAction}
+      disabled={disabled}
     >
       <span className={`cc-tile__icon ${active ? 'is-active' : ''}`} aria-hidden>
         {icon}
@@ -107,7 +123,51 @@ function Tile({ icon, label, subtitle, active, onToggle }: TileProps) {
         <span className="cc-tile__label">{label}</span>
         <span className="cc-tile__subtitle">{subtitle}</span>
       </span>
-      <ToggleSwitch active={active} onChange={onToggle} ariaLabel={label} />
     </button>
   );
+}
+
+function DndTile({ active, onToggle }: { active: boolean; onToggle: (next: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      className={`cc-tile ${active ? 'is-active' : ''}`}
+      onClick={() => onToggle(!active)}
+    >
+      <span className={`cc-tile__icon ${active ? 'is-active' : ''}`} aria-hidden>
+        🌙
+      </span>
+      <span className="cc-tile__text">
+        <span className="cc-tile__label">勿扰</span>
+        <span className="cc-tile__subtitle">{active ? '已开启' : '已关闭'}</span>
+      </span>
+      <ToggleSwitch active={active} onChange={onToggle} ariaLabel="勿扰" />
+    </button>
+  );
+}
+
+function bluetoothLabel(status: string) {
+  switch (status) {
+    case 'ready':
+      return '可连接设备';
+    case 'connected':
+      return '已连接';
+    case 'denied':
+      return '未连接';
+    default:
+      return '浏览器不支持';
+  }
+}
+
+function shareLabel(status: string) {
+  switch (status) {
+    case 'ready':
+      return '系统分享';
+    case 'shared':
+      return '已分享';
+    case 'cancelled':
+      return '未分享';
+    default:
+      return '浏览器不支持';
+  }
 }
