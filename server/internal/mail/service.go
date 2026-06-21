@@ -291,14 +291,15 @@ func (s *Service) upsertMessages(ctx context.Context, userID model.Int64String, 
 			FromAddress:       trimText(fetched.FromAddress, 300),
 			Subject:           trimText(fetched.Subject, 500),
 			Snippet:           trimText(fetched.Snippet, 1000),
-			TextBody:          trimText(fetched.TextBody, 8000),
+			TextBody:          trimBodyText(fetched.TextBody, 8000),
+			HTMLBody:          trimHTMLBody(fetched.HTMLBody, 200000),
 			IsRead:            fetched.IsRead,
 			SentAt:            sentAt,
 		}
 		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "account_id"}, {Name: "provider_message_id"}},
 			DoUpdates: clause.AssignmentColumns([]string{
-				"thread_id", "from_address", "subject", "snippet", "text_body", "is_read", "sent_at", "updated_at",
+				"thread_id", "from_address", "subject", "snippet", "text_body", "html_body", "is_read", "sent_at", "updated_at",
 			}),
 		}).Create(&message).Error; err != nil {
 			return err
@@ -380,6 +381,7 @@ func messageDTO(message model.MailMessage, includeBody bool) MessageDTO {
 	}
 	if includeBody {
 		dto.TextBody = message.TextBody
+		dto.HTMLBody = message.HTMLBody
 	}
 	return dto
 }

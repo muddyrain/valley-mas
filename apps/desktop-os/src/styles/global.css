@@ -92,6 +92,49 @@ body {
   background: transparent;
 }
 
+.plush-scrollbar {
+  scrollbar-color: transparent transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.plush-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.plush-scrollbar::-webkit-scrollbar-button,
+.plush-scrollbar::-webkit-scrollbar-button:single-button,
+.plush-scrollbar::-webkit-scrollbar-button:vertical:start:decrement,
+.plush-scrollbar::-webkit-scrollbar-button:vertical:end:increment,
+.plush-scrollbar::-webkit-scrollbar-button:horizontal:start:decrement,
+.plush-scrollbar::-webkit-scrollbar-button:horizontal:end:increment {
+  display: none;
+  width: 0;
+  height: 0;
+  min-width: 0;
+  min-height: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+  border: 0;
+  margin: 0;
+  background: transparent;
+  background-image: none;
+}
+
+.plush-scrollbar::-webkit-scrollbar-thumb,
+.plush-scrollbar::-webkit-scrollbar-track,
+.plush-scrollbar::-webkit-scrollbar-track-piece:start,
+.plush-scrollbar::-webkit-scrollbar-track-piece:end {
+  background: transparent;
+}
+
+.plush-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 button {
   background: none;
   border: none;
@@ -101,12 +144,15 @@ button {
 }
 
 button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible,
 [role="button"]:focus-visible {
   outline: 3px solid rgba(217, 122, 79, 0.28);
   outline-offset: 2px;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
 }
 
 button:disabled,

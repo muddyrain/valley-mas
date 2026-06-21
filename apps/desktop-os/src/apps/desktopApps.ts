@@ -1,6 +1,7 @@
 export type DesktopAppId =
   | 'about'
   | 'finder'
+  | 'blog'
   | 'mail'
   | 'notes'
   | 'music'
@@ -69,6 +70,16 @@ export const DESKTOP_APPS: Record<DesktopAppId, DesktopApp> = {
     keywords: ['finder', 'file', 'resource', '资源', '文件'],
     dockDefault: true,
     dockRequired: true,
+  },
+  blog: {
+    id: 'blog',
+    title: '博客',
+    icon: '/icons/blog.png',
+    width: 900,
+    height: 620,
+    category: 'content',
+    keywords: ['blog', 'post', 'article', '博客', '文章', '阅读'],
+    dockDefault: true,
   },
   mail: {
     id: 'mail',
@@ -165,8 +176,8 @@ export const DESKTOP_APPS: Record<DesktopAppId, DesktopApp> = {
     id: 'aiTools',
     title: 'AI Command Center',
     icon: '/icons/stationery.png',
-    width: 780,
-    height: 560,
+    width: 1180,
+    height: 720,
     category: 'tool',
     keywords: [
       'ai',

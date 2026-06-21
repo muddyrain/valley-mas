@@ -53,7 +53,47 @@ export interface PasswordOptions {
   readable: boolean;
 }
 
+export type RandomStringPresetId =
+  | 'safeAscii'
+  | 'printableAscii'
+  | 'alphanumeric'
+  | 'hex'
+  | 'base64url';
+
+export interface RandomStringPreset {
+  id: RandomStringPresetId;
+  label: string;
+  alphabet: string;
+}
+
+export interface RandomStringOptions {
+  length?: number;
+  preset?: RandomStringPresetId;
+  alphabet?: string;
+}
+
+export interface RandomStringsOptions extends RandomStringOptions {
+  count?: number;
+}
+
 const READABLE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+const ALPHANUMERIC_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const HEX_ALPHABET = '0123456789abcdef';
+const BASE64URL_ALPHABET = `${ALPHANUMERIC_ALPHABET}-_`;
+const PRINTABLE_ASCII_ALPHABET = asciiRange(33, 126);
+const SAFE_ASCII_ALPHABET = PRINTABLE_ASCII_ALPHABET.replace(/["'\\`]/g, '');
+const DEFAULT_RANDOM_LENGTH = 32;
+const MAX_RANDOM_LENGTH = 256;
+const DEFAULT_RANDOM_COUNT = 1;
+const MAX_RANDOM_COUNT = 20;
+
+export const RANDOM_STRING_PRESETS: RandomStringPreset[] = [
+  { id: 'safeAscii', label: '安全 ASCII', alphabet: SAFE_ASCII_ALPHABET },
+  { id: 'printableAscii', label: '可打印 ASCII', alphabet: PRINTABLE_ASCII_ALPHABET },
+  { id: 'alphanumeric', label: '字母数字', alphabet: ALPHANUMERIC_ALPHABET },
+  { id: 'hex', label: 'Hex', alphabet: HEX_ALPHABET },
+  { id: 'base64url', label: 'Base64URL', alphabet: BASE64URL_ALPHABET },
+];
 
 export function formatJson(input: string, compact = false): ToolResult {
   try {
@@ -246,11 +286,28 @@ export function createUuid(): string {
 }
 
 export function createToken(length = 32): string {
-  return randomString(READABLE_ALPHABET, length);
+  return generateRandomString({ length, preset: 'base64url' });
 }
 
 export function generateRandomToken(length = 32): string {
   return createToken(length);
+}
+
+export function generateRandomAscii(length = DEFAULT_RANDOM_LENGTH): string {
+  return generateRandomString({ length, preset: 'safeAscii' });
+}
+
+export function generateRandomString(options: RandomStringOptions = {}): string {
+  const length = normalizeInteger(options.length, DEFAULT_RANDOM_LENGTH, 1, MAX_RANDOM_LENGTH);
+  const alphabet = normalizeAlphabet(
+    options.alphabet ?? getRandomStringPreset(options.preset).alphabet,
+  );
+  return randomString(alphabet, length);
+}
+
+export function generateRandomStrings(options: RandomStringsOptions = {}): string[] {
+  const count = normalizeInteger(options.count, DEFAULT_RANDOM_COUNT, 1, MAX_RANDOM_COUNT);
+  return Array.from({ length: count }, () => generateRandomString(options));
 }
 
 export function createPassword(length: number, readable = false): string {
@@ -502,8 +559,48 @@ function randomBytes(length: number): Uint8Array {
 }
 
 function randomString(alphabet: string, length: number): string {
-  const bytes = randomBytes(Math.max(1, length));
-  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('');
+  if (alphabet.length > 256) {
+    throw new Error('随机字符集最多支持 256 个字符。');
+  }
+  const maxByte = 256 - (256 % alphabet.length);
+  let output = '';
+  while (output.length < length) {
+    const bytes = randomBytes(Math.max(16, (length - output.length) * 2));
+    for (const byte of bytes) {
+      if (byte >= maxByte) continue;
+      output += alphabet[byte % alphabet.length];
+      if (output.length === length) break;
+    }
+  }
+  return output;
+}
+
+function getRandomStringPreset(id: RandomStringPresetId = 'safeAscii'): RandomStringPreset {
+  return RANDOM_STRING_PRESETS.find((preset) => preset.id === id) ?? RANDOM_STRING_PRESETS[0];
+}
+
+function normalizeAlphabet(alphabet: string): string {
+  const unique = Array.from(new Set(Array.from(alphabet))).join('');
+  if (!unique) {
+    throw new Error('随机字符集不能为空。');
+  }
+  return unique;
+}
+
+function normalizeInteger(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(value ?? fallback)));
+}
+
+function asciiRange(start: number, end: number): string {
+  return Array.from({ length: end - start + 1 }, (_, index) =>
+    String.fromCharCode(start + index),
+  ).join('');
 }
 
 function parseDelimited(input: string, delimiter: string): string[][] {

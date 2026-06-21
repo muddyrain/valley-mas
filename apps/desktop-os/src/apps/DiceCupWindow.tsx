@@ -1,11 +1,5 @@
 import { Dices } from 'lucide-react';
-import {
-  type PointerEvent as ReactPointerEvent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { createDicePlacements3D, rollDice } from '../tools/miniGamesV2';
 import DiceCupScene from './DiceCupScene';
 import './MiniApps.css';
@@ -44,7 +38,6 @@ export default function DiceCupWindow() {
   const dragRef = useRef<DragState | null>(null);
   const displayDice = isShaking ? rollingDice : dice;
   const displayPlacements = isShaking ? rollingPlacements : dicePlacements;
-  const total = useMemo(() => dice.reduce((sum, value) => sum + value, 0), [dice]);
 
   useEffect(() => {
     if (!isShaking) return;
@@ -166,11 +159,6 @@ export default function DiceCupWindow() {
           />
         </div>
       </section>
-
-      <div className="dice-cup-result">
-        <span>总点数 {isOpen ? total : '--'}</span>
-        <span>{isOpen ? dice.join(' · ') : '盖住'}</span>
-      </div>
 
       <div className="dice-cup-actions">
         <button

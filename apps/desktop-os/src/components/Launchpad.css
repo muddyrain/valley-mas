@@ -117,6 +117,18 @@
   min-height: 0;
   place-items: center;
   overflow: hidden;
+  cursor: default;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.launchpad__stage.is-swipe-pressing {
+  cursor: grabbing;
+}
+
+.launchpad__stage.is-swipe-pressing .launchpad-app,
+.launchpad__stage.is-swipe-pressing .launchpad__nav {
+  cursor: grabbing;
 }
 
 .launchpad__page {
@@ -136,6 +148,7 @@
   background: rgba(255, 255, 255, 0.32);
   box-shadow: 0 10px 24px rgba(90, 74, 58, 0.1);
   color: rgba(90, 74, 58, 0.62);
+  cursor: pointer;
   font-size: 36px;
   line-height: 1;
   transform: translateY(-50%);
@@ -183,6 +196,7 @@
   border-radius: 999px;
   background: rgba(90, 74, 58, 0.22);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  cursor: pointer;
   transition:
     background 0.16s var(--ease-out),
     transform 0.18s var(--ease-spring),
@@ -244,6 +258,7 @@
   padding: 9px 8px 8px;
   border-radius: 18px;
   color: var(--plush-text);
+  cursor: pointer;
   text-align: center;
   transition:
     background 0.16s var(--ease-out),

@@ -1,3 +1,4 @@
+import { LoaderCircle, MapPin } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api/client';
 import { getUserPreference, updateUserPreference } from '../api/preferences';
@@ -21,6 +22,7 @@ import {
   type WeatherCityItem,
   writeWeatherCitiesPreference,
 } from './weatherCityModel';
+import { getWeatherIconSrc } from './weatherIconModel';
 import './WeatherWindow.css';
 
 type WeatherCitySyncStatus = 'local' | 'syncing' | 'synced' | 'error';
@@ -50,6 +52,10 @@ export default function WeatherWindow() {
   const localMutationVersionRef = useRef(0);
   const selectedCityQuery = city.trim().toLowerCase();
   const initialLocationPending = !locationAttempted && !weather;
+  const currentLocationResolving = !weather && (initialLocationPending || locating);
+  const currentLocationUnavailable = !weather && locationAttempted && Boolean(error);
+  const shouldMaskDefaultLocation = currentLocationResolving || currentLocationUnavailable;
+  const currentLocationLabel = currentLocationResolving ? '定位中' : '当前位置';
 
   useEffect(() => {
     void loadWeather();
@@ -211,24 +217,31 @@ export default function WeatherWindow() {
     void relocateWeather();
   }
 
-  const displayCity = initialLocationPending
-    ? '定位中'
+  const displayCity = shouldMaskDefaultLocation
+    ? currentLocationLabel
     : resolveSelectedWeatherLocationLabel(city, weather?.city, cities);
 
   function getCityRowView(item: WeatherCityItem) {
     const isActive =
       item.query.trim().toLowerCase() === selectedCityQuery ||
       (item.currentLocation && item.query.trim().toLowerCase() === selectedCityQuery);
-    const cachedWeather = weatherCache[getWeatherCacheKey(item.query)]?.weather;
-    const rowWeather = isActive ? (weather ?? cachedWeather) : cachedWeather;
+    const shouldHideCurrentWeather = item.currentLocation && shouldMaskDefaultLocation;
+    const cachedWeather = shouldHideCurrentWeather
+      ? undefined
+      : weatherCache[getWeatherCacheKey(item.query)]?.weather;
+    const rowWeather = shouldHideCurrentWeather
+      ? undefined
+      : isActive
+        ? (weather ?? cachedWeather)
+        : cachedWeather;
     const label =
-      item.currentLocation && initialLocationPending
-        ? '定位中'
+      item.currentLocation && shouldMaskDefaultLocation
+        ? currentLocationLabel
         : item.currentLocation && rowWeather?.city
           ? rowWeather.city
           : resolveWeatherCityListLabel(item, displayCity);
     const rowSummary =
-      item.currentLocation && locating
+      item.currentLocation && currentLocationResolving
         ? '定位中'
         : rowWeather?.now.text || getWeatherCityFallbackSubtitle(item);
     return { isActive, label, rowSummary, rowWeather };
@@ -258,7 +271,11 @@ export default function WeatherWindow() {
                     aria-label={locating ? '定位中' : '重新定位'}
                     title={locating ? '定位中' : '重新定位'}
                   >
-                    {locating ? '…' : '⌖'}
+                    {locating ? (
+                      <LoaderCircle className="weather-city__locate-icon is-spinning" />
+                    ) : (
+                      <MapPin className="weather-city__locate-icon" />
+                    )}
                   </button>
                 ) : null}
                 <button
@@ -330,7 +347,11 @@ export default function WeatherWindow() {
                           aria-label={locating ? '定位中' : '重新定位'}
                           title={locating ? '定位中' : '重新定位'}
                         >
-                          {locating ? '…' : '⌖'}
+                          {locating ? (
+                            <LoaderCircle className="weather-city-settings__locate-icon is-spinning" />
+                          ) : (
+                            <MapPin className="weather-city-settings__locate-icon" />
+                          )}
                         </button>
                         <b className="weather-city-settings__fixed">固定</b>
                       </div>
@@ -366,7 +387,7 @@ export default function WeatherWindow() {
             </p>
           </div>
           <div className="weather-window__hero-side">
-            <img src="/icons/weather.png" alt="" />
+            <img src={getWeatherIconSrc(weather?.now.text, weather?.updatedAt)} alt="" />
             <span className="weather-window__source">
               {weather?.source === 'qweather' ? 'QWeather' : '参考天气'}
             </span>
@@ -449,6 +470,11 @@ function WeatherHourCard({ hour }: { hour: WeatherApiHour }) {
   return (
     <article className={`weather-hour ${hour.active ? 'is-active' : ''}`}>
       <span>{hour.time}</span>
+      <img
+        className="weather-hour__icon"
+        src={getWeatherIconSrc(hour.text, hour.dateTime)}
+        alt=""
+      />
       <strong>{formatTemperature(hour.temp)}</strong>
       <em>{hour.text}</em>
     </article>
@@ -459,6 +485,11 @@ function WeatherDayRow({ day }: { day: WeatherApiDay }) {
   return (
     <article className="weather-day">
       <span>{formatWeatherDate(day.date)}</span>
+      <img
+        className="weather-day__icon"
+        src={getWeatherIconSrc(day.textDay, undefined, 'day')}
+        alt=""
+      />
       <strong>{day.textDay}</strong>
       <em>
         {formatTemperature(day.high)} / {formatTemperature(day.low)}

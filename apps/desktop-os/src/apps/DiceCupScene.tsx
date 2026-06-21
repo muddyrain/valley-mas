@@ -1,5 +1,5 @@
-import { Canvas, useFrame } from '@react-three/fiber';
-import { useMemo, useRef } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import type { Group } from 'three';
 import { DoubleSide, MathUtils } from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
@@ -30,6 +30,9 @@ const FACE_VALUES: Record<number, Record<DiceFaceName, number>> = {
 
 type DiceFaceName = 'front' | 'back' | 'right' | 'left' | 'top' | 'bottom';
 
+const SCENE_OFFSET_Y = -2.05;
+const CAMERA_TARGET: [number, number, number] = [0, -0.9, 0];
+
 export default function DiceCupScene({
   dice,
   isOpen,
@@ -40,33 +43,97 @@ export default function DiceCupScene({
 }: DiceCupSceneProps) {
   return (
     <Canvas
-      camera={{ fov: 34, position: [0, 2.62, 9.55] }}
+      camera={{ fov: 34, position: [0, 8.7, 9.6] }}
       className="dice-cup-scene"
+      dpr={[1, 2]}
       gl={{ alpha: true, antialias: true, preserveDrawingBuffer: true }}
       shadows
+      style={{ display: 'block', height: '100%', width: '100%' }}
     >
+      <CanvasStageResizer />
+      <DiceCupCamera />
       <color attach="background" args={['#f6ead2']} />
       <ambientLight intensity={1.55} />
-      <directionalLight castShadow intensity={2.15} position={[-3.8, 5.8, 4.8]} />
+      <directionalLight
+        castShadow
+        intensity={2.15}
+        position={[-3.8, 5.8, 4.8]}
+        shadow-bias={-0.0001}
+        shadow-mapSize-height={2048}
+        shadow-mapSize-width={2048}
+        shadow-normalBias={0.025}
+      />
       <pointLight intensity={0.62} position={[3.2, 3.4, 2.4]} color="#b7ddeb" />
-      <group position={[0, -1.92, 0]} rotation={[0, 0.08, 0]}>
-        <group rotation={[0.42, 0, 0]}>
-          <DiceTray />
-          {dice.map((value, index) => (
-            <DiceMesh
-              key={`dice-3d-${index}`}
-              index={index}
-              isShaking={isShaking}
-              placement={placements[index]}
-              reducedMotion={reducedMotion}
-              value={value}
-            />
-          ))}
-        </group>
+      <group position={[0, SCENE_OFFSET_Y, 0]} rotation={[0, 0.08, 0]}>
+        <DiceTray />
+        {dice.map((value, index) => (
+          <DiceMesh
+            key={`dice-3d-${index}`}
+            index={index}
+            isShaking={isShaking}
+            placement={placements[index]}
+            reducedMotion={reducedMotion}
+            value={value}
+          />
+        ))}
         <CupLid isOpen={isOpen} lidOffset={lidOffset} />
       </group>
     </Canvas>
   );
+}
+
+function DiceCupCamera() {
+  const { camera } = useThree();
+
+  useLayoutEffect(() => {
+    camera.lookAt(...CAMERA_TARGET);
+    camera.updateProjectionMatrix();
+  }, [camera]);
+
+  useFrame(() => {
+    camera.lookAt(...CAMERA_TARGET);
+  });
+
+  return null;
+}
+
+function CanvasStageResizer() {
+  const { gl, setSize } = useThree();
+  const syncSize = useCallback(() => {
+    const canvas = gl.domElement;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+    const rect = parent.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const nextWidth = Math.round(rect.width);
+    const nextHeight = Math.round(rect.height);
+    if (Math.abs(canvas.width - nextWidth) > 1 || Math.abs(canvas.height - nextHeight) > 1) {
+      setSize(rect.width, rect.height);
+    }
+    if (canvas.style.width !== '100%') canvas.style.width = '100%';
+    if (canvas.style.height !== '100%') canvas.style.height = '100%';
+  }, [gl, setSize]);
+
+  useLayoutEffect(() => {
+    const parent = gl.domElement.parentElement;
+    if (!parent) return;
+
+    syncSize();
+    const animationFrame = window.requestAnimationFrame(syncSize);
+    const delayedSync = window.setTimeout(syncSize, 280);
+    const observer = new ResizeObserver(syncSize);
+    observer.observe(parent);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.clearTimeout(delayedSync);
+      observer.disconnect();
+    };
+  }, [gl, syncSize]);
+
+  useFrame(syncSize);
+
+  return null;
 }
 
 function DiceTray() {
@@ -182,7 +249,7 @@ function DiceMesh({
       {Object.entries(FACE_TRANSFORMS).map(([face, transform]) => (
         <PipFace
           key={face}
-          color={face === 'front' || face === 'left' ? '#e46d59' : '#4d4038'}
+          color={face === 'front' || face === 'left' ? '#cf3b2e' : '#1f1b18'}
           transform={transform}
           value={faceValues[face as DiceFaceName]}
         />
@@ -215,9 +282,9 @@ function PipFace({
   return (
     <group position={transform.position} rotation={transform.rotation}>
       {getPipPositions(value).map(([x, y], index) => (
-        <mesh key={`pip-${value}-${index}`} position={[x, y, 0.003]}>
-          <circleGeometry args={[0.048, 22]} />
-          <meshStandardMaterial color={color} roughness={0.5} />
+        <mesh key={`pip-${value}-${index}`} position={[x, y, 0.006]}>
+          <circleGeometry args={[0.067, 28]} />
+          <meshStandardMaterial color={color} roughness={0.34} />
         </mesh>
       ))}
     </group>
@@ -229,16 +296,18 @@ function getLidTarget(isOpen: boolean, lidOffset: Point) {
   const dragY = -lidOffset.y / 70;
   const openAmount = MathUtils.clamp((Math.abs(dragX) + Math.max(0, dragY)) / 2.1, 0, 1);
   const baseOpen = isOpen ? 1 : openAmount;
+  const slideAmount = baseOpen ** 1.35;
+  const liftClearance = Math.sin(baseOpen * Math.PI) * 0.82;
   return {
     position: [
-      MathUtils.lerp(0, 2.02, baseOpen) + dragX * 0.12,
-      MathUtils.lerp(1.34, 2.16, baseOpen),
-      MathUtils.lerp(0.02, -1.3, baseOpen),
+      MathUtils.lerp(0, 3.56, slideAmount) + dragX * 0.12,
+      MathUtils.lerp(1.34, 1.72, baseOpen) + liftClearance,
+      MathUtils.lerp(0.02, -1.78, slideAmount),
     ] as [number, number, number],
     rotation: [
-      MathUtils.lerp(0, -0.36, baseOpen),
-      MathUtils.lerp(0, -0.34, baseOpen),
-      MathUtils.lerp(0, -0.3, baseOpen),
+      MathUtils.lerp(0, -0.36, slideAmount),
+      MathUtils.lerp(0, -0.34, slideAmount),
+      MathUtils.lerp(0, -0.3, slideAmount),
     ] as [number, number, number],
   };
 }

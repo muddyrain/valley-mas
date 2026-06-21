@@ -287,6 +287,9 @@ func autoMigrateModelsByName() map[string]any {
 		"household_invite":                   &model.HouseholdInvite{},
 		"operation_log":                      &model.OperationLog{},
 		"ai_usage_log":                       &model.AIUsageLog{},
+		"ai_agent":                           &model.AIAgent{},
+		"ai_conversation":                    &model.AIConversation{},
+		"ai_message":                         &model.AIMessage{},
 		"creator":                            &model.Creator{},
 		"creator_space":                      &model.CreatorSpace{},
 		"resource":                           &model.Resource{},
@@ -347,6 +350,10 @@ func autoMigrateModelAliases() map[string]string {
 		"mail_message":             "mail_message",
 		"ai_usage":                 "ai_usage_log",
 		"ai_usage_logs":            "ai_usage_log",
+		"ai_agents":                "ai_agent",
+		"agents":                   "ai_agent",
+		"ai_conversations":         "ai_conversation",
+		"ai_messages":              "ai_message",
 		"places":                   "lifetrace_place",
 		"place":                    "lifetrace_place",
 		"plans":                    "lifetrace_plan",
@@ -395,6 +402,9 @@ func coreMigrationModels() []any {
 		&model.HouseholdInvite{},
 		&model.OperationLog{},
 		&model.AIUsageLog{},
+		&model.AIAgent{},
+		&model.AIConversation{},
+		&model.AIMessage{},
 	}
 }
 

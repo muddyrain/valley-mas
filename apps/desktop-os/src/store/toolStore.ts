@@ -1,3 +1,4 @@
+import type { RandomStringPresetId } from '@valley/format-tools';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -137,6 +138,9 @@ interface ToolStore {
   devDiffLeft: string;
   devDiffRight: string;
   devCsvDraft: string;
+  devRandomLength: number;
+  devRandomPreset: RandomStringPresetId;
+  devRandomCount: number;
   setDevToolsTab: (tab: DevToolsTab) => void;
   setDevJsonDraft: (draft: string) => void;
   setDevTimeDraft: (draft: string) => void;
@@ -144,6 +148,9 @@ interface ToolStore {
   setDevDiffLeft: (draft: string) => void;
   setDevDiffRight: (draft: string) => void;
   setDevCsvDraft: (draft: string) => void;
+  setDevRandomLength: (value: number) => void;
+  setDevRandomPreset: (preset: RandomStringPresetId) => void;
+  setDevRandomCount: (value: number) => void;
 
   dailyToolsTab: DailyToolsTab;
   dailyDateStart: string;
@@ -411,6 +418,9 @@ export const useToolStore = create<ToolStore>()(
       devDiffLeft: '',
       devDiffRight: '',
       devCsvDraft: 'name,value\nValley,1',
+      devRandomLength: 32,
+      devRandomPreset: 'safeAscii',
+      devRandomCount: 1,
       setDevToolsTab: (tab) => set({ devToolsTab: tab }),
       setDevJsonDraft: (draft) => set({ devJsonDraft: draft }),
       setDevTimeDraft: (draft) => set({ devTimeDraft: draft }),
@@ -418,6 +428,9 @@ export const useToolStore = create<ToolStore>()(
       setDevDiffLeft: (draft) => set({ devDiffLeft: draft }),
       setDevDiffRight: (draft) => set({ devDiffRight: draft }),
       setDevCsvDraft: (draft) => set({ devCsvDraft: draft }),
+      setDevRandomLength: (value) => set({ devRandomLength: value }),
+      setDevRandomPreset: (preset) => set({ devRandomPreset: preset }),
+      setDevRandomCount: (value) => set({ devRandomCount: value }),
 
       dailyToolsTab: 'date',
       dailyDateStart: '',
@@ -464,6 +477,9 @@ export const useToolStore = create<ToolStore>()(
         devDiffLeft: state.devDiffLeft,
         devDiffRight: state.devDiffRight,
         devCsvDraft: state.devCsvDraft,
+        devRandomLength: state.devRandomLength,
+        devRandomPreset: state.devRandomPreset,
+        devRandomCount: state.devRandomCount,
         dailyToolsTab: state.dailyToolsTab,
         dailyDateStart: state.dailyDateStart,
         dailyDateEnd: state.dailyDateEnd,

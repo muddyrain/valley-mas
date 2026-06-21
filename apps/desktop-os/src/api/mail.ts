@@ -32,6 +32,7 @@ export interface MailMessageSummary {
 
 export interface MailMessageDetail extends MailMessageSummary {
   textBody?: string;
+  htmlBody?: string;
 }
 
 export interface MailPagination {

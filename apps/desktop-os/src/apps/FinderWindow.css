@@ -13,6 +13,13 @@
   padding: 0;
 }
 
+.window__body:has(.finder-window) .window__body-content {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+}
+
 .finder__sr-only {
   position: absolute;
   width: 1px;
@@ -26,40 +33,18 @@
 }
 
 .finder__sidebar {
-  display: flex;
   min-height: 0;
+  border-right: 1px solid rgba(126, 105, 70, 0.16);
+  background: rgba(255, 245, 226, 0.7);
+  overflow: hidden;
+}
+
+.finder__sidebar .plush-scrollbar__content {
+  display: flex;
+  min-height: 100%;
   flex-direction: column;
   gap: 18px;
   padding: 18px 12px;
-  border-right: 1px solid rgba(126, 105, 70, 0.16);
-  background: rgba(255, 245, 226, 0.7);
-  overflow-y: auto;
-  scrollbar-color: transparent transparent;
-  scrollbar-width: thin;
-  transition: scrollbar-color 0.18s ease;
-}
-
-.finder__sidebar::-webkit-scrollbar {
-  width: 8px;
-}
-
-.finder__sidebar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.finder__sidebar::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background-color: transparent;
-  background-clip: padding-box;
-}
-
-.finder__sidebar.is-scrolling {
-  scrollbar-color: rgba(126, 105, 70, 0.28) transparent;
-}
-
-.finder__sidebar.is-scrolling::-webkit-scrollbar-thumb {
-  background-color: rgba(126, 105, 70, 0.28);
 }
 
 .finder__sidebar-group {
@@ -255,6 +240,13 @@
   background: rgba(255, 255, 255, 0.72);
 }
 
+.finder__search:focus-within {
+  border-color: rgba(168, 212, 234, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 0 0 3px rgba(168, 212, 234, 0.2);
+}
+
 .finder__search input {
   width: 100%;
   min-width: 0;
@@ -356,53 +348,32 @@
   min-height: 0;
 }
 
-.finder__browser {
-  display: grid;
-  align-content: start;
-  gap: 18px 20px;
+.finder__content > .plush-scrollbar-frame {
   min-width: 0;
   min-height: 0;
-  padding: 18px 20px 20px;
-  overflow: auto;
+}
+
+.finder__browser {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   outline: none;
-  scrollbar-color: transparent transparent;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  transition: scrollbar-color 0.18s ease;
 }
 
-.finder__browser::-webkit-scrollbar,
-.finder__detail::-webkit-scrollbar {
-  width: 8px;
+.finder__browser .plush-scrollbar__content {
+  display: grid;
+  min-height: 100%;
+  align-content: start;
+  gap: 18px 20px;
+  padding: 18px 20px 20px;
 }
 
-.finder__browser::-webkit-scrollbar-track,
-.finder__detail::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.finder__browser::-webkit-scrollbar-thumb,
-.finder__detail::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background-color: transparent;
-  background-clip: padding-box;
-}
-
-.finder__browser.is-scrolling {
-  scrollbar-color: rgba(126, 105, 70, 0.22) transparent;
-}
-
-.finder__browser.is-scrolling::-webkit-scrollbar-thumb {
-  background-color: rgba(126, 105, 70, 0.22);
-}
-
-.finder__browser--grid {
+.finder__browser--grid .plush-scrollbar__content {
   grid-template-columns: repeat(auto-fill, minmax(164px, 1fr));
 }
 
-.finder__browser--list,
-.finder__browser--gallery {
+.finder__browser--list .plush-scrollbar__content,
+.finder__browser--gallery .plush-scrollbar__content {
   grid-template-columns: 1fr;
 }
 
@@ -750,25 +721,17 @@
 
 .finder__detail {
   min-width: 0;
-  padding: 18px 14px 20px 18px;
   border-left: 1px solid rgba(126, 105, 70, 0.14);
-  overflow: auto;
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(255, 253, 246, 0.9), rgba(255, 243, 218, 0.68)),
     linear-gradient(135deg, rgba(244, 217, 122, 0.18), rgba(244, 168, 184, 0.08)),
     rgba(255, 248, 232, 0.76);
-  scrollbar-color: transparent transparent;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  transition: scrollbar-color 0.18s ease;
 }
 
-.finder__detail.is-scrolling {
-  scrollbar-color: rgba(126, 105, 70, 0.24) transparent;
-}
-
-.finder__detail.is-scrolling::-webkit-scrollbar-thumb {
-  background-color: rgba(126, 105, 70, 0.24);
+.finder__detail .plush-scrollbar__content {
+  min-height: 100%;
+  padding: 18px 14px 20px 18px;
 }
 
 .finder__preview {

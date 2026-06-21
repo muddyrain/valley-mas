@@ -1,7 +1,5 @@
 import {
-  type MutableRefObject,
   type PointerEvent as ReactPointerEvent,
-  type UIEvent,
   useEffect,
   useMemo,
   useRef,
@@ -36,6 +34,7 @@ import EmptyState from '../ui/EmptyState';
 import PlushImage from '../ui/PlushImage';
 import PlushLoading from '../ui/PlushLoading';
 import PlushLoadMore from '../ui/PlushLoadMore';
+import PlushScrollbar from '../ui/PlushScrollbar';
 import PlushSelect from '../ui/PlushSelect';
 import { getDefaultWindowOptions } from './desktopApps';
 import './FinderWindow.css';
@@ -132,22 +131,17 @@ export default function FinderWindow() {
   const [previewItem, setPreviewItem] = useState<FinderItem | null>(null);
   const [searchInput, setSearchInput] = useState(keyword);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [sidebarScrolling, setSidebarScrolling] = useState(false);
-  const [browserScrolling, setBrowserScrolling] = useState(false);
-  const [detailScrolling, setDetailScrolling] = useState(false);
   const [contextMenu, setContextMenu] = useState<FinderContextMenuState | null>(null);
   const [imageRetryKey, setImageRetryKey] = useState(0);
   const [activeTypeFilter, setActiveTypeFilter] = useState<FinderTypeFilter>('all');
   const [activePackageId, setActivePackageId] = useState<string | null>(null);
   const [activeSavedSearchId, setActiveSavedSearchId] = useState<string | null>(null);
   const itemRefs = useRef<Record<string, HTMLElement | null>>({});
-  const browserRef = useRef<HTMLDivElement | null>(null);
-  const sidebarScrollTimerRef = useRef<number | null>(null);
-  const browserScrollTimerRef = useRef<number | null>(null);
-  const detailScrollTimerRef = useRef<number | null>(null);
+  const browserRef = useRef<HTMLElement | null>(null);
   const scrollMemoryFrameRef = useRef<number | null>(null);
   const pendingScrollTopRef = useRef(0);
   const restoringViewRef = useRef(false);
+  const restoredViewKeyRef = useRef<string | null>(null);
 
   const activeTag = tags.find((tag) => tag.id === activeTagId) ?? null;
   const isResourceBrowser = isServerResourcePath(currentPath);
@@ -254,13 +248,22 @@ export default function FinderWindow() {
   }, [currentPath, setActiveSmartView]);
 
   useEffect(() => {
+    if (restoredViewKeyRef.current === viewKey) return;
+    restoredViewKeyRef.current = viewKey;
     const saved = viewStates[viewKey];
-    if (!saved) return;
+    if (!saved) {
+      restoringViewRef.current = false;
+      return;
+    }
     restoringViewRef.current = true;
     if (saved.viewMode && saved.viewMode !== viewMode) setViewMode(saved.viewMode);
     if (saved.sort && saved.sort !== sort) void setSort(saved.sort);
     if (saved.selectedId) selectItem(saved.selectedId);
     window.requestAnimationFrame(() => {
+      if (restoredViewKeyRef.current !== viewKey) {
+        restoringViewRef.current = false;
+        return;
+      }
       if (browserRef.current && typeof saved.scrollTop === 'number') {
         browserRef.current.scrollTop = saved.scrollTop;
       }
@@ -351,9 +354,6 @@ export default function FinderWindow() {
 
   useEffect(() => {
     return () => {
-      if (sidebarScrollTimerRef.current) window.clearTimeout(sidebarScrollTimerRef.current);
-      if (browserScrollTimerRef.current) window.clearTimeout(browserScrollTimerRef.current);
-      if (detailScrollTimerRef.current) window.clearTimeout(detailScrollTimerRef.current);
       if (scrollMemoryFrameRef.current !== null) {
         window.cancelAnimationFrame(scrollMemoryFrameRef.current);
       }
@@ -648,11 +648,10 @@ export default function FinderWindow() {
     setPath('all', null, null);
   }
 
-  function handleGridScroll(e: UIEvent<HTMLElement>) {
-    markScrolling(setBrowserScrolling, browserScrollTimerRef);
-    rememberScrollTop(e.currentTarget.scrollTop);
+  function handleGridScroll(event: Event) {
+    const target = event.target as HTMLElement;
+    rememberScrollTop(target.scrollTop);
     if (!isResourceBrowser || loadingMore || loading || !hasMore) return;
-    const target = e.currentTarget;
     const remaining = target.scrollHeight - target.scrollTop - target.clientHeight;
     if (remaining < 160) void loadMoreResources();
   }
@@ -664,26 +663,6 @@ export default function FinderWindow() {
       scrollMemoryFrameRef.current = null;
       rememberViewState({ scrollTop: pendingScrollTopRef.current });
     });
-  }
-
-  function handleSidebarScroll() {
-    markScrolling(setSidebarScrolling, sidebarScrollTimerRef);
-  }
-
-  function handleDetailScroll() {
-    markScrolling(setDetailScrolling, detailScrollTimerRef);
-  }
-
-  function markScrolling(
-    setScrolling: (scrolling: boolean) => void,
-    timerRef: MutableRefObject<number | null>,
-  ) {
-    setScrolling(true);
-    if (timerRef.current) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(() => {
-      setScrolling(false);
-      timerRef.current = null;
-    }, 650);
   }
 
   function selectOffset(delta: number) {
@@ -763,11 +742,7 @@ export default function FinderWindow() {
 
   return (
     <div className="finder-window">
-      <aside
-        className={`finder__sidebar ${sidebarScrolling ? 'is-scrolling' : ''}`}
-        aria-label="Finder 位置"
-        onScroll={handleSidebarScroll}
-      >
+      <PlushScrollbar as="aside" className="finder__sidebar" aria-label="Finder 位置">
         <FinderSidebarGroup
           title="资源库"
           sections={groupedSections.library}
@@ -867,7 +842,7 @@ export default function FinderWindow() {
             ))}
           </div>
         )}
-      </aside>
+      </PlushScrollbar>
 
       <main className="finder__main">
         <header className="finder__toolbar">
@@ -1024,11 +999,11 @@ export default function FinderWindow() {
         </header>
 
         <div className="finder__content">
-          <div
-            ref={browserRef}
-            className={`finder__browser finder__browser--${viewMode} ${
-              browserScrolling ? 'is-scrolling' : ''
-            }`}
+          <PlushScrollbar
+            viewportRef={(node) => {
+              browserRef.current = node;
+            }}
+            className={`finder__browser finder__browser--${viewMode}`}
             aria-label={`${locationTitle}内容`}
             onScroll={handleGridScroll}
             onKeyDown={handleKeyDown}
@@ -1086,13 +1061,9 @@ export default function FinderWindow() {
                 onLoadMore={hasMore && !loadingMore ? () => void loadMoreResources() : undefined}
               />
             )}
-          </div>
+          </PlushScrollbar>
 
-          <aside
-            className={`finder__detail ${detailScrolling ? 'is-scrolling' : ''}`}
-            aria-label="内容详情"
-            onScroll={handleDetailScroll}
-          >
+          <PlushScrollbar as="aside" className="finder__detail" aria-label="内容详情">
             {detailItem ? (
               <FinderDetail
                 item={detailItem}
@@ -1109,7 +1080,7 @@ export default function FinderWindow() {
             ) : (
               <EmptyState icon="◇" title="暂无内容" description="选择资源查看详情" />
             )}
-          </aside>
+          </PlushScrollbar>
         </div>
 
         {hasBatchSelection && (

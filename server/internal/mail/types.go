@@ -35,6 +35,7 @@ type MessageDTO struct {
 	Subject           string    `json:"subject"`
 	Snippet           string    `json:"snippet"`
 	TextBody          string    `json:"textBody,omitempty"`
+	HTMLBody          string    `json:"htmlBody,omitempty"`
 	IsRead            bool      `json:"isRead"`
 	SentAt            time.Time `json:"sentAt"`
 	CreatedAt         time.Time `json:"createdAt"`
@@ -50,6 +51,7 @@ type FetchedMessage struct {
 	Subject           string
 	Snippet           string
 	TextBody          string
+	HTMLBody          string
 	IsRead            bool
 	SentAt            time.Time
 }
