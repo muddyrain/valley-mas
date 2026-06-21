@@ -14,10 +14,13 @@ import {
   digestText,
   encodeHtmlEntities,
   formatJson,
+  generateRandomStrings,
   jsonArrayToCsv,
   jsonToQueryString,
   nowTimestampInput,
   queryStringToJson,
+  RANDOM_STRING_PRESETS,
+  type RandomStringPresetId,
   readTimestamp,
   shiftDate,
   type ToolResult,
@@ -50,6 +53,12 @@ export default function DevToolsWindow() {
   const setDiffRight = useToolStore((s) => s.setDevDiffRight);
   const csvDraft = useToolStore((s) => s.devCsvDraft);
   const setCsvDraft = useToolStore((s) => s.setDevCsvDraft);
+  const randomLength = useToolStore((s) => s.devRandomLength);
+  const setRandomLength = useToolStore((s) => s.setDevRandomLength);
+  const randomPreset = useToolStore((s) => s.devRandomPreset);
+  const setRandomPreset = useToolStore((s) => s.setDevRandomPreset);
+  const randomCount = useToolStore((s) => s.devRandomCount);
+  const setRandomCount = useToolStore((s) => s.setDevRandomCount);
   const [result, setResult] = useState<ToolResult>({
     ok: true,
     output: '',
@@ -144,6 +153,33 @@ export default function DevToolsWindow() {
       const algorithm = action === 'sha1' ? 'SHA-1' : 'SHA-256';
       setResult({ ok: true, output: await digestText(hashInput, algorithm), message: '已计算' });
     }
+  }
+
+  function applyRandomString(overrides?: {
+    preset?: RandomStringPresetId;
+    length?: number;
+    count?: number;
+  }) {
+    try {
+      const output = generateRandomStrings({
+        length: overrides?.length ?? randomLength,
+        preset: overrides?.preset ?? randomPreset,
+        count: overrides?.count ?? randomCount,
+      }).join('\n');
+      setResult({ ok: true, output, message: '已生成' });
+    } catch (error) {
+      setResult({
+        ok: false,
+        output: '',
+        message: error instanceof Error ? error.message : '生成失败',
+      });
+    }
+  }
+
+  function applyUuidBatch() {
+    const count = Math.min(20, Math.max(1, Math.floor(randomCount)));
+    const output = Array.from({ length: count }, () => createUuid()).join('\n');
+    setResult({ ok: true, output, message: '已生成' });
   }
 
   function applyCsv(action: 'csvToJson' | 'tsvToJson' | 'jsonToCsv' | 'markdown') {
@@ -260,7 +296,7 @@ export default function DevToolsWindow() {
         ) : null}
 
         {tab === 'hash' ? (
-          <div className="toolbox-panel">
+          <div className="toolbox-panel toolbox-panel--hash">
             <div className="toolbox-panel__head">ID / 哈希</div>
             <textarea
               className="mini-input mini-input--textarea"
@@ -285,6 +321,56 @@ export default function DevToolsWindow() {
               <button type="button" onClick={() => void applyHash('sha1')}>
                 SHA-1
               </button>
+            </div>
+            <div className="toolbox-subpanel">
+              <div className="toolbox-panel__head">随机字符串</div>
+              <div className="toolbox-inline">
+                <label>
+                  长度
+                  <input
+                    className="mini-input"
+                    type="number"
+                    min="1"
+                    max="256"
+                    value={randomLength}
+                    onChange={(e) => setRandomLength(Number.parseInt(e.target.value || '0', 10))}
+                  />
+                </label>
+                <label>
+                  数量
+                  <input
+                    className="mini-input"
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={randomCount}
+                    onChange={(e) => setRandomCount(Number.parseInt(e.target.value || '0', 10))}
+                  />
+                </label>
+                <PlushSelect
+                  value={randomPreset}
+                  onChange={(value) => setRandomPreset(value as RandomStringPresetId)}
+                  ariaLabel="随机字符集"
+                  options={RANDOM_STRING_PRESETS.map((preset) => ({
+                    value: preset.id,
+                    label: preset.label,
+                  }))}
+                />
+              </div>
+              <div className="toolbox-actions">
+                <button type="button" onClick={() => applyRandomString()}>
+                  生成
+                </button>
+                <button type="button" onClick={() => applyRandomString({ preset: 'base64url' })}>
+                  Base64URL
+                </button>
+                <button type="button" onClick={() => applyRandomString({ preset: 'hex' })}>
+                  Hex
+                </button>
+                <button type="button" onClick={applyUuidBatch}>
+                  UUID 批量
+                </button>
+              </div>
             </div>
           </div>
         ) : null}

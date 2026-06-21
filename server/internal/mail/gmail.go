@@ -220,6 +220,7 @@ func extractGmailMessage(message gmailMessage, accountID string) FetchedMessage 
 	}
 
 	body := strings.TrimSpace(extractGmailText(message.Payload))
+	htmlBody := strings.TrimSpace(extractGmailHTML(message.Payload))
 	snippet := strings.TrimSpace(message.Snippet)
 	if snippet == "" {
 		snippet = trimText(body, 240)
@@ -233,25 +234,46 @@ func extractGmailMessage(message gmailMessage, accountID string) FetchedMessage 
 		FromAddress:       headers["from"],
 		Subject:           headers["subject"],
 		Snippet:           snippet,
-		TextBody:          trimText(body, 8000),
+		TextBody:          trimBodyText(body, 8000),
+		HTMLBody:          trimHTMLBody(htmlBody, 200000),
 		IsRead:            containsString(message.LabelIDs, "UNREAD") == false,
 		SentAt:            sentAt,
 	}
 }
 
 func extractGmailText(payload gmailPayload) string {
-	if strings.EqualFold(payload.MimeType, "text/plain") && payload.Body.Data != "" {
-		if decoded, err := base64.RawURLEncoding.DecodeString(payload.Body.Data); err == nil {
-			return string(decoded)
-		}
-		if decoded, err := base64.StdEncoding.DecodeString(payload.Body.Data); err == nil {
-			return string(decoded)
-		}
+	if strings.EqualFold(payload.MimeType, "text/plain") {
+		return decodeGmailPayloadBody(payload.Body.Data)
 	}
 	for _, part := range payload.Parts {
 		if text := extractGmailText(part); strings.TrimSpace(text) != "" {
 			return text
 		}
+	}
+	return ""
+}
+
+func extractGmailHTML(payload gmailPayload) string {
+	if strings.EqualFold(payload.MimeType, "text/html") {
+		return decodeGmailPayloadBody(payload.Body.Data)
+	}
+	for _, part := range payload.Parts {
+		if htmlBody := extractGmailHTML(part); strings.TrimSpace(htmlBody) != "" {
+			return htmlBody
+		}
+	}
+	return ""
+}
+
+func decodeGmailPayloadBody(data string) string {
+	if strings.TrimSpace(data) == "" {
+		return ""
+	}
+	if decoded, err := base64.RawURLEncoding.DecodeString(data); err == nil {
+		return string(decoded)
+	}
+	if decoded, err := base64.StdEncoding.DecodeString(data); err == nil {
+		return string(decoded)
 	}
 	return ""
 }

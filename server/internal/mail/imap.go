@@ -62,7 +62,7 @@ func (p *QQIMAPProvider) FetchInbox(ctx context.Context, accountID string, email
 	for _, uid := range uids {
 		uidParts = append(uidParts, strconv.Itoa(uid))
 	}
-	fetchRaw, err := client.command("UID FETCH %s (UID FLAGS ENVELOPE BODY.PEEK[TEXT]<0.8192>)", strings.Join(uidParts, ","))
+	fetchRaw, err := client.command("UID FETCH %s (UID FLAGS ENVELOPE BODY.PEEK[]<0.65536>)", strings.Join(uidParts, ","))
 	if err != nil {
 		return nil, err
 	}
@@ -185,15 +185,8 @@ func parseIMAPFetch(raw string, accountID string) (FetchedMessage, error) {
 		from = fmt.Sprintf("%s <%s>", fromName, from)
 	}
 
-	body := raw
-	if marker := "BODY[TEXT]"; strings.Contains(raw, marker) {
-		body = raw[strings.Index(raw, marker)+len(marker):]
-		if idx := strings.Index(body, "\r\n"); idx >= 0 {
-			body = body[idx+2:]
-		}
-	}
-	body = stripIMAPTaggedTail(body)
-	body = strings.TrimSpace(body)
+	bodies := parseReadableMailBodies(extractIMAPMessageBody(raw))
+	body := bodies.Text
 
 	sentAt := time.Now().UTC()
 	if parsed, err := parseMailTime(dateValue); err == nil {
@@ -207,7 +200,8 @@ func parseIMAPFetch(raw string, accountID string) (FetchedMessage, error) {
 		FromAddress:       from,
 		Subject:           subject,
 		Snippet:           trimText(body, 240),
-		TextBody:          trimText(body, 8000),
+		TextBody:          trimBodyText(body, 8000),
+		HTMLBody:          trimHTMLBody(bodies.HTML, 200000),
 		IsRead:            strings.Contains(raw, `\Seen`),
 		SentAt:            sentAt,
 	}, nil
@@ -229,10 +223,27 @@ func stripIMAPTaggedTail(value string) string {
 		if strings.HasPrefix(line, "A") && strings.Contains(line, " OK") {
 			break
 		}
+		if strings.TrimSpace(line) == ")" {
+			continue
+		}
 		if strings.HasSuffix(line, ")") && strings.Contains(line, " FETCH ") {
 			continue
 		}
 		kept = append(kept, line)
 	}
 	return strings.Join(kept, "\n")
+}
+
+func extractIMAPMessageBody(raw string) string {
+	for _, marker := range []string{"BODY[]", "BODY[TEXT]"} {
+		if !strings.Contains(raw, marker) {
+			continue
+		}
+		body := raw[strings.Index(raw, marker)+len(marker):]
+		if idx := strings.Index(body, "\r\n"); idx >= 0 {
+			body = body[idx+2:]
+		}
+		return strings.TrimSpace(stripIMAPTaggedTail(body))
+	}
+	return strings.TrimSpace(stripIMAPTaggedTail(raw))
 }

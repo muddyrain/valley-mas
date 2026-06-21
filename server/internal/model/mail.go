@@ -30,7 +30,7 @@ func (a *MailAccount) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// MailMessage stores a safe, text-only cache of a read-only mailbox message.
+// MailMessage stores a safe cache of a read-only mailbox message.
 type MailMessage struct {
 	ID                Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	UserID            Int64String    `gorm:"index;not null" json:"userId"`
@@ -42,6 +42,7 @@ type MailMessage struct {
 	Subject           string         `gorm:"size:500" json:"subject"`
 	Snippet           string         `gorm:"size:1000" json:"snippet"`
 	TextBody          string         `gorm:"type:text" json:"textBody,omitempty"`
+	HTMLBody          string         `gorm:"type:text" json:"htmlBody,omitempty"`
 	IsRead            bool           `gorm:"default:false" json:"isRead"`
 	SentAt            time.Time      `gorm:"index" json:"sentAt"`
 	CreatedAt         time.Time      `json:"createdAt"`

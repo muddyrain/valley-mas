@@ -19,12 +19,16 @@ describe('desktop runtime lifecycle surface', () => {
     const finderSource = readSource('src/apps/FinderWindow.tsx');
     const safariSource = readSource('src/apps/SafariWindow.tsx');
     const spotlightSource = readSource('src/spotlight/Spotlight.tsx');
+    const blogSource = readSource('src/apps/BlogWindow.tsx');
 
     expect(appSource).not.toContain('useResourceStore');
     expect(appSource).not.toContain('loadResources()');
+    expect(appSource).not.toContain('useBlogStore');
+    expect(appSource).not.toContain('loadPosts()');
     expect(finderSource).toContain('loadResources');
     expect(safariSource).toContain('loadResources');
     expect(spotlightSource).toContain('loadResources');
+    expect(blogSource).toContain('loadPosts');
   });
 
   it('keeps audio runtime behind a lazy gate and removes the pet runtime', () => {

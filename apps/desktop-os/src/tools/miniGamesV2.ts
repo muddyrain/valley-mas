@@ -205,9 +205,9 @@ function makeDicePlacement3D(
   return clampPlacementToBoard(
     {
       x: slot.x + (rng() - 0.5) * 0.08,
-      y: 0.56,
+      y: 0.52,
       z: slot.z + (rng() - 0.5) * 0.08,
-      rotation: [-0.34 + (rng() - 0.5) * 0.12, -0.4 + (rng() - 0.5) * 0.2, (rng() - 0.5) * 0.16],
+      rotation: [0, -0.36 + (rng() - 0.5) * 0.34, 0],
       spin: [1.8 + rng() * 2.8, 2.2 + rng() * 3.2, 1.4 + rng() * 2.6],
       settleDelay: Math.round(index * 55 + rng() * 90),
     } satisfies DicePlacement3D,

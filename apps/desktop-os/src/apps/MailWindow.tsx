@@ -1,4 +1,4 @@
-import { RefreshCw, Search, Trash2 } from 'lucide-react';
+import { Inbox, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   deleteMailAccount,
@@ -12,6 +12,8 @@ import {
 } from '../api/mail';
 import { useAuthStore } from '../store/authStore';
 import './DockAppWindows.css';
+import MailBodyText from './MailBodyText';
+import MailHTMLFrame from './MailHTMLFrame';
 
 const ALL_INBOX = 'all';
 
@@ -163,47 +165,72 @@ export default function MailWindow() {
 
       <div className="mail-window__layout">
         <aside className="mail-window__accounts">
-          <button
-            type="button"
-            className={selectedAccountId === ALL_INBOX ? 'is-active' : ''}
-            onClick={() => setSelectedAccountId(ALL_INBOX)}
-          >
-            <span>统一收件箱</span>
-            <strong>{messages.length}</strong>
-          </button>
-          {accounts.map((account) => (
-            <div className="mail-window__account-row" key={account.id}>
-              <button
-                type="button"
-                className={selectedAccountId === account.id ? 'is-active' : ''}
-                onClick={() => setSelectedAccountId(account.id)}
-              >
-                <span>{account.email}</span>
-                <small>
-                  {providerLabel(account.provider)} · {statusLabel(account.status)}
-                </small>
-              </button>
-              <button
-                type="button"
-                className="mail-window__tiny"
-                onClick={() => void handleSync(account.id)}
-                disabled={Boolean(isSyncing)}
-                aria-label="同步邮箱"
-                title="同步邮箱"
-              >
-                <RefreshCw size={13} className={isSyncing === account.id ? 'is-spinning' : ''} />
-              </button>
-              <button
-                type="button"
-                className="mail-window__tiny"
-                onClick={() => void handleDeleteAccount(account.id)}
-                aria-label="解绑邮箱"
-                title="解绑邮箱"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-          ))}
+          <div className="mail-window__accounts-scroll">
+            <button
+              type="button"
+              className={
+                selectedAccountId === ALL_INBOX
+                  ? 'mail-window__account-card is-active'
+                  : 'mail-window__account-card'
+              }
+              onClick={() => setSelectedAccountId(ALL_INBOX)}
+            >
+              <span className="mail-window__account-icon">
+                <Inbox size={15} />
+              </span>
+              <span className="mail-window__account-copy">
+                <span>统一收件箱</span>
+                <small>{messages.length} 封邮件</small>
+              </span>
+            </button>
+            {accounts.map((account) => (
+              <div className="mail-window__account-row" key={account.id}>
+                <button
+                  type="button"
+                  className={
+                    selectedAccountId === account.id
+                      ? 'mail-window__account-card is-active'
+                      : 'mail-window__account-card'
+                  }
+                  onClick={() => setSelectedAccountId(account.id)}
+                >
+                  <span className={`mail-window__account-icon ${providerTone(account.provider)}`}>
+                    {providerInitial(account.provider)}
+                  </span>
+                  <span className="mail-window__account-copy">
+                    <span>{account.email}</span>
+                    <small className={account.status === 'error' ? 'is-error' : ''}>
+                      {providerLabel(account.provider)} · {statusLabel(account.status)}
+                    </small>
+                  </span>
+                </button>
+                <span className="mail-window__account-actions">
+                  <button
+                    type="button"
+                    className="mail-window__tiny"
+                    onClick={() => void handleSync(account.id)}
+                    disabled={Boolean(isSyncing)}
+                    aria-label="同步邮箱"
+                    title="同步邮箱"
+                  >
+                    <RefreshCw
+                      size={13}
+                      className={isSyncing === account.id ? 'is-spinning' : ''}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    className="mail-window__tiny"
+                    onClick={() => void handleDeleteAccount(account.id)}
+                    aria-label="解绑邮箱"
+                    title="解绑邮箱"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
         </aside>
 
         <main className="mail-window__messages">
@@ -228,31 +255,64 @@ export default function MailWindow() {
                 type="button"
                 key={message.id}
                 className={
-                  message.id === selectedMessageId ? 'mail-message is-active' : 'mail-message'
+                  message.id === selectedMessageId
+                    ? 'mail-message is-active'
+                    : message.isRead
+                      ? 'mail-message'
+                      : 'mail-message is-unread'
                 }
                 onClick={() => setSelectedMessageId(message.id)}
               >
-                <span className="mail-message__from">
-                  {message.fromAddress || providerLabel(message.provider)}
+                <span className="mail-message__meta">
+                  <span className="mail-message__from">
+                    <span className="mail-message__dot" />
+                    {senderName(message.fromAddress) || providerLabel(message.provider)}
+                  </span>
+                  <time>{formatMailDate(message.sentAt)}</time>
                 </span>
-                <strong>{message.subject || '无主题'}</strong>
-                <small>{message.snippet}</small>
-                <em>{formatMailDate(message.sentAt)}</em>
+                <span className="mail-message__subject-row">
+                  <strong>{message.subject || '无主题'}</strong>
+                  <span className={`mail-message__provider ${providerTone(message.provider)}`}>
+                    {providerLabel(message.provider)}
+                  </span>
+                </span>
+                <small>{message.snippet || '暂无摘要'}</small>
               </button>
             ))}
           </div>
         </main>
 
-        <article className="mail-window__detail">
+        <article className="mail-window__detail mail-window__reader">
           {selectedMessage ? (
             <>
               <div className="mail-window__detail-head">
-                <span>{providerLabel(selectedMessage.provider)}</span>
-                <time>{formatMailDate(selectedMessage.sentAt)}</time>
+                <span
+                  className={`mail-message__provider ${providerTone(selectedMessage.provider)}`}
+                >
+                  {providerLabel(selectedMessage.provider)}
+                </span>
+                <time>{formatMailDateTime(selectedMessage.sentAt)}</time>
               </div>
               <h3>{selectedMessage.subject || '无主题'}</h3>
-              <p className="mail-window__from">{selectedMessage.fromAddress}</p>
-              <pre>{selectedMessage.textBody || selectedMessage.snippet || '暂无正文预览'}</pre>
+              <div className="mail-window__from">
+                <span className="mail-window__sender-avatar">
+                  {senderInitial(selectedMessage.fromAddress || selectedMessage.subject)}
+                </span>
+                <span>
+                  <strong>{senderName(selectedMessage.fromAddress) || '未知发件人'}</strong>
+                  <small>{selectedMessage.fromAddress || '发件人未显示'}</small>
+                </span>
+              </div>
+              <div className="mail-window__reader-body">
+                {selectedMessage.htmlBody ? (
+                  <MailHTMLFrame
+                    html={selectedMessage.htmlBody}
+                    title={selectedMessage.subject || '邮件正文'}
+                  />
+                ) : (
+                  <MailBodyText text={selectedMessage.textBody || selectedMessage.snippet} />
+                )}
+              </div>
             </>
           ) : (
             <div className="mail-window__empty">选择一封邮件</div>
@@ -269,6 +329,18 @@ function providerLabel(provider: string) {
   return '邮箱';
 }
 
+function providerInitial(provider: string) {
+  if (provider === 'gmail') return 'G';
+  if (provider === 'qq_imap') return 'Q';
+  return 'M';
+}
+
+function providerTone(provider: string) {
+  if (provider === 'gmail') return 'is-gmail';
+  if (provider === 'qq_imap') return 'is-qq';
+  return 'is-mail';
+}
+
 function statusLabel(status: string) {
   if (status === 'connected') return '已绑定';
   if (status === 'error') return '需处理';
@@ -279,4 +351,27 @@ function formatMailDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+}
+
+function formatMailDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function senderName(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  const match = trimmed.match(/^"?([^"<]+)"?\s*</);
+  return (match?.[1] ?? trimmed.split('<')[0]).trim();
+}
+
+function senderInitial(value: string) {
+  const name = senderName(value) || value.trim() || 'M';
+  return name.slice(0, 1).toUpperCase();
 }

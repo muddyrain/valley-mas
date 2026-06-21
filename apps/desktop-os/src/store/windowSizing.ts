@@ -46,6 +46,15 @@ const LARGE_PROFILE: WindowProfile = {
   heightRatio: 0.76,
 };
 
+const AI_COMMAND_PROFILE: WindowProfile = {
+  minWidth: 1180,
+  minHeight: 720,
+  maxWidth: 1480,
+  maxHeight: 860,
+  widthRatio: 0.86,
+  heightRatio: 0.84,
+};
+
 const MEDIUM_PROFILE: WindowProfile = {
   minWidth: 680,
   minHeight: 500,
@@ -84,6 +93,8 @@ const DICE_CUP_PROFILE: WindowProfile = {
 
 const APP_WINDOW_PROFILES: Partial<Record<DesktopAppId, WindowProfile>> = {
   finder: LARGE_PROFILE,
+  aiTools: AI_COMMAND_PROFILE,
+  blog: LARGE_PROFILE,
   safari: LARGE_PROFILE,
   calendar: LARGE_PROFILE,
   music: LARGE_PROFILE,

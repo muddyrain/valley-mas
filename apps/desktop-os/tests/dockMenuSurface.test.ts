@@ -10,7 +10,7 @@ describe('dock context menu surface', () => {
     expect(dockSource).toContain('隐藏启动台');
     expect(dockSource).toContain('显示');
     expect(dockSource).toContain('选项');
-    expect(dockSource).toContain('›');
+    expect(dockSource).toContain('ChevronRight');
     expect(dockSource).toContain('在 Dock 中保留');
     expect(dockSource).toContain('从 Dock 中移除');
     expect(dockSource).toContain('Dock 设置');

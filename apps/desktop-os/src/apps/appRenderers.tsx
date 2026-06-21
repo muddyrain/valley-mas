@@ -4,6 +4,7 @@ import AccountWindow from './AccountWindow';
 import AICommandCenterWindow from './AICommandCenterWindow';
 import BeadSortWindow from './BeadSortWindow';
 import BlockDropWindow from './BlockDropWindow';
+import BlogWindow from './BlogWindow';
 import CalculatorWindow from './CalculatorWindow';
 import CalendarWindow from './CalendarWindow';
 import ClipboardWindow from './ClipboardWindow';
@@ -36,6 +37,7 @@ export const APP_RENDERERS: Record<DesktopAppId, () => ReactNode> = {
   account: () => <AccountWindow />,
   aiTools: () => <AICommandCenterWindow />,
   beadSort: () => <BeadSortWindow />,
+  blog: () => <BlogWindow />,
   blockDrop: () => <BlockDropWindow />,
   calculator: () => <CalculatorWindow />,
   calendar: () => <CalendarWindow />,

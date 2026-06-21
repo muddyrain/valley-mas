@@ -13,6 +13,8 @@ import './Launchpad.css';
 
 const CLOSE_ANIMATION_MS = 260;
 const DEFAULT_METRICS = { pageSize: 15, columns: 5 };
+const SWIPE_PAGE_THRESHOLD = 92;
+const SWIPE_VERTICAL_CANCEL = 86;
 
 const CATEGORY_LABEL: Record<DesktopAppCategory, string> = {
   system: '系统',
@@ -64,7 +66,9 @@ function LaunchpadPanel({ isOpen, isClosing }: LaunchpadPanelProps) {
   const [keyboardActive, setKeyboardActive] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageDirection, setPageDirection] = useState(1);
+  const [isSwipePressing, setIsSwipePressing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const swipeRef = useRef<LaunchpadSwipeState | null>(null);
   const runningApps = useMemo(() => new Set(runningAppIds), [runningAppIds]);
 
   const apps = useMemo(() => filterApps(query), [query]);
@@ -130,6 +134,48 @@ function LaunchpadPanel({ isOpen, isClosing }: LaunchpadPanelProps) {
     setPageIndex(normalizedPage);
     setActiveIndex(normalizedPage * pageSize);
     setKeyboardActive(false);
+  }
+
+  function endSwipeGesture(stage?: HTMLDivElement) {
+    const swipe = swipeRef.current;
+    if (stage && swipe?.pointerId != null && stage.hasPointerCapture(swipe.pointerId)) {
+      stage.releasePointerCapture(swipe.pointerId);
+    }
+    swipeRef.current = null;
+    setIsSwipePressing(false);
+  }
+
+  function onStagePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (pageCount <= 1 || e.button !== 0 || isInteractivePointerTarget(e.target)) return;
+    swipeRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setIsSwipePressing(true);
+    setKeyboardActive(false);
+  }
+
+  function onStagePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const swipe = swipeRef.current;
+    if (!swipe || swipe.pointerId !== e.pointerId) return;
+
+    const deltaX = e.clientX - swipe.startX;
+    const deltaY = e.clientY - swipe.startY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    if (absY > SWIPE_VERTICAL_CANCEL && absY > absX) {
+      endSwipeGesture(e.currentTarget);
+      return;
+    }
+
+    if (absX < SWIPE_PAGE_THRESHOLD || absX < absY * 1.2) return;
+
+    e.preventDefault();
+    goToPage(deltaX < 0 ? pageIndex + 1 : pageIndex - 1);
+    endSwipeGesture(e.currentTarget);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -225,7 +271,13 @@ function LaunchpadPanel({ isOpen, isClosing }: LaunchpadPanelProps) {
           <div className="launchpad__empty">没有找到应用</div>
         ) : (
           <>
-            <div className="launchpad__stage">
+            <div
+              className={`launchpad__stage ${isSwipePressing ? 'is-swipe-pressing' : ''}`}
+              onPointerDown={onStagePointerDown}
+              onPointerMove={onStagePointerMove}
+              onPointerUp={(e) => endSwipeGesture(e.currentTarget)}
+              onPointerCancel={(e) => endSwipeGesture(e.currentTarget)}
+            >
               {pageCount > 1 && (
                 <>
                   <button
@@ -331,6 +383,17 @@ function chunkApps(apps: DesktopApp[], pageSize: number) {
     chunks.push(apps.slice(index, index + pageSize));
   }
   return chunks;
+}
+
+interface LaunchpadSwipeState {
+  pointerId: number;
+  startX: number;
+  startY: number;
+}
+
+function isInteractivePointerTarget(target: EventTarget) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest('button, input, textarea, select, a, [role="button"]'));
 }
 
 function useLaunchpadMetrics() {

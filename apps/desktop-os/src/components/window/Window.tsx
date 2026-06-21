@@ -2,6 +2,7 @@ import { memo, useRef, useState } from 'react';
 import { renderDesktopApp } from '../../apps/appRenderers';
 import { getDesktopAppRuntimePolicy } from '../../apps/desktopApps';
 import { type AppId, useWindowStore, type WindowState } from '../../store/windowStore';
+import PlushScrollbar from '../../ui/PlushScrollbar';
 import ResizeHandles from '../../ui/ResizeHandles';
 import TrafficLights from '../../ui/TrafficLights';
 import './Window.css';
@@ -105,9 +106,9 @@ function Window({ state, appId }: Props) {
         <div className="window__title">{state.title}</div>
         <div className="window__titlebar-spacer" />
       </div>
-      <div className="window__body">
+      <PlushScrollbar className="window__body" contentClassName="window__body-content">
         <DesktopAppHost appId={appId} lifecycleState={state.lifecycleState} />
-      </div>
+      </PlushScrollbar>
       {!state.maximized && !isClosing && (
         <ResizeHandles
           rect={{ x: state.x, y: state.y, width: state.width, height: state.height }}
