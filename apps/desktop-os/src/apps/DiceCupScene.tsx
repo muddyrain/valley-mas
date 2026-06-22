@@ -243,7 +243,8 @@ function DiceMesh({
 
   return (
     <group ref={groupRef}>
-      <mesh castShadow receiveShadow geometry={geometry}>
+      <mesh castShadow receiveShadow>
+        <primitive object={geometry} attach="geometry" />
         <meshStandardMaterial color="#fffdf7" metalness={0.03} roughness={0.26} />
       </mesh>
       {Object.entries(FACE_TRANSFORMS).map(([face, transform]) => (
