@@ -72,7 +72,21 @@ export type UserSettings = {
   subscriptionReminderEnabled: boolean;
   subscriptionReminderRules: SubscriptionReminderRule[];
   subscriptionReminderTime: string;
+  pantryListStatusFilter: PantryListStatusFilter;
+  pantryListCategoryFilter: PantryListCategoryFilter;
+  pantryListSortMode: PantrySortMode;
 };
+
+export type PantryListStatusFilter =
+  | 'all'
+  | 'normal'
+  | 'expiring'
+  | 'expired'
+  | 'no-expiry'
+  | 'used-up'
+  | 'discarded';
+
+export type PantryListCategoryFilter = 'all' | PantryCategory;
 
 export type PantryCategory = '食品' | '日用品' | '药品' | '宠物' | '其他';
 

@@ -38,6 +38,9 @@ type updateSettingsRequest struct {
 	SubscriptionReminderEnabled bool     `json:"subscriptionReminderEnabled"`
 	SubscriptionReminderRules   []string `json:"subscriptionReminderRules"`
 	SubscriptionReminderTime    string   `json:"subscriptionReminderTime"`
+	PantryListStatusFilter      string   `json:"pantryListStatusFilter"`
+	PantryListCategoryFilter    string   `json:"pantryListCategoryFilter"`
+	PantryListSortMode          string   `json:"pantryListSortMode"`
 }
 
 var errPreferredPantryHouseholdInaccessible = errors.New("preferred pantry household inaccessible")
@@ -91,6 +94,9 @@ func defaultSettings(userID model.Int64String) model.LifeTraceSettings {
 		SubscriptionReminderEnabled: true,
 		SubscriptionReminderRules:   model.StringList{"7d", "3d", "same-day", "overdue"},
 		SubscriptionReminderTime:    "09:00",
+		PantryListStatusFilter:      "all",
+		PantryListCategoryFilter:    "all",
+		PantryListSortMode:          "expiry-asc",
 	}
 }
 
@@ -219,6 +225,43 @@ func normalizeSubscriptionReminderRules(rules []string) model.StringList {
 	return result
 }
 
+var validPantryListStatusFilters = map[string]bool{
+	"all":       true,
+	"normal":    true,
+	"expiring":  true,
+	"expired":   true,
+	"no-expiry": true,
+	"used-up":   true,
+	"discarded": true,
+}
+
+func normalizePantryListStatusFilter(value string) string {
+	value = strings.TrimSpace(value)
+	if !validPantryListStatusFilters[value] {
+		return "all"
+	}
+	return value
+}
+
+func normalizePantryListCategoryFilter(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "all" {
+		return "all"
+	}
+	if !validPantryCategories[value] {
+		return "all"
+	}
+	return value
+}
+
+func normalizePantryListSortMode(value string) string {
+	value = strings.TrimSpace(value)
+	if !validPantrySorts[value] {
+		return "expiry-asc"
+	}
+	return value
+}
+
 func resolvePreferredPantryHouseholdID(userID model.Int64String, raw string) (model.Int64String, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -283,6 +326,9 @@ func applySettingsRequest(settings *model.LifeTraceSettings, req updateSettingsR
 	settings.SubscriptionReminderEnabled = req.SubscriptionReminderEnabled
 	settings.SubscriptionReminderRules = normalizeSubscriptionReminderRules(req.SubscriptionReminderRules)
 	settings.SubscriptionReminderTime = normalizeTimeText(req.SubscriptionReminderTime, "09:00")
+	settings.PantryListStatusFilter = normalizePantryListStatusFilter(req.PantryListStatusFilter)
+	settings.PantryListCategoryFilter = normalizePantryListCategoryFilter(req.PantryListCategoryFilter)
+	settings.PantryListSortMode = normalizePantryListSortMode(req.PantryListSortMode)
 	return nil
 }
 
