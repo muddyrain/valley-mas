@@ -6,6 +6,7 @@ import type {
   NewPantryItemInput,
   PantryItem,
   PantryItemStatus,
+  PantryListStatusFilter,
   PantryOverview,
   PantrySortMode,
   Trace,
@@ -15,7 +16,7 @@ export type ListPantryOptions = {
   page?: number;
   pageSize?: number;
   householdId?: string;
-  status?: PantryItemStatus | 'all';
+  status?: PantryListStatusFilter;
   category?: PantryItem['category'] | 'all';
   sort?: PantrySortMode;
   q?: string;

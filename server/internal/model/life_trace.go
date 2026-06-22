@@ -617,6 +617,9 @@ type LifeTraceSettings struct {
 	SubscriptionReminderEnabled bool       `gorm:"column:subscription_reminder_enabled;default:true" json:"subscriptionReminderEnabled"`
 	SubscriptionReminderRules   StringList `gorm:"column:subscription_reminder_rules;type:text" json:"subscriptionReminderRules"`
 	SubscriptionReminderTime    string     `gorm:"column:subscription_reminder_time;size:20;not null;default:'09:00'" json:"subscriptionReminderTime"`
+	PantryListStatusFilter      string     `gorm:"column:pantry_list_status_filter;size:20;not null;default:'all'" json:"pantryListStatusFilter"`
+	PantryListCategoryFilter    string     `gorm:"column:pantry_list_category_filter;size:20;not null;default:'all'" json:"pantryListCategoryFilter"`
+	PantryListSortMode          string     `gorm:"column:pantry_list_sort_mode;size:20;not null;default:'expiry-asc'" json:"pantryListSortMode"`
 	CreatedAt               time.Time      `json:"createdAt"`
 	UpdatedAt               time.Time      `json:"updatedAt"`
 	DeletedAt               gorm.DeletedAt `gorm:"index" json:"-"`
@@ -670,6 +673,15 @@ func (settings *LifeTraceSettings) BeforeCreate(tx *gorm.DB) error {
 	}
 	if settings.SubscriptionReminderTime == "" {
 		settings.SubscriptionReminderTime = "09:00"
+	}
+	if settings.PantryListStatusFilter == "" {
+		settings.PantryListStatusFilter = "all"
+	}
+	if settings.PantryListCategoryFilter == "" {
+		settings.PantryListCategoryFilter = "all"
+	}
+	if settings.PantryListSortMode == "" {
+		settings.PantryListSortMode = "expiry-asc"
 	}
 	return nil
 }

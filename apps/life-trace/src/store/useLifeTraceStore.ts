@@ -330,6 +330,9 @@ const defaultSettings: UserSettings = {
   subscriptionReminderEnabled: true,
   subscriptionReminderRules: ['7d', '3d', 'same-day', 'overdue'],
   subscriptionReminderTime: '09:00',
+  pantryListStatusFilter: 'all',
+  pantryListCategoryFilter: 'all',
+  pantryListSortMode: 'expiry-asc',
 };
 
 const defaultPagination: ListPagination = {
@@ -486,6 +489,29 @@ function normalizeSettings(settings: Partial<UserSettings>): UserSettings {
         .filter((habit, index, list) => habit.length > 0 && list.indexOf(habit) === index)
     : defaultSettings.habits;
 
+  const validStatusFilters: UserSettings['pantryListStatusFilter'][] = [
+    'all',
+    'normal',
+    'expiring',
+    'expired',
+    'no-expiry',
+    'used-up',
+    'discarded',
+  ];
+  const validCategoryFilters: UserSettings['pantryListCategoryFilter'][] = [
+    'all',
+    '食品',
+    '日用品',
+    '药品',
+    '宠物',
+    '其他',
+  ];
+  const validSortModes: UserSettings['pantryListSortMode'][] = [
+    'expiry-asc',
+    'created-desc',
+    'expiry-desc',
+  ];
+
   return {
     ...defaultSettings,
     ...settings,
@@ -502,6 +528,20 @@ function normalizeSettings(settings: Partial<UserSettings>): UserSettings {
       typeof settings.planReminderLeadMinutes === 'number'
         ? settings.planReminderLeadMinutes
         : defaultSettings.planReminderLeadMinutes,
+    pantryListStatusFilter:
+      settings.pantryListStatusFilter &&
+      validStatusFilters.includes(settings.pantryListStatusFilter)
+        ? settings.pantryListStatusFilter
+        : defaultSettings.pantryListStatusFilter,
+    pantryListCategoryFilter:
+      settings.pantryListCategoryFilter &&
+      validCategoryFilters.includes(settings.pantryListCategoryFilter)
+        ? settings.pantryListCategoryFilter
+        : defaultSettings.pantryListCategoryFilter,
+    pantryListSortMode:
+      settings.pantryListSortMode && validSortModes.includes(settings.pantryListSortMode)
+        ? settings.pantryListSortMode
+        : defaultSettings.pantryListSortMode,
   };
 }
 
