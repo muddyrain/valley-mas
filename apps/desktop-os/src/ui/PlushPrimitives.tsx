@@ -188,3 +188,6 @@ export {
   TooltipProvider as PlushTooltipProvider,
   TooltipTrigger as PlushTooltipTrigger,
 };
+
+export type { PlushSegmentedOption } from './PlushSegmented';
+export { default as PlushSegmented } from './PlushSegmented';
