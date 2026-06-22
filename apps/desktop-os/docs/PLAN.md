@@ -2,13 +2,17 @@
 
 ## 当前状态
 
+- 视觉风格唯一事实来源已落到 `apps/desktop-os/docs/DESIGN.md`：以任天堂 first-party 气质统领,动森 storybook miniature 打底、Switch 系统 UI 质感作壳层、宝可梦画风元素作 Identity 层点缀,色板增加 ember/sunny/lagoon/meadow/petal 能量 accent;`apps/desktop-os/AGENTS.md` 的视觉风格章节改为指向 DESIGN.md 的指针。
 - macOS Plush 桌面壳层已包含壁纸、菜单栏、Dock、窗口管理、Spotlight、控制中心、通知中心、Launchpad 和多个内置 App。
 - Launchpad v1 已接入 Dock 和菜单栏，并升级为 macOS 式覆盖层：支持关闭按钮、搜索、左右分页、分页指示点、按住横向拖拽翻页、打开 App 后自动关闭，以及基于 Motion 的打开/关闭和翻页动画。
 - Finder 定位为 Valley 资源库外壳，接入公开资源列表、搜索、筛选、排序、收藏、下载、图片预览、右键菜单、最近浏览、下载记录和路径级视图状态记忆；资源卡片默认以完整缩略图、标题和来源为主，选中态只做高亮，快捷操作只在 hover 或 focus-within 时显示。
 - Desktop OS 已新增公共 `PlushLoading` 和 `PlushLoadMore` 加载组件，Finder Quick Look、Finder 资源加载、Finder 加载更多、Safari 起始页资源加载和 Notes 同步加载统一使用毛绒风加载态。
 - Desktop OS 已新增公共 `PlushImage` 图片组件，Finder 资源缩略图、详情预览和 Quick Look 使用统一图片加载失败兜底与单图重试。
 - Desktop OS 已新增公共 `PlushSelect` 下拉组件，Finder、Calendar、Converter、Daily Tools 和 Dev Tools 的下拉菜单统一使用毛绒风控件，不再显示浏览器默认菜单。
-- Desktop OS 已新增公共 `PlushScrollbar` 滚动容器：以 `overlayscrollbars` / `overlayscrollbars-react` 作为滚动交互底座，统一隐藏 Windows/Chromium 原生滚动条控件残影，空闲时隐藏滚动条、滚动中显示 storybook miniature 风格 overlay thumb；窗口内容区和 Finder 侧栏、资源区、详情区已接入。
+- Desktop OS 已新增公共 `PlushScrollbar` 滚动容器：以 `overlayscrollbars` / `overlayscrollbars-react` 作为滚动交互底座，统一隐藏 Windows/Chromium 原生滚动条控件残影，空闲时隐藏滚动条、滚动中显示 storybook miniature 风格 overlay thumb；窗口内容区、Finder 侧栏/资源区/详情区、Blog 列表与正文、Notes 便签列表、Calendar 侧栏面板、通知中心面板已接入。Music 队列空态 `music-window__queue-empty`、歌词空态 `music-window__lyric-empty`、Mail 未登录占位 `mail-window__empty` 等迁移后不再被引用的私有 CSS class 已统一删除。
+- Desktop OS 公共按钮 `PlushButton` 已支持 `loading` / `loadingLabel` / `unstyled` 属性：开启后自动 `aria-busy`、禁用点击、并展示毛绒风三连点动画；`unstyled` 模式让外部 className 主导视觉，便于沿用各 App 私有按钮样式时仍复用统一 loading 行为。Account App 的登录、保存资料、绑定 Gmail、绑定 QQ 邮箱、解绑邮箱按钮，Blog App 的刷新按钮，Weather App 的刷新按钮已全部接入，不再各自维护「保存中/登录中/绑定中/刷新中/更新中」三元文案与 disabled 互斥。
+- Desktop OS 公共 `EmptyState` 已新增 `action` 槽：在空态/错误态右侧承载「重试 / 新窗口打开 / 重新定位」等操作按钮，`tone="danger"` 自动带上 `role="alert"`，让公共组件同时覆盖 empty 与 error status 视觉。Music App 队列与歌词空态、Safari iframe 嵌入受限提示与载入态、Mail App 列表加载/空邮件/未选择邮件已全部接入公共 `EmptyState` / `PlushLoading`，不再各自维护一次性的 `__empty` div + 自造按钮。
+- Desktop OS 公共 `PlushConfirmDialog` 已封装：基于 `PlushDialog` 的标题 + 描述 + 取消/确认双按钮模板，支持 `tone="danger"` 高亮、`loading` 受控异步与禁止 backdrop 关闭、确认按钮内置 `PlushButton.loading` 三连点动画。Finder 删除资源包、Finder 删除保存搜索、Account 退出登录、Account 解绑邮箱、Mail 侧栏解绑邮箱、Notes 删除便签已接入二次确认，旧的「点击即生效」危险操作改为弹窗显式确认。
 - Storybook Design System v1 已启动：Desktop OS 接入 Tailwind 4、shadcn/base-ui 源码组件、`components.json`、`@/*` alias 和 `PlushPrimitives` 包装层；shadcn 只作为可访问交互底座，视觉方向继续由 Animal Crossing × Pixar 的 storybook miniature token、壳层样式和 Plush 组件掌控。
 - 桌面壳层已完成第一轮 storybook miniature 统一：Window、MenuBar、Dock、Launchpad、Spotlight、Control Center 和 Notification Center 使用同一套 surface、panel、field、accent、outline、shadow、motion 和 game-shape token。
 - Finder v4 已增强资源库浏览能力：支持资源类型筛选、Cmd/Ctrl 多选、Shift 范围选择、批量收藏、下载、复制链接、Open With、资源包和保存搜索。

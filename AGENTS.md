@@ -6,8 +6,8 @@
 
 ## 项目定位
 
-- Valley MAS 是一个 monorepo，主要包含 `apps/web`、`apps/admin`、`server`、`apps/ai-mind-arena` 和 `packages/*`。
-- 项目核心是个人内容展示、创作者空间、资源/博客/图文内容管理、AI 辅助能力和管理后台。
+- Valley MAS 是一个 monorepo，主要包含 `apps/web`、`apps/admin`、`apps/desktop-os`、`apps/ai-mind-arena`、`apps/life-trace`、`server` 和 `packages/*`。
+- 项目核心是个人内容展示、创作者空间、资源/博客/图文内容管理、AI 辅助能力、生活记录、毛毡桌面壳层和管理后台。
 - 详细业务、技术栈、环境变量和启动方式不要在本文件重复维护，统一查阅 `docs/PROJECT_GUIDE.md`。
 
 ## 必读资料
@@ -27,6 +27,7 @@
 | Life Trace | `apps/life-trace/AGENTS.md` | Life Trace 的 Today、计划、AI、踪迹、Pantry、提醒、家庭空间和个人设置。 |
 | Web 前台 | `apps/web/AGENTS.md` | 用户侧页面、创作者空间、资源、博客、我的空间、个人状态与 Web API 封装。 |
 | Admin 后台 | `apps/admin/AGENTS.md` | 管理后台页面、审核与管理流程、Ant Design 管理端组件和 Admin API 封装。 |
+| Desktop OS | `apps/desktop-os/AGENTS.md` | macOS Plush 毛毡桌面、Dock/Launchpad/Spotlight、Finder/Safari/Mail/Blog/Music/AI Command Center 等窗口与 Mini Apps。 |
 | AI Mind Arena | `apps/ai-mind-arena/AGENTS.md` | 脑内会议室 Next.js 前端、多人格辩论 UI、SSE 对战流和分享体验。 |
 | WorldSim | `apps/world-sim/AGENTS.md` | 沙盒文明模拟游戏、游戏设计文档、Phaser/Vite 子项目规则。 |
 | Go 服务端 | `server/AGENTS.md` | Gin/GORM API、认证中间件、业务处理器、数据模型、AI 与 Mind Arena 服务端能力。 |
@@ -36,6 +37,7 @@
 每次实现前先判断当前改动是否计划内；每次收尾必须说明计划文档是否已同步。同步范围按“真实长期影响”判断，避免把临时调试和局部修复写进长期计划。
 
 - Life Trace 产品计划唯一入口：`apps/life-trace/docs/PLAN.md`。
+- Desktop OS 产品计划唯一入口：`apps/desktop-os/docs/PLAN.md`。
 - WorldSim 玩法或系统参数：按 `apps/world-sim/AGENTS.md` 和 `game-doc-sync-guard` 同步对应设计文档。
 - 根项目长期文档索引：`docs/README.md`。
 - 必须同步：新增、删除或调整功能状态、页面入口、接口路径、依赖策略、数据模型、产品方向、长期文档索引或验收标准。
@@ -52,33 +54,37 @@
 6. 不确定是否需要技能时，先读取 INDEX 和候选 SKILL.md，再决定。
 7. 只要改动可能影响产品计划、功能状态、接口路径、依赖策略或验收标准，必须同步检查当前项目计划文档；需要更新时先更新计划文档再收尾。
 
-## Matt Pocock 工程技能配置
+## 全局工作流分级
 
-本节由 `setup-matt-pocock-skills` 初始化，记录 Matt Pocock 工程技能使用的问题追踪、分诊标签和领域文档消费规则。普通 Valley MAS 开发不默认读取 `docs/agents/*`；只有用户明确使用相关外部工程技能，或任务涉及问题、分诊、领域文档工作流时才读取。
+本仓库的 `.agents/skills/` 只声明项目级 skill。开发机上常装的全局 skill 体系（`superpowers`、`andrej-karpathy-skills`、`grill-me` 等）不在仓库内登记，但 AI 进入任务前必须按下表判断走哪一档。用户已显式指定档位时，以用户指令为准。
 
-### 问题追踪
+| 档 | 触发条件 | 执行流程 |
+|---|---|---|
+| A · Vibe | 单文件 ≤ 30 行的 typo、文案微调、注释修订、纯解释/复述代码；或用户明确要求"快点干、不要 plan" | 直接动手，不写 plan，收尾按本仓库正常的最终回复格式说明改动。 |
+| B · Vibe + Karpathy | 多文件或单文件 > 30 行的 bugfix、组件抽取、重复逻辑收敛、纯重构、不改变产品计划的优化 | 直接动手；落地后调用 `andrej-karpathy-skills:karpathy-coder` 按 4 原则自检（surface assumptions / keep it simple / surgical changes / verifiable goals），并在收尾说明自检结论。 |
+| C · Superpowers 全流程 | 新功能 / 新页面 / 新接口 / 新数据模型 / 新依赖 / 跨子项目重构 / 修改产品方向或视觉验收标准 / 用户明确要求"先写计划再做" | 顺序：`grill-me` 拷打需求 → `superpowers:brainstorming` → `superpowers:writing-plans` → `superpowers:executing-plans` 或 `superpowers:subagent-driven-development` → `andrej-karpathy-skills:karpathy-coder` 自检 → `superpowers:verification-before-completion` → 必要时 `superpowers:finishing-a-development-branch`。plan / spec 产物允许沉淀在 `docs/superpowers/plans/<date>-*.md` 与 `docs/superpowers/specs/<date>-*.md`，作为临时工作产物，任务关闭后可由 owner 决定是否清理；不要写进子项目长期 `PLAN.md`，长期能力状态仍按"计划文档同步"规则单独同步。 |
+| D · Systematic Debugging | 复杂运行时 bug、间歇性失败、单靠静态分析无法定位的问题 | 启用 `superpowers:systematic-debugging`；需要收集运行时证据时叠加 `TRAE-debugger`。修复完成后回到 B 或 C 档继续走收尾流程。 |
 
-问题追踪使用 `muddyrain/valley-mas` 的 GitHub Issues；外部 PR 不作为分诊请求入口。见 `docs/agents/issue-tracker.md`。
+需求模糊触发条件：当用户描述不完整、目标不清晰或同一回合内出现互相矛盾的诉求时，无论计划走哪一档，**先用 `grill-me` 把需求问清楚再继续**，不要一边猜一边动手。
 
-### 分诊标签
+档位升降：执行中发现真实改动范围超出当前档位（例如 B 档发现要新增接口），先停手并向用户说明，再决定是否升到 C 档；不能一边按低档执行一边偷偷扩张范围。
 
-分诊使用默认标签：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`。见 `docs/agents/triage-labels.md`。
+## Skill 选择路由
 
-### 领域文档
-
-领域文档配置预留为多上下文布局，但当前仓库尚未落地 `CONTEXT-MAP.md`、`CONTEXT.md` 或 ADR 目录。普通任务继续以 `AGENTS.md`、`docs/PROJECT_GUIDE.md`、子项目 `AGENTS.md` 和当前代码为准；见 `docs/agents/domain.md`。
-
-## 技能选择路由
-
-- 如果出现重复 JSX、重复处理器、重复弹窗/表单/上传/列表逻辑 → `component-reuse-guard`。
-- 如果生成提交信息、执行 `git commit`，或用户要求提交 → `conventional-commit-guard`。
-- 如果用户要求“每次告诉我改了什么 / 下一步做什么 / 详细汇报阶段进展 / 每次更新要同步计划” → `delivery-reporting`。
-- 如果新增、删除或调整产品功能、页面、接口、依赖、数据模型、长期文档或验收标准 → `delivery-reporting`。
-- 如果修改用户可见 UI 文案、设置说明、按钮、副标题、空状态或入口摘要 → `ui-copy-boundary-guard`。
-- 如果修改中文、Markdown、技能、配置示例或非 ASCII 文本 → `encoding-guard`。
-- 如果任务包含多步骤执行、计划后实施、跨文件改动或需要验证闭环 → `task-completion-guard`。
-- 如果本回合启用了任何技能 → 按 `skill-usage-disclosure` 做简短披露。
-- 如果没有匹配技能 → 说明未发现必须启用的项目技能，并按本文件继续执行。
+- IF 用户需求描述不完整、目标不明或自相矛盾 → 先用 `grill-me` 拷打需求，再决定档位。
+- IF 改动属于 A 档（单文件 ≤ 30 行 / typo / 文案 / 仅解释）或用户明确要求 vibe → 直接做，不必启动 superpowers 全流程。
+- IF 改动属于 B 档（多文件 / >30 行 / bugfix / 重构 / 复用收敛）→ 直接做，收尾启用 `andrej-karpathy-skills:karpathy-coder` 4 原则自检。
+- IF 改动属于 C 档（新功能 / 新接口 / 新依赖 / 新数据模型 / 跨子项目重构 / 产品方向或视觉验收标准变化）→ 走 superpowers 全流程，plan / spec 落到 `docs/superpowers/plans|specs/`。
+- IF 命中复杂运行时 bug 且静态分析无法诊断 → 启用 `superpowers:systematic-debugging`，必要时叠加 `TRAE-debugger`。
+- IF 出现重复 JSX、重复 handler、重复弹窗/表单/上传/列表逻辑 → `component-reuse-guard`。
+- IF 生成 commit message、执行 `git commit`，或用户要求提交 → `conventional-commit-guard`。
+- IF 用户要求"每次告诉我改了什么 / 下一步做什么 / 详细汇报阶段进展 / 每次更新要同步计划" → `delivery-reporting`。
+- IF 新增、删除或调整产品功能、页面、接口、依赖、数据模型、长期文档或验收标准 → `delivery-reporting`。
+- IF 修改用户可见 UI 文案、设置说明、按钮、副标题、空状态或入口摘要 → `ui-copy-boundary-guard`。
+- IF 修改中文、Markdown、skill、配置示例或非 ASCII 文本 → `encoding-guard`。
+- IF 任务包含多步骤执行、计划后实施或需要验证 → `task-completion-guard`。
+- IF 本回合启用了任何 skill → 按 `skill-usage-disclosure` 做简短披露。
+- IF 没有匹配 skill → 说明未发现必须启用的项目 skill，并按本文件继续执行。
 
 ## 顶层红线
 
@@ -102,6 +108,7 @@
 | Life Trace | `apps/life-trace` | 路由看 `apps/life-trace/src/App.tsx`，API 看 `apps/life-trace/src/api`，计划看 `apps/life-trace/docs/PLAN.md`。 |
 | Web 前台 | `apps/web` | 路由看 `apps/web/src/App.tsx`，API 看 `apps/web/src/api`。 |
 | Admin 后台 | `apps/admin` | 路由看 `apps/admin/src/App.tsx`，API 看 `apps/admin/src/api`。 |
+| Desktop OS | `apps/desktop-os` | 入口看 `apps/desktop-os/src/App.tsx`，窗口编排看 `src/apps/desktopApps.ts` 与 `src/store/windowStore.ts`，API 看 `src/api`，计划看 `apps/desktop-os/docs/PLAN.md`。 |
 | AI Mind Arena | `apps/ai-mind-arena` | 页面看 `app`，组件看 `components`，接口看 `lib/api.ts`。 |
 | WorldSim | `apps/world-sim` | 协作入口看 `apps/world-sim/AGENTS.md`，设计文档看 `apps/world-sim/docs`。 |
 | Go 服务端 | `server` | 路由看 `server/internal/router/router.go`，配置看 `server/internal/config/config.go`。 |
@@ -149,6 +156,9 @@ cd apps/admin && pnpm dev
 # 启动 AI Mind Arena
 cd apps/ai-mind-arena && pnpm dev
 
+# 启动 Desktop OS
+cd apps/desktop-os && pnpm dev
+
 # 启动 WorldSim
 cd apps/world-sim && pnpm dev
 
@@ -164,6 +174,9 @@ cd server && go run ./cmd/server
 - [ ] Admin 后台改动：`pnpm --filter @valley/admin exec tsc --noEmit`
 - [ ] Admin 样式或 lint 相关改动：`pnpm --filter @valley/admin check`
 - [ ] AI Mind Arena 改动：`pnpm --filter @valley/ai-mind-arena typecheck`
+- [ ] Desktop OS 改动：`pnpm --filter @valley/desktop-os typecheck`
+- [ ] Desktop OS 样式或 lint 相关改动：`pnpm --filter @valley/desktop-os check`
+- [ ] Desktop OS 测试覆盖范围内的改动：`pnpm --filter @valley/desktop-os exec vitest run`
 - [ ] WorldSim 改动：`pnpm --filter @valley/world-sim typecheck`
 - [ ] 共享包改动：对应包的 `pnpm --filter <package> typecheck` 或 `pnpm --filter <package> build`
 - [ ] 中文文案、Markdown、技能或配置示例改动：`python3 .agents/skills/encoding-guard/scripts/check_mojibake.py <相关文件>`
@@ -183,5 +196,6 @@ cd server && go run ./cmd/server
 - 核心改动已落地。
 - 引用、入口和文档没有指向已删除技能、过期路径或旧模块名。
 - 已判断是否计划内，并同步更新对应计划文档；如果未更新，最终回复说明无需更新的原因。
+- 已按"全局工作流分级"判定的档位完成对应流程：B / C 档需在最终回复中说明 `karpathy-coder` 自检结论；C 档若产出 plan / spec md，需在最终回复中给出文件路径，方便 owner 后续清理。
 - 适用校验已运行并读取结果。
 - 最终回复说明：改了什么、验证了什么、哪些未验证或有残留风险。
