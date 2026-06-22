@@ -89,14 +89,15 @@
 }
 
 .notes-window__list {
-  display: flex;
-  min-height: 0;
   flex: 1;
+  min-height: 0;
+}
+
+.notes-window__list-content {
+  display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  overflow: auto;
-  scrollbar-gutter: stable;
 }
 
 .notes-window__note {

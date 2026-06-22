@@ -11,6 +11,9 @@ import {
   syncMailAccount,
 } from '../api/mail';
 import { useAuthStore } from '../store/authStore';
+import EmptyState from '../ui/EmptyState';
+import PlushConfirmDialog from '../ui/PlushConfirmDialog';
+import PlushLoading from '../ui/PlushLoading';
 import './DockAppWindows.css';
 import MailBodyText from './MailBodyText';
 import MailHTMLFrame from './MailHTMLFrame';
@@ -29,6 +32,7 @@ export default function MailWindow() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [pendingUnbindAccountId, setPendingUnbindAccountId] = useState<string | null>(null);
 
   const selectedAccount = useMemo(
     () => accounts.find((account) => account.id === selectedAccountId) ?? null,
@@ -142,184 +146,200 @@ export default function MailWindow() {
   }
 
   return (
-    <section className="dock-app-window mail-window">
-      <header className="mail-window__header">
-        <div>
-          <div className="dock-app-window__eyebrow">邮件</div>
-          <h2>统一收件箱</h2>
-          <p>{accounts.length > 0 ? `${accounts.length} 个邮箱账号` : '尚未绑定邮箱'}</p>
-        </div>
-        <button
-          type="button"
-          className="mail-window__icon-button"
-          onClick={() => void handleSync()}
-          disabled={accounts.length === 0 || Boolean(isSyncing)}
-          aria-label="刷新邮件"
-          title="刷新邮件"
-        >
-          <RefreshCw className={isSyncing ? 'is-spinning' : ''} size={16} />
-        </button>
-      </header>
-
-      {error ? <div className="account-window__error">{error}</div> : null}
-
-      <div className="mail-window__layout">
-        <aside className="mail-window__accounts">
-          <div className="mail-window__accounts-scroll">
-            <button
-              type="button"
-              className={
-                selectedAccountId === ALL_INBOX
-                  ? 'mail-window__account-card is-active'
-                  : 'mail-window__account-card'
-              }
-              onClick={() => setSelectedAccountId(ALL_INBOX)}
-            >
-              <span className="mail-window__account-icon">
-                <Inbox size={15} />
-              </span>
-              <span className="mail-window__account-copy">
-                <span>统一收件箱</span>
-                <small>{messages.length} 封邮件</small>
-              </span>
-            </button>
-            {accounts.map((account) => (
-              <div className="mail-window__account-row" key={account.id}>
-                <button
-                  type="button"
-                  className={
-                    selectedAccountId === account.id
-                      ? 'mail-window__account-card is-active'
-                      : 'mail-window__account-card'
-                  }
-                  onClick={() => setSelectedAccountId(account.id)}
-                >
-                  <span className={`mail-window__account-icon ${providerTone(account.provider)}`}>
-                    {providerInitial(account.provider)}
-                  </span>
-                  <span className="mail-window__account-copy">
-                    <span>{account.email}</span>
-                    <small className={account.status === 'error' ? 'is-error' : ''}>
-                      {providerLabel(account.provider)} · {statusLabel(account.status)}
-                    </small>
-                  </span>
-                </button>
-                <span className="mail-window__account-actions">
-                  <button
-                    type="button"
-                    className="mail-window__tiny"
-                    onClick={() => void handleSync(account.id)}
-                    disabled={Boolean(isSyncing)}
-                    aria-label="同步邮箱"
-                    title="同步邮箱"
-                  >
-                    <RefreshCw
-                      size={13}
-                      className={isSyncing === account.id ? 'is-spinning' : ''}
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    className="mail-window__tiny"
-                    onClick={() => void handleDeleteAccount(account.id)}
-                    aria-label="解绑邮箱"
-                    title="解绑邮箱"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </span>
-              </div>
-            ))}
+    <>
+      <section className="dock-app-window mail-window">
+        <header className="mail-window__header">
+          <div>
+            <div className="dock-app-window__eyebrow">邮件</div>
+            <h2>统一收件箱</h2>
+            <p>{accounts.length > 0 ? `${accounts.length} 个邮箱账号` : '尚未绑定邮箱'}</p>
           </div>
-        </aside>
+          <button
+            type="button"
+            className="mail-window__icon-button"
+            onClick={() => void handleSync()}
+            disabled={accounts.length === 0 || Boolean(isSyncing)}
+            aria-label="刷新邮件"
+            title="刷新邮件"
+          >
+            <RefreshCw className={isSyncing ? 'is-spinning' : ''} size={16} />
+          </button>
+        </header>
 
-        <main className="mail-window__messages">
-          <form className="mail-window__search" onSubmit={(event) => void handleSearch(event)}>
-            <Search size={15} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索邮件"
-            />
-          </form>
+        {error ? <div className="account-window__error">{error}</div> : null}
 
-          <div className="mail-window__message-list">
-            {isLoading ? <div className="mail-window__empty">加载中</div> : null}
-            {!isLoading && messages.length === 0 ? (
-              <div className="mail-window__empty">
-                {selectedAccount ? '当前邮箱暂无邮件' : '暂无邮件'}
-              </div>
-            ) : null}
-            {messages.map((message) => (
+        <div className="mail-window__layout">
+          <aside className="mail-window__accounts">
+            <div className="mail-window__accounts-scroll">
               <button
                 type="button"
-                key={message.id}
                 className={
-                  message.id === selectedMessageId
-                    ? 'mail-message is-active'
-                    : message.isRead
-                      ? 'mail-message'
-                      : 'mail-message is-unread'
+                  selectedAccountId === ALL_INBOX
+                    ? 'mail-window__account-card is-active'
+                    : 'mail-window__account-card'
                 }
-                onClick={() => setSelectedMessageId(message.id)}
+                onClick={() => setSelectedAccountId(ALL_INBOX)}
               >
-                <span className="mail-message__meta">
-                  <span className="mail-message__from">
-                    <span className="mail-message__dot" />
-                    {senderName(message.fromAddress) || providerLabel(message.provider)}
-                  </span>
-                  <time>{formatMailDate(message.sentAt)}</time>
+                <span className="mail-window__account-icon">
+                  <Inbox size={15} />
                 </span>
-                <span className="mail-message__subject-row">
-                  <strong>{message.subject || '无主题'}</strong>
-                  <span className={`mail-message__provider ${providerTone(message.provider)}`}>
-                    {providerLabel(message.provider)}
-                  </span>
+                <span className="mail-window__account-copy">
+                  <span>统一收件箱</span>
+                  <small>{messages.length} 封邮件</small>
                 </span>
-                <small>{message.snippet || '暂无摘要'}</small>
               </button>
-            ))}
-          </div>
-        </main>
+              {accounts.map((account) => (
+                <div className="mail-window__account-row" key={account.id}>
+                  <button
+                    type="button"
+                    className={
+                      selectedAccountId === account.id
+                        ? 'mail-window__account-card is-active'
+                        : 'mail-window__account-card'
+                    }
+                    onClick={() => setSelectedAccountId(account.id)}
+                  >
+                    <span className={`mail-window__account-icon ${providerTone(account.provider)}`}>
+                      {providerInitial(account.provider)}
+                    </span>
+                    <span className="mail-window__account-copy">
+                      <span>{account.email}</span>
+                      <small className={account.status === 'error' ? 'is-error' : ''}>
+                        {providerLabel(account.provider)} · {statusLabel(account.status)}
+                      </small>
+                    </span>
+                  </button>
+                  <span className="mail-window__account-actions">
+                    <button
+                      type="button"
+                      className="mail-window__tiny"
+                      onClick={() => void handleSync(account.id)}
+                      disabled={Boolean(isSyncing)}
+                      aria-label="同步邮箱"
+                      title="同步邮箱"
+                    >
+                      <RefreshCw
+                        size={13}
+                        className={isSyncing === account.id ? 'is-spinning' : ''}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      className="mail-window__tiny"
+                      onClick={() => setPendingUnbindAccountId(account.id)}
+                      aria-label="解绑邮箱"
+                      title="解绑邮箱"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </aside>
 
-        <article className="mail-window__detail mail-window__reader">
-          {selectedMessage ? (
-            <>
-              <div className="mail-window__detail-head">
-                <span
-                  className={`mail-message__provider ${providerTone(selectedMessage.provider)}`}
+          <main className="mail-window__messages">
+            <form className="mail-window__search" onSubmit={(event) => void handleSearch(event)}>
+              <Search size={15} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索邮件"
+              />
+            </form>
+
+            <div className="mail-window__message-list">
+              {isLoading ? <PlushLoading variant="inline" title="加载中" /> : null}
+              {!isLoading && messages.length === 0 ? (
+                <EmptyState title={selectedAccount ? '当前邮箱暂无邮件' : '暂无邮件'} />
+              ) : null}
+              {messages.map((message) => (
+                <button
+                  type="button"
+                  key={message.id}
+                  className={
+                    message.id === selectedMessageId
+                      ? 'mail-message is-active'
+                      : message.isRead
+                        ? 'mail-message'
+                        : 'mail-message is-unread'
+                  }
+                  onClick={() => setSelectedMessageId(message.id)}
                 >
-                  {providerLabel(selectedMessage.provider)}
-                </span>
-                <time>{formatMailDateTime(selectedMessage.sentAt)}</time>
-              </div>
-              <h3>{selectedMessage.subject || '无主题'}</h3>
-              <div className="mail-window__from">
-                <span className="mail-window__sender-avatar">
-                  {senderInitial(selectedMessage.fromAddress || selectedMessage.subject)}
-                </span>
-                <span>
-                  <strong>{senderName(selectedMessage.fromAddress) || '未知发件人'}</strong>
-                  <small>{selectedMessage.fromAddress || '发件人未显示'}</small>
-                </span>
-              </div>
-              <div className="mail-window__reader-body">
-                {selectedMessage.htmlBody ? (
-                  <MailHTMLFrame
-                    html={selectedMessage.htmlBody}
-                    title={selectedMessage.subject || '邮件正文'}
-                  />
-                ) : (
-                  <MailBodyText text={selectedMessage.textBody || selectedMessage.snippet} />
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="mail-window__empty">选择一封邮件</div>
-          )}
-        </article>
-      </div>
-    </section>
+                  <span className="mail-message__meta">
+                    <span className="mail-message__from">
+                      <span className="mail-message__dot" />
+                      {senderName(message.fromAddress) || providerLabel(message.provider)}
+                    </span>
+                    <time>{formatMailDate(message.sentAt)}</time>
+                  </span>
+                  <span className="mail-message__subject-row">
+                    <strong>{message.subject || '无主题'}</strong>
+                    <span className={`mail-message__provider ${providerTone(message.provider)}`}>
+                      {providerLabel(message.provider)}
+                    </span>
+                  </span>
+                  <small>{message.snippet || '暂无摘要'}</small>
+                </button>
+              ))}
+            </div>
+          </main>
+
+          <article className="mail-window__detail mail-window__reader">
+            {selectedMessage ? (
+              <>
+                <div className="mail-window__detail-head">
+                  <span
+                    className={`mail-message__provider ${providerTone(selectedMessage.provider)}`}
+                  >
+                    {providerLabel(selectedMessage.provider)}
+                  </span>
+                  <time>{formatMailDateTime(selectedMessage.sentAt)}</time>
+                </div>
+                <h3>{selectedMessage.subject || '无主题'}</h3>
+                <div className="mail-window__from">
+                  <span className="mail-window__sender-avatar">
+                    {senderInitial(selectedMessage.fromAddress || selectedMessage.subject)}
+                  </span>
+                  <span>
+                    <strong>{senderName(selectedMessage.fromAddress) || '未知发件人'}</strong>
+                    <small>{selectedMessage.fromAddress || '发件人未显示'}</small>
+                  </span>
+                </div>
+                <div className="mail-window__reader-body">
+                  {selectedMessage.htmlBody ? (
+                    <MailHTMLFrame
+                      html={selectedMessage.htmlBody}
+                      title={selectedMessage.subject || '邮件正文'}
+                    />
+                  ) : (
+                    <MailBodyText text={selectedMessage.textBody || selectedMessage.snippet} />
+                  )}
+                </div>
+              </>
+            ) : (
+              <EmptyState title="选择一封邮件" />
+            )}
+          </article>
+        </div>
+      </section>
+      <PlushConfirmDialog
+        open={pendingUnbindAccountId !== null}
+        onOpenChange={(next) => {
+          if (!next) setPendingUnbindAccountId(null);
+        }}
+        tone="danger"
+        title="解绑该邮箱？"
+        description="解绑后该邮箱将不再同步邮件，可随时重新绑定。"
+        confirmLabel="解绑"
+        loadingLabel="解绑中"
+        onConfirm={async () => {
+          if (!pendingUnbindAccountId) return;
+          await handleDeleteAccount(pendingUnbindAccountId);
+          setPendingUnbindAccountId(null);
+        }}
+      />
+    </>
   );
 }
 

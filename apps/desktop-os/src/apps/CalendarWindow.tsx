@@ -10,6 +10,7 @@ import {
   useCalendarStore,
 } from '../store/calendarStore';
 import { useNotificationCenterStore } from '../store/notificationCenterStore';
+import PlushScrollbar from '../ui/PlushScrollbar';
 import PlushSelect from '../ui/PlushSelect';
 import './CalendarWindow.css';
 
@@ -263,7 +264,11 @@ export default function CalendarWindow() {
           ) : null}
         </main>
 
-        <aside className="calendar-window__sidebar">
+        <PlushScrollbar
+          as="aside"
+          className="calendar-window__sidebar"
+          contentClassName="calendar-window__sidebar-content"
+        >
           <section className="calendar-window__panel">
             <div className="calendar-window__panel-title">{selectedDate.format('M月D日')}</div>
             {selectedHoliday ? <HolidayPill holiday={selectedHoliday} /> : null}
@@ -414,7 +419,7 @@ export default function CalendarWindow() {
               </button>
             </div>
           </form>
-        </aside>
+        </PlushScrollbar>
       </div>
     </div>
   );

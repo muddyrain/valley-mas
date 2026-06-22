@@ -1635,16 +1635,6 @@ button.settings-card:disabled:hover {
   font-weight: 800;
 }
 
-.mail-window__empty {
-  display: grid;
-  min-height: 110px;
-  place-items: center;
-  color: rgba(90, 74, 58, 0.52);
-  font-size: 12px;
-  font-weight: 800;
-  text-align: center;
-}
-
 @media (max-width: 680px) {
   .account-window__hero,
   .account-window__identity {
@@ -2253,26 +2243,6 @@ button.settings-card:disabled:hover {
   font-size: 10px;
 }
 
-.music-window__queue-empty {
-  display: grid;
-  min-height: 120px;
-  place-items: center;
-  gap: 8px;
-  color: rgba(90, 74, 58, 0.54);
-  font-size: 12px;
-  text-align: center;
-}
-
-.music-window__queue-empty button {
-  height: 28px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: rgba(143, 180, 94, 0.16);
-  color: var(--plush-sage-deep);
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .music-window__lyric-offset {
   justify-content: center;
   flex-shrink: 0;
@@ -2303,10 +2273,6 @@ button.settings-card:disabled:hover {
   font-size: 13px;
   font-weight: 700;
   transform: scale(1.02);
-}
-
-.music-window__lyric-empty {
-  color: rgba(90, 74, 58, 0.48);
 }
 
 @keyframes music-spin {

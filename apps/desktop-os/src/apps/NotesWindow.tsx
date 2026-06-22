@@ -3,7 +3,9 @@ import { useAuthStore } from '../store/authStore';
 import { useNotesStore } from '../store/notesStore';
 import { useWindowStore } from '../store/windowStore';
 import EmptyState from '../ui/EmptyState';
+import PlushConfirmDialog from '../ui/PlushConfirmDialog';
 import PlushLoading from '../ui/PlushLoading';
+import PlushScrollbar from '../ui/PlushScrollbar';
 import { getDefaultWindowOptions } from './desktopApps';
 import './NotesWindow.css';
 
@@ -32,6 +34,7 @@ export default function NotesWindow() {
     [notes, selectedId],
   );
   const [draft, setDraft] = useState(EMPTY_DRAFT);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const isNewDraft = selectedId === null;
 
   useEffect(() => {
@@ -103,7 +106,10 @@ export default function NotesWindow() {
             新建
           </button>
         </div>
-        <div className="notes-window__list">
+        <PlushScrollbar
+          className="notes-window__list"
+          contentClassName="notes-window__list-content"
+        >
           {loading ? (
             <PlushLoading
               className="notes-window__loading"
@@ -131,7 +137,7 @@ export default function NotesWindow() {
               </button>
             ))
           )}
-        </div>
+        </PlushScrollbar>
       </aside>
 
       <main className="notes-window__editor">
@@ -139,7 +145,7 @@ export default function NotesWindow() {
           <span>{selectedNote ? '编辑便签' : '新建便签'}</span>
           <div className="notes-window__actions">
             {selectedNote ? (
-              <button type="button" onClick={removeNote} disabled={saving}>
+              <button type="button" onClick={() => setDeleteConfirmOpen(true)} disabled={saving}>
                 删除
               </button>
             ) : null}
@@ -167,6 +173,20 @@ export default function NotesWindow() {
           placeholder="写点什么"
         />
       </main>
+      <PlushConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        tone="danger"
+        title="删除这条便签？"
+        description={
+          selectedNote?.title?.trim()
+            ? `便签「${selectedNote.title.trim()}」删除后无法恢复。`
+            : '便签删除后无法恢复。'
+        }
+        confirmLabel="删除"
+        loadingLabel="删除中"
+        onConfirm={removeNote}
+      />
     </div>
   );
 }

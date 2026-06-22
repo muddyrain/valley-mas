@@ -5,10 +5,8 @@
   z-index: 1500;
   width: 340px;
   max-height: calc(100vh - 60px);
-  padding: 18px 16px 14px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
   background: rgba(248, 245, 236, 0.78);
   backdrop-filter: blur(22px) saturate(160%);
   -webkit-backdrop-filter: blur(22px) saturate(160%);
@@ -17,10 +15,21 @@
   box-shadow:
     0 8px 24px rgba(40, 32, 24, 0.16),
     0 24px 60px rgba(40, 32, 24, 0.18);
-  overflow-y: auto;
-  scrollbar-gutter: stable;
+  overflow: hidden;
   animation: nc-pop 0.24s var(--ease-spring);
   transform-origin: top right;
+}
+
+.notification-center__scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.notification-center__content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 16px 14px;
 }
 
 @keyframes nc-pop {

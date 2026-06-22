@@ -19,6 +19,9 @@ import {
 } from '../music/catalog';
 import { formatDuration, getActiveLyricIndex, parseLyrics } from '../music/lyrics';
 import { useMusicStore } from '../store/musicStore';
+import EmptyState from '../ui/EmptyState';
+import PlushLoading from '../ui/PlushLoading';
+import { PlushButton } from '../ui/PlushPrimitives';
 import './DockAppWindows.css';
 
 export default function MusicWindow() {
@@ -240,15 +243,28 @@ export default function MusicWindow() {
                       <small>{track.mood}</small>
                     </button>
                   ))
+                ) : isLoadingAudius ? (
+                  <PlushLoading variant="panel" title="正在加载 Audius" />
+                ) : audiusError ? (
+                  <EmptyState
+                    icon="!"
+                    tone="danger"
+                    title="Audius 加载失败"
+                    description={audiusError}
+                    action={
+                      selectedPlaylist.id === 'audius-trending' ? (
+                        <PlushButton
+                          type="button"
+                          unstyled
+                          onClick={() => void loadAudiusTrending()}
+                        >
+                          重试
+                        </PlushButton>
+                      ) : null
+                    }
+                  />
                 ) : (
-                  <div className="music-window__queue-empty">
-                    {isLoadingAudius ? '正在加载 Audius' : audiusError || '暂无可播放曲目'}
-                    {selectedPlaylist.id === 'audius-trending' ? (
-                      <button type="button" onClick={() => void loadAudiusTrending()}>
-                        重试
-                      </button>
-                    ) : null}
-                  </div>
+                  <EmptyState title="暂无可播放曲目" />
                 )}
               </div>
             </div>
@@ -284,9 +300,7 @@ export default function MusicWindow() {
                     </div>
                   ))
                 ) : (
-                  <div className="music-window__lyric-empty">
-                    {lyricsEnabled ? '暂无歌词' : '歌词已关闭'}
-                  </div>
+                  <EmptyState title={lyricsEnabled ? '暂无歌词' : '歌词已关闭'} />
                 )}
               </div>
             </div>

@@ -45,12 +45,68 @@ import './PlushPrimitives.css';
 
 export type PlushTone = 'primary' | 'neutral' | 'accent' | 'danger';
 
+export type PlushButtonProps = React.ComponentProps<typeof Button> & {
+  tone?: PlushTone;
+  loading?: boolean;
+  loadingLabel?: React.ReactNode;
+  unstyled?: boolean;
+};
+
 export function PlushButton({
   className,
   tone = 'primary',
+  loading = false,
+  loadingLabel,
+  unstyled = false,
+  disabled,
+  children,
   ...props
-}: React.ComponentProps<typeof Button> & { tone?: PlushTone }) {
-  return <Button data-tone={tone} className={cn('plush-button', className)} {...props} />;
+}: PlushButtonProps) {
+  const dataLoading = loading ? 'true' : undefined;
+  const ariaBusy = loading || undefined;
+  const isDisabled = loading || disabled;
+  const indicator = loading ? (
+    <span className="plush-button__loading" aria-hidden>
+      <span className="plush-button__dot" />
+      <span className="plush-button__dot" />
+      <span className="plush-button__dot" />
+    </span>
+  ) : null;
+  const label = (
+    <span className="plush-button__label">{loading && loadingLabel ? loadingLabel : children}</span>
+  );
+
+  if (unstyled) {
+    const { type, ...rest } = props as React.ComponentProps<typeof Button>;
+    return (
+      <button
+        type={type ?? 'button'}
+        data-tone={tone}
+        data-loading={dataLoading}
+        aria-busy={ariaBusy}
+        disabled={isDisabled}
+        className={cn('plush-button-bare', loading && 'plush-button-bare--loading', className)}
+        {...(rest as React.ButtonHTMLAttributes<HTMLButtonElement>)}
+      >
+        {indicator}
+        {label}
+      </button>
+    );
+  }
+
+  return (
+    <Button
+      data-tone={tone}
+      data-loading={dataLoading}
+      aria-busy={ariaBusy}
+      disabled={isDisabled}
+      className={cn('plush-button', loading && 'plush-button--loading', className)}
+      {...props}
+    >
+      {indicator}
+      {label}
+    </Button>
+  );
 }
 
 export function PlushCard({ className, ...props }: React.ComponentProps<typeof Card>) {

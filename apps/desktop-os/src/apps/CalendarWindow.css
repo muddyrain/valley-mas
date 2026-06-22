@@ -114,9 +114,13 @@
   display: flex;
   min-width: 280px;
   flex-direction: column;
+  min-height: 0;
+}
+
+.calendar-window__sidebar-content {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  overflow: auto;
-  scrollbar-gutter: stable;
 }
 
 .calendar-window__panel,

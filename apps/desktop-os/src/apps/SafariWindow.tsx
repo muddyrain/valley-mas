@@ -4,6 +4,7 @@ import { useBrowserStore } from '../store/browserStore';
 import { useResourceStore } from '../store/resourceStore';
 import EmptyState from '../ui/EmptyState';
 import PlushLoading from '../ui/PlushLoading';
+import { PlushButton } from '../ui/PlushPrimitives';
 import { scheduleIdleWork } from '../utils/scheduleIdleWork';
 import './DockAppWindows.css';
 
@@ -103,14 +104,25 @@ export default function SafariWindow() {
           />
           {(status === 'loading' || status === 'embed-limited') && (
             <div className="safari-browser__fallback">
-              <span>{status === 'loading' ? '正在载入' : '网页可能限制嵌入显示'}</span>
-              <button
-                type="button"
-                className="dock-app-window__button"
-                onClick={() => window.open(currentUrl, '_blank', 'noopener,noreferrer')}
-              >
-                新窗口打开
-              </button>
+              {status === 'loading' ? (
+                <PlushLoading variant="inline" title="正在载入" />
+              ) : (
+                <EmptyState
+                  icon="!"
+                  tone="danger"
+                  title="网页可能限制嵌入显示"
+                  action={
+                    <PlushButton
+                      type="button"
+                      unstyled
+                      className="dock-app-window__button"
+                      onClick={() => window.open(currentUrl, '_blank', 'noopener,noreferrer')}
+                    >
+                      新窗口打开
+                    </PlushButton>
+                  }
+                />
+              )}
             </div>
           )}
         </section>
