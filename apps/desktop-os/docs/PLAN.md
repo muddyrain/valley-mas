@@ -42,6 +42,14 @@
 - Desktop OS 已完成运行时生命周期治理：窗口内容、音乐 audio runtime、通知中心/控制中心面板和资源数据加载均按打开或使用时激活，窗口焦点提供轻量 `focusedAppId`，拖拽和缩放按 animation frame 合并写入，保留动画和毛玻璃效果但减少关闭态与高频交互开销。
 - Desktop OS 已完成后台任务与 App 独立运行治理：普通 App 默认 `foreground-only`，最小化后只保留窗口壳层和状态元数据，业务组件、定时器和局部监听随窗口内容卸载；Music 与 FocusTimer 作为明确后台白名单运行，根组件的全局事件和通知轮询集中到 Gate，Spotlight/Safari/Finder 的资源加载和滚动持久化避开首帧与滚动热路径。
 
+## 动画统一迁移到 motion
+
+- 目标：`apps/desktop-os/src/**/*.tsx` 内 React 进出场 / layout 动画统一通过 `PlushMotion` 原语接入。
+- 边界：rAF 直驱 transform（Window 拖动 / Dock magnification / ResizeHandles）与装饰类 `@keyframes`（loading / shimmer / spin / cloud-drift / 控件 pop）不动。
+- reduced-motion：被迁组件统一走 `useReducedMotion()`，同名 CSS `@media (prefers-reduced-motion: reduce)` 分支同步删除。
+- Phase 进度：P1 PlushMotion 原语 ✅ / P2 窗口层（Window / Spotlight / Dock 菜单）/ P3 面板层（ControlCenter / NotificationCenter / Launchpad）/ P4 业务列表（AICommandCenter / Launchpad 翻页）。
+- 工作流档位：C 档，plan / spec 临时存放在 `docs/superpowers/{specs,plans}/2026-06-23-desktop-os-motion-migration*.md`，任务收尾后由 owner 决定是否清理。
+
 ## 当前阶段
 
 Desktop OS 继续保持“前端静态能力优先、server 只在已有通用能力成熟时接入”的节奏：
