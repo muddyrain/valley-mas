@@ -20,12 +20,12 @@ func TestListAchievementsReturnsLockedStateForNewUser(t *testing.T) {
 
 	data := decodeTracePayload(t, resp)["data"].(map[string]interface{})
 	summary := data["summary"].(map[string]interface{})
-	if summary["unlocked"].(float64) != 0 || summary["total"].(float64) != 72 {
+	if summary["unlocked"].(float64) != 0 || summary["total"].(float64) != 71 {
 		t.Fatalf("expected locked achievement set, got %+v", summary)
 	}
 	list := data["list"].([]interface{})
-	if len(list) != 72 {
-		t.Fatalf("expected 72 definitions, got %d", len(list))
+	if len(list) != 71 {
+		t.Fatalf("expected 71 definitions, got %d", len(list))
 	}
 	first := findAchievementCard(t, list, "first_plan")
 	if first["unlocked"].(bool) {
@@ -91,7 +91,6 @@ func TestAchievementExpansionDefinitions(t *testing.T) {
 		"autumn_pantry",
 		"winter_meal_plan",
 		"plan_three_day_streak",
-		"checkin_seven_day_streak",
 		"trace_fourteen_day_streak",
 		"weekly_review_to_plan_five",
 	} {
@@ -242,19 +241,6 @@ func TestAchievementExpansionUnlocksFromExistingData(t *testing.T) {
 		}
 	}
 
-	for i := 0; i < 7; i++ {
-		completedAt := now.AddDate(0, 0, -i)
-		if err := database.GetDB().Create(&model.LifeTraceCheckin{
-			UserID:      101,
-			Date:        completedAt.Format("2006-01-02"),
-			Name:        "喝水",
-			Completed:   true,
-			CompletedAt: &completedAt,
-		}).Error; err != nil {
-			t.Fatalf("seed checkin: %v", err)
-		}
-	}
-
 	sharedHousehold := model.Household{
 		Name:        "一起生活",
 		Kind:        householdKindShared,
@@ -390,7 +376,6 @@ func TestAchievementExpansionUnlocksFromExistingData(t *testing.T) {
 		"autumn_pantry",
 		"winter_meal_plan",
 		"plan_three_day_streak",
-		"checkin_seven_day_streak",
 		"trace_fourteen_day_streak",
 		"weekly_review_to_plan_five",
 	} {

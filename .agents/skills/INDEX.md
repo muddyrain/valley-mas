@@ -15,6 +15,8 @@
 | Skill | 触发场景 |
 |---|---|
 | `skill-usage-disclosure` | 只要本回合启用了任何 skill，就简短说明使用了哪些以及原因。 |
+| `grill-me` | 用户手动通过 `/grill-me` 触发的反复追问会话，用于打磨计划或设计；AI 不自动调用。 |
+| `grill-with-docs` | 用户手动触发的 `/grill-me` 会话，并同步产出 ADR 与术语表等文档；AI 不自动调用。 |
 | `encoding-guard` | 修改中文、Markdown、skill、配置示例或任何非 ASCII 文本前后必须使用，防止乱码和文本丢失。 |
 | `task-completion-guard` | 多步骤任务、计划后实施、需要验证或容易停在口头承诺的任务。 |
 | `component-reuse-guard` | 发现重复 JSX、重复 handler、重复弹窗/表单/上传/列表逻辑时，先复用或抽取。 |

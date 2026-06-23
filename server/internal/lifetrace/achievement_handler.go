@@ -58,7 +58,6 @@ type achievementSnapshot struct {
 	Traces                 []model.LifeTraceTrace
 	PantryItems            []model.LifeTracePantryItem
 	SharedPantryItems      []model.LifeTracePantryItem
-	Checkins               []model.LifeTraceCheckin
 	WeeklyReviews          []model.LifeTraceWeeklyReview
 	AIActionCount          int64
 	AIMessageCount         int64
@@ -146,7 +145,6 @@ var lifeTraceAchievementDefinitions = []achievementDefinition{
 	{Code: "autumn_pantry", Title: "秋天把库存收好", Description: "在秋天保存一个库存物品。", Category: "pantry", Rarity: "rare", Icon: "leaf", Tone: "health", Target: 1},
 	{Code: "winter_meal_plan", Title: "冬天也有热饭计划", Description: "在冬天完成一个吃饭计划。", Category: "plan", Rarity: "rare", Icon: "cooking-pot", Tone: "health", Target: 1},
 	{Code: "plan_three_day_streak", Title: "三天都认真安排", Description: "连续三天都有生活计划。", Category: "plan", Rarity: "rare", Icon: "calendar-days", Tone: "plan", Target: 3},
-	{Code: "checkin_seven_day_streak", Title: "七天都打了个勾", Description: "连续七天完成同一个打卡项。", Category: "plan", Rarity: "epic", Icon: "calendar-check", Tone: "health", Target: 7},
 	{Code: "trace_fourteen_day_streak", Title: "十四天都有生活证据", Description: "连续十四天都有生活踪迹。", Category: "trace", Rarity: "epic", Icon: "calendar-heart", Tone: "trace", Target: 14},
 	{Code: "weekly_review_to_plan_five", Title: "五次复盘变成行动", Description: "从周回顾行动创建五个计划。", Category: "ai", Rarity: "epic", Icon: "clipboard-check", Tone: "ai", Target: 5},
 }
@@ -356,9 +354,6 @@ func loadAchievementSnapshot(userID model.Int64String) (achievementSnapshot, err
 	if err := db.Where("user_id = ?", userID).Find(&snapshot.PantryItems).Error; err != nil {
 		return snapshot, err
 	}
-	if err := db.Where("user_id = ?", userID).Find(&snapshot.Checkins).Error; err != nil {
-		return snapshot, err
-	}
 	if err := db.Where("user_id = ?", userID).Find(&snapshot.WeeklyReviews).Error; err != nil {
 		return snapshot, err
 	}
@@ -517,7 +512,6 @@ func buildAchievementProgress(snapshot achievementSnapshot) map[string]achieveme
 	progress["shared_pantry_expiry_rescue"] = expiryRescueProgress(snapshot.SharedPantryItems)
 	progress["shared_pantry_photo_memory"] = pantryPhotoProgress(snapshot.SharedPantryItems)
 	progress["shared_pantry_location_three"] = pantryLocationCollectorProgress(snapshot.SharedPantryItems)
-	progress["checkin_seven_day_streak"] = checkinSevenDayStreakProgress(snapshot.Checkins)
 
 	return progress
 }
@@ -1212,39 +1206,6 @@ func weeklyReviewProgress(reviews []model.LifeTraceWeeklyReview) achievementProg
 	return countProgress(len(reviews), "weekly_review", reviews[0].ID.String())
 }
 
-func checkinSevenDayStreakProgress(checkins []model.LifeTraceCheckin) achievementProgress {
-	daysByName := map[string]map[string]model.LifeTraceCheckin{}
-	for _, checkin := range checkins {
-		if !checkin.Completed || strings.TrimSpace(checkin.Date) == "" {
-			continue
-		}
-		name := strings.TrimSpace(checkin.Name)
-		if name == "" {
-			continue
-		}
-		if _, exists := daysByName[name]; !exists {
-			daysByName[name] = map[string]model.LifeTraceCheckin{}
-		}
-		if _, exists := daysByName[name][checkin.Date]; !exists {
-			daysByName[name][checkin.Date] = checkin
-		}
-	}
-
-	best := 0
-	evidenceID := ""
-	for _, days := range daysByName {
-		streak := longestConsecutiveCheckinDays(days)
-		if streak > best {
-			best = streak
-			for _, checkin := range days {
-				evidenceID = checkin.ID.String()
-				break
-			}
-		}
-	}
-	return countProgress(best, "checkin", evidenceID)
-}
-
 func countProgress(progress int, evidenceType string, evidenceID string) achievementProgress {
 	return achievementProgress{
 		Progress:     progress,
@@ -1315,31 +1276,6 @@ func parseLifeTraceDate(raw string) time.Time {
 }
 
 func longestConsecutivePlanDays(days map[string]model.LifeTracePlan) int {
-	if len(days) == 0 {
-		return 0
-	}
-	keys := make([]string, 0, len(days))
-	for key := range days {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	best := 1
-	current := 1
-	for i := 1; i < len(keys); i++ {
-		previous := parseLifeTraceDate(keys[i-1])
-		next := parseLifeTraceDate(keys[i])
-		if !previous.IsZero() && !next.IsZero() && next.Sub(previous) == 24*time.Hour {
-			current++
-		} else {
-			current = 1
-		}
-		best = maxInt(best, current)
-	}
-	return best
-}
-
-func longestConsecutiveCheckinDays(days map[string]model.LifeTraceCheckin) int {
 	if len(days) == 0 {
 		return 0
 	}

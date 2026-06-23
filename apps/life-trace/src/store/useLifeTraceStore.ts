@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { listAchievements } from '@/api/achievements';
 import { listAiActions } from '@/api/aiActions';
-import { listCheckins, toggleCheckin } from '@/api/checkins';
 import {
   type ListInboxOptions,
   listInboxItems,
@@ -80,7 +79,6 @@ import type {
   AchievementSummary,
   AiAction,
   AppTab,
-  Checkin,
   InboxConvertedType,
   InboxItem,
   InboxItemStatus,
@@ -177,12 +175,6 @@ type LifeTraceState = {
   recurringPaymentUpdatingById: Record<string, boolean>;
   recurringPaymentArchivingById: Record<string, boolean>;
   recurringPaymentAdvancingById: Record<string, boolean>;
-  checkins: Checkin[];
-  checkinsDate: string;
-  checkinsLoaded: boolean;
-  checkinsLoading: boolean;
-  checkinsError: string;
-  checkinTogglingByName: Record<string, boolean>;
   settings: UserSettings;
   settingsLoaded: boolean;
   settingsLoading: boolean;
@@ -242,10 +234,8 @@ type LifeTraceState = {
   loadMoreInboxItems: () => Promise<void>;
   loadLedgerEntries: (options?: ListLedgerOptions) => Promise<void>;
   loadMoreLedgerEntries: () => Promise<void>;
-  loadCheckins: (date: string) => Promise<void>;
   loadAchievements: (options?: { notifyNew?: boolean }) => Promise<void>;
   loadAiActions: () => Promise<void>;
-  toggleHabitCheckin: (date: string, name: string, completed: boolean) => Promise<void>;
   addPlan: (input: NewPlanInput) => Promise<Plan | null>;
   addPantryItem: (input: NewPantryItemInput, householdId?: string) => Promise<PantryItem | null>;
   editPantryItem: (
@@ -323,7 +313,6 @@ const defaultSettings: UserSettings = {
   weatherAlerts: true,
   planReminders: true,
   aiPersonalization: true,
-  habits: ['喝水', '休息', '运动', '护肤'],
   pantryReminderEnabled: true,
   pantryReminderRules: ['7d', '3d', 'same-day', 'expired'],
   pantryReminderTime: '09:00',
@@ -483,12 +472,6 @@ const pantryStatusUpdateInFlightKeys = new Set<string>();
 let pantryListRequestId = 0;
 
 function normalizeSettings(settings: Partial<UserSettings>): UserSettings {
-  const habits = Array.isArray(settings.habits)
-    ? settings.habits
-        .map((habit) => habit.trim())
-        .filter((habit, index, list) => habit.length > 0 && list.indexOf(habit) === index)
-    : defaultSettings.habits;
-
   const validStatusFilters: UserSettings['pantryListStatusFilter'][] = [
     'all',
     'normal',
@@ -516,7 +499,6 @@ function normalizeSettings(settings: Partial<UserSettings>): UserSettings {
     ...defaultSettings,
     ...settings,
     activePantryHouseholdId: normalizeHouseholdScopeId(settings.activePantryHouseholdId),
-    habits,
     workdays: settings.workdays?.length ? settings.workdays : defaultSettings.workdays,
     pantryReminderRules: settings.pantryReminderRules?.length
       ? settings.pantryReminderRules
@@ -702,12 +684,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       recurringPaymentUpdatingById: {},
       recurringPaymentArchivingById: {},
       recurringPaymentAdvancingById: {},
-      checkins: [],
-      checkinsDate: '',
-      checkinsLoaded: false,
-      checkinsLoading: false,
-      checkinsError: '',
-      checkinTogglingByName: {},
       settings: defaultSettings,
       settingsLoaded: false,
       settingsLoading: false,
@@ -1626,37 +1602,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           });
         }
       },
-      loadCheckins: async (date) => {
-        const token = getToken();
-        if (!token) {
-          set({
-            checkins: [],
-            checkinsDate: date,
-            checkinsLoaded: true,
-            checkinsLoading: false,
-            checkinsError: '',
-          });
-          return;
-        }
-
-        set({ checkinsLoading: true, checkinsError: '', checkinsDate: date });
-        try {
-          const { list } = await listCheckins(token, date);
-          set({
-            checkins: list,
-            checkinsDate: date,
-            checkinsLoaded: true,
-            checkinsLoading: false,
-            checkinsError: '',
-          });
-        } catch (error) {
-          set({
-            checkinsLoading: false,
-            checkinsLoaded: true,
-            checkinsError: error instanceof Error ? error.message : '获取打卡失败',
-          });
-        }
-      },
       loadAchievements: async (options = {}) => {
         const token = getToken();
         if (!token) {
@@ -1708,51 +1653,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           set({ aiActions: response.list.map(normalizeAiActionRecord) });
         } catch {
           // Keep local actions when the history endpoint is temporarily unavailable.
-        }
-      },
-      toggleHabitCheckin: async (date, name, completed) => {
-        const token = getToken();
-        if (!token) {
-          set({ checkinsError: '请先登录后再打卡' });
-          return;
-        }
-        if (get().checkinTogglingByName[name]) {
-          return;
-        }
-
-        set((state) => ({
-          checkinTogglingByName: { ...state.checkinTogglingByName, [name]: true },
-          checkinsError: '',
-        }));
-        try {
-          const updated = await toggleCheckin(token, { date, name, completed });
-          set((state) => {
-            const exists = state.checkins.some((item) => item.name === name && item.date === date);
-            return {
-              checkinsDate: date,
-              checkins: exists
-                ? state.checkins.map((item) =>
-                    item.name === name && item.date === date ? updated : item,
-                  )
-                : [...state.checkins, updated],
-              checkinsError: '',
-              aiActions: [
-                {
-                  id: createActionId(),
-                  title: `${completed ? '完成' : '取消'}了「${name}」打卡`,
-                  timeLabel: '刚刚',
-                },
-                ...getAiActions(state),
-              ],
-            };
-          });
-          void get().loadAchievements({ notifyNew: true });
-        } catch (error) {
-          set({ checkinsError: error instanceof Error ? error.message : '保存打卡失败' });
-        } finally {
-          set((state) => ({
-            checkinTogglingByName: { ...state.checkinTogglingByName, [name]: false },
-          }));
         }
       },
       addPlan: async (input) => {

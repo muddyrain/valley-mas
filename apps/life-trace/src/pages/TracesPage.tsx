@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Trace } from '@/types';
 
-type TraceFilter = 'all' | 'plan' | 'checkin' | 'pantry' | 'media' | 'manual' | 'with-image';
+type TraceFilter = 'all' | 'plan' | 'pantry' | 'media' | 'manual' | 'with-image';
 
 const traceFilters: Array<{ id: TraceFilter; label: string; emptyText: string }> = [
   {
@@ -47,11 +47,6 @@ const traceFilters: Array<{ id: TraceFilter; label: string; emptyText: string }>
     id: 'plan',
     label: '计划',
     emptyText: '还没有由计划生成的踪迹。完成一个计划后会自动沉淀到这里。',
-  },
-  {
-    id: 'checkin',
-    label: '打卡',
-    emptyText: '还没有打卡类踪迹。后续完成关键打卡后可以沉淀成生活记录。',
   },
   {
     id: 'pantry',
@@ -77,7 +72,6 @@ const traceFilters: Array<{ id: TraceFilter; label: string; emptyText: string }>
 
 const sourceTone: Record<Trace['source'], 'plan' | 'health' | 'trace'> = {
   计划: 'plan',
-  打卡: 'health',
   库存: 'trace',
   书影音: 'trace',
   穿搭: 'plan',
@@ -103,9 +97,6 @@ type TraceMonthGroup = {
 function filterTraces(traces: Trace[], filter: TraceFilter) {
   if (filter === 'plan') {
     return traces.filter((trace) => trace.source === '计划');
-  }
-  if (filter === 'checkin') {
-    return traces.filter((trace) => trace.source === '打卡');
   }
   if (filter === 'pantry') {
     return traces.filter((trace) => trace.source === '库存');

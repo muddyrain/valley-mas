@@ -36,29 +36,6 @@ type LifeTracePlan struct {
 	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-type LifeTraceCheckin struct {
-	ID          Int64String    `gorm:"primaryKey;autoIncrement:false" json:"id"`
-	UserID      Int64String    `gorm:"column:user_id;index;not null;uniqueIndex:uidx_life_trace_checkin_day_item" json:"userId"`
-	Date        string         `gorm:"size:20;not null;index;uniqueIndex:uidx_life_trace_checkin_day_item" json:"date"`
-	Name        string         `gorm:"size:80;not null;uniqueIndex:uidx_life_trace_checkin_day_item" json:"name"`
-	Completed   bool           `gorm:"default:false;index" json:"completed"`
-	CompletedAt *time.Time     `json:"completedAt,omitempty"`
-	CreatedAt   time.Time      `json:"createdAt"`
-	UpdatedAt   time.Time      `json:"updatedAt"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
-}
-
-func (checkin *LifeTraceCheckin) BeforeCreate(tx *gorm.DB) error {
-	if checkin.ID == 0 {
-		checkin.ID = Int64String(utils.GenerateID())
-	}
-	return nil
-}
-
-func (LifeTraceCheckin) TableName() string {
-	return "life_trace_checkins"
-}
-
 func (p *LifeTracePlan) BeforeCreate(tx *gorm.DB) error {
 	if p.ID == 0 {
 		p.ID = Int64String(utils.GenerateID())
@@ -610,7 +587,6 @@ type LifeTraceSettings struct {
 	WeatherAlerts           bool           `gorm:"default:true" json:"weatherAlerts"`
 	PlanReminders           bool           `gorm:"default:true" json:"planReminders"`
 	AIPersonalization       bool           `gorm:"column:ai_personalization;default:true" json:"aiPersonalization"`
-	Habits                  StringList     `gorm:"type:text" json:"habits"`
 	PantryReminderEnabled   bool           `gorm:"column:pantry_reminder_enabled;default:true" json:"pantryReminderEnabled"`
 	PantryReminderRules     StringList     `gorm:"type:text" json:"pantryReminderRules"`
 	PantryReminderTime      string         `gorm:"size:20;not null;default:'09:00'" json:"pantryReminderTime"`
@@ -658,9 +634,6 @@ func (settings *LifeTraceSettings) BeforeCreate(tx *gorm.DB) error {
 	}
 	if settings.QuietEnd == "" {
 		settings.QuietEnd = "07:30"
-	}
-	if settings.Habits == nil {
-		settings.Habits = StringList{"喝水", "休息", "运动", "护肤"}
 	}
 	if settings.PantryReminderRules == nil {
 		settings.PantryReminderRules = StringList{"7d", "3d", "same-day", "expired"}

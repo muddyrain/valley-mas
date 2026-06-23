@@ -31,7 +31,6 @@ type updateSettingsRequest struct {
 	WeatherAlerts           bool     `json:"weatherAlerts"`
 	PlanReminders           bool     `json:"planReminders"`
 	AIPersonalization       bool     `json:"aiPersonalization"`
-	Habits                  []string `json:"habits"`
 	PantryReminderEnabled   bool     `json:"pantryReminderEnabled"`
 	PantryReminderRules     []string `json:"pantryReminderRules"`
 	PantryReminderTime      string   `json:"pantryReminderTime"`
@@ -87,7 +86,6 @@ func defaultSettings(userID model.Int64String) model.LifeTraceSettings {
 		WeatherAlerts:           true,
 		PlanReminders:           true,
 		AIPersonalization:       true,
-		Habits:                  model.StringList{"喝水", "休息", "运动", "护肤"},
 		PantryReminderEnabled:   true,
 		PantryReminderRules:     model.StringList{"7d", "3d", "same-day", "expired"},
 		PantryReminderTime:      "09:00",
@@ -159,20 +157,6 @@ func normalizeWorkdays(days []string) model.StringList {
 	}
 	if len(result) == 0 {
 		return model.StringList{"1", "2", "3", "4", "5"}
-	}
-	return result
-}
-
-func normalizeHabits(habits []string) model.StringList {
-	seen := map[string]bool{}
-	result := model.StringList{}
-	for _, habit := range habits {
-		habit = strings.TrimSpace(habit)
-		if habit == "" || seen[habit] {
-			continue
-		}
-		seen[habit] = true
-		result = append(result, habit)
 	}
 	return result
 }
@@ -319,7 +303,6 @@ func applySettingsRequest(settings *model.LifeTraceSettings, req updateSettingsR
 	settings.WeatherAlerts = req.WeatherAlerts
 	settings.PlanReminders = req.PlanReminders
 	settings.AIPersonalization = req.AIPersonalization
-	settings.Habits = normalizeHabits(req.Habits)
 	settings.PantryReminderEnabled = req.PantryReminderEnabled
 	settings.PantryReminderRules = normalizePantryReminderRules(req.PantryReminderRules)
 	settings.PantryReminderTime = normalizeTimeText(req.PantryReminderTime, "09:00")

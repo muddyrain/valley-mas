@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { NewTraceInput, Trace } from '@/types';
 
-const traceSources: Trace['source'][] = ['计划', '打卡', '库存', '手动'];
+const traceSources: Trace['source'][] = ['计划', '库存', '手动'];
 const traceMoods = ['放松', '满足', '活力', '平静', '开心', '专注'];
 const traceSourceOptions = traceSources.map((source) => ({ label: source, value: source }));
 

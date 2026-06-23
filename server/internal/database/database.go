@@ -306,7 +306,6 @@ func autoMigrateModelsByName() map[string]any {
 		"post_tag_relation":                  &model.PostTagRelation{},
 		"post_comment":                       &model.PostComment{},
 		"lifetrace_plan":                     &model.LifeTracePlan{},
-		"lifetrace_checkin":                  &model.LifeTraceCheckin{},
 		"lifetrace_trace":                    &model.LifeTraceTrace{},
 		"lifetrace_place":                    &model.LifeTracePlace{},
 		"lifetrace_inbox_item":               &model.LifeTraceInboxItem{},
@@ -342,8 +341,6 @@ func autoMigrateModelAliases() map[string]string {
 		"place":                    "lifetrace_place",
 		"plans":                    "lifetrace_plan",
 		"plan":                     "lifetrace_plan",
-		"checkins":                 "lifetrace_checkin",
-		"checkin":                  "lifetrace_checkin",
 		"traces":                   "lifetrace_trace",
 		"trace":                    "lifetrace_trace",
 		"inbox":                    "lifetrace_inbox_item",
@@ -431,7 +428,6 @@ func lifeTraceMigrationModels() []any {
 func lifeTraceDomainMigrationModels() []any {
 	return []any{
 		&model.LifeTracePlan{},
-		&model.LifeTraceCheckin{},
 		&model.LifeTraceTrace{},
 		&model.LifeTracePlace{},
 		&model.LifeTraceInboxItem{},

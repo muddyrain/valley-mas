@@ -147,7 +147,6 @@ func TestPreviewDailyBriefPushBuildsPayload(t *testing.T) {
 		UserID:         101,
 		City:           "杭州",
 		DailyBriefTime: "08:10",
-		Habits:         model.StringList{"喝水", "拉伸"},
 		WeatherAlerts:  true,
 	}).Error; err != nil {
 		t.Fatalf("seed settings: %v", err)
@@ -162,14 +161,6 @@ func TestPreviewDailyBriefPushBuildsPayload(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatalf("seed plan: %v", err)
 	}
-	if err := database.GetDB().Create(&model.LifeTraceCheckin{
-		UserID:    101,
-		Date:      today,
-		Name:      "喝水",
-		Completed: true,
-	}).Error; err != nil {
-		t.Fatalf("seed checkin: %v", err)
-	}
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/push/daily-brief-preview", nil)
 	resp := httptest.NewRecorder()
@@ -180,8 +171,8 @@ func TestPreviewDailyBriefPushBuildsPayload(t *testing.T) {
 		t.Fatalf("expected daily brief preview to route to today, got %+v", data)
 	}
 	body := data["body"].(string)
-	if body == "" || !strings.Contains(body, "晨间散步") || !strings.Contains(body, "今日打卡") {
-		t.Fatalf("expected preview body to include plan and habit summary, got %+v", data)
+	if body == "" || !strings.Contains(body, "晨间散步") {
+		t.Fatalf("expected preview body to include plan summary, got %+v", data)
 	}
 }
 

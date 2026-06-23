@@ -69,8 +69,7 @@ export function LoginPage() {
               登录后进入你的今日生活简报
             </h2>
             <p className="max-w-sm text-sm leading-6 text-muted-foreground">
-              Life Trace
-              会把天气建议、今日计划、打卡和生活踪迹沉淀到你的个人空间，后续用于跨设备同步。
+              Life Trace 会把天气建议、今日计划和生活踪迹沉淀到你的个人空间，后续用于跨设备同步。
             </p>
           </div>
         </header>

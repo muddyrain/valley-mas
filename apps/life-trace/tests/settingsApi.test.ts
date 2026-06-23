@@ -20,7 +20,6 @@ const settings: UserSettings = {
   weatherAlerts: false,
   planReminders: true,
   aiPersonalization: false,
-  habits: ['喝水', '早睡'],
   pantryReminderEnabled: true,
   pantryReminderRules: ['7d', 'same-day'],
   pantryReminderTime: '09:15',

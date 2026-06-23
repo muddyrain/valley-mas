@@ -379,20 +379,12 @@ func sendDailyBriefPush(
 		return err
 	}
 
-	var checkins []model.LifeTraceCheckin
-	if err := database.GetDB().
-		Where("user_id = ? AND date = ?", settings.UserID, today).
-		Order("created_at ASC").
-		Find(&checkins).Error; err != nil {
-		return err
-	}
-
 	var weatherResp WeatherResponse
 	if weather != nil {
 		weatherResp = weather.Fetch(ctx, settings.City, false)
 	}
 
-	payload := buildDailyBriefPushPayload(settings, weatherResp, plans, checkins, dueAt)
+	payload := buildDailyBriefPushPayload(settings, weatherResp, plans, dueAt)
 	for _, subscription := range subscriptions {
 		if dailyBriefDeliveryExists(settings.UserID, today, subscription.ID) {
 			continue
@@ -454,18 +446,15 @@ func buildDailyBriefPushPayload(
 	settings model.LifeTraceSettings,
 	weather WeatherResponse,
 	plans []model.LifeTracePlan,
-	checkins []model.LifeTraceCheckin,
 	dueAt time.Time,
 ) PushPayload {
 	intro := buildDailyBriefIntro(settings, weather, dueAt)
 	planText := buildDailyBriefPlanText(plans)
-	completedCount := countCompletedCheckins(checkins)
-	habitText := buildDailyBriefHabitText(settings, completedCount)
 
-	parts := []string{intro, planText, habitText}
+	parts := []string{intro, planText}
 	body := strings.Join(compactStrings(parts), "；")
 	if body == "" {
-		body = "看看今天的天气、计划和打卡节奏。"
+		body = "看看今天的天气和计划。"
 	}
 
 	return PushPayload{
@@ -536,20 +525,6 @@ func buildDailyBriefPlanText(plans []model.LifeTracePlan) string {
 		nextPlanText = fmt.Sprintf("%s，下一项 %s %s", nextPlanText, nextPlan.ScheduledTime, nextPlan.Title)
 	}
 	return nextPlanText
-}
-
-func buildDailyBriefHabitText(settings model.LifeTraceSettings, completedCount int) string {
-	totalHabits := len(settings.Habits)
-	if totalHabits <= 0 {
-		return ""
-	}
-	if completedCount == 0 {
-		return fmt.Sprintf("今日打卡还没开始，先完成 %s", settings.Habits[0])
-	}
-	if completedCount >= totalHabits {
-		return fmt.Sprintf("今日打卡 %d/%d，状态不错，继续保持", completedCount, totalHabits)
-	}
-	return fmt.Sprintf("今日打卡 %d/%d，再完成一项会更稳", completedCount, totalHabits)
 }
 
 func buildDailyBriefRiskTitle(weather WeatherResponse) string {
@@ -674,16 +649,6 @@ func compactStrings(values []string) []string {
 		}
 	}
 	return result
-}
-
-func countCompletedCheckins(checkins []model.LifeTraceCheckin) int {
-	count := 0
-	for _, item := range checkins {
-		if item.Completed {
-			count++
-		}
-	}
-	return count
 }
 
 func findNextPlanWithTime(plans []model.LifeTracePlan) *model.LifeTracePlan {

@@ -28,7 +28,6 @@ type createTraceRequest struct {
 
 var validTraceSources = map[string]bool{
 	"计划":  true,
-	"打卡":  true,
 	"库存":  true,
 	"书影音": true,
 	"穿搭":  true,

@@ -21,7 +21,7 @@ const planMetaByAdviceId: Record<
     timeLabel: '今天 上班前',
     scheduledTime: '08:30',
   },
-  health: { prefix: '健康打卡', type: '运动', timeLabel: '今天 晚上', scheduledTime: '20:00' },
+  health: { prefix: '健康提醒', type: '运动', timeLabel: '今天 晚上', scheduledTime: '20:00' },
   plan: { prefix: '计划整理', type: '普通事项', timeLabel: '今天 晚上', scheduledTime: '20:00' },
 };
 

@@ -40,7 +40,6 @@ const recordTypeOptions: Array<{ value: LifeTraceRecordType; label: string }> = 
   { value: 'plans', label: '计划' },
   { value: 'traces', label: '踪迹' },
   { value: 'pantry', label: '库存' },
-  { value: 'checkins', label: '打卡' },
   { value: 'weekly-reviews', label: '周报' },
   { value: 'ai-conversations', label: 'AI 对话' },
   { value: 'push-subscriptions', label: '推送订阅' },
@@ -241,7 +240,6 @@ export default function LifeTrace() {
             <Tag color="blue">计划 {record.plans}</Tag>
             <Tag color="green">踪迹 {record.traces}</Tag>
             <Tag color="cyan">库存 {record.pantryItems}</Tag>
-            <Tag color="purple">打卡 {record.checkins}</Tag>
             <Tag color="orange">待办 {record.openPlans}</Tag>
           </Space>
         ),
@@ -399,9 +397,8 @@ export default function LifeTrace() {
                   <Col xs={24} sm={12} lg={6}>
                     <Card loading={overviewLoading}>
                       <Statistic
-                        title="踪迹 / 打卡"
+                        title="生活踪迹"
                         value={overview?.traces || 0}
-                        suffix={`/ ${overview?.checkins || 0}`}
                         prefix={<CheckCircleOutlined />}
                       />
                     </Card>

@@ -14,11 +14,9 @@ describe('today page surface', () => {
   it('keeps async home cards behind shaped loading surfaces', () => {
     expect(todayPageSource).toContain('function TodayAchievementSkeleton');
     expect(todayPageSource).toContain('function TodayPantrySkeleton');
-    expect(todayPageSource).toContain('function TodayHabitSkeleton');
     expect(todayPageSource).toContain('function TodayPlanSkeleton');
     expect(todayPageSource).toContain('achievementCardLoading');
     expect(todayPageSource).toContain('pantryCardInitialLoading');
-    expect(todayPageSource).toContain('checkinsCardLoading');
     expect(todayPageSource).toContain('planCardLoading');
     expect(todayPageSource).not.toContain('正在整理库存优先级');
     expect(todayPageSource).not.toContain('这里就会直接按云端清单展示');

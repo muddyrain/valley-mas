@@ -98,7 +98,6 @@ func TestListHouseholdsUsesUserPreferredActiveHousehold(t *testing.T) {
 		PlanReminders:           true,
 		WeatherAlerts:           true,
 		AIPersonalization:       true,
-		Habits:                  model.StringList{"喝水"},
 		PantryReminderEnabled:   true,
 		PantryReminderRules:     model.StringList{"7d", "3d", "same-day", "expired"},
 		PantryReminderTime:      "09:00",

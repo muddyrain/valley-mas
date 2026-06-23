@@ -83,7 +83,6 @@ import {
   removePhotoItemAnalysisHistoryItem,
 } from '@/lib/photoItemAnalysisCloud';
 import { getPlanDisplayTimeParts } from '@/lib/planReminder';
-import { getLocalISODate } from '@/lib/planSchedule';
 import { createPlanFromRecipe } from '@/lib/recipePlan';
 import { cn } from '@/lib/utils';
 import { readWeatherCache } from '@/lib/weatherCache';
@@ -1273,7 +1272,6 @@ function AgentConversationPanel({
   weatherSummary,
   pantryHouseholdLabel,
   openPlanCount,
-  completedCheckinCount,
   expiringPantryCount,
   speechSupported,
   listening,
@@ -1319,7 +1317,6 @@ function AgentConversationPanel({
   weatherSummary: string;
   pantryHouseholdLabel: string;
   openPlanCount: number;
-  completedCheckinCount: number;
   expiringPantryCount: number;
   speechSupported: boolean;
   listening: boolean;
@@ -1429,12 +1426,6 @@ function AgentConversationPanel({
                       label="临期"
                       value={`${expiringPantryCount} 件`}
                       toneClass="text-life-health"
-                    />
-                    <ContextSummaryChip
-                      icon={Check}
-                      label="打卡"
-                      value={`${completedCheckinCount} 项`}
-                      toneClass="text-life-trace"
                     />
                     <ContextSummaryChip
                       icon={Sparkles}
@@ -1705,11 +1696,7 @@ function useAiPageState() {
   );
   const plans = useLifeTraceStore((state) => state.plans);
   const traces = useLifeTraceStore((state) => state.traces);
-  const checkins = useLifeTraceStore((state) => state.checkins);
-  const checkinsDate = useLifeTraceStore((state) => state.checkinsDate);
-  const checkinsLoading = useLifeTraceStore((state) => state.checkinsLoading);
   const settings = useLifeTraceStore((state) => state.settings);
-  const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const aiActions = useLifeTraceStore((state) => state.aiActions ?? []);
   const addAiAction = useLifeTraceStore((state) => state.addAiAction);
   const addPlan = useLifeTraceStore((state) => state.addPlan);
@@ -1718,7 +1705,6 @@ function useAiPageState() {
   const receiveServerLedgerEntry = useLifeTraceStore((state) => state.receiveServerLedgerEntry);
   const loadAchievements = useLifeTraceStore((state) => state.loadAchievements);
   const loadAiActions = useLifeTraceStore((state) => state.loadAiActions);
-  const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const pantryListSummary = useLifeTraceStore((state) => state.pantryListSummary);
   const generateTraceFromLatestPlan = useLifeTraceStore(
@@ -1776,9 +1762,6 @@ function useAiPageState() {
 
   const openPlanCount = plans.filter((plan) => !plan.completed).length;
   const completedPlanCount = plans.length - openPlanCount;
-  const todayDate = useMemo(() => getLocalISODate(new Date()), []);
-  const todayCheckins = checkinsDate === todayDate ? checkins : [];
-  const completedCheckinCount = todayCheckins.filter((item) => item.completed).length;
   const latestWeeklyReview = weeklyReviews[0];
   const currentWeekReview = findCurrentWeekReview(weeklyReviews);
   const activeAssistantConversation =
@@ -1818,14 +1801,6 @@ function useAiPageState() {
       householdId: preferredPantryHouseholdId || undefined,
     });
   }, [loadPantryList, preferredPantryHouseholdId, token]);
-
-  useEffect(() => {
-    if (!token || !settingsLoaded) {
-      return;
-    }
-
-    void loadCheckins(todayDate);
-  }, [loadCheckins, settingsLoaded, todayDate, token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2287,9 +2262,8 @@ function useAiPageState() {
       });
       setWeeklyReviews((items) => [review, ...items.filter((item) => item.id !== review.id)]);
     } catch (error) {
-      const habits = settings.habits ?? [];
       const reason = error instanceof Error ? error.message : '服务端 AI 暂时不可用';
-      const detail = `未存档原因：${reason}。这次只生成本地回顾，不会进入历史周报。本周已有 ${traces.length} 条生活踪迹、${completedPlanCount} 个已完成计划。你最稳定的节奏是：${habits.slice(0, 3).join('、') || '保持记录'}。`;
+      const detail = `未存档原因：${reason}。这次只生成本地回顾，不会进入历史周报。本周已有 ${traces.length} 条生活踪迹、${completedPlanCount} 个已完成计划。`;
       setResult({ title: '本地每周回顾（未存档）', detail, tone: 'health' });
     } finally {
       setQuickActionLoading(null);
@@ -2483,7 +2457,7 @@ function useAiPageState() {
     if (!token) {
       setResult({
         title: '请先登录',
-        detail: '登录后 Life Trace 才能读取你的计划、打卡和天气上下文。',
+        detail: '登录后 Life Trace 才能读取你的计划和天气上下文。',
         tone: 'alert',
       });
       return;
@@ -2734,7 +2708,6 @@ function useAiPageState() {
   return {
     plans,
     traces,
-    checkinsLoading,
     settings,
     aiActions,
     navigate,
@@ -2783,7 +2756,6 @@ function useAiPageState() {
     addingWeeklyActionKey,
     openPlanCount,
     completedPlanCount,
-    completedCheckinCount,
     latestWeeklyReview,
     photoItemHistory,
     handleRemovePhotoItemDraft,
@@ -2967,7 +2939,6 @@ export function AiPage() {
     weatherSummary,
     pantryHouseholdLabel,
     openPlanCount,
-    completedCheckinCount,
     expiringPantryCount,
     handleSelectAssistantConversation,
     handleCreateAssistantConversation,
@@ -3004,7 +2975,6 @@ export function AiPage() {
         weatherSummary={weatherSummary}
         pantryHouseholdLabel={pantryHouseholdLabel}
         openPlanCount={openPlanCount}
-        completedCheckinCount={completedCheckinCount}
         expiringPantryCount={expiringPantryCount}
         speechSupported={assistantSpeechSupported}
         listening={assistantListening}

@@ -89,9 +89,6 @@ describe('achievement card surface', () => {
       'trace_fourteen_day_streak: TraceFourteenDayStreakGlyph',
     );
     expect(achievementBadgeIconSource).toContain(
-      'checkin_seven_day_streak: CheckinSevenDayStreakGlyph',
-    );
-    expect(achievementBadgeIconSource).toContain(
       'weekly_review_to_plan_five: WeeklyReviewToPlanFiveGlyph',
     );
   });
