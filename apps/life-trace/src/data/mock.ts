@@ -131,7 +131,7 @@ export const initialTraces: Trace[] = [
       'https://images.unsplash.com/photo-1486218119243-13883505764c?auto=format&fit=crop&w=900&q=80',
     mood: '活力',
     tags: ['运动', '清晨', '健康'],
-    source: '打卡',
+    source: '手动',
   },
 ];
 
@@ -157,6 +157,5 @@ export const profileSettings = [
   { label: '上班时间', value: '09:30', icon: CalendarDays },
   { label: '通勤方式', value: '开车', icon: Car },
   { label: '每日简报', value: '08:10 推送', icon: Bell },
-  { label: '默认打卡', value: '喝水 / 休息 / 运动', icon: Heart },
   { label: 'AI 个性化', value: '已开启', icon: Sparkles },
 ];

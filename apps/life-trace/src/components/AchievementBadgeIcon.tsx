@@ -53,7 +53,6 @@ const achievementGlyphMap: Record<string, AchievementGlyph> = {
   expiry_rescue: ExpiryRescueGlyph,
   fresh_start: FreshStartGlyph,
   autumn_pantry: AutumnPantryGlyph,
-  checkin_seven_day_streak: CheckinSevenDayStreakGlyph,
   family_three_members: FamilyThreeMembersGlyph,
   first_ai_chat: FirstAiChatGlyph,
   first_household: FirstHouseholdGlyph,
@@ -903,17 +902,6 @@ function WinterMealPlanGlyph({ className }: AchievementGlyphProps) {
       <path d="M22 44v10h20V44M27 50h10" />
       <path d="M20 14v7M32 11v8M44 14v7" />
       <SparkMark />
-    </GlyphSvg>
-  );
-}
-
-function CheckinSevenDayStreakGlyph({ className }: AchievementGlyphProps) {
-  return (
-    <GlyphSvg className={className}>
-      <rect height="36" rx="8" width="40" x="12" y="17" />
-      <path d="M21 12v10M43 12v10M12 29h40" />
-      <path d="M22 39l4 4 7-9M36 39l4 4 7-9" />
-      <path d="M22 49h24" />
     </GlyphSvg>
   );
 }

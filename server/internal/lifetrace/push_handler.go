@@ -214,21 +214,12 @@ func (h *Handler) PreviewDailyBriefPush(c *gin.Context) {
 		return
 	}
 
-	var checkins []model.LifeTraceCheckin
-	if err := database.GetDB().
-		Where("user_id = ? AND date = ?", userID, today).
-		Order("created_at ASC").
-		Find(&checkins).Error; err != nil {
-		fail(c, http.StatusInternalServerError, "读取今日打卡失败")
-		return
-	}
-
 	var weatherResp WeatherResponse
 	if h.weather != nil {
 		weatherResp = h.weather.Fetch(c.Request.Context(), settings.City, false)
 	}
 
-	payload := buildDailyBriefPushPayload(settings, weatherResp, plans, checkins, now)
+	payload := buildDailyBriefPushPayload(settings, weatherResp, plans, now)
 	payload.Tag = "life-trace-daily-brief-preview"
 	success(c, payload)
 }

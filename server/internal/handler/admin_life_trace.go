@@ -31,7 +31,6 @@ type adminLifeTraceUserRow struct {
 	OpenPlans         int64      `json:"openPlans"`
 	Traces            int64      `json:"traces"`
 	PantryItems       int64      `json:"pantryItems"`
-	Checkins          int64      `json:"checkins"`
 	WeeklyReviews     int64      `json:"weeklyReviews"`
 	AIConversations   int64      `json:"aiConversations"`
 	Feedbacks         int64      `json:"feedbacks"`
@@ -218,7 +217,6 @@ func ListAdminLifeTraceUsers(c *gin.Context) {
 		"plans":             loadAdminLifeTraceCounts(&model.LifeTracePlan{}),
 		"traces":            loadAdminLifeTraceCounts(&model.LifeTraceTrace{}),
 		"pantryItems":       loadAdminLifeTraceCounts(&model.LifeTracePantryItem{}),
-		"checkins":          loadAdminLifeTraceCounts(&model.LifeTraceCheckin{}),
 		"weeklyReviews":     loadAdminLifeTraceCounts(&model.LifeTraceWeeklyReview{}),
 		"aiConversations":   loadAdminLifeTraceCounts(&model.LifeTraceAIConversation{}),
 		"feedbacks":         loadAdminLifeTraceCounts(&model.LifeTraceFeedback{}),
@@ -261,7 +259,6 @@ func ListAdminLifeTraceUsers(c *gin.Context) {
 			OpenPlans:         openPlansByUser[user.ID],
 			Traces:            countsByKind["traces"][user.ID],
 			PantryItems:       countsByKind["pantryItems"][user.ID],
-			Checkins:          countsByKind["checkins"][user.ID],
 			WeeklyReviews:     countsByKind["weeklyReviews"][user.ID],
 			AIConversations:   countsByKind["aiConversations"][user.ID],
 			Feedbacks:         countsByKind["feedbacks"][user.ID],
@@ -286,7 +283,6 @@ func GetAdminLifeTraceOverview(c *gin.Context) {
 	countTargets := map[string]any{
 		"settings":             &model.LifeTraceSettings{},
 		"plans":                &model.LifeTracePlan{},
-		"checkins":             &model.LifeTraceCheckin{},
 		"traces":               &model.LifeTraceTrace{},
 		"pantryItems":          &model.LifeTracePantryItem{},
 		"weeklyReviews":        &model.LifeTraceWeeklyReview{},
@@ -354,8 +350,6 @@ func listAdminLifeTraceRecordsByType(c *gin.Context, recordType string) {
 		listAdminLifeTraceTraces(c)
 	case "pantry":
 		listAdminLifeTracePantryItems(c)
-	case "checkins":
-		listAdminLifeTraceCheckins(c)
 	case "weekly-reviews":
 		listAdminLifeTraceWeeklyReviews(c)
 	case "ai-conversations":
@@ -571,58 +565,6 @@ func listAdminLifeTracePantryItems(c *gin.Context) {
 				"unit":        item.Unit,
 				"location":    item.Location,
 				"expiresAt":   item.ExpiresAt,
-			},
-		})
-	}
-	finishAdminLifeTraceRecords(c, rows, total, page)
-}
-
-func listAdminLifeTraceCheckins(c *gin.Context) {
-	page := parseAdminLifeTracePage(c)
-	query := database.GetDB().Model(&model.LifeTraceCheckin{})
-	if userID, ok := parseAdminLifeTraceUserID(c); ok {
-		query = query.Where("user_id = ?", userID)
-	}
-	if keyword := strings.TrimSpace(c.Query("keyword")); keyword != "" {
-		query = query.Where("name LIKE ?", "%"+keyword+"%")
-	}
-	query = applyAdminLifeTraceDateFilters(query, c, "created_at")
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		Error(c, 500, "查询打卡记录失败")
-		return
-	}
-	var items []model.LifeTraceCheckin
-	if err := query.Order("created_at DESC").Limit(page.PageSize).Offset(page.Offset).Find(&items).Error; err != nil {
-		Error(c, 500, "查询打卡记录失败")
-		return
-	}
-
-	userIDs := make([]model.Int64String, 0, len(items))
-	for _, item := range items {
-		userIDs = append(userIDs, item.UserID)
-	}
-	users := loadAdminLifeTraceUsers(userIDs)
-	rows := make([]adminLifeTraceRecordRow, 0, len(items))
-	for _, item := range items {
-		updatedAt := item.UpdatedAt
-		status := "open"
-		if item.Completed {
-			status = "completed"
-		}
-		rows = append(rows, adminLifeTraceRecordRow{
-			ID:        item.ID.String(),
-			Type:      "checkins",
-			UserID:    item.UserID.String(),
-			UserName:  adminLifeTraceUserName(users[item.UserID], item.UserID),
-			Title:     item.Name,
-			Status:    status,
-			TimeLabel: item.Date,
-			CreatedAt: item.CreatedAt,
-			UpdatedAt: &updatedAt,
-			Detail: map[string]any{
-				"completedAt": item.CompletedAt,
 			},
 		})
 	}

@@ -5,7 +5,6 @@ export type LifeTraceRecordType =
   | 'plans'
   | 'traces'
   | 'pantry'
-  | 'checkins'
   | 'weekly-reviews'
   | 'ai-conversations'
   | 'push-subscriptions'
@@ -17,7 +16,6 @@ export interface LifeTraceOverview {
   settings: number;
   plans: number;
   openPlans: number;
-  checkins: number;
   traces: number;
   pantryItems: number;
   expiredPantryItems: number;
@@ -53,7 +51,6 @@ export interface LifeTraceUserRow {
   openPlans: number;
   traces: number;
   pantryItems: number;
-  checkins: number;
   weeklyReviews: number;
   aiConversations: number;
   feedbacks: number;

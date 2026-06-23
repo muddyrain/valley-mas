@@ -14,7 +14,6 @@ import {
   MapPin,
   MessageSquareText,
   MoonStar,
-  Plus,
   ReceiptText,
   RefreshCw,
   Repeat,
@@ -27,7 +26,6 @@ import {
   Sparkles,
   Trophy,
   Users,
-  X,
   Zap,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -44,7 +42,6 @@ import { SettingInput, SettingToggle, SyncStatus } from '@/components/SettingsCo
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { usePantryHouseholdManager } from '@/hooks/usePantryHouseholdManager';
 import { usePwaStatus } from '@/hooks/usePwaStatus';
 import { APP_VERSION_LABEL } from '@/lib/appVersion';
@@ -58,7 +55,6 @@ import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Achievement, CommuteMethod, UserSettings } from '@/types';
 
 const commuteMethods: CommuteMethod[] = ['开车', '地铁', '步行', '骑行', '远程'];
-const suggestedHabitOptions = ['喝水', '休息', '运动', '护肤', '早睡', '吃药'];
 const canPreviewAchievementToast = import.meta.env.DEV;
 const previewAchievementToastDurationMs = 4200;
 
@@ -92,8 +88,6 @@ export function ProfilePage() {
   const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
   const [householdDetailOpen, setHouseholdDetailOpen] = useState(false);
   const [feedbackSheetOpen, setFeedbackSheetOpen] = useState(false);
-  const [habitDraft, setHabitDraft] = useState('');
-  const [habitDraftError, setHabitDraftError] = useState('');
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const settingsLoading = useLifeTraceStore((state) => state.settingsLoading);
@@ -279,34 +273,6 @@ export function ProfilePage() {
     });
   };
 
-  const addHabit = (rawValue: string) => {
-    const nextHabit = rawValue.trim();
-    if (!nextHabit) {
-      setHabitDraftError('先输入一个打卡项');
-      return;
-    }
-    if (nextHabit.length > 40) {
-      setHabitDraftError('打卡项最多 40 个字');
-      return;
-    }
-    if (settings.habits.includes(nextHabit)) {
-      setHabitDraftError('这个打卡项已经存在了');
-      return;
-    }
-
-    update('habits', [...settings.habits, nextHabit]);
-    setHabitDraft('');
-    setHabitDraftError('');
-  };
-
-  const removeHabit = (habit: string) => {
-    update(
-      'habits',
-      settings.habits.filter((item) => item !== habit),
-    );
-    setHabitDraftError('');
-  };
-
   return (
     <div ref={pageRef} className="space-y-6 px-5 pt-4 max-[360px]:px-4">
       <section
@@ -404,8 +370,8 @@ export function ProfilePage() {
             </div>
             <div className="rounded-2xl border border-border/70 bg-background/50 p-3.5 backdrop-blur">
               <Heart className="mb-2 size-[1.05rem] text-life-trace" />
-              <p className="truncate text-[0.95rem] font-semibold">{settings.habits.length} 项</p>
-              <p className="mt-1 text-xs text-muted-foreground">打卡开启</p>
+              <p className="truncate text-[0.95rem] font-semibold">{enabledSignals} 项</p>
+              <p className="mt-1 text-xs text-muted-foreground">提醒开启</p>
             </div>
           </div>
 
@@ -643,7 +609,7 @@ export function ProfilePage() {
         <SectionHeader title="智能偏好" meta={settings.aiPersonalization ? '已开启' : '已关闭'} />
         <SettingToggle
           label="AI 个性化"
-          detail="根据计划、打卡和偏好生成今日建议"
+          detail="根据计划和偏好生成今日建议"
           icon={Sparkles}
           active={settings.aiPersonalization}
           onToggle={() => update('aiPersonalization', !settings.aiPersonalization)}
@@ -814,98 +780,6 @@ export function ProfilePage() {
           tone="trace"
           onClick={() => navigate('/media-diary')}
         />
-      </section>
-
-      <section data-profile-card className="space-y-3">
-        <SectionHeader title="每日打卡" meta={`${settings.habits.length} 项已开启`} />
-        <Card className="space-y-4 p-4">
-          <div className="flex items-start gap-3">
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-trace/10 text-life-trace">
-              <Heart className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-semibold">每日打卡</h3>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                喝水、休息、运动和睡前小习惯。
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-2 max-[360px]:flex-col">
-            <Input
-              type="text"
-              value={habitDraft}
-              maxLength={40}
-              placeholder="例如：晚饭后吃维生素D"
-              className="flex-1 text-sm focus:border-life-trace/50"
-              onChange={(event) => {
-                setHabitDraft(event.target.value);
-                if (habitDraftError) {
-                  setHabitDraftError('');
-                }
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  addHabit(habitDraft);
-                }
-              }}
-            />
-            <Button type="button" variant="ai" onClick={() => addHabit(habitDraft)}>
-              <Plus className="size-4" />
-              添加
-            </Button>
-          </div>
-
-          {habitDraftError ? (
-            <p className="text-sm text-life-alert">{habitDraftError}</p>
-          ) : (
-            <p className="text-xs leading-5 text-muted-foreground">今日页会按这份清单展示。</p>
-          )}
-
-          {settings.habits.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {settings.habits.map((habit) => (
-                <span
-                  key={habit}
-                  className="inline-flex items-center gap-2 rounded-full border border-life-trace/25 bg-life-trace/10 px-3 py-2 text-sm font-medium text-life-trace"
-                >
-                  <span className="max-w-[16rem] truncate">{habit}</span>
-                  <button
-                    type="button"
-                    className="grid size-5 place-items-center rounded-full bg-background/60 text-life-trace transition hover:bg-background"
-                    aria-label={`删除 ${habit}`}
-                    onClick={() => removeHabit(habit)}
-                  >
-                    <X className="size-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-border px-4 py-4 text-sm leading-6 text-muted-foreground">
-              还没有自定义打卡项。先加一个最容易坚持的，比如喝药、喝水或睡前拉伸。
-            </div>
-          )}
-
-          <div>
-            <p className="mb-2 text-xs font-semibold text-muted-foreground">快速添加</p>
-            <div className="flex flex-wrap gap-2">
-              {suggestedHabitOptions
-                .filter((habit) => !settings.habits.includes(habit))
-                .map((habit) => (
-                  <button
-                    key={habit}
-                    type="button"
-                    className="rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-life-trace/30 hover:text-foreground"
-                    onClick={() => addHabit(habit)}
-                  >
-                    + {habit}
-                  </button>
-                ))}
-            </div>
-          </div>
-        </Card>
       </section>
 
       <section data-profile-card className="space-y-3">

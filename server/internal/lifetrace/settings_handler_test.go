@@ -28,10 +28,6 @@ func TestGetSettingsCreatesDefaultForCurrentUser(t *testing.T) {
 	if settings["workdayMode"] != "legal" || settings["planReminderLeadMinutes"] != float64(10) {
 		t.Fatalf("expected default workday settings, got %+v", settings)
 	}
-	habits := settings["habits"].([]interface{})
-	if len(habits) != 4 || habits[0] != "喝水" {
-		t.Fatalf("expected default habits, got %+v", habits)
-	}
 	pantryRules := settings["pantryReminderRules"].([]interface{})
 	if settings["pantryReminderEnabled"] != true || settings["pantryReminderTime"] != "09:00" {
 		t.Fatalf("expected default pantry reminder settings, got %+v", settings)
@@ -96,7 +92,6 @@ func TestUpdateSettingsPersistsCurrentUserPreferences(t *testing.T) {
 		"weatherAlerts": false,
 		"planReminders": true,
 		"aiPersonalization": false,
-		"habits": ["喝水", "早睡", "喝水"],
 		"pantryReminderEnabled": true,
 		"pantryReminderRules": ["3d", "same-day", "same-day"],
 		"pantryReminderTime": "08:45"
@@ -122,10 +117,6 @@ func TestUpdateSettingsPersistsCurrentUserPreferences(t *testing.T) {
 	workdays := settings["workdays"].([]interface{})
 	if len(workdays) != 3 || workdays[1] != "3" {
 		t.Fatalf("expected deduplicated workdays, got %+v", workdays)
-	}
-	habits := settings["habits"].([]interface{})
-	if len(habits) != 2 || habits[1] != "早睡" {
-		t.Fatalf("expected deduplicated habits, got %+v", habits)
 	}
 	pantryRules := settings["pantryReminderRules"].([]interface{})
 	if len(pantryRules) != 2 || pantryRules[0] != "3d" {
@@ -178,7 +169,6 @@ func TestUpdateSettingsRejectsInaccessibleActivePantryHousehold(t *testing.T) {
 		"weatherAlerts": true,
 		"planReminders": true,
 		"aiPersonalization": true,
-		"habits": ["喝水"],
 		"pantryReminderEnabled": true,
 		"pantryReminderRules": ["7d", "3d", "same-day", "expired"],
 		"pantryReminderTime": "09:00"
@@ -200,41 +190,5 @@ func TestUpdateSettingsRejectsInaccessibleActivePantryHousehold(t *testing.T) {
 	settings := decodeTracePayload(t, getResp)["data"].(map[string]interface{})
 	if settings["activePantryHouseholdId"] != nil {
 		t.Fatalf("expected inaccessible active household not to be silently persisted, got %+v", settings)
-	}
-}
-
-func TestUpdateSettingsAllowsEmptyHabits(t *testing.T) {
-	router := setupTraceTestRouter(t, 101)
-
-	body := bytes.NewBufferString(`{
-		"city": "杭州",
-		"workStart": "09:30",
-		"workEnd": "18:30",
-		"commuteMethod": "开车",
-		"dailyBriefTime": "08:10",
-		"workdayMode": "legal",
-		"workdays": ["1", "2", "3", "4", "5"],
-		"holidaySync": true,
-		"weekendReminders": false,
-		"planReminderLeadMinutes": 10,
-		"quietStart": "22:30",
-		"quietEnd": "07:30",
-		"weatherAlerts": true,
-		"planReminders": true,
-		"aiPersonalization": true,
-		"habits": [],
-		"pantryReminderEnabled": true,
-		"pantryReminderRules": ["7d", "3d", "same-day", "expired"],
-		"pantryReminderTime": "09:00"
-	}`)
-	updateReq := httptest.NewRequest(http.MethodPut, "/api/v1/life-trace/settings", body)
-	updateReq.Header.Set("Content-Type", "application/json")
-	updateResp := httptest.NewRecorder()
-	router.ServeHTTP(updateResp, updateReq)
-
-	settings := decodeTracePayload(t, updateResp)["data"].(map[string]interface{})
-	habits := settings["habits"].([]interface{})
-	if len(habits) != 0 {
-		t.Fatalf("expected empty habits to persist, got %+v", habits)
 	}
 }

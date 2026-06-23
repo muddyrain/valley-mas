@@ -271,12 +271,11 @@ export function ReminderSettingsPage() {
           <SectionHeader title="每日简报" meta={`${settings.dailyBriefTime} 推送`} />
           <Card className="space-y-4 p-4">
             <p className="text-sm leading-6 text-muted-foreground">
-              这条通知会组合天气城市、今天计划和打卡进度来生成。现在就可以按当前设置发一条出来，看实际长什么样。
+              这条通知会组合天气城市和今天计划来生成。现在就可以按当前设置发一条出来，看实际长什么样。
             </p>
             <div className="flex flex-wrap gap-2">
               <Badge tone="weather">天气城市：{settings.city}</Badge>
               <Badge tone="plan">简报时间：{settings.dailyBriefTime}</Badge>
-              <Badge tone="trace">打卡清单：{settings.habits.length} 项</Badge>
             </div>
             <Button
               type="button"

@@ -65,7 +65,6 @@ export type UserSettings = {
   weatherAlerts: boolean;
   planReminders: boolean;
   aiPersonalization: boolean;
-  habits: string[];
   pantryReminderEnabled: boolean;
   pantryReminderRules: PantryReminderRule[];
   pantryReminderTime: string;
@@ -293,7 +292,7 @@ export type Trace = {
   imageUrl?: string;
   mood: string;
   tags: string[];
-  source: '计划' | '打卡' | '库存' | '书影音' | '穿搭' | '手动';
+  source: '计划' | '库存' | '书影音' | '穿搭' | '手动';
   createdAt?: string;
   updatedAt?: string;
 };
@@ -562,16 +561,6 @@ export type MediaDiarySummary = {
   completedMonth: number;
   bestRating: number;
   recent?: MediaDiaryEntry;
-};
-export type Checkin = {
-  id: string;
-  userId: string;
-  date: string;
-  name: string;
-  completed: boolean;
-  completedAt?: string;
-  createdAt?: string;
-  updatedAt?: string;
 };
 
 export type AiAction = {

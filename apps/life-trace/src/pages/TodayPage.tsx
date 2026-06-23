@@ -3,13 +3,11 @@ import {
   Bell,
   CalendarDays,
   Camera,
-  Check,
   ChevronRight,
   Cloud,
   Droplets,
   Leaf,
   Lightbulb,
-  LoaderCircle,
   PackageCheck,
   PackageOpen,
   PenLine,
@@ -49,7 +47,6 @@ import {
 } from '@/lib/pantry';
 import { isOverduePlan, isTodayPlan } from '@/lib/planGroups';
 import { getNextReminder, getPlanDisplayTimeParts } from '@/lib/planReminder';
-import { getLocalISODate } from '@/lib/planSchedule';
 import { cn } from '@/lib/utils';
 import { buildWeatherAlerts } from '@/lib/weatherAdvice';
 import { readWeatherCache, writeWeatherCache } from '@/lib/weatherCache';
@@ -283,23 +280,6 @@ function TodayPantrySkeleton() {
   );
 }
 
-function TodayHabitSkeleton() {
-  return (
-    <div className="grid grid-cols-2 gap-2 max-[340px]:grid-cols-1">
-      <span className="sr-only">正在加载今日打卡</span>
-      {[0, 1, 2, 3].map((index) => (
-        <div
-          key={`today-habit-skeleton-${index}`}
-          className="flex min-h-12 items-center justify-between gap-2 rounded-2xl border border-border bg-secondary px-3"
-        >
-          <SkeletonBar className={cn('h-3', index % 2 === 0 ? 'w-14' : 'w-20')} />
-          <div className="size-6 shrink-0 animate-pulse rounded-full border border-border bg-card motion-reduce:animate-none" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function TodayPlanSkeleton() {
   return (
     <div className="space-y-2">
@@ -343,12 +323,6 @@ function buildWeatherDayLabel(dateText: string, fallbackLabel: string) {
 export function TodayPage() {
   const plans = useLifeTraceStore((state) => state.plans);
   const plansLoaded = useLifeTraceStore((state) => state.plansLoaded);
-  const checkins = useLifeTraceStore((state) => state.checkins);
-  const checkinsDate = useLifeTraceStore((state) => state.checkinsDate);
-  const checkinsLoaded = useLifeTraceStore((state) => state.checkinsLoaded);
-  const checkinsLoading = useLifeTraceStore((state) => state.checkinsLoading);
-  const checkinsError = useLifeTraceStore((state) => state.checkinsError);
-  const checkinTogglingByName = useLifeTraceStore((state) => state.checkinTogglingByName);
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const preferredPantryHouseholdId = useLifeTraceStore((state) => state.preferredPantryHouseholdId);
@@ -367,8 +341,6 @@ export function TodayPage() {
   const achievementsLoading = useLifeTraceStore((state) => state.achievementsLoading);
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
-  const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
-  const toggleHabitCheckin = useLifeTraceStore((state) => state.toggleHabitCheckin);
   const shoppingListItems = useLifeTraceStore((state) => state.shoppingListItems);
   const shoppingListLoaded = useLifeTraceStore((state) => state.shoppingListLoaded);
   const loadShoppingList = useLifeTraceStore((state) => state.loadShoppingList);
@@ -386,7 +358,6 @@ export function TodayPage() {
   const [quickLedgerOpen, setQuickLedgerOpen] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
   const showToast = useFeedbackToastStore((state) => state.showToast);
-  const todayDate = useMemo(() => getLocalISODate(new Date()), []);
   const todayLabel = useMemo(
     () =>
       new Intl.DateTimeFormat('zh-CN', {
@@ -412,10 +383,6 @@ export function TodayPage() {
     }
     return '晚上好';
   }, []);
-  const habitNames = settings.habits;
-  const todayCheckins = checkinsDate === todayDate ? checkins : [];
-  const checkinsCardLoading =
-    Boolean(token) && (!settingsLoaded || !checkinsLoaded || checkinsDate !== todayDate);
   const pantryHouseholdName = pantryListResolvedHouseholdName || preferredPantryHouseholdName;
   const pantryOverview = pantryListSummary;
   const pantryAttentionTotal = pantryOverview.expiring + pantryOverview.expired;
@@ -514,20 +481,7 @@ export function TodayPage() {
       : todayOpenPlans.length > 0
         ? `今天还有 ${todayOpenPlans.length} 个计划，完成后会自动沉淀为踪迹。`
         : '今天还没有未完成计划，可以进入计划页手动创建。';
-  const completedHabitCount = habitNames.filter((name) =>
-    todayCheckins.some((item) => item.name === name && item.completed),
-  ).length;
-  const habitProgress =
-    habitNames.length > 0 ? `${completedHabitCount}/${habitNames.length}` : '未设置';
-  const habitPercent =
-    habitNames.length > 0 ? Math.round((completedHabitCount / habitNames.length) * 100) : 0;
   const greetingName = user?.nickname?.trim() || user?.username?.trim();
-  const checkinAdviceText =
-    habitNames.length === 0
-      ? '先去我的页添加自定义打卡，比如喝药、维生素或饭后散步。'
-      : completedHabitCount > 0
-        ? `已完成 ${completedHabitCount} 项，今天继续按这个节奏就很好。`
-        : '先完成一个小打卡，今天会更容易进入状态。';
   const latestAchievement = recentAchievements[0];
   const firstPreviewPlan = previewPlans[0];
   const firstPreviewPlanTime = firstPreviewPlan ? getPlanDisplayTimeParts(firstPreviewPlan) : null;
@@ -538,14 +492,14 @@ export function TodayPage() {
       : '今天还没有安排';
   const todaySummaryItems = [
     {
-      label: '习惯完成',
-      value: habitProgress,
+      label: '今日计划',
+      value: `${todayOpenPlans.length}`,
       tone: 'text-life-trace',
-      icon: Check,
+      icon: CalendarDays,
     },
     {
-      label: '好事发生',
-      value: latestAchievement ? '1' : `${completedHabitCount}`,
+      label: '近期成就',
+      value: latestAchievement ? '1' : '0',
       tone: 'text-life-health',
       icon: Sparkles,
     },
@@ -612,14 +566,6 @@ export function TodayPage() {
       return;
     }
 
-    void loadCheckins(todayDate);
-  }, [loadCheckins, settingsLoaded, todayDate, token]);
-
-  useEffect(() => {
-    if (!token || !settingsLoaded) {
-      return;
-    }
-
     void loadPlans({ status: 'open', pageSize: 20 });
   }, [loadPlans, settingsLoaded, token]);
 
@@ -670,11 +616,6 @@ export function TodayPage() {
       .finally(() => setWeatherLoading(false));
   };
 
-  const handleToggleCheckin = (name: string) => {
-    const current = todayCheckins.find((item) => item.name === name);
-    void toggleHabitCheckin(todayDate, name, !current?.completed);
-  };
-
   return (
     <div
       ref={pageRef}
@@ -719,7 +660,7 @@ export function TodayPage() {
           今日节奏
         </h2>
 
-        <div className="relative mt-4 grid grid-cols-4 divide-x divide-border/70 py-1 max-[360px]:grid-cols-2 max-[360px]:divide-x-0 max-[360px]:divide-y">
+        <div className="relative mt-4 grid grid-cols-3 divide-x divide-border/70 py-1 max-[360px]:grid-cols-1 max-[360px]:divide-x-0 max-[360px]:divide-y">
           <button
             type="button"
             className="min-w-0 px-2 text-center"
@@ -749,26 +690,6 @@ export function TodayPage() {
             </div>
             <p className="mt-2 truncate text-[0.88rem] font-semibold text-foreground">下个计划</p>
             <p className="mt-1 truncate text-[0.82rem] text-muted-foreground">{nextPlanMeta}</p>
-          </button>
-          <button
-            type="button"
-            className="min-w-0 px-2 text-center"
-            onClick={() => navigate('/plans')}
-          >
-            <div
-              className="mx-auto grid size-12 place-items-center rounded-full p-1"
-              style={{
-                background: `conic-gradient(#f26d3d ${habitPercent * 3.6}deg, rgba(242,109,61,0.2) 0deg)`,
-              }}
-            >
-              <span className="grid size-9 place-items-center rounded-full bg-background text-[0.82rem] font-semibold text-foreground">
-                {habitNames.length > 0 ? `${habitPercent}%` : '0%'}
-              </span>
-            </div>
-            <p className="mt-2 truncate text-[0.88rem] font-semibold text-foreground">习惯进度</p>
-            <p className="mt-1 truncate text-[0.82rem] text-muted-foreground">
-              {habitNames.length > 0 ? `${habitProgress} 完成` : '未设置'}
-            </p>
           </button>
           <button
             type="button"
@@ -1580,87 +1501,6 @@ export function TodayPage() {
                 去补库存
               </button>
             </div>
-          )}
-        </Card>
-
-        <Card className="p-4" data-today-entrance>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <Badge tone="trace">今日打卡</Badge>
-                {checkinsLoading && !checkinsCardLoading ? (
-                  <ActionLoadingIcon className="size-3.5" tone="trace" />
-                ) : null}
-              </div>
-              <h2 className="mt-2 text-lg font-semibold">保持一点生活节奏</h2>
-            </div>
-            <div className="rounded-2xl border border-life-trace/25 bg-life-trace/10 px-3 py-2 text-sm font-bold text-life-trace">
-              {checkinsCardLoading ? (
-                <SkeletonBar className="h-4 w-10 bg-life-trace/20" />
-              ) : (
-                habitProgress
-              )}
-            </div>
-          </div>
-          {checkinsCardLoading ? (
-            <TodayHabitSkeleton />
-          ) : habitNames.length > 0 ? (
-            <div className="grid grid-cols-2 gap-2 max-[340px]:grid-cols-1">
-              {habitNames.map((name) => {
-                const checkin = todayCheckins.find((item) => item.name === name);
-                const completed = Boolean(checkin?.completed);
-                const toggling = Boolean(checkinTogglingByName[name]);
-
-                return (
-                  <button
-                    type="button"
-                    key={name}
-                    disabled={toggling}
-                    className={`flex min-h-12 cursor-pointer items-center justify-between gap-2 rounded-2xl border px-3 text-left text-sm font-semibold transition disabled:cursor-default disabled:opacity-70 ${
-                      completed
-                        ? 'border-life-trace/40 bg-life-trace/10 text-life-trace'
-                        : 'border-border bg-secondary text-muted-foreground hover:text-foreground'
-                    }`}
-                    onClick={() => handleToggleCheckin(name)}
-                  >
-                    <span className="truncate">{name}</span>
-                    <span
-                      className={`grid size-6 shrink-0 place-items-center rounded-full border transition ${
-                        toggling
-                          ? 'border-life-trace/40 bg-transparent text-life-trace'
-                          : completed
-                            ? 'border-life-trace bg-life-trace text-background'
-                            : 'border-border bg-transparent'
-                      }`}
-                    >
-                      {toggling ? (
-                        <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" />
-                      ) : completed ? (
-                        <Check className="size-3.5" />
-                      ) : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-border px-4 py-4">
-              <p className="text-sm leading-6 text-muted-foreground">
-                还没有设置今天要坚持的打卡项。设置后会按云端清单展示。
-              </p>
-              <button
-                type="button"
-                className="mt-3 inline-flex h-9 items-center rounded-xl bg-secondary px-3 text-sm font-semibold text-foreground transition hover:bg-secondary/80"
-                onClick={() => navigate('/profile')}
-              >
-                去设置打卡
-              </button>
-            </div>
-          )}
-          {checkinsCardLoading ? null : checkinsError ? (
-            <p className="mt-3 text-sm text-life-alert">{checkinsError}</p>
-          ) : (
-            <p className="mt-3 text-xs leading-5 text-muted-foreground">{checkinAdviceText}</p>
           )}
         </Card>
 
