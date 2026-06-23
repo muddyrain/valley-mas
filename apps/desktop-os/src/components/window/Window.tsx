@@ -1,7 +1,8 @@
-import { memo, useRef, useState } from 'react';
+import { memo, useRef } from 'react';
 import { renderDesktopApp } from '../../apps/appRenderers';
 import { getDesktopAppRuntimePolicy } from '../../apps/desktopApps';
 import { type AppId, useWindowStore, type WindowState } from '../../store/windowStore';
+import { PlushPop } from '../../ui/PlushMotion';
 import PlushScrollbar from '../../ui/PlushScrollbar';
 import ResizeHandles from '../../ui/ResizeHandles';
 import TrafficLights from '../../ui/TrafficLights';
@@ -11,8 +12,6 @@ interface Props {
   state: WindowState;
   appId: AppId;
 }
-
-const CLOSE_ANIM_MS = 220;
 
 function Window({ state, appId }: Props) {
   const closeWindow = useWindowStore((s) => s.closeWindow);
@@ -30,14 +29,9 @@ function Window({ state, appId }: Props) {
     y: number;
     frame: number | null;
   } | null>(null);
-  const closingRef = useRef(false);
-  const [isClosing, setIsClosing] = useState(false);
 
   function handleClose() {
-    if (closingRef.current) return;
-    closingRef.current = true;
-    setIsClosing(true);
-    window.setTimeout(() => closeWindow(state.id), CLOSE_ANIM_MS);
+    closeWindow(state.id);
   }
 
   function startDrag(e: React.PointerEvent<HTMLDivElement>) {
@@ -85,38 +79,44 @@ function Window({ state, appId }: Props) {
   }
 
   return (
-    <div
-      className={`window ${isFocused ? 'is-focused' : 'is-blurred'} ${state.maximized ? 'is-maximized' : ''} ${state.minimized ? 'is-minimized' : ''} ${isClosing ? 'is-closing' : ''}`}
+    <PlushPop
+      open
+      data-window-id={state.id}
       style={{
+        position: 'absolute',
         left: state.x,
         top: state.y,
         width: state.width,
         height: state.height,
         zIndex: state.zIndex,
       }}
-      onPointerDown={() => focusWindow(state.id)}
     >
-      <div className="window__titlebar" onPointerDown={startDrag} onDoubleClick={handleMaximize}>
-        <TrafficLights
-          active={isFocused}
-          onClose={handleClose}
-          onMinimize={() => minimizeWindow(state.id)}
-          onMaximize={handleMaximize}
-        />
-        <div className="window__title">{state.title}</div>
-        <div className="window__titlebar-spacer" />
+      <div
+        className={`window ${isFocused ? 'is-focused' : 'is-blurred'} ${state.maximized ? 'is-maximized' : ''} ${state.minimized ? 'is-minimized' : ''}`}
+        onPointerDown={() => focusWindow(state.id)}
+      >
+        <div className="window__titlebar" onPointerDown={startDrag} onDoubleClick={handleMaximize}>
+          <TrafficLights
+            active={isFocused}
+            onClose={handleClose}
+            onMinimize={() => minimizeWindow(state.id)}
+            onMaximize={handleMaximize}
+          />
+          <div className="window__title">{state.title}</div>
+          <div className="window__titlebar-spacer" />
+        </div>
+        <PlushScrollbar className="window__body" contentClassName="window__body-content">
+          <DesktopAppHost appId={appId} lifecycleState={state.lifecycleState} />
+        </PlushScrollbar>
+        {!state.maximized && (
+          <ResizeHandles
+            rect={{ x: state.x, y: state.y, width: state.width, height: state.height }}
+            onResize={(rect) => resizeWindow(state.id, rect)}
+            onResizeStart={() => focusWindow(state.id)}
+          />
+        )}
       </div>
-      <PlushScrollbar className="window__body" contentClassName="window__body-content">
-        <DesktopAppHost appId={appId} lifecycleState={state.lifecycleState} />
-      </PlushScrollbar>
-      {!state.maximized && !isClosing && (
-        <ResizeHandles
-          rect={{ x: state.x, y: state.y, width: state.width, height: state.height }}
-          onResize={(rect) => resizeWindow(state.id, rect)}
-          onResizeStart={() => focusWindow(state.id)}
-        />
-      )}
-    </div>
+    </PlushPop>
   );
 }
 

@@ -1,7 +1,9 @@
 .window {
-  position: absolute;
+  position: relative;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  height: 100%;
   background: var(--plush-cream);
   border-radius: var(--radius-lg);
   border: 1px solid rgba(90, 74, 58, 0.08);
@@ -9,8 +11,6 @@
   overflow: visible;
   outline: none;
   isolation: isolate;
-  animation: window-pop 0.32s var(--ease-spring);
-  transform-origin: center center;
   transition:
     box-shadow 0.2s var(--ease-out),
     opacity 0.22s var(--ease-out),
@@ -22,17 +22,6 @@
 .window:focus-visible,
 .window:focus-within {
   outline: none;
-}
-
-@keyframes window-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.92);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 .window.is-blurred {
@@ -49,12 +38,6 @@
     opacity 0.32s var(--ease-out),
     transform 0.36s cubic-bezier(0.55, 0.05, 0.45, 0.95),
     filter 0.32s var(--ease-out);
-}
-
-.window.is-closing {
-  opacity: 0;
-  transform: scale(0.86);
-  pointer-events: none;
 }
 
 .window__titlebar {
