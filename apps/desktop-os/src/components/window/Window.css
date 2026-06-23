@@ -124,6 +124,20 @@
   box-sizing: border-box;
 }
 
+.window__body:has(.safari-window) {
+  overflow: hidden;
+}
+
+.window__body:has(.safari-window) .window__body-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 12px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
 /* Storybook Design System v1 */
 .window {
   border: 1px solid var(--plush-outline);
