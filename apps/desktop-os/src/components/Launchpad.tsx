@@ -9,7 +9,7 @@ import {
 } from '../apps/desktopApps';
 import { useLaunchpadStore } from '../store/launchpadStore';
 import { useWindowStore } from '../store/windowStore';
-import { PlushPop, PlushPresence } from '../ui/PlushMotion';
+import { MOTION_TOKENS, PlushPop, PlushPresence } from '../ui/PlushMotion';
 import './Launchpad.css';
 
 const DEFAULT_METRICS = { pageSize: 15, columns: 5 };
@@ -267,11 +267,7 @@ function LaunchpadPanel() {
                   animate="center"
                   exit="exit"
                   variants={pageVariants}
-                  transition={
-                    prefersReduced
-                      ? { duration: 0 }
-                      : { type: 'spring', stiffness: 420, damping: 38, mass: 0.82 }
-                  }
+                  transition={prefersReduced ? { duration: 0 } : MOTION_TOKENS.slide}
                 >
                   <div className="launchpad__grid">
                     {currentPage.map((app, pageItemIndex) => {

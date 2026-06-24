@@ -39,7 +39,7 @@
 - 公共组件清单（位于 `src/ui/`）：`PlushPrimitives`（Button/Card/Dialog/Input/Tooltip/Popover 等包装）、`PlushScrollbar`、`PlushImage`、`PlushSelect`、`PlushLoading`、`PlushLoadMore`、`EmptyState`、`Slider`、`ToggleSwitch`、`TrafficLights`、`ResizeHandles`。
 - 壳层组件（`Window`、`MenuBar`、`Dock`、`Launchpad`、`Spotlight`、`ControlCenter`、`NotificationCenter`）必须共用同一套 surface / panel / field / accent / outline / shadow / motion / game-shape token，不得引入彼此割裂的暖色卡片或默认菜单 hover。
 - 应用窗口、Finder 侧栏、资源区、详情区等高频滚动面板优先接入 `PlushScrollbar`，不直接暴露浏览器默认滚动条。
-- 进出场 / layout 动画统一通过 `PlushMotion`（`PlushPresence` / `PlushPop` / `PlushFade` / `PlushSlide`）接入，业务组件不直接 `import 'motion/react'`。装饰类 `@keyframes`（loading / shimmer / spin / cloud-drift / 控件 pop）与 rAF 拖拽缩放路径不在 motion 治理范围内。
+- 进出场 / layout 动画统一通过 `PlushMotion`（`PlushPresence` / `PlushPop` / `PlushFade` / `PlushSlide`）接入，业务组件不直接 `import 'motion/react'`。装饰类 `@keyframes`（loading / shimmer / spin / cloud-drift / 控件 pop）与 rAF 拖拽缩放路径不在 motion 治理范围内。例外:layout / shared layout 动画（如 Launchpad 翻页）允许在组件内直接 `import { motion } from 'motion/react'`，但 transition 仍走 `MOTION_TOKENS`。
 
 ## 运行时与生命周期治理
 
