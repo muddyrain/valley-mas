@@ -1,4 +1,4 @@
-import { SIM_SPEED_TIERS, type SimSpeedTier } from '@/shared/types';
+import { formatGameTime, SIM_SPEED_TIERS, type SimSpeedTier } from '@/shared/types';
 import { useWorldSimStore } from '@/state';
 import styles from './TopBar.module.css';
 
@@ -12,7 +12,6 @@ export function TopBar() {
   const setSpeed = useWorldSimStore((s) => s.setSpeed);
   const togglePaused = useWorldSimStore((s) => s.togglePaused);
   const advanceTick = useWorldSimStore((s) => s.advanceTick);
-  const startSim = useWorldSimStore((s) => s.startSim);
   const resetBattle = useWorldSimStore((s) => s.resetBattle);
   const toggleHud = useWorldSimStore((s) => s.toggleHud);
   const worldMode = useWorldSimStore((s) => s.worldMode);
@@ -50,16 +49,16 @@ export function TopBar() {
       </div>
       <div className={styles.center}>
         <div className={styles.tickGroup}>
-          <span className={styles.tickLabel}>Tick</span>
-          <span className={styles.tickValue}>{tick}</span>
+          <span className={styles.tickLabel}>时间</span>
+          <span className={styles.tickValue}>{formatGameTime(tick)}</span>
         </div>
         {banner ? (
           <span className={styles.banner} data-kind={banner.kind}>
             {banner.text}
           </span>
         ) : (
-          <span className={styles.statusChip} data-status={status}>
-            {status === 'running' ? '推演中' : '待命'}
+          <span className={styles.statusChip} data-status={status} data-paused={paused}>
+            {status === 'running' ? (paused ? '暂停中' : '推演中') : '待命'}
           </span>
         )}
         {ended ? (
@@ -67,20 +66,23 @@ export function TopBar() {
             重新开局
           </button>
         ) : (
-          <>
-            <button
-              type="button"
-              onClick={startSim}
-              disabled={!canStart || (status === 'running' && !paused)}
-              className={styles.primaryBtn}
-              title={canStart ? '开始推演' : '至少需要一个已出生的势力'}
-            >
-              开始
-            </button>
-            <button type="button" onClick={togglePaused} disabled={!canStart}>
-              {paused ? '继续' : '暂停'}
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={togglePaused}
+            disabled={!canStart}
+            className={styles.primaryBtn}
+            title={
+              canStart
+                ? paused
+                  ? status === 'idle'
+                    ? '开始推演'
+                    : '继续推演'
+                  : '暂停推演'
+                : '至少需要一个已出生的势力'
+            }
+          >
+            {paused ? (status === 'idle' ? '▶ 开始' : '▶ 继续') : '⏸ 暂停'}
+          </button>
         )}
         <div className={styles.speedGroup}>
           {SIM_SPEED_TIERS.map((tier: SimSpeedTier) => (
@@ -99,9 +101,9 @@ export function TopBar() {
           type="button"
           onClick={() => advanceTick(1)}
           disabled={ended || !canStart}
-          title="手动推进 1 tick（调试）"
+          title="手动推进 1 季（调试）"
         >
-          +1 tick
+          +1 季
         </button>
         <button
           type="button"

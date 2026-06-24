@@ -69,9 +69,20 @@ const SIM_RESET = {
   paused: true,
 };
 
+/** 首次加载时生成随机 seed，保证每次进入页面地图和剧本都不同 */
+function generateInitialSeed(): string {
+  if (typeof window === 'undefined') return 'sanguo-001';
+  // 支持 URL 参数 ?seed=xxx 指定 seed，便于分享和复现
+  const params = new URLSearchParams(window.location.search);
+  const urlSeed = params.get('seed');
+  if (urlSeed && urlSeed.trim().length > 0) return urlSeed.trim();
+  // 默认随机生成
+  return `seed-${Math.floor(Math.random() * 1e9).toString(36)}`;
+}
+
 export const createMapSlice: StateCreator<Deps, [], [], MapSlice> = (set, get) => ({
   map: null,
-  seed: 'sanguo-001',
+  seed: generateInitialSeed(),
   provinceCount: 3000,
   mapSource: 'random',
   geoRegionNames: null,

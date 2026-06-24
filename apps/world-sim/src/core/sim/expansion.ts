@@ -1,6 +1,7 @@
 import type { MapData } from '@/core/map';
 import type { RandomSource } from '@/shared/math';
 import type { FactionId, FactionSummary, RegionId, Tick } from '@/shared/types';
+import { getSmallRealmCollapseBias, getTempoConfig } from './tempo';
 import { strengthBias, TERRAIN_ATTACK_PROB } from './terrainCombat';
 import type { SimTickResult } from './types';
 
@@ -9,7 +10,7 @@ export interface RunExpansionTickInput {
   map: MapData;
   factions: FactionSummary[];
   rng: RandomSource;
-  /** 每 tick 进行的扩张尝试次数；默认 clamp(势力数*8, 20, 50) */
+  /** 每 tick 进行的扩张尝试次数；默认 clamp(势力数*16, 40, 100)，终局阶段翻倍 */
   attemptsPerTick?: number;
 }
 
@@ -27,7 +28,7 @@ interface FactionRuntime {
  * 与旧版的差别：
  *   - 不再每次 attempt 全表 refreshSnapshotBorders；
  *   - 维护每势力的 border Set<RegionId>，每次 owner 变更只对「该州 + 邻居」做局部 patch；
- *   - 默认 attemptsPerTick 从 ceil(N/2) 升到 clamp(N*8, 20, 50)，把 3000 州地图打热。
+ *   - 默认 attemptsPerTick 从 ceil(N/2) 升到 clamp(N*16, 40, 100)，把 3000 州地图打热。
  *   - 仍保持纯函数：不读 store、不写 store、不依赖渲染。
  */
 export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
@@ -57,7 +58,10 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
   }
 
   const liveCount = liveRuntimes.length;
-  const attempts = input.attemptsPerTick ?? clamp(liveCount * 8, 20, 50);
+  const occupiedRatio = occupied / map.provinces.length;
+  const largestFactionShare = Math.max(...liveRuntimes.map((r) => r.totalRegions)) / occupied;
+  const tempo = getTempoConfig({ occupiedRatio, liveCount, largestFactionShare });
+  const attempts = input.attemptsPerTick ?? tempo.attempts;
 
   // ownerOverride：tick 内累计的 owner 变更，下一个 attempt 看到的就是「本 tick 已变后」的视图
   const ownerOverride = new Map<number, FactionId | null>();
@@ -75,14 +79,29 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
     if (attackersWithBorder.length === 0) break;
 
     const attacker = attackersWithBorder[Math.floor(rng.next() * attackersWithBorder.length)];
-    const sourceRegionNum = pickFromSet(attacker.border, rng);
+    const preferOwnedTarget = rng.next() < tempo.ownedTargetPreference;
+    const sourceRegionNum = preferOwnedTarget
+      ? (pickWarfrontFromBorder(attacker.border, map, ownerOf, attacker.id, rng) ??
+        pickFromSet(attacker.border, rng))
+      : pickFromSet(attacker.border, rng);
     if (sourceRegionNum == null) continue;
     const sourceProvince = map.provinces[sourceRegionNum];
     if (!sourceProvince || sourceProvince.neighbors.length === 0) continue;
 
     const enemyNeighbors: RegionId[] = [];
+    const ownedEnemyNeighbors: Array<{ region: RegionId; weight: number }> = [];
     for (const nid of sourceProvince.neighbors) {
-      if (ownerOf(nid) !== attacker.id) enemyNeighbors.push(nid);
+      const owner = ownerOf(nid);
+      if (owner === attacker.id) continue;
+      enemyNeighbors.push(nid);
+      if (owner != null) {
+        const defender = runtimeById.get(owner);
+        const strength = defender?.totalRegions ?? 1;
+        ownedEnemyNeighbors.push({
+          region: nid,
+          weight: 1 / (strength + 1),
+        });
+      }
     }
     if (enemyNeighbors.length === 0) {
       // 源州其实已被己方包围（可能因为本 tick 内已扩张）→ 修正其 border 标记
@@ -90,7 +109,10 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
       continue;
     }
 
-    const targetRegion = enemyNeighbors[Math.floor(rng.next() * enemyNeighbors.length)];
+    const targetRegion =
+      preferOwnedTarget && ownedEnemyNeighbors.length > 0
+        ? pickWeightedRegion(ownedEnemyNeighbors, rng)
+        : enemyNeighbors[Math.floor(rng.next() * enemyNeighbors.length)];
     const targetRegionNum = targetRegion as unknown as number;
     const targetProvince = map.provinces[targetRegionNum];
     if (!targetProvince) continue;
@@ -119,9 +141,24 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
     if (defenderId === attacker.id) continue;
 
     const defender = runtimeById.get(defenderId);
+    const defenderRegions = defender?.totalRegions ?? 1;
     const baseProb = TERRAIN_ATTACK_PROB[targetProvince.terrain];
-    const bias = strengthBias(attacker.totalRegions, defender?.totalRegions ?? 1);
-    const winProb = clamp01(baseProb + bias);
+    const bias = strengthBias(attacker.totalRegions, defenderRegions, tempo.strengthBiasScale);
+    const collapseBias = getSmallRealmCollapseBias(occupiedRatio, defenderRegions);
+    const winProb = clamp01(baseProb + bias + collapseBias);
+    const combatDetail = formatCombatDetail({
+      terrain: targetProvince.terrain,
+      baseProb,
+      bias,
+      collapseBias,
+      winProb,
+      attackerRegions: attacker.totalRegions,
+      defenderRegions,
+      occupiedRatio,
+      ownedTargetPreference: tempo.ownedTargetPreference,
+      strengthBiasScale: tempo.strengthBiasScale,
+      tempoLabel: tempo.label,
+    });
 
     if (rng.next() < winProb) {
       applyOwnerChange(map, runtimeById, ownerOverride, targetRegion, attacker.id);
@@ -137,7 +174,7 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
         regionId: targetRegion,
         attackerId: attacker.id,
         defenderId,
-        message: `${attacker.name} 攻陷 ${defenderName} 控制的 #${targetRegion}`,
+        message: `${attacker.name} 攻陷 ${defenderName} 控制的 #${targetRegion}（${combatDetail}）`,
       });
 
       if (defender && defender.totalRegions <= 0) {
@@ -147,7 +184,7 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
           regionId: null,
           attackerId: attacker.id,
           defenderId,
-          message: `${defender.name} 已被消灭`,
+          message: `${defender.name} 已被 ${attacker.name} 消灭（最后失守 #${targetRegion}；${combatDetail}）`,
         });
       }
     } else {
@@ -158,7 +195,7 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
         regionId: targetRegion,
         attackerId: attacker.id,
         defenderId,
-        message: `${attacker.name} 攻击 #${targetRegion} 失利，被 ${defenderName} 击退`,
+        message: `${attacker.name} 攻击 #${targetRegion} 失利，被 ${defenderName} 击退（${combatDetail}）`,
       });
     }
   }
@@ -391,6 +428,73 @@ export function assertContiguous(map: MapData, ownerOverride: Map<number, Factio
 /* 辅助                                                                */
 /* ------------------------------------------------------------------ */
 
+function pickWarfrontFromBorder(
+  border: Set<number>,
+  map: MapData,
+  ownerOf: (id: RegionId) => FactionId | null,
+  attackerId: FactionId,
+  rng: RandomSource,
+): number | null {
+  const candidates: number[] = [];
+  for (const sourceRegionNum of border) {
+    const sourceProvince = map.provinces[sourceRegionNum];
+    if (!sourceProvince) continue;
+    for (const nid of sourceProvince.neighbors) {
+      const owner = ownerOf(nid);
+      if (owner != null && owner !== attackerId) {
+        candidates.push(sourceRegionNum);
+        break;
+      }
+    }
+  }
+  if (candidates.length === 0) return null;
+  return candidates[Math.floor(rng.next() * candidates.length)];
+}
+
+function formatCombatDetail(input: {
+  terrain: string;
+  baseProb: number;
+  bias: number;
+  collapseBias: number;
+  winProb: number;
+  attackerRegions: number;
+  defenderRegions: number;
+  occupiedRatio: number;
+  ownedTargetPreference: number;
+  strengthBiasScale: number;
+  tempoLabel: string;
+}): string {
+  return [
+    `阶段=${input.tempoLabel}`,
+    `地形=${input.terrain}`,
+    `胜率=${formatPercent(input.winProb)}`,
+    `基础=${formatPercent(input.baseProb)}`,
+    `强弱=${input.bias >= 0 ? '+' : ''}${formatPercent(input.bias)}`,
+    `残局=${formatPercent(input.collapseBias)}`,
+    `强弱倍率=${input.strengthBiasScale.toFixed(2)}`,
+    `州数=${input.attackerRegions}:${input.defenderRegions}`,
+    `占领率=${formatPercent(input.occupiedRatio)}`,
+    `战争偏好=${formatPercent(input.ownedTargetPreference)}`,
+  ].join('，');
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function pickWeightedRegion(
+  targets: Array<{ region: RegionId; weight: number }>,
+  rng: RandomSource,
+): RegionId {
+  const totalWeight = targets.reduce((sum, target) => sum + target.weight, 0);
+  let cursor = rng.next() * totalWeight;
+  for (const target of targets) {
+    cursor -= target.weight;
+    if (cursor <= 0) return target.region;
+  }
+  return targets[targets.length - 1].region;
+}
+
 function pickFromSet(set: Set<number>, rng: RandomSource): number | null {
   const size = set.size;
   if (size === 0) return null;
@@ -401,12 +505,6 @@ function pickFromSet(set: Set<number>, rng: RandomSource): number | null {
     i++;
   }
   return null;
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  if (v < lo) return lo;
-  if (v > hi) return hi;
-  return v;
 }
 
 function clamp01(v: number): number {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { LogEvent, LogEventCategory } from '@/shared/types';
-import { LOG_CATEGORY_LABEL } from '@/shared/types';
+import { formatGameTime, LOG_CATEGORY_LABEL } from '@/shared/types';
 import { useWorldSimStore } from '@/state';
 import styles from './LogPanel.module.css';
 
@@ -94,7 +94,7 @@ export function LogPanel() {
         ) : (
           filtered.map((log: LogEvent) => (
             <li key={log.id} className={styles.item} data-level={log.level}>
-              <span className={styles.tick}>t{log.tick}</span>
+              <span className={styles.tick}>{formatGameTime(log.tick)}</span>
               <span className={styles.category} data-category={log.category ?? 'misc'}>
                 {log.category ? LOG_CATEGORY_LABEL[log.category] : '事件'}
               </span>

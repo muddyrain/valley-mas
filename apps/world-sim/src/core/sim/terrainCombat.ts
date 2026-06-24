@@ -19,11 +19,17 @@ export const TERRAIN_ATTACK_PROB: Record<TerrainKind, number> = {
 
 /**
  * 强弱差额修正：攻方/(攻方+守方) 控制的州数比例越高，越增加胜率上限。
- * 返回值在 [-0.18, +0.18] 范围内，再叠加到地形基础概率上。
+ * 返回值由 tempo.strengthBiasScale 控制，再叠加到地形基础概率上。
+ *
+ * 当最大势力占比过高时，tempo 会降低 scale，避免早期领地优势直接滚成速胜。
  */
-export function strengthBias(attackerRegions: number, defenderRegions: number): number {
+export function strengthBias(
+  attackerRegions: number,
+  defenderRegions: number,
+  scale = 0.65,
+): number {
   const total = attackerRegions + defenderRegions;
   if (total <= 0) return 0;
   const ratio = attackerRegions / total;
-  return (ratio - 0.5) * 0.36;
+  return (ratio - 0.5) * scale;
 }

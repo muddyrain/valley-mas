@@ -307,10 +307,16 @@ export const createSimSlice: StateCreator<Deps, [], [], SimSlice> = (set, get) =
 };
 
 function appendLogs(prev: LogEvent[], next: LogEvent[]): LogEvent[] {
-  const combined = prev.length + next.length;
-  if (combined <= MAX_LOG_ENTRIES) {
-    return [...prev, ...next];
-  }
-  const drop = combined - MAX_LOG_ENTRIES;
-  return [...prev.slice(drop), ...next];
+  const combined = [...prev, ...next];
+  const milestones = combined.filter(isMilestoneLog);
+  const recentNormal = combined.filter((log) => !isMilestoneLog(log)).slice(-MAX_LOG_ENTRIES);
+  return [...milestones, ...recentNormal].sort((a, b) => {
+    const tickDelta = Number(a.tick) - Number(b.tick);
+    if (tickDelta !== 0) return tickDelta;
+    return Number(a.id) - Number(b.id);
+  });
+}
+
+function isMilestoneLog(log: LogEvent): boolean {
+  return log.category === 'eliminate' || log.category === 'victory' || log.category === 'stalemate';
 }

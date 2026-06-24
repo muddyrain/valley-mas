@@ -72,8 +72,8 @@ export function ReplayBar() {
 
   const recordingHint = useMemo(() => {
     if (isReplay) return null;
-    if (total === 0) return '尚未录制任何 tick，开始推演后将自动录制每帧';
-    return `已录制 ${total} tick · 状态：${status}`;
+    if (total === 0) return '尚未录制任何内容，开始推演后将自动录制每季';
+    return `已录制 ${total} 季 · 状态：${status}`;
   }, [isReplay, total, status]);
 
   const cursorMax = Math.max(total, 1);
@@ -97,7 +97,7 @@ export function ReplayBar() {
               type="button"
               onClick={() => stepReplay(-1)}
               disabled={replayCursor <= 0}
-              title="后退 1 tick"
+              title="后退 1 季"
             >
               {'<'}
             </button>
@@ -110,12 +110,7 @@ export function ReplayBar() {
             >
               {replayPlaying ? '暂停' : '播放'}
             </button>
-            <button
-              type="button"
-              onClick={() => stepReplay(1)}
-              disabled={atEnd}
-              title="前进 1 tick"
-            >
+            <button type="button" onClick={() => stepReplay(1)} disabled={atEnd} title="前进 1 季">
               {'>'}
             </button>
             <input

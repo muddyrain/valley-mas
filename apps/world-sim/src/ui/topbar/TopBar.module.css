@@ -156,15 +156,33 @@
   border-color: var(--ws-accent);
 }
 
+.statusChip[data-status="running"][data-paused="true"] {
+  color: var(--ws-text);
+  background: var(--ws-bg-elev-2);
+  border-color: var(--ws-border);
+}
+
 .primaryBtn {
   background: var(--ws-accent);
   color: #1a1410;
-  border-color: var(--ws-accent);
+  border: 1px solid var(--ws-accent);
   font-weight: 600;
+}
+
+.primaryBtn:hover:not(:disabled) {
+  background: var(--ws-accent-dim);
+  border-color: var(--ws-accent-dim);
 }
 
 .primaryBtn:disabled {
   opacity: 0.5;
+  border-color: var(--ws-accent);
+  cursor: not-allowed;
+}
+
+.primaryBtn:disabled:hover {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
 }
 
 .dangerBtn {
