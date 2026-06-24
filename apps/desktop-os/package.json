@@ -16,6 +16,7 @@
     "@base-ui/react": "^1.2.0",
     "@react-three/fiber": "^9.6.1",
     "@valley/browser-media": "workspace:*",
+    "@valley/calendar": "workspace:*",
     "@valley/format-tools": "workspace:*",
     "@valley/mini-games": "workspace:*",
     "class-variance-authority": "^0.7.1",

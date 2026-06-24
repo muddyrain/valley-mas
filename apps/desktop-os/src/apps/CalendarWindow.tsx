@@ -1,5 +1,3 @@
-import dayjs, { type Dayjs } from 'dayjs';
-import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type CalendarEvent,
   type CalendarEventCategory,
@@ -8,7 +6,9 @@ import {
   type CalendarReminderMinutes,
   getHolidayInfoForDate,
   useCalendarStore,
-} from '../store/calendarStore';
+} from '@valley/calendar';
+import dayjs, { type Dayjs } from 'dayjs';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNotificationCenterStore } from '../store/notificationCenterStore';
 import PlushScrollbar from '../ui/PlushScrollbar';
 import PlushSelect from '../ui/PlushSelect';
@@ -88,7 +88,13 @@ export default function CalendarWindow() {
     () => [...new Set(visibleDates.map((date) => date.year()))],
     [visibleDates],
   );
-  const holidayStatus = holidayStatusText(visibleYears, holidayLoadingYears, holidayErrorYears);
+  const holidayStatus = useMemo(() => {
+    const failed = visibleYears.find((year) => holidayErrorYears[year]);
+    if (failed) return `${failed} 年节假日不可用`;
+    const loading = visibleYears.some((year) => holidayLoadingYears[year]);
+    if (loading) return '节假日加载中';
+    return '中国节假日与周末';
+  }, [visibleYears, holidayLoadingYears, holidayErrorYears]);
 
   useEffect(() => {
     for (const year of visibleYears) {
@@ -477,11 +483,9 @@ function MonthView({
                 <span className="calendar-day-cell__num">{date.date()}</span>
                 {holiday ? <HolidayBadge holiday={holiday} /> : null}
               </span>
-              {holiday ? (
-                <span className="calendar-day-cell__holiday" title={holiday.name}>
-                  {compactHolidayName(holiday)}
-                </span>
-              ) : null}
+              <span className="calendar-day-cell__holiday" title={holiday?.name}>
+                {holiday ? compactHolidayName(holiday) : '\u00A0'}
+              </span>
               <span className="calendar-day-cell__events">
                 {dayEvents.slice(0, 2).map((event) => (
                   <span
@@ -758,18 +762,6 @@ function visibleDatesForView(cursor: Dayjs, selectedDate: Dayjs, view: CalendarV
     return Array.from({ length: 7 }, (_, index) => start.add(index, 'day'));
   }
   return [selectedDate];
-}
-
-function holidayStatusText(
-  years: number[],
-  loadingYears: Record<number, boolean>,
-  errorYears: Record<number, string>,
-) {
-  const loading = years.some((year) => loadingYears[year]);
-  if (loading) return '节假日加载中';
-  const failed = years.find((year) => errorYears[year]);
-  if (failed) return `${failed} 年节假日不可用`;
-  return '中国节假日与周末';
 }
 
 function normalizeDraft(input: CalendarEventInput): CalendarEventInput {
