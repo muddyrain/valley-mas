@@ -1,0 +1,33 @@
+{
+  "name": "@valley/world-sim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint src/",
+    "check": "biome check src/",
+    "format": "biome format --write src/",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "d3-delaunay": "^6.0.4",
+    "pixi.js": "^8.13.0",
+    "react": "catalog:react-19",
+    "react-dom": "catalog:react-19",
+    "simplex-noise": "^4.0.3",
+    "zustand": "catalog:shared-runtime"
+  },
+  "devDependencies": {
+    "@types/d3-delaunay": "^6.0.4",
+    "@types/node": "catalog:node-22",
+    "@types/react": "catalog:react-19",
+    "@types/react-dom": "catalog:react-19",
+    "@vitejs/plugin-react-swc": "catalog:vite-6",
+    "typescript": "catalog:ts-tooling",
+    "vite": "catalog:vite-6"
+  }
+}

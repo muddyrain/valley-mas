@@ -1,0 +1,121 @@
+.bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 16px;
+  border-top: 1px solid var(--ws-border);
+  background: var(--ws-bg-elev-1);
+  position: relative;
+}
+
+.bar[data-mode="replaying"] {
+  background: linear-gradient(180deg, var(--ws-bg-elev-2) 0%, var(--ws-bg-elev-1) 100%);
+}
+
+.left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ws-text);
+  letter-spacing: 0.04em;
+}
+
+.modeChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: var(--ws-radius-sm);
+  border: 1px solid var(--ws-border);
+  color: var(--ws-text-dim);
+  background: var(--ws-bg-elev-2);
+}
+
+.modeChip[data-mode="replaying"] {
+  color: #1a1410;
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+}
+
+.cursor {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ws-text-mute);
+  min-width: 64px;
+}
+
+.center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.timeline {
+  flex: 1 1 auto;
+  min-width: 120px;
+  accent-color: var(--ws-accent);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--ws-text-mute);
+}
+
+.right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.speedGroup {
+  display: inline-flex;
+  border: 1px solid var(--ws-border);
+  border-radius: var(--ws-radius-sm);
+  overflow: hidden;
+}
+
+.speedBtn {
+  border: none;
+  border-radius: 0;
+  padding: 3px 8px;
+  background: transparent;
+  border-right: 1px solid var(--ws-border);
+  font-size: 11px;
+  color: var(--ws-text-dim);
+}
+
+.speedBtn:last-child {
+  border-right: none;
+}
+
+.speedBtn[data-active="true"] {
+  background: var(--ws-accent);
+  color: #1a1410;
+  border-color: var(--ws-accent);
+}
+
+.primaryBtn {
+  background: var(--ws-accent);
+  color: #1a1410;
+  border-color: var(--ws-accent);
+  font-weight: 600;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.5;
+}
+
+.message {
+  position: absolute;
+  bottom: -22px;
+  left: 16px;
+  font-size: 11px;
+  color: var(--ws-text-mute);
+}
