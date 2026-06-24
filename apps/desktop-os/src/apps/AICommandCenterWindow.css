@@ -1028,10 +1028,7 @@
   .ai-command-center__conversation,
   .ai-command-center__thread,
   .ai-command-center__thread-content,
-  .ai-command-center__composer-shell,
-  .ai-command-center__inspector,
-  .ai-command-center__dialog,
-  .ai-command-center__dialog-backdrop {
+  .ai-command-center__composer-shell {
     animation: none;
     transition: none;
   }
