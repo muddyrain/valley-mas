@@ -1,6 +1,7 @@
 import type { MapBounds, MapData, Province } from '@/core/map';
 import type { RandomSource } from '@/shared/math';
 import type { FactionId, RegionId } from '@/shared/types';
+import { DEFAULT_LEADER_POOL, NAME_LEADER_PRESET } from './defaults';
 import { parseSpawnDirective } from './parse';
 import type {
   Scenario,
@@ -34,7 +35,7 @@ const DEFAULT_FALLBACK_COLORS = [
   '#7a86c2',
 ];
 
-const DEFAULT_FALLBACK_LEADERS = ['未知君主'];
+const DEFAULT_FALLBACK_LEADERS = DEFAULT_LEADER_POOL;
 
 /**
  * 把剧本应用到当前地图：解析每家势力的 spawnProvinceIds，依序占领空州。
@@ -49,12 +50,14 @@ export function applyScenarioToWorld(opts: ApplyScenarioOptions): ScenarioApplyR
   const occupied = new Set<number>();
   const assignments: ScenarioFactionAssignment[] = [];
   const ownership: Array<{ regionId: RegionId; factionId: FactionId }> = [];
+  const usedLeaders = new Set<string>();
   let unresolvedCount = 0;
 
   scenario.factions.forEach((faction, factionIdx) => {
     const factionId = mintFactionId();
     const colorHex = pickColor(faction, fallbackColors, factionIdx);
-    const leader = pickLeader(faction, fallbackLeaders, factionIdx);
+    const leader = pickLeader(faction, fallbackLeaders, factionIdx, usedLeaders);
+    usedLeaders.add(leader);
 
     const tokens = faction.spawnProvinceIds.length > 0 ? faction.spawnProvinceIds : ['random'];
     const spawnRegionIds: RegionId[] = [];
@@ -91,10 +94,23 @@ function pickColor(faction: ScenarioFaction, fallback: readonly string[], index:
   return fallback[index % fallback.length];
 }
 
-function pickLeader(faction: ScenarioFaction, fallback: readonly string[], index: number): string {
+function pickLeader(
+  faction: ScenarioFaction,
+  fallback: readonly string[],
+  index: number,
+  used: Set<string>,
+): string {
   const trimmed = (faction.leader ?? '').trim();
   if (trimmed.length > 0) return trimmed;
-  return fallback[index % fallback.length] ?? '未知君主';
+  // 1) 朝代名命中预设：蜀汉→刘备 / 大唐→李世民 等，且未被同剧本其他势力占用
+  const preset = NAME_LEADER_PRESET[faction.factionName];
+  if (preset && !used.has(preset)) return preset;
+  // 2) 默认君主池里挑首个未占用名
+  for (const candidate of fallback) {
+    if (!used.has(candidate)) return candidate;
+  }
+  // 3) 池用尽：循环回退，避免出现「未知君主」占位
+  return fallback[index % fallback.length] ?? '佚名君主';
 }
 
 function pickRegionForDirective(

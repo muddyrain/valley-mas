@@ -5,7 +5,8 @@ import type { FactionId, FactionSummary, RegionId } from '@/shared/types';
 import { asFactionId, asRegionId, asTick } from '@/shared/types';
 import type { FactionSlice } from './factionSlice';
 import { ensureFactionIdSeqAtLeast } from './factionSlice';
-import type { MapSlice } from './mapSlice';
+import type { MapSlice, ProvincePreset } from './mapSlice';
+import { PROVINCE_PRESETS } from './mapSlice';
 import type { ScenarioSlice } from './scenarioSlice';
 import type { SimSlice } from './simSlice';
 import type { UiSlice } from './uiSlice';
@@ -342,10 +343,10 @@ export const createEditSlice: StateCreator<Deps, [], [], EditSlice> = (set, get)
       },
       factions,
       seed: doc.meta.seed,
-      provinceCount: ((): 100 | 300 | 500 => {
+      provinceCount: ((): ProvincePreset => {
         const c = doc.meta.provinceCount;
-        if (c === 100 || c === 300 || c === 500) return c;
-        return 300;
+        if ((PROVINCE_PRESETS as readonly number[]).includes(c)) return c as ProvincePreset;
+        return 3000;
       })(),
       tick: asTick(0),
       status: 'idle',

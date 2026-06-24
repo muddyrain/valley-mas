@@ -321,8 +321,21 @@ function refreshBorderState(
 /* ------------------------------------------------------------------ */
 
 /**
+ * 模块级状态：记录上一次 assertContiguous 看到的每势力连通分量数。
+ * 仅当当前 tick 的分量数 > 上一次记录时才 warn，避免「基线就有的飞地」
+ * 或「海岛剧本」每 tick 刷屏。
+ *
+ * 重置时机由调用方负责：剧本切换 / 地图重建 / Replay 重建 → resetContiguityWatch。
+ */
+const lastComponentByFaction = new Map<FactionId, number>();
+
+export function resetContiguityWatch(): void {
+  lastComponentByFaction.clear();
+}
+
+/**
  * 由于扩张内核只允许沿邻居推进，结构上不会产生飞地。这里只做 dev 防御性断言：
- * 若发现某势力出现两个互不连通的连通分量，向 console 报警。
+ * 若发现某势力当前的连通分量数比上一次记录更多，向 console 报警一次。
  */
 export function assertContiguous(map: MapData, ownerOverride: Map<number, FactionId | null>): void {
   const ownerOf = (id: number): FactionId | null => {
@@ -358,11 +371,18 @@ export function assertContiguous(map: MapData, ownerOverride: Map<number, Factio
     componentByFaction.set(owner, prev + 1);
   }
   for (const [factionId, count] of componentByFaction.entries()) {
-    if (count > 1) {
-      // eslint-disable-next-line no-console
+    const prev = lastComponentByFaction.get(factionId) ?? 1;
+    if (count > prev) {
       console.warn(
-        `[worldsim] faction ${factionId as unknown as number} 出现 ${count} 个连通分量（疑似飞地）`,
+        `[worldsim] faction ${factionId as unknown as number} 连通分量 ${prev} → ${count}（疑似新增飞地）`,
       );
+    }
+    lastComponentByFaction.set(factionId, count);
+  }
+  // 已被消灭的势力清掉记录，下次再出现飞地仍能 warn 一次
+  for (const factionId of Array.from(lastComponentByFaction.keys())) {
+    if (!componentByFaction.has(factionId)) {
+      lastComponentByFaction.delete(factionId);
     }
   }
 }

@@ -515,6 +515,44 @@
   color: var(--ws-text-dim);
 }
 
+.scenarioOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  margin-top: 2px;
+  border: 1px dashed var(--ws-border);
+  border-radius: 4px;
+  background: var(--ws-bg-elevated, rgba(255, 255, 255, 0.02));
+}
+
+.scenarioOptionsTitle {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ws-text-mute);
+  text-transform: uppercase;
+}
+
+.scenarioOptionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ws-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.scenarioOptionRow input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.scenarioOptionRow[data-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .rankList {
   list-style: none;
   margin: 0;

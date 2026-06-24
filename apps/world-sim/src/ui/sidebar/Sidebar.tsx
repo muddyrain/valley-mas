@@ -45,6 +45,8 @@ export function Sidebar() {
   const scenarioUnresolvedCount = useWorldSimStore((s) => s.scenarioUnresolvedCount);
   const loadScenario = useWorldSimStore((s) => s.loadScenario);
   const listAvailableScenarios = useWorldSimStore((s) => s.listAvailableScenarios);
+  const randomScenarioOptions = useWorldSimStore((s) => s.randomScenarioOptions);
+  const setRandomScenarioOptions = useWorldSimStore((s) => s.setRandomScenarioOptions);
   const scenarios = useMemo(() => listAvailableScenarios(), [listAvailableScenarios]);
 
   const worldMode = useWorldSimStore((s) => s.worldMode);
@@ -306,10 +308,53 @@ export function Sidebar() {
               disabled={!map}
             >
               <span className={styles.scenarioName}>{s.name}</span>
-              <span className={styles.scenarioMeta}>{s.factions.length} 家</span>
+              <span className={styles.scenarioMeta}>
+                {s.factionsFactory ? '随机' : `${s.factions.length} 家`}
+              </span>
             </button>
           ))}
         </div>
+        {currentScenarioId === 'random' && (
+          <div className={styles.scenarioOptions}>
+            <span className={styles.scenarioOptionsTitle}>随机剧本来源</span>
+            <label
+              className={styles.scenarioOptionRow}
+              data-disabled={
+                randomScenarioOptions.includeChinese && !randomScenarioOptions.includeForeign
+                  ? 'true'
+                  : undefined
+              }
+            >
+              <input
+                type="checkbox"
+                checked={randomScenarioOptions.includeChinese}
+                onChange={(e) => setRandomScenarioOptions({ includeChinese: e.target.checked })}
+                disabled={
+                  randomScenarioOptions.includeChinese && !randomScenarioOptions.includeForeign
+                }
+              />
+              中国朝代（蜀汉 / 大唐 / 大明 …）
+            </label>
+            <label
+              className={styles.scenarioOptionRow}
+              data-disabled={
+                randomScenarioOptions.includeForeign && !randomScenarioOptions.includeChinese
+                  ? 'true'
+                  : undefined
+              }
+            >
+              <input
+                type="checkbox"
+                checked={randomScenarioOptions.includeForeign}
+                onChange={(e) => setRandomScenarioOptions({ includeForeign: e.target.checked })}
+                disabled={
+                  randomScenarioOptions.includeForeign && !randomScenarioOptions.includeChinese
+                }
+              />
+              国外政体（法兰西帝国 / 罗马帝国 …）
+            </label>
+          </div>
+        )}
         <p className={styles.empty}>
           点击切换剧本，或再次点击当前剧本以重新随机出生。地图刷新时会自动应用当前剧本。
         </p>

@@ -518,6 +518,30 @@ apps/world-sim/
 
 **性能预算**：3000 州 × 60 FPS。Pixi ticker 仅在 `ownerAnims.size > 0` 时重画 ownerLayer；borderLayer / labelLayer / markerLayer 仅在 `factions` 引用变化时重画（每 tick 一次）；ownerLayer 颜色采用 lerp + ease-out cubic 600ms 动画。
 
+**势力命名规范**（避免「势力·甲 / 未知君主」占位文案）：
+
+- 默认池统一抽到 `core/scenario/defaults.ts`：`DEFAULT_FACTION_NAME_POOL`（20 个朝代名）+ `DEFAULT_LEADER_POOL`（16 位历史君主）+ `NAME_LEADER_PRESET`（朝代→君主预设，如 蜀汉→刘备 / 大唐→李世民）。`state/slices/factionSlice.ts` 通过 `import { ... } from '@/core/scenario'` 获取并 re-export，保证 `state/index.ts` 对外接口稳定。
+- 随机剧本 `RANDOM_SCENARIO` 不再写死 `factions`，改为 `factionsFactory(rng)`：每次加载抽 `RANDOM_FACTION_COUNT = 8` 家不重名势力（4 家在 3000 州下死亡 1-2 家就空场，8 家在标签可读性 + 早期容错上更平衡）。`scenarioSlice.loadScenario` 在执行 `applyScenarioToWorld` 前用 factory 替换 `scenario.factions`。
+- 中外政体**互不混配**：中文池走 `DEFAULT_FACTION_NAME_POOL` + `NAME_LEADER_PRESET` / `DEFAULT_LEADER_POOL`；国外政体抽 `WORLD_POLITY_PAIRS`（如 `法兰西帝国 + 拿破仑` / `第三帝国 + 希特勒` / `苏维埃 + 斯大林` / `大英帝国 + 维多利亚`），政体名与领袖整组打包出现，避免「大唐 + 拿破仑」「大宋 + 斯大林」这类跨时空违和组合。`FOREIGN_POLITY_RATIO = 0.3` 控制国外政体出现概率（8 家中平均 2-3 家）。
+- 随机剧本支持「中文 / 国外」独立开关：`scenarioSlice.randomScenarioOptions = { includeChinese, includeForeign }`，UI 在 Sidebar 剧本卡片下方加 checkbox（默认两边都开），切换时 `setRandomScenarioOptions` 自动重抽。两边都关闭时由工厂兜底强制开启中文，避免 0 家势力；只开一边时 `factionsFactory` 跳过概率切换、整批走对应池。`Scenario.factionsFactory` 签名升级为 `(rng, options?: ScenarioFactoryOptions) => ScenarioFaction[]`。
+- 色板扩到 16 色硬编码（与 `factionSlice.FACTION_COLOR_PALETTE` 同源），8 家以下不会重复色相。
+- `apply.ts.pickLeader` 优先级：剧本显式 leader → `NAME_LEADER_PRESET[factionName]` → `DEFAULT_LEADER_POOL` 未占用名 → `index % len` 循环回退（不再使用「未知君主」字面量）。
+- Sidebar 新建势力 `pickFreeName`：默认池命中即可；池用尽走 `FALLBACK_NAME_PREFIXES × FALLBACK_NAME_SUFFIXES` 朝代字头/字尾随机拼接，再用尽才以「汉2 / 汉3」形式拼序号，避免出现「势力1 / 势力·甲」占位。
+
+**州数规模与性能预期**（`PROVINCE_PRESETS = [500, 1000, 2000, 3000, 10000]`，默认 `3000`）：
+
+| 州数 | generate 用时 | sim tick FPS | ownerLayer 重画 | 标签可读性 | 备注 |
+|---|---|---|---|---|---|
+| 500 | < 30 ms | 60 | 极快 | 优 | 调试用，势力扩张 5-10 tick 见胜负 |
+| 1000 | < 80 ms | 60 | 流畅 | 良 | 入门体验，地形对比清晰 |
+| 2000 | < 200 ms | 60 | 流畅 | 良 | 中等规模，类 EU4 标准布局 |
+| 3000 | < 400 ms | 60（默认） | 流畅 | 良 | EU4 视觉基准；4 家死亡 1-2 家不会空场 |
+| 10000 | 1-3 s | 30-45 | ownerLayer 全量重画约 16-25 ms/帧 | 一般（标签会挤） | 标记为「实验」级；首次加载明显卡顿，进入后能跑但 ownerAnims 期间帧率会跌 |
+
+> 30000 州当前架构跑不动：`ownerLayer` 每帧用 `Graphics.poly().fill()` 全量重画，O(N) poly 调用 + Pixi 8 batcher 上限决定 30000 个 poly fill 没法撑 60 FPS。如需 3w/5w，需要先把 ownerLayer 重构为 Mesh+Texture 或 Tilemap-style 渲染（独立 PR / Phase 12 任务，不在本期范围内）。
+
+> 性能数字基于 M 系列 Mac + Pixi 8.13 + Vite 6 dev 实测的「数量级估算」，非严格 benchmark；`generate` 主要瓶颈是 `d3-delaunay` + 地形 noise 计算，`sim tick` 与 N 解耦（attemptsPerTick clamp 在 50 内）。
+
 ---
 
 ## 10. 风险与未决项

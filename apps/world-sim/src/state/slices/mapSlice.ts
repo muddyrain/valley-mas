@@ -7,9 +7,9 @@ import type { FactionSlice } from './factionSlice';
 import type { ScenarioSlice } from './scenarioSlice';
 import type { SimSlice } from './simSlice';
 
-export type ProvincePreset = 100 | 300 | 500 | 1000 | 3000;
+export type ProvincePreset = 500 | 1000 | 2000 | 3000 | 10000;
 
-export const PROVINCE_PRESETS: ProvincePreset[] = [100, 300, 500, 1000, 3000];
+export const PROVINCE_PRESETS: ProvincePreset[] = [500, 1000, 2000, 3000, 10000];
 
 export const DEFAULT_MAP_BOUNDS: MapBounds = { width: 1920, height: 1200 };
 
@@ -72,7 +72,7 @@ const SIM_RESET = {
 export const createMapSlice: StateCreator<Deps, [], [], MapSlice> = (set, get) => ({
   map: null,
   seed: 'sanguo-001',
-  provinceCount: 300,
+  provinceCount: 3000,
   mapSource: 'random',
   geoRegionNames: null,
   geoLoadStatus: 'idle',

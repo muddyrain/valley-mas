@@ -3,6 +3,13 @@ import type { Scenario } from './types';
 
 export type { ApplyScenarioOptions } from './apply';
 export { applyScenarioToWorld } from './apply';
+export type { WorldPolityPair } from './defaults';
+export {
+  DEFAULT_FACTION_NAME_POOL,
+  DEFAULT_LEADER_POOL,
+  NAME_LEADER_PRESET,
+  WORLD_POLITY_PAIRS,
+} from './defaults';
 export { parseSpawnDirective } from './parse';
 export {
   BUILTIN_SCENARIOS,
@@ -17,6 +24,7 @@ export type {
   ScenarioApplyResult,
   ScenarioFaction,
   ScenarioFactionAssignment,
+  ScenarioFactoryOptions,
   SpawnDirective,
   SpawnQuadrant,
 } from './types';

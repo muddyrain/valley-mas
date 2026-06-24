@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { SimEventType, SimStatus } from '@/core/sim';
-import { runExpansionTick } from '@/core/sim';
+import { computeCapitalsAndCentroids, runExpansionTick } from '@/core/sim';
 import { createPrngFromSeed, type RandomSource } from '@/shared/math';
 import type {
   FactionId,
@@ -313,78 +313,4 @@ function appendLogs(prev: LogEvent[], next: LogEvent[]): LogEvent[] {
   }
   const drop = combined - MAX_LOG_ENTRIES;
   return [...prev.slice(drop), ...next];
-}
-
-interface CapitalInfo {
-  capital: import('@/shared/types').RegionId | null;
-  centroid: import('@/shared/types').RegionId | null;
-}
-
-/**
- * Phase 8.5：在所有 patches 应用后，重新计算每势力的领土重心州；
- * 若当前 capital 不在己方掌控，则迁都至 centroid。无领土的势力保持原样。
- */
-function computeCapitalsAndCentroids(
-  map: import('@/core/map').MapData,
-  factions: FactionSummary[],
-): Map<FactionId, CapitalInfo> {
-  const out = new Map<FactionId, CapitalInfo>();
-  // 聚合 owned regions 的 centroid 平均
-  const sumByFaction = new Map<FactionId, { x: number; y: number; count: number }>();
-  const ownedByFaction = new Map<FactionId, number[]>();
-  for (const province of map.provinces) {
-    const owner = province.ownerFactionId;
-    if (owner == null) continue;
-    let agg = sumByFaction.get(owner);
-    if (!agg) {
-      agg = { x: 0, y: 0, count: 0 };
-      sumByFaction.set(owner, agg);
-    }
-    agg.x += province.centroid.x;
-    agg.y += province.centroid.y;
-    agg.count += 1;
-    let owned = ownedByFaction.get(owner);
-    if (!owned) {
-      owned = [];
-      ownedByFaction.set(owner, owned);
-    }
-    owned.push(province.id as unknown as number);
-  }
-  for (const f of factions) {
-    const agg = sumByFaction.get(f.id);
-    if (!agg || agg.count === 0) {
-      out.set(f.id, { capital: null, centroid: null });
-      continue;
-    }
-    const avgX = agg.x / agg.count;
-    const avgY = agg.y / agg.count;
-    const owned = ownedByFaction.get(f.id) ?? [];
-    let bestId = owned[0];
-    let bestDist = Infinity;
-    for (const idNum of owned) {
-      const p = map.provinces[idNum];
-      if (!p) continue;
-      const dx = p.centroid.x - avgX;
-      const dy = p.centroid.y - avgY;
-      const d = dx * dx + dy * dy;
-      if (d < bestDist) {
-        bestDist = d;
-        bestId = idNum;
-      }
-    }
-    const centroidId = bestId as unknown as import('@/shared/types').RegionId;
-
-    // 迁都判定
-    let capitalId = f.capitalRegionId;
-    if (capitalId == null) {
-      capitalId = centroidId;
-    } else {
-      const capProvince = map.provinces[capitalId as unknown as number];
-      if (!capProvince || capProvince.ownerFactionId !== f.id) {
-        capitalId = centroidId;
-      }
-    }
-    out.set(f.id, { capital: capitalId, centroid: centroidId });
-  }
-  return out;
 }

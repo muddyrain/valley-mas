@@ -1,4 +1,5 @@
 import type { StateCreator } from 'zustand';
+import { computeCapitalsAndCentroids, resetContiguityWatch } from '@/core/sim';
 import type {
   FactionId,
   FactionSummary,
@@ -93,6 +94,8 @@ export const createReplaySlice: StateCreator<Deps, [], [], ReplaySlice> = (set, 
   captureBaseline: () => {
     const state = get();
     const map = state.map;
+    // 新基线视为新一局，清掉飞地告警的历史 prev 计数，避免上一局或上一份地图的遗留状态影响告警。
+    resetContiguityWatch();
     if (!map) {
       set({
         replayMode: 'recording',
@@ -329,26 +332,42 @@ function rebuildWorldUpToCursor(get: Get, set: Set, cursor: number): void {
     ...p,
     ownerFactionId: ownership[i] ?? null,
   }));
+  const nextMap = { ...map, provinces: nextProvinces };
 
-  // 重新统计 regions，并基于 initialFactions 还原 name/color/leader/birth
+  // 重新统计 regions
   const regionsByFaction = new Map<number, number>();
   for (const owner of ownership) {
     if (owner == null) continue;
     const k = owner as unknown as number;
     regionsByFaction.set(k, (regionsByFaction.get(k) ?? 0) + 1);
   }
+  // P0：基于重建后的 ownership 重新计算每势力的首都/重心，
+  // 与 simSlice live tick 保持一致；否则回放下首都永远停在 baseline。
+  // 输入用 initialFactions 的 capitalRegionId 作为「上一帧首都」；computeCapitalsAndCentroids
+  // 在 capital 不再 self-owned 时会自动迁都至 centroid，等价于把整段历史一次性追上。
+  const capitalsByFaction = computeCapitalsAndCentroids(
+    nextMap,
+    state.initialFactions.map((f) => ({
+      id: f.id,
+      capitalRegionId: f.capitalRegionId ?? f.birthRegionId,
+    })),
+  );
   // 优先用 initialFactions 重建（保证 baseline 时的颜色/名字稳定）；当前 store 里多余的势力丢弃
-  const factionsNext: FactionSummary[] = state.initialFactions.map((f) => ({
-    id: f.id,
-    name: f.name,
-    leader: f.leader,
-    colorHex: f.colorHex,
-    birthRegionId: f.birthRegionId,
-    capitalRegionId: f.capitalRegionId ?? f.birthRegionId,
-    centroidRegionId: f.capitalRegionId ?? f.birthRegionId,
-    regions: regionsByFaction.get(f.id as unknown as number) ?? 0,
-    population: f.population,
-  }));
+  const factionsNext: FactionSummary[] = state.initialFactions.map((f) => {
+    const cap = capitalsByFaction.get(f.id);
+    const fallback = f.capitalRegionId ?? f.birthRegionId;
+    return {
+      id: f.id,
+      name: f.name,
+      leader: f.leader,
+      colorHex: f.colorHex,
+      birthRegionId: f.birthRegionId,
+      capitalRegionId: cap ? cap.capital : fallback,
+      centroidRegionId: cap ? cap.centroid : fallback,
+      regions: regionsByFaction.get(f.id as unknown as number) ?? 0,
+      population: f.population,
+    };
+  });
 
   // 截断 logs：MAX_LOG_ENTRIES 由 logSlice 管控，这里直接全量写入并取末尾
   const MAX = 1000;
@@ -358,7 +377,7 @@ function rebuildWorldUpToCursor(get: Get, set: Set, cursor: number): void {
   const tickNumber = cursor;
 
   set({
-    map: { ...map, provinces: nextProvinces },
+    map: nextMap,
     factions: factionsNext,
     logs: logsNext,
     tick: asTick(tickNumber),
@@ -368,6 +387,9 @@ function rebuildWorldUpToCursor(get: Get, set: Set, cursor: number): void {
     snapshotVersion: state.snapshotVersion + 1,
     replayCursor: cursor,
   });
+  // 回放期 sim 已暂停，不会再触发 assertContiguous；但 rebuild 出来的世界相当于新基线，
+  // 主动清掉飞地告警记录，避免之后退出回放接续 live tick 时拿到陈旧 prev 计数。
+  resetContiguityWatch();
 }
 
 /* ------------------------------------------------------------------ */

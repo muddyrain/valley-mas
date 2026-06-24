@@ -1,11 +1,19 @@
 import type { StateCreator } from 'zustand';
 import type { Province } from '@/core/map';
+import {
+  DEFAULT_FACTION_NAME_POOL,
+  DEFAULT_LEADER_POOL,
+  NAME_LEADER_PRESET,
+} from '@/core/scenario';
 import { createPrngFromSeed } from '@/shared/math';
 import type { FactionId, FactionSummary, RegionId } from '@/shared/types';
 import { asFactionId, asTick } from '@/shared/types';
 import type { MapSlice } from './mapSlice';
 import type { SimSlice } from './simSlice';
 import type { UiSlice } from './uiSlice';
+
+// 兼容历史导出：state/index.ts 仍然 re-export 这两个常量
+export { DEFAULT_FACTION_NAME_POOL, DEFAULT_LEADER_POOL };
 
 export interface FactionCreateInput {
   name?: string;
@@ -28,58 +36,10 @@ export interface FactionSlice {
 /**
  * Phase 4 默认君主池：用户期望的「刘备/曹操/孙权/李世民」全部在内，
  * 同时提供其他历史人物兜底。仅作为「自动建议」，用户可在 UI 输入任意名称。
+ *
+ * 默认池与 NAME_LEADER_PRESET 的真实定义已抽到 core/scenario/defaults.ts，
+ * 本文件顶部 import 后通过 `export { ... }` 维持原有对外接口。
  */
-export const DEFAULT_LEADER_POOL = [
-  '刘备',
-  '曹操',
-  '孙权',
-  '李世民',
-  '李渊',
-  '刘邦',
-  '汉武帝',
-  '秦始皇',
-  '朱元璋',
-  '朱棣',
-  '康熙',
-  '乾隆',
-  '成吉思汗',
-  '忽必烈',
-  '赵匡胤',
-  '杨广',
-];
-
-/** 默认势力名池：常用朝代或政权名 */
-export const DEFAULT_FACTION_NAME_POOL = [
-  '蜀汉',
-  '曹魏',
-  '东吴',
-  '大唐',
-  '大汉',
-  '大明',
-  '大宋',
-  '大清',
-  '大元',
-  '大秦',
-  '大楚',
-  '北周',
-  '北齐',
-  '南齐',
-  '后梁',
-];
-
-/** 经典名 → 默认君主映射，匹配时自动配对 */
-const NAME_LEADER_PRESET: Record<string, string> = {
-  蜀汉: '刘备',
-  曹魏: '曹操',
-  东吴: '孙权',
-  大唐: '李世民',
-  大汉: '刘邦',
-  大明: '朱元璋',
-  大清: '康熙',
-  大宋: '赵匡胤',
-  大元: '忽必烈',
-  大秦: '秦始皇',
-};
 
 const INITIAL_PRESETS: Array<{ name: string; leader: string; color: string }> = [
   { name: '蜀汉', leader: '刘备', color: '#e05656' },
@@ -176,13 +136,57 @@ function normalizeColor(input: string): string | null {
   return trimmed.startsWith('#') ? trimmed.toLowerCase() : `#${trimmed.toLowerCase()}`;
 }
 
+/**
+ * 池用尽时的字头/字尾组合：默认池里 20 多个朝代用完后，仍然按朝代风格继续拼，
+ * 避免回到「势力N」「势力·甲」这种占位文案。
+ */
+const FALLBACK_NAME_PREFIXES = [
+  '新',
+  '后',
+  '前',
+  '西',
+  '东',
+  '北',
+  '南',
+  '小',
+  '上',
+  '中',
+] as const;
+const FALLBACK_NAME_SUFFIXES = [
+  '汉',
+  '唐',
+  '宋',
+  '明',
+  '清',
+  '魏',
+  '吴',
+  '齐',
+  '楚',
+  '燕',
+] as const;
+
 function pickFreeName(used: Set<string>): string {
   for (const cand of DEFAULT_FACTION_NAME_POOL) {
     if (!used.has(cand)) return cand;
   }
-  let n = 1;
-  while (used.has(`势力${n}`)) n++;
-  return `势力${n}`;
+  // 朝代池用尽：先按 PRNG 顺序遍历前缀×字尾的全部组合，挑首个未占用名
+  for (
+    let attempt = 0;
+    attempt < FALLBACK_NAME_PREFIXES.length * FALLBACK_NAME_SUFFIXES.length;
+    attempt++
+  ) {
+    const pIdx = Math.floor(sessionRng.next() * FALLBACK_NAME_PREFIXES.length);
+    const sIdx = Math.floor(sessionRng.next() * FALLBACK_NAME_SUFFIXES.length);
+    const cand = `${FALLBACK_NAME_PREFIXES[pIdx]}${FALLBACK_NAME_SUFFIXES[sIdx]}`;
+    if (!used.has(cand)) return cand;
+  }
+  // 兜底拼接序号但仍带朝代字尾，避免「势力N」
+  let n = 2;
+  while (true) {
+    const cand = `${FALLBACK_NAME_SUFFIXES[0]}${n}`;
+    if (!used.has(cand)) return cand;
+    n++;
+  }
 }
 
 function pickLeaderForName(name: string, used: Set<string>): string {
