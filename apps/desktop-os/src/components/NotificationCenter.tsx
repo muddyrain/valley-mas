@@ -13,19 +13,25 @@ import { FOCUS_LABELS, formatTimer, useToolStore } from '../store/toolStore';
 import { useWeatherStore } from '../store/weatherStore';
 import { useWindowStore } from '../store/windowStore';
 import EmptyState from '../ui/EmptyState';
+import { PlushFade, PlushPresence, PlushSlide } from '../ui/PlushMotion';
 import PlushScrollbar from '../ui/PlushScrollbar';
 import { DESKTOP_WIDGETS, type DesktopWidget } from '../widgets/data';
 import './NotificationCenter.css';
 
 export default function NotificationCenter() {
   const isOpen = useNotificationCenterStore((s) => s.isOpen);
-
-  if (!isOpen) return null;
-
-  return <NotificationCenterPanel />;
+  return (
+    <PlushPresence>
+      {isOpen ? (
+        <PlushSlide key="notification-center" open from="right">
+          <NotificationCenterPanel />
+        </PlushSlide>
+      ) : null}
+    </PlushPresence>
+  );
 }
 
-function NotificationCenterPanel() {
+export function NotificationCenterPanel() {
   const close = useNotificationCenterStore((s) => s.close);
   const notifications = useNotificationCenterStore((s) => s.notifications);
   const loading = useNotificationCenterStore((s) => s.loading);
@@ -134,9 +140,13 @@ function NotificationCenterPanel() {
             />
           ) : (
             <ul className="nc__list">
-              {visibleNotifications.map((n) => (
-                <NotificationCard key={n.id} item={n} onDismiss={() => void dismiss(n.id, token)} />
-              ))}
+              <PlushPresence>
+                {visibleNotifications.map((n) => (
+                  <PlushFade key={n.id} open {...{ 'data-notification-id': n.id }}>
+                    <NotificationCard item={n} onDismiss={() => void dismiss(n.id, token)} />
+                  </PlushFade>
+                ))}
+              </PlushPresence>
             </ul>
           )}
         </section>
@@ -199,7 +209,7 @@ interface NotificationCardProps {
   onDismiss: () => void;
 }
 
-function NotificationCard({ item, onDismiss }: NotificationCardProps) {
+export function NotificationCard({ item, onDismiss }: NotificationCardProps) {
   return (
     <li className="nc__card">
       <div className="nc__card-head">

@@ -16,8 +16,6 @@
     0 8px 24px rgba(40, 32, 24, 0.16),
     0 24px 60px rgba(40, 32, 24, 0.18);
   overflow: hidden;
-  animation: nc-pop 0.24s var(--ease-spring);
-  transform-origin: top right;
 }
 
 .notification-center__scroll {
@@ -30,17 +28,6 @@
   flex-direction: column;
   gap: 14px;
   padding: 18px 16px 14px;
-}
-
-@keyframes nc-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.94) translateX(8px);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) translateX(0);
-  }
 }
 
 .nc__date {

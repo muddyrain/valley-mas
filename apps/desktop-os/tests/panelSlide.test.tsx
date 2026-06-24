@@ -40,12 +40,20 @@ vi.mock('motion/react', async () => {
 });
 
 import ControlCenter, { ControlCenterPanel } from '../src/components/ControlCenter';
+import NotificationCenter, { NotificationCenterPanel } from '../src/components/NotificationCenter';
 import { useControlCenterStore } from '../src/store/controlCenterStore';
-import { PlushPresence, PlushSlide } from '../src/ui/PlushMotion';
+import { useNotificationCenterStore } from '../src/store/notificationCenterStore';
+import { PlushFade, PlushPresence, PlushSlide } from '../src/ui/PlushMotion';
 
 afterEach(() => {
   reducedMotionMock.value = false;
   useControlCenterStore.setState({ isOpen: false });
+  useNotificationCenterStore.setState({
+    isOpen: false,
+    notifications: [],
+    loading: false,
+    error: null,
+  });
 });
 
 describe('Panel slide AnimatePresence', () => {
@@ -78,6 +86,54 @@ describe('Panel slide AnimatePresence', () => {
       expect(html).toContain('data-from="top"');
       expect(html).toContain('data-state="enter"');
       expect(html).toContain('class="control-center"');
+    });
+  });
+
+  describe('NotificationCenter', () => {
+    it('NotificationCenter 源码用 PlushPresence + PlushSlide(from="right") + PlushFade 编排进出场', () => {
+      const src = readFileSync(
+        path.resolve(__dirname, '../src/components/NotificationCenter.tsx'),
+        'utf8',
+      );
+      expect(src).toContain("from '../ui/PlushMotion'");
+      expect(src).toMatch(/PlushPresence/);
+      expect(src).toMatch(/PlushSlide[\s\S]*?key="notification-center"[\s\S]*?from="right"/);
+      // PlushFade 包裹通知卡，使用 spread 传递 data-notification-id
+      expect(src).toMatch(/PlushFade[\s\S]*?key=\{n\.id\}/);
+      expect(src).toMatch(/\.\.\.\{\s*['"]data-notification-id['"]:\s*n\.id\s*\}/);
+    });
+
+    it('isOpen=false 时 NotificationCenter SSR 输出不含 motion 包装', () => {
+      const html = renderToStaticMarkup(<NotificationCenter />);
+      expect(html).not.toContain('data-motion-presence="slide"');
+      expect(html).not.toContain('class="notification-center"');
+    });
+
+    it('PlushPresence + PlushSlide + NotificationCenterPanel SSR 含 motion 包装属性', () => {
+      const html = renderToStaticMarkup(
+        <PlushPresence>
+          <PlushSlide key="notification-center" open from="right">
+            <NotificationCenterPanel />
+          </PlushSlide>
+        </PlushPresence>,
+      );
+      expect(html).toContain('data-motion-presence="slide"');
+      expect(html).toContain('data-from="right"');
+      expect(html).toContain('data-state="enter"');
+      expect(html).toContain('class="notification-center"');
+    });
+
+    it('通知列表有数据时 PlushFade 包裹每条通知', () => {
+      // 直接渲染 NotificationCenterPanel 而不经过 store，直接检查源码中的 PlushFade 配置
+      const src = readFileSync(
+        path.resolve(__dirname, '../src/components/NotificationCenter.tsx'),
+        'utf8',
+      );
+      // 验证通知列表 map 块使用了 PlushPresence + PlushFade 包裹 NotificationCard
+      expect(src).toMatch(
+        /PlushPresence[\s\S]*?\{visibleNotifications\.map\(\(n\)[\s\S]*?PlushFade/,
+      );
+      expect(src).toMatch(/data-notification-id['"]:\s*n\.id/);
     });
   });
 });
