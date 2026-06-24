@@ -104,8 +104,11 @@ describe('AI Command Center surface', () => {
     expect(css).toContain('overflow-y: auto');
     expect(css).toContain('overscroll-behavior: contain');
     expect(css).toContain('.ai-command-center__dialog-backdrop');
-    expect(css).toContain('@keyframes ai-command-thread-in');
-    expect(css).toContain('@keyframes ai-command-inspector-in');
+    expect(css).not.toContain('@keyframes ai-command-thread-in');
+    expect(css).not.toContain('@keyframes ai-command-message-in');
+    expect(css).not.toContain('@keyframes ai-command-inspector-in');
+    expect(css).not.toContain('@keyframes ai-command-dialog-in');
+    expect(css).not.toContain('@keyframes ai-command-fade-in');
     expect(css).toContain('.ai-command-center__message--assistant');
     expect(css).toContain('.ai-command-center__composer-shell');
     expect(css).toContain('.ai-command-center__composer-shell:focus-within');

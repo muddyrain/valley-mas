@@ -37,6 +37,7 @@ import {
   updateAIAgent,
 } from '../api/ai';
 import { useAuthStore } from '../store/authStore';
+import { PlushFade, PlushPresence } from '../ui/PlushMotion';
 import { deriveAICommandTitle } from './aiCommandCenterHistory';
 import './AICommandCenterWindow.css';
 
@@ -270,10 +271,10 @@ export default function AICommandCenterWindow() {
     void threadViewKey;
     const node = threadScrollRef.current;
     if (!node) return;
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReducedAutoScroll = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     node.scrollTo({
       top: node.scrollHeight,
-      behavior: prefersReducedMotion || isSending ? 'auto' : 'smooth',
+      behavior: prefersReducedAutoScroll || isSending ? 'auto' : 'smooth',
     });
   }, [scrollVersion, threadViewKey, isSending]);
 
@@ -686,28 +687,35 @@ export default function AICommandCenterWindow() {
                 <span>选择下方建议，或者直接输入你的问题。</span>
               </div>
             ) : (
-              activeMessages.map((message) => (
-                <article
-                  className={`ai-command-center__message ai-command-center__message--${message.role}`}
-                  key={message.id}
-                >
-                  <span
-                    className="ai-command-center__agent-avatar ai-command-center__message-avatar"
-                    style={
-                      {
-                        '--agent-color':
-                          message.role === 'assistant' ? getAgentAccent(activeAgent) : '#a8d4ea',
-                      } as React.CSSProperties
-                    }
-                  >
-                    {message.role === 'assistant' ? getAgentIcon(activeAgent) : '你'}
-                  </span>
-                  <div className="ai-command-center__bubble">
-                    <div>{message.role === 'assistant' ? activeAgent?.name || 'AI' : 'You'}</div>
-                    <p>{message.content || '...'}</p>
-                  </div>
-                </article>
-              ))
+              <PlushPresence>
+                {activeMessages.map((message) => (
+                  <PlushFade key={message.id} open>
+                    <article
+                      className={`ai-command-center__message ai-command-center__message--${message.role}`}
+                    >
+                      <span
+                        className="ai-command-center__agent-avatar ai-command-center__message-avatar"
+                        style={
+                          {
+                            '--agent-color':
+                              message.role === 'assistant'
+                                ? getAgentAccent(activeAgent)
+                                : '#a8d4ea',
+                          } as React.CSSProperties
+                        }
+                      >
+                        {message.role === 'assistant' ? getAgentIcon(activeAgent) : '你'}
+                      </span>
+                      <div className="ai-command-center__bubble">
+                        <div>
+                          {message.role === 'assistant' ? activeAgent?.name || 'AI' : 'You'}
+                        </div>
+                        <p>{message.content || '...'}</p>
+                      </div>
+                    </article>
+                  </PlushFade>
+                ))}
+              </PlushPresence>
             )}
           </div>
         </section>
