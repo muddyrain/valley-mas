@@ -84,7 +84,8 @@ describe('desktop runtime lifecycle surface', () => {
     const launchpadSource = readSource('src/components/Launchpad.tsx');
 
     expect(launchpadSource).toContain('function LaunchpadPanel');
-    expect(launchpadSource).toContain('return <LaunchpadPanel');
+    // LaunchpadPanel is rendered inside PlushPop, gated by isOpen ternary in PlushPresence
+    expect(launchpadSource).toMatch(/PlushPresence[\s\S]*?PlushPop[\s\S]*?LaunchpadPanel/);
     expect(launchpadSource.indexOf('const query = useLaunchpadStore')).toBeGreaterThan(
       launchpadSource.indexOf('function LaunchpadPanel'),
     );
