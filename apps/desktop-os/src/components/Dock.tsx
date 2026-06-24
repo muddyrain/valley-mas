@@ -11,6 +11,7 @@ import { getDefaultWindowOptions } from '../apps/desktopApps';
 import { type DockItemConfig, useDockStore } from '../store/dockStore';
 import { useLaunchpadStore } from '../store/launchpadStore';
 import { type AppId, useWindowStore } from '../store/windowStore';
+import { PlushPop, PlushPresence } from '../ui/PlushMotion';
 import './Dock.css';
 
 const BOUNCE_MS = 600;
@@ -236,37 +237,41 @@ export default function Dock() {
         </ul>
       </div>
 
-      {menu ? (
-        <DockContextMenu
-          item={menu.item}
-          menuRef={menuRef}
-          menuPosition={menuPosition}
-          hasPrimaryMenuAction={Boolean(menu.item.appId || menu.item.action)}
-          onOpen={() => {
-            openItem(menu.item);
-            setMenu(null);
-          }}
-          onPin={() => {
-            pinItem(menu.item.id);
-            setMenu(null);
-          }}
-          onRemove={() => {
-            removeItem(menu.item.id);
-            setMenu(null);
-          }}
-          onOpenSettings={() => {
-            openDockSettings();
-            setMenu(null);
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          openLabel={getMenuOpenLabel(menu.item)}
-        />
-      ) : null}
+      <PlushPresence>
+        {menu ? (
+          <PlushPop key="dock-menu" open>
+            <DockContextMenu
+              item={menu.item}
+              menuRef={menuRef}
+              menuPosition={menuPosition}
+              hasPrimaryMenuAction={Boolean(menu.item.appId || menu.item.action)}
+              onOpen={() => {
+                openItem(menu.item);
+                setMenu(null);
+              }}
+              onPin={() => {
+                pinItem(menu.item.id);
+                setMenu(null);
+              }}
+              onRemove={() => {
+                removeItem(menu.item.id);
+                setMenu(null);
+              }}
+              onOpenSettings={() => {
+                openDockSettings();
+                setMenu(null);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              openLabel={getMenuOpenLabel(menu.item)}
+            />
+          </PlushPop>
+        ) : null}
+      </PlushPresence>
     </>
   );
 }
 
-function DockContextMenu({
+export function DockContextMenu({
   item,
   menuRef,
   menuPosition,

@@ -24,8 +24,8 @@ describe('dock context menu surface', () => {
   it('styles the menu like an animated compact system context menu', () => {
     expect(dockStyles).toContain('dock-menu__separator');
     expect(dockStyles).toContain('dock-menu__submenu');
-    expect(dockStyles).toContain('@keyframes dock-menu-pop');
-    expect(dockStyles).toContain('@keyframes dock-submenu-pop');
+    expect(dockStyles).not.toContain('@keyframes dock-menu-pop');
+    expect(dockStyles).not.toContain('@keyframes dock-submenu-pop');
     expect(dockStyles).toContain('prefers-reduced-motion');
     expect(dockStyles).toContain('rgba(0, 122, 255');
     expect(dockStyles).toContain('min-width: 168px');
