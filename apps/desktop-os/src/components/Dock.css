@@ -265,6 +265,9 @@
   .dock-menu__submenu {
     transition: none;
   }
+  .dock__btn.is-bouncing .dock__icon {
+    animation: none;
+  }
 }
 
 /* Storybook Design System v1 */
