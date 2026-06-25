@@ -29,7 +29,7 @@ describe('pantry status action guards', () => {
     expect(pantryPageSource).toContain(':consume-discarded` || consumePending');
     expect(pantryPageSource).toContain('<ActionLoadingIcon className="size-4" tone="trace" />');
     expect(pantryPageSource).toContain('<ActionLoadingIcon className="size-4" tone="alert" />');
-    expect(pantryPageSource).toContain('min-w-10 whitespace-nowrap text-center');
+    expect(pantryPageSource).toContain('<span className="whitespace-nowrap">');
     expect(pantryPageSource).toContain("'用 1'");
     expect(pantryPageSource).toContain("'处理'");
     expect(pantryPageSource).not.toContain("usedUpPending ? '处理中...'");
@@ -53,8 +53,9 @@ describe('pantry status action guards', () => {
   });
 
   it('keeps pantry card thumbnails in a fixed mobile slot', () => {
-    expect(pantryPageSource).toContain('flex w-full items-start gap-0 text-left');
-    expect(pantryPageSource).toContain('grid h-44 w-26 shrink-0');
+    expect(pantryPageSource).toContain('flex w-full items-stretch gap-3 p-3 text-left');
+    expect(pantryPageSource).toContain('grid h-32 w-[6.75rem] shrink-0');
+    expect(pantryPageSource).toContain('max-[360px]:h-[7.5rem] max-[360px]:w-24');
     expect(pantryPageSource).not.toContain('h-full min-h-28 w-full');
   });
 });

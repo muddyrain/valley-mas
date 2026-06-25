@@ -47,8 +47,10 @@ describe('pantry drawer mobile layout guards', () => {
     expect(formItemSource).toContain('h-11 min-w-0 w-full');
     expect(pantryDrawerSource).toContain('className="overflow-hidden rounded-');
     expect(pantryDrawerSource).toContain('<ImagePreview');
-    expect(pantryDrawerSource).toContain('type="date"');
-    expect(pantryDrawerSource).toContain('appearance-none');
+    expect(pantryDrawerSource).toContain('<DateInputWithClear');
+    expect(pantryDrawerSource).toContain('<PantryExpiryDateField');
+    expect(expiryDateFieldSource).toContain('type="date"');
+    expect(expiryDateFieldSource).toContain('appearance-none');
   });
 
   it('keeps the photo review card in normal document flow while the sheet scrolls', () => {

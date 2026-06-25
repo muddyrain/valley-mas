@@ -50,6 +50,13 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			achievements.GET("", handler.ListAchievements)
 		}
 
+		checkins := group.Group("/checkins")
+		checkins.Use(auth)
+		{
+			checkins.GET("", handler.ListLegacyCheckins)
+			checkins.PUT("", handler.ToggleLegacyCheckin)
+		}
+
 		plans := group.Group("/plans")
 		plans.Use(auth)
 		{
