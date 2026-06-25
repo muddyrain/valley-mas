@@ -1,14 +1,6 @@
-import {
-  ChevronLeft,
-  CircleDollarSign,
-  LoaderCircle,
-  Pencil,
-  Plus,
-  ReceiptText,
-  Trash2,
-} from 'lucide-react';
+import { CircleDollarSign, LoaderCircle, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { EmptyState } from '@/components/EmptyState';
@@ -19,6 +11,7 @@ import {
   SheetSelectButton,
   SheetSelectField,
 } from '@/components/FormItem';
+import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -124,7 +117,6 @@ function normalizeFormInput(form: NewLedgerEntryInput): NewLedgerEntryInput {
 }
 
 export function LedgerPage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const ledgerEntries = useLifeTraceStore((state) => state.ledgerEntries);
   const ledgerLoaded = useLifeTraceStore((state) => state.ledgerLoaded);
@@ -258,25 +250,17 @@ export function LedgerPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-5 px-4 pb-28 pt-4 sm:px-6">
-      <header className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button type="button" variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ChevronLeft className="size-5" />
-          </Button>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-life-health">
-              Ledger
-            </p>
-            <h1 className="truncate text-2xl font-semibold">轻账本</h1>
-          </div>
-        </div>
+    <SubPageShell
+      title="轻账本"
+      eyebrow="Ledger"
+      fallbackBackTo="/today"
+      action={
         <Button type="button" variant="ai" size="sm" onClick={openCreateForm}>
           <Plus className="size-4" />
           记一笔
         </Button>
-      </header>
-
+      }
+    >
       <section className="grid gap-3 md:grid-cols-[1.35fr_1fr]">
         <Card className="relative overflow-hidden border-life-health/20 p-5">
           <div
@@ -613,6 +597,6 @@ export function LedgerPage() {
           </SheetActions>
         </form>
       </BottomSheet>
-    </div>
+    </SubPageShell>
   );
 }

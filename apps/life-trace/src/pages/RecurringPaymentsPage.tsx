@@ -1,7 +1,6 @@
 import {
   Archive,
   CalendarClock,
-  ChevronLeft,
   CircleDollarSign,
   LoaderCircle,
   Pencil,
@@ -15,6 +14,7 @@ import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetHeader, SheetSelectField } from '@/components/FormItem';
+import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -306,25 +306,17 @@ export function RecurringPaymentsPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-5 px-4 pb-28 pt-4 sm:px-6">
-      <header className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button type="button" variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ChevronLeft className="size-5" />
-          </Button>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-life-health">
-              Subscriptions
-            </p>
-            <h1 className="truncate text-2xl font-semibold">订阅与续费</h1>
-          </div>
-        </div>
+    <SubPageShell
+      title="订阅与续费"
+      eyebrow="Subscriptions"
+      fallbackBackTo="/today"
+      action={
         <Button type="button" variant="ai" size="sm" onClick={openCreateForm}>
           <Plus className="size-4" />
           新增订阅
         </Button>
-      </header>
-
+      }
+    >
       <section className="grid gap-3 md:grid-cols-[1.35fr_1fr]">
         <Card className="relative overflow-hidden border-life-health/20 p-5">
           <div
@@ -691,6 +683,6 @@ export function RecurringPaymentsPage() {
           </SheetActions>
         </form>
       </BottomSheet>
-    </div>
+    </SubPageShell>
   );
 }

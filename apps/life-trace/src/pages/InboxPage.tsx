@@ -2,7 +2,6 @@ import {
   Archive,
   BookOpen,
   CheckCircle2,
-  ChevronLeft,
   ClipboardList,
   ExternalLink,
   FileText,
@@ -32,6 +31,7 @@ import {
   SheetSelectField,
 } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
+import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -351,21 +351,7 @@ export function InboxPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-5 px-4 pb-28 pt-4 sm:px-6">
-      <header className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button type="button" variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ChevronLeft className="size-5" />
-          </Button>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-life-ai">
-              Inspiration
-            </p>
-            <h1 className="truncate text-2xl font-semibold">灵感</h1>
-          </div>
-        </div>
-      </header>
-
+    <SubPageShell title="灵感" eyebrow="Inspiration" fallbackBackTo="/today">
       <Card className="p-4">
         <form className="grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={submitQuickCapture}>
           <label className="block">
@@ -897,6 +883,6 @@ export function InboxPage() {
           }
         }}
       />
-    </div>
+    </SubPageShell>
   );
 }
