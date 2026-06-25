@@ -6,6 +6,7 @@
 
 - [项目指南](./PROJECT_GUIDE.md)：项目定位、技术栈、模块地图、开发命令、端口和环境变量。
 - [Harness Engineering](./HARNESS_ENGINEERING.md)：AI coding agent 在本仓库中的上下文入口、工具边界、验证命令、评审回路和回归证据。
+- [Agent 配置](./agents/)：Matt Pocock engineering skills 使用的 issue tracker、triage 标签和 domain docs 消费规则。
 
 ## 子项目文档
 
