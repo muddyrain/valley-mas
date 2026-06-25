@@ -39,6 +39,7 @@ import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
 import { ProfileAvatarSheet } from '@/components/ProfileAvatarSheet';
 import { SectionHeader } from '@/components/SectionHeader';
 import { SettingInput, SettingToggle, SyncStatus } from '@/components/SettingsControls';
+import { ThemeSelector } from '@/components/ThemeSelector';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -48,6 +49,7 @@ import { APP_VERSION_LABEL } from '@/lib/appVersion';
 import { gsap, useGSAP } from '@/lib/gsap';
 import { getPwaShareFeedback } from '@/lib/pwa';
 import { getWorkdayModeMeta } from '@/lib/reminderSettings';
+import { getStoredTheme, setStoredTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
@@ -88,6 +90,7 @@ export function ProfilePage() {
   const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
   const [householdDetailOpen, setHouseholdDetailOpen] = useState(false);
   const [feedbackSheetOpen, setFeedbackSheetOpen] = useState(false);
+  const [theme, setTheme] = useState(getStoredTheme);
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const settingsLoading = useLifeTraceStore((state) => state.settingsLoading);
@@ -293,16 +296,25 @@ export function ProfilePage() {
               <Leaf className="size-4 shrink-0" />
               <span className="truncate">我的生活页</span>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="relative z-10 rounded-2xl bg-background/30 text-muted-foreground backdrop-blur hover:bg-background/50"
-              aria-label="退出登录"
-              onClick={() => void signOut()}
-            >
-              <LogOut className="size-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <ThemeSelector
+                theme={theme}
+                onThemeChange={(nextTheme) => {
+                  setTheme(nextTheme);
+                  setStoredTheme(nextTheme);
+                }}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="relative z-10 rounded-2xl bg-background/30 text-muted-foreground backdrop-blur hover:bg-background/50"
+                aria-label="退出登录"
+                onClick={() => void signOut()}
+              >
+                <LogOut className="size-5" />
+              </Button>
+            </div>
           </div>
 
           <div className="flex items-center gap-[1.125rem] max-[360px]:gap-3.5">
@@ -353,25 +365,35 @@ export function ProfilePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2.5 max-[360px]:grid-cols-1">
-            <div className="rounded-2xl border border-border/70 bg-background/50 p-3.5 backdrop-blur">
-              <ActiveCommuteIcon className="mb-2 size-[1.05rem] text-life-ai" />
-              <p className="truncate text-[0.95rem] font-semibold">{settings.commuteMethod}</p>
-              <p className="mt-1 text-xs text-muted-foreground">通勤方式</p>
-            </div>
-            <div className="rounded-2xl border border-border/70 bg-background/50 p-3.5 backdrop-blur">
-              <Clock className="mb-2 size-[1.05rem] text-life-plan" />
-              <p className="text-[0.84rem] font-semibold leading-tight whitespace-nowrap">
-                <span>{settings.workStart}</span>
-                <span className="px-1 text-muted-foreground">-</span>
-                <span>{settings.workEnd}</span>
+          <div className="grid grid-cols-[1fr_1.4fr] gap-3 max-[360px]:grid-cols-1">
+            <div className="group relative overflow-hidden rounded-[1.35rem] border border-border/60 bg-card/80 p-4 shadow-[0_4px_18px_rgba(71,58,42,0.06)] transition duration-300 hover:border-foreground/15 hover:shadow-[0_8px_28px_rgba(71,58,42,0.1)] backdrop-blur">
+              <div className="mb-3 grid size-10 place-items-center rounded-xl bg-life-plan/10 text-life-plan transition duration-200 group-hover:bg-life-plan/15">
+                <Clock className="size-5" />
+              </div>
+              <p className="truncate text-base font-semibold leading-tight">
+                {settings.workStart} - {settings.workEnd}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">工作时段</p>
+              <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">工作时段</p>
             </div>
-            <div className="rounded-2xl border border-border/70 bg-background/50 p-3.5 backdrop-blur">
-              <Heart className="mb-2 size-[1.05rem] text-life-trace" />
-              <p className="truncate text-[0.95rem] font-semibold">{enabledSignals} 项</p>
-              <p className="mt-1 text-xs text-muted-foreground">提醒开启</p>
+            <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+              <div className="group relative overflow-hidden rounded-[1.35rem] border border-border/60 bg-card/80 p-4 shadow-[0_4px_18px_rgba(71,58,42,0.06)] transition duration-300 hover:border-foreground/15 hover:shadow-[0_8px_28px_rgba(71,58,42,0.1)] backdrop-blur">
+                <div className="mb-3 grid size-10 place-items-center rounded-xl bg-life-ai/10 text-life-ai transition duration-200 group-hover:bg-life-ai/15">
+                  <ActiveCommuteIcon className="size-5" />
+                </div>
+                <p className="truncate text-base font-semibold leading-tight">
+                  {settings.commuteMethod}
+                </p>
+                <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">通勤方式</p>
+              </div>
+              <div className="group relative overflow-hidden rounded-[1.35rem] border border-border/60 bg-card/80 p-4 shadow-[0_4px_18px_rgba(71,58,42,0.06)] transition duration-300 hover:border-foreground/15 hover:shadow-[0_8px_28px_rgba(71,58,42,0.1)] backdrop-blur">
+                <div className="mb-3 grid size-10 place-items-center rounded-xl bg-life-trace/10 text-life-trace transition duration-200 group-hover:bg-life-trace/15">
+                  <Heart className="size-5" />
+                </div>
+                <p className="truncate text-base font-semibold leading-tight">
+                  {enabledSignals} 项
+                </p>
+                <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">提醒开启</p>
+              </div>
             </div>
           </div>
 

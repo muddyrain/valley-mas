@@ -1,3 +1,4 @@
+import { useTheme } from '@/hooks/useTheme';
 import { cn } from '@/lib/utils';
 
 type LifeTraceBrandMarkProps = {
@@ -11,6 +12,8 @@ export function LifeTraceBrandMark({
   imageClassName,
   alt = 'Life Trace',
 }: LifeTraceBrandMarkProps) {
+  const { dark } = useTheme();
+
   return (
     <span
       className={cn(
@@ -19,7 +22,7 @@ export function LifeTraceBrandMark({
       )}
     >
       <img
-        src="/brand/life-trace-mark.svg"
+        src={dark ? '/brand/life-trace-mark-dark.svg' : '/brand/life-trace-mark-light.svg'}
         alt={alt}
         className={cn('size-full object-cover', imageClassName)}
       />

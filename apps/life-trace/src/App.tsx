@@ -24,6 +24,7 @@ import { PhotoItemAnalysisPage } from '@/pages/PhotoItemAnalysisPage';
 import { PlacesPage } from '@/pages/PlacesPage';
 import { PlansPage } from '@/pages/PlansPage';
 import { ProfilePage } from '@/pages/ProfilePage';
+import { RecipePlayerPage } from '@/pages/RecipePlayerPage';
 import { RecurringPaymentsPage } from '@/pages/RecurringPaymentsPage';
 import { ReminderSettingsPage } from '@/pages/ReminderSettingsPage';
 import { ShoppingListPage } from '@/pages/ShoppingListPage';
@@ -136,6 +137,7 @@ function AppContent() {
           <Route path="/ai/photo-item-analysis" element={<PhotoItemAnalysisPage />} />
           <Route path="/ai/photo-clothing-analysis" element={<PhotoClothingAnalysisPage />} />
           <Route path="/ai/weekly-reviews" element={<AiWeeklyReviewsPage />} />
+          <Route path="/recipe/:recipeId" element={<RecipePlayerPage />} />
           <Route path="/achievements" element={<AchievementsPage />} />
           <Route path="/traces/:traceId?" element={<TracesPage />} />
           <Route path="/profile" element={<ProfilePage />} />

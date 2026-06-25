@@ -153,3 +153,26 @@ export function generateRecipeSuggestions(
     signal: controller.signal,
   }).finally(() => globalThis.clearTimeout(timeout));
 }
+
+export type RecipeVideoResponse = {
+  url: string;
+  expiresAt: string;
+};
+
+export function renderRecipeVideo(
+  token: string,
+  input: { recipeId: string },
+  options: { signal?: AbortSignal } = {},
+) {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), 120000); // 2分钟超时
+  options.signal?.addEventListener('abort', () => controller.abort(), { once: true });
+
+  return apiRequest<RecipeVideoResponse>('/life-trace/ai/recipes/render-video', token, {
+    method: 'POST',
+    body: JSON.stringify({
+      recipeId: input.recipeId,
+    }),
+    signal: controller.signal,
+  }).finally(() => globalThis.clearTimeout(timeout));
+}

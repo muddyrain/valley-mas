@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Camera,
   Check,
+  CirclePlay,
   Clock,
   History,
   Image,
@@ -388,6 +389,8 @@ function RecipeSuggestionPanel({
   addingRecipeId: string | null;
   onAddRecipePlan: (recipe: RecipeSuggestionItem) => void;
 }) {
+  const navigate = useNavigate();
+
   return (
     <div className="mb-3 space-y-3">
       <div className="rounded-2xl border border-life-health/25 bg-life-health/10 p-3">
@@ -467,6 +470,15 @@ function RecipeSuggestionPanel({
                     </li>
                   ))}
                 </ol>
+
+                <button
+                  type="button"
+                  className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-life-trace/10 py-2.5 text-sm font-semibold text-life-trace transition hover:bg-life-trace/15"
+                  onClick={() => navigate(`/recipe/${recipe.id}`, { state: { recipe } })}
+                >
+                  <CirclePlay className="size-4" />
+                  跟着做 · {recipe.timeMinutes} 分钟
+                </button>
 
                 {recipe.tags.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-1.5">
@@ -1250,6 +1262,131 @@ function AssistantToolsSheet({
   );
 }
 
+function RecipePreferenceSheet({
+  open,
+  meal,
+  servings,
+  maxMinutes,
+  loading,
+  onMealChange,
+  onServingsChange,
+  onMaxMinutesChange,
+  onOpenChange,
+  onGenerate,
+}: {
+  open: boolean;
+  meal: string;
+  servings: number;
+  maxMinutes: number;
+  loading: boolean;
+  onMealChange: (meal: string) => void;
+  onServingsChange: (servings: number) => void;
+  onMaxMinutesChange: (minutes: number) => void;
+  onOpenChange: (open: boolean) => void;
+  onGenerate: () => void;
+}) {
+  const mealOptions = [
+    { value: '早餐', label: '早餐' },
+    { value: '午餐', label: '午餐' },
+    { value: '晚餐', label: '晚餐' },
+  ];
+  const servingOptions = [1, 2, 3, 4, 5, 6];
+  const timeOptions = [15, 30, 45, 60];
+
+  return (
+    <BottomSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      overlayLabel="关闭菜谱偏好选择"
+      contentClassName="space-y-6"
+      portal
+    >
+      <div className="px-1 pb-1">
+        <p className="text-2xl font-semibold tracking-normal">菜谱偏好</p>
+        <p className="mt-2 text-sm leading-5 text-muted-foreground">
+          选择用餐类型、人数和时长，让 AI 更精准地生成菜谱。
+        </p>
+      </div>
+
+      <div className="space-y-5">
+        <div className="space-y-3">
+          <p className="text-sm font-semibold">用餐类型</p>
+          <div className="flex gap-2">
+            {mealOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`flex-1 rounded-xl border py-2.5 text-sm font-semibold transition ${
+                  meal === option.value
+                    ? 'border-life-health/35 bg-life-health/10 text-life-health'
+                    : 'border-border bg-card text-muted-foreground hover:bg-secondary'
+                }`}
+                onClick={() => onMealChange(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-sm font-semibold">用餐人数</p>
+          <div className="grid grid-cols-3 gap-2">
+            {servingOptions.map((count) => (
+              <button
+                key={count}
+                type="button"
+                className={`rounded-xl border py-2.5 text-sm font-semibold transition ${
+                  servings === count
+                    ? 'border-life-health/35 bg-life-health/10 text-life-health'
+                    : 'border-border bg-card text-muted-foreground hover:bg-secondary'
+                }`}
+                onClick={() => onServingsChange(count)}
+              >
+                {count} 人
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-sm font-semibold">最长烹饪时长</p>
+          <div className="grid grid-cols-4 gap-2">
+            {timeOptions.map((minutes) => (
+              <button
+                key={minutes}
+                type="button"
+                className={`rounded-xl border py-2.5 text-sm font-semibold transition ${
+                  maxMinutes === minutes
+                    ? 'border-life-health/35 bg-life-health/10 text-life-health'
+                    : 'border-border bg-card text-muted-foreground hover:bg-secondary'
+                }`}
+                onClick={() => onMaxMinutesChange(minutes)}
+              >
+                {minutes} 分钟
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-life-health py-3 text-sm font-semibold text-background transition hover:bg-life-health/90 disabled:cursor-default disabled:opacity-70"
+          disabled={loading}
+          onClick={onGenerate}
+        >
+          {loading ? (
+            <ActionLoadingIcon className="size-4 text-background" tone="health" />
+          ) : (
+            <Utensils className="size-4" />
+          )}
+          {loading ? '生成中...' : '生成菜谱'}
+        </button>
+      </div>
+    </BottomSheet>
+  );
+}
+
 function AgentConversationPanel({
   conversation,
   messages,
@@ -1717,6 +1854,10 @@ function useAiPageState() {
     householdId: preferredPantryHouseholdId || undefined,
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [recipePrefSheetOpen, setRecipePrefSheetOpen] = useState(false);
+  const [recipePrefMeal, setRecipePrefMeal] = useState('晚餐');
+  const [recipePrefServings, setRecipePrefServings] = useState(2);
+  const [recipePrefMaxMinutes, setRecipePrefMaxMinutes] = useState(30);
   const [result, setResult] = useState<AiResult | null>(null);
   const [recipeResult, setRecipeResult] = useState<RecipeSuggestionResponse | null>(null);
   const [adviceCards, setAdviceCards] = useState<AdvicePayload[]>([]);
@@ -2339,45 +2480,10 @@ function useAiPageState() {
     }
 
     if (label === '智能菜谱') {
-      setQuickActionLoading(label);
-      setAdviceCards([]);
-      setRecipeResult(null);
-      setResult({
-        title: '正在生成智能菜谱',
-        detail: '正在读取当前 Pantry 食品库存。',
-        tone: 'health',
-      });
-      try {
-        if (!token) {
-          throw new Error('请先登录后再生成智能菜谱');
-        }
-        if (!settings.aiPersonalization) {
-          throw new Error('“我的”页的 AI 个性化开关未开启');
-        }
-
-        const recipes = await generateRecipeSuggestions(token, {
-          meal: '晚餐',
-          servings: 2,
-          maxMinutes: 30,
-          householdId: preferredPantryHouseholdId || undefined,
-        });
-        setRecipeResult(recipes);
-        setResult({
-          title: recipes.recipes.length > 0 ? '智能菜谱已生成' : '暂时没有可用菜谱',
-          detail: recipes.summary,
-          tone: recipes.recipes.length > 0 ? 'health' : 'alert',
-        });
-      } catch (error) {
-        setResult({
-          title: '智能菜谱生成失败',
-          detail:
-            error instanceof Error ? error.message : '请稍后再试，或先检查 Pantry 是否有食品库存。',
-          tone: 'alert',
-        });
-      } finally {
-        setQuickActionLoading(null);
-      }
-      addAiAction('生成了库存优先智能菜谱');
+      setRecipePrefMeal('晚餐');
+      setRecipePrefServings(2);
+      setRecipePrefMaxMinutes(30);
+      setRecipePrefSheetOpen(true);
       return;
     }
 
@@ -2627,6 +2733,38 @@ function useAiPageState() {
     }
   };
 
+  const handleGenerateRecipe = async () => {
+    setQuickActionLoading('智能菜谱');
+    setRecipePrefSheetOpen(false);
+    setRecipeResult(null);
+    try {
+      if (!token) {
+        throw new Error('请先登录后再生成菜谱');
+      }
+      if (!settings.aiPersonalization) {
+        throw new Error('AI 个性化开关未开启');
+      }
+
+      const response = await generateRecipeSuggestions(token, {
+        meal: recipePrefMeal as '早餐' | '午餐' | '晚餐',
+        servings: recipePrefServings,
+        maxMinutes: recipePrefMaxMinutes,
+        householdId: preferredPantryHouseholdId || undefined,
+      });
+      setRecipeResult(response);
+      addAiAction(`生成了 ${recipePrefMeal} 智能菜谱`);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'AI 暂时不可用';
+      setResult({
+        title: '菜谱生成失败',
+        detail: `未生成菜谱原因：${reason}。请确保已开启 AI 个性化并登录。`,
+        tone: 'alert',
+      });
+    } finally {
+      setQuickActionLoading(null);
+    }
+  };
+
   const handleAddRecipePlan = async (recipe: RecipeSuggestionItem) => {
     const planTitle = recipe.planTitle || recipe.title;
     if (
@@ -2726,6 +2864,14 @@ function useAiPageState() {
     setAssistantConversationSheetOpen,
     assistantToolsSheetOpen,
     setAssistantToolsSheetOpen,
+    recipePrefSheetOpen,
+    setRecipePrefSheetOpen,
+    recipePrefMeal,
+    setRecipePrefMeal,
+    recipePrefServings,
+    setRecipePrefServings,
+    recipePrefMaxMinutes,
+    setRecipePrefMaxMinutes,
     assistantConversationsLoading,
     assistantConversationCreating,
     deletingAssistantConversationId,
@@ -2774,6 +2920,7 @@ function useAiPageState() {
     handleAddWeeklyReviewActionPlan,
     handleDeleteWeeklyReview,
     handleQuickAction,
+    handleGenerateRecipe,
     runWeeklyReview,
   };
 }
@@ -2917,6 +3064,14 @@ export function AiPage() {
     setAssistantConversationSheetOpen,
     assistantToolsSheetOpen,
     setAssistantToolsSheetOpen,
+    recipePrefSheetOpen,
+    setRecipePrefSheetOpen,
+    recipePrefMeal,
+    setRecipePrefMeal,
+    recipePrefServings,
+    setRecipePrefServings,
+    recipePrefMaxMinutes,
+    setRecipePrefMaxMinutes,
     assistantConversationsLoading,
     assistantConversationCreating,
     deletingAssistantConversationId,
@@ -2947,6 +3102,7 @@ export function AiPage() {
     toggleAssistantListening,
     handleAddAdvicePlan,
     handleAddRecipePlan,
+    handleGenerateRecipe,
     handleQuickAction,
     runWeeklyReview,
   } = useAiPageState();
@@ -3018,6 +3174,20 @@ export function AiPage() {
       />
 
       <CreatePlanDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+
+      <RecipePreferenceSheet
+        open={recipePrefSheetOpen}
+        meal={recipePrefMeal}
+        servings={recipePrefServings}
+        maxMinutes={recipePrefMaxMinutes}
+        loading={quickActionLoading === '智能菜谱'}
+        onMealChange={setRecipePrefMeal}
+        onServingsChange={setRecipePrefServings}
+        onMaxMinutesChange={setRecipePrefMaxMinutes}
+        onOpenChange={setRecipePrefSheetOpen}
+        onGenerate={() => void handleGenerateRecipe()}
+      />
+
       <ConfirmDialog
         open={Boolean(weeklyReviewRegenerateTarget)}
         title="重新生成本周周报？"
