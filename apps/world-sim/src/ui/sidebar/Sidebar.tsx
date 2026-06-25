@@ -1,6 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { GeoMapId, TerrainKind } from '@/core/map';
 import { GEO_MAP_IDS, GEO_MAP_REGISTRY, TERRAIN_KINDS, TERRAIN_LABEL } from '@/core/map';
+import {
+  buildFrontPressureState,
+  type FactionFrontPressureSummary,
+  type FrontPressureLevel,
+  summarizeFactionFrontPressure,
+} from '@/core/sim';
 import type { FactionId, FactionSummary, RegionId } from '@/shared/types';
 import type { EditTool, ProvincePreset } from '@/state';
 import { computeFactionRankings, PROVINCE_PRESETS, useWorldSimStore } from '@/state';
@@ -40,6 +46,8 @@ export function Sidebar() {
   const geoLoadStatus = useWorldSimStore((s) => s.geoLoadStatus);
   const geoLoadError = useWorldSimStore((s) => s.geoLoadError);
   const loadGeoMap = useWorldSimStore((s) => s.loadGeoMap);
+  const frontPressureOverlayVisible = useWorldSimStore((s) => s.frontPressureOverlayVisible);
+  const toggleFrontPressureOverlay = useWorldSimStore((s) => s.toggleFrontPressureOverlay);
 
   const currentScenarioId = useWorldSimStore((s) => s.currentScenarioId);
   const scenarioUnresolvedCount = useWorldSimStore((s) => s.scenarioUnresolvedCount);
@@ -63,6 +71,33 @@ export function Sidebar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const rankings = useMemo(() => computeFactionRankings(factions, map), [factions, map]);
+  const frontPressureSummaries = useMemo(() => {
+    if (!map) return new Map<FactionId, FactionFrontPressureSummary>();
+    const liveFactions = factions.filter((f) => (f.regions ?? 0) > 0);
+    const frontPressureState = buildFrontPressureState({
+      map,
+      factions: liveFactions.map((f) => ({
+        id: f.id,
+        regions: f.regions ?? 0,
+        centroidRegionId: f.centroidRegionId ?? f.capitalRegionId,
+      })),
+      ownedTargetPreference: 0,
+    });
+    return new Map(
+      liveFactions.map((f) => [
+        f.id,
+        summarizeFactionFrontPressure({
+          state: frontPressureState,
+          faction: {
+            id: f.id,
+            regions: f.regions ?? 0,
+            centroidRegionId: f.centroidRegionId ?? f.capitalRegionId,
+          },
+        }),
+      ]),
+    );
+  }, [factions, map]);
+  const factionNameById = useMemo(() => new Map(factions.map((f) => [f.id, f.name])), [factions]);
 
   const [seedDraft, setSeedDraft] = useState(seed);
   const [newFactionName, setNewFactionName] = useState('');
@@ -223,6 +258,15 @@ export function Sidebar() {
             </span>
           )}
         </header>
+        <button
+          type="button"
+          className={styles.overlayToggle}
+          data-active={frontPressureOverlayVisible}
+          disabled={!map}
+          onClick={toggleFrontPressureOverlay}
+        >
+          前线压力
+        </button>
         <div className={styles.controlGroup}>
           <label className={styles.fieldLabel}>种子</label>
           <div className={styles.seedRow}>
@@ -490,6 +534,7 @@ export function Sidebar() {
               const isActive = selectedFactionId === f.id;
               const isRenaming = renameDraft?.id === f.id;
               const isDead = (f.regions ?? 0) === 0;
+              const frontPressureSummary = frontPressureSummaries.get(f.id);
               return (
                 <li
                   key={f.id}
@@ -562,6 +607,13 @@ export function Sidebar() {
                       </>
                     )}
                   </div>
+                  {isActive && (
+                    <FrontPressureCard
+                      summary={frontPressureSummary}
+                      factionNameById={factionNameById}
+                      isDead={isDead}
+                    />
+                  )}
                 </li>
               );
             })}
@@ -602,6 +654,76 @@ export function Sidebar() {
       </section>
     </div>
   );
+}
+
+function FrontPressureCard({
+  summary,
+  factionNameById,
+  isDead,
+}: {
+  summary: FactionFrontPressureSummary | undefined;
+  factionNameById: Map<FactionId, string>;
+  isDead: boolean;
+}) {
+  if (isDead) {
+    return <p className={styles.frontPressureEmpty}>势力已灭</p>;
+  }
+  if (!summary || summary.frontCount === 0) {
+    return <p className={styles.frontPressureEmpty}>暂无接敌前线</p>;
+  }
+
+  const risk = summary.highestRiskFront;
+  const riskEnemyName = risk ? (factionNameById.get(risk.enemyId) ?? '未知势力') : '未知势力';
+
+  return (
+    <div className={styles.frontPressureCard}>
+      <div className={styles.frontPressureHead}>
+        <span>前线压力</span>
+        <span data-level={summary.pressureLevel}>
+          {PRESSURE_LEVEL_LABEL[summary.pressureLevel]}
+        </span>
+      </div>
+      <div className={styles.frontPressureGrid}>
+        <div>
+          <span className={styles.frontPressureLabel}>接敌</span>
+          <span className={styles.frontPressureValue}>{summary.frontCount} 条</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>补给</span>
+          <span className={styles.frontPressureValue}>{formatPercent(summary.averageSupply)}</span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>多线</span>
+          <span className={styles.frontPressureValue}>
+            -{formatPercent(summary.multiFrontPenalty)}
+          </span>
+        </div>
+        <div>
+          <span className={styles.frontPressureLabel}>潜力</span>
+          <span className={styles.frontPressureValue}>{Math.round(summary.totalWarPotential)}</span>
+        </div>
+      </div>
+      {risk && (
+        <div className={styles.frontPressureRisk}>
+          <span className={styles.frontPressureLabel}>最高风险</span>
+          <span className={styles.frontPressureValue}>
+            对 {riskEnemyName} · {Math.round(risk.myPower)}:{Math.round(risk.enemyPower)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const PRESSURE_LEVEL_LABEL: Record<FrontPressureLevel, string> = {
+  none: '无',
+  low: '边境稳定',
+  medium: '多线牵制',
+  high: '腹背受敌',
+};
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(0)}%`;
 }
 
 function buildInspectorText(

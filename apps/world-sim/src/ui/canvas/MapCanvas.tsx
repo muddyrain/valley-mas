@@ -2,6 +2,11 @@ import { Application, Container, Graphics, Text as PixiText, Rectangle } from 'p
 import { useEffect, useRef, useState } from 'react';
 import type { MapData, Province } from '@/core/map';
 import { findProvinceAt, TERRAIN_COLOR, TERRAIN_KINDS, TERRAIN_LABEL } from '@/core/map';
+import {
+  buildFrontPressureState,
+  type FrontPressureOverlaySegment,
+  getFrontPressureOverlaySegments,
+} from '@/core/sim';
 import type { FactionId, FactionSummary, RegionId } from '@/shared/types';
 import { useWorldSimStore } from '@/state';
 import styles from './MapCanvas.module.css';
@@ -29,6 +34,7 @@ interface RenderRefs {
   baseLayer: Graphics;
   ownerLayer: Graphics;
   borderLayer: Graphics;
+  frontPressureLayer: Graphics;
   highlightLayer: Graphics;
   /** 势力名标签层（Text 容器，跟随 world 一起缩放） */
   labelLayer: Container;
@@ -73,6 +79,7 @@ export function MapCanvas() {
   const hoveredRegionId = useWorldSimStore((s) => s.hoveredRegionId);
   const selectedRegionId = useWorldSimStore((s) => s.selectedRegionId);
   const selectedFactionId = useWorldSimStore((s) => s.selectedFactionId);
+  const frontPressureOverlayVisible = useWorldSimStore((s) => s.frontPressureOverlayVisible);
   const setHoveredRegion = useWorldSimStore((s) => s.setHoveredRegion);
   const setSelectedRegion = useWorldSimStore((s) => s.setSelectedRegion);
   const tick = useWorldSimStore((s) => s.tick);
@@ -88,6 +95,7 @@ export function MapCanvas() {
     const baseLayer = new Graphics();
     const ownerLayer = new Graphics();
     const borderLayer = new Graphics();
+    const frontPressureLayer = new Graphics();
     const highlightLayer = new Graphics();
     const labelLayer = new Container();
     const markerLayer = new Container();
@@ -97,6 +105,7 @@ export function MapCanvas() {
     world.addChild(baseLayer);
     world.addChild(ownerLayer);
     world.addChild(borderLayer);
+    world.addChild(frontPressureLayer);
     world.addChild(highlightLayer);
     world.addChild(markerLayer);
     world.addChild(labelLayer);
@@ -124,6 +133,7 @@ export function MapCanvas() {
           baseLayer,
           ownerLayer,
           borderLayer,
+          frontPressureLayer,
           highlightLayer,
           labelLayer,
           markerLayer,
@@ -173,6 +183,7 @@ export function MapCanvas() {
     r.ownerAnims.clear();
     r.displayedOwner.clear();
     drawOwnerOverlay(r, map, factions, { animate: false });
+    drawFrontPressureOverlay(r, map, factions, frontPressureOverlayVisible);
     drawHighlight(r, map, hoveredRegionId, selectedRegionId, factions, selectedFactionId);
   }, [ready, map]);
 
@@ -188,8 +199,16 @@ export function MapCanvas() {
     const replayMode = useWorldSimStore.getState().replayMode;
     drawOwnerOverlay(r, map, factions, { animate: replayMode !== 'replaying' });
     redrawBorders(r, map, factions);
+    drawFrontPressureOverlay(r, map, factions, frontPressureOverlayVisible);
     drawHighlight(r, map, hoveredRegionId, selectedRegionId, factions, selectedFactionId);
   }, [ready, factions]);
+
+  /* -------- 前线压力开关变化时仅重绘 overlay 层 -------- */
+  useEffect(() => {
+    const r = refs.current;
+    if (!ready || !r || !map) return;
+    drawFrontPressureOverlay(r, map, factions, frontPressureOverlayVisible);
+  }, [ready, map, factions, frontPressureOverlayVisible]);
 
   /* -------- Hover/Select 变化时仅重绘 highlight 层 -------- */
   useEffect(() => {
@@ -522,6 +541,44 @@ function redrawBorders(refs: RenderRefs, map: MapData, factions: FactionSummary[
 
     borderLayer.moveTo(edge.a.x, edge.a.y).lineTo(edge.b.x, edge.b.y);
     borderLayer.stroke({ width: strokeWidth, color: strokeColor, alpha: strokeAlpha });
+  }
+}
+
+function drawFrontPressureOverlay(
+  refs: RenderRefs,
+  map: MapData,
+  factions: FactionSummary[],
+  visible: boolean,
+) {
+  const { frontPressureLayer } = refs;
+  frontPressureLayer.clear();
+  if (!visible) return;
+
+  const liveFactions = factions.filter((f) => (f.regions ?? 0) > 0);
+  if (liveFactions.length === 0) return;
+
+  const state = buildFrontPressureState({
+    map,
+    factions: liveFactions.map((f) => ({
+      id: f.id,
+      regions: f.regions ?? 0,
+      centroidRegionId: f.centroidRegionId ?? f.capitalRegionId,
+    })),
+    ownedTargetPreference: 0,
+  });
+  const segments = getFrontPressureOverlaySegments({ map, state });
+  drawFrontPressureSegments(frontPressureLayer, segments);
+}
+
+function drawFrontPressureSegments(layer: Graphics, segments: FrontPressureOverlaySegment[]) {
+  for (const segment of segments) {
+    const alpha = 0.2 + segment.intensity * 0.55;
+    layer.moveTo(segment.a.x, segment.a.y).lineTo(segment.b.x, segment.b.y);
+    layer.stroke({
+      width: segment.width,
+      color: 0xffd166,
+      alpha,
+    });
   }
 }
 

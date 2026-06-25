@@ -8,6 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test:balance": "vitest run tests/balancePacing.test.ts",
+    "test:stability": "vitest run tests/runtimeStability.test.ts",
+    "test:longrun": "vitest run tests/longRunConvergence.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint src/",
     "check": "biome check src/",

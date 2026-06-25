@@ -337,6 +337,33 @@
   font-variant-numeric: tabular-nums;
 }
 
+.overlayToggle {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--ws-border);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-bg-elev-2);
+  color: var(--ws-text-dim);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.overlayToggle:hover:not(:disabled) {
+  border-color: var(--ws-accent);
+  color: var(--ws-text);
+}
+
+.overlayToggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.overlayToggle[data-active="true"] {
+  background: rgba(255, 209, 102, 0.16);
+  border-color: rgba(255, 209, 102, 0.7);
+  color: #ffd166;
+}
+
 .factionList {
   list-style: none;
   margin: 0;
@@ -489,6 +516,86 @@
 .factionItem[data-dead="true"] .factionStat {
   color: var(--ws-danger, #e05656);
   text-decoration: none;
+}
+
+.frontPressureCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--ws-border);
+  border-radius: var(--ws-radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 12px;
+}
+
+.frontPressureHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ws-text);
+  font-weight: 600;
+}
+
+.frontPressureHead span:last-child {
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--ws-border);
+  color: var(--ws-text-dim);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.frontPressureHead span:last-child[data-level="low"] {
+  border-color: rgba(90, 180, 120, 0.45);
+  color: #9ee6af;
+}
+
+.frontPressureHead span:last-child[data-level="medium"] {
+  border-color: rgba(245, 185, 66, 0.5);
+  color: #f5d184;
+}
+
+.frontPressureHead span:last-child[data-level="high"] {
+  border-color: rgba(224, 86, 86, 0.55);
+  color: #ff9a9a;
+}
+
+.frontPressureGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+}
+
+.frontPressureGrid > div,
+.frontPressureRisk {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.frontPressureRisk {
+  padding-top: 6px;
+  border-top: 1px solid var(--ws-border);
+}
+
+.frontPressureLabel {
+  color: var(--ws-text-mute);
+}
+
+.frontPressureValue {
+  color: var(--ws-text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.frontPressureEmpty {
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px dashed var(--ws-border);
+  border-radius: var(--ws-radius-sm);
+  color: var(--ws-text-mute);
+  font-size: 12px;
 }
 
 .inspector {

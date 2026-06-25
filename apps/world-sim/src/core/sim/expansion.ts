@@ -1,8 +1,14 @@
 import type { MapData } from '@/core/map';
 import type { RandomSource } from '@/shared/math';
 import type { FactionId, FactionSummary, RegionId, Tick } from '@/shared/types';
+import {
+  buildFrontPressureState,
+  type FrontBattlePressure,
+  getDefenderPressureTargetWeight,
+  resolveFrontBattlePressure,
+} from './frontPressure';
 import { getSmallRealmCollapseBias, getTempoConfig } from './tempo';
-import { strengthBias, TERRAIN_ATTACK_PROB } from './terrainCombat';
+import { TERRAIN_ATTACK_PROB } from './terrainCombat';
 import type { SimTickResult } from './types';
 
 export interface RunExpansionTickInput {
@@ -62,6 +68,19 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
   const largestFactionShare = Math.max(...liveRuntimes.map((r) => r.totalRegions)) / occupied;
   const tempo = getTempoConfig({ occupiedRatio, liveCount, largestFactionShare });
   const attempts = input.attemptsPerTick ?? tempo.attempts;
+  const factionSummaryById = new Map(factions.map((faction) => [faction.id, faction]));
+  const frontPressure = buildFrontPressureState({
+    map,
+    factions: liveRuntimes.map((runtime) => {
+      const summary = factionSummaryById.get(runtime.id);
+      return {
+        id: runtime.id,
+        regions: runtime.totalRegions,
+        centroidRegionId: summary?.centroidRegionId ?? summary?.capitalRegionId ?? null,
+      };
+    }),
+    ownedTargetPreference: tempo.ownedTargetPreference,
+  });
 
   // ownerOverride：tick 内累计的 owner 变更，下一个 attempt 看到的就是「本 tick 已变后」的视图
   const ownerOverride = new Map<number, FactionId | null>();
@@ -99,7 +118,7 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
         const strength = defender?.totalRegions ?? 1;
         ownedEnemyNeighbors.push({
           region: nid,
-          weight: 1 / (strength + 1),
+          weight: (1 / (strength + 1)) * getDefenderPressureTargetWeight(frontPressure, owner),
         });
       }
     }
@@ -143,20 +162,32 @@ export function runExpansionTick(input: RunExpansionTickInput): SimTickResult {
     const defender = runtimeById.get(defenderId);
     const defenderRegions = defender?.totalRegions ?? 1;
     const baseProb = TERRAIN_ATTACK_PROB[targetProvince.terrain];
-    const bias = strengthBias(attacker.totalRegions, defenderRegions, tempo.strengthBiasScale);
+    const pressure = resolveFrontBattlePressure({
+      state: frontPressure,
+      map,
+      attackerId: attacker.id,
+      defenderId,
+      targetRegion,
+      ownerOf,
+    });
     const collapseBias = getSmallRealmCollapseBias(occupiedRatio, defenderRegions);
-    const winProb = clamp01(baseProb + bias + collapseBias);
+    const winProb = clamp01(
+      baseProb +
+        pressure.frontBias +
+        pressure.localSurroundBias +
+        collapseBias -
+        pressure.multiFrontPenalty,
+    );
     const combatDetail = formatCombatDetail({
       terrain: targetProvince.terrain,
       baseProb,
-      bias,
+      pressure,
       collapseBias,
       winProb,
       attackerRegions: attacker.totalRegions,
       defenderRegions,
       occupiedRatio,
       ownedTargetPreference: tempo.ownedTargetPreference,
-      strengthBiasScale: tempo.strengthBiasScale,
       tempoLabel: tempo.label,
     });
 
@@ -454,14 +485,13 @@ function pickWarfrontFromBorder(
 function formatCombatDetail(input: {
   terrain: string;
   baseProb: number;
-  bias: number;
+  pressure: FrontBattlePressure;
   collapseBias: number;
   winProb: number;
   attackerRegions: number;
   defenderRegions: number;
   occupiedRatio: number;
   ownedTargetPreference: number;
-  strengthBiasScale: number;
   tempoLabel: string;
 }): string {
   return [
@@ -469,10 +499,14 @@ function formatCombatDetail(input: {
     `地形=${input.terrain}`,
     `胜率=${formatPercent(input.winProb)}`,
     `基础=${formatPercent(input.baseProb)}`,
-    `强弱=${input.bias >= 0 ? '+' : ''}${formatPercent(input.bias)}`,
+    `前线=${input.pressure.frontBias >= 0 ? '+' : ''}${formatPercent(input.pressure.frontBias)}`,
+    `兵力=${Math.round(input.pressure.attackerPower)}:${Math.round(input.pressure.defenderPower)}`,
+    `补给=${formatPercent(input.pressure.attackerSupply)}`,
+    `多线=-${formatPercent(input.pressure.multiFrontPenalty)}`,
+    `合围=${input.pressure.localSurroundBias >= 0 ? '+' : ''}${formatPercent(input.pressure.localSurroundBias)}`,
     `残局=${formatPercent(input.collapseBias)}`,
-    `强弱倍率=${input.strengthBiasScale.toFixed(2)}`,
     `州数=${input.attackerRegions}:${input.defenderRegions}`,
+    `前线数=${input.pressure.attackerFrontCount}:${input.pressure.defenderFrontCount}`,
     `占领率=${formatPercent(input.occupiedRatio)}`,
     `战争偏好=${formatPercent(input.ownedTargetPreference)}`,
   ].join('，');

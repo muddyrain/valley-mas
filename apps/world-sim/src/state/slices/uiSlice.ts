@@ -10,12 +10,16 @@ export interface UiSlice {
   selectedFactionId: FactionId | null;
   /** 当前打开的侧边面板集合 */
   openedPanels: Set<PanelKey>;
+  /** 地图前线压力描边是否显示 */
+  frontPressureOverlayVisible: boolean;
   /** 主题色调（Phase 1 仅 dark） */
   theme: 'dark';
 
   toggleHud: () => void;
   setHudVisible: (visible: boolean) => void;
   selectFaction: (id: FactionId | null) => void;
+  setFrontPressureOverlayVisible: (visible: boolean) => void;
+  toggleFrontPressureOverlay: () => void;
   togglePanel: (key: PanelKey) => void;
   openPanel: (key: PanelKey) => void;
   closePanel: (key: PanelKey) => void;
@@ -25,11 +29,15 @@ export const createUiSlice: StateCreator<UiSlice, [], [], UiSlice> = (set) => ({
   hudVisible: true,
   selectedFactionId: null,
   openedPanels: new Set<PanelKey>(['factions', 'log']),
+  frontPressureOverlayVisible: false,
   theme: 'dark',
 
   toggleHud: () => set((s) => ({ hudVisible: !s.hudVisible })),
   setHudVisible: (visible) => set({ hudVisible: visible }),
   selectFaction: (id) => set({ selectedFactionId: id }),
+  setFrontPressureOverlayVisible: (visible) => set({ frontPressureOverlayVisible: visible }),
+  toggleFrontPressureOverlay: () =>
+    set((s) => ({ frontPressureOverlayVisible: !s.frontPressureOverlayVisible })),
   togglePanel: (key) =>
     set((s) => {
       const next = new Set(s.openedPanels);
