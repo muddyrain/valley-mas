@@ -8,11 +8,12 @@ const profilePageSource = readFileSync(resolve(__dirname, '../src/pages/ProfileP
 const inboxPagePath = resolve(__dirname, '../src/pages/InboxPage.tsx');
 
 describe('inbox page surface', () => {
-  it('registers the secondary inbox route and entries', () => {
+  it('keeps the secondary inbox route without promoting it on core surfaces', () => {
     expect(existsSync(inboxPagePath)).toBe(true);
     expect(appSource).toContain('path="/inbox"');
-    expect(todayPageSource).toContain("navigate('/inbox')");
-    expect(profilePageSource).toContain("navigate('/inbox')");
+    expect(appSource).not.toContain('void loadInboxItems();');
+    expect(todayPageSource).not.toContain("navigate('/inbox')");
+    expect(profilePageSource).not.toContain("navigate('/inbox')");
   });
 
   it('keeps developer analysis copy out of the visible inbox UI', () => {

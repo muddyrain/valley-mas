@@ -1272,33 +1272,6 @@ button.mini-list__row {
   opacity: 0.72;
 }
 
-.dice-cup-window.is-shaking .dice-cup-canvas-stage {
-  animation: dice-cup-stage-shake 0.46s ease-in-out infinite;
-}
-
-@keyframes dice-cup-stage-shake {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) rotate(0deg);
-  }
-
-  18% {
-    transform: translate3d(-7px, 2px, 0) rotate(-1.2deg);
-  }
-
-  36% {
-    transform: translate3d(8px, -2px, 0) rotate(1.4deg);
-  }
-
-  54% {
-    transform: translate3d(-5px, -1px, 0) rotate(-0.9deg);
-  }
-
-  72% {
-    transform: translate3d(6px, 2px, 0) rotate(1deg);
-  }
-}
-
 .dice-cup-stage {
   display: grid;
   flex: 1 1 auto;
@@ -1419,13 +1392,6 @@ button.mini-list__row {
 .dice-cup-shake-button:disabled {
   cursor: wait;
   opacity: 0.72;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dice-cup-window.is-shaking .dice-cup-canvas-stage {
-    animation-duration: 0.9s;
-    animation-iteration-count: 1;
-  }
 }
 
 .arcade-window {

@@ -20,6 +20,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { getPantryItem, getPantryItemTimeline } from '@/api/pantry';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetHeader } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
@@ -147,6 +148,7 @@ export function PantryItemDetailPage() {
   const [quantitySheetOpen, setQuantitySheetOpen] = useState(false);
   const [quantityText, setQuantityText] = useState('1');
   const [transferOpen, setTransferOpen] = useState(false);
+  const [usedUpConfirmQuantity, setUsedUpConfirmQuantity] = useState<number | null>(null);
 
   const status = item ? resolvePantryStatus(item) : 'normal';
   const coverUrl = item ? getPantryCoverUrl(item) : '';
@@ -303,7 +305,7 @@ export function PantryItemDetailPage() {
         />
       ) : item ? (
         <div className="space-y-5 pb-4">
-          <section className="overflow-hidden rounded-[1.35rem] border border-border bg-card">
+          <section className="overflow-hidden rounded-[1.25rem] border border-border bg-card">
             <div className="grid min-h-64 place-items-center bg-secondary/60">
               {coverUrl ? (
                 <ImagePreview
@@ -367,7 +369,13 @@ export function PantryItemDetailPage() {
                   variant="outline"
                   className="border-life-trace/30 bg-life-trace/10 text-life-trace hover:bg-life-trace/15"
                   disabled={terminalStatus || Boolean(actionId)}
-                  onClick={() => void runConsumeAction('used', 1, 'use-one')}
+                  onClick={() => {
+                    if (item.quantity <= 1) {
+                      setUsedUpConfirmQuantity(item.quantity);
+                      return;
+                    }
+                    void runConsumeAction('used', 1, 'use-one');
+                  }}
                 >
                   {actionId === 'use-one' ? (
                     <ActionLoadingIcon className="size-4" tone="trace" />
@@ -670,6 +678,33 @@ export function PantryItemDetailPage() {
           }
         />
       )}
+      <ConfirmDialog
+        open={usedUpConfirmQuantity !== null}
+        title="确认标记为用完？"
+        description={
+          item && usedUpConfirmQuantity !== null
+            ? `${item.name} 将被标记为已用完，可在时间线撤销。`
+            : ''
+        }
+        confirmLabel="确认用完"
+        loadingLabel="处理中"
+        loading={Boolean(actionId) && usedUpConfirmQuantity !== null}
+        onCancel={() => {
+          if (!actionId) {
+            setUsedUpConfirmQuantity(null);
+          }
+        }}
+        onConfirm={() => {
+          if (usedUpConfirmQuantity === null) {
+            return;
+          }
+          const quantity = usedUpConfirmQuantity;
+          void (async () => {
+            await runConsumeAction('used', quantity, 'use-one');
+            setUsedUpConfirmQuantity(null);
+          })();
+        }}
+      />
     </SubPageShell>
   );
 }

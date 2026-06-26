@@ -76,7 +76,12 @@ export default function DiceCupScene({
             value={value}
           />
         ))}
-        <CupLid isOpen={isOpen} lidOffset={lidOffset} />
+        <CupLid
+          isOpen={isOpen}
+          isShaking={isShaking}
+          lidOffset={lidOffset}
+          reducedMotion={reducedMotion}
+        />
       </group>
     </Canvas>
   );
@@ -159,19 +164,36 @@ function DiceTray() {
   );
 }
 
-function CupLid({ isOpen, lidOffset }: { isOpen: boolean; lidOffset: Point }) {
+function CupLid({
+  isOpen,
+  isShaking,
+  lidOffset,
+  reducedMotion,
+}: {
+  isOpen: boolean;
+  isShaking: boolean;
+  lidOffset: Point;
+  reducedMotion: boolean;
+}) {
   const groupRef = useRef<Group>(null);
   const target = getLidTarget(isOpen, lidOffset);
 
-  useFrame(() => {
+  useFrame(({ clock }) => {
     const group = groupRef.current;
     if (!group) return;
-    group.position.x = MathUtils.lerp(group.position.x, target.position[0], 0.22);
-    group.position.y = MathUtils.lerp(group.position.y, target.position[1], 0.22);
-    group.position.z = MathUtils.lerp(group.position.z, target.position[2], 0.22);
-    group.rotation.x = MathUtils.lerp(group.rotation.x, target.rotation[0], 0.2);
+    const shakeActive = isShaking && !reducedMotion;
+    const t = clock.elapsedTime;
+    const shakeX = shakeActive ? Math.sin(t * 32) * 0.18 : 0;
+    const shakeY = shakeActive ? Math.cos(t * 28) * 0.12 : 0;
+    const shakeZ = shakeActive ? Math.sin(t * 22 + 1.3) * 0.14 : 0;
+    const tiltX = shakeActive ? Math.sin(t * 26 + 0.4) * 0.08 : 0;
+    const tiltZ = shakeActive ? Math.cos(t * 24) * 0.1 : 0;
+    group.position.x = MathUtils.lerp(group.position.x, target.position[0] + shakeX, 0.22);
+    group.position.y = MathUtils.lerp(group.position.y, target.position[1] + shakeY, 0.22);
+    group.position.z = MathUtils.lerp(group.position.z, target.position[2] + shakeZ, 0.22);
+    group.rotation.x = MathUtils.lerp(group.rotation.x, target.rotation[0] + tiltX, 0.2);
     group.rotation.y = MathUtils.lerp(group.rotation.y, target.rotation[1], 0.2);
-    group.rotation.z = MathUtils.lerp(group.rotation.z, target.rotation[2], 0.2);
+    group.rotation.z = MathUtils.lerp(group.rotation.z, target.rotation[2] + tiltZ, 0.2);
   });
 
   return (
@@ -243,7 +265,8 @@ function DiceMesh({
 
   return (
     <group ref={groupRef}>
-      <mesh castShadow receiveShadow geometry={geometry}>
+      <mesh castShadow receiveShadow>
+        <primitive object={geometry} attach="geometry" />
         <meshStandardMaterial color="#fffdf7" metalness={0.03} roughness={0.26} />
       </mesh>
       {Object.entries(FACE_TRANSFORMS).map(([face, transform]) => (

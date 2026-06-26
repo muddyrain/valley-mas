@@ -48,6 +48,8 @@ coverage/
 *.tgz
 .cache/
 .turbo
+.turbo/
+.playwright-mcp/
 
 # Unity generated caches
 [Ll]ibrary/

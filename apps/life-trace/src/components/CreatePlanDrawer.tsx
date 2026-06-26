@@ -17,7 +17,7 @@ import {
 } from '@/lib/planSchedule';
 import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
-import type { NewPlanInput, Plan, PlanType } from '@/types';
+import type { NewPlanInput, Plan, PlanRecurrenceFrequency, PlanType } from '@/types';
 
 const planTypes: PlanType[] = ['电影', '吃饭', '运动', '阅读', '聚会', '普通事项'];
 const dateOptions = [
@@ -28,6 +28,21 @@ const dateOptions = [
   { value: 'custom', label: '自定义' },
 ] as const;
 
+const recurrenceOptions: { value: PlanRecurrenceFrequency; label: string }[] = [
+  { value: 'none', label: '不重复' },
+  { value: 'daily', label: '每天' },
+  { value: 'weekly', label: '每周' },
+  { value: 'monthly', label: '每月' },
+  { value: 'yearly', label: '每年' },
+];
+
+const recurrenceUnitText: Record<Exclude<PlanRecurrenceFrequency, 'none'>, string> = {
+  daily: '天',
+  weekly: '周',
+  monthly: '月',
+  yearly: '年',
+};
+
 const defaultForm: NewPlanInput = {
   title: '',
   type: '普通事项',
@@ -36,6 +51,8 @@ const defaultForm: NewPlanInput = {
   imageUrl: '',
   location: '',
   note: '',
+  recurrenceFrequency: 'none',
+  recurrenceInterval: 1,
 };
 
 type DateOptionValue = Extract<(typeof dateOptions)[number]['value'], PlanDateOption>;
@@ -126,6 +143,9 @@ export function CreatePlanDrawer({
         placeId: plan.placeId,
         note: plan.note,
         source: plan.source ?? 'manual',
+        recurrenceFrequency: plan.recurrenceFrequency ?? 'none',
+        recurrenceInterval: plan.recurrenceInterval ?? 1,
+        recurrenceEndAt: plan.recurrenceEndAt,
       });
       setDateOption(nextDateOption);
       setCustomDate(nextDateOption === 'custom' ? (plan.scheduledDate ?? '') : '');
@@ -137,6 +157,8 @@ export function CreatePlanDrawer({
         reminder: initialInput?.reminder ?? defaultForm.reminder,
         type: initialInput?.type ?? defaultForm.type,
         source: initialInput?.source ?? 'manual',
+        recurrenceFrequency: initialInput?.recurrenceFrequency ?? 'none',
+        recurrenceInterval: initialInput?.recurrenceInterval ?? 1,
       });
       setDateOption('今天');
       setCustomDate('');
@@ -170,6 +192,12 @@ export function CreatePlanDrawer({
 
     const schedule = buildPlanSchedule({ dateOption, customDate, time });
 
+    const recurrenceFrequency = form.recurrenceFrequency ?? 'none';
+    const recurrenceInterval =
+      recurrenceFrequency === 'none' ? 1 : Math.max(1, Math.floor(form.recurrenceInterval ?? 1));
+    const recurrenceEndAt =
+      recurrenceFrequency === 'none' ? undefined : (form.recurrenceEndAt ?? undefined);
+
     const payload = {
       ...form,
       source: form.source ?? 'manual',
@@ -179,6 +207,9 @@ export function CreatePlanDrawer({
       location: form.location?.trim() || undefined,
       placeId: form.placeId,
       note: form.note.trim() || '由 Life Trace 创建的新生活计划。',
+      recurrenceFrequency,
+      recurrenceInterval,
+      recurrenceEndAt,
     };
 
     const savedPlan = plan ? await editPlan(plan.id, payload) : await addPlan(payload);
@@ -331,6 +362,75 @@ export function CreatePlanDrawer({
             placeholder="写一点期待，AI 后续可以帮你丰富。"
           />
         </FormItem>
+
+        <div className="space-y-3 rounded-2xl border border-border bg-secondary/40 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">重复</span>
+            <span className="text-xs text-muted-foreground">完成后自动生成下一次计划</span>
+          </div>
+          <div className="grid grid-cols-5 gap-2 max-[420px]:grid-cols-3">
+            {recurrenceOptions.map((option) => {
+              const active = (form.recurrenceFrequency ?? 'none') === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={cn(
+                    'h-9 rounded-xl border px-2 text-xs font-semibold transition',
+                    active
+                      ? 'border-life-ai/40 bg-life-ai/10 text-life-ai'
+                      : 'border-border bg-background text-muted-foreground hover:text-foreground',
+                  )}
+                  onClick={() => {
+                    updateField('recurrenceFrequency', option.value);
+                    if (option.value === 'none') {
+                      updateField('recurrenceEndAt', undefined);
+                    }
+                    if ((form.recurrenceInterval ?? 1) <= 0) {
+                      updateField('recurrenceInterval', 1);
+                    }
+                  }}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+          {form.recurrenceFrequency && form.recurrenceFrequency !== 'none' ? (
+            <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+              <FormItem label="间隔">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">每</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={form.recurrenceInterval ?? 1}
+                    onChange={(event) => {
+                      const raw = Number(event.target.value);
+                      const next = Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 1;
+                      updateField('recurrenceInterval', next);
+                    }}
+                    className="w-20"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {recurrenceUnitText[form.recurrenceFrequency]}
+                  </span>
+                </div>
+              </FormItem>
+              <FormItem label="结束日期（可选）">
+                <Input
+                  type="date"
+                  value={form.recurrenceEndAt ?? ''}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    updateField('recurrenceEndAt', value ? value : undefined);
+                  }}
+                />
+              </FormItem>
+            </div>
+          ) : null}
+        </div>
 
         {plansError ? (
           <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">

@@ -5,6 +5,7 @@ import { getUserPreference, updateUserPreference } from '../api/preferences';
 import type { WeatherApiDay, WeatherApiHour, WeatherApiIndex } from '../api/weather';
 import { useAuthStore } from '../store/authStore';
 import { getWeatherCacheKey, useWeatherStore } from '../store/weatherStore';
+import { PlushButton } from '../ui/PlushPrimitives';
 import {
   addWeatherCity,
   applyWeatherCitiesPreference,
@@ -400,14 +401,16 @@ export default function WeatherWindow() {
         </section>
 
         <div className="weather-actions">
-          <button
+          <PlushButton
             type="button"
+            unstyled
             onClick={() => void loadWeather(true)}
-            disabled={loading || locating}
+            loading={loading || locating}
+            loadingLabel="更新中"
             aria-label="刷新天气"
           >
-            {loading || locating ? '更新中' : '刷新'}
-          </button>
+            刷新
+          </PlushButton>
         </div>
 
         {weather?.warning || error ? (

@@ -12,6 +12,8 @@
     "format": "biome format --write src/",
     "preview": "vite preview",
     "preview:host": "vite preview --host 0.0.0.0 --port 4178",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "clean": "rm -rf dist"
   },
   "dependencies": {

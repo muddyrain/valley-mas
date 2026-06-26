@@ -37,6 +37,7 @@ import {
   updateAIAgent,
 } from '../api/ai';
 import { useAuthStore } from '../store/authStore';
+import { PlushFade, PlushPop, PlushPresence, PlushSlide } from '../ui/PlushMotion';
 import { deriveAICommandTitle } from './aiCommandCenterHistory';
 import './AICommandCenterWindow.css';
 
@@ -270,10 +271,10 @@ export default function AICommandCenterWindow() {
     void threadViewKey;
     const node = threadScrollRef.current;
     if (!node) return;
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReducedAutoScroll = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     node.scrollTo({
       top: node.scrollHeight,
-      behavior: prefersReducedMotion || isSending ? 'auto' : 'smooth',
+      behavior: prefersReducedAutoScroll || isSending ? 'auto' : 'smooth',
     });
   }, [scrollVersion, threadViewKey, isSending]);
 
@@ -686,28 +687,35 @@ export default function AICommandCenterWindow() {
                 <span>选择下方建议，或者直接输入你的问题。</span>
               </div>
             ) : (
-              activeMessages.map((message) => (
-                <article
-                  className={`ai-command-center__message ai-command-center__message--${message.role}`}
-                  key={message.id}
-                >
-                  <span
-                    className="ai-command-center__agent-avatar ai-command-center__message-avatar"
-                    style={
-                      {
-                        '--agent-color':
-                          message.role === 'assistant' ? getAgentAccent(activeAgent) : '#a8d4ea',
-                      } as React.CSSProperties
-                    }
-                  >
-                    {message.role === 'assistant' ? getAgentIcon(activeAgent) : '你'}
-                  </span>
-                  <div className="ai-command-center__bubble">
-                    <div>{message.role === 'assistant' ? activeAgent?.name || 'AI' : 'You'}</div>
-                    <p>{message.content || '...'}</p>
-                  </div>
-                </article>
-              ))
+              <PlushPresence>
+                {activeMessages.map((message) => (
+                  <PlushFade key={message.id} open>
+                    <article
+                      className={`ai-command-center__message ai-command-center__message--${message.role}`}
+                    >
+                      <span
+                        className="ai-command-center__agent-avatar ai-command-center__message-avatar"
+                        style={
+                          {
+                            '--agent-color':
+                              message.role === 'assistant'
+                                ? getAgentAccent(activeAgent)
+                                : '#a8d4ea',
+                          } as React.CSSProperties
+                        }
+                      >
+                        {message.role === 'assistant' ? getAgentIcon(activeAgent) : '你'}
+                      </span>
+                      <div className="ai-command-center__bubble">
+                        <div>
+                          {message.role === 'assistant' ? activeAgent?.name || 'AI' : 'You'}
+                        </div>
+                        <p>{message.content || '...'}</p>
+                      </div>
+                    </article>
+                  </PlushFade>
+                ))}
+              </PlushPresence>
             )}
           </div>
         </section>
@@ -764,287 +772,303 @@ export default function AICommandCenterWindow() {
       </main>
 
       {isInspectorOpen ? (
-        <aside className="ai-command-center__inspector" aria-label="智能体详情">
-          <header className="ai-command-center__detail-head">
-            <span>智能体详情</span>
-            <button type="button" onClick={() => setIsInspectorOpen(false)} aria-label="收起详情">
-              <X size={16} />
-            </button>
-          </header>
-
-          {activeAgent ? (
-            <>
-              <section className="ai-command-center__detail-card">
-                <span
-                  className="ai-command-center__agent-avatar ai-command-center__agent-avatar--hero"
-                  style={{ '--agent-color': getAgentAccent(activeAgent) } as React.CSSProperties}
+        <PlushPresence>
+          <PlushSlide key="ai-inspector" open from="right">
+            <aside className="ai-command-center__inspector" aria-label="智能体详情">
+              <header className="ai-command-center__detail-head">
+                <span>智能体详情</span>
+                <button
+                  type="button"
+                  onClick={() => setIsInspectorOpen(false)}
+                  aria-label="收起详情"
                 >
-                  {getAgentIcon(activeAgent)}
-                </span>
-                <h3>{activeAgent.name}</h3>
-                <p>{getAgentSubtitle(activeAgent)}</p>
-              </section>
+                  <X size={16} />
+                </button>
+              </header>
 
-              <section className="ai-command-center__detail-section">
-                <strong>简介</strong>
-                <p>
-                  {activeAgent.description ||
-                    activeAgent.openingMessage ||
-                    '这个智能体还没有简介。'}
-                </p>
-              </section>
-
-              <section className="ai-command-center__detail-section">
-                <strong>能力</strong>
-                <div className="ai-command-center__ability-tags">
-                  {abilityTags.map((tag) => (
-                    <span key={tag}>{tag}</span>
-                  ))}
-                </div>
-              </section>
-
-              <section className="ai-command-center__detail-section">
-                <strong>擅长任务</strong>
-                <div className="ai-command-center__task-list">
-                  {taskList.map((task) => (
-                    <span key={task}>
-                      <Check size={13} />
-                      {task}
+              {activeAgent ? (
+                <div>
+                  <section className="ai-command-center__detail-card">
+                    <span
+                      className="ai-command-center__agent-avatar ai-command-center__agent-avatar--hero"
+                      style={
+                        { '--agent-color': getAgentAccent(activeAgent) } as React.CSSProperties
+                      }
+                    >
+                      {getAgentIcon(activeAgent)}
                     </span>
-                  ))}
-                </div>
-              </section>
+                    <h3>{activeAgent.name}</h3>
+                    <p>{getAgentSubtitle(activeAgent)}</p>
+                  </section>
 
-              <section className="ai-command-center__detail-rows">
-                <div>
-                  <span>模型</span>
-                  <strong>ARK 对话模型</strong>
-                  <ChevronRight size={15} />
-                </div>
-                <div>
-                  <span>工具</span>
-                  <strong>已启用基础对话</strong>
-                  <ChevronRight size={15} />
-                </div>
-                <div>
-                  <span>提示词示例</span>
-                  <strong>{activeAgent.exampleQuestions.length || 0} 条</strong>
-                  <ChevronRight size={15} />
-                </div>
-              </section>
+                  <section className="ai-command-center__detail-section">
+                    <strong>简介</strong>
+                    <p>
+                      {activeAgent.description ||
+                        activeAgent.openingMessage ||
+                        '这个智能体还没有简介。'}
+                    </p>
+                  </section>
 
-              <section className="ai-command-center__switch-rows">
-                <div>
-                  <span>记忆</span>
-                  <i className="is-on" />
-                </div>
-                <div>
-                  <span>联网搜索</span>
-                  <i />
-                </div>
-              </section>
+                  <section className="ai-command-center__detail-section">
+                    <strong>能力</strong>
+                    <div className="ai-command-center__ability-tags">
+                      {abilityTags.map((tag) => (
+                        <span key={tag}>{tag}</span>
+                      ))}
+                    </div>
+                  </section>
 
-              <section className="ai-command-center__edit-card">
-                <header>
-                  <PencilLine size={15} />
-                  <strong>资料编辑</strong>
-                </header>
-                <label>
-                  名称
-                  <input
-                    value={agentDraft.name}
-                    onChange={(event) =>
-                      setAgentDraft((current) => ({ ...current, name: event.target.value }))
-                    }
-                  />
-                </label>
-                <label>
-                  简介
-                  <textarea
-                    value={agentDraft.description}
-                    onChange={(event) =>
-                      setAgentDraft((current) => ({
-                        ...current,
-                        description: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <div className="ai-command-center__edit-grid">
-                  <label>
-                    头像色
-                    <input
-                      value={agentDraft.avatarColor}
-                      onChange={(event) =>
-                        setAgentDraft((current) => ({
-                          ...current,
-                          avatarColor: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    图标
-                    <input
-                      value={agentDraft.avatarIcon}
-                      onChange={(event) =>
-                        setAgentDraft((current) => ({
-                          ...current,
-                          avatarIcon: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
+                  <section className="ai-command-center__detail-section">
+                    <strong>擅长任务</strong>
+                    <div className="ai-command-center__task-list">
+                      {taskList.map((task) => (
+                        <span key={task}>
+                          <Check size={13} />
+                          {task}
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="ai-command-center__detail-rows">
+                    <div>
+                      <span>模型</span>
+                      <strong>ARK 对话模型</strong>
+                      <ChevronRight size={15} />
+                    </div>
+                    <div>
+                      <span>工具</span>
+                      <strong>已启用基础对话</strong>
+                      <ChevronRight size={15} />
+                    </div>
+                    <div>
+                      <span>提示词示例</span>
+                      <strong>{activeAgent.exampleQuestions.length || 0} 条</strong>
+                      <ChevronRight size={15} />
+                    </div>
+                  </section>
+
+                  <section className="ai-command-center__switch-rows">
+                    <div>
+                      <span>记忆</span>
+                      <i className="is-on" />
+                    </div>
+                    <div>
+                      <span>联网搜索</span>
+                      <i />
+                    </div>
+                  </section>
+
+                  <section className="ai-command-center__edit-card">
+                    <header>
+                      <PencilLine size={15} />
+                      <strong>资料编辑</strong>
+                    </header>
+                    <label>
+                      名称
+                      <input
+                        value={agentDraft.name}
+                        onChange={(event) =>
+                          setAgentDraft((current) => ({ ...current, name: event.target.value }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      简介
+                      <textarea
+                        value={agentDraft.description}
+                        onChange={(event) =>
+                          setAgentDraft((current) => ({
+                            ...current,
+                            description: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <div className="ai-command-center__edit-grid">
+                      <label>
+                        头像色
+                        <input
+                          value={agentDraft.avatarColor}
+                          onChange={(event) =>
+                            setAgentDraft((current) => ({
+                              ...current,
+                              avatarColor: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label>
+                        图标
+                        <input
+                          value={agentDraft.avatarIcon}
+                          onChange={(event) =>
+                            setAgentDraft((current) => ({
+                              ...current,
+                              avatarIcon: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                    <label>
+                      系统提示词
+                      <textarea
+                        value={agentDraft.systemPrompt}
+                        onChange={(event) =>
+                          setAgentDraft((current) => ({
+                            ...current,
+                            systemPrompt: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      开场白
+                      <textarea
+                        value={agentDraft.openingMessage}
+                        onChange={(event) =>
+                          setAgentDraft((current) => ({
+                            ...current,
+                            openingMessage: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      示例问题
+                      <textarea
+                        value={agentDraft.exampleQuestionsText}
+                        onChange={(event) =>
+                          setAgentDraft((current) => ({
+                            ...current,
+                            exampleQuestionsText: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <div className="ai-command-center__edit-actions">
+                      <button type="button" onClick={handleSaveAgent}>
+                        保存
+                      </button>
+                      <button type="button" onClick={handleDeleteAgent}>
+                        删除
+                      </button>
+                    </div>
+                  </section>
                 </div>
-                <label>
-                  系统提示词
-                  <textarea
-                    value={agentDraft.systemPrompt}
-                    onChange={(event) =>
-                      setAgentDraft((current) => ({
-                        ...current,
-                        systemPrompt: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  开场白
-                  <textarea
-                    value={agentDraft.openingMessage}
-                    onChange={(event) =>
-                      setAgentDraft((current) => ({
-                        ...current,
-                        openingMessage: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  示例问题
-                  <textarea
-                    value={agentDraft.exampleQuestionsText}
-                    onChange={(event) =>
-                      setAgentDraft((current) => ({
-                        ...current,
-                        exampleQuestionsText: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <div className="ai-command-center__edit-actions">
-                  <button type="button" onClick={handleSaveAgent}>
-                    保存
-                  </button>
-                  <button type="button" onClick={handleDeleteAgent}>
-                    删除
-                  </button>
-                </div>
-              </section>
-            </>
-          ) : null}
-        </aside>
+              ) : null}
+            </aside>
+          </PlushSlide>
+        </PlushPresence>
       ) : null}
 
       {isCreateDialogOpen ? (
-        <div className="ai-command-center__dialog-backdrop">
-          <form className="ai-command-center__dialog" onSubmit={handleCreateAgent}>
-            <header>
-              <strong>创建智能体</strong>
-              <button type="button" onClick={() => setIsCreateDialogOpen(false)}>
-                <X size={15} />
-              </button>
-            </header>
-            <label>
-              名称
-              <input
-                value={createDraft.name}
-                onChange={(event) =>
-                  setCreateDraft((current) => ({ ...current, name: event.target.value }))
-                }
-                placeholder="例如：研究分析师"
-              />
-            </label>
-            <label>
-              简介
-              <input
-                value={createDraft.description}
-                onChange={(event) =>
-                  setCreateDraft((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-                placeholder="这个智能体擅长什么"
-              />
-            </label>
-            <div className="ai-command-center__edit-grid">
-              <label>
-                头像色
-                <input
-                  value={createDraft.avatarColor}
-                  onChange={(event) =>
-                    setCreateDraft((current) => ({
-                      ...current,
-                      avatarColor: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                图标
-                <input
-                  value={createDraft.avatarIcon}
-                  onChange={(event) =>
-                    setCreateDraft((current) => ({
-                      ...current,
-                      avatarIcon: event.target.value,
-                    }))
-                  }
-                />
-              </label>
+        <PlushPresence>
+          <PlushFade key="ai-dialog-backdrop" open>
+            <div className="ai-command-center__dialog-backdrop">
+              <PlushPop key="ai-dialog" open>
+                <form className="ai-command-center__dialog" onSubmit={handleCreateAgent}>
+                  <header>
+                    <strong>创建智能体</strong>
+                    <button type="button" onClick={() => setIsCreateDialogOpen(false)}>
+                      <X size={15} />
+                    </button>
+                  </header>
+                  <label>
+                    名称
+                    <input
+                      value={createDraft.name}
+                      onChange={(event) =>
+                        setCreateDraft((current) => ({ ...current, name: event.target.value }))
+                      }
+                      placeholder="例如：研究分析师"
+                    />
+                  </label>
+                  <label>
+                    简介
+                    <input
+                      value={createDraft.description}
+                      onChange={(event) =>
+                        setCreateDraft((current) => ({
+                          ...current,
+                          description: event.target.value,
+                        }))
+                      }
+                      placeholder="这个智能体擅长什么"
+                    />
+                  </label>
+                  <div className="ai-command-center__edit-grid">
+                    <label>
+                      头像色
+                      <input
+                        value={createDraft.avatarColor}
+                        onChange={(event) =>
+                          setCreateDraft((current) => ({
+                            ...current,
+                            avatarColor: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      图标
+                      <input
+                        value={createDraft.avatarIcon}
+                        onChange={(event) =>
+                          setCreateDraft((current) => ({
+                            ...current,
+                            avatarIcon: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <label>
+                    系统提示词
+                    <textarea
+                      value={createDraft.systemPrompt}
+                      onChange={(event) =>
+                        setCreateDraft((current) => ({
+                          ...current,
+                          systemPrompt: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    开场白
+                    <textarea
+                      value={createDraft.openingMessage}
+                      onChange={(event) =>
+                        setCreateDraft((current) => ({
+                          ...current,
+                          openingMessage: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    示例问题
+                    <textarea
+                      value={createDraft.exampleQuestionsText}
+                      onChange={(event) =>
+                        setCreateDraft((current) => ({
+                          ...current,
+                          exampleQuestionsText: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <button type="submit" disabled={!createDraft.name.trim()}>
+                    创建智能体
+                  </button>
+                </form>
+              </PlushPop>
             </div>
-            <label>
-              系统提示词
-              <textarea
-                value={createDraft.systemPrompt}
-                onChange={(event) =>
-                  setCreateDraft((current) => ({
-                    ...current,
-                    systemPrompt: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              开场白
-              <textarea
-                value={createDraft.openingMessage}
-                onChange={(event) =>
-                  setCreateDraft((current) => ({
-                    ...current,
-                    openingMessage: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              示例问题
-              <textarea
-                value={createDraft.exampleQuestionsText}
-                onChange={(event) =>
-                  setCreateDraft((current) => ({
-                    ...current,
-                    exampleQuestionsText: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <button type="submit" disabled={!createDraft.name.trim()}>
-              创建智能体
-            </button>
-          </form>
-        </div>
+          </PlushFade>
+        </PlushPresence>
       ) : null}
     </div>
   );

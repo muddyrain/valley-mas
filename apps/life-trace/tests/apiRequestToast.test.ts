@@ -81,7 +81,7 @@ describe('api request error toast', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Load failed')));
 
     await expect(
-      apiRequest('/life-trace/checkins?date=2026-06-04', token, {
+      apiRequest('/life-trace/plans?date=2026-06-04', token, {
         retryOnTransientFailure: false,
       }),
     ).rejects.toThrow('网络连接失败，请检查网络后重试');

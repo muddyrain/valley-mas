@@ -4,6 +4,8 @@ export type AppTab = 'today' | 'plans' | 'ai' | 'traces' | 'profile';
 
 export type PlanType = '电影' | '吃饭' | '运动' | '阅读' | '聚会' | '普通事项';
 
+export type PlanRecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+
 export type Plan = {
   id: string;
   placeId?: string;
@@ -20,6 +22,10 @@ export type Plan = {
   source?: PlanSource;
   completed: boolean;
   completedAt?: string;
+  recurrenceFrequency?: PlanRecurrenceFrequency;
+  recurrenceInterval?: number;
+  recurrenceEndAt?: string;
+  recurrenceParentId?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -59,11 +65,27 @@ export type UserSettings = {
   weatherAlerts: boolean;
   planReminders: boolean;
   aiPersonalization: boolean;
-  habits: string[];
   pantryReminderEnabled: boolean;
   pantryReminderRules: PantryReminderRule[];
   pantryReminderTime: string;
+  subscriptionReminderEnabled: boolean;
+  subscriptionReminderRules: SubscriptionReminderRule[];
+  subscriptionReminderTime: string;
+  pantryListStatusFilter: PantryListStatusFilter;
+  pantryListCategoryFilter: PantryListCategoryFilter;
+  pantryListSortMode: PantrySortMode;
 };
+
+export type PantryListStatusFilter =
+  | 'all'
+  | 'normal'
+  | 'expiring'
+  | 'expired'
+  | 'no-expiry'
+  | 'used-up'
+  | 'discarded';
+
+export type PantryListCategoryFilter = 'all' | PantryCategory;
 
 export type PantryCategory = '食品' | '日用品' | '药品' | '宠物' | '其他';
 
@@ -119,6 +141,38 @@ export type PantryPreferences = {
   defaultReminderEnabled: boolean;
   defaultReminderRules: PantryReminderRule[];
   defaultReminderTime: string;
+};
+
+export type ShoppingListSource =
+  | 'manual'
+  | 'pantry_used_up'
+  | 'pantry_low'
+  | 'pantry_discard'
+  | 'recipe';
+
+export type ShoppingListItem = {
+  id: string;
+  householdId?: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  category: string;
+  source: ShoppingListSource;
+  sourcePantryItemId?: string;
+  note?: string;
+  checkedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type NewShoppingListItemInput = {
+  name: string;
+  quantity?: number;
+  unit?: string;
+  category?: string;
+  source?: ShoppingListSource;
+  sourcePantryItemId?: string;
+  note?: string;
 };
 
 export type ClosetCategory = '上装' | '下装' | '外套' | '鞋履' | '配饰' | '包袋' | '套装' | '其他';
@@ -238,7 +292,7 @@ export type Trace = {
   imageUrl?: string;
   mood: string;
   tags: string[];
-  source: '计划' | '打卡' | '库存' | '书影音' | '穿搭' | '手动';
+  source: '计划' | '库存' | '书影音' | '穿搭' | '手动';
   createdAt?: string;
   updatedAt?: string;
 };
@@ -287,7 +341,7 @@ export type InboxItemType = 'text' | 'link' | 'image';
 
 export type InboxItemStatus = 'inbox' | 'converted' | 'archived';
 
-export type InboxConvertedType = 'plan' | 'trace' | 'ledger';
+export type InboxConvertedType = 'plan' | 'trace' | 'ledger' | 'media' | 'place';
 
 export type InboxAISuggestedType = 'plan' | 'trace';
 
@@ -352,6 +406,7 @@ export type LedgerEntry = {
   planId?: string;
   traceId?: string;
   pantryItemId?: string;
+  recurringPaymentId?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -370,6 +425,7 @@ export type NewLedgerEntryInput = {
   planId?: string;
   traceId?: string;
   pantryItemId?: string;
+  recurringPaymentId?: string;
 };
 
 export type LedgerCategorySummary = {
@@ -390,6 +446,75 @@ export type LedgerSummary = {
   refund: number;
   net: number;
   categories: LedgerCategorySummary[];
+};
+
+export type SubscriptionReminderRule = '7d' | '3d' | 'same-day' | 'overdue';
+
+export type RecurringPaymentFrequency =
+  | 'daily'
+  | 'weekly'
+  | 'monthly'
+  | 'quarterly'
+  | 'half_year'
+  | 'yearly';
+
+export type RecurringPaymentDirection = '支出' | '收入';
+
+export type RecurringPaymentReminderConfig = {
+  enabled: boolean;
+  useDefault: boolean;
+  rules: SubscriptionReminderRule[];
+  reminderTime: string;
+};
+
+export type RecurringPayment = {
+  id: string;
+  userId: string;
+  name: string;
+  category: LedgerCategory;
+  amount: number;
+  amountCents: number;
+  currency: string;
+  direction: RecurringPaymentDirection;
+  merchant?: string;
+  note: string;
+  imageUrl?: string;
+  frequency: RecurringPaymentFrequency;
+  interval: number;
+  startedAt: string;
+  nextDueAt: string;
+  endAt?: string;
+  archived: boolean;
+  canceledAt?: string;
+  reminder: RecurringPaymentReminderConfig;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type NewRecurringPaymentInput = {
+  name: string;
+  category: LedgerCategory;
+  amount: number;
+  currency?: string;
+  direction: RecurringPaymentDirection;
+  merchant?: string;
+  note?: string;
+  imageUrl?: string;
+  frequency: RecurringPaymentFrequency;
+  interval: number;
+  startedAt: string;
+  endAt?: string;
+  reminder: RecurringPaymentReminderConfig;
+};
+
+export type RecurringPaymentSummary = {
+  total: number;
+  activeCount: number;
+  overdueCount: number;
+  upcomingCount: number;
+  monthlyExpenseCents: number;
+  monthlyExpense: number;
+  upcomingDays: number;
 };
 
 export type MediaDiaryType = '书籍' | '电影' | '剧集' | '动漫' | '音乐';
@@ -436,16 +561,6 @@ export type MediaDiarySummary = {
   completedMonth: number;
   bestRating: number;
   recent?: MediaDiaryEntry;
-};
-export type Checkin = {
-  id: string;
-  userId: string;
-  date: string;
-  name: string;
-  completed: boolean;
-  completedAt?: string;
-  createdAt?: string;
-  updatedAt?: string;
 };
 
 export type AiAction = {

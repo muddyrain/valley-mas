@@ -106,8 +106,8 @@ export function PhotoClothingAnalysisPage() {
 
   return (
     <SubPageShell title="拍照识别衣物" eyebrow="衣橱 AI" fallbackBackTo="/closet">
-      <div className="space-y-6">
-        <Card className="space-y-4 p-5">
+      <div className="space-y-5">
+        <Card className="space-y-4 p-4">
           <div className="flex items-start gap-3">
             <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
               <Camera className="size-6" />
@@ -167,7 +167,7 @@ export function PhotoClothingAnalysisPage() {
         </Card>
 
         {analysis ? (
-          <Card className="space-y-4 p-5">
+          <Card className="space-y-4 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <Badge tone="ai">草稿</Badge>

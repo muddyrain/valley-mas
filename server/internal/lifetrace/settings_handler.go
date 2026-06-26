@@ -31,10 +31,15 @@ type updateSettingsRequest struct {
 	WeatherAlerts           bool     `json:"weatherAlerts"`
 	PlanReminders           bool     `json:"planReminders"`
 	AIPersonalization       bool     `json:"aiPersonalization"`
-	Habits                  []string `json:"habits"`
 	PantryReminderEnabled   bool     `json:"pantryReminderEnabled"`
 	PantryReminderRules     []string `json:"pantryReminderRules"`
 	PantryReminderTime      string   `json:"pantryReminderTime"`
+	SubscriptionReminderEnabled bool     `json:"subscriptionReminderEnabled"`
+	SubscriptionReminderRules   []string `json:"subscriptionReminderRules"`
+	SubscriptionReminderTime    string   `json:"subscriptionReminderTime"`
+	PantryListStatusFilter      string   `json:"pantryListStatusFilter"`
+	PantryListCategoryFilter    string   `json:"pantryListCategoryFilter"`
+	PantryListSortMode          string   `json:"pantryListSortMode"`
 }
 
 var errPreferredPantryHouseholdInaccessible = errors.New("preferred pantry household inaccessible")
@@ -81,10 +86,15 @@ func defaultSettings(userID model.Int64String) model.LifeTraceSettings {
 		WeatherAlerts:           true,
 		PlanReminders:           true,
 		AIPersonalization:       true,
-		Habits:                  model.StringList{"喝水", "休息", "运动", "护肤"},
 		PantryReminderEnabled:   true,
 		PantryReminderRules:     model.StringList{"7d", "3d", "same-day", "expired"},
 		PantryReminderTime:      "09:00",
+		SubscriptionReminderEnabled: true,
+		SubscriptionReminderRules:   model.StringList{"7d", "3d", "same-day", "overdue"},
+		SubscriptionReminderTime:    "09:00",
+		PantryListStatusFilter:      "all",
+		PantryListCategoryFilter:    "all",
+		PantryListSortMode:          "expiry-asc",
 	}
 }
 
@@ -151,20 +161,6 @@ func normalizeWorkdays(days []string) model.StringList {
 	return result
 }
 
-func normalizeHabits(habits []string) model.StringList {
-	seen := map[string]bool{}
-	result := model.StringList{}
-	for _, habit := range habits {
-		habit = strings.TrimSpace(habit)
-		if habit == "" || seen[habit] {
-			continue
-		}
-		seen[habit] = true
-		result = append(result, habit)
-	}
-	return result
-}
-
 var validPantryReminderRules = map[string]bool{
 	"7d":       true,
 	"3d":       true,
@@ -187,6 +183,67 @@ func normalizePantryReminderRules(rules []string) model.StringList {
 		return model.StringList{"7d", "3d", "same-day", "expired"}
 	}
 	return result
+}
+
+var validSubscriptionReminderRules = map[string]bool{
+	"7d":       true,
+	"3d":       true,
+	"same-day": true,
+	"overdue":  true,
+}
+
+func normalizeSubscriptionReminderRules(rules []string) model.StringList {
+	seen := map[string]bool{}
+	result := model.StringList{}
+	for _, rule := range rules {
+		rule = strings.TrimSpace(rule)
+		if !validSubscriptionReminderRules[rule] || seen[rule] {
+			continue
+		}
+		seen[rule] = true
+		result = append(result, rule)
+	}
+	if len(result) == 0 {
+		return model.StringList{"7d", "3d", "same-day", "overdue"}
+	}
+	return result
+}
+
+var validPantryListStatusFilters = map[string]bool{
+	"all":       true,
+	"normal":    true,
+	"expiring":  true,
+	"expired":   true,
+	"no-expiry": true,
+	"used-up":   true,
+	"discarded": true,
+}
+
+func normalizePantryListStatusFilter(value string) string {
+	value = strings.TrimSpace(value)
+	if !validPantryListStatusFilters[value] {
+		return "all"
+	}
+	return value
+}
+
+func normalizePantryListCategoryFilter(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "all" {
+		return "all"
+	}
+	if !validPantryCategories[value] {
+		return "all"
+	}
+	return value
+}
+
+func normalizePantryListSortMode(value string) string {
+	value = strings.TrimSpace(value)
+	if !validPantrySorts[value] {
+		return "expiry-asc"
+	}
+	return value
 }
 
 func resolvePreferredPantryHouseholdID(userID model.Int64String, raw string) (model.Int64String, error) {
@@ -246,10 +303,15 @@ func applySettingsRequest(settings *model.LifeTraceSettings, req updateSettingsR
 	settings.WeatherAlerts = req.WeatherAlerts
 	settings.PlanReminders = req.PlanReminders
 	settings.AIPersonalization = req.AIPersonalization
-	settings.Habits = normalizeHabits(req.Habits)
 	settings.PantryReminderEnabled = req.PantryReminderEnabled
 	settings.PantryReminderRules = normalizePantryReminderRules(req.PantryReminderRules)
 	settings.PantryReminderTime = normalizeTimeText(req.PantryReminderTime, "09:00")
+	settings.SubscriptionReminderEnabled = req.SubscriptionReminderEnabled
+	settings.SubscriptionReminderRules = normalizeSubscriptionReminderRules(req.SubscriptionReminderRules)
+	settings.SubscriptionReminderTime = normalizeTimeText(req.SubscriptionReminderTime, "09:00")
+	settings.PantryListStatusFilter = normalizePantryListStatusFilter(req.PantryListStatusFilter)
+	settings.PantryListCategoryFilter = normalizePantryListCategoryFilter(req.PantryListCategoryFilter)
+	settings.PantryListSortMode = normalizePantryListSortMode(req.PantryListSortMode)
 	return nil
 }
 

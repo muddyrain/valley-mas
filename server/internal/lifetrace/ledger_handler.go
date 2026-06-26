@@ -15,19 +15,20 @@ import (
 )
 
 type ledgerEntryRequest struct {
-	Amount       float64 `json:"amount"`
-	Currency     string  `json:"currency"`
-	Direction    string  `json:"direction"`
-	Category     string  `json:"category"`
-	OccurredAt   string  `json:"occurredAt"`
-	Merchant     string  `json:"merchant"`
-	Location     string  `json:"location"`
-	Note         string  `json:"note"`
-	ImageURL     string  `json:"imageUrl"`
-	InboxItemID  string  `json:"inboxItemId"`
-	PlanID       string  `json:"planId"`
-	TraceID      string  `json:"traceId"`
-	PantryItemID string  `json:"pantryItemId"`
+	Amount             float64 `json:"amount"`
+	Currency           string  `json:"currency"`
+	Direction          string  `json:"direction"`
+	Category           string  `json:"category"`
+	OccurredAt         string  `json:"occurredAt"`
+	Merchant           string  `json:"merchant"`
+	Location           string  `json:"location"`
+	Note               string  `json:"note"`
+	ImageURL           string  `json:"imageUrl"`
+	InboxItemID        string  `json:"inboxItemId"`
+	PlanID             string  `json:"planId"`
+	TraceID            string  `json:"traceId"`
+	PantryItemID       string  `json:"pantryItemId"`
+	RecurringPaymentID string  `json:"recurringPaymentId"`
 }
 
 type ledgerEntryResponse struct {
@@ -183,22 +184,27 @@ func buildLedgerEntryFromRequest(req ledgerEntryRequest, userID model.Int64Strin
 	if !ok {
 		return model.LifeTraceLedgerEntry{}, "库存关联不正确", false
 	}
+	recurringPaymentID, ok := parseOptionalLedgerID(req.RecurringPaymentID)
+	if !ok {
+		return model.LifeTraceLedgerEntry{}, "订阅关联不正确", false
+	}
 
 	return model.LifeTraceLedgerEntry{
-		UserID:       userID,
-		AmountCents:  amountCents,
-		Currency:     normalizeLedgerCurrency(req.Currency),
-		Direction:    direction,
-		Category:     category,
-		OccurredAt:   occurredAt,
-		Merchant:     strings.TrimSpace(req.Merchant),
-		Location:     strings.TrimSpace(req.Location),
-		Note:         strings.TrimSpace(req.Note),
-		ImageURL:     strings.TrimSpace(req.ImageURL),
-		InboxItemID:  inboxItemID,
-		PlanID:       planID,
-		TraceID:      traceID,
-		PantryItemID: pantryItemID,
+		UserID:             userID,
+		AmountCents:        amountCents,
+		Currency:           normalizeLedgerCurrency(req.Currency),
+		Direction:          direction,
+		Category:           category,
+		OccurredAt:         occurredAt,
+		Merchant:           strings.TrimSpace(req.Merchant),
+		Location:           strings.TrimSpace(req.Location),
+		Note:               strings.TrimSpace(req.Note),
+		ImageURL:           strings.TrimSpace(req.ImageURL),
+		InboxItemID:        inboxItemID,
+		PlanID:             planID,
+		TraceID:            traceID,
+		PantryItemID:       pantryItemID,
+		RecurringPaymentID: recurringPaymentID,
 	}, "", true
 }
 
@@ -371,19 +377,20 @@ func (h *Handler) UpdateLedgerEntry(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{
-		"amount_cents":   nextEntry.AmountCents,
-		"currency":       nextEntry.Currency,
-		"direction":      nextEntry.Direction,
-		"category":       nextEntry.Category,
-		"occurred_at":    nextEntry.OccurredAt,
-		"merchant":       nextEntry.Merchant,
-		"location":       nextEntry.Location,
-		"note":           nextEntry.Note,
-		"image_url":      nextEntry.ImageURL,
-		"inbox_item_id":  nextEntry.InboxItemID,
-		"plan_id":        nextEntry.PlanID,
-		"trace_id":       nextEntry.TraceID,
-		"pantry_item_id": nextEntry.PantryItemID,
+		"amount_cents":         nextEntry.AmountCents,
+		"currency":             nextEntry.Currency,
+		"direction":            nextEntry.Direction,
+		"category":             nextEntry.Category,
+		"occurred_at":          nextEntry.OccurredAt,
+		"merchant":             nextEntry.Merchant,
+		"location":             nextEntry.Location,
+		"note":                 nextEntry.Note,
+		"image_url":            nextEntry.ImageURL,
+		"inbox_item_id":        nextEntry.InboxItemID,
+		"plan_id":              nextEntry.PlanID,
+		"trace_id":             nextEntry.TraceID,
+		"pantry_item_id":       nextEntry.PantryItemID,
+		"recurring_payment_id": nextEntry.RecurringPaymentID,
 	}
 	if err := database.GetDB().Model(&entry).Updates(updates).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "更新账目失败")

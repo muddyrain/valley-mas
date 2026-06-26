@@ -153,7 +153,6 @@ func TestSendDueDailyBriefPushesSendsOnlyOncePerDay(t *testing.T) {
 		City:              "上海",
 		DailyBriefTime:    "08:10",
 		WorkdayMode:       "daily",
-		Habits:            model.StringList{"喝水", "运动"},
 		WeekendReminders:  true,
 		HolidaySync:       true,
 		PlanReminders:     true,
@@ -185,14 +184,6 @@ func TestSendDueDailyBriefPushesSendsOnlyOncePerDay(t *testing.T) {
 		Note:          "测试计划",
 	}).Error; err != nil {
 		t.Fatalf("create plan: %v", err)
-	}
-	if err := database.GetDB().Create(&model.LifeTraceCheckin{
-		UserID:    model.Int64String(101),
-		Date:      "2026-06-02",
-		Name:      "喝水",
-		Completed: true,
-	}).Error; err != nil {
-		t.Fatalf("create checkin: %v", err)
 	}
 
 	sender := &fakePushSender{}
@@ -484,11 +475,10 @@ func TestBuildDailyBriefPushPayloadUsesWeekendTone(t *testing.T) {
 		HolidaySync:      true,
 		WeekendReminders: true,
 		WeatherAlerts:    true,
-		Habits:           model.StringList{"喝水", "休息"},
 	}
 	dueAt := time.Date(2026, 6, 6, 8, 10, 0, 0, time.Local)
 
-	payload := buildDailyBriefPushPayload(settings, WeatherResponse{}, nil, nil, dueAt)
+	payload := buildDailyBriefPushPayload(settings, WeatherResponse{}, nil, dueAt)
 	if payload.Title != "Life Trace 周末天气" {
 		t.Fatalf("expected weekend title, got %+v", payload)
 	}
@@ -502,7 +492,6 @@ func TestBuildDailyBriefPushPayloadPrioritizesWeatherRisk(t *testing.T) {
 		City:          "上海",
 		WorkdayMode:   "daily",
 		WeatherAlerts: true,
-		Habits:        model.StringList{"喝水", "运动"},
 	}
 	weather := WeatherResponse{}
 	weather.Now.Temp = "33"
@@ -511,7 +500,7 @@ func TestBuildDailyBriefPushPayloadPrioritizesWeatherRisk(t *testing.T) {
 	weather.Now.Text = "晴"
 	dueAt := time.Date(2026, 6, 2, 8, 10, 0, 0, time.Local)
 
-	payload := buildDailyBriefPushPayload(settings, weather, nil, nil, dueAt)
+	payload := buildDailyBriefPushPayload(settings, weather, nil, dueAt)
 	if payload.Title != "Life Trace 高温提醒" {
 		t.Fatalf("expected heat warning title, got %+v", payload)
 	}
@@ -525,7 +514,6 @@ func TestBuildDailyBriefPushPayloadKeepsDailyWeatherWhenRiskAlertsDisabled(t *te
 		City:          "上海",
 		WorkdayMode:   "daily",
 		WeatherAlerts: false,
-		Habits:        model.StringList{"喝水", "运动"},
 	}
 	weather := WeatherResponse{}
 	weather.Now.Temp = "33"
@@ -534,7 +522,7 @@ func TestBuildDailyBriefPushPayloadKeepsDailyWeatherWhenRiskAlertsDisabled(t *te
 	weather.Now.Text = "晴"
 	dueAt := time.Date(2026, 6, 2, 8, 10, 0, 0, time.Local)
 
-	payload := buildDailyBriefPushPayload(settings, weather, nil, nil, dueAt)
+	payload := buildDailyBriefPushPayload(settings, weather, nil, dueAt)
 	if payload.Title != "Life Trace 每日天气" {
 		t.Fatalf("expected daily weather title when alerts are disabled, got %+v", payload)
 	}

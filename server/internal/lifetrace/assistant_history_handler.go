@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const assistantConversationMessageLimit = 40
+const assistantConversationMessageLimit = 120
 
 var validAssistantMessageRoles = map[string]bool{
 	"user":      true,

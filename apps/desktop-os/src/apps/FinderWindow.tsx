@@ -31,6 +31,7 @@ import { useResourceStore } from '../store/resourceStore';
 import { useToolStore } from '../store/toolStore';
 import { useWindowStore } from '../store/windowStore';
 import EmptyState from '../ui/EmptyState';
+import PlushConfirmDialog from '../ui/PlushConfirmDialog';
 import PlushImage from '../ui/PlushImage';
 import PlushLoading from '../ui/PlushLoading';
 import PlushLoadMore from '../ui/PlushLoadMore';
@@ -136,6 +137,8 @@ export default function FinderWindow() {
   const [activeTypeFilter, setActiveTypeFilter] = useState<FinderTypeFilter>('all');
   const [activePackageId, setActivePackageId] = useState<string | null>(null);
   const [activeSavedSearchId, setActiveSavedSearchId] = useState<string | null>(null);
+  const [pendingDeletePackageId, setPendingDeletePackageId] = useState<string | null>(null);
+  const [pendingDeleteSavedSearchId, setPendingDeleteSavedSearchId] = useState<string | null>(null);
   const itemRefs = useRef<Record<string, HTMLElement | null>>({});
   const browserRef = useRef<HTMLElement | null>(null);
   const scrollMemoryFrameRef = useRef<number | null>(null);
@@ -415,19 +418,31 @@ export default function FinderWindow() {
     resourcePackageId: string,
   ) {
     event.stopPropagation();
-    removeResourcePackage(resourcePackageId);
-    if (activePackageId === resourcePackageId) {
+    setPendingDeletePackageId(resourcePackageId);
+  }
+
+  function confirmDeleteResourcePackage() {
+    if (!pendingDeletePackageId) return;
+    removeResourcePackage(pendingDeletePackageId);
+    if (activePackageId === pendingDeletePackageId) {
       setActivePackageId(null);
       setPath('all', null, null);
     }
+    setPendingDeletePackageId(null);
   }
 
   function deleteSavedSearch(event: React.MouseEvent<HTMLButtonElement>, savedSearchId: string) {
     event.stopPropagation();
-    removeSavedSearch(savedSearchId);
-    if (activeSavedSearchId === savedSearchId) {
+    setPendingDeleteSavedSearchId(savedSearchId);
+  }
+
+  function confirmDeleteSavedSearch() {
+    if (!pendingDeleteSavedSearchId) return;
+    removeSavedSearch(pendingDeleteSavedSearchId);
+    if (activeSavedSearchId === pendingDeleteSavedSearchId) {
       setActiveSavedSearchId(null);
     }
+    setPendingDeleteSavedSearchId(null);
   }
 
   function rememberResourceView(item: FinderItem) {
@@ -1163,6 +1178,30 @@ export default function FinderWindow() {
           }}
         />
       )}
+      <PlushConfirmDialog
+        open={pendingDeletePackageId !== null}
+        onOpenChange={(next) => {
+          if (!next) setPendingDeletePackageId(null);
+        }}
+        tone="danger"
+        title="删除资源包？"
+        description="删除后该资源包将不再保留在侧栏，包内文件不会被删除。"
+        confirmLabel="删除"
+        loadingLabel="删除中"
+        onConfirm={confirmDeleteResourcePackage}
+      />
+      <PlushConfirmDialog
+        open={pendingDeleteSavedSearchId !== null}
+        onOpenChange={(next) => {
+          if (!next) setPendingDeleteSavedSearchId(null);
+        }}
+        tone="danger"
+        title="删除保存搜索？"
+        description="删除后该搜索条件将从侧栏移除，已索引的资源不受影响。"
+        confirmLabel="删除"
+        loadingLabel="删除中"
+        onConfirm={confirmDeleteSavedSearch}
+      />
     </div>
   );
 }

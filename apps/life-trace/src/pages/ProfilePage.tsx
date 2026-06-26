@@ -8,24 +8,23 @@ import {
   Disc3,
   Download,
   Heart,
-  Inbox,
   Leaf,
   LogOut,
   MapPin,
   MessageSquareText,
   MoonStar,
-  Plus,
   ReceiptText,
   RefreshCw,
+  Repeat,
   Route,
   Share2,
   ShieldCheck,
   Shirt,
+  ShoppingBasket,
   Smartphone,
   Sparkles,
   Trophy,
   Users,
-  X,
   Zap,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -33,22 +32,24 @@ import { useNavigate } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { EntryCard } from '@/components/EntryCard';
 import { FeedbackSheet } from '@/components/FeedbackSheet';
+import { LifePage } from '@/components/LifeLayout';
 import { LocationPicker } from '@/components/LocationPicker';
 import { PantryHouseholdDetailSheet } from '@/components/PantryHouseholdDetailSheet';
 import { PantryHouseholdSheet } from '@/components/PantryHouseholdSheet';
 import { ProfileAvatarSheet } from '@/components/ProfileAvatarSheet';
 import { SectionHeader } from '@/components/SectionHeader';
 import { SettingInput, SettingToggle, SyncStatus } from '@/components/SettingsControls';
+import { ThemeSelector } from '@/components/ThemeSelector';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { usePantryHouseholdManager } from '@/hooks/usePantryHouseholdManager';
 import { usePwaStatus } from '@/hooks/usePwaStatus';
 import { APP_VERSION_LABEL } from '@/lib/appVersion';
 import { gsap, useGSAP } from '@/lib/gsap';
 import { getPwaShareFeedback } from '@/lib/pwa';
 import { getWorkdayModeMeta } from '@/lib/reminderSettings';
+import { getStoredTheme, setStoredTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
@@ -56,7 +57,6 @@ import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Achievement, CommuteMethod, UserSettings } from '@/types';
 
 const commuteMethods: CommuteMethod[] = ['开车', '地铁', '步行', '骑行', '远程'];
-const suggestedHabitOptions = ['喝水', '休息', '运动', '护肤', '早睡', '吃药'];
 const canPreviewAchievementToast = import.meta.env.DEV;
 const previewAchievementToastDurationMs = 4200;
 
@@ -90,8 +90,7 @@ export function ProfilePage() {
   const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
   const [householdDetailOpen, setHouseholdDetailOpen] = useState(false);
   const [feedbackSheetOpen, setFeedbackSheetOpen] = useState(false);
-  const [habitDraft, setHabitDraft] = useState('');
-  const [habitDraftError, setHabitDraftError] = useState('');
+  const [theme, setTheme] = useState(getStoredTheme);
   const settings = useLifeTraceStore((state) => state.settings);
   const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const settingsLoading = useLifeTraceStore((state) => state.settingsLoading);
@@ -277,39 +276,11 @@ export function ProfilePage() {
     });
   };
 
-  const addHabit = (rawValue: string) => {
-    const nextHabit = rawValue.trim();
-    if (!nextHabit) {
-      setHabitDraftError('先输入一个打卡项');
-      return;
-    }
-    if (nextHabit.length > 40) {
-      setHabitDraftError('打卡项最多 40 个字');
-      return;
-    }
-    if (settings.habits.includes(nextHabit)) {
-      setHabitDraftError('这个打卡项已经存在了');
-      return;
-    }
-
-    update('habits', [...settings.habits, nextHabit]);
-    setHabitDraft('');
-    setHabitDraftError('');
-  };
-
-  const removeHabit = (habit: string) => {
-    update(
-      'habits',
-      settings.habits.filter((item) => item !== habit),
-    );
-    setHabitDraftError('');
-  };
-
   return (
-    <div ref={pageRef} className="space-y-6 px-5 pt-4 max-[360px]:px-4">
+    <LifePage ref={pageRef} variant="tab" spacing="default">
       <section
         data-profile-hero
-        className="relative overflow-hidden rounded-[1.65rem] border border-border/70 bg-card/80 p-5 shadow-[0_18px_54px_rgba(71,58,42,0.075)] backdrop-blur max-[360px]:p-4"
+        className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-card/80 p-4 shadow-[0_18px_54px_rgba(71,58,42,0.075)] backdrop-blur max-[360px]:p-4"
       >
         <div
           aria-hidden="true"
@@ -325,16 +296,25 @@ export function ProfilePage() {
               <Leaf className="size-4 shrink-0" />
               <span className="truncate">我的生活页</span>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="relative z-10 rounded-2xl bg-background/30 text-muted-foreground backdrop-blur hover:bg-background/50"
-              aria-label="退出登录"
-              onClick={() => void signOut()}
-            >
-              <LogOut className="size-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <ThemeSelector
+                theme={theme}
+                onThemeChange={(nextTheme) => {
+                  setTheme(nextTheme);
+                  setStoredTheme(nextTheme);
+                }}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="relative z-10 rounded-2xl bg-background/30 text-muted-foreground backdrop-blur hover:bg-background/50"
+                aria-label="退出登录"
+                onClick={() => void signOut()}
+              >
+                <LogOut className="size-5" />
+              </Button>
+            </div>
           </div>
 
           <div className="flex items-center gap-[1.125rem] max-[360px]:gap-3.5">
@@ -347,10 +327,10 @@ export function ProfilePage() {
                 <img
                   src={user.avatar}
                   alt={profileName}
-                  className="size-[4.6rem] rounded-[1.45rem] border border-foreground/10 object-cover shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition duration-300 group-hover:scale-[1.03] max-[360px]:size-16"
+                  className="size-[4.6rem] rounded-[1.5rem] border border-foreground/10 object-cover shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition duration-300 group-hover:scale-[1.03] max-[360px]:size-16"
                 />
               ) : (
-                <div className="grid size-[4.6rem] place-items-center rounded-[1.45rem] border border-life-ai/20 bg-life-ai text-2xl font-bold text-primary-foreground shadow-[0_16px_40px_rgba(95,146,112,0.18)] transition duration-300 group-hover:scale-[1.03] max-[360px]:size-16">
+                <div className="grid size-[4.6rem] place-items-center rounded-[1.5rem] border border-life-ai/20 bg-life-ai text-2xl font-bold text-primary-foreground shadow-[0_16px_40px_rgba(95,146,112,0.18)] transition duration-300 group-hover:scale-[1.03] max-[360px]:size-16">
                   {profileName.slice(0, 1).toUpperCase()}
                 </div>
               )}
@@ -385,25 +365,35 @@ export function ProfilePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2.5 max-[360px]:grid-cols-1">
-            <div className="rounded-2xl border border-border/70 bg-background/50 p-3.5 backdrop-blur">
-              <ActiveCommuteIcon className="mb-2 size-[1.05rem] text-life-ai" />
-              <p className="truncate text-[0.95rem] font-semibold">{settings.commuteMethod}</p>
-              <p className="mt-1 text-xs text-muted-foreground">通勤方式</p>
-            </div>
-            <div className="rounded-2xl border border-border/70 bg-background/50 p-3.5 backdrop-blur">
-              <Clock className="mb-2 size-[1.05rem] text-life-plan" />
-              <p className="text-[0.84rem] font-semibold leading-tight whitespace-nowrap">
-                <span>{settings.workStart}</span>
-                <span className="px-1 text-muted-foreground">-</span>
-                <span>{settings.workEnd}</span>
+          <div className="grid grid-cols-[1fr_1.4fr] gap-3 max-[360px]:grid-cols-1">
+            <div className="group relative overflow-hidden rounded-[1.25rem] border border-border/60 bg-card/80 p-4 shadow-[0_4px_18px_rgba(71,58,42,0.06)] transition duration-300 hover:border-foreground/15 hover:shadow-[0_8px_28px_rgba(71,58,42,0.1)] backdrop-blur">
+              <div className="mb-3 grid size-10 place-items-center rounded-xl bg-life-plan/10 text-life-plan transition duration-200 group-hover:bg-life-plan/15">
+                <Clock className="size-5" />
+              </div>
+              <p className="truncate text-base font-semibold leading-tight">
+                {settings.workStart} - {settings.workEnd}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">工作时段</p>
+              <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">工作时段</p>
             </div>
-            <div className="rounded-2xl border border-border/70 bg-background/50 p-3.5 backdrop-blur">
-              <Heart className="mb-2 size-[1.05rem] text-life-trace" />
-              <p className="truncate text-[0.95rem] font-semibold">{settings.habits.length} 项</p>
-              <p className="mt-1 text-xs text-muted-foreground">打卡开启</p>
+            <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
+              <div className="group relative overflow-hidden rounded-[1.25rem] border border-border/60 bg-card/80 p-4 shadow-[0_4px_18px_rgba(71,58,42,0.06)] transition duration-300 hover:border-foreground/15 hover:shadow-[0_8px_28px_rgba(71,58,42,0.1)] backdrop-blur">
+                <div className="mb-3 grid size-10 place-items-center rounded-xl bg-life-ai/10 text-life-ai transition duration-200 group-hover:bg-life-ai/15">
+                  <ActiveCommuteIcon className="size-5" />
+                </div>
+                <p className="truncate text-base font-semibold leading-tight">
+                  {settings.commuteMethod}
+                </p>
+                <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">通勤方式</p>
+              </div>
+              <div className="group relative overflow-hidden rounded-[1.25rem] border border-border/60 bg-card/80 p-4 shadow-[0_4px_18px_rgba(71,58,42,0.06)] transition duration-300 hover:border-foreground/15 hover:shadow-[0_8px_28px_rgba(71,58,42,0.1)] backdrop-blur">
+                <div className="mb-3 grid size-10 place-items-center rounded-xl bg-life-trace/10 text-life-trace transition duration-200 group-hover:bg-life-trace/15">
+                  <Heart className="size-5" />
+                </div>
+                <p className="truncate text-base font-semibold leading-tight">
+                  {enabledSignals} 项
+                </p>
+                <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">提醒开启</p>
+              </div>
             </div>
           </div>
 
@@ -426,7 +416,7 @@ export function ProfilePage() {
             <button
               type="button"
               className={cn(
-                'group flex w-full items-center justify-between gap-3 rounded-[1.35rem] border border-border bg-card/80 p-4 text-left transition duration-300',
+                'group flex w-full items-center justify-between gap-3 rounded-[1.25rem] border border-border bg-card/80 p-4 text-left transition duration-300',
                 'hover:border-foreground/20 hover:bg-card',
               )}
               onClick={openPicker}
@@ -518,17 +508,17 @@ export function ProfilePage() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 max-[360px]:grid-cols-1">
-            <div className="rounded-[1.15rem] border border-border bg-secondary/55 p-3">
+            <div className="rounded-[1.25rem] border border-border bg-secondary/55 p-3">
               <p className="text-xs font-semibold text-muted-foreground">计划提醒</p>
               <p className="mt-2 text-sm font-semibold text-foreground">
                 {settings.planReminders ? planReminderMeta : '已关闭'}
               </p>
             </div>
-            <div className="rounded-[1.15rem] border border-border bg-secondary/55 p-3">
+            <div className="rounded-[1.25rem] border border-border bg-secondary/55 p-3">
               <p className="text-xs font-semibold text-muted-foreground">提醒节奏</p>
               <p className="mt-2 text-sm font-semibold text-foreground">{workdayMeta}</p>
             </div>
-            <div className="rounded-[1.15rem] border border-border bg-secondary/55 p-3 max-[360px]:col-span-1 sm:col-span-2">
+            <div className="rounded-[1.25rem] border border-border bg-secondary/55 p-3 max-[360px]:col-span-1 sm:col-span-2">
               <p className="text-xs font-semibold text-muted-foreground">库存默认提醒</p>
               <p className="mt-2 text-sm font-semibold text-foreground">{pantryReminderMeta}</p>
             </div>
@@ -545,6 +535,7 @@ export function ProfilePage() {
             type="button"
             variant="outline"
             className="w-full sm:w-auto"
+            data-scroll-anchor="profile:reminders"
             onClick={() => navigate('/profile/reminders')}
           >
             打开提醒设置
@@ -554,27 +545,12 @@ export function ProfilePage() {
       </section>
 
       <section data-profile-card className="space-y-3">
-        <SectionHeader title="个人工具" meta="Inbox / 轻账本" />
+        <SectionHeader title="个人工具" meta="轻账本 / 订阅 / 采购" />
         <Card className="grid gap-3 p-4">
           <button
             type="button"
             className="flex w-full items-center gap-3 text-left"
-            onClick={() => navigate('/inbox')}
-          >
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
-              <Inbox className="size-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold">捕捉 Inbox</h3>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                收下想法、链接和待处理事项。
-              </p>
-            </div>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </button>
-          <button
-            type="button"
-            className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
+            data-scroll-anchor="profile:places"
             onClick={() => navigate('/places')}
           >
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-trace/10 text-life-trace">
@@ -591,6 +567,7 @@ export function ProfilePage() {
           <button
             type="button"
             className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
+            data-scroll-anchor="profile:ledger"
             onClick={() => navigate('/ledger')}
           >
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
@@ -602,6 +579,40 @@ export function ProfilePage() {
             </div>
             <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
           </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
+            data-scroll-anchor="profile:recurring-payments"
+            onClick={() => navigate('/recurring-payments')}
+          >
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+              <Repeat className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold">订阅与续费</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                统一管理周期性支出，到期前会发提醒。
+              </p>
+            </div>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 border-t border-border pt-3 text-left"
+            data-scroll-anchor="profile:shopping"
+            onClick={() => navigate('/shopping')}
+          >
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+              <ShoppingBasket className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold">采购清单</h3>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                把要买的东西先记下来，逛超市或下单时一目了然。
+              </p>
+            </div>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </button>
         </Card>
       </section>
 
@@ -609,7 +620,7 @@ export function ProfilePage() {
         <SectionHeader title="智能偏好" meta={settings.aiPersonalization ? '已开启' : '已关闭'} />
         <SettingToggle
           label="AI 个性化"
-          detail="根据计划、打卡和偏好生成今日建议"
+          detail="根据计划和偏好生成今日建议"
           icon={Sparkles}
           active={settings.aiPersonalization}
           onToggle={() => update('aiPersonalization', !settings.aiPersonalization)}
@@ -664,6 +675,7 @@ export function ProfilePage() {
               type="button"
               variant="outline"
               className="w-full sm:w-auto"
+              data-scroll-anchor="profile:achievements"
               onClick={() => navigate('/achievements')}
             >
               打开生活成就
@@ -699,7 +711,7 @@ export function ProfilePage() {
             </div>
           </div>
 
-          <div className="rounded-[1.35rem] border border-life-ai/20 bg-life-ai/5 p-4">
+          <div className="rounded-[1.25rem] border border-life-ai/20 bg-life-ai/5 p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-life-ai">当前激活空间</p>
@@ -741,7 +753,12 @@ export function ProfilePage() {
                 查看空间详情
               </Button>
             ) : null}
-            <Button type="button" variant="outline" onClick={() => navigate('/pantry')}>
+            <Button
+              type="button"
+              variant="outline"
+              data-scroll-anchor="profile:pantry"
+              onClick={() => navigate('/pantry')}
+            >
               查看当前库存
             </Button>
           </div>
@@ -753,6 +770,7 @@ export function ProfilePage() {
         <button
           type="button"
           className="flex w-full items-center justify-between gap-4 rounded-[1.25rem] border border-life-ai/20 bg-card p-4 text-left transition hover:border-life-ai/35 hover:bg-card/95"
+          data-scroll-anchor="profile:closet"
           onClick={() => navigate('/closet')}
         >
           <span className="flex min-w-0 items-center gap-3">
@@ -778,100 +796,9 @@ export function ProfilePage() {
           title="书影音日记"
           description="书籍、电影、剧集、动漫和音乐"
           tone="trace"
+          data-scroll-anchor="profile:media-diary"
           onClick={() => navigate('/media-diary')}
         />
-      </section>
-
-      <section data-profile-card className="space-y-3">
-        <SectionHeader title="每日打卡" meta={`${settings.habits.length} 项已开启`} />
-        <Card className="space-y-4 p-4">
-          <div className="flex items-start gap-3">
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-trace/10 text-life-trace">
-              <Heart className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-semibold">每日打卡</h3>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                喝水、休息、运动和睡前小习惯。
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-2 max-[360px]:flex-col">
-            <Input
-              type="text"
-              value={habitDraft}
-              maxLength={40}
-              placeholder="例如：晚饭后吃维生素D"
-              className="flex-1 text-sm focus:border-life-trace/50"
-              onChange={(event) => {
-                setHabitDraft(event.target.value);
-                if (habitDraftError) {
-                  setHabitDraftError('');
-                }
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  addHabit(habitDraft);
-                }
-              }}
-            />
-            <Button type="button" variant="ai" onClick={() => addHabit(habitDraft)}>
-              <Plus className="size-4" />
-              添加
-            </Button>
-          </div>
-
-          {habitDraftError ? (
-            <p className="text-sm text-life-alert">{habitDraftError}</p>
-          ) : (
-            <p className="text-xs leading-5 text-muted-foreground">今日页会按这份清单展示。</p>
-          )}
-
-          {settings.habits.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {settings.habits.map((habit) => (
-                <span
-                  key={habit}
-                  className="inline-flex items-center gap-2 rounded-full border border-life-trace/25 bg-life-trace/10 px-3 py-2 text-sm font-medium text-life-trace"
-                >
-                  <span className="max-w-[16rem] truncate">{habit}</span>
-                  <button
-                    type="button"
-                    className="grid size-5 place-items-center rounded-full bg-background/60 text-life-trace transition hover:bg-background"
-                    aria-label={`删除 ${habit}`}
-                    onClick={() => removeHabit(habit)}
-                  >
-                    <X className="size-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-border px-4 py-4 text-sm leading-6 text-muted-foreground">
-              还没有自定义打卡项。先加一个最容易坚持的，比如喝药、喝水或睡前拉伸。
-            </div>
-          )}
-
-          <div>
-            <p className="mb-2 text-xs font-semibold text-muted-foreground">快速添加</p>
-            <div className="flex flex-wrap gap-2">
-              {suggestedHabitOptions
-                .filter((habit) => !settings.habits.includes(habit))
-                .map((habit) => (
-                  <button
-                    key={habit}
-                    type="button"
-                    className="rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-life-trace/30 hover:text-foreground"
-                    onClick={() => addHabit(habit)}
-                  >
-                    + {habit}
-                  </button>
-                ))}
-            </div>
-          </div>
-        </Card>
       </section>
 
       <section data-profile-card className="space-y-3">
@@ -1050,6 +977,6 @@ export function ProfilePage() {
         onDissolveHousehold={handleDissolveHousehold}
       />
       <FeedbackSheet open={feedbackSheetOpen} onOpenChange={setFeedbackSheetOpen} />
-    </div>
+    </LifePage>
   );
 }

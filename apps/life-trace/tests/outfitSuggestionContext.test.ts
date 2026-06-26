@@ -18,7 +18,6 @@ const baseSettings: UserSettings = {
   weatherAlerts: true,
   planReminders: true,
   aiPersonalization: true,
-  habits: [],
   pantryReminderEnabled: true,
   pantryReminderRules: ['7d', '3d'],
   pantryReminderTime: '09:00',

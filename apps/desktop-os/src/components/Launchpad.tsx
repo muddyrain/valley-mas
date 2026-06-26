@@ -9,9 +9,9 @@ import {
 } from '../apps/desktopApps';
 import { useLaunchpadStore } from '../store/launchpadStore';
 import { useWindowStore } from '../store/windowStore';
+import { MOTION_TOKENS, PlushPop, PlushPresence } from '../ui/PlushMotion';
 import './Launchpad.css';
 
-const CLOSE_ANIMATION_MS = 260;
 const DEFAULT_METRICS = { pageSize: 15, columns: 5 };
 const SWIPE_PAGE_THRESHOLD = 92;
 const SWIPE_VERTICAL_CANCEL = 86;
@@ -25,42 +25,25 @@ const CATEGORY_LABEL: Record<DesktopAppCategory, string> = {
 
 export default function Launchpad() {
   const isOpen = useLaunchpadStore((s) => s.isOpen);
-  const [shouldRender, setShouldRender] = useState(isOpen);
-  const [isClosing, setIsClosing] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true);
-      setIsClosing(false);
-      return;
-    }
-
-    if (!shouldRender) return;
-    setIsClosing(true);
-    const timer = window.setTimeout(() => {
-      setShouldRender(false);
-      setIsClosing(false);
-    }, CLOSE_ANIMATION_MS);
-    return () => window.clearTimeout(timer);
-  }, [isOpen, shouldRender]);
-
-  if (!shouldRender) return null;
-
-  return <LaunchpadPanel isOpen={isOpen} isClosing={isClosing} />;
+  return (
+    <PlushPresence>
+      {isOpen ? (
+        <PlushPop key="launchpad">
+          <LaunchpadPanel />
+        </PlushPop>
+      ) : null}
+    </PlushPresence>
+  );
 }
 
-interface LaunchpadPanelProps {
-  isOpen: boolean;
-  isClosing: boolean;
-}
-
-function LaunchpadPanel({ isOpen, isClosing }: LaunchpadPanelProps) {
+function LaunchpadPanel() {
+  const isOpen = useLaunchpadStore((s) => s.isOpen);
   const query = useLaunchpadStore((s) => s.query);
   const setQuery = useLaunchpadStore((s) => s.setQuery);
   const close = useLaunchpadStore((s) => s.close);
   const restoreOrFocus = useWindowStore((s) => s.restoreOrFocus);
   const runningAppIds = useWindowStore((s) => s.runningAppIds);
-  const shouldReduceMotion = useReducedMotion();
+  const prefersReduced = useReducedMotion() === true;
   const { pageSize, columns } = useLaunchpadMetrics();
   const [activeIndex, setActiveIndex] = useState(0);
   const [keyboardActive, setKeyboardActive] = useState(false);
@@ -220,40 +203,17 @@ function LaunchpadPanel({ isOpen, isClosing }: LaunchpadPanelProps) {
   }
 
   return (
-    <motion.div
+    <div
       className="launchpad"
-      initial={launchpadOverlayState(false, shouldReduceMotion)}
-      animate={launchpadOverlayState(!isClosing, shouldReduceMotion)}
-      transition={launchpadSpring(shouldReduceMotion)}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) close();
       }}
     >
-      <motion.div
-        className="launchpad__surface"
-        role="dialog"
-        aria-label="启动台"
-        initial={launchpadSurfaceState(false, shouldReduceMotion)}
-        animate={launchpadSurfaceState(!isClosing, shouldReduceMotion)}
-        transition={launchpadSpring(shouldReduceMotion)}
-      >
-        <motion.button
-          type="button"
-          className="launchpad__close"
-          onClick={close}
-          aria-label="关闭启动台"
-          initial={launchpadControlState(false, shouldReduceMotion)}
-          animate={launchpadControlState(!isClosing, shouldReduceMotion)}
-          transition={launchpadSpring(shouldReduceMotion, 0.04)}
-        >
+      <div className="launchpad__surface" role="dialog" aria-label="启动台">
+        <button type="button" className="launchpad__close" onClick={close} aria-label="关闭启动台">
           ×
-        </motion.button>
-        <motion.div
-          className="launchpad__search"
-          initial={launchpadControlState(false, shouldReduceMotion)}
-          animate={launchpadControlState(!isClosing, shouldReduceMotion)}
-          transition={launchpadSpring(shouldReduceMotion, 0.04)}
-        >
+        </button>
+        <div className="launchpad__search">
           <img src="/icons/launchpad.png" alt="" aria-hidden />
           <input
             ref={inputRef}
@@ -265,7 +225,7 @@ function LaunchpadPanel({ isOpen, isClosing }: LaunchpadPanelProps) {
             spellCheck={false}
             autoComplete="off"
           />
-        </motion.div>
+        </div>
 
         {apps.length === 0 ? (
           <div className="launchpad__empty">没有找到应用</div>
@@ -302,16 +262,12 @@ function LaunchpadPanel({ isOpen, isClosing }: LaunchpadPanelProps) {
                 <motion.div
                   key={`${query}-${pageSize}-${pageIndex}`}
                   className="launchpad__page"
-                  custom={{ direction: pageDirection, reduce: Boolean(shouldReduceMotion) }}
+                  custom={{ direction: pageDirection, reduce: prefersReduced }}
                   initial="enter"
                   animate="center"
                   exit="exit"
                   variants={pageVariants}
-                  transition={
-                    shouldReduceMotion
-                      ? { duration: 0 }
-                      : { type: 'spring', stiffness: 420, damping: 38, mass: 0.82 }
-                  }
+                  transition={prefersReduced ? { duration: 0 } : MOTION_TOKENS.slide}
                 >
                   <div className="launchpad__grid">
                     {currentPage.map((app, pageItemIndex) => {
@@ -358,8 +314,8 @@ function LaunchpadPanel({ isOpen, isClosing }: LaunchpadPanelProps) {
             )}
           </>
         )}
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 
@@ -416,40 +372,6 @@ function getLaunchpadMetrics() {
   if (window.innerWidth <= 640) return { pageSize: 8, columns: 4 };
   if (window.innerWidth <= 900) return { pageSize: 12, columns: 4 };
   return DEFAULT_METRICS;
-}
-
-function launchpadOverlayState(open: boolean, reduce: boolean | null) {
-  if (reduce) return { opacity: open ? 1 : 0 };
-  return {
-    opacity: open ? 1 : 0,
-    filter: open ? 'blur(0px) saturate(1)' : 'blur(10px) saturate(0.9)',
-    scale: open ? 1 : 0.22,
-    y: open ? 0 : 42,
-  };
-}
-
-function launchpadSurfaceState(open: boolean, reduce: boolean | null) {
-  if (reduce) return { opacity: open ? 1 : 0 };
-  return {
-    opacity: open ? 1 : 0,
-    filter: open ? 'blur(0px)' : 'blur(8px)',
-    scale: open ? 1 : 0.72,
-    y: open ? 0 : 28,
-  };
-}
-
-function launchpadControlState(open: boolean, reduce: boolean | null) {
-  if (reduce) return { opacity: open ? 1 : 0 };
-  return {
-    opacity: open ? 1 : 0,
-    scale: open ? 1 : 0.86,
-    y: open ? 0 : 10,
-  };
-}
-
-function launchpadSpring(reduce: boolean | null, delay = 0) {
-  if (reduce) return { duration: 0 };
-  return { type: 'spring' as const, stiffness: 420, damping: 34, mass: 0.82, delay };
 }
 
 const pageVariants = {

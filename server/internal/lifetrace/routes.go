@@ -31,6 +31,7 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			ai.POST("/transparent-cover", handler.GenerateTransparentCover)
 			ai.POST("/pantry-thumbnail", handler.GeneratePantryThumbnail)
 			ai.POST("/recipes", handler.GenerateRecipeSuggestions)
+			ai.POST("/recipes/render-video", handler.RenderRecipeVideo)
 			ai.GET("/actions", handler.ListAIActions)
 			ai.POST("/actions", handler.CreateAIAction)
 			ai.POST("/assistant/stream", handler.StreamAssistant)
@@ -48,6 +49,13 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 		achievements.Use(auth)
 		{
 			achievements.GET("", handler.ListAchievements)
+		}
+
+		checkins := group.Group("/checkins")
+		checkins.Use(auth)
+		{
+			checkins.GET("", handler.ListLegacyCheckins)
+			checkins.PUT("", handler.ToggleLegacyCheckin)
 		}
 
 		plans := group.Group("/plans")
@@ -111,6 +119,16 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			ledger.DELETE("/:id", handler.DeleteLedgerEntry)
 		}
 
+		recurringPayments := group.Group("/recurring-payments")
+		recurringPayments.Use(auth)
+		{
+			recurringPayments.GET("", handler.ListRecurringPayments)
+			recurringPayments.POST("", handler.CreateRecurringPayment)
+			recurringPayments.PATCH("/:id", handler.UpdateRecurringPayment)
+			recurringPayments.DELETE("/:id", handler.DeleteRecurringPayment)
+			recurringPayments.POST("/:id/advance", handler.AdvanceRecurringPayment)
+		}
+
 		closet := group.Group("/closet")
 		closet.Use(auth)
 		{
@@ -146,6 +164,16 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 			pantry.DELETE("/:id", handler.DeletePantryItem)
 		}
 
+		shopping := group.Group("/shopping")
+		shopping.Use(auth)
+		{
+			shopping.GET("", handler.ListShoppingListItems)
+			shopping.POST("", handler.CreateShoppingListItem)
+			shopping.PATCH("/:id", handler.UpdateShoppingListItem)
+			shopping.PATCH("/:id/check", handler.CheckShoppingListItem)
+			shopping.DELETE("/:id", handler.DeleteShoppingListItem)
+		}
+
 		households := group.Group("/households")
 		households.Use(auth)
 		{
@@ -167,13 +195,6 @@ func RegisterRoutes(api *gin.RouterGroup, handler *Handler, auth gin.HandlerFunc
 		{
 			weeklyReviews.GET("", handler.ListWeeklyReviews)
 			weeklyReviews.DELETE("/:id", handler.DeleteWeeklyReview)
-		}
-
-		checkins := group.Group("/checkins")
-		checkins.Use(auth)
-		{
-			checkins.GET("", handler.ListCheckins)
-			checkins.PUT("", handler.ToggleCheckin)
 		}
 
 		settings := group.Group("/settings")

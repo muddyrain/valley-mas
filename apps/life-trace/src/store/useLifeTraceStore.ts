@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { listAchievements } from '@/api/achievements';
 import { listAiActions } from '@/api/aiActions';
-import { listCheckins, toggleCheckin } from '@/api/checkins';
 import {
   type ListInboxOptions,
   listInboxItems,
@@ -50,7 +49,23 @@ import {
   updatePlan,
   updatePlanStatus,
 } from '@/api/plans';
+import {
+  type ListRecurringPaymentsOptions,
+  listRecurringPayments,
+  advanceRecurringPayment as requestAdvanceRecurringPayment,
+  archiveRecurringPayment as requestArchiveRecurringPayment,
+  createRecurringPayment as requestCreateRecurringPayment,
+  updateRecurringPayment as requestUpdateRecurringPayment,
+} from '@/api/recurringPayments';
 import { getSettings, saveSettings } from '@/api/settings';
+import {
+  type ListShoppingOptions,
+  listShopping,
+  checkShoppingItem as requestCheckShoppingItem,
+  createShoppingItem as requestCreateShoppingItem,
+  deleteShoppingItem as requestDeleteShoppingItem,
+  updateShoppingItem as requestUpdateShoppingItem,
+} from '@/api/shopping';
 import { createTrace, deleteTrace, listTraces, updateTrace } from '@/api/traces';
 import { findNewlyUnlockedAchievements, normalizeAchievement } from '@/lib/achievements';
 import { normalizeAiActionRecord } from '@/lib/aiHistory';
@@ -64,7 +79,6 @@ import type {
   AchievementSummary,
   AiAction,
   AppTab,
-  Checkin,
   InboxConvertedType,
   InboxItem,
   InboxItemStatus,
@@ -75,6 +89,8 @@ import type {
   NewLedgerEntryInput,
   NewPantryItemInput,
   NewPlanInput,
+  NewRecurringPaymentInput,
+  NewShoppingListItemInput,
   NewTraceInput,
   PantryItem,
   PantryItemStatus,
@@ -83,6 +99,9 @@ import type {
   Place,
   PlaceRecord,
   Plan,
+  RecurringPayment,
+  RecurringPaymentSummary,
+  ShoppingListItem,
   Trace,
   UserSettings,
 } from '@/types';
@@ -145,12 +164,17 @@ type LifeTraceState = {
   ledgerCreating: boolean;
   ledgerUpdatingById: Record<string, boolean>;
   ledgerDeletingById: Record<string, boolean>;
-  checkins: Checkin[];
-  checkinsDate: string;
-  checkinsLoaded: boolean;
-  checkinsLoading: boolean;
-  checkinsError: string;
-  checkinTogglingByName: Record<string, boolean>;
+  recurringPayments: RecurringPayment[];
+  recurringPaymentsLoaded: boolean;
+  recurringPaymentsLoading: boolean;
+  recurringPaymentsError: string;
+  recurringPaymentsPagination: ListPagination;
+  recurringPaymentsListOptions: ListRecurringPaymentsOptions;
+  recurringPaymentsSummary: RecurringPaymentSummary;
+  recurringPaymentCreating: boolean;
+  recurringPaymentUpdatingById: Record<string, boolean>;
+  recurringPaymentArchivingById: Record<string, boolean>;
+  recurringPaymentAdvancingById: Record<string, boolean>;
   settings: UserSettings;
   settingsLoaded: boolean;
   settingsLoading: boolean;
@@ -171,6 +195,11 @@ type LifeTraceState = {
   pantryListResolvedHouseholdName: string;
   pantryListSummary: PantryOverview;
   pantryPreferences: PantryPreferences;
+  shoppingListItems: ShoppingListItem[];
+  shoppingListLoaded: boolean;
+  shoppingListLoading: boolean;
+  shoppingListError: string;
+  shoppingListResolvedHouseholdId: string;
   achievements: Achievement[];
   achievementSummary: AchievementSummary;
   recentAchievements: Achievement[];
@@ -205,10 +234,8 @@ type LifeTraceState = {
   loadMoreInboxItems: () => Promise<void>;
   loadLedgerEntries: (options?: ListLedgerOptions) => Promise<void>;
   loadMoreLedgerEntries: () => Promise<void>;
-  loadCheckins: (date: string) => Promise<void>;
   loadAchievements: (options?: { notifyNew?: boolean }) => Promise<void>;
   loadAiActions: () => Promise<void>;
-  toggleHabitCheckin: (date: string, name: string, completed: boolean) => Promise<void>;
   addPlan: (input: NewPlanInput) => Promise<Plan | null>;
   addPantryItem: (input: NewPantryItemInput, householdId?: string) => Promise<PantryItem | null>;
   editPantryItem: (
@@ -246,6 +273,22 @@ type LifeTraceState = {
   addLedgerEntry: (input: NewLedgerEntryInput) => Promise<LedgerEntry | null>;
   editLedgerEntry: (entryId: string, input: NewLedgerEntryInput) => Promise<LedgerEntry | null>;
   removeLedgerEntry: (entryId: string) => Promise<boolean>;
+  loadRecurringPayments: (options?: ListRecurringPaymentsOptions) => Promise<void>;
+  addRecurringPayment: (input: NewRecurringPaymentInput) => Promise<RecurringPayment | null>;
+  editRecurringPayment: (
+    id: string,
+    input: NewRecurringPaymentInput,
+  ) => Promise<RecurringPayment | null>;
+  archiveRecurringPaymentAction: (id: string) => Promise<RecurringPayment | null>;
+  advanceRecurringPaymentAction: (id: string) => Promise<RecurringPayment | null>;
+  loadShoppingList: (options?: ListShoppingOptions) => Promise<void>;
+  addShoppingItem: (input: NewShoppingListItemInput) => Promise<ShoppingListItem | null>;
+  editShoppingItem: (
+    itemId: string,
+    input: NewShoppingListItemInput,
+  ) => Promise<ShoppingListItem | null>;
+  toggleShoppingItem: (itemId: string, checked: boolean) => Promise<ShoppingListItem | null>;
+  removeShoppingItem: (itemId: string) => Promise<boolean>;
   completePlan: (planId: string) => Promise<void>;
   removePlan: (planId: string) => Promise<void>;
   removeTrace: (traceId: string) => Promise<void>;
@@ -270,10 +313,15 @@ const defaultSettings: UserSettings = {
   weatherAlerts: true,
   planReminders: true,
   aiPersonalization: true,
-  habits: ['喝水', '休息', '运动', '护肤'],
   pantryReminderEnabled: true,
   pantryReminderRules: ['7d', '3d', 'same-day', 'expired'],
   pantryReminderTime: '09:00',
+  subscriptionReminderEnabled: true,
+  subscriptionReminderRules: ['7d', '3d', 'same-day', 'overdue'],
+  subscriptionReminderTime: '09:00',
+  pantryListStatusFilter: 'all',
+  pantryListCategoryFilter: 'all',
+  pantryListSortMode: 'expiry-asc',
 };
 
 const defaultPagination: ListPagination = {
@@ -325,6 +373,22 @@ const defaultLedgerListOptions: ListLedgerOptions = {
   month: getDefaultLedgerMonth(),
   category: 'all',
   direction: 'all',
+};
+
+const defaultRecurringPaymentsListOptions: ListRecurringPaymentsOptions = {
+  page: 1,
+  pageSize: 20,
+  status: 'active',
+};
+
+const defaultRecurringPaymentSummary: RecurringPaymentSummary = {
+  total: 0,
+  activeCount: 0,
+  overdueCount: 0,
+  upcomingCount: 0,
+  monthlyExpenseCents: 0,
+  monthlyExpense: 0,
+  upcomingDays: 7,
 };
 
 const defaultPlacesListOptions: ListPlacesOptions = {
@@ -408,25 +472,58 @@ const pantryStatusUpdateInFlightKeys = new Set<string>();
 let pantryListRequestId = 0;
 
 function normalizeSettings(settings: Partial<UserSettings>): UserSettings {
-  const habits = Array.isArray(settings.habits)
-    ? settings.habits
-        .map((habit) => habit.trim())
-        .filter((habit, index, list) => habit.length > 0 && list.indexOf(habit) === index)
-    : defaultSettings.habits;
+  const validStatusFilters: UserSettings['pantryListStatusFilter'][] = [
+    'all',
+    'normal',
+    'expiring',
+    'expired',
+    'no-expiry',
+    'used-up',
+    'discarded',
+  ];
+  const validCategoryFilters: UserSettings['pantryListCategoryFilter'][] = [
+    'all',
+    '食品',
+    '日用品',
+    '药品',
+    '宠物',
+    '其他',
+  ];
+  const validSortModes: UserSettings['pantryListSortMode'][] = [
+    'expiry-asc',
+    'created-desc',
+    'expiry-desc',
+  ];
 
   return {
     ...defaultSettings,
     ...settings,
     activePantryHouseholdId: normalizeHouseholdScopeId(settings.activePantryHouseholdId),
-    habits,
     workdays: settings.workdays?.length ? settings.workdays : defaultSettings.workdays,
     pantryReminderRules: settings.pantryReminderRules?.length
       ? settings.pantryReminderRules
       : defaultSettings.pantryReminderRules,
+    subscriptionReminderRules: settings.subscriptionReminderRules?.length
+      ? settings.subscriptionReminderRules
+      : defaultSettings.subscriptionReminderRules,
     planReminderLeadMinutes:
       typeof settings.planReminderLeadMinutes === 'number'
         ? settings.planReminderLeadMinutes
         : defaultSettings.planReminderLeadMinutes,
+    pantryListStatusFilter:
+      settings.pantryListStatusFilter &&
+      validStatusFilters.includes(settings.pantryListStatusFilter)
+        ? settings.pantryListStatusFilter
+        : defaultSettings.pantryListStatusFilter,
+    pantryListCategoryFilter:
+      settings.pantryListCategoryFilter &&
+      validCategoryFilters.includes(settings.pantryListCategoryFilter)
+        ? settings.pantryListCategoryFilter
+        : defaultSettings.pantryListCategoryFilter,
+    pantryListSortMode:
+      settings.pantryListSortMode && validSortModes.includes(settings.pantryListSortMode)
+        ? settings.pantryListSortMode
+        : defaultSettings.pantryListSortMode,
   };
 }
 
@@ -573,12 +670,20 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       ledgerCreating: false,
       ledgerUpdatingById: {},
       ledgerDeletingById: {},
-      checkins: [],
-      checkinsDate: '',
-      checkinsLoaded: false,
-      checkinsLoading: false,
-      checkinsError: '',
-      checkinTogglingByName: {},
+      recurringPayments: [],
+      recurringPaymentsLoaded: false,
+      recurringPaymentsLoading: false,
+      recurringPaymentsError: '',
+      recurringPaymentsPagination: {
+        ...defaultPagination,
+        pageSize: defaultRecurringPaymentsListOptions.pageSize ?? 20,
+      },
+      recurringPaymentsListOptions: defaultRecurringPaymentsListOptions,
+      recurringPaymentsSummary: defaultRecurringPaymentSummary,
+      recurringPaymentCreating: false,
+      recurringPaymentUpdatingById: {},
+      recurringPaymentArchivingById: {},
+      recurringPaymentAdvancingById: {},
       settings: defaultSettings,
       settingsLoaded: false,
       settingsLoading: false,
@@ -602,6 +707,11 @@ export const useLifeTraceStore = create<LifeTraceState>()(
       pantryListResolvedHouseholdName: '',
       pantryListSummary: defaultPantryOverview,
       pantryPreferences: defaultPantryPreferences,
+      shoppingListItems: [],
+      shoppingListLoaded: false,
+      shoppingListLoading: false,
+      shoppingListError: '',
+      shoppingListResolvedHouseholdId: '',
       achievements: [],
       achievementSummary: defaultAchievementSummary,
       recentAchievements: [],
@@ -1492,37 +1602,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           });
         }
       },
-      loadCheckins: async (date) => {
-        const token = getToken();
-        if (!token) {
-          set({
-            checkins: [],
-            checkinsDate: date,
-            checkinsLoaded: true,
-            checkinsLoading: false,
-            checkinsError: '',
-          });
-          return;
-        }
-
-        set({ checkinsLoading: true, checkinsError: '', checkinsDate: date });
-        try {
-          const { list } = await listCheckins(token, date);
-          set({
-            checkins: list,
-            checkinsDate: date,
-            checkinsLoaded: true,
-            checkinsLoading: false,
-            checkinsError: '',
-          });
-        } catch (error) {
-          set({
-            checkinsLoading: false,
-            checkinsLoaded: true,
-            checkinsError: error instanceof Error ? error.message : '获取打卡失败',
-          });
-        }
-      },
       loadAchievements: async (options = {}) => {
         const token = getToken();
         if (!token) {
@@ -1574,51 +1653,6 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           set({ aiActions: response.list.map(normalizeAiActionRecord) });
         } catch {
           // Keep local actions when the history endpoint is temporarily unavailable.
-        }
-      },
-      toggleHabitCheckin: async (date, name, completed) => {
-        const token = getToken();
-        if (!token) {
-          set({ checkinsError: '请先登录后再打卡' });
-          return;
-        }
-        if (get().checkinTogglingByName[name]) {
-          return;
-        }
-
-        set((state) => ({
-          checkinTogglingByName: { ...state.checkinTogglingByName, [name]: true },
-          checkinsError: '',
-        }));
-        try {
-          const updated = await toggleCheckin(token, { date, name, completed });
-          set((state) => {
-            const exists = state.checkins.some((item) => item.name === name && item.date === date);
-            return {
-              checkinsDate: date,
-              checkins: exists
-                ? state.checkins.map((item) =>
-                    item.name === name && item.date === date ? updated : item,
-                  )
-                : [...state.checkins, updated],
-              checkinsError: '',
-              aiActions: [
-                {
-                  id: createActionId(),
-                  title: `${completed ? '完成' : '取消'}了「${name}」打卡`,
-                  timeLabel: '刚刚',
-                },
-                ...getAiActions(state),
-              ],
-            };
-          });
-          void get().loadAchievements({ notifyNew: true });
-        } catch (error) {
-          set({ checkinsError: error instanceof Error ? error.message : '保存打卡失败' });
-        } finally {
-          set((state) => ({
-            checkinTogglingByName: { ...state.checkinTogglingByName, [name]: false },
-          }));
         }
       },
       addPlan: async (input) => {
@@ -2355,6 +2389,299 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           }));
         }
       },
+      loadRecurringPayments: async (options = {}) => {
+        const token = getToken();
+        const nextOptions: ListRecurringPaymentsOptions = {
+          ...get().recurringPaymentsListOptions,
+          ...options,
+          page: options.page ?? 1,
+          pageSize: options.pageSize ?? get().recurringPaymentsListOptions.pageSize ?? 20,
+          status: options.status ?? get().recurringPaymentsListOptions.status ?? 'active',
+        };
+        if (!token) {
+          set({
+            recurringPayments: [],
+            recurringPaymentsLoaded: true,
+            recurringPaymentsLoading: false,
+            recurringPaymentsError: '',
+            recurringPaymentsPagination: {
+              ...defaultPagination,
+              pageSize: nextOptions.pageSize ?? 20,
+            },
+            recurringPaymentsListOptions: nextOptions,
+            recurringPaymentsSummary: defaultRecurringPaymentSummary,
+          });
+          return;
+        }
+
+        set({
+          recurringPaymentsLoading: true,
+          recurringPaymentsError: '',
+          recurringPaymentsListOptions: nextOptions,
+        });
+        try {
+          const { list, summary, pagination } = await listRecurringPayments(token, nextOptions);
+          set({
+            recurringPayments: list,
+            recurringPaymentsSummary: summary,
+            recurringPaymentsPagination: pagination ?? {
+              ...defaultPagination,
+              pageSize: nextOptions.pageSize ?? 20,
+              total: list.length,
+              hasMore: false,
+            },
+            recurringPaymentsLoaded: true,
+            recurringPaymentsLoading: false,
+            recurringPaymentsError: '',
+          });
+        } catch (error) {
+          set({
+            recurringPaymentsLoading: false,
+            recurringPaymentsLoaded: true,
+            recurringPaymentsError: getLifeTraceErrorMessage(error, '获取订阅失败'),
+          });
+        }
+      },
+      addRecurringPayment: async (input) => {
+        const token = getToken();
+        if (!token) {
+          set({ recurringPaymentsError: '请先登录后再添加订阅' });
+          return null;
+        }
+        if (get().recurringPaymentCreating) {
+          return null;
+        }
+
+        set({ recurringPaymentCreating: true, recurringPaymentsError: '' });
+        try {
+          const item = await requestCreateRecurringPayment(token, input);
+          set((state) => ({
+            recurringPayments: [item, ...state.recurringPayments],
+            recurringPaymentsPagination: {
+              ...state.recurringPaymentsPagination,
+              total: state.recurringPaymentsPagination.total + 1,
+            },
+            recurringPaymentsError: '',
+            aiActions: [
+              { id: createActionId(), title: `订阅了「${item.name}」`, timeLabel: '刚刚' },
+              ...getAiActions(state),
+            ],
+          }));
+          void get().loadRecurringPayments(get().recurringPaymentsListOptions);
+          return item;
+        } catch (error) {
+          set({ recurringPaymentsError: getLifeTraceErrorMessage(error, '创建订阅失败') });
+          return null;
+        } finally {
+          set({ recurringPaymentCreating: false });
+        }
+      },
+      editRecurringPayment: async (id, input) => {
+        const token = getToken();
+        if (!token) {
+          set({ recurringPaymentsError: '请先登录后再编辑订阅' });
+          return null;
+        }
+        if (get().recurringPaymentUpdatingById[id]) {
+          return null;
+        }
+
+        set((state) => ({
+          recurringPaymentUpdatingById: { ...state.recurringPaymentUpdatingById, [id]: true },
+          recurringPaymentsError: '',
+        }));
+        try {
+          const updated = await requestUpdateRecurringPayment(token, id, input);
+          set((state) => ({
+            recurringPayments: state.recurringPayments.map((item) =>
+              item.id === id ? updated : item,
+            ),
+            recurringPaymentsError: '',
+          }));
+          void get().loadRecurringPayments(get().recurringPaymentsListOptions);
+          return updated;
+        } catch (error) {
+          set({ recurringPaymentsError: getLifeTraceErrorMessage(error, '更新订阅失败') });
+          return null;
+        } finally {
+          set((state) => ({
+            recurringPaymentUpdatingById: { ...state.recurringPaymentUpdatingById, [id]: false },
+          }));
+        }
+      },
+      archiveRecurringPaymentAction: async (id) => {
+        const token = getToken();
+        if (!token) {
+          set({ recurringPaymentsError: '请先登录后再归档订阅' });
+          return null;
+        }
+        if (get().recurringPaymentArchivingById[id]) {
+          return null;
+        }
+
+        set((state) => ({
+          recurringPaymentArchivingById: { ...state.recurringPaymentArchivingById, [id]: true },
+          recurringPaymentsError: '',
+        }));
+        try {
+          const archived = await requestArchiveRecurringPayment(token, id);
+          set((state) => ({
+            recurringPayments: state.recurringPayments.map((item) =>
+              item.id === id ? archived : item,
+            ),
+            recurringPaymentsError: '',
+            aiActions: [
+              { id: createActionId(), title: `归档了「${archived.name}」`, timeLabel: '刚刚' },
+              ...getAiActions(state),
+            ],
+          }));
+          void get().loadRecurringPayments(get().recurringPaymentsListOptions);
+          return archived;
+        } catch (error) {
+          set({ recurringPaymentsError: getLifeTraceErrorMessage(error, '归档订阅失败') });
+          return null;
+        } finally {
+          set((state) => ({
+            recurringPaymentArchivingById: {
+              ...state.recurringPaymentArchivingById,
+              [id]: false,
+            },
+          }));
+        }
+      },
+      advanceRecurringPaymentAction: async (id) => {
+        const token = getToken();
+        if (!token) {
+          set({ recurringPaymentsError: '请先登录后再推进订阅' });
+          return null;
+        }
+        if (get().recurringPaymentAdvancingById[id]) {
+          return null;
+        }
+
+        set((state) => ({
+          recurringPaymentAdvancingById: { ...state.recurringPaymentAdvancingById, [id]: true },
+          recurringPaymentsError: '',
+        }));
+        try {
+          const advanced = await requestAdvanceRecurringPayment(token, id);
+          set((state) => ({
+            recurringPayments: state.recurringPayments.map((item) =>
+              item.id === id ? advanced : item,
+            ),
+            recurringPaymentsError: '',
+          }));
+          void get().loadRecurringPayments(get().recurringPaymentsListOptions);
+          return advanced;
+        } catch (error) {
+          set({ recurringPaymentsError: getLifeTraceErrorMessage(error, '推进订阅失败') });
+          return null;
+        } finally {
+          set((state) => ({
+            recurringPaymentAdvancingById: {
+              ...state.recurringPaymentAdvancingById,
+              [id]: false,
+            },
+          }));
+        }
+      },
+      loadShoppingList: async (options = {}) => {
+        const token = getToken();
+        const householdId =
+          options.householdId ??
+          (get().preferredPantryHouseholdId ? get().preferredPantryHouseholdId : undefined);
+        if (!token) {
+          set({
+            shoppingListItems: [],
+            shoppingListLoaded: true,
+            shoppingListLoading: false,
+            shoppingListError: '',
+            shoppingListResolvedHouseholdId: '',
+          });
+          return;
+        }
+        set({ shoppingListLoading: true, shoppingListError: '' });
+        try {
+          const data = await listShopping(token, { ...options, householdId });
+          set({
+            shoppingListItems: data.list,
+            shoppingListLoaded: true,
+            shoppingListLoading: false,
+            shoppingListError: '',
+            shoppingListResolvedHouseholdId: data.householdId ?? '',
+          });
+        } catch (error) {
+          set({
+            shoppingListLoaded: true,
+            shoppingListLoading: false,
+            shoppingListError: getLifeTraceErrorMessage(error, '获取采购清单失败'),
+          });
+        }
+      },
+      addShoppingItem: async (input) => {
+        const token = getToken();
+        if (!token) return null;
+        const householdId = get().preferredPantryHouseholdId || undefined;
+        try {
+          const item = await requestCreateShoppingItem(token, input, householdId);
+          set((state) => ({
+            shoppingListItems: [item, ...state.shoppingListItems],
+          }));
+          return item;
+        } catch (error) {
+          set({ shoppingListError: getLifeTraceErrorMessage(error, '加入采购清单失败') });
+          return null;
+        }
+      },
+      editShoppingItem: async (itemId, input) => {
+        const token = getToken();
+        if (!token) return null;
+        const householdId = get().preferredPantryHouseholdId || undefined;
+        try {
+          const item = await requestUpdateShoppingItem(token, itemId, input, householdId);
+          set((state) => ({
+            shoppingListItems: state.shoppingListItems.map((entry) =>
+              entry.id === itemId ? item : entry,
+            ),
+          }));
+          return item;
+        } catch (error) {
+          set({ shoppingListError: getLifeTraceErrorMessage(error, '更新采购清单失败') });
+          return null;
+        }
+      },
+      toggleShoppingItem: async (itemId, checked) => {
+        const token = getToken();
+        if (!token) return null;
+        const householdId = get().preferredPantryHouseholdId || undefined;
+        try {
+          const item = await requestCheckShoppingItem(token, itemId, checked, householdId);
+          set((state) => ({
+            shoppingListItems: state.shoppingListItems.map((entry) =>
+              entry.id === itemId ? item : entry,
+            ),
+          }));
+          return item;
+        } catch (error) {
+          set({ shoppingListError: getLifeTraceErrorMessage(error, '更新采购清单失败') });
+          return null;
+        }
+      },
+      removeShoppingItem: async (itemId) => {
+        const token = getToken();
+        if (!token) return false;
+        const householdId = get().preferredPantryHouseholdId || undefined;
+        try {
+          await requestDeleteShoppingItem(token, itemId, householdId);
+          set((state) => ({
+            shoppingListItems: state.shoppingListItems.filter((entry) => entry.id !== itemId),
+          }));
+          return true;
+        } catch (error) {
+          set({ shoppingListError: getLifeTraceErrorMessage(error, '删除采购清单失败') });
+          return false;
+        }
+      },
       completePlan: async (planId) => {
         const target = get().plans.find((plan) => plan.id === planId);
         const token = getToken();
@@ -2369,7 +2696,15 @@ export const useLifeTraceStore = create<LifeTraceState>()(
         }));
         try {
           const nextCompleted = !target.completed;
-          const updated = await updatePlanStatus(token, planId, nextCompleted);
+          const result = await updatePlanStatus(token, planId, nextCompleted);
+          const updated: Plan =
+            result && typeof result === 'object' && 'plan' in result
+              ? result.plan
+              : (result as Plan);
+          const derivedPlan: Plan | null =
+            result && typeof result === 'object' && 'derivedPlan' in result
+              ? (result.derivedPlan ?? null)
+              : null;
           if (!nextCompleted) {
             set((state) => ({
               plans: state.plans.map((plan) => (plan.id === planId ? updated : plan)),
@@ -2388,16 +2723,39 @@ export const useLifeTraceStore = create<LifeTraceState>()(
           }
 
           const trace = await createTrace(token, createTraceFromPlan(updated));
-          set((state) => ({
-            plans: state.plans.map((plan) => (plan.id === planId ? updated : plan)),
-            traces: [trace, ...state.traces],
-            plansError: '',
-            tracesError: '',
-            aiActions: [
-              { id: createActionId(), title: `生成了「${updated.title}」踪迹`, timeLabel: '刚刚' },
-              ...getAiActions(state),
-            ],
-          }));
+          set((state) => {
+            const replaced = state.plans.map((plan) => (plan.id === planId ? updated : plan));
+            const nextPlans = derivedPlan ? [derivedPlan, ...replaced] : replaced;
+            const nextActions = derivedPlan
+              ? [
+                  {
+                    id: createActionId(),
+                    title: `周期计划「${updated.title}」已生成下一次（${derivedPlan.scheduledDate || ''}）`,
+                    timeLabel: '刚刚',
+                  },
+                  {
+                    id: createActionId(),
+                    title: `生成了「${updated.title}」踪迹`,
+                    timeLabel: '刚刚',
+                  },
+                  ...getAiActions(state),
+                ]
+              : [
+                  {
+                    id: createActionId(),
+                    title: `生成了「${updated.title}」踪迹`,
+                    timeLabel: '刚刚',
+                  },
+                  ...getAiActions(state),
+                ];
+            return {
+              plans: nextPlans,
+              traces: [trace, ...state.traces],
+              plansError: '',
+              tracesError: '',
+              aiActions: nextActions,
+            };
+          });
           void get().loadAchievements({ notifyNew: true });
         } catch (error) {
           set({ plansError: error instanceof Error ? error.message : '更新计划失败' });

@@ -265,6 +265,35 @@ func TestUpdateArchiveConvertAndDeleteInboxItem(t *testing.T) {
 		t.Fatalf("unexpected ledger converted inbox item: %+v", ledgerConverted)
 	}
 
+	for _, target := range []struct {
+		convertedType string
+		convertedID   string
+		title         string
+	}{
+		{convertedType: "media", convertedID: "6001", title: "看完《活着》"},
+		{convertedType: "place", convertedID: "5001", title: "想去的小酒馆"},
+	} {
+		seedItem := model.LifeTraceInboxItem{
+			UserID:   101,
+			Title:    target.title,
+			ItemType: "text",
+			Status:   "inbox",
+		}
+		if err := database.GetDB().Create(&seedItem).Error; err != nil {
+			t.Fatalf("seed %s inbox item: %v", target.convertedType, err)
+		}
+		body := bytes.NewBufferString(`{"convertedType": "` + target.convertedType + `", "convertedId": "` + target.convertedID + `"}`)
+		req := httptest.NewRequest(http.MethodPatch, "/api/v1/life-trace/inbox/"+seedItem.ID.String()+"/convert", body)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+
+		got := decodeTracePayload(t, resp)["data"].(map[string]interface{})
+		if got["status"] != "converted" || got["convertedType"] != target.convertedType || got["convertedId"] != target.convertedID {
+			t.Fatalf("unexpected %s converted inbox item: %+v", target.convertedType, got)
+		}
+	}
+
 	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/life-trace/inbox/"+item.ID.String(), nil)
 	deleteResp := httptest.NewRecorder()
 	router.ServeHTTP(deleteResp, deleteReq)

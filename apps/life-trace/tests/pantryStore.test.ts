@@ -312,7 +312,6 @@ describe('pantry store', () => {
               weatherAlerts: true,
               planReminders: true,
               aiPersonalization: true,
-              habits: ['喝水'],
               pantryReminderEnabled: true,
               pantryReminderRules: ['7d', '3d', 'same-day'],
               pantryReminderTime: '08:30',

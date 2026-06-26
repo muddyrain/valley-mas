@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
+import { useBrowserStore } from '../store/browserStore';
 import { useControlCenterStore } from '../store/controlCenterStore';
 import { useLaunchpadStore } from '../store/launchpadStore';
 import { useNotificationCenterStore } from '../store/notificationCenterStore';
 import { useSpotlightStore } from '../store/spotlightStore';
+import { useWindowStore } from '../store/windowStore';
 
 export default function DesktopGlobalEvents() {
   const toggleSpotlight = useSpotlightStore((s) => s.toggle);
@@ -59,6 +61,56 @@ export default function DesktopGlobalEvents() {
     closeSpotlight,
     toggleSpotlight,
   ]);
+
+  useEffect(() => {
+    function isInsideAddressBar(target: EventTarget | null): boolean {
+      if (!(target instanceof HTMLElement)) return false;
+      return Boolean(target.closest('[data-safari-address-input]'));
+    }
+
+    function focusSafariAddressBar() {
+      if (typeof document === 'undefined') return;
+      const input = document.querySelector<HTMLInputElement>('[data-safari-address-input]');
+      if (!input) return;
+      input.focus();
+      input.select();
+    }
+
+    function onSafariShortcut(e: KeyboardEvent) {
+      const cmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (!cmdOrCtrl) return;
+      if (useWindowStore.getState().focusedAppId !== 'safari') return;
+
+      const key = e.key.toLowerCase();
+      if (key !== 't' && key !== 'w' && key !== 'l' && key !== 'r') return;
+
+      if (key !== 'l' && isInsideAddressBar(e.target)) return;
+
+      const browser = useBrowserStore.getState();
+      if (key === 't') {
+        e.preventDefault();
+        browser.newTab();
+        return;
+      }
+      if (key === 'w') {
+        e.preventDefault();
+        browser.closeTab(browser.activeTabId);
+        return;
+      }
+      if (key === 'l') {
+        e.preventDefault();
+        focusSafariAddressBar();
+        return;
+      }
+      if (key === 'r') {
+        e.preventDefault();
+        browser.refresh();
+      }
+    }
+
+    window.addEventListener('keydown', onSafariShortcut);
+    return () => window.removeEventListener('keydown', onSafariShortcut);
+  }, []);
 
   return null;
 }

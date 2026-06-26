@@ -17,6 +17,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EditTraceDrawer } from '@/components/EditTraceDrawer';
 import { EmptyState } from '@/components/EmptyState';
 import { ImagePreview } from '@/components/ImagePreview';
+import { LifeFilterBar } from '@/components/LifeLayout';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import {
   SoftHeader,
@@ -26,6 +27,7 @@ import {
   SoftSectionTitle,
   SoftStatGrid,
 } from '@/components/SoftDiary';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
@@ -35,7 +37,7 @@ import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
 import type { Trace } from '@/types';
 
-type TraceFilter = 'all' | 'plan' | 'checkin' | 'pantry' | 'media' | 'manual' | 'with-image';
+type TraceFilter = 'all' | 'plan' | 'pantry' | 'media' | 'manual' | 'with-image';
 
 const traceFilters: Array<{ id: TraceFilter; label: string; emptyText: string }> = [
   {
@@ -47,11 +49,6 @@ const traceFilters: Array<{ id: TraceFilter; label: string; emptyText: string }>
     id: 'plan',
     label: '计划',
     emptyText: '还没有由计划生成的踪迹。完成一个计划后会自动沉淀到这里。',
-  },
-  {
-    id: 'checkin',
-    label: '打卡',
-    emptyText: '还没有打卡类踪迹。后续完成关键打卡后可以沉淀成生活记录。',
   },
   {
     id: 'pantry',
@@ -77,7 +74,6 @@ const traceFilters: Array<{ id: TraceFilter; label: string; emptyText: string }>
 
 const sourceTone: Record<Trace['source'], 'plan' | 'health' | 'trace'> = {
   计划: 'plan',
-  打卡: 'health',
   库存: 'trace',
   书影音: 'trace',
   穿搭: 'plan',
@@ -103,9 +99,6 @@ type TraceMonthGroup = {
 function filterTraces(traces: Trace[], filter: TraceFilter) {
   if (filter === 'plan') {
     return traces.filter((trace) => trace.source === '计划');
-  }
-  if (filter === 'checkin') {
-    return traces.filter((trace) => trace.source === '打卡');
   }
   if (filter === 'pantry') {
     return traces.filter((trace) => trace.source === '库存');
@@ -335,6 +328,7 @@ function TraceDetailContent({
 
 export function TracesPage() {
   const traces = useLifeTraceStore((state) => state.traces);
+  const tracesLoaded = useLifeTraceStore((state) => state.tracesLoaded);
   const tracesLoading = useLifeTraceStore((state) => state.tracesLoading);
   const tracesLoadingMore = useLifeTraceStore((state) => state.tracesLoadingMore);
   const tracesPagination = useLifeTraceStore((state) => state.tracesPagination);
@@ -376,6 +370,8 @@ export function TracesPage() {
   }, [activeFilter, activeTag, traces]);
   const showTracesErrorFallback =
     Boolean(tracesError) && !tracesLoading && filteredTraces.length === 0;
+  const initialTracesLoading = tracesLoading && !tracesLoaded;
+  const tracesRefreshing = tracesLoading && tracesLoaded;
   const monthGroups = useMemo(() => groupTracesByMonth(filteredTraces), [filteredTraces]);
   const selectedTrace = traceId ? (traces.find((trace) => trace.id === traceId) ?? null) : null;
   const activeFilterConfig =
@@ -471,7 +467,7 @@ export function TracesPage() {
             type="button"
             variant="secondary"
             size="icon"
-            className="size-14 rounded-[1.15rem]"
+            className="size-14 rounded-[1.25rem]"
             aria-label="新建踪迹"
             onClick={() => setCreateOpen(true)}
           >
@@ -490,7 +486,7 @@ export function TracesPage() {
 
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-3 rounded-[1.35rem] border border-life-trace/20 bg-card/85 p-4 text-left shadow-[0_18px_54px_rgba(71,58,42,0.075)] transition hover:border-life-trace/40 hover:bg-card"
+        className="flex w-full items-center justify-between gap-3 rounded-[1.25rem] border border-life-trace/20 bg-card/85 p-4 text-left shadow-[0_18px_54px_rgba(71,58,42,0.075)] transition hover:border-life-trace/40 hover:bg-card"
         onClick={() => navigate('/media-diary')}
       >
         <span className="flex min-w-0 items-center gap-3">
@@ -505,8 +501,8 @@ export function TracesPage() {
         <Badge tone="trace">进入</Badge>
       </button>
 
-      <div className="rounded-[1.35rem] border border-border/70 bg-card/80 p-1">
-        <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="rounded-[1.25rem] border border-border/70 bg-card/80 p-1">
+        <LifeFilterBar className="gap-1 pb-0">
           {traceFilters.map((filter) => {
             const active = activeFilter === filter.id;
 
@@ -527,7 +523,7 @@ export function TracesPage() {
               </button>
             );
           })}
-        </div>
+        </LifeFilterBar>
       </div>
 
       <SoftPanel className="p-3">
@@ -599,11 +595,9 @@ export function TracesPage() {
         </Card>
       ) : null}
 
-      {tracesLoading ? (
-        <SyncState title="正在同步生活踪迹" tone="trace" variant="skeleton-list" />
-      ) : null}
-
-      <div className="space-y-7">
+      <div className="relative space-y-5">
+        {tracesRefreshing ? <InlineRefreshStatus tone="trace" /> : null}
+        {initialTracesLoading ? <ListCardSkeleton media rows={3} /> : null}
         {filteredTraces.length > 0 ? (
           <SoftSectionTitle title={currentMonthLabel} meta={`${filteredTraces.length} 条记录`} />
         ) : null}
@@ -626,13 +620,14 @@ export function TracesPage() {
                 <article
                   key={trace.id}
                   className="relative grid grid-cols-[2rem_minmax(0,1fr)] gap-3"
+                  data-scroll-anchor={`traces:${trace.id}`}
                 >
                   <span className="relative z-10 mt-5 grid size-5 self-start justify-self-center rounded-full border border-life-trace/40 bg-background shadow-[0_0_0_5px_rgba(16,185,129,0.06)]">
                     <span className="m-auto size-2 rounded-full bg-life-trace" />
                   </span>
                   <Card
                     className={cn(
-                      'cursor-pointer overflow-hidden rounded-[1.35rem] border-border/80 bg-card/85 shadow-[0_18px_54px_rgba(71,58,42,0.065)] transition hover:border-life-trace/40 hover:shadow-[0_18px_56px_rgba(16,185,129,0.08)]',
+                      'cursor-pointer overflow-hidden rounded-[1.25rem] border-border/80 bg-card/85 shadow-[0_18px_54px_rgba(71,58,42,0.065)] transition hover:border-life-trace/40 hover:shadow-[0_18px_56px_rgba(16,185,129,0.08)]',
                       trace.source === '库存' &&
                         'border-life-ai/15 bg-[linear-gradient(180deg,rgba(6,182,212,0.04),rgba(16,185,129,0.03))]',
                     )}

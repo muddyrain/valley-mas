@@ -11,11 +11,12 @@ import {
   StarOff,
 } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetSelectField } from '@/components/FormItem';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { SectionHeader } from '@/components/SectionHeader';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -120,6 +121,7 @@ function PlaceCard({ place }: { place: Place }) {
     <button
       type="button"
       className="block w-full text-left"
+      data-scroll-anchor={`places:${place.id}`}
       onClick={() => navigate(`/places/${place.id}`)}
     >
       <Card className="p-4 transition hover:border-life-trace/35 hover:bg-life-trace/5">
@@ -316,14 +318,40 @@ function PlacesListView() {
   const loadMorePlaces = useLifeTraceStore((state) => state.loadMorePlaces);
   const addPlace = useLifeTraceStore((state) => state.addPlace);
   const exportPlaces = useLifeTraceStore((state) => state.exportPlaces);
+  const convertInbox = useLifeTraceStore((state) => state.convertInbox);
   const groups = useMemo(() => groupPlaces(places), [places]);
+  const initialPlacesLoading = placesLoading && !placesLoaded;
+  const placesRefreshing = placesLoading && placesLoaded;
+  const location = useLocation();
+  const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState<PlaceFormState>(defaultPlaceForm);
   const [formError, setFormError] = useState('');
+  const [pendingInboxItemId, setPendingInboxItemId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadPlaces({ page: 1, pageSize: 20, archived: false });
   }, [loadPlaces]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('new') !== '1') {
+      return;
+    }
+    const rawStatus = params.get('status');
+    const status: PlaceStatus =
+      rawStatus === 'want' || rawStatus === 'visited' ? rawStatus : 'want';
+    setCreateForm({
+      ...defaultPlaceForm,
+      name: params.get('name') ?? '',
+      status,
+      note: params.get('note') ?? '',
+    });
+    setPendingInboxItemId(params.get('inboxItemId'));
+    setFormError('');
+    setCreating(true);
+    navigate(location.pathname, { replace: true });
+  }, [location.pathname, location.search, navigate]);
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -339,7 +367,11 @@ function PlacesListView() {
     }
     const created = await addPlace(payload);
     if (created) {
+      if (pendingInboxItemId) {
+        void convertInbox(pendingInboxItemId, 'place', created.id);
+      }
       setCreateForm(defaultPlaceForm);
+      setPendingInboxItemId(null);
       setCreating(false);
     }
   };
@@ -371,7 +403,7 @@ function PlacesListView() {
         </Button>
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-5">
         <Card className="p-4">
           <div className="flex items-start gap-3">
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-trace/10 text-life-trace">
@@ -412,6 +444,8 @@ function PlacesListView() {
 
         {placesError ? <LoadErrorState error={placesError} onRetry={() => loadPlaces()} /> : null}
 
+        {initialPlacesLoading ? <ListCardSkeleton rows={3} /> : null}
+
         {!placesLoading && placesLoaded && places.length === 0 ? (
           <EmptyState
             icon={MapPin}
@@ -420,10 +454,13 @@ function PlacesListView() {
           />
         ) : null}
 
-        <PlaceGroup title="收藏地点" places={groups.favorites} />
-        <PlaceGroup title="想去地点" places={groups.wantPlaces} />
-        <PlaceGroup title="常去地点" places={groups.frequent} />
-        <PlaceGroup title="最近出现" places={groups.recent} />
+        <div className="relative space-y-5">
+          {placesRefreshing ? <InlineRefreshStatus tone="trace" /> : null}
+          <PlaceGroup title="收藏地点" places={groups.favorites} />
+          <PlaceGroup title="想去地点" places={groups.wantPlaces} />
+          <PlaceGroup title="常去地点" places={groups.frequent} />
+          <PlaceGroup title="最近出现" places={groups.recent} />
+        </div>
 
         {placesPagination.hasMore ? (
           <Button

@@ -8,6 +8,7 @@ import EmptyState from '../ui/EmptyState';
 import PlushImage from '../ui/PlushImage';
 import PlushLoading from '../ui/PlushLoading';
 import PlushLoadMore from '../ui/PlushLoadMore';
+import { PlushButton } from '../ui/PlushPrimitives';
 import PlushScrollbar from '../ui/PlushScrollbar';
 import PlushSelect, { type PlushSelectOption } from '../ui/PlushSelect';
 import './BlogWindow.css';
@@ -119,14 +120,16 @@ export default function BlogWindow() {
           <h2>博客</h2>
           <p>{total > 0 ? `${total} 篇文章` : '阅读已发布文章'}</p>
         </div>
-        <button
+        <PlushButton
           type="button"
+          unstyled
           className="dock-app-window__button"
           onClick={() => void refreshPosts()}
-          disabled={loading}
+          loading={loading}
+          loadingLabel="刷新中"
         >
-          {loading ? '刷新中' : '刷新'}
-        </button>
+          刷新
+        </PlushButton>
       </header>
 
       <form className="blog-window__toolbar" onSubmit={submitSearch}>

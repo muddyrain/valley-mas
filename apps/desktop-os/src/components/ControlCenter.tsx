@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useControlCenterStore } from '../store/controlCenterStore';
+import { PlushPresence, PlushSlide } from '../ui/PlushMotion';
 import Slider from '../ui/Slider';
 import ToggleSwitch from '../ui/ToggleSwitch';
 import './ControlCenter.css';
@@ -7,12 +8,18 @@ import './ControlCenter.css';
 export default function ControlCenter() {
   const isOpen = useControlCenterStore((s) => s.isOpen);
 
-  if (!isOpen) return null;
-
-  return <ControlCenterPanel />;
+  return (
+    <PlushPresence>
+      {isOpen ? (
+        <PlushSlide key="control-center" open from="top">
+          <ControlCenterPanel />
+        </PlushSlide>
+      ) : null}
+    </PlushPresence>
+  );
 }
 
-function ControlCenterPanel() {
+export function ControlCenterPanel() {
   const close = useControlCenterStore((s) => s.close);
   const isOnline = useControlCenterStore((s) => s.isOnline);
   const bluetoothStatus = useControlCenterStore((s) => s.bluetoothStatus);

@@ -27,7 +27,7 @@ describe('createPlanFromAdvice', () => {
       city: '杭州',
     });
 
-    expect(plan.title).toBe('健康打卡：湿热感强，注意补水休息');
+    expect(plan.title).toBe('健康提醒：湿热感强，注意补水休息');
     expect(plan.type).toBe('运动');
     expect(plan.timeLabel).toMatch(/^\d{4}-\d{2}-\d{2} 20:00$/);
     expect(plan.scheduledTime).toBe('20:00');

@@ -19,9 +19,11 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { EmptyState } from '@/components/EmptyState';
 import { ImagePreview } from '@/components/ImagePreview';
+import { LifeFilterBar, LifeList } from '@/components/LifeLayout';
 import { LoadErrorState } from '@/components/LoadErrorState';
 import { PlanDetailContent } from '@/components/PlanDetailDrawer';
 import { SoftHeader, SoftPage, SoftPanel, SoftSectionTitle } from '@/components/SoftDiary';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
@@ -72,12 +74,13 @@ const planTypeOptions: Array<PlanType | 'all'> = [
   '普通事项',
 ];
 
-type QuickPlanFilter = 'all' | 'weekend' | 'reminded';
+type QuickPlanFilter = 'all' | 'weekend' | 'reminded' | 'recurring';
 
 const quickFilterOptions: Array<{ id: QuickPlanFilter; label: string }> = [
   { id: 'all', label: '全部计划' },
   { id: 'weekend', label: '只看周末' },
   { id: 'reminded', label: '只看提醒' },
+  { id: 'recurring', label: '仅看周期' },
 ];
 
 const typeTone: Record<PlanType, 'plan' | 'health' | 'trace' | 'weather' | 'ai' | 'alert'> = {
@@ -93,6 +96,7 @@ export function PlansPage() {
   const {
     plans,
     plansError,
+    plansLoaded,
     plansLoading,
     plansLoadingMore,
     plansPagination,
@@ -137,6 +141,11 @@ export function PlansPage() {
     if (quickFilter === 'reminded') {
       nextPlans = filterPlans(nextPlans, 'reminded');
     }
+    if (quickFilter === 'recurring') {
+      nextPlans = nextPlans.filter(
+        (plan) => plan.recurrenceFrequency && plan.recurrenceFrequency !== 'none',
+      );
+    }
     if (activeFilter !== 'completed') {
       nextPlans = nextPlans.filter((plan) => !plan.completed);
     }
@@ -178,6 +187,9 @@ export function PlansPage() {
   const showPlansErrorCard = Boolean(plansError) && !plansSyncIssue;
   const showPlansSyncFallback = Boolean(plansSyncIssue) && !plansLoading && plans.length === 0;
   const showPlansErrorFallback = showPlansErrorCard && !plansLoading && plans.length === 0;
+  // 初次加载占位，刷新保留旧列表，避免返回后布局跳动。
+  const initialPlansLoading = plansLoading && !plansLoaded;
+  const plansRefreshing = plansLoading && plansLoaded;
   const weekDays = useMemo(() => {
     const base = new Date();
     const monday = new Date(base);
@@ -279,6 +291,7 @@ export function PlansPage() {
         role="button"
         tabIndex={0}
         data-plan-card
+        data-scroll-anchor={`plans:${plan.id}`}
         onClick={() => navigate(`/plans/${plan.id}`)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -324,6 +337,9 @@ export function PlansPage() {
                   <Badge tone={typeTone[plan.type]}>{plan.type}</Badge>
                   {isAdvicePlan(plan) ? <Badge tone="ai">今日建议</Badge> : null}
                   {isOverduePlan(plan) ? <Badge tone="alert">已逾期</Badge> : null}
+                  {plan.recurrenceFrequency && plan.recurrenceFrequency !== 'none' ? (
+                    <Badge tone="weather">循环</Badge>
+                  ) : null}
                   {plan.completed ? <Badge tone="trace">已完成</Badge> : null}
                 </div>
                 <h2 className="mt-2 line-clamp-2 text-lg font-semibold leading-snug">
@@ -453,7 +469,7 @@ export function PlansPage() {
   }
 
   return (
-    <SoftPage ref={pageRef} className="space-y-5">
+    <SoftPage ref={pageRef} className="pb-32">
       <SoftHeader
         title="计划"
         subtitle={new Intl.DateTimeFormat('zh-CN', {
@@ -465,7 +481,7 @@ export function PlansPage() {
           <Button
             type="button"
             variant="ai"
-            className="h-14 rounded-[1.15rem] px-4 text-base"
+            className="h-14 rounded-[1.25rem] px-4 text-base"
             disabled={planCreating}
             onClick={() => {
               setEditingPlan(null);
@@ -523,7 +539,7 @@ export function PlansPage() {
         </button>
       ) : null}
 
-      <div className="grid grid-cols-3 rounded-[1.35rem] border border-border/70 bg-card/70 p-1 text-sm font-semibold text-muted-foreground">
+      <div className="grid grid-cols-3 rounded-[1.25rem] border border-border/70 bg-card/70 p-1 text-sm font-semibold text-muted-foreground">
         {primaryPlanFilters.map((filter) => {
           const active = activeFilter === filter.id;
 
@@ -601,7 +617,7 @@ export function PlansPage() {
               </Button>
             )}
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <LifeFilterBar>
             {quickFilterOptions.map((filter) => {
               const active = quickFilter === filter.id;
               return (
@@ -620,8 +636,8 @@ export function PlansPage() {
                 </button>
               );
             })}
-          </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          </LifeFilterBar>
+          <LifeFilterBar className="items-center">
             <div className="flex shrink-0 items-center gap-1 text-xs font-semibold text-muted-foreground">
               类型
             </div>
@@ -643,7 +659,7 @@ export function PlansPage() {
                 </button>
               );
             })}
-          </div>
+          </LifeFilterBar>
         </Card>
       ) : null}
 
@@ -667,14 +683,13 @@ export function PlansPage() {
         </Card>
       ) : null}
 
-      {plansLoading ? (
-        <SyncState title="正在同步你的计划" description="正在从云端刷新计划列表。" tone="plan" />
-      ) : null}
-
-      <div className="space-y-5">
+      <div className="relative space-y-5">
+        {plansRefreshing ? <InlineRefreshStatus tone="plan" /> : null}
         <SoftSectionTitle title="今天的安排" meta={`${todayTimelinePlans.length} 个`} />
         <SoftPanel className="px-4 py-2">
-          {todayTimelinePlans.length > 0 ? (
+          {initialPlansLoading ? (
+            <ListCardSkeleton rows={2} />
+          ) : todayTimelinePlans.length > 0 ? (
             <div className="relative py-2 pl-[5.25rem]">
               <div className="absolute left-[4.55rem] top-7 bottom-7 w-px bg-border" />
               {todayTimelinePlans.map((plan, index) => {
@@ -692,6 +707,7 @@ export function PlansPage() {
                     key={plan.id}
                     type="button"
                     className="relative flex min-h-[5rem] w-full items-center gap-3.5 border-b border-border/70 py-3 text-left last:border-b-0"
+                    data-scroll-anchor={`plans:${plan.id}`}
                     onClick={() => navigate(`/plans/${plan.id}`)}
                   >
                     <span className="absolute -left-[4.85rem] w-14 text-[1.05rem] font-semibold text-life-trace">
@@ -726,7 +742,9 @@ export function PlansPage() {
 
         <SoftSectionTitle title="即将到来" meta={`${upcomingPreviewPlans.length} 个`} />
         <SoftPanel className="px-4 py-2">
-          {upcomingPreviewPlans.length > 0 ? (
+          {initialPlansLoading ? (
+            <ListCardSkeleton rows={2} />
+          ) : upcomingPreviewPlans.length > 0 ? (
             upcomingPreviewPlans.map((plan) => {
               const { dateText, timeText } = getPlanDisplayTimeParts(plan);
               return (
@@ -734,6 +752,7 @@ export function PlansPage() {
                   key={plan.id}
                   type="button"
                   className="flex min-h-[4.8rem] w-full items-center gap-4 border-b border-border/70 py-3 text-left last:border-b-0"
+                  data-scroll-anchor={`plans:${plan.id}`}
                   onClick={() => navigate(`/plans/${plan.id}`)}
                 >
                   <span className="w-20 shrink-0 text-sm font-semibold text-life-trace">
@@ -760,13 +779,14 @@ export function PlansPage() {
           )}
         </SoftPanel>
 
+        {initialPlansLoading && planGroups.length === 0 ? <ListCardSkeleton rows={3} /> : null}
         {planGroups.map((group) => (
           <section key={group.title} className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <h2 className={cn('text-lg font-semibold', group.tone)}>{group.title}</h2>
               <span className="text-xs text-muted-foreground">{group.plans.length} 个</span>
             </div>
-            <div className="space-y-4">{group.plans.map(renderPlanCard)}</div>
+            <LifeList>{group.plans.map(renderPlanCard)}</LifeList>
           </section>
         ))}
         {showPlansSyncFallback ? (

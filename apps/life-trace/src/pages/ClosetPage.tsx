@@ -24,7 +24,9 @@ import { listHouseholds } from '@/api/household';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { ClosetItemSheet, clothingAnalysisToClosetDraft } from '@/components/ClosetItemSheet';
 import { EmptyState } from '@/components/EmptyState';
+import { LifeFilterBar, LifeList } from '@/components/LifeLayout';
 import { SectionHeader } from '@/components/SectionHeader';
+import { ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -483,7 +485,7 @@ export function ClosetPage() {
     return (
       <SubPageShell title="衣物详情" eyebrow="衣橱" fallbackBackTo="/closet">
         {itemLoading || !selectedItem ? (
-          <Card className="p-5 text-sm text-muted-foreground">正在读取衣物</Card>
+          <Card className="p-4 text-sm text-muted-foreground">正在读取衣物</Card>
         ) : (
           <div className="space-y-5">
             <Card className="overflow-hidden p-0">
@@ -498,7 +500,7 @@ export function ClosetPage() {
                   <Shirt className="size-12" />
                 </div>
               )}
-              <div className="space-y-4 p-5">
+              <div className="space-y-4 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <Badge tone={selectedItem.item.shared ? 'ai' : 'trace'}>
@@ -618,7 +620,7 @@ export function ClosetPage() {
     return (
       <SubPageShell title="穿搭详情" eyebrow="衣橱" fallbackBackTo="/closet">
         {outfitLoading || !selectedOutfit ? (
-          <Card className="p-5 text-sm text-muted-foreground">正在读取穿搭</Card>
+          <Card className="p-4 text-sm text-muted-foreground">正在读取穿搭</Card>
         ) : (
           <div className="space-y-5">
             <Card className="overflow-hidden p-0">
@@ -629,7 +631,7 @@ export function ClosetPage() {
                   className="aspect-[4/3] w-full object-cover"
                 />
               ) : null}
-              <div className="space-y-3 p-5">
+              <div className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <Badge tone={selectedOutfit.outfit.status === 'worn' ? 'trace' : 'ai'}>
@@ -687,8 +689,8 @@ export function ClosetPage() {
         </button>
       }
     >
-      <div className="space-y-6">
-        <Card className="space-y-4 p-5">
+      <div className="space-y-5">
+        <Card className="space-y-4 p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-life-ai">今日穿搭</p>
@@ -723,7 +725,7 @@ export function ClosetPage() {
         </Card>
 
         {households.length > 1 ? (
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <LifeFilterBar>
             {households.map((household) => {
               const active = household.id === selectedHousehold?.id;
               return (
@@ -743,7 +745,7 @@ export function ClosetPage() {
                 </button>
               );
             })}
-          </div>
+          </LifeFilterBar>
         ) : null}
 
         {error ? <p className="text-sm text-life-alert">{error}</p> : null}
@@ -751,7 +753,7 @@ export function ClosetPage() {
         {suggestions.length > 0 ? (
           <section>
             <SectionHeader title="建议穿搭" meta={`${suggestions.length} 套`} />
-            <div className="space-y-3">
+            <LifeList>
               {suggestions.map((suggestion) => {
                 const saveActionKey = getSuggestionActionKey(suggestion, 'save');
                 const wearActionKey = getSuggestionActionKey(suggestion, 'wear');
@@ -825,14 +827,14 @@ export function ClosetPage() {
                   </Card>
                 );
               })}
-            </div>
+            </LifeList>
           </section>
         ) : null}
 
         <section>
           <SectionHeader title="衣物" meta={loading ? '同步中' : `${filteredItems.length} 件`} />
           {!loading && items.length > 0 ? (
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            <LifeFilterBar className="mt-3">
               <button
                 type="button"
                 className={cn(
@@ -869,10 +871,10 @@ export function ClosetPage() {
               >
                 待洗护 {careDueItemsCount > 0 ? `${careDueItemsCount}` : ''}
               </button>
-            </div>
+            </LifeFilterBar>
           ) : null}
           {loading ? (
-            <Card className="p-5 text-sm text-muted-foreground">正在读取衣橱</Card>
+            <ListCardSkeleton media rows={4} />
           ) : filteredItems.length === 0 ? (
             <EmptyState
               icon={Shirt}
@@ -904,16 +906,17 @@ export function ClosetPage() {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {filteredItems.map((item) => (
-                <ClosetItemCard
-                  key={item.id}
-                  item={item}
-                  onEdit={() => {
-                    setEditingItem(item);
-                    setSheetOpen(true);
-                  }}
-                  onOpen={() => navigate(`/closet/items/${item.id}`)}
-                  onDelete={() => void handleDeleteItem(item)}
-                />
+                <div key={item.id} data-scroll-anchor={`closet:item:${item.id}`}>
+                  <ClosetItemCard
+                    item={item}
+                    onEdit={() => {
+                      setEditingItem(item);
+                      setSheetOpen(true);
+                    }}
+                    onOpen={() => navigate(`/closet/items/${item.id}`)}
+                    onDelete={() => void handleDeleteItem(item)}
+                  />
+                </div>
               ))}
             </div>
           )}
@@ -921,7 +924,9 @@ export function ClosetPage() {
 
         <section>
           <SectionHeader title="穿搭" meta={outfitsLoading ? '同步中' : `${outfits.length} 套`} />
-          {outfits.length === 0 ? (
+          {outfitsLoading && outfits.length === 0 ? (
+            <ListCardSkeleton rows={2} />
+          ) : outfits.length === 0 ? (
             <Card className="p-4 text-sm text-muted-foreground">保存穿搭后会出现在这里。</Card>
           ) : (
             <div className="space-y-3">
@@ -930,6 +935,7 @@ export function ClosetPage() {
                   key={outfit.id}
                   type="button"
                   className="flex w-full items-center justify-between gap-4 rounded-[1.25rem] border border-border bg-card p-4 text-left transition hover:bg-secondary/60"
+                  data-scroll-anchor={`closet:outfit:${outfit.id}`}
                   onClick={() => navigate(`/closet/outfits/${outfit.id}`)}
                 >
                   <span className="min-w-0">

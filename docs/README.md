@@ -6,6 +6,7 @@
 
 - [项目指南](./PROJECT_GUIDE.md)：项目定位、技术栈、模块地图、开发命令、端口和环境变量。
 - [Harness Engineering](./HARNESS_ENGINEERING.md)：AI coding agent 在本仓库中的上下文入口、工具边界、验证命令、评审回路和回归证据。
+- [Agent 配置](./agents/)：Matt Pocock engineering skills 使用的 issue tracker、triage 标签和 domain docs 消费规则。
 
 ## 子项目文档
 
@@ -14,6 +15,7 @@
 - Admin 运营后台入口：`apps/admin/src/pages/admin-ops`、`apps/admin/src/api/operations.ts`；覆盖运营列表、AI 调用审计和存储资产只读治理。
 - Go 服务端：`server/AGENTS.md`、`server/README.md`、`server/migrations/README.md`。
 - Life Trace：`apps/life-trace/README.md`、`apps/life-trace/docs/PLAN.md`。
+- Desktop OS：`apps/desktop-os/AGENTS.md`、`apps/desktop-os/docs/PLAN.md`。
 - AI Mind Arena：`apps/ai-mind-arena/AGENTS.md`、`apps/ai-mind-arena/README.md`、`server/internal/model/mind_arena.go`。
 - WorldSim：`apps/world-sim/AGENTS.md`、`apps/world-sim/docs/*`。
 - Toy Climb Arena：`apps/toy-climb-arena/AGENTS.md`、`apps/toy-climb-arena/docs/*`。

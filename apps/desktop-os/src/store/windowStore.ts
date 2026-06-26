@@ -160,6 +160,7 @@ export const useWindowStore = create<WindowStore>((set, get) => ({
 
   focusWindow: (id) =>
     set((state) => {
+      if (!state.windows.some((w) => w.id === id)) return state;
       const z = state.topZ + 1;
       const focusedAppId = state.windows.find((w) => w.id === id)?.appId ?? state.focusedAppId;
       const windows: WindowState[] = state.windows.map((w) =>

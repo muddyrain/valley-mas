@@ -27,12 +27,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   deleteWeeklyReview,
-  generateRecipeSuggestions,
   generateTodayAdvice,
   generateWeeklyReview,
   listWeeklyReviews,
-  type RecipeSuggestionItem,
-  type RecipeSuggestionResponse,
   type WeeklyReviewResponse,
 } from '@/api/advice';
 import {
@@ -52,6 +49,7 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CreatePlanDrawer } from '@/components/CreatePlanDrawer';
 import { EmptyState } from '@/components/EmptyState';
+import { LifePage } from '@/components/LifeLayout';
 import { LifeTraceBrandMark } from '@/components/LifeTraceBrandMark';
 import { SectionHeader } from '@/components/SectionHeader';
 import { SubPageShell } from '@/components/SubPageShell';
@@ -63,6 +61,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { suggestedPrompts } from '@/data/mock';
 import { useLifeAssistantStream } from '@/features/ai/useLifeAssistantStream';
 import { createPlanFromAdvice, hasAdvicePlan } from '@/lib/advicePlan';
+import {
+  readAiConversationArtifact,
+  writeAiConversationArtifact,
+} from '@/lib/aiConversationArtifacts';
 import {
   filterAiActions,
   getAiActionMeta,
@@ -83,8 +85,7 @@ import {
   removePhotoItemAnalysisHistoryItem,
 } from '@/lib/photoItemAnalysisCloud';
 import { getPlanDisplayTimeParts } from '@/lib/planReminder';
-import { getLocalISODate } from '@/lib/planSchedule';
-import { createPlanFromRecipe } from '@/lib/recipePlan';
+import { readRecipeHistory, type StoredRecipeSuggestion } from '@/lib/recipeHistory';
 import { cn } from '@/lib/utils';
 import { readWeatherCache } from '@/lib/weatherCache';
 import {
@@ -287,6 +288,25 @@ function formatConversationTime(conversation: LifeAssistantConversation) {
   });
 }
 
+function getConversationSortTime(conversation: LifeAssistantConversation) {
+  const value = conversation.updatedAt || conversation.createdAt;
+  if (!value) {
+    return 0;
+  }
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function mergeAssistantConversations(
+  conversations: LifeAssistantConversation[],
+  nextConversation: LifeAssistantConversation,
+) {
+  return [
+    nextConversation,
+    ...conversations.filter((item) => item.id !== nextConversation.id),
+  ].sort((left, right) => getConversationSortTime(right) - getConversationSortTime(left));
+}
+
 function WeeklyReviewPanel({
   review,
   addingActionKey,
@@ -380,147 +400,6 @@ function WeeklyReviewPanel({
   );
 }
 
-function RecipeSuggestionPanel({
-  result,
-  addingRecipeId,
-  onAddRecipePlan,
-}: {
-  result: RecipeSuggestionResponse;
-  addingRecipeId: string | null;
-  onAddRecipePlan: (recipe: RecipeSuggestionItem) => void;
-}) {
-  return (
-    <div className="mb-3 space-y-3">
-      <div className="rounded-2xl border border-life-health/25 bg-life-health/10 p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Utensils className="size-4 text-life-health" />
-          <Badge tone="health">库存优先</Badge>
-          <p className="min-w-0 flex-1 text-sm font-semibold">
-            {result.householdName ? `${result.householdName} · ` : ''}
-            {result.summary}
-          </p>
-        </div>
-        {result.warnings.length > 0 ? (
-          <div className="mt-3 space-y-1.5">
-            {result.warnings.map((warning) => (
-              <p key={warning} className="text-xs leading-5 text-muted-foreground">
-                {warning}
-              </p>
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      {result.recipes.length > 0 ? (
-        <div className="space-y-3">
-          {result.recipes.map((recipe) => {
-            const adding = addingRecipeId === recipe.id;
-
-            return (
-              <Card key={recipe.id} className="border-life-health/20 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge tone="health">{recipe.timeMinutes} 分钟</Badge>
-                      <Badge tone="ai">{recipe.difficulty}</Badge>
-                      <span className="text-xs font-semibold text-muted-foreground">
-                        {recipe.servings} 人份
-                      </span>
-                    </div>
-                    <h3 className="mt-3 text-base font-semibold leading-snug">{recipe.title}</h3>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{recipe.reason}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-life-plan px-3 py-1.5 text-xs font-semibold text-background transition hover:bg-life-plan/90 disabled:cursor-default disabled:opacity-70"
-                    disabled={Boolean(addingRecipeId)}
-                    onClick={() => onAddRecipePlan(recipe)}
-                  >
-                    {adding ? (
-                      <ActionLoadingIcon className="size-3.5 text-background" />
-                    ) : (
-                      <Plus className="size-3.5" />
-                    )}
-                    {adding ? '加入中' : '加入计划'}
-                  </button>
-                </div>
-
-                <div className="mt-3 grid gap-2 text-xs leading-5 text-muted-foreground">
-                  <p>
-                    <span className="font-semibold text-foreground">消耗：</span>
-                    {recipe.usedItems.length > 0 ? recipe.usedItems.join('、') : '按现有食材确认'}
-                  </p>
-                  {recipe.missingItems.length > 0 ? (
-                    <p>
-                      <span className="font-semibold text-foreground">可能缺：</span>
-                      {recipe.missingItems.join('、')}
-                    </p>
-                  ) : null}
-                </div>
-
-                <ol className="mt-3 space-y-2 text-sm leading-6">
-                  {recipe.steps.map((step, stepIndex) => (
-                    <li key={`${recipe.id}-${step}`} className="flex gap-2">
-                      <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-secondary text-xs font-semibold text-life-health">
-                        {stepIndex + 1}
-                      </span>
-                      <span className="min-w-0">{step}</span>
-                    </li>
-                  ))}
-                </ol>
-
-                {recipe.tags.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {recipe.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-muted-foreground"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-              </Card>
-            );
-          })}
-        </div>
-      ) : (
-        <EmptyState
-          title="暂时没有可用食材"
-          description="去 Pantry 补充食品或切换家庭空间后，再让 Life AI 生成菜谱。"
-          eyebrow="智能菜谱"
-          icon={Utensils}
-          tone="health"
-          align="center"
-        />
-      )}
-    </div>
-  );
-}
-
-function RecipeLoadingState() {
-  return (
-    <div className="mb-3 rounded-2xl border border-life-health/25 bg-life-health/10 p-4">
-      <div className="flex items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
-          <ActionLoadingIcon className="size-5" tone="health" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground">正在生成智能菜谱</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            正在读取当前 Pantry 食品库存。
-          </p>
-        </div>
-      </div>
-      <div className="mt-4 space-y-2" aria-hidden="true">
-        <div className="h-3 w-3/4 animate-pulse rounded-full bg-life-health/20 motion-reduce:animate-none" />
-        <div className="h-3 w-1/2 animate-pulse rounded-full bg-life-health/20 motion-reduce:animate-none" />
-      </div>
-    </div>
-  );
-}
-
 function WeeklyReviewsArchive({
   reviews,
   loading,
@@ -545,7 +424,7 @@ function WeeklyReviewsArchive({
   addingActionKey: string | null;
 }) {
   return (
-    <SubPageShell title="历史周报" eyebrow="周报归档" onBack={onBack} contentClassName="space-y-6">
+    <SubPageShell title="历史周报" eyebrow="周报归档" onBack={onBack}>
       {loading ? (
         <SyncState
           title="正在同步历史周报"
@@ -654,7 +533,6 @@ function AssistantHistoryPage({
       title="对话历史"
       eyebrow="Life AI"
       onBack={onBack}
-      contentClassName="space-y-6"
       action={
         <button
           type="button"
@@ -773,12 +651,7 @@ function AiActionsArchive({ actions, onBack }: { actions: AiAction[]; onBack: ()
   const hasKeyword = keyword.trim().length > 0;
 
   return (
-    <SubPageShell
-      title="AI 操作历史"
-      eyebrow="Life AI"
-      onBack={onBack}
-      contentClassName="space-y-6"
-    >
+    <SubPageShell title="AI 操作历史" eyebrow="Life AI" onBack={onBack}>
       <section className="space-y-3">
         <SectionHeader title="动作追踪" meta={`${filteredActions.length} 条`} />
         <label className="flex min-h-11 items-center gap-2 rounded-2xl border border-border bg-card px-3 text-sm text-muted-foreground focus-within:border-life-ai/50 focus-within:text-life-ai">
@@ -843,7 +716,6 @@ function PhotoItemHistoryArchive({
       title="最近商品识别"
       eyebrow="Life AI"
       onBack={onBack}
-      contentClassName="space-y-6"
       action={
         <button
           type="button"
@@ -1053,6 +925,105 @@ function AssistantLandingPromptButton({
   );
 }
 
+function AiCommandCard({
+  icon: Icon,
+  title,
+  description,
+  toneClass,
+  onClick,
+  loading,
+  disabled,
+  featured,
+}: {
+  icon: typeof Sparkles;
+  title: string;
+  description: string;
+  toneClass: string;
+  onClick: () => void;
+  loading: boolean;
+  disabled: boolean;
+  featured: boolean;
+}) {
+  let iconContent = <Icon className="size-4" />;
+  let titleText = title;
+
+  if (loading) {
+    iconContent = <ActionLoadingIcon className="size-4" />;
+    titleText = '处理中';
+  }
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        'flex min-h-[6.6rem] w-full cursor-pointer flex-col items-start justify-between rounded-[1.2rem] border p-3 text-left shadow-[0_12px_36px_rgba(71,58,42,0.055)] transition hover:-translate-y-0.5 hover:bg-secondary/55 disabled:cursor-default disabled:opacity-70 disabled:hover:translate-y-0',
+        featured && 'border-life-ai/25 bg-life-ai/10',
+        !featured && 'border-border/75 bg-card/82 hover:border-life-ai/25',
+      )}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className="flex w-full items-start justify-between gap-3">
+        <span
+          className={cn(
+            'grid size-10 shrink-0 place-items-center rounded-xl bg-secondary',
+            toneClass,
+          )}
+        >
+          {iconContent}
+        </span>
+        <ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold leading-5">{titleText}</span>
+        <span className="mt-1 block text-xs leading-5 text-muted-foreground">{description}</span>
+      </span>
+    </button>
+  );
+}
+
+function RecentRecipeHistory({
+  recipes,
+  onOpenRecipes,
+}: {
+  recipes: StoredRecipeSuggestion[];
+  onOpenRecipes: () => void;
+}) {
+  if (recipes.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3 px-1">
+        <p className="text-xl font-semibold">最近菜谱</p>
+        <span className="text-xs font-semibold text-muted-foreground">{recipes.length} 份</span>
+      </div>
+      <div className="grid gap-2">
+        {recipes.slice(0, 3).map((recipe) => (
+          <button
+            type="button"
+            key={recipe.id}
+            className="flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-[1.25rem] border border-life-health/20 bg-card/80 px-3 py-2.5 text-left shadow-[0_10px_30px_rgba(71,58,42,0.055)] transition hover:border-life-health/35 hover:bg-life-health/5"
+            onClick={onOpenRecipes}
+          >
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-life-health/10 text-life-health">
+              <Utensils className="size-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold">{recipe.title}</span>
+              <span className="mt-1 block truncate text-xs text-muted-foreground">
+                {recipe.householdName || '我的空间'} · {recipe.timeMinutes} 分钟
+              </span>
+            </span>
+            <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AssistantToolRow({
   icon: Icon,
   label,
@@ -1128,13 +1099,7 @@ function AssistantToolsSheet({
   };
 
   return (
-    <BottomSheet
-      open={open}
-      onOpenChange={onOpenChange}
-      overlayLabel="关闭 AI 工具"
-      contentClassName="space-y-6"
-      portal
-    >
+    <BottomSheet open={open} onOpenChange={onOpenChange} overlayLabel="关闭 AI 工具" portal>
       <div className="px-1 pb-1">
         <p className="text-2xl font-semibold tracking-normal">AI 工具</p>
         <p className="mt-2 text-sm leading-5 text-muted-foreground">计划、Pantry 与回顾</p>
@@ -1145,7 +1110,7 @@ function AssistantToolsSheet({
           <p className="text-sm font-semibold">生活动作</p>
           <span className="text-xs text-muted-foreground">5 个动作</span>
         </div>
-        <div className="space-y-2 rounded-[1.35rem] border border-border/80 bg-secondary/15 p-2.5">
+        <div className="space-y-2 rounded-[1.25rem] border border-border/80 bg-secondary/15 p-2.5">
           <AssistantToolRow
             icon={Sun}
             label="今天安排"
@@ -1190,7 +1155,7 @@ function AssistantToolsSheet({
           <p className="text-sm font-semibold">Pantry 智能</p>
           <span className="text-xs text-muted-foreground">5 个入口</span>
         </div>
-        <div className="space-y-2 rounded-[1.35rem] border border-border/80 bg-secondary/15 p-2.5">
+        <div className="space-y-2 rounded-[1.25rem] border border-border/80 bg-secondary/15 p-2.5">
           <AssistantToolRow
             icon={Camera}
             label="拍照分析商品"
@@ -1201,8 +1166,6 @@ function AssistantToolsSheet({
             icon={Utensils}
             label="智能菜谱"
             toneClass="text-life-health"
-            loading={quickActionLoading === '智能菜谱'}
-            disabled={Boolean(quickActionLoading)}
             onClick={() => closeAndRun(() => onQuickAction('智能菜谱'))}
           />
           <AssistantToolRow
@@ -1259,21 +1222,19 @@ function AgentConversationPanel({
   model,
   input,
   result,
-  recipeResult,
   adviceCards,
   plans,
   addingAdviceId,
-  addingRecipeId,
   weeklyReviews,
   weeklyReviewsLoading,
   photoItemHistory,
+  recentRecipes,
   quickActionLoading,
   aiActions,
   locationLabel,
   weatherSummary,
   pantryHouseholdLabel,
   openPlanCount,
-  completedCheckinCount,
   expiringPantryCount,
   speechSupported,
   listening,
@@ -1295,7 +1256,6 @@ function AgentConversationPanel({
   toolsSheetOpen,
   onToolsSheetOpenChange,
   onAddAdvicePlan,
-  onAddRecipePlan,
   onQuickAction,
 }: {
   conversation: LifeAssistantConversation | null;
@@ -1305,21 +1265,19 @@ function AgentConversationPanel({
   model: string;
   input: string;
   result: AiResult | null;
-  recipeResult: RecipeSuggestionResponse | null;
   adviceCards: AdvicePayload[];
   plans: Plan[];
   addingAdviceId: string | null;
-  addingRecipeId: string | null;
   weeklyReviews: WeeklyReviewResponse[];
   weeklyReviewsLoading: boolean;
   photoItemHistory: PhotoItemAnalysisHistoryItem[];
+  recentRecipes: StoredRecipeSuggestion[];
   quickActionLoading: string | null;
   aiActions: AiAction[];
   locationLabel: string;
   weatherSummary: string;
   pantryHouseholdLabel: string;
   openPlanCount: number;
-  completedCheckinCount: number;
   expiringPantryCount: number;
   speechSupported: boolean;
   listening: boolean;
@@ -1341,7 +1299,6 @@ function AgentConversationPanel({
   toolsSheetOpen: boolean;
   onToolsSheetOpenChange: (open: boolean) => void;
   onAddAdvicePlan: (item: AdvicePayload) => void;
-  onAddRecipePlan: (recipe: RecipeSuggestionItem) => void;
   onQuickAction: (label: string) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -1349,8 +1306,7 @@ function AgentConversationPanel({
   const canSend = Boolean(input.trim()) && !streaming;
   const latestPhotoDraft = photoItemHistory.find((item) => item.status === 'draft') ?? null;
   const summaryPhotoItemHistory = getPhotoItemAnalysisSummaryItems(photoItemHistory);
-  const hasChatActivity =
-    messages.length > 0 || Boolean(result) || Boolean(recipeResult) || adviceCards.length > 0;
+  const hasChatActivity = messages.length > 0 || Boolean(result) || adviceCards.length > 0;
   const landingPromptCards = suggestedPrompts.slice(0, 4);
 
   useEffect(() => {
@@ -1358,11 +1314,16 @@ function AgentConversationPanel({
   });
 
   return (
-    <div className="flex h-[calc(100dvh_-_5.35rem_-_env(safe-area-inset-bottom))] min-h-0 flex-col overflow-hidden px-4 pt-3 max-[360px]:px-3">
-      <div className="grid shrink-0 grid-cols-[3rem_minmax(0,1fr)_3rem] items-start gap-2 pb-3">
+    <LifePage
+      variant="immersive"
+      spacing="compact"
+      withBottomInset={false}
+      className="flex h-[calc(100dvh_-_5.35rem_-_env(safe-area-inset-bottom))] min-h-0 flex-col overflow-hidden"
+    >
+      <div className="grid shrink-0 grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-start gap-2 pb-2">
         <button
           type="button"
-          className="mt-1 grid size-12 place-items-center rounded-[1.05rem] bg-card/80 text-foreground shadow-[0_8px_24px_rgba(71,58,42,0.07)] transition hover:bg-secondary"
+          className="mt-1 grid size-11 place-items-center rounded-[1rem] bg-card/85 text-foreground shadow-[0_8px_24px_rgba(71,58,42,0.07)] transition hover:bg-secondary"
           aria-label="打开话题列表"
           onClick={onOpenConversations}
         >
@@ -1381,7 +1342,7 @@ function AgentConversationPanel({
               </span>
             ) : null}
           </div>
-          <p className="mt-2 truncate text-base text-muted-foreground">
+          <p className="mt-1.5 truncate text-sm text-muted-foreground">
             {streaming
               ? '正在整理下一步'
               : loading
@@ -1393,7 +1354,7 @@ function AgentConversationPanel({
         </div>
         <button
           type="button"
-          className="mt-1 grid size-12 place-items-center rounded-[1.05rem] bg-card/80 text-foreground shadow-[0_8px_24px_rgba(71,58,42,0.07)] transition hover:bg-secondary disabled:opacity-50"
+          className="mt-1 grid size-11 place-items-center rounded-[1rem] bg-card/85 text-foreground shadow-[0_8px_24px_rgba(71,58,42,0.07)] transition hover:bg-secondary disabled:opacity-50"
           aria-label="新话题"
           disabled={streaming}
           onClick={onCreateConversation}
@@ -1406,18 +1367,18 @@ function AgentConversationPanel({
         <section className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {!hasChatActivity ? (
-              <div className="mb-5 space-y-5">
-                <div className="rounded-[1.45rem] border border-border/75 bg-card/78 p-4 shadow-[0_18px_54px_rgba(71,58,42,0.075)] backdrop-blur">
-                  <div className="flex items-start justify-between gap-3">
+              <div className="mb-5 space-y-4">
+                <div className="rounded-[1.25rem] border border-border/75 bg-card/82 p-3.5 shadow-[0_14px_42px_rgba(71,58,42,0.065)] backdrop-blur">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-xl font-semibold">今天我看到了这些</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p className="text-lg font-semibold">今日状态</p>
+                      <p className="mt-1 truncate text-sm text-muted-foreground">
                         {locationLabel} · {weatherSummary}
                       </p>
                     </div>
                     <LifeTraceBrandMark className="size-10 rounded-2xl" />
                   </div>
-                  <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     <ContextSummaryChip
                       icon={CalendarDays}
                       label="计划"
@@ -1431,12 +1392,6 @@ function AgentConversationPanel({
                       toneClass="text-life-health"
                     />
                     <ContextSummaryChip
-                      icon={Check}
-                      label="打卡"
-                      value={`${completedCheckinCount} 项`}
-                      toneClass="text-life-trace"
-                    />
-                    <ContextSummaryChip
                       icon={Sparkles}
                       label="Pantry"
                       value={pantryHouseholdLabel}
@@ -1445,21 +1400,81 @@ function AgentConversationPanel({
                   </div>
                 </div>
 
-                <div className="rounded-[1.45rem] border border-border/75 bg-card/78 p-4 shadow-[0_18px_54px_rgba(71,58,42,0.075)]">
-                  <div className="flex items-start gap-3">
-                    <LifeTraceBrandMark className="size-11 rounded-full" />
-                    <div className="min-w-0 flex-1 rounded-[1.25rem] border border-border/70 bg-background/70 px-4 py-3 text-lg font-semibold leading-8">
-                      今天适合先处理一件小事：补一个计划，或者把临期食材用掉。
-                    </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3 px-1">
+                    <p className="text-xl font-semibold">常用动作</p>
+                    {quickActionLoading && <Badge tone="ai">处理中</Badge>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <AiCommandCard
+                      icon={Sun}
+                      title="今天安排"
+                      description="生成今日建议"
+                      toneClass="text-life-health"
+                      loading={quickActionLoading === '生成今日建议'}
+                      disabled={Boolean(quickActionLoading)}
+                      onClick={() => onQuickAction('生成今日建议')}
+                      featured
+                    />
+                    <AiCommandCard
+                      icon={CalendarDays}
+                      title="创建计划"
+                      description="补一条生活安排"
+                      toneClass="text-life-plan"
+                      loading={false}
+                      disabled={Boolean(quickActionLoading)}
+                      featured={false}
+                      onClick={() => onQuickAction('创建计划')}
+                    />
+                    <AiCommandCard
+                      icon={Camera}
+                      title="拍照入库"
+                      description="识别商品草稿"
+                      toneClass="text-life-ai"
+                      loading={false}
+                      disabled={Boolean(quickActionLoading)}
+                      featured={false}
+                      onClick={onOpenPhotoAnalysis}
+                    />
+                    <AiCommandCard
+                      icon={Utensils}
+                      title="智能菜谱"
+                      description="库存优先做饭"
+                      toneClass="text-life-health"
+                      loading={false}
+                      disabled={Boolean(quickActionLoading)}
+                      featured={false}
+                      onClick={() => onQuickAction('智能菜谱')}
+                    />
+                    <AiCommandCard
+                      icon={ListChecks}
+                      title="每周回顾"
+                      description="整理本周生活"
+                      toneClass="text-life-plan"
+                      loading={quickActionLoading === '每周回顾'}
+                      disabled={Boolean(quickActionLoading)}
+                      featured={false}
+                      onClick={() => onQuickAction('每周回顾')}
+                    />
+                    <AiCommandCard
+                      icon={History}
+                      title="对话历史"
+                      description={`${messages.length} 条消息`}
+                      toneClass="text-life-ai"
+                      loading={false}
+                      disabled={Boolean(quickActionLoading)}
+                      featured={false}
+                      onClick={onOpenHistory}
+                    />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-3 px-1">
-                    <p className="text-xl font-semibold">生活动作</p>
+                    <p className="text-xl font-semibold">快速提问</p>
                     {streaming ? <Badge tone="ai">处理中</Badge> : null}
                   </div>
-                  <div className="overflow-hidden rounded-[1.45rem] border border-border/75 bg-card/78 shadow-[0_18px_54px_rgba(71,58,42,0.075)]">
+                  <div className="overflow-hidden rounded-[1.25rem] border border-border/75 bg-card/82 shadow-[0_14px_42px_rgba(71,58,42,0.065)]">
                     {landingPromptCards.map((prompt) => {
                       const Icon = prompt.icon;
 
@@ -1475,6 +1490,11 @@ function AgentConversationPanel({
                     })}
                   </div>
                 </div>
+
+                <RecentRecipeHistory
+                  recipes={recentRecipes}
+                  onOpenRecipes={() => onQuickAction('智能菜谱')}
+                />
               </div>
             ) : null}
 
@@ -1571,15 +1591,6 @@ function AgentConversationPanel({
               </div>
             ) : null}
 
-            {recipeResult ? (
-              <RecipeSuggestionPanel
-                result={recipeResult}
-                addingRecipeId={addingRecipeId}
-                onAddRecipePlan={onAddRecipePlan}
-              />
-            ) : null}
-            {quickActionLoading === '智能菜谱' && !recipeResult ? <RecipeLoadingState /> : null}
-
             {messages.length > 0 ? (
               <div className="space-y-2.5">
                 {messages.map((message) => (
@@ -1614,10 +1625,10 @@ function AgentConversationPanel({
                 <div className="min-w-0">
                   <p className="truncate text-xs text-muted-foreground">
                     {listening
-                      ? '正在听写，停下后可以直接发送'
+                      ? '正在听写'
                       : streaming
                         ? '正在生成回复'
-                        : '所有工具都会在当前 chat 内完成'}
+                        : conversation?.title || '当前话题'}
                   </p>
                   {speechError ? (
                     <p className="mt-1 text-xs text-life-alert">{speechError}</p>
@@ -1681,7 +1692,7 @@ function AgentConversationPanel({
         onOpenPhotoItemDraft={onOpenPhotoItemDraft}
         onQuickAction={onQuickAction}
       />
-    </div>
+    </LifePage>
   );
 }
 
@@ -1705,11 +1716,7 @@ function useAiPageState() {
   );
   const plans = useLifeTraceStore((state) => state.plans);
   const traces = useLifeTraceStore((state) => state.traces);
-  const checkins = useLifeTraceStore((state) => state.checkins);
-  const checkinsDate = useLifeTraceStore((state) => state.checkinsDate);
-  const checkinsLoading = useLifeTraceStore((state) => state.checkinsLoading);
   const settings = useLifeTraceStore((state) => state.settings);
-  const settingsLoaded = useLifeTraceStore((state) => state.settingsLoaded);
   const aiActions = useLifeTraceStore((state) => state.aiActions ?? []);
   const addAiAction = useLifeTraceStore((state) => state.addAiAction);
   const addPlan = useLifeTraceStore((state) => state.addPlan);
@@ -1718,7 +1725,6 @@ function useAiPageState() {
   const receiveServerLedgerEntry = useLifeTraceStore((state) => state.receiveServerLedgerEntry);
   const loadAchievements = useLifeTraceStore((state) => state.loadAchievements);
   const loadAiActions = useLifeTraceStore((state) => state.loadAiActions);
-  const loadCheckins = useLifeTraceStore((state) => state.loadCheckins);
   const loadPantryList = useLifeTraceStore((state) => state.loadPantryList);
   const pantryListSummary = useLifeTraceStore((state) => state.pantryListSummary);
   const generateTraceFromLatestPlan = useLifeTraceStore(
@@ -1732,7 +1738,6 @@ function useAiPageState() {
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [result, setResult] = useState<AiResult | null>(null);
-  const [recipeResult, setRecipeResult] = useState<RecipeSuggestionResponse | null>(null);
   const [adviceCards, setAdviceCards] = useState<AdvicePayload[]>([]);
   const [assistantInput, setAssistantInput] = useState('');
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
@@ -1757,11 +1762,11 @@ function useAiPageState() {
   const [assistantListening, setAssistantListening] = useState(false);
   const [assistantSpeechError, setAssistantSpeechError] = useState('');
   const [quickActionLoading, setQuickActionLoading] = useState<string | null>(null);
+  const [recentRecipes] = useState<StoredRecipeSuggestion[]>(() => readRecipeHistory());
   const [photoItemHistory, setPhotoItemHistory] = useState<PhotoItemAnalysisHistoryItem[]>(() =>
     readPhotoItemAnalysisHistory(),
   );
   const [addingAdviceId, setAddingAdviceId] = useState<string | null>(null);
-  const [addingRecipeId, setAddingRecipeId] = useState<string | null>(null);
   const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReviewResponse[]>([]);
   const [weeklyReviewsLoading, setWeeklyReviewsLoading] = useState(false);
   const [weeklyReviewRegenerateTarget, setWeeklyReviewRegenerateTarget] =
@@ -1776,9 +1781,6 @@ function useAiPageState() {
 
   const openPlanCount = plans.filter((plan) => !plan.completed).length;
   const completedPlanCount = plans.length - openPlanCount;
-  const todayDate = useMemo(() => getLocalISODate(new Date()), []);
-  const todayCheckins = checkinsDate === todayDate ? checkins : [];
-  const completedCheckinCount = todayCheckins.filter((item) => item.completed).length;
   const latestWeeklyReview = weeklyReviews[0];
   const currentWeekReview = findCurrentWeekReview(weeklyReviews);
   const activeAssistantConversation =
@@ -1800,6 +1802,26 @@ function useAiPageState() {
     : '我的空间';
 
   useEffect(() => {
+    if (
+      !activeAssistantConversationId ||
+      assistantHistoryLoading ||
+      assistantConversationsLoading
+    ) {
+      return;
+    }
+    writeAiConversationArtifact(activeAssistantConversationId, {
+      result: result?.weeklyReview ? null : result,
+      adviceCards,
+    });
+  }, [
+    activeAssistantConversationId,
+    adviceCards,
+    assistantConversationsLoading,
+    assistantHistoryLoading,
+    result,
+  ]);
+
+  useEffect(() => {
     if (!token) {
       return;
     }
@@ -1818,14 +1840,6 @@ function useAiPageState() {
       householdId: preferredPantryHouseholdId || undefined,
     });
   }, [loadPantryList, preferredPantryHouseholdId, token]);
-
-  useEffect(() => {
-    if (!token || !settingsLoaded) {
-      return;
-    }
-
-    void loadCheckins(todayDate);
-  }, [loadCheckins, settingsLoaded, todayDate, token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1888,6 +1902,8 @@ function useAiPageState() {
       setAssistantMessages([]);
       setAssistantConversations([]);
       setActiveAssistantConversationId('');
+      setResult(null);
+      setAdviceCards([]);
       return;
     }
 
@@ -1913,12 +1929,12 @@ function useAiPageState() {
           return;
         }
         setAssistantHistoryNotice('');
-        setAssistantConversations((items) => [
-          data.conversation,
-          ...items.filter((item) => item.id !== data.conversation.id),
-        ]);
+        setAssistantConversations((items) => mergeAssistantConversations(items, data.conversation));
         setActiveAssistantConversationId(data.conversation.id);
         setAssistantMessages(data.messages.map(normalizeAssistantMessage));
+        const artifact = readAiConversationArtifact(data.conversation.id);
+        setResult((artifact?.result as AiResult | null | undefined) ?? null);
+        setAdviceCards(artifact?.adviceCards ?? []);
       })
       .catch(() => {
         if (!alive) {
@@ -2010,11 +2026,13 @@ function useAiPageState() {
       if (message.role === 'user') {
         const title = message.content.trim().slice(0, 32);
         setAssistantConversations((items) =>
-          items.map((item) =>
-            item.id === saved.conversationId
-              ? { ...item, title, updatedAt: saved.createdAt }
-              : item,
-          ),
+          items
+            .map((item) =>
+              item.id === saved.conversationId
+                ? { ...item, title, updatedAt: saved.createdAt }
+                : item,
+            )
+            .sort((left, right) => getConversationSortTime(right) - getConversationSortTime(left)),
         );
       }
     } catch {
@@ -2035,14 +2053,11 @@ function useAiPageState() {
     try {
       const data = await getLifeAssistantConversationById(token, conversation.id);
       setActiveAssistantConversationId(data.conversation.id);
-      setAssistantConversations((items) => [
-        data.conversation,
-        ...items.filter((item) => item.id !== data.conversation.id),
-      ]);
+      setAssistantConversations((items) => mergeAssistantConversations(items, data.conversation));
       setAssistantMessages(data.messages.map(normalizeAssistantMessage));
-      setResult(null);
-      setRecipeResult(null);
-      setAdviceCards([]);
+      const artifact = readAiConversationArtifact(data.conversation.id);
+      setResult((artifact?.result as AiResult | null | undefined) ?? null);
+      setAdviceCards(artifact?.adviceCards ?? []);
       setAssistantModel('');
       setAssistantHistoryNotice('');
       setAssistantConversationSheetOpen(false);
@@ -2059,14 +2074,10 @@ function useAiPageState() {
     }
 
     const conversation = await createLifeAssistantConversation(token);
-    setAssistantConversations((items) => [
-      conversation,
-      ...items.filter((item) => item.id !== conversation.id),
-    ]);
+    setAssistantConversations((items) => mergeAssistantConversations(items, conversation));
     setActiveAssistantConversationId(conversation.id);
     setAssistantMessages([]);
     setResult(null);
-    setRecipeResult(null);
     setAdviceCards([]);
     setAssistantModel('');
     if (resetInput) {
@@ -2108,16 +2119,14 @@ function useAiPageState() {
         setActiveAssistantConversationId(nextId);
         if (nextId) {
           const next = await getLifeAssistantConversationById(token, nextId);
-          setAssistantConversations((items) => [
-            next.conversation,
-            ...items.filter((item) => item.id !== next.conversation.id),
-          ]);
+          setAssistantConversations((items) =>
+            mergeAssistantConversations(items, next.conversation),
+          );
           setAssistantMessages(next.messages.map(normalizeAssistantMessage));
         } else {
           setAssistantMessages([]);
         }
         setResult(null);
-        setRecipeResult(null);
         setAdviceCards([]);
         setAssistantModel('');
       }
@@ -2260,7 +2269,6 @@ function useAiPageState() {
 
   const runWeeklyReview = async () => {
     setQuickActionLoading('每周回顾');
-    setRecipeResult(null);
     try {
       if (!token) {
         throw new Error('请先登录后再生成服务端 AI 每周回顾');
@@ -2287,9 +2295,8 @@ function useAiPageState() {
       });
       setWeeklyReviews((items) => [review, ...items.filter((item) => item.id !== review.id)]);
     } catch (error) {
-      const habits = settings.habits ?? [];
       const reason = error instanceof Error ? error.message : '服务端 AI 暂时不可用';
-      const detail = `未存档原因：${reason}。这次只生成本地回顾，不会进入历史周报。本周已有 ${traces.length} 条生活踪迹、${completedPlanCount} 个已完成计划。你最稳定的节奏是：${habits.slice(0, 3).join('、') || '保持记录'}。`;
+      const detail = `未存档原因：${reason}。这次只生成本地回顾，不会进入历史周报。本周已有 ${traces.length} 条生活踪迹、${completedPlanCount} 个已完成计划。`;
       setResult({ title: '本地每周回顾（未存档）', detail, tone: 'health' });
     } finally {
       setQuickActionLoading(null);
@@ -2340,7 +2347,6 @@ function useAiPageState() {
   const handleQuickAction = async (label: string) => {
     if (label === '创建计划') {
       setDrawerOpen(true);
-      setRecipeResult(null);
       setResult({
         title: '准备创建计划',
         detail: '填写标题、时间和提醒后，Life Trace 会把它加入计划列表。',
@@ -2365,51 +2371,12 @@ function useAiPageState() {
     }
 
     if (label === '智能菜谱') {
-      setQuickActionLoading(label);
-      setAdviceCards([]);
-      setRecipeResult(null);
-      setResult({
-        title: '正在生成智能菜谱',
-        detail: '正在读取当前 Pantry 食品库存。',
-        tone: 'health',
-      });
-      try {
-        if (!token) {
-          throw new Error('请先登录后再生成智能菜谱');
-        }
-        if (!settings.aiPersonalization) {
-          throw new Error('“我的”页的 AI 个性化开关未开启');
-        }
-
-        const recipes = await generateRecipeSuggestions(token, {
-          meal: '晚餐',
-          servings: 2,
-          maxMinutes: 30,
-          householdId: preferredPantryHouseholdId || undefined,
-        });
-        setRecipeResult(recipes);
-        setResult({
-          title: recipes.recipes.length > 0 ? '智能菜谱已生成' : '暂时没有可用菜谱',
-          detail: recipes.summary,
-          tone: recipes.recipes.length > 0 ? 'health' : 'alert',
-        });
-      } catch (error) {
-        setResult({
-          title: '智能菜谱生成失败',
-          detail:
-            error instanceof Error ? error.message : '请稍后再试，或先检查 Pantry 是否有食品库存。',
-          tone: 'alert',
-        });
-      } finally {
-        setQuickActionLoading(null);
-      }
-      addAiAction('生成了库存优先智能菜谱');
+      navigate('/ai/recipes');
       return;
     }
 
     if (label === '生成今日建议') {
       setQuickActionLoading(label);
-      setRecipeResult(null);
       try {
         if (!token || !settings.aiPersonalization) {
           throw new Error('use local advice');
@@ -2438,7 +2405,6 @@ function useAiPageState() {
     }
 
     if (label === '生成踪迹') {
-      setRecipeResult(null);
       const trace = await generateTraceFromLatestPlan();
 
       setResult(
@@ -2466,7 +2432,6 @@ function useAiPageState() {
       return;
     }
 
-    setRecipeResult(null);
     setResult({
       title: '暂不支持这个动作',
       detail: '可以先使用计划、踪迹、智能菜谱或拍照分析商品。',
@@ -2483,7 +2448,7 @@ function useAiPageState() {
     if (!token) {
       setResult({
         title: '请先登录',
-        detail: '登录后 Life Trace 才能读取你的计划、打卡和天气上下文。',
+        detail: '登录后 Life Trace 才能读取你的计划和天气上下文。',
         tone: 'alert',
       });
       return;
@@ -2528,7 +2493,6 @@ function useAiPageState() {
 
     setAssistantInput('');
     setAdviceCards([]);
-    setRecipeResult(null);
     setAssistantModel('');
     setAssistantStreaming(true);
     setAssistantMessages((items) => [...items, userMessage, assistantMessage]);
@@ -2608,7 +2572,6 @@ function useAiPageState() {
     }
     setAssistantMessages([]);
     setResult(null);
-    setRecipeResult(null);
     setAssistantModel('');
     setAssistantClearConfirmOpen(false);
     setAssistantClearing(false);
@@ -2650,42 +2613,6 @@ function useAiPageState() {
       );
     } finally {
       setAddingAdviceId(null);
-    }
-  };
-
-  const handleAddRecipePlan = async (recipe: RecipeSuggestionItem) => {
-    const planTitle = recipe.planTitle || recipe.title;
-    if (
-      plans.some(
-        (plan) => !plan.completed && plan.title === planTitle && plan.source === 'ai_advice',
-      )
-    ) {
-      setResult({
-        title: '菜谱计划已存在',
-        detail: `「${planTitle}」已经在计划里了，不需要重复添加。`,
-        tone: 'plan',
-      });
-      return;
-    }
-
-    setAddingRecipeId(recipe.id);
-    try {
-      const plan = await addPlan(createPlanFromRecipe(recipe));
-      setResult(
-        plan
-          ? {
-              title: '已加入晚餐计划',
-              detail: `「${plan.title}」已经加入计划，做完后可以再确认库存消耗。`,
-              tone: 'plan',
-            }
-          : {
-              title: '计划保存失败',
-              detail: '刚才的菜谱没有保存成计划，请稍后再试。',
-              tone: 'alert',
-            },
-      );
-    } finally {
-      setAddingRecipeId(null);
     }
   };
 
@@ -2734,14 +2661,12 @@ function useAiPageState() {
   return {
     plans,
     traces,
-    checkinsLoading,
     settings,
     aiActions,
     navigate,
     drawerOpen,
     setDrawerOpen,
     result,
-    recipeResult,
     adviceCards,
     assistantInput,
     setAssistantInput,
@@ -2770,7 +2695,6 @@ function useAiPageState() {
     preferredPantryHouseholdId,
     quickActionLoading,
     addingAdviceId,
-    addingRecipeId,
     weeklyReviews,
     weeklyReviewsLoading,
     weeklyReviewRegenerateTarget,
@@ -2783,9 +2707,9 @@ function useAiPageState() {
     addingWeeklyActionKey,
     openPlanCount,
     completedPlanCount,
-    completedCheckinCount,
     latestWeeklyReview,
     photoItemHistory,
+    recentRecipes,
     handleRemovePhotoItemDraft,
     locationLabel,
     weatherSummary,
@@ -2798,7 +2722,6 @@ function useAiPageState() {
     toggleAssistantListening,
     handleClearAssistantMessages,
     handleAddAdvicePlan,
-    handleAddRecipePlan,
     handleAddWeeklyReviewActionPlan,
     handleDeleteWeeklyReview,
     handleQuickAction,
@@ -2933,7 +2856,6 @@ export function AiPage() {
     drawerOpen,
     setDrawerOpen,
     result,
-    recipeResult,
     adviceCards,
     assistantInput,
     setAssistantInput,
@@ -2956,18 +2878,17 @@ export function AiPage() {
     assistantSpeechError,
     quickActionLoading,
     addingAdviceId,
-    addingRecipeId,
     weeklyReviews,
     weeklyReviewsLoading,
     weeklyReviewRegenerateTarget,
     setWeeklyReviewRegenerateTarget,
     photoItemHistory,
+    recentRecipes,
     handleRemovePhotoItemDraft,
     locationLabel,
     weatherSummary,
     pantryHouseholdLabel,
     openPlanCount,
-    completedCheckinCount,
     expiringPantryCount,
     handleSelectAssistantConversation,
     handleCreateAssistantConversation,
@@ -2975,7 +2896,6 @@ export function AiPage() {
     handleAssistantSubmit,
     toggleAssistantListening,
     handleAddAdvicePlan,
-    handleAddRecipePlan,
     handleQuickAction,
     runWeeklyReview,
   } = useAiPageState();
@@ -2990,21 +2910,19 @@ export function AiPage() {
         model={assistantModel}
         input={assistantInput}
         result={result}
-        recipeResult={recipeResult}
         adviceCards={adviceCards}
         plans={plans}
         addingAdviceId={addingAdviceId}
-        addingRecipeId={addingRecipeId}
         weeklyReviews={weeklyReviews}
         weeklyReviewsLoading={weeklyReviewsLoading}
         photoItemHistory={photoItemHistory}
+        recentRecipes={recentRecipes}
         quickActionLoading={quickActionLoading}
         aiActions={aiActions}
         locationLabel={locationLabel}
         weatherSummary={weatherSummary}
         pantryHouseholdLabel={pantryHouseholdLabel}
         openPlanCount={openPlanCount}
-        completedCheckinCount={completedCheckinCount}
         expiringPantryCount={expiringPantryCount}
         speechSupported={assistantSpeechSupported}
         listening={assistantListening}
@@ -3030,7 +2948,6 @@ export function AiPage() {
         toolsSheetOpen={assistantToolsSheetOpen}
         onToolsSheetOpenChange={setAssistantToolsSheetOpen}
         onAddAdvicePlan={(item) => void handleAddAdvicePlan(item)}
-        onAddRecipePlan={(recipe) => void handleAddRecipePlan(recipe)}
         onQuickAction={(label) => void handleQuickAction(label)}
       />
 
@@ -3048,6 +2965,7 @@ export function AiPage() {
       />
 
       <CreatePlanDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+
       <ConfirmDialog
         open={Boolean(weeklyReviewRegenerateTarget)}
         title="重新生成本周周报？"

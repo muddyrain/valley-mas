@@ -35,18 +35,20 @@ pnpm --filter @valley/life-trace dev
 独立实验应用：
 
 ```bash
+pnpm --filter @valley/desktop-os dev
 pnpm --filter @valley/ai-mind-arena dev
 pnpm --filter @valley/scratch-legend dev
 pnpm --filter @valley/toy-climb-arena dev
 pnpm --filter @valley/world-sim dev
 ```
 
-注意：`apps/ai-mind-arena` 和 `apps/toy-climb-arena` 当前都使用 `5175` 端口，不能同时用默认端口启动。
+注意：`apps/ai-mind-arena` 和 `apps/toy-climb-arena` 当前都使用 `5175` 端口，不能同时用默认端口启动；`apps/desktop-os` 默认监听 `5177`。
 
 ## 5. 必要配置
 
 - Web/Admin API 地址：`apps/web/.env.example`、`apps/admin/.env.example`。
 - Life Trace API 地址：`apps/life-trace/.env.example`。
+- Desktop OS API / Audius 地址：`apps/desktop-os/.env.example`。
 - AI Mind Arena API 地址：`apps/ai-mind-arena/.env.example`。
 - Go 服务：`server/.env.example`。
 

@@ -127,7 +127,7 @@ export function LocationPicker({
             />
           </FormItem>
 
-          <div className="rounded-[1.35rem] border border-life-ai/20 bg-life-ai/5 px-4 py-3">
+          <div className="rounded-[1.25rem] border border-life-ai/20 bg-life-ai/5 px-4 py-3">
             <p className="text-xs font-semibold text-life-ai">当前将保存为</p>
             <p className="mt-1 text-sm font-semibold text-foreground">
               {formatLocationDisplay(buildLocationValue(draft.city, draft.district)) ||

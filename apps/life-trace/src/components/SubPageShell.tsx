@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { type ReactNode, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { LifePage } from '@/components/LifeLayout';
 import { Button } from '@/components/ui/button';
 import { gsap, useGSAP } from '@/lib/gsap';
 import { cn } from '@/lib/utils';
@@ -24,6 +25,37 @@ export function canNavigateBackFromState(historyState: unknown) {
 
   const { idx } = historyState as { idx?: unknown };
   return typeof idx === 'number' && idx > 0;
+}
+
+export type SubPageBackTarget =
+  | { type: 'custom' }
+  | { type: 'history' }
+  | { type: 'path'; path: string };
+
+export function resolveSubPageBackTarget({
+  backTo,
+  fallbackBackTo,
+  hasOnBack,
+  historyState,
+}: {
+  backTo?: string;
+  fallbackBackTo?: string;
+  hasOnBack: boolean;
+  historyState: unknown;
+}): SubPageBackTarget {
+  if (hasOnBack) {
+    return { type: 'custom' };
+  }
+  if (canNavigateBackFromState(historyState)) {
+    return { type: 'history' };
+  }
+  if (backTo) {
+    return { type: 'path', path: backTo };
+  }
+  if (fallbackBackTo) {
+    return { type: 'path', path: fallbackBackTo };
+  }
+  return { type: 'history' };
 }
 
 export function SubPageShell({
@@ -64,23 +96,22 @@ export function SubPageShell({
   );
 
   const handleBack = () => {
-    if (onBack) {
-      onBack();
+    const target = resolveSubPageBackTarget({
+      backTo,
+      fallbackBackTo,
+      hasOnBack: Boolean(onBack),
+      historyState: window.history.state,
+    });
+
+    if (target.type === 'custom') {
+      onBack?.();
       return;
     }
-    if (backTo) {
-      navigate(backTo);
-      return;
-    }
-    if (canNavigateBackFromState(window.history.state)) {
+    if (target.type === 'history') {
       navigate(-1);
       return;
     }
-    if (fallbackBackTo) {
-      navigate(fallbackBackTo);
-      return;
-    }
-    navigate(-1);
+    navigate(target.path);
   };
 
   return (
@@ -106,7 +137,14 @@ export function SubPageShell({
           <div className="flex size-10 shrink-0 items-center justify-end">{action}</div>
         </div>
       </header>
-      <div className={contentClassName}>{children}</div>
+      <LifePage
+        variant="sub"
+        spacing="default"
+        withBottomInset={false}
+        className={contentClassName}
+      >
+        {children}
+      </LifePage>
     </div>
   );
 }

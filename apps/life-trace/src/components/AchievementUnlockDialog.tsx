@@ -94,7 +94,7 @@ export function AchievementUnlockDialog({
           <X className="size-4" />
         </button>
 
-        <div className="p-5">
+        <div className="p-4">
           <div className="flex items-start gap-4">
             <AchievementBadgeIcon achievement={achievement} size="lg" />
             <div className="min-w-0 flex-1 pr-8">

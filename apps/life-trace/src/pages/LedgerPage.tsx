@@ -1,14 +1,6 @@
-import {
-  ChevronLeft,
-  CircleDollarSign,
-  LoaderCircle,
-  Pencil,
-  Plus,
-  ReceiptText,
-  Trash2,
-} from 'lucide-react';
+import { CircleDollarSign, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { ActionLoadingIcon } from '@/components/ActionLoadingIcon';
 import { BottomSheet } from '@/components/BottomSheet';
 import { EmptyState } from '@/components/EmptyState';
@@ -19,6 +11,9 @@ import {
   SheetSelectButton,
   SheetSelectField,
 } from '@/components/FormItem';
+import { LifeFilterBar, LifeList } from '@/components/LifeLayout';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
+import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -106,6 +101,7 @@ function entryToInput(entry: LedgerEntry): NewLedgerEntryInput {
     planId: entry.planId,
     traceId: entry.traceId,
     pantryItemId: entry.pantryItemId,
+    recurringPaymentId: entry.recurringPaymentId,
   };
 }
 
@@ -123,7 +119,6 @@ function normalizeFormInput(form: NewLedgerEntryInput): NewLedgerEntryInput {
 }
 
 export function LedgerPage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const ledgerEntries = useLifeTraceStore((state) => state.ledgerEntries);
   const ledgerLoaded = useLifeTraceStore((state) => state.ledgerLoaded);
@@ -141,6 +136,9 @@ export function LedgerPage() {
   const editLedgerEntry = useLifeTraceStore((state) => state.editLedgerEntry);
   const removeLedgerEntry = useLifeTraceStore((state) => state.removeLedgerEntry);
   const convertInbox = useLifeTraceStore((state) => state.convertInbox);
+  const advanceRecurringPaymentAction = useLifeTraceStore(
+    (state) => state.advanceRecurringPaymentAction,
+  );
   const [month, setMonth] = useState(getDefaultLedgerMonth());
   const [categoryFilter, setCategoryFilter] = useState<LedgerFilter>('all');
   const [directionFilter, setDirectionFilter] = useState<LedgerDirectionFilter>('all');
@@ -151,6 +149,8 @@ export function LedgerPage() {
     occurredAt: formatDateTimeLocal(),
   });
   const [formErrors, setFormErrors] = useState<LedgerFormErrors>({});
+  const initialLedgerLoading = ledgerLoading && !ledgerLoaded;
+  const ledgerRefreshing = ledgerLoading && ledgerLoaded;
 
   useEffect(() => {
     void loadLedgerEntries({
@@ -168,9 +168,13 @@ export function LedgerPage() {
     const amount = Number(params.get('amount') || '0');
     setEditingEntry(null);
     const category = params.get('category');
+    const direction = params.get('direction');
     setForm({
       ...defaultForm,
       amount: Number.isFinite(amount) ? amount : 0,
+      direction: ledgerDirections.includes(direction as LedgerDirection)
+        ? (direction as LedgerDirection)
+        : '支出',
       category: ledgerCategories.includes(category as LedgerCategory)
         ? (category as LedgerCategory)
         : '购物',
@@ -179,6 +183,7 @@ export function LedgerPage() {
       imageUrl: params.get('imageUrl') || '',
       inboxItemId: params.get('inboxItemId') || undefined,
       pantryItemId: params.get('pantryItemId') || undefined,
+      recurringPaymentId: params.get('recurringPaymentId') || undefined,
       occurredAt: formatDateTimeLocal(),
     });
     setFormOpen(true);
@@ -241,32 +246,27 @@ export function LedgerPage() {
       if (!editingEntry && input.inboxItemId) {
         void convertInbox(input.inboxItemId, 'ledger', saved.id);
       }
+      if (!editingEntry && input.recurringPaymentId) {
+        void advanceRecurringPaymentAction(input.recurringPaymentId);
+      }
       closeForm();
     }
   };
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-5 px-4 pb-28 pt-4 sm:px-6">
-      <header className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button type="button" variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ChevronLeft className="size-5" />
-          </Button>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-life-health">
-              Ledger
-            </p>
-            <h1 className="truncate text-2xl font-semibold">轻账本</h1>
-          </div>
-        </div>
+    <SubPageShell
+      title="轻账本"
+      eyebrow="Ledger"
+      fallbackBackTo="/today"
+      action={
         <Button type="button" variant="ai" size="sm" onClick={openCreateForm}>
           <Plus className="size-4" />
           记一笔
         </Button>
-      </header>
-
+      }
+    >
       <section className="grid gap-3 md:grid-cols-[1.35fr_1fr]">
-        <Card className="relative overflow-hidden border-life-health/20 p-5">
+        <Card className="relative overflow-hidden border-life-health/20 p-4">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-life-health/70 to-transparent"
@@ -305,7 +305,7 @@ export function LedgerPage() {
           </div>
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold">分类占比</p>
@@ -348,7 +348,7 @@ export function LedgerPage() {
             onChange={(event) => setMonth(event.target.value || getDefaultLedgerMonth())}
             className="h-10 rounded-xl border border-border bg-secondary px-3 text-sm outline-none transition focus:border-ring"
           />
-          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <LifeFilterBar>
             {(['all', ...ledgerCategories] as LedgerFilter[]).map((category) => (
               <button
                 key={category}
@@ -364,7 +364,7 @@ export function LedgerPage() {
                 {category === 'all' ? '全部' : category}
               </button>
             ))}
-          </div>
+          </LifeFilterBar>
           <SheetSelectButton
             value={directionFilter}
             options={ledgerDirectionFilterOptions}
@@ -380,11 +380,8 @@ export function LedgerPage() {
           </Card>
         ) : null}
 
-        {ledgerLoading && !ledgerLoaded ? (
-          <Card className="grid min-h-44 place-items-center p-6 text-sm text-muted-foreground">
-            <LoaderCircle className="mb-3 size-6 animate-spin text-life-health motion-reduce:animate-none" />
-            正在同步账目
-          </Card>
+        {initialLedgerLoading ? (
+          <ListCardSkeleton rows={3} />
         ) : ledgerEntries.length === 0 ? (
           <EmptyState
             title="还没有账目"
@@ -400,13 +397,14 @@ export function LedgerPage() {
             }
           />
         ) : (
-          <div className="grid gap-3">
+          <LifeList className="relative">
+            {ledgerRefreshing ? <InlineRefreshStatus tone="health" /> : null}
             {ledgerEntries.map((entry) => {
               const deleting = Boolean(ledgerDeletingById[entry.id]);
               const updating = Boolean(ledgerUpdatingById[entry.id]);
               const disabled = deleting || updating;
               return (
-                <Card key={entry.id} className="p-4">
+                <Card key={entry.id} className="p-4" data-scroll-anchor={`ledger:${entry.id}`}>
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -461,7 +459,7 @@ export function LedgerPage() {
                 </Card>
               );
             })}
-          </div>
+          </LifeList>
         )}
 
         {ledgerPagination.hasMore ? (
@@ -601,6 +599,6 @@ export function LedgerPage() {
           </SheetActions>
         </form>
       </BottomSheet>
-    </div>
+    </SubPageShell>
   );
 }

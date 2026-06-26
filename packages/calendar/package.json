@@ -1,0 +1,33 @@
+{
+  "name": "@valley/calendar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "lint": "biome lint src/",
+    "check": "biome check src/",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dayjs": "^1.11.19",
+    "zustand": "catalog:shared-runtime"
+  },
+  "devDependencies": {
+    "tsup": "catalog:ts-tooling",
+    "typescript": "catalog:ts-tooling",
+    "vitest": "catalog:test"
+  }
+}

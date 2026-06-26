@@ -6,16 +6,24 @@ import { useFinderStore } from '../store/finderStore';
 import { useResourceStore } from '../store/resourceStore';
 import { useSpotlightStore } from '../store/spotlightStore';
 import { useWindowStore } from '../store/windowStore';
+import { PlushPop, PlushPresence } from '../ui/PlushMotion';
 import { type SpotlightItem, searchSpotlight } from './data';
 import './Spotlight.css';
 
 export default function SpotlightGate() {
   const isOpen = useSpotlightStore((s) => s.isOpen);
-  if (!isOpen) return null;
-  return <SpotlightPanel />;
+  return (
+    <PlushPresence>
+      {isOpen ? (
+        <PlushPop key="spotlight" open>
+          <SpotlightPanel />
+        </PlushPop>
+      ) : null}
+    </PlushPresence>
+  );
 }
 
-function SpotlightPanel() {
+export function SpotlightPanel() {
   const close = useSpotlightStore((s) => s.close);
   const revealFinderItem = useFinderStore((s) => s.revealItem);
   const openBrowserUrl = useBrowserStore((s) => s.openUrl);

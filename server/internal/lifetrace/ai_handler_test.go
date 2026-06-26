@@ -467,7 +467,6 @@ func TestStreamAssistantOpenAIUsesLifeContext(t *testing.T) {
 		UserID:        101,
 		City:          "上海",
 		CommuteMethod: "开车",
-		Habits:        model.StringList{"喝水", "休息"},
 	}).Error; err != nil {
 		t.Fatalf("seed settings: %v", err)
 	}
@@ -695,7 +694,6 @@ func TestGenerateWeeklyReviewUsesCloudLifeContext(t *testing.T) {
 		UserID:        101,
 		City:          "上海",
 		CommuteMethod: "地铁",
-		Habits:        model.StringList{"喝水", "阅读"},
 	}).Error; err != nil {
 		t.Fatalf("seed settings: %v", err)
 	}
@@ -728,14 +726,6 @@ func TestGenerateWeeklyReviewUsesCloudLifeContext(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatalf("seed trace: %v", err)
 	}
-	if err := database.GetDB().Create(&model.LifeTraceCheckin{
-		UserID:    101,
-		Date:      now.Format("2006-01-02"),
-		Name:      "喝水",
-		Completed: true,
-	}).Error; err != nil {
-		t.Fatalf("seed checkin: %v", err)
-	}
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/life-trace/ai/weekly-review", bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -756,7 +746,7 @@ func TestGenerateWeeklyReviewUsesCloudLifeContext(t *testing.T) {
 	if data["id"] == "" || data["weekStart"] == "" || data["weekEnd"] == "" {
 		t.Fatalf("expected persisted weekly review identity fields, got %+v", data)
 	}
-	for _, want := range []string{"周五看电影", "周末阅读", "电影散场后散步", "喝水：已完成"} {
+	for _, want := range []string{"周五看电影", "周末阅读", "电影散场后散步"} {
 		if !strings.Contains(capturedPrompt, want) {
 			t.Fatalf("expected weekly prompt to contain %q, got %s", want, capturedPrompt)
 		}
@@ -911,7 +901,7 @@ func TestWeeklyReviewSaveErrorMessageExplainsMissingTable(t *testing.T) {
 func TestParseWeeklyReviewAIResponseNormalizesSections(t *testing.T) {
 	raw := `{
 		"summary": "本周节奏稳定，完成了主要生活计划。",
-		"wins": ["完成电影计划", "保持喝水打卡"],
+		"wins": ["完成电影计划", "保持每天喝水"],
 		"delays": ["阅读计划还没开始"],
 		"insights": ["晚上适合安排轻量任务"],
 		"nextActions": ["下周先安排阅读", "保留一个空白晚上"]
@@ -1003,33 +993,13 @@ func TestBuildTodayAdvicePromptAsksForSlimItems(t *testing.T) {
 		WorkStart:     "09:30",
 		WorkEnd:       "18:30",
 		CommuteMethod: "地铁",
-		Habits:        []string{"喝水"},
-	}, WeatherResponse{}, nil, nil)
+	}, WeatherResponse{}, nil)
 
 	if !strings.Contains(prompt, `"items":[{"id":"wear","detail"`) {
 		t.Fatalf("expected slim item schema, got %s", prompt)
 	}
 	if !strings.Contains(prompt, "不要输出 title 和 tone") {
 		t.Fatalf("expected prompt to keep title and tone server-side, got %s", prompt)
-	}
-}
-
-func TestBuildTodayAdvicePromptIncludesCheckins(t *testing.T) {
-	prompt := buildTodayAdvicePrompt(model.LifeTraceSettings{
-		City:          "上海",
-		WorkStart:     "09:30",
-		WorkEnd:       "18:30",
-		CommuteMethod: "开车",
-		Habits:        []string{"喝水", "运动"},
-	}, WeatherResponse{}, nil, []model.LifeTraceCheckin{
-		{Name: "喝水", Completed: true},
-	})
-
-	if !strings.Contains(prompt, "今日打卡") {
-		t.Fatalf("expected checkin section, got %s", prompt)
-	}
-	if !strings.Contains(prompt, "喝水：已完成") || !strings.Contains(prompt, "运动：未完成") {
-		t.Fatalf("expected checkin status lines, got %s", prompt)
 	}
 }
 
@@ -1040,13 +1010,11 @@ func TestBuildLifeTraceAssistantPromptKeepsLifeContext(t *testing.T) {
 			WorkStart:     "09:30",
 			WorkEnd:       "18:30",
 			CommuteMethod: "开车",
-			Habits:        []string{"喝水", "休息"},
 		},
 		WeatherResponse{
 			Now: WeatherNow{Text: "多云", High: "28", Low: "21", FeelsLike: "26"},
 		},
 		[]model.LifeTracePlan{{Title: "看电影", Type: "电影", TimeLabel: "周六 晚上", Reminder: true}},
-		[]model.LifeTraceCheckin{{Name: "喝水", Completed: true}},
 		[]model.LifeTraceTrace{{Title: "吃了牛肉饭", Mood: "满足", TimeLabel: "昨天"}},
 		lifeTraceAssistantRequest{
 			Message: "帮我安排今天下班后",
@@ -1062,16 +1030,12 @@ func TestBuildLifeTraceAssistantPromptKeepsLifeContext(t *testing.T) {
 			t.Fatalf("expected prompt to contain %q, got %s", want, prompt)
 		}
 	}
-	if !strings.Contains(prompt, "喝水：已完成") {
-		t.Fatalf("expected checkin status in prompt, got %s", prompt)
-	}
 }
 
 func TestBuildLifeTraceAssistantPromptHandlesReminderBriefly(t *testing.T) {
 	prompt := buildLifeTraceAssistantPrompt(
 		model.LifeTraceSettings{City: "杭州", CommuteMethod: "开车"},
 		WeatherResponse{},
-		nil,
 		nil,
 		nil,
 		lifeTraceAssistantRequest{Message: "晚上提醒我记得预约取车"},
@@ -1510,7 +1474,6 @@ func TestStreamAssistantStructuredResponseCreatesPantryItem(t *testing.T) {
 		UserID:        101,
 		City:          "上海",
 		CommuteMethod: "开车",
-		Habits:        model.StringList{"喝水"},
 	}).Error; err != nil {
 		t.Fatalf("seed settings: %v", err)
 	}
@@ -1582,7 +1545,6 @@ func TestStreamAssistantStructuredResponseCreatesLedgerEntry(t *testing.T) {
 		UserID:        101,
 		City:          "上海",
 		CommuteMethod: "地铁",
-		Habits:        model.StringList{"记账"},
 	}).Error; err != nil {
 		t.Fatalf("seed settings: %v", err)
 	}
@@ -1638,7 +1600,6 @@ func TestStreamAssistantStructuredResponseFallsBackToPantryDraftWhenActionMissin
 		UserID:        101,
 		City:          "上海",
 		CommuteMethod: "开车",
-		Habits:        model.StringList{"喝水"},
 	}).Error; err != nil {
 		t.Fatalf("seed settings: %v", err)
 	}
@@ -1706,7 +1667,6 @@ func TestStreamAssistantStructuredResponseFallsBackWhenToolsUnsupported(t *testi
 		UserID:        101,
 		City:          "上海",
 		CommuteMethod: "开车",
-		Habits:        model.StringList{"喝水"},
 	}).Error; err != nil {
 		t.Fatalf("seed settings: %v", err)
 	}
@@ -1746,7 +1706,7 @@ func TestLifeTraceAssistantSystemPromptIsNotGenericChat(t *testing.T) {
 	if !strings.Contains(prompt, "生活助理") || !strings.Contains(prompt, "不是通用聊天 AI") {
 		t.Fatalf("expected assistant identity guard, got %s", prompt)
 	}
-	if !strings.Contains(prompt, "提醒我") || !strings.Contains(prompt, "不要把所有天气、打卡、习惯都复述") {
+	if !strings.Contains(prompt, "提醒我") || !strings.Contains(prompt, "不要把所有天气、计划都复述") {
 		t.Fatalf("expected reminder and brevity guard, got %s", prompt)
 	}
 }

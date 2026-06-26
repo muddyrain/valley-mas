@@ -9,10 +9,26 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import {
+  type MouseEvent,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useLifeTraceEntrance } from '@/hooks/useLifeTraceEntrance';
 import { usePwaStatus } from '@/hooks/usePwaStatus';
+import {
+  captureScrollMemory,
+  getActiveLifeTraceTab,
+  getLifeTraceScrollKey,
+  isLifeTraceTabRoute,
+  restoreScrollMemory,
+  type ScrollMemoryEntry,
+} from '@/lib/lifeTraceNavigation';
 import { getPwaShareFeedback } from '@/lib/pwa';
 import { cn } from '@/lib/utils';
 import { useFeedbackToastStore } from '@/store/useFeedbackToastStore';
@@ -28,49 +44,36 @@ const tabs: Array<{ id: AppTab; label: string; path: string; icon: typeof House 
   { id: 'profile', label: '我的', path: '/profile', icon: UserRound },
 ];
 
-function getActiveTab(pathname: string): AppTab {
-  if (pathname === '/plans' || pathname.startsWith('/plans/')) {
-    return 'plans';
-  }
-  if (pathname === '/ai' || pathname.startsWith('/ai/')) {
-    return 'ai';
-  }
-  if (pathname === '/traces' || pathname.startsWith('/traces/')) {
-    return 'traces';
-  }
-  if (pathname === '/profile') {
-    return 'profile';
-  }
-  return 'today';
-}
-
-function getScrollRouteKey(pathname: string) {
-  return pathname;
-}
-
-function isTabRoute(pathname: string) {
-  return tabs.some((tab) => tab.path === pathname);
-}
-
 function BottomTabLink({
   active,
   icon: Icon,
   isCenter = false,
   label,
+  onReselect,
   path,
 }: {
   active: boolean;
   icon: typeof House;
   isCenter?: boolean;
   label: string;
+  onReselect?: () => void;
   path: string;
 }) {
+  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!active) {
+      return;
+    }
+    event.preventDefault();
+    onReselect?.();
+  };
+
   if (isCenter) {
     return (
       <NavLink
         to={path}
         data-tab-active={active}
         className="group relative flex h-[4.55rem] min-w-0 items-start justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={handleClick}
       >
         <span
           data-tab-icon
@@ -101,6 +104,7 @@ function BottomTabLink({
         'group flex h-[4.15rem] min-w-0 flex-col items-center justify-end gap-1.5 rounded-2xl px-1 pb-1 text-muted-foreground transition-colors duration-200 hover:text-life-trace focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[360px]:h-[3.95rem]',
         active && 'text-life-trace',
       )}
+      onClick={handleClick}
     >
       <span data-tab-icon className="grid size-7 place-items-center transition-colors duration-200">
         <Icon className={cn('size-[1.48rem] stroke-[1.9]', active && 'stroke-[2]')} />
@@ -113,10 +117,6 @@ function BottomTabLink({
       </span>
     </NavLink>
   );
-}
-
-function scrollContentToTop(element: HTMLElement | null, _routeKey: string) {
-  element?.scrollTo({ top: 0, behavior: 'instant' });
 }
 
 function PwaActionBanner({ hidden }: { hidden: boolean }) {
@@ -151,7 +151,7 @@ function PwaActionBanner({ hidden }: { hidden: boolean }) {
 
   return (
     <div className="safe-x pointer-events-none fixed inset-x-0 bottom-[calc(6.9rem+env(safe-area-inset-bottom))] z-40 w-full">
-      <div className="pointer-events-auto rounded-[1.35rem] border border-life-ai/20 bg-card/95 p-3 shadow-[0_-18px_54px_rgba(45,41,35,0.14)] backdrop-blur-2xl">
+      <div className="pointer-events-auto rounded-[1.25rem] border border-life-ai/20 bg-card/95 p-3 shadow-[0_-18px_54px_rgba(45,41,35,0.14)] backdrop-blur-2xl">
         <div className="flex items-start gap-3">
           <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-life-ai/10 text-life-ai">
             {updateAvailable ? <RefreshCw className="size-5" /> : <Download className="size-5" />}
@@ -216,13 +216,14 @@ function PwaActionBanner({ hidden }: { hidden: boolean }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
-  const activeTab = getActiveTab(location.pathname);
-  const scrollRouteKey = getScrollRouteKey(location.pathname);
+  const activeTab = getActiveLifeTraceTab(location.pathname);
+  const scrollRouteKey = getLifeTraceScrollKey(location.pathname, location.search);
   const isAgentChatRoute = location.pathname === '/ai';
-  const showBottomNavigation = isTabRoute(location.pathname);
+  const showBottomNavigation = isLifeTraceTabRoute(location.pathname);
   const showBottomOverlay = showBottomNavigation && !isAgentChatRoute;
   const contentRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
+  const scrollMemoryRef = useRef(new Map<string, ScrollMemoryEntry>());
 
   useLifeTraceEntrance(contentRef, {
     dependencies: [scrollRouteKey],
@@ -231,14 +232,106 @@ export function AppShell({ children }: { children: ReactNode }) {
     stagger: 0.035,
   });
 
-  useEffect(() => {
-    scrollContentToTop(contentRef.current, scrollRouteKey);
+  const getEventScrollAnchor = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+      return null;
+    }
+    return target.closest<HTMLElement>('[data-scroll-anchor]');
+  };
+
+  const rememberCurrentScroll = (
+    event?: MouseEvent<HTMLElement> | ReactPointerEvent<HTMLElement>,
+  ) => {
+    const element = contentRef.current;
+    if (!element) {
+      return;
+    }
+    scrollMemoryRef.current.set(
+      scrollRouteKey,
+      captureScrollMemory(element, scrollRouteKey, getEventScrollAnchor(event?.target ?? null)),
+    );
+  };
+
+  useLayoutEffect(() => {
+    const element = contentRef.current;
+    if (!element) {
+      return;
+    }
+
+    let cancelled = false;
+    const restore = () => {
+      if (cancelled) {
+        return true;
+      }
+      return restoreScrollMemory(element, scrollMemoryRef.current.get(scrollRouteKey));
+    };
+
+    restore();
+    const frame = window.requestAnimationFrame(restore);
+    const retryDelays = [80, 180, 360, 720];
+    const timeouts = retryDelays.map((delay) =>
+      window.setTimeout(() => {
+        if (!restore()) {
+          window.requestAnimationFrame(restore);
+        }
+      }, delay),
+    );
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+      for (const timeout of timeouts) {
+        window.clearTimeout(timeout);
+      }
+    };
   }, [scrollRouteKey]);
+
+  useEffect(() => {
+    const element = contentRef.current;
+    if (!element) {
+      return;
+    }
+
+    let frame = 0;
+    const remember = () => {
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
+      frame = window.requestAnimationFrame(() => {
+        scrollMemoryRef.current.set(scrollRouteKey, captureScrollMemory(element, scrollRouteKey));
+      });
+    };
+
+    element.addEventListener('scroll', remember, { passive: true });
+
+    return () => {
+      element.removeEventListener('scroll', remember);
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
+    };
+  }, [scrollRouteKey]);
+
+  const handleTabReselect = () => {
+    const element = contentRef.current;
+    if (!element) {
+      return;
+    }
+    element.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollMemoryRef.current.set(scrollRouteKey, {
+      key: scrollRouteKey,
+      scrollTop: 0,
+      anchorId: '',
+      anchorOffsetTop: 0,
+    });
+  };
 
   return (
     <div className="h-dvh w-full overflow-hidden bg-background text-foreground">
       <main
         ref={contentRef}
+        onClickCapture={rememberCurrentScroll}
+        onPointerDownCapture={rememberCurrentScroll}
         className={cn(
           'h-dvh w-full overflow-x-hidden overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
           showBottomNavigation && 'life-soft-page',
@@ -276,6 +369,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 icon={tab.icon}
                 isCenter={tab.id === 'ai'}
                 label={tab.label}
+                onReselect={handleTabReselect}
                 path={tab.path}
               />
             ))}

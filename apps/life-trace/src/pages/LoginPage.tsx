@@ -69,13 +69,12 @@ export function LoginPage() {
               登录后进入你的今日生活简报
             </h2>
             <p className="max-w-sm text-sm leading-6 text-muted-foreground">
-              Life Trace
-              会把天气建议、今日计划、打卡和生活踪迹沉淀到你的个人空间，后续用于跨设备同步。
+              Life Trace 会把天气建议、今日计划和生活踪迹沉淀到你的个人空间，后续用于跨设备同步。
             </p>
           </div>
         </header>
 
-        <Card className="space-y-5 p-5" data-login-entrance>
+        <Card className="space-y-5 p-4" data-login-entrance>
           <div>
             <h3 className="text-lg font-semibold">账号登录</h3>
             <p className="mt-1 text-sm text-muted-foreground">当前先使用邮箱和密码登录。</p>

@@ -222,7 +222,7 @@ export function ProfileAvatarSheet({
         onClose={closeSheet}
       />
 
-      <Card className="overflow-hidden border-life-ai/20 bg-[linear-gradient(180deg,rgba(6,182,212,0.08),rgba(16,185,129,0.06))] p-5">
+      <Card className="overflow-hidden border-life-ai/20 bg-[linear-gradient(180deg,rgba(6,182,212,0.08),rgba(16,185,129,0.06))] p-4">
         <div className="flex flex-col items-center text-center">
           <div className="relative">
             {avatarUrl ? (
@@ -324,7 +324,7 @@ export function ProfileAvatarSheet({
             {Array.from({ length: 4 }).map((_, index) => (
               <div
                 key={index}
-                className="aspect-square rounded-[1.35rem] border border-border bg-secondary/80"
+                className="aspect-square rounded-[1.25rem] border border-border bg-secondary/80"
               />
             ))}
           </div>
@@ -340,7 +340,7 @@ export function ProfileAvatarSheet({
                   type="button"
                   disabled={busy}
                   className={cn(
-                    'group relative aspect-square overflow-hidden rounded-[1.35rem] border transition',
+                    'group relative aspect-square overflow-hidden rounded-[1.25rem] border transition',
                     active
                       ? 'border-life-ai/50 shadow-[0_16px_36px_rgba(6,182,212,0.18)]'
                       : 'border-border bg-secondary hover:border-foreground/20',

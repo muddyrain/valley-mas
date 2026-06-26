@@ -61,7 +61,7 @@ export function AchievementsPage() {
       }
     >
       <div className="space-y-5">
-        <Card className="relative overflow-hidden border-life-ai/20 p-5">
+        <Card className="relative overflow-hidden border-life-ai/20 p-4">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-x-5 top-0 h-px bg-life-ai/70"
@@ -157,7 +157,9 @@ export function AchievementsPage() {
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {filteredAchievements.map((achievement) => (
-                <AchievementCard key={achievement.code} achievement={achievement} />
+                <div key={achievement.code} data-scroll-anchor={`achievements:${achievement.code}`}>
+                  <AchievementCard achievement={achievement} />
+                </div>
               ))}
             </div>
           )}

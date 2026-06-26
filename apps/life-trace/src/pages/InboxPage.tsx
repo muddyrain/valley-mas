@@ -1,13 +1,14 @@
 import {
   Archive,
+  BookOpen,
   CheckCircle2,
-  ChevronLeft,
   ClipboardList,
   ExternalLink,
   FileText,
-  LoaderCircle,
+  Lightbulb,
+  MapPin,
+  MoreHorizontal,
   Pencil,
-  Plus,
   ReceiptText,
   Search,
   Sparkles,
@@ -29,12 +30,21 @@ import {
   SheetSelectField,
 } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
+import { LifeList } from '@/components/LifeLayout';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
+import { SubPageShell } from '@/components/SubPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { applyInboxAISuggestion, buildInboxPlanDraft, buildInboxTraceDraft } from '@/lib/inbox';
+import {
+  applyInboxAISuggestion,
+  buildInboxMediaDraft,
+  buildInboxPlaceDraft,
+  buildInboxPlanDraft,
+  buildInboxTraceDraft,
+} from '@/lib/inbox';
 import { buildLedgerDraftFromInbox } from '@/lib/ledger';
 import { cn } from '@/lib/utils';
 import { useLifeTraceStore } from '@/store/useLifeTraceStore';
@@ -174,6 +184,9 @@ export function InboxPage() {
   const [formErrors, setFormErrors] = useState<InboxFormErrors>({});
   const [planDraftItem, setPlanDraftItem] = useState<InboxItem | null>(null);
   const [traceDraftItem, setTraceDraftItem] = useState<InboxItem | null>(null);
+  const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
+  const initialInboxLoading = inboxLoading && !inboxLoaded;
+  const inboxRefreshing = inboxLoading && inboxLoaded;
 
   useEffect(() => {
     void loadInboxItems({ status: filter, type: typeFilter, q: query });
@@ -299,6 +312,33 @@ export function InboxPage() {
     navigate(`/ledger?${params.toString()}`);
   };
 
+  const convertToMedia = (item: InboxItem) => {
+    const draft = buildInboxMediaDraft(item);
+    const params = new URLSearchParams({
+      new: '1',
+      inboxItemId: item.id,
+      mediaType: draft.mediaType,
+      status: draft.status,
+      title: draft.title,
+      note: draft.note,
+      coverUrl: draft.coverUrl,
+      tags: draft.tags.join(','),
+    });
+    navigate(`/media-diary?${params.toString()}`);
+  };
+
+  const convertToPlace = (item: InboxItem) => {
+    const draft = buildInboxPlaceDraft(item);
+    const params = new URLSearchParams({
+      new: '1',
+      inboxItemId: item.id,
+      name: draft.name,
+      status: draft.status,
+      note: draft.note,
+    });
+    navigate(`/places?${params.toString()}`);
+  };
+
   const applySuggestionToEditor = () => {
     if (!editingItem) {
       return;
@@ -314,34 +354,18 @@ export function InboxPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-5 px-4 pb-28 pt-4 sm:px-6">
-      <header className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button type="button" variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ChevronLeft className="size-5" />
-          </Button>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-life-ai">Inbox</p>
-            <h1 className="truncate text-2xl font-semibold">捕捉 Inbox</h1>
-          </div>
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => setEditingItem(null)}>
-          <Plus className="size-4" />
-          收下
-        </Button>
-      </header>
-
+    <SubPageShell title="灵感" eyebrow="Inspiration" fallbackBackTo="/today">
       <Card className="p-4">
         <form className="grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={submitQuickCapture}>
           <label className="block">
-            <span className="sr-only">快速捕捉</span>
+            <span className="sr-only">写下灵感</span>
             <Textarea
               value={quickText}
               onChange={(event) => {
                 setQuickText(event.target.value);
                 setQuickError('');
               }}
-              placeholder="先收下一个想法、链接或待处理事项"
+              placeholder="写下你刚才想到的事，链接也行"
               className="min-h-24 text-sm"
             />
           </label>
@@ -352,8 +376,8 @@ export function InboxPage() {
               className="w-full sm:w-auto"
               disabled={inboxCreating}
             >
-              {inboxCreating ? <ActionLoadingIcon /> : <Plus className="size-4" />}
-              {inboxCreating ? '保存中' : '收下'}
+              {inboxCreating ? <ActionLoadingIcon /> : <Lightbulb className="size-4" />}
+              {inboxCreating ? '保存中' : '记下'}
             </Button>
           </div>
         </form>
@@ -420,28 +444,26 @@ export function InboxPage() {
           </Card>
         ) : null}
 
-        {inboxLoading && !inboxLoaded ? (
-          <Card className="grid min-h-44 place-items-center p-6 text-sm text-muted-foreground">
-            <LoaderCircle className="mb-3 size-6 animate-spin text-life-ai motion-reduce:animate-none" />
-            正在同步 Inbox
-          </Card>
+        {initialInboxLoading ? (
+          <ListCardSkeleton media rows={3} />
         ) : inboxItems.length === 0 ? (
           <EmptyState
-            title="还没有未处理内容"
-            description="先收下一条想法，之后再决定去向。"
-            eyebrow="Inbox"
-            icon={ClipboardList}
+            title="还没有灵感记下"
+            description="写下你刚才想到的事，先记下来再说。"
+            eyebrow="灵感"
+            icon={Lightbulb}
             tone="ai"
           />
         ) : (
-          <div className="grid gap-3">
+          <LifeList className="relative">
+            {inboxRefreshing ? <InlineRefreshStatus tone="ai" /> : null}
             {inboxItems.map((item) => {
               const updating = Boolean(inboxUpdatingById[item.id]);
               const deleting = Boolean(inboxDeletingById[item.id]);
               const disabled = updating || deleting;
 
               return (
-                <Card key={item.id} className="p-4">
+                <Card key={item.id} className="p-4" data-scroll-anchor={`inbox:${item.id}`}>
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -467,7 +489,7 @@ export function InboxPage() {
                             src={item.imageUrl}
                             alt={item.title}
                             title={item.title}
-                            subtitle="Inbox 图片"
+                            subtitle="灵感图片"
                             imageClassName="aspect-video w-full object-cover"
                           />
                         </div>
@@ -537,6 +559,32 @@ export function InboxPage() {
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2 lg:max-w-56 lg:justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={disabled}
+                        onClick={() => setEditingItem(item)}
+                      >
+                        <Pencil className="size-4" />
+                        编辑
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={disabled}
+                        onClick={() =>
+                          setExpandedActionId((current) => (current === item.id ? null : item.id))
+                        }
+                      >
+                        <MoreHorizontal className="size-4" />
+                        {expandedActionId === item.id ? '收起' : '更多'}
+                      </Button>
+                    </div>
+                  </div>
+                  {expandedActionId === item.id ? (
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
                       {item.status === 'inbox' ? (
                         <>
                           <Button
@@ -602,6 +650,26 @@ export function InboxPage() {
                           </Button>
                           <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={disabled}
+                            onClick={() => convertToMedia(item)}
+                          >
+                            <BookOpen className="size-4" />
+                            转书影音
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={disabled}
+                            onClick={() => convertToPlace(item)}
+                          >
+                            <MapPin className="size-4" />
+                            转地点
+                          </Button>
+                          <Button
+                            type="button"
                             variant="secondary"
                             size="sm"
                             disabled={disabled}
@@ -629,27 +697,17 @@ export function InboxPage() {
                         variant="ghost"
                         size="sm"
                         disabled={disabled}
-                        onClick={() => setEditingItem(item)}
-                      >
-                        <Pencil className="size-4" />
-                        编辑
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={disabled}
                         onClick={() => void removeInboxItem(item.id)}
                       >
                         {deleting ? <ActionLoadingIcon /> : <Trash2 className="size-4" />}
                         删除
                       </Button>
                     </div>
-                  </div>
+                  ) : null}
                 </Card>
               );
             })}
-          </div>
+          </LifeList>
         )}
 
         {inboxPagination.hasMore ? (
@@ -679,13 +737,10 @@ export function InboxPage() {
             closeEditor();
           }
         }}
-        overlayLabel="关闭编辑 Inbox"
+        overlayLabel="关闭编辑灵感"
         zIndexClassName="z-[60]"
       >
-        <SheetHeader
-          title={editingItem === null ? '收下 Inbox' : '编辑 Inbox'}
-          onClose={closeEditor}
-        />
+        <SheetHeader title={editingItem === null ? '记下灵感' : '编辑灵感'} onClose={closeEditor} />
         <form className="space-y-4" onSubmit={submitEditor}>
           <FormItem label="标题" error={formErrors.title}>
             <Input
@@ -746,7 +801,7 @@ export function InboxPage() {
                   setForm((current) => ({ ...current, imageUrl: url }));
                   setFormErrors((current) => ({ ...current, imageUrl: undefined }));
                 }}
-                label="Inbox 图片"
+                label="灵感图片"
                 description="支持拍照或从相册选择一张图片。"
                 cameraAndLibrary
               />
@@ -794,7 +849,7 @@ export function InboxPage() {
               (editingItem && inboxUpdatingById[editingItem.id]) ? (
                 <ActionLoadingIcon />
               ) : null}
-              {editingItem === null ? '收下' : '保存修改'}
+              {editingItem === null ? '记下' : '保存修改'}
             </Button>
           </SheetActions>
         </form>
@@ -829,6 +884,6 @@ export function InboxPage() {
           }
         }}
       />
-    </div>
+    </SubPageShell>
   );
 }

@@ -1,4 +1,11 @@
-import type { InboxItem, NewPlanInput, NewTraceInput } from '@/types';
+import type {
+  InboxItem,
+  MediaDiaryType,
+  NewMediaDiaryEntryInput,
+  NewPlanInput,
+  NewTraceInput,
+  PlaceStatus,
+} from '@/types';
 
 function getDefaultPlanTime() {
   const date = new Date();
@@ -57,5 +64,66 @@ export function applyInboxAISuggestion(item: InboxItem): InboxItem {
     title: getInboxDisplayTitle(item),
     content: item.aiSummary?.trim() || item.content,
     tags: getInboxDisplayTags(item),
+  };
+}
+
+export type InboxMediaDraft = {
+  inboxItemId: string;
+  mediaType: MediaDiaryType;
+  status: NewMediaDiaryEntryInput['status'];
+  title: string;
+  note: string;
+  coverUrl: string;
+  tags: string[];
+};
+
+export type InboxPlaceDraft = {
+  inboxItemId: string;
+  name: string;
+  status: PlaceStatus;
+  note: string;
+};
+
+const mediaTypeHints: Array<{ pattern: RegExp; mediaType: MediaDiaryType }> = [
+  {
+    pattern:
+      /(douban\.com\/movie|movie\.douban|imdb\.com|netflix\.com|iqiyi|youku|tv\.qq\.com|mtime)/i,
+    mediaType: '电影',
+  },
+  { pattern: /(bilibili\.com|youtube\.com|youtu\.be)/i, mediaType: '剧集' },
+  { pattern: /(spotify|music\.163\.com|qq\.com\/music|music\.apple)/i, mediaType: '音乐' },
+  { pattern: /(douban\.com\/book|book\.douban|weread|read\.qq\.com)/i, mediaType: '书籍' },
+  { pattern: /(bangumi\.tv|anilist\.co|anidb\.net)/i, mediaType: '动漫' },
+];
+
+function inferMediaTypeFromText(text: string): MediaDiaryType {
+  for (const hint of mediaTypeHints) {
+    if (hint.pattern.test(text)) {
+      return hint.mediaType;
+    }
+  }
+  return '书籍';
+}
+
+export function buildInboxMediaDraft(item: InboxItem): InboxMediaDraft {
+  const haystack = [item.title, item.content ?? '', item.linkUrl ?? ''].join(' ');
+  const mediaType = inferMediaTypeFromText(haystack);
+  return {
+    inboxItemId: item.id,
+    mediaType,
+    status: '想看',
+    title: getInboxDisplayTitle(item),
+    note: getInboxDisplaySummary(item),
+    coverUrl: item.imageUrl ?? '',
+    tags: getInboxDisplayTags(item),
+  };
+}
+
+export function buildInboxPlaceDraft(item: InboxItem): InboxPlaceDraft {
+  return {
+    inboxItemId: item.id,
+    name: getInboxDisplayTitle(item),
+    status: 'want',
+    note: getInboxDisplaySummary(item),
   };
 }

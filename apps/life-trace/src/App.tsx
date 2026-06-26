@@ -12,6 +12,7 @@ import {
   AiPhotoItemHistoryPage,
   AiWeeklyReviewsPage,
 } from '@/pages/AiPage';
+import { AiRecipesPage } from '@/pages/AiRecipesPage';
 import { ClosetPage } from '@/pages/ClosetPage';
 import { InboxPage } from '@/pages/InboxPage';
 import { LedgerPage } from '@/pages/LedgerPage';
@@ -24,7 +25,10 @@ import { PhotoItemAnalysisPage } from '@/pages/PhotoItemAnalysisPage';
 import { PlacesPage } from '@/pages/PlacesPage';
 import { PlansPage } from '@/pages/PlansPage';
 import { ProfilePage } from '@/pages/ProfilePage';
+import { RecipePlayerPage } from '@/pages/RecipePlayerPage';
+import { RecurringPaymentsPage } from '@/pages/RecurringPaymentsPage';
 import { ReminderSettingsPage } from '@/pages/ReminderSettingsPage';
+import { ShoppingListPage } from '@/pages/ShoppingListPage';
 import { TodayPage } from '@/pages/TodayPage';
 import { TracesPage } from '@/pages/TracesPage';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -45,7 +49,6 @@ function AppContent() {
   const loadPlans = useLifeTraceStore((state) => state.loadPlans);
   const loadPlaces = useLifeTraceStore((state) => state.loadPlaces);
   const loadTraces = useLifeTraceStore((state) => state.loadTraces);
-  const loadInboxItems = useLifeTraceStore((state) => state.loadInboxItems);
   const loadLedgerEntries = useLifeTraceStore((state) => state.loadLedgerEntries);
   const loadAchievements = useLifeTraceStore((state) => state.loadAchievements);
   const { status, token, verifySession } = useAuthStore();
@@ -65,13 +68,11 @@ function AppContent() {
       void loadPlans();
       void loadPlaces();
       void loadTraces();
-      void loadInboxItems();
       void loadLedgerEntries();
       void loadAchievements();
     }
   }, [
     loadAchievements,
-    loadInboxItems,
     loadLedgerEntries,
     loadPantry,
     loadPlaces,
@@ -121,6 +122,8 @@ function AppContent() {
           <Route path="/closet/outfits/:outfitId" element={<ClosetPage />} />
           <Route path="/inbox" element={<InboxPage />} />
           <Route path="/ledger" element={<LedgerPage />} />
+          <Route path="/recurring-payments" element={<RecurringPaymentsPage />} />
+          <Route path="/shopping" element={<ShoppingListPage />} />
           <Route path="/media-diary/:entryId?" element={<MediaDiaryPage />} />
           <Route path="/places/:placeId?" element={<PlacesPage />} />
           <Route path="/pantry/:itemId" element={<PantryItemDetailPage />} />
@@ -132,6 +135,9 @@ function AppContent() {
           <Route path="/ai/photo-item-analysis" element={<PhotoItemAnalysisPage />} />
           <Route path="/ai/photo-clothing-analysis" element={<PhotoClothingAnalysisPage />} />
           <Route path="/ai/weekly-reviews" element={<AiWeeklyReviewsPage />} />
+          <Route path="/ai/recipes" element={<AiRecipesPage />} />
+          <Route path="/ai/recipes/:recipeId" element={<RecipePlayerPage />} />
+          <Route path="/recipe/:recipeId" element={<RecipePlayerPage />} />
           <Route path="/achievements" element={<AchievementsPage />} />
           <Route path="/traces/:traceId?" element={<TracesPage />} />
           <Route path="/profile" element={<ProfilePage />} />

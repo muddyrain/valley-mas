@@ -2,6 +2,18 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { applyTheme, getStoredTheme } from './lib/theme';
+
+// Apply theme immediately before React renders to avoid flash
+const initialTheme = getStoredTheme();
+applyTheme(initialTheme);
+
+// Listen for system theme changes when in system mode
+if (initialTheme === 'system') {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    applyTheme('system');
+  });
+}
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>

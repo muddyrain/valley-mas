@@ -13,18 +13,25 @@ import { FOCUS_LABELS, formatTimer, useToolStore } from '../store/toolStore';
 import { useWeatherStore } from '../store/weatherStore';
 import { useWindowStore } from '../store/windowStore';
 import EmptyState from '../ui/EmptyState';
+import { PlushFade, PlushPresence, PlushSlide } from '../ui/PlushMotion';
+import PlushScrollbar from '../ui/PlushScrollbar';
 import { DESKTOP_WIDGETS, type DesktopWidget } from '../widgets/data';
 import './NotificationCenter.css';
 
 export default function NotificationCenter() {
   const isOpen = useNotificationCenterStore((s) => s.isOpen);
-
-  if (!isOpen) return null;
-
-  return <NotificationCenterPanel />;
+  return (
+    <PlushPresence>
+      {isOpen ? (
+        <PlushSlide key="notification-center" open from="right">
+          <NotificationCenterPanel />
+        </PlushSlide>
+      ) : null}
+    </PlushPresence>
+  );
 }
 
-function NotificationCenterPanel() {
+export function NotificationCenterPanel() {
   const close = useNotificationCenterStore((s) => s.close);
   const notifications = useNotificationCenterStore((s) => s.notifications);
   const loading = useNotificationCenterStore((s) => s.loading);
@@ -95,95 +102,104 @@ function NotificationCenterPanel() {
 
   return (
     <div ref={panelRef} className="notification-center" role="dialog" aria-label="通知中心">
-      <div className="nc__date">
-        <span className="nc__date-week">{today.week}</span>
-        <span className="nc__date-day">{today.day}</span>
-        <span className="nc__date-month">{today.monthLong}</span>
-      </div>
-
-      <section className="nc__section">
-        <header className="nc__section-header">
-          <span>通知</span>
-          {visibleNotifications.length > 0 && (
-            <button type="button" className="nc__clear-all" onClick={() => void clearAll(token)}>
-              全部清除
-            </button>
-          )}
-        </header>
-        {loading ? (
-          <EmptyState className="nc__empty" icon="⌁" title="正在同步通知" description="请稍候" />
-        ) : error ? (
-          <EmptyState
-            className="nc__empty"
-            icon="!"
-            title="通知同步失败"
-            description={error}
-            tone="danger"
-          />
-        ) : visibleNotifications.length === 0 ? (
-          <EmptyState
-            className="nc__empty"
-            icon={dnd ? '☾' : '◇'}
-            title={dnd ? '勿扰已开启' : '暂无新通知'}
-            description={dnd ? '通知已静音' : '稍后再看'}
-          />
-        ) : (
-          <ul className="nc__list">
-            {visibleNotifications.map((n) => (
-              <NotificationCard key={n.id} item={n} onDismiss={() => void dismiss(n.id, token)} />
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="nc__section">
-        <header className="nc__section-header">
-          <span>小组件</span>
-        </header>
-        <div className="nc__widgets">
-          {DESKTOP_WIDGETS.map((widget) => (
-            <WidgetCard
-              key={widget.id}
-              widget={widget}
-              today={today}
-              brightness={brightness}
-              weather={weather}
-              weatherLoading={weatherLoading}
-              weatherLocating={weatherLocating}
-              weatherError={weatherError}
-              currentMusic={currentMusic}
-              musicPlaying={musicPlaying}
-              musicBuffering={musicLoadingVisible}
-              musicProgress={musicProgress}
-              musicDuration={musicDuration}
-              focusMode={focusMode}
-              focusStatus={focusStatus}
-              focusRemaining={focusRemaining}
-              focusCompletedCount={focusCompletedCount}
-              plushMatchBest={plushMatchBest}
-              deskTidyBest={deskTidyBest}
-              beadSortBest={beadSortBest}
-              cloudBounceBest={cloudBounceBest}
-              blockDropBest={blockDropBest}
-              snakeBest={snakeBest}
-              clipboardSnippets={clipboardSnippets.length}
-              converterRecent={converterRecent.length}
-              paletteColors={paletteColors.length}
-              plushGardenBlooms={plushGarden.blooms}
-              onOpenWeather={() => {
-                restoreOrFocus('weather', getDefaultWindowOptions('weather'));
-                close();
-              }}
-              onRefreshWeather={() => loadWeather(true)}
-              onOpenMusic={() => {
-                restoreOrFocus('music', getDefaultWindowOptions('music'));
-                close();
-              }}
-              onToggleMusic={toggleMusic}
-            />
-          ))}
+      <PlushScrollbar
+        className="notification-center__scroll"
+        contentClassName="notification-center__content"
+      >
+        <div className="nc__date">
+          <span className="nc__date-week">{today.week}</span>
+          <span className="nc__date-day">{today.day}</span>
+          <span className="nc__date-month">{today.monthLong}</span>
         </div>
-      </section>
+
+        <section className="nc__section">
+          <header className="nc__section-header">
+            <span>通知</span>
+            {visibleNotifications.length > 0 && (
+              <button type="button" className="nc__clear-all" onClick={() => void clearAll(token)}>
+                全部清除
+              </button>
+            )}
+          </header>
+          {loading ? (
+            <EmptyState className="nc__empty" icon="⌁" title="正在同步通知" description="请稍候" />
+          ) : error ? (
+            <EmptyState
+              className="nc__empty"
+              icon="!"
+              title="通知同步失败"
+              description={error}
+              tone="danger"
+            />
+          ) : visibleNotifications.length === 0 ? (
+            <EmptyState
+              className="nc__empty"
+              icon={dnd ? '☾' : '◇'}
+              title={dnd ? '勿扰已开启' : '暂无新通知'}
+              description={dnd ? '通知已静音' : '稍后再看'}
+            />
+          ) : (
+            <ul className="nc__list">
+              <PlushPresence>
+                {visibleNotifications.map((n) => (
+                  <PlushFade key={n.id} open {...{ 'data-notification-id': n.id }}>
+                    <NotificationCard item={n} onDismiss={() => void dismiss(n.id, token)} />
+                  </PlushFade>
+                ))}
+              </PlushPresence>
+            </ul>
+          )}
+        </section>
+
+        <section className="nc__section">
+          <header className="nc__section-header">
+            <span>小组件</span>
+          </header>
+          <div className="nc__widgets">
+            {DESKTOP_WIDGETS.map((widget) => (
+              <WidgetCard
+                key={widget.id}
+                widget={widget}
+                today={today}
+                brightness={brightness}
+                weather={weather}
+                weatherLoading={weatherLoading}
+                weatherLocating={weatherLocating}
+                weatherError={weatherError}
+                currentMusic={currentMusic}
+                musicPlaying={musicPlaying}
+                musicBuffering={musicLoadingVisible}
+                musicProgress={musicProgress}
+                musicDuration={musicDuration}
+                focusMode={focusMode}
+                focusStatus={focusStatus}
+                focusRemaining={focusRemaining}
+                focusCompletedCount={focusCompletedCount}
+                plushMatchBest={plushMatchBest}
+                deskTidyBest={deskTidyBest}
+                beadSortBest={beadSortBest}
+                cloudBounceBest={cloudBounceBest}
+                blockDropBest={blockDropBest}
+                snakeBest={snakeBest}
+                clipboardSnippets={clipboardSnippets.length}
+                converterRecent={converterRecent.length}
+                paletteColors={paletteColors.length}
+                plushGardenBlooms={plushGarden.blooms}
+                onOpenWeather={() => {
+                  restoreOrFocus('weather', getDefaultWindowOptions('weather'));
+                  close();
+                }}
+                onRefreshWeather={() => loadWeather(true)}
+                onOpenMusic={() => {
+                  restoreOrFocus('music', getDefaultWindowOptions('music'));
+                  close();
+                }}
+                onToggleMusic={toggleMusic}
+              />
+            ))}
+          </div>
+        </section>
+      </PlushScrollbar>
     </div>
   );
 }
@@ -193,7 +209,7 @@ interface NotificationCardProps {
   onDismiss: () => void;
 }
 
-function NotificationCard({ item, onDismiss }: NotificationCardProps) {
+export function NotificationCard({ item, onDismiss }: NotificationCardProps) {
   return (
     <li className="nc__card">
       <div className="nc__card-head">

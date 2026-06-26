@@ -15,7 +15,7 @@ import {
   Tv,
 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   createMediaDiaryEntry,
   deleteMediaDiaryEntry,
@@ -32,6 +32,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { FormItem, SheetActions, SheetHeader, SheetSelectField } from '@/components/FormItem';
 import { ImagePreview } from '@/components/ImagePreview';
 import { LoadErrorState } from '@/components/LoadErrorState';
+import { InlineRefreshStatus, ListCardSkeleton } from '@/components/StableListState';
 import { SubPageShell } from '@/components/SubPageShell';
 import { SyncState } from '@/components/SyncState';
 import { Badge } from '@/components/ui/badge';
@@ -316,7 +317,7 @@ function MediaDiaryDetail({
             imageClassName="max-h-[24rem] w-full object-cover"
           />
         ) : null}
-        <div className="space-y-4 p-5">
+        <div className="space-y-4 p-4">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={getTypeTone(entry.mediaType)}>
               <span className="inline-flex items-center gap-1.5">
@@ -394,6 +395,7 @@ function MediaDiaryDetail({
 function MediaDiaryEditor({
   open,
   entry,
+  prefill,
   saving,
   suggesting,
   onOpenChange,
@@ -402,6 +404,7 @@ function MediaDiaryEditor({
 }: {
   open: boolean;
   entry: MediaDiaryEntry | null;
+  prefill?: Partial<NewMediaDiaryEntryInput> | null;
   saving: boolean;
   suggesting: boolean;
   onOpenChange: (open: boolean) => void;
@@ -421,11 +424,21 @@ function MediaDiaryEditor({
     if (!open) {
       return;
     }
-    const nextForm = entry ? buildFormFromEntry(entry) : defaultForm;
-    setForm(nextForm);
-    setTagText(stringifyTags(nextForm.tags));
+    if (entry) {
+      const nextForm = buildFormFromEntry(entry);
+      setForm(nextForm);
+      setTagText(stringifyTags(nextForm.tags));
+      setErrors({});
+      return;
+    }
+    const merged: NewMediaDiaryEntryInput = { ...defaultForm, ...(prefill ?? {}) };
+    const mediaType = merged.mediaType || defaultForm.mediaType;
+    const baseTags = prefill?.tags?.length ? prefill.tags : defaultForm.tags;
+    const tags = normalizeFormTags(mediaType, stringifyTags(baseTags));
+    setForm({ ...merged, mediaType, tags });
+    setTagText(stringifyTags(tags));
     setErrors({});
-  }, [entry, open]);
+  }, [entry, open, prefill]);
 
   const updateField = <K extends keyof NewMediaDiaryEntryInput>(
     key: K,
@@ -654,9 +667,11 @@ function MediaDiaryEditor({
 export function MediaDiaryPage() {
   const token = useAuthStore((state) => state.token);
   const navigate = useNavigate();
+  const location = useLocation();
   const { entryId } = useParams<{ entryId?: string }>();
   const showToast = useFeedbackToastStore((state) => state.showToast);
   const loadTraces = useLifeTraceStore((state) => state.loadTraces);
+  const convertInbox = useLifeTraceStore((state) => state.convertInbox);
   const [entries, setEntries] = useState<MediaDiaryEntry[]>([]);
   const [summary, setSummary] = useState<MediaDiarySummary>(defaultSummary);
   const [pagination, setPagination] = useState<ListPagination>(defaultPagination);
@@ -669,9 +684,13 @@ export function MediaDiaryPage() {
   const [searchDraft, setSearchDraft] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<MediaDiaryEntry | null>(null);
+  const [editorPrefill, setEditorPrefill] = useState<Partial<NewMediaDiaryEntryInput> | null>(null);
+  const [pendingInboxItemId, setPendingInboxItemId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<MediaDiaryEntry | null>(null);
+  const initialMediaDiaryLoading = loading && entries.length === 0;
+  const mediaDiaryRefreshing = loading && entries.length > 0;
   const [deleting, setDeleting] = useState(false);
 
   const selectedEntry = entryId ? (entries.find((entry) => entry.id === entryId) ?? null) : null;
@@ -721,6 +740,40 @@ export function MediaDiaryPage() {
   }, [loadEntries]);
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('new') !== '1') {
+      return;
+    }
+    const rawType = params.get('mediaType');
+    const allowedTypes: MediaDiaryType[] = ['书籍', '电影', '剧集', '动漫', '音乐'];
+    const mediaType = allowedTypes.includes(rawType as MediaDiaryType)
+      ? (rawType as MediaDiaryType)
+      : '书籍';
+    const rawStatus = params.get('status');
+    const status = (mediaDiaryStatuses as string[]).includes(rawStatus ?? '')
+      ? (rawStatus as MediaDiaryStatus)
+      : '想看';
+    const tagsParam = params.get('tags') ?? '';
+    const tags = tagsParam
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+    const prefill: Partial<NewMediaDiaryEntryInput> = {
+      mediaType,
+      status,
+      title: params.get('title') ?? '',
+      coverUrl: params.get('coverUrl') ?? '',
+      note: params.get('note') ?? '',
+      tags,
+    };
+    setEditorPrefill(prefill);
+    setPendingInboxItemId(params.get('inboxItemId'));
+    setEditingEntry(null);
+    setEditorOpen(true);
+    navigate(location.pathname, { replace: true });
+  }, [location.pathname, location.search, navigate]);
+
+  useEffect(() => {
     if (entryId && !loading && entries.length > 0 && !selectedEntry) {
       navigate('/media-diary', { replace: true });
     }
@@ -728,6 +781,8 @@ export function MediaDiaryPage() {
 
   const openEditor = (entry: MediaDiaryEntry | null = null) => {
     setEditingEntry(entry);
+    setEditorPrefill(null);
+    setPendingInboxItemId(null);
     setEditorOpen(true);
   };
 
@@ -747,8 +802,13 @@ export function MediaDiaryPage() {
         }
         return [saved, ...current];
       });
+      if (!editingEntry && pendingInboxItemId) {
+        void convertInbox(pendingInboxItemId, 'media', saved.id);
+      }
       setEditorOpen(false);
       setEditingEntry(null);
+      setEditorPrefill(null);
+      setPendingInboxItemId(null);
       showToast(editingEntry ? '书影音日记已更新' : '书影音日记已保存', 'success');
       void loadTraces();
       void loadEntries({ page: 1 });
@@ -837,12 +897,15 @@ export function MediaDiaryPage() {
         <MediaDiaryEditor
           open={editorOpen}
           entry={editingEntry}
+          prefill={editorPrefill}
           saving={saving}
           suggesting={suggesting}
           onOpenChange={(open) => {
             setEditorOpen(open);
             if (!open) {
               setEditingEntry(null);
+              setEditorPrefill(null);
+              setPendingInboxItemId(null);
             }
           }}
           onSubmit={handleSubmit}
@@ -972,18 +1035,20 @@ export function MediaDiaryPage() {
           </Card>
         ) : null}
 
-        {loading ? (
-          <SyncState title="正在同步书影音日记" tone="trace" variant="skeleton-list" />
+        {initialMediaDiaryLoading ? (
+          <ListCardSkeleton media rows={3} />
         ) : entries.length > 0 ? (
-          <div className="space-y-3">
+          <div className="relative space-y-3">
+            {mediaDiaryRefreshing ? <InlineRefreshStatus tone="trace" /> : null}
             {entries.map((entry) => (
-              <MediaDiaryCard
-                key={entry.id}
-                entry={entry}
-                onOpen={() => navigate(`/media-diary/${entry.id}`)}
-                onEdit={() => openEditor(entry)}
-                onDelete={() => setDeleteTarget(entry)}
-              />
+              <div key={entry.id} data-scroll-anchor={`media-diary:${entry.id}`}>
+                <MediaDiaryCard
+                  entry={entry}
+                  onOpen={() => navigate(`/media-diary/${entry.id}`)}
+                  onEdit={() => openEditor(entry)}
+                  onDelete={() => setDeleteTarget(entry)}
+                />
+              </div>
             ))}
           </div>
         ) : (
@@ -1021,12 +1086,15 @@ export function MediaDiaryPage() {
       <MediaDiaryEditor
         open={editorOpen}
         entry={editingEntry}
+        prefill={editorPrefill}
         saving={saving}
         suggesting={suggesting}
         onOpenChange={(open) => {
           setEditorOpen(open);
           if (!open) {
             setEditingEntry(null);
+            setEditorPrefill(null);
+            setPendingInboxItemId(null);
           }
         }}
         onSubmit={handleSubmit}

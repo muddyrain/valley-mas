@@ -28,6 +28,84 @@
   transform: translateY(1px) scale(0.99);
 }
 
+.plush-button[data-loading="true"] {
+  cursor: progress;
+  opacity: 0.86;
+}
+
+.plush-button[data-loading="true"]:hover {
+  transform: none;
+}
+
+.plush-button-bare {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition:
+    transform var(--motion-pop-fast),
+    background 0.16s var(--ease-out),
+    box-shadow 0.16s var(--ease-out);
+}
+
+.plush-button-bare:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.plush-button-bare[data-loading="true"] {
+  cursor: progress;
+  opacity: 0.86;
+}
+
+.plush-button-bare[data-loading="true"]:hover {
+  transform: none;
+}
+
+.plush-button__loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plush-button__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.55;
+  animation: plush-button-dot 1.05s ease-in-out infinite;
+}
+
+.plush-button__dot:nth-child(2) {
+  animation-delay: 0.14s;
+}
+
+.plush-button__dot:nth-child(3) {
+  animation-delay: 0.28s;
+}
+
+.plush-button__label {
+  display: inline-flex;
+  align-items: center;
+  gap: inherit;
+  min-width: 0;
+}
+
+@keyframes plush-button-dot {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
 .plush-button[data-tone="primary"] {
   border-color: rgba(92, 128, 54, 0.22);
   background:
@@ -122,4 +200,41 @@
     animation: none;
     transition: none;
   }
+
+  .plush-button__dot {
+    animation: none;
+  }
+}
+
+.plush-confirm-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 22px 18px;
+  min-width: 280px;
+  max-width: 360px;
+}
+
+.plush-confirm-dialog .plush-confirm-dialog__title,
+.plush-confirm-dialog [data-slot="dialog-title"] {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--plush-text);
+}
+
+.plush-confirm-dialog [data-slot="dialog-description"] {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--plush-text-soft, rgba(90, 74, 58, 0.72));
+}
+
+.plush-confirm-dialog [data-slot="dialog-footer"] {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.plush-confirm-dialog--danger [data-slot="dialog-title"] {
+  color: rgba(176, 64, 56, 0.92);
 }
