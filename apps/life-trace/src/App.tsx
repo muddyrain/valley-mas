@@ -12,6 +12,7 @@ import {
   AiPhotoItemHistoryPage,
   AiWeeklyReviewsPage,
 } from '@/pages/AiPage';
+import { AiRecipesPage } from '@/pages/AiRecipesPage';
 import { ClosetPage } from '@/pages/ClosetPage';
 import { InboxPage } from '@/pages/InboxPage';
 import { LedgerPage } from '@/pages/LedgerPage';
@@ -137,6 +138,8 @@ function AppContent() {
           <Route path="/ai/photo-item-analysis" element={<PhotoItemAnalysisPage />} />
           <Route path="/ai/photo-clothing-analysis" element={<PhotoClothingAnalysisPage />} />
           <Route path="/ai/weekly-reviews" element={<AiWeeklyReviewsPage />} />
+          <Route path="/ai/recipes" element={<AiRecipesPage />} />
+          <Route path="/ai/recipes/:recipeId" element={<RecipePlayerPage />} />
           <Route path="/recipe/:recipeId" element={<RecipePlayerPage />} />
           <Route path="/achievements" element={<AchievementsPage />} />
           <Route path="/traces/:traceId?" element={<TracesPage />} />

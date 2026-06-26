@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRenderRecipeVideoValidatesRecipeId(t *testing.T) {
@@ -384,8 +385,12 @@ func TestRenderRecipeVideoResponseHasExpiration(t *testing.T) {
 		t.Fatal("expected expiresAt to be set")
 	}
 
-	// Should be roughly 7 days from now (allow 1 minute tolerance)
-	if !strings.Contains(expiresAt, "2026-07-02") {
-		t.Fatalf("expected expiration around 7 days from now (2026-07-02), got %s", expiresAt)
+	expiresAtTime, err := time.Parse(time.RFC3339, expiresAt)
+	if err != nil {
+		t.Fatalf("expected RFC3339 expiresAt, got %s", expiresAt)
+	}
+	delta := time.Until(expiresAtTime)
+	if delta < 6*24*time.Hour || delta > 8*24*time.Hour {
+		t.Fatalf("expected expiration around 7 days from now, got %s", expiresAt)
 	}
 }

@@ -1,23 +1,13 @@
-import { ChevronLeft, Loader2, Play, Timer, Video } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { renderRecipeVideo } from '@/api/advice';
+import { ChevronLeft, Timer, Video } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import type { RecipeSuggestionItem } from '@/api/advice';
 import { Button } from '@/components/ui/button';
 import { gsap, useGSAP } from '@/lib/gsap';
+import { readRecipeHistoryItem } from '@/lib/recipeHistory';
 import { cn } from '@/lib/utils';
-import { useAuthStore } from '@/store/useAuthStore';
 
-interface RecipeFromState {
-  id: string;
-  title: string;
-  steps: string[];
-  usedItems: string[];
-  missingItems: string[];
-  timeMinutes: number;
-  difficulty: string;
-  servings: number;
-  tags: string[];
-}
+type RecipeFromState = RecipeSuggestionItem;
 
 function formatSeconds(total: number) {
   const mins = Math.floor(total / 60);
@@ -30,14 +20,19 @@ type VideoState = 'idle' | 'rendering' | 'ready' | 'error';
 export function RecipePlayerPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const recipe = location.state?.recipe as RecipeFromState | undefined;
+  const { recipeId } = useParams();
+  const recipeFromState = location.state?.recipe as RecipeFromState | undefined;
+  const recipe = useMemo(
+    () => recipeFromState ?? (recipeId ? readRecipeHistoryItem(recipeId) : null),
+    [recipeFromState, recipeId],
+  );
   const pageRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [videoState, setVideoState] = useState<VideoState>('idle');
-  const [videoUrl, setVideoUrl] = useState<string>('');
-  const [expiresAt, setExpiresAt] = useState<string>('');
+  const videoUrl = '';
+  const expiresAt = '';
   const [timerRunning, setTimerRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
@@ -57,30 +52,33 @@ export function RecipePlayerPage() {
   );
 
   if (!recipe) {
-    navigate('/ai', { replace: true });
-    return null;
+    return (
+      <div ref={pageRef} className="fixed inset-0 z-50 flex flex-col bg-[#0a0a0a] text-[#fafafa]">
+        <header className="flex items-center justify-between border-b border-[#27272a] px-4 py-3">
+          <button
+            type="button"
+            onClick={() => navigate('/ai', { replace: true })}
+            className="flex items-center gap-1.5 text-sm text-[#a1a1aa] transition hover:text-[#fafafa]"
+          >
+            <ChevronLeft className="size-5" />
+            返回
+          </button>
+          <h1 className="text-sm font-semibold">菜谱记录</h1>
+          <span className="w-10" />
+        </header>
+        <main className="grid flex-1 place-items-center px-6 text-center">
+          <div>
+            <p className="text-base font-semibold">没有找到这份菜谱</p>
+            <p className="mt-2 text-sm text-[#a1a1aa]">回到 Life AI 重新生成或打开最近菜谱。</p>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   // Manual trigger video rendering
   const handleStartVideo = () => {
-    const token = useAuthStore.getState().token;
-    if (!token) {
-      setVideoState('error');
-      return;
-    }
-
-    setVideoState('rendering');
-
-    renderRecipeVideo(token, { recipeId: recipe.id })
-      .then((res) => {
-        setVideoUrl(res.url);
-        setExpiresAt(res.expiresAt);
-        setVideoState('ready');
-      })
-      .catch(() => {
-        // 服务端 HyperFrames 渲染未实现时，fallback 到错误提示
-        setVideoState('error');
-      });
+    setVideoState('error');
   };
 
   // Cooking timer
@@ -243,21 +241,11 @@ export function RecipePlayerPage() {
           </div>
           <Button
             type="button"
-            className="w-full bg-life-trace hover:bg-life-trace/90 text-black font-semibold"
+            className="w-full bg-[#27272a] text-[#a1a1aa] hover:bg-[#27272a]"
             onClick={handleStartVideo}
             disabled={videoState === 'rendering'}
           >
-            {videoState === 'rendering' ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                生成中...
-              </>
-            ) : (
-              <>
-                <Play className="size-4" />
-                生成菜谱视频
-              </>
-            )}
+            视频生成待接入
           </Button>
           {videoState === 'error' && (
             <p className="mt-2 text-xs text-amber-400">

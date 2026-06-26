@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"valley-server/internal/aiusage"
 	"valley-server/internal/utils"
 
 	"github.com/gin-gonic/gin"
@@ -57,17 +58,42 @@ func (h *Handler) RenderRecipeVideo(c *gin.Context) {
 		return
 	}
 
-	// TODO: 后续集成 HyperFrames 时，这里需要：
-	// 1. 从数据库/缓存获取菜谱详情
-	// 2. 调用 AI 生成 HyperFrames HTML
-	// 3. 渲染 MP4 并上传 TOS
-	// 当前暂时返回占位响应，供前端验证流程
+	aiCfg, errMsg := readLifeTraceAIConfig()
+	if errMsg != "" {
+		c.JSON(http.StatusServiceUnavailable, apiResponse{Code: http.StatusServiceUnavailable, Message: errMsg})
+		return
+	}
+
+	aiCtx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(recipeVideoRenderTimeoutSeconds)*time.Second)
+	aiCtx = aiusage.WithAudit(aiCtx, "life-trace-recipe-video", userID.String())
+	defer cancel()
+
+	html, _, err := callLifeTraceAIWithMaxTokens(aiCtx, aiCfg, buildRecipeVideoHTMLPrompt(req), 1800)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "视频脚本生成失败：" + err.Error()})
+		return
+	}
+	html = strings.TrimSpace(html)
+	if !strings.Contains(strings.ToLower(html), "<html") {
+		c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "视频脚本格式不正确"})
+		return
+	}
+
+	videoBytes, renderErr := renderRecipeVideoMP4(aiCtx, html)
+	if renderErr != nil {
+		c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "视频渲染失败：" + renderErr.Error()})
+		return
+	}
+	if len(videoBytes) == 0 {
+		c.JSON(http.StatusBadGateway, apiResponse{Code: http.StatusBadGateway, Message: "视频渲染结果为空"})
+		return
+	}
 
 	uploadedURL, uploadErr := uploadRecipeVideoToTOS(
-		c.Request.Context(),
+		aiCtx,
 		userID.String(),
 		req.RecipeID,
-		[]byte("placeholder-video-content"),
+		videoBytes,
 	)
 	if uploadErr != nil {
 		status := http.StatusBadGateway
